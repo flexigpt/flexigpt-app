@@ -622,7 +622,15 @@ export default function MCPServersPage() {
 				)
 			);
 
-			await refreshBundleServers(bundleID);
+			try {
+				await refreshBundleServers(bundleID);
+			} catch (error) {
+				console.error('MCP bundle state was saved but refresh failed:', error);
+				setAlertMsg(
+					'The MCP bundle state was saved, but its servers could not be refreshed. Reload before making more changes.'
+				);
+				setShowAlert(true);
+			}
 		},
 		[bundles, refreshBundleServers]
 	);
@@ -665,7 +673,15 @@ export default function MCPServersPage() {
 				)
 			);
 
-			await refreshServerRuntimeAndAuth(bundleID, serverID);
+			try {
+				await refreshServerRuntimeAndAuth(bundleID, serverID);
+			} catch (error) {
+				console.error('MCP server state was saved but runtime refresh failed:', error);
+				setAlertMsg(
+					'The MCP server state was saved, but runtime status could not be refreshed. Reload before retrying.'
+				);
+				setShowAlert(true);
+			}
 		},
 		[bundles, refreshServerRuntimeAndAuth]
 	);
@@ -866,10 +882,19 @@ export default function MCPServersPage() {
 				await mcpAPI.putMCPServer(bundleID, input.serverID, finalPayload);
 			}
 
-			await refreshBundleServers(bundleID);
+			try {
+				await refreshBundleServers(bundleID);
+			} catch (error) {
+				console.error('MCP server was saved but bundle refresh failed:', error);
+				setAlertMsg(
+					'The MCP server was saved, but the bundle could not be refreshed. Reload before retrying or changing secrets.'
+				);
+				setShowAlert(true);
+			}
 		},
 		[bundles, refreshBundleServers]
 	);
+
 	const handleSubmitServerSetup = useCallback(
 		async (
 			bundleID: string,
@@ -878,10 +903,17 @@ export default function MCPServersPage() {
 			reset: boolean
 		) => {
 			await mcpAPI.patchMCPServerSetup(bundleID, serverID, inputValues, reset);
-			await refreshBundleServers(bundleID);
+			try {
+				await refreshBundleServers(bundleID);
+			} catch (error) {
+				console.error('MCP setup was saved but bundle refresh failed:', error);
+				setAlertMsg('MCP setup was saved, but the bundle could not be refreshed. Reload before applying setup again.');
+				setShowAlert(true);
+			}
 		},
 		[refreshBundleServers]
 	);
+
 	const handleConnectServer = useCallback(
 		async (bundleID: string, serverID: string) => {
 			const connectResult = withTimeout(
@@ -983,6 +1015,13 @@ export default function MCPServersPage() {
 		}
 
 		const bundleData = bundles.find(item => item.bundle.id === bundleToDeleteID);
+		if (bundleData?.bundle.isBuiltIn) {
+			setAlertMsg('Built-in MCP bundles cannot be deleted.');
+			setShowAlert(true);
+			setBundleToDeleteID(null);
+			return;
+		}
+
 		if (!bundleData || bundleData.serverLoadError || bundleData.servers.length > 0) {
 			setAlertMsg(
 				bundleData?.serverLoadError

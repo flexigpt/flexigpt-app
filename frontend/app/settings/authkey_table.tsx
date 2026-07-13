@@ -5,6 +5,7 @@ import { FiCheckCircle, FiDelete, FiEdit2, FiTrash2, FiXCircle } from 'react-ico
 import type { AuthKeyMeta } from '@/spec/setting';
 
 import { isBuiltInProviderAuthKeyName, useBuiltInsReady } from '@/hooks/use_builtin_provider';
+import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import { aggregateAPI } from '@/apis/baseapi';
 
@@ -17,18 +18,34 @@ interface AuthKeyTableProps {
 	onChanged: () => void; // parent refetch
 }
 
+const actionKey = (action: string, meta: AuthKeyMeta) => JSON.stringify([action, meta.type, meta.keyName]);
+
 export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps) {
 	const builtInsReady = useBuiltInsReady();
 	const [deleteTarget, setDeleteTarget] = useState<AuthKeyMeta | null>(null);
+	const [resetTarget, setResetTarget] = useState<AuthKeyMeta | null>(null);
 	const [alertMsg, setAlertMsg] = useState('');
+	const { isPending, runAction } = usePendingActions();
 
 	if (!builtInsReady) {
 		return <span className="loading loading-dots loading-sm" />;
 	}
 
-	const resetKey = async (meta: AuthKeyMeta) => {
-		await aggregateAPI.setAuthKey(meta.type, meta.keyName, '');
-		onChanged();
+	const confirmReset = async () => {
+		if (!resetTarget) {
+			return;
+		}
+
+		const target = resetTarget;
+		try {
+			await runAction(actionKey('reset', target), async () => {
+				await aggregateAPI.setAuthKey(target.type, target.keyName, '');
+				onChanged();
+			});
+			setResetTarget(null);
+		} catch (error) {
+			setAlertMsg(error instanceof Error && error.message.trim() ? error.message : 'Failed to reset auth key.');
+		}
 	};
 
 	const requestDelete = (meta: AuthKeyMeta) => {
@@ -43,9 +60,17 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 		if (!deleteTarget) {
 			return;
 		}
-		await aggregateAPI.deleteAuthKey(deleteTarget.type, deleteTarget.keyName);
-		setDeleteTarget(null);
-		onChanged();
+
+		const target = deleteTarget;
+		try {
+			await runAction(actionKey('delete', target), async () => {
+				await aggregateAPI.deleteAuthKey(target.type, target.keyName);
+				onChanged();
+			});
+			setDeleteTarget(null);
+		} catch (error) {
+			setAlertMsg(error instanceof Error && error.message.trim() ? error.message : 'Failed to delete auth key.');
+		}
 	};
 
 	if (authKeys.length === 0) {
@@ -105,6 +130,8 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 												onEdit(meta);
 											}}
 											title="Edit"
+											aria-label={`Edit ${meta.keyName}`}
+											disabled={isPending(actionKey('reset', meta)) || isPending(actionKey('delete', meta))}
 										>
 											<FiEdit2 size={16} />
 										</button>
@@ -112,8 +139,12 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 										<button
 											type="button"
 											className="btn btn-xs btn-ghost rounded-2xl"
-											onClick={() => resetKey(meta)}
+											onClick={() => {
+												setResetTarget(meta);
+											}}
 											title="Reset Secret"
+											aria-label={`Reset secret for ${meta.keyName}`}
+											disabled={isPending(actionKey('reset', meta)) || isPending(actionKey('delete', meta))}
 										>
 											<FiDelete size={16} />
 										</button>
@@ -125,7 +156,8 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 												requestDelete(meta);
 											}}
 											title={inbuilt ? 'Cannot delete in-built key' : 'Delete'}
-											disabled={inbuilt}
+											aria-label={`Delete ${meta.keyName}`}
+											disabled={inbuilt || isPending(actionKey('reset', meta)) || isPending(actionKey('delete', meta))}
 										>
 											<FiTrash2 size={16} />
 										</button>
@@ -138,13 +170,28 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 			</div>
 
 			<DeleteConfirmationModal
+				isOpen={resetTarget !== null}
+				title="Reset Auth Key"
+				message={`Clear the stored secret for "${resetTarget?.keyName}"? The key metadata will remain, but requests using it will stop working until a replacement is added.`}
+				confirmButtonText="Reset Secret"
+				onConfirm={confirmReset}
+				onClose={() => {
+					if (!resetTarget || !isPending(actionKey('reset', resetTarget))) {
+						setResetTarget(null);
+					}
+				}}
+			/>
+
+			<DeleteConfirmationModal
 				isOpen={!!deleteTarget}
 				title="Delete Auth Key"
 				message={`Delete key "${deleteTarget?.keyName}" of type "${deleteTarget?.type}"? This cannot be undone.`}
 				confirmButtonText="Delete"
 				onConfirm={confirmDelete}
 				onClose={() => {
-					setDeleteTarget(null);
+					if (!deleteTarget || !isPending(actionKey('delete', deleteTarget))) {
+						setDeleteTarget(null);
+					}
 				}}
 			/>
 

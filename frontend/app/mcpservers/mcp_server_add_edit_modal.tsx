@@ -158,7 +158,6 @@ function getDefaultAPIKeyValuePrefix(headerName: string): string {
 }
 
 function hasInvalidHTTPHeaderValueChars(value: string): boolean {
-	// oxlint-disable-next-line no-control-regex
 	return /[\r\n\u0000]/.test(value);
 }
 
@@ -966,7 +965,7 @@ function AddEditMCPServerModalContent({
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
+			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={headerTitle}
 					description={headerDescription}

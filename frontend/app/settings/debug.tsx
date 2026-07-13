@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
-import { FiAlertTriangle } from 'react-icons/fi';
+import { FiAlertCircle, FiAlertTriangle } from 'react-icons/fi';
 
 import type { DebugSettings } from '@/spec/setting';
 import { DebugLogLevel, DEFAULT_DEBUG_SETTINGS } from '@/spec/setting';
@@ -32,21 +32,38 @@ interface DebugSettingsSectionProps {
 export function DebugSettingsSection({ value, onChanged }: DebugSettingsSectionProps) {
 	const current = useMemo(() => value ?? DEFAULT_DEBUG_SETTINGS, [value]);
 	const [saving, setSaving] = useState(false);
+	const [saveError, setSaveError] = useState('');
+	const savingRef = useRef(false);
 
 	const save = async (next: DebugSettings) => {
+		if (savingRef.current) {
+			return;
+		}
+
+		savingRef.current = true;
 		setSaving(true);
+		setSaveError('');
 		try {
 			await settingstoreAPI.setDebugSettings(next);
 			onChanged?.(next);
 		} catch (err) {
 			console.error('Failed to save debug settings', err);
+			setSaveError(err instanceof Error && err.message.trim() ? err.message : 'Failed to save debug settings.');
 		} finally {
+			savingRef.current = false;
 			setSaving(false);
 		}
 	};
 
 	return (
 		<div className="flex w-full flex-col gap-4 p-4">
+			{saveError ? (
+				<div className="alert alert-error rounded-2xl text-sm" role="alert">
+					<FiAlertCircle className="shrink-0" size={14} />
+					<span className="wrap-break-word">{saveError}</span>
+				</div>
+			) : null}
+
 			{(current.logLLMReqResp || current.disableContentStripping) && (
 				<div className="border-warning/40 bg-warning/10 text-warning-content rounded-2xl border p-2 text-sm">
 					<div className="flex items-start gap-2">

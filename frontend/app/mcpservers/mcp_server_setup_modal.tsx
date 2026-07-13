@@ -8,6 +8,8 @@ import { FiAlertCircle, FiX } from 'react-icons/fi';
 import type { MCPServerConfig, MCPServerSetupInput, MCPServerSetupInputValue } from '@/spec/mcp';
 import { MCPServerSetupInputKind } from '@/spec/mcp';
 
+import { validateHTTPHeaderName, validateHTTPURLSecurity } from '@/lib/http_input_utils';
+
 import { useDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
@@ -29,6 +31,79 @@ interface RowState {
 
 function emptyRow(): RowState {
 	return { value: '', clientID: '', clientSecret: '' };
+}
+
+const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function validateSetupRow(input: MCPServerSetupInput, row: RowState): string | undefined {
+	const label = input.label || input.id;
+
+	switch (input.kind) {
+		case MCPServerSetupInputKind.OAuthClientCredentials:
+			if (row.clientID.trim() || row.clientSecret) {
+				if (!row.clientID.trim()) {
+					return `"${label}" requires a Client ID when credentials are supplied.`;
+				}
+				if (row.clientID !== row.clientID.trim()) {
+					return `"${label}" Client ID must not have leading or trailing whitespace.`;
+				}
+				if (row.clientSecret && !row.clientSecret.trim()) {
+					return `"${label}" Client Secret must not contain only whitespace.`;
+				}
+			}
+			return undefined;
+
+		case MCPServerSetupInputKind.StreamableHTTPURL:
+			if (!row.value.trim()) {
+				return undefined;
+			}
+			return validateHTTPURLSecurity(row.value.trim(), `"${label}"`);
+
+		case MCPServerSetupInputKind.ClientIDMetadataDocumentURL:
+			if (!row.value.trim()) {
+				return undefined;
+			}
+			try {
+				const url = new URL(row.value.trim());
+				if (url.protocol !== 'https:') {
+					return `"${label}" must use https.`;
+				}
+				if (url.username || url.password) {
+					return `"${label}" must not include embedded credentials.`;
+				}
+				if (!url.pathname || url.pathname === '/') {
+					return `"${label}" must include a document path.`;
+				}
+				if (url.hash) {
+					return `"${label}" must not include a fragment.`;
+				}
+			} catch {
+				return `"${label}" must be a valid HTTPS URL.`;
+			}
+			return undefined;
+
+		case MCPServerSetupInputKind.HTTPHeader: {
+			const headerName = input.httpHeader?.headerName ?? '';
+			const headerNameError = validateHTTPHeaderName(headerName, `"${label}" header name`);
+			if (headerNameError) {
+				return headerNameError;
+			}
+			const value = `${input.httpHeader?.valuePrefix ?? ''}${row.value}${input.httpHeader?.valueSuffix ?? ''}`;
+			return /[\r\n\u0000]/.test(value) ? `"${label}" must not contain CR, LF, or NUL.` : undefined;
+		}
+
+		case MCPServerSetupInputKind.StdioEnv: {
+			const envName = input.stdioEnv?.envName ?? '';
+			if (!ENV_NAME_RE.test(envName)) {
+				return `"${label}" has an invalid environment variable name.`;
+			}
+			const value = `${input.stdioEnv?.valuePrefix ?? ''}${row.value}${input.stdioEnv?.valueSuffix ?? ''}`;
+			return value.includes('\u0000') ? `"${label}" must not contain NUL.` : undefined;
+		}
+
+		default:
+			return `"${label}" uses an unsupported setup input kind.`;
+	}
 }
 
 function MCPServerSetupModalContent({
@@ -63,15 +138,28 @@ function MCPServerSetupModalContent({
 		reset ? false : isMCPSetupInputConfigured(server, input);
 
 	const validate = (): string => {
+		if (new Set(inputs.map(input => input.id)).size !== inputs.length) {
+			return 'Server setup metadata contains duplicate input IDs.';
+		}
+
 		for (const input of inputs) {
+			const row = rows[input.id] ?? emptyRow();
+
 			if (!input.required) {
+				const rowError = validateSetupRow(input, row);
+				if (rowError) {
+					return rowError;
+				}
 				continue;
 			}
 			if (effectiveConfigured(input)) {
+				const rowError = validateSetupRow(input, row);
+				if (rowError) {
+					return rowError;
+				}
 				continue;
 			}
 
-			const row = rows[input.id] ?? emptyRow();
 			if (input.kind === MCPServerSetupInputKind.OAuthClientCredentials) {
 				if (!row.clientID.trim()) {
 					return `"${input.label || input.id}" requires a Client ID.`;
@@ -81,6 +169,11 @@ function MCPServerSetupModalContent({
 				}
 			} else if (!row.value.trim()) {
 				return `"${input.label || input.id}" is required.`;
+			}
+
+			const rowError = validateSetupRow(input, row);
+			if (rowError) {
+				return rowError;
 			}
 		}
 		return '';
@@ -142,8 +235,8 @@ function MCPServerSetupModalContent({
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
+			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl overflow-hidden rounded-2xl p-0">
+				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<div className="mb-4 flex items-center justify-between">
 						<div>
 							<h3 className="text-lg font-bold">Configure {server.displayName}</h3>

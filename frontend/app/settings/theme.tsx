@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
-import { FiMonitor, FiMoon, FiSun } from 'react-icons/fi';
+import { FiAlertCircle, FiMonitor, FiMoon, FiSun } from 'react-icons/fi';
 
 import type { AppTheme } from '@/spec/setting';
 import { ThemeType } from '@/spec/setting';
@@ -57,16 +57,27 @@ function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSe
 	);
 
 	const [otherName, setOtherName] = useState<string>(() => getInitialOtherName(startupTheme, providerTheme));
+	const [saving, setSaving] = useState(false);
+	const [saveError, setSaveError] = useState('');
+	const savingRef = useRef(false);
 
 	const selectedOtherName = current === ThemeType.Other && isOtherThemeName(providerTheme) ? providerTheme : otherName;
 
 	/* ————————————————————————————— apply theme —————————————————————————————— */
 	const applyTheme = useCallback(
 		async (type: ThemeType, name: string) => {
+			if (savingRef.current) {
+				return;
+			}
 			if (name === '') {
 				console.error('[Theme] empty name recieved');
 				return;
 			}
+
+			const previousTheme = providerTheme;
+			savingRef.current = true;
+			setSaving(true);
+			setSaveError('');
 
 			/* optimistic update */
 			setTheme(name);
@@ -82,23 +93,25 @@ function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSe
 				console.log('[Theme] changed to', newTheme.type, newTheme.name);
 			} catch (err) {
 				console.error('[Theme] failed to persist, reverting', err);
-				// fallback to last known persistent value
-				if (startupTheme) {
-					setTheme(startupTheme.name);
-				}
+				setTheme(previousTheme);
+				setSaveError(err instanceof Error && err.message.trim() ? err.message : 'Failed to save theme.');
+			} finally {
+				savingRef.current = false;
+				setSaving(false);
 			}
 		},
-		[setTheme, startupTheme]
+		[providerTheme, setTheme]
 	);
 
 	/* ————————————————————————————— UI —————————————————————————————— */
 	return (
-		<div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+		<div className="flex flex-wrap items-center gap-x-6 gap-y-3" aria-busy={saving}>
 			<label className="flex cursor-pointer items-center gap-2">
 				<input
 					type="radio"
 					className="radio radio-accent"
 					checked={current === ThemeType.System}
+					disabled={saving}
 					onChange={() => {
 						void applyTheme(ThemeType.System, CustomThemeSystem);
 					}}
@@ -111,6 +124,7 @@ function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSe
 					type="radio"
 					className="radio radio-accent"
 					checked={current === ThemeType.Light}
+					disabled={saving}
 					onChange={() => {
 						void applyTheme(ThemeType.Light, CustomThemeLight);
 					}}
@@ -124,6 +138,7 @@ function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSe
 					type="radio"
 					className="radio radio-accent"
 					checked={current === ThemeType.Dark}
+					disabled={saving}
 					onChange={() => {
 						void applyTheme(ThemeType.Dark, CustomThemeDark);
 					}}
@@ -137,6 +152,7 @@ function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSe
 					type="radio"
 					className="radio radio-accent"
 					checked={current === ThemeType.Other}
+					disabled={saving}
 					onChange={() => {
 						void applyTheme(ThemeType.Other, selectedOtherName);
 					}}
@@ -152,9 +168,17 @@ function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSe
 						filterDisabled={false}
 						title="Select Theme"
 						getDisplayName={k => k[0].toUpperCase() + k.slice(1)}
+						disabled={saving}
 					/>
 				</div>
 			</label>
+
+			{saveError ? (
+				<div className="text-error flex w-full items-start gap-1 text-xs" role="alert">
+					<FiAlertCircle className="mt-0.5 shrink-0" size={12} />
+					<span className="wrap-break-word">{saveError}</span>
+				</div>
+			) : null}
 		</div>
 	);
 }

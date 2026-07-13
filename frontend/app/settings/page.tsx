@@ -23,8 +23,21 @@ import { DebugSettingsSection } from '@/settings/debug';
 import { ThemeSelector } from '@/settings/theme';
 
 async function exportSettings() {
-	const settings = await settingstoreAPI.getSettings(true);
-	return JSON.stringify(settings, null, 2);
+	const settings = await settingstoreAPI.getSettings();
+	return JSON.stringify(
+		{
+			appTheme: settings.appTheme,
+			debug: settings.debug,
+			authKeys: settings.authKeys.map(({ type, keyName, sha256, nonEmpty }) => ({
+				type,
+				keyName,
+				sha256,
+				nonEmpty,
+			})),
+		},
+		null,
+		2
+	);
 }
 
 // oxlint-disable-next-line no-restricted-exports
@@ -101,31 +114,31 @@ export default function SettingsPage() {
 						/>
 					) : null}
 
-					<div className="bg-base-100 flex flex-col gap-3 rounded-2xl p-4 shadow-lg sm:flex-row sm:items-center">
+					<section className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-4 shadow-sm sm:flex-row sm:items-center">
 						<h2 className="font-semibold">Theme</h2>
 						<ThemeSelector />
-					</div>
+					</section>
 
-					<div className="bg-base-100 rounded-2xl p-4 shadow-lg">
-						<div className="mb-4 flex items-center justify-between">
-							<h2 className="mr-8 ml-4 font-semibold">Auth Keys</h2>
-							<button type="button" className="btn btn-ghost flex items-center rounded-2xl" onClick={showAddModal}>
+					<section className="border-base-content/10 bg-base-100 rounded-2xl border p-4 shadow-sm">
+						<div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+							<h2 className="font-semibold">Auth Keys</h2>
+							<button type="button" className="btn btn-ghost flex items-center rounded-xl" onClick={showAddModal}>
 								<FiPlus className="mr-1" /> Add Key
 							</button>
 						</div>
 
 						<AuthKeyTable authKeys={authKeys} onEdit={showEditModal} onChanged={refresh} />
-					</div>
+					</section>
 
-					<div className="bg-base-100 rounded-2xl p-4 shadow-lg">
-						<h2 className="mr-8 mb-0 ml-4 font-semibold">Debug</h2>
+					<section className="border-base-content/10 bg-base-100 rounded-2xl border p-4 shadow-sm">
+						<h2 className="font-semibold">Debug</h2>
 						<DebugSettingsSection
 							value={debugSettings}
 							onChanged={debug => {
 								setSettings(previous => (previous ? { ...previous, debug } : previous));
 							}}
 						/>
-					</div>
+					</section>
 				</ManagementPageContent>
 
 				<AddEditAuthKeyModal

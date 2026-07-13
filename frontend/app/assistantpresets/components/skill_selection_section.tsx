@@ -90,8 +90,8 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 			<div className="space-y-3">
 				{items.map((item, idx) => (
 					<div key={item.key} className="border-base-content/10 rounded-2xl border p-3">
-						<div className="flex items-start justify-between gap-3">
-							<div>
+						<div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-start">
+							<div className="min-w-0">
 								<div className="font-medium">{item.title}</div>
 								<div className="text-base-content/70 mt-1 text-xs">{item.subtitle}</div>
 								{item.statusLabel && <div className="badge badge-warning mt-2 rounded-xl">{item.statusLabel}</div>}

@@ -21,7 +21,10 @@ export function ManagementResourceError({
 			: 'The requested data could not be loaded.';
 
 	return (
-		<div className={`alert alert-error rounded-2xl text-sm ${className}`} role="alert">
+		<div
+			className={`alert alert-error flex-col items-stretch rounded-2xl text-sm sm:flex-row sm:items-center ${className}`}
+			role="alert"
+		>
 			<FiAlertCircle className="shrink-0" size={16} />
 
 			<div className="min-w-0 grow">
@@ -31,7 +34,7 @@ export function ManagementResourceError({
 
 			<button
 				type="button"
-				className="btn btn-sm rounded-xl"
+				className="btn btn-sm w-full rounded-xl sm:w-auto"
 				disabled={isRetrying}
 				onClick={() => {
 					void Promise.resolve(onRetry()).catch(() => undefined);

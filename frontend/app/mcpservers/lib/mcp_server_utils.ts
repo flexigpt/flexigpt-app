@@ -21,6 +21,8 @@ import {
 	MCPTrustLevel,
 } from '@/spec/mcp';
 
+import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
+
 export const MCP_OAUTH_CLIENT_CREDENTIALS_SLOT = 'clientCredentials';
 
 /**
@@ -430,7 +432,12 @@ export function getEffectiveMCPServerStatus(
 }
 
 export function isMCPAuthActionable(authHealth?: MCPAuthHealth, server?: MCPAuthDisplayServer): boolean {
-	if (!authHealth?.authorizationURL) {
+	const authorizationURL = authHealth?.authorizationURL?.trim();
+	if (!authorizationURL) {
+		return false;
+	}
+
+	if (validateHTTPURLSecurity(authorizationURL, 'OAuth authorization URL')) {
 		return false;
 	}
 

@@ -169,6 +169,7 @@ const eslintRules: DummyRuleMap = {
 	'max-statements': 'off',
 	'new-cap': 'off',
 	'no-continue': 'off',
+	'no-control-regex': 'off',
 	'no-implicit-coercion': 'off',
 	'no-magic-numbers': 'off',
 	'no-multi-str': 'off',

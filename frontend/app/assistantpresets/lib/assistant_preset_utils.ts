@@ -126,6 +126,7 @@ export function hasAssistantPresetModelPatch(patch: AssistantPresetModelPatchLik
 		patch.maxPromptLength !== undefined ||
 		patch.maxOutputLength !== undefined ||
 		patch.temperature !== undefined ||
+		patch.cacheControl !== undefined ||
 		patch.outputParam !== undefined ||
 		(patch.stopSequences?.length ?? 0) > 0 ||
 		patch.reasoning !== undefined ||
@@ -143,6 +144,7 @@ function cloneStartingModelPatch(
 
 	return {
 		...patch,
+		cacheControl: patch.cacheControl ? { ...patch.cacheControl } : undefined,
 		stopSequences: patch.stopSequences ? [...patch.stopSequences] : undefined,
 		reasoning: patch.reasoning
 			? {

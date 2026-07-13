@@ -365,7 +365,7 @@ function AddEditAuthKeyModalContent({
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-3xl flex-col overflow-hidden rounded-2xl p-0">
+			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl flex-col overflow-hidden rounded-2xl p-0">
 				<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
 					<ModalHeader
 						title={modalTitle}

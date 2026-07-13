@@ -223,14 +223,8 @@ export function mergeModelCapabilitiesOverride(
 export function getSupportedReasoningLevels(cap?: ModelCapabilitiesOverride): ReasoningLevel[] {
 	const raw = cap?.reasoningCapabilities?.supportedReasoningLevels;
 	if (!raw || raw.length === 0) {
-		// Default UI list (existing behavior, but now includes XHigh)
-		return [
-			ReasoningLevel.None,
-			ReasoningLevel.Minimal,
-			ReasoningLevel.Low,
-			ReasoningLevel.Medium,
-			ReasoningLevel.High,
-		];
+		// An absent capability allowlist means no additional restriction.
+		return [...ORDERED_REASONING_LEVELS];
 	}
 
 	const set = new Set(raw.filter(r => isReasoningLevel(r)));

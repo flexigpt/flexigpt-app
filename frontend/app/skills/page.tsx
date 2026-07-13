@@ -236,6 +236,17 @@ export default function SkillsPage() {
 
 	const handleSkillEnableChange = useCallback(
 		async (bundleID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => {
+			const bundleData = bundles.find(item => item.bundle.id === bundleID);
+			if (!bundleData) {
+				throw new Error('Skill bundle not found.');
+			}
+			if (!bundleData.bundle.isEnabled) {
+				throw new Error('Enable the skill bundle before changing a skill.');
+			}
+			if (!bundleData.skills.some(skill => skill.id === skillID && skill.slug === skillSlug)) {
+				throw new Error('Skill not found.');
+			}
+
 			try {
 				await skillStoreAPI.patchSkill(bundleID, skillSlug, nextEnabled);
 
@@ -244,15 +255,15 @@ export default function SkillsPage() {
 				}
 
 				setBundles(prev =>
-					prev.map(bundleData =>
-						bundleData.bundle.id === bundleID
+					prev.map(b =>
+						b.bundle.id === bundleID
 							? {
-									...bundleData,
-									skills: bundleData.skills.map(existingSkill =>
+									...b,
+									skills: b.skills.map(existingSkill =>
 										existingSkill.id === skillID ? { ...existingSkill, isEnabled: nextEnabled } : existingSkill
 									),
 								}
-							: bundleData
+							: b
 					)
 				);
 			} catch (err) {
@@ -260,11 +271,26 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[setBundles]
+		[bundles, setBundles]
 	);
 
 	const handleDeleteSkill = useCallback(
 		async (bundleID: string, skillID: string, skillSlug: string) => {
+			const bundleData = bundles.find(item => item.bundle.id === bundleID);
+			if (!bundleData) {
+				throw new Error('Skill bundle not found.');
+			}
+			if (bundleData.bundle.isBuiltIn) {
+				throw new Error('Cannot delete skills from a built-in bundle.');
+			}
+			const skill = bundleData.skills.find(item => item.id === skillID && item.slug === skillSlug);
+			if (!skill) {
+				throw new Error('Skill not found.');
+			}
+			if (skill.isBuiltIn) {
+				throw new Error('Built-in skills cannot be deleted.');
+			}
+
 			try {
 				await skillStoreAPI.deleteSkill(bundleID, skillSlug);
 
@@ -273,13 +299,13 @@ export default function SkillsPage() {
 				}
 
 				setBundles(prev =>
-					prev.map(bundleData =>
-						bundleData.bundle.id === bundleID
+					prev.map(b =>
+						b.bundle.id === bundleID
 							? {
-									...bundleData,
-									skills: bundleData.skills.filter(existingSkill => existingSkill.id !== skillID),
+									...b,
+									skills: b.skills.filter(existingSkill => existingSkill.id !== skillID),
 								}
-							: bundleData
+							: b
 					)
 				);
 			} catch (err) {
@@ -287,11 +313,31 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[setBundles]
+		[bundles, setBundles]
 	);
 
 	const handleSubmitSkill = useCallback(
 		async (bundleID: string, partial: SkillUpsertInput, existingSkillSlug?: string) => {
+			const bundleData = bundles.find(item => item.bundle.id === bundleID);
+			if (!bundleData) {
+				throw new Error('Skill bundle not found.');
+			}
+			if (bundleData.bundle.isBuiltIn) {
+				throw new Error('Cannot add or edit skills in a built-in bundle.');
+			}
+			if (!bundleData.bundle.isEnabled) {
+				throw new Error('Enable the skill bundle before adding or editing skills.');
+			}
+			if (existingSkillSlug) {
+				const existingSkill = bundleData.skills.find(skill => skill.slug === existingSkillSlug);
+				if (!existingSkill) {
+					throw new Error('Skill not found.');
+				}
+				if (existingSkill.isBuiltIn) {
+					throw new Error('Built-in skills cannot be edited.');
+				}
+			}
+
 			try {
 				// A successful write is authoritative even if the follow-up list refresh fails.
 				if (existingSkillSlug) {
@@ -372,7 +418,7 @@ export default function SkillsPage() {
 				}
 			}
 		},
-		[refreshBundleSkills]
+		[bundles, refreshBundleSkills]
 	);
 
 	const handleBundleDelete = useCallback(async () => {
@@ -383,6 +429,13 @@ export default function SkillsPage() {
 		}
 
 		const bundleData = bundles.find(item => item.bundle.id === deletingBundle.id);
+		if (bundleData?.bundle.isBuiltIn) {
+			setBundleToDelete(null);
+			setAlertMsg('Built-in skill bundles cannot be deleted.');
+			setShowAlert(true);
+			return;
+		}
+
 		if (!bundleData || bundleData.skillLoadError || bundleData.skills.length > 0) {
 			setBundleToDelete(null);
 			setAlertMsg(

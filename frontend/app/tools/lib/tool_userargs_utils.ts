@@ -39,19 +39,13 @@ export function computeToolUserArgsStatus(
 		isSatisfied: true,
 	};
 
-	if (required.length === 0) {
-		// Schema exists but does not require anything -> always satisfied.
-		return status;
-	}
-
-	// From here on, there ARE required keys.
 	if (!rawInstance || rawInstance.trim() === '') {
 		return {
 			...status,
 			isInstancePresent: false,
 			isInstanceJSONValid: false,
 			missingRequired: required,
-			isSatisfied: false,
+			isSatisfied: required.length === 0,
 		};
 	}
 
@@ -79,6 +73,10 @@ export function computeToolUserArgsStatus(
 	}
 
 	status.isInstanceJSONValid = true;
+
+	if (required.length === 0) {
+		return status;
+	}
 
 	const obj = parsed as Record<string, unknown>;
 	const missing: string[] = [];

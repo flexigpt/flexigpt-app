@@ -140,6 +140,17 @@ export default function ToolsPage() {
 
 	const handleToggleToolEnable = useCallback(
 		async (bundleID: string, tool: Tool, enabled: boolean) => {
+			const bundleData = bundles.find(item => item.bundle.id === bundleID);
+			if (!bundleData) {
+				throw new Error('Tool bundle not found.');
+			}
+			if (!bundleData.bundle.isEnabled) {
+				throw new Error('Enable the tool bundle before changing a tool.');
+			}
+			if (!bundleData.tools.some(existing => existing.id === tool.id)) {
+				throw new Error('Tool not found.');
+			}
+
 			try {
 				await toolStoreAPI.patchTool(bundleID, tool.slug, tool.version, enabled);
 
@@ -157,11 +168,26 @@ export default function ToolsPage() {
 				throw new Error(getErrorMessage(err, 'Failed to toggle tool.'), { cause: err });
 			}
 		},
-		[setBundles]
+		[bundles, setBundles]
 	);
 
 	const handleDeleteTool = useCallback(
 		async (bundleID: string, tool: Tool) => {
+			const bundleData = bundles.find(item => item.bundle.id === bundleID);
+			if (!bundleData) {
+				throw new Error('Tool bundle not found.');
+			}
+			if (bundleData.bundle.isBuiltIn) {
+				throw new Error('Cannot delete tools from a built-in bundle.');
+			}
+			const storedTool = bundleData.tools.find(existing => existing.id === tool.id);
+			if (!storedTool) {
+				throw new Error('Tool not found.');
+			}
+			if (storedTool.isBuiltIn) {
+				throw new Error('Built-in tools cannot be deleted.');
+			}
+
 			try {
 				await toolStoreAPI.deleteTool(bundleID, tool.slug, tool.version);
 
@@ -179,7 +205,7 @@ export default function ToolsPage() {
 				throw new Error(getErrorMessage(err, 'Failed to delete tool.'), { cause: err });
 			}
 		},
-		[setBundles]
+		[bundles, setBundles]
 	);
 
 	const handleSubmitTool = useCallback(
@@ -283,6 +309,13 @@ export default function ToolsPage() {
 		}
 
 		const bundleData = (bundles ?? []).find(item => item.bundle.id === bundleToDelete.id);
+		if (bundleData?.bundle.isBuiltIn) {
+			setBundleToDelete(null);
+			setAlertMsg('Built-in tool bundles cannot be deleted.');
+			setShowAlert(true);
+			return;
+		}
+
 		if (!bundleData || bundleData.toolLoadError || bundleData.tools.length > 0) {
 			setBundleToDelete(null);
 			setAlertMsg(

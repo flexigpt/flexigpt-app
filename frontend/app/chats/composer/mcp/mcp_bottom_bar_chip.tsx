@@ -29,7 +29,11 @@ import { MCPAuthHealthState, MCPRefType, MCPServerStatus, MCPToolExposure } from
 
 import { mcpAPI } from '@/apis/baseapi';
 
-import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
+import {
+	actionTriggerChipClearButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerChipSurfaceClasses,
+} from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
@@ -1049,7 +1053,7 @@ export function MCPBottomBarChip({
 						{enabledCount > 0 || hasAppContextUpdates ? (
 							<button
 								type="button"
-								className="btn btn-ghost btn-xs app-text-neutral hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
+								className={actionTriggerChipClearButtonClasses}
 								onClick={event => {
 									event.preventDefault();
 									event.stopPropagation();

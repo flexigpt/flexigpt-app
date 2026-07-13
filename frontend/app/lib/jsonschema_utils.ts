@@ -11,6 +11,7 @@ type JSONValue = JSONPrimitive | JSONObject | JSONValue[];
 
 export type JSONSchema = JSONValue;
 export type JSONRawString = string;
+type JSONObjectParseResult = { ok: true; value: Record<string, unknown> } | { ok: false; error: string };
 
 export function isJSONObject(value: unknown): value is JSONObject {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -18,6 +19,18 @@ export function isJSONObject(value: unknown): value is JSONObject {
 
 export function getJSONObject(value: unknown): JSONObject | undefined {
 	return isJSONObject(value) ? value : undefined;
+}
+
+export function tryParseJSONObject(raw: string, fieldLabel = 'JSON schema body'): JSONObjectParseResult {
+	try {
+		const value = JSON.parse(raw);
+		if (!isJSONObject(value)) {
+			return { ok: false, error: `${fieldLabel} must be a JSON object.` };
+		}
+		return { ok: true, value };
+	} catch {
+		return { ok: false, error: `${fieldLabel} must be valid JSON.` };
+	}
 }
 
 /**

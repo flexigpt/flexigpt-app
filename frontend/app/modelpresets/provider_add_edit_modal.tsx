@@ -10,7 +10,14 @@ import { ProviderSDKType, SDK_DEFAULTS, SDK_DISPLAY_NAME } from '@/spec/inferenc
 import type { PatchProviderPresetPayload, PostProviderPresetPayload, ProviderPreset } from '@/spec/modelpreset';
 
 import { GenerateRandomNumberString } from '@/lib/encode_decode';
-import { parseHTTPHeadersJSON, redactSensitiveHTTPHeaders } from '@/lib/http_input_utils';
+import {
+	omitSensitiveHTTPHeaders,
+	parseHTTPHeadersJSON,
+	redactSensitiveHTTPHeaders,
+	restoreRedactedHTTPHeaders,
+	validateHTTPHeaderName,
+	validateHTTPURLSecurity,
+} from '@/lib/http_input_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 
@@ -92,13 +99,7 @@ function getInitialFormData(mode: ModalMode, initialPreset?: ProviderPreset): Pr
 			origin: initialPreset.origin,
 			chatCompletionPathPrefix: initialPreset.chatCompletionPathPrefix,
 			apiKeyHeaderKey: initialPreset.apiKeyHeaderKey,
-			defaultHeadersRawJSON: JSON.stringify(
-				mode === 'view'
-					? (redactSensitiveHTTPHeaders(initialPreset.defaultHeaders) ?? {})
-					: (initialPreset.defaultHeaders ?? {}),
-				null,
-				2
-			),
+			defaultHeadersRawJSON: JSON.stringify(redactSensitiveHTTPHeaders(initialPreset.defaultHeaders) ?? {}, null, 2),
 			apiKey: '',
 		};
 	}
@@ -232,9 +233,10 @@ function AddEditProviderPresetModalContent({
 			}
 
 			if (field === 'origin') {
-				const { error } = validateUrlForInput(String(val), originInput, { required: true });
-				if (error) {
-					newErrs.origin = error;
+				const { error, normalized } = validateUrlForInput(String(val), originInput, { required: true });
+				const securityError = normalized ? validateHTTPURLSecurity(normalized, 'Provider origin') : undefined;
+				if (error || securityError) {
+					newErrs.origin = error ?? securityError;
 				} else {
 					newErrs = omitManyKeys(newErrs, ['origin']);
 				}
@@ -243,8 +245,21 @@ function AddEditProviderPresetModalContent({
 			if (field === 'chatCompletionPathPrefix') {
 				if (!String(v).trim()) {
 					newErrs.chatCompletionPathPrefix = 'Chat path required.';
+				} else if (!String(v).startsWith('/')) {
+					newErrs.chatCompletionPathPrefix = 'Chat path must start with "/".';
+				} else if (/[\r\n\u0000]/.test(String(v))) {
+					newErrs.chatCompletionPathPrefix = 'Chat path must not contain control characters.';
 				} else {
 					newErrs = omitManyKeys(newErrs, ['chatCompletionPathPrefix']);
+				}
+			}
+
+			if (field === 'apiKeyHeaderKey') {
+				const headerNameError = String(v).trim() ? validateHTTPHeaderName(String(v), 'API-key header name') : undefined;
+				if (headerNameError) {
+					newErrs.apiKeyHeaderKey = headerNameError;
+				} else {
+					newErrs = omitManyKeys(newErrs, ['apiKeyHeaderKey']);
 				}
 			}
 
@@ -296,14 +311,28 @@ function AddEditProviderPresetModalContent({
 			next = validateField('displayName', state.displayName, next);
 			next = validateField('origin', state.origin, next);
 			next = validateField('chatCompletionPathPrefix', state.chatCompletionPathPrefix, next);
+			next = validateField('apiKeyHeaderKey', state.apiKeyHeaderKey, next);
 			next = validateField('defaultHeadersRawJSON', state.defaultHeadersRawJSON, next);
 			if (mode === 'add' || state.apiKey.trim()) {
 				next = validateField('apiKey', state.apiKey, next);
 			}
 			next = validateField('sdkType', state.sdkType, next);
+
+			if (!next.defaultHeadersRawJSON) {
+				try {
+					restoreRedactedHTTPHeaders(
+						parseDefaultHeadersRawJSON(state.defaultHeadersRawJSON),
+						mode === 'edit' ? initialPreset?.defaultHeaders : undefined
+					);
+				} catch (error) {
+					next.defaultHeadersRawJSON =
+						error instanceof Error ? error.message : 'Sensitive default headers could not be resolved.';
+				}
+			}
+
 			return next;
 		},
-		[isReadOnly, mode, validateField]
+		[initialPreset?.defaultHeaders, isReadOnly, mode, validateField]
 	);
 
 	const buildPatchPayload = useCallback(
@@ -357,7 +386,7 @@ function AddEditProviderPresetModalContent({
 			origin: src.origin,
 			chatCompletionPathPrefix: src.chatCompletionPathPrefix,
 			apiKeyHeaderKey: src.apiKeyHeaderKey,
-			defaultHeadersRawJSON: JSON.stringify(src.defaultHeaders, null, 2),
+			defaultHeadersRawJSON: JSON.stringify(omitSensitiveHTTPHeaders(src.defaultHeaders) ?? {}, null, 2),
 			apiKey: '',
 		};
 
@@ -427,7 +456,10 @@ function AddEditProviderPresetModalContent({
 
 		let defaultHeaders: Record<string, string>;
 		try {
-			defaultHeaders = parseDefaultHeadersRawJSON(formData.defaultHeadersRawJSON);
+			defaultHeaders = restoreRedactedHTTPHeaders(
+				parseDefaultHeadersRawJSON(formData.defaultHeadersRawJSON),
+				mode === 'edit' ? initialPreset?.defaultHeaders : undefined
+			);
 		} catch {
 			return true;
 		}
@@ -481,8 +513,15 @@ function AddEditProviderPresetModalContent({
 
 		let defaultHeaders: Record<string, string>;
 		try {
-			defaultHeaders = parseDefaultHeadersRawJSON(formData.defaultHeadersRawJSON);
-		} catch {
+			defaultHeaders = restoreRedactedHTTPHeaders(
+				parseDefaultHeadersRawJSON(formData.defaultHeadersRawJSON),
+				mode === 'edit' ? initialPreset?.defaultHeaders : undefined
+			);
+		} catch (error) {
+			setErrors(previous => ({
+				...previous,
+				defaultHeadersRawJSON: error instanceof Error ? error.message : 'Default headers could not be resolved.',
+			}));
 			return;
 		}
 
@@ -534,7 +573,7 @@ function AddEditProviderPresetModalContent({
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
+			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={title}
 					description={
@@ -788,12 +827,20 @@ function AddEditProviderPresetModalContent({
 										name="apiKeyHeaderKey"
 										value={formData.apiKeyHeaderKey}
 										onChange={handleInput}
-										className="input w-full rounded-xl"
+										className={`input w-full rounded-xl ${errors.apiKeyHeaderKey ? 'input-error' : ''}`}
 										spellCheck="false"
 										autoComplete="off"
 										readOnly={isReadOnly}
 										disabled={isSubmitting}
+										aria-invalid={Boolean(errors.apiKeyHeaderKey)}
 									/>
+									{errors.apiKeyHeaderKey ? (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.apiKeyHeaderKey}
+											</span>
+										</div>
+									) : null}
 								</div>
 							</div>
 
@@ -930,7 +977,11 @@ export function AddEditProviderPresetModal(props: AddEditProviderPresetModalProp
 	}
 
 	const modalKey =
-		props.mode === 'add' ? 'add-provider' : `${props.mode}:${props.initialPreset?.name ?? 'provider-without-name'}`;
+		props.mode === 'add'
+			? 'add-provider'
+			: `${props.mode}:${props.initialPreset?.name ?? 'provider-without-name'}:${
+					props.initialPreset?.modifiedAt ?? 'unknown-modified'
+				}`;
 
 	return createPortal(<AddEditProviderPresetModalContent key={modalKey} {...props} />, document.body);
 }

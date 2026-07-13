@@ -1,5 +1,7 @@
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import type {
+	CacheControlKind,
+	CacheControlTTL,
 	OutputFormatKind,
 	OutputVerbosity,
 	ReasoningLevel,
@@ -7,6 +9,7 @@ import type {
 	ReasoningType,
 } from '@/spec/inference';
 import type { MCPConversationContext } from '@/spec/mcp';
+import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import type { ToolRef } from '@/spec/tool';
 
@@ -40,6 +43,11 @@ export interface ModelPatchFormData {
 	stopSequencesText: string;
 	additionalParametersRawJSON: string;
 
+	cacheControlEnabled: boolean;
+	cacheControlKind: CacheControlKind;
+	cacheControlTTL: '' | CacheControlTTL;
+	cacheControlKey: string;
+
 	reasoningEnabled: boolean;
 	reasoningType: ReasoningType;
 	reasoningLevel: ReasoningLevel;
@@ -71,6 +79,7 @@ export interface AssistantPresetFormData {
 
 	startingText: string;
 	startingModelPresetKey: string;
+	startingModelPresetRef?: ModelPresetRef;
 	startingIncludeModelSystemPrompt: TriStateBoolean;
 	modelPatch: ModelPatchFormData;
 

@@ -7,7 +7,7 @@ import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiUpload, FiX } from 'react-i
 
 import type { AssistantPreset, AssistantPresetStartingModelPresetPatch } from '@/spec/assistantpreset';
 import type { JSONSchemaParam, OutputFormat, OutputParam } from '@/spec/inference';
-import { OutputFormatKind, ReasoningLevel, ReasoningType } from '@/spec/inference';
+import { CacheControlKind, OutputFormatKind, ReasoningLevel, ReasoningType } from '@/spec/inference';
 import type { MCPConversationContext } from '@/spec/mcp';
 import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
@@ -15,6 +15,7 @@ import type { AssistantSkillOption } from '@/spec/skill';
 import type { AssistantToolOption } from '@/spec/tool';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
+import { isJSONObject, tryParseJSONObject } from '@/lib/jsonschema_utils';
 import { parseOptionalNumber, parsePositiveInteger } from '@/lib/obj_utils';
 import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
@@ -81,8 +82,6 @@ interface AddEditAssistantPresetModalProps {
 	copyablePresets?: PresetItem[];
 }
 
-type JSONParseResult = { ok: true; value: unknown } | { ok: false; error: string };
-
 const EMPTY_ERROR_STATE: ErrorState = {};
 const EMPTY_MODEL_OPTIONS: AssistantModelPresetOption[] = [];
 
@@ -144,24 +143,6 @@ function removeItemAtIndex<T>(items: readonly T[], index: number): T[] {
 
 function updateItemAtIndex<T>(items: readonly T[], index: number, updater: (item: T) => T): T[] {
 	return items.map((item, itemIndex) => (itemIndex === index ? updater(item) : item));
-}
-
-function isJSONObjectLike(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function tryParseJSONRaw(raw: string): JSONParseResult {
-	try {
-		return {
-			ok: true,
-			value: JSON.parse(raw),
-		};
-	} catch {
-		return {
-			ok: false,
-			error: 'Must be valid JSON.',
-		};
-	}
 }
 
 function getTriStateLabel(value: TriStateBoolean): string {
@@ -320,6 +301,11 @@ function buildModelPatchSeedFormData(modelOption?: AssistantModelPresetOption): 
 		stopSequencesText: (effective.stopSequences ?? []).join('\n'),
 		additionalParametersRawJSON: effective.additionalParametersRawJSON ?? '',
 
+		cacheControlEnabled: effective.cacheControl !== undefined,
+		cacheControlKind: effective.cacheControl?.kind ?? base.cacheControlKind,
+		cacheControlTTL: effective.cacheControl?.ttl ?? '',
+		cacheControlKey: effective.cacheControl?.key ?? '',
+
 		reasoningEnabled: effective.reasoning !== undefined,
 		reasoningType: effective.reasoning?.type ?? base.reasoningType,
 		reasoningLevel: effective.reasoning?.level ?? base.reasoningLevel,
@@ -350,6 +336,11 @@ function getDefaultModelPatchFormData(): ModelPatchFormData {
 		timeout: '',
 		stopSequencesText: '',
 		additionalParametersRawJSON: '',
+
+		cacheControlEnabled: false,
+		cacheControlKind: CacheControlKind.Ephemeral,
+		cacheControlTTL: '',
+		cacheControlKey: '',
 
 		reasoningEnabled: false,
 		reasoningType: ReasoningType.SingleWithLevels,
@@ -384,6 +375,11 @@ function getInitialModelPatchFormData(patch?: AssistantPreset['startingModelPres
 		timeout: patch.timeout !== undefined ? String(patch.timeout) : '',
 		stopSequencesText: (patch.stopSequences ?? []).join('\n'),
 		additionalParametersRawJSON: patch.additionalParametersRawJSON ?? '',
+
+		cacheControlEnabled: patch.cacheControl !== undefined,
+		cacheControlKind: patch.cacheControl?.kind ?? base.cacheControlKind,
+		cacheControlTTL: patch.cacheControl?.ttl ?? '',
+		cacheControlKey: patch.cacheControl?.key ?? '',
 
 		reasoningEnabled: patch.reasoning !== undefined,
 		reasoningType: patch.reasoning?.type ?? base.reasoningType,
@@ -422,6 +418,12 @@ function getInitialFormData(
 
 			startingText: src.startingText ?? '',
 			startingModelPresetKey: src.startingModelPresetRef ? buildModelPresetRefKey(src.startingModelPresetRef) : '',
+			startingModelPresetRef: src.startingModelPresetRef
+				? {
+						providerName: src.startingModelPresetRef.providerName,
+						modelPresetID: src.startingModelPresetRef.modelPresetID,
+					}
+				: undefined,
 			startingIncludeModelSystemPrompt: booleanToTriState(src.startingIncludeModelSystemPrompt),
 			modelPatch: getInitialModelPatchFormData(src.startingModelPresetPatch),
 			startingToolSelections: (src.startingToolSelections ?? []).map(selection => ({
@@ -446,26 +448,13 @@ function getInitialFormData(
 		isEnabled: true,
 		startingText: '',
 		startingModelPresetKey: '',
+		startingModelPresetRef: undefined,
 		startingIncludeModelSystemPrompt: '',
 		modelPatch: getDefaultModelPatchFormData(),
 		startingToolSelections: [],
 		startingSkillSelections: [],
 		startingMCPContext: undefined,
 	};
-}
-
-function hasModelPatchFormValues(modelPatch: ModelPatchFormData): boolean {
-	return (
-		modelPatch.stream !== '' ||
-		modelPatch.maxPromptLength.trim().length > 0 ||
-		modelPatch.maxOutputLength.trim().length > 0 ||
-		modelPatch.temperature.trim().length > 0 ||
-		modelPatch.timeout.trim().length > 0 ||
-		modelPatch.stopSequencesText.trim().length > 0 ||
-		modelPatch.additionalParametersRawJSON.trim().length > 0 ||
-		modelPatch.reasoningEnabled ||
-		modelPatch.outputEnabled
-	);
 }
 
 function hasConfiguredModelPatchFormValues(modelPatch: ModelPatchFormData): boolean {
@@ -477,6 +466,7 @@ function hasConfiguredModelPatchFormValues(modelPatch: ModelPatchFormData): bool
 		modelPatch.timeout.trim().length > 0 ||
 		modelPatch.stopSequencesText.trim().length > 0 ||
 		modelPatch.additionalParametersRawJSON.trim().length > 0 ||
+		modelPatch.cacheControlEnabled ||
 		modelPatch.reasoningEnabled ||
 		(modelPatch.outputEnabled && (modelPatch.outputVerbosity !== '' || modelPatch.outputFormatEnabled))
 	);
@@ -521,11 +511,20 @@ function buildModelPatchFromFormData(
 		.map(item => item.trim())
 		.filter(Boolean);
 	if (stopSequences.length > 0) {
-		patch.stopSequences = stopSequences;
+		patch.stopSequences = [...new Set(stopSequences)];
 	}
 
 	if (modelPatch.additionalParametersRawJSON.trim()) {
 		patch.additionalParametersRawJSON = modelPatch.additionalParametersRawJSON.trim();
+	}
+
+	if (modelPatch.cacheControlEnabled) {
+		const cacheControlKey = modelPatch.cacheControlKey.trim();
+		patch.cacheControl = {
+			kind: modelPatch.cacheControlKind,
+			...(modelPatch.cacheControlTTL ? { ttl: modelPatch.cacheControlTTL } : {}),
+			...(cacheControlKey ? { key: cacheControlKey } : {}),
+		};
 	}
 
 	const reasoningTokens = parsePositiveInteger(modelPatch.reasoningTokens);
@@ -561,8 +560,8 @@ function buildModelPatchFromFormData(
 				}
 
 				if (modelPatch.outputJSONSchemaRaw.trim()) {
-					const parsed = tryParseJSONRaw(modelPatch.outputJSONSchemaRaw.trim());
-					if (parsed.ok && isJSONObjectLike(parsed.value)) {
+					const parsed = tryParseJSONObject(modelPatch.outputJSONSchemaRaw.trim());
+					if (parsed.ok && isJSONObject(parsed.value)) {
 						jsonSchemaParam.schema = parsed.value;
 					}
 				}
@@ -859,6 +858,12 @@ function AddEditAssistantPresetModalContent({
 					parseOptionalNumber(state.modelPatch.temperature) === undefined
 				) {
 					nextErrors.modelPatch = 'Temperature must be a valid number.';
+				} else if (
+					!nextErrors.modelPatch &&
+					state.modelPatch.temperature.trim() &&
+					(Number(state.modelPatch.temperature) < 0 || Number(state.modelPatch.temperature) > 1)
+				) {
+					nextErrors.modelPatch = 'Temperature must be between 0 and 1.';
 				}
 
 				if (
@@ -870,9 +875,11 @@ function AddEditAssistantPresetModalContent({
 				}
 
 				if (!nextErrors.modelPatch && state.modelPatch.additionalParametersRawJSON.trim()) {
-					const parsed = tryParseJSONRaw(state.modelPatch.additionalParametersRawJSON.trim());
+					const parsed = tryParseJSONObject(state.modelPatch.additionalParametersRawJSON.trim());
 					if (!parsed.ok) {
 						nextErrors.modelPatch = 'Additional parameters raw JSON must be valid JSON.';
+					} else if (!isJSONObject(parsed.value)) {
+						nextErrors.modelPatch = 'Additional parameters raw JSON must be a JSON object.';
 					}
 				}
 
@@ -893,16 +900,17 @@ function AddEditAssistantPresetModalContent({
 					if (!state.modelPatch.outputJSONSchemaName.trim()) {
 						nextErrors.modelPatch = 'JSON schema output format requires a schema name.';
 					} else if (state.modelPatch.outputJSONSchemaRaw.trim()) {
-						const parsed = tryParseJSONRaw(state.modelPatch.outputJSONSchemaRaw.trim());
+						const parsed = tryParseJSONObject(state.modelPatch.outputJSONSchemaRaw.trim());
 						if (!parsed.ok) {
 							nextErrors.modelPatch = 'JSON schema body must be valid JSON.';
-						} else if (!isJSONObjectLike(parsed.value)) {
+						} else if (!isJSONObject(parsed.value)) {
 							nextErrors.modelPatch = 'JSON schema body must be a JSON object.';
 						}
 					}
 				}
 			}
-			if (!nextErrors.modelPatch && !hasConfiguredModelPatchFormValues(state.modelPatch)) {
+
+			if (state.modelPatch.enabled && !nextErrors.modelPatch && !hasConfiguredModelPatchFormValues(state.modelPatch)) {
 				nextErrors.modelPatch =
 					'Choose at least one runtime, reasoning, or output override, or turn off the starting model patch.';
 			}
@@ -961,7 +969,7 @@ function AddEditAssistantPresetModalContent({
 								return raw.length > 0;
 							}
 
-							if (raw && !tryParseJSONRaw(raw).ok) {
+							if (raw && !tryParseJSONObject(raw).ok) {
 								return true;
 							}
 
@@ -975,7 +983,7 @@ function AddEditAssistantPresetModalContent({
 									'Tool args may only be provided for tools that expose a user-args schema.';
 							} else {
 								const raw = invalidArgsSelection.userArgSchemaInstance.trim();
-								const parsed = raw ? tryParseJSONRaw(raw) : undefined;
+								const parsed = raw ? tryParseJSONObject(raw) : undefined;
 								const status = computeToolUserArgsStatus(option.toolDefinition.userArgSchema, raw);
 
 								nextErrors.startingToolSelections =
@@ -1088,19 +1096,13 @@ function AddEditAssistantPresetModalContent({
 		(patch: Partial<ModelPatchFormData>) => {
 			updateFormData(prev => ({
 				...prev,
-				modelPatch:
-					patch.enabled === true &&
-					!prev.modelPatch.enabled &&
-					!hasModelPatchFormValues(prev.modelPatch) &&
-					currentModelOption
-						? buildModelPatchSeedFormData(currentModelOption)
-						: {
-								...prev.modelPatch,
-								...patch,
-							},
+				modelPatch: {
+					...prev.modelPatch,
+					...patch,
+				},
 			}));
 		},
-		[currentModelOption, updateFormData]
+		[updateFormData]
 	);
 
 	const modelPresetDropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(() => {
@@ -1210,6 +1212,8 @@ function AddEditAssistantPresetModalContent({
 			!catalogLoading &&
 			!catalogRefreshing &&
 			!catalogError &&
+			!mcpState.loading &&
+			!mcpState.error &&
 			!mcpState.argumentsBlocked &&
 			Object.keys(errors).length === 0);
 
@@ -1419,6 +1423,11 @@ function AddEditAssistantPresetModalContent({
 			return;
 		}
 
+		if (mcpState.loading || mcpState.error) {
+			setSubmitError('MCP state could not be verified. Wait for it to load or resolve the MCP error before saving.');
+			return;
+		}
+
 		const nextErrors = validateForm(formData);
 		if (Object.keys(nextErrors).length > 0) {
 			return;
@@ -1435,12 +1444,12 @@ function AddEditAssistantPresetModalContent({
 					startingModelPresetRef = selectedModelOption.ref;
 				} else if (
 					catalogLoadErrors?.models &&
-					initialData?.preset.startingModelPresetRef &&
-					buildModelPresetRefKey(initialData.preset.startingModelPresetRef) === formData.startingModelPresetKey
+					formData.startingModelPresetRef &&
+					buildModelPresetRefKey(formData.startingModelPresetRef) === formData.startingModelPresetKey
 				) {
 					startingModelPresetRef = {
-						providerName: initialData.preset.startingModelPresetRef.providerName,
-						modelPresetID: initialData.preset.startingModelPresetRef.modelPresetID,
+						providerName: formData.startingModelPresetRef.providerName,
+						modelPresetID: formData.startingModelPresetRef.modelPresetID,
 					};
 				} else {
 					setSubmitError(selectedModelOption?.availabilityReason ?? 'Selected model preset is not available.');
@@ -1839,9 +1848,16 @@ function AddEditAssistantPresetModalContent({
 											orderedKeys={modelPresetOrderedKeys}
 											selectedKey={formData.startingModelPresetKey}
 											onChange={value => {
+												const selectedRef = value ? modelOptionByKey.get(value)?.ref : undefined;
 												updateFormData(prev => ({
 													...prev,
 													startingModelPresetKey: value,
+													startingModelPresetRef: selectedRef
+														? {
+																providerName: selectedRef.providerName,
+																modelPresetID: selectedRef.modelPresetID,
+															}
+														: undefined,
 													startingIncludeModelSystemPrompt: value ? prev.startingIncludeModelSystemPrompt : '',
 												}));
 											}}

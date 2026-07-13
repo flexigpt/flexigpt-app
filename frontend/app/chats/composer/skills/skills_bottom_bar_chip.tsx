@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
@@ -14,6 +14,7 @@ import { skillStoreAPI } from '@/apis/baseapi';
 import { getAllSkillBundles } from '@/apis/list_helper';
 
 import {
+	actionTriggerChipClearButtonClasses,
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
 	actionTriggerMenuItemClasses,
@@ -547,7 +548,6 @@ export function SkillsBottomBarChip({
 		return isInstructionSkill(s);
 	}).length;
 	const totalCount = instructionCount;
-	const isEnabled = enabledCount > 0;
 
 	const sortedSkills = useMemo(
 		() => [...(allSkills ?? [])].filter(item => isInstructionSkill(item)).toSorted(compareSkillRows),
@@ -637,33 +637,61 @@ export function SkillsBottomBarChip({
 	const selectedInstructionSourceCount =
 		systemPrompt.selectedInstructionSourceKeys.length + (systemPrompt.includeModelDefault ? 1 : 0);
 
+	const hasConfiguredSkillState = enabledCount > 0 || activeCount > 0 || selectedInstructionSourceCount > 0;
+
 	const title = useMemo(() => {
 		const lines: string[] = [
 			shortcut ? `Instruction skills (${shortcut})` : 'Instruction skills',
-			'Instruction skills can be enabled for this chat or activated as standing session context.',
-			'Simple argumentless resource-free skills can also be independently selected as flattened system instruction sources.',
-			'User-message templates are shown separately in the Templates menu.',
-			'Resource-backed skills can still be enabled or activated, but this menu does not fork or inline-copy their resource context.',
-			isEnabled ? `Status: Enabled (${enabledCount})` : 'Status: Disabled',
-			`Active now: ${activeCount}`,
-			`Flattened instruction sources: ${selectedInstructionSourceCount}`,
+			'Enable skills for this chat, activate eligible skills, or select system instruction sources.',
+			'User-message templates are managed in the Templates menu.',
+			hasConfiguredSkillState ? 'Status: Configured' : 'Status: Not configured',
 		];
 
+		if (enabledCount > 0) {
+			lines.push(`Enabled skills: ${enabledCount}`);
+		}
+		if (activeCount > 0) {
+			lines.push(`Active now: ${activeCount}`);
+		}
+		if (selectedInstructionSourceCount > 0) {
+			lines.push(`System instruction sources: ${selectedInstructionSourceCount}`);
+		}
 		if (totalCount > 0) {
 			lines.push(`Available: ${totalCount}`);
 		}
 		if (loading && totalCount === 0) {
 			lines.push('Loading available skills…');
 		}
+		if (loadError) {
+			lines.push('Skill list needs refresh.');
+		}
 		return lines.join('\n');
-	}, [activeCount, enabledCount, isEnabled, loading, selectedInstructionSourceCount, shortcut, totalCount]);
+	}, [
+		activeCount,
+		enabledCount,
+		hasConfiguredSkillState,
+		loadError,
+		loading,
+		selectedInstructionSourceCount,
+		shortcut,
+		totalCount,
+	]);
 
-	const chipToneClasses =
-		enabledCount > 0 || selectedInstructionSourceCount > 0
-			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
-			: open
-				? 'border-base-300 bg-base-300/60'
-				: 'border-transparent';
+	const chipToneClasses = hasConfiguredSkillState
+		? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+		: open
+			? 'border-base-300 bg-base-300/60'
+			: 'border-transparent';
+
+	const clearConfiguredSkillState = () => {
+		if (enabledCount > 0 || activeCount > 0) {
+			onDisableAll();
+		}
+		if (selectedInstructionSourceCount > 0) {
+			systemPrompt.clearInstructionSources();
+		}
+		menu.hide();
+	};
 
 	const openAddInstructionModal = useCallback(() => {
 		setInstructionModalMode('add');
@@ -715,15 +743,18 @@ export function SkillsBottomBarChip({
 			source => source.identityKey === instructionSourceKey
 		);
 		const instructionSourceSelected = selectedInstructionSourceKeySet.has(instructionSourceKey);
+		const hasVisibleSelection = checked || isActive || instructionSourceSelected;
 
 		return (
 			<MenuItem
 				key={k}
 				data-searchable-menu-item="true"
 				hideOnClick={false}
-				className={`data-active-item:bg-base-200 flex w-full flex-col items-start gap-2 rounded-xl border p-2 outline-none ${
-					!isInstruction ? 'opacity-75' : ''
-				}`}
+				className={`data-active-item:bg-base-200 flex w-full flex-col items-start gap-2 rounded-xl border p-2 transition-colors outline-none ${
+					hasVisibleSelection
+						? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+						: 'border-base-300 hover:bg-base-200'
+				} ${!isInstruction ? 'opacity-75' : ''}`}
 				title={
 					isInstruction
 						? `${item.bundleSlug}/${item.skillSlug}\nEnable makes it available. Enable + active loads its instructions now.`
@@ -901,21 +932,30 @@ export function SkillsBottomBarChip({
 					<MenuButton
 						store={menu}
 						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
-						aria-label={shortcut ? `Attach skills (${shortcut})` : 'Attach skills'}
+						aria-label={shortcut ? `Manage instruction skills (${shortcut})` : 'Manage instruction skills'}
 						disabled={isInputLocked}
 					>
 						<ActionTriggerChipContent
 							icon={<FiFilePlus size={14} />}
 							label="Skills"
 							count={
-								isEnabled ? (
+								enabledCount > 0 ? (
 									<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
 								) : undefined
 							}
 							suffix={
-								activeCount > 0 ? (
-									<span className="badge badge-info badge-xs bg-info/30">Active {activeCount}</span>
-								) : isEnabled ? (
+								activeCount > 0 || selectedInstructionSourceCount > 0 ? (
+									<span className="flex shrink-0 items-center gap-1">
+										{activeCount > 0 ? (
+											<span className="badge badge-info badge-xs bg-info/30">Active {activeCount}</span>
+										) : null}
+										{selectedInstructionSourceCount > 0 ? (
+											<span className="badge badge-secondary badge-xs bg-secondary/30">
+												System {selectedInstructionSourceCount}
+											</span>
+										) : null}
+									</span>
+								) : hasConfiguredSkillState ? (
 									<FiCheck size={14} className="shrink-0" />
 								) : undefined
 							}
@@ -923,17 +963,16 @@ export function SkillsBottomBarChip({
 						/>
 					</MenuButton>
 
-					{enabledCount > 0 ? (
+					{hasConfiguredSkillState ? (
 						<button
 							type="button"
-							className="btn btn-xs app-text-neutral hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
+							className={actionTriggerChipClearButtonClasses}
 							onClick={event => {
 								stop(event);
-								onDisableAll();
-								menu.hide();
+								clearConfiguredSkillState();
 							}}
-							aria-label="Clear all skills"
-							title="Clear all skills"
+							aria-label="Clear skills and system instructions"
+							title="Clear skills and system instructions"
 							disabled={isInputLocked}
 						>
 							<FiX size={12} />
@@ -952,82 +991,47 @@ export function SkillsBottomBarChip({
 			>
 				<div className="mb-2 flex items-center justify-between gap-2 px-1">
 					<div className="text-base-content/70 text-xs font-semibold">Instruction Skills</div>
-					<div className="text-base-content/60 flex items-center gap-2 text-xs">
-						<span>Enabled: {enabledCount}</span>
-						<span>•</span>
-						<span>Active: {activeCount}</span>
-						<span>•</span>
-						<span>{totalCount} available</span>
+					<div className="text-base-content/60 flex flex-wrap items-center justify-end gap-1 text-xs">
+						<span className="badge badge-ghost badge-xs">Enabled {enabledCount}</span>
+						<span className="badge badge-info badge-xs">Active {activeCount}</span>
+						<span className="badge badge-secondary badge-xs">System {selectedInstructionSourceCount}</span>
+						<span className="badge badge-ghost badge-xs">Available {totalCount}</span>
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs rounded-lg px-1"
+							title="Refresh instruction skills"
+							aria-label="Refresh instruction skills"
+							disabled={isInputLocked || loading}
+							onClick={event => {
+								stop(event);
+								void onRefreshSkills();
+							}}
+						>
+							<FiRefreshCw size={12} />
+						</button>
 					</div>
 				</div>
 
 				{loadError ? (
 					<div className="alert alert-warning mb-2 rounded-xl text-xs">
+						<FiAlertCircle size={14} className="shrink-0" />
 						<div className="grow">
 							<div className="font-semibold">Skills could not be refreshed</div>
 							<div>{loadError}</div>
 						</div>
-						<button type="button" className="btn btn-xs rounded-lg" onClick={() => void onRefreshSkills()}>
+						<button
+							type="button"
+							className="btn btn-xs rounded-lg"
+							disabled={isInputLocked || loading}
+							onClick={event => {
+								stop(event);
+								void onRefreshSkills();
+							}}
+						>
 							Retry
 						</button>
 					</div>
 				) : null}
-
-				<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
-					<div className="mb-2 flex items-center justify-between gap-2">
-						<div className="text-xs font-semibold">System instruction sources</div>
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs rounded-lg"
-							disabled={isInputLocked || selectedInstructionSourceCount === 0}
-							onClick={() => {
-								systemPrompt.clearInstructionSources();
-							}}
-						>
-							Clear selected
-						</button>
-					</div>
-
-					<div className="space-y-1">
-						{systemPrompt.modelDefaultPrompt.trim() ? (
-							<label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1">
-								<span className="truncate text-xs">Model default instructions</span>
-								<input
-									type="checkbox"
-									className="checkbox checkbox-xs"
-									checked={systemPrompt.includeModelDefault}
-									disabled={isInputLocked}
-									onChange={event => {
-										systemPrompt.setIncludeModelDefault(event.target.checked);
-									}}
-								/>
-							</label>
-						) : null}
-
-						{systemPrompt.instructionSources.map(source => (
-							<label
-								key={source.identityKey}
-								className="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1"
-								title={source.text}
-							>
-								<span className="min-w-0 truncate text-xs">{source.displayName}</span>
-								<input
-									type="checkbox"
-									className="checkbox checkbox-xs"
-									checked={selectedInstructionSourceKeySet.has(source.identityKey)}
-									disabled={isInputLocked}
-									onChange={() => {
-										systemPrompt.toggleInstructionSource(source.identityKey);
-									}}
-								/>
-							</label>
-						))}
-
-						{!systemPrompt.modelDefaultPrompt.trim() && systemPrompt.instructionSources.length === 0 ? (
-							<div className="text-base-content/60 px-2 py-1 text-xs">No instruction sources selected.</div>
-						) : null}
-					</div>
-				</div>
 
 				<SearchableMenuInput
 					open={open}
@@ -1049,6 +1053,78 @@ export function SkillsBottomBarChip({
 						menu.hide();
 					}}
 				/>
+
+				<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
+					<div className="mb-2 flex items-center justify-between gap-2">
+						<div className="flex min-w-0 items-center gap-1">
+							<div className="truncate text-xs font-semibold">System instruction sources</div>
+							<span className="badge badge-secondary badge-xs">{selectedInstructionSourceCount} selected</span>
+						</div>
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs rounded-lg"
+							title="Clear selected system instruction sources"
+							aria-label="Clear selected system instruction sources"
+							disabled={isInputLocked || selectedInstructionSourceCount === 0}
+							onClick={event => {
+								stop(event);
+								systemPrompt.clearInstructionSources();
+							}}
+						>
+							Clear selected
+						</button>
+					</div>
+
+					<div className="max-h-40 space-y-1 overflow-y-auto">
+						{systemPrompt.modelDefaultPrompt.trim() ? (
+							<label
+								className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 transition-colors ${
+									systemPrompt.includeModelDefault
+										? 'bg-secondary/10 hover:bg-secondary/15 focus-within:bg-secondary/15'
+										: 'hover:bg-base-200 focus-within:bg-base-200'
+								}`}
+							>
+								<span className="truncate text-xs">Model default instructions</span>
+								<input
+									type="checkbox"
+									className="checkbox checkbox-xs"
+									checked={systemPrompt.includeModelDefault}
+									disabled={isInputLocked}
+									onChange={event => {
+										systemPrompt.setIncludeModelDefault(event.target.checked);
+									}}
+								/>
+							</label>
+						) : null}
+
+						{systemPrompt.instructionSources.map(source => (
+							<label
+								key={source.identityKey}
+								className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 transition-colors ${
+									selectedInstructionSourceKeySet.has(source.identityKey)
+										? 'bg-secondary/10 hover:bg-secondary/15 focus-within:bg-secondary/15'
+										: 'hover:bg-base-200 focus-within:bg-base-200'
+								}`}
+								title={source.text}
+							>
+								<span className="min-w-0 truncate text-xs">{source.displayName}</span>
+								<input
+									type="checkbox"
+									className="checkbox checkbox-xs"
+									checked={selectedInstructionSourceKeySet.has(source.identityKey)}
+									disabled={isInputLocked}
+									onChange={() => {
+										systemPrompt.toggleInstructionSource(source.identityKey);
+									}}
+								/>
+							</label>
+						))}
+
+						{!systemPrompt.modelDefaultPrompt.trim() && systemPrompt.instructionSources.length === 0 ? (
+							<div className="text-base-content/60 px-2 py-1 text-xs">No instruction sources selected.</div>
+						) : null}
+					</div>
+				</div>
 
 				{!loading ? (
 					<div className="border-base-300 mb-2 flex flex-wrap items-center justify-between gap-2 border-b px-1 pb-2">

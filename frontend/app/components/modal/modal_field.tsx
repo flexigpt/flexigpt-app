@@ -32,7 +32,7 @@ export function ModalField({
 				</span>
 
 				{hint ? (
-					<span className="tooltip tooltip-right" data-tip={hint}>
+					<span className="tooltip tooltip-bottom sm:tooltip-right" data-tip={hint}>
 						<FiHelpCircle size={12} />
 					</span>
 				) : null}

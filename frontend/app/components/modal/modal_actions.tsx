@@ -16,7 +16,9 @@ export function ModalActions({ children, leading, className = '' }: ModalActions
 			) : (
 				<span className="hidden sm:block" />
 			)}
-			<div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
+			<div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>button]:w-full sm:[&>button]:w-auto">
+				{children}
+			</div>
 		</footer>
 	);
 }

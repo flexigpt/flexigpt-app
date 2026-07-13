@@ -29,7 +29,7 @@ export function ManagementItemCard({
 		>
 			<div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div className="min-w-0">
-					<div className="truncate font-medium">{title}</div>
+					<div className="font-medium wrap-break-word">{title}</div>
 
 					{subtitle ? <div className="text-base-content/60 mt-1 text-xs wrap-break-word">{subtitle}</div> : null}
 

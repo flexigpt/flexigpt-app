@@ -221,13 +221,17 @@ export function MCPBundleCard({
 			return;
 		}
 
-		await runActionWithAlert(
-			`${serverToDelete.id}:delete`,
-			() => onDeleteServer(bundle.id, serverToDelete.id),
-			'Failed to delete MCP server.'
-		);
-		setIsDeleteServerModalOpen(false);
-		setServerToDelete(null);
+		try {
+			await runActionWithAlert(
+				`${serverToDelete.id}:delete`,
+				() => onDeleteServer(bundle.id, serverToDelete.id),
+				'Failed to delete MCP server.'
+			);
+			setIsDeleteServerModalOpen(false);
+			setServerToDelete(null);
+		} catch {
+			// Keep the confirmation dialog open so the user can retry or cancel.
+		}
 	};
 
 	const openServerModal = (mode: ServerModalMode, server?: MCPServerConfig) => {

@@ -31,6 +31,7 @@ import type {
 } from '@/spec/modelpreset';
 import { DEFAULT_REASONING_TOKENS } from '@/spec/modelpreset';
 
+import { tryParseJSONObject } from '@/lib/jsonschema_utils';
 import { arraysEqual, parseOptionalNumber } from '@/lib/obj_utils';
 
 import { useDialogController } from '@/hooks/use_dialog_controller';
@@ -70,7 +71,6 @@ const OUTPUT_VERBOSITY_NONE = '__none__' as const;
 type OutputVerbositySelection = OutputVerbosity | typeof OUTPUT_VERBOSITY_NONE;
 
 type OptionalBooleanSelection = '' | 'true' | 'false';
-type JSONObjectParseResult = { ok: true; value: Record<string, unknown> } | { ok: false; error: string };
 
 const OPTIONAL_BOOLEAN_ORDERED_KEYS: OptionalBooleanSelection[] = ['', 'true', 'false'];
 
@@ -92,22 +92,6 @@ function optionalBooleanToBoolean(value: OptionalBooleanSelection): boolean | un
 		return false;
 	}
 	return undefined;
-}
-
-function isJSONObjectLike(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function tryParseJSONObject(raw: string): JSONObjectParseResult {
-	try {
-		const value = JSON.parse(raw);
-		if (!isJSONObjectLike(value)) {
-			return { ok: false, error: 'JSON schema body must be a JSON object.' };
-		}
-		return { ok: true, value };
-	} catch {
-		return { ok: false, error: 'JSON schema body must be valid JSON.' };
-	}
 }
 
 const outputFormatKindItems: Record<OutputFormatKindSelection, { isEnabled: boolean; displayName: string }> = {
@@ -469,12 +453,16 @@ function AddEditModelPresetModalContent({
 	const cannotClearExistingOutput = isEditMode && initialData?.outputParam !== undefined;
 	const cannotClearExistingCacheTTL = isEditMode && initialData?.cacheControl?.ttl !== undefined;
 	const cannotClearExistingCacheKey = isEditMode && Boolean(initialData?.cacheControl?.key?.trim());
+	const cannotClearExistingMaxPromptLength = isEditMode && initialData?.maxPromptLength !== undefined;
+	const cannotClearExistingMaxOutputLength = isEditMode && initialData?.maxOutputLength !== undefined;
 	const hasUnsupportedExistingClear =
 		cannotClearExistingReasoning ||
 		cannotClearExistingOutput ||
 		Boolean(initialData?.cacheControl) ||
 		initialData?.temperature !== undefined ||
-		initialData?.timeout !== undefined;
+		initialData?.timeout !== undefined ||
+		cannotClearExistingMaxPromptLength ||
+		cannotClearExistingMaxOutputLength;
 	const cacheControlKindItems = useMemo(
 		() => buildCacheControlKindDropdownItems(supportedCacheKinds),
 		[supportedCacheKinds]
@@ -680,8 +668,11 @@ function AddEditModelPresetModalContent({
 				const idTrim = mpid.trim();
 				if (!idTrim) {
 					nextErrors.modelPresetID = 'Model Preset ID is required.';
-				} else if (!/^[a-zA-Z0-9-]+$/.test(idTrim)) {
-					nextErrors.modelPresetID = 'Only letters, numbers, and hyphens allowed.';
+				} else if (idTrim.length > 64) {
+					nextErrors.modelPresetID = 'Model Preset ID must be at most 64 characters.';
+				} else if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(idTrim)) {
+					nextErrors.modelPresetID =
+						'Model Preset ID must start with a letter and contain only letters, numbers, and hyphens.';
 				} else if (Object.hasOwn(existingModels, idTrim)) {
 					nextErrors.modelPresetID = 'Model Preset ID must be unique.';
 				}
@@ -694,15 +685,18 @@ function AddEditModelPresetModalContent({
 				nextErrors.presetLabel = 'Preset Label is required.';
 			}
 
-			const maybeValidateNumeric = (field: ValidationField, range?: { min?: number; max?: number }) => {
+			const maybeValidateNumeric = (
+				field: ValidationField,
+				range?: { min?: number; max?: number; integer?: boolean }
+			) => {
 				const value = field === 'modelPresetID' ? mpid : (fd[field as keyof ModelPresetFormData] as string);
 				nextErrors[field] = calcNumericError(field, value, range);
 			};
 
 			maybeValidateNumeric('temperature', { min: 0, max: 1 });
-			maybeValidateNumeric('maxPromptLength', { min: 1 });
-			maybeValidateNumeric('maxOutputLength', { min: 1 });
-			maybeValidateNumeric('timeout', { min: 1 });
+			maybeValidateNumeric('maxPromptLength', { min: 1, integer: true });
+			maybeValidateNumeric('maxOutputLength', { min: 1, integer: true });
+			maybeValidateNumeric('timeout', { min: 1, integer: true });
 
 			if (isEditMode && initialData?.temperature !== undefined && !fd.temperature.trim()) {
 				nextErrors.temperature = EXISTING_FIELD_CLEAR_UNSUPPORTED_MESSAGE;
@@ -710,6 +704,14 @@ function AddEditModelPresetModalContent({
 
 			if (isEditMode && initialData?.timeout !== undefined && !fd.timeout.trim()) {
 				nextErrors.timeout = EXISTING_FIELD_CLEAR_UNSUPPORTED_MESSAGE;
+			}
+
+			if (cannotClearExistingMaxPromptLength && !fd.maxPromptLength.trim()) {
+				nextErrors.maxPromptLength = EXISTING_FIELD_CLEAR_UNSUPPORTED_MESSAGE;
+			}
+
+			if (cannotClearExistingMaxOutputLength && !fd.maxOutputLength.trim()) {
+				nextErrors.maxOutputLength = EXISTING_FIELD_CLEAR_UNSUPPORTED_MESSAGE;
 			}
 
 			if (cannotClearExistingCacheKey && !fd.cacheControlKey.trim()) {
@@ -720,7 +722,7 @@ function AddEditModelPresetModalContent({
 				if ((fd.reasoningTokens ?? '').trim() === '') {
 					nextErrors.reasoningTokens = 'Reasoning Tokens is required for Hybrid mode.';
 				} else {
-					maybeValidateNumeric('reasoningTokens', { min: 1024 });
+					maybeValidateNumeric('reasoningTokens', { min: 1024, integer: true });
 				}
 			}
 
@@ -751,6 +753,8 @@ function AddEditModelPresetModalContent({
 			) as ValidationErrors;
 		},
 		[
+			cannotClearExistingMaxOutputLength,
+			cannotClearExistingMaxPromptLength,
 			cannotClearExistingCacheKey,
 			existingModels,
 			formData,
@@ -897,7 +901,7 @@ function AddEditModelPresetModalContent({
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
+			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={title}
 					description={
@@ -1788,7 +1792,8 @@ export function AddEditModelPresetModal(props: AddEditModelPresetModalProps) {
 	const modalKey =
 		effectiveMode === 'add'
 			? `add-model:${props.providerName}`
-			: `${effectiveMode}:${props.providerName}:${props.initialData?.id ?? props.initialModelID ?? 'unknown-model'}`;
-
+			: `${effectiveMode}:${props.providerName}:${
+					props.initialData?.id ?? props.initialModelID ?? 'unknown-model'
+				}:${props.initialData?.modifiedAt ?? 'unknown-modified'}`;
 	return createPortal(<AddEditModelPresetModalContent key={modalKey} {...props} mode={effectiveMode} />, document.body);
 }

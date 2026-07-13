@@ -13,6 +13,7 @@ import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 import { useTools } from '@/hooks/use_tool';
 
 import {
+	actionTriggerChipClearButtonClasses,
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
 	actionTriggerMenuItemClasses,
@@ -970,7 +971,7 @@ export function ToolsBottomBarChip({
 					{configuredToolCount > 0 || webSearchTemplates.length > 0 || conversationToolsState.length > 0 ? (
 						<button
 							type="button"
-							className="btn btn-ghost btn-xs app-text-neutral hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
+							className={actionTriggerChipClearButtonClasses}
 							onClick={event => {
 								stop(event);
 								clearAllConfiguredTools();

@@ -208,8 +208,8 @@ export function SkillBundleCard({
 	};
 
 	const openSkillModal = (mode: SkillModalMode, skill?: Skill) => {
-		if ((mode === 'add' || mode === 'fork') && !bundle.isEnabled) {
-			setAlertMsg('Enable the bundle before creating or forking a skill. Enabled skills are indexed by the runtime.');
+		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !bundle.isEnabled) {
+			setAlertMsg('Enable the bundle before creating, editing, or forking a skill.');
 			setShowAlert(true);
 			return;
 		}

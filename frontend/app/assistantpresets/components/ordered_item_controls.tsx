@@ -20,10 +20,10 @@ export const OrderedItemControls = memo(function OrderedItemControls({
 	disabled = false,
 }: OrderedItemControlsProps) {
 	return (
-		<div className="flex items-center gap-2">
+		<div className="flex shrink-0 items-center gap-1">
 			<button
 				type="button"
-				className="btn btn-sm btn-ghost rounded-xl"
+				className="btn btn-square btn-sm btn-ghost rounded-xl"
 				onClick={() => {
 					onMoveUp(index);
 				}}
@@ -36,7 +36,7 @@ export const OrderedItemControls = memo(function OrderedItemControls({
 
 			<button
 				type="button"
-				className="btn btn-sm btn-ghost rounded-xl"
+				className="btn btn-square btn-sm btn-ghost rounded-xl"
 				onClick={() => {
 					onMoveDown(index);
 				}}
@@ -49,7 +49,7 @@ export const OrderedItemControls = memo(function OrderedItemControls({
 
 			<button
 				type="button"
-				className="btn btn-sm btn-ghost rounded-xl"
+				className="btn btn-square btn-sm btn-ghost rounded-xl"
 				onClick={() => {
 					onRemove(index);
 				}}

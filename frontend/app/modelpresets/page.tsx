@@ -15,6 +15,7 @@ import type { AuthKeyMeta } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
 import { throwIfAborted } from '@/lib/async_utils';
+import { redactSensitiveHTTPHeaders } from '@/lib/http_input_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
@@ -510,7 +511,15 @@ export default function ModelPresetsPage() {
 			return JSON.stringify(
 				{
 					defaultProvider: data.defaultProvider,
-					providers: data.providerPresets,
+					providers: Object.fromEntries(
+						Object.entries(data.providerPresets).map(([name, provider]) => [
+							name,
+							{
+								...provider,
+								defaultHeaders: redactSensitiveHTTPHeaders(provider.defaultHeaders) ?? {},
+							},
+						])
+					),
 				},
 				null,
 				2

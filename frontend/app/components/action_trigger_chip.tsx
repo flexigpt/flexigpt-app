@@ -8,6 +8,9 @@ export const actionTriggerChipButtonClasses =
 export const actionTriggerChipSurfaceClasses =
 	'app-text-neutral bg-base-200/70 hover:bg-base-300/80 flex h-7 min-h-0 items-center overflow-hidden rounded-full px-2 shadow-none';
 
+export const actionTriggerChipClearButtonClasses =
+	'btn btn-ghost btn-xs app-text-neutral hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none';
+
 export const actionTriggerMenuWideClasses =
 	'rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-120 max-w-lg min-w-60 overflow-y-auto border p-2 text-xs shadow-xl outline-none';
 

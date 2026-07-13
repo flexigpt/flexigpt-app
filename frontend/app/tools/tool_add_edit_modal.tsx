@@ -9,11 +9,14 @@ import type { Tool } from '@/spec/tool';
 import { HTTPBodyOutputMode, ToolImplType } from '@/spec/tool';
 
 import {
+	omitSensitiveHTTPHeaders,
 	parseHTTPHeadersJSON,
 	parseHTTPStatusCodes,
 	parseStringRecordJSON,
+	REDACTED_HTTP_VALUE,
 	redactSensitiveHTTPHeaders,
-	validateHTTPURLSecurity,
+	restoreRedactedHTTPHeaders,
+	validateHTTPURLTemplateSecurity,
 } from '@/lib/http_input_utils';
 import type { JSONSchema } from '@/lib/jsonschema_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
@@ -69,6 +72,7 @@ interface ErrorState {
 	httpQuery?: string;
 	httpResponseCodes?: string;
 	httpTimeoutMS?: string;
+	httpAuth?: string;
 	tags?: string;
 }
 
@@ -129,7 +133,7 @@ function validateHTTPToolURL(raw: string, input: HTMLInputElement | null) {
 		...result,
 		error:
 			result.error ??
-			(result.normalized ? validateHTTPURLSecurity(result.normalized, 'HTTP tool URL') : MessageEnterValidURL),
+			(result.normalized ? validateHTTPURLTemplateSecurity(result.normalized, 'HTTP tool URL') : MessageEnterValidURL),
 	};
 }
 
@@ -146,6 +150,7 @@ function buildInitialFormData(
 	const t = initialData.tool;
 	const existingVersionsForSlug = existingTools.filter(x => x.tool.slug === t.slug).map(x => x.tool.version);
 	const nextV = isEditMode ? suggestNextMinorVersion(t.version, existingVersionsForSlug).suggested : t.version;
+	const protectSensitiveValues = isEditMode || isViewMode;
 
 	return {
 		displayName: t.displayName,
@@ -168,7 +173,7 @@ function buildInitialFormData(
 		httpUrl: t.httpImpl?.request.urlTemplate ?? '',
 		httpMethod: t.httpImpl?.request.method ?? 'GET',
 		httpHeaders: JSON.stringify(
-			isViewMode
+			protectSensitiveValues
 				? (redactSensitiveHTTPHeaders(t.httpImpl?.request.headers) ?? {})
 				: (t.httpImpl?.request.headers ?? {}),
 			null,
@@ -180,7 +185,7 @@ function buildInitialFormData(
 		httpAuthIn: t.httpImpl?.request.auth?.in ?? '',
 		httpAuthName: t.httpImpl?.request.auth?.name ?? '',
 		httpAuthValueTemplate:
-			isViewMode && t.httpImpl?.request.auth?.valueTemplate
+			protectSensitiveValues && t.httpImpl?.request.auth?.valueTemplate
 				? '[configured]'
 				: (t.httpImpl?.request.auth?.valueTemplate ?? ''),
 		httpResponseCodes: (t.httpImpl?.response.successCodes ?? []).join(','),
@@ -336,7 +341,10 @@ function AddEditToolModalContent({
 				newErrs = omitManyKeys(newErrs, ['httpHeaders']);
 			} else {
 				try {
-					parseHTTPHeadersJSON(val, 'Headers');
+					restoreRedactedHTTPHeaders(
+						parseHTTPHeadersJSON(val, 'Headers'),
+						isEditMode ? initialData?.tool.httpImpl?.request.headers : undefined
+					);
 					newErrs = omitManyKeys(newErrs, ['httpHeaders']);
 				} catch (error) {
 					newErrs.httpHeaders = error instanceof Error ? error.message : 'Headers must be valid JSON.';
@@ -375,6 +383,24 @@ function AddEditToolModalContent({
 					newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
 				}
 			}
+		} else if (field === 'httpAuth') {
+			if (!state.httpAuthType.trim()) {
+				newErrs = omitManyKeys(newErrs, ['httpAuth']);
+			} else if (state.httpAuthType !== 'apiKey') {
+				newErrs.httpAuth = 'Only apiKey authentication is supported by the HTTP tool schema.';
+			} else if (state.httpAuthIn !== 'header' && state.httpAuthIn !== 'query') {
+				newErrs.httpAuth = 'Auth In must be either "header" or "query".';
+			} else if (!state.httpAuthName.trim()) {
+				newErrs.httpAuth = 'Auth Name is required when authentication is configured.';
+			} else if (!state.httpAuthValueTemplate) {
+				newErrs.httpAuth = 'Auth Value Template is required when authentication is configured.';
+			} else if (!isEditMode && state.httpAuthValueTemplate === REDACTED_HTTP_VALUE) {
+				newErrs.httpAuth = 'Enter an authentication value instead of using the redaction marker.';
+			} else if (/[\r\n\u0000]/.test(state.httpAuthValueTemplate)) {
+				newErrs.httpAuth = 'Auth Value Template must not contain CR, LF, or NUL.';
+			} else {
+				newErrs = omitManyKeys(newErrs, ['httpAuth']);
+			}
 		} else {
 			newErrs = omitManyKeys(newErrs, [field]);
 		}
@@ -401,6 +427,7 @@ function AddEditToolModalContent({
 			newErrs = validateField('httpQuery', state.httpQuery, newErrs, state);
 			newErrs = validateField('httpResponseCodes', state.httpResponseCodes, newErrs, state);
 			newErrs = validateField('httpTimeoutMS', state.httpTimeoutMS, newErrs, state);
+			newErrs = validateField('httpAuth', state.httpAuthType, newErrs, state);
 		}
 
 		return newErrs;
@@ -418,6 +445,8 @@ function AddEditToolModalContent({
 			slug: formData.slug,
 			version: formData.version,
 			isEnabled: true,
+			httpHeaders: JSON.stringify(omitSensitiveHTTPHeaders(source.tool.httpImpl?.request.headers) ?? {}, null, 2),
+			httpAuthValueTemplate: '',
 		};
 
 		setFormData(next);
@@ -462,7 +491,7 @@ function AddEditToolModalContent({
 			});
 		}
 	};
-	// oxlint-disable-next-line jsreact-hooks/refs
+
 	const formIsValid = Object.values(validateForm(formData)).every(error => !error);
 	const requiredFieldsPresent =
 		formData.displayName.trim() &&
@@ -521,10 +550,16 @@ function AddEditToolModalContent({
 			let query: Record<string, string> | undefined;
 
 			try {
-				const parsed = parseHTTPHeadersJSON(formData.httpHeaders, 'Headers');
+				const parsed = restoreRedactedHTTPHeaders(
+					parseHTTPHeadersJSON(formData.httpHeaders, 'Headers'),
+					isEditMode ? initialData?.tool.httpImpl?.request.headers : undefined
+				);
 				headers = Object.keys(parsed).length > 0 ? parsed : undefined;
-			} catch {
-				setErrors(prev => ({ ...prev, httpHeaders: 'Headers must be a JSON object containing string values.' }));
+			} catch (error) {
+				setErrors(prev => ({
+					...prev,
+					httpHeaders: error instanceof Error ? error.message : 'Headers could not be resolved.',
+				}));
 				return;
 			}
 
@@ -537,6 +572,10 @@ function AddEditToolModalContent({
 			}
 
 			const successCodes = parseHTTPStatusCodes(formData.httpResponseCodes);
+			const authValueTemplate =
+				isEditMode && formData.httpAuthValueTemplate === REDACTED_HTTP_VALUE
+					? (initialData?.tool.httpImpl?.request.auth?.valueTemplate ?? '')
+					: formData.httpAuthValueTemplate;
 
 			httpImpl = {
 				request: {
@@ -551,7 +590,7 @@ function AddEditToolModalContent({
 								type: formData.httpAuthType,
 								in: formData.httpAuthIn || undefined,
 								name: formData.httpAuthName || undefined,
-								valueTemplate: formData.httpAuthValueTemplate,
+								valueTemplate: authValueTemplate,
 							}
 						: undefined,
 				},
@@ -1136,10 +1175,18 @@ function AddEditToolModalContent({
 											value={formData.httpAuthValueTemplate}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className="input w-full rounded-xl"
+											className={`input w-full rounded-xl ${errors.httpAuth ? 'input-error' : ''}`}
 											spellCheck="false"
 											autoComplete="off"
+											aria-invalid={Boolean(errors.httpAuth)}
 										/>
+										{errors.httpAuth ? (
+											<div className="label">
+												<span className="text-error flex items-center gap-1">
+													<FiAlertCircle size={12} /> {errors.httpAuth}
+												</span>
+											</div>
+										) : null}
 									</div>
 								</div>
 
@@ -1282,7 +1329,9 @@ export function AddEditToolModal({ isOpen, initialData, mode, ...rest }: AddEdit
 	}
 
 	const effectiveMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
-	const modalKey = `${effectiveMode}:${initialData?.tool.id ?? 'new'}:${initialData?.tool.version ?? DEFAULT_SEMVER}`;
+	const modalKey = `${effectiveMode}:${initialData?.tool.id ?? 'new'}:${
+		initialData?.tool.version ?? DEFAULT_SEMVER
+	}:${initialData?.tool.modifiedAt ?? 'unknown-modified'}`;
 
 	return createPortal(
 		<AddEditToolModalContent key={modalKey} initialData={initialData} mode={mode} {...rest} />,

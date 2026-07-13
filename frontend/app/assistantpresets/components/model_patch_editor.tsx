@@ -3,6 +3,8 @@ import { memo } from 'react';
 import { FiRefreshCcw } from 'react-icons/fi';
 
 import {
+	CacheControlKind,
+	CacheControlTTL,
 	OutputFormatKind,
 	OutputVerbosity,
 	ReasoningLevel,
@@ -15,6 +17,7 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import type { ModelPatchFormData, TriStateBoolean } from '@/assistantpresets/lib/assistant_preset_editor_types';
+import { CACHE_CONTROL_KIND_LABELS, CACHE_CONTROL_TTL_LABELS } from '@/modelpresets/lib/capabilities_override';
 
 interface AssistantPresetModelPatchEditorProps {
 	isViewMode: boolean;
@@ -30,10 +33,13 @@ const REASONING_LEVELS = Object.values(ReasoningLevel) as ReasoningLevel[];
 const REASONING_SUMMARY_STYLES = Object.values(ReasoningSummaryStyle) as ReasoningSummaryStyle[];
 const OUTPUT_VERBOSITIES = Object.values(OutputVerbosity) as OutputVerbosity[];
 const OUTPUT_FORMAT_KINDS = Object.values(OutputFormatKind) as OutputFormatKind[];
+const CACHE_CONTROL_KINDS = Object.values(CacheControlKind) as CacheControlKind[];
+const CACHE_CONTROL_TTLS = Object.values(CacheControlTTL) as CacheControlTTL[];
 
 const TRI_STATE_OPTIONS: TriStateBoolean[] = ['', 'true', 'false'];
 const REASONING_SUMMARY_STYLE_OPTIONS: Array<'' | ReasoningSummaryStyle> = ['', ...REASONING_SUMMARY_STYLES];
 const OUTPUT_VERBOSITY_OPTIONS: Array<'' | OutputVerbosity> = ['', ...OUTPUT_VERBOSITIES];
+const CACHE_CONTROL_TTL_OPTIONS: Array<'' | CacheControlTTL> = ['', ...CACHE_CONTROL_TTLS];
 
 function buildEnabledDropdownItems<K extends string>(keys: readonly K[]): Record<K, { isEnabled: boolean }> {
 	return Object.fromEntries(keys.map(key => [key, { isEnabled: true }])) as Record<K, { isEnabled: boolean }>;
@@ -55,6 +61,8 @@ const REASONING_LEVEL_DROPDOWN_ITEMS = buildEnabledDropdownItems(REASONING_LEVEL
 const REASONING_SUMMARY_STYLE_DROPDOWN_ITEMS = buildEnabledDropdownItems(REASONING_SUMMARY_STYLE_OPTIONS);
 const OUTPUT_VERBOSITY_DROPDOWN_ITEMS = buildEnabledDropdownItems(OUTPUT_VERBOSITY_OPTIONS);
 const OUTPUT_FORMAT_KIND_DROPDOWN_ITEMS = buildEnabledDropdownItems(OUTPUT_FORMAT_KINDS);
+const CACHE_CONTROL_KIND_DROPDOWN_ITEMS = buildEnabledDropdownItems(CACHE_CONTROL_KINDS);
+const CACHE_CONTROL_TTL_DROPDOWN_ITEMS = buildEnabledDropdownItems(CACHE_CONTROL_TTL_OPTIONS);
 
 export const AssistantPresetModelPatchEditor = memo(function AssistantPresetModelPatchEditor({
 	isViewMode,
@@ -221,6 +229,76 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 								spellCheck="false"
 							/>
 						</ModalField>
+					</ModalSection>
+
+					<ModalSection
+						title="Cache-control override"
+						description="Override request-level cache behavior. Provider capability validation still applies at runtime."
+					>
+						<ModalField label="Override Cache Control" htmlFor="assistant-model-patch-cache-enabled">
+							<input
+								id="assistant-model-patch-cache-enabled"
+								type="checkbox"
+								className="toggle toggle-accent"
+								checked={modelPatch.cacheControlEnabled}
+								disabled={isViewMode}
+								onChange={event => {
+									onPatchChange({ cacheControlEnabled: event.currentTarget.checked });
+								}}
+							/>
+						</ModalField>
+
+						{modelPatch.cacheControlEnabled ? (
+							<>
+								<ModalField label="Cache Kind">
+									<Dropdown<CacheControlKind>
+										dropdownItems={CACHE_CONTROL_KIND_DROPDOWN_ITEMS}
+										orderedKeys={CACHE_CONTROL_KINDS}
+										selectedKey={modelPatch.cacheControlKind}
+										onChange={cacheControlKind => {
+											onPatchChange({ cacheControlKind });
+										}}
+										disabled={isViewMode}
+										title="Cache-control kind"
+										getDisplayName={value => CACHE_CONTROL_KIND_LABELS[value] ?? value}
+									/>
+								</ModalField>
+
+								<ModalField label="Cache TTL" hint="Provider default leaves the explicit TTL unset.">
+									<Dropdown<'' | CacheControlTTL>
+										dropdownItems={CACHE_CONTROL_TTL_DROPDOWN_ITEMS}
+										orderedKeys={CACHE_CONTROL_TTL_OPTIONS}
+										selectedKey={modelPatch.cacheControlTTL}
+										onChange={cacheControlTTL => {
+											onPatchChange({ cacheControlTTL });
+										}}
+										disabled={isViewMode}
+										placeholderLabel="Provider Default"
+										title="Cache-control TTL"
+										getDisplayName={value => (value ? (CACHE_CONTROL_TTL_LABELS[value] ?? value) : 'Provider Default')}
+									/>
+								</ModalField>
+
+								<ModalField
+									label="Cache Key"
+									htmlFor="assistant-model-patch-cache-key"
+									hint="Optional provider request-cache key."
+								>
+									<input
+										id="assistant-model-patch-cache-key"
+										type="text"
+										className="input w-full rounded-xl"
+										readOnly={isViewMode}
+										value={modelPatch.cacheControlKey}
+										onChange={event => {
+											onPatchChange({ cacheControlKey: event.currentTarget.value });
+										}}
+										spellCheck="false"
+										autoComplete="off"
+									/>
+								</ModalField>
+							</>
+						) : null}
 					</ModalSection>
 
 					<ModalSection

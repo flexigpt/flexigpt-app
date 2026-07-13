@@ -329,6 +329,13 @@ export default function AssistantPresetsPage() {
 		}
 
 		const bundleData = bundles.find(item => item.bundle.id === deletingBundleID);
+		if (bundleData?.bundle.isBuiltIn) {
+			setBundleToDeleteID(null);
+			setAlertMsg('Built-in assistant preset bundles cannot be deleted.');
+			setShowAlert(true);
+			return;
+		}
+
 		if (!bundleData || bundleData.presetLoadError || bundleData.presets.length > 0) {
 			setBundleToDeleteID(null);
 			setAlertMsg(
