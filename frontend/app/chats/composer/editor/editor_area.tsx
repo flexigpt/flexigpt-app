@@ -1933,7 +1933,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						</div>
 					</div>
 
-					{/* Bottom bar for template/tool/attachment pickers + tips menus */}
+					{/* Bottom bar for composer pickers and keyboard shortcuts */}
 					<EditorBottomBar
 						onAttachFiles={handleAttachFiles}
 						onAttachDirectory={handleAttachDirectory}

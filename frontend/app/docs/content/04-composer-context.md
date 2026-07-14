@@ -1,14 +1,17 @@
 # Composer Context
 
-The composer is where you decide what the next message includes. This page covers how to use attachments, tools, skills, and web search while composing a chat message.
+The composer is where you decide what the next message includes. This page covers templates, instruction sources, attachments, tools, skills, and web search while composing a chat message.
 
 This page is about using context in Chats. To create or maintain reusable definitions, see [Reusable Catalogs](/docs?doc=reusable-catalogs).
 
 ## Table of contents <!-- omit from toc -->
 
 - [Quick chooser](#quick-chooser)
+- [Templates and instruction sources](#templates-and-instruction-sources)
 - [Attachments](#attachments)
 - [Tools](#tools)
+  - [Tool scope and persistence](#tool-scope-and-persistence)
+  - [Error results](#error-results)
 - [Web search](#web-search)
 - [Skills](#skills)
 - [MCP servers](#mcp-servers)
@@ -25,6 +28,22 @@ This page is about using context in Chats. To create or maintain reusable defini
 | Use server-discovered context                   | MCP                                                  |
 | Need recent web information                     | Web search, if compatible with the selected provider |
 | Use a reusable workflow mode or instruction set | Skill                                                |
+
+## Templates and instruction sources
+
+Template-style skills and instruction sources solve different parts of a request.
+
+- A template-style skill renders reusable text into the current draft. Templates with arguments or resources ask for configuration first.
+- After insertion, the rendered content is ordinary plain composer text. There is no active template to keep selected or collapse later.
+- Edit or remove inserted template text as you would manually written text. Doing so does not change selected instruction sources, attachments, or tools.
+
+Instruction sources shape the system instructions sent with the request. They are independent of template text:
+
+- the selected model default is added first when enabled
+- selected instruction-only skill sources are then appended in the order you selected them
+- sources are combined; a later source does not silently replace an earlier one
+
+Use the **Skills** picker to select or remove instruction sources. Clearing a source changes the next request's instructions but does not alter text previously inserted by a template.
 
 ## Attachments
 
@@ -50,8 +69,9 @@ The composer can add:
 
 Attachment behavior:
 
-- attachments added to the current draft belong to the message you send
-- older attachments return only when their older user turn is included by **Previous user turns**
+- attachments added to the current draft are available to the model when that message is sent
+- after sending, an attachment remains with that user message in conversation history
+- an older attachment is available again only when its older user turn is included by **Previous user turns**
 - deleting an attachment from the current draft does not rewrite older messages
 - folder chips are UI grouping; restored messages may show flat attachment chips
 - files and URLs are deduplicated by identity
@@ -93,6 +113,12 @@ Tools can be made available by:
 - skills
 - provider-compatible web search
 
+### Tool scope and persistence
+
+Use the **Tools** bottom bar chip area to add a tool for the next send, or configure a conversation tool when it should remain available. After a successful send, the tool choices used for that request are retained as conversation tools and included in later turns until you remove, disable, or change them.
+
+Review the configured conversation tools before sending a new task. Remove tools that are no longer needed instead of relying on an earlier task's narrow scope.
+
 Manual tool flow:
 
 1. choose or attach tools
@@ -107,6 +133,12 @@ Use manual review first for new tools, network tools, file tools, shell/script t
 Auto-execute can run eligible trusted calls with less interruption. Use it only for trusted, low-risk workflows.
 
 Some tools define required user options. If required options are missing, the composer blocks send. Use the tool options editor to provide valid JSON arguments.
+
+### Error results
+
+If a runnable tool call fails before producing output, retry or discard the call before sending. When an executed tool returns an error result, the composer marks the output separately. Retry a supported result, discard it, or deliberately send the error output to the model as context.
+
+Error output is not retried automatically. Treat it as data: inspect it and decide whether it belongs in the next request.
 
 ## Web search
 
@@ -128,7 +160,7 @@ Skills are reusable workflow modes. They are not just saved text.
 
 FlexiGPT uses skills for three closely related things:
 
-- **Template-style skills** seed the composer with reusable draft structure or starter text.
+- **Template-style skills** render reusable draft structure or starter text into plain composer text. They do not remain selected after insertion.
 - **Instruction-only skills** behave like durable system-style instructions without needing a separate prompt-template.
 - **Normal skills** carry workflow behavior, session state, and any runtime context the workflow needs.
 
@@ -140,6 +172,8 @@ The composer tracks:
 | **Active skills**  | Skills currently active in the skill runtime session. |
 
 When you send with enabled skills, FlexiGPT may create or refresh a skill session and include skill-related context, draft structure, or instruction-only behavior in the request.
+
+Selected instruction-only sources are independent of template text and are assembled with the selected model default as described in [Templates and instruction sources](#templates-and-instruction-sources).
 
 Assistant presets can enable skills and mark some as **preload as active**.
 

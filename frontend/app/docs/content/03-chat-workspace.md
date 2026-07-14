@@ -97,8 +97,8 @@ The composer bottom bar is where you add message context:
   - workflow modes for the current session, including template-style skills and instruction-only skills
 - **Web search**
   - provider-compatible web search selection
-- **Shortcuts and tips**
-  - input behavior reference
+- **Keyboard shortcuts**
+  - chat and composer actions
 
 The active chips bar shows what is currently attached or pending. Review chips before sending important work.
 

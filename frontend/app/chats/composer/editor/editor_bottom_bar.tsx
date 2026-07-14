@@ -11,7 +11,7 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
 import { AttachmentBottomBarChip } from '@/chats/composer/attachments/attachment_bottom_bar_chip';
-import { CommandTipsMenu } from '@/chats/composer/inputtips/command_tips_menu';
+import { KeyboardShortcutsMenu } from '@/chats/composer/editor/keyboard_shortcuts_menu';
 import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
@@ -220,7 +220,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 				</div>
 
 				<div className="ml-auto flex items-center gap-1">
-					<CommandTipsMenu shortcutConfig={shortcutConfig} />
+					<KeyboardShortcutsMenu shortcutConfig={shortcutConfig} />
 				</div>
 			</div>
 		</div>

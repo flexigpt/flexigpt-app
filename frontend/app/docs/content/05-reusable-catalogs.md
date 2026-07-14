@@ -172,7 +172,9 @@ Important behavior:
 - skills can be enabled or disabled
 - skills can show presence status such as present, missing, error, or unknown
 
-Use skills when you want a reusable workflow mode, a template-style draft starter, or instruction-only behavior that shapes the request context.
+In Chats, a template-style skill renders into plain composer text and does not remain selected after insertion. An instruction-only skill can be selected as a system instruction source independently of any template text. Selected sources are combined with the enabled model default rather than replacing one another.
+
+Use skills when you want a reusable workflow mode, a template-style draft starter, or instruction-only behavior that shapes the request context. See [Composer Context](/docs?doc=composer-context#templates-and-instruction-sources) for the per-message flow.
 
 Use assistant presets to preload skills for common workflows.
 

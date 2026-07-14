@@ -34,18 +34,18 @@ When a result changes, compare these layers one at a time.
 
 ## Main terms
 
-| Term                         | Meaning                                                                                                                                                                                      |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, a local runtime preset, or a compatible custom endpoint. |
-| **Model preset**             | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.           |
-| **Assistant preset**         | A reusable starter setup that can apply starting text, a model preset, tool selections, web search choices, and skill selections.                                                            |
-| **Instruction context**      | Durable instruction context shaped by model defaults or instruction-only skills.                                                                                                             |
-| **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                |
-| **Tool**                     | A callable capability the model can request during a conversation.                                                                                                                           |
-| **Skill**                    | A reusable workflow mode, including template-style skills and instruction-only skills that can seed drafts or shape behavior.                                                                |
-| **MCP server**               | One configured MCP (Model context protocol) endpoint inside a bundle, including transport, auth, trust, setup, discovery, and runtime state.                                                 |
-| **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                                         |
-| **Previous user turns**      | The history window for the next request.                                                                                                                                                     |
+| Term                         | Meaning                                                                                                                                                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, a local runtime preset, or a compatible custom endpoint.       |
+| **Model preset**             | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.                 |
+| **Assistant preset**         | A reusable starter setup that can apply starting text, a model preset, tool selections, web search choices, and skill selections.                                                                  |
+| **Instruction context**      | Durable system instruction context built from the selected model default and instruction-only skill sources. The model default comes first; selected sources are then combined in selection order. |
+| **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                      |
+| **Tool**                     | A callable capability the model can request during a conversation.                                                                                                                                 |
+| **Skill**                    | A reusable workflow mode, including template-style skills and instruction-only skills that can seed drafts or shape behavior.                                                                      |
+| **MCP server**               | One configured MCP (Model context protocol) endpoint inside a bundle, including transport, auth, trust, setup, discovery, and runtime state.                                                       |
+| **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                                               |
+| **Previous user turns**      | The history window for the next request.                                                                                                                                                           |
 
 ## Assistant preset versus model preset
 
