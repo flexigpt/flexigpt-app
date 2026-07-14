@@ -28,6 +28,46 @@ interface HoverTipProps {
 	tooltipClassName?: string;
 }
 
+interface HoverTipSection {
+	id: string;
+	title: ReactNode;
+	items: ReactNode[];
+}
+
+interface HoverTipContentProps {
+	title: ReactNode;
+	description: ReactNode;
+	sections: HoverTipSection[];
+}
+
+export function HoverTipContent({ title, description, sections }: HoverTipContentProps) {
+	return (
+		<div className="space-y-2 whitespace-normal">
+			<div className="text-xs/4 font-semibold">{title}</div>
+
+			<div className="border-info/30 bg-info/10 text-base-content/80 rounded-lg border px-2 py-1.5 text-[11px]/4">
+				<div>{description}</div>
+			</div>
+
+			{sections.map(section => (
+				<section key={section.id} className="border-base-300 border-t pt-2">
+					<div className="text-base-content/70 text-[10px] font-semibold tracking-wide uppercase">{section.title}</div>
+					<ul className="mt-1 space-y-1">
+						{section.items.map((item, index) => (
+							<li key={`${section.id}-${index}`} className="flex items-start gap-1.5 text-[11px]/4">
+								<span className="text-base-content/50 shrink-0" aria-hidden="true">
+									-
+								</span>
+								<span>{item}</span>
+							</li>
+						))}
+					</ul>
+				</section>
+			))}
+		</div>
+	);
+}
+
 export function HoverTip({
 	content,
 	children,

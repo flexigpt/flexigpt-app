@@ -13,7 +13,7 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 
 type TipKey = 'lastWins' | 'remove' | 'collapse' | 'attachmentsScope' | 'toolsPersist' | 'toolErrors';
 const tipsText: Record<TipKey, string> = {

@@ -6,9 +6,9 @@ import { FiEdit2, FiPlus, FiX } from 'react-icons/fi';
 import type { TabStore } from '@ariakit/react/tab';
 import { Tab, TabList } from '@ariakit/react/tab';
 
-import { HoverTip } from '@/components/ariakit_hover_tip';
 import { BusyDot } from '@/components/busy_dot';
 import { DownloadButton } from '@/components/download_button';
+import { HoverTip } from '@/components/hover_tip';
 
 import { sanitizeConversationTitle } from '@/chats/tabs/tabs_model';
 

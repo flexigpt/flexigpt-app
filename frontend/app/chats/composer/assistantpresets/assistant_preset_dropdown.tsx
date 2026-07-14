@@ -10,8 +10,8 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
+import { HoverTip } from '@/components/hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,

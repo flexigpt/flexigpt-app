@@ -4,7 +4,7 @@ import type { ConversationSearchItem } from '@/spec/conversation';
 
 import { formatDateAsString } from '@/lib/date_utils';
 
-import { HoverTip } from '@/components/ariakit_hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 
 import type { SearchResult } from '@/chats/search/conversation_search_utils';
 

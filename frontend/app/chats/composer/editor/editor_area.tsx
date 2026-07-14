@@ -38,7 +38,7 @@ import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
-import { HoverTip } from '@/components/ariakit_hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 
 import type { AssistantPresetRuntimeSnapshot } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { mapAssistantPresetWebSearchTemplatesToChoices } from '@/chats/composer/assistantpresets/assistant_preset_runtime';

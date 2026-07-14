@@ -6,7 +6,7 @@ import { ReasoningType } from '@/spec/inference';
 import type { UIChatOption } from '@/spec/modelpreset';
 
 import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 
 import { AdvancedParamsModal } from '@/chats/composer/advancedparams/advanced_params_modal';
 import { AssistantPresetDropdown } from '@/chats/composer/assistantpresets/assistant_preset_dropdown';

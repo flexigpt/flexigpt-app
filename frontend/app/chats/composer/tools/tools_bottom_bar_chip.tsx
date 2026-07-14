@@ -19,8 +19,8 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
+import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,
@@ -506,33 +506,60 @@ export function ToolsBottomBarChip({
 	const configuredToolCount =
 		visibleAttachedToolEntries.length + conversationToolCount + compatibleWebSearchTemplates.length;
 
-	const title = useMemo(() => {
-		const lines: string[] = [
-			shortcut ? `Attach tools (${shortcut})` : 'Attach tools',
-			'Choose per-message tools, conversation tools, and web search.',
-			configuredToolCount > 0 ? `Configured: ${configuredToolCount}` : 'No tools configured',
-		];
-		if (visibleAttachedToolEntries.length > 0) {
-			lines.push(`Per-message tools: ${visibleAttachedToolEntries.length}`);
-		}
-		if (conversationToolCount > 0) {
-			lines.push(`Conversation tools: ${conversationToolCount}`);
-		}
-		if (webSearchEnabled) {
-			lines.push('Web search: enabled');
-		}
-		if (missingArgsCount > 0) {
-			lines.push(`Missing required options: ${missingArgsCount}`);
-		}
-		return lines.join('\n');
-	}, [
-		configuredToolCount,
-		conversationToolCount,
-		missingArgsCount,
-		shortcut,
-		visibleAttachedToolEntries.length,
-		webSearchEnabled,
-	]);
+	const hoverTipContent = useMemo(
+		() => (
+			<HoverTipContent
+				title={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
+				description="Choose tools for this message, retain conversation tools, and configure web search."
+				sections={[
+					{
+						id: 'current-state',
+						title: 'Current state',
+						items: [
+							`Tool configurations: ${configuredToolCount}`,
+							`Per-message tools: ${visibleAttachedToolEntries.length}`,
+							`Conversation tools: ${conversationToolCount}`,
+							webSearchDefinitionPending
+								? 'Web search: resolving the selected tool'
+								: webSearchEnabled
+									? 'Web search: enabled'
+									: 'Web search: not enabled',
+							missingArgsCount > 0 ? `Required options: ${missingArgsCount} missing` : 'Required options: complete',
+						],
+					},
+					...(missingArgsCount > 0
+						? [
+								{
+									id: 'before-sending',
+									title: <span className="text-warning">Before sending</span>,
+									items: [
+										`Fill ${missingArgsCount} required tool or web-search option${missingArgsCount === 1 ? '' : 's'} before sending.`,
+									],
+								},
+							]
+						: []),
+					...(configuredToolCount > 0
+						? [
+								{
+									id: 'clear-action',
+									title: 'Clear action',
+									items: ['Clear removes per-message tools, conversation tool settings, and the web-search selection.'],
+								},
+							]
+						: []),
+				]}
+			/>
+		),
+		[
+			configuredToolCount,
+			conversationToolCount,
+			missingArgsCount,
+			shortcut,
+			visibleAttachedToolEntries.length,
+			webSearchEnabled,
+			webSearchDefinitionPending,
+		]
+	);
 
 	const chipToneClasses =
 		missingArgsCount > 0
@@ -938,7 +965,13 @@ export function ToolsBottomBarChip({
 
 	return (
 		<div className="relative shrink-0" data-bottom-bar-tools>
-			<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+			<HoverTip
+				content={hoverTipContent}
+				placement="top"
+				wrapperElement="div"
+				wrapperClassName="inline-flex max-w-full"
+				tooltipClassName="max-w-sm"
+			>
 				<div
 					className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
 				>

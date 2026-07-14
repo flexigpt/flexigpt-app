@@ -19,8 +19,8 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
+import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,
@@ -784,11 +784,28 @@ function SkillTemplateBottomBarChipInner({
 	isInputLocked = false,
 }: SkillTemplateBottomBarChipProps) {
 	const open = useStoreState(store, 'open');
-	const tooltip = [
-		shortcut ? `Insert template (${shortcut})` : 'Insert template',
-		'Templates are user-message skills rendered into plain composer text.',
-		'Inserted templates do not remain selected, so there is no active count or clear action.',
-	].join('\n');
+	const hoverTipContent = (
+		<HoverTipContent
+			title={shortcut ? `Insert template (${shortcut})` : 'Insert template'}
+			description="Templates are user-message skills that render into plain composer text."
+			sections={[
+				{
+					id: 'current-state',
+					title: 'Current state',
+					items: ['No template is active. Inserted templates do not remain selected after insertion.'],
+				},
+				{
+					id: 'insertion-behavior',
+					title: 'When you insert',
+					items: [
+						'The rendered template text is added directly to the composer.',
+						'Templates with arguments or resources open a configuration dialog first.',
+						'There is no active-template count or clear action after insertion.',
+					],
+				},
+			]}
+		/>
+	);
 	const { items: templates, loading, error: templateLoadError, refresh } = useUserMessageSkillTemplates(open);
 	const [modalItem, setModalItem] = useState<SkillListItem | null>(null);
 	const [templateActionError, setTemplateActionError] = useState<string | null>(null);
@@ -857,7 +874,13 @@ function SkillTemplateBottomBarChipInner({
 
 	return (
 		<div className="relative shrink-0" data-bottom-bar-skill-templates>
-			<HoverTip content={tooltip} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+			<HoverTip
+				content={hoverTipContent}
+				placement="top"
+				wrapperElement="div"
+				wrapperClassName="inline-flex max-w-full"
+				tooltipClassName="max-w-sm"
+			>
 				<div
 					className={`${actionTriggerChipSurfaceClasses} border ${
 						open ? 'border-base-300 bg-base-300/60' : 'border-transparent'

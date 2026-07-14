@@ -34,7 +34,7 @@ import {
 	ActionTriggerChipContent,
 	actionTriggerChipSurfaceClasses,
 } from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
+import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,
@@ -918,41 +918,65 @@ export function MCPBottomBarChip({
 
 	const firstVisibleOption = displayedVisibleOptions[0] ?? null;
 
-	const title = useMemo(() => {
-		const lines = [
-			shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP',
-			'Choose MCP servers, tools, resources, and prompts for the next message.',
-			enabledCount > 0
-				? `Status: Enabled (${enabledCount} server${enabledCount === 1 ? '' : 's'})`
-				: 'Status: Disabled',
-		];
-
-		if (state.selectedToolCount > 0) {
-			lines.push(`Tools: ${state.selectedToolCount}`);
-		}
-		if (state.selectedResourceCount > 0) {
-			lines.push(`Resources: ${state.selectedResourceCount}`);
-		}
-		if (state.selectedPromptCount > 0) {
-			lines.push(`Prompts: ${state.selectedPromptCount}`);
-		}
-		if (state.requiredArgumentMissingCount > 0) {
-			lines.push(`Missing required args: ${state.requiredArgumentMissingCount}`);
-		}
-		if (hasAppContextUpdates) {
-			lines.push(`Queued app context updates: ${appContextUpdateCount}`);
-		}
-		return lines.join('\n');
-	}, [
-		appContextUpdateCount,
-		enabledCount,
-		hasAppContextUpdates,
-		shortcut,
-		state.requiredArgumentMissingCount,
-		state.selectedPromptCount,
-		state.selectedResourceCount,
-		state.selectedToolCount,
-	]);
+	const hoverTipContent = useMemo(
+		() => (
+			<HoverTipContent
+				title={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
+				description="Choose MCP servers and the tools, resources, prompts, and instructions they provide for the next message."
+				sections={[
+					{
+						id: 'current-state',
+						title: 'Current state',
+						items: [
+							`${enabledCount} MCP ${enabledCount === 1 ? 'server' : 'servers'} selected`,
+							`Tools: ${state.selectedToolCount} selected`,
+							`Resources: ${state.selectedResourceCount} selected`,
+							`Prompts: ${state.selectedPromptCount} selected`,
+							state.requiredArgumentMissingCount > 0
+								? `Required arguments: ${state.requiredArgumentMissingCount} missing`
+								: 'Required arguments: complete',
+							hasAppContextUpdates
+								? `App context updates: ${appContextUpdateCount} queued for the next send`
+								: 'App context updates: none queued',
+						],
+					},
+					...(hasBlockingArgs
+						? [
+								{
+									id: 'before-sending',
+									title: <span className="text-warning">Before sending</span>,
+									items: [
+										state.requiredArgumentMissingCount > 0
+											? `Fill ${state.requiredArgumentMissingCount} required MCP argument${state.requiredArgumentMissingCount === 1 ? '' : 's'}.`
+											: 'Complete the required MCP arguments before sending.',
+									],
+								},
+							]
+						: []),
+					...(enabledCount > 0 || hasAppContextUpdates
+						? [
+								{
+									id: 'clear-action',
+									title: 'Clear action',
+									items: ['Clear removes selected MCP context and discards queued app context updates.'],
+								},
+							]
+						: []),
+				]}
+			/>
+		),
+		[
+			appContextUpdateCount,
+			enabledCount,
+			hasAppContextUpdates,
+			hasBlockingArgs,
+			shortcut,
+			state.requiredArgumentMissingCount,
+			state.selectedPromptCount,
+			state.selectedResourceCount,
+			state.selectedToolCount,
+		]
+	);
 
 	const manualOAuthModalOption = useMemo(() => {
 		if (!manualOAuthModalKey) {
@@ -1018,7 +1042,13 @@ export function MCPBottomBarChip({
 	return (
 		<>
 			<div className="relative shrink-0" data-bottom-bar-mcp>
-				<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+				<HoverTip
+					content={hoverTipContent}
+					placement="top"
+					wrapperElement="div"
+					wrapperClassName="inline-flex max-w-full"
+					tooltipClassName="max-w-sm"
+				>
 					<div
 						className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
 					>

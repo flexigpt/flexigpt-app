@@ -20,8 +20,8 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
 import { Dropdown } from '@/components/dropdown';
+import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,
@@ -644,52 +644,63 @@ export function SkillsBottomBarChip({
 	const hasClearableSkillState =
 		enabledSkillRefs.length > 0 || activeSkillRefs.length > 0 || hasSelectedSystemInstructionState;
 
-	const title = useMemo(() => {
-		const lines: string[] = [
-			shortcut ? `Instruction skills (${shortcut})` : 'Instruction skills',
-			'Enable available instruction skills, activate eligible skills, or apply system instruction sources.',
-			'User-message templates are managed in the Templates menu.',
-			hasConfiguredSkillState ? 'Status: Configured' : 'Status: Not configured',
-		];
-		if (configuredCount > 0) {
-			lines.push(`Configured entries: ${configuredCount} (available enabled skills + applied system sources).`);
-		}
-		if (enabledCount > 0) {
-			lines.push(`Enabled skills: ${enabledCount}`);
-		}
-		if (activeCount > 0) {
-			lines.push(`Active now: ${activeCount}`);
-		}
-		if (appliedSystemInstructionCount > 0) {
-			lines.push(`Applied system instruction sources: ${appliedSystemInstructionCount}`);
-		}
-		if (totalCount > 0) {
-			lines.push(`Available: ${totalCount}`);
-		}
-		if (loading && totalCount === 0) {
-			lines.push('Loading available skills…');
-		}
-		if (loadError) {
-			lines.push('Skill list needs refresh. Only listed skills are counted.');
-		}
-		if (hasClearableSkillState) {
-			lines.push(
-				'Clear disables skills, turns off the model default for this conversation, and removes flattened instruction sources.'
-			);
-		}
-		return lines.join('\n');
-	}, [
-		configuredCount,
-		appliedSystemInstructionCount,
-		activeCount,
-		enabledCount,
-		hasClearableSkillState,
-		hasConfiguredSkillState,
-		loadError,
-		loading,
-		shortcut,
-		totalCount,
-	]);
+	const hoverTipContent = useMemo(
+		() => (
+			<HoverTipContent
+				title={shortcut ? `Instruction skills (${shortcut})` : 'Instruction skills'}
+				description="Enable skills for this conversation, activate eligible instructions now, and select flattened system-instruction sources. User-message templates are managed in Templates."
+				sections={[
+					{
+						id: 'current-state',
+						title: 'Current state',
+						items: [
+							`Configured entries: ${configuredCount}`,
+							`Session-enabled skills: ${enabledCount}`,
+							`Active session instructions: ${activeCount}`,
+							`Applied system instruction sources: ${appliedSystemInstructionCount}`,
+							`Available instruction skills: ${totalCount}`,
+							loading
+								? 'Skill catalog: loading'
+								: loadError
+									? 'Skill catalog: needs refresh'
+									: 'Skill catalog: available',
+						],
+					},
+					...(loadError
+						? [
+								{
+									id: 'catalog-attention',
+									title: <span className="text-warning">Catalog needs attention</span>,
+									items: ['Refresh the skill catalog. Only skills currently listed in the menu are counted.'],
+								},
+							]
+						: []),
+					...(hasClearableSkillState
+						? [
+								{
+									id: 'clear-action',
+									title: 'Clear action',
+									items: [
+										'Clear disables skills, turns off the model default, and removes flattened instruction sources.',
+									],
+								},
+							]
+						: []),
+				]}
+			/>
+		),
+		[
+			appliedSystemInstructionCount,
+			activeCount,
+			configuredCount,
+			enabledCount,
+			hasClearableSkillState,
+			loadError,
+			loading,
+			shortcut,
+			totalCount,
+		]
+	);
 
 	const chipToneClasses = hasConfiguredSkillState
 		? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
@@ -955,7 +966,13 @@ export function SkillsBottomBarChip({
 
 	return (
 		<div className="relative shrink-0" data-bottom-bar-skills>
-			<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+			<HoverTip
+				content={hoverTipContent}
+				placement="top"
+				wrapperElement="div"
+				wrapperClassName="inline-flex max-w-full"
+				tooltipClassName="max-w-sm"
+			>
 				<div
 					className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
 				>
@@ -969,8 +986,8 @@ export function SkillsBottomBarChip({
 							icon={<FiFilePlus size={14} />}
 							label="Skills"
 							count={
-								configuredCount > 0 ? (
-									<span className="badge badge-success badge-xs bg-success/30">{configuredCount}</span>
+								enabledCount > 0 ? (
+									<span className="badge badge-success badge-xs bg-success/30">Session {enabledCount}</span>
 								) : undefined
 							}
 							suffix={

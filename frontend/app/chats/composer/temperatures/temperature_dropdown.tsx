@@ -8,7 +8,7 @@ import {
 	actionTriggerMenuCompactClasses,
 	actionTriggerMenuItemClasses,
 } from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 
 const defaultTemperatureOptions = [0.0, 0.1, 0.5, 1.0];
 

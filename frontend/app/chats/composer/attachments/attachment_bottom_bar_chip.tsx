@@ -12,7 +12,7 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
+import { HoverTip } from '@/components/hover_tip';
 
 import { UrlAttachmentModal } from '@/chats/composer/attachments/attachment_url_modal';
 
