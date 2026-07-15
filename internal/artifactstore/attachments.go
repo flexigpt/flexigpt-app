@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 // RootSourceAttachmentDraft contains local fields for a new root/source link.
@@ -169,7 +170,7 @@ func (s *Store) validateAttachment(
 	root spec.ArtifactRoot,
 	attachment spec.RootSourceAttachment,
 ) error {
-	if err := spec.ValidateRootSourceAttachment(attachment); err != nil {
+	if err := validate.ValidateRootSourceAttachment(attachment); err != nil {
 		return fmt.Errorf("%w: source attachment: %w", spec.ErrInvalidRequest, err)
 	}
 	if hook, ok := s.rootHookFor(root.Kind); ok {

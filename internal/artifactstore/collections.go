@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 // CollectionUpdate replaces mutable local collection fields. CollectionID,
@@ -261,7 +262,7 @@ func (s *Store) DeleteCollection(
 }
 
 func (s *Store) validateCollection(ctx context.Context, collection spec.ArtifactCollection) error {
-	if err := spec.ValidateArtifactCollection(collection); err != nil {
+	if err := validate.ValidateArtifactCollection(collection); err != nil {
 		return fmt.Errorf("%w: collection: %w", spec.ErrInvalidRequest, err)
 	}
 	if hook, ok := s.collectionHookFor(collection.Kind); ok {

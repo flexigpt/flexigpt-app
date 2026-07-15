@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const (
@@ -29,7 +30,7 @@ const (
 )
 
 func (s *MetadataStore) CreateCollection(ctx context.Context, collection spec.ArtifactCollection) error {
-	if err := spec.ValidateArtifactCollection(collection); err != nil {
+	if err := validate.ValidateArtifactCollection(collection); err != nil {
 		return fmt.Errorf("validate collection for persistence: %w", err)
 	}
 	_, err := s.db.ExecContext(ctx, `
@@ -133,7 +134,7 @@ func (s *MetadataStore) UpdateCollection(
 	collection spec.ArtifactCollection,
 	expectedModifiedAt time.Time,
 ) error {
-	if err := spec.ValidateArtifactCollection(collection); err != nil {
+	if err := validate.ValidateArtifactCollection(collection); err != nil {
 		return fmt.Errorf("validate collection for persistence: %w", err)
 	}
 	if err := validateExpectedModifiedAt("collection", expectedModifiedAt); err != nil {
@@ -199,7 +200,7 @@ func scanCollection(scanner sqlScanner) (spec.ArtifactCollection, error) {
 		ModifiedAt:    modified,
 		SoftDeletedAt: deleted,
 	}
-	if err := spec.ValidateArtifactCollection(collection); err != nil {
+	if err := validate.ValidateArtifactCollection(collection); err != nil {
 		return spec.ArtifactCollection{}, fmt.Errorf(
 			"invalid persisted collection %q: %w",
 			row.CollectionID,

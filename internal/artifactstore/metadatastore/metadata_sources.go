@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const sourceColumns = `
@@ -25,7 +26,7 @@ const sourceColumns = `
 	modified_at`
 
 func (s *MetadataStore) CreateSource(ctx context.Context, source spec.ArtifactSource) error {
-	if err := spec.ValidateArtifactSource(source); err != nil {
+	if err := validate.ValidateArtifactSource(source); err != nil {
 		return fmt.Errorf("validate source for persistence: %w", err)
 	}
 	diagnostics, err := encodeDiagnostics(source.Diagnostics)
@@ -103,7 +104,7 @@ func (s *MetadataStore) UpdateSource(
 	source spec.ArtifactSource,
 	expectedModifiedAt time.Time,
 ) error {
-	if err := spec.ValidateArtifactSource(source); err != nil {
+	if err := validate.ValidateArtifactSource(source); err != nil {
 		return fmt.Errorf("validate source for persistence: %w", err)
 	}
 	if err := validateExpectedModifiedAt("source", expectedModifiedAt); err != nil {
@@ -186,7 +187,7 @@ func scanSource(scanner sqlScanner) (spec.ArtifactSource, error) {
 		CreatedAt:              created,
 		ModifiedAt:             modified,
 	}
-	if err := spec.ValidateArtifactSource(source); err != nil {
+	if err := validate.ValidateArtifactSource(source); err != nil {
 		return spec.ArtifactSource{}, fmt.Errorf("invalid persisted source %q: %w", row.SourceID, err)
 	}
 	return source, nil

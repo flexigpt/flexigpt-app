@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 func (s *Store) CreateRecord(ctx context.Context, draft spec.ArtifactRecordDraft) (spec.ArtifactRecord, error) {
@@ -414,7 +415,7 @@ func (s *Store) validateRecord(
 			record.Diagnostics = diagnostics
 		}
 	}
-	if err := spec.ValidateArtifactRecord(*record); err != nil {
+	if err := validate.ValidateArtifactRecord(*record); err != nil {
 		return err
 	}
 	return nil
@@ -469,7 +470,7 @@ func (s *Store) PinRecord(
 		record.State = spec.RecordStateAvailable
 	}
 	record.ModifiedAt = s.nextModifiedAt(record.ModifiedAt)
-	if err := spec.ValidateArtifactRecord(record); err != nil {
+	if err := validate.ValidateArtifactRecord(record); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	if err := s.repository.UpdateRecord(ctx, record, expectedModifiedAt); err != nil {
@@ -515,7 +516,7 @@ func (s *Store) DetachRecord(
 	record.State = spec.RecordStateAvailable
 	record.Diagnostics = nil
 	record.ModifiedAt = s.nextModifiedAt(record.ModifiedAt)
-	if err := spec.ValidateArtifactRecord(record); err != nil {
+	if err := validate.ValidateArtifactRecord(record); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	if err := s.repository.UpdateRecord(ctx, record, expectedModifiedAt); err != nil {

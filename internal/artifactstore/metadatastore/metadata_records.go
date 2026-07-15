@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const selectLatestRootGenerationForSynchronizationSQL = `SELECT generation
@@ -89,7 +90,7 @@ func (s *MetadataStore) UpdateRecord(
 	record spec.ArtifactRecord,
 	expectedModifiedAt time.Time,
 ) error {
-	if err := spec.ValidateArtifactRecord(record); err != nil {
+	if err := validate.ValidateArtifactRecord(record); err != nil {
 		return err
 	}
 	if err := validateExpectedModifiedAt("record", expectedModifiedAt); err != nil {
@@ -202,7 +203,7 @@ func (s *MetadataStore) PublishRecordSynchronization(
 			update.ExpectedTrackingMode == "" {
 			return fmt.Errorf("%w: invalid synchronized record update", spec.ErrInvalidRequest)
 		}
-		if err := spec.ValidateArtifactRecord(record); err != nil {
+		if err := validate.ValidateArtifactRecord(record); err != nil {
 			return err
 		}
 		diagnostics, err := encodeDiagnostics(record.Diagnostics)
@@ -270,16 +271,16 @@ func (s *MetadataStore) PublishRecordTransfer(
 		publication.Provenance.TargetRecordID != publication.Record.RecordID {
 		return fmt.Errorf("%w: inconsistent record transfer publication", spec.ErrInvalidRequest)
 	}
-	if err := spec.ValidateCatalogResource(publication.Resource); err != nil {
+	if err := validate.ValidateCatalogResource(publication.Resource); err != nil {
 		return err
 	}
-	if err := spec.ValidateCatalogResourceRevision(publication.Revision); err != nil {
+	if err := validate.ValidateCatalogResourceRevision(publication.Revision); err != nil {
 		return err
 	}
-	if err := spec.ValidateArtifactRecord(publication.Record); err != nil {
+	if err := validate.ValidateArtifactRecord(publication.Record); err != nil {
 		return err
 	}
-	if err := spec.ValidateTransferProvenance(publication.Provenance); err != nil {
+	if err := validate.ValidateTransferProvenance(publication.Provenance); err != nil {
 		return err
 	}
 
@@ -342,7 +343,7 @@ func (s *MetadataStore) ListTransferProvenance(
 			OriginDefinitionDigest: spec.Digest(row.OriginDefinitionDigest),
 			CreatedAt:              createdAt,
 		}
-		if err := spec.ValidateTransferProvenance(value); err != nil {
+		if err := validate.ValidateTransferProvenance(value); err != nil {
 			return nil, err
 		}
 		out = append(out, value)
@@ -355,7 +356,7 @@ func insertTransferProvenance(
 	executor sqlExecutor,
 	provenance spec.TransferProvenance,
 ) error {
-	if err := spec.ValidateTransferProvenance(provenance); err != nil {
+	if err := validate.ValidateTransferProvenance(provenance); err != nil {
 		return err
 	}
 	origin, err := encodeCatalogResourceKey(provenance.OriginResource)
@@ -377,7 +378,7 @@ func insertTransferProvenance(
 }
 
 func insertRecord(ctx context.Context, executor sqlExecutor, record spec.ArtifactRecord) error {
-	if err := spec.ValidateArtifactRecord(record); err != nil {
+	if err := validate.ValidateArtifactRecord(record); err != nil {
 		return err
 	}
 	diagnostics, err := encodeDiagnostics(record.Diagnostics)
@@ -450,7 +451,7 @@ func scanRecord(scanner sqlScanner) (spec.ArtifactRecord, error) {
 		CreatedAt:                    created,
 		ModifiedAt:                   modified,
 	}
-	if err := spec.ValidateArtifactRecord(record); err != nil {
+	if err := validate.ValidateArtifactRecord(record); err != nil {
 		return spec.ArtifactRecord{}, fmt.Errorf("invalid persisted record %q: %w", row.RecordID, err)
 	}
 	return record, nil

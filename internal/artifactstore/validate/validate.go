@@ -1,4 +1,4 @@
-package spec
+package validate
 
 import (
 	"bytes"
@@ -12,6 +12,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
 
 var (
@@ -21,20 +23,25 @@ var (
 )
 
 // ValidateArtifactRoot validates app-local root metadata.
-func ValidateArtifactRoot(v ArtifactRoot) error {
+func ValidateArtifactRoot(v spec.ArtifactRoot) error {
 	if err := validateID("rootID", string(v.RootID)); err != nil {
 		return err
 	}
 	if err := validateKind("root.kind", string(v.Kind)); err != nil {
 		return err
 	}
-	if err := validateRequiredText("root.displayName", v.DisplayName, MaxDisplayNameBytes); err != nil {
+	if err := validateRequiredText("root.displayName", v.DisplayName, spec.MaxDisplayNameBytes); err != nil {
 		return err
 	}
 	if err := validateDescription("root.description", v.Description); err != nil {
 		return err
 	}
-	if err := validateSchemaBoundJSONObject("root.data", v.Data, v.DataSchemaID, MaxLocalDataJSONBytes); err != nil {
+	if err := validateSchemaBoundJSONObject(
+		"root.data",
+		v.Data,
+		v.DataSchemaID,
+		spec.MaxLocalDataJSONBytes,
+	); err != nil {
 		return err
 	}
 	if err := validateCreatedModified("root", v.CreatedAt, v.ModifiedAt); err != nil {
@@ -47,20 +54,20 @@ func ValidateArtifactRoot(v ArtifactRoot) error {
 }
 
 // ValidateArtifactSource validates app-local source registration metadata.
-func ValidateArtifactSource(v ArtifactSource) error {
+func ValidateArtifactSource(v spec.ArtifactSource) error {
 	if err := validateID("sourceID", string(v.SourceID)); err != nil {
 		return err
 	}
 	if err := validateKind("source.kind", string(v.Kind)); err != nil {
 		return err
 	}
-	if err := validateRequiredText("source.displayName", v.DisplayName, MaxDisplayNameBytes); err != nil {
+	if err := validateRequiredText("source.displayName", v.DisplayName, spec.MaxDisplayNameBytes); err != nil {
 		return err
 	}
 	if err := validateSchemaID("source.configSchemaID", v.ConfigSchemaID); err != nil {
 		return err
 	}
-	if err := validateJSONObject("source.config", v.Config, MaxConfigJSONBytes); err != nil {
+	if err := validateJSONObject("source.config", v.Config, spec.MaxConfigJSONBytes); err != nil {
 		return err
 	}
 	if err := validateKnownSourceConfig(v); err != nil {
@@ -83,7 +90,7 @@ func ValidateArtifactSource(v ArtifactSource) error {
 }
 
 // ValidateRootSourceAttachment validates an app-local root/source attachment.
-func ValidateRootSourceAttachment(v RootSourceAttachment) error {
+func ValidateRootSourceAttachment(v spec.RootSourceAttachment) error {
 	if err := validateID("attachment.rootID", string(v.RootID)); err != nil {
 		return err
 	}
@@ -93,14 +100,18 @@ func ValidateRootSourceAttachment(v RootSourceAttachment) error {
 	if err := validateKind("attachment.role", string(v.Role)); err != nil {
 		return err
 	}
-	if v.Priority < -MaxAttachmentPriority || v.Priority > MaxAttachmentPriority {
-		return invalidf("attachment.priority must be between %d and %d", -MaxAttachmentPriority, MaxAttachmentPriority)
+	if v.Priority < -spec.MaxAttachmentPriority || v.Priority > spec.MaxAttachmentPriority {
+		return invalidf(
+			"attachment.priority must be between %d and %d",
+			-spec.MaxAttachmentPriority,
+			spec.MaxAttachmentPriority,
+		)
 	}
 	if err := validateSchemaBoundJSONObject(
 		"attachment.data",
 		v.Data,
 		v.DataSchemaID,
-		MaxLocalDataJSONBytes,
+		spec.MaxLocalDataJSONBytes,
 	); err != nil {
 		return err
 	}
@@ -108,7 +119,7 @@ func ValidateRootSourceAttachment(v RootSourceAttachment) error {
 }
 
 // ValidateArtifactPackage validates app-local package-occurrence metadata.
-func ValidateArtifactPackage(v ArtifactPackage) error {
+func ValidateArtifactPackage(v spec.ArtifactPackage) error {
 	if err := validateID("package.sourceID", string(v.SourceID)); err != nil {
 		return err
 	}
@@ -119,7 +130,7 @@ func ValidateArtifactPackage(v ArtifactPackage) error {
 		return err
 	}
 	if v.Name != "" {
-		if err := validateRequiredText("package.name", string(v.Name), MaxLogicalNameBytes); err != nil {
+		if err := validateRequiredText("package.name", string(v.Name), spec.MaxLogicalNameBytes); err != nil {
 			return err
 		}
 	}
@@ -128,7 +139,7 @@ func ValidateArtifactPackage(v ArtifactPackage) error {
 			return err
 		}
 	}
-	if err := validateOptionalText("package.displayName", v.DisplayName, MaxDisplayNameBytes); err != nil {
+	if err := validateOptionalText("package.displayName", v.DisplayName, spec.MaxDisplayNameBytes); err != nil {
 		return err
 	}
 	if err := validateDescription("package.description", v.Description); err != nil {
@@ -137,15 +148,18 @@ func ValidateArtifactPackage(v ArtifactPackage) error {
 	if err := validateOptionalDigest("package.currentManifestDigest", v.CurrentManifestDigest); err != nil {
 		return err
 	}
-	if v.State == CatalogStateValid {
-		if err := validateRequiredText("package.name", string(v.Name), MaxLogicalNameBytes); err != nil {
+	if v.State == spec.CatalogStateValid {
+		if err := validateRequiredText("package.name", string(v.Name), spec.MaxLogicalNameBytes); err != nil {
 			return err
 		}
 		if err := validateVersion("package.version", string(v.Version), false); err != nil {
 			return err
 		}
 		if v.CurrentManifestDigest == nil {
-			return invalidf("package.currentManifestDigest is required when package.state is %q", CatalogStateValid)
+			return invalidf(
+				"package.currentManifestDigest is required when package.state is %q",
+				spec.CatalogStateValid,
+			)
 		}
 	}
 	if err := validateFirstLast("package", v.FirstSeenAt, v.LastSeenAt); err != nil {
@@ -155,8 +169,8 @@ func ValidateArtifactPackage(v ArtifactPackage) error {
 }
 
 // ValidateCatalogResource validates app-local catalog metadata.
-func ValidateCatalogResource(v CatalogResource) error {
-	if err := ValidateCatalogResourceKey(CatalogResourceKey{
+func ValidateCatalogResource(v spec.CatalogResource) error {
+	if err := ValidateCatalogResourceKey(spec.CatalogResourceKey{
 		SourceID:           v.SourceID,
 		Locator:            v.Locator,
 		SubresourceLocator: v.SubresourceLocator,
@@ -181,7 +195,7 @@ func ValidateCatalogResource(v CatalogResource) error {
 		if err := validateRequiredText(
 			"catalog resource.logicalName",
 			string(v.LogicalName),
-			MaxLogicalNameBytes,
+			spec.MaxLogicalNameBytes,
 		); err != nil {
 			return err
 		}
@@ -208,21 +222,21 @@ func ValidateCatalogResource(v CatalogResource) error {
 	if err := validateCatalogState("catalog resource.state", v.State); err != nil {
 		return err
 	}
-	if v.State == CatalogStateValid {
+	if v.State == spec.CatalogStateValid {
 		if err := validateKind("catalog resource.kind", string(v.Kind)); err != nil {
 			return err
 		}
 		if err := validateRequiredText(
 			"catalog resource.logicalName",
 			string(v.LogicalName),
-			MaxLogicalNameBytes,
+			spec.MaxLogicalNameBytes,
 		); err != nil {
 			return err
 		}
 		if v.CurrentDefinitionDigest == nil || v.SourceContentDigest == nil {
 			return invalidf(
 				"catalog resource digests are required when catalog resource.state is %q",
-				CatalogStateValid,
+				spec.CatalogStateValid,
 			)
 		}
 		if err := validateKind("catalog resource.frontendID", string(v.FrontendID)); err != nil {
@@ -236,8 +250,8 @@ func ValidateCatalogResource(v CatalogResource) error {
 }
 
 // ValidateCatalogResourceRevision validates durable resource history metadata.
-func ValidateCatalogResourceRevision(v CatalogResourceRevision) error {
-	if err := ValidateCatalogResourceKey(CatalogResourceKey{
+func ValidateCatalogResourceRevision(v spec.CatalogResourceRevision) error {
+	if err := ValidateCatalogResourceKey(spec.CatalogResourceKey{
 		SourceID:           v.SourceID,
 		Locator:            v.Locator,
 		SubresourceLocator: v.SubresourceLocator,
@@ -261,8 +275,8 @@ func ValidateCatalogResourceRevision(v CatalogResourceRevision) error {
 
 // ValidateArtifactDefinitionFile validates the portable JSON definition file
 // envelope used by generic transfer operations.
-func ValidateArtifactDefinitionFile(v ArtifactDefinitionFile) error {
-	if v.Format != ArtifactDefinitionFileFormatV1 {
+func ValidateArtifactDefinitionFile(v spec.ArtifactDefinitionFile) error {
+	if v.Format != spec.ArtifactDefinitionFileFormatV1 {
 		return invalidf("definition file.format %q is not supported", v.Format)
 	}
 	return ValidateCanonicalDefinition(v.Definition)
@@ -270,7 +284,7 @@ func ValidateArtifactDefinitionFile(v ArtifactDefinitionFile) error {
 
 // ValidateCanonicalDefinition validates portable definition structure. Digest
 // recomputation is intentionally performed later by the canonical codec.
-func ValidateCanonicalDefinition(v CanonicalDefinition) error {
+func ValidateCanonicalDefinition(v spec.CanonicalDefinition) error {
 	if err := validateDigest("definition.digest", v.Digest); err != nil {
 		return err
 	}
@@ -283,13 +297,17 @@ func ValidateCanonicalDefinition(v CanonicalDefinition) error {
 	if err := validateVersion("definition.schemaVersion", v.SchemaVersion, false); err != nil {
 		return err
 	}
-	if err := validateRequiredText("definition.logicalName", string(v.LogicalName), MaxLogicalNameBytes); err != nil {
+	if err := validateRequiredText(
+		"definition.logicalName",
+		string(v.LogicalName),
+		spec.MaxLogicalNameBytes,
+	); err != nil {
 		return err
 	}
 	if err := validateVersion("definition.logicalVersion", string(v.LogicalVersion), true); err != nil {
 		return err
 	}
-	if err := validateOptionalText("definition.displayName", v.DisplayName, MaxDisplayNameBytes); err != nil {
+	if err := validateOptionalText("definition.displayName", v.DisplayName, spec.MaxDisplayNameBytes); err != nil {
 		return err
 	}
 	if err := validateDescription("definition.description", v.Description); err != nil {
@@ -298,24 +316,28 @@ func ValidateCanonicalDefinition(v CanonicalDefinition) error {
 	if err := validateLabels("definition.labels", v.Labels); err != nil {
 		return err
 	}
-	if err := validateJSONObject("definition.extensions", v.Extensions, MaxExtensionsJSONBytes); err != nil {
+	if err := validateJSONObject("definition.extensions", v.Extensions, spec.MaxExtensionsJSONBytes); err != nil {
 		return err
 	}
-	if err := validateJSONObject("definition.definitionJSON", v.DefinitionJSON, MaxDefinitionJSONBytes); err != nil {
+	if err := validateJSONObject(
+		"definition.definitionJSON",
+		v.DefinitionJSON,
+		spec.MaxDefinitionJSONBytes,
+	); err != nil {
 		return err
 	}
-	if len(v.DependencySelectors) > MaxSelectorsPerDefinition {
-		return invalidf("definition.dependencySelectors exceeds %d entries", MaxSelectorsPerDefinition)
+	if len(v.DependencySelectors) > spec.MaxSelectorsPerDefinition {
+		return invalidf("definition.dependencySelectors exceeds %d entries", spec.MaxSelectorsPerDefinition)
 	}
 	for i, selector := range v.DependencySelectors {
 		if err := ValidateArtifactSelector(selector); err != nil {
 			return fmt.Errorf("definition.dependencySelectors[%d]: %w", i, err)
 		}
 	}
-	if len(v.AssetManifest) > MaxAssetsPerDefinition {
-		return invalidf("definition.assetManifest exceeds %d entries", MaxAssetsPerDefinition)
+	if len(v.AssetManifest) > spec.MaxAssetsPerDefinition {
+		return invalidf("definition.assetManifest exceeds %d entries", spec.MaxAssetsPerDefinition)
 	}
-	seenPaths := make(map[PortablePath]struct{}, len(v.AssetManifest))
+	seenPaths := make(map[spec.PortablePath]struct{}, len(v.AssetManifest))
 	for i, asset := range v.AssetManifest {
 		if err := ValidateAssetManifestEntry(asset); err != nil {
 			return fmt.Errorf("definition.assetManifest[%d]: %w", i, err)
@@ -330,30 +352,34 @@ func ValidateCanonicalDefinition(v CanonicalDefinition) error {
 
 // ValidatePortablePackageManifest validates the portable generic package
 // manifest. It does not impose this format on frontend-native source files.
-func ValidatePortablePackageManifest(v PortablePackageManifest) error {
-	if v.Format != PortablePackageManifestFormatV1 {
+func ValidatePortablePackageManifest(v spec.PortablePackageManifest) error {
+	if v.Format != spec.PortablePackageManifestFormatV1 {
 		return invalidf("portable package.format %q is not supported", v.Format)
 	}
-	if err := validateRequiredText("portable package.name", string(v.Name), MaxLogicalNameBytes); err != nil {
+	if err := validateRequiredText("portable package.name", string(v.Name), spec.MaxLogicalNameBytes); err != nil {
 		return err
 	}
 	if err := validateVersion("portable package.version", string(v.Version), false); err != nil {
 		return err
 	}
-	if err := validateOptionalText("portable package.displayName", v.DisplayName, MaxDisplayNameBytes); err != nil {
+	if err := validateOptionalText(
+		"portable package.displayName",
+		v.DisplayName,
+		spec.MaxDisplayNameBytes,
+	); err != nil {
 		return err
 	}
 	if err := validateDescription("portable package.description", v.Description); err != nil {
 		return err
 	}
-	if err := validateJSONObject("portable package.extensions", v.Extensions, MaxExtensionsJSONBytes); err != nil {
+	if err := validateJSONObject("portable package.extensions", v.Extensions, spec.MaxExtensionsJSONBytes); err != nil {
 		return err
 	}
-	if len(v.Definitions) > MaxPortablePackageDefinitions {
-		return invalidf("portable package.definitions exceeds %d entries", MaxPortablePackageDefinitions)
+	if len(v.Definitions) > spec.MaxPortablePackageDefinitions {
+		return invalidf("portable package.definitions exceeds %d entries", spec.MaxPortablePackageDefinitions)
 	}
-	seenDigests := make(map[Digest]struct{}, len(v.Definitions))
-	seenFiles := make(map[PortablePath]struct{}, len(v.Definitions))
+	seenDigests := make(map[spec.Digest]struct{}, len(v.Definitions))
+	seenFiles := make(map[spec.PortablePath]struct{}, len(v.Definitions))
 	for i, ref := range v.Definitions {
 		if err := validateDigest("portable package definition.digest", ref.Digest); err != nil {
 			return fmt.Errorf("portable package.definitions[%d]: %w", i, err)
@@ -370,10 +396,10 @@ func ValidatePortablePackageManifest(v PortablePackageManifest) error {
 		seenDigests[ref.Digest] = struct{}{}
 		seenFiles[ref.File] = struct{}{}
 	}
-	if len(v.Assets) > MaxAssetsPerDefinition {
-		return invalidf("portable package.assets exceeds %d entries", MaxAssetsPerDefinition)
+	if len(v.Assets) > spec.MaxAssetsPerDefinition {
+		return invalidf("portable package.assets exceeds %d entries", spec.MaxAssetsPerDefinition)
 	}
-	seenAssetPaths := make(map[PortablePath]struct{}, len(v.Assets))
+	seenAssetPaths := make(map[spec.PortablePath]struct{}, len(v.Assets))
 	for i, asset := range v.Assets {
 		if err := ValidateAssetManifestEntry(asset); err != nil {
 			return fmt.Errorf("portable package.assets[%d]: %w", i, err)
@@ -387,14 +413,14 @@ func ValidatePortablePackageManifest(v PortablePackageManifest) error {
 }
 
 // ValidateAssetManifestEntry validates one portable asset reference.
-func ValidateAssetManifestEntry(v AssetManifestEntry) error {
+func ValidateAssetManifestEntry(v spec.AssetManifestEntry) error {
 	if err := validatePortablePath("asset.path", v.Path, false); err != nil {
 		return err
 	}
 	if err := validateDigest("asset.digest", v.Digest); err != nil {
 		return err
 	}
-	if err := validateOptionalText("asset.mediaType", v.MediaType, MaxKindBytes); err != nil {
+	if err := validateOptionalText("asset.mediaType", v.MediaType, spec.MaxKindBytes); err != nil {
 		return err
 	}
 	if v.SizeBytes < 0 {
@@ -404,7 +430,7 @@ func ValidateAssetManifestEntry(v AssetManifestEntry) error {
 }
 
 // ValidateArtifactRecord validates app-local generic item metadata.
-func ValidateArtifactRecord(v ArtifactRecord) error {
+func ValidateArtifactRecord(v spec.ArtifactRecord) error {
 	if err := validateID("record.recordID", string(v.RecordID)); err != nil {
 		return err
 	}
@@ -425,7 +451,7 @@ func ValidateArtifactRecord(v ArtifactRecord) error {
 	if err := validateVersion("record.version", string(v.Version), true); err != nil {
 		return err
 	}
-	if err := ValidateCatalogResourceKey(CatalogResourceKey{
+	if err := ValidateCatalogResourceKey(spec.CatalogResourceKey{
 		SourceID:           v.SourceID,
 		Locator:            v.Locator,
 		SubresourceLocator: v.SubresourceLocator,
@@ -448,18 +474,18 @@ func ValidateArtifactRecord(v ArtifactRecord) error {
 		return err
 	}
 	switch v.TrackingMode {
-	case TrackingModePinDigest:
+	case spec.TrackingModePinDigest:
 		if v.PinnedDefinitionDigest == nil {
 			return invalidf(
 				"record.pinnedDefinitionDigest is required when record.trackingMode is %q",
-				TrackingModePinDigest,
+				spec.TrackingModePinDigest,
 			)
 		}
-	case TrackingModeFollowSource, TrackingModeManualRefresh:
+	case spec.TrackingModeFollowSource, spec.TrackingModeManualRefresh:
 		if v.PinnedDefinitionDigest != nil {
 			return invalidf(
 				"record.pinnedDefinitionDigest is only valid when record.trackingMode is %q",
-				TrackingModePinDigest,
+				spec.TrackingModePinDigest,
 			)
 		}
 	}
@@ -467,13 +493,18 @@ func ValidateArtifactRecord(v ArtifactRecord) error {
 		return err
 	}
 	switch v.State {
-	case RecordStateAvailable, RecordStateStale, RecordStateIncompatible:
+	case spec.RecordStateAvailable, spec.RecordStateStale, spec.RecordStateIncompatible:
 		if v.LastResolvedDefinitionDigest == nil {
 			return invalidf("record.lastResolvedDefinitionDigest is required when record.state is %q", v.State)
 		}
 	default:
 	}
-	if err := validateSchemaBoundJSONObject("record.data", v.Data, v.DataSchemaID, MaxLocalDataJSONBytes); err != nil {
+	if err := validateSchemaBoundJSONObject(
+		"record.data",
+		v.Data,
+		v.DataSchemaID,
+		spec.MaxLocalDataJSONBytes,
+	); err != nil {
 		return err
 	}
 	if err := ValidateDiagnostics(v.Diagnostics); err != nil {
@@ -483,7 +514,7 @@ func ValidateArtifactRecord(v ArtifactRecord) error {
 }
 
 // ValidateArtifactCollection validates an app-local record grouping.
-func ValidateArtifactCollection(v ArtifactCollection) error {
+func ValidateArtifactCollection(v spec.ArtifactCollection) error {
 	if err := validateID("collection.collectionID", string(v.CollectionID)); err != nil {
 		return err
 	}
@@ -496,7 +527,7 @@ func ValidateArtifactCollection(v ArtifactCollection) error {
 	if err := validateSlug("collection.slug", string(v.Slug)); err != nil {
 		return err
 	}
-	if err := validateRequiredText("collection.displayName", v.DisplayName, MaxDisplayNameBytes); err != nil {
+	if err := validateRequiredText("collection.displayName", v.DisplayName, spec.MaxDisplayNameBytes); err != nil {
 		return err
 	}
 	if err := validateDescription("collection.description", v.Description); err != nil {
@@ -506,7 +537,7 @@ func ValidateArtifactCollection(v ArtifactCollection) error {
 		"collection.data",
 		v.Data,
 		v.DataSchemaID,
-		MaxLocalDataJSONBytes,
+		spec.MaxLocalDataJSONBytes,
 	); err != nil {
 		return err
 	}
@@ -517,7 +548,7 @@ func ValidateArtifactCollection(v ArtifactCollection) error {
 }
 
 // ValidateRootCatalogGeneration validates app-local scan-publication metadata.
-func ValidateRootCatalogGeneration(v RootCatalogGeneration) error {
+func ValidateRootCatalogGeneration(v spec.RootCatalogGeneration) error {
 	if err := validateID("catalog generation.rootID", string(v.RootID)); err != nil {
 		return err
 	}
@@ -545,7 +576,7 @@ func ValidateRootCatalogGeneration(v RootCatalogGeneration) error {
 }
 
 // ValidateArtifactDependencySnapshot validates one durable selector result.
-func ValidateArtifactDependencySnapshot(v ArtifactDependencySnapshot) error {
+func ValidateArtifactDependencySnapshot(v spec.ArtifactDependencySnapshot) error {
 	if err := validateID("dependency.rootID", string(v.RootID)); err != nil {
 		return err
 	}
@@ -564,25 +595,25 @@ func ValidateArtifactDependencySnapshot(v ArtifactDependencySnapshot) error {
 	if err := validateDigest("dependency.definitionDigest", v.DefinitionDigest); err != nil {
 		return err
 	}
-	if v.SelectorIndex < 0 || v.SelectorIndex >= MaxSelectorsPerDefinition {
+	if v.SelectorIndex < 0 || v.SelectorIndex >= spec.MaxSelectorsPerDefinition {
 		return invalidf(
 			"dependency.selectorIndex must be between 0 and %d",
-			MaxSelectorsPerDefinition-1,
+			spec.MaxSelectorsPerDefinition-1,
 		)
 	}
 	if err := ValidateArtifactSelector(v.Selector); err != nil {
 		return fmt.Errorf("dependency.selector: %w", err)
 	}
 	switch v.State {
-	case DependencyResolutionStateResolved:
+	case spec.DependencyResolutionStateResolved:
 		if len(v.Candidates) != 1 {
 			return invalidf("resolved dependency must contain exactly one candidate")
 		}
-	case DependencyResolutionStateMissing:
+	case spec.DependencyResolutionStateMissing:
 		if len(v.Candidates) != 0 {
 			return invalidf("missing dependency must not contain candidates")
 		}
-	case DependencyResolutionStateAmbiguous:
+	case spec.DependencyResolutionStateAmbiguous:
 		if len(v.Candidates) < 2 {
 			return invalidf("ambiguous dependency must contain at least two candidates")
 		}
@@ -616,12 +647,16 @@ func ValidateArtifactDependencySnapshot(v ArtifactDependencySnapshot) error {
 }
 
 // ValidateArtifactSelector validates a portable dependency selector.
-func ValidateArtifactSelector(v ArtifactSelector) error {
+func ValidateArtifactSelector(v spec.ArtifactSelector) error {
 	if err := validateKind("selector.kind", string(v.Kind)); err != nil {
 		return err
 	}
 	if v.LogicalName != "" {
-		if err := validateRequiredText("selector.logicalName", string(v.LogicalName), MaxLogicalNameBytes); err != nil {
+		if err := validateRequiredText(
+			"selector.logicalName",
+			string(v.LogicalName),
+			spec.MaxLogicalNameBytes,
+		); err != nil {
 			return err
 		}
 	}
@@ -632,7 +667,7 @@ func ValidateArtifactSelector(v ArtifactSelector) error {
 }
 
 // ValidateTransferProvenance validates app-local transfer audit metadata.
-func ValidateTransferProvenance(v TransferProvenance) error {
+func ValidateTransferProvenance(v spec.TransferProvenance) error {
 	if err := validateID("provenance.provenanceID", string(v.ProvenanceID)); err != nil {
 		return err
 	}
@@ -659,7 +694,7 @@ func ValidateTransferProvenance(v TransferProvenance) error {
 }
 
 // ValidateCatalogResourceKey validates a source-local resource identity.
-func ValidateCatalogResourceKey(v CatalogResourceKey) error {
+func ValidateCatalogResourceKey(v spec.CatalogResourceKey) error {
 	if err := validateID("catalog resource.sourceID", string(v.SourceID)); err != nil {
 		return err
 	}
@@ -670,9 +705,9 @@ func ValidateCatalogResourceKey(v CatalogResourceKey) error {
 }
 
 // ValidateDiagnostics validates a bounded current diagnostic collection.
-func ValidateDiagnostics(v []Diagnostic) error {
-	if len(v) > MaxDiagnosticsPerEntity {
-		return invalidf("diagnostics exceeds %d entries", MaxDiagnosticsPerEntity)
+func ValidateDiagnostics(v []spec.Diagnostic) error {
+	if len(v) > spec.MaxDiagnosticsPerEntity {
+		return invalidf("diagnostics exceeds %d entries", spec.MaxDiagnosticsPerEntity)
 	}
 	for i, diagnostic := range v {
 		if err := ValidateDiagnostic(diagnostic); err != nil {
@@ -683,16 +718,16 @@ func ValidateDiagnostics(v []Diagnostic) error {
 }
 
 // ValidateDiagnostic validates one structured diagnostic.
-func ValidateDiagnostic(v Diagnostic) error {
+func ValidateDiagnostic(v spec.Diagnostic) error {
 	switch v.Severity {
-	case DiagnosticSeverityError, DiagnosticSeverityWarning, DiagnosticSeverityInfo:
+	case spec.DiagnosticSeverityError, spec.DiagnosticSeverityWarning, spec.DiagnosticSeverityInfo:
 	default:
 		return invalidf("diagnostic.severity %q is invalid", v.Severity)
 	}
 	if err := validateKind("diagnostic.code", v.Code); err != nil {
 		return err
 	}
-	if err := validateRequiredText("diagnostic.message", v.Message, MaxDiagnosticMessageBytes); err != nil {
+	if err := validateRequiredText("diagnostic.message", v.Message, spec.MaxDiagnosticMessageBytes); err != nil {
 		return err
 	}
 	if v.Location == nil {
@@ -715,31 +750,34 @@ func ValidateDiagnostic(v Diagnostic) error {
 	return nil
 }
 
-func validateKnownSourceConfig(v ArtifactSource) error {
+func validateKnownSourceConfig(v spec.ArtifactSource) error {
 	switch v.Kind {
-	case SourceKindFSDirectory:
-		if v.ConfigSchemaID != FSDirectoryConfigSchemaID {
-			return invalidf("fs-directory source.configSchemaID must be %q", FSDirectoryConfigSchemaID)
+	case spec.SourceKindFSDirectory:
+		if v.ConfigSchemaID != spec.FSDirectoryConfigSchemaID {
+			return invalidf("fs-directory source.configSchemaID must be %q", spec.FSDirectoryConfigSchemaID)
 		}
-		var cfg FSDirectorySourceConfig
+		var cfg spec.FSDirectorySourceConfig
 		if err := decodeStrictJSONObject(v.Config, &cfg); err != nil {
 			return fmt.Errorf("fs-directory source.config: %w", err)
 		}
 		return ValidateFSDirectorySourceConfig(cfg)
-	case SourceKindEmbeddedFSDirectory:
-		if v.ConfigSchemaID != EmbeddedFSDirectoryConfigSchemaID {
-			return invalidf("embedded-fs-directory source.configSchemaID must be %q", EmbeddedFSDirectoryConfigSchemaID)
+	case spec.SourceKindEmbeddedFSDirectory:
+		if v.ConfigSchemaID != spec.EmbeddedFSDirectoryConfigSchemaID {
+			return invalidf(
+				"embedded-fs-directory source.configSchemaID must be %q",
+				spec.EmbeddedFSDirectoryConfigSchemaID,
+			)
 		}
-		var cfg EmbeddedFSDirectorySourceConfig
+		var cfg spec.EmbeddedFSDirectorySourceConfig
 		if err := decodeStrictJSONObject(v.Config, &cfg); err != nil {
 			return fmt.Errorf("embedded-fs-directory source.config: %w", err)
 		}
 		return ValidateEmbeddedFSDirectorySourceConfig(cfg)
-	case SourceKindMemoryDirectory:
-		if v.ConfigSchemaID != MemoryDirectoryConfigSchemaID {
-			return invalidf("memory-directory source.configSchemaID must be %q", MemoryDirectoryConfigSchemaID)
+	case spec.SourceKindMemoryDirectory:
+		if v.ConfigSchemaID != spec.MemoryDirectoryConfigSchemaID {
+			return invalidf("memory-directory source.configSchemaID must be %q", spec.MemoryDirectoryConfigSchemaID)
 		}
-		var cfg MemoryDirectorySourceConfig
+		var cfg spec.MemoryDirectorySourceConfig
 		if err := decodeStrictJSONObject(v.Config, &cfg); err != nil {
 			return fmt.Errorf("memory-directory source.config: %w", err)
 		}
@@ -752,7 +790,7 @@ func validateKnownSourceConfig(v ArtifactSource) error {
 }
 
 // ValidateMemoryDirectorySourceConfig validates test-only memory driver config.
-func ValidateMemoryDirectorySourceConfig(v MemoryDirectorySourceConfig) error {
+func ValidateMemoryDirectorySourceConfig(v spec.MemoryDirectorySourceConfig) error {
 	if err := validateKind("memory-directory.providerKey", v.ProviderKey); err != nil {
 		return err
 	}
@@ -760,7 +798,7 @@ func ValidateMemoryDirectorySourceConfig(v MemoryDirectorySourceConfig) error {
 }
 
 // ValidateEmbeddedFSDirectorySourceConfig validates embedded-fs driver config.
-func ValidateEmbeddedFSDirectorySourceConfig(v EmbeddedFSDirectorySourceConfig) error {
+func ValidateEmbeddedFSDirectorySourceConfig(v spec.EmbeddedFSDirectorySourceConfig) error {
 	if err := validateKind("embedded-fs-directory.providerKey", v.ProviderKey); err != nil {
 		return err
 	}
@@ -769,8 +807,8 @@ func ValidateEmbeddedFSDirectorySourceConfig(v EmbeddedFSDirectorySourceConfig) 
 
 // ValidateFSDirectorySourceConfig validates the app-local filesystem driver
 // configuration. The service normalizes a path before storing it.
-func ValidateFSDirectorySourceConfig(v FSDirectorySourceConfig) error {
-	if err := validateRequiredText("fs-directory.rootPath", v.RootPath, MaxFilesystemPathBytes); err != nil {
+func ValidateFSDirectorySourceConfig(v spec.FSDirectorySourceConfig) error {
+	if err := validateRequiredText("fs-directory.rootPath", v.RootPath, spec.MaxFilesystemPathBytes); err != nil {
 		return err
 	}
 	if strings.ContainsRune(v.RootPath, 0) {
@@ -792,75 +830,83 @@ func validateID(label, value string) error {
 	return nil
 }
 
-func validateOptionalDigest(label string, value *Digest) error {
+func validateOptionalDigest(label string, value *spec.Digest) error {
 	if value == nil {
 		return nil
 	}
 	return validateDigest(label, *value)
 }
 
-func validateDigest(label string, value Digest) error {
+func validateDigest(label string, value spec.Digest) error {
 	if !digestRE.MatchString(string(value)) {
 		return invalidf("%s must be sha256:<64 lowercase hex characters>", label)
 	}
 	return nil
 }
 
-func validateCatalogState(label string, value CatalogState) error {
+func validateCatalogState(label string, value spec.CatalogState) error {
 	switch value {
-	case CatalogStateValid, CatalogStateInvalid, CatalogStateMissing:
+	case spec.CatalogStateValid, spec.CatalogStateInvalid, spec.CatalogStateMissing:
 		return nil
 	default:
 		return invalidf("%s %q is invalid", label, value)
 	}
 }
 
-func validateRecordMode(label string, value RecordMode) error {
+func validateRecordMode(label string, value spec.RecordMode) error {
 	switch value {
-	case RecordModeLinked, RecordModeCaptured, RecordModeForked, RecordModeAppLocal, RecordModeEmbeddedOverlay:
+	case spec.RecordModeLinked,
+		spec.RecordModeCaptured,
+		spec.RecordModeForked,
+		spec.RecordModeAppLocal,
+		spec.RecordModeEmbeddedOverlay:
 		return nil
 	default:
 		return invalidf("%s %q is invalid", label, value)
 	}
 }
 
-func validateTrackingMode(label string, value TrackingMode) error {
+func validateTrackingMode(label string, value spec.TrackingMode) error {
 	switch value {
-	case TrackingModeFollowSource, TrackingModePinDigest, TrackingModeManualRefresh:
+	case spec.TrackingModeFollowSource, spec.TrackingModePinDigest, spec.TrackingModeManualRefresh:
 		return nil
 	default:
 		return invalidf("%s %q is invalid", label, value)
 	}
 }
 
-func validateRecordState(label string, value RecordState) error {
+func validateRecordState(label string, value spec.RecordState) error {
 	switch value {
-	case RecordStateAvailable, RecordStateStale, RecordStateMissing, RecordStateInvalid, RecordStateIncompatible:
+	case spec.RecordStateAvailable,
+		spec.RecordStateStale,
+		spec.RecordStateMissing,
+		spec.RecordStateInvalid,
+		spec.RecordStateIncompatible:
 		return nil
 	default:
 		return invalidf("%s %q is invalid", label, value)
 	}
 }
 
-func validateTransferOperation(label string, value TransferOperation) error {
+func validateTransferOperation(label string, value spec.TransferOperation) error {
 	switch value {
-	case TransferOperationImport, TransferOperationCapture, TransferOperationFork:
+	case spec.TransferOperationImport, spec.TransferOperationCapture, spec.TransferOperationFork:
 		return nil
 	default:
 		return invalidf("%s %q is invalid", label, value)
 	}
 }
 
-func validateSourceGeneration(label string, value SourceGeneration) error {
-	return validateRequiredText(label, string(value), MaxSourceGenerationBytes)
+func validateSourceGeneration(label string, value spec.SourceGeneration) error {
+	return validateRequiredText(label, string(value), spec.MaxSourceGenerationBytes)
 }
 
 func validateSlug(label, value string) error {
 	if !utf8.ValidString(value) || strings.TrimSpace(value) != value || value == "" {
 		return invalidf("%s must be non-empty, valid UTF-8, and trimmed", label)
 	}
-	if utf8.RuneCountInString(value) > MaxSlugRunes {
-		return invalidf("%s exceeds %d runes", label, MaxSlugRunes)
+	if utf8.RuneCountInString(value) > spec.MaxSlugRunes {
+		return invalidf("%s exceeds %d runes", label, spec.MaxSlugRunes)
 	}
 	if strings.HasPrefix(value, "-") || strings.HasSuffix(value, "-") {
 		return invalidf("%s must not start or end with a hyphen", label)
@@ -878,7 +924,7 @@ func validateVersion(label, value string, optional bool) error {
 	if value == "" && optional {
 		return nil
 	}
-	return validateRequiredText(label, value, MaxVersionBytes)
+	return validateRequiredText(label, value, spec.MaxVersionBytes)
 }
 
 func validateOptionalText(label, value string, maxBytes int) error {
@@ -895,21 +941,21 @@ func validateDescription(label, value string) error {
 	if !utf8.ValidString(value) || strings.ContainsRune(value, 0) {
 		return invalidf("%s must be valid UTF-8 and contain no NUL byte", label)
 	}
-	if len(value) > MaxDescriptionBytes {
-		return invalidf("%s exceeds %d bytes", label, MaxDescriptionBytes)
+	if len(value) > spec.MaxDescriptionBytes {
+		return invalidf("%s exceeds %d bytes", label, spec.MaxDescriptionBytes)
 	}
 	return nil
 }
 
 func validateLabels(label string, values map[string]string) error {
-	if len(values) > MaxLabelsPerDefinition {
-		return invalidf("%s exceeds %d entries", label, MaxLabelsPerDefinition)
+	if len(values) > spec.MaxLabelsPerDefinition {
+		return invalidf("%s exceeds %d entries", label, spec.MaxLabelsPerDefinition)
 	}
 	for key, value := range values {
 		if err := validateKind(label+" key", key); err != nil {
 			return err
 		}
-		if err := validateRequiredText(label+"["+key+"]", value, MaxLabelValueBytes); err != nil {
+		if err := validateRequiredText(label+"["+key+"]", value, spec.MaxLabelValueBytes); err != nil {
 			return err
 		}
 	}
@@ -931,18 +977,18 @@ func validateRequiredText(label, value string, maxBytes int) error {
 	return nil
 }
 
-func validateSourceLocator(label string, value SourceLocator, allowRoot bool) error {
+func validateSourceLocator(label string, value spec.SourceLocator, allowRoot bool) error {
 	return validatePortablePathValue(label, string(value), allowRoot)
 }
 
-func validateSubresourceLocator(label string, value SubresourceLocator) error {
+func validateSubresourceLocator(label string, value spec.SubresourceLocator) error {
 	if value == "" {
 		return nil
 	}
 	return validatePortablePathValue(label, string(value), false)
 }
 
-func validatePortablePath(label string, value PortablePath, allowRoot bool) error {
+func validatePortablePath(label string, value spec.PortablePath, allowRoot bool) error {
 	return validatePortablePathValue(label, string(value), allowRoot)
 }
 
@@ -950,7 +996,7 @@ func validatePortablePathValue(label, value string, allowRoot bool) error {
 	if value == "." && allowRoot {
 		return nil
 	}
-	if value == "" || len(value) > MaxSourceLocatorBytes || !utf8.ValidString(value) {
+	if value == "" || len(value) > spec.MaxSourceLocatorBytes || !utf8.ValidString(value) {
 		return invalidf("%s must be a non-empty, bounded, valid UTF-8 relative path", label)
 	}
 	if strings.ContainsRune(value, 0) || strings.Contains(value, "\\") || strings.Contains(value, ":") {
@@ -973,7 +1019,7 @@ func validatePortablePathValue(label, value string, allowRoot bool) error {
 	return nil
 }
 
-func validateSchemaBoundJSONObject(label string, raw json.RawMessage, schemaID SchemaID, maxBytes int) error {
+func validateSchemaBoundJSONObject(label string, raw json.RawMessage, schemaID spec.SchemaID, maxBytes int) error {
 	if err := validateJSONObject(label, raw, maxBytes); err != nil {
 		return err
 	}
@@ -989,14 +1035,14 @@ func validateSchemaBoundJSONObject(label string, raw json.RawMessage, schemaID S
 }
 
 func validateKind(label, value string) error {
-	if len(value) > MaxKindBytes || !kindRE.MatchString(value) {
+	if len(value) > spec.MaxKindBytes || !kindRE.MatchString(value) {
 		return invalidf("%s must be a lowercase dotted or hyphenated identifier", label)
 	}
 	return nil
 }
 
-func validateSchemaID(label string, value SchemaID) error {
-	if len(value) > MaxSchemaIDBytes || !kindRE.MatchString(string(value)) {
+func validateSchemaID(label string, value spec.SchemaID) error {
+	if len(value) > spec.MaxSchemaIDBytes || !kindRE.MatchString(string(value)) {
 		return invalidf("%s must be a lowercase dotted or hyphenated identifier", label)
 	}
 	return nil
@@ -1163,5 +1209,5 @@ func validateRequiredTime(label string, value time.Time) error {
 }
 
 func invalidf(format string, args ...any) error {
-	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...))
+	return fmt.Errorf("%w: %s", spec.ErrInvalid, fmt.Sprintf(format, args...))
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 func (s *MetadataStore) GetArtifactPackage(
@@ -53,7 +54,7 @@ func (s *MetadataStore) ListArtifactPackagesForSource(
 }
 
 func (s *MetadataStore) UpsertArtifactPackage(ctx context.Context, value spec.ArtifactPackage) error {
-	if err := spec.ValidateArtifactPackage(value); err != nil {
+	if err := validate.ValidateArtifactPackage(value); err != nil {
 		return err
 	}
 	diagnostics, err := encodeDiagnostics(value.Diagnostics)
@@ -108,7 +109,7 @@ func scanArtifactPackage(scanner sqlScanner) (spec.ArtifactPackage, error) {
 		FirstSeenAt:           first,
 		LastSeenAt:            last,
 	}
-	if err := spec.ValidateArtifactPackage(value); err != nil {
+	if err := validate.ValidateArtifactPackage(value); err != nil {
 		return spec.ArtifactPackage{}, err
 	}
 	return value, nil

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication spec.SourceCatalogPublication) error {
@@ -19,7 +20,7 @@ func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication sp
 			spec.ErrInvalidRequest,
 		)
 	}
-	if err := spec.ValidateDiagnostics(publication.Diagnostics); err != nil {
+	if err := validate.ValidateDiagnostics(publication.Diagnostics); err != nil {
 		return err
 	}
 	diagnostics, err := encodeDiagnostics(publication.Diagnostics)
@@ -59,7 +60,7 @@ func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication sp
 		if resource.SourceID != publication.SourceID {
 			return fmt.Errorf("%w: catalog resource source mismatch", spec.ErrInvalidRequest)
 		}
-		if err := spec.ValidateCatalogResource(resource); err != nil {
+		if err := validate.ValidateCatalogResource(resource); err != nil {
 			return err
 		}
 		key := string(resource.Locator) + "\x00" + string(resource.SubresourceLocator)
@@ -75,7 +76,7 @@ func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication sp
 		if revision.SourceID != publication.SourceID {
 			return fmt.Errorf("%w: catalog revision source mismatch", spec.ErrInvalidRequest)
 		}
-		if err := spec.ValidateCatalogResourceRevision(revision); err != nil {
+		if err := validate.ValidateCatalogResourceRevision(revision); err != nil {
 			return err
 		}
 		if err := upsertCatalogRevisionTx(ctx, tx, revision); err != nil {
@@ -209,7 +210,7 @@ func (s *MetadataStore) PublishRootCatalogGeneration(
 		CreatedAt:         publication.CreatedAt,
 		Diagnostics:       publication.Diagnostics,
 	}
-	if err := spec.ValidateRootCatalogGeneration(result); err != nil {
+	if err := validate.ValidateRootCatalogGeneration(result); err != nil {
 		return spec.RootCatalogGeneration{}, err
 	}
 	if _, err := tx.ExecContext(
@@ -267,7 +268,7 @@ func (s *MetadataStore) GetRootCatalogGeneration(
 		CreatedAt:         created,
 		Diagnostics:       decodedDiagnostics,
 	}
-	if err := spec.ValidateRootCatalogGeneration(result); err != nil {
+	if err := validate.ValidateRootCatalogGeneration(result); err != nil {
 		return spec.RootCatalogGeneration{}, err
 	}
 	return result, nil

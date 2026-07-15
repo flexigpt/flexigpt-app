@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const databaseTimeLayout = "2006-01-02T15:04:05.000000000Z"
@@ -39,7 +40,7 @@ func decodeDiagnostics(raw []byte) ([]spec.Diagnostic, error) {
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return nil, fmt.Errorf("decode diagnostics: %w", err)
 	}
-	if err := spec.ValidateDiagnostics(value); err != nil {
+	if err := validate.ValidateDiagnostics(value); err != nil {
 		return nil, fmt.Errorf("validate persisted diagnostics: %w", err)
 	}
 	return value, nil
@@ -91,7 +92,7 @@ func decodeCatalogResourceKey(raw []byte) (*spec.CatalogResourceKey, error) {
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return nil, fmt.Errorf("decode catalog resource key: %w", err)
 	}
-	if err := spec.ValidateCatalogResourceKey(value); err != nil {
+	if err := validate.ValidateCatalogResourceKey(value); err != nil {
 		return nil, fmt.Errorf("validate persisted catalog resource key: %w", err)
 	}
 	return &value, nil

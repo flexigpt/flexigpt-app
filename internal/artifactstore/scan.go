@@ -13,6 +13,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/baseutils"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.ScanPlan) (spec.ScanResult, error) {
@@ -256,7 +257,7 @@ func (s *Store) scanSource(
 				Message:  "the selected frontend emitted no definitions",
 			}}
 		}
-		if err := spec.ValidateDiagnostics(diagnostics); err != nil {
+		if err := validate.ValidateDiagnostics(diagnostics); err != nil {
 			return result, publication, fmt.Errorf(
 				"%w: frontend %q returned invalid diagnostics: %w",
 				spec.ErrInvalidRequest,
@@ -322,7 +323,7 @@ func (s *Store) scanSource(
 			allDiagnostics = append(allDiagnostics, frontend.ValidateSemantic(ctx, definition)...)
 			selectors, dependencyDiagnostics := frontend.ExtractDependencies(ctx, definition)
 			allDiagnostics = append(allDiagnostics, dependencyDiagnostics...)
-			if err := spec.ValidateDiagnostics(allDiagnostics); err != nil {
+			if err := validate.ValidateDiagnostics(allDiagnostics); err != nil {
 				return result, publication, fmt.Errorf(
 					"%w: frontend %q returned invalid diagnostics: %w",
 					spec.ErrInvalidRequest,

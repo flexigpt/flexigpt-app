@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 	"github.com/flexigpt/llmtools-go/fstool"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
@@ -303,7 +304,7 @@ func decodeLLMToolsFSConfig(raw json.RawMessage) (llmToolsFSConfig, error) {
 		}
 		return llmToolsFSConfig{}, err
 	}
-	if err := spec.ValidateFSDirectorySourceConfig(config); err != nil {
+	if err := validate.ValidateFSDirectorySourceConfig(config); err != nil {
 		return llmToolsFSConfig{}, err
 	}
 	return llmToolsFSConfig{RootPath: config.RootPath, FollowSymlinks: config.FollowSymlinks}, nil

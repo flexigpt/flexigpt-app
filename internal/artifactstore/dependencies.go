@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 func (s *Store) GetDependencies(ctx context.Context, recordID spec.RecordID) ([]spec.ArtifactSelector, error) {
@@ -120,7 +121,7 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 				Diagnostics:          append([]spec.Diagnostic(nil), explanation.Diagnostics...),
 				ModifiedAt:           now,
 			}
-			if err := spec.ValidateArtifactDependencySnapshot(snapshot); err != nil {
+			if err := validate.ValidateArtifactDependencySnapshot(snapshot); err != nil {
 				return err
 			}
 			snapshots = append(snapshots, snapshot)

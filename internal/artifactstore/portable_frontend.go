@@ -8,6 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/baseutils"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 type portableDefinitionFrontend struct{}
@@ -45,7 +46,7 @@ func (portableDefinitionFrontend) Decode(
 	if err := ensurePortableJSONEOF(decoder); err != nil {
 		return nil, portableDefinitionDiagnostic(err.Error())
 	}
-	if err := spec.ValidateArtifactDefinitionFile(file); err != nil {
+	if err := validate.ValidateArtifactDefinitionFile(file); err != nil {
 		return nil, portableDefinitionDiagnostic(err.Error())
 	}
 	canonical, err := baseutils.CanonicalizeDefinition(file.Definition)

@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const (
@@ -136,7 +137,7 @@ func (s *MetadataStore) PublishRootScan(
 			spec.ErrInvalidRequest,
 		)
 	}
-	if err := spec.ValidateDiagnostics(publication.RootCatalog.Diagnostics); err != nil {
+	if err := validate.ValidateDiagnostics(publication.RootCatalog.Diagnostics); err != nil {
 		return spec.RootCatalogGeneration{}, err
 	}
 
@@ -239,7 +240,7 @@ func (s *MetadataStore) PublishRootScan(
 		CreatedAt:         publication.RootCatalog.CreatedAt,
 		Diagnostics:       publication.RootCatalog.Diagnostics,
 	}
-	if err := spec.ValidateRootCatalogGeneration(result); err != nil {
+	if err := validate.ValidateRootCatalogGeneration(result); err != nil {
 		return spec.RootCatalogGeneration{}, err
 	}
 
@@ -532,7 +533,7 @@ func publishRootScanSourceCatalog(
 			spec.ErrInvalidRequest,
 		)
 	}
-	if err := spec.ValidateDiagnostics(publication.Diagnostics); err != nil {
+	if err := validate.ValidateDiagnostics(publication.Diagnostics); err != nil {
 		return err
 	}
 	diagnostics, err := encodeDiagnostics(publication.Diagnostics)
@@ -569,7 +570,7 @@ func publishRootScanSourceCatalog(
 		if resource.SourceID != publication.SourceID {
 			return fmt.Errorf("%w: catalog resource source mismatch", spec.ErrInvalidRequest)
 		}
-		if err := spec.ValidateCatalogResource(resource); err != nil {
+		if err := validate.ValidateCatalogResource(resource); err != nil {
 			return err
 		}
 		key := string(resource.Locator) + "\x00" + string(resource.SubresourceLocator)
@@ -589,7 +590,7 @@ func publishRootScanSourceCatalog(
 		if revision.SourceID != publication.SourceID {
 			return fmt.Errorf("%w: catalog revision source mismatch", spec.ErrInvalidRequest)
 		}
-		if err := spec.ValidateCatalogResourceRevision(revision); err != nil {
+		if err := validate.ValidateCatalogResourceRevision(revision); err != nil {
 			return err
 		}
 		if err := upsertCatalogRevisionTx(ctx, tx, revision); err != nil {

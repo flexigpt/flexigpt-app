@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 func (s *Store) GetArtifactPackage(
@@ -41,7 +42,7 @@ func (s *Store) PublishArtifactPackage(ctx context.Context, artifactPackage spec
 		return err
 	}
 	defer finish()
-	if err := spec.ValidateArtifactPackage(artifactPackage); err != nil {
+	if err := validate.ValidateArtifactPackage(artifactPackage); err != nil {
 		return fmt.Errorf("%w: artifact package: %w", spec.ErrInvalidRequest, err)
 	}
 	if _, err := s.repository.GetSource(ctx, artifactPackage.SourceID); err != nil {

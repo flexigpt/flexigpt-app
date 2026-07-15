@@ -9,6 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/baseutils"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 func (s *Store) ImportDefinition(
@@ -162,7 +163,7 @@ func (s *Store) buildTransferPayload(
 	seenPaths := make(map[spec.PortablePath]struct{}, len(exported.Closure.Assets))
 	var totalBytes int64
 	for _, manifest := range exported.Closure.Assets {
-		if err := spec.ValidateAssetManifestEntry(manifest); err != nil {
+		if err := validate.ValidateAssetManifestEntry(manifest); err != nil {
 			return spec.DefinitionTransferPayload{}, err
 		}
 		if _, exists := seenPaths[manifest.Path]; exists {
@@ -324,7 +325,7 @@ func (s *Store) publishTransferredRecord(
 	}
 	sourceDigest := materialized.SourceContentDigest
 	resource.SourceContentDigest = &sourceDigest
-	if err := spec.ValidateCatalogResource(resource); err != nil {
+	if err := validate.ValidateCatalogResource(resource); err != nil {
 		discardErr := materializer.DiscardDefinition(
 			context.WithoutCancel(ctx),
 			source,

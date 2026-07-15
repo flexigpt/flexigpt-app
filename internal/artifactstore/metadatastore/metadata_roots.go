@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const rootColumns = `
@@ -23,7 +24,7 @@ const rootColumns = `
 	soft_deleted_at`
 
 func (s *MetadataStore) CreateRoot(ctx context.Context, root spec.ArtifactRoot) error {
-	if err := spec.ValidateArtifactRoot(root); err != nil {
+	if err := validate.ValidateArtifactRoot(root); err != nil {
 		return fmt.Errorf("validate root for persistence: %w", err)
 	}
 	_, err := s.db.ExecContext(ctx, `
@@ -99,7 +100,7 @@ func (s *MetadataStore) UpdateRoot(
 	root spec.ArtifactRoot,
 	expectedModifiedAt time.Time,
 ) error {
-	if err := spec.ValidateArtifactRoot(root); err != nil {
+	if err := validate.ValidateArtifactRoot(root); err != nil {
 		return fmt.Errorf("validate root for persistence: %w", err)
 	}
 	if err := validateExpectedModifiedAt("root", expectedModifiedAt); err != nil {
@@ -151,7 +152,7 @@ func scanRoot(scanner sqlScanner) (spec.ArtifactRoot, error) {
 		ModifiedAt:    modified,
 		SoftDeletedAt: deleted,
 	}
-	if err := spec.ValidateArtifactRoot(root); err != nil {
+	if err := validate.ValidateArtifactRoot(root); err != nil {
 		return spec.ArtifactRoot{}, fmt.Errorf("invalid persisted root %q: %w", row.RootID, err)
 	}
 	return root, nil

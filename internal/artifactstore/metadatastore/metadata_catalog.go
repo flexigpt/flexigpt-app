@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const catalogResourceColumns = `
@@ -40,7 +41,7 @@ func (s *MetadataStore) GetCatalogResource(
 	ctx context.Context,
 	key spec.CatalogResourceKey,
 ) (spec.CatalogResource, error) {
-	if err := spec.ValidateCatalogResourceKey(key); err != nil {
+	if err := validate.ValidateCatalogResourceKey(key); err != nil {
 		return spec.CatalogResource{}, fmt.Errorf("validate catalog resource key: %w", err)
 	}
 	resource, err := scanCatalogResource(s.db.QueryRowContext(
@@ -99,7 +100,7 @@ func (s *MetadataStore) ListCatalogResourcesForSource(
 }
 
 func (s *MetadataStore) UpsertCatalogResource(ctx context.Context, resource spec.CatalogResource) error {
-	if err := spec.ValidateCatalogResource(resource); err != nil {
+	if err := validate.ValidateCatalogResource(resource); err != nil {
 		return fmt.Errorf("validate catalog resource for persistence: %w", err)
 	}
 	diagnostics, err := encodeDiagnostics(resource.Diagnostics)
@@ -170,7 +171,7 @@ func (s *MetadataStore) UpsertCatalogResourceRevision(
 	ctx context.Context,
 	revision spec.CatalogResourceRevision,
 ) error {
-	if err := spec.ValidateCatalogResourceRevision(revision); err != nil {
+	if err := validate.ValidateCatalogResourceRevision(revision); err != nil {
 		return fmt.Errorf("validate catalog resource revision for persistence: %w", err)
 	}
 	_, err := s.db.ExecContext(ctx, `
@@ -203,7 +204,7 @@ func (s *MetadataStore) ListCatalogResourceRevisions(
 	ctx context.Context,
 	key spec.CatalogResourceKey,
 ) ([]spec.CatalogResourceRevision, error) {
-	if err := spec.ValidateCatalogResourceKey(key); err != nil {
+	if err := validate.ValidateCatalogResourceKey(key); err != nil {
 		return nil, fmt.Errorf("validate catalog resource key: %w", err)
 	}
 	rows, err := s.db.QueryContext(
@@ -268,7 +269,7 @@ func scanCatalogResource(scanner sqlScanner) (spec.CatalogResource, error) {
 		LastSeenAt:              lastSeen,
 		Diagnostics:             decodedDiagnostics,
 	}
-	if err := spec.ValidateCatalogResource(resource); err != nil {
+	if err := validate.ValidateCatalogResource(resource); err != nil {
 		return spec.CatalogResource{}, fmt.Errorf(
 			"invalid persisted catalog resource %q/%q/%q: %w",
 			row.SourceID,
@@ -304,7 +305,7 @@ func scanCatalogResourceRevision(scanner sqlScanner) (spec.CatalogResourceRevisi
 		FirstSeenAt:         firstSeen,
 		LastSeenAt:          lastSeen,
 	}
-	if err := spec.ValidateCatalogResourceRevision(revision); err != nil {
+	if err := validate.ValidateCatalogResourceRevision(revision); err != nil {
 		return spec.CatalogResourceRevision{}, fmt.Errorf(
 			"invalid persisted catalog resource revision %q/%q/%q/%q: %w",
 			row.SourceID,

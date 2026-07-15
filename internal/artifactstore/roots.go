@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 // RootUpdate is a full mutable replacement for an active root's local fields.
@@ -165,7 +166,7 @@ func (s *Store) DeleteRoot(
 }
 
 func (s *Store) validateRoot(ctx context.Context, root spec.ArtifactRoot) error {
-	if err := spec.ValidateArtifactRoot(root); err != nil {
+	if err := validate.ValidateArtifactRoot(root); err != nil {
 		return fmt.Errorf("%w: root: %w", spec.ErrInvalidRequest, err)
 	}
 	if hook, ok := s.rootHookFor(root.Kind); ok {

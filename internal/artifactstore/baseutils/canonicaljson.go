@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const placeholderDefinitionDigest spec.Digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
@@ -28,7 +29,7 @@ func CanonicalizeDefinition(in spec.CanonicalDefinition) (spec.CanonicalDefiniti
 	if out.Digest == "" {
 		out.Digest = placeholderDefinitionDigest
 	}
-	if err := spec.ValidateCanonicalDefinition(out); err != nil {
+	if err := validate.ValidateCanonicalDefinition(out); err != nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf("canonical definition structure: %w", err)
 	}
 	sort.Slice(out.AssetManifest, func(left, right int) bool {
@@ -44,7 +45,7 @@ func CanonicalizeDefinition(in spec.CanonicalDefinition) (spec.CanonicalDefiniti
 	if err != nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf("canonicalize definition JSON: %w", err)
 	}
-	if err := spec.ValidateCanonicalDefinition(out); err != nil {
+	if err := validate.ValidateCanonicalDefinition(out); err != nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf("canonical definition after ordering: %w", err)
 	}
 
@@ -62,7 +63,7 @@ func CanonicalizeDefinition(in spec.CanonicalDefinition) (spec.CanonicalDefiniti
 		)
 	}
 	out.Digest = digest
-	if err := spec.ValidateCanonicalDefinition(out); err != nil {
+	if err := validate.ValidateCanonicalDefinition(out); err != nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf("canonical definition after normalization: %w", err)
 	}
 	return out, nil

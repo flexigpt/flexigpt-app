@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 // EmbeddedFSProviderRegistrar is implemented by embedded source drivers that
@@ -46,7 +47,7 @@ func (d *EmbeddedFSDirectoryDriver) RegisterProvider(providerKey string, provide
 		ProviderKey: providerKey,
 		RootLocator: ".",
 	}
-	if err := spec.ValidateEmbeddedFSDirectorySourceConfig(config); err != nil {
+	if err := validate.ValidateEmbeddedFSDirectorySourceConfig(config); err != nil {
 		return fmt.Errorf("%w: embedded filesystem provider key: %w", spec.ErrInvalidRequest, err)
 	}
 
@@ -331,7 +332,7 @@ func decodeEmbeddedFSConfig(raw json.RawMessage) (spec.EmbeddedFSDirectorySource
 		}
 		return spec.EmbeddedFSDirectorySourceConfig{}, err
 	}
-	if err := spec.ValidateEmbeddedFSDirectorySourceConfig(config); err != nil {
+	if err := validate.ValidateEmbeddedFSDirectorySourceConfig(config); err != nil {
 		return spec.EmbeddedFSDirectorySourceConfig{}, err
 	}
 	return config, nil

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const (
@@ -78,7 +79,7 @@ func (s *MetadataStore) ReplaceDependencySnapshots(
 				spec.ErrInvalidRequest,
 			)
 		}
-		if err := spec.ValidateArtifactDependencySnapshot(snapshot); err != nil {
+		if err := validate.ValidateArtifactDependencySnapshot(snapshot); err != nil {
 			return err
 		}
 	}
@@ -212,7 +213,7 @@ func (s *MetadataStore) ListDependencySnapshots(
 			Diagnostics:          diagnostics,
 			ModifiedAt:           modifiedAt,
 		}
-		if err := spec.ValidateArtifactDependencySnapshot(snapshot); err != nil {
+		if err := validate.ValidateArtifactDependencySnapshot(snapshot); err != nil {
 			return nil, fmt.Errorf(
 				"invalid persisted dependency snapshot for record %q: %w",
 				recordID,

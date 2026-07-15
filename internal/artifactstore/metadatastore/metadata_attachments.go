@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 const rootSourceAttachmentColumns = `
@@ -22,7 +23,7 @@ const rootSourceAttachmentColumns = `
 	modified_at`
 
 func (s *MetadataStore) CreateRootSourceAttachment(ctx context.Context, attachment spec.RootSourceAttachment) error {
-	if err := spec.ValidateRootSourceAttachment(attachment); err != nil {
+	if err := validate.ValidateRootSourceAttachment(attachment); err != nil {
 		return fmt.Errorf("validate root source attachment for persistence: %w", err)
 	}
 	_, err := s.db.ExecContext(ctx, `
@@ -103,7 +104,7 @@ func (s *MetadataStore) UpdateRootSourceAttachment(
 	attachment spec.RootSourceAttachment,
 	expectedModifiedAt time.Time,
 ) error {
-	if err := spec.ValidateRootSourceAttachment(attachment); err != nil {
+	if err := validate.ValidateRootSourceAttachment(attachment); err != nil {
 		return fmt.Errorf("validate root source attachment for persistence: %w", err)
 	}
 	if err := validateExpectedModifiedAt("root/source attachment", expectedModifiedAt); err != nil {
@@ -178,7 +179,7 @@ func scanRootSourceAttachment(scanner sqlScanner) (spec.RootSourceAttachment, er
 		CreatedAt:    created,
 		ModifiedAt:   modified,
 	}
-	if err := spec.ValidateRootSourceAttachment(attachment); err != nil {
+	if err := validate.ValidateRootSourceAttachment(attachment); err != nil {
 		return spec.RootSourceAttachment{}, fmt.Errorf(
 			"invalid persisted root source attachment %q/%q: %w",
 			row.RootID,

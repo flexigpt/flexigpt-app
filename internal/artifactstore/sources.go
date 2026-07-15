@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 // SourceUpdate replaces mutable local source-registration fields. SourceID,
@@ -146,7 +147,7 @@ func (s *Store) validateSource(ctx context.Context, source *spec.ArtifactSource)
 	if source == nil {
 		return fmt.Errorf("%w: source is nil", spec.ErrInvalidRequest)
 	}
-	if err := spec.ValidateArtifactSource(*source); err != nil {
+	if err := validate.ValidateArtifactSource(*source); err != nil {
 		return fmt.Errorf("%w: source: %w", spec.ErrInvalidRequest, err)
 	}
 	driver, ok := s.driverFor(source.Kind)
@@ -158,7 +159,7 @@ func (s *Store) validateSource(ctx context.Context, source *spec.ArtifactSource)
 		return err
 	}
 	source.Diagnostics = append([]spec.Diagnostic(nil), diagnostics...)
-	if err := spec.ValidateArtifactSource(*source); err != nil {
+	if err := validate.ValidateArtifactSource(*source); err != nil {
 		return fmt.Errorf("%w: validated source: %w", spec.ErrInvalidRequest, err)
 	}
 	return nil

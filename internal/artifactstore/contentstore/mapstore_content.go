@@ -11,6 +11,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/baseutils"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 )
@@ -117,7 +118,7 @@ func (r *mapStorePortableContentRepository) PutDefinition(
 		return spec.CanonicalDefinition{}, err
 	}
 	file.Definition = normalized
-	if err := spec.ValidateArtifactDefinitionFile(file); err != nil {
+	if err := validate.ValidateArtifactDefinitionFile(file); err != nil {
 		return spec.CanonicalDefinition{}, err
 	}
 	key, err := definitionFileKey(normalized.Digest)
@@ -266,7 +267,7 @@ func (r *mapStorePortableContentRepository) PutPackageManifest(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := spec.ValidatePortablePackageManifest(manifest); err != nil {
+	if err := validate.ValidatePortablePackageManifest(manifest); err != nil {
 		return err
 	}
 	key, err := packageManifestFileKey(keyValue)
@@ -323,7 +324,7 @@ func (r *mapStorePortableContentRepository) GetPackageManifest(
 	if err := jsonencdec.MapToStructWithJSONTags(data, &manifest); err != nil {
 		return spec.PortablePackageManifest{}, fmt.Errorf("decode portable package manifest: %w", err)
 	}
-	if err := spec.ValidatePortablePackageManifest(manifest); err != nil {
+	if err := validate.ValidatePortablePackageManifest(manifest); err != nil {
 		return spec.PortablePackageManifest{}, err
 	}
 	return manifest, nil
@@ -351,7 +352,7 @@ func (r *mapStorePortableContentRepository) getDefinitionLocked(
 	if err := jsonencdec.MapToStructWithJSONTags(data, &file); err != nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf("decode portable definition %q: %w", digest, err)
 	}
-	if err := spec.ValidateArtifactDefinitionFile(file); err != nil {
+	if err := validate.ValidateArtifactDefinitionFile(file); err != nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf("validate portable definition %q: %w", digest, err)
 	}
 	normalized, err := baseutils.CanonicalizeDefinition(file.Definition)

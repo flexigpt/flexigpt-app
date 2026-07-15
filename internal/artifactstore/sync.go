@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
 // SyncRecords synchronizes root-local records with the currently published
@@ -129,7 +130,7 @@ func (s *Store) SyncRecords(
 			return spec.RecordSyncResult{}, err
 		}
 		derivation, create, diagnostics := policy.DeriveRecord(ctx, root, resource, definition)
-		if err := spec.ValidateDiagnostics(diagnostics); err != nil {
+		if err := validate.ValidateDiagnostics(diagnostics); err != nil {
 			return spec.RecordSyncResult{}, fmt.Errorf(
 				"%w: synchronization policy diagnostics: %w",
 				spec.ErrInvalidRequest,
