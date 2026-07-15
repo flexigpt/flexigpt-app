@@ -118,7 +118,7 @@ func (s *Store) DeleteRoot(ctx context.Context, rootID spec.RootID) (spec.Artifa
 	now := s.nowUTC()
 	current.Enabled = false
 	current.ModifiedAt = now
-	current.SoftDeletedAt = new(now)
+	current.SoftDeletedAt = &now
 	if err := s.validateRoot(ctx, current); err != nil {
 		return spec.ArtifactRoot{}, err
 	}

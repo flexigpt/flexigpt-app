@@ -10,8 +10,10 @@ import (
 	"io"
 	"maps"
 	"math"
+	"math/big"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -60,30 +62,6 @@ func CanonicalizeDefinition(in spec.CanonicalDefinition) (spec.CanonicalDefiniti
 	return out, nil
 }
 
-// CanonicalizeJSON returns deterministic JSON bytes. Objects are ordered by
-// UTF-8 key order, arrays retain their input order, and JSON numbers are
-// normalized through IEEE-754 binary64 representation. It is intentionally a
-// stable Artifact Store encoding, rather than a claim of general-purpose JCS
-// conformance for every possible JSON producer.
-func CanonicalizeJSON(raw []byte) ([]byte, error) {
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-
-	var value any
-	if err := decoder.Decode(&value); err != nil {
-		return nil, fmt.Errorf("decode JSON: %w", err)
-	}
-	if err := ensureJSONEOF(decoder); err != nil {
-		return nil, err
-	}
-
-	var out bytes.Buffer
-	if err := appendCanonicalJSON(&out, value); err != nil {
-		return nil, err
-	}
-	return out.Bytes(), nil
-}
-
 func canonicalDefinitionPayload(definition spec.CanonicalDefinition) ([]byte, error) {
 	envelope := struct {
 		Kind                spec.ArtifactKind         `json:"kind"`
@@ -121,6 +99,31 @@ func canonicalDefinitionPayload(definition spec.CanonicalDefinition) ([]byte, er
 		return nil, fmt.Errorf("canonicalize definition envelope: %w", err)
 	}
 	return canonical, nil
+}
+
+// CanonicalizeJSON returns deterministic JSON bytes. Objects are ordered by
+// UTF-8 key order, arrays retain their input order, and exactly round-trippable
+// JSON numbers are normalized through IEEE-754 binary64 representation.
+// Numbers that would lose precision are rejected instead of being allowed to
+// alias another canonical digest. This is a stable Artifact Store encoding,
+// not a claim of general-purpose JCS conformance.
+func CanonicalizeJSON(raw []byte) ([]byte, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return nil, fmt.Errorf("decode JSON: %w", err)
+	}
+	if err := ensureJSONEOF(decoder); err != nil {
+		return nil, err
+	}
+
+	var out bytes.Buffer
+	if err := appendCanonicalJSON(&out, value); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }
 
 func DigestBytes(value []byte) spec.Digest {
@@ -212,7 +215,25 @@ func canonicalJSONNumber(value string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parse JSON number %q: %w", value, err)
 	}
-	return canonicalFloat(parsed)
+	canonical, err := canonicalFloat(parsed)
+	if err != nil {
+		return "", err
+	}
+	originalValue, err := exactJSONNumber(value)
+	if err != nil {
+		return "", fmt.Errorf("parse exact JSON number %q: %w", value, err)
+	}
+	canonicalValue, err := exactJSONNumber(canonical)
+	if err != nil {
+		return "", fmt.Errorf("parse canonical JSON number %q: %w", canonical, err)
+	}
+	if originalValue.Cmp(canonicalValue) != 0 {
+		return "", fmt.Errorf(
+			"JSON number %q cannot be represented without precision loss",
+			value,
+		)
+	}
+	return canonical, nil
 }
 
 func canonicalFloat(value float64) (string, error) {
@@ -223,6 +244,61 @@ func canonicalFloat(value float64) (string, error) {
 		return "0", nil
 	}
 	return strconv.FormatFloat(value, 'g', -1, 64), nil
+}
+
+func exactJSONNumber(value string) (*big.Rat, error) {
+	sign := 1
+	if strings.HasPrefix(value, "-") {
+		sign = -1
+		value = strings.TrimPrefix(value, "-")
+	}
+
+	exponent := 0
+	if index := strings.IndexAny(value, "eE"); index >= 0 {
+		parsedExponent, err := strconv.Atoi(value[index+1:])
+		if err != nil {
+			return nil, err
+		}
+		if parsedExponent < -100_000 || parsedExponent > 100_000 {
+			return nil, errors.New("JSON exponent is outside the supported range")
+		}
+		exponent = parsedExponent
+		value = value[:index]
+	}
+	fractionDigits := 0
+	if index := strings.IndexByte(value, '.'); index >= 0 {
+		fractionDigits = len(value) - index - 1
+		value = value[:index] + value[index+1:]
+	}
+	if value == "" {
+		return nil, errors.New("JSON number has no digits")
+	}
+
+	numerator := new(big.Int)
+	if _, ok := numerator.SetString(value, 10); !ok {
+		return nil, errors.New("JSON number has invalid digits")
+	}
+	if sign < 0 {
+		numerator.Neg(numerator)
+	}
+
+	scale := fractionDigits - exponent
+	if scale <= 0 {
+		multiplier := new(big.Int).Exp(
+			big.NewInt(10),
+			big.NewInt(int64(-scale)),
+			nil,
+		)
+		numerator.Mul(numerator, multiplier)
+		return new(big.Rat).SetInt(numerator), nil
+	}
+
+	denominator := new(big.Int).Exp(
+		big.NewInt(10),
+		big.NewInt(int64(scale)),
+		nil,
+	)
+	return new(big.Rat).SetFrac(numerator, denominator), nil
 }
 
 func cloneCanonicalDefinition(in spec.CanonicalDefinition) spec.CanonicalDefinition {

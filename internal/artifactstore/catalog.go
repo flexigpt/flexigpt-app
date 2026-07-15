@@ -32,6 +32,36 @@ func (s *Store) ListCatalogResourcesForSource(
 	return s.repository.ListCatalogResourcesForSource(ctx, sourceID)
 }
 
+// ListCatalogResourcesForRoot lists resources from enabled source attachments
+// belonging to one active root.
+func (s *Store) ListCatalogResourcesForRoot(
+	ctx context.Context,
+	rootID spec.RootID,
+) ([]spec.CatalogResource, error) {
+	if err := s.ensureOpen(); err != nil {
+		return nil, err
+	}
+	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
+		return nil, err
+	}
+	return s.repository.ListCatalogResourcesForRoot(ctx, rootID)
+}
+
+// GetRootCatalogGeneration returns the most recently published generation for
+// one root.
+func (s *Store) GetRootCatalogGeneration(
+	ctx context.Context,
+	rootID spec.RootID,
+) (spec.RootCatalogGeneration, error) {
+	if err := s.ensureOpen(); err != nil {
+		return spec.RootCatalogGeneration{}, err
+	}
+	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
+		return spec.RootCatalogGeneration{}, err
+	}
+	return s.repository.GetRootCatalogGeneration(ctx, rootID)
+}
+
 // ListDefinitionHistory returns retained digest revisions for one source-local
 // occurrence. Definition bodies are resolved separately through the portable
 // content repository.

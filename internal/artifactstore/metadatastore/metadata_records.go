@@ -12,38 +12,11 @@ import (
 const recordColumns = `record_id, root_id, collection_id, kind, name, version, source_id, locator, subresource_locator, record_mode, tracking_mode, pinned_definition_digest, last_resolved_definition_digest, enabled, data_schema_id, data_json, state, diagnostics_json, created_at, modified_at`
 
 func (s *MetadataStore) CreateRecord(ctx context.Context, record spec.ArtifactRecord) error {
-	if err := spec.ValidateArtifactRecord(record); err != nil {
-		return err
-	}
-	diagnostics, err := encodeDiagnostics(record.Diagnostics)
-	if err != nil {
-		return err
-	}
-	_, err = s.db.ExecContext(
-		ctx,
-		`INSERT INTO artifact_records (record_id, root_id, collection_id, kind, name, version, source_id, locator, subresource_locator, record_mode, tracking_mode, pinned_definition_digest, last_resolved_definition_digest, enabled, data_schema_id, data_json, state, diagnostics_json, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		string(record.RecordID),
-		string(record.RootID),
-		nullableID(record.CollectionID),
-		string(record.Kind),
-		string(record.Name),
-		string(record.Version),
-		string(record.SourceID),
-		string(record.Locator),
-		string(record.SubresourceLocator),
-		string(record.RecordMode),
-		string(record.TrackingMode),
-		nullableDigest(record.PinnedDefinitionDigest),
-		nullableDigest(record.LastResolvedDefinitionDigest),
-		boolToInt(record.Enabled),
-		string(record.DataSchemaID),
-		[]byte(record.Data),
-		string(record.State),
-		diagnostics,
-		formatTime(record.CreatedAt),
-		formatTime(record.ModifiedAt),
-	)
-	return sqliteError(err)
+	return insertRecord(ctx, s.db, record)
+}
+
+type sqlExecutor interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
 func (s *MetadataStore) GetRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
@@ -157,25 +130,140 @@ func (s *MetadataStore) DeleteRecord(ctx context.Context, recordID spec.RecordID
 }
 
 func (s *MetadataStore) CreateTransferProvenance(ctx context.Context, provenance spec.TransferProvenance) error {
-	if err := spec.ValidateTransferProvenance(provenance); err != nil {
-		return err
+	return insertTransferProvenance(ctx, s.db, provenance)
+}
+
+func (s *MetadataStore) PublishRecordSynchronization(
+	ctx context.Context,
+	publication spec.RecordSynchronizationPublication,
+) error {
+	if publication.RootID == "" {
+		return fmt.Errorf("%w: synchronization root ID is empty", spec.ErrInvalidRequest)
 	}
-	origin, err := encodeCatalogResourceKey(provenance.OriginResource)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		return fmt.Errorf("begin record synchronization: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, record := range publication.Creates {
+		if record.RootID != publication.RootID {
+			return fmt.Errorf("%w: synchronized record root mismatch", spec.ErrInvalidRequest)
+		}
+		if err := insertRecord(ctx, tx, record); err != nil {
+			return err
+		}
+	}
+	for _, update := range publication.Updates {
+		record := update.Record
+		if record.RootID != publication.RootID ||
+			update.ExpectedModifiedAt.IsZero() ||
+			update.ExpectedRecordMode == "" ||
+			update.ExpectedTrackingMode == "" {
+			return fmt.Errorf("%w: invalid synchronized record update", spec.ErrInvalidRequest)
+		}
+		if err := spec.ValidateArtifactRecord(record); err != nil {
+			return err
+		}
+		diagnostics, err := encodeDiagnostics(record.Diagnostics)
+		if err != nil {
+			return err
+		}
+		result, err := tx.ExecContext(
+			ctx,
+			`UPDATE artifact_records
+			    SET last_resolved_definition_digest = ?,
+			        state = ?,
+			        diagnostics_json = ?,
+			        modified_at = ?
+			  WHERE record_id = ?
+			    AND root_id = ?
+			    AND modified_at = ?
+			    AND record_mode = ?
+			    AND tracking_mode = ?`,
+			nullableDigest(record.LastResolvedDefinitionDigest),
+			string(record.State),
+			diagnostics,
+			formatTime(record.ModifiedAt),
+			string(record.RecordID),
+			string(record.RootID),
+			formatTime(update.ExpectedModifiedAt),
+			string(update.ExpectedRecordMode),
+			string(update.ExpectedTrackingMode),
+		)
+		if err != nil {
+			return sqliteError(fmt.Errorf("synchronize record %q: %w", record.RecordID, err))
+		}
+		changed, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("inspect synchronized record %q: %w", record.RecordID, err)
+		}
+		if changed == 0 {
+			return fmt.Errorf(
+				"%w: record %q changed during synchronization",
+				spec.ErrConflict,
+				record.RecordID,
+			)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit record synchronization: %w", err)
+	}
+	return nil
+}
+
+func (s *MetadataStore) PublishRecordTransfer(
+	ctx context.Context,
+	publication spec.RecordTransferPublication,
+) error {
+	resourceKey := spec.CatalogResourceKey{
+		SourceID:           publication.Resource.SourceID,
+		Locator:            publication.Resource.Locator,
+		SubresourceLocator: publication.Resource.SubresourceLocator,
+	}
+	if publication.Record.SourceID != resourceKey.SourceID ||
+		publication.Record.Locator != resourceKey.Locator ||
+		publication.Record.SubresourceLocator != resourceKey.SubresourceLocator ||
+		publication.Revision.SourceID != resourceKey.SourceID ||
+		publication.Revision.Locator != resourceKey.Locator ||
+		publication.Revision.SubresourceLocator != resourceKey.SubresourceLocator ||
+		publication.Provenance.TargetRecordID != publication.Record.RecordID {
+		return fmt.Errorf("%w: inconsistent record transfer publication", spec.ErrInvalidRequest)
+	}
+	if err := spec.ValidateCatalogResource(publication.Resource); err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(
-		ctx,
-		`INSERT INTO artifact_transfer_provenance (provenance_id, target_record_id, operation, origin_record_id, origin_resource_json, origin_definition_digest, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		string(provenance.ProvenanceID),
-		string(provenance.TargetRecordID),
-		string(provenance.Operation),
-		nullableID(provenance.OriginRecordID),
-		origin,
-		string(provenance.OriginDefinitionDigest),
-		formatTime(provenance.CreatedAt),
-	)
-	return sqliteError(err)
+	if err := spec.ValidateCatalogResourceRevision(publication.Revision); err != nil {
+		return err
+	}
+	if err := spec.ValidateArtifactRecord(publication.Record); err != nil {
+		return err
+	}
+	if err := spec.ValidateTransferProvenance(publication.Provenance); err != nil {
+		return err
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin record transfer publication: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := upsertCatalogResourceTx(ctx, tx, publication.Resource); err != nil {
+		return err
+	}
+	if err := upsertCatalogRevisionTx(ctx, tx, publication.Revision); err != nil {
+		return err
+	}
+	if err := insertRecord(ctx, tx, publication.Record); err != nil {
+		return err
+	}
+	if err := insertTransferProvenance(ctx, tx, publication.Provenance); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit record transfer publication: %w", err)
+	}
+	return nil
 }
 
 func (s *MetadataStore) ListTransferProvenance(
@@ -193,27 +281,25 @@ func (s *MetadataStore) ListTransferProvenance(
 	defer rows.Close()
 	out := []spec.TransferProvenance{}
 	for rows.Next() {
-		var id, target, operation, digest, created string
-		var originID sql.NullString
-		var originRaw []byte
-		if err := rows.Scan(&id, &target, &operation, &originID, &originRaw, &digest, &created); err != nil {
+		row := transferProvenanceRow{}
+		if err := rows.Scan(row.destinations()...); err != nil {
 			return nil, err
 		}
-		originResource, err := decodeCatalogResourceKey(originRaw)
+		originResource, err := decodeCatalogResourceKey(row.OriginResource)
 		if err != nil {
 			return nil, err
 		}
-		createdAt, err := parseRequiredTime("provenance.createdAt", created)
+		createdAt, err := parseRequiredTime("provenance.createdAt", row.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
 		value := spec.TransferProvenance{
-			ProvenanceID:           spec.ProvenanceID(id),
-			TargetRecordID:         spec.RecordID(target),
-			Operation:              spec.TransferOperation(operation),
-			OriginRecordID:         optionalRecordID(originID),
+			ProvenanceID:           spec.ProvenanceID(row.ProvenanceID),
+			TargetRecordID:         spec.RecordID(row.TargetRecordID),
+			Operation:              spec.TransferOperation(row.Operation),
+			OriginRecordID:         optionalRecordID(row.OriginRecordID),
 			OriginResource:         originResource,
-			OriginDefinitionDigest: spec.Digest(digest),
+			OriginDefinitionDigest: spec.Digest(row.OriginDefinitionDigest),
 			CreatedAt:              createdAt,
 		}
 		if err := spec.ValidateTransferProvenance(value); err != nil {
@@ -224,71 +310,108 @@ func (s *MetadataStore) ListTransferProvenance(
 	return out, rows.Err()
 }
 
+func insertTransferProvenance(
+	ctx context.Context,
+	executor sqlExecutor,
+	provenance spec.TransferProvenance,
+) error {
+	if err := spec.ValidateTransferProvenance(provenance); err != nil {
+		return err
+	}
+	origin, err := encodeCatalogResourceKey(provenance.OriginResource)
+	if err != nil {
+		return err
+	}
+	_, err = executor.ExecContext(
+		ctx,
+		`INSERT INTO artifact_transfer_provenance (provenance_id, target_record_id, operation, origin_record_id, origin_resource_json, origin_definition_digest, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		string(provenance.ProvenanceID),
+		string(provenance.TargetRecordID),
+		string(provenance.Operation),
+		nullableID(provenance.OriginRecordID),
+		origin,
+		string(provenance.OriginDefinitionDigest),
+		formatTime(provenance.CreatedAt),
+	)
+	return sqliteError(err)
+}
+
+func insertRecord(ctx context.Context, executor sqlExecutor, record spec.ArtifactRecord) error {
+	if err := spec.ValidateArtifactRecord(record); err != nil {
+		return err
+	}
+	diagnostics, err := encodeDiagnostics(record.Diagnostics)
+	if err != nil {
+		return err
+	}
+	_, err = executor.ExecContext(
+		ctx,
+		`INSERT INTO artifact_records (record_id, root_id, collection_id, kind, name, version, source_id, locator, subresource_locator, record_mode, tracking_mode, pinned_definition_digest, last_resolved_definition_digest, enabled, data_schema_id, data_json, state, diagnostics_json, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(record.RecordID),
+		string(record.RootID),
+		nullableID(record.CollectionID),
+		string(record.Kind),
+		string(record.Name),
+		string(record.Version),
+		string(record.SourceID),
+		string(record.Locator),
+		string(record.SubresourceLocator),
+		string(record.RecordMode),
+		string(record.TrackingMode),
+		nullableDigest(record.PinnedDefinitionDigest),
+		nullableDigest(record.LastResolvedDefinitionDigest),
+		boolToInt(record.Enabled),
+		string(record.DataSchemaID),
+		[]byte(record.Data),
+		string(record.State),
+		diagnostics,
+		formatTime(record.CreatedAt),
+		formatTime(record.ModifiedAt),
+	)
+	return sqliteError(err)
+}
+
 func scanRecord(scanner sqlScanner) (spec.ArtifactRecord, error) {
-	var id, root, kind, name, version, source, locator, subresource, mode, tracking, dataSchema, state, createdRaw, modifiedRaw string
-	var collection, pinned, resolved sql.NullString
-	var enabled int
-	var data, diagnostics []byte
-	if err := scanner.Scan(
-		&id,
-		&root,
-		&collection,
-		&kind,
-		&name,
-		&version,
-		&source,
-		&locator,
-		&subresource,
-		&mode,
-		&tracking,
-		&pinned,
-		&resolved,
-		&enabled,
-		&dataSchema,
-		&data,
-		&state,
-		&diagnostics,
-		&createdRaw,
-		&modifiedRaw,
-	); err != nil {
+	row := artifactRecordRow{}
+	if err := scanner.Scan(row.destinations()...); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
-	created, err := parseRequiredTime("record.createdAt", createdRaw)
+	created, err := parseRequiredTime("record.createdAt", row.CreatedAt)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
-	modified, err := parseRequiredTime("record.modifiedAt", modifiedRaw)
+	modified, err := parseRequiredTime("record.modifiedAt", row.ModifiedAt)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
-	decodedDiagnostics, err := decodeDiagnostics(diagnostics)
+	decodedDiagnostics, err := decodeDiagnostics(row.Diagnostics)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	record := spec.ArtifactRecord{
-		RecordID:                     spec.RecordID(id),
-		RootID:                       spec.RootID(root),
-		CollectionID:                 optionalCollectionID(collection),
-		Kind:                         spec.ArtifactKind(kind),
-		Name:                         spec.RecordName(name),
-		Version:                      spec.RecordVersion(version),
-		SourceID:                     spec.SourceID(source),
-		Locator:                      spec.SourceLocator(locator),
-		SubresourceLocator:           spec.SubresourceLocator(subresource),
-		RecordMode:                   spec.RecordMode(mode),
-		TrackingMode:                 spec.TrackingMode(tracking),
-		PinnedDefinitionDigest:       optionalDigest(pinned),
-		LastResolvedDefinitionDigest: optionalDigest(resolved),
-		Enabled:                      enabled != 0,
-		DataSchemaID:                 spec.SchemaID(dataSchema),
-		Data:                         append([]byte(nil), data...),
-		State:                        spec.RecordState(state),
+		RecordID:                     spec.RecordID(row.RecordID),
+		RootID:                       spec.RootID(row.RootID),
+		CollectionID:                 optionalCollectionID(row.CollectionID),
+		Kind:                         spec.ArtifactKind(row.Kind),
+		Name:                         spec.RecordName(row.Name),
+		Version:                      spec.RecordVersion(row.Version),
+		SourceID:                     spec.SourceID(row.SourceID),
+		Locator:                      spec.SourceLocator(row.Locator),
+		SubresourceLocator:           spec.SubresourceLocator(row.SubresourceLocator),
+		RecordMode:                   spec.RecordMode(row.RecordMode),
+		TrackingMode:                 spec.TrackingMode(row.TrackingMode),
+		PinnedDefinitionDigest:       optionalDigest(row.PinnedDefinitionDigest),
+		LastResolvedDefinitionDigest: optionalDigest(row.LastResolvedDefinitionDigest),
+		Enabled:                      row.Enabled != 0,
+		DataSchemaID:                 spec.SchemaID(row.DataSchemaID),
+		Data:                         append([]byte(nil), row.Data...),
+		State:                        spec.RecordState(row.State),
 		Diagnostics:                  decodedDiagnostics,
 		CreatedAt:                    created,
 		ModifiedAt:                   modified,
 	}
 	if err := spec.ValidateArtifactRecord(record); err != nil {
-		return spec.ArtifactRecord{}, fmt.Errorf("invalid persisted record %q: %w", id, err)
+		return spec.ArtifactRecord{}, fmt.Errorf("invalid persisted record %q: %w", row.RecordID, err)
 	}
 	return record, nil
 }

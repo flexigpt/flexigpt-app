@@ -20,8 +20,9 @@ const (
 )
 
 type mapStorePortableContentRepository struct {
-	store *mapstore.MapDirectoryStore
-	mu    sync.Mutex
+	store  *mapstore.MapDirectoryStore
+	mu     sync.Mutex
+	closed bool
 }
 
 type artifactContentPartition string
@@ -80,10 +81,18 @@ func NewMapStorePortableContentRepository(baseDir string) (spec.PortableContentR
 }
 
 func (r *mapStorePortableContentRepository) Close() error {
-	if r == nil || r.store == nil {
+	if r == nil {
 		return nil
 	}
-	return r.store.CloseAll()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed || r.store == nil {
+		return nil
+	}
+	r.closed = true
+	store := r.store
+	r.store = nil
+	return store.CloseAll()
 }
 
 func (r *mapStorePortableContentRepository) PutDefinition(
@@ -111,15 +120,11 @@ func (r *mapStorePortableContentRepository) PutDefinition(
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if existing, err := r.getDefinitionLocked(ctx, normalized.Digest); err == nil {
-		if existing.Digest != normalized.Digest {
-			return spec.CanonicalDefinition{}, fmt.Errorf(
-				"%w: existing definition %q",
-				spec.ErrDigestMismatch,
-				normalized.Digest,
-			)
-		}
-		return existing, nil
+	if err := r.ensureOpenLocked(); err != nil {
+		return spec.CanonicalDefinition{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return spec.CanonicalDefinition{}, err
 	}
 	data, err := jsonencdec.StructWithJSONTagsToMap(file)
 	if err != nil {
@@ -128,7 +133,18 @@ func (r *mapStorePortableContentRepository) PutDefinition(
 	if err := r.store.SetFileData(key, data); err != nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf("persist portable definition: %w", err)
 	}
-	return normalized, nil
+	stored, err := r.getDefinitionLocked(ctx, normalized.Digest)
+	if err != nil {
+		return spec.CanonicalDefinition{}, err
+	}
+	if stored.Digest != normalized.Digest {
+		return spec.CanonicalDefinition{}, fmt.Errorf(
+			"%w: persisted definition %q",
+			spec.ErrDigestMismatch,
+			normalized.Digest,
+		)
+	}
+	return stored, nil
 }
 
 func (r *mapStorePortableContentRepository) GetDefinition(
@@ -140,6 +156,9 @@ func (r *mapStorePortableContentRepository) GetDefinition(
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := r.ensureOpenLocked(); err != nil {
+		return spec.CanonicalDefinition{}, err
+	}
 	return r.getDefinitionLocked(ctx, digest)
 }
 
@@ -160,6 +179,12 @@ func (r *mapStorePortableContentRepository) PutAsset(ctx context.Context, conten
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := r.ensureOpenLocked(); err != nil {
+		return "", 0, err
+	}
+	if err := ctx.Err(); err != nil {
+		return "", 0, err
+	}
 	if err := r.store.SetFileData(key, blob); err != nil {
 		return "", 0, fmt.Errorf("persist portable asset: %w", err)
 	}
@@ -176,6 +201,12 @@ func (r *mapStorePortableContentRepository) GetAsset(ctx context.Context, digest
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := r.ensureOpenLocked(); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	data, err := r.store.GetFileData(key, true)
 	if err != nil {
 		return nil, fmt.Errorf("%w: asset %q: %w", spec.ErrContentNotFound, digest, err)
@@ -217,6 +248,12 @@ func (r *mapStorePortableContentRepository) PutPackageManifest(
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := r.ensureOpenLocked(); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := r.store.SetFileData(key, data); err != nil {
 		return fmt.Errorf("persist portable package manifest: %w", err)
 	}
@@ -236,6 +273,12 @@ func (r *mapStorePortableContentRepository) GetPackageManifest(
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := r.ensureOpenLocked(); err != nil {
+		return spec.PortablePackageManifest{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return spec.PortablePackageManifest{}, err
+	}
 	data, err := r.store.GetFileData(key, true)
 	if err != nil {
 		return spec.PortablePackageManifest{}, fmt.Errorf(
@@ -259,6 +302,9 @@ func (r *mapStorePortableContentRepository) getDefinitionLocked(
 	ctx context.Context,
 	digest spec.Digest,
 ) (def spec.CanonicalDefinition, err error) {
+	if err := r.ensureOpenLocked(); err != nil {
+		return spec.CanonicalDefinition{}, err
+	}
 	if err := ctx.Err(); err != nil {
 		return spec.CanonicalDefinition{}, err
 	}
@@ -290,6 +336,13 @@ func (r *mapStorePortableContentRepository) getDefinitionLocked(
 		)
 	}
 	return normalized, nil
+}
+
+func (r *mapStorePortableContentRepository) ensureOpenLocked() error {
+	if r == nil || r.closed || r.store == nil {
+		return spec.ErrClosed
+	}
+	return nil
 }
 
 func definitionFileKey(digest spec.Digest) (mapstore.FileKey, error) {

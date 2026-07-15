@@ -8,74 +8,7 @@ import (
 	_ "github.com/glebarez/go-sqlite"
 )
 
-const metadataSchemaVersion = 2
-
-type MetadataStore struct {
-	db *sql.DB
-}
-
-func OpenMetadataStore(ctx context.Context, path string) (*MetadataStore, error) {
-	db, err := sql.Open(
-		"sqlite",
-		path+"?busy_timeout=5000&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("open artifact metadata database: %w", err)
-	}
-	db.SetMaxOpenConns(4)
-	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("ping artifact metadata database: %w", err)
-	}
-	if err := migrateMetadata(ctx, db); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	return &MetadataStore{db: db}, nil
-}
-
-func (s *MetadataStore) Close() error {
-	if s == nil || s.db == nil {
-		return nil
-	}
-	return s.db.Close()
-}
-
-func migrateMetadata(ctx context.Context, db *sql.DB) error {
-	var currentVersion int
-	if err := db.QueryRowContext(ctx, "PRAGMA user_version;").Scan(&currentVersion); err != nil {
-		return fmt.Errorf("read artifact metadata schema version: %w", err)
-	}
-	if currentVersion > metadataSchemaVersion {
-		return fmt.Errorf(
-			"artifact metadata schema version %d is newer than supported version %d",
-			currentVersion,
-			metadataSchemaVersion,
-		)
-	}
-	if currentVersion == metadataSchemaVersion {
-		return nil
-	}
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin artifact metadata migration: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	for _, statement := range metadataSchemaStatements {
-		if _, err := tx.ExecContext(ctx, statement); err != nil {
-			return fmt.Errorf("apply artifact metadata schema: %w", err)
-		}
-	}
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d;", metadataSchemaVersion)); err != nil {
-		return fmt.Errorf("set artifact metadata schema version: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit artifact metadata migration: %w", err)
-	}
-	return nil
-}
+const metadataSchemaVersion = 3
 
 var metadataSchemaStatements = []string{
 	`CREATE TABLE IF NOT EXISTS artifact_roots (
@@ -235,4 +168,158 @@ var metadataSchemaStatements = []string{
 	`CREATE INDEX IF NOT EXISTS idx_artifact_records_collection ON artifact_records (collection_id);`,
 	`CREATE INDEX IF NOT EXISTS idx_root_catalog_generations_root ON root_catalog_generations (root_id, generation DESC);`,
 	`CREATE INDEX IF NOT EXISTS idx_artifact_dependencies_record ON artifact_dependencies (record_id, selector_index);`,
+}
+
+var metadataSchemaV3Statements = []string{
+	`CREATE TABLE IF NOT EXISTS root_catalog_generation_counters (
+		root_id TEXT PRIMARY KEY REFERENCES artifact_roots(root_id) ON DELETE RESTRICT,
+		generation INTEGER NOT NULL CHECK (generation >= 0)
+	);`,
+	`INSERT INTO root_catalog_generation_counters (root_id, generation)
+		SELECT root_id, MAX(generation)
+		  FROM root_catalog_generations
+		 GROUP BY root_id
+		ON CONFLICT (root_id) DO UPDATE SET
+			generation = MAX(root_catalog_generation_counters.generation, excluded.generation);`,
+	`CREATE TRIGGER IF NOT EXISTS trg_artifact_records_collection_insert
+		BEFORE INSERT ON artifact_records
+		WHEN NEW.collection_id IS NOT NULL
+		 AND NOT EXISTS (
+			SELECT 1
+			  FROM artifact_collections
+			 WHERE collection_id = NEW.collection_id
+			   AND root_id = NEW.root_id
+			   AND soft_deleted_at IS NULL
+		 )
+		BEGIN
+			SELECT RAISE(ABORT, 'foreign key constraint failed: invalid active record collection');
+		END;`,
+	`CREATE TRIGGER IF NOT EXISTS trg_artifact_records_collection_update
+		BEFORE UPDATE OF collection_id ON artifact_records
+		WHEN NEW.collection_id IS NOT NULL
+		 AND NOT EXISTS (
+			SELECT 1
+			  FROM artifact_collections
+			 WHERE collection_id = NEW.collection_id
+			   AND root_id = NEW.root_id
+			   AND soft_deleted_at IS NULL
+		 )
+		BEGIN
+			SELECT RAISE(ABORT, 'foreign key constraint failed: invalid active record collection');
+		END;`,
+	`CREATE TRIGGER IF NOT EXISTS trg_artifact_collections_nonempty_delete
+		BEFORE UPDATE OF soft_deleted_at ON artifact_collections
+		WHEN OLD.soft_deleted_at IS NULL
+		 AND NEW.soft_deleted_at IS NOT NULL
+		 AND EXISTS (
+			SELECT 1
+			  FROM artifact_records
+			 WHERE collection_id = NEW.collection_id
+		 )
+		BEGIN
+			SELECT RAISE(ABORT, 'foreign key constraint failed: collection still contains records');
+		END;`,
+	`CREATE TRIGGER IF NOT EXISTS trg_artifact_records_attachment_insert
+		BEFORE INSERT ON artifact_records
+		WHEN NOT EXISTS (
+			SELECT 1
+			  FROM root_source_attachments
+			 WHERE root_id = NEW.root_id
+			   AND source_id = NEW.source_id
+		 )
+		BEGIN
+			SELECT RAISE(ABORT, 'foreign key constraint failed: source is not attached to record root');
+		END;`,
+}
+
+type MetadataStore struct {
+	db *sql.DB
+}
+
+type metadataMigration struct {
+	Version    int
+	Statements []string
+}
+
+var metadataMigrations = []metadataMigration{
+	{
+		Version:    2,
+		Statements: metadataSchemaStatements,
+	},
+	{
+		Version:    3,
+		Statements: metadataSchemaV3Statements,
+	},
+}
+
+func OpenMetadataStore(ctx context.Context, path string) (*MetadataStore, error) {
+	db, err := sql.Open(
+		"sqlite",
+		path+"?busy_timeout=5000&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("open artifact metadata database: %w", err)
+	}
+	db.SetMaxOpenConns(4)
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ping artifact metadata database: %w", err)
+	}
+	if err := migrateMetadata(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return &MetadataStore{db: db}, nil
+}
+
+func (s *MetadataStore) Close() error {
+	if s == nil || s.db == nil {
+		return nil
+	}
+	return s.db.Close()
+}
+
+func migrateMetadata(ctx context.Context, db *sql.DB) error {
+	var currentVersion int
+	if err := db.QueryRowContext(ctx, "PRAGMA user_version;").Scan(&currentVersion); err != nil {
+		return fmt.Errorf("read artifact metadata schema version: %w", err)
+	}
+	if currentVersion > metadataSchemaVersion {
+		return fmt.Errorf(
+			"artifact metadata schema version %d is newer than supported version %d",
+			currentVersion,
+			metadataSchemaVersion,
+		)
+	}
+	if currentVersion == metadataSchemaVersion {
+		return nil
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin artifact metadata migration: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, migration := range metadataMigrations {
+		if migration.Version <= currentVersion {
+			continue
+		}
+		for _, statement := range migration.Statements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf(
+					"apply artifact metadata migration %d: %w",
+					migration.Version,
+					err,
+				)
+			}
+		}
+	}
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d;", metadataSchemaVersion)); err != nil {
+		return fmt.Errorf("set artifact metadata schema version: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit artifact metadata migration: %w", err)
+	}
+	return nil
 }

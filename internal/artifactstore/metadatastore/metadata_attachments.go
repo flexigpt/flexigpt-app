@@ -157,54 +157,34 @@ func (s *MetadataStore) DeleteRootSourceAttachment(
 }
 
 func scanRootSourceAttachment(scanner sqlScanner) (spec.RootSourceAttachment, error) {
-	var (
-		rootID       string
-		sourceID     string
-		role         string
-		priority     int
-		enabled      int
-		dataSchemaID string
-		data         []byte
-		createdAt    string
-		modifiedAt   string
-	)
-	if err := scanner.Scan(
-		&rootID,
-		&sourceID,
-		&role,
-		&priority,
-		&enabled,
-		&dataSchemaID,
-		&data,
-		&createdAt,
-		&modifiedAt,
-	); err != nil {
+	row := rootSourceAttachmentRow{}
+	if err := scanner.Scan(row.destinations()...); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
-	created, err := parseRequiredTime("attachment.createdAt", createdAt)
+	created, err := parseRequiredTime("attachment.createdAt", row.CreatedAt)
 	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
-	modified, err := parseRequiredTime("attachment.modifiedAt", modifiedAt)
+	modified, err := parseRequiredTime("attachment.modifiedAt", row.ModifiedAt)
 	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
 	attachment := spec.RootSourceAttachment{
-		RootID:       spec.RootID(rootID),
-		SourceID:     spec.SourceID(sourceID),
-		Role:         spec.AttachmentRole(role),
-		Priority:     priority,
-		Enabled:      enabled != 0,
-		DataSchemaID: spec.SchemaID(dataSchemaID),
-		Data:         append([]byte(nil), data...),
+		RootID:       spec.RootID(row.RootID),
+		SourceID:     spec.SourceID(row.SourceID),
+		Role:         spec.AttachmentRole(row.Role),
+		Priority:     row.Priority,
+		Enabled:      row.Enabled != 0,
+		DataSchemaID: spec.SchemaID(row.DataSchemaID),
+		Data:         append([]byte(nil), row.Data...),
 		CreatedAt:    created,
 		ModifiedAt:   modified,
 	}
 	if err := spec.ValidateRootSourceAttachment(attachment); err != nil {
 		return spec.RootSourceAttachment{}, fmt.Errorf(
 			"invalid persisted root source attachment %q/%q: %w",
-			rootID,
-			sourceID,
+			row.RootID,
+			row.SourceID,
 			err,
 		)
 	}

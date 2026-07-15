@@ -7,13 +7,14 @@ import (
 // SourceCatalogPublication is the driver-independent result of observing one
 // source. A repository publishes it atomically to app-local metadata.
 type SourceCatalogPublication struct {
-	SourceID           SourceID
-	ObservedGeneration SourceGeneration
-	ObservedAt         time.Time
-	Diagnostics        []Diagnostic
-	Resources          []CatalogResource
-	Revisions          []CatalogResourceRevision
-	Authoritative      bool
+	SourceID                 SourceID
+	ExpectedSourceModifiedAt time.Time
+	ObservedGeneration       SourceGeneration
+	ObservedAt               time.Time
+	Diagnostics              []Diagnostic
+	Resources                []CatalogResource
+	Revisions                []CatalogResourceRevision
+	Authoritative            bool
 }
 
 // RootCatalogPublication records a durable root-level catalog generation after
@@ -36,6 +37,36 @@ type RecordUpdate struct {
 	Enabled         *bool
 	DataSchemaID    *SchemaID
 	Data            []byte
+}
+
+// RecordSynchronizationUpdate is an optimistic source-state update. Expected
+// values prevent synchronization from overwriting a concurrent local record
+// mutation such as pinning, detaching, or moving a record.
+type RecordSynchronizationUpdate struct {
+	Record               ArtifactRecord
+	ExpectedModifiedAt   time.Time
+	ExpectedRecordMode   RecordMode
+	ExpectedTrackingMode TrackingMode
+}
+
+// RecordSynchronizationPublication commits one root synchronization as a
+// single app-metadata transaction. Portable definition content is already
+// content-addressed and is not part of this transaction.
+type RecordSynchronizationPublication struct {
+	RootID  RootID
+	Creates []ArtifactRecord
+	Updates []RecordSynchronizationUpdate
+}
+
+// RecordTransferPublication atomically publishes the app-local metadata for an
+// imported, captured, or forked record. The portable definition is immutable
+// content and may be persisted before this transaction without compromising
+// metadata consistency.
+type RecordTransferPublication struct {
+	Resource   CatalogResource
+	Revision   CatalogResourceRevision
+	Record     ArtifactRecord
+	Provenance TransferProvenance
 }
 
 // ImportDefinitionRequest imports a portable definition through the configured

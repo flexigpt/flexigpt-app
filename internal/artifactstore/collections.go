@@ -18,41 +18,6 @@ type CollectionUpdate struct {
 	Data         json.RawMessage
 }
 
-// CreateCollection creates an app-local grouping of records.
-func (s *Store) CreateCollection(ctx context.Context, draft spec.CollectionDraft) (spec.ArtifactCollection, error) {
-	if err := s.ensureOpen(); err != nil {
-		return spec.ArtifactCollection{}, err
-	}
-	if _, err := s.repository.GetRoot(ctx, draft.RootID, false); err != nil {
-		return spec.ArtifactCollection{}, err
-	}
-	id, err := s.newID()
-	if err != nil {
-		return spec.ArtifactCollection{}, err
-	}
-	now := s.nowUTC()
-	collection := spec.ArtifactCollection{
-		CollectionID: spec.CollectionID(id),
-		RootID:       draft.RootID,
-		Kind:         draft.Kind,
-		Slug:         draft.Slug,
-		DisplayName:  draft.DisplayName,
-		Description:  draft.Description,
-		Enabled:      draft.Enabled,
-		DataSchemaID: draft.DataSchemaID,
-		Data:         normalizedJSONObject(draft.Data),
-		CreatedAt:    now,
-		ModifiedAt:   now,
-	}
-	if err := s.validateCollection(ctx, collection); err != nil {
-		return spec.ArtifactCollection{}, err
-	}
-	if err := s.repository.CreateCollection(ctx, collection); err != nil {
-		return spec.ArtifactCollection{}, err
-	}
-	return collection, nil
-}
-
 // EnsureBaseCollection returns an active collection with the requested root and
 // slug, creating it when absent. It handles a concurrent creator by reloading
 // the natural key after a uniqueness conflict.
@@ -91,6 +56,41 @@ func (s *Store) EnsureBaseCollection(ctx context.Context, draft spec.CollectionD
 			spec.ErrConflict,
 			collection.CollectionID,
 		)
+	}
+	return collection, nil
+}
+
+// CreateCollection creates an app-local grouping of records.
+func (s *Store) CreateCollection(ctx context.Context, draft spec.CollectionDraft) (spec.ArtifactCollection, error) {
+	if err := s.ensureOpen(); err != nil {
+		return spec.ArtifactCollection{}, err
+	}
+	if _, err := s.repository.GetRoot(ctx, draft.RootID, false); err != nil {
+		return spec.ArtifactCollection{}, err
+	}
+	id, err := s.newID()
+	if err != nil {
+		return spec.ArtifactCollection{}, err
+	}
+	now := s.nowUTC()
+	collection := spec.ArtifactCollection{
+		CollectionID: spec.CollectionID(id),
+		RootID:       draft.RootID,
+		Kind:         draft.Kind,
+		Slug:         draft.Slug,
+		DisplayName:  draft.DisplayName,
+		Description:  draft.Description,
+		Enabled:      draft.Enabled,
+		DataSchemaID: draft.DataSchemaID,
+		Data:         normalizedJSONObject(draft.Data),
+		CreatedAt:    now,
+		ModifiedAt:   now,
+	}
+	if err := s.validateCollection(ctx, collection); err != nil {
+		return spec.ArtifactCollection{}, err
+	}
+	if err := s.repository.CreateCollection(ctx, collection); err != nil {
+		return spec.ArtifactCollection{}, err
 	}
 	return collection, nil
 }
@@ -195,7 +195,7 @@ func (s *Store) DeleteCollection(ctx context.Context, collectionID spec.Collecti
 	now := s.nowUTC()
 	collection.Enabled = false
 	collection.ModifiedAt = now
-	collection.SoftDeletedAt = new(now)
+	collection.SoftDeletedAt = &now
 	if err := s.validateCollection(ctx, collection); err != nil {
 		return spec.ArtifactCollection{}, err
 	}

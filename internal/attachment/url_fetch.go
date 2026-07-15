@@ -107,31 +107,6 @@ func contentBlockFromFetchOutputs(
 	return nil, errors.New("fetchurl returned no usable content")
 }
 
-func normalizeMIMEType(ct string) string {
-	ct = strings.TrimSpace(ct)
-	if ct == "" {
-		return ""
-	}
-
-	mt, _, err := mime.ParseMediaType(ct)
-	if err == nil && strings.TrimSpace(mt) != "" {
-		return strings.ToLower(strings.TrimSpace(mt))
-	}
-
-	if i := strings.Index(ct, ";"); i >= 0 {
-		ct = ct[:i]
-	}
-
-	return strings.ToLower(strings.TrimSpace(ct))
-}
-
-func isHTMLMIMEType(ct string) bool {
-	ct = normalizeMIMEType(ct)
-	return ct == "text/html" ||
-		ct == "application/xhtml+xml" ||
-		strings.Contains(ct, "html")
-}
-
 func isPlainTextLikeMIME(ct string) bool {
 	ct = normalizeMIMEType(ct)
 	if ct == "" || isHTMLMIMEType(ct) {
@@ -162,6 +137,13 @@ func isPlainTextLikeMIME(ct string) bool {
 	}
 }
 
+func isHTMLMIMEType(ct string) bool {
+	ct = normalizeMIMEType(ct)
+	return ct == "text/html" ||
+		ct == "application/xhtml+xml" ||
+		strings.Contains(ct, "html")
+}
+
 func mimeTypeFromURLPath(rawURL string) string {
 	pathForExt := strings.TrimSpace(rawURL)
 	if u, err := url.Parse(rawURL); err == nil {
@@ -173,6 +155,24 @@ func mimeTypeFromURLPath(rawURL string) string {
 	}
 
 	return ""
+}
+
+func normalizeMIMEType(ct string) string {
+	ct = strings.TrimSpace(ct)
+	if ct == "" {
+		return ""
+	}
+
+	mt, _, err := mime.ParseMediaType(ct)
+	if err == nil && strings.TrimSpace(mt) != "" {
+		return strings.ToLower(strings.TrimSpace(mt))
+	}
+
+	if i := strings.Index(ct, ";"); i >= 0 {
+		ct = ct[:i]
+	}
+
+	return strings.ToLower(strings.TrimSpace(ct))
 }
 
 func filenameFromURLPath(rawURL string) string {

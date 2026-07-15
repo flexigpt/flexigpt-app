@@ -8,6 +8,9 @@ import (
 )
 
 func (s *Store) GetDependencies(ctx context.Context, recordID spec.RecordID) ([]spec.ArtifactSelector, error) {
+	if err := s.ensureOpen(); err != nil {
+		return nil, err
+	}
 	record, err := s.GetRecord(ctx, recordID)
 	if err != nil {
 		return nil, err
@@ -22,73 +25,10 @@ func (s *Store) GetDependencies(ctx context.Context, recordID spec.RecordID) ([]
 	return append([]spec.ArtifactSelector(nil), definition.DependencySelectors...), nil
 }
 
-func (s *Store) FindCandidates(
-	ctx context.Context,
-	rootID spec.RootID,
-	selector spec.ArtifactSelector,
-) ([]spec.DependencyCandidate, error) {
-	resources, err := s.repository.ListCatalogResourcesForRoot(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-	candidates := []spec.DependencyCandidate{}
-	for _, resource := range resources {
-		if resource.State != spec.CatalogStateValid || resource.CurrentDefinitionDigest == nil ||
-			resource.Kind != selector.Kind {
-			continue
-		}
-		if selector.LogicalName != "" && resource.LogicalName != selector.LogicalName {
-			continue
-		}
-		if selector.VersionConstraint != "" && selector.VersionConstraint != "*" &&
-			string(resource.LogicalVersion) != selector.VersionConstraint {
-			continue
-		}
-		definition, err := s.GetDefinitionByDigest(ctx, *resource.CurrentDefinitionDigest)
-		if err != nil {
-			return nil, err
-		}
-		if !selectorLabelsMatch(selector.Labels, definition.Labels) {
-			continue
-		}
-		candidates = append(candidates, spec.DependencyCandidate{Resource: resource, Definition: definition})
-	}
-	return candidates, nil
-}
-
-func (s *Store) ExplainDependencyResolution(
-	ctx context.Context,
-	rootID spec.RootID,
-	selector spec.ArtifactSelector,
-) (spec.DependencyExplanation, error) {
-	candidates, err := s.FindCandidates(ctx, rootID, selector)
-	if err != nil {
-		return spec.DependencyExplanation{}, err
-	}
-	explanation := spec.DependencyExplanation{Selector: selector, Candidates: candidates}
-	switch len(candidates) {
-	case 0:
-		explanation.Diagnostics = []spec.Diagnostic{
-			{
-				Severity: spec.DiagnosticSeverityError,
-				Code:     "artifactstore.dependency.missing",
-				Message:  "no catalog candidate matches dependency selector",
-			},
-		}
-	case 1:
-	default:
-		explanation.Diagnostics = []spec.Diagnostic{
-			{
-				Severity: spec.DiagnosticSeverityError,
-				Code:     "artifactstore.dependency.ambiguous",
-				Message:  "multiple catalog candidates match dependency selector",
-			},
-		}
-	}
-	return explanation, nil
-}
-
 func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID) (spec.DependencyGraph, error) {
+	if err := s.ensureOpen(); err != nil {
+		return spec.DependencyGraph{}, err
+	}
 	record, err := s.GetRecord(ctx, recordID)
 	if err != nil {
 		return spec.DependencyGraph{}, err
@@ -110,7 +50,7 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 				spec.Diagnostic{
 					Severity: spec.DiagnosticSeverityError,
 					Code:     "artifactstore.dependency.cycle",
-					Message:  "dependency cycle detected",
+					Message:  fmt.Sprintf("dependency cycle detected at definition %q", digest),
 				},
 			)
 			return nil
@@ -142,6 +82,81 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 	}
 	err = visit(*record.LastResolvedDefinitionDigest)
 	return graph, err
+}
+
+func (s *Store) ExplainDependencyResolution(
+	ctx context.Context,
+	rootID spec.RootID,
+	selector spec.ArtifactSelector,
+) (spec.DependencyExplanation, error) {
+	if err := s.ensureOpen(); err != nil {
+		return spec.DependencyExplanation{}, err
+	}
+	candidates, err := s.FindCandidates(ctx, rootID, selector)
+	if err != nil {
+		return spec.DependencyExplanation{}, err
+	}
+	explanation := spec.DependencyExplanation{Selector: selector, Candidates: candidates}
+	switch len(candidates) {
+	case 0:
+		explanation.Diagnostics = []spec.Diagnostic{
+			{
+				Severity: spec.DiagnosticSeverityError,
+				Code:     "artifactstore.dependency.missing",
+				Message:  "no catalog candidate matches dependency selector",
+			},
+		}
+	case 1:
+	default:
+		explanation.Diagnostics = []spec.Diagnostic{
+			{
+				Severity: spec.DiagnosticSeverityError,
+				Code:     "artifactstore.dependency.ambiguous",
+				Message:  "multiple catalog candidates match dependency selector",
+			},
+		}
+	}
+	return explanation, nil
+}
+
+func (s *Store) FindCandidates(
+	ctx context.Context,
+	rootID spec.RootID,
+	selector spec.ArtifactSelector,
+) ([]spec.DependencyCandidate, error) {
+	if err := s.ensureOpen(); err != nil {
+		return nil, err
+	}
+	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
+		return nil, err
+	}
+	resources, err := s.repository.ListCatalogResourcesForRoot(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	candidates := []spec.DependencyCandidate{}
+	for _, resource := range resources {
+		if resource.State != spec.CatalogStateValid || resource.CurrentDefinitionDigest == nil ||
+			resource.Kind != selector.Kind {
+			continue
+		}
+		if selector.LogicalName != "" && resource.LogicalName != selector.LogicalName {
+			continue
+		}
+		if selector.VersionConstraint != "" && selector.VersionConstraint != "*" &&
+			string(resource.LogicalVersion) != selector.VersionConstraint {
+			continue
+		}
+		definition, err := s.GetDefinitionByDigest(ctx, *resource.CurrentDefinitionDigest)
+		if err != nil {
+			return nil, err
+		}
+		if !selectorLabelsMatch(selector.Labels, definition.Labels) {
+			continue
+		}
+		candidates = append(candidates, spec.DependencyCandidate{Resource: resource, Definition: definition})
+	}
+	return candidates, nil
 }
 
 func selectorLabelsMatch(selector, labels map[string]string) bool {

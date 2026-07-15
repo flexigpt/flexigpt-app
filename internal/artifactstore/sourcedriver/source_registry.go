@@ -1,4 +1,5 @@
 package sourcedriver
 
-// Source-provider registration is deferred with the source drivers. Future
-// implementations must use the approved MapStore and LLMTools boundaries.
+// Embedded provider registration is implemented by EmbeddedFSDirectoryDriver.
+// Additional provider registries should remain transport-specific and should
+// be injected through SourceDriver implementations.

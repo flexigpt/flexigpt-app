@@ -52,6 +52,28 @@ type ExportClosure struct {
 	Assets            []AssetManifestEntry
 }
 
+// ArtifactRecordDraft is the caller-provided portion of a new app-local record.
+// Artifact Store assigns RecordID, state, resolved digest, and timestamps.
+type ArtifactRecordDraft struct {
+	RootID       RootID
+	CollectionID *CollectionID
+
+	Kind    ArtifactKind
+	Name    RecordName
+	Version RecordVersion
+
+	SourceID           SourceID
+	Locator            SourceLocator
+	SubresourceLocator SubresourceLocator
+
+	RecordMode             RecordMode
+	TrackingMode           TrackingMode
+	PinnedDefinitionDigest *Digest
+	Enabled                bool
+	DataSchemaID           SchemaID
+	Data                   json.RawMessage
+}
+
 // ArtifactFrontend owns domain-specific recognition, decoding, and validation.
 // It must not implement transport behavior or depend on app-local source paths.
 type ArtifactFrontend interface {
@@ -93,28 +115,6 @@ type CollectionKindHook interface {
 		collection ArtifactCollection,
 		record ArtifactRecord,
 	) []Diagnostic
-}
-
-// ArtifactRecordDraft is the caller-provided portion of a new app-local record.
-// Artifact Store assigns RecordID, state, resolved digest, and timestamps.
-type ArtifactRecordDraft struct {
-	RootID       RootID
-	CollectionID *CollectionID
-
-	Kind    ArtifactKind
-	Name    RecordName
-	Version RecordVersion
-
-	SourceID           SourceID
-	Locator            SourceLocator
-	SubresourceLocator SubresourceLocator
-
-	RecordMode             RecordMode
-	TrackingMode           TrackingMode
-	PinnedDefinitionDigest *Digest
-	Enabled                bool
-	DataSchemaID           SchemaID
-	Data                   json.RawMessage
 }
 
 // RecordDerivation is a policy-owned set of local values for a record created

@@ -56,6 +56,69 @@ func newSettingSecretResolver(s mcpAuthKeyReader) auth.SecretResolver {
 	return &settingSecretResolver{store: s}
 }
 
+func (r *settingSecretResolver) LoadOAuthToken(
+	ctx context.Context,
+	base spec.MCPAuthStatus,
+) (*oauth2.Token, error) {
+	ref, err := oauthTokenSecretRef(base)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := r.ResolveSecret(ctx, ref)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return nil, auth.ErrOAuthTokenNotFound
+		}
+		return nil, err
+	}
+	if strings.TrimSpace(raw) == "" {
+		return nil, auth.ErrOAuthTokenNotFound
+	}
+
+	var tok oauth2.Token
+	if err := json.Unmarshal([]byte(raw), &tok); err != nil {
+		return nil, err
+	}
+	return &tok, nil
+}
+
+func (r *settingSecretResolver) SaveOAuthToken(
+	ctx context.Context,
+	base spec.MCPAuthStatus,
+	tok *oauth2.Token,
+) error {
+	if tok == nil || !tok.Valid() {
+		return nil
+	}
+	ref, err := oauthTokenSecretRef(base)
+	if err != nil {
+		return err
+	}
+	//nolint:gosec // Access token.
+	raw, err := json.Marshal(tok)
+	if err != nil {
+		return err
+	}
+	_, _, err = r.SetMCPSecret(ctx, ref, string(raw))
+	return err
+}
+
+func (r *settingSecretResolver) DeleteOAuthToken(
+	ctx context.Context,
+	base spec.MCPAuthStatus,
+) error {
+	ref, err := oauthTokenSecretRef(base)
+	if err != nil {
+		return err
+	}
+	err = r.DeleteMCPSecret(ctx, ref)
+	if err != nil && strings.Contains(strings.ToLower(err.Error()), "not found") {
+		return nil
+	}
+	return err
+}
+
 func (r *settingSecretResolver) ResolveSecret(
 	ctx context.Context,
 	keyName string,
@@ -158,69 +221,6 @@ func (r *settingSecretResolver) DeleteMCPSecret(ctx context.Context, secretRef s
 		Type:    settingSpec.AuthKeyTypeMCP,
 		KeyName: keyName,
 	})
-	return err
-}
-
-func (r *settingSecretResolver) LoadOAuthToken(
-	ctx context.Context,
-	base spec.MCPAuthStatus,
-) (*oauth2.Token, error) {
-	ref, err := oauthTokenSecretRef(base)
-	if err != nil {
-		return nil, err
-	}
-
-	raw, err := r.ResolveSecret(ctx, ref)
-	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "not found") {
-			return nil, auth.ErrOAuthTokenNotFound
-		}
-		return nil, err
-	}
-	if strings.TrimSpace(raw) == "" {
-		return nil, auth.ErrOAuthTokenNotFound
-	}
-
-	var tok oauth2.Token
-	if err := json.Unmarshal([]byte(raw), &tok); err != nil {
-		return nil, err
-	}
-	return &tok, nil
-}
-
-func (r *settingSecretResolver) SaveOAuthToken(
-	ctx context.Context,
-	base spec.MCPAuthStatus,
-	tok *oauth2.Token,
-) error {
-	if tok == nil || !tok.Valid() {
-		return nil
-	}
-	ref, err := oauthTokenSecretRef(base)
-	if err != nil {
-		return err
-	}
-	//nolint:gosec // Access token.
-	raw, err := json.Marshal(tok)
-	if err != nil {
-		return err
-	}
-	_, _, err = r.SetMCPSecret(ctx, ref, string(raw))
-	return err
-}
-
-func (r *settingSecretResolver) DeleteOAuthToken(
-	ctx context.Context,
-	base spec.MCPAuthStatus,
-) error {
-	ref, err := oauthTokenSecretRef(base)
-	if err != nil {
-		return err
-	}
-	err = r.DeleteMCPSecret(ctx, ref)
-	if err != nil && strings.Contains(strings.ToLower(err.Error()), "not found") {
-		return nil
-	}
 	return err
 }
 

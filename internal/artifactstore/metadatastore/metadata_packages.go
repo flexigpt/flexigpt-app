@@ -79,45 +79,31 @@ func (s *MetadataStore) UpsertArtifactPackage(ctx context.Context, value spec.Ar
 }
 
 func scanArtifactPackage(scanner sqlScanner) (spec.ArtifactPackage, error) {
-	var sourceID, locator, name, version, displayName, description, state, firstRaw, lastRaw string
-	var digest sql.NullString
-	var diagnostics []byte
-	if err := scanner.Scan(
-		&sourceID,
-		&locator,
-		&name,
-		&version,
-		&displayName,
-		&description,
-		&digest,
-		&state,
-		&diagnostics,
-		&firstRaw,
-		&lastRaw,
-	); err != nil {
+	row := artifactPackageRow{}
+	if err := scanner.Scan(row.destinations()...); err != nil {
 		return spec.ArtifactPackage{}, err
 	}
-	first, err := parseRequiredTime("package.firstSeenAt", firstRaw)
+	first, err := parseRequiredTime("package.firstSeenAt", row.FirstSeenAt)
 	if err != nil {
 		return spec.ArtifactPackage{}, err
 	}
-	last, err := parseRequiredTime("package.lastSeenAt", lastRaw)
+	last, err := parseRequiredTime("package.lastSeenAt", row.LastSeenAt)
 	if err != nil {
 		return spec.ArtifactPackage{}, err
 	}
-	decoded, err := decodeDiagnostics(diagnostics)
+	decoded, err := decodeDiagnostics(row.Diagnostics)
 	if err != nil {
 		return spec.ArtifactPackage{}, err
 	}
 	value := spec.ArtifactPackage{
-		SourceID:              spec.SourceID(sourceID),
-		ManifestLocator:       spec.SourceLocator(locator),
-		Name:                  spec.LogicalName(name),
-		Version:               spec.LogicalVersion(version),
-		DisplayName:           displayName,
-		Description:           description,
-		CurrentManifestDigest: optionalDigest(digest),
-		State:                 spec.CatalogState(state),
+		SourceID:              spec.SourceID(row.SourceID),
+		ManifestLocator:       spec.SourceLocator(row.ManifestLocator),
+		Name:                  spec.LogicalName(row.Name),
+		Version:               spec.LogicalVersion(row.Version),
+		DisplayName:           row.DisplayName,
+		Description:           row.Description,
+		CurrentManifestDigest: optionalDigest(row.CurrentManifestDigest),
+		State:                 spec.CatalogState(row.State),
 		Diagnostics:           decoded,
 		FirstSeenAt:           first,
 		LastSeenAt:            last,

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -18,6 +19,9 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 	if err := s.ensureOpen(); err != nil {
 		return spec.ScanResult{}, err
 	}
+	s.scanMu.Lock()
+	defer s.scanMu.Unlock()
+
 	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
 		return spec.ScanResult{}, err
 	}
@@ -25,12 +29,38 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 	if err != nil {
 		return spec.ScanResult{}, err
 	}
-	plans := make(map[spec.SourceID]spec.SourceScanPlan)
-	for _, sourcePlan := range plan.SourcePlans {
-		if sourcePlan.SourceID != "" {
-			plans[sourcePlan.SourceID] = sourcePlan
-		}
+	attached := make(map[spec.SourceID]struct{}, len(attachments))
+	for _, attachment := range attachments {
+		attached[attachment.SourceID] = struct{}{}
 	}
+
+	plans := make(map[spec.SourceID]spec.SourceScanPlan, len(plan.SourcePlans))
+	for _, sourcePlan := range plan.SourcePlans {
+		if sourcePlan.SourceID == "" {
+			return spec.ScanResult{}, fmt.Errorf(
+				"%w: scan source plan has an empty source ID",
+				spec.ErrInvalidRequest,
+			)
+		}
+		if _, exists := plans[sourcePlan.SourceID]; exists {
+			return spec.ScanResult{}, fmt.Errorf(
+				"%w: duplicate source plan for %q",
+				spec.ErrInvalidRequest,
+				sourcePlan.SourceID,
+			)
+		}
+		if _, ok := attached[sourcePlan.SourceID]; !ok {
+			return spec.ScanResult{}, fmt.Errorf(
+				"%w: source %q is not attached to root %q",
+				spec.ErrSourceNotAttached,
+				sourcePlan.SourceID,
+				rootID,
+			)
+		}
+		plans[sourcePlan.SourceID] = sourcePlan
+	}
+	hasExplicitSourcePlans := len(plan.SourcePlans) > 0
+
 	result := spec.ScanResult{RootID: rootID}
 	sourceGenerations := map[spec.SourceID]spec.SourceGeneration{}
 	for _, attachment := range attachments {
@@ -45,7 +75,10 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 			continue
 		}
 		sourcePlan, ok := plans[source.SourceID]
-		if !ok {
+		if hasExplicitSourcePlans && !ok {
+			continue
+		}
+		if !hasExplicitSourcePlans {
 			sourcePlan = spec.SourceScanPlan{
 				SourceID:       source.SourceID,
 				DirectoryRoots: []spec.DirectoryScanRoot{{Root: ".", Recursive: true}},
@@ -117,12 +150,14 @@ func (s *Store) scanSource(
 	}
 	now := s.nowUTC()
 	publication := spec.SourceCatalogPublication{
-		SourceID:           source.SourceID,
-		ObservedGeneration: generation,
-		ObservedAt:         now,
-		Authoritative:      plan.Authoritative,
+		SourceID:                 source.SourceID,
+		ExpectedSourceModifiedAt: source.ModifiedAt,
+		ObservedGeneration:       generation,
+		ObservedAt:               now,
+		Authoritative:            plan.Authoritative,
 	}
 	result := spec.SourceScanResult{SourceID: source.SourceID, Generation: generation}
+	seenResources := make(map[string]struct{})
 	for _, entry := range entries {
 		result.Candidates++
 		content, err := readCandidate(ctx, driver, source, entry.Locator, plan.MaxFileBytes)
@@ -144,15 +179,40 @@ func (s *Store) scanSource(
 		if err := errorDiagnostics("frontend decode", diagnostics); err != nil || len(decoded) == 0 {
 			publication.Resources = append(
 				publication.Resources,
-				invalidCatalogResource(source.SourceID, entry.Locator, "", frontend.ID(), now, diagnostics),
+				invalidCatalogResource(
+					source.SourceID,
+					entry.Locator,
+					"",
+					frontend.ID(),
+					now,
+					&digest,
+					diagnostics,
+				),
 			)
 			result.InvalidResources++
 			result.Diagnostics = append(result.Diagnostics, diagnostics...)
 			continue
 		}
 		for _, decodedArtifact := range decoded {
+			resourceKey := string(entry.Locator) + "\x00" + string(decodedArtifact.SubresourceLocator)
+			if _, exists := seenResources[resourceKey]; exists {
+				return result, publication, fmt.Errorf(
+					"%w: frontend %q emitted duplicate resource %q/%q",
+					spec.ErrInvalidRequest,
+					frontend.ID(),
+					entry.Locator,
+					decodedArtifact.SubresourceLocator,
+				)
+			}
+			seenResources[resourceKey] = struct{}{}
+
 			definition, err := baseutils.CanonicalizeDefinition(decodedArtifact.Definition)
 			if err != nil {
+				canonicalDiagnostics := []spec.Diagnostic{{
+					Severity: spec.DiagnosticSeverityError,
+					Code:     "artifactstore.definition.canonical.invalid",
+					Message:  err.Error(),
+				}}
 				publication.Resources = append(
 					publication.Resources,
 					invalidCatalogResource(
@@ -161,19 +221,16 @@ func (s *Store) scanSource(
 						decodedArtifact.SubresourceLocator,
 						frontend.ID(),
 						now,
-						[]spec.Diagnostic{
-							{
-								Severity: spec.DiagnosticSeverityError,
-								Code:     "artifactstore.definition.canonical.invalid",
-								Message:  err.Error(),
-							},
-						},
+						&digest,
+						canonicalDiagnostics,
 					),
 				)
 				result.InvalidResources++
+				result.Diagnostics = append(result.Diagnostics, canonicalDiagnostics...)
 				continue
 			}
-			allDiagnostics := append([]spec.Diagnostic{}, frontend.ValidateStructure(ctx, definition)...)
+			allDiagnostics := append([]spec.Diagnostic{}, diagnostics...)
+			allDiagnostics = append(allDiagnostics, frontend.ValidateStructure(ctx, definition)...)
 			allDiagnostics = append(allDiagnostics, frontend.ValidateSemantic(ctx, definition)...)
 			selectors, dependencyDiagnostics := frontend.ExtractDependencies(ctx, definition)
 			allDiagnostics = append(allDiagnostics, dependencyDiagnostics...)
@@ -186,6 +243,7 @@ func (s *Store) scanSource(
 						decodedArtifact.SubresourceLocator,
 						frontend.ID(),
 						now,
+						&digest,
 						allDiagnostics,
 					),
 				)
@@ -193,7 +251,32 @@ func (s *Store) scanSource(
 				result.Diagnostics = append(result.Diagnostics, allDiagnostics...)
 				continue
 			}
+
 			definition.DependencySelectors = selectors
+			definition.Digest = ""
+			definition, err = baseutils.CanonicalizeDefinition(definition)
+			if err != nil {
+				dependencyDigestDiagnostics := []spec.Diagnostic{{
+					Severity: spec.DiagnosticSeverityError,
+					Code:     "artifactstore.definition.dependencies.invalid",
+					Message:  err.Error(),
+				}}
+				publication.Resources = append(
+					publication.Resources,
+					invalidCatalogResource(
+						source.SourceID,
+						entry.Locator,
+						decodedArtifact.SubresourceLocator,
+						frontend.ID(),
+						now,
+						&digest,
+						dependencyDigestDiagnostics,
+					),
+				)
+				result.InvalidResources++
+				result.Diagnostics = append(result.Diagnostics, dependencyDigestDiagnostics...)
+				continue
+			}
 			if s.portableContent == nil {
 				return result, publication, fmt.Errorf(
 					"%w: portable content repository is not configured",
@@ -241,6 +324,19 @@ func (s *Store) scanSource(
 			result.ValidResources++
 		}
 	}
+
+	confirmedGeneration, err := driver.Snapshot(ctx, source)
+	if err != nil {
+		return result, publication, err
+	}
+	if confirmedGeneration != generation {
+		return result, publication, fmt.Errorf(
+			"%w: source %q changed while it was being scanned",
+			spec.ErrConflict,
+			source.SourceID,
+		)
+	}
+	publication.Diagnostics = append([]spec.Diagnostic(nil), result.Diagnostics...)
 	return result, publication, nil
 }
 
@@ -289,6 +385,16 @@ func collectSourceCandidates(
 		walkRoot := root.Root
 		if walkRoot == "" {
 			walkRoot = "."
+		}
+		for _, pattern := range root.IncludePatterns {
+			if _, err := path.Match(pattern, "candidate"); err != nil {
+				return nil, fmt.Errorf(
+					"%w: invalid include pattern %q: %w",
+					spec.ErrInvalidRequest,
+					pattern,
+					err,
+				)
+			}
 		}
 		err := driver.Walk(ctx, source, walkRoot, func(ctx context.Context, entry spec.SourceEntry) error {
 			if !entry.IsRegular || !matchesDirectoryRoot(walkRoot, entry.Locator, root) {
@@ -365,22 +471,49 @@ func invalidCatalogResource(
 	subresource spec.SubresourceLocator,
 	frontendID spec.FrontendID,
 	now time.Time,
+	sourceContentDigest *spec.Digest,
 	diagnostics []spec.Diagnostic,
 ) spec.CatalogResource {
 	return spec.CatalogResource{
-		SourceID:           sourceID,
-		Locator:            locator,
-		SubresourceLocator: subresource,
-		FrontendID:         frontendID,
-		State:              spec.CatalogStateInvalid,
-		FirstSeenAt:        now,
-		LastSeenAt:         now,
-		Diagnostics:        diagnostics,
+		SourceID:            sourceID,
+		Locator:             locator,
+		SubresourceLocator:  subresource,
+		SourceContentDigest: sourceContentDigest,
+		FrontendID:          frontendID,
+		State:               spec.CatalogStateInvalid,
+		FirstSeenAt:         now,
+		LastSeenAt:          now,
+		Diagnostics:         diagnostics,
 	}
 }
 
 func digestScanPlan(plan spec.ScanPlan) (spec.Digest, error) {
-	raw, err := json.Marshal(plan)
+	normalized := spec.ScanPlan{
+		SourcePlans: append([]spec.SourceScanPlan(nil), plan.SourcePlans...),
+	}
+	for index := range normalized.SourcePlans {
+		sourcePlan := &normalized.SourcePlans[index]
+		sourcePlan.ExplicitLocators = append([]spec.SourceLocator(nil), sourcePlan.ExplicitLocators...)
+		sourcePlan.DirectoryRoots = append([]spec.DirectoryScanRoot(nil), sourcePlan.DirectoryRoots...)
+		sourcePlan.AllowedFrontendIDs = append([]spec.FrontendID(nil), sourcePlan.AllowedFrontendIDs...)
+		slices.Sort(sourcePlan.ExplicitLocators)
+		slices.Sort(sourcePlan.AllowedFrontendIDs)
+		for rootIndex := range sourcePlan.DirectoryRoots {
+			sourcePlan.DirectoryRoots[rootIndex].IncludePatterns = append(
+				[]string(nil),
+				sourcePlan.DirectoryRoots[rootIndex].IncludePatterns...,
+			)
+			sort.Strings(sourcePlan.DirectoryRoots[rootIndex].IncludePatterns)
+		}
+		sort.Slice(sourcePlan.DirectoryRoots, func(left, right int) bool {
+			return sourcePlan.DirectoryRoots[left].Root < sourcePlan.DirectoryRoots[right].Root
+		})
+	}
+	sort.Slice(normalized.SourcePlans, func(left, right int) bool {
+		return normalized.SourcePlans[left].SourceID < normalized.SourcePlans[right].SourceID
+	})
+
+	raw, err := json.Marshal(normalized)
 	if err != nil {
 		return "", err
 	}
@@ -392,7 +525,38 @@ func digestScanPlan(plan spec.ScanPlan) (spec.Digest, error) {
 }
 
 func digestCatalog(resources []spec.CatalogResource) (spec.Digest, error) {
-	raw, err := json.Marshal(resources)
+	type digestResource struct {
+		SourceID                spec.SourceID           `json:"sourceID"`
+		Locator                 spec.SourceLocator      `json:"locator"`
+		SubresourceLocator      spec.SubresourceLocator `json:"subresourceLocator,omitempty"`
+		PackageManifestLocator  spec.SourceLocator      `json:"packageManifestLocator,omitempty"`
+		Kind                    spec.ArtifactKind       `json:"kind,omitempty"`
+		LogicalName             spec.LogicalName        `json:"logicalName,omitempty"`
+		LogicalVersion          spec.LogicalVersion     `json:"logicalVersion,omitempty"`
+		CurrentDefinitionDigest *spec.Digest            `json:"currentDefinitionDigest,omitempty"`
+		SourceContentDigest     *spec.Digest            `json:"sourceContentDigest,omitempty"`
+		FrontendID              spec.FrontendID         `json:"frontendID,omitempty"`
+		State                   spec.CatalogState       `json:"state"`
+		Diagnostics             []spec.Diagnostic       `json:"diagnostics,omitempty"`
+	}
+	projected := make([]digestResource, 0, len(resources))
+	for _, resource := range resources {
+		projected = append(projected, digestResource{
+			SourceID:                resource.SourceID,
+			Locator:                 resource.Locator,
+			SubresourceLocator:      resource.SubresourceLocator,
+			PackageManifestLocator:  resource.PackageManifestLocator,
+			Kind:                    resource.Kind,
+			LogicalName:             resource.LogicalName,
+			LogicalVersion:          resource.LogicalVersion,
+			CurrentDefinitionDigest: resource.CurrentDefinitionDigest,
+			SourceContentDigest:     resource.SourceContentDigest,
+			FrontendID:              resource.FrontendID,
+			State:                   resource.State,
+			Diagnostics:             resource.Diagnostics,
+		})
+	}
+	raw, err := json.Marshal(projected)
 	if err != nil {
 		return "", err
 	}

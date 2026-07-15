@@ -16,105 +16,6 @@ type authStatusKey struct {
 	ServerID spec.MCPServerID
 }
 
-func MergeMCPAuthStatus(st spec.MCPAuthStatus, cfg spec.MCPServerConfig) spec.MCPAuthStatus {
-	def := DefaultMCPAuthStatusFromConfig(cfg)
-	if st.BundleID != "" && st.BundleID != def.BundleID {
-		return def
-	}
-	if st.ServerID != "" && st.ServerID != def.ServerID {
-		return def
-	}
-	if st.AuthMode != "" && st.AuthMode != def.AuthMode {
-		return def
-	}
-	if st.Resource != "" && def.Resource != "" && st.Resource != def.Resource {
-		return def
-	}
-	if st.ServerID == "" {
-		st.ServerID = def.ServerID
-	}
-	if st.BundleID == "" {
-		st.BundleID = def.BundleID
-	}
-	if st.AuthMode == "" {
-		st.AuthMode = def.AuthMode
-	}
-	if st.Resource == "" {
-		st.Resource = def.Resource
-	}
-	if st.State == "" {
-		st.State = def.State
-	}
-	if st.State == spec.MCPAuthStateAuthorized {
-		if !authStatusCanBeAuthorized(cfg, def) {
-			return def
-		}
-		if authStatusExpiredByClock(st) {
-			st.State = spec.MCPAuthStateExpired
-			if st.LastError == "" {
-				st.LastError = "OAuth token is expired"
-			}
-		}
-	}
-	if def.AuthMode == spec.MCPHTTPAuthNone {
-		st.State = def.State
-		st.Scopes = nil
-		st.ExpiresAt = nil
-		st.LastError = ""
-		st.AuthorizationServer = ""
-	}
-	return st
-}
-
-func authStatusCanBeAuthorized(cfg spec.MCPServerConfig, def spec.MCPAuthStatus) bool {
-	switch def.AuthMode {
-	case spec.MCPHTTPAuthAPIKey:
-		return cfg.StreamableHTTP != nil && len(cfg.StreamableHTTP.SecretHeaderRefs) > 0
-	case spec.MCPHTTPAuthClientCredentials:
-		return cfg.StreamableHTTP != nil &&
-			strings.TrimSpace(cfg.StreamableHTTP.ClientCredentialRef) != ""
-	default:
-		return true
-	}
-}
-
-func authStatusExpiredByClock(st spec.MCPAuthStatus) bool {
-	if st.ExpiresAt == nil || st.ExpiresAt.IsZero() {
-		return false
-	}
-	return !time.Now().UTC().Before(st.ExpiresAt.UTC())
-}
-
-func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus {
-	st := spec.MCPAuthStatus{
-		BundleID: cfg.BundleID,
-		ServerID: cfg.ID,
-		AuthMode: spec.MCPHTTPAuthNone,
-		State:    spec.MCPAuthStateNotRequired,
-	}
-
-	if cfg.StreamableHTTP != nil {
-		st.AuthMode = normalizeHTTPAuthMode(cfg.StreamableHTTP.AuthMode)
-		st.Resource = strings.TrimSpace(cfg.StreamableHTTP.URL)
-	}
-
-	switch st.AuthMode {
-	case spec.MCPHTTPAuthOAuth:
-		st.State = spec.MCPAuthStateRequired
-	case spec.MCPHTTPAuthClientCredentials:
-		st.State = spec.MCPAuthStateRequired
-	case spec.MCPHTTPAuthAPIKey:
-		st.State = spec.MCPAuthStateRequired
-	case spec.MCPHTTPAuthNone, "":
-		st.State = spec.MCPAuthStateNotRequired
-	default:
-		st.State = spec.MCPAuthStateError
-		st.LastError = errStrUnsupportedAuthMode
-	}
-
-	return st
-}
-
 type oauthAuthorizationPendingLister interface {
 	Pending() []spec.MCPOAuthAuthorization
 }
@@ -261,6 +162,105 @@ func (m *AuthManager) findPendingOAuthAuthorization(
 		}
 	}
 	return nil
+}
+
+func MergeMCPAuthStatus(st spec.MCPAuthStatus, cfg spec.MCPServerConfig) spec.MCPAuthStatus {
+	def := DefaultMCPAuthStatusFromConfig(cfg)
+	if st.BundleID != "" && st.BundleID != def.BundleID {
+		return def
+	}
+	if st.ServerID != "" && st.ServerID != def.ServerID {
+		return def
+	}
+	if st.AuthMode != "" && st.AuthMode != def.AuthMode {
+		return def
+	}
+	if st.Resource != "" && def.Resource != "" && st.Resource != def.Resource {
+		return def
+	}
+	if st.ServerID == "" {
+		st.ServerID = def.ServerID
+	}
+	if st.BundleID == "" {
+		st.BundleID = def.BundleID
+	}
+	if st.AuthMode == "" {
+		st.AuthMode = def.AuthMode
+	}
+	if st.Resource == "" {
+		st.Resource = def.Resource
+	}
+	if st.State == "" {
+		st.State = def.State
+	}
+	if st.State == spec.MCPAuthStateAuthorized {
+		if !authStatusCanBeAuthorized(cfg, def) {
+			return def
+		}
+		if authStatusExpiredByClock(st) {
+			st.State = spec.MCPAuthStateExpired
+			if st.LastError == "" {
+				st.LastError = "OAuth token is expired"
+			}
+		}
+	}
+	if def.AuthMode == spec.MCPHTTPAuthNone {
+		st.State = def.State
+		st.Scopes = nil
+		st.ExpiresAt = nil
+		st.LastError = ""
+		st.AuthorizationServer = ""
+	}
+	return st
+}
+
+func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus {
+	st := spec.MCPAuthStatus{
+		BundleID: cfg.BundleID,
+		ServerID: cfg.ID,
+		AuthMode: spec.MCPHTTPAuthNone,
+		State:    spec.MCPAuthStateNotRequired,
+	}
+
+	if cfg.StreamableHTTP != nil {
+		st.AuthMode = normalizeHTTPAuthMode(cfg.StreamableHTTP.AuthMode)
+		st.Resource = strings.TrimSpace(cfg.StreamableHTTP.URL)
+	}
+
+	switch st.AuthMode {
+	case spec.MCPHTTPAuthOAuth:
+		st.State = spec.MCPAuthStateRequired
+	case spec.MCPHTTPAuthClientCredentials:
+		st.State = spec.MCPAuthStateRequired
+	case spec.MCPHTTPAuthAPIKey:
+		st.State = spec.MCPAuthStateRequired
+	case spec.MCPHTTPAuthNone, "":
+		st.State = spec.MCPAuthStateNotRequired
+	default:
+		st.State = spec.MCPAuthStateError
+		st.LastError = errStrUnsupportedAuthMode
+	}
+
+	return st
+}
+
+func authStatusCanBeAuthorized(cfg spec.MCPServerConfig, def spec.MCPAuthStatus) bool {
+	switch def.AuthMode {
+	case spec.MCPHTTPAuthAPIKey:
+		return cfg.StreamableHTTP != nil && len(cfg.StreamableHTTP.SecretHeaderRefs) > 0
+	case spec.MCPHTTPAuthClientCredentials:
+		return cfg.StreamableHTTP != nil &&
+			strings.TrimSpace(cfg.StreamableHTTP.ClientCredentialRef) != ""
+	default:
+		return true
+	}
+}
+
+func authStatusExpiredByClock(st spec.MCPAuthStatus) bool {
+	if st.ExpiresAt == nil || st.ExpiresAt.IsZero() {
+		return false
+	}
+	return !time.Now().UTC().Before(st.ExpiresAt.UTC())
 }
 
 func authHealthConfigured(

@@ -10,9 +10,12 @@ import (
 )
 
 func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication spec.SourceCatalogPublication) error {
-	if publication.SourceID == "" || publication.ObservedGeneration == "" || publication.ObservedAt.IsZero() {
+	if publication.SourceID == "" ||
+		publication.ExpectedSourceModifiedAt.IsZero() ||
+		publication.ObservedGeneration == "" ||
+		publication.ObservedAt.IsZero() {
 		return fmt.Errorf(
-			"%w: source catalog publication requires source, generation, and observation time",
+			"%w: source catalog publication requires source, expected version, generation, and observation time",
 			spec.ErrInvalidRequest,
 		)
 	}
@@ -31,9 +34,10 @@ func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication sp
 	result, err := tx.ExecContext(ctx, `
 		UPDATE artifact_sources
 		   SET last_observed_generation = ?, last_scanned_at = ?, diagnostics_json = ?, modified_at = ?
-		 WHERE source_id = ?`,
+		 WHERE source_id = ? AND modified_at = ?`,
 		string(publication.ObservedGeneration), formatTime(publication.ObservedAt), diagnostics,
 		formatTime(publication.ObservedAt), string(publication.SourceID),
+		formatTime(publication.ExpectedSourceModifiedAt),
 	)
 	if err != nil {
 		return sqliteError(err)
@@ -43,7 +47,11 @@ func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication sp
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("%w: source %q", spec.ErrNotFound, publication.SourceID)
+		return fmt.Errorf(
+			"%w: source %q changed while catalog publication was pending",
+			spec.ErrConflict,
+			publication.SourceID,
+		)
 	}
 	seen := make(map[string]struct{}, len(publication.Resources))
 	for _, resource := range publication.Resources {
@@ -54,6 +62,9 @@ func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication sp
 			return err
 		}
 		key := string(resource.Locator) + "\x00" + string(resource.SubresourceLocator)
+		if _, exists := seen[key]; exists {
+			return fmt.Errorf("%w: duplicate catalog resource %q", spec.ErrInvalidRequest, key)
+		}
 		seen[key] = struct{}{}
 		if err := upsertCatalogResourceTx(ctx, tx, resource); err != nil {
 			return err
@@ -79,10 +90,7 @@ func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication sp
 		if err != nil {
 			return err
 		}
-		if rows.Err() != nil {
-			return rows.Err()
-		}
-		missingDiagnostics, _ := encodeDiagnostics([]spec.Diagnostic{})
+		missing := make([]spec.CatalogResourceKey, 0)
 		for rows.Next() {
 			var locator, subresource string
 			if err := rows.Scan(&locator, &subresource); err != nil {
@@ -93,21 +101,37 @@ func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication sp
 			if _, ok := seen[locator+"\x00"+subresource]; ok {
 				continue
 			}
-			if _, err := tx.ExecContext(
-				ctx,
-				`UPDATE catalog_resources SET state = ?, diagnostics_json = ? WHERE source_id = ? AND locator = ? AND subresource_locator = ?`,
-				string(spec.CatalogStateMissing),
-				missingDiagnostics,
-				string(publication.SourceID),
-				locator,
-				subresource,
-			); err != nil {
-				_ = rows.Close()
-				return err
-			}
+			missing = append(missing, spec.CatalogResourceKey{
+				SourceID:           publication.SourceID,
+				Locator:            spec.SourceLocator(locator),
+				SubresourceLocator: spec.SubresourceLocator(subresource),
+			})
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
 		}
 		if err := rows.Close(); err != nil {
 			return err
+		}
+		missingDiagnostics, err := encodeDiagnostics([]spec.Diagnostic{})
+		if err != nil {
+			return err
+		}
+		for _, key := range missing {
+			if _, err := tx.ExecContext(
+				ctx,
+				`UPDATE catalog_resources
+				    SET state = ?, diagnostics_json = ?
+				  WHERE source_id = ? AND locator = ? AND subresource_locator = ?`,
+				string(spec.CatalogStateMissing),
+				missingDiagnostics,
+				string(key.SourceID),
+				string(key.Locator),
+				string(key.SubresourceLocator),
+			); err != nil {
+				return err
+			}
 		}
 	}
 	return tx.Commit()
@@ -163,7 +187,15 @@ func (s *MetadataStore) PublishRootCatalogGeneration(
 	}
 	defer func() { _ = tx.Rollback() }()
 	var generation uint64
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(generation), 0) + 1 FROM root_catalog_generations WHERE root_id = ?`, string(publication.RootID)).
+	if err := tx.QueryRowContext(
+		ctx,
+		`INSERT INTO root_catalog_generation_counters (root_id, generation)
+		 VALUES (?, 1)
+		 ON CONFLICT (root_id) DO UPDATE SET
+			generation = root_catalog_generation_counters.generation + 1
+		 RETURNING generation`,
+		string(publication.RootID),
+	).
 		Scan(&generation); err != nil {
 		return spec.RootCatalogGeneration{}, err
 	}
@@ -247,7 +279,44 @@ func upsertCatalogResourceTx(ctx context.Context, tx *sql.Tx, resource spec.Cata
 	}
 	_, err = tx.ExecContext(
 		ctx,
-		`INSERT INTO catalog_resources (source_id, locator, subresource_locator, package_manifest_locator, kind, logical_name, logical_version, current_definition_digest, source_content_digest, frontend_id, state, first_seen_at, last_seen_at, diagnostics_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (source_id, locator, subresource_locator) DO UPDATE SET package_manifest_locator = excluded.package_manifest_locator, kind = excluded.kind, logical_name = excluded.logical_name, logical_version = excluded.logical_version, current_definition_digest = excluded.current_definition_digest, source_content_digest = excluded.source_content_digest, frontend_id = excluded.frontend_id, state = excluded.state, last_seen_at = excluded.last_seen_at, diagnostics_json = excluded.diagnostics_json`,
+		`INSERT INTO catalog_resources (
+			source_id, locator, subresource_locator, package_manifest_locator,
+			kind, logical_name, logical_version, current_definition_digest,
+			source_content_digest, frontend_id, state, first_seen_at, last_seen_at,
+			diagnostics_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (source_id, locator, subresource_locator) DO UPDATE SET
+			package_manifest_locator = CASE
+				WHEN excluded.package_manifest_locator <> '' THEN excluded.package_manifest_locator
+				ELSE catalog_resources.package_manifest_locator
+			END,
+			kind = CASE
+				WHEN excluded.kind <> '' THEN excluded.kind
+				ELSE catalog_resources.kind
+			END,
+			logical_name = CASE
+				WHEN excluded.logical_name <> '' THEN excluded.logical_name
+				ELSE catalog_resources.logical_name
+			END,
+			logical_version = CASE
+				WHEN excluded.logical_version <> '' THEN excluded.logical_version
+				ELSE catalog_resources.logical_version
+			END,
+			current_definition_digest = COALESCE(
+				excluded.current_definition_digest,
+				catalog_resources.current_definition_digest
+			),
+			source_content_digest = COALESCE(
+				excluded.source_content_digest,
+				catalog_resources.source_content_digest
+			),
+			frontend_id = CASE
+				WHEN excluded.frontend_id <> '' THEN excluded.frontend_id
+				ELSE catalog_resources.frontend_id
+			END,
+			state = excluded.state,
+			last_seen_at = excluded.last_seen_at,
+			diagnostics_json = excluded.diagnostics_json`,
 		string(resource.SourceID),
 		string(resource.Locator),
 		string(resource.SubresourceLocator),

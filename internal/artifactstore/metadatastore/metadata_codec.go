@@ -76,11 +76,12 @@ func encodeCatalogResourceKey(value *spec.CatalogResourceKey) ([]byte, error) {
 }
 
 func decodeCatalogResourceKey(raw []byte) (*spec.CatalogResourceKey, error) {
-	value := spec.CatalogResourceKey{}
 	if len(raw) == 0 {
-		return &value, nil
+		//nolint:nilnil // Nil nil required.
+		return nil, nil
 	}
 
+	value := spec.CatalogResourceKey{}
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return nil, fmt.Errorf("decode catalog resource key: %w", err)
 	}
@@ -90,15 +91,23 @@ func decodeCatalogResourceKey(raw []byte) (*spec.CatalogResourceKey, error) {
 	return &value, nil
 }
 
-func formatTime(value time.Time) string {
-	return value.UTC().Format(time.RFC3339Nano)
-}
-
 func nullableTime(value *time.Time) any {
 	if value == nil {
 		return nil
 	}
 	return formatTime(*value)
+}
+
+func parseNullableTime(label string, value sql.NullString) (*time.Time, error) {
+	if !value.Valid || value.String == "" {
+		//nolint:nilnil // Nil nil required.
+		return nil, nil
+	}
+	parsed, err := parseRequiredTime(label, value.String)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
 }
 
 func parseRequiredTime(label, value string) (time.Time, error) {
@@ -107,17 +116,6 @@ func parseRequiredTime(label, value string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("parse %s: %w", label, err)
 	}
 	return parsed.UTC(), nil
-}
-
-func parseNullableTime(label string, value sql.NullString) (*time.Time, error) {
-	if !value.Valid || value.String == "" {
-		return &time.Time{}, nil
-	}
-	parsed, err := parseRequiredTime(label, value.String)
-	if err != nil {
-		return nil, err
-	}
-	return &parsed, nil
 }
 
 func nullableDigest(value *spec.Digest) any {
@@ -179,4 +177,8 @@ func sqliteError(err error) error {
 	default:
 		return err
 	}
+}
+
+func formatTime(value time.Time) string {
+	return value.UTC().Format(time.RFC3339Nano)
 }

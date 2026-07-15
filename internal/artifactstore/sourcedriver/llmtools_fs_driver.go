@@ -103,38 +103,44 @@ func (d *llmToolsFSDirectoryDriver) Open(
 	return io.NopCloser(bytes.NewReader(content)), nil
 }
 
-func (d *llmToolsFSDirectoryDriver) Stat(
+func (d *llmToolsFSDirectoryDriver) Walk(
 	ctx context.Context,
 	source spec.ArtifactSource,
-	locator spec.SourceLocator,
-) (spec.SourceEntry, error) {
-	tool, config, err := d.toolFor(source)
+	root spec.SourceLocator,
+	walk spec.WalkFunc,
+) error {
+	if walk == nil {
+		return fmt.Errorf("%w: walk callback is nil", spec.ErrInvalidRequest)
+	}
+	rootEntry, err := d.Stat(ctx, source, root)
 	if err != nil {
-		return spec.SourceEntry{}, err
+		return err
 	}
-	path, err := sourcePath(config.RootPath, locator)
-	if err != nil {
-		return spec.SourceEntry{}, err
+	if !rootEntry.IsDirectory {
+		return fmt.Errorf("%w: walk root %q is not a directory", spec.ErrInvalidRequest, root)
 	}
-	out, err := tool.StatPath(ctx, fstool.StatPathArgs{Path: path})
-	if err != nil {
-		return spec.SourceEntry{}, err
+	var visit func(spec.SourceLocator) error
+	visit = func(directory spec.SourceLocator) error {
+		entries, err := d.ReadDir(ctx, source, directory)
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if err := walk(ctx, entry); err != nil {
+				return err
+			}
+			if entry.IsDirectory {
+				if err := visit(entry.Locator); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	}
-	if out == nil || !out.Exists {
-		return spec.SourceEntry{}, fmt.Errorf("%w: source locator %q", spec.ErrNotFound, locator)
-	}
-	modified := time.Time{}
-	if out.ModTime != nil {
-		modified = out.ModTime.UTC()
-	}
-	return spec.SourceEntry{
-		Locator:     locator,
-		Name:        out.Name,
-		SizeBytes:   out.SizeBytes,
-		ModifiedAt:  modified,
-		IsDirectory: out.IsDir,
-		IsRegular:   !out.IsDir,
-	}, nil
+	return visit(root)
 }
 
 func (d *llmToolsFSDirectoryDriver) ReadDir(
@@ -177,44 +183,38 @@ func (d *llmToolsFSDirectoryDriver) ReadDir(
 	return entries, nil
 }
 
-func (d *llmToolsFSDirectoryDriver) Walk(
+func (d *llmToolsFSDirectoryDriver) Stat(
 	ctx context.Context,
 	source spec.ArtifactSource,
-	root spec.SourceLocator,
-	walk spec.WalkFunc,
-) error {
-	if walk == nil {
-		return fmt.Errorf("%w: walk callback is nil", spec.ErrInvalidRequest)
-	}
-	rootEntry, err := d.Stat(ctx, source, root)
+	locator spec.SourceLocator,
+) (spec.SourceEntry, error) {
+	tool, config, err := d.toolFor(source)
 	if err != nil {
-		return err
+		return spec.SourceEntry{}, err
 	}
-	if !rootEntry.IsDirectory {
-		return fmt.Errorf("%w: walk root %q is not a directory", spec.ErrInvalidRequest, root)
+	path, err := sourcePath(config.RootPath, locator)
+	if err != nil {
+		return spec.SourceEntry{}, err
 	}
-	var visit func(spec.SourceLocator) error
-	visit = func(directory spec.SourceLocator) error {
-		entries, err := d.ReadDir(ctx, source, directory)
-		if err != nil {
-			return err
-		}
-		for _, entry := range entries {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			if err := walk(ctx, entry); err != nil {
-				return err
-			}
-			if entry.IsDirectory {
-				if err := visit(entry.Locator); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
+	out, err := tool.StatPath(ctx, fstool.StatPathArgs{Path: path})
+	if err != nil {
+		return spec.SourceEntry{}, err
 	}
-	return visit(root)
+	if out == nil || !out.Exists {
+		return spec.SourceEntry{}, fmt.Errorf("%w: source locator %q", spec.ErrNotFound, locator)
+	}
+	modified := time.Time{}
+	if out.ModTime != nil {
+		modified = out.ModTime.UTC()
+	}
+	return spec.SourceEntry{
+		Locator:     locator,
+		Name:        out.Name,
+		SizeBytes:   out.SizeBytes,
+		ModifiedAt:  modified,
+		IsDirectory: out.IsDir,
+		IsRegular:   !out.IsDir,
+	}, nil
 }
 
 type llmToolsFSConfig struct {

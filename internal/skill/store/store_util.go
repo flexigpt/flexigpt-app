@@ -123,16 +123,6 @@ func (s *SkillStore) getAnyBundle(ctx context.Context, id bundleitemutils.Bundle
 	return b, false, nil
 }
 
-func (s *SkillStore) writeAllUser(sc skillStoreSchema) error {
-	sc.SchemaVersion = spec.SkillSchemaVersion
-
-	mp, err := jsonencdec.StructWithJSONTagsToMap(sc)
-	if err != nil {
-		return err
-	}
-	return s.userStore.SetAll(mp)
-}
-
 func (s *SkillStore) ensureBaseSkillBundleHydrated() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -208,6 +198,16 @@ func (s *SkillStore) ensureBaseSkillBundleHydrated() error {
 	}
 	all.Skills[spec.BaseSkillBundleID] = map[spec.SkillSlug]spec.Skill{}
 	return s.writeAllUser(all)
+}
+
+func (s *SkillStore) writeAllUser(sc skillStoreSchema) error {
+	sc.SchemaVersion = spec.SkillSchemaVersion
+
+	mp, err := jsonencdec.StructWithJSONTagsToMap(sc)
+	if err != nil {
+		return err
+	}
+	return s.userStore.SetAll(mp)
 }
 
 func (s *SkillStore) readAllUser(force bool) (skillStoreSchema, error) {

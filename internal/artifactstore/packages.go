@@ -2,6 +2,7 @@ package artifactstore
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -32,6 +33,12 @@ func (s *Store) ListArtifactPackagesForSource(
 // into the portable manifest itself.
 func (s *Store) PublishArtifactPackage(ctx context.Context, artifactPackage spec.ArtifactPackage) error {
 	if err := s.ensureOpen(); err != nil {
+		return err
+	}
+	if err := spec.ValidateArtifactPackage(artifactPackage); err != nil {
+		return fmt.Errorf("%w: artifact package: %w", spec.ErrInvalidRequest, err)
+	}
+	if _, err := s.repository.GetSource(ctx, artifactPackage.SourceID); err != nil {
 		return err
 	}
 	return s.repository.UpsertArtifactPackage(ctx, artifactPackage)

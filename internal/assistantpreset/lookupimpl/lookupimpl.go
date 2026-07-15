@@ -179,6 +179,30 @@ type mcpContextLookupAdapter struct {
 	discovery   MCPDiscoveryLookup
 }
 
+func NewAssistantPresetReferenceLookups(
+	modelPresetSt *modelpresetStore.ModelPresetStore,
+	toolSt *toolStore.ToolStore,
+	skillSt *skillStore.SkillStore,
+	mcpServerStore MCPServerConfigStore,
+	mcpDiscovery MCPDiscoveryLookup,
+) assistantpresetStore.ReferenceLookups {
+	lookups := assistantpresetStore.ReferenceLookups{
+		ModelPresets: &modelPresetLookupAdapter{
+			store: modelPresetSt,
+		},
+		ToolSelections: &toolSelectionLookupAdapter{
+			store: toolSt,
+		},
+		Skills: &skillLookupAdapter{
+			store: skillSt,
+		},
+	}
+	if mcpServerStore != nil {
+		lookups.MCPContext = NewMCPContextLookup(mcpServerStore, mcpDiscovery)
+	}
+	return lookups
+}
+
 func NewMCPContextLookup(
 	serverStore MCPServerConfigStore,
 	discovery MCPDiscoveryLookup,
@@ -662,28 +686,4 @@ func getSkillBundleEnabled(
 		return false, skillSpec.ErrSkillBundleNotFound
 	}
 	return resp.Body.SkillBundles[0].IsEnabled, nil
-}
-
-func NewAssistantPresetReferenceLookups(
-	modelPresetSt *modelpresetStore.ModelPresetStore,
-	toolSt *toolStore.ToolStore,
-	skillSt *skillStore.SkillStore,
-	mcpServerStore MCPServerConfigStore,
-	mcpDiscovery MCPDiscoveryLookup,
-) assistantpresetStore.ReferenceLookups {
-	lookups := assistantpresetStore.ReferenceLookups{
-		ModelPresets: &modelPresetLookupAdapter{
-			store: modelPresetSt,
-		},
-		ToolSelections: &toolSelectionLookupAdapter{
-			store: toolSt,
-		},
-		Skills: &skillLookupAdapter{
-			store: skillSt,
-		},
-	}
-	if mcpServerStore != nil {
-		lookups.MCPContext = NewMCPContextLookup(mcpServerStore, mcpDiscovery)
-	}
-	return lookups
 }

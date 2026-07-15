@@ -13,10 +13,6 @@ const (
 	// portable Artifact Store package. It is an interchange format, not a
 	// mandatory source envelope for frontends.
 	PortablePackageManifestFormatV1 = "artifact-package/v1"
-
-	FSDirectoryConfigSchemaID         SchemaID = "artifactstore.fs-directory.config.v1"
-	EmbeddedFSDirectoryConfigSchemaID SchemaID = "artifactstore.embedded-fs-directory.config.v1"
-	MemoryDirectoryConfigSchemaID     SchemaID = "artifactstore.memory-directory.config.v1"
 )
 
 const (
@@ -72,6 +68,12 @@ type (
 	PortablePath       string
 	Digest             string
 	SourceGeneration   string
+)
+
+const (
+	FSDirectoryConfigSchemaID         SchemaID = "artifactstore.fs-directory.config.v1"
+	EmbeddedFSDirectoryConfigSchemaID SchemaID = "artifactstore.embedded-fs-directory.config.v1"
+	MemoryDirectoryConfigSchemaID     SchemaID = "artifactstore.memory-directory.config.v1"
 )
 
 type CatalogState string

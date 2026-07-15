@@ -152,65 +152,41 @@ func (s *MetadataStore) DeleteSource(ctx context.Context, sourceID spec.SourceID
 }
 
 func scanSource(scanner sqlScanner) (spec.ArtifactSource, error) {
-	var (
-		sourceID       string
-		kind           string
-		displayName    string
-		enabled        int
-		configSchemaID string
-		config         []byte
-		lastGeneration sql.NullString
-		lastScannedAt  sql.NullString
-		diagnostics    []byte
-		createdAt      string
-		modifiedAt     string
-	)
-	if err := scanner.Scan(
-		&sourceID,
-		&kind,
-		&displayName,
-		&enabled,
-		&configSchemaID,
-		&config,
-		&lastGeneration,
-		&lastScannedAt,
-		&diagnostics,
-		&createdAt,
-		&modifiedAt,
-	); err != nil {
+	row := artifactSourceRow{}
+	if err := scanner.Scan(row.destinations()...); err != nil {
 		return spec.ArtifactSource{}, err
 	}
-	created, err := parseRequiredTime("source.createdAt", createdAt)
+	created, err := parseRequiredTime("source.createdAt", row.CreatedAt)
 	if err != nil {
 		return spec.ArtifactSource{}, err
 	}
-	modified, err := parseRequiredTime("source.modifiedAt", modifiedAt)
+	modified, err := parseRequiredTime("source.modifiedAt", row.ModifiedAt)
 	if err != nil {
 		return spec.ArtifactSource{}, err
 	}
-	scanned, err := parseNullableTime("source.lastScannedAt", lastScannedAt)
+	scanned, err := parseNullableTime("source.lastScannedAt", row.LastScannedAt)
 	if err != nil {
 		return spec.ArtifactSource{}, err
 	}
-	decodedDiagnostics, err := decodeDiagnostics(diagnostics)
+	decodedDiagnostics, err := decodeDiagnostics(row.Diagnostics)
 	if err != nil {
 		return spec.ArtifactSource{}, err
 	}
 	source := spec.ArtifactSource{
-		SourceID:               spec.SourceID(sourceID),
-		Kind:                   spec.SourceKind(kind),
-		DisplayName:            displayName,
-		Enabled:                enabled != 0,
-		ConfigSchemaID:         spec.SchemaID(configSchemaID),
-		Config:                 append([]byte(nil), config...),
-		LastObservedGeneration: optionalSourceGeneration(lastGeneration),
+		SourceID:               spec.SourceID(row.SourceID),
+		Kind:                   spec.SourceKind(row.Kind),
+		DisplayName:            row.DisplayName,
+		Enabled:                row.Enabled != 0,
+		ConfigSchemaID:         spec.SchemaID(row.ConfigSchemaID),
+		Config:                 append([]byte(nil), row.Config...),
+		LastObservedGeneration: optionalSourceGeneration(row.LastObservedGeneration),
 		LastScannedAt:          scanned,
 		Diagnostics:            decodedDiagnostics,
 		CreatedAt:              created,
 		ModifiedAt:             modified,
 	}
 	if err := spec.ValidateArtifactSource(source); err != nil {
-		return spec.ArtifactSource{}, fmt.Errorf("invalid persisted source %q: %w", sourceID, err)
+		return spec.ArtifactSource{}, fmt.Errorf("invalid persisted source %q: %w", row.SourceID, err)
 	}
 	return source, nil
 }

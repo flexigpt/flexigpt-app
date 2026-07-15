@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -40,6 +41,7 @@ type Store struct {
 	rootHooks       map[spec.RootKind]spec.RootKindHook
 	collectionHooks map[spec.CollectionKind]spec.CollectionKindHook
 
+	scanMu sync.Mutex
 	lifeMu sync.RWMutex
 	closed bool
 	now    func() time.Time
@@ -49,6 +51,29 @@ type StoreOption func(*Store) error
 
 func WithSourceDriver(driver spec.SourceDriver) StoreOption {
 	return func(store *Store) error { return store.RegisterSourceDriver(driver) }
+}
+
+// WithEmbeddedFSProvider registers an application-owned read-only fs.FS under
+// the provider key referenced by embedded-fs-directory source configuration.
+func WithEmbeddedFSProvider(providerKey string, provider fs.FS) StoreOption {
+	return func(store *Store) error {
+		driver, ok := store.driverFor(spec.SourceKindEmbeddedFSDirectory)
+		if !ok {
+			embedded := sourcedriver.NewEmbeddedFSDirectoryDriver()
+			if err := store.RegisterSourceDriver(embedded); err != nil {
+				return err
+			}
+			driver = embedded
+		}
+		registrar, ok := driver.(sourcedriver.EmbeddedFSProviderRegistrar)
+		if !ok {
+			return fmt.Errorf(
+				"%w: embedded source driver does not support provider registration",
+				spec.ErrUnsupported,
+			)
+		}
+		return registrar.RegisterProvider(providerKey, provider)
+	}
 }
 
 func WithArtifactFrontend(frontend spec.ArtifactFrontend) StoreOption {
@@ -101,6 +126,10 @@ func NewStore(baseDir string, options ...StoreOption) (*Store, error) {
 	}
 	store.baseDir = cleanBaseDir
 	if err := store.RegisterSourceDriver(sourcedriver.NewLLMToolsFSDirectoryDriver()); err != nil {
+		_ = store.Close()
+		return nil, err
+	}
+	if err := store.RegisterSourceDriver(sourcedriver.NewEmbeddedFSDirectoryDriver()); err != nil {
 		_ = store.Close()
 		return nil, err
 	}

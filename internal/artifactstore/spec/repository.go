@@ -83,6 +83,12 @@ type ArtifactMetadataRepository interface {
 	UpdateRecord(ctx context.Context, record ArtifactRecord) error
 	DeleteRecord(ctx context.Context, recordID RecordID) error
 
+	PublishRecordSynchronization(
+		ctx context.Context,
+		publication RecordSynchronizationPublication,
+	) error
+	PublishRecordTransfer(ctx context.Context, publication RecordTransferPublication) error
+
 	CreateTransferProvenance(ctx context.Context, provenance TransferProvenance) error
 	ListTransferProvenance(ctx context.Context, recordID RecordID) ([]TransferProvenance, error)
 }

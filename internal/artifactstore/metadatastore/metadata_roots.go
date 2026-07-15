@@ -130,58 +130,36 @@ func (s *MetadataStore) UpdateRoot(ctx context.Context, root spec.ArtifactRoot) 
 }
 
 func scanRoot(scanner sqlScanner) (spec.ArtifactRoot, error) {
-	var (
-		rootID        string
-		kind          string
-		displayName   string
-		description   string
-		enabled       int
-		dataSchemaID  string
-		data          []byte
-		createdAt     string
-		modifiedAt    string
-		softDeletedAt sql.NullString
-	)
-	if err := scanner.Scan(
-		&rootID,
-		&kind,
-		&displayName,
-		&description,
-		&enabled,
-		&dataSchemaID,
-		&data,
-		&createdAt,
-		&modifiedAt,
-		&softDeletedAt,
-	); err != nil {
+	row := artifactRootRow{}
+	if err := scanner.Scan(row.destinations()...); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
-	created, err := parseRequiredTime("root.createdAt", createdAt)
+	created, err := parseRequiredTime("root.createdAt", row.CreatedAt)
 	if err != nil {
 		return spec.ArtifactRoot{}, err
 	}
-	modified, err := parseRequiredTime("root.modifiedAt", modifiedAt)
+	modified, err := parseRequiredTime("root.modifiedAt", row.ModifiedAt)
 	if err != nil {
 		return spec.ArtifactRoot{}, err
 	}
-	deleted, err := parseNullableTime("root.softDeletedAt", softDeletedAt)
+	deleted, err := parseNullableTime("root.softDeletedAt", row.SoftDeletedAt)
 	if err != nil {
 		return spec.ArtifactRoot{}, err
 	}
 	root := spec.ArtifactRoot{
-		RootID:        spec.RootID(rootID),
-		Kind:          spec.RootKind(kind),
-		DisplayName:   displayName,
-		Description:   description,
-		Enabled:       enabled != 0,
-		DataSchemaID:  spec.SchemaID(dataSchemaID),
-		Data:          append([]byte(nil), data...),
+		RootID:        spec.RootID(row.RootID),
+		Kind:          spec.RootKind(row.Kind),
+		DisplayName:   row.DisplayName,
+		Description:   row.Description,
+		Enabled:       row.Enabled != 0,
+		DataSchemaID:  spec.SchemaID(row.DataSchemaID),
+		Data:          append([]byte(nil), row.Data...),
 		CreatedAt:     created,
 		ModifiedAt:    modified,
 		SoftDeletedAt: deleted,
 	}
 	if err := spec.ValidateArtifactRoot(root); err != nil {
-		return spec.ArtifactRoot{}, fmt.Errorf("invalid persisted root %q: %w", rootID, err)
+		return spec.ArtifactRoot{}, fmt.Errorf("invalid persisted root %q: %w", row.RootID, err)
 	}
 	return root, nil
 }

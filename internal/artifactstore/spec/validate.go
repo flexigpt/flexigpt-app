@@ -154,17 +154,6 @@ func ValidateArtifactPackage(v ArtifactPackage) error {
 	return ValidateDiagnostics(v.Diagnostics)
 }
 
-// ValidateCatalogResourceKey validates a source-local resource identity.
-func ValidateCatalogResourceKey(v CatalogResourceKey) error {
-	if err := validateID("catalog resource.sourceID", string(v.SourceID)); err != nil {
-		return err
-	}
-	if err := validateSourceLocator("catalog resource.locator", v.Locator, true); err != nil {
-		return err
-	}
-	return validateSubresourceLocator("catalog resource.subresourceLocator", v.SubresourceLocator)
-}
-
 // ValidateCatalogResource validates app-local catalog metadata.
 func ValidateCatalogResource(v CatalogResource) error {
 	if err := ValidateCatalogResourceKey(CatalogResourceKey{
@@ -270,6 +259,15 @@ func ValidateCatalogResourceRevision(v CatalogResourceRevision) error {
 	return validateFirstLast("catalog resource revision", v.FirstSeenAt, v.LastSeenAt)
 }
 
+// ValidateArtifactDefinitionFile validates the portable JSON definition file
+// envelope used by generic transfer operations.
+func ValidateArtifactDefinitionFile(v ArtifactDefinitionFile) error {
+	if v.Format != ArtifactDefinitionFileFormatV1 {
+		return invalidf("definition file.format %q is not supported", v.Format)
+	}
+	return ValidateCanonicalDefinition(v.Definition)
+}
+
 // ValidateCanonicalDefinition validates portable definition structure. Digest
 // recomputation is intentionally performed later by the canonical codec.
 func ValidateCanonicalDefinition(v CanonicalDefinition) error {
@@ -328,15 +326,6 @@ func ValidateCanonicalDefinition(v CanonicalDefinition) error {
 		seenPaths[asset.Path] = struct{}{}
 	}
 	return nil
-}
-
-// ValidateArtifactDefinitionFile validates the portable JSON definition file
-// envelope used by generic transfer operations.
-func ValidateArtifactDefinitionFile(v ArtifactDefinitionFile) error {
-	if v.Format != ArtifactDefinitionFileFormatV1 {
-		return invalidf("definition file.format %q is not supported", v.Format)
-	}
-	return ValidateCanonicalDefinition(v.Definition)
 }
 
 // ValidatePortablePackageManifest validates the portable generic package
@@ -598,6 +587,17 @@ func ValidateTransferProvenance(v TransferProvenance) error {
 	return validateRequiredTime("provenance.createdAt", v.CreatedAt)
 }
 
+// ValidateCatalogResourceKey validates a source-local resource identity.
+func ValidateCatalogResourceKey(v CatalogResourceKey) error {
+	if err := validateID("catalog resource.sourceID", string(v.SourceID)); err != nil {
+		return err
+	}
+	if err := validateSourceLocator("catalog resource.locator", v.Locator, true); err != nil {
+		return err
+	}
+	return validateSubresourceLocator("catalog resource.subresourceLocator", v.SubresourceLocator)
+}
+
 // ValidateDiagnostics validates a bounded current diagnostic collection.
 func ValidateDiagnostics(v []Diagnostic) error {
 	if len(v) > MaxDiagnosticsPerEntity {
@@ -644,40 +644,6 @@ func ValidateDiagnostic(v Diagnostic) error {
 	return nil
 }
 
-// ValidateFSDirectorySourceConfig validates the app-local filesystem driver
-// configuration. The service normalizes a path before storing it.
-func ValidateFSDirectorySourceConfig(v FSDirectorySourceConfig) error {
-	if err := validateRequiredText("fs-directory.rootPath", v.RootPath, MaxFilesystemPathBytes); err != nil {
-		return err
-	}
-	if strings.ContainsRune(v.RootPath, 0) {
-		return invalidf("fs-directory.rootPath contains a NUL byte")
-	}
-	if !filepath.IsAbs(v.RootPath) {
-		return invalidf("fs-directory.rootPath must be absolute")
-	}
-	if filepath.Clean(v.RootPath) != v.RootPath {
-		return invalidf("fs-directory.rootPath must be normalized")
-	}
-	return nil
-}
-
-// ValidateEmbeddedFSDirectorySourceConfig validates embedded-fs driver config.
-func ValidateEmbeddedFSDirectorySourceConfig(v EmbeddedFSDirectorySourceConfig) error {
-	if err := validateKind("embedded-fs-directory.providerKey", v.ProviderKey); err != nil {
-		return err
-	}
-	return validateSourceLocator("embedded-fs-directory.rootLocator", v.RootLocator, true)
-}
-
-// ValidateMemoryDirectorySourceConfig validates test-only memory driver config.
-func ValidateMemoryDirectorySourceConfig(v MemoryDirectorySourceConfig) error {
-	if err := validateKind("memory-directory.providerKey", v.ProviderKey); err != nil {
-		return err
-	}
-	return validateSourceLocator("memory-directory.rootLocator", v.RootLocator, true)
-}
-
 func validateKnownSourceConfig(v ArtifactSource) error {
 	switch v.Kind {
 	case SourceKindFSDirectory:
@@ -714,30 +680,43 @@ func validateKnownSourceConfig(v ArtifactSource) error {
 	}
 }
 
+// ValidateMemoryDirectorySourceConfig validates test-only memory driver config.
+func ValidateMemoryDirectorySourceConfig(v MemoryDirectorySourceConfig) error {
+	if err := validateKind("memory-directory.providerKey", v.ProviderKey); err != nil {
+		return err
+	}
+	return validateSourceLocator("memory-directory.rootLocator", v.RootLocator, true)
+}
+
+// ValidateEmbeddedFSDirectorySourceConfig validates embedded-fs driver config.
+func ValidateEmbeddedFSDirectorySourceConfig(v EmbeddedFSDirectorySourceConfig) error {
+	if err := validateKind("embedded-fs-directory.providerKey", v.ProviderKey); err != nil {
+		return err
+	}
+	return validateSourceLocator("embedded-fs-directory.rootLocator", v.RootLocator, true)
+}
+
+// ValidateFSDirectorySourceConfig validates the app-local filesystem driver
+// configuration. The service normalizes a path before storing it.
+func ValidateFSDirectorySourceConfig(v FSDirectorySourceConfig) error {
+	if err := validateRequiredText("fs-directory.rootPath", v.RootPath, MaxFilesystemPathBytes); err != nil {
+		return err
+	}
+	if strings.ContainsRune(v.RootPath, 0) {
+		return invalidf("fs-directory.rootPath contains a NUL byte")
+	}
+	if !filepath.IsAbs(v.RootPath) {
+		return invalidf("fs-directory.rootPath must be absolute")
+	}
+	if filepath.Clean(v.RootPath) != v.RootPath {
+		return invalidf("fs-directory.rootPath must be normalized")
+	}
+	return nil
+}
+
 func validateID(label, value string) error {
 	if !uuidV7RE.MatchString(value) {
 		return invalidf("%s must be a canonical UUIDv7", label)
-	}
-	return nil
-}
-
-func validateKind(label, value string) error {
-	if len(value) > MaxKindBytes || !kindRE.MatchString(value) {
-		return invalidf("%s must be a lowercase dotted or hyphenated identifier", label)
-	}
-	return nil
-}
-
-func validateSchemaID(label string, value SchemaID) error {
-	if len(value) > MaxSchemaIDBytes || !kindRE.MatchString(string(value)) {
-		return invalidf("%s must be a lowercase dotted or hyphenated identifier", label)
-	}
-	return nil
-}
-
-func validateDigest(label string, value Digest) error {
-	if !digestRE.MatchString(string(value)) {
-		return invalidf("%s must be sha256:<64 lowercase hex characters>", label)
 	}
 	return nil
 }
@@ -747,6 +726,13 @@ func validateOptionalDigest(label string, value *Digest) error {
 		return nil
 	}
 	return validateDigest(label, *value)
+}
+
+func validateDigest(label string, value Digest) error {
+	if !digestRE.MatchString(string(value)) {
+		return invalidf("%s must be sha256:<64 lowercase hex characters>", label)
+	}
+	return nil
 }
 
 func validateCatalogState(label string, value CatalogState) error {
@@ -824,21 +810,6 @@ func validateVersion(label, value string, optional bool) error {
 	return validateRequiredText(label, value, MaxVersionBytes)
 }
 
-func validateRequiredText(label, value string, maxBytes int) error {
-	if !utf8.ValidString(value) || value == "" || strings.TrimSpace(value) != value {
-		return invalidf("%s must be non-empty, valid UTF-8, and trimmed", label)
-	}
-	if len(value) > maxBytes {
-		return invalidf("%s exceeds %d bytes", label, maxBytes)
-	}
-	for _, r := range value {
-		if unicode.IsControl(r) {
-			return invalidf("%s contains a control character", label)
-		}
-	}
-	return nil
-}
-
 func validateOptionalText(label, value string, maxBytes int) error {
 	if value == "" {
 		return nil
@@ -869,6 +840,21 @@ func validateLabels(label string, values map[string]string) error {
 		}
 		if err := validateRequiredText(label+"["+key+"]", value, MaxLabelValueBytes); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func validateRequiredText(label, value string, maxBytes int) error {
+	if !utf8.ValidString(value) || value == "" || strings.TrimSpace(value) != value {
+		return invalidf("%s must be non-empty, valid UTF-8, and trimmed", label)
+	}
+	if len(value) > maxBytes {
+		return invalidf("%s exceeds %d bytes", label, maxBytes)
+	}
+	for _, r := range value {
+		if unicode.IsControl(r) {
+			return invalidf("%s contains a control character", label)
 		}
 	}
 	return nil
@@ -927,6 +913,20 @@ func validateSchemaBoundJSONObject(label string, raw json.RawMessage, schemaID S
 	}
 	if !isEmptyJSONObject(raw) && schemaID == "" {
 		return invalidf("%sSchemaID is required when %s is not empty", label, label)
+	}
+	return nil
+}
+
+func validateKind(label, value string) error {
+	if len(value) > MaxKindBytes || !kindRE.MatchString(value) {
+		return invalidf("%s must be a lowercase dotted or hyphenated identifier", label)
+	}
+	return nil
+}
+
+func validateSchemaID(label string, value SchemaID) error {
+	if len(value) > MaxSchemaIDBytes || !kindRE.MatchString(string(value)) {
+		return invalidf("%s must be a lowercase dotted or hyphenated identifier", label)
 	}
 	return nil
 }

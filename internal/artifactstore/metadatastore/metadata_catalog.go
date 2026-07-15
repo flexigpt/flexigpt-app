@@ -114,13 +114,34 @@ func (s *MetadataStore) UpsertCatalogResource(ctx context.Context, resource spec
 			diagnostics_json
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (source_id, locator, subresource_locator) DO UPDATE SET
-			package_manifest_locator = excluded.package_manifest_locator,
-			kind = excluded.kind,
-			logical_name = excluded.logical_name,
-			logical_version = excluded.logical_version,
-			current_definition_digest = excluded.current_definition_digest,
-			source_content_digest = excluded.source_content_digest,
-			frontend_id = excluded.frontend_id,
+			package_manifest_locator = CASE
+				WHEN excluded.package_manifest_locator <> '' THEN excluded.package_manifest_locator
+				ELSE catalog_resources.package_manifest_locator
+			END,
+			kind = CASE
+				WHEN excluded.kind <> '' THEN excluded.kind
+				ELSE catalog_resources.kind
+			END,
+			logical_name = CASE
+				WHEN excluded.logical_name <> '' THEN excluded.logical_name
+				ELSE catalog_resources.logical_name
+			END,
+			logical_version = CASE
+				WHEN excluded.logical_version <> '' THEN excluded.logical_version
+				ELSE catalog_resources.logical_version
+			END,
+			current_definition_digest = COALESCE(
+				excluded.current_definition_digest,
+				catalog_resources.current_definition_digest
+			),
+			source_content_digest = COALESCE(
+				excluded.source_content_digest,
+				catalog_resources.source_content_digest
+			),
+			frontend_id = CASE
+				WHEN excluded.frontend_id <> '' THEN excluded.frontend_id
+				ELSE catalog_resources.frontend_id
+			END,
 			state = excluded.state,
 			last_seen_at = excluded.last_seen_at,
 			diagnostics_json = excluded.diagnostics_json`,

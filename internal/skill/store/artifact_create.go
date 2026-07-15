@@ -25,6 +25,15 @@ const (
 
 var skillArtifactNameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 
+type managedSkillMarkdownInput struct {
+	Name         string
+	Description  string
+	DisplayName  string
+	Insert       agentskillsSpec.SkillInsert
+	Arguments    []agentskillsSpec.SkillArgument
+	MarkdownBody string
+}
+
 func (s *SkillStore) PutSkillArtifact(
 	ctx context.Context,
 	req *spec.PutSkillArtifactRequest,
@@ -223,15 +232,6 @@ func createManagedSkillPackage(dir, skillMD string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, skillMDFileName), []byte(skillMD), 0o600)
-}
-
-type managedSkillMarkdownInput struct {
-	Name         string
-	Description  string
-	DisplayName  string
-	Insert       agentskillsSpec.SkillInsert
-	Arguments    []agentskillsSpec.SkillArgument
-	MarkdownBody string
 }
 
 func buildManagedSkillMarkdown(in managedSkillMarkdownInput) string {

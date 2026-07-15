@@ -176,64 +176,42 @@ func (s *MetadataStore) CountRecordsInCollection(ctx context.Context, collection
 }
 
 func scanCollection(scanner sqlScanner) (spec.ArtifactCollection, error) {
-	var (
-		collectionID  string
-		rootID        string
-		kind          string
-		slug          string
-		displayName   string
-		description   string
-		enabled       int
-		dataSchemaID  string
-		data          []byte
-		createdAt     string
-		modifiedAt    string
-		softDeletedAt sql.NullString
-	)
-	if err := scanner.Scan(
-		&collectionID,
-		&rootID,
-		&kind,
-		&slug,
-		&displayName,
-		&description,
-		&enabled,
-		&dataSchemaID,
-		&data,
-		&createdAt,
-		&modifiedAt,
-		&softDeletedAt,
-	); err != nil {
+	row := artifactCollectionRow{}
+	if err := scanner.Scan(row.destinations()...); err != nil {
 		return spec.ArtifactCollection{}, err
 	}
-	created, err := parseRequiredTime("collection.createdAt", createdAt)
+	created, err := parseRequiredTime("collection.createdAt", row.CreatedAt)
 	if err != nil {
 		return spec.ArtifactCollection{}, err
 	}
-	modified, err := parseRequiredTime("collection.modifiedAt", modifiedAt)
+	modified, err := parseRequiredTime("collection.modifiedAt", row.ModifiedAt)
 	if err != nil {
 		return spec.ArtifactCollection{}, err
 	}
-	deleted, err := parseNullableTime("collection.softDeletedAt", softDeletedAt)
+	deleted, err := parseNullableTime("collection.softDeletedAt", row.SoftDeletedAt)
 	if err != nil {
 		return spec.ArtifactCollection{}, err
 	}
 	collection := spec.ArtifactCollection{
-		CollectionID:  spec.CollectionID(collectionID),
-		RootID:        spec.RootID(rootID),
-		Kind:          spec.CollectionKind(kind),
-		Slug:          spec.CollectionSlug(slug),
-		DisplayName:   displayName,
-		Description:   description,
-		Enabled:       enabled != 0,
-		DataSchemaID:  spec.SchemaID(dataSchemaID),
-		Data:          append([]byte(nil), data...),
+		CollectionID:  spec.CollectionID(row.CollectionID),
+		RootID:        spec.RootID(row.RootID),
+		Kind:          spec.CollectionKind(row.Kind),
+		Slug:          spec.CollectionSlug(row.Slug),
+		DisplayName:   row.DisplayName,
+		Description:   row.Description,
+		Enabled:       row.Enabled != 0,
+		DataSchemaID:  spec.SchemaID(row.DataSchemaID),
+		Data:          append([]byte(nil), row.Data...),
 		CreatedAt:     created,
 		ModifiedAt:    modified,
 		SoftDeletedAt: deleted,
 	}
 	if err := spec.ValidateArtifactCollection(collection); err != nil {
-		return spec.ArtifactCollection{}, fmt.Errorf("invalid persisted collection %q: %w", collectionID, err)
+		return spec.ArtifactCollection{}, fmt.Errorf(
+			"invalid persisted collection %q: %w",
+			row.CollectionID,
+			err,
+		)
 	}
 	return collection, nil
 }
