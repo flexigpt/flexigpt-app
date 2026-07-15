@@ -46,6 +46,9 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 	if err != nil {
 		return spec.DependencyGraph{}, err
 	}
+	if err := s.ensureRootCatalogCurrent(ctx, record.RootID, generation); err != nil {
+		return spec.DependencyGraph{}, err
+	}
 	rootDefinitionDigest := *record.LastResolvedDefinitionDigest
 	graph := spec.DependencyGraph{
 		RootRecordID: recordID,
@@ -149,11 +152,12 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 	if err := s.repository.ReplaceDependencySnapshots(
 		ctx,
 		spec.DependencySnapshotPublication{
-			RootID:               record.RootID,
-			RecordID:             record.RecordID,
-			RootDefinitionDigest: rootDefinitionDigest,
-			CatalogGeneration:    generation.Generation,
-			Snapshots:            snapshots,
+			RootID:                   record.RootID,
+			RecordID:                 record.RecordID,
+			RootDefinitionDigest:     rootDefinitionDigest,
+			CatalogGeneration:        generation.Generation,
+			ExpectedRecordModifiedAt: record.ModifiedAt,
+			Snapshots:                snapshots,
 		},
 	); err != nil {
 		return spec.DependencyGraph{}, err
@@ -208,10 +212,14 @@ func (s *Store) FindCandidates(
 		return nil, err
 	}
 	defer finish()
-	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
-		return nil, err
+	if err := validate.ValidateArtifactSelector(selector); err != nil {
+		return nil, fmt.Errorf(
+			"%w: dependency selector: %w",
+			spec.ErrInvalidRequest,
+			err,
+		)
 	}
-	resources, err := s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
+	resources, err := s.ListCatalogResourcesForRoot(ctx, rootID)
 	if err != nil {
 		return nil, err
 	}

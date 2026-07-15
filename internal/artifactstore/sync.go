@@ -35,6 +35,9 @@ func (s *Store) SyncRecords(
 	if err != nil {
 		return spec.RecordSyncResult{}, err
 	}
+	if err := s.ensureRootCatalogCurrent(ctx, rootID, generation); err != nil {
+		return spec.RecordSyncResult{}, err
+	}
 	resources, err := s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
 	if err != nil {
 		return spec.RecordSyncResult{}, err

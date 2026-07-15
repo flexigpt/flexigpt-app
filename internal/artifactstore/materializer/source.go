@@ -1,7 +1,6 @@
 package materializer
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -146,23 +145,37 @@ func (m *CopyingSourceMaterializer) Materialize(
 		if err != nil {
 			return err
 		}
-		content, readErr := io.ReadAll(io.LimitReader(reader, remaining+1))
+		readLimit := remaining
+		const maximumInt64 = int64(^uint64(0) >> 1)
+		if readLimit < maximumInt64 {
+			readLimit++
+		}
+		limited := &io.LimitedReader{R: reader, N: readLimit}
+		writeErr := publication.WriteFile(ctx, relative, entry.Mode, limited)
 		closeErr := reader.Close()
-		if readErr != nil {
-			return readErr
+		if writeErr != nil {
+			return writeErr
 		}
 		if closeErr != nil {
 			return closeErr
 		}
-		if int64(len(content)) > remaining {
+		consumed := readLimit - limited.N
+		if consumed > remaining {
 			return fmt.Errorf(
 				"%w: materialization exceeds %d bytes",
 				spec.ErrInvalidRequest,
 				input.MaxBytes,
 			)
 		}
-		result.Bytes += int64(len(content))
-		return publication.WriteFile(ctx, relative, entry.Mode, bytes.NewReader(content))
+		if consumed != entry.SizeBytes {
+			return fmt.Errorf(
+				"%w: source entry %q changed size during materialization",
+				spec.ErrConflict,
+				entry.Locator,
+			)
+		}
+		result.Bytes += consumed
+		return nil
 	})
 	if err != nil {
 		return spec.MaterializedSource{}, err

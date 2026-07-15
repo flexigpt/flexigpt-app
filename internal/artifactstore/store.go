@@ -32,7 +32,6 @@ type storeOperationContextKey struct{}
 // driver facades; SQLite, MapStore, LLMTools, PostgreSQL, and other concrete
 // data-access mechanisms remain outside service methods.
 type Store struct {
-	baseDir            string
 	repository         spec.ArtifactMetadataRepository
 	portableContent    spec.PortableContentRepository
 	sourceMaterializer spec.SourceMaterializer
@@ -134,38 +133,36 @@ func WithPortableContentRepository(repository spec.PortableContentRepository) St
 }
 
 // NewStore composes the default SQLite app-metadata repository, MapStore
-// portable-content repository, and LLMTools fs-directory driver. No business
-// method itself accesses the filesystem directly.
+// portable-content repository, and required source drivers. Constructor
+// options are applied before defaults so callers can replace any external
+// adapter without changing business logic.
 func NewStore(baseDir string, options ...StoreOption) (*Store, error) {
 	if strings.TrimSpace(baseDir) == "" {
 		return nil, fmt.Errorf("%w: base directory is empty", spec.ErrInvalidRequest)
 	}
 	cleanBaseDir := filepath.Clean(baseDir)
+
+	// Open MapStore first. Besides preserving the files-only portable-content
+	// boundary, this lets the approved storage adapter prepare its hierarchy
+	// before SQLite opens a database beneath the same application directory.
+	defaultContent, err := contentstore.NewMapStorePortableContentRepository(
+		filepath.Join(cleanBaseDir, "artifact-content"),
+	)
+	if err != nil {
+		return nil, err
+	}
 	metadata, err := metadatastore.OpenMetadataStore(
 		context.Background(),
 		filepath.Join(cleanBaseDir, "artifactstore.sqlite"),
 	)
 	if err != nil {
+		_ = defaultContent.Close()
 		return nil, err
 	}
-	content, err := contentstore.NewMapStorePortableContentRepository(filepath.Join(cleanBaseDir, "artifact-content"))
+	store, err := newStore(metadata, nil)
 	if err != nil {
+		_ = defaultContent.Close()
 		_ = metadata.Close()
-		return nil, err
-	}
-	store, err := newStore(metadata, content)
-	if err != nil {
-		_ = content.Close()
-		_ = metadata.Close()
-		return nil, err
-	}
-	store.baseDir = cleanBaseDir
-	if err := store.RegisterSourceDriver(sourcedriver.NewLLMToolsFSDirectoryDriver()); err != nil {
-		_ = store.Close()
-		return nil, err
-	}
-	if err := store.RegisterSourceDriver(sourcedriver.NewEmbeddedFSDirectoryDriver()); err != nil {
-		_ = store.Close()
 		return nil, err
 	}
 	for _, option := range options {
@@ -173,9 +170,24 @@ func NewStore(baseDir string, options ...StoreOption) (*Store, error) {
 			continue
 		}
 		if err := option(store); err != nil {
+			_ = defaultContent.Close()
 			_ = store.Close()
 			return nil, err
 		}
+	}
+	if store.portableContent == nil {
+		store.portableContent = defaultContent
+		defaultContent = nil
+	}
+	if defaultContent != nil {
+		if err := defaultContent.Close(); err != nil {
+			_ = store.Close()
+			return nil, fmt.Errorf("close replaced default portable content repository: %w", err)
+		}
+	}
+	if err := store.installRequiredSourceDrivers(); err != nil {
+		_ = store.Close()
+		return nil, err
 	}
 	return store, nil
 }
@@ -199,6 +211,10 @@ func NewStoreWithMetadataRepository(
 			_ = store.Close()
 			return nil, err
 		}
+	}
+	if err := store.installRequiredSourceDrivers(); err != nil {
+		_ = store.Close()
+		return nil, err
 	}
 	return store, nil
 }
@@ -370,6 +386,20 @@ func (s *Store) RegisterCollectionKindHook(hook spec.CollectionKindHook) error {
 		return fmt.Errorf("%w: collection kind hook %q", spec.ErrConflict, kind)
 	}
 	s.collectionHooks[kind] = hook
+	return nil
+}
+
+func (s *Store) installRequiredSourceDrivers() error {
+	if _, ok := s.driverFor(spec.SourceKindFSDirectory); !ok {
+		if err := s.RegisterSourceDriver(sourcedriver.NewLLMToolsFSDirectoryDriver()); err != nil {
+			return err
+		}
+	}
+	if _, ok := s.driverFor(spec.SourceKindEmbeddedFSDirectory); !ok {
+		if err := s.RegisterSourceDriver(sourcedriver.NewEmbeddedFSDirectoryDriver()); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

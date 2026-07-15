@@ -63,11 +63,12 @@ type RootScanPublication struct {
 // DependencySnapshotPublication replaces one record's resolution snapshot for
 // one root definition and catalog generation.
 type DependencySnapshotPublication struct {
-	RootID               RootID
-	RecordID             RecordID
-	RootDefinitionDigest Digest
-	CatalogGeneration    uint64
-	Snapshots            []ArtifactDependencySnapshot
+	RootID                   RootID
+	RecordID                 RecordID
+	RootDefinitionDigest     Digest
+	CatalogGeneration        uint64
+	ExpectedRecordModifiedAt time.Time
+	Snapshots                []ArtifactDependencySnapshot
 }
 
 // RecordUpdate replaces mutable app-local record fields. ClearCollection is
@@ -107,10 +108,13 @@ type RecordSynchronizationPublication struct {
 // content and may be persisted before this transaction without compromising
 // metadata consistency.
 type RecordTransferPublication struct {
-	Resource   CatalogResource
-	Revision   CatalogResourceRevision
-	Record     ArtifactRecord
-	Provenance TransferProvenance
+	Resource                          CatalogResource
+	Revision                          CatalogResourceRevision
+	Record                            ArtifactRecord
+	Provenance                        TransferProvenance
+	ExpectedSourceModifiedAt          time.Time
+	ExpectedSourceObservationRevision uint64
+	ExpectedAttachmentModifiedAt      time.Time
 }
 
 // ExportedRecord is the portable result of exporting an app-local record. The

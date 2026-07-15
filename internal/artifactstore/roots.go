@@ -74,11 +74,6 @@ func (s *Store) GetRootIncludingDeleted(ctx context.Context, rootID spec.RootID)
 		return spec.ArtifactRoot{}, err
 	}
 	defer finish()
-	ctx, finish, err = s.beginOperation(ctx)
-	if err != nil {
-		return spec.ArtifactRoot{}, err
-	}
-	defer finish()
 	return s.repository.GetRoot(ctx, rootID, true)
 }
 

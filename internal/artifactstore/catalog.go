@@ -50,6 +50,13 @@ func (s *Store) ListCatalogResourcesForRoot(
 	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
 		return nil, err
 	}
+	generation, err := s.repository.GetRootCatalogGeneration(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureRootCatalogCurrent(ctx, rootID, generation); err != nil {
+		return nil, err
+	}
 	return s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
 }
 
@@ -119,4 +126,101 @@ func (s *Store) GetDefinitionByDigest(
 		)
 	}
 	return canonical, nil
+}
+
+func (s *Store) ensureRootCatalogCurrent(
+	ctx context.Context,
+	rootID spec.RootID,
+	generation spec.RootCatalogGeneration,
+) error {
+	root, err := s.repository.GetRoot(ctx, rootID, false)
+	if err != nil {
+		return err
+	}
+	if !root.Enabled {
+		return fmt.Errorf("%w: root %q is disabled", spec.ErrConflict, rootID)
+	}
+	if generation.RootID != rootID {
+		return fmt.Errorf(
+			"%w: catalog generation belongs to a different root",
+			spec.ErrInvalidRequest,
+		)
+	}
+
+	attachments, err := s.repository.ListRootSourceAttachments(ctx, rootID)
+	if err != nil {
+		return err
+	}
+	current := make(map[spec.SourceID]spec.SourceGeneration)
+	for _, attachment := range attachments {
+		source, err := s.repository.GetSource(ctx, attachment.SourceID)
+		if err != nil {
+			return err
+		}
+		if !attachment.Enabled || !source.Enabled {
+			continue
+		}
+		if source.LastObservedGeneration == nil {
+			return fmt.Errorf(
+				"%w: root %q has an unobserved active source %q; rescan the root",
+				spec.ErrConflict,
+				rootID,
+				source.SourceID,
+			)
+		}
+		current[source.SourceID] = *source.LastObservedGeneration
+	}
+	if len(current) != len(generation.SourceGenerations) {
+		return fmt.Errorf(
+			"%w: root %q source attachments changed after catalog generation %d; rescan the root",
+			spec.ErrConflict,
+			rootID,
+			generation.Generation,
+		)
+	}
+	for sourceID, observed := range current {
+		published, ok := generation.SourceGenerations[sourceID]
+		if !ok || published != observed {
+			return fmt.Errorf(
+				"%w: source %q changed after root catalog generation %d; rescan the root",
+				spec.ErrConflict,
+				sourceID,
+				generation.Generation,
+			)
+		}
+	}
+	return nil
+}
+
+func (s *Store) publishedCatalogResource(
+	ctx context.Context,
+	rootID spec.RootID,
+	key spec.CatalogResourceKey,
+) (spec.CatalogResource, error) {
+	generation, err := s.repository.GetRootCatalogGeneration(ctx, rootID)
+	if err != nil {
+		return spec.CatalogResource{}, err
+	}
+	if err := s.ensureRootCatalogCurrent(ctx, rootID, generation); err != nil {
+		return spec.CatalogResource{}, err
+	}
+	resources, err := s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
+	if err != nil {
+		return spec.CatalogResource{}, err
+	}
+	for _, resource := range resources {
+		if resource.SourceID == key.SourceID &&
+			resource.Locator == key.Locator &&
+			resource.SubresourceLocator == key.SubresourceLocator {
+			return resource, nil
+		}
+	}
+	return spec.CatalogResource{}, fmt.Errorf(
+		"%w: catalog resource %q/%q/%q is not published for root %q",
+		spec.ErrNotFound,
+		key.SourceID,
+		key.Locator,
+		key.SubresourceLocator,
+		rootID,
+	)
 }

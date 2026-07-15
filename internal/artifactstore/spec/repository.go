@@ -72,20 +72,13 @@ type ArtifactMetadataRepository interface {
 	GetCatalogResource(ctx context.Context, key CatalogResourceKey) (CatalogResource, error)
 	ListCatalogResourcesForSource(ctx context.Context, sourceID SourceID) ([]CatalogResource, error)
 	ListPublishedCatalogResourcesForRoot(ctx context.Context, rootID RootID) ([]CatalogResource, error)
-	UpsertCatalogResource(ctx context.Context, resource CatalogResource) error
-	UpsertCatalogResourceRevision(ctx context.Context, revision CatalogResourceRevision) error
 	ListCatalogResourceRevisions(
 		ctx context.Context,
 		key CatalogResourceKey,
 	) ([]CatalogResourceRevision, error)
-	PublishSourceCatalog(ctx context.Context, publication SourceCatalogPublication) error
 	PublishRootScan(
 		ctx context.Context,
 		publication RootScanPublication,
-	) (RootCatalogGeneration, error)
-	PublishRootCatalogGeneration(
-		ctx context.Context,
-		publication RootCatalogPublication,
 	) (RootCatalogGeneration, error)
 	GetRootCatalogGeneration(ctx context.Context, rootID RootID) (RootCatalogGeneration, error)
 
@@ -107,7 +100,6 @@ type ArtifactMetadataRepository interface {
 	) error
 	PublishRecordTransfer(ctx context.Context, publication RecordTransferPublication) error
 
-	CreateTransferProvenance(ctx context.Context, provenance TransferProvenance) error
 	ListTransferProvenance(ctx context.Context, recordID RecordID) ([]TransferProvenance, error)
 
 	ReplaceDependencySnapshots(

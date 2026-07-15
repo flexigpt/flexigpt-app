@@ -39,6 +39,27 @@ func (*EmbeddedFSDirectoryDriver) Kind() spec.SourceKind {
 	return spec.SourceKindEmbeddedFSDirectory
 }
 
+func (*EmbeddedFSDirectoryDriver) NormalizeConfig(
+	_ context.Context,
+	raw json.RawMessage,
+) (json.RawMessage, []spec.Diagnostic) {
+	config, err := decodeEmbeddedFSConfigValue(raw)
+	if err != nil {
+		return nil, invalidEmbeddedFSConfigDiagnostics(err)
+	}
+	if config.RootLocator != "" {
+		config.RootLocator = spec.SourceLocator(path.Clean(string(config.RootLocator)))
+	}
+	if err := validate.ValidateEmbeddedFSDirectorySourceConfig(config); err != nil {
+		return nil, invalidEmbeddedFSConfigDiagnostics(err)
+	}
+	normalized, err := json.Marshal(config)
+	if err != nil {
+		return nil, invalidEmbeddedFSConfigDiagnostics(err)
+	}
+	return normalized, nil
+}
+
 func (d *EmbeddedFSDirectoryDriver) RegisterProvider(providerKey string, provider fs.FS) error {
 	if d == nil || provider == nil {
 		return fmt.Errorf("%w: embedded filesystem provider is nil", spec.ErrInvalidRequest)
@@ -65,11 +86,7 @@ func (*EmbeddedFSDirectoryDriver) ValidateConfig(
 	raw json.RawMessage,
 ) []spec.Diagnostic {
 	if _, err := decodeEmbeddedFSConfig(raw); err != nil {
-		return []spec.Diagnostic{{
-			Severity: spec.DiagnosticSeverityError,
-			Code:     "artifactstore.source.config.invalid",
-			Message:  err.Error(),
-		}}
+		return invalidEmbeddedFSConfigDiagnostics(err)
 	}
 	return nil
 }
@@ -107,6 +124,13 @@ func (d *EmbeddedFSDirectoryDriver) Snapshot(
 			)
 		}
 		if entry.IsRegular {
+			if entry.SizeBytes < 0 {
+				return "", fmt.Errorf(
+					"%w: embedded source file %q has a negative size",
+					spec.ErrInvalidRequest,
+					entry.Locator,
+				)
+			}
 			totalBytes += entry.SizeBytes
 			if totalBytes > spec.DefaultMaxMaterializedBytes {
 				return "", fmt.Errorf(
@@ -119,6 +143,7 @@ func (d *EmbeddedFSDirectoryDriver) Snapshot(
 	}
 
 	hash := sha256.New()
+	var copiedBytes int64
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
 			return "", err
@@ -132,7 +157,8 @@ func (d *EmbeddedFSDirectoryDriver) Snapshot(
 				return "", err
 			}
 			_, _ = io.WriteString(hash, "f\x00"+string(entry.Locator)+"\x00")
-			_, copyErr := io.Copy(hash, reader)
+			remaining := spec.DefaultMaxMaterializedBytes - copiedBytes
+			written, copyErr := io.Copy(hash, io.LimitReader(reader, remaining+1))
 			closeErr := reader.Close()
 			if copyErr != nil {
 				return "", copyErr
@@ -140,6 +166,14 @@ func (d *EmbeddedFSDirectoryDriver) Snapshot(
 			if closeErr != nil {
 				return "", closeErr
 			}
+			if written > remaining {
+				return "", fmt.Errorf(
+					"%w: embedded source exceeds %d bytes",
+					spec.ErrInvalidRequest,
+					spec.DefaultMaxMaterializedBytes,
+				)
+			}
+			copiedBytes += written
 			_, _ = hash.Write([]byte{0})
 		default:
 			_, _ = io.WriteString(hash, "o\x00"+string(entry.Locator)+"\x00")
@@ -195,8 +229,9 @@ func (d *EmbeddedFSDirectoryDriver) Walk(
 		return fmt.Errorf("%w: walk root %q is not a directory", spec.ErrInvalidRequest, root)
 	}
 
-	var visit func(spec.SourceLocator) error
-	visit = func(directory spec.SourceLocator) error {
+	visited := 0
+	var visit func(spec.SourceLocator, int) error
+	visit = func(directory spec.SourceLocator, depth int) error {
 		entries, err := d.ReadDir(ctx, source, directory)
 		if err != nil {
 			return err
@@ -205,18 +240,35 @@ func (d *EmbeddedFSDirectoryDriver) Walk(
 			if err := ctx.Err(); err != nil {
 				return err
 			}
+			visited++
+			if visited > spec.DefaultMaxScanEntries {
+				return fmt.Errorf(
+					"%w: embedded source walk exceeds %d entries",
+					spec.ErrInvalidRequest,
+					spec.DefaultMaxScanEntries,
+				)
+			}
+			entryDepth := depth + 1
+			if entryDepth > spec.DefaultMaxTraversalDepth {
+				return fmt.Errorf(
+					"%w: embedded source walk exceeds depth %d at %q",
+					spec.ErrInvalidRequest,
+					spec.DefaultMaxTraversalDepth,
+					entry.Locator,
+				)
+			}
 			if err := walk(ctx, entry); err != nil {
 				return err
 			}
 			if entry.IsDirectory {
-				if err := visit(entry.Locator); err != nil {
+				if err := visit(entry.Locator, entryDepth); err != nil {
 					return err
 				}
 			}
 		}
 		return nil
 	}
-	return visit(root)
+	return visit(root, 0)
 }
 
 func (d *EmbeddedFSDirectoryDriver) Stat(
@@ -320,6 +372,17 @@ func (d *EmbeddedFSDirectoryDriver) providerFor(source spec.ArtifactSource) (fs.
 }
 
 func decodeEmbeddedFSConfig(raw json.RawMessage) (spec.EmbeddedFSDirectorySourceConfig, error) {
+	config, err := decodeEmbeddedFSConfigValue(raw)
+	if err != nil {
+		return spec.EmbeddedFSDirectorySourceConfig{}, err
+	}
+	if err := validate.ValidateEmbeddedFSDirectorySourceConfig(config); err != nil {
+		return spec.EmbeddedFSDirectorySourceConfig{}, err
+	}
+	return config, nil
+}
+
+func decodeEmbeddedFSConfigValue(raw json.RawMessage) (spec.EmbeddedFSDirectorySourceConfig, error) {
 	decoder := json.NewDecoder(strings.NewReader(string(raw)))
 	decoder.DisallowUnknownFields()
 	var config spec.EmbeddedFSDirectorySourceConfig
@@ -332,10 +395,15 @@ func decodeEmbeddedFSConfig(raw json.RawMessage) (spec.EmbeddedFSDirectorySource
 		}
 		return spec.EmbeddedFSDirectorySourceConfig{}, err
 	}
-	if err := validate.ValidateEmbeddedFSDirectorySourceConfig(config); err != nil {
-		return spec.EmbeddedFSDirectorySourceConfig{}, err
-	}
 	return config, nil
+}
+
+func invalidEmbeddedFSConfigDiagnostics(err error) []spec.Diagnostic {
+	return []spec.Diagnostic{{
+		Severity: spec.DiagnosticSeverityError,
+		Code:     "artifactstore.source.config.invalid",
+		Message:  err.Error(),
+	}}
 }
 
 func embeddedFSName(locator spec.SourceLocator) (string, error) {
@@ -401,5 +469,6 @@ func mapEmbeddedFSError(locator spec.SourceLocator, err error) error {
 
 var (
 	_ spec.SourceDriver           = (*EmbeddedFSDirectoryDriver)(nil)
+	_ spec.SourceConfigNormalizer = (*EmbeddedFSDirectoryDriver)(nil)
 	_ EmbeddedFSProviderRegistrar = (*EmbeddedFSDirectoryDriver)(nil)
 )

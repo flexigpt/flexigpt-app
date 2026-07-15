@@ -46,6 +46,7 @@ const (
 	DefaultMaxMaterializedFiles   = 50_000
 	DefaultMaxMaterializedBytes   = int64(512 << 20)
 	MaxTransferPayloadBytes       = int64(512 << 20)
+	MaxObservationRevision        = uint64(1<<63 - 1)
 )
 
 var ErrInvalid = errors.New("artifactstore: invalid")

@@ -1,6 +1,7 @@
 package artifactstore
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -99,16 +100,38 @@ func (s *Store) UpdateSource(
 	); err != nil {
 		return spec.ArtifactSource{}, err
 	}
+	previousEnabled := source.Enabled
+	previousConfigSchemaID := source.ConfigSchemaID
+	previousConfig := append(json.RawMessage(nil), source.Config...)
+
 	source.DisplayName = update.DisplayName
 	source.Enabled = update.Enabled
 	source.ConfigSchemaID = update.ConfigSchemaID
 	source.Config = normalizedJSONObject(update.Config)
-	source.LastObservedGeneration = nil
-	source.LastScannedAt = nil
-	source.Diagnostics = nil
 	source.ModifiedAt = s.nextModifiedAt(source.ModifiedAt)
 	if err := s.validateSource(ctx, &source); err != nil {
 		return spec.ArtifactSource{}, err
+	}
+	observationInvalidated := previousEnabled != source.Enabled ||
+		previousConfigSchemaID != source.ConfigSchemaID ||
+		!bytes.Equal(previousConfig, source.Config)
+	if observationInvalidated {
+		if source.ObservationRevision >= spec.MaxObservationRevision {
+			return spec.ArtifactSource{}, fmt.Errorf(
+				"%w: source observation revision is exhausted",
+				spec.ErrConflict,
+			)
+		}
+		source.LastObservedGeneration = nil
+		source.LastScannedAt = nil
+		source.ObservationRevision++
+	}
+	if err := validate.ValidateArtifactSource(source); err != nil {
+		return spec.ArtifactSource{}, fmt.Errorf(
+			"%w: updated source: %w",
+			spec.ErrInvalidRequest,
+			err,
+		)
 	}
 	if err := s.repository.UpdateSource(ctx, source, update.ExpectedModifiedAt); err != nil {
 		return spec.ArtifactSource{}, err
@@ -147,18 +170,37 @@ func (s *Store) validateSource(ctx context.Context, source *spec.ArtifactSource)
 	if source == nil {
 		return fmt.Errorf("%w: source is nil", spec.ErrInvalidRequest)
 	}
-	if err := validate.ValidateArtifactSource(*source); err != nil {
-		return fmt.Errorf("%w: source: %w", spec.ErrInvalidRequest, err)
-	}
 	driver, ok := s.driverFor(source.Kind)
 	if !ok {
 		return fmt.Errorf("%w: source kind %q", spec.ErrDriverUnavailable, source.Kind)
 	}
-	diagnostics := driver.ValidateConfig(ctx, append(json.RawMessage(nil), source.Config...))
-	if err := errorDiagnostics("source "+string(source.Kind), diagnostics); err != nil {
+	diagnostics := make([]spec.Diagnostic, 0)
+	if normalizer, ok := driver.(spec.SourceConfigNormalizer); ok {
+		normalized, normalizationDiagnostics := normalizer.NormalizeConfig(
+			ctx,
+			append(json.RawMessage(nil), source.Config...),
+		)
+		if err := errorDiagnostics(
+			"source "+string(source.Kind)+" configuration normalization",
+			normalizationDiagnostics,
+		); err != nil {
+			return err
+		}
+		source.Config = normalizedJSONObject(normalized)
+		diagnostics = appendBoundedDiagnostics(diagnostics, normalizationDiagnostics...)
+	}
+	if err := validate.ValidateArtifactSource(*source); err != nil {
+		return fmt.Errorf("%w: source: %w", spec.ErrInvalidRequest, err)
+	}
+	validationDiagnostics := driver.ValidateConfig(
+		ctx,
+		append(json.RawMessage(nil), source.Config...),
+	)
+	if err := errorDiagnostics("source "+string(source.Kind), validationDiagnostics); err != nil {
 		return err
 	}
-	source.Diagnostics = append([]spec.Diagnostic(nil), diagnostics...)
+	diagnostics = appendBoundedDiagnostics(diagnostics, validationDiagnostics...)
+	source.Diagnostics = diagnostics
 	if err := validate.ValidateArtifactSource(*source); err != nil {
 		return fmt.Errorf("%w: validated source: %w", spec.ErrInvalidRequest, err)
 	}

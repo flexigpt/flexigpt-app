@@ -17,6 +17,20 @@ const selectLatestRootGenerationForSynchronizationSQL = `SELECT generation
 	ORDER BY generation DESC
 	LIMIT 1`
 
+const selectTransferAttachmentSQL = `SELECT modified_at, enabled
+	FROM root_source_attachments
+	WHERE root_id = ? AND source_id = ?`
+
+const invalidateTransferredSourceSQL = `UPDATE artifact_sources
+	SET last_observed_generation = NULL,
+	    last_scanned_at = NULL,
+	    observation_revision = observation_revision + 1
+	WHERE source_id = ?
+	  AND modified_at = ?
+	  AND observation_revision = ?
+	  AND observation_revision < ?
+	  AND enabled = 1`
+
 const recordColumns = `record_id, root_id, collection_id, kind, name, version, source_id, locator, subresource_locator, record_mode, tracking_mode, pinned_definition_digest, last_resolved_definition_digest, enabled, data_schema_id, data_json, state, diagnostics_json, created_at, modified_at`
 
 func (s *MetadataStore) CreateRecord(ctx context.Context, record spec.ArtifactRecord) error {
@@ -271,6 +285,13 @@ func (s *MetadataStore) PublishRecordTransfer(
 		publication.Provenance.TargetRecordID != publication.Record.RecordID {
 		return fmt.Errorf("%w: inconsistent record transfer publication", spec.ErrInvalidRequest)
 	}
+	if publication.ExpectedSourceModifiedAt.IsZero() ||
+		publication.ExpectedAttachmentModifiedAt.IsZero() {
+		return fmt.Errorf(
+			"%w: record transfer optimistic expectations are incomplete",
+			spec.ErrInvalidRequest,
+		)
+	}
 	if err := validate.ValidateCatalogResource(publication.Resource); err != nil {
 		return err
 	}
@@ -289,6 +310,53 @@ func (s *MetadataStore) PublishRecordTransfer(
 		return fmt.Errorf("begin record transfer publication: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+
+	var attachmentModifiedAt string
+	var attachmentEnabled int
+	err = tx.QueryRowContext(
+		ctx,
+		selectTransferAttachmentSQL,
+		string(publication.Record.RootID),
+		string(publication.Record.SourceID),
+	).Scan(&attachmentModifiedAt, &attachmentEnabled)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf(
+			"%w: destination source is no longer attached to the root",
+			spec.ErrConflict,
+		)
+	}
+	if err != nil {
+		return fmt.Errorf("read transfer attachment: %w", err)
+	}
+	if attachmentEnabled == 0 ||
+		attachmentModifiedAt != formatTime(publication.ExpectedAttachmentModifiedAt) {
+		return fmt.Errorf(
+			"%w: destination source attachment changed during transfer",
+			spec.ErrConflict,
+		)
+	}
+
+	sourceResult, err := tx.ExecContext(
+		ctx,
+		invalidateTransferredSourceSQL,
+		string(publication.Record.SourceID),
+		formatTime(publication.ExpectedSourceModifiedAt),
+		publication.ExpectedSourceObservationRevision,
+		spec.MaxObservationRevision,
+	)
+	if err != nil {
+		return sqliteError(fmt.Errorf("invalidate transferred source observation: %w", err))
+	}
+	changed, err := sourceResult.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("inspect transferred source invalidation: %w", err)
+	}
+	if changed != 1 {
+		return fmt.Errorf(
+			"%w: destination source changed during transfer",
+			spec.ErrConflict,
+		)
+	}
 	if err := upsertCatalogResourceTx(ctx, tx, publication.Resource); err != nil {
 		return err
 	}

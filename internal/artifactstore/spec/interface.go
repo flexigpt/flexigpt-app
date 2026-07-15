@@ -249,6 +249,16 @@ type CollectionDraft struct {
 // WalkFunc receives one source-relative entry during SourceDriver.Walk.
 type WalkFunc func(context.Context, SourceEntry) error
 
+// SourceConfigNormalizer optionally canonicalizes source-kind-specific
+// configuration before it is validated and persisted. Normalization must be
+// deterministic and must not access source content.
+type SourceConfigNormalizer interface {
+	NormalizeConfig(
+		ctx context.Context,
+		config json.RawMessage,
+	) (json.RawMessage, []Diagnostic)
+}
+
 // SourceDriver owns source transport, traversal safety, and generation
 // calculation for one Artifact Store-owned source kind.
 type SourceDriver interface {

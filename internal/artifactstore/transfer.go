@@ -28,17 +28,47 @@ func (s *Store) ImportDefinition(
 			spec.ErrUnsupported,
 		)
 	}
-	definition, err := s.portableContent.PutDefinition(ctx, request.File)
+	definition, err := baseutils.CanonicalizeDefinition(request.File.Definition)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	file := spec.ArtifactDefinitionFile{
-		Format:     spec.ArtifactDefinitionFileFormatV1,
+		Format:     request.File.Format,
 		Definition: definition,
 	}
+	if err := validate.ValidateArtifactDefinitionFile(file); err != nil {
+		return spec.ArtifactRecord{}, fmt.Errorf(
+			"%w: imported definition: %w",
+			spec.ErrInvalidRequest,
+			err,
+		)
+	}
+	assets, err := validateImportedAssets(definition.AssetManifest, request.Assets)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	for _, asset := range assets {
+		digest, size, err := s.portableContent.PutAsset(ctx, asset.Content)
+		if err != nil {
+			return spec.ArtifactRecord{}, err
+		}
+		if digest != asset.Manifest.Digest || size != asset.Manifest.SizeBytes {
+			return spec.ArtifactRecord{}, fmt.Errorf(
+				"%w: imported asset %q changed while being persisted",
+				spec.ErrDigestMismatch,
+				asset.Manifest.Path,
+			)
+		}
+	}
+	definition, err = s.portableContent.PutDefinition(ctx, file)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	file.Definition = definition
 	payload := spec.DefinitionTransferPayload{
 		RootDefinitionDigest: definition.Digest,
 		Definitions:          []spec.ArtifactDefinitionFile{file},
+		Assets:               assets,
 	}
 	return s.publishTransferredRecord(
 		ctx,
@@ -48,6 +78,69 @@ func (s *Store) ImportDefinition(
 		payload,
 		definition,
 	)
+}
+
+func validateImportedAssets(
+	manifest []spec.AssetManifestEntry,
+	assets []spec.PortableAssetContent,
+) ([]spec.PortableAssetContent, error) {
+	if len(manifest) != len(assets) {
+		return nil, fmt.Errorf(
+			"%w: imported definition declares %d assets but request contains %d",
+			spec.ErrInvalidRequest,
+			len(manifest),
+			len(assets),
+		)
+	}
+	expected := make(map[spec.PortablePath]spec.AssetManifestEntry, len(manifest))
+	for _, entry := range manifest {
+		expected[entry.Path] = entry
+	}
+	out := make([]spec.PortableAssetContent, 0, len(assets))
+	seen := make(map[spec.PortablePath]struct{}, len(assets))
+	var totalBytes int64
+	for _, asset := range assets {
+		if err := validate.ValidateAssetManifestEntry(asset.Manifest); err != nil {
+			return nil, fmt.Errorf("%w: imported asset: %w", spec.ErrInvalidRequest, err)
+		}
+		if _, duplicate := seen[asset.Manifest.Path]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: duplicate imported asset path %q",
+				spec.ErrInvalidRequest,
+				asset.Manifest.Path,
+			)
+		}
+		seen[asset.Manifest.Path] = struct{}{}
+		declared, ok := expected[asset.Manifest.Path]
+		if !ok || declared != asset.Manifest {
+			return nil, fmt.Errorf(
+				"%w: imported asset %q does not match the definition manifest",
+				spec.ErrInvalidRequest,
+				asset.Manifest.Path,
+			)
+		}
+		if int64(len(asset.Content)) != asset.Manifest.SizeBytes ||
+			baseutils.DigestBytes(asset.Content) != asset.Manifest.Digest {
+			return nil, fmt.Errorf(
+				"%w: imported asset %q content does not match its manifest",
+				spec.ErrDigestMismatch,
+				asset.Manifest.Path,
+			)
+		}
+		if int64(len(asset.Content)) > spec.MaxTransferPayloadBytes-totalBytes {
+			return nil, fmt.Errorf(
+				"%w: imported assets exceed %d bytes",
+				spec.ErrInvalidRequest,
+				spec.MaxTransferPayloadBytes,
+			)
+		}
+		totalBytes += int64(len(asset.Content))
+		out = append(out, spec.PortableAssetContent{
+			Manifest: asset.Manifest,
+			Content:  append([]byte(nil), asset.Content...),
+		})
+	}
+	return out, nil
 }
 
 func (s *Store) CaptureRecord(
@@ -210,6 +303,12 @@ func (s *Store) publishTransferredRecord(
 	payload spec.DefinitionTransferPayload,
 	definition spec.CanonicalDefinition,
 ) (spec.ArtifactRecord, error) {
+	s.scanMu.Lock()
+	defer s.scanMu.Unlock()
+
+	if err := validateDefinitionTransferPayload(payload, definition.Digest); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
 	source, err := s.repository.GetSource(ctx, destination.SourceID)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
@@ -219,6 +318,22 @@ func (s *Store) publishTransferredRecord(
 			"%w: destination source %q is disabled",
 			spec.ErrConflict,
 			source.SourceID,
+		)
+	}
+	attachment, err := s.repository.GetRootSourceAttachment(
+		ctx,
+		destination.RootID,
+		destination.SourceID,
+	)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if !attachment.Enabled {
+		return spec.ArtifactRecord{}, fmt.Errorf(
+			"%w: destination source %q is disabled for root %q",
+			spec.ErrConflict,
+			source.SourceID,
+			destination.RootID,
 		)
 	}
 	materializer, ok := s.definitionMaterializerFor(source.Kind)
@@ -233,6 +348,13 @@ func (s *Store) publishTransferredRecord(
 	frontendID := destination.FrontendID
 	if frontendID == "" {
 		frontendID = spec.PortableDefinitionFrontendID
+	}
+	if _, ok := s.frontendFor(frontendID); !ok {
+		return spec.ArtifactRecord{}, fmt.Errorf(
+			"%w: destination frontend %q",
+			spec.ErrFrontendUnavailable,
+			frontendID,
+		)
 	}
 	if frontendID == spec.PortableDefinitionFrontendID &&
 		destination.SubresourceLocator != "" {
@@ -372,10 +494,13 @@ func (s *Store) publishTransferredRecord(
 	}
 
 	if err := s.repository.PublishRecordTransfer(ctx, spec.RecordTransferPublication{
-		Resource:   resource,
-		Revision:   revision,
-		Record:     record,
-		Provenance: provenance,
+		Resource:                          resource,
+		Revision:                          revision,
+		Record:                            record,
+		Provenance:                        provenance,
+		ExpectedSourceModifiedAt:          source.ModifiedAt,
+		ExpectedSourceObservationRevision: source.ObservationRevision,
+		ExpectedAttachmentModifiedAt:      attachment.ModifiedAt,
 	}); err != nil {
 		discardErr := materializer.DiscardDefinition(
 			context.WithoutCancel(ctx),
@@ -391,4 +516,81 @@ func (s *Store) publishTransferredRecord(
 		return spec.ArtifactRecord{}, err
 	}
 	return record, nil
+}
+
+func validateDefinitionTransferPayload(
+	payload spec.DefinitionTransferPayload,
+	rootDigest spec.Digest,
+) error {
+	if payload.RootDefinitionDigest != rootDigest {
+		return fmt.Errorf(
+			"%w: transfer root digest does not match the target definition",
+			spec.ErrDigestMismatch,
+		)
+	}
+	if len(payload.Definitions) == 0 ||
+		len(payload.Definitions) > spec.MaxPortablePackageDefinitions {
+		return fmt.Errorf(
+			"%w: transfer definition count is invalid",
+			spec.ErrInvalidRequest,
+		)
+	}
+	seenDefinitions := make(map[spec.Digest]struct{}, len(payload.Definitions))
+	rootSeen := false
+	for _, file := range payload.Definitions {
+		if err := validate.ValidateArtifactDefinitionFile(file); err != nil {
+			return fmt.Errorf("%w: transfer definition: %w", spec.ErrInvalidRequest, err)
+		}
+		canonical, err := baseutils.CanonicalizeDefinition(file.Definition)
+		if err != nil {
+			return err
+		}
+		if _, duplicate := seenDefinitions[canonical.Digest]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate transfer definition %q",
+				spec.ErrInvalidRequest,
+				canonical.Digest,
+			)
+		}
+		seenDefinitions[canonical.Digest] = struct{}{}
+		rootSeen = rootSeen || canonical.Digest == rootDigest
+	}
+	if !rootSeen {
+		return fmt.Errorf(
+			"%w: transfer payload does not contain its root definition",
+			spec.ErrInvalidRequest,
+		)
+	}
+	var totalBytes int64
+	seenAssets := make(map[spec.PortablePath]struct{}, len(payload.Assets))
+	for _, asset := range payload.Assets {
+		if err := validate.ValidateAssetManifestEntry(asset.Manifest); err != nil {
+			return fmt.Errorf("%w: transfer asset: %w", spec.ErrInvalidRequest, err)
+		}
+		if _, duplicate := seenAssets[asset.Manifest.Path]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate transfer asset path %q",
+				spec.ErrInvalidRequest,
+				asset.Manifest.Path,
+			)
+		}
+		seenAssets[asset.Manifest.Path] = struct{}{}
+		if int64(len(asset.Content)) != asset.Manifest.SizeBytes ||
+			baseutils.DigestBytes(asset.Content) != asset.Manifest.Digest {
+			return fmt.Errorf(
+				"%w: transfer asset %q does not match its manifest",
+				spec.ErrDigestMismatch,
+				asset.Manifest.Path,
+			)
+		}
+		if int64(len(asset.Content)) > spec.MaxTransferPayloadBytes-totalBytes {
+			return fmt.Errorf(
+				"%w: transfer payload exceeds %d bytes",
+				spec.ErrInvalidRequest,
+				spec.MaxTransferPayloadBytes,
+			)
+		}
+		totalBytes += int64(len(asset.Content))
+	}
+	return nil
 }

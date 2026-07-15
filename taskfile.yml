@@ -141,6 +141,10 @@ tasks:
     cmds:
       - golangci-lint run --fix
 
+  fmt-go:
+    cmds:
+      - golangci-lint fmt
+
   lint-go:
     cmds:
       - pnpm run touch:tmp

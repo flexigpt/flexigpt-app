@@ -29,16 +29,33 @@ func NewLLMToolsFSDirectoryDriver() spec.SourceDriver { return &llmToolsFSDirect
 
 func (*llmToolsFSDirectoryDriver) Kind() spec.SourceKind { return spec.SourceKindFSDirectory }
 
+func (*llmToolsFSDirectoryDriver) NormalizeConfig(
+	_ context.Context,
+	raw json.RawMessage,
+) (json.RawMessage, []spec.Diagnostic) {
+	config, err := decodeLLMToolsFSConfigValue(raw)
+	if err != nil {
+		return nil, invalidLLMToolsFSConfigDiagnostics(err)
+	}
+	if config.RootPath != "" {
+		config.RootPath = filepath.Clean(config.RootPath)
+	}
+	if err := validate.ValidateFSDirectorySourceConfig(config); err != nil {
+		return nil, invalidLLMToolsFSConfigDiagnostics(err)
+	}
+	normalized, err := json.Marshal(config)
+	if err != nil {
+		return nil, invalidLLMToolsFSConfigDiagnostics(err)
+	}
+	return normalized, nil
+}
+
 func (*llmToolsFSDirectoryDriver) ValidateConfig(_ context.Context, raw json.RawMessage) []spec.Diagnostic {
 	_, err := decodeLLMToolsFSConfig(raw)
 	if err == nil {
 		return nil
 	}
-	return []spec.Diagnostic{{
-		Severity: spec.DiagnosticSeverityError,
-		Code:     "artifactstore.source.config.invalid",
-		Message:  err.Error(),
-	}}
+	return invalidLLMToolsFSConfigDiagnostics(err)
 }
 
 func (d *llmToolsFSDirectoryDriver) Snapshot(
@@ -129,8 +146,9 @@ func (d *llmToolsFSDirectoryDriver) Walk(
 	if !rootEntry.IsDirectory {
 		return fmt.Errorf("%w: walk root %q is not a directory", spec.ErrInvalidRequest, root)
 	}
-	var visit func(spec.SourceLocator) error
-	visit = func(directory spec.SourceLocator) error {
+	visited := 0
+	var visit func(spec.SourceLocator, int) error
+	visit = func(directory spec.SourceLocator, depth int) error {
 		entries, err := d.ReadDir(ctx, source, directory)
 		if err != nil {
 			return err
@@ -139,18 +157,35 @@ func (d *llmToolsFSDirectoryDriver) Walk(
 			if err := ctx.Err(); err != nil {
 				return err
 			}
+			visited++
+			if visited > spec.DefaultMaxScanEntries {
+				return fmt.Errorf(
+					"%w: source walk exceeds %d entries",
+					spec.ErrInvalidRequest,
+					spec.DefaultMaxScanEntries,
+				)
+			}
+			entryDepth := depth + 1
+			if entryDepth > spec.DefaultMaxTraversalDepth {
+				return fmt.Errorf(
+					"%w: source walk exceeds depth %d at %q",
+					spec.ErrInvalidRequest,
+					spec.DefaultMaxTraversalDepth,
+					entry.Locator,
+				)
+			}
 			if err := walk(ctx, entry); err != nil {
 				return err
 			}
 			if entry.IsDirectory {
-				if err := visit(entry.Locator); err != nil {
+				if err := visit(entry.Locator, entryDepth); err != nil {
 					return err
 				}
 			}
 		}
 		return nil
 	}
-	return visit(root)
+	return visit(root, 0)
 }
 
 func (d *llmToolsFSDirectoryDriver) ReadDir(
@@ -170,7 +205,7 @@ func (d *llmToolsFSDirectoryDriver) ReadDir(
 		Path:              path,
 		IncludeDotEntries: true,
 		Kind:              fstool.ListDirectoryEntryKindAll,
-		MaxEntries:        5000,
+		MaxEntries:        spec.DefaultMaxScanEntries,
 	})
 	if err != nil {
 		return nil, err
@@ -193,8 +228,9 @@ func (d *llmToolsFSDirectoryDriver) ReadDir(
 		}
 		if item.Kind == fstool.ListDirectoryEntryKindOther && !config.FollowSymlinks {
 			entries = append(entries, spec.SourceEntry{
-				Locator: childLocator,
-				Name:    item.Name,
+				Locator:   childLocator,
+				Name:      item.Name,
+				IsSymlink: true,
 			})
 			continue
 		}
@@ -210,6 +246,7 @@ func (d *llmToolsFSDirectoryDriver) ReadDir(
 			child.IsDirectory = true
 			child.IsRegular = false
 		case fstool.ListDirectoryEntryKindOther:
+			child.IsSymlink = true
 			// FollowSymlinks was explicitly enabled. StatPath describes the
 			// resolved target, while traversal limits prevent unbounded cycles.
 		default:
@@ -290,24 +327,43 @@ func (d *llmToolsFSDirectoryDriver) toolFor(source spec.ArtifactSource) (*fstool
 }
 
 func decodeLLMToolsFSConfig(raw json.RawMessage) (llmToolsFSConfig, error) {
-	decoder := json.NewDecoder(strings.NewReader(string(raw)))
-	decoder.DisallowUnknownFields()
-	var config spec.FSDirectorySourceConfig
-	if err := decoder.Decode(&config); err != nil {
-		return llmToolsFSConfig{}, err
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		if err == nil {
-			return llmToolsFSConfig{}, errors.New(
-				"filesystem source config contains trailing JSON",
-			)
-		}
+	config, err := decodeLLMToolsFSConfigValue(raw)
+	if err != nil {
 		return llmToolsFSConfig{}, err
 	}
 	if err := validate.ValidateFSDirectorySourceConfig(config); err != nil {
 		return llmToolsFSConfig{}, err
 	}
-	return llmToolsFSConfig{RootPath: config.RootPath, FollowSymlinks: config.FollowSymlinks}, nil
+	return llmToolsFSConfig{
+		RootPath:       config.RootPath,
+		FollowSymlinks: config.FollowSymlinks,
+	}, nil
+}
+
+func decodeLLMToolsFSConfigValue(raw json.RawMessage) (spec.FSDirectorySourceConfig, error) {
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder.DisallowUnknownFields()
+	var config spec.FSDirectorySourceConfig
+	if err := decoder.Decode(&config); err != nil {
+		return spec.FSDirectorySourceConfig{}, err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return spec.FSDirectorySourceConfig{}, errors.New(
+				"filesystem source config contains trailing JSON",
+			)
+		}
+		return spec.FSDirectorySourceConfig{}, err
+	}
+	return config, nil
+}
+
+func invalidLLMToolsFSConfigDiagnostics(err error) []spec.Diagnostic {
+	return []spec.Diagnostic{{
+		Severity: spec.DiagnosticSeverityError,
+		Code:     "artifactstore.source.config.invalid",
+		Message:  err.Error(),
+	}}
 }
 
 func readLLMToolsFile(ctx context.Context, tool *fstool.FSTool, path string) ([]byte, error) {
@@ -366,3 +422,5 @@ func joinSourceLocator(parent spec.SourceLocator, name string) (spec.SourceLocat
 	}
 	return spec.SourceLocator(string(parent) + "/" + name), nil
 }
+
+var _ spec.SourceConfigNormalizer = (*llmToolsFSDirectoryDriver)(nil)

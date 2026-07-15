@@ -3,6 +3,7 @@ package artifactstore
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -61,7 +62,7 @@ func (s *Store) EnsureBaseCollection(ctx context.Context, draft spec.CollectionD
 	}
 	collection, reloadErr := s.repository.GetCollectionByRootSlug(ctx, draft.RootID, draft.Slug, true)
 	if reloadErr != nil {
-		return spec.ArtifactCollection{}, err
+		return spec.ArtifactCollection{}, errors.Join(err, reloadErr)
 	}
 	if collection.SoftDeletedAt != nil {
 		return spec.ArtifactCollection{}, fmt.Errorf(
@@ -152,7 +153,7 @@ func (s *Store) ListCollections(
 		return nil, err
 	}
 	defer finish()
-	if _, err := s.repository.GetRoot(ctx, rootID, true); err != nil {
+	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
 		return nil, err
 	}
 	return s.repository.ListCollections(ctx, rootID, includeSoftDeleted)

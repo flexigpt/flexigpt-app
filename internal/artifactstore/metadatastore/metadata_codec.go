@@ -179,6 +179,11 @@ func sqliteError(err error) error {
 	switch {
 	case strings.Contains(message, "unique constraint failed"):
 		return fmt.Errorf("%w: %w", spec.ErrConflict, err)
+	case strings.Contains(message, "database is locked"),
+		strings.Contains(message, "database is busy"),
+		strings.Contains(message, "sqlite_busy"),
+		strings.Contains(message, "sqlite_locked"):
+		return fmt.Errorf("%w: metadata database is busy: %w", spec.ErrConflict, err)
 	case strings.Contains(message, "artifactstore conflict:"):
 		return fmt.Errorf("%w: %w", spec.ErrConflict, err)
 	case strings.Contains(message, "foreign key constraint failed"):

@@ -86,6 +86,12 @@ func ValidateArtifactSource(v spec.ArtifactSource) error {
 	if err := ValidateDiagnostics(v.Diagnostics); err != nil {
 		return err
 	}
+	if v.ObservationRevision > spec.MaxObservationRevision {
+		return invalidf(
+			"source.observationRevision exceeds %d",
+			spec.MaxObservationRevision,
+		)
+	}
 	return validateCreatedModified("source", v.CreatedAt, v.ModifiedAt)
 }
 
@@ -425,6 +431,60 @@ func ValidateAssetManifestEntry(v spec.AssetManifestEntry) error {
 	}
 	if v.SizeBytes < 0 {
 		return invalidf("asset.sizeBytes must not be negative")
+	}
+	return nil
+}
+
+// ValidateExportClosure validates the generic portable closure returned by an
+// artifact frontend. The root definition and all of its declared assets must
+// remain present in the closure.
+func ValidateExportClosure(
+	root spec.CanonicalDefinition,
+	closure spec.ExportClosure,
+) error {
+	if len(closure.DefinitionDigests) == 0 ||
+		len(closure.DefinitionDigests) > spec.MaxPortablePackageDefinitions {
+		return invalidf(
+			"export closure must contain between 1 and %d definitions",
+			spec.MaxPortablePackageDefinitions,
+		)
+	}
+	seenDigests := make(map[spec.Digest]struct{}, len(closure.DefinitionDigests))
+	rootSeen := false
+	for index, digest := range closure.DefinitionDigests {
+		if err := validateDigest("export closure.definitionDigest", digest); err != nil {
+			return fmt.Errorf("export closure.definitionDigests[%d]: %w", index, err)
+		}
+		if _, exists := seenDigests[digest]; exists {
+			return invalidf("export closure contains duplicate definition digest %q", digest)
+		}
+		seenDigests[digest] = struct{}{}
+		rootSeen = rootSeen || digest == root.Digest
+	}
+	if !rootSeen {
+		return invalidf("export closure does not contain root definition %q", root.Digest)
+	}
+	if len(closure.Assets) > spec.MaxAssetsPerDefinition {
+		return invalidf("export closure.assets exceeds %d entries", spec.MaxAssetsPerDefinition)
+	}
+	assetsByPath := make(map[spec.PortablePath]spec.AssetManifestEntry, len(closure.Assets))
+	for index, asset := range closure.Assets {
+		if err := ValidateAssetManifestEntry(asset); err != nil {
+			return fmt.Errorf("export closure.assets[%d]: %w", index, err)
+		}
+		if _, exists := assetsByPath[asset.Path]; exists {
+			return invalidf("export closure contains duplicate asset path %q", asset.Path)
+		}
+		assetsByPath[asset.Path] = asset
+	}
+	for _, required := range root.AssetManifest {
+		available, ok := assetsByPath[required.Path]
+		if !ok || available != required {
+			return invalidf(
+				"export closure does not contain root asset %q with its declared metadata",
+				required.Path,
+			)
+		}
 	}
 	return nil
 }

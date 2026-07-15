@@ -460,7 +460,7 @@ func sqliteDataSourceName(path string) string {
 	query := value.Query()
 	query.Set("_pragma", "foreign_keys(1)")
 	query.Add("_pragma", "journal_mode(WAL)")
-	query.Set("busy_timeout", "5000")
+	query.Add("_pragma", "busy_timeout(5000)")
 	value.RawQuery = query.Encode()
 	return value.String()
 }

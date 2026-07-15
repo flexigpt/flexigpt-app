@@ -155,6 +155,7 @@ type DefinitionMaterializer interface {
 
 type ImportDefinitionRequest struct {
 	File        ArtifactDefinitionFile
+	Assets      []PortableAssetContent
 	Destination TransferDestination
 }
 

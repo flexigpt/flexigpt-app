@@ -533,6 +533,13 @@ func publishRootScanSourceCatalog(
 			spec.ErrInvalidRequest,
 		)
 	}
+	if publication.ExpectedObservationRevision >= spec.MaxObservationRevision {
+		return fmt.Errorf(
+			"%w: source %q observation revision is exhausted",
+			spec.ErrConflict,
+			publication.SourceID,
+		)
+	}
 	if err := validate.ValidateDiagnostics(publication.Diagnostics); err != nil {
 		return err
 	}

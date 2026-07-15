@@ -142,6 +142,13 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 		}
 		sourcePlan, ok := plans[source.SourceID]
 		if hasExplicitSourcePlans && !ok {
+			if source.LastObservedGeneration == nil {
+				return spec.ScanResult{}, fmt.Errorf(
+					"%w: active source %q has never been observed and requires a source plan",
+					spec.ErrInvalidRequest,
+					source.SourceID,
+				)
+			}
 			continue
 		}
 		if !hasExplicitSourcePlans {
@@ -161,7 +168,10 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 		applySourceCatalogPublication(catalogByOccurrence, publication)
 		result.Sources = append(result.Sources, sourceResult)
 		sourceGenerations[source.SourceID] = sourceResult.Generation
-		result.Diagnostics = append(result.Diagnostics, sourceResult.Diagnostics...)
+		result.Diagnostics = appendBoundedDiagnostics(
+			result.Diagnostics,
+			sourceResult.Diagnostics...,
+		)
 	}
 	resources := catalogResourcesFromMap(catalogByOccurrence)
 	planDigest, err := digestScanPlan(executedPlan)
@@ -210,6 +220,17 @@ func (s *Store) scanSource(
 			source.Kind,
 		)
 	}
+	existingResources, err := s.repository.ListCatalogResourcesForSource(ctx, source.SourceID)
+	if err != nil {
+		return spec.SourceScanResult{}, spec.SourceCatalogPublication{}, err
+	}
+	existingByLocator := make(map[spec.SourceLocator][]spec.CatalogResource)
+	for _, resource := range existingResources {
+		existingByLocator[resource.Locator] = append(
+			existingByLocator[resource.Locator],
+			resource,
+		)
+	}
 	generation, err := driver.Snapshot(ctx, source)
 	if err != nil {
 		return spec.SourceScanResult{}, spec.SourceCatalogPublication{}, err
@@ -231,6 +252,49 @@ func (s *Store) scanSource(
 	seenResources := make(map[string]struct{})
 	for _, entry := range entries {
 		result.Candidates++
+		maximum := plan.MaxFileBytes
+		if maximum <= 0 {
+			maximum = spec.MaxDefinitionJSONBytes
+		}
+		if entry.SizeBytes < 0 || entry.SizeBytes > maximum {
+			prior := existingByLocator[entry.Locator]
+			severity := spec.DiagnosticSeverityWarning
+			message := fmt.Sprintf(
+				"candidate exceeds the configured %d byte limit and was skipped",
+				maximum,
+			)
+			if len(prior) > 0 {
+				severity = spec.DiagnosticSeverityError
+				message = fmt.Sprintf(
+					"previously cataloged candidate exceeds the configured %d byte limit",
+					maximum,
+				)
+			}
+			diagnostics := []spec.Diagnostic{{
+				Severity: severity,
+				Code:     "artifactstore.candidate.too-large",
+				Message:  message,
+				Location: &spec.DiagnosticLocation{Locator: entry.Locator},
+			}}
+			if len(prior) > 0 {
+				invalid := invalidCandidateResources(
+					source.SourceID,
+					entry.Locator,
+					"",
+					now,
+					nil,
+					diagnostics,
+					prior,
+				)
+				publication.Resources = append(publication.Resources, invalid...)
+				result.InvalidResources += len(invalid)
+			}
+			result.Diagnostics = appendBoundedDiagnostics(
+				result.Diagnostics,
+				diagnostics...,
+			)
+			continue
+		}
 		content, err := readCandidate(ctx, driver, source, entry, plan.MaxFileBytes)
 		if err != nil {
 			return result, publication, err
@@ -247,15 +311,40 @@ func (s *Store) scanSource(
 			return result, publication, err
 		}
 		if frontend == nil {
+			prior := existingByLocator[entry.Locator]
+			if len(prior) > 0 {
+				diagnostics := []spec.Diagnostic{{
+					Severity: spec.DiagnosticSeverityError,
+					Code:     "artifactstore.frontend.unrecognized",
+					Message:  "a previously cataloged source file is no longer recognized by an allowed frontend",
+					Location: &spec.DiagnosticLocation{Locator: entry.Locator},
+				}}
+				invalid := invalidCandidateResources(
+					source.SourceID,
+					entry.Locator,
+					"",
+					now,
+					&digest,
+					diagnostics,
+					prior,
+				)
+				publication.Resources = append(publication.Resources, invalid...)
+				result.InvalidResources += len(invalid)
+				result.Diagnostics = appendBoundedDiagnostics(
+					result.Diagnostics,
+					diagnostics...,
+				)
+			}
 			continue
 		}
 		decoded, diagnostics := frontend.Decode(ctx, candidate)
-		if len(decoded) == 0 && len(diagnostics) == 0 {
-			diagnostics = []spec.Diagnostic{{
+		if len(decoded) == 0 {
+			diagnostics = append(diagnostics, spec.Diagnostic{
 				Severity: spec.DiagnosticSeverityError,
 				Code:     "artifactstore.frontend.decode-empty",
 				Message:  "the selected frontend emitted no definitions",
-			}}
+				Location: &spec.DiagnosticLocation{Locator: entry.Locator},
+			})
 		}
 		if err := validate.ValidateDiagnostics(diagnostics); err != nil {
 			return result, publication, fmt.Errorf(
@@ -266,20 +355,21 @@ func (s *Store) scanSource(
 			)
 		}
 		if err := errorDiagnostics("frontend decode", diagnostics); err != nil || len(decoded) == 0 {
-			publication.Resources = append(
-				publication.Resources,
-				invalidCatalogResource(
-					source.SourceID,
-					entry.Locator,
-					"",
-					frontend.ID(),
-					now,
-					&digest,
-					diagnostics,
-				),
+			invalid := invalidCandidateResources(
+				source.SourceID,
+				entry.Locator,
+				frontend.ID(),
+				now,
+				&digest,
+				diagnostics,
+				existingByLocator[entry.Locator],
 			)
-			result.InvalidResources++
-			result.Diagnostics = append(result.Diagnostics, diagnostics...)
+			publication.Resources = append(publication.Resources, invalid...)
+			result.InvalidResources += len(invalid)
+			result.Diagnostics = appendBoundedDiagnostics(
+				result.Diagnostics,
+				diagnostics...,
+			)
 			continue
 		}
 		for _, decodedArtifact := range decoded {
@@ -315,7 +405,10 @@ func (s *Store) scanSource(
 					),
 				)
 				result.InvalidResources++
-				result.Diagnostics = append(result.Diagnostics, canonicalDiagnostics...)
+				result.Diagnostics = appendBoundedDiagnostics(
+					result.Diagnostics,
+					canonicalDiagnostics...,
+				)
 				continue
 			}
 			allDiagnostics := append([]spec.Diagnostic{}, diagnostics...)
@@ -345,7 +438,10 @@ func (s *Store) scanSource(
 					),
 				)
 				result.InvalidResources++
-				result.Diagnostics = append(result.Diagnostics, allDiagnostics...)
+				result.Diagnostics = appendBoundedDiagnostics(
+					result.Diagnostics,
+					allDiagnostics...,
+				)
 				continue
 			}
 
@@ -371,7 +467,10 @@ func (s *Store) scanSource(
 					),
 				)
 				result.InvalidResources++
-				result.Diagnostics = append(result.Diagnostics, dependencyDigestDiagnostics...)
+				result.Diagnostics = appendBoundedDiagnostics(
+					result.Diagnostics,
+					dependencyDigestDiagnostics...,
+				)
 				continue
 			}
 			if s.portableContent == nil {
@@ -419,6 +518,10 @@ func (s *Store) scanSource(
 				},
 			)
 			result.ValidResources++
+			result.Diagnostics = appendBoundedDiagnostics(
+				result.Diagnostics,
+				allDiagnostics...,
+			)
 		}
 	}
 
@@ -512,6 +615,9 @@ func collectSourceCandidates(
 	for _, locator := range plan.ExplicitLocators {
 		entry, err := driver.Stat(ctx, source, locator)
 		if err != nil {
+			if isNotFound(err) {
+				continue
+			}
 			return nil, err
 		}
 		if entry.IsRegular {
@@ -538,6 +644,9 @@ func collectSourceCandidates(
 		}
 		rootEntry, err := driver.Stat(ctx, source, walkRoot)
 		if err != nil {
+			if isNotFound(err) {
+				continue
+			}
 			return nil, err
 		}
 		if !rootEntry.IsDirectory {
@@ -688,6 +797,41 @@ func invalidCatalogResource(
 		LastSeenAt:          now,
 		Diagnostics:         diagnostics,
 	}
+}
+
+func invalidCandidateResources(
+	sourceID spec.SourceID,
+	locator spec.SourceLocator,
+	frontendID spec.FrontendID,
+	now time.Time,
+	sourceContentDigest *spec.Digest,
+	diagnostics []spec.Diagnostic,
+	existing []spec.CatalogResource,
+) []spec.CatalogResource {
+	if len(existing) == 0 {
+		return []spec.CatalogResource{invalidCatalogResource(
+			sourceID,
+			locator,
+			"",
+			frontendID,
+			now,
+			sourceContentDigest,
+			diagnostics,
+		)}
+	}
+	out := make([]spec.CatalogResource, 0, len(existing))
+	for _, previous := range existing {
+		resource := previous
+		resource.State = spec.CatalogStateInvalid
+		resource.LastSeenAt = now
+		resource.Diagnostics = append([]spec.Diagnostic(nil), diagnostics...)
+		resource.SourceContentDigest = cloneDigest(sourceContentDigest)
+		if frontendID != "" {
+			resource.FrontendID = frontendID
+		}
+		out = append(out, resource)
+	}
+	return out
 }
 
 func digestScanPlan(plan spec.ScanPlan) (spec.Digest, error) {

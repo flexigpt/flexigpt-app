@@ -20,6 +20,7 @@ const updateSourceSQL = `
 	       config_json = ?,
 	       last_observed_generation = ?,
 	       last_scanned_at = ?,
+	       observation_revision = ?,
 	       diagnostics_json = ?,
 	       modified_at = ?
 	 WHERE source_id = ?

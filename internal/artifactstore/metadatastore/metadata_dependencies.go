@@ -17,6 +17,12 @@ const (
 		WHERE root_id = ?
 		ORDER BY generation DESC
 		LIMIT 1`
+	selectDependencyPublicationRecordSQL = `SELECT
+			root_id,
+			modified_at,
+			last_resolved_definition_digest
+		FROM artifact_records
+		WHERE record_id = ?`
 	deleteDependencySnapshotSetSQL = `DELETE FROM artifact_dependencies
 		WHERE root_id = ?
 		  AND record_id = ?
@@ -63,7 +69,8 @@ func (s *MetadataStore) ReplaceDependencySnapshots(
 	if publication.RootID == "" ||
 		publication.RecordID == "" ||
 		publication.RootDefinitionDigest == "" ||
-		publication.CatalogGeneration == 0 {
+		publication.CatalogGeneration == 0 ||
+		publication.ExpectedRecordModifiedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: dependency snapshot publication is incomplete",
 			spec.ErrInvalidRequest,
@@ -109,6 +116,32 @@ func (s *MetadataStore) ReplaceDependencySnapshots(
 	if currentGeneration != publication.CatalogGeneration {
 		return fmt.Errorf(
 			"%w: root catalog changed during dependency resolution",
+			spec.ErrConflict,
+		)
+	}
+
+	var recordRootID, recordModifiedAt string
+	var recordDigest sql.NullString
+	err = tx.QueryRowContext(
+		ctx,
+		selectDependencyPublicationRecordSQL,
+		string(publication.RecordID),
+	).Scan(&recordRootID, &recordModifiedAt, &recordDigest)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf(
+			"%w: dependency root record no longer exists",
+			spec.ErrConflict,
+		)
+	}
+	if err != nil {
+		return fmt.Errorf("read dependency publication record: %w", err)
+	}
+	if recordRootID != string(publication.RootID) ||
+		recordModifiedAt != formatTime(publication.ExpectedRecordModifiedAt) ||
+		!recordDigest.Valid ||
+		recordDigest.String != string(publication.RootDefinitionDigest) {
+		return fmt.Errorf(
+			"%w: dependency root record changed during dependency resolution",
 			spec.ErrConflict,
 		)
 	}
