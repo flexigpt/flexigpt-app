@@ -15,8 +15,6 @@ const (
 	PortablePackageManifestFormatV1 = "artifact-package/v1"
 )
 
-const PortableDefinitionFrontendID FrontendID = "artifactstore.portable-definition"
-
 const (
 	MaxKindBytes                  = 128
 	MaxSchemaIDBytes              = 256
@@ -42,6 +40,7 @@ const (
 	MaxAttachmentPriority         = 1_000_000
 	MaxSlugRunes                  = 64
 	DefaultMaxScanCandidates      = 10_000
+	DefaultMaxScanEntries         = 100_000
 	DefaultMaxTraversalDepth      = 64
 	DefaultMaxMaterializedEntries = 100_000
 	DefaultMaxMaterializedFiles   = 50_000
@@ -82,6 +81,8 @@ const (
 	FSDirectoryConfigSchemaID         SchemaID = "artifactstore.fs-directory.config.v1"
 	EmbeddedFSDirectoryConfigSchemaID SchemaID = "artifactstore.embedded-fs-directory.config.v1"
 	MemoryDirectoryConfigSchemaID     SchemaID = "artifactstore.memory-directory.config.v1"
+
+	PortableDefinitionFrontendID FrontendID = "artifactstore.portable-definition"
 )
 
 type CatalogState string
@@ -118,6 +119,14 @@ const (
 	RecordStateMissing      RecordState = "missing"
 	RecordStateInvalid      RecordState = "invalid"
 	RecordStateIncompatible RecordState = "incompatible"
+)
+
+type DependencyResolutionState string
+
+const (
+	DependencyResolutionStateResolved  DependencyResolutionState = "resolved"
+	DependencyResolutionStateMissing   DependencyResolutionState = "missing"
+	DependencyResolutionStateAmbiguous DependencyResolutionState = "ambiguous"
 )
 
 type DiagnosticSeverity string

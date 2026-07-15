@@ -33,9 +33,11 @@ type RootSourceAttachmentUpdate struct {
 // AttachSource creates an app-local root/source attachment after root-hook
 // validation. It does not access the attached source content.
 func (s *Store) AttachSource(ctx context.Context, draft RootSourceAttachmentDraft) (spec.RootSourceAttachment, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
+	defer finish()
 	root, err := s.repository.GetRoot(ctx, draft.RootID, false)
 	if err != nil {
 		return spec.RootSourceAttachment{}, err
@@ -70,17 +72,21 @@ func (s *Store) GetRootSourceAttachment(
 	rootID spec.RootID,
 	sourceID spec.SourceID,
 ) (spec.RootSourceAttachment, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
+	defer finish()
 	return s.repository.GetRootSourceAttachment(ctx, rootID, sourceID)
 }
 
 // ListRootSources lists source attachments ordered by priority then source ID.
 func (s *Store) ListRootSources(ctx context.Context, rootID spec.RootID) ([]spec.RootSourceAttachment, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer finish()
 	return s.repository.ListRootSourceAttachments(ctx, rootID)
 }
 

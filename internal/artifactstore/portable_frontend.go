@@ -103,6 +103,12 @@ func portableDefinitionDiagnostic(message string) []spec.Diagnostic {
 	}}
 }
 
+type portableTrailingJSONError struct{}
+
+func (*portableTrailingJSONError) Error() string {
+	return "portable definition contains trailing JSON values"
+}
+
 func ensurePortableJSONEOF(decoder *json.Decoder) error {
 	var extra any
 	err := decoder.Decode(&extra)
@@ -113,12 +119,6 @@ func ensurePortableJSONEOF(decoder *json.Decoder) error {
 		return &portableTrailingJSONError{}
 	}
 	return err
-}
-
-type portableTrailingJSONError struct{}
-
-func (*portableTrailingJSONError) Error() string {
-	return "portable definition contains trailing JSON values"
 }
 
 var _ spec.ArtifactFrontend = portableDefinitionFrontend{}

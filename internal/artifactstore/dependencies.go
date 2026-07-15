@@ -9,9 +9,11 @@ import (
 )
 
 func (s *Store) GetDependencies(ctx context.Context, recordID spec.RecordID) ([]spec.ArtifactSelector, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer finish()
 	record, err := s.GetRecord(ctx, recordID)
 	if err != nil {
 		return nil, err
@@ -27,9 +29,11 @@ func (s *Store) GetDependencies(ctx context.Context, recordID spec.RecordID) ([]
 }
 
 func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID) (spec.DependencyGraph, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.DependencyGraph{}, err
 	}
+	defer finish()
 	record, err := s.GetRecord(ctx, recordID)
 	if err != nil {
 		return spec.DependencyGraph{}, err
@@ -37,12 +41,19 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 	if record.LastResolvedDefinitionDigest == nil {
 		return spec.DependencyGraph{}, fmt.Errorf("%w: record has no resolved definition", spec.ErrConflict)
 	}
+	generation, err := s.GetRootCatalogGeneration(ctx, record.RootID)
+	if err != nil {
+		return spec.DependencyGraph{}, err
+	}
+	rootDefinitionDigest := *record.LastResolvedDefinitionDigest
 	graph := spec.DependencyGraph{
 		RootRecordID: recordID,
 		Nodes:        map[spec.Digest]spec.CanonicalDefinition{},
 		Edges:        map[spec.Digest][]spec.DependencyExplanation{},
 	}
 	visiting := map[spec.Digest]bool{}
+	snapshots := make([]spec.ArtifactDependencySnapshot, 0)
+	now := s.nowUTC()
 	var visit func(spec.Digest) error
 	visit = func(digest spec.Digest) error {
 		if visiting[digest] {
@@ -66,13 +77,53 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 		graph.Nodes[digest] = definition
 		visiting[digest] = true
 		defer delete(visiting, digest)
-		for _, selector := range definition.DependencySelectors {
+		for selectorIndex, selector := range definition.DependencySelectors {
 			explanation, err := s.ExplainDependencyResolution(ctx, record.RootID, selector)
 			if err != nil {
 				return err
 			}
 			graph.Edges[digest] = append(graph.Edges[digest], explanation)
 			graph.Diagnostics = append(graph.Diagnostics, explanation.Diagnostics...)
+			candidateRefs := make(
+				[]spec.DependencyCandidateRef,
+				0,
+				len(explanation.Candidates),
+			)
+			for _, candidate := range explanation.Candidates {
+				candidateRefs = append(candidateRefs, spec.DependencyCandidateRef{
+					Resource: spec.CatalogResourceKey{
+						SourceID:           candidate.Resource.SourceID,
+						Locator:            candidate.Resource.Locator,
+						SubresourceLocator: candidate.Resource.SubresourceLocator,
+					},
+					DefinitionDigest: candidate.Definition.Digest,
+				})
+			}
+			state := spec.DependencyResolutionStateResolved
+			switch len(candidateRefs) {
+			case 0:
+				state = spec.DependencyResolutionStateMissing
+			case 1:
+			default:
+				state = spec.DependencyResolutionStateAmbiguous
+			}
+			snapshot := spec.ArtifactDependencySnapshot{
+				RootID:               record.RootID,
+				RecordID:             record.RecordID,
+				CatalogGeneration:    generation.Generation,
+				RootDefinitionDigest: rootDefinitionDigest,
+				DefinitionDigest:     digest,
+				SelectorIndex:        selectorIndex,
+				Selector:             selector,
+				State:                state,
+				Candidates:           candidateRefs,
+				Diagnostics:          append([]spec.Diagnostic(nil), explanation.Diagnostics...),
+				ModifiedAt:           now,
+			}
+			if err := spec.ValidateArtifactDependencySnapshot(snapshot); err != nil {
+				return err
+			}
+			snapshots = append(snapshots, snapshot)
 			if len(explanation.Candidates) == 1 {
 				if err := visit(explanation.Candidates[0].Definition.Digest); err != nil {
 					return err
@@ -81,8 +132,32 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 		}
 		return nil
 	}
-	err = visit(*record.LastResolvedDefinitionDigest)
-	return graph, err
+	if err := visit(rootDefinitionDigest); err != nil {
+		return spec.DependencyGraph{}, err
+	}
+	currentGeneration, err := s.GetRootCatalogGeneration(ctx, record.RootID)
+	if err != nil {
+		return spec.DependencyGraph{}, err
+	}
+	if currentGeneration.Generation != generation.Generation {
+		return spec.DependencyGraph{}, fmt.Errorf(
+			"%w: root catalog changed while building dependency graph",
+			spec.ErrConflict,
+		)
+	}
+	if err := s.repository.ReplaceDependencySnapshots(
+		ctx,
+		spec.DependencySnapshotPublication{
+			RootID:               record.RootID,
+			RecordID:             record.RecordID,
+			RootDefinitionDigest: rootDefinitionDigest,
+			CatalogGeneration:    generation.Generation,
+			Snapshots:            snapshots,
+		},
+	); err != nil {
+		return spec.DependencyGraph{}, err
+	}
+	return graph, nil
 }
 
 func (s *Store) ExplainDependencyResolution(
@@ -90,9 +165,11 @@ func (s *Store) ExplainDependencyResolution(
 	rootID spec.RootID,
 	selector spec.ArtifactSelector,
 ) (spec.DependencyExplanation, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.DependencyExplanation{}, err
 	}
+	defer finish()
 	candidates, err := s.FindCandidates(ctx, rootID, selector)
 	if err != nil {
 		return spec.DependencyExplanation{}, err
@@ -125,13 +202,15 @@ func (s *Store) FindCandidates(
 	rootID spec.RootID,
 	selector spec.ArtifactSelector,
 ) ([]spec.DependencyCandidate, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer finish()
 	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
 		return nil, err
 	}
-	resources, err := s.repository.ListCatalogResourcesForRoot(ctx, rootID)
+	resources, err := s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
 	if err != nil {
 		return nil, err
 	}

@@ -43,6 +43,7 @@ type artifactSourceRow struct {
 	Config                 []byte
 	LastObservedGeneration sql.NullString
 	LastScannedAt          sql.NullString
+	ObservationRevision    uint64
 	Diagnostics            []byte
 	CreatedAt              string
 	ModifiedAt             string
@@ -58,6 +59,7 @@ func (r *artifactSourceRow) destinations() []any {
 		&r.Config,
 		&r.LastObservedGeneration,
 		&r.LastScannedAt,
+		&r.ObservationRevision,
 		&r.Diagnostics,
 		&r.CreatedAt,
 		&r.ModifiedAt,
@@ -281,5 +283,35 @@ func (r *transferProvenanceRow) destinations() []any {
 		&r.OriginResource,
 		&r.OriginDefinitionDigest,
 		&r.CreatedAt,
+	}
+}
+
+type artifactDependencyRow struct {
+	RootID               string
+	RecordID             string
+	CatalogGeneration    uint64
+	RootDefinitionDigest string
+	DefinitionDigest     string
+	SelectorIndex        int
+	Selector             []byte
+	State                string
+	Candidates           []byte
+	Diagnostics          []byte
+	ModifiedAt           string
+}
+
+func (r *artifactDependencyRow) destinations() []any {
+	return []any{
+		&r.RootID,
+		&r.RecordID,
+		&r.CatalogGeneration,
+		&r.RootDefinitionDigest,
+		&r.DefinitionDigest,
+		&r.SelectorIndex,
+		&r.Selector,
+		&r.State,
+		&r.Candidates,
+		&r.Diagnostics,
+		&r.ModifiedAt,
 	}
 }

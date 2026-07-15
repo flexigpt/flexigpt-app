@@ -37,8 +37,50 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 		return spec.ScanResult{}, err
 	}
 	attached := make(map[spec.SourceID]spec.RootSourceAttachment, len(attachments))
+	sources := make(map[spec.SourceID]spec.ArtifactSource, len(attachments))
+	attachmentExpectations := make(
+		[]spec.RootScanAttachmentExpectation,
+		0,
+		len(attachments),
+	)
+	sourceExpectations := make([]spec.RootScanSourceExpectation, 0, len(attachments))
+	catalogByOccurrence := make(map[string]spec.CatalogResource)
+	sourceGenerations := map[spec.SourceID]spec.SourceGeneration{}
 	for _, attachment := range attachments {
 		attached[attachment.SourceID] = attachment
+		attachmentExpectations = append(attachmentExpectations, spec.RootScanAttachmentExpectation{
+			SourceID:   attachment.SourceID,
+			ModifiedAt: attachment.ModifiedAt,
+			Enabled:    attachment.Enabled,
+		})
+		source, err := s.repository.GetSource(ctx, attachment.SourceID)
+		if err != nil {
+			return spec.ScanResult{}, err
+		}
+		sources[source.SourceID] = source
+		sourceExpectations = append(sourceExpectations, spec.RootScanSourceExpectation{
+			SourceID:            source.SourceID,
+			ModifiedAt:          source.ModifiedAt,
+			ObservationRevision: source.ObservationRevision,
+			Enabled:             source.Enabled,
+		})
+		if !attachment.Enabled || !source.Enabled {
+			continue
+		}
+		if source.LastObservedGeneration != nil {
+			sourceGenerations[source.SourceID] = *source.LastObservedGeneration
+		}
+		resources, err := s.repository.ListCatalogResourcesForSource(ctx, source.SourceID)
+		if err != nil {
+			return spec.ScanResult{}, err
+		}
+		for _, resource := range resources {
+			catalogByOccurrence[recordOccurrenceKey(
+				resource.SourceID,
+				resource.Locator,
+				resource.SubresourceLocator,
+			)] = resource
+		}
 	}
 
 	plans := make(map[spec.SourceID]spec.SourceScanPlan, len(plan.SourcePlans))
@@ -73,21 +115,27 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 				rootID,
 			)
 		}
+		source, ok := sources[sourcePlan.SourceID]
+		if !ok || !source.Enabled {
+			return spec.ScanResult{}, fmt.Errorf(
+				"%w: source %q is disabled for root %q",
+				spec.ErrConflict,
+				sourcePlan.SourceID,
+				rootID,
+			)
+		}
 		plans[sourcePlan.SourceID] = sourcePlan
 	}
 	hasExplicitSourcePlans := len(plan.SourcePlans) > 0
 
 	result := spec.ScanResult{RootID: rootID}
-	sourceGenerations := map[spec.SourceID]spec.SourceGeneration{}
 	executedPlan := spec.ScanPlan{}
+	sourcePublications := make([]spec.SourceCatalogPublication, 0, len(attachments))
 	for _, attachment := range attachments {
 		if !attachment.Enabled {
 			continue
 		}
-		source, err := s.repository.GetSource(ctx, attachment.SourceID)
-		if err != nil {
-			return spec.ScanResult{}, err
-		}
+		source := sources[attachment.SourceID]
 		if !source.Enabled {
 			continue
 		}
@@ -108,17 +156,13 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 		if err != nil {
 			return spec.ScanResult{}, err
 		}
-		if err := s.repository.PublishSourceCatalog(ctx, publication); err != nil {
-			return spec.ScanResult{}, err
-		}
+		sourcePublications = append(sourcePublications, publication)
+		applySourceCatalogPublication(catalogByOccurrence, publication)
 		result.Sources = append(result.Sources, sourceResult)
 		sourceGenerations[source.SourceID] = sourceResult.Generation
 		result.Diagnostics = append(result.Diagnostics, sourceResult.Diagnostics...)
 	}
-	resources, err := s.repository.ListCatalogResourcesForRoot(ctx, rootID)
-	if err != nil {
-		return spec.ScanResult{}, err
-	}
+	resources := catalogResourcesFromMap(catalogByOccurrence)
 	planDigest, err := digestScanPlan(executedPlan)
 	if err != nil {
 		return spec.ScanResult{}, err
@@ -127,15 +171,22 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 	if err != nil {
 		return spec.ScanResult{}, err
 	}
-	generation, err := s.repository.PublishRootCatalogGeneration(
+	generation, err := s.repository.PublishRootScan(
 		ctx,
-		spec.RootCatalogPublication{
-			RootID:            rootID,
-			SourceGenerations: sourceGenerations,
-			ScanPlanDigest:    planDigest,
-			CatalogDigest:     catalogDigest,
-			CreatedAt:         s.nowUTC(),
-			Diagnostics:       result.Diagnostics,
+		spec.RootScanPublication{
+			RootCatalog: spec.RootCatalogPublication{
+				RootID:            rootID,
+				SourceGenerations: sourceGenerations,
+				ScanPlanDigest:    planDigest,
+				CatalogDigest:     catalogDigest,
+				CreatedAt:         s.nowUTC(),
+				Diagnostics:       result.Diagnostics,
+			},
+			ExpectedRootModifiedAt: root.ModifiedAt,
+			Attachments:            attachmentExpectations,
+			Sources:                sourceExpectations,
+			SourceCatalogs:         sourcePublications,
+			CatalogResources:       resources,
 		},
 	)
 	if err != nil {
@@ -168,17 +219,18 @@ func (s *Store) scanSource(
 	}
 	now := s.nowUTC()
 	publication := spec.SourceCatalogPublication{
-		SourceID:                 source.SourceID,
-		ExpectedSourceModifiedAt: source.ModifiedAt,
-		ObservedGeneration:       generation,
-		ObservedAt:               now,
-		Authoritative:            plan.Authoritative,
+		SourceID:                    source.SourceID,
+		ExpectedSourceModifiedAt:    source.ModifiedAt,
+		ExpectedObservationRevision: source.ObservationRevision,
+		ObservedGeneration:          generation,
+		ObservedAt:                  now,
+		Authoritative:               plan.Authoritative,
 	}
 	result := spec.SourceScanResult{SourceID: source.SourceID, Generation: generation}
 	seenResources := make(map[string]struct{})
 	for _, entry := range entries {
 		result.Candidates++
-		content, err := readCandidate(ctx, driver, source, entry.Locator, plan.MaxFileBytes)
+		content, err := readCandidate(ctx, driver, source, entry, plan.MaxFileBytes)
 		if err != nil {
 			return result, publication, err
 		}
@@ -189,11 +241,29 @@ func (s *Store) scanSource(
 			SourceContentDigest: digest,
 			Content:             content,
 		}
-		frontend := s.selectFrontend(ctx, candidate, plan.AllowedFrontendIDs)
+		frontend, err := s.selectFrontend(ctx, candidate, plan.AllowedFrontendIDs)
+		if err != nil {
+			return result, publication, err
+		}
 		if frontend == nil {
 			continue
 		}
 		decoded, diagnostics := frontend.Decode(ctx, candidate)
+		if len(decoded) == 0 && len(diagnostics) == 0 {
+			diagnostics = []spec.Diagnostic{{
+				Severity: spec.DiagnosticSeverityError,
+				Code:     "artifactstore.frontend.decode-empty",
+				Message:  "the selected frontend emitted no definitions",
+			}}
+		}
+		if err := spec.ValidateDiagnostics(diagnostics); err != nil {
+			return result, publication, fmt.Errorf(
+				"%w: frontend %q returned invalid diagnostics: %w",
+				spec.ErrInvalidRequest,
+				frontend.ID(),
+				err,
+			)
+		}
 		if err := errorDiagnostics("frontend decode", diagnostics); err != nil || len(decoded) == 0 {
 			publication.Resources = append(
 				publication.Resources,
@@ -252,6 +322,14 @@ func (s *Store) scanSource(
 			allDiagnostics = append(allDiagnostics, frontend.ValidateSemantic(ctx, definition)...)
 			selectors, dependencyDiagnostics := frontend.ExtractDependencies(ctx, definition)
 			allDiagnostics = append(allDiagnostics, dependencyDiagnostics...)
+			if err := spec.ValidateDiagnostics(allDiagnostics); err != nil {
+				return result, publication, fmt.Errorf(
+					"%w: frontend %q returned invalid diagnostics: %w",
+					spec.ErrInvalidRequest,
+					frontend.ID(),
+					err,
+				)
+			}
 			if err := errorDiagnostics("frontend validation", allDiagnostics); err != nil {
 				publication.Resources = append(
 					publication.Resources,
@@ -362,13 +440,14 @@ func (s *Store) selectFrontend(
 	ctx context.Context,
 	candidate spec.ArtifactCandidate,
 	allowed []spec.FrontendID,
-) spec.ArtifactFrontend {
+) (spec.ArtifactFrontend, error) {
 	allowedSet := map[spec.FrontendID]struct{}{}
 	for _, id := range allowed {
 		allowedSet[id] = struct{}{}
 	}
 	var selected spec.ArtifactFrontend
 	best := spec.RecognitionNone
+	tied := make([]spec.FrontendID, 0, 2)
 	for _, frontend := range s.frontendsSnapshot() {
 		if len(allowedSet) > 0 {
 			if _, ok := allowedSet[frontend.ID()]; !ok {
@@ -376,11 +455,31 @@ func (s *Store) selectFrontend(
 			}
 		}
 		recognition := frontend.Recognizes(ctx, candidate)
+		if recognition < spec.RecognitionNone || recognition > spec.RecognitionPreferred {
+			return nil, fmt.Errorf(
+				"%w: frontend %q returned invalid recognition %d",
+				spec.ErrInvalidRequest,
+				frontend.ID(),
+				recognition,
+			)
+		}
 		if recognition > best {
 			selected, best = frontend, recognition
+			tied = []spec.FrontendID{frontend.ID()}
+		} else if recognition == best && recognition != spec.RecognitionNone {
+			tied = append(tied, frontend.ID())
 		}
 	}
-	return selected
+	if len(tied) > 1 {
+		slices.Sort(tied)
+		return nil, fmt.Errorf(
+			"%w: candidate %q is equally recognized by frontends %v",
+			spec.ErrConflict,
+			candidate.Locator,
+			tied,
+		)
+	}
+	return selected, nil
 }
 
 func collectSourceCandidates(
@@ -392,6 +491,10 @@ func collectSourceCandidates(
 	maxCandidates := plan.MaxCandidates
 	if maxCandidates <= 0 {
 		maxCandidates = spec.DefaultMaxScanCandidates
+	}
+	maxEntries := plan.MaxTraversalEntries
+	if maxEntries <= 0 {
+		maxEntries = spec.DefaultMaxScanEntries
 	}
 	maxDepth := plan.MaxTraversalDepth
 	if maxDepth <= 0 {
@@ -416,6 +519,7 @@ func collectSourceCandidates(
 			}
 		}
 	}
+	visitedEntries := 0
 	for _, root := range plan.DirectoryRoots {
 		walkRoot := root.Root
 		if walkRoot == "" {
@@ -431,32 +535,61 @@ func collectSourceCandidates(
 				)
 			}
 		}
-		err := driver.Walk(ctx, source, walkRoot, func(ctx context.Context, entry spec.SourceEntry) error {
-			relative := string(entry.Locator)
-			if walkRoot != "." {
-				relative = strings.TrimPrefix(
-					relative,
-					string(walkRoot)+"/",
-				)
-			}
-			depth := 1
-			if relative != "" {
-				depth += strings.Count(relative, "/")
-			}
-			if depth > maxDepth {
-				return fmt.Errorf(
-					"%w: scan traversal exceeds depth %d at %q",
-					spec.ErrInvalidRequest,
-					maxDepth,
-					entry.Locator,
-				)
-			}
-			if !entry.IsRegular || !matchesDirectoryRoot(walkRoot, entry.Locator, root) {
-				return nil
-			}
-			return add(entry)
-		})
+		rootEntry, err := driver.Stat(ctx, source, walkRoot)
 		if err != nil {
+			return nil, err
+		}
+		if !rootEntry.IsDirectory {
+			return nil, fmt.Errorf(
+				"%w: scan root %q is not a directory",
+				spec.ErrInvalidRequest,
+				walkRoot,
+			)
+		}
+		var visit func(spec.SourceLocator, int) error
+		visit = func(directory spec.SourceLocator, depth int) error {
+			entries, err := driver.ReadDir(ctx, source, directory)
+			if err != nil {
+				return err
+			}
+			for _, entry := range entries {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				visitedEntries++
+				if visitedEntries > maxEntries {
+					return fmt.Errorf(
+						"%w: scan traversal exceeds %d entries",
+						spec.ErrInvalidRequest,
+						maxEntries,
+					)
+				}
+				entryDepth := depth + 1
+				if entryDepth > maxDepth {
+					return fmt.Errorf(
+						"%w: scan traversal exceeds depth %d at %q",
+						spec.ErrInvalidRequest,
+						maxDepth,
+						entry.Locator,
+					)
+				}
+				if entry.IsDirectory {
+					if root.Recursive {
+						if err := visit(entry.Locator, entryDepth); err != nil {
+							return err
+						}
+					}
+					continue
+				}
+				if entry.IsRegular && matchesDirectoryRoot(walkRoot, entry.Locator, root) {
+					if err := add(entry); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
+		if err := visit(walkRoot, 0); err != nil {
 			return nil, err
 		}
 	}
@@ -497,23 +630,39 @@ func readCandidate(
 	ctx context.Context,
 	driver spec.SourceDriver,
 	source spec.ArtifactSource,
-	locator spec.SourceLocator,
+	entry spec.SourceEntry,
 	maximum int64,
 ) ([]byte, error) {
 	if maximum <= 0 {
 		maximum = spec.MaxDefinitionJSONBytes
 	}
-	reader, err := driver.Open(ctx, source, locator)
+	if entry.SizeBytes > maximum {
+		return nil, fmt.Errorf(
+			"%w: candidate %q exceeds %d bytes",
+			spec.ErrInvalidRequest,
+			entry.Locator,
+			maximum,
+		)
+	}
+	reader, err := driver.Open(ctx, source, entry.Locator)
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
 	content, err := io.ReadAll(io.LimitReader(reader, maximum+1))
 	if err != nil {
+		_ = reader.Close()
+		return nil, err
+	}
+	if err := reader.Close(); err != nil {
 		return nil, err
 	}
 	if int64(len(content)) > maximum {
-		return nil, fmt.Errorf("%w: candidate %q exceeds %d bytes", spec.ErrInvalidRequest, locator, maximum)
+		return nil, fmt.Errorf(
+			"%w: candidate %q exceeds %d bytes",
+			spec.ErrInvalidRequest,
+			entry.Locator,
+			maximum,
+		)
 	}
 	return content, nil
 }
@@ -609,6 +758,15 @@ func digestCatalog(resources []spec.CatalogResource) (spec.Digest, error) {
 			Diagnostics:             resource.Diagnostics,
 		})
 	}
+	sort.Slice(projected, func(left, right int) bool {
+		if projected[left].SourceID != projected[right].SourceID {
+			return projected[left].SourceID < projected[right].SourceID
+		}
+		if projected[left].Locator != projected[right].Locator {
+			return projected[left].Locator < projected[right].Locator
+		}
+		return projected[left].SubresourceLocator < projected[right].SubresourceLocator
+	})
 	raw, err := json.Marshal(projected)
 	if err != nil {
 		return "", err
@@ -618,4 +776,77 @@ func digestCatalog(resources []spec.CatalogResource) (spec.Digest, error) {
 		return "", err
 	}
 	return baseutils.DigestBytes(canonical), nil
+}
+
+func applySourceCatalogPublication(
+	resources map[string]spec.CatalogResource,
+	publication spec.SourceCatalogPublication,
+) {
+	seen := make(map[string]struct{}, len(publication.Resources))
+	for _, incoming := range publication.Resources {
+		key := recordOccurrenceKey(
+			incoming.SourceID,
+			incoming.Locator,
+			incoming.SubresourceLocator,
+		)
+		seen[key] = struct{}{}
+		if existing, ok := resources[key]; ok {
+			incoming.FirstSeenAt = existing.FirstSeenAt
+			if incoming.PackageManifestLocator == "" {
+				incoming.PackageManifestLocator = existing.PackageManifestLocator
+			}
+			if incoming.Kind == "" {
+				incoming.Kind = existing.Kind
+			}
+			if incoming.LogicalName == "" {
+				incoming.LogicalName = existing.LogicalName
+			}
+			if incoming.LogicalVersion == "" {
+				incoming.LogicalVersion = existing.LogicalVersion
+			}
+			if incoming.CurrentDefinitionDigest == nil {
+				incoming.CurrentDefinitionDigest = cloneDigest(existing.CurrentDefinitionDigest)
+			}
+			if incoming.SourceContentDigest == nil {
+				incoming.SourceContentDigest = cloneDigest(existing.SourceContentDigest)
+			}
+			if incoming.FrontendID == "" {
+				incoming.FrontendID = existing.FrontendID
+			}
+		}
+		resources[key] = incoming
+	}
+	if !publication.Authoritative {
+		return
+	}
+	for key, resource := range resources {
+		if resource.SourceID != publication.SourceID {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		resource.State = spec.CatalogStateMissing
+		resource.Diagnostics = []spec.Diagnostic{}
+		resources[key] = resource
+	}
+}
+
+func catalogResourcesFromMap(
+	resources map[string]spec.CatalogResource,
+) []spec.CatalogResource {
+	out := make([]spec.CatalogResource, 0, len(resources))
+	for _, resource := range resources {
+		out = append(out, resource)
+	}
+	sort.Slice(out, func(left, right int) bool {
+		if out[left].SourceID != out[right].SourceID {
+			return out[left].SourceID < out[right].SourceID
+		}
+		if out[left].Locator != out[right].Locator {
+			return out[left].Locator < out[right].Locator
+		}
+		return out[left].SubresourceLocator < out[right].SubresourceLocator
+	})
+	return out
 }

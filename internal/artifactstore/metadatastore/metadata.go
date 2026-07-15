@@ -4,15 +4,32 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
+	"path/filepath"
+	"strings"
 
 	_ "github.com/glebarez/go-sqlite"
 )
 
-const metadataSchemaVersion = 1
+const (
+	metadataSchemaVersion     = 1
+	metadataSchemaFingerprint = "flexigpt.artifactstore.metadata.schema-1.2026-04-atomic-root-catalog"
+)
 
 const (
 	readMetadataSchemaVersionSQL = `PRAGMA user_version;`
 	setMetadataSchemaVersionSQL  = `PRAGMA user_version = 1;`
+
+	createMetadataSchemaIdentitySQL = `CREATE TABLE artifact_store_schema (
+		schema_version INTEGER PRIMARY KEY CHECK (schema_version = 1),
+		schema_fingerprint TEXT NOT NULL
+	);`
+	insertMetadataSchemaIdentitySQL = `INSERT INTO artifact_store_schema (
+		schema_version, schema_fingerprint
+	) VALUES (1, 'flexigpt.artifactstore.metadata.schema-1.2026-04-atomic-root-catalog');`
+	readMetadataSchemaIdentitySQL = `SELECT schema_fingerprint
+		FROM artifact_store_schema
+		WHERE schema_version = 1;`
 
 	createArtifactRootsSQL = `CREATE TABLE artifact_roots (
 		root_id TEXT PRIMARY KEY,
@@ -40,6 +57,7 @@ const (
 		config_json TEXT NOT NULL CHECK (json_valid(config_json) AND json_type(config_json) = 'object'),
 		last_observed_generation TEXT,
 		last_scanned_at TEXT,
+		observation_revision INTEGER NOT NULL CHECK (observation_revision >= 0),
 		diagnostics_json TEXT NOT NULL CHECK (
 			json_valid(diagnostics_json) AND json_type(diagnostics_json) = 'array'
 		),
@@ -193,6 +211,37 @@ const (
 		),
 		PRIMARY KEY (root_id, generation)
 	);`
+	createRootCatalogResourceSnapshotsSQL = `CREATE TABLE root_catalog_resource_snapshots (
+		root_id TEXT NOT NULL,
+		generation INTEGER NOT NULL,
+		source_id TEXT NOT NULL REFERENCES artifact_sources(source_id) ON DELETE RESTRICT,
+		locator TEXT NOT NULL,
+		subresource_locator TEXT NOT NULL,
+		package_manifest_locator TEXT NOT NULL,
+		kind TEXT NOT NULL,
+		logical_name TEXT NOT NULL,
+		logical_version TEXT NOT NULL,
+		current_definition_digest TEXT,
+		source_content_digest TEXT,
+		frontend_id TEXT NOT NULL,
+		state TEXT NOT NULL CHECK (state IN ('valid', 'invalid', 'missing')),
+		first_seen_at TEXT NOT NULL,
+		last_seen_at TEXT NOT NULL,
+		diagnostics_json TEXT NOT NULL CHECK (
+			json_valid(diagnostics_json) AND json_type(diagnostics_json) = 'array'
+		),
+		PRIMARY KEY (
+			root_id,
+			generation,
+			source_id,
+			locator,
+			subresource_locator
+		),
+		FOREIGN KEY (root_id, generation)
+			REFERENCES root_catalog_generations(root_id, generation)
+			ON DELETE CASCADE,
+		CHECK (last_seen_at >= first_seen_at)
+	);`
 	createRootCatalogGenerationCountersSQL = `CREATE TABLE root_catalog_generation_counters (
 		root_id TEXT PRIMARY KEY REFERENCES artifact_roots(root_id) ON DELETE RESTRICT,
 		generation INTEGER NOT NULL CHECK (generation >= 0)
@@ -213,6 +262,7 @@ const (
 	createArtifactDependenciesSQL = `CREATE TABLE artifact_dependencies (
 		root_id TEXT NOT NULL REFERENCES artifact_roots(root_id) ON DELETE RESTRICT,
 		record_id TEXT NOT NULL,
+		catalog_generation INTEGER NOT NULL CHECK (catalog_generation > 0),
 		root_definition_digest TEXT NOT NULL,
 		definition_digest TEXT NOT NULL,
 		selector_index INTEGER NOT NULL,
@@ -230,14 +280,27 @@ const (
 		PRIMARY KEY (
 			root_id,
 			record_id,
+			catalog_generation,
 			root_definition_digest,
 			definition_digest,
 			selector_index
 		),
 		FOREIGN KEY (record_id, root_id)
 			REFERENCES artifact_records(record_id, root_id)
+			ON DELETE CASCADE,
+		FOREIGN KEY (root_id, catalog_generation)
+			REFERENCES root_catalog_generations(root_id, generation)
 			ON DELETE CASCADE
 	);`
+	createActiveAttachmentRootTriggerSQL = `CREATE TRIGGER trg_root_source_attachments_active_root
+		BEFORE INSERT ON root_source_attachments
+		WHEN NOT EXISTS (
+			SELECT 1 FROM artifact_roots
+			 WHERE root_id = NEW.root_id AND soft_deleted_at IS NULL
+		)
+		BEGIN
+			SELECT RAISE(ABORT, 'artifactstore conflict: attachment root is not active');
+		END;`
 	createRecordCollectionInsertTriggerSQL = `CREATE TRIGGER trg_artifact_records_collection_insert
 		BEFORE INSERT ON artifact_records
 		WHEN NEW.collection_id IS NOT NULL
@@ -280,12 +343,26 @@ const (
 		BEFORE INSERT ON artifact_records
 		WHEN NOT EXISTS (
 			SELECT 1
-			  FROM root_source_attachments
-			 WHERE root_id = NEW.root_id
-			   AND source_id = NEW.source_id
+			  FROM root_source_attachments a
+			  JOIN artifact_sources s ON s.source_id = a.source_id
+			  JOIN artifact_roots r ON r.root_id = a.root_id
+			 WHERE a.root_id = NEW.root_id
+			   AND a.source_id = NEW.source_id
+			   AND a.enabled = 1
+			   AND s.enabled = 1
+			   AND r.soft_deleted_at IS NULL
 		 )
 		BEGIN
-			SELECT RAISE(ABORT, 'artifactstore conflict: source is not attached to record root');
+			SELECT RAISE(ABORT, 'artifactstore conflict: source is not actively attached to record root');
+		END;`
+	createActiveCollectionRootTriggerSQL = `CREATE TRIGGER trg_artifact_collections_active_root
+		BEFORE INSERT ON artifact_collections
+		WHEN NOT EXISTS (
+			SELECT 1 FROM artifact_roots
+			 WHERE root_id = NEW.root_id AND soft_deleted_at IS NULL
+		)
+		BEGIN
+			SELECT RAISE(ABORT, 'artifactstore conflict: collection root is not active');
 		END;`
 	createRootSourceAttachmentSourceIndexSQL = `CREATE INDEX idx_root_source_attachments_source
 		ON root_source_attachments (source_id);`
@@ -306,7 +383,7 @@ const (
 	createRootGenerationsRootIndexSQL = `CREATE INDEX idx_root_catalog_generations_root
 		ON root_catalog_generations (root_id, generation DESC);`
 	createDependenciesRecordIndexSQL = `CREATE INDEX idx_artifact_dependencies_record
-		ON artifact_dependencies (record_id, root_definition_digest, definition_digest, selector_index);`
+		ON artifact_dependencies (record_id, catalog_generation, root_definition_digest, definition_digest, selector_index);`
 )
 
 type MetadataStore struct {
@@ -314,6 +391,8 @@ type MetadataStore struct {
 }
 
 var metadataSchemaStatements = []string{
+	createMetadataSchemaIdentitySQL,
+	insertMetadataSchemaIdentitySQL,
 	createArtifactRootsSQL,
 	createArtifactSourcesSQL,
 	createRootSourceAttachmentsSQL,
@@ -323,13 +402,16 @@ var metadataSchemaStatements = []string{
 	createArtifactCollectionsSQL,
 	createArtifactRecordsSQL,
 	createRootCatalogGenerationsSQL,
+	createRootCatalogResourceSnapshotsSQL,
 	createRootCatalogGenerationCountersSQL,
 	createArtifactTransferProvenanceSQL,
 	createArtifactDependenciesSQL,
+	createActiveAttachmentRootTriggerSQL,
 	createRecordCollectionInsertTriggerSQL,
 	createRecordCollectionUpdateTriggerSQL,
 	createNonemptyCollectionDeleteTriggerSQL,
 	createRecordAttachmentInsertTriggerSQL,
+	createActiveCollectionRootTriggerSQL,
 	createRootSourceAttachmentSourceIndexSQL,
 	createArtifactPackagesSourceIndexSQL,
 	createCatalogResourcesSourceStateIndexSQL,
@@ -345,7 +427,7 @@ var metadataSchemaStatements = []string{
 func OpenMetadataStore(ctx context.Context, path string) (*MetadataStore, error) {
 	db, err := sql.Open(
 		"sqlite",
-		path+"?busy_timeout=5000&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)",
+		sqliteDataSourceName(path),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("open artifact metadata database: %w", err)
@@ -355,7 +437,7 @@ func OpenMetadataStore(ctx context.Context, path string) (*MetadataStore, error)
 		_ = db.Close()
 		return nil, fmt.Errorf("ping artifact metadata database: %w", err)
 	}
-	if err := migrateMetadata(ctx, db); err != nil {
+	if err := initializeMetadataSchema(ctx, db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -369,13 +451,27 @@ func (s *MetadataStore) Close() error {
 	return s.db.Close()
 }
 
-func migrateMetadata(ctx context.Context, db *sql.DB) error {
+func sqliteDataSourceName(path string) string {
+	normalized := filepath.ToSlash(path)
+	if filepath.VolumeName(path) != "" && !strings.HasPrefix(normalized, "/") {
+		normalized = "/" + normalized
+	}
+	value := &url.URL{Scheme: "file", Path: normalized}
+	query := value.Query()
+	query.Set("_pragma", "foreign_keys(1)")
+	query.Add("_pragma", "journal_mode(WAL)")
+	query.Set("busy_timeout", "5000")
+	value.RawQuery = query.Encode()
+	return value.String()
+}
+
+func initializeMetadataSchema(ctx context.Context, db *sql.DB) error {
 	var currentVersion int
 	if err := db.QueryRowContext(ctx, readMetadataSchemaVersionSQL).Scan(&currentVersion); err != nil {
 		return fmt.Errorf("read artifact metadata schema version: %w", err)
 	}
 	if currentVersion == metadataSchemaVersion {
-		return nil
+		return verifyMetadataSchemaIdentity(ctx, db)
 	}
 	if currentVersion != 0 {
 		return fmt.Errorf(
@@ -401,6 +497,23 @@ func migrateMetadata(ctx context.Context, db *sql.DB) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit artifact metadata schema initialization: %w", err)
+	}
+	return verifyMetadataSchemaIdentity(ctx, db)
+}
+
+func verifyMetadataSchemaIdentity(ctx context.Context, db *sql.DB) error {
+	var fingerprint string
+	if err := db.QueryRowContext(ctx, readMetadataSchemaIdentitySQL).Scan(&fingerprint); err != nil {
+		return fmt.Errorf(
+			"artifact metadata schema 1 is not the current schema 1; recreate the new store: %w",
+			err,
+		)
+	}
+	if fingerprint != metadataSchemaFingerprint {
+		return fmt.Errorf(
+			"artifact metadata schema 1 fingerprint %q is unsupported; recreate the new store",
+			fingerprint,
+		)
 	}
 	return nil
 }

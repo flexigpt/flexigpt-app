@@ -172,14 +172,15 @@ type DirectoryScanRoot struct {
 // authoritative plan marks previously known resources outside this result as
 // missing; partial scans must leave Authoritative false.
 type SourceScanPlan struct {
-	SourceID           SourceID            `json:"sourceID"`
-	ExplicitLocators   []SourceLocator     `json:"explicitLocators,omitempty"`
-	DirectoryRoots     []DirectoryScanRoot `json:"directoryRoots,omitempty"`
-	AllowedFrontendIDs []FrontendID        `json:"allowedFrontendIDs,omitempty"`
-	MaxFileBytes       int64               `json:"maxFileBytes,omitempty"`
-	MaxCandidates      int                 `json:"maxCandidates,omitempty"`
-	MaxTraversalDepth  int                 `json:"maxTraversalDepth,omitempty"`
-	Authoritative      bool                `json:"authoritative,omitempty"`
+	SourceID            SourceID            `json:"sourceID"`
+	ExplicitLocators    []SourceLocator     `json:"explicitLocators,omitempty"`
+	DirectoryRoots      []DirectoryScanRoot `json:"directoryRoots,omitempty"`
+	AllowedFrontendIDs  []FrontendID        `json:"allowedFrontendIDs,omitempty"`
+	MaxFileBytes        int64               `json:"maxFileBytes,omitempty"`
+	MaxCandidates       int                 `json:"maxCandidates,omitempty"`
+	MaxTraversalEntries int                 `json:"maxTraversalEntries,omitempty"`
+	MaxTraversalDepth   int                 `json:"maxTraversalDepth,omitempty"`
+	Authoritative       bool                `json:"authoritative,omitempty"`
 }
 
 // ScanPlan is supplied by a consumer feature. With no source plans, ScanRoot

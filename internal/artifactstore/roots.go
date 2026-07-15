@@ -23,9 +23,11 @@ type RootUpdate struct {
 // CreateRoot creates app-local root metadata after generic and typed root
 // validation. It does not create or modify any portable source file.
 func (s *Store) CreateRoot(ctx context.Context, draft spec.RootDraft) (spec.ArtifactRoot, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRoot{}, err
 	}
+	defer finish()
 	if err := ctx.Err(); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
@@ -56,25 +58,36 @@ func (s *Store) CreateRoot(ctx context.Context, draft spec.RootDraft) (spec.Arti
 
 // GetRoot returns an active root. Soft-deleted roots are intentionally hidden.
 func (s *Store) GetRoot(ctx context.Context, rootID spec.RootID) (spec.ArtifactRoot, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRoot{}, err
 	}
+	defer finish()
 	return s.repository.GetRoot(ctx, rootID, false)
 }
 
 // GetRootIncludingDeleted returns a root regardless of its soft-deletion state.
 func (s *Store) GetRootIncludingDeleted(ctx context.Context, rootID spec.RootID) (spec.ArtifactRoot, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRoot{}, err
 	}
+	defer finish()
+	ctx, finish, err = s.beginOperation(ctx)
+	if err != nil {
+		return spec.ArtifactRoot{}, err
+	}
+	defer finish()
 	return s.repository.GetRoot(ctx, rootID, true)
 }
 
 // ListRoots lists roots in descending modification order.
 func (s *Store) ListRoots(ctx context.Context, includeSoftDeleted bool) ([]spec.ArtifactRoot, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer finish()
 	return s.repository.ListRoots(ctx, includeSoftDeleted)
 }
 

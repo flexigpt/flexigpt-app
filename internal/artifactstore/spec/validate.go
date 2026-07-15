@@ -386,22 +386,6 @@ func ValidatePortablePackageManifest(v PortablePackageManifest) error {
 	return nil
 }
 
-// ValidateArtifactSelector validates a portable dependency selector.
-func ValidateArtifactSelector(v ArtifactSelector) error {
-	if err := validateKind("selector.kind", string(v.Kind)); err != nil {
-		return err
-	}
-	if v.LogicalName != "" {
-		if err := validateRequiredText("selector.logicalName", string(v.LogicalName), MaxLogicalNameBytes); err != nil {
-			return err
-		}
-	}
-	if err := validateVersion("selector.versionConstraint", v.VersionConstraint, true); err != nil {
-		return err
-	}
-	return validateLabels("selector.labels", v.Labels)
-}
-
 // ValidateAssetManifestEntry validates one portable asset reference.
 func ValidateAssetManifestEntry(v AssetManifestEntry) error {
 	if err := validatePortablePath("asset.path", v.Path, false); err != nil {
@@ -558,6 +542,93 @@ func ValidateRootCatalogGeneration(v RootCatalogGeneration) error {
 		return err
 	}
 	return ValidateDiagnostics(v.Diagnostics)
+}
+
+// ValidateArtifactDependencySnapshot validates one durable selector result.
+func ValidateArtifactDependencySnapshot(v ArtifactDependencySnapshot) error {
+	if err := validateID("dependency.rootID", string(v.RootID)); err != nil {
+		return err
+	}
+	if err := validateID("dependency.recordID", string(v.RecordID)); err != nil {
+		return err
+	}
+	if v.CatalogGeneration == 0 {
+		return invalidf("dependency.catalogGeneration must be greater than zero")
+	}
+	if err := validateDigest(
+		"dependency.rootDefinitionDigest",
+		v.RootDefinitionDigest,
+	); err != nil {
+		return err
+	}
+	if err := validateDigest("dependency.definitionDigest", v.DefinitionDigest); err != nil {
+		return err
+	}
+	if v.SelectorIndex < 0 || v.SelectorIndex >= MaxSelectorsPerDefinition {
+		return invalidf(
+			"dependency.selectorIndex must be between 0 and %d",
+			MaxSelectorsPerDefinition-1,
+		)
+	}
+	if err := ValidateArtifactSelector(v.Selector); err != nil {
+		return fmt.Errorf("dependency.selector: %w", err)
+	}
+	switch v.State {
+	case DependencyResolutionStateResolved:
+		if len(v.Candidates) != 1 {
+			return invalidf("resolved dependency must contain exactly one candidate")
+		}
+	case DependencyResolutionStateMissing:
+		if len(v.Candidates) != 0 {
+			return invalidf("missing dependency must not contain candidates")
+		}
+	case DependencyResolutionStateAmbiguous:
+		if len(v.Candidates) < 2 {
+			return invalidf("ambiguous dependency must contain at least two candidates")
+		}
+	default:
+		return invalidf("dependency.state %q is invalid", v.State)
+	}
+	seen := make(map[string]struct{}, len(v.Candidates))
+	for index, candidate := range v.Candidates {
+		if err := ValidateCatalogResourceKey(candidate.Resource); err != nil {
+			return fmt.Errorf("dependency.candidates[%d].resource: %w", index, err)
+		}
+		if err := validateDigest(
+			"dependency candidate.definitionDigest",
+			candidate.DefinitionDigest,
+		); err != nil {
+			return fmt.Errorf("dependency.candidates[%d]: %w", index, err)
+		}
+		key := string(candidate.Resource.SourceID) + "\x00" +
+			string(candidate.Resource.Locator) + "\x00" +
+			string(candidate.Resource.SubresourceLocator) + "\x00" +
+			string(candidate.DefinitionDigest)
+		if _, exists := seen[key]; exists {
+			return invalidf("dependency contains duplicate candidate %q", key)
+		}
+		seen[key] = struct{}{}
+	}
+	if err := ValidateDiagnostics(v.Diagnostics); err != nil {
+		return err
+	}
+	return validateRequiredTime("dependency.modifiedAt", v.ModifiedAt)
+}
+
+// ValidateArtifactSelector validates a portable dependency selector.
+func ValidateArtifactSelector(v ArtifactSelector) error {
+	if err := validateKind("selector.kind", string(v.Kind)); err != nil {
+		return err
+	}
+	if v.LogicalName != "" {
+		if err := validateRequiredText("selector.logicalName", string(v.LogicalName), MaxLogicalNameBytes); err != nil {
+			return err
+		}
+	}
+	if err := validateVersion("selector.versionConstraint", v.VersionConstraint, true); err != nil {
+		return err
+	}
+	return validateLabels("selector.labels", v.Labels)
 }
 
 // ValidateTransferProvenance validates app-local transfer audit metadata.

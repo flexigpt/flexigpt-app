@@ -8,14 +8,15 @@ import (
 // SourceCatalogPublication is the driver-independent result of observing one
 // source. A repository publishes it atomically to app-local metadata.
 type SourceCatalogPublication struct {
-	SourceID                 SourceID
-	ExpectedSourceModifiedAt time.Time
-	ObservedGeneration       SourceGeneration
-	ObservedAt               time.Time
-	Diagnostics              []Diagnostic
-	Resources                []CatalogResource
-	Revisions                []CatalogResourceRevision
-	Authoritative            bool
+	SourceID                    SourceID
+	ExpectedSourceModifiedAt    time.Time
+	ExpectedObservationRevision uint64
+	ObservedGeneration          SourceGeneration
+	ObservedAt                  time.Time
+	Diagnostics                 []Diagnostic
+	Resources                   []CatalogResource
+	Revisions                   []CatalogResourceRevision
+	Authoritative               bool
 }
 
 // RootCatalogPublication records a durable root-level catalog generation after
@@ -27,6 +28,46 @@ type RootCatalogPublication struct {
 	CatalogDigest     Digest
 	CreatedAt         time.Time
 	Diagnostics       []Diagnostic
+}
+
+// RootScanAttachmentExpectation protects a scan against concurrent attachment
+// changes, including attaching or detaching another source.
+type RootScanAttachmentExpectation struct {
+	SourceID   SourceID
+	ModifiedAt time.Time
+	Enabled    bool
+}
+
+// RootScanSourceExpectation protects both source configuration and mutable
+// source observation state used to construct a root catalog snapshot.
+type RootScanSourceExpectation struct {
+	SourceID            SourceID
+	ModifiedAt          time.Time
+	ObservationRevision uint64
+	Enabled             bool
+}
+
+// RootScanPublication atomically publishes all source observations and the
+// resulting root generation. CatalogResources is the exact root-local snapshot
+// calculated by the business layer. The repository verifies it against the
+// post-publication source catalog before committing.
+type RootScanPublication struct {
+	RootCatalog            RootCatalogPublication
+	ExpectedRootModifiedAt time.Time
+	Attachments            []RootScanAttachmentExpectation
+	Sources                []RootScanSourceExpectation
+	SourceCatalogs         []SourceCatalogPublication
+	CatalogResources       []CatalogResource
+}
+
+// DependencySnapshotPublication replaces one record's resolution snapshot for
+// one root definition and catalog generation.
+type DependencySnapshotPublication struct {
+	RootID               RootID
+	RecordID             RecordID
+	RootDefinitionDigest Digest
+	CatalogGeneration    uint64
+	Snapshots            []ArtifactDependencySnapshot
 }
 
 // RecordUpdate replaces mutable app-local record fields. ClearCollection is
@@ -55,9 +96,10 @@ type RecordSynchronizationUpdate struct {
 // single app-metadata transaction. Portable definition content is already
 // content-addressed and is not part of this transaction.
 type RecordSynchronizationPublication struct {
-	RootID  RootID
-	Creates []ArtifactRecord
-	Updates []RecordSynchronizationUpdate
+	RootID                    RootID
+	ExpectedCatalogGeneration uint64
+	Creates                   []ArtifactRecord
+	Updates                   []RecordSynchronizationUpdate
 }
 
 // RecordTransferPublication atomically publishes the app-local metadata for an

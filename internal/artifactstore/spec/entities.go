@@ -114,6 +114,7 @@ type ArtifactSource struct {
 
 	LastObservedGeneration *SourceGeneration `json:"lastObservedGeneration,omitempty"`
 	LastScannedAt          *time.Time        `json:"lastScannedAt,omitempty"`
+	ObservationRevision    uint64            `json:"observationRevision"`
 	Diagnostics            []Diagnostic      `json:"diagnostics,omitempty"`
 
 	CreatedAt  time.Time `json:"createdAt"`
@@ -254,6 +255,29 @@ type RootCatalogGeneration struct {
 	CatalogDigest     Digest                        `json:"catalogDigest"`
 	CreatedAt         time.Time                     `json:"createdAt"`
 	Diagnostics       []Diagnostic                  `json:"diagnostics,omitempty"`
+}
+
+// DependencyCandidateRef is the durable, app-local representation of a
+// dependency candidate. Canonical definition bodies are deliberately excluded.
+type DependencyCandidateRef struct {
+	Resource         CatalogResourceKey `json:"resource"`
+	DefinitionDigest Digest             `json:"definitionDigest"`
+}
+
+// ArtifactDependencySnapshot records one selector resolution against one
+// published root catalog generation.
+type ArtifactDependencySnapshot struct {
+	RootID               RootID                    `json:"rootID"`
+	RecordID             RecordID                  `json:"recordID"`
+	CatalogGeneration    uint64                    `json:"catalogGeneration"`
+	RootDefinitionDigest Digest                    `json:"rootDefinitionDigest"`
+	DefinitionDigest     Digest                    `json:"definitionDigest"`
+	SelectorIndex        int                       `json:"selectorIndex"`
+	Selector             ArtifactSelector          `json:"selector"`
+	State                DependencyResolutionState `json:"state"`
+	Candidates           []DependencyCandidateRef  `json:"candidates"`
+	Diagnostics          []Diagnostic              `json:"diagnostics,omitempty"`
+	ModifiedAt           time.Time                 `json:"modifiedAt"`
 }
 
 // TransferProvenance is app-local audit metadata for a record created through

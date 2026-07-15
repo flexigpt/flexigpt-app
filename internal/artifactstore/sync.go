@@ -15,9 +15,11 @@ func (s *Store) SyncRecords(
 	rootID spec.RootID,
 	policy spec.RecordSyncPolicy,
 ) (spec.RecordSyncResult, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.RecordSyncResult{}, err
 	}
+	defer finish()
 	if policy == nil {
 		return spec.RecordSyncResult{}, fmt.Errorf(
 			"%w: record synchronization policy is nil",
@@ -28,7 +30,11 @@ func (s *Store) SyncRecords(
 	if err != nil {
 		return spec.RecordSyncResult{}, err
 	}
-	resources, err := s.repository.ListCatalogResourcesForRoot(ctx, rootID)
+	generation, err := s.repository.GetRootCatalogGeneration(ctx, rootID)
+	if err != nil {
+		return spec.RecordSyncResult{}, err
+	}
+	resources, err := s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
 	if err != nil {
 		return spec.RecordSyncResult{}, err
 	}
@@ -47,7 +53,10 @@ func (s *Store) SyncRecords(
 	}
 
 	existingByTypedOccurrence := make(map[string]struct{}, len(records))
-	publication := spec.RecordSynchronizationPublication{RootID: rootID}
+	publication := spec.RecordSynchronizationPublication{
+		RootID:                    rootID,
+		ExpectedCatalogGeneration: generation.Generation,
+	}
 	result := spec.RecordSyncResult{RootID: rootID}
 
 	for _, existing := range records {
@@ -73,8 +82,19 @@ func (s *Store) SyncRecords(
 		if !applyCatalogResourceToRecord(&updated, resourcePointer, false) {
 			continue
 		}
-		updated.ModifiedAt = s.nowUTC()
-		if err := spec.ValidateArtifactRecord(updated); err != nil {
+		updated.ModifiedAt = s.nextModifiedAt(existing.ModifiedAt)
+		var definitionPointer *spec.CanonicalDefinition
+		if updated.LastResolvedDefinitionDigest != nil {
+			definition, err := s.GetDefinitionByDigest(
+				ctx,
+				*updated.LastResolvedDefinitionDigest,
+			)
+			if err != nil {
+				return spec.RecordSyncResult{}, err
+			}
+			definitionPointer = &definition
+		}
+		if err := s.validateRecord(ctx, &updated, resourcePointer, definitionPointer); err != nil {
 			return spec.RecordSyncResult{}, fmt.Errorf(
 				"validate synchronized record %q: %w",
 				existing.RecordID,
@@ -121,7 +141,7 @@ func (s *Store) SyncRecords(
 			continue
 		}
 
-		record, _, _, err := s.prepareRecord(ctx, spec.ArtifactRecordDraft{
+		draft := spec.ArtifactRecordDraft{
 			RootID:             rootID,
 			CollectionID:       derivation.CollectionID,
 			Kind:               resource.Kind,
@@ -135,7 +155,14 @@ func (s *Store) SyncRecords(
 			Enabled:            derivation.Enabled,
 			DataSchemaID:       derivation.DataSchemaID,
 			Data:               derivation.Data,
-		})
+		}
+		record, err := s.prepareRecordForResolved(
+			ctx,
+			draft,
+			resource,
+			definition,
+			*resource.CurrentDefinitionDigest,
+		)
 		if err != nil {
 			return spec.RecordSyncResult{}, err
 		}

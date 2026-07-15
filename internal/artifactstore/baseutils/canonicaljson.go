@@ -31,6 +31,9 @@ func CanonicalizeDefinition(in spec.CanonicalDefinition) (spec.CanonicalDefiniti
 	if err := spec.ValidateCanonicalDefinition(out); err != nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf("canonical definition structure: %w", err)
 	}
+	sort.Slice(out.AssetManifest, func(left, right int) bool {
+		return out.AssetManifest[left].Path < out.AssetManifest[right].Path
+	})
 
 	var err error
 	out.Extensions, err = CanonicalizeJSON(out.Extensions)
@@ -40,6 +43,9 @@ func CanonicalizeDefinition(in spec.CanonicalDefinition) (spec.CanonicalDefiniti
 	out.DefinitionJSON, err = CanonicalizeJSON(out.DefinitionJSON)
 	if err != nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf("canonicalize definition JSON: %w", err)
+	}
+	if err := spec.ValidateCanonicalDefinition(out); err != nil {
+		return spec.CanonicalDefinition{}, fmt.Errorf("canonical definition after ordering: %w", err)
 	}
 
 	payload, err := canonicalDefinitionPayload(out)

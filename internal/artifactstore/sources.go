@@ -22,9 +22,11 @@ type SourceUpdate struct {
 // CreateSource creates only app-local source-registration metadata. A source
 // kind must have a registered driver, but this method never accesses content.
 func (s *Store) CreateSource(ctx context.Context, draft spec.SourceDraft) (spec.ArtifactSource, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactSource{}, err
 	}
+	defer finish()
 	if err := ctx.Err(); err != nil {
 		return spec.ArtifactSource{}, err
 	}
@@ -54,17 +56,21 @@ func (s *Store) CreateSource(ctx context.Context, draft spec.SourceDraft) (spec.
 
 // GetSource returns one app-local source registration.
 func (s *Store) GetSource(ctx context.Context, sourceID spec.SourceID) (spec.ArtifactSource, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactSource{}, err
 	}
+	defer finish()
 	return s.repository.GetSource(ctx, sourceID)
 }
 
 // ListSources lists app-local source registrations by modification time.
 func (s *Store) ListSources(ctx context.Context) ([]spec.ArtifactSource, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer finish()
 	return s.repository.ListSources(ctx)
 }
 

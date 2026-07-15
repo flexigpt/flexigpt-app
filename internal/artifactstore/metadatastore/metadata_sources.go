@@ -19,6 +19,7 @@ const sourceColumns = `
 	config_json,
 	last_observed_generation,
 	last_scanned_at,
+	observation_revision,
 	diagnostics_json,
 	created_at,
 	modified_at`
@@ -34,8 +35,9 @@ func (s *MetadataStore) CreateSource(ctx context.Context, source spec.ArtifactSo
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO artifact_sources (
 			source_id, kind, display_name, enabled, config_schema_id, config_json,
-			last_observed_generation, last_scanned_at, diagnostics_json, created_at, modified_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			last_observed_generation, last_scanned_at, observation_revision,
+			diagnostics_json, created_at, modified_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(source.SourceID),
 		string(source.Kind),
 		source.DisplayName,
@@ -44,6 +46,7 @@ func (s *MetadataStore) CreateSource(ctx context.Context, source spec.ArtifactSo
 		[]byte(source.Config),
 		nullableSourceGeneration(source.LastObservedGeneration),
 		nullableTime(source.LastScannedAt),
+		source.ObservationRevision,
 		diagnostics,
 		formatTime(source.CreatedAt),
 		formatTime(source.ModifiedAt),
@@ -178,6 +181,7 @@ func scanSource(scanner sqlScanner) (spec.ArtifactSource, error) {
 		Config:                 append([]byte(nil), row.Config...),
 		LastObservedGeneration: optionalSourceGeneration(row.LastObservedGeneration),
 		LastScannedAt:          scanned,
+		ObservationRevision:    row.ObservationRevision,
 		Diagnostics:            decodedDiagnostics,
 		CreatedAt:              created,
 		ModifiedAt:             modified,

@@ -9,9 +9,11 @@ import (
 )
 
 func (s *Store) CreateRecord(ctx context.Context, draft spec.ArtifactRecordDraft) (spec.ArtifactRecord, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
+	defer finish()
 	record, _, _, err := s.prepareRecord(ctx, draft)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
@@ -24,7 +26,12 @@ func (s *Store) CreateRecord(ctx context.Context, draft spec.ArtifactRecordDraft
 }
 
 func (s *Store) ListRecords(ctx context.Context, rootID spec.RootID) ([]spec.ArtifactRecord, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	if _, err := s.repository.GetRoot(ctx, rootID, true); err != nil {
 		return nil, err
 	}
 	return s.repository.ListRecordsForRoot(ctx, rootID)
@@ -414,9 +421,11 @@ func (s *Store) validateRecord(
 }
 
 func (s *Store) GetRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
+	defer finish()
 	return s.repository.GetRecord(ctx, recordID)
 }
 

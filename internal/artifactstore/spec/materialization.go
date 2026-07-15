@@ -50,17 +50,6 @@ type SourceMaterializer interface {
 	) (MaterializedSource, error)
 }
 
-// DirectoryPublisher is the write-side storage port used by the generic source
-// materializer. A production implementation should be backed by verified
-// LLMTools create, write, move, and delete operations.
-type DirectoryPublisher interface {
-	BeginDirectoryPublication(
-		ctx context.Context,
-		publicationKey string,
-		generation SourceGeneration,
-	) (DirectoryPublication, error)
-}
-
 // DirectoryPublication represents an isolated staging directory. Commit must
 // publish the staging tree atomically from a consumer's perspective. Abort must
 // remove only staging state owned by this publication.
@@ -78,6 +67,17 @@ type DirectoryPublication interface {
 	) error
 	Commit(ctx context.Context) (publishedRootPath string, err error)
 	Abort(ctx context.Context) error
+}
+
+// DirectoryPublisher is the write-side storage port used by the generic source
+// materializer. A production implementation should be backed by verified
+// LLMTools create, write, move, and delete operations.
+type DirectoryPublisher interface {
+	BeginDirectoryPublication(
+		ctx context.Context,
+		publicationKey string,
+		generation SourceGeneration,
+	) (DirectoryPublication, error)
 }
 
 type TransferMaterializationMode string

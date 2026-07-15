@@ -10,6 +10,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
 
+const selectLatestRootGenerationForSynchronizationSQL = `SELECT generation
+	FROM root_catalog_generations
+	WHERE root_id = ?
+	ORDER BY generation DESC
+	LIMIT 1`
+
 const recordColumns = `record_id, root_id, collection_id, kind, name, version, source_id, locator, subresource_locator, record_mode, tracking_mode, pinned_definition_digest, last_resolved_definition_digest, enabled, data_schema_id, data_json, state, diagnostics_json, created_at, modified_at`
 
 func (s *MetadataStore) CreateRecord(ctx context.Context, record spec.ArtifactRecord) error {
@@ -145,11 +151,40 @@ func (s *MetadataStore) PublishRecordSynchronization(
 	if publication.RootID == "" {
 		return fmt.Errorf("%w: synchronization root ID is empty", spec.ErrInvalidRequest)
 	}
+	if publication.ExpectedCatalogGeneration == 0 {
+		return fmt.Errorf(
+			"%w: synchronization catalog generation is required",
+			spec.ErrInvalidRequest,
+		)
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin record synchronization: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+
+	var currentGeneration uint64
+	err = tx.QueryRowContext(
+		ctx,
+		selectLatestRootGenerationForSynchronizationSQL,
+		string(publication.RootID),
+	).Scan(&currentGeneration)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf(
+			"%w: root %q has no published catalog",
+			spec.ErrConflict,
+			publication.RootID,
+		)
+	}
+	if err != nil {
+		return fmt.Errorf("read synchronization catalog generation: %w", err)
+	}
+	if currentGeneration != publication.ExpectedCatalogGeneration {
+		return fmt.Errorf(
+			"%w: root catalog changed during record synchronization",
+			spec.ErrConflict,
+		)
+	}
 
 	for _, record := range publication.Creates {
 		if record.RootID != publication.RootID {

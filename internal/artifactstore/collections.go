@@ -24,9 +24,11 @@ type CollectionUpdate struct {
 // slug, creating it when absent. It handles a concurrent creator by reloading
 // the natural key after a uniqueness conflict.
 func (s *Store) EnsureBaseCollection(ctx context.Context, draft spec.CollectionDraft) (spec.ArtifactCollection, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactCollection{}, err
 	}
+	defer finish()
 	collection, err := s.repository.GetCollectionByRootSlug(ctx, draft.RootID, draft.Slug, true)
 	if err == nil {
 		if collection.SoftDeletedAt != nil {
@@ -80,9 +82,11 @@ func (s *Store) EnsureBaseCollection(ctx context.Context, draft spec.CollectionD
 
 // CreateCollection creates an app-local grouping of records.
 func (s *Store) CreateCollection(ctx context.Context, draft spec.CollectionDraft) (spec.ArtifactCollection, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactCollection{}, err
 	}
+	defer finish()
 	if _, err := s.repository.GetRoot(ctx, draft.RootID, false); err != nil {
 		return spec.ArtifactCollection{}, err
 	}
@@ -115,9 +119,11 @@ func (s *Store) CreateCollection(ctx context.Context, draft spec.CollectionDraft
 
 // GetCollection returns one active collection.
 func (s *Store) GetCollection(ctx context.Context, collectionID spec.CollectionID) (spec.ArtifactCollection, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactCollection{}, err
 	}
+	defer finish()
 	return s.repository.GetCollection(ctx, collectionID, false)
 }
 
@@ -126,9 +132,11 @@ func (s *Store) GetCollectionIncludingDeleted(
 	ctx context.Context,
 	collectionID spec.CollectionID,
 ) (spec.ArtifactCollection, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactCollection{}, err
 	}
+	defer finish()
 	return s.repository.GetCollection(ctx, collectionID, true)
 }
 
@@ -138,7 +146,12 @@ func (s *Store) ListCollections(
 	rootID spec.RootID,
 	includeSoftDeleted bool,
 ) ([]spec.ArtifactCollection, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	if _, err := s.repository.GetRoot(ctx, rootID, true); err != nil {
 		return nil, err
 	}
 	return s.repository.ListCollections(ctx, rootID, includeSoftDeleted)

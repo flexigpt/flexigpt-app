@@ -28,37 +28,6 @@ func isConflict(err error) bool {
 
 type storeOperationContextKey struct{}
 
-type storeOperationLease struct {
-	mu     sync.Mutex
-	store  *Store
-	refs   int
-	active bool
-}
-
-func (l *storeOperationLease) retain() bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if !l.active {
-		return false
-	}
-	l.refs++
-	return true
-}
-
-func (l *storeOperationLease) release() bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if !l.active || l.refs <= 0 {
-		return false
-	}
-	l.refs--
-	if l.refs != 0 {
-		return false
-	}
-	l.active = false
-	return true
-}
-
 // Store owns Artifact Store business logic. It depends only on repository and
 // driver facades; SQLite, MapStore, LLMTools, PostgreSQL, and other concrete
 // data-access mechanisms remain outside service methods.
@@ -155,6 +124,9 @@ func WithPortableContentRepository(repository spec.PortableContentRepository) St
 	return func(store *Store) error {
 		if repository == nil {
 			return fmt.Errorf("%w: portable content repository is nil", spec.ErrInvalidRequest)
+		}
+		if store.portableContent != nil {
+			return fmt.Errorf("%w: portable content repository is already configured", spec.ErrConflict)
 		}
 		store.portableContent = repository
 		return nil
@@ -444,18 +416,6 @@ func (s *Store) releaseOperation(lease *storeOperationLease) {
 	s.lifeMu.Unlock()
 }
 
-func (s *Store) ensureOpen() error {
-	if s == nil {
-		return spec.ErrClosed
-	}
-	s.lifeMu.Lock()
-	defer s.lifeMu.Unlock()
-	if s.closed || s.repository == nil {
-		return spec.ErrClosed
-	}
-	return nil
-}
-
 func (s *Store) newID() (string, error) {
 	value, err := uuid.NewV7()
 	if err != nil {
@@ -464,8 +424,6 @@ func (s *Store) newID() (string, error) {
 	return value.String(), nil
 }
 
-func (s *Store) nowUTC() time.Time { return s.now().UTC() }
-
 func (s *Store) nextModifiedAt(previous time.Time) time.Time {
 	now := s.nowUTC()
 	if !now.After(previous) {
@@ -473,6 +431,8 @@ func (s *Store) nextModifiedAt(previous time.Time) time.Time {
 	}
 	return now
 }
+
+func (s *Store) nowUTC() time.Time { return s.now().UTC() }
 
 func requireExpectedModifiedAt(label string, current, expected time.Time) error {
 	if expected.IsZero() {

@@ -71,7 +71,7 @@ type ArtifactMetadataRepository interface {
 
 	GetCatalogResource(ctx context.Context, key CatalogResourceKey) (CatalogResource, error)
 	ListCatalogResourcesForSource(ctx context.Context, sourceID SourceID) ([]CatalogResource, error)
-	ListCatalogResourcesForRoot(ctx context.Context, rootID RootID) ([]CatalogResource, error)
+	ListPublishedCatalogResourcesForRoot(ctx context.Context, rootID RootID) ([]CatalogResource, error)
 	UpsertCatalogResource(ctx context.Context, resource CatalogResource) error
 	UpsertCatalogResourceRevision(ctx context.Context, revision CatalogResourceRevision) error
 	ListCatalogResourceRevisions(
@@ -79,6 +79,10 @@ type ArtifactMetadataRepository interface {
 		key CatalogResourceKey,
 	) ([]CatalogResourceRevision, error)
 	PublishSourceCatalog(ctx context.Context, publication SourceCatalogPublication) error
+	PublishRootScan(
+		ctx context.Context,
+		publication RootScanPublication,
+	) (RootCatalogGeneration, error)
 	PublishRootCatalogGeneration(
 		ctx context.Context,
 		publication RootCatalogPublication,
@@ -105,6 +109,15 @@ type ArtifactMetadataRepository interface {
 
 	CreateTransferProvenance(ctx context.Context, provenance TransferProvenance) error
 	ListTransferProvenance(ctx context.Context, recordID RecordID) ([]TransferProvenance, error)
+
+	ReplaceDependencySnapshots(
+		ctx context.Context,
+		publication DependencySnapshotPublication,
+	) error
+	ListDependencySnapshots(
+		ctx context.Context,
+		recordID RecordID,
+	) ([]ArtifactDependencySnapshot, error)
 }
 
 // PortableContentRepository is the boundary for shareable JSON/files. Its

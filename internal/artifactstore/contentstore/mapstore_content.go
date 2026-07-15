@@ -33,6 +33,13 @@ const (
 	artifactContentPackages    artifactContentPartition = "packages"
 )
 
+type portableAssetFile struct {
+	Format    string `json:"format"`
+	Digest    string `json:"digest"`
+	SizeBytes int64  `json:"sizeBytes"`
+	Data      string `json:"data"`
+}
+
 type artifactContentPartitionProvider struct{}
 
 func (artifactContentPartitionProvider) GetPartitionDir(key mapstore.FileKey) (string, error) {
@@ -166,16 +173,27 @@ func (r *mapStorePortableContentRepository) PutAsset(ctx context.Context, conten
 	if err := ctx.Err(); err != nil {
 		return "", 0, err
 	}
+	if int64(len(content)) > spec.MaxTransferPayloadBytes {
+		return "", 0, fmt.Errorf(
+			"%w: asset exceeds %d bytes",
+			spec.ErrInvalidRequest,
+			spec.MaxTransferPayloadBytes,
+		)
+	}
 	digest := baseutils.DigestBytes(content)
 	key, err := assetFileKey(digest)
 	if err != nil {
 		return "", 0, err
 	}
-	blob := map[string]any{
-		"format":    portableAssetFileFormatV1,
-		"digest":    string(digest),
-		"sizeBytes": int64(len(content)),
-		"data":      base64.StdEncoding.EncodeToString(content),
+	file := portableAssetFile{
+		Format:    portableAssetFileFormatV1,
+		Digest:    string(digest),
+		SizeBytes: int64(len(content)),
+		Data:      base64.StdEncoding.EncodeToString(content),
+	}
+	blob, err := jsonencdec.StructWithJSONTagsToMap(file)
+	if err != nil {
+		return "", 0, fmt.Errorf("encode portable asset: %w", err)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -211,15 +229,28 @@ func (r *mapStorePortableContentRepository) GetAsset(ctx context.Context, digest
 	if err != nil {
 		return nil, fmt.Errorf("%w: asset %q: %w", spec.ErrContentNotFound, digest, err)
 	}
-	format, _ := data["format"].(string)
-	storedDigest, _ := data["digest"].(string)
-	encoded, _ := data["data"].(string)
-	if format != portableAssetFileFormatV1 || spec.Digest(storedDigest) != digest || encoded == "" {
+	var file portableAssetFile
+	if err := jsonencdec.MapToStructWithJSONTags(data, &file); err != nil {
+		return nil, fmt.Errorf("decode portable asset %q: %w", digest, err)
+	}
+	if file.Format != portableAssetFileFormatV1 ||
+		spec.Digest(file.Digest) != digest ||
+		file.SizeBytes < 0 ||
+		file.SizeBytes > spec.MaxTransferPayloadBytes {
 		return nil, fmt.Errorf("%w: malformed portable asset %q", spec.ErrInvalidRequest, digest)
 	}
-	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	decoded, err := base64.StdEncoding.DecodeString(file.Data)
 	if err != nil {
 		return nil, fmt.Errorf("decode portable asset %q: %w", digest, err)
+	}
+	if int64(len(decoded)) != file.SizeBytes {
+		return nil, fmt.Errorf(
+			"%w: asset %q stored size is %d, decoded size is %d",
+			spec.ErrDigestMismatch,
+			digest,
+			file.SizeBytes,
+			len(decoded),
+		)
 	}
 	if baseutils.DigestBytes(decoded) != digest {
 		return nil, fmt.Errorf("%w: asset %q", spec.ErrDigestMismatch, digest)

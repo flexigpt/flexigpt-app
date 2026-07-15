@@ -14,9 +14,11 @@ func (s *Store) GetCatalogResource(
 	ctx context.Context,
 	key spec.CatalogResourceKey,
 ) (spec.CatalogResource, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.CatalogResource{}, err
 	}
+	defer finish()
 	return s.repository.GetCatalogResource(ctx, key)
 }
 
@@ -26,9 +28,11 @@ func (s *Store) ListCatalogResourcesForSource(
 	ctx context.Context,
 	sourceID spec.SourceID,
 ) ([]spec.CatalogResource, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer finish()
 	return s.repository.ListCatalogResourcesForSource(ctx, sourceID)
 }
 
@@ -38,13 +42,15 @@ func (s *Store) ListCatalogResourcesForRoot(
 	ctx context.Context,
 	rootID spec.RootID,
 ) ([]spec.CatalogResource, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer finish()
 	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
 		return nil, err
 	}
-	return s.repository.ListCatalogResourcesForRoot(ctx, rootID)
+	return s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
 }
 
 // GetRootCatalogGeneration returns the most recently published generation for
@@ -53,9 +59,11 @@ func (s *Store) GetRootCatalogGeneration(
 	ctx context.Context,
 	rootID spec.RootID,
 ) (spec.RootCatalogGeneration, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.RootCatalogGeneration{}, err
 	}
+	defer finish()
 	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
 		return spec.RootCatalogGeneration{}, err
 	}
@@ -69,9 +77,11 @@ func (s *Store) ListDefinitionHistory(
 	ctx context.Context,
 	key spec.CatalogResourceKey,
 ) ([]spec.CatalogResourceRevision, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer finish()
 	return s.repository.ListCatalogResourceRevisions(ctx, key)
 }
 
@@ -81,9 +91,11 @@ func (s *Store) GetDefinitionByDigest(
 	ctx context.Context,
 	digest spec.Digest,
 ) (spec.CanonicalDefinition, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.CanonicalDefinition{}, err
 	}
+	defer finish()
 	if s.portableContent == nil {
 		return spec.CanonicalDefinition{}, fmt.Errorf(
 			"%w: portable content repository is not configured",

@@ -12,9 +12,11 @@ func (s *Store) GetArtifactPackage(
 	sourceID spec.SourceID,
 	manifestLocator spec.SourceLocator,
 ) (spec.ArtifactPackage, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactPackage{}, err
 	}
+	defer finish()
 	return s.repository.GetArtifactPackage(ctx, sourceID, manifestLocator)
 }
 
@@ -22,9 +24,11 @@ func (s *Store) ListArtifactPackagesForSource(
 	ctx context.Context,
 	sourceID spec.SourceID,
 ) ([]spec.ArtifactPackage, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer finish()
 	return s.repository.ListArtifactPackagesForSource(ctx, sourceID)
 }
 
@@ -32,9 +36,11 @@ func (s *Store) ListArtifactPackagesForSource(
 // package manifest. The caller owns source parsing and never leaks local paths
 // into the portable manifest itself.
 func (s *Store) PublishArtifactPackage(ctx context.Context, artifactPackage spec.ArtifactPackage) error {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return err
 	}
+	defer finish()
 	if err := spec.ValidateArtifactPackage(artifactPackage); err != nil {
 		return fmt.Errorf("%w: artifact package: %w", spec.ErrInvalidRequest, err)
 	}

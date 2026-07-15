@@ -87,6 +87,35 @@ func (d *EmbeddedFSDirectoryDriver) Snapshot(
 	sort.Slice(entries, func(left, right int) bool {
 		return entries[left].Locator < entries[right].Locator
 	})
+	if len(entries) > spec.DefaultMaxScanEntries {
+		return "", fmt.Errorf(
+			"%w: embedded source snapshot exceeds %d entries",
+			spec.ErrInvalidRequest,
+			spec.DefaultMaxScanEntries,
+		)
+	}
+	var totalBytes int64
+	for _, entry := range entries {
+		depth := 1 + strings.Count(string(entry.Locator), "/")
+		if depth > spec.DefaultMaxTraversalDepth {
+			return "", fmt.Errorf(
+				"%w: embedded source snapshot exceeds depth %d at %q",
+				spec.ErrInvalidRequest,
+				spec.DefaultMaxTraversalDepth,
+				entry.Locator,
+			)
+		}
+		if entry.IsRegular {
+			totalBytes += entry.SizeBytes
+			if totalBytes > spec.DefaultMaxMaterializedBytes {
+				return "", fmt.Errorf(
+					"%w: embedded source exceeds %d bytes",
+					spec.ErrInvalidRequest,
+					spec.DefaultMaxMaterializedBytes,
+				)
+			}
+		}
+	}
 
 	hash := sha256.New()
 	for _, entry := range entries {

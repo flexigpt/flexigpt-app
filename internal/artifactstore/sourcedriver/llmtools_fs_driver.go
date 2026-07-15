@@ -51,35 +51,43 @@ func (d *llmToolsFSDirectoryDriver) Snapshot(
 	}); err != nil {
 		return "", err
 	}
+	if len(entries) > spec.DefaultMaxScanEntries {
+		return "", fmt.Errorf(
+			"%w: source snapshot exceeds %d entries",
+			spec.ErrInvalidRequest,
+			spec.DefaultMaxScanEntries,
+		)
+	}
 	sort.Slice(entries, func(left, right int) bool { return entries[left].Locator < entries[right].Locator })
 	hash := sha256.New()
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
-		if entry.IsDirectory {
-			_, _ = hash.Write([]byte("d\x00" + string(entry.Locator) + "\x00"))
-			continue
+		depth := 1 + strings.Count(string(entry.Locator), "/")
+		if depth > spec.DefaultMaxTraversalDepth {
+			return "", fmt.Errorf(
+				"%w: source snapshot exceeds depth %d at %q",
+				spec.ErrInvalidRequest,
+				spec.DefaultMaxTraversalDepth,
+				entry.Locator,
+			)
 		}
-		if !entry.IsRegular {
-			_, _ = hash.Write([]byte("o\x00" + string(entry.Locator) + "\x00"))
-			continue
+		entryType := "o"
+		switch {
+		case entry.IsDirectory:
+			entryType = "d"
+		case entry.IsRegular:
+			entryType = "f"
 		}
-		reader, err := d.Open(ctx, source, entry.Locator)
-		if err != nil {
-			return "", err
-		}
-		content, readErr := io.ReadAll(reader)
-		closeErr := reader.Close()
-		if readErr != nil {
-			return "", readErr
-		}
-		if closeErr != nil {
-			return "", closeErr
-		}
-		_, _ = hash.Write([]byte("f\x00" + string(entry.Locator) + "\x00"))
-		_, _ = hash.Write(content)
-		_, _ = hash.Write([]byte{0})
+		_, _ = fmt.Fprintf(
+			hash,
+			"%s\x00%s\x00%d\x00%s\x00",
+			entryType,
+			entry.Locator,
+			entry.SizeBytes,
+			entry.ModifiedAt.UTC().Format(time.RFC3339Nano),
+		)
 	}
 	return spec.SourceGeneration("sha256:" + hex.EncodeToString(hash.Sum(nil))), nil
 }
@@ -169,18 +177,52 @@ func (d *llmToolsFSDirectoryDriver) ReadDir(
 	if out == nil {
 		return nil, fmt.Errorf("%w: source directory %q", spec.ErrNotFound, locator)
 	}
+	if out.ReachedMaxEntries {
+		return nil, fmt.Errorf(
+			"%w: directory %q exceeds the LLMTools listing limit",
+			spec.ErrInvalidRequest,
+			locator,
+		)
+	}
 	entries := make([]spec.SourceEntry, 0, len(out.Items))
 	for _, item := range out.Items {
 		childLocator, err := joinSourceLocator(locator, item.Name)
 		if err != nil {
 			return nil, err
 		}
+		if item.Kind == fstool.ListDirectoryEntryKindOther && !config.FollowSymlinks {
+			entries = append(entries, spec.SourceEntry{
+				Locator: childLocator,
+				Name:    item.Name,
+			})
+			continue
+		}
 		child, err := d.Stat(ctx, source, childLocator)
 		if err != nil {
 			return nil, err
 		}
+		switch item.Kind {
+		case fstool.ListDirectoryEntryKindFile:
+			child.IsDirectory = false
+			child.IsRegular = true
+		case fstool.ListDirectoryEntryKindDirectory:
+			child.IsDirectory = true
+			child.IsRegular = false
+		case fstool.ListDirectoryEntryKindOther:
+			// FollowSymlinks was explicitly enabled. StatPath describes the
+			// resolved target, while traversal limits prevent unbounded cycles.
+		default:
+			return nil, fmt.Errorf(
+				"%w: unknown LLMTools directory entry kind %q",
+				spec.ErrInvalidRequest,
+				item.Kind,
+			)
+		}
 		entries = append(entries, child)
 	}
+	sort.Slice(entries, func(left, right int) bool {
+		return entries[left].Locator < entries[right].Locator
+	})
 	return entries, nil
 }
 
