@@ -391,7 +391,7 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 	);
 
 	return (
-		<div className="bg-base-200 flex max-h-[min(52vh,36rem)] w-full min-w-0 flex-col overflow-hidden">
+		<div className="bg-base-200 flex max-h-128 w-full min-w-0 flex-col overflow-hidden">
 			<div className="shrink-0">
 				<EditorContextBar context={assistantContext} assistantPreset={assistantPreset} systemPrompt={systemPrompt} />
 			</div>

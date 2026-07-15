@@ -1778,7 +1778,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</div>
 							)}
 							{/* Row: editor with send/stop button on the right */}
-							<div className="flex min-h-16 min-w-0 grow gap-2 overflow-hidden p-1">
+							<div className="flex min-h-24 min-w-0 grow gap-2 overflow-hidden p-1">
 								<PlateContent
 									ref={contentRef}
 									placeholder="Type message..."
@@ -1789,14 +1789,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onKeyDown={handleEditorKeyDown}
 									onPaste={onEditorPaste}
 									scrollSelectionIntoView={scrollSelectionIntoEditorView}
-									className="min-w-0 flex-1 resize-none overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent p-1 wrap-break-word whitespace-break-spaces tab-2 outline-none focus:outline-none"
+									className="max-h-96 min-w-0 flex-1 resize-none overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent p-1 wrap-break-word whitespace-break-spaces tab-2 outline-none focus:outline-none"
 									style={{
 										fontSize: 14,
 										lineHeight: 1.5,
 										whiteSpace: 'break-spaces',
 										tabSize: 2,
 										minHeight: '4rem',
-										maxHeight: 'min(30em, 40vh)',
 										boxSizing: 'border-box',
 										overflowAnchor: 'none',
 										overscrollBehavior: 'contain',
