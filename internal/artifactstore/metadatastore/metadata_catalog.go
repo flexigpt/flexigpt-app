@@ -236,64 +236,34 @@ func (s *MetadataStore) ListCatalogResourceRevisions(
 }
 
 func scanCatalogResource(scanner sqlScanner) (spec.CatalogResource, error) {
-	var (
-		sourceID               string
-		locator                string
-		subresourceLocator     string
-		packageManifestLocator string
-		kind                   string
-		logicalName            string
-		logicalVersion         string
-		definitionDigest       sql.NullString
-		sourceContentDigest    sql.NullString
-		frontendID             string
-		state                  string
-		firstSeenAt            string
-		lastSeenAt             string
-		diagnostics            []byte
-	)
-	if err := scanner.Scan(
-		&sourceID,
-		&locator,
-		&subresourceLocator,
-		&packageManifestLocator,
-		&kind,
-		&logicalName,
-		&logicalVersion,
-		&definitionDigest,
-		&sourceContentDigest,
-		&frontendID,
-		&state,
-		&firstSeenAt,
-		&lastSeenAt,
-		&diagnostics,
-	); err != nil {
+	row := catalogResourceRow{}
+	if err := scanner.Scan(row.destinations()...); err != nil {
 		return spec.CatalogResource{}, err
 	}
-	firstSeen, err := parseRequiredTime("catalog resource.firstSeenAt", firstSeenAt)
+	firstSeen, err := parseRequiredTime("catalog resource.firstSeenAt", row.FirstSeenAt)
 	if err != nil {
 		return spec.CatalogResource{}, err
 	}
-	lastSeen, err := parseRequiredTime("catalog resource.lastSeenAt", lastSeenAt)
+	lastSeen, err := parseRequiredTime("catalog resource.lastSeenAt", row.LastSeenAt)
 	if err != nil {
 		return spec.CatalogResource{}, err
 	}
-	decodedDiagnostics, err := decodeDiagnostics(diagnostics)
+	decodedDiagnostics, err := decodeDiagnostics(row.Diagnostics)
 	if err != nil {
 		return spec.CatalogResource{}, err
 	}
 	resource := spec.CatalogResource{
-		SourceID:                spec.SourceID(sourceID),
-		Locator:                 spec.SourceLocator(locator),
-		SubresourceLocator:      spec.SubresourceLocator(subresourceLocator),
-		PackageManifestLocator:  spec.SourceLocator(packageManifestLocator),
-		Kind:                    spec.ArtifactKind(kind),
-		LogicalName:             spec.LogicalName(logicalName),
-		LogicalVersion:          spec.LogicalVersion(logicalVersion),
-		CurrentDefinitionDigest: optionalDigest(definitionDigest),
-		SourceContentDigest:     optionalDigest(sourceContentDigest),
-		FrontendID:              spec.FrontendID(frontendID),
-		State:                   spec.CatalogState(state),
+		SourceID:                spec.SourceID(row.SourceID),
+		Locator:                 spec.SourceLocator(row.Locator),
+		SubresourceLocator:      spec.SubresourceLocator(row.SubresourceLocator),
+		PackageManifestLocator:  spec.SourceLocator(row.PackageManifestLocator),
+		Kind:                    spec.ArtifactKind(row.Kind),
+		LogicalName:             spec.LogicalName(row.LogicalName),
+		LogicalVersion:          spec.LogicalVersion(row.LogicalVersion),
+		CurrentDefinitionDigest: optionalDigest(row.CurrentDefinitionDigest),
+		SourceContentDigest:     optionalDigest(row.SourceContentDigest),
+		FrontendID:              spec.FrontendID(row.FrontendID),
+		State:                   spec.CatalogState(row.State),
 		FirstSeenAt:             firstSeen,
 		LastSeenAt:              lastSeen,
 		Diagnostics:             decodedDiagnostics,
@@ -301,9 +271,9 @@ func scanCatalogResource(scanner sqlScanner) (spec.CatalogResource, error) {
 	if err := spec.ValidateCatalogResource(resource); err != nil {
 		return spec.CatalogResource{}, fmt.Errorf(
 			"invalid persisted catalog resource %q/%q/%q: %w",
-			sourceID,
-			locator,
-			subresourceLocator,
+			row.SourceID,
+			row.Locator,
+			row.SubresourceLocator,
 			err,
 		)
 	}
@@ -311,56 +281,36 @@ func scanCatalogResource(scanner sqlScanner) (spec.CatalogResource, error) {
 }
 
 func scanCatalogResourceRevision(scanner sqlScanner) (spec.CatalogResourceRevision, error) {
-	var (
-		sourceID            string
-		locator             string
-		subresourceLocator  string
-		definitionDigest    string
-		sourceContentDigest string
-		kind                string
-		frontendID          string
-		firstSeenAt         string
-		lastSeenAt          string
-	)
-	if err := scanner.Scan(
-		&sourceID,
-		&locator,
-		&subresourceLocator,
-		&definitionDigest,
-		&sourceContentDigest,
-		&kind,
-		&frontendID,
-		&firstSeenAt,
-		&lastSeenAt,
-	); err != nil {
+	row := catalogResourceRevisionRow{}
+	if err := scanner.Scan(row.destinations()...); err != nil {
 		return spec.CatalogResourceRevision{}, err
 	}
-	firstSeen, err := parseRequiredTime("catalog revision.firstSeenAt", firstSeenAt)
+	firstSeen, err := parseRequiredTime("catalog revision.firstSeenAt", row.FirstSeenAt)
 	if err != nil {
 		return spec.CatalogResourceRevision{}, err
 	}
-	lastSeen, err := parseRequiredTime("catalog revision.lastSeenAt", lastSeenAt)
+	lastSeen, err := parseRequiredTime("catalog revision.lastSeenAt", row.LastSeenAt)
 	if err != nil {
 		return spec.CatalogResourceRevision{}, err
 	}
 	revision := spec.CatalogResourceRevision{
-		SourceID:            spec.SourceID(sourceID),
-		Locator:             spec.SourceLocator(locator),
-		SubresourceLocator:  spec.SubresourceLocator(subresourceLocator),
-		DefinitionDigest:    spec.Digest(definitionDigest),
-		SourceContentDigest: spec.Digest(sourceContentDigest),
-		Kind:                spec.ArtifactKind(kind),
-		FrontendID:          spec.FrontendID(frontendID),
+		SourceID:            spec.SourceID(row.SourceID),
+		Locator:             spec.SourceLocator(row.Locator),
+		SubresourceLocator:  spec.SubresourceLocator(row.SubresourceLocator),
+		DefinitionDigest:    spec.Digest(row.DefinitionDigest),
+		SourceContentDigest: spec.Digest(row.SourceContentDigest),
+		Kind:                spec.ArtifactKind(row.Kind),
+		FrontendID:          spec.FrontendID(row.FrontendID),
 		FirstSeenAt:         firstSeen,
 		LastSeenAt:          lastSeen,
 	}
 	if err := spec.ValidateCatalogResourceRevision(revision); err != nil {
 		return spec.CatalogResourceRevision{}, fmt.Errorf(
 			"invalid persisted catalog resource revision %q/%q/%q/%q: %w",
-			sourceID,
-			locator,
-			subresourceLocator,
-			definitionDigest,
+			row.SourceID,
+			row.Locator,
+			row.SubresourceLocator,
+			row.DefinitionDigest,
 			err,
 		)
 	}

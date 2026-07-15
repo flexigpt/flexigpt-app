@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -11,11 +12,12 @@ import (
 // CollectionUpdate replaces mutable local collection fields. CollectionID,
 // RootID, Kind, Slug, timestamps, and soft-deletion state remain store-owned.
 type CollectionUpdate struct {
-	DisplayName  string
-	Description  string
-	Enabled      bool
-	DataSchemaID spec.SchemaID
-	Data         json.RawMessage
+	ExpectedModifiedAt time.Time
+	DisplayName        string
+	Description        string
+	Enabled            bool
+	DataSchemaID       spec.SchemaID
+	Data               json.RawMessage
 }
 
 // EnsureBaseCollection returns an active collection with the requested root and
@@ -32,6 +34,14 @@ func (s *Store) EnsureBaseCollection(ctx context.Context, draft spec.CollectionD
 				"%w: collection %q is soft-deleted",
 				spec.ErrConflict,
 				collection.CollectionID,
+			)
+		}
+		if collection.RootID != draft.RootID || collection.Kind != draft.Kind {
+			return spec.ArtifactCollection{}, fmt.Errorf(
+				"%w: collection slug %q already belongs to kind %q",
+				spec.ErrConflict,
+				draft.Slug,
+				collection.Kind,
 			)
 		}
 		return collection, nil
@@ -55,6 +65,14 @@ func (s *Store) EnsureBaseCollection(ctx context.Context, draft spec.CollectionD
 			"%w: collection %q is soft-deleted",
 			spec.ErrConflict,
 			collection.CollectionID,
+		)
+	}
+	if collection.RootID != draft.RootID || collection.Kind != draft.Kind {
+		return spec.ArtifactCollection{}, fmt.Errorf(
+			"%w: collection slug %q already belongs to kind %q",
+			spec.ErrConflict,
+			draft.Slug,
+			collection.Kind,
 		)
 	}
 	return collection, nil
@@ -132,11 +150,21 @@ func (s *Store) UpdateCollection(
 	collectionID spec.CollectionID,
 	update CollectionUpdate,
 ) (spec.ArtifactCollection, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactCollection{}, err
 	}
+	defer finish()
+
 	collection, err := s.repository.GetCollection(ctx, collectionID, true)
 	if err != nil {
+		return spec.ArtifactCollection{}, err
+	}
+	if err := requireExpectedModifiedAt(
+		"collection "+string(collectionID),
+		collection.ModifiedAt,
+		update.ExpectedModifiedAt,
+	); err != nil {
 		return spec.ArtifactCollection{}, err
 	}
 	if collection.SoftDeletedAt != nil {
@@ -154,23 +182,37 @@ func (s *Store) UpdateCollection(
 	collection.Enabled = update.Enabled
 	collection.DataSchemaID = update.DataSchemaID
 	collection.Data = normalizedJSONObject(update.Data)
-	collection.ModifiedAt = s.nowUTC()
+	collection.ModifiedAt = s.nextModifiedAt(collection.ModifiedAt)
 	if err := s.validateCollection(ctx, collection); err != nil {
 		return spec.ArtifactCollection{}, err
 	}
-	if err := s.repository.UpdateCollection(ctx, collection); err != nil {
+	if err := s.repository.UpdateCollection(ctx, collection, update.ExpectedModifiedAt); err != nil {
 		return spec.ArtifactCollection{}, err
 	}
 	return collection, nil
 }
 
 // DeleteCollection disables and soft-deletes an empty collection.
-func (s *Store) DeleteCollection(ctx context.Context, collectionID spec.CollectionID) (spec.ArtifactCollection, error) {
-	if err := s.ensureOpen(); err != nil {
+func (s *Store) DeleteCollection(
+	ctx context.Context,
+	collectionID spec.CollectionID,
+	expectedModifiedAt time.Time,
+) (spec.ArtifactCollection, error) {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactCollection{}, err
 	}
+	defer finish()
+
 	collection, err := s.repository.GetCollection(ctx, collectionID, true)
 	if err != nil {
+		return spec.ArtifactCollection{}, err
+	}
+	if err := requireExpectedModifiedAt(
+		"collection "+string(collectionID),
+		collection.ModifiedAt,
+		expectedModifiedAt,
+	); err != nil {
 		return spec.ArtifactCollection{}, err
 	}
 	if collection.SoftDeletedAt != nil {
@@ -192,14 +234,14 @@ func (s *Store) DeleteCollection(ctx context.Context, collectionID spec.Collecti
 			count,
 		)
 	}
-	now := s.nowUTC()
+	now := s.nextModifiedAt(collection.ModifiedAt)
 	collection.Enabled = false
 	collection.ModifiedAt = now
 	collection.SoftDeletedAt = &now
 	if err := s.validateCollection(ctx, collection); err != nil {
 		return spec.ArtifactCollection{}, err
 	}
-	if err := s.repository.UpdateCollection(ctx, collection); err != nil {
+	if err := s.repository.UpdateCollection(ctx, collection, expectedModifiedAt); err != nil {
 		return spec.ArtifactCollection{}, err
 	}
 	return collection, nil

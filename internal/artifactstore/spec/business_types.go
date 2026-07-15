@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -32,11 +33,12 @@ type RootCatalogPublication struct {
 // explicit because a nil CollectionID otherwise cannot distinguish clear from
 // leave-unchanged semantics.
 type RecordUpdate struct {
-	CollectionID    *CollectionID
-	ClearCollection bool
-	Enabled         *bool
-	DataSchemaID    *SchemaID
-	Data            []byte
+	ExpectedModifiedAt time.Time
+	CollectionID       *CollectionID
+	ClearCollection    bool
+	Enabled            *bool
+	DataSchemaID       *SchemaID
+	Data               *json.RawMessage
 }
 
 // RecordSynchronizationUpdate is an optimistic source-state update. Expected
@@ -67,16 +69,6 @@ type RecordTransferPublication struct {
 	Revision   CatalogResourceRevision
 	Record     ArtifactRecord
 	Provenance TransferProvenance
-}
-
-// ImportDefinitionRequest imports a portable definition through the configured
-// portable-content repository and materializes a catalog occurrence at the
-// caller-supplied app-local source location.
-type ImportDefinitionRequest struct {
-	File                   ArtifactDefinitionFile
-	Record                 ArtifactRecordDraft
-	FrontendID             FrontendID
-	PackageManifestLocator SourceLocator
 }
 
 // ExportedRecord is the portable result of exporting an app-local record. The

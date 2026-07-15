@@ -16,22 +16,29 @@ import (
 )
 
 func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.ScanPlan) (spec.ScanResult, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ScanResult{}, err
 	}
+	defer finish()
+
 	s.scanMu.Lock()
 	defer s.scanMu.Unlock()
 
-	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
+	root, err := s.repository.GetRoot(ctx, rootID, false)
+	if err != nil {
 		return spec.ScanResult{}, err
+	}
+	if !root.Enabled {
+		return spec.ScanResult{}, fmt.Errorf("%w: root %q is disabled", spec.ErrConflict, rootID)
 	}
 	attachments, err := s.repository.ListRootSourceAttachments(ctx, rootID)
 	if err != nil {
 		return spec.ScanResult{}, err
 	}
-	attached := make(map[spec.SourceID]struct{}, len(attachments))
+	attached := make(map[spec.SourceID]spec.RootSourceAttachment, len(attachments))
 	for _, attachment := range attachments {
-		attached[attachment.SourceID] = struct{}{}
+		attached[attachment.SourceID] = attachment
 	}
 
 	plans := make(map[spec.SourceID]spec.SourceScanPlan, len(plan.SourcePlans))
@@ -49,10 +56,19 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 				sourcePlan.SourceID,
 			)
 		}
-		if _, ok := attached[sourcePlan.SourceID]; !ok {
+		attachment, ok := attached[sourcePlan.SourceID]
+		if !ok {
 			return spec.ScanResult{}, fmt.Errorf(
 				"%w: source %q is not attached to root %q",
 				spec.ErrSourceNotAttached,
+				sourcePlan.SourceID,
+				rootID,
+			)
+		}
+		if !attachment.Enabled {
+			return spec.ScanResult{}, fmt.Errorf(
+				"%w: source %q attachment is disabled for root %q",
+				spec.ErrConflict,
 				sourcePlan.SourceID,
 				rootID,
 			)
@@ -63,6 +79,7 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 
 	result := spec.ScanResult{RootID: rootID}
 	sourceGenerations := map[spec.SourceID]spec.SourceGeneration{}
+	executedPlan := spec.ScanPlan{}
 	for _, attachment := range attachments {
 		if !attachment.Enabled {
 			continue
@@ -86,6 +103,7 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 				Authoritative:  true,
 			}
 		}
+		executedPlan.SourcePlans = append(executedPlan.SourcePlans, sourcePlan)
 		sourceResult, publication, err := s.scanSource(ctx, source, sourcePlan)
 		if err != nil {
 			return spec.ScanResult{}, err
@@ -101,7 +119,7 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 	if err != nil {
 		return spec.ScanResult{}, err
 	}
-	planDigest, err := digestScanPlan(plan)
+	planDigest, err := digestScanPlan(executedPlan)
 	if err != nil {
 		return spec.ScanResult{}, err
 	}
@@ -371,14 +389,31 @@ func collectSourceCandidates(
 	source spec.ArtifactSource,
 	plan spec.SourceScanPlan,
 ) ([]spec.SourceEntry, error) {
+	maxCandidates := plan.MaxCandidates
+	if maxCandidates <= 0 {
+		maxCandidates = spec.DefaultMaxScanCandidates
+	}
+	maxDepth := plan.MaxTraversalDepth
+	if maxDepth <= 0 {
+		maxDepth = spec.DefaultMaxTraversalDepth
+	}
 	seen := map[spec.SourceLocator]spec.SourceEntry{}
+	add := func(entry spec.SourceEntry) error {
+		if _, exists := seen[entry.Locator]; !exists && len(seen) >= maxCandidates {
+			return fmt.Errorf("%w: scan exceeds %d candidates", spec.ErrInvalidRequest, maxCandidates)
+		}
+		seen[entry.Locator] = entry
+		return nil
+	}
 	for _, locator := range plan.ExplicitLocators {
 		entry, err := driver.Stat(ctx, source, locator)
 		if err != nil {
 			return nil, err
 		}
 		if entry.IsRegular {
-			seen[entry.Locator] = entry
+			if err := add(entry); err != nil {
+				return nil, err
+			}
 		}
 	}
 	for _, root := range plan.DirectoryRoots {
@@ -397,11 +432,29 @@ func collectSourceCandidates(
 			}
 		}
 		err := driver.Walk(ctx, source, walkRoot, func(ctx context.Context, entry spec.SourceEntry) error {
+			relative := string(entry.Locator)
+			if walkRoot != "." {
+				relative = strings.TrimPrefix(
+					relative,
+					string(walkRoot)+"/",
+				)
+			}
+			depth := 1
+			if relative != "" {
+				depth += strings.Count(relative, "/")
+			}
+			if depth > maxDepth {
+				return fmt.Errorf(
+					"%w: scan traversal exceeds depth %d at %q",
+					spec.ErrInvalidRequest,
+					maxDepth,
+					entry.Locator,
+				)
+			}
 			if !entry.IsRegular || !matchesDirectoryRoot(walkRoot, entry.Locator, root) {
 				return nil
 			}
-			seen[entry.Locator] = entry
-			return nil
+			return add(entry)
 		})
 		if err != nil {
 			return nil, err

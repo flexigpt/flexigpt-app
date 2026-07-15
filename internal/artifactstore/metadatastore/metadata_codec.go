@@ -10,8 +10,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
 
+const databaseTimeLayout = "2006-01-02T15:04:05.000000000Z"
+
 type sqlScanner interface {
 	Scan(destinations ...any) error
+}
+
+type rowsAffectedResult interface {
+	RowsAffected() (int64, error)
 }
 
 func encodeDiagnostics(value []spec.Diagnostic) ([]byte, error) {
@@ -111,7 +117,7 @@ func parseNullableTime(label string, value sql.NullString) (*time.Time, error) {
 }
 
 func parseRequiredTime(label, value string) (time.Time, error) {
-	parsed, err := time.Parse(time.RFC3339Nano, value)
+	parsed, err := time.Parse(databaseTimeLayout, value)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("parse %s: %w", label, err)
 	}
@@ -172,6 +178,8 @@ func sqliteError(err error) error {
 	switch {
 	case strings.Contains(message, "unique constraint failed"):
 		return fmt.Errorf("%w: %w", spec.ErrConflict, err)
+	case strings.Contains(message, "artifactstore conflict:"):
+		return fmt.Errorf("%w: %w", spec.ErrConflict, err)
 	case strings.Contains(message, "foreign key constraint failed"):
 		return fmt.Errorf("%w: related app-local metadata exists or is missing", spec.ErrConflict)
 	default:
@@ -180,5 +188,34 @@ func sqliteError(err error) error {
 }
 
 func formatTime(value time.Time) string {
-	return value.UTC().Format(time.RFC3339Nano)
+	return value.UTC().Format(databaseTimeLayout)
+}
+
+func validateExpectedModifiedAt(label string, value time.Time) error {
+	if value.IsZero() {
+		return fmt.Errorf(
+			"%w: %s expected modifiedAt is required",
+			spec.ErrInvalidRequest,
+			label,
+		)
+	}
+	return nil
+}
+
+func optimisticMutationResult(result rowsAffectedResult, label string) error {
+	changed, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("inspect %s mutation: %w", label, err)
+	}
+	if changed == 0 {
+		return fmt.Errorf(
+			"%w: %s changed or no longer exists",
+			spec.ErrConflict,
+			label,
+		)
+	}
+	if changed != 1 {
+		return fmt.Errorf("unexpected %s mutation count %d", label, changed)
+	}
+	return nil
 }

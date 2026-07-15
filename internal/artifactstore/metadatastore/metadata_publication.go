@@ -31,12 +31,13 @@ func (s *MetadataStore) PublishSourceCatalog(ctx context.Context, publication sp
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.ExecContext(ctx, `
-		UPDATE artifact_sources
-		   SET last_observed_generation = ?, last_scanned_at = ?, diagnostics_json = ?, modified_at = ?
-		 WHERE source_id = ? AND modified_at = ?`,
-		string(publication.ObservedGeneration), formatTime(publication.ObservedAt), diagnostics,
-		formatTime(publication.ObservedAt), string(publication.SourceID),
+	result, err := tx.ExecContext(
+		ctx,
+		publishSourceObservationSQL,
+		string(publication.ObservedGeneration),
+		formatTime(publication.ObservedAt),
+		string(diagnostics),
+		string(publication.SourceID),
 		formatTime(publication.ExpectedSourceModifiedAt),
 	)
 	if err != nil {

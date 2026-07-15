@@ -3,6 +3,7 @@ package artifactstore
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -34,11 +35,21 @@ func (s *Store) UpdateRecord(
 	recordID spec.RecordID,
 	update spec.RecordUpdate,
 ) (spec.ArtifactRecord, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
+	defer finish()
+
 	record, err := s.repository.GetRecord(ctx, recordID)
 	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if err := requireExpectedModifiedAt(
+		"record "+string(recordID),
+		record.ModifiedAt,
+		update.ExpectedModifiedAt,
+	); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	if update.ClearCollection {
@@ -51,8 +62,11 @@ func (s *Store) UpdateRecord(
 	}
 	if update.DataSchemaID != nil {
 		record.DataSchemaID = *update.DataSchemaID
-		record.Data = normalizedJSONObject(update.Data)
 	}
+	if update.Data != nil {
+		record.Data = normalizedJSONObject(*update.Data)
+	}
+
 	var resource *spec.CatalogResource
 	resourceValue, err := s.repository.GetCatalogResource(
 		ctx,
@@ -75,20 +89,23 @@ func (s *Store) UpdateRecord(
 		}
 		definition = &definitionValue
 	}
-	record.ModifiedAt = s.nowUTC()
+	record.ModifiedAt = s.nextModifiedAt(record.ModifiedAt)
 	if err := s.validateRecord(ctx, &record, resource, definition); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
-	if err := s.repository.UpdateRecord(ctx, record); err != nil {
+	if err := s.repository.UpdateRecord(ctx, record, update.ExpectedModifiedAt); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	return record, nil
 }
 
 func (s *Store) RefreshRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
+	defer finish()
+
 	record, err := s.repository.GetRecord(ctx, recordID)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
@@ -111,7 +128,8 @@ func (s *Store) RefreshRecord(ctx context.Context, recordID spec.RecordID) (spec
 	if !applyCatalogResourceToRecord(&record, resource, true) {
 		return record, nil
 	}
-	record.ModifiedAt = s.nowUTC()
+	expectedModifiedAt := record.ModifiedAt
+	record.ModifiedAt = s.nextModifiedAt(record.ModifiedAt)
 	var definition *spec.CanonicalDefinition
 	if record.LastResolvedDefinitionDigest != nil {
 		definitionValue, err := s.GetDefinitionByDigest(ctx, *record.LastResolvedDefinitionDigest)
@@ -123,21 +141,43 @@ func (s *Store) RefreshRecord(ctx context.Context, recordID spec.RecordID) (spec
 	if err := s.validateRecord(ctx, &record, resource, definition); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
-	if err := s.repository.UpdateRecord(ctx, record); err != nil {
+	if err := s.repository.UpdateRecord(ctx, record, expectedModifiedAt); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	return record, nil
 }
 
-func (s *Store) DeleteRecord(ctx context.Context, recordID spec.RecordID) error {
-	if err := s.ensureOpen(); err != nil {
+func (s *Store) DeleteRecord(
+	ctx context.Context,
+	recordID spec.RecordID,
+	expectedModifiedAt time.Time,
+) error {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return err
 	}
-	return s.repository.DeleteRecord(ctx, recordID)
+	defer finish()
+	record, err := s.repository.GetRecord(ctx, recordID)
+	if err != nil {
+		return err
+	}
+	if err := requireExpectedModifiedAt("record "+string(recordID), record.ModifiedAt, expectedModifiedAt); err != nil {
+		return err
+	}
+	return s.repository.DeleteRecord(ctx, recordID, expectedModifiedAt)
 }
 
 func (s *Store) ExportRecord(ctx context.Context, recordID spec.RecordID) (spec.ExportedRecord, error) {
-	record, err := s.GetRecord(ctx, recordID)
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
+		return spec.ExportedRecord{}, err
+	}
+	defer finish()
+	return s.exportRecord(ctx, recordID)
+}
+
+func (s *Store) exportRecord(ctx context.Context, recordID spec.RecordID) (spec.ExportedRecord, error) {
+	record, err := s.repository.GetRecord(ctx, recordID)
 	if err != nil {
 		return spec.ExportedRecord{}, err
 	}
@@ -173,97 +213,6 @@ func (s *Store) ExportRecord(ctx context.Context, recordID spec.RecordID) (spec.
 		Definition: spec.ArtifactDefinitionFile{Format: spec.ArtifactDefinitionFileFormatV1, Definition: definition},
 		Closure:    closure,
 	}, nil
-}
-
-func (s *Store) ImportDefinition(
-	ctx context.Context,
-	request spec.ImportDefinitionRequest,
-) (spec.ArtifactRecord, error) {
-	if err := s.ensureOpen(); err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	if s.portableContent == nil {
-		return spec.ArtifactRecord{}, fmt.Errorf(
-			"%w: portable content repository is not configured",
-			spec.ErrUnsupported,
-		)
-	}
-	definition, err := s.portableContent.PutDefinition(ctx, request.File)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-
-	now := s.nowUTC()
-	digest := definition.Digest
-	if request.FrontendID == "" {
-		request.FrontendID = "artifactstore.portable-definition"
-	}
-	resource := spec.CatalogResource{
-		SourceID:                request.Record.SourceID,
-		Locator:                 request.Record.Locator,
-		SubresourceLocator:      request.Record.SubresourceLocator,
-		PackageManifestLocator:  request.PackageManifestLocator,
-		Kind:                    definition.Kind,
-		LogicalName:             definition.LogicalName,
-		LogicalVersion:          definition.LogicalVersion,
-		CurrentDefinitionDigest: &digest,
-		SourceContentDigest:     &digest,
-		FrontendID:              request.FrontendID,
-		State:                   spec.CatalogStateValid,
-		FirstSeenAt:             now,
-		LastSeenAt:              now,
-	}
-
-	revision := spec.CatalogResourceRevision{
-		SourceID:            resource.SourceID,
-		Locator:             resource.Locator,
-		SubresourceLocator:  resource.SubresourceLocator,
-		DefinitionDigest:    digest,
-		SourceContentDigest: digest,
-		Kind:                definition.Kind,
-		FrontendID:          request.FrontendID,
-		FirstSeenAt:         now,
-		LastSeenAt:          now,
-	}
-
-	if request.Record.TrackingMode == "" {
-		request.Record.TrackingMode = spec.TrackingModePinDigest
-		request.Record.PinnedDefinitionDigest = &digest
-	}
-	if request.Record.RecordMode == "" {
-		request.Record.RecordMode = spec.RecordModeCaptured
-	}
-	request.Record.Kind = definition.Kind
-	record, err := s.prepareRecordForResolved(
-		ctx,
-		request.Record,
-		resource,
-		definition,
-		digest,
-	)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	provenanceID, err := s.newID()
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	provenance := spec.TransferProvenance{
-		ProvenanceID:           spec.ProvenanceID(provenanceID),
-		TargetRecordID:         record.RecordID,
-		Operation:              spec.TransferOperationImport,
-		OriginDefinitionDigest: definition.Digest,
-		CreatedAt:              record.CreatedAt,
-	}
-	if err := s.repository.PublishRecordTransfer(ctx, spec.RecordTransferPublication{
-		Resource:   resource,
-		Revision:   revision,
-		Record:     record,
-		Provenance: provenance,
-	}); err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	return record, nil
 }
 
 func (s *Store) prepareRecord(
@@ -464,51 +413,6 @@ func (s *Store) validateRecord(
 	return nil
 }
 
-func (s *Store) CaptureRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
-	return s.DetachRecord(ctx, recordID)
-}
-
-func (s *Store) ForkRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
-	record, err := s.DetachRecord(ctx, recordID)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	record.RecordMode = spec.RecordModeForked
-	record.ModifiedAt = s.nowUTC()
-	if err := s.repository.UpdateRecord(ctx, record); err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	return record, nil
-}
-
-// DetachRecord captures the currently resolved portable definition by pinning
-// it and changing the local record mode. It deliberately does not write source
-// files; a future source driver may materialize an editable fork separately.
-func (s *Store) DetachRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
-	record, err := s.GetRecord(ctx, recordID)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	if record.LastResolvedDefinitionDigest == nil {
-		return spec.ArtifactRecord{}, fmt.Errorf("%w: record has no resolved definition", spec.ErrConflict)
-	}
-	record, err = s.PinRecord(ctx, recordID, *record.LastResolvedDefinitionDigest)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	record.RecordMode = spec.RecordModeCaptured
-	record.State = spec.RecordStateAvailable
-	record.Diagnostics = nil
-	record.ModifiedAt = s.nowUTC()
-	if err := spec.ValidateArtifactRecord(record); err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	if err := s.repository.UpdateRecord(ctx, record); err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	return record, nil
-}
-
 func (s *Store) GetRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
 	if err := s.ensureOpen(); err != nil {
 		return spec.ArtifactRecord{}, err
@@ -520,10 +424,13 @@ func (s *Store) PinRecord(
 	ctx context.Context,
 	recordID spec.RecordID,
 	digest spec.Digest,
+	expectedModifiedAt time.Time,
 ) (spec.ArtifactRecord, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
+	defer finish()
 
 	definition, err := s.GetDefinitionByDigest(ctx, digest)
 	if err != nil {
@@ -532,6 +439,9 @@ func (s *Store) PinRecord(
 
 	record, err := s.repository.GetRecord(ctx, recordID)
 	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if err := requireExpectedModifiedAt("record "+string(recordID), record.ModifiedAt, expectedModifiedAt); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	if definition.Kind != record.Kind {
@@ -549,11 +459,57 @@ func (s *Store) PinRecord(
 	if record.State != spec.RecordStateMissing || isDetachedPinnedRecord(record) {
 		record.State = spec.RecordStateAvailable
 	}
-	record.ModifiedAt = s.nowUTC()
+	record.ModifiedAt = s.nextModifiedAt(record.ModifiedAt)
 	if err := spec.ValidateArtifactRecord(record); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
-	if err := s.repository.UpdateRecord(ctx, record); err != nil {
+	if err := s.repository.UpdateRecord(ctx, record, expectedModifiedAt); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	return record, nil
+}
+
+// DetachRecord pins the existing occurrence in place. It is deliberately
+// distinct from CaptureRecord and ForkRecord, which create new occurrences.
+func (s *Store) DetachRecord(
+	ctx context.Context,
+	recordID spec.RecordID,
+	expectedModifiedAt time.Time,
+) (spec.ArtifactRecord, error) {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	defer finish()
+
+	record, err := s.repository.GetRecord(ctx, recordID)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if err := requireExpectedModifiedAt("record "+string(recordID), record.ModifiedAt, expectedModifiedAt); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if record.LastResolvedDefinitionDigest == nil {
+		return spec.ArtifactRecord{}, fmt.Errorf(
+			"%w: record has no resolved definition",
+			spec.ErrConflict,
+		)
+	}
+	digest := *record.LastResolvedDefinitionDigest
+	if _, err := s.GetDefinitionByDigest(ctx, digest); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	record.RecordMode = spec.RecordModeCaptured
+	record.TrackingMode = spec.TrackingModePinDigest
+	record.PinnedDefinitionDigest = &digest
+	record.LastResolvedDefinitionDigest = &digest
+	record.State = spec.RecordStateAvailable
+	record.Diagnostics = nil
+	record.ModifiedAt = s.nextModifiedAt(record.ModifiedAt)
+	if err := spec.ValidateArtifactRecord(record); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if err := s.repository.UpdateRecord(ctx, record, expectedModifiedAt); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	return record, nil

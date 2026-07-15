@@ -3,6 +3,7 @@ package artifactstore
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -143,10 +144,6 @@ func (s *Store) FindCandidates(
 		if selector.LogicalName != "" && resource.LogicalName != selector.LogicalName {
 			continue
 		}
-		if selector.VersionConstraint != "" && selector.VersionConstraint != "*" &&
-			string(resource.LogicalVersion) != selector.VersionConstraint {
-			continue
-		}
 		definition, err := s.GetDefinitionByDigest(ctx, *resource.CurrentDefinitionDigest)
 		if err != nil {
 			return nil, err
@@ -154,9 +151,66 @@ func (s *Store) FindCandidates(
 		if !selectorLabelsMatch(selector.Labels, definition.Labels) {
 			continue
 		}
+		if selector.VersionConstraint != "" {
+			matches, err := s.matchesVersionConstraint(
+				ctx,
+				resource,
+				selector.VersionConstraint,
+				definition.LogicalVersion,
+			)
+			if err != nil {
+				return nil, err
+			}
+			if !matches {
+				continue
+			}
+		}
 		candidates = append(candidates, spec.DependencyCandidate{Resource: resource, Definition: definition})
 	}
+	sort.Slice(candidates, func(left, right int) bool {
+		l := candidates[left].Resource
+		r := candidates[right].Resource
+		if l.SourceID != r.SourceID {
+			return l.SourceID < r.SourceID
+		}
+		if l.Locator != r.Locator {
+			return l.Locator < r.Locator
+		}
+		return l.SubresourceLocator < r.SubresourceLocator
+	})
 	return candidates, nil
+}
+
+func (s *Store) matchesVersionConstraint(
+	ctx context.Context,
+	resource spec.CatalogResource,
+	constraint string,
+	version spec.LogicalVersion,
+) (bool, error) {
+	if frontend, ok := s.frontendFor(resource.FrontendID); ok {
+		if matcher, ok := frontend.(spec.FrontendVersionMatcher); ok {
+			return matcher.MatchesVersionConstraint(ctx, constraint, version)
+		}
+	}
+	matcher, ok := s.versionMatcherFor(resource.Kind)
+	if !ok {
+		return false, fmt.Errorf(
+			"%w: artifact kind %q, constraint %q",
+			spec.ErrVersionMatcherUnavailable,
+			resource.Kind,
+			constraint,
+		)
+	}
+	matches, err := matcher.MatchesVersionConstraint(ctx, constraint, version)
+	if err != nil {
+		return false, fmt.Errorf(
+			"match version constraint %q for artifact kind %q: %w",
+			constraint,
+			resource.Kind,
+			err,
+		)
+	}
+	return matches, nil
 }
 
 func selectorLabelsMatch(selector, labels map[string]string) bool {

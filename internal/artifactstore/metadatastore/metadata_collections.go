@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -127,40 +128,32 @@ func (s *MetadataStore) ListCollections(
 	return collections, nil
 }
 
-func (s *MetadataStore) UpdateCollection(ctx context.Context, collection spec.ArtifactCollection) error {
+func (s *MetadataStore) UpdateCollection(
+	ctx context.Context,
+	collection spec.ArtifactCollection,
+	expectedModifiedAt time.Time,
+) error {
 	if err := spec.ValidateArtifactCollection(collection); err != nil {
 		return fmt.Errorf("validate collection for persistence: %w", err)
 	}
-	result, err := s.db.ExecContext(ctx, `
-		UPDATE artifact_collections
-		   SET display_name = ?,
-		       description = ?,
-		       enabled = ?,
-		       data_schema_id = ?,
-		       data_json = ?,
-		       modified_at = ?,
-		       soft_deleted_at = ?
-		 WHERE collection_id = ?`,
+	if err := validateExpectedModifiedAt("collection", expectedModifiedAt); err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, updateCollectionSQL,
 		collection.DisplayName,
 		collection.Description,
 		boolToInt(collection.Enabled),
 		string(collection.DataSchemaID),
-		[]byte(collection.Data),
+		string(collection.Data),
 		formatTime(collection.ModifiedAt),
 		nullableTime(collection.SoftDeletedAt),
 		string(collection.CollectionID),
+		formatTime(expectedModifiedAt),
 	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("update collection: %w", err))
 	}
-	changed, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("inspect collection update: %w", err)
-	}
-	if changed == 0 {
-		return fmt.Errorf("%w: collection %q", spec.ErrNotFound, collection.CollectionID)
-	}
-	return nil
+	return optimisticMutationResult(result, "collection "+string(collection.CollectionID))
 }
 
 func (s *MetadataStore) CountRecordsInCollection(ctx context.Context, collectionID spec.CollectionID) (int64, error) {

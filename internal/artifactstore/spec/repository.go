@@ -2,6 +2,7 @@ package spec
 
 import (
 	"context"
+	"time"
 )
 
 // ArtifactMetadataRepository is the app-local data-access boundary. Business
@@ -13,13 +14,13 @@ type ArtifactMetadataRepository interface {
 	CreateRoot(ctx context.Context, root ArtifactRoot) error
 	GetRoot(ctx context.Context, rootID RootID, includeSoftDeleted bool) (ArtifactRoot, error)
 	ListRoots(ctx context.Context, includeSoftDeleted bool) ([]ArtifactRoot, error)
-	UpdateRoot(ctx context.Context, root ArtifactRoot) error
+	UpdateRoot(ctx context.Context, root ArtifactRoot, expectedModifiedAt time.Time) error
 
 	CreateSource(ctx context.Context, source ArtifactSource) error
 	GetSource(ctx context.Context, sourceID SourceID) (ArtifactSource, error)
 	ListSources(ctx context.Context) ([]ArtifactSource, error)
-	UpdateSource(ctx context.Context, source ArtifactSource) error
-	DeleteSource(ctx context.Context, sourceID SourceID) error
+	UpdateSource(ctx context.Context, source ArtifactSource, expectedModifiedAt time.Time) error
+	DeleteSource(ctx context.Context, sourceID SourceID, expectedModifiedAt time.Time) error
 
 	CreateRootSourceAttachment(ctx context.Context, attachment RootSourceAttachment) error
 	GetRootSourceAttachment(
@@ -28,8 +29,17 @@ type ArtifactMetadataRepository interface {
 		sourceID SourceID,
 	) (RootSourceAttachment, error)
 	ListRootSourceAttachments(ctx context.Context, rootID RootID) ([]RootSourceAttachment, error)
-	UpdateRootSourceAttachment(ctx context.Context, attachment RootSourceAttachment) error
-	DeleteRootSourceAttachment(ctx context.Context, rootID RootID, sourceID SourceID) error
+	UpdateRootSourceAttachment(
+		ctx context.Context,
+		attachment RootSourceAttachment,
+		expectedModifiedAt time.Time,
+	) error
+	DeleteRootSourceAttachment(
+		ctx context.Context,
+		rootID RootID,
+		sourceID SourceID,
+		expectedModifiedAt time.Time,
+	) error
 
 	CreateCollection(ctx context.Context, collection ArtifactCollection) error
 	GetCollection(
@@ -44,7 +54,11 @@ type ArtifactMetadataRepository interface {
 		includeSoftDeleted bool,
 	) (ArtifactCollection, error)
 	ListCollections(ctx context.Context, rootID RootID, includeSoftDeleted bool) ([]ArtifactCollection, error)
-	UpdateCollection(ctx context.Context, collection ArtifactCollection) error
+	UpdateCollection(
+		ctx context.Context,
+		collection ArtifactCollection,
+		expectedModifiedAt time.Time,
+	) error
 	CountRecordsInCollection(ctx context.Context, collectionID CollectionID) (int64, error)
 
 	GetArtifactPackage(
@@ -80,8 +94,8 @@ type ArtifactMetadataRepository interface {
 		key CatalogResourceKey,
 		kind ArtifactKind,
 	) (ArtifactRecord, error)
-	UpdateRecord(ctx context.Context, record ArtifactRecord) error
-	DeleteRecord(ctx context.Context, recordID RecordID) error
+	UpdateRecord(ctx context.Context, record ArtifactRecord, expectedModifiedAt time.Time) error
+	DeleteRecord(ctx context.Context, recordID RecordID, expectedModifiedAt time.Time) error
 
 	PublishRecordSynchronization(
 		ctx context.Context,

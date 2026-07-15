@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -21,11 +22,12 @@ type RootSourceAttachmentDraft struct {
 
 // RootSourceAttachmentUpdate replaces mutable fields of an existing link.
 type RootSourceAttachmentUpdate struct {
-	Role         spec.AttachmentRole
-	Priority     int
-	Enabled      bool
-	DataSchemaID spec.SchemaID
-	Data         json.RawMessage
+	ExpectedModifiedAt time.Time
+	Role               spec.AttachmentRole
+	Priority           int
+	Enabled            bool
+	DataSchemaID       spec.SchemaID
+	Data               json.RawMessage
 }
 
 // AttachSource creates an app-local root/source attachment after root-hook
@@ -89,9 +91,12 @@ func (s *Store) UpdateRootSourceAttachment(
 	sourceID spec.SourceID,
 	update RootSourceAttachmentUpdate,
 ) (spec.RootSourceAttachment, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
+	defer finish()
+
 	root, err := s.repository.GetRoot(ctx, rootID, false)
 	if err != nil {
 		return spec.RootSourceAttachment{}, err
@@ -100,16 +105,27 @@ func (s *Store) UpdateRootSourceAttachment(
 	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
+	if err := requireExpectedModifiedAt(
+		"root/source attachment "+string(rootID)+"/"+string(sourceID),
+		attachment.ModifiedAt,
+		update.ExpectedModifiedAt,
+	); err != nil {
+		return spec.RootSourceAttachment{}, err
+	}
 	attachment.Role = update.Role
 	attachment.Priority = update.Priority
 	attachment.Enabled = update.Enabled
 	attachment.DataSchemaID = update.DataSchemaID
 	attachment.Data = normalizedJSONObject(update.Data)
-	attachment.ModifiedAt = s.nowUTC()
+	attachment.ModifiedAt = s.nextModifiedAt(attachment.ModifiedAt)
 	if err := s.validateAttachment(ctx, root, attachment); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
-	if err := s.repository.UpdateRootSourceAttachment(ctx, attachment); err != nil {
+	if err := s.repository.UpdateRootSourceAttachment(
+		ctx,
+		attachment,
+		update.ExpectedModifiedAt,
+	); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
 	return attachment, nil
@@ -117,11 +133,29 @@ func (s *Store) UpdateRootSourceAttachment(
 
 // DetachSource removes only the local root/source relationship. It does not
 // delete source registration, source content, catalog history, or records.
-func (s *Store) DetachSource(ctx context.Context, rootID spec.RootID, sourceID spec.SourceID) error {
-	if err := s.ensureOpen(); err != nil {
+func (s *Store) DetachSource(
+	ctx context.Context,
+	rootID spec.RootID,
+	sourceID spec.SourceID,
+	expectedModifiedAt time.Time,
+) error {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return err
 	}
-	return s.repository.DeleteRootSourceAttachment(ctx, rootID, sourceID)
+	defer finish()
+	attachment, err := s.repository.GetRootSourceAttachment(ctx, rootID, sourceID)
+	if err != nil {
+		return err
+	}
+	if err := requireExpectedModifiedAt(
+		"root/source attachment "+string(rootID)+"/"+string(sourceID),
+		attachment.ModifiedAt,
+		expectedModifiedAt,
+	); err != nil {
+		return err
+	}
+	return s.repository.DeleteRootSourceAttachment(ctx, rootID, sourceID, expectedModifiedAt)
 }
 
 func (s *Store) validateAttachment(

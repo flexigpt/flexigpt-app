@@ -15,6 +15,8 @@ const (
 	PortablePackageManifestFormatV1 = "artifact-package/v1"
 )
 
+const PortableDefinitionFrontendID FrontendID = "artifactstore.portable-definition"
+
 const (
 	MaxKindBytes                  = 128
 	MaxSchemaIDBytes              = 256
@@ -39,6 +41,12 @@ const (
 	MaxPortablePackageDefinitions = 4096
 	MaxAttachmentPriority         = 1_000_000
 	MaxSlugRunes                  = 64
+	DefaultMaxScanCandidates      = 10_000
+	DefaultMaxTraversalDepth      = 64
+	DefaultMaxMaterializedEntries = 100_000
+	DefaultMaxMaterializedFiles   = 50_000
+	DefaultMaxMaterializedBytes   = int64(512 << 20)
+	MaxTransferPayloadBytes       = int64(512 << 20)
 )
 
 var ErrInvalid = errors.New("artifactstore: invalid")

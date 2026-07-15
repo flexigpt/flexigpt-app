@@ -120,6 +120,68 @@ func (r *artifactPackageRow) destinations() []any {
 	}
 }
 
+type catalogResourceRow struct {
+	SourceID                string
+	Locator                 string
+	SubresourceLocator      string
+	PackageManifestLocator  string
+	Kind                    string
+	LogicalName             string
+	LogicalVersion          string
+	CurrentDefinitionDigest sql.NullString
+	SourceContentDigest     sql.NullString
+	FrontendID              string
+	State                   string
+	FirstSeenAt             string
+	LastSeenAt              string
+	Diagnostics             []byte
+}
+
+func (r *catalogResourceRow) destinations() []any {
+	return []any{
+		&r.SourceID,
+		&r.Locator,
+		&r.SubresourceLocator,
+		&r.PackageManifestLocator,
+		&r.Kind,
+		&r.LogicalName,
+		&r.LogicalVersion,
+		&r.CurrentDefinitionDigest,
+		&r.SourceContentDigest,
+		&r.FrontendID,
+		&r.State,
+		&r.FirstSeenAt,
+		&r.LastSeenAt,
+		&r.Diagnostics,
+	}
+}
+
+type catalogResourceRevisionRow struct {
+	SourceID            string
+	Locator             string
+	SubresourceLocator  string
+	DefinitionDigest    string
+	SourceContentDigest string
+	Kind                string
+	FrontendID          string
+	FirstSeenAt         string
+	LastSeenAt          string
+}
+
+func (r *catalogResourceRevisionRow) destinations() []any {
+	return []any{
+		&r.SourceID,
+		&r.Locator,
+		&r.SubresourceLocator,
+		&r.DefinitionDigest,
+		&r.SourceContentDigest,
+		&r.Kind,
+		&r.FrontendID,
+		&r.FirstSeenAt,
+		&r.LastSeenAt,
+	}
+}
+
 type artifactCollectionRow struct {
 	CollectionID  string
 	RootID        string

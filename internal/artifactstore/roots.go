@@ -2,7 +2,9 @@ package artifactstore
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -10,11 +12,12 @@ import (
 // RootUpdate is a full mutable replacement for an active root's local fields.
 // RootID, Kind, CreatedAt, and soft-deletion state remain store-owned.
 type RootUpdate struct {
-	DisplayName  string
-	Description  string
-	Enabled      bool
-	DataSchemaID spec.SchemaID
-	Data         []byte
+	ExpectedModifiedAt time.Time
+	DisplayName        string
+	Description        string
+	Enabled            bool
+	DataSchemaID       spec.SchemaID
+	Data               json.RawMessage
 }
 
 // CreateRoot creates app-local root metadata after generic and typed root
@@ -77,11 +80,21 @@ func (s *Store) ListRoots(ctx context.Context, includeSoftDeleted bool) ([]spec.
 
 // UpdateRoot replaces mutable app-local root fields.
 func (s *Store) UpdateRoot(ctx context.Context, rootID spec.RootID, update RootUpdate) (spec.ArtifactRoot, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRoot{}, err
 	}
+	defer finish()
+
 	current, err := s.repository.GetRoot(ctx, rootID, true)
 	if err != nil {
+		return spec.ArtifactRoot{}, err
+	}
+	if err := requireExpectedModifiedAt(
+		"root "+string(rootID),
+		current.ModifiedAt,
+		update.ExpectedModifiedAt,
+	); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
 	if current.SoftDeletedAt != nil {
@@ -92,11 +105,11 @@ func (s *Store) UpdateRoot(ctx context.Context, rootID spec.RootID, update RootU
 	current.Enabled = update.Enabled
 	current.DataSchemaID = update.DataSchemaID
 	current.Data = normalizedJSONObject(update.Data)
-	current.ModifiedAt = s.nowUTC()
+	current.ModifiedAt = s.nextModifiedAt(current.ModifiedAt)
 	if err := s.validateRoot(ctx, current); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
-	if err := s.repository.UpdateRoot(ctx, current); err != nil {
+	if err := s.repository.UpdateRoot(ctx, current, update.ExpectedModifiedAt); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
 	return current, nil
@@ -104,25 +117,35 @@ func (s *Store) UpdateRoot(ctx context.Context, rootID spec.RootID, update RootU
 
 // DeleteRoot marks a root as disabled and soft-deleted. Associated local data
 // remains intact and can be inspected through explicit including-deleted APIs.
-func (s *Store) DeleteRoot(ctx context.Context, rootID spec.RootID) (spec.ArtifactRoot, error) {
-	if err := s.ensureOpen(); err != nil {
+func (s *Store) DeleteRoot(
+	ctx context.Context,
+	rootID spec.RootID,
+	expectedModifiedAt time.Time,
+) (spec.ArtifactRoot, error) {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactRoot{}, err
 	}
+	defer finish()
+
 	current, err := s.repository.GetRoot(ctx, rootID, true)
 	if err != nil {
+		return spec.ArtifactRoot{}, err
+	}
+	if err := requireExpectedModifiedAt("root "+string(rootID), current.ModifiedAt, expectedModifiedAt); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
 	if current.SoftDeletedAt != nil {
 		return spec.ArtifactRoot{}, fmt.Errorf("%w: root %q is already soft-deleted", spec.ErrConflict, rootID)
 	}
-	now := s.nowUTC()
+	now := s.nextModifiedAt(current.ModifiedAt)
 	current.Enabled = false
 	current.ModifiedAt = now
 	current.SoftDeletedAt = &now
 	if err := s.validateRoot(ctx, current); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
-	if err := s.repository.UpdateRoot(ctx, current); err != nil {
+	if err := s.repository.UpdateRoot(ctx, current, expectedModifiedAt); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
 	return current, nil

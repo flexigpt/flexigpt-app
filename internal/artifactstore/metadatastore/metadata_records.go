@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -77,17 +78,22 @@ func (s *MetadataStore) FindRecordBySource(
 	return record, err
 }
 
-func (s *MetadataStore) UpdateRecord(ctx context.Context, record spec.ArtifactRecord) error {
+func (s *MetadataStore) UpdateRecord(
+	ctx context.Context,
+	record spec.ArtifactRecord,
+	expectedModifiedAt time.Time,
+) error {
 	if err := spec.ValidateArtifactRecord(record); err != nil {
+		return err
+	}
+	if err := validateExpectedModifiedAt("record", expectedModifiedAt); err != nil {
 		return err
 	}
 	diagnostics, err := encodeDiagnostics(record.Diagnostics)
 	if err != nil {
 		return err
 	}
-	result, err := s.db.ExecContext(
-		ctx,
-		`UPDATE artifact_records SET collection_id = ?, record_mode = ?, tracking_mode = ?, pinned_definition_digest = ?, last_resolved_definition_digest = ?, enabled = ?, data_schema_id = ?, data_json = ?, state = ?, diagnostics_json = ?, modified_at = ? WHERE record_id = ?`,
+	result, err := s.db.ExecContext(ctx, updateRecordSQL,
 		nullableID(record.CollectionID),
 		string(record.RecordMode),
 		string(record.TrackingMode),
@@ -95,38 +101,37 @@ func (s *MetadataStore) UpdateRecord(ctx context.Context, record spec.ArtifactRe
 		nullableDigest(record.LastResolvedDefinitionDigest),
 		boolToInt(record.Enabled),
 		string(record.DataSchemaID),
-		[]byte(record.Data),
+		string(record.Data),
 		string(record.State),
-		diagnostics,
+		string(diagnostics),
 		formatTime(record.ModifiedAt),
 		string(record.RecordID),
+		formatTime(expectedModifiedAt),
 	)
 	if err != nil {
 		return sqliteError(err)
 	}
-	changed, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if changed == 0 {
-		return fmt.Errorf("%w: record %q", spec.ErrNotFound, record.RecordID)
-	}
-	return nil
+	return optimisticMutationResult(result, "record "+string(record.RecordID))
 }
 
-func (s *MetadataStore) DeleteRecord(ctx context.Context, recordID spec.RecordID) error {
-	result, err := s.db.ExecContext(ctx, `DELETE FROM artifact_records WHERE record_id = ?`, string(recordID))
+func (s *MetadataStore) DeleteRecord(
+	ctx context.Context,
+	recordID spec.RecordID,
+	expectedModifiedAt time.Time,
+) error {
+	if err := validateExpectedModifiedAt("record", expectedModifiedAt); err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(
+		ctx,
+		deleteRecordSQL,
+		string(recordID),
+		formatTime(expectedModifiedAt),
+	)
 	if err != nil {
 		return sqliteError(err)
 	}
-	changed, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if changed == 0 {
-		return fmt.Errorf("%w: record %q", spec.ErrNotFound, recordID)
-	}
-	return nil
+	return optimisticMutationResult(result, "record "+string(recordID))
 }
 
 func (s *MetadataStore) CreateTransferProvenance(ctx context.Context, provenance spec.TransferProvenance) error {

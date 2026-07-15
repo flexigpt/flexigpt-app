@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -246,8 +247,18 @@ func (d *llmToolsFSDirectoryDriver) toolFor(source spec.ArtifactSource) (*fstool
 }
 
 func decodeLLMToolsFSConfig(raw json.RawMessage) (llmToolsFSConfig, error) {
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder.DisallowUnknownFields()
 	var config spec.FSDirectorySourceConfig
-	if err := json.Unmarshal(raw, &config); err != nil {
+	if err := decoder.Decode(&config); err != nil {
+		return llmToolsFSConfig{}, err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return llmToolsFSConfig{}, errors.New(
+				"filesystem source config contains trailing JSON",
+			)
+		}
 		return llmToolsFSConfig{}, err
 	}
 	if err := spec.ValidateFSDirectorySourceConfig(config); err != nil {

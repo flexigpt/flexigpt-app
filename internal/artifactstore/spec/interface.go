@@ -94,6 +94,28 @@ type ArtifactFrontend interface {
 	DescribeExportClosure(ctx context.Context, definition CanonicalDefinition) (ExportClosure, []Diagnostic)
 }
 
+// ArtifactVersionMatcher owns version-constraint syntax for one artifact kind.
+// Artifact Store deliberately does not interpret semver, date versions, tags,
+// ranges, or domain-specific version aliases.
+type ArtifactVersionMatcher interface {
+	Kind() ArtifactKind
+	MatchesVersionConstraint(
+		ctx context.Context,
+		constraint string,
+		version LogicalVersion,
+	) (bool, error)
+}
+
+// FrontendVersionMatcher lets a frontend own version syntax for definitions it
+// emitted. It takes precedence over a kind-wide registered matcher.
+type FrontendVersionMatcher interface {
+	MatchesVersionConstraint(
+		ctx context.Context,
+		constraint string,
+		version LogicalVersion,
+	) (bool, error)
+}
+
 // RootKindHook validates app-local typed root data and source attachment rules.
 type RootKindHook interface {
 	Kind() RootKind
@@ -155,6 +177,8 @@ type SourceScanPlan struct {
 	DirectoryRoots     []DirectoryScanRoot `json:"directoryRoots,omitempty"`
 	AllowedFrontendIDs []FrontendID        `json:"allowedFrontendIDs,omitempty"`
 	MaxFileBytes       int64               `json:"maxFileBytes,omitempty"`
+	MaxCandidates      int                 `json:"maxCandidates,omitempty"`
+	MaxTraversalDepth  int                 `json:"maxTraversalDepth,omitempty"`
 	Authoritative      bool                `json:"authoritative,omitempty"`
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -11,10 +12,11 @@ import (
 // SourceUpdate replaces mutable local source-registration fields. SourceID,
 // Kind, CreatedAt, and source observations remain store-owned.
 type SourceUpdate struct {
-	DisplayName    string
-	Enabled        bool
-	ConfigSchemaID spec.SchemaID
-	Config         json.RawMessage
+	ExpectedModifiedAt time.Time
+	DisplayName        string
+	Enabled            bool
+	ConfigSchemaID     spec.SchemaID
+	Config             json.RawMessage
 }
 
 // CreateSource creates only app-local source-registration metadata. A source
@@ -73,11 +75,21 @@ func (s *Store) UpdateSource(
 	sourceID spec.SourceID,
 	update SourceUpdate,
 ) (spec.ArtifactSource, error) {
-	if err := s.ensureOpen(); err != nil {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return spec.ArtifactSource{}, err
 	}
+	defer finish()
+
 	source, err := s.repository.GetSource(ctx, sourceID)
 	if err != nil {
+		return spec.ArtifactSource{}, err
+	}
+	if err := requireExpectedModifiedAt(
+		"source "+string(sourceID),
+		source.ModifiedAt,
+		update.ExpectedModifiedAt,
+	); err != nil {
 		return spec.ArtifactSource{}, err
 	}
 	source.DisplayName = update.DisplayName
@@ -87,23 +99,41 @@ func (s *Store) UpdateSource(
 	source.LastObservedGeneration = nil
 	source.LastScannedAt = nil
 	source.Diagnostics = nil
-	source.ModifiedAt = s.nowUTC()
+	source.ModifiedAt = s.nextModifiedAt(source.ModifiedAt)
 	if err := s.validateSource(ctx, &source); err != nil {
 		return spec.ArtifactSource{}, err
 	}
-	if err := s.repository.UpdateSource(ctx, source); err != nil {
+	if err := s.repository.UpdateSource(ctx, source, update.ExpectedModifiedAt); err != nil {
 		return spec.ArtifactSource{}, err
 	}
 	return source, nil
 }
 
-// DeleteSource removes an app-local source registration only when SQLite
-// foreign-key relationships permit it. It does not mutate source content.
-func (s *Store) DeleteSource(ctx context.Context, sourceID spec.SourceID) error {
-	if err := s.ensureOpen(); err != nil {
+// DeleteSource removes an app-local source registration only when repository
+// relationships permit it. It does not mutate source content.
+func (s *Store) DeleteSource(
+	ctx context.Context,
+	sourceID spec.SourceID,
+	expectedModifiedAt time.Time,
+) error {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
 		return err
 	}
-	return s.repository.DeleteSource(ctx, sourceID)
+	defer finish()
+
+	source, err := s.repository.GetSource(ctx, sourceID)
+	if err != nil {
+		return err
+	}
+	if err := requireExpectedModifiedAt(
+		"source "+string(sourceID),
+		source.ModifiedAt,
+		expectedModifiedAt,
+	); err != nil {
+		return err
+	}
+	return s.repository.DeleteSource(ctx, sourceID, expectedModifiedAt)
 }
 
 func (s *Store) validateSource(ctx context.Context, source *spec.ArtifactSource) error {

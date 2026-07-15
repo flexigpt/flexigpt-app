@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -93,40 +94,32 @@ func (s *MetadataStore) ListRoots(ctx context.Context, includeSoftDeleted bool) 
 	return roots, nil
 }
 
-func (s *MetadataStore) UpdateRoot(ctx context.Context, root spec.ArtifactRoot) error {
+func (s *MetadataStore) UpdateRoot(
+	ctx context.Context,
+	root spec.ArtifactRoot,
+	expectedModifiedAt time.Time,
+) error {
 	if err := spec.ValidateArtifactRoot(root); err != nil {
 		return fmt.Errorf("validate root for persistence: %w", err)
 	}
-	result, err := s.db.ExecContext(ctx, `
-		UPDATE artifact_roots
-		   SET display_name = ?,
-		       description = ?,
-		       enabled = ?,
-		       data_schema_id = ?,
-		       data_json = ?,
-		       modified_at = ?,
-		       soft_deleted_at = ?
-		 WHERE root_id = ?`,
+	if err := validateExpectedModifiedAt("root", expectedModifiedAt); err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, updateRootSQL,
 		root.DisplayName,
 		root.Description,
 		boolToInt(root.Enabled),
 		string(root.DataSchemaID),
-		[]byte(root.Data),
+		string(root.Data),
 		formatTime(root.ModifiedAt),
 		nullableTime(root.SoftDeletedAt),
 		string(root.RootID),
+		formatTime(expectedModifiedAt),
 	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("update root: %w", err))
 	}
-	changed, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("inspect root update: %w", err)
-	}
-	if changed == 0 {
-		return fmt.Errorf("%w: root %q", spec.ErrNotFound, root.RootID)
-	}
-	return nil
+	return optimisticMutationResult(result, "root "+string(root.RootID))
 }
 
 func scanRoot(scanner sqlScanner) (spec.ArtifactRoot, error) {

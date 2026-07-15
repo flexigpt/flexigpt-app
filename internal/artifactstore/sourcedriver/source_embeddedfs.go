@@ -355,6 +355,17 @@ func mapEmbeddedFSError(locator spec.SourceLocator, err error) error {
 	if err == nil {
 		return nil
 	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf(
+			"%w: embedded source locator %q: %w",
+			spec.ErrNotFound,
+			locator,
+			err,
+		)
+	}
+	if errors.Is(err, fs.ErrPermission) {
+		return fmt.Errorf("access embedded source locator %q: %w", locator, err)
+	}
 	return fmt.Errorf("access embedded source locator %q: %w", locator, err)
 }
 

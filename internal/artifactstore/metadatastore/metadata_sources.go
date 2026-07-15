@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -94,61 +95,57 @@ func (s *MetadataStore) ListSources(ctx context.Context) ([]spec.ArtifactSource,
 	return sources, nil
 }
 
-func (s *MetadataStore) UpdateSource(ctx context.Context, source spec.ArtifactSource) error {
+func (s *MetadataStore) UpdateSource(
+	ctx context.Context,
+	source spec.ArtifactSource,
+	expectedModifiedAt time.Time,
+) error {
 	if err := spec.ValidateArtifactSource(source); err != nil {
 		return fmt.Errorf("validate source for persistence: %w", err)
+	}
+	if err := validateExpectedModifiedAt("source", expectedModifiedAt); err != nil {
+		return err
 	}
 	diagnostics, err := encodeDiagnostics(source.Diagnostics)
 	if err != nil {
 		return err
 	}
-	result, err := s.db.ExecContext(ctx, `
-		UPDATE artifact_sources
-		   SET display_name = ?,
-		       enabled = ?,
-		       config_schema_id = ?,
-		       config_json = ?,
-		       last_observed_generation = ?,
-		       last_scanned_at = ?,
-		       diagnostics_json = ?,
-		       modified_at = ?
-		 WHERE source_id = ?`,
+	result, err := s.db.ExecContext(ctx, updateSourceSQL,
 		source.DisplayName,
 		boolToInt(source.Enabled),
 		string(source.ConfigSchemaID),
-		[]byte(source.Config),
+		string(source.Config),
 		nullableSourceGeneration(source.LastObservedGeneration),
 		nullableTime(source.LastScannedAt),
-		diagnostics,
+		string(diagnostics),
 		formatTime(source.ModifiedAt),
 		string(source.SourceID),
+		formatTime(expectedModifiedAt),
 	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("update source: %w", err))
 	}
-	changed, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("inspect source update: %w", err)
-	}
-	if changed == 0 {
-		return fmt.Errorf("%w: source %q", spec.ErrNotFound, source.SourceID)
-	}
-	return nil
+	return optimisticMutationResult(result, "source "+string(source.SourceID))
 }
 
-func (s *MetadataStore) DeleteSource(ctx context.Context, sourceID spec.SourceID) error {
-	result, err := s.db.ExecContext(ctx, `DELETE FROM artifact_sources WHERE source_id = ?`, string(sourceID))
+func (s *MetadataStore) DeleteSource(
+	ctx context.Context,
+	sourceID spec.SourceID,
+	expectedModifiedAt time.Time,
+) error {
+	if err := validateExpectedModifiedAt("source", expectedModifiedAt); err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(
+		ctx,
+		deleteSourceSQL,
+		string(sourceID),
+		formatTime(expectedModifiedAt),
+	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("delete source: %w", err))
 	}
-	changed, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("inspect source deletion: %w", err)
-	}
-	if changed == 0 {
-		return fmt.Errorf("%w: source %q", spec.ErrNotFound, sourceID)
-	}
-	return nil
+	return optimisticMutationResult(result, "source "+string(sourceID))
 }
 
 func scanSource(scanner sqlScanner) (spec.ArtifactSource, error) {

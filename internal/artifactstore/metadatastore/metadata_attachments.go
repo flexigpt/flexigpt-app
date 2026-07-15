@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
@@ -97,63 +98,60 @@ func (s *MetadataStore) ListRootSourceAttachments(
 	return attachments, nil
 }
 
-func (s *MetadataStore) UpdateRootSourceAttachment(ctx context.Context, attachment spec.RootSourceAttachment) error {
+func (s *MetadataStore) UpdateRootSourceAttachment(
+	ctx context.Context,
+	attachment spec.RootSourceAttachment,
+	expectedModifiedAt time.Time,
+) error {
 	if err := spec.ValidateRootSourceAttachment(attachment); err != nil {
 		return fmt.Errorf("validate root source attachment for persistence: %w", err)
 	}
-	result, err := s.db.ExecContext(ctx, `
-		UPDATE root_source_attachments
-		   SET role = ?,
-		       priority = ?,
-		       enabled = ?,
-		       data_schema_id = ?,
-		       data_json = ?,
-		       modified_at = ?
-		 WHERE root_id = ? AND source_id = ?`,
+	if err := validateExpectedModifiedAt("root/source attachment", expectedModifiedAt); err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, updateRootSourceAttachmentSQL,
 		string(attachment.Role),
 		attachment.Priority,
 		boolToInt(attachment.Enabled),
 		string(attachment.DataSchemaID),
-		[]byte(attachment.Data),
+		string(attachment.Data),
 		formatTime(attachment.ModifiedAt),
 		string(attachment.RootID),
 		string(attachment.SourceID),
+		formatTime(expectedModifiedAt),
 	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("update root source attachment: %w", err))
 	}
-	changed, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("inspect root source attachment update: %w", err)
-	}
-	if changed == 0 {
-		return fmt.Errorf("%w: root/source attachment %q/%q", spec.ErrNotFound, attachment.RootID, attachment.SourceID)
-	}
-	return nil
+	return optimisticMutationResult(
+		result,
+		"root/source attachment "+string(attachment.RootID)+"/"+string(attachment.SourceID),
+	)
 }
 
 func (s *MetadataStore) DeleteRootSourceAttachment(
 	ctx context.Context,
 	rootID spec.RootID,
 	sourceID spec.SourceID,
+	expectedModifiedAt time.Time,
 ) error {
+	if err := validateExpectedModifiedAt("root/source attachment", expectedModifiedAt); err != nil {
+		return err
+	}
 	result, err := s.db.ExecContext(
 		ctx,
-		`DELETE FROM root_source_attachments WHERE root_id = ? AND source_id = ?`,
+		deleteRootSourceAttachmentSQL,
 		string(rootID),
 		string(sourceID),
+		formatTime(expectedModifiedAt),
 	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("delete root source attachment: %w", err))
 	}
-	changed, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("inspect root source attachment deletion: %w", err)
-	}
-	if changed == 0 {
-		return fmt.Errorf("%w: root/source attachment %q/%q", spec.ErrNotFound, rootID, sourceID)
-	}
-	return nil
+	return optimisticMutationResult(
+		result,
+		"root/source attachment "+string(rootID)+"/"+string(sourceID),
+	)
 }
 
 func scanRootSourceAttachment(scanner sqlScanner) (spec.RootSourceAttachment, error) {
