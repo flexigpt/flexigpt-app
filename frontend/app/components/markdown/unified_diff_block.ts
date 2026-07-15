@@ -130,6 +130,8 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 	let current: WorkingParsedUnifiedDiffFileForUI | null = null;
 	let inHunk = false;
+	let remainingOldHunkLines: number | undefined;
+	let remainingNewHunkLines: number | undefined;
 	let sawOpenAIPatchFormat = false;
 
 	const createWorkingFile = (): WorkingParsedUnifiedDiffFileForUI => ({
@@ -158,6 +160,8 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 		}
 		current = null;
 		inHunk = false;
+		remainingOldHunkLines = undefined;
+		remainingNewHunkLines = undefined;
 	};
 
 	const ensureCurrent = () => {
@@ -180,6 +184,9 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 			if (current) {
 				current.lines.push(line);
 			}
+			inHunk = false;
+			remainingOldHunkLines = undefined;
+			remainingNewHunkLines = undefined;
 			continue;
 		}
 
@@ -216,6 +223,8 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 				current.targetPath,
 			]);
 			inHunk = false;
+			remainingOldHunkLines = undefined;
+			remainingNewHunkLines = undefined;
 			continue;
 		}
 
@@ -255,7 +264,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 			continue;
 		}
 
-		if (line.startsWith('--- ') && i + 1 < lines.length && lines[i + 1].startsWith('+++ ')) {
+		if (!inHunk && line.startsWith('--- ') && i + 1 < lines.length && lines[i + 1].startsWith('+++ ')) {
 			if (!current || current.hunks > 0) {
 				pushCurrent();
 				current = createWorkingFile();
@@ -281,8 +290,11 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 			const file = ensureCurrent();
 			file.lines.push(line);
 			file.hunks += 1;
-			inHunk = true;
 
+			const hunkLineCounts = parseUnifiedDiffHunkLineCounts(line);
+			remainingOldHunkLines = hunkLineCounts?.oldLines;
+			remainingNewHunkLines = hunkLineCounts?.newLines;
+			inHunk = !hunkLineCounts || hunkLineCounts.oldLines > 0 || hunkLineCounts.newLines > 0;
 			continue;
 		}
 
@@ -296,6 +308,27 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 			} else if (line.startsWith('-') && !line.startsWith('---')) {
 				current.deletedLines += 1;
 			}
+
+			if (
+				typeof remainingOldHunkLines === 'number' &&
+				typeof remainingNewHunkLines === 'number' &&
+				!line.startsWith('\\')
+			) {
+				if (line.startsWith('+')) {
+					remainingNewHunkLines -= 1;
+				} else if (line.startsWith('-')) {
+					remainingOldHunkLines -= 1;
+				} else if (line.startsWith(' ')) {
+					remainingOldHunkLines -= 1;
+					remainingNewHunkLines -= 1;
+				}
+
+				if (remainingOldHunkLines <= 0 && remainingNewHunkLines <= 0) {
+					inHunk = false;
+					remainingOldHunkLines = undefined;
+					remainingNewHunkLines = undefined;
+				}
+			}
 		}
 	}
 
@@ -304,12 +337,26 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 	const files = mergeParsedUnifiedDiffFiles(rawFiles);
 
 	if (sawOpenAIPatchFormat) {
-		diagnostics.push({
-			level: ApplyUnifiedDiffDiagnosticLevel.Warning,
-			code: 'openai_patch_format',
-			message:
-				'Detected OpenAI apply_patch format. File paths were extracted for target selection, but this apply control still sends patch text to the unified diff backend. Convert to unified diff if applying fails.',
-		});
+		if (
+			files.length > 0 &&
+			files.every(f => {
+				return isParsedOpenAIAddFile(f);
+			})
+		) {
+			diagnostics.push({
+				level: ApplyUnifiedDiffDiagnosticLevel.Info,
+				code: 'openai_add_format',
+				message:
+					'Detected OpenAI Add File format. Add-file sections will be converted to standard unified diff before being sent.',
+			});
+		} else {
+			diagnostics.push({
+				level: ApplyUnifiedDiffDiagnosticLevel.Warning,
+				code: 'openai_patch_format',
+				message:
+					'Detected OpenAI apply_patch format. Only patches containing Add File sections exclusively can be converted safely by this apply control.',
+			});
+		}
 	}
 
 	return {
@@ -321,6 +368,72 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 		deletedLines: files.reduce((sum, file) => sum + file.deletedLines, 0),
 		diagnostics,
 	};
+}
+
+function isParsedOpenAIAddFile(file: ParsedUnifiedDiffFileForUI): boolean {
+	return file.oldPath === DEV_NULL && isUsablePatchPath(file.newPath);
+}
+
+function formatOpenAIAddPathForUnifiedDiff(path: string): string {
+	return /[\s"\\]/.test(path) ? JSON.stringify(path) : path;
+}
+
+function convertParsedOpenAIAddFileToUnifiedDiff(file: ParsedUnifiedDiffFileForUI): string | undefined {
+	if (!isParsedOpenAIAddFile(file) || !file.diffText || !file.newPath) {
+		return undefined;
+	}
+
+	const sectionLines = file.diffText.split('\n');
+	const headerIndex = sectionLines.findIndex(line => parseOpenAIPatchFileHeader(line)?.kind === 'add');
+	if (headerIndex < 0) {
+		return undefined;
+	}
+
+	const bodyLines: string[] = [];
+
+	for (const line of sectionLines.slice(headerIndex + 1)) {
+		if (line.trim() === '*** End Patch') {
+			break;
+		}
+
+		if (line === '\\ No newline at end of file') {
+			bodyLines.push(line);
+			continue;
+		}
+
+		if (!line.startsWith('+')) {
+			return undefined;
+		}
+
+		bodyLines.push(line);
+	}
+
+	const addedLines = bodyLines.filter(line => line.startsWith('+')).length;
+	if (addedLines === 0 && bodyLines.length > 0) {
+		return undefined;
+	}
+
+	const out = ['--- /dev/null', `+++ ${formatOpenAIAddPathForUnifiedDiff(file.newPath)}`];
+
+	if (addedLines > 0) {
+		out.push(`@@ -0,0 +1,${addedLines} @@`, ...bodyLines);
+	}
+
+	return out.join('\n');
+}
+
+export function prepareUnifiedDiffTextForApply(value: string, language = ''): string {
+	const parsed = parseUnifiedDiffForUI(value, language);
+	if (!parsed.isOpenAIPatch || parsed.files.length === 0 || !parsed.files.every(isParsedOpenAIAddFile)) {
+		return value;
+	}
+
+	const convertedParts = parsed.files.map(convertParsedOpenAIAddFileToUnifiedDiff);
+	if (convertedParts.some(part => !part)) {
+		return value;
+	}
+
+	return joinUnifiedDiffTextParts(convertedParts) ?? value;
 }
 
 export function buildUnifiedDiffTextForTarget(
@@ -345,12 +458,32 @@ export function buildUnifiedDiffTextForTarget(
 		return undefined;
 	}
 
-	const diffText = joinUnifiedDiffTextParts(matches.map(file => file.diffText));
+	let diffText: string | undefined;
+	let expectedHunks = matches.reduce((sum, file) => sum + file.hunks, 0);
+
+	if (
+		parsed.isOpenAIPatch &&
+		matches.every(f => {
+			return isParsedOpenAIAddFile(f);
+		})
+	) {
+		const convertedParts = matches.map(m => {
+			return convertParsedOpenAIAddFileToUnifiedDiff(m);
+		});
+		if (convertedParts.some(part => !part)) {
+			return undefined;
+		}
+
+		diffText = joinUnifiedDiffTextParts(convertedParts);
+		expectedHunks = diffText ? countHunkHeaders(diffText) : 0;
+	} else {
+		diffText = joinUnifiedDiffTextParts(matches.map(file => file.diffText));
+	}
+
 	if (!diffText) {
 		return undefined;
 	}
 
-	const hunks = matches.reduce((sum, file) => sum + file.hunks, 0);
 	const detectedHunks = countHunkHeaders(diffText);
 	const sectionKeyCandidates: string[] = [];
 
@@ -364,9 +497,9 @@ export function buildUnifiedDiffTextForTarget(
 
 	return {
 		diffText,
-		hunks,
+		hunks: expectedHunks,
 		sectionKeys: uniqueStrings(sectionKeyCandidates),
-		verified: hunks === 0 || detectedHunks === hunks,
+		verified: expectedHunks === 0 || detectedHunks === expectedHunks,
 	};
 }
 
@@ -376,25 +509,64 @@ export function buildEditableTargetsFromOutput(
 	globalCandidatePaths: string[] = []
 ): EditableUnifiedDiffTarget[] {
 	const byKey = new Map<string, EditableUnifiedDiffTarget>();
+	const rawInferenceCandidatePaths: string[] = [...globalCandidatePaths];
+
+	for (const file of fallback.files) {
+		rawInferenceCandidatePaths.push(...(file.candidatePaths ?? []));
+		if (file.targetPath) {
+			rawInferenceCandidatePaths.push(file.targetPath);
+		}
+		if (file.oldPath) {
+			rawInferenceCandidatePaths.push(file.oldPath);
+		}
+		if (file.newPath) {
+			rawInferenceCandidatePaths.push(file.newPath);
+		}
+	}
+
+	for (const target of output?.fileTargets ?? []) {
+		rawInferenceCandidatePaths.push(target.targetPath);
+		if (target.oldPath) {
+			rawInferenceCandidatePaths.push(target.oldPath);
+		}
+		if (target.newPath) {
+			rawInferenceCandidatePaths.push(target.newPath);
+		}
+	}
+
+	for (const file of output?.files ?? []) {
+		rawInferenceCandidatePaths.push(...(file.candidatePaths ?? []));
+		if (file.targetPath) {
+			rawInferenceCandidatePaths.push(file.targetPath);
+		}
+		if (file.resolvedPath) {
+			rawInferenceCandidatePaths.push(file.resolvedPath);
+		}
+		if (file.oldPath) {
+			rawInferenceCandidatePaths.push(file.oldPath);
+		}
+		if (file.newPath) {
+			rawInferenceCandidatePaths.push(file.newPath);
+		}
+	}
+
+	const inferenceCandidatePaths = absolutePathStrings(rawInferenceCandidatePaths);
 
 	const upsert = (target: EditableUnifiedDiffTarget) => {
 		upsertEditableTarget(byKey, target);
 	};
 
 	for (const file of fallback.files) {
-		const inferredTargets = inferTargetPathsForUI(file, globalCandidatePaths);
-		const inferredBestTarget = getUniqueBestInferredTarget(inferredTargets);
+		const inferredTargets = inferTargetPathsForUI(file, inferenceCandidatePaths);
+		const bestInferredTargets = getBestInferredTargetPaths(inferredTargets);
+		const inferredBestTarget = bestInferredTargets.length === 1 ? bestInferredTargets[0] : undefined;
 
 		upsert({
 			fileKey: file.fileKey,
 			oldPath: file.oldPath,
 			newPath: file.newPath,
 			targetPath: chooseEditableTargetPath(file, inferredBestTarget),
-			candidatePaths: absolutePathStrings([
-				...(file.candidatePaths ?? []),
-				file.targetPath,
-				...inferredTargets.map(candidate => candidate.targetPath),
-			]),
+			candidatePaths: absolutePathStrings([...(file.candidatePaths ?? []), file.targetPath, ...bestInferredTargets]),
 			hunks: file.hunks,
 			addedLines: file.addedLines,
 			deletedLines: file.deletedLines,
@@ -404,18 +576,23 @@ export function buildEditableTargetsFromOutput(
 	}
 
 	for (const target of output?.fileTargets ?? []) {
+		const inferredTargets = inferTargetPathsForUI(target, inferenceCandidatePaths);
+		const bestInferredTargets = getBestInferredTargetPaths(inferredTargets);
+		const inferredBestTarget = bestInferredTargets.length === 1 ? bestInferredTargets[0] : undefined;
+
 		upsert({
 			fileKey: target.fileKey,
 			oldPath: target.oldPath,
 			newPath: target.newPath,
-			targetPath: chooseEditableTargetPath(target),
-			candidatePaths: absolutePathStrings([target.targetPath, target.newPath, target.oldPath]),
+			targetPath: chooseEditableTargetPath(target, inferredBestTarget),
+			candidatePaths: absolutePathStrings([target.targetPath, target.newPath, target.oldPath, ...bestInferredTargets]),
 		});
 	}
 
 	for (const file of output?.files ?? []) {
-		const inferredTargets = inferTargetPathsForUI(file, globalCandidatePaths);
-		const inferredBestTarget = getUniqueBestInferredTarget(inferredTargets);
+		const inferredTargets = inferTargetPathsForUI(file, inferenceCandidatePaths);
+		const bestInferredTargets = getBestInferredTargetPaths(inferredTargets);
+		const inferredBestTarget = bestInferredTargets.length === 1 ? bestInferredTargets[0] : undefined;
 
 		upsert({
 			fileKey: file.fileKey,
@@ -424,7 +601,7 @@ export function buildEditableTargetsFromOutput(
 			targetPath: chooseEditableTargetPath(file, inferredBestTarget),
 			resolvedPath: toAbsolutePath(file.resolvedPath) || undefined,
 			candidatePaths: absolutePathStrings([
-				...inferredTargets.map(candidate => candidate.targetPath),
+				...bestInferredTargets,
 				...(file.candidatePaths ?? []),
 				file.targetPath,
 				file.resolvedPath,
@@ -790,12 +967,12 @@ function chooseEditableTargetPath(
 		return targetPath;
 	}
 
-	if (inferredBestTarget) {
-		return inferredBestTarget;
-	}
-
 	if (resolvedPath && isResolvedPathCompatibleWithPatchPath(resolvedPath, file)) {
 		return resolvedPath;
+	}
+
+	if (inferredBestTarget) {
+		return inferredBestTarget;
 	}
 
 	return toAbsolutePath(file.newPath) || toAbsolutePath(file.oldPath);
@@ -883,33 +1060,20 @@ function inferTargetPathsForUI(
 				break;
 			}
 		}
-
-		if (candidateLooksDirectory) {
-			const targetPath = toAbsolutePath(joinPathKey(trimTrailingSlashes(candidate), patchPath));
-			if (targetPath) {
-				inferences.push({
-					targetPath,
-					sourcePath: candidateRaw,
-					score: 0,
-				});
-			}
-		}
 	}
 
 	return sortAndDedupeTargetInferences(inferences);
 }
 
-function getUniqueBestInferredTarget(inferences: TargetPathInferenceForUI[]): string | undefined {
+function getBestInferredTargetPaths(inferences: TargetPathInferenceForUI[]): string[] {
 	if (inferences.length === 0) {
-		return undefined;
+		return [];
 	}
 
 	const bestScore = inferences[0].score;
-	const bestTargets = uniqueStrings(
+	return uniqueStrings(
 		inferences.filter(candidate => candidate.score === bestScore).map(candidate => candidate.targetPath)
 	);
-
-	return bestTargets.length === 1 ? bestTargets[0] : undefined;
 }
 
 function sortAndDedupeTargetInferences(inferences: TargetPathInferenceForUI[]): TargetPathInferenceForUI[] {
@@ -1119,6 +1283,22 @@ function joinUnifiedDiffTextParts(parts: Array<string | undefined>): string | un
 
 function countHunkHeaders(diffText: string): number {
 	return diffText.split('\n').filter(line => line.startsWith('@@')).length;
+}
+
+function parseUnifiedDiffHunkLineCounts(line: string): { oldLines: number; newLines: number } | undefined {
+	const match = /^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/.exec(line);
+	if (!match) {
+		return undefined;
+	}
+
+	const oldLines = match[2] === undefined ? 1 : Number(match[2]);
+	const newLines = match[4] === undefined ? 1 : Number(match[4]);
+
+	if (!Number.isSafeInteger(oldLines) || !Number.isSafeInteger(newLines)) {
+		return undefined;
+	}
+
+	return { oldLines, newLines };
 }
 
 function normalizePathKey(value: string | undefined): string {

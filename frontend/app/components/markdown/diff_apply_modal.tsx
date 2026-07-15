@@ -75,6 +75,9 @@ function getTargetStatusBadgeClassName(visualState: TargetVisualState): string {
 }
 
 function getTargetStatusLabel(target: EditableUnifiedDiffTarget, missing: boolean): string {
+	if (target.status && isTerminalUnifiedDiffStatus(target.status)) {
+		return target.status.replaceAll('_', ' ');
+	}
 	if (missing) {
 		return 'needs path';
 	}
@@ -469,6 +472,10 @@ function buildDisplayCandidatePathsForTarget(
 }
 
 function isTargetProblem(target: EditableUnifiedDiffTarget, missing: boolean): boolean {
+	if (isTerminalUnifiedDiffStatus(target.status)) {
+		return false;
+	}
+
 	return (
 		missing ||
 		target.ok === false ||
@@ -517,7 +524,7 @@ function getTargetVisualState(
 	diagnostics: ApplyUnifiedDiffDiagnostic[] = []
 ): TargetVisualState {
 	if (isTerminalUnifiedDiffStatus(target.status)) {
-		return 'info';
+		return target.status === ApplyUnifiedDiffStatus.Applied ? 'success' : 'info';
 	}
 
 	if (
@@ -650,9 +657,10 @@ export function DiffApplyModal({
 	const fileDiagnostics = collectFileLevelDiagnostics(output);
 	const summary = summaryLabel(output, fallbackParsed);
 	const counts = buildFileStatusCounts(output, fallbackParsed);
-	const missingCount = displayTargets.filter(target => !isAbsolutePath(target.targetPath)).length;
+	const targetsForApply = displayTargets.filter(target => !isTerminalUnifiedDiffStatus(target.status));
+	const missingCount = targetsForApply.filter(target => !isAbsolutePath(target.targetPath)).length;
 	const hasAnyTargets = displayTargets.length > 0;
-	const canApplyFromModal = hasAnyTargets && missingCount === 0 && !isRunning;
+	const canApplyFromModal = targetsForApply.length > 0 && missingCount === 0 && !isRunning;
 	const patchDiagnosticCounts = getDiagnosticSeverityCounts(patchDiagnostics);
 	const blockedFileCount = Math.max(0, counts.blocked - counts.needsInfo);
 
@@ -710,7 +718,7 @@ export function DiffApplyModal({
 
 		setRunningAction({ key: 'global', kind: 'apply' });
 		try {
-			await onApply(displayTargets, strict);
+			await onApply(targetsForApply, strict);
 		} finally {
 			setRunningAction(null);
 		}
@@ -745,7 +753,7 @@ export function DiffApplyModal({
 		}
 
 		const target = displayTargets[index];
-		if (!target || !isAbsolutePath(target.targetPath)) {
+		if (!target || isTerminalUnifiedDiffStatus(target.status) || !isAbsolutePath(target.targetPath)) {
 			return;
 		}
 
@@ -884,6 +892,7 @@ export function DiffApplyModal({
 							const isTargetDryRunning = runningAction?.key === targetKey && runningAction.kind === 'dry-run';
 							const isTargetApplying = runningAction?.key === targetKey && runningAction.kind === 'apply';
 							const isProblem = isTargetProblem(target, missing);
+							const isTerminal = isTerminalUnifiedDiffStatus(target.status);
 							const targetVisualState = getTargetVisualState(target, missing, targetDiagnostics);
 							const targetCardClassName = getTargetCardClassName(targetVisualState);
 							const targetBadgeClassName = getTargetStatusBadgeClassName(targetVisualState);
@@ -957,7 +966,7 @@ export function DiffApplyModal({
 											<button
 												type="button"
 												className="btn btn-xs btn-primary"
-												disabled={isRunning || isProblem}
+												disabled={isRunning || isProblem || isTerminal}
 												onClick={() => {
 													void handleTargetApply(index);
 												}}

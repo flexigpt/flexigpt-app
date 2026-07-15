@@ -38,6 +38,7 @@ import {
 	isTerminalUnifiedDiffStatus,
 	looksLikeUnifiedDiff,
 	parseUnifiedDiffForUI,
+	prepareUnifiedDiffTextForApply,
 	summaryLabel,
 	toAbsolutePath,
 	uniqueStrings,
@@ -76,8 +77,28 @@ function editableTargetsToFileTargets(targets: EditableUnifiedDiffTarget[]): App
 	);
 }
 
-function normalizeApplyOutputTargetPaths(output: ApplyUnifiedDiffOut): ApplyUnifiedDiffOut {
+function reconcileTerminalApplyOutput(output: ApplyUnifiedDiffOut): ApplyUnifiedDiffOut {
+	const files = output.files ?? [];
+	if (files.length === 0 || !files.every(file => isTerminalUnifiedDiffStatus(file.status))) {
+		return output;
+	}
+
+	const expectedFiles = output.summary?.files;
+	if (typeof expectedFiles === 'number' && expectedFiles > files.length) {
+		return output;
+	}
+
 	return {
+		...output,
+		ok: true,
+		status: files.some(file => file.status === ApplyUnifiedDiffStatus.Applied)
+			? ApplyUnifiedDiffStatus.Applied
+			: ApplyUnifiedDiffStatus.AlreadyApplied,
+	};
+}
+
+function normalizeApplyOutputTargetPaths(output: ApplyUnifiedDiffOut): ApplyUnifiedDiffOut {
+	const normalized: ApplyUnifiedDiffOut = {
 		...output,
 		fileTargets: output.fileTargets ? normalizeApplyFileTargets(output.fileTargets) : undefined,
 		files: output.files?.map(file => ({
@@ -87,6 +108,8 @@ function normalizeApplyOutputTargetPaths(output: ApplyUnifiedDiffOut): ApplyUnif
 			candidatePaths: absolutePathStrings(file.candidatePaths ?? []),
 		})),
 	};
+
+	return reconcileTerminalApplyOutput(normalized);
 }
 
 function resolveRequestDiffText(
@@ -283,10 +306,6 @@ function applyOutputFileMatchesTarget(file: ApplyUnifiedDiffFileOut, target: App
 	// Fall back to target/resolved paths when the backend normalizes paths
 	// differently from the request patch headers.
 	if (haveSharedPathIdentity(getApplyResolvedIdentityPaths(file), getApplyResolvedIdentityPaths(target))) {
-		return true;
-	}
-
-	if (filePatchPaths.length === 0 && targetPatchPaths.length === 0) {
 		return true;
 	}
 
@@ -494,10 +513,6 @@ function applyOutputFilesMatch(left: ApplyUnifiedDiffFileOut, right: ApplyUnifie
 		return true;
 	}
 
-	if (leftPatchPaths.length === 0 && rightPatchPaths.length === 0) {
-		return true;
-	}
-
 	return false;
 }
 
@@ -636,25 +651,33 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 	const buildDiffTextForEditableTargets = useCallback(
 		(targets: EditableUnifiedDiffTarget[]): string | undefined => {
+			const preparedDiffText = fallbackParsed.isOpenAIPatch
+				? prepareUnifiedDiffTextForApply(diffText, language)
+				: diffText;
+			const canScopeOpenAIAddPatch = fallbackParsed.isOpenAIPatch && preparedDiffText !== diffText;
+			const sourceDiffText = canScopeOpenAIAddPatch ? preparedDiffText : diffText;
+			const sourceLanguage = canScopeOpenAIAddPatch ? 'diff' : language;
+
 			if (targets.length === 0) {
+				return sourceDiffText;
+			}
+
+			// Unsupported OpenAI Update/Delete sections still need their original
+			// wrapper. Add-only patches have already been converted and can be scoped.
+			if (fallbackParsed.isOpenAIPatch && !canScopeOpenAIAddPatch) {
 				return diffText;
 			}
-			// OpenAI patch format needs its original wrapper preserved.
-			// The selected file targets are already sent separately, so sending the
-			// raw patch text is safer than trying to reassemble a partial patch.
-			if (fallbackParsed.isOpenAIPatch) {
-				return diffText;
-			}
+
 			const parts: string[] = [];
 			const seen = new Set<string>();
 
 			for (const target of targets) {
-				const split = buildUnifiedDiffTextForTarget(diffText, language, target);
-				const part = split?.diffText ?? target.diffText;
+				const split = buildUnifiedDiffTextForTarget(sourceDiffText, sourceLanguage, target);
+				const part = split?.diffText ?? (canScopeOpenAIAddPatch ? undefined : target.diffText);
 
 				if (!part?.trim()) {
 					if (targets.length === 1 && fallbackParsed.files.length <= 1) {
-						return diffText;
+						return sourceDiffText;
 					}
 
 					return undefined;
@@ -677,17 +700,17 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			}
 
 			if (parts.length === 0) {
-				return targets.length <= 1 ? diffText : undefined;
+				return targets.length <= 1 ? sourceDiffText : undefined;
 			}
 			return joinDiffTextParts(parts);
 		},
-		[diffText, fallbackParsed.files.length, language, fallbackParsed.isOpenAIPatch]
+		[diffText, fallbackParsed.files.length, fallbackParsed.isOpenAIPatch, language]
 	);
 
 	const runDryRun = useCallback(
 		async (targets: ApplyUnifiedDiffFileTarget[], nextStrict: boolean, options?: DiffApplyRunOptions) => {
 			const seq = ++requestSeqRef.current;
-			const requestDiffText = options?.diffText ?? diffText;
+			const requestDiffText = prepareUnifiedDiffTextForApply(options?.diffText ?? diffText, language);
 			const requestTargets =
 				targets.length > 0 ? targets : buildRequestTargetsFromParsedDiff(fallbackParsed, normalizedCandidatePaths);
 
@@ -736,7 +759,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				return undefined;
 			}
 		},
-		[deriveAndStoreTargets, diffText, normalizedCandidatePaths, setControlState, fallbackParsed]
+		[deriveAndStoreTargets, diffText, normalizedCandidatePaths, setControlState, fallbackParsed, language]
 	);
 
 	const runApply = async (
@@ -744,7 +767,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 		nextStrict: boolean,
 		options?: DiffApplyRunOptions
 	) => {
-		const requestDiffText = options?.diffText ?? diffText;
+		const requestDiffText = prepareUnifiedDiffTextForApply(options?.diffText ?? diffText, language);
 
 		setControlState(previous => ({
 			...previous,
