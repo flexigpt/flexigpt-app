@@ -81,11 +81,3 @@ const deleteRecordSQL = `
 	DELETE FROM artifact_records
 	 WHERE record_id = ?
 	   AND modified_at = ?`
-
-const publishSourceObservationSQL = `
-	UPDATE artifact_sources
-	   SET last_observed_generation = ?,
-	       last_scanned_at = ?,
-	       diagnostics_json = ?
-	 WHERE source_id = ?
-	   AND modified_at = ?`

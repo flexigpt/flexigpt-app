@@ -155,10 +155,6 @@ func (s *MetadataStore) DeleteRecord(
 	return optimisticMutationResult(result, "record "+string(recordID))
 }
 
-func (s *MetadataStore) CreateTransferProvenance(ctx context.Context, provenance spec.TransferProvenance) error {
-	return insertTransferProvenance(ctx, s.db, provenance)
-}
-
 func (s *MetadataStore) PublishRecordSynchronization(
 	ctx context.Context,
 	publication spec.RecordSynchronizationPublication,
