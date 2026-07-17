@@ -49,6 +49,7 @@ export function MessageDetailsModal({
 	showReasoningAtTop = false,
 }: MessageDetailsModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isEffectCleanupCloseRef = useRef(false);
 
 	const summaryText = joinReasoningParts(reasoningContents, 'summary');
 	const finalThinkingText = joinReasoningParts(reasoningContents, 'thinking');
@@ -77,6 +78,7 @@ export function MessageDetailsModal({
 		return () => {
 			// If the component unmounts while the dialog is still open, close it.
 			if (dialog.open) {
+				isEffectCleanupCloseRef.current = true;
 				dialog.close();
 			}
 		};
@@ -84,6 +86,11 @@ export function MessageDetailsModal({
 
 	// Sync parent state whenever the dialog is closed (Esc, backdrop, or dialog.close()).
 	const handleDialogClose = () => {
+		if (isEffectCleanupCloseRef.current) {
+			isEffectCleanupCloseRef.current = false;
+			return;
+		}
+
 		onClose();
 	};
 

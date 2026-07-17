@@ -216,6 +216,7 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 
 export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isEffectCleanupCloseRef = useRef(false);
 
 	useEffect(() => {
 		if (!state) {
@@ -231,12 +232,18 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 
 		return () => {
 			if (dialog.open) {
+				isEffectCleanupCloseRef.current = true;
 				dialog.close();
 			}
 		};
 	}, [state]);
 
 	const handleDialogClose = () => {
+		if (isEffectCleanupCloseRef.current) {
+			isEffectCleanupCloseRef.current = false;
+			return;
+		}
+
 		onClose();
 	};
 
