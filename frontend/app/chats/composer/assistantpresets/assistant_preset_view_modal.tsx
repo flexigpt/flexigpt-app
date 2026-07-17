@@ -1,7 +1,5 @@
 import { useMemo } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiServer, FiSliders, FiTool, FiZap } from 'react-icons/fi';
 
 import type { AssistantPreset } from '@/spec/assistantpreset';
@@ -11,10 +9,11 @@ import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import type {
@@ -271,9 +270,8 @@ interface AssistantPresetViewModalProps {
 	modificationSummary: AssistantPresetModificationSummary;
 }
 
-export function AssistantPresetViewModal({
+function AssistantPresetViewModalContent({
 	isOpen,
-	onClose,
 	viewedPreset,
 	viewedPresetApplication,
 	isActivePresetView,
@@ -284,7 +282,7 @@ export function AssistantPresetViewModal({
 	instructionSources,
 	modificationSummary,
 }: AssistantPresetViewModalProps) {
-	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose, isOpen });
+	const { requestClose } = useModalDialogController();
 
 	const instructionSourcesByKey = useMemo(() => {
 		return new Map(
@@ -295,7 +293,7 @@ export function AssistantPresetViewModal({
 		);
 	}, [instructionSources, viewedPresetApplication?.preparedInstructionSources]);
 
-	if (!isOpen || !viewedPreset || typeof document === 'undefined') {
+	if (!isOpen || !viewedPreset) {
 		return null;
 	}
 
@@ -371,8 +369,8 @@ export function AssistantPresetViewModal({
 	const showCurrentSkills = shouldShowActiveComparison && modificationSummary.skills;
 	const showCurrentMCP = shouldShowActiveComparison && modificationSummary.mcp;
 
-	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+	return (
+		<>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-4xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
 					<ModalHeader
@@ -597,7 +595,18 @@ export function AssistantPresetViewModal({
 			</div>
 
 			<ModalBackdrop enabled={true} />
-		</dialog>,
-		document.body
+		</>
+	);
+}
+
+export function AssistantPresetViewModal(props: AssistantPresetViewModalProps) {
+	if (!props.isOpen || !props.viewedPreset) {
+		return null;
+	}
+
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose}>
+			<AssistantPresetViewModalContent {...props} />
+		</ModalDialog>
 	);
 }

@@ -1,8 +1,6 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import type {
@@ -34,7 +32,7 @@ import { DEFAULT_REASONING_TOKENS } from '@/spec/modelpreset';
 import { tryParseJSONObject } from '@/lib/jsonschema_utils';
 import { arraysEqual, parseOptionalNumber } from '@/lib/obj_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
@@ -42,6 +40,7 @@ import { ManagementInfoGrid } from '@/components/managementui/management_info_gr
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -413,7 +412,6 @@ function getInitialModelPresetFormData(
 }
 
 function AddEditModelPresetModalContent({
-	onClose,
 	onSubmit,
 	providerName,
 	providerSDKType,
@@ -423,7 +421,7 @@ function AddEditModelPresetModalContent({
 	initialData,
 	existingModels,
 	allModelPresets,
-}: AddEditModelPresetModalContentProps) {
+}: Omit<AddEditModelPresetModalContentProps, 'isOpen' | 'onClose'>) {
 	const isEditMode = mode === 'edit';
 	const isViewMode = mode === 'view';
 	const isReadOnly = isViewMode;
@@ -482,11 +480,7 @@ function AddEditModelPresetModalContent({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [submitError, setSubmitError] = useState('');
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: !isReadOnly,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 
 	const modelPresetIdInputRef = useRef<HTMLInputElement | null>(null);
 	const modelNameInputRef = useRef<HTMLInputElement | null>(null);
@@ -900,7 +894,7 @@ function AddEditModelPresetModalContent({
 	const title = mode === 'add' ? 'Add Model Preset' : mode === 'edit' ? 'Edit Model Preset' : 'View Model Preset';
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={title}
@@ -1774,7 +1768,7 @@ function AddEditModelPresetModalContent({
 				</form>
 			</div>
 			<ModalBackdrop enabled={isReadOnly} />
-		</dialog>
+		</>
 	);
 }
 
@@ -1782,10 +1776,6 @@ export function AddEditModelPresetModal(props: AddEditModelPresetModalProps) {
 	if (!props.isOpen) {
 		return null;
 	}
-	if (typeof document === 'undefined' || !document.body) {
-		return null;
-	}
-
 	const inferredMode: ModalMode = props.initialModelID ? 'edit' : 'add';
 	const effectiveMode: ModalMode = props.mode ?? inferredMode;
 
@@ -1795,5 +1785,9 @@ export function AddEditModelPresetModal(props: AddEditModelPresetModalProps) {
 			: `${effectiveMode}:${props.providerName}:${
 					props.initialData?.id ?? props.initialModelID ?? 'unknown-model'
 				}:${props.initialData?.modifiedAt ?? 'unknown-modified'}`;
-	return createPortal(<AddEditModelPresetModalContent key={modalKey} {...props} mode={effectiveMode} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel={effectiveMode !== 'view'}>
+			<AddEditModelPresetModalContent key={modalKey} {...props} mode={effectiveMode} />
+		</ModalDialog>
+	);
 }

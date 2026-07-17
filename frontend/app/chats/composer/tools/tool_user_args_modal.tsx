@@ -1,8 +1,6 @@
 import type { SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiRefreshCcw, FiTool } from 'react-icons/fi';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
@@ -14,10 +12,11 @@ import {
 	getRequiredFromJSONSchema,
 } from '@/lib/jsonschema_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
@@ -63,8 +62,13 @@ function getInitialRawJson(existingInstance?: string): string {
 	return '{}';
 }
 
-function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance, onSave }: ToolUserArgsModalProps) {
-	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose });
+function ToolUserArgsModalContent({
+	toolLabel,
+	schema,
+	existingInstance,
+	onSave,
+}: Omit<ToolUserArgsModalProps, 'isOpen' | 'onClose'>) {
+	const { requestClose } = useModalDialogController();
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
 	const [formData, setFormData] = useState<FormState>(() => ({
@@ -160,7 +164,7 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 	};
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-[80vw] min-w-0 overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
 					<ModalHeader
@@ -318,15 +322,12 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 			</div>
 
 			<ModalBackdrop enabled={true} />
-		</dialog>
+		</>
 	);
 }
 
 export function ToolUserArgsModal(props: ToolUserArgsModalProps) {
 	if (!props.isOpen) {
-		return null;
-	}
-	if (typeof document === 'undefined' || !document.body) {
 		return null;
 	}
 
@@ -335,5 +336,9 @@ export function ToolUserArgsModal(props: ToolUserArgsModalProps) {
 		existingInstance: props.existingInstance ?? null,
 	});
 
-	return createPortal(<ToolUserArgsModalContent key={remountKey} {...props} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose}>
+			<ToolUserArgsModalContent key={remountKey} {...props} />
+		</ModalDialog>
+	);
 }

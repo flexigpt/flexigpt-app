@@ -1,8 +1,6 @@
 import type { ChangeEvent, ReactNode, SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import type { ProviderName } from '@/spec/inference';
@@ -12,7 +10,7 @@ import { AuthKeyTypeProvider } from '@/spec/setting';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { aggregateAPI } from '@/apis/baseapi';
 import { getAllProviderPresetsMap } from '@/apis/list_helper';
@@ -23,6 +21,7 @@ import { ManagementInfoGrid } from '@/components/managementui/management_info_gr
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -74,13 +73,14 @@ function getInitialFormData(
 function AddEditAuthKeyModalContent({
 	initial,
 	existing,
-	onClose,
+
 	onChanged,
 	prefill = null,
 	providerOnly = false,
 	defaultKeyName = null,
 	intro = null,
-}: AddEditAuthKeyModalProps) {
+	onBusyChange,
+}: Omit<AddEditAuthKeyModalProps, 'isOpen' | 'onClose'> & { onBusyChange?: (isBusy: boolean) => void }) {
 	const isEdit = Boolean(initial); // “edit” = we already have that record
 	const isPrefilled = !isEdit && !!prefill; // “add”, but (type,keyName) should be fixed
 	const isReadOnly = isEdit || isPrefilled; // helper for rendering
@@ -103,10 +103,14 @@ function AddEditAuthKeyModalContent({
 	/* raw provider presets fetched from backend */
 	const [providerPresets, setProviderPresets] = useState<Record<ProviderName, ProviderPreset>>({});
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
+	useEffect(() => {
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
+		onBusyChange?.(isSubmitting);
+		return () => {
+			onBusyChange?.(false);
+		};
+	}, [isSubmitting, onBusyChange]);
 
 	/* list of *types* that already exist (for dropdown) */
 	const existingTypes = useMemo(() => [...new Set(existing.map(k => k.type))], [existing]);
@@ -364,7 +368,7 @@ function AddEditAuthKeyModalContent({
 	};
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl flex-col overflow-hidden rounded-2xl p-0">
 				<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
 					<ModalHeader
@@ -525,15 +529,13 @@ function AddEditAuthKeyModalContent({
 				</form>
 			</div>
 			<ModalBackdrop enabled={!isSubmitting} />
-		</dialog>
+		</>
 	);
 }
 
 export function AddEditAuthKeyModal(props: AddEditAuthKeyModalProps) {
+	const [isSubmitting, setIsSubmitting] = useState(false);
 	if (!props.isOpen) {
-		return null;
-	}
-	if (typeof document === 'undefined' || !document.body) {
 		return null;
 	}
 
@@ -545,5 +547,9 @@ export function AddEditAuthKeyModal(props: AddEditAuthKeyModalProps) {
 				? `provider-only:${props.defaultKeyName ?? 'default'}`
 				: 'add';
 
-	return createPortal(<AddEditAuthKeyModalContent key={modalKey} {...props} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} isBusy={isSubmitting}>
+			<AddEditAuthKeyModalContent key={modalKey} {...props} onBusyChange={setIsSubmitting} />
+		</ModalDialog>
+	);
 }

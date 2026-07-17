@@ -1,16 +1,15 @@
 import type { SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiLink } from 'react-icons/fi';
 
 import type { FieldErrorState } from '@/lib/url_utils';
 import { createUrlFieldChangeHandler, MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 interface UrlAttachmentModalProps {
@@ -27,16 +26,12 @@ type UrlAttachmentModalContentProps = Omit<UrlAttachmentModalProps, 'isOpen'>;
 
 const INITIAL_FORM_STATE: FormState = { url: '' };
 
-function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalContentProps) {
+function UrlAttachmentModalContent({ onAttachURL }: UrlAttachmentModalContentProps) {
 	const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 	const [errors, setErrors] = useState<FieldErrorState<FormState>>({});
 	const [submitting, setSubmitting] = useState(false);
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: true,
-		isBusy: submitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 	const inputRef = useRef<HTMLInputElement | null>(null);
 
 	const focusInputAtEnd = useCallback(() => {
@@ -115,7 +110,7 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 	const urlError = errors.url ?? null;
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-xl overflow-auto rounded-2xl p-0">
 				<ModalHeader
 					title={
@@ -189,7 +184,7 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 				</form>
 			</div>
 			{/* NOTE: no modal-backdrop here: backdrop click should NOT close this modal */}
-		</dialog>
+		</>
 	);
 }
 
@@ -197,9 +192,10 @@ export function UrlAttachmentModal({ isOpen, onClose, onAttachURL }: UrlAttachme
 	if (!isOpen) {
 		return null;
 	}
-	if (typeof document === 'undefined' || !document.body) {
-		return null;
-	}
 
-	return createPortal(<UrlAttachmentModalContent onClose={onClose} onAttachURL={onAttachURL} />, document.body);
+	return (
+		<ModalDialog isOpen={isOpen} onClose={onClose} blockCancel>
+			<UrlAttachmentModalContent onClose={onClose} onAttachURL={onAttachURL} />
+		</ModalDialog>
+	);
 }

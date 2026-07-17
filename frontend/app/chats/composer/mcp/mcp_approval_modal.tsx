@@ -1,16 +1,13 @@
 import { useEffect, useRef } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import type { MCPApprovalSummary } from '@/spec/mcp';
 import { MCPApprovalResolution } from '@/spec/mcp';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
-
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import type { MCPApprovalRequest } from '@/chats/composer/mcp/use_mcp_approval';
@@ -60,29 +57,20 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 		resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
 	};
 
-	const { dialogRef, handleClose } = useDialogController({
-		onClose: closeAsDenyOnce,
-		isOpen: Boolean(approvalRequest),
-	});
-
 	if (!approvalRequest) {
-		return null;
-	}
-	if (typeof document === 'undefined' || !document.body) {
 		return null;
 	}
 
 	const { summary, reason } = approvalRequest;
 
-	return createPortal(
-		<dialog
-			ref={dialogRef}
-			className="modal"
+	return (
+		<ModalDialog
+			isOpen={true}
+			onClose={closeAsDenyOnce}
 			onCancel={e => {
 				e.preventDefault();
 				closeAsDenyOnce();
 			}}
-			onClose={handleClose}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
@@ -176,7 +164,6 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 			</div>
 
 			<ModalBackdrop enabled={true} />
-		</dialog>,
-		document.body
+		</ModalDialog>
 	);
 }

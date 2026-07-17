@@ -1,14 +1,13 @@
 import type { SubmitEventHandler } from 'react';
 import { useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 interface MCPSettingsModalProps {
@@ -71,19 +70,14 @@ function MCPSettingsModalContent({
 	initialListenAddr,
 	activeListenAddr,
 	oauthRedirectURL,
-	onClose,
 	onSubmit,
-}: MCPSettingsModalProps) {
+}: Omit<MCPSettingsModalProps, 'isOpen' | 'onClose'>) {
 	const [listenAddr, setListenAddr] = useState(initialListenAddr ?? '');
 	const [errorState, setErrorState] = useState('');
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: true,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
@@ -119,7 +113,7 @@ function MCPSettingsModalContent({
 	};
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 max-w-2xl rounded-2xl p-0">
 				<div className="p-6">
 					<ModalHeader
@@ -202,7 +196,7 @@ function MCPSettingsModalContent({
 				</div>
 			</div>
 			<ModalBackdrop enabled={false} />
-		</dialog>
+		</>
 	);
 }
 
@@ -210,8 +204,9 @@ export function MCPSettingsModal(props: MCPSettingsModalProps) {
 	if (!props.isOpen) {
 		return null;
 	}
-	if (typeof document === 'undefined' || !document.body) {
-		return null;
-	}
-	return createPortal(<MCPSettingsModalContent key="mcp-settings-modal" {...props} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
+			<MCPSettingsModalContent key="mcp-settings-modal" {...props} />
+		</ModalDialog>
+	);
 }

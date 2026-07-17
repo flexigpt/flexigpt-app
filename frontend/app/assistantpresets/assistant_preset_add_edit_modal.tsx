@@ -1,8 +1,6 @@
 import type { SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiUpload, FiX } from 'react-icons/fi';
 
 import type { MCPConversationContext } from '@/spec/mcp';
@@ -17,7 +15,7 @@ import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
@@ -25,6 +23,7 @@ import { ManagementInfoGrid } from '@/components/managementui/management_info_gr
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -359,7 +358,6 @@ function getAssistantPresetToolModelCompatibilityError(
 }
 
 function AddEditAssistantPresetModalContent({
-	onClose,
 	onSubmit,
 	initialData,
 	existingPresets,
@@ -388,11 +386,7 @@ function AddEditAssistantPresetModalContent({
 	const initialPresetVersion = initialData?.preset?.version;
 
 	const forceCatalogReloadRef = useRef(false);
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: !isViewMode,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 
 	const loadCatalogResource = useCallback(async (signal: AbortSignal): Promise<AssistantPresetEditorCatalog> => {
 		const force = forceCatalogReloadRef.current;
@@ -1153,7 +1147,7 @@ function AddEditAssistantPresetModalContent({
 				: 'Add Assistant Preset';
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl p-0">
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
@@ -1702,7 +1696,7 @@ function AddEditAssistantPresetModalContent({
 				</div>
 			</div>
 			<ModalBackdrop enabled={isViewMode} />
-		</dialog>
+		</>
 	);
 }
 
@@ -1710,13 +1704,15 @@ export function AddEditAssistantPresetModal(props: AddEditAssistantPresetModalPr
 	if (!props.isOpen) {
 		return null;
 	}
-	if (typeof document === 'undefined' || !document.body) {
-		return null;
-	}
 
 	const remountKey = props.initialData
 		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.preset.id}:${props.initialData.preset.version}:${String(props.initialData.preset.modifiedAt)}`
 		: `${props.mode ?? 'auto'}:new`;
+	const effectiveMode = props.mode ?? (props.initialData ? 'edit' : 'add');
 
-	return createPortal(<AddEditAssistantPresetModalContent key={remountKey} {...props} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel={effectiveMode !== 'view'}>
+			<AddEditAssistantPresetModalContent key={remountKey} {...props} />
+		</ModalDialog>
+	);
 }

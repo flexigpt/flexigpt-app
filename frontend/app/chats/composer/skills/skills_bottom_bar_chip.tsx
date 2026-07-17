@@ -1,8 +1,6 @@
 import type { Dispatch, SetStateAction, SubmitEventHandler, SyntheticEvent } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiRefreshCw, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
@@ -10,7 +8,7 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 
 import type { SkillBundle, SkillListItem, SkillRef } from '@/spec/skill';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { skillStoreAPI } from '@/apis/baseapi';
 import { getAllSkillBundles } from '@/apis/list_helper';
@@ -25,6 +23,7 @@ import {
 import { Dropdown } from '@/components/dropdown';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
@@ -175,21 +174,33 @@ function slugifySkillName(value: string): string {
 		.slice(0, 64);
 }
 
-function AddInstructionSkillModal({
-	isOpen,
-	allSkills,
-	mode,
-	initialDraft,
-	onClose,
-	onCreated,
-}: {
+interface AddInstructionSkillModalProps {
 	isOpen: boolean;
 	allSkills: SkillListItem[];
 	mode: 'add' | 'fork';
 	initialDraft: InstructionSkillDraft | null;
 	onClose: () => void;
 	onCreated: (item: SkillListItem) => Promise<void> | void;
-}) {
+}
+
+function AddInstructionSkillModal(props: AddInstructionSkillModalProps) {
+	if (!props.isOpen) {
+		return null;
+	}
+
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
+			<AddInstructionSkillModalContent {...props} />
+		</ModalDialog>
+	);
+}
+
+function AddInstructionSkillModalContent({
+	allSkills,
+	mode,
+	initialDraft,
+	onCreated,
+}: Omit<AddInstructionSkillModalProps, 'isOpen' | 'onClose'>) {
 	const initial = initialDraft ?? DEFAULT_INSTRUCTION_SKILL_DRAFT;
 	const [bundles, setBundles] = useState<SkillBundle[]>([]);
 	const [bundleID, setBundleID] = useState(initial.bundleID ?? '');
@@ -198,17 +209,9 @@ function AddInstructionSkillModal({
 	const [body, setBody] = useState(initial.body);
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: true,
-		isBusy: isSubmitting,
-		isOpen,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 
 	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
 		let cancelled = false;
 		void getAllSkillBundles(undefined, true)
 			.then(nextBundles => {
@@ -232,7 +235,7 @@ function AddInstructionSkillModal({
 		return () => {
 			cancelled = true;
 		};
-	}, [initialDraft, isOpen]);
+	}, [initialDraft]);
 
 	const existingSlugsForBundle = useMemo(
 		() => new Set(allSkills.filter(item => item.bundleID === bundleID).map(item => item.skillSlug)),
@@ -304,131 +307,124 @@ function AddInstructionSkillModal({
 			});
 	};
 
-	if (!isOpen || typeof document === 'undefined' || !document.body) {
-		return null;
-	}
-
 	const bundleDropdownItems = Object.fromEntries(
 		bundles.map(bundle => [bundle.id, { isEnabled: bundle.isEnabled }] as const)
 	);
 
-	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-xl overflow-auto rounded-2xl p-0">
-				<ModalHeader
-					title={mode === 'fork' ? 'Fork Instruction Skill' : 'Add Instruction Skill'}
-					onClose={() => {
-						requestClose();
-					}}
-					closeDisabled={isSubmitting}
-				/>
+	return (
+		<div className="modal-box bg-base-200 max-h-[80vh] max-w-xl overflow-auto rounded-2xl p-0">
+			<ModalHeader
+				title={mode === 'fork' ? 'Fork Instruction Skill' : 'Add Instruction Skill'}
+				onClose={() => {
+					requestClose();
+				}}
+				closeDisabled={isSubmitting}
+			/>
 
-				<form className="space-y-4 p-6" onSubmit={handleSubmit} aria-busy={isSubmitting}>
-					{submitError ? (
-						<div className="alert alert-error rounded-2xl text-sm">
-							<FiAlertCircle size={14} />
-							<span>{submitError}</span>
-						</div>
-					) : null}
-
-					<div className="alert alert-info rounded-2xl text-sm">
-						{mode === 'fork' ? (
-							<span>This creates a new managed filesystem instruction skill from the rendered source skill text.</span>
-						) : (
-							<span>
-								This creates a managed filesystem skill with <span className="font-mono">insert: instructions</span>.
-								For arguments, scripts, resources, or user-message templates, use the Skill Bundles page.
-							</span>
-						)}
+			<form className="space-y-4 p-6" onSubmit={handleSubmit} aria-busy={isSubmitting}>
+				{submitError ? (
+					<div className="alert alert-error rounded-2xl text-sm">
+						<FiAlertCircle size={14} />
+						<span>{submitError}</span>
 					</div>
+				) : null}
 
-					<div>
-						<label className="label py-1">
-							<span className="text-sm">Bundle</span>
-						</label>
-						<Dropdown<string>
-							dropdownItems={bundleDropdownItems}
-							orderedKeys={bundles.map(bundle => bundle.id)}
-							selectedKey={bundleID}
-							onChange={setBundleID}
-							filterDisabled={true}
-							title="Select skill bundle"
-							getDisplayName={key => {
-								const bundle = bundles.find(item => item.id === key);
-								return bundle ? `${bundle.displayName || bundle.slug} (${bundle.slug})` : key;
-							}}
-						/>
-						{bundleError ? <div className="text-error mt-1 text-xs">{bundleError}</div> : null}
-					</div>
+				<div className="alert alert-info rounded-2xl text-sm">
+					{mode === 'fork' ? (
+						<span>This creates a new managed filesystem instruction skill from the rendered source skill text.</span>
+					) : (
+						<span>
+							This creates a managed filesystem skill with <span className="font-mono">insert: instructions</span>. For
+							arguments, scripts, resources, or user-message templates, use the Skill Bundles page.
+						</span>
+					)}
+				</div>
 
-					<div>
-						<label className="label py-1">
-							<span className="text-sm">Display name</span>
-						</label>
-						<input
-							className="input w-full rounded-xl"
-							value={displayName}
-							onChange={event => {
-								setDisplayName(event.target.value);
-							}}
-							spellCheck="false"
-						/>
-					</div>
+				<div>
+					<label className="label py-1">
+						<span className="text-sm">Bundle</span>
+					</label>
+					<Dropdown<string>
+						dropdownItems={bundleDropdownItems}
+						orderedKeys={bundles.map(bundle => bundle.id)}
+						selectedKey={bundleID}
+						onChange={setBundleID}
+						filterDisabled={true}
+						title="Select skill bundle"
+						getDisplayName={key => {
+							const bundle = bundles.find(item => item.id === key);
+							return bundle ? `${bundle.displayName || bundle.slug} (${bundle.slug})` : key;
+						}}
+					/>
+					{bundleError ? <div className="text-error mt-1 text-xs">{bundleError}</div> : null}
+				</div>
 
-					<div>
-						<label className="label py-1">
-							<span className="text-sm">Skill name and slug</span>
-						</label>
-						<input
-							className={`input w-full rounded-xl ${nameError ? 'input-error' : ''}`}
-							value={name}
-							onChange={event => {
-								const next = event.target.value;
-								setName(next);
-								if (displayName === 'Instruction Skill') {
-									setDisplayName(next.replaceAll('-', ' ').replaceAll(/\b\w/g, c => c.toUpperCase()));
-								}
-							}}
-							spellCheck="false"
-						/>
-						<div className="text-base-content/70 mt-1 text-xs">Saved as: {normalizedName || '-'}</div>
-						{nameError ? <div className="text-error mt-1 text-xs">{nameError}</div> : null}
-					</div>
+				<div>
+					<label className="label py-1">
+						<span className="text-sm">Display name</span>
+					</label>
+					<input
+						className="input w-full rounded-xl"
+						value={displayName}
+						onChange={event => {
+							setDisplayName(event.target.value);
+						}}
+						spellCheck="false"
+					/>
+				</div>
 
-					<div>
-						<label className="label py-1">
-							<span className="text-sm">Instructions</span>
-						</label>
-						<textarea
-							className={`textarea h-36 w-full rounded-xl ${bodyError ? 'textarea-error' : ''}`}
-							value={body}
-							onChange={event => {
-								setBody(event.target.value);
-							}}
-							placeholder="Write standing assistant instructions here..."
-							spellCheck="false"
-						/>
-						{bodyError ? <div className="text-error mt-1 text-xs">{bodyError}</div> : null}
-					</div>
+				<div>
+					<label className="label py-1">
+						<span className="text-sm">Skill name and slug</span>
+					</label>
+					<input
+						className={`input w-full rounded-xl ${nameError ? 'input-error' : ''}`}
+						value={name}
+						onChange={event => {
+							const next = event.target.value;
+							setName(next);
+							if (displayName === 'Instruction Skill') {
+								setDisplayName(next.replaceAll('-', ' ').replaceAll(/\b\w/g, c => c.toUpperCase()));
+							}
+						}}
+						spellCheck="false"
+					/>
+					<div className="text-base-content/70 mt-1 text-xs">Saved as: {normalizedName || '-'}</div>
+					{nameError ? <div className="text-error mt-1 text-xs">{nameError}</div> : null}
+				</div>
 
-					<ModalActions className="-mx-6 mt-6 -mb-6">
-						<button
-							type="button"
-							className="btn bg-base-300 rounded-xl"
-							onClick={() => {
-								requestClose();
-							}}
-						>
-							Cancel
-						</button>
-						<button type="submit" className="btn btn-primary rounded-xl" disabled={!canSubmit}>
-							{isSubmitting ? 'Creating…' : mode === 'fork' ? 'Fork and add to instructions' : 'Create and add'}
-						</button>
-					</ModalActions>
-				</form>
-			</div>
-		</dialog>,
-		document.body
+				<div>
+					<label className="label py-1">
+						<span className="text-sm">Instructions</span>
+					</label>
+					<textarea
+						className={`textarea h-36 w-full rounded-xl ${bodyError ? 'textarea-error' : ''}`}
+						value={body}
+						onChange={event => {
+							setBody(event.target.value);
+						}}
+						placeholder="Write standing assistant instructions here..."
+						spellCheck="false"
+					/>
+					{bodyError ? <div className="text-error mt-1 text-xs">{bodyError}</div> : null}
+				</div>
+
+				<ModalActions className="-mx-6 mt-6 -mb-6">
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						Cancel
+					</button>
+					<button type="submit" className="btn btn-primary rounded-xl" disabled={!canSubmit}>
+						{isSubmitting ? 'Creating…' : mode === 'fork' ? 'Fork and add to instructions' : 'Create and add'}
+					</button>
+				</ModalActions>
+			</form>
+		</div>
 	);
 }
 

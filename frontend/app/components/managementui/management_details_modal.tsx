@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
 
-import { createPortal } from 'react-dom';
-
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 interface ManagementDetailsModalProps {
@@ -22,7 +21,6 @@ interface ManagementDetailsModalProps {
 }
 
 function ManagementDetailsModalContent({
-	onClose,
 	title,
 	description,
 	children,
@@ -30,16 +28,14 @@ function ManagementDetailsModalContent({
 	height = 'standard',
 	closeLabel = 'Close',
 	allowBackdropClose = true,
-}: Omit<ManagementDetailsModalProps, 'isOpen' | 'modalKey'>) {
-	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({
-		onClose,
-	});
+}: Omit<ManagementDetailsModalProps, 'isOpen' | 'modalKey' | 'onClose'>) {
+	const { requestClose } = useModalDialogController();
 
 	const widthClassName = width === 'wide' ? 'max-w-6xl' : 'max-w-3xl';
 	const heightClassName = height === 'tall' ? 'max-h-[85vh]' : 'max-h-[80vh]';
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div
 				className={`modal-box bg-base-200 flex ${heightClassName} w-[calc(100%-1rem)] ${widthClassName} flex-col overflow-hidden rounded-2xl p-0`}
 			>
@@ -67,7 +63,7 @@ function ManagementDetailsModalContent({
 			</div>
 
 			<ModalBackdrop enabled={allowBackdropClose} />
-		</dialog>
+		</>
 	);
 }
 
@@ -83,23 +79,23 @@ export function ManagementDetailsModal({
 	closeLabel,
 	allowBackdropClose,
 }: ManagementDetailsModalProps) {
-	if (!isOpen || typeof document === 'undefined' || !document.body) {
+	if (!isOpen) {
 		return null;
 	}
 
-	return createPortal(
-		<ManagementDetailsModalContent
-			key={modalKey}
-			onClose={onClose}
-			title={title}
-			description={description}
-			width={width}
-			height={height}
-			closeLabel={closeLabel}
-			allowBackdropClose={allowBackdropClose}
-		>
-			{children}
-		</ManagementDetailsModalContent>,
-		document.body
+	return (
+		<ModalDialog isOpen={isOpen} onClose={onClose}>
+			<ManagementDetailsModalContent
+				key={modalKey}
+				title={title}
+				description={description}
+				width={width}
+				height={height}
+				closeLabel={closeLabel}
+				allowBackdropClose={allowBackdropClose}
+			>
+				{children}
+			</ManagementDetailsModalContent>
+		</ModalDialog>
 	);
 }

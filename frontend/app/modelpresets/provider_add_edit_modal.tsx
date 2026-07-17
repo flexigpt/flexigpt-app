@@ -1,8 +1,6 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import type { ProviderName } from '@/spec/inference';
@@ -21,7 +19,7 @@ import {
 import { omitManyKeys } from '@/lib/obj_utils';
 import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
@@ -29,6 +27,7 @@ import { ManagementInfoGrid } from '@/components/managementui/management_info_gr
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -124,13 +123,12 @@ interface AddEditProviderPresetModalProps {
 
 function AddEditProviderPresetModalContent({
 	mode,
-	onClose,
 	onSubmit,
 	existingProviderNames,
 	allProviderPresets,
 	initialPreset,
 	apiKeyAlreadySet = false,
-}: AddEditProviderPresetModalProps) {
+}: Omit<AddEditProviderPresetModalProps, 'isOpen' | 'onClose'>) {
 	const isReadOnly = mode === 'view';
 
 	const [formData, setFormData] = useState<ProviderFormData>(() => getInitialFormData(mode, initialPreset));
@@ -140,11 +138,7 @@ function AddEditProviderPresetModalContent({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [submitError, setSubmitError] = useState('');
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: !isReadOnly,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 
 	const providerNameInputRef = useRef<HTMLInputElement | null>(null);
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
@@ -572,7 +566,7 @@ function AddEditProviderPresetModalContent({
 	const title = mode === 'add' ? 'Add Provider' : mode === 'edit' ? 'Edit Provider' : 'View Provider';
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={title}
@@ -964,15 +958,12 @@ function AddEditProviderPresetModalContent({
 				</form>
 			</div>
 			<ModalBackdrop enabled={isReadOnly} />
-		</dialog>
+		</>
 	);
 }
 
 export function AddEditProviderPresetModal(props: AddEditProviderPresetModalProps) {
 	if (!props.isOpen) {
-		return null;
-	}
-	if (typeof document === 'undefined' || !document.body) {
 		return null;
 	}
 
@@ -983,5 +974,9 @@ export function AddEditProviderPresetModal(props: AddEditProviderPresetModalProp
 					props.initialPreset?.modifiedAt ?? 'unknown-modified'
 				}`;
 
-	return createPortal(<AddEditProviderPresetModalContent key={modalKey} {...props} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel={props.mode !== 'view'}>
+			<AddEditProviderPresetModalContent key={modalKey} {...props} />
+		</ModalDialog>
+	);
 }

@@ -1,16 +1,15 @@
-import { useState } from 'react';
-
-import { createPortal } from 'react-dom';
+import { useEffect, useState } from 'react';
 
 import { FiAlertCircle, FiExternalLink } from 'react-icons/fi';
 
 import type { MCPAuthHealth, MCPServerConfig } from '@/spec/mcp';
 import { MCPAuthHealthState } from '@/spec/mcp';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import {
@@ -32,17 +31,21 @@ interface MCPOAuthAuthorizationModalProps {
 function MCPOAuthAuthorizationModalContent({
 	server,
 	authHealth,
-	onClose,
 	onOpenURL,
 	onCancel,
-}: MCPOAuthAuthorizationModalProps) {
+	onBusyChange,
+}: MCPOAuthAuthorizationModalProps & { onBusyChange?: (isBusy: boolean) => void }) {
 	const [isCancelling, setIsCancelling] = useState(false);
 	const [cancelError, setCancelError] = useState('');
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		isBusy: isCancelling,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
+	useEffect(() => {
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
+		onBusyChange?.(isCancelling);
+		return () => {
+			onBusyChange?.(false);
+		};
+	}, [isCancelling, onBusyChange]);
 
 	const authState = getEffectiveMCPAuthHealthState(server ?? undefined, authHealth);
 	const authorizationURL = isMCPAuthActionable(authHealth, server ?? undefined)
@@ -77,7 +80,7 @@ function MCPOAuthAuthorizationModalContent({
 	};
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl p-0">
 				<div className="app-scrollbar-thin p-4 sm:p-6">
 					<ModalHeader
@@ -193,20 +196,24 @@ function MCPOAuthAuthorizationModalContent({
 				</div>
 			</div>
 			<ModalBackdrop enabled={!isCancelling} />
-		</dialog>
+		</>
 	);
 }
 
 export function MCPOAuthAuthorizationModal(props: MCPOAuthAuthorizationModalProps) {
+	const [isCancelling, setIsCancelling] = useState(false);
+
 	if (!props.isOpen) {
 		return null;
 	}
-	if (typeof document === 'undefined' || !document.body) {
-		return null;
-	}
 
-	return createPortal(
-		<MCPOAuthAuthorizationModalContent key="mcp-oauth-authorization-modal" {...props} />,
-		document.body
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} isBusy={isCancelling}>
+			<MCPOAuthAuthorizationModalContent
+				key="mcp-oauth-authorization-modal"
+				{...props}
+				onBusyChange={setIsCancelling}
+			/>
+		</ModalDialog>
 	);
 }

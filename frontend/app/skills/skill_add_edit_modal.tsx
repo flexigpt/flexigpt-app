@@ -1,8 +1,6 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiCopy, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import type { Skill, SkillArgument, SkillInsert } from '@/spec/skill';
@@ -11,7 +9,7 @@ import { SkillType } from '@/spec/skill';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug, validateTags } from '@/lib/text_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { skillStoreAPI } from '@/apis/baseapi';
 
@@ -22,6 +20,7 @@ import { ManagementInfoRow } from '@/components/managementui/management_info_row
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -274,13 +273,12 @@ function validateScaffoldArgumentLines(text: string): string | undefined {
 }
 
 function AddEditSkillModalContent({
-	onClose,
 	onSubmit,
 	initialData,
 	existingSkills,
 	prefillSkills,
 	mode,
-}: AddEditSkillModalProps) {
+}: Omit<AddEditSkillModalProps, 'isOpen' | 'onClose'>) {
 	const requestedMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	const isForkMode = requestedMode === 'fork';
 	// Match the Tool modal pattern: unsupported impls can exist (viewable),
@@ -331,11 +329,7 @@ function AddEditSkillModalContent({
 	const artifactFrontmatter = stringifySkillFrontmatter(artifactSkill?.rawFrontmatter);
 	const scaffoldArgumentError = validateScaffoldArgumentLines(scaffoldArgumentsText);
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: !isViewMode,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 	const nameInputRef = useRef<HTMLInputElement | null>(null);
 
 	const scaffoldArguments = useMemo(() => parseScaffoldArgumentLines(scaffoldArgumentsText), [scaffoldArgumentsText]);
@@ -675,7 +669,7 @@ function AddEditSkillModalContent({
 				: 'Add Skill or Template';
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl p-0">
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
@@ -1331,15 +1325,12 @@ function AddEditSkillModalContent({
 			</div>
 
 			<ModalBackdrop enabled={isViewMode} />
-		</dialog>
+		</>
 	);
 }
 
 export function AddEditSkillModal(props: AddEditSkillModalProps) {
 	if (!props.isOpen) {
-		return null;
-	}
-	if (typeof document === 'undefined' || !document.body) {
 		return null;
 	}
 
@@ -1348,6 +1339,15 @@ export function AddEditSkillModal(props: AddEditSkillModalProps) {
 				props.initialData.skill.modifiedAt
 			)}:${props.initialData.skill.type}:${props.initialData.skill.isBuiltIn ? '1' : '0'}`
 		: `${props.mode ?? 'auto'}:new`;
+	const requestedMode = props.mode ?? (props.initialData ? 'edit' : 'add');
+	const isLockedSkill =
+		requestedMode !== 'fork' &&
+		(Boolean(props.initialData?.skill?.isBuiltIn) || props.initialData?.skill?.type === SkillType.EmbeddedFS);
+	const isViewMode = isLockedSkill || requestedMode === 'view';
 
-	return createPortal(<AddEditSkillModalContent key={remountKey} {...props} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel={!isViewMode}>
+			<AddEditSkillModalContent key={remountKey} {...props} />
+		</ModalDialog>
+	);
 }

@@ -1,11 +1,10 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useRef } from 'react';
 
-import { createPortal } from 'react-dom';
-
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 
 interface MermaidZoomModalProps {
 	isOpen: boolean;
@@ -14,8 +13,8 @@ interface MermaidZoomModalProps {
 	surfaceStyle?: CSSProperties;
 }
 
-function MermaidZoomModalContent({ onClose, svgNode, surfaceStyle }: Omit<MermaidZoomModalProps, 'isOpen'>) {
-	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose });
+function MermaidZoomModalContent({ svgNode, surfaceStyle }: Omit<MermaidZoomModalProps, 'isOpen' | 'onClose'>) {
+	const { requestClose } = useModalDialogController();
 	const modalRef = useRef<HTMLDivElement | null>(null);
 
 	// Inject the SVG into the modal container whenever we have one and the modal is open
@@ -47,13 +46,7 @@ function MermaidZoomModalContent({ onClose, svgNode, surfaceStyle }: Omit<Mermai
 	}, [svgNode]);
 
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleClose}
-			onCancel={handleCancel}
-			aria-label="Enlarged Mermaid diagram"
-		>
+		<>
 			<div
 				className="modal-box app-bg-mermaid flex h-[90vh] max-w-[90vw] cursor-zoom-out items-center justify-center"
 				style={surfaceStyle}
@@ -66,17 +59,18 @@ function MermaidZoomModalContent({ onClose, svgNode, surfaceStyle }: Omit<Mermai
 			</div>
 
 			<ModalBackdrop enabled={true} />
-		</dialog>
+		</>
 	);
 }
 
 export function MermaidZoomModal(props: MermaidZoomModalProps) {
-	if (!props.isOpen || typeof document === 'undefined' || !document.body) {
+	if (!props.isOpen) {
 		return null;
 	}
 
-	return createPortal(
-		<MermaidZoomModalContent onClose={props.onClose} svgNode={props.svgNode} surfaceStyle={props.surfaceStyle} />,
-		document.body
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} aria-label="Enlarged Mermaid diagram">
+			<MermaidZoomModalContent svgNode={props.svgNode} surfaceStyle={props.surfaceStyle} />
+		</ModalDialog>
 	);
 }

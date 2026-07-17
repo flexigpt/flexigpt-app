@@ -1,13 +1,12 @@
-import { createPortal } from 'react-dom';
-
 import { FiCode } from 'react-icons/fi';
 
 import type { ReasoningContent } from '@/spec/inference';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
@@ -39,7 +38,6 @@ function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'sum
 }
 
 function MessageDetailsModalContent({
-	onClose,
 	messageID,
 	title,
 	content,
@@ -48,7 +46,7 @@ function MessageDetailsModalContent({
 	streamedThinking = '',
 	showReasoningAtTop = false,
 }: MessageDetailsModalProps) {
-	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose });
+	const { requestClose } = useModalDialogController();
 
 	const summaryText = joinReasoningParts(reasoningContents, 'summary');
 	const finalThinkingText = joinReasoningParts(reasoningContents, 'thinking');
@@ -60,7 +58,7 @@ function MessageDetailsModalContent({
 	const hasDebugContent = content.trim().length > 0;
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 flex max-h-[80vh] max-w-[80vw] flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={
@@ -139,14 +137,18 @@ function MessageDetailsModalContent({
 			</div>
 
 			<ModalBackdrop enabled={true} />
-		</dialog>
+		</>
 	);
 }
 
 export function MessageDetailsModal(props: MessageDetailsModalProps) {
-	if (!props.isOpen || typeof document === 'undefined' || !document.body) {
+	if (!props.isOpen) {
 		return null;
 	}
 
-	return createPortal(<MessageDetailsModalContent {...props} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose}>
+			<MessageDetailsModalContent {...props} />
+		</ModalDialog>
+	);
 }

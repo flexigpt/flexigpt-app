@@ -1,5 +1,3 @@
-import { createPortal } from 'react-dom';
-
 import { FiTool } from 'react-icons/fi';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
@@ -13,10 +11,11 @@ import {
 	normalizeStructuredJSONStringDeep,
 } from '@/lib/jsonschema_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
@@ -215,12 +214,8 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 	return lines.join('\n');
 }
 
-export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
-	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({
-		onClose,
-		isOpen: Boolean(state),
-	});
-
+function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
+	const { requestClose } = useModalDialogController();
 	if (!state) {
 		return null;
 	}
@@ -252,8 +247,8 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 		}
 	}
 
-	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+	return (
+		<>
 			<div className="modal-box bg-base-200 flex max-h-[80vh] max-w-[80vw] flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={
@@ -311,7 +306,18 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 			</div>
 
 			<ModalBackdrop enabled={true} />
-		</dialog>,
-		document.body
+		</>
+	);
+}
+
+export function ToolDetailsModal(props: ToolDetailsModalProps) {
+	if (!props.state) {
+		return null;
+	}
+
+	return (
+		<ModalDialog isOpen={true} onClose={props.onClose}>
+			<ToolDetailsModalContent {...props} />
+		</ModalDialog>
 	);
 }

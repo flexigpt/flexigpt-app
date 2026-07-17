@@ -1,8 +1,6 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiPlus, FiTrash2, FiUpload, FiX } from 'react-icons/fi';
 
 import type { MCPServerConfig, MCPToolPolicyOverride, PutMCPServerPayload } from '@/spec/mcp';
@@ -12,7 +10,7 @@ import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug } from '@/lib/text_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
@@ -20,6 +18,7 @@ import { ManagementInfoGrid } from '@/components/managementui/management_info_gr
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -368,13 +367,12 @@ function validateClientIDMetadataURL(raw: string): string | undefined {
 }
 
 function AddEditMCPServerModalContent({
-	onClose,
 	onSubmit,
 	initialData,
 	existingServerIDs,
 	prefillServers = [],
 	mode,
-}: AddEditMCPServerModalProps) {
+}: Omit<AddEditMCPServerModalProps, 'isOpen' | 'onClose'>) {
 	const effectiveMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	const isEditMode = effectiveMode === 'edit';
 
@@ -386,11 +384,7 @@ function AddEditMCPServerModalContent({
 	const [deletedStdioSecretRows, setDeletedStdioSecretRows] = useState<SecretEnvRow[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: true,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 
 	const prefillSourceMap = useMemo<Record<string, MCPServerConfig>>(
 		() => Object.fromEntries(prefillServers.map(server => [buildMCPServerPrefillKey(server), server] as const)),
@@ -964,7 +958,7 @@ function AddEditMCPServerModalContent({
 		: 'Create a custom MCP server with explicit transport, trust, credential, and policy settings.';
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={headerTitle}
@@ -1736,7 +1730,7 @@ function AddEditMCPServerModalContent({
 				</form>
 			</div>
 			<ModalBackdrop enabled={false} />
-		</dialog>
+		</>
 	);
 }
 
@@ -1744,13 +1738,14 @@ export function AddEditMCPServerModal(props: AddEditMCPServerModalProps) {
 	if (!props.isOpen) {
 		return null;
 	}
-	if (typeof document === 'undefined' || !document.body) {
-		return null;
-	}
 
 	const remountKey = props.initialData
 		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.id}:${props.initialData.modifiedAt}`
 		: `${props.mode ?? 'auto'}:new`;
 
-	return createPortal(<AddEditMCPServerModalContent key={remountKey} {...props} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
+			<AddEditMCPServerModalContent key={remountKey} {...props} />
+		</ModalDialog>
+	);
 }

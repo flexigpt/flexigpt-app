@@ -1,5 +1,5 @@
 import type { SyntheticEvent } from 'react';
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { createContext, useCallback, useContext, useLayoutEffect, useRef } from 'react';
 
 interface UseDialogControllerOptions {
 	onClose: () => void;
@@ -103,4 +103,29 @@ export function useDialogController({
 		handleCancel,
 		unmountingRef,
 	};
+}
+
+/**
+ * Controls exposed to modal content through `ModalDialog`'s render-function
+ * children. They keep close requests and async-unmount checks consistent with
+ * the native dialog lifecycle.
+ */
+export type ModalDialogController = Pick<
+	ReturnType<typeof useDialogController>,
+	'dialogRef' | 'requestClose' | 'unmountingRef'
+>;
+
+export const ModalDialogControllerContext = createContext<ModalDialogController | null>(null);
+
+/**
+ * Accesses the lifecycle controls for content rendered beneath `ModalDialog`.
+ * It lets modal bodies use close and unmount state without recreating their
+ * own native-dialog controller.
+ */
+export function useModalDialogController(): ModalDialogController {
+	const controller = useContext(ModalDialogControllerContext);
+	if (!controller) {
+		throw new Error('useModalDialogController must be used within a ModalDialog.');
+	}
+	return controller;
 }

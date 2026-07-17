@@ -1,8 +1,6 @@
 import type { RefObject, SubmitEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiFile, FiFilePlus, FiPaperclip } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
@@ -11,7 +9,7 @@ import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 import type { SkillArgument, SkillListItem } from '@/spec/skill';
 import { SkillType } from '@/spec/skill';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { skillStoreAPI } from '@/apis/baseapi';
 
@@ -24,6 +22,7 @@ import {
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
@@ -487,7 +486,10 @@ function SkillTemplateDropdown({
 	);
 }
 
-function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<SkillTemplateRenderModalProps, 'isOpen'>) {
+function SkillTemplateRenderModalContent({
+	item,
+	onInsert,
+}: Omit<SkillTemplateRenderModalProps, 'isOpen' | 'onClose'>) {
 	const args = useMemo(() => getTemplateArguments(item), [item]);
 	const skillAttachmentPaths = useMemo(() => getSkillAttachmentPaths(item), [item]);
 	const [formState, setFormState] = useState<RenderFormState>(() => ({
@@ -496,11 +498,7 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 	const [submitError, setSubmitError] = useState('');
 	const [submitting, setSubmitting] = useState(false);
 	const [insertedWithAttachmentWarning, setInsertedWithAttachmentWarning] = useState(false);
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: true,
-		isBusy: submitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 	const [selectedSkillAttachmentPaths, setSelectedSkillAttachmentPaths] = useState<Set<string>>(
 		() => new Set(skillAttachmentPaths)
 	);
@@ -554,153 +552,150 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 			});
 	};
 
-	if (!item || typeof document === 'undefined' || !document.body) {
+	if (!item) {
 		return null;
 	}
 
 	const resourceCount = item.skillDefinition.resources?.totalCount ?? 0;
 
-	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-2xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
-					<ModalHeader
-						title="Use Template"
-						description={`${getSkillTemplateLabel(item)} renders into plain composer text.`}
-						onClose={() => {
-							requestClose();
-						}}
-						closeDisabled={submitting}
-					/>
+	return (
+		<div className="modal-box bg-base-200 max-h-[80vh] max-w-2xl overflow-hidden rounded-2xl p-0">
+			<div className="max-h-[80vh] overflow-y-auto p-6">
+				<ModalHeader
+					title="Use Template"
+					description={`${getSkillTemplateLabel(item)} renders into plain composer text.`}
+					onClose={() => {
+						requestClose();
+					}}
+					closeDisabled={submitting}
+				/>
 
-					<form className="space-y-4" onSubmit={handleSubmit}>
-						{submitError ? (
-							<div className="alert alert-error rounded-2xl text-sm">
-								<FiAlertCircle size={14} />
-								<span>{submitError}</span>
-							</div>
-						) : null}
+				<form className="space-y-4" onSubmit={handleSubmit}>
+					{submitError ? (
+						<div className="alert alert-error rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>{submitError}</span>
+						</div>
+					) : null}
 
-						{args.length > 0 ? (
-							<div className="space-y-3">
-								<div className="text-sm font-semibold">Arguments</div>
-								<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-									{args.map(arg => (
-										<div key={arg.name} className="border-base-content/10 rounded-2xl border p-3">
-											<label className="text-sm font-medium">{arg.name}</label>
-											{arg.description ? (
-												<div className="text-base-content/70 mt-1 text-xs">{arg.description}</div>
-											) : null}
-											<input
-												className="input bg-base-100 mt-3 w-full rounded-xl"
-												value={formState.arguments[arg.name] ?? ''}
-												onChange={event => {
-													const value = event.target.value;
-													setFormState(prev => ({
-														...prev,
-														arguments: {
-															...prev.arguments,
-															[arg.name]: value,
-														},
-													}));
-												}}
-												placeholder={arg.default ?? ''}
-												spellCheck="false"
-											/>
-											<div className="text-base-content/60 mt-1 text-xs">
-												Blank values are allowed and are passed to the skill renderer as empty strings.
-											</div>
+					{args.length > 0 ? (
+						<div className="space-y-3">
+							<div className="text-sm font-semibold">Arguments</div>
+							<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+								{args.map(arg => (
+									<div key={arg.name} className="border-base-content/10 rounded-2xl border p-3">
+										<label className="text-sm font-medium">{arg.name}</label>
+										{arg.description ? (
+											<div className="text-base-content/70 mt-1 text-xs">{arg.description}</div>
+										) : null}
+										<input
+											className="input bg-base-100 mt-3 w-full rounded-xl"
+											value={formState.arguments[arg.name] ?? ''}
+											onChange={event => {
+												const value = event.target.value;
+												setFormState(prev => ({
+													...prev,
+													arguments: {
+														...prev.arguments,
+														[arg.name]: value,
+													},
+												}));
+											}}
+											placeholder={arg.default ?? ''}
+											spellCheck="false"
+										/>
+										<div className="text-base-content/60 mt-1 text-xs">
+											Blank values are allowed and are passed to the skill renderer as empty strings.
 										</div>
+									</div>
+								))}
+							</div>
+						</div>
+					) : (
+						<div className="text-base-content/70 text-sm">This template has no arguments.</div>
+					)}
+
+					{hasResources(item) ? (
+						<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
+							<div className="font-medium">Optional resource attachments</div>
+							<div className="text-base-content/70 mt-1 text-xs">
+								The rendered template body is inserted into the composer. Select only the indexed resource files that
+								should accompany the user message. SKILL.md is not attached again.
+							</div>
+
+							{skillAttachmentPaths.length > 0 ? (
+								<div className="mt-2 max-h-40 space-y-1 overflow-auto">
+									{skillAttachmentPaths.map(path => (
+										<label key={path} className="bg-base-200 flex cursor-pointer items-start gap-2 rounded-xl p-2">
+											<input
+												type="checkbox"
+												className="checkbox checkbox-xs mt-0.5"
+												checked={selectedSkillAttachmentPaths.has(path)}
+												onChange={event => {
+													const checked = event.target.checked;
+													setSelectedSkillAttachmentPaths(previous => {
+														const next = new Set(previous);
+														if (checked) {
+															next.add(path);
+														} else {
+															next.delete(path);
+														}
+														return next;
+													});
+												}}
+											/>
+											<span className="min-w-0 font-mono text-xs break-all">{path}</span>
+										</label>
 									))}
 								</div>
-							</div>
-						) : (
-							<div className="text-base-content/70 text-sm">This template has no arguments.</div>
-						)}
-
-						{hasResources(item) ? (
-							<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
-								<div className="font-medium">Optional resource attachments</div>
-								<div className="text-base-content/70 mt-1 text-xs">
-									The rendered template body is inserted into the composer. Select only the indexed resource files that
-									should accompany the user message. SKILL.md is not attached again.
+							) : (
+								<div className="text-warning mt-2 text-xs">
+									{resourceCount} resource{resourceCount === 1 ? ' is' : 's are'} indexed, but no local filesystem paths
+									were exposed. You can still insert the rendered template without attachments.
 								</div>
+							)}
 
-								{skillAttachmentPaths.length > 0 ? (
-									<div className="mt-2 max-h-40 space-y-1 overflow-auto">
-										{skillAttachmentPaths.map(path => (
-											<label key={path} className="bg-base-200 flex cursor-pointer items-start gap-2 rounded-xl p-2">
-												<input
-													type="checkbox"
-													className="checkbox checkbox-xs mt-0.5"
-													checked={selectedSkillAttachmentPaths.has(path)}
-													onChange={event => {
-														const checked = event.target.checked;
-														setSelectedSkillAttachmentPaths(previous => {
-															const next = new Set(previous);
-															if (checked) {
-																next.add(path);
-															} else {
-																next.delete(path);
-															}
-															return next;
-														});
-													}}
-												/>
-												<span className="min-w-0 font-mono text-xs break-all">{path}</span>
-											</label>
-										))}
-									</div>
-								) : (
-									<div className="text-warning mt-2 text-xs">
-										{resourceCount} resource{resourceCount === 1 ? ' is' : 's are'} indexed, but no local filesystem
-										paths were exposed. You can still insert the rendered template without attachments.
-									</div>
-								)}
+							{item.skillDefinition.resources?.moreLocations ? (
+								<div className="text-base-content/60 mt-2 text-xs">
+									Additional indexed resources were omitted by the backend and are not selected automatically.
+								</div>
+							) : null}
+						</div>
+					) : null}
 
-								{item.skillDefinition.resources?.moreLocations ? (
-									<div className="text-base-content/60 mt-2 text-xs">
-										Additional indexed resources were omitted by the backend and are not selected automatically.
-									</div>
-								) : null}
-							</div>
-						) : null}
-
-						<ModalActions className="-mx-6 mt-6 -mb-6">
-							<button
-								type="button"
-								className="btn bg-base-300 rounded-xl"
-								onClick={() => {
+					<ModalActions className="-mx-6 mt-6 -mb-6">
+						<button
+							type="button"
+							className="btn bg-base-300 rounded-xl"
+							onClick={() => {
+								requestClose();
+							}}
+							disabled={submitting}
+						>
+							Cancel
+						</button>
+						<button
+							type={insertedWithAttachmentWarning ? 'button' : 'submit'}
+							className="btn btn-primary rounded-xl"
+							disabled={!canInsert}
+							onClick={() => {
+								if (insertedWithAttachmentWarning) {
 									requestClose();
-								}}
-								disabled={submitting}
-							>
-								Cancel
-							</button>
-							<button
-								type={insertedWithAttachmentWarning ? 'button' : 'submit'}
-								className="btn btn-primary rounded-xl"
-								disabled={!canInsert}
-								onClick={() => {
-									if (insertedWithAttachmentWarning) {
-										requestClose();
-									}
-								}}
-							>
-								{insertedWithAttachmentWarning
-									? 'Close'
-									: submitting
-										? 'Rendering…'
-										: selectedAttachmentPaths.length > 0
-											? `Insert with ${selectedAttachmentPaths.length} resource attachment${selectedAttachmentPaths.length === 1 ? '' : 's'}`
-											: 'Insert'}
-							</button>
-						</ModalActions>
-					</form>
-				</div>
+								}
+							}}
+						>
+							{insertedWithAttachmentWarning
+								? 'Close'
+								: submitting
+									? 'Rendering…'
+									: selectedAttachmentPaths.length > 0
+										? `Insert with ${selectedAttachmentPaths.length} resource attachment${selectedAttachmentPaths.length === 1 ? '' : 's'}`
+										: 'Insert'}
+						</button>
+					</ModalActions>
+				</form>
 			</div>
-		</dialog>,
-		document.body
+		</div>
 	);
 }
 
@@ -712,12 +707,9 @@ function SkillTemplateRenderModal(props: SkillTemplateRenderModalProps) {
 	}
 
 	return (
-		<SkillTemplateRenderModalContent
-			key={skillTemplateKey(item)}
-			item={item}
-			onClose={props.onClose}
-			onInsert={props.onInsert}
-		/>
+		<ModalDialog isOpen={isOpen} onClose={props.onClose} blockCancel>
+			<SkillTemplateRenderModalContent key={skillTemplateKey(item)} item={item} onInsert={props.onInsert} />
+		</ModalDialog>
 	);
 }
 

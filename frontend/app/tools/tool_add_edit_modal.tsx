@@ -1,8 +1,6 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle, FiAlertTriangle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import type { Tool } from '@/spec/tool';
@@ -24,7 +22,7 @@ import { validateSlug, validateTags } from '@/lib/text_utils';
 import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
@@ -32,6 +30,7 @@ import { ManagementInfoGrid } from '@/components/managementui/management_info_gr
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -200,12 +199,11 @@ function buildToolPrefillKey(item: ToolItem): string {
 }
 
 function AddEditToolModalContent({
-	onClose,
 	onSubmit,
 	initialData,
 	existingTools,
 	mode,
-}: AddEditToolModalContentProps) {
+}: Omit<AddEditToolModalContentProps, 'isOpen' | 'onClose'>) {
 	const effectiveMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	const isViewMode = effectiveMode === 'view';
 	const isEditMode = effectiveMode === 'edit';
@@ -219,11 +217,7 @@ function AddEditToolModalContent({
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: !isViewMode,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 	const httpUrlInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -646,7 +640,7 @@ function AddEditToolModalContent({
 	const headerTitle = effectiveMode === 'view' ? 'View Tool' : effectiveMode === 'edit' ? 'Edit Tool' : 'Add Tool';
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl overflow-hidden rounded-2xl p-0">
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
@@ -1319,12 +1313,12 @@ function AddEditToolModalContent({
 				</div>
 			</div>
 			<ModalBackdrop enabled={isViewMode} />
-		</dialog>
+		</>
 	);
 }
 
 export function AddEditToolModal({ isOpen, initialData, mode, ...rest }: AddEditToolModalProps) {
-	if (!isOpen || typeof document === 'undefined' || !document.body) {
+	if (!isOpen) {
 		return null;
 	}
 
@@ -1333,8 +1327,9 @@ export function AddEditToolModal({ isOpen, initialData, mode, ...rest }: AddEdit
 		initialData?.tool.version ?? DEFAULT_SEMVER
 	}:${initialData?.tool.modifiedAt ?? 'unknown-modified'}`;
 
-	return createPortal(
-		<AddEditToolModalContent key={modalKey} initialData={initialData} mode={mode} {...rest} />,
-		document.body
+	return (
+		<ModalDialog isOpen={isOpen} onClose={rest.onClose} blockCancel={effectiveMode !== 'view'}>
+			<AddEditToolModalContent key={modalKey} initialData={initialData} mode={mode} {...rest} />
+		</ModalDialog>
 	);
 }

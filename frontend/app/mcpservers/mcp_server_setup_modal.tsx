@@ -1,8 +1,6 @@
 import type { SubmitEventHandler } from 'react';
 import { useMemo, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import type { MCPServerConfig, MCPServerSetupInput, MCPServerSetupInputValue } from '@/spec/mcp';
@@ -10,10 +8,11 @@ import { MCPServerSetupInputKind } from '@/spec/mcp';
 
 import { validateHTTPHeaderName, validateHTTPURLSecurity } from '@/lib/http_input_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import { getMCPSetupInputKindLabel, isMCPSetupInputConfigured } from '@/mcpservers/lib/mcp_server_utils';
@@ -110,9 +109,8 @@ function validateSetupRow(input: MCPServerSetupInput, row: RowState): string | u
 
 function MCPServerSetupModalContent({
 	server,
-	onClose,
 	onSubmit,
-}: MCPServerSetupModalProps & { server: MCPServerConfig }) {
+}: Omit<MCPServerSetupModalProps, 'isOpen' | 'onClose'> & { server: MCPServerConfig }) {
 	const inputs = useMemo(() => server.setup?.inputs ?? [], [server.setup]);
 
 	const [rows, setRows] = useState<Record<string, RowState>>(() => {
@@ -126,11 +124,7 @@ function MCPServerSetupModalContent({
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: true,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 
 	const updateRow = (id: string, patch: Partial<RowState>) => {
 		setRows(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -236,7 +230,7 @@ function MCPServerSetupModalContent({
 	};
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+		<>
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl overflow-hidden rounded-2xl p-0">
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
@@ -380,7 +374,7 @@ function MCPServerSetupModalContent({
 				</div>
 			</div>
 			<ModalBackdrop enabled={false} />
-		</dialog>
+		</>
 	);
 }
 
@@ -388,10 +382,11 @@ export function MCPServerSetupModal(props: MCPServerSetupModalProps) {
 	if (!props.isOpen || !props.server) {
 		return null;
 	}
-	if (typeof document === 'undefined' || !document.body) {
-		return null;
-	}
 
 	const remountKey = `${props.server.bundleID}:${props.server.id}:${props.server.modifiedAt}`;
-	return createPortal(<MCPServerSetupModalContent key={remountKey} {...props} server={props.server} />, document.body);
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
+			<MCPServerSetupModalContent key={remountKey} {...props} server={props.server} />
+		</ModalDialog>
+	);
 }

@@ -1,15 +1,14 @@
 import type { SubmitEventHandler } from 'react';
 import { useId, useMemo, useRef, useState } from 'react';
 
-import { createPortal } from 'react-dom';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import { validateSlug } from '@/lib/text_utils';
 
-import { useDialogController } from '@/hooks/use_dialog_controller';
+import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 
@@ -93,7 +92,6 @@ function validateBundleForm(
 function ManagementBundleCreateModalContent({
 	title,
 	entityLabel,
-	onClose,
 	onSubmit,
 	existingSlugs,
 	existingDisplayNames = [],
@@ -115,11 +113,7 @@ function ManagementBundleCreateModalContent({
 		[existingDisplayNames, existingSlugs, formData]
 	);
 
-	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
-		onClose,
-		blockCancel: true,
-		isBusy: isSubmitting,
-	});
+	const { requestClose, unmountingRef } = useModalDialogController();
 
 	const updateField = (field: keyof BundleFormData, value: string) => {
 		const nextValue = field === 'slug' ? normalizeBundleSlugInput(value) : value;
@@ -176,125 +170,118 @@ function ManagementBundleCreateModalContent({
 	};
 
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleClose}
-			onCancel={handleCancel}
-			aria-labelledby={`${displayNameID}-modal-title`}
-		>
-			<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-3xl flex-col overflow-hidden rounded-2xl p-0">
-				<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
-					<ModalHeader
-						title={<span id={`${displayNameID}-modal-title`}>{title}</span>}
-						description={`Create a custom ${entityLabel.toLowerCase()} container.`}
-						onClose={() => {
+		<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-3xl flex-col overflow-hidden rounded-2xl p-0">
+			<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
+				<ModalHeader
+					title={<span id={`${displayNameID}-modal-title`}>{title}</span>}
+					description={`Create a custom ${entityLabel.toLowerCase()} container.`}
+					onClose={() => {
+						requestClose();
+					}}
+					closeDisabled={isSubmitting}
+				/>
+
+				<div className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
+					{submitError ? (
+						<div className="alert alert-error rounded-2xl text-sm" role="alert">
+							<FiAlertCircle className="shrink-0" size={14} />
+							<span className="wrap-break-word">{submitError}</span>
+						</div>
+					) : null}
+
+					<ModalField
+						label="Bundle Slug"
+						htmlFor={slugID}
+						required
+						hint="Lower-case, URL-friendly identifier."
+						error={visibleError('slug')}
+					>
+						<input
+							id={slugID}
+							type="text"
+							className={`input w-full rounded-xl ${visibleError('slug') ? 'input-error' : ''}`}
+							value={formData.slug}
+							onChange={event => {
+								updateField('slug', event.currentTarget.value);
+							}}
+							autoCapitalize="none"
+							onBlur={() => {
+								markTouched('slug');
+							}}
+							placeholder="my-custom-bundle"
+							spellCheck="false"
+							autoComplete="off"
+							autoFocus
+							disabled={isSubmitting}
+							aria-invalid={Boolean(visibleError('slug'))}
+						/>
+					</ModalField>
+
+					<ModalField label="Display Name" htmlFor={displayNameID} required error={visibleError('displayName')}>
+						<input
+							id={displayNameID}
+							type="text"
+							className={`input w-full rounded-xl ${visibleError('displayName') ? 'input-error' : ''}`}
+							value={formData.displayName}
+							onChange={event => {
+								updateField('displayName', event.currentTarget.value);
+							}}
+							onBlur={() => {
+								markTouched('displayName');
+							}}
+							spellCheck="false"
+							autoComplete="off"
+							disabled={isSubmitting}
+							aria-invalid={Boolean(visibleError('displayName'))}
+						/>
+					</ModalField>
+
+					<ModalField label="Description" htmlFor={descriptionID} align="start">
+						<textarea
+							id={descriptionID}
+							className="textarea min-h-24 w-full rounded-xl"
+							value={formData.description}
+							onChange={event => {
+								updateField('description', event.currentTarget.value);
+							}}
+							spellCheck="false"
+							disabled={isSubmitting}
+						/>
+					</ModalField>
+				</div>
+
+				<ModalActions>
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						onClick={() => {
 							requestClose();
 						}}
-						closeDisabled={isSubmitting}
-					/>
-
-					<div className="app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
-						{submitError ? (
-							<div className="alert alert-error rounded-2xl text-sm" role="alert">
-								<FiAlertCircle className="shrink-0" size={14} />
-								<span className="wrap-break-word">{submitError}</span>
-							</div>
-						) : null}
-
-						<ModalField
-							label="Bundle Slug"
-							htmlFor={slugID}
-							required
-							hint="Lower-case, URL-friendly identifier."
-							error={visibleError('slug')}
-						>
-							<input
-								id={slugID}
-								type="text"
-								className={`input w-full rounded-xl ${visibleError('slug') ? 'input-error' : ''}`}
-								value={formData.slug}
-								onChange={event => {
-									updateField('slug', event.currentTarget.value);
-								}}
-								autoCapitalize="none"
-								onBlur={() => {
-									markTouched('slug');
-								}}
-								placeholder="my-custom-bundle"
-								spellCheck="false"
-								autoComplete="off"
-								autoFocus
-								disabled={isSubmitting}
-								aria-invalid={Boolean(visibleError('slug'))}
-							/>
-						</ModalField>
-
-						<ModalField label="Display Name" htmlFor={displayNameID} required error={visibleError('displayName')}>
-							<input
-								id={displayNameID}
-								type="text"
-								className={`input w-full rounded-xl ${visibleError('displayName') ? 'input-error' : ''}`}
-								value={formData.displayName}
-								onChange={event => {
-									updateField('displayName', event.currentTarget.value);
-								}}
-								onBlur={() => {
-									markTouched('displayName');
-								}}
-								spellCheck="false"
-								autoComplete="off"
-								disabled={isSubmitting}
-								aria-invalid={Boolean(visibleError('displayName'))}
-							/>
-						</ModalField>
-
-						<ModalField label="Description" htmlFor={descriptionID} align="start">
-							<textarea
-								id={descriptionID}
-								className="textarea min-h-24 w-full rounded-xl"
-								value={formData.description}
-								onChange={event => {
-									updateField('description', event.currentTarget.value);
-								}}
-								spellCheck="false"
-								disabled={isSubmitting}
-							/>
-						</ModalField>
-					</div>
-
-					<ModalActions>
-						<button
-							type="button"
-							className="btn bg-base-300 rounded-xl"
-							onClick={() => {
-								requestClose();
-							}}
-							disabled={isSubmitting}
-						>
-							Cancel
-						</button>
-						<button
-							type="submit"
-							className="btn btn-primary rounded-xl"
-							disabled={Object.keys(validationErrors).length > 0 || isSubmitting}
-						>
-							{isSubmitting ? 'Creating...' : 'Create'}
-						</button>
-					</ModalActions>
-				</form>
-			</div>
-		</dialog>
+						disabled={isSubmitting}
+					>
+						Cancel
+					</button>
+					<button
+						type="submit"
+						className="btn btn-primary rounded-xl"
+						disabled={Object.keys(validationErrors).length > 0 || isSubmitting}
+					>
+						{isSubmitting ? 'Creating...' : 'Create'}
+					</button>
+				</ModalActions>
+			</form>
+		</div>
 	);
 }
 
 export function ManagementBundleCreateModal(props: ManagementBundleCreateModalProps) {
-	if (!props.isOpen || typeof document === 'undefined' || !document.body) {
+	if (!props.isOpen) {
 		return null;
 	}
 
-	return createPortal(
-		<ManagementBundleCreateModalContent key={`${props.entityLabel}:create-bundle`} {...props} />,
-		document.body
+	return (
+		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
+			<ManagementBundleCreateModalContent key={`${props.entityLabel}:create-bundle`} {...props} />
+		</ModalDialog>
 	);
 }
