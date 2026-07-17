@@ -2,8 +2,6 @@ import type { InputUnion, OutputUnion, ToolCall, UIToolCall } from '@/spec/infer
 import { InputKind, OutputKind } from '@/spec/inference';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
-import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
-
 export function isRunnableComposerToolCall(toolCall: UIToolCall): boolean {
 	return (
 		toolCall.type === ToolStoreChoiceType.Function ||
@@ -80,53 +78,4 @@ export function collectToolCallsFromOutputs(
 	}
 
 	return map;
-}
-
-/**
- * Best-effort short summary of tool-call arguments for chip labels.
- */
-function summarizeToolCallArguments(args: string): string | undefined {
-	if (!args) {
-		return undefined;
-	}
-	try {
-		const parsed = JSON.parse(args);
-		if (parsed === null || typeof parsed !== 'object') {
-			return typeof parsed === 'string' ? parsed : undefined;
-		}
-		const obj = parsed as Record<string, unknown>;
-		const primaryKeys = ['file', 'path', 'url', 'query', 'id', 'name'];
-		const parts: string[] = [];
-
-		for (const key of primaryKeys) {
-			const value = obj[key];
-			if (value !== undefined && value !== null) {
-				// oxlint-disable-next-line typescript/no-base-to-string
-				const text = String(value).trim();
-				if (text) {
-					parts.push(text);
-				}
-			}
-		}
-
-		if (parts.length === 0) {
-			const keys = Object.keys(obj);
-			for (const key of keys.slice(0, 2)) {
-				parts.push(`${key}=${String(obj[key])}`);
-			}
-		}
-
-		return parts.length > 0 ? parts.join(', ') : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
-/**
- * Label used for tool-call chips in composer / history.
- */
-export function formatToolCallLabel(call: UIToolCall): string {
-	const pretty = getPrettyToolName(call.name);
-	const argSummary = summarizeToolCallArguments(call.arguments ?? '');
-	return argSummary ? `${pretty}: ${argSummary}` : pretty;
 }

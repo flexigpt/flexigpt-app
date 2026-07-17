@@ -2,33 +2,37 @@
 
 ## 1. Document status
 
-- Status: Proposed architecture
+- Status: Artifact Store implementation baseline, Workspace design pending implementation
 - Scope: Internal Artifact Store foundation and Workspace feature built on it
 - Excludes: Conversation configuration, conversation persistence, runtime lifecycle, secret values, policy evaluation, and execution logic
 - Primary objective: Establish a durable, minimal artifact lifecycle model that Workspace uses first and other stores may adopt later
+- Reading rule: Part A describes the implemented `internal/artifactstore` architecture. Part B is a target design for a future Workspace consumer.
+- Terminology: `implemented` describes code currently present in Artifact Store. `planned` describes intended Workspace integration and is not an available Workspace API.
 
 ## 2. Architectural decisions
 
-| ID      | Decision                                                                                                             |
-| ------- | -------------------------------------------------------------------------------------------------------------------- |
-| `AS-01` | Artifact Store owns all durable artifact lifecycle state                                                             |
-| `AS-02` | Workspace has no separate persistent Workspace Store database                                                        |
-| `AS-03` | Workspace is implemented as a typed consumer of Artifact Store                                                       |
-| `AS-04` | Current domain stores remain physically unchanged in the Workspace implementation                                    |
-| `AS-05` | Current Bundle maps to generic Artifact Collection                                                                   |
-| `AS-06` | Current item maps to generic Artifact Record                                                                         |
-| `AS-07` | Portable source package and app-local collection are separate concepts                                               |
-| `AS-08` | Artifact definitions do not contain app IDs, local paths, secrets, runtime state, or conversation state              |
-| `AS-09` | Artifact Store owns source kinds; consumers do not implement source transport behavior                               |
-| `AS-10` | Artifact Store initially supports `fs-directory` and `embedded-fs-directory` sources                                 |
-| `AS-11` | Artifact revisions are identified by canonical digest, not a generated revision ID                                   |
-| `AS-12` | Catalog resources use source locator identity, not a generated resource ID                                           |
-| `AS-13` | Artifact Record is the sole generic app-side artifact record                                                         |
-| `AS-14` | Artifact Store supports source schemas through registered frontends and does not require a universal source envelope |
-| `AS-15` | Runtime projections and execution are outside Artifact Store                                                         |
-| `AS-16` | Workspace Root is a typed Artifact Root with kind `flexigpt.workspace`                                               |
-| `AS-17` | Workspace artifacts are synchronized into root-local Artifact Records                                                |
-| `AS-18` | Imported, captured, linked, and forked artifacts are represented by Artifact Record modes                            |
+| ID      | Status                  | Decision                                                                                                                                              |
+| ------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AS-01` | Implemented             | Artifact Store owns app-local artifact lifecycle metadata and coordinates portable content through repository ports.                                  |
+| `AS-02` | Planned                 | Workspace will not introduce a separate persistent Workspace Store database.                                                                          |
+| `AS-03` | Planned                 | Workspace will be a typed consumer of Artifact Store.                                                                                                 |
+| `AS-04` | Planned                 | Existing domain stores should remain physically unchanged during Workspace adoption.                                                                  |
+| `AS-05` | Planned mapping         | A current Bundle maps to generic `ArtifactCollection`.                                                                                                |
+| `AS-06` | Planned mapping         | A current item maps to generic `ArtifactRecord`.                                                                                                      |
+| `AS-07` | Implemented             | Portable package content and app-local collections are separate concepts and storage domains.                                                         |
+| `AS-08` | Implemented             | Portable definitions exclude app IDs, local paths, secrets, runtime state, and conversation state.                                                    |
+| `AS-09` | Implemented             | Source transport is an Artifact Store extension port registered during composition, not behavior implemented by frontends or consumer features.       |
+| `AS-10` | Implemented             | `NewStore` installs `fs-directory` and `embedded-fs-directory`. `memory-directory` is a contract and test-only injection point, not a default driver. |
+| `AS-11` | Implemented             | Artifact revisions are canonical definition digests, not generated revision IDs.                                                                      |
+| `AS-12` | Implemented             | Catalog resources use source occurrence identity, not generated resource IDs.                                                                         |
+| `AS-13` | Implemented             | `ArtifactRecord` is the sole generic app-side artifact item.                                                                                          |
+| `AS-14` | Implemented             | Registered frontends own source-format recognition and decoding. The portable-definition frontend is registered by default.                           |
+| `AS-15` | Implemented             | Runtime projections and execution remain outside Artifact Store.                                                                                      |
+| `AS-16` | Planned                 | A Workspace Root will be `ArtifactRoot(kind=flexigpt.workspace)`.                                                                                     |
+| `AS-17` | Planned                 | Workspace discovery will synchronize selected catalog resources into root-local records.                                                              |
+| `AS-18` | Implemented generically | Linked, captured, forked, and app-local record modes exist. Their Workspace-specific use is planned.                                                  |
+| `AS-19` | Implemented             | Root scans atomically publish source observations and immutable root catalog snapshots in metadata storage.                                           |
+| `AS-20` | Implemented             | Read-only source projection and source-kind-specific transfer writes use separate optional materializer ports.                                        |
 
 ---
 
@@ -37,6 +41,10 @@
 ## 3. Purpose
 
 Artifact Store is a generic internal FlexiGPT component that manages portable artifact definitions and app-local artifact records.
+
+The implemented public façade is `artifactstore.Store`. Its business methods
+operate through injected ports rather than directly through SQLite, MapStore,
+or operating-system filesystem data access.
 
 It provides the common substrate for:
 
@@ -63,49 +71,56 @@ It does not interpret domain behavior.
 
 It does not know what a Skill, MCP server, Tool, Model Preset, Workspace, Agent, or Assistant Preset means.
 
-## 4. Scope boundary
+## 4. Implemented decomposition and ownership
 
-```text
-Artifact Store
-  - source and content lifecycle
-  - definition lifecycle
-  - local record lifecycle
-  - collection lifecycle
-  - catalog lifecycle
+The implementation separates domain orchestration from persistence, portable
+content, source I/O, and runtime projection. `artifactstore.Store` is the
+business façade and does not embed adapter-specific persistence or source
+transport behavior.
 
-Workspace
-  - Workspace root semantics
-  - Workspace discovery rules
-  - Workspace schemas
-  - Workspace resource grouping
-  - Workspace composition
-  - Workspace runtime projection
+| Layer                    | Implemented location                                     | Owns                                                                                                    | Does not own                                                        |
+| ------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Contracts                | `internal/artifactstore/spec`                            | Portable and app-local entities, ports, errors, and operation payloads                                  | SQLite, MapStore, source I/O, Workspace semantics                   |
+| Canonical codec          | `internal/artifactstore/baseutils`                       | Canonical JSON encoding, canonical definition encoding, SHA-256 digests                                 | Persistence and source traversal                                    |
+| Business layer           | `internal/artifactstore`                                 | Lifecycle rules, validation orchestration, scanning, synchronization, transfer coordination, registries | SQL statements, MapStore calls, direct filesystem reads             |
+| Metadata adapter         | `internal/artifactstore/metadatastore`                   | SQLite app-local metadata, repository transactions, optimistic checks, relational constraints           | Canonical definition bodies, assets, frontend parsing, source reads |
+| Portable content adapter | `internal/artifactstore/contentstore`                    | MapStore-backed definitions, assets, and portable package manifests                                     | Roots, sources, records, collections, catalog publication           |
+| Source adapters          | `internal/artifactstore/sourcedriver`                    | Source configuration, traversal safety, reads, snapshots, source generations                            | Catalog persistence, frontend selection, domain interpretation      |
+| Materialization adapters | `internal/artifactstore/materializer` and injected ports | Stable source projection and source-kind-specific transfer writes                                       | Root metadata and runtime execution                                 |
+| Typed consumer           | Future Workspace or another feature                      | Typed semantics, frontend semantics, scan plans, record derivation, projections                         | Generic storage adapters and source transport                       |
 
-Runtime
-  - model clients
-  - MCP connections
-  - Skill sessions
-  - Tool execution
-  - prompt rendering
-  - policy and trust evaluation
-```
+`NewStore(baseDir)` opens SQLite metadata at `artifactstore.sqlite`, opens a
+MapStore-backed portable content repository under `artifact-content`, registers
+the portable-definition frontend, and installs the `fs-directory` and
+`embedded-fs-directory` drivers. It does not configure a source materializer,
+definition materializer, typed hook, version matcher, or consumer frontend.
+
+`NewStoreWithMetadataRepository` permits a different metadata implementation.
+Portable-content-dependent operations remain unavailable until a
+`PortableContentRepository` is supplied during composition.
 
 ## 5. Entity model
 
 ```text
-Artifact Root
-  -> Root Source Attachments
-  -> Artifact Sources
-  -> optional Artifact Packages
-  -> Catalog Resources
-  -> Canonical Definitions by digest
+ArtifactSource
+  -> mutable source-local Catalog Resources
+  -> retained Catalog Resource Revisions
+  -> Canonical Definition digests
 
 Artifact Root
-  -> Artifact Collections
-  -> Artifact Records
-  -> Catalog Resources
-  -> Canonical Definitions by digest
+  -> RootSourceAttachments -> enabled ArtifactSources
+  -> RootCatalogGeneration -> immutable root catalog resource snapshots
+  -> ArtifactCollections -> ArtifactRecords
+       -> source occurrence and resolved or pinned definition digest
 ```
+
+A source catalog is shared by every root that attaches the source. A published
+root catalog is a durable snapshot of the active source catalog, rather than a
+live query over current source metadata.
+
+Records retain their local identity and data independently of a source
+occurrence. A captured, forked, or detached record can remain resolvable even
+when its original source occurrence is no longer present in a root catalog.
 
 ## 6. Entity definitions
 
@@ -164,7 +179,10 @@ flexigpt.package-mount
 
 `Data` is opaque to Artifact Store.
 
-The owner of the root kind validates and interprets it.
+Generic validation requires `Data` to be a bounded JSON object and requires a
+schema ID when the object is not empty. A registered `RootKindHook`, when one
+exists for the root kind, performs typed root-data and source-attachment
+validation. Interpretation remains the responsibility of the consumer.
 
 ## 6.2 Artifact Source
 
@@ -172,12 +190,11 @@ An Artifact Source is a content provider.
 
 It is responsible only for safely exposing directory-like content to Artifact Store.
 
-Initial supported source kinds:
+The default Store installs the following source kinds:
 
 ```text
 fs-directory
 embedded-fs-directory
-memory-directory
 ```
 
 ### Fields
@@ -192,6 +209,8 @@ ArtifactSource
   - Config
   - LastObservedGeneration
   - LastScannedAt
+  - ObservationRevision
+  - Diagnostics
   - CreatedAt
   - ModifiedAt
 ```
@@ -219,6 +238,10 @@ The source driver owns:
 - Directory walk.
 - File read.
 - Source generation calculation.
+
+The `fs-directory` driver delegates local file reads, stats, and directory
+listing to `LLMTools` `FSTool`. Artifact Store business logic does not perform
+direct operating-system filesystem I/O.
 
 ### `embedded-fs-directory` source
 
@@ -253,6 +276,10 @@ RootID + SourceID
 
 No generated attachment ID is required.
 
+Detaching removes only this app-local relationship. It does not delete the
+source registration, source content, source catalog history, records, or
+portable definitions.
+
 ### Fields
 
 ```text
@@ -284,17 +311,15 @@ The consumer feature interprets their meaning.
 
 ## 6.4 Artifact Package
 
-An Artifact Package is optional portable source metadata.
+An Artifact Package is app-local metadata for an observed portable
+package-manifest occurrence. The portable `PortablePackageManifest` body belongs
+in `PortableContentRepository`; SQLite stores observation metadata and an
+optional manifest digest.
 
-It is used for:
-
-- Sharing.
-- Export.
-- Import.
-- Package display metadata.
-- Source-level grouping.
-- Declared package assets.
-- Package-level documentation.
+The implemented Store exposes `PublishArtifactPackage`, `GetArtifactPackage`,
+and `ListArtifactPackagesForSource`. A caller discovers and parses a manifest
+before publishing its metadata. `ScanRoot` does not perform generic package
+manifest discovery or automatically derive package-to-resource membership.
 
 It is not equivalent to an Artifact Collection.
 
@@ -384,6 +409,11 @@ A Catalog Resource represents one source location.
 
 It is not an app-owned item.
 
+The mutable current resource is source-local. During a root scan, the active
+source resources are copied into the newly published root catalog snapshot.
+Root catalog readers use that immutable snapshot only after verifying that the
+root's attachments and observed source generations are still current.
+
 ## 6.6 Canonical Definition
 
 A Canonical Definition is normalized portable content.
@@ -411,7 +441,6 @@ CanonicalDefinition
   - DefinitionJSON
   - DependencySelectors
   - AssetManifest
-  - CreatedAt
 ```
 
 The digest is the revision identity.
@@ -419,6 +448,7 @@ The digest is the revision identity.
 There is no generated `RevisionID`.
 
 Definitions may be deduplicated by digest even when found in different sources.
+Definition bodies are stored through `PortableContentRepository`, not in SQLite.
 
 ## 6.7 Artifact Record
 
@@ -457,6 +487,7 @@ ArtifactRecord
   - DataSchemaID
   - Data
   - State
+  - Diagnostics
   - CreatedAt
   - ModifiedAt
 ```
@@ -534,9 +565,15 @@ RootCatalogGeneration
   - Diagnostics
 ```
 
+Each generation also has a durable resource snapshot in metadata. The
+`SourceGenerations` map is the freshness boundary for that snapshot, not a
+subscription to source changes. A changed attachment, disabled source, changed
+source configuration, or missing/current-generation mismatch makes
+root-catalog reads conflict until another `ScanRoot` publication succeeds.
+
 ---
 
-# 7. Bundle, package, collection, and item mapping
+# 7. Planned Workspace bundle, package, collection, and item mapping
 
 ## 7.1 Current model
 
@@ -545,20 +582,27 @@ Bundle
   -> Item
 ```
 
+This is a target Workspace compatibility mapping. Workspace itself is not
+implemented yet, and Artifact Store has not changed any existing Bundle or item
+persistence.
+
 ## 7.2 Generic Artifact Store model
 
 ```text
 ArtifactCollection
-  -> ArtifactRecord
-    -> CatalogResource
-      -> CanonicalDefinition digest
+  -> ArtifactRecord -> source occurrence fields
+                    -> resolved or pinned CanonicalDefinition digest
+
+ArtifactSource
+  -> CatalogResource
+    -> CanonicalDefinition digest
 ```
 
 ## 7.3 Portable package model
 
 ```text
 ArtifactPackage
-  -> CatalogResources
+  -> observed portable package manifest metadata
 ```
 
 ## 7.4 Full relationship
@@ -634,14 +678,18 @@ Artifact Store provides:
 
 ## 8.3 Package lifecycle
 
-Artifact Store provides:
+Artifact Store provides app-local package-observation persistence:
 
-- Discover package manifests.
-- Store package metadata.
-- Track package manifest digest.
-- Associate catalog resources with package locator.
-- Store package diagnostics.
-- Export package metadata.
+- Publish parsed package metadata.
+- Read package metadata by source and manifest locator.
+- List package metadata for a source.
+- Validate package metadata and package diagnostics.
+
+Package parsing, package discovery, portable manifest persistence, package
+archive creation, and package-to-resource grouping are not generic Store
+workflows. Portable package-manifest storage is available through
+`PortableContentRepository`, not through a separate Store-level package export
+operation.
 
 ## 8.4 Catalog lifecycle
 
@@ -656,6 +704,10 @@ Artifact Store provides:
 - Store canonical definitions by digest.
 - Store diagnostics.
 - Publish root catalog generation.
+- Persist an immutable catalog-resource snapshot for that root generation.
+
+The public scan entry point is `ScanRoot`. Source scanning is an internal part
+of a root scan and is not exposed as a standalone `ScanSource` API.
 
 ## 8.5 Record synchronization
 
@@ -670,6 +722,11 @@ Artifact Store provides:
 - Mark records missing.
 - Avoid automatic record deletion.
 - Support pin and detach behavior.
+- Persist synchronization updates only when the published catalog generation is
+  still current.
+
+`RecordSyncPolicy` is consumer-owned. It decides whether a valid catalog
+resource creates a linked record and supplies only local derivation values.
 
 ## 8.6 Collection lifecycle
 
@@ -684,53 +741,70 @@ Artifact Store provides:
 - Soft delete collection.
 - Validate collection existence.
 - Reject deletion when records remain.
-- Move records between collections.
-- Sweep empty soft-deleted collections.
+- Change or clear record placement through `UpdateRecord`.
 
 ## 8.7 Transfer lifecycle
 
 Artifact Store provides:
 
-- Export canonical definition.
-- Export package metadata.
-- Export frontend-declared assets.
-- Import definition into app-local source.
-- Create linked record.
-- Create captured record.
-- Create forked record.
-- Preserve provenance.
-- Store captured assets in optional blob store.
+- Return an `ExportedRecord` containing the portable definition envelope and a
+  frontend-declared export closure.
+- Persist imported definitions and assets through `PortableContentRepository`.
+- Materialize import, capture, and fork payloads through an injected
+  source-kind-specific `DefinitionMaterializer`.
+- Create captured or forked destination records and transfer provenance.
+- Invalidate the destination source observation after transfer publication.
+
+`ExportRecord` does not create an archive or an `ArtifactPackage`. Import,
+capture, and fork require an enabled destination source, an enabled root/source
+attachment, and a registered `DefinitionMaterializer` for the destination
+source kind. Source writes happen before the SQLite publication; failed metadata
+publication triggers best-effort compensation through `DiscardDefinition`.
+
+Portable content is immutable and may be persisted before the metadata
+transaction. It can therefore remain content-addressed storage even if a later
+metadata publication conflicts.
 
 ## 8.8 Dependency lifecycle
 
 Artifact Store provides:
 
-- Store dependency selectors.
+- Read dependency selectors from canonical definitions.
 - Query candidate catalog resources.
 - Build dependency graph.
 - Detect cycles.
 - Report missing dependencies.
 - Report ambiguous candidates.
-- Return diagnostics.
+- Persist dependency-resolution snapshots against a root catalog generation.
 
 Artifact Store does not choose consumer precedence rules.
+
+## 8.9 Source materialization
+
+`MaterializeSource` produces an app-local, stable real-directory projection for
+consumers that require a directory path. It reads through the source driver and
+delegates atomic directory publication to an injected `SourceMaterializer`.
+
+This is separate from `DefinitionMaterializer`, which owns writes required by
+import, capture, and fork. Neither materializer is installed by default.
 
 ---
 
 # 9. Artifact Store validation model
 
-| Validation layer              | Owner                               | Examples                                           |
-| ----------------------------- | ----------------------------------- | -------------------------------------------------- |
-| Root validation               | Artifact Store plus root hook       | root kind, root data schema                        |
-| Source validation             | Artifact Store plus source driver   | filesystem config, embedded provider key           |
-| Source safety                 | Artifact Store and source driver    | path traversal, containment, file limits           |
-| Generic definition validation | Artifact Store                      | locator, digest, metadata fields                   |
-| Structural validation         | Artifact frontend                   | JSON schema, source document shape                 |
-| Semantic validation           | Artifact frontend callback          | Workspace discovery declarations, MCP schema rules |
-| Collection validation         | Artifact Store plus collection hook | slug, collection state, placement rules            |
-| Record validation             | Artifact Store plus frontend        | target locator, local data schema                  |
-| Runtime validation            | Outside Artifact Store              | Skill indexing, MCP connection, model readiness    |
-| Policy validation             | Outside Artifact Store              | trust, approval, execution policy                  |
+| Validation layer              | Owner                                        | Examples                                                              |
+| ----------------------------- | -------------------------------------------- | --------------------------------------------------------------------- |
+| Root validation               | Artifact Store plus optional root hook       | root metadata, typed root data, attachment rules                      |
+| Source validation             | Artifact Store plus source driver            | source config normalization, filesystem config, embedded provider key |
+| Source safety                 | Source driver and scan orchestration         | path traversal, containment, traversal and file limits                |
+| Generic definition validation | Artifact Store and canonical codec           | locator, digest, canonical JSON, metadata fields                      |
+| Structural validation         | Artifact frontend                            | JSON schema, source document shape                                    |
+| Semantic validation           | Artifact frontend callback                   | consumer-specific source semantics                                    |
+| Collection validation         | Artifact Store plus optional collection hook | slug, collection state, placement rules                               |
+| Record validation             | Artifact Store, collection hook, frontend    | target occurrence, placement, local data                              |
+| Publication consistency       | Metadata repository                          | optimistic timestamps, scan expectations, SQLite constraints          |
+| Runtime validation            | Outside Artifact Store                       | Skill indexing, MCP connection, model readiness                       |
+| Policy validation             | Outside Artifact Store                       | trust, approval, execution policy                                     |
 
 ---
 
@@ -738,46 +812,54 @@ Artifact Store does not choose consumer precedence rules.
 
 ## 10.1 Source kind ownership
 
-Artifact Store owns source kind implementations.
+Source kinds are registered with `artifactstore.Store` during application
+composition. Typed consumers use those drivers through Artifact Store; they do
+not implement source transport inside a frontend, root hook, or Workspace.
 
-Domain features may not create ad hoc transport implementations.
+The public driver registry allows an application to add an approved source kind
+without changing Store business logic.
 
-| Source kind             | Owner          | Initial status  |
-| ----------------------- | -------------- | --------------- |
-| `fs-directory`          | Artifact Store | Required        |
-| `embedded-fs-directory` | Artifact Store | Required        |
-| `memory-directory`      | Artifact Store | Test-only       |
-| `git-checkout`          | Artifact Store | Future optional |
-| `zip-directory`         | Artifact Store | Future optional |
-| `cas-directory`         | Artifact Store | Future optional |
+| Source kind             | Owner          | Initial status                                      |
+| ----------------------- | -------------- | --------------------------------------------------- |
+| `fs-directory`          | Artifact Store | Required                                            |
+| `embedded-fs-directory` | Artifact Store | Required                                            |
+| `memory-directory`      | Artifact Store | Test-only injected driver, not installed by default |
+| `git-checkout`          | Artifact Store | Future optional                                     |
+| `zip-directory`         | Artifact Store | Future optional                                     |
+| `cas-directory`         | Artifact Store | Future optional                                     |
 
 ## 10.2 Materialization rule
 
-A domain-specific remote acquisition flow should usually materialize to an Artifact Store-supported directory source.
+Artifact Store has two intentionally separate materialization boundaries:
 
-Examples:
+- `SourceMaterializer` projects an enabled source-driver snapshot into an
+  application-owned directory publication for a file-oriented consumer.
+- `DefinitionMaterializer` performs source-kind-specific destination writes for
+  import, capture, and fork before metadata publication.
 
-```text
-MCP-managed HTTP download
--> verified local directory cache
--> fs-directory source
-```
+The Store does not provide a default publisher or definition writer. Runtime
+code and typed consumers must not bypass these ports by reading source paths or
+writing source content directly.
+
+## 10.3 Future acquisition integration
+
+A remote acquisition flow may materialize its verified result into an Artifact
+Store-supported directory source. Network, Git, archive, credential, and trust
+behavior remain outside Artifact Store and Workspace.
 
 ```text
 Git sync worker
--> checkout directory
+-> verified checkout directory
 -> fs-directory source
 ```
 
 ```text
 ZIP importer
--> extraction directory
+-> verified extraction directory
 -> fs-directory source
 ```
 
-This avoids embedding network, Git, archive, or credential behavior in Workspace, Skills, MCP, or Assistant packages.
-
-## 10.3 Source driver contract
+## 10.4 Source driver contract
 
 ```go
 type SourceDriver interface {
@@ -820,6 +902,11 @@ type SourceDriver interface {
 }
 ```
 
+`SourceConfigNormalizer` is an optional companion port. When a driver provides
+it, Artifact Store normalizes source configuration before generic validation and
+persistence. Drivers also own source-generation calculation; the Store only
+uses that generation to protect scans and root catalog freshness.
+
 ---
 
 # 11. Artifact Store extension model
@@ -857,7 +944,7 @@ type ArtifactFrontend interface {
   Decode(
     ctx context.Context,
     candidate ArtifactCandidate,
-  ) ([]CanonicalDefinition, []Diagnostic)
+  ) ([]DecodedArtifact, []Diagnostic)
 
   ValidateStructure(
     ctx context.Context,
@@ -887,6 +974,11 @@ type ArtifactFrontend interface {
 }
 ```
 
+`DecodedArtifact` carries a source-local `SubresourceLocator` as well as the
+definition emitted by a frontend. Artifact Store canonicalizes the definition,
+calculates its digest, and persists portable content only after frontend
+diagnostics pass generic validation.
+
 ## 11.3 Collection kind hook
 
 ```go
@@ -910,6 +1002,18 @@ type CollectionKindHook interface {
 
 # 12. Artifact Store scanning workflow
 
+`ScanRoot` is the public scan operation. It serializes scan publication within
+one Store instance and performs the following work:
+
+1. Reads the active root, all root/source attachments, and their source state.
+2. Builds source plans for enabled attachments and snapshots each source before scanning.
+3. Collects bounded candidates through the source driver.
+4. Selects one registered frontend or reports a recognition tie.
+5. Decodes, canonicalizes, validates, and stores portable definitions.
+6. Confirms every scanned source generation has not changed.
+7. Atomically publishes source observations, current source catalogs, the root
+   catalog generation, and that generation's immutable resource snapshot.
+
 ```text
 Artifact Root
 -> attached Source
@@ -924,24 +1028,29 @@ Artifact Root
 -> catalog resources
 -> definition digests
 -> root catalog generation
--> record synchronization
+-> separate `SyncRecords` call when the consumer chooses to synchronize records
 ```
 
 A scan plan may contain:
 
 - Explicit source locators.
-- Directory roots.
-- Glob patterns.
+- Directory roots and `path.Match` include patterns.
 - Recursion settings.
-- Candidate priorities.
 - Allowed frontend IDs.
 - Maximum file sizes.
+- Maximum candidate count.
+- Maximum traversal entries.
 - Maximum traversal depth.
-- Package manifest patterns.
+- Authoritative or partial source-catalog publication behavior.
 
 Artifact Store executes plans.
 
 Consumers define plans.
+
+With no source plans, `ScanRoot` performs an authoritative recursive scan of
+every enabled attachment. With explicit plans, every planned source must be an
+enabled attachment. An enabled source that has never been observed must be
+planned; an already observed unplanned source remains part of the root catalog.
 
 ---
 
@@ -983,110 +1092,107 @@ Catalog Resource state becomes missing
 -> Artifact Record state becomes missing
 ```
 
+`DetachRecord` changes the existing record to a captured, pinned record using
+its already resolved definition. It deliberately does not copy content or
+create a new source occurrence. `CaptureRecord` and `ForkRecord` are separate
+transfer operations that materialize content into a destination source.
+
+Synchronization never deletes records and does not create collections itself.
+The consumer must ensure a collection exists before a `RecordSyncPolicy`
+returns its ID as the placement for a newly derived record.
+
 ---
 
 # 14. Artifact Store API surface
 
 ```text
-Roots
-  - CreateRoot
-  - GetRoot
-  - ListRoots
-  - UpdateRoot
-  - DeleteRoot
-  - AttachSource
-  - DetachSource
-  - ListRootSources
+Roots and attachments
+  - CreateRoot, GetRoot, GetRootIncludingDeleted, ListRoots
+  - UpdateRoot, DeleteRoot
+  - AttachSource, GetRootSourceAttachment, ListRootSources
+  - UpdateRootSourceAttachment, DetachSource
 
 Sources
-  - CreateSource
-  - GetSource
-  - ListSources
-  - UpdateSource
-  - DeleteSource
-  - RefreshSource
+  - CreateSource, GetSource, ListSources, UpdateSource, DeleteSource
 
-Catalog
-  - ScanSource
+Scanning and catalog
   - ScanRoot
-  - GetRootCatalogGeneration
-  - ListCatalogResources
-  - GetCatalogResource
-  - GetDefinitionByDigest
-  - ListDefinitionHistory
+  - GetCatalogResource, ListCatalogResourcesForSource
+  - ListCatalogResourcesForRoot, GetRootCatalogGeneration
+  - GetDefinitionByDigest, ListDefinitionHistory
 
 Records
-  - GetRecord
-  - ListRecords
-  - CreateRecord
-  - UpdateRecord
-  - RefreshRecord
-  - PinRecord
-  - DetachRecord
-  - DeleteRecord
+  - CreateRecord, GetRecord, ListRecords, UpdateRecord, RefreshRecord
+  - PinRecord, DetachRecord, DeleteRecord, ExportRecord
 
 Collections
-  - EnsureBaseCollection
-  - CreateCollection
-  - UpdateCollection
-  - DeleteCollection
-  - ListCollections
-  - AddRecordToCollection
-  - RemoveRecordFromCollection
+  - EnsureBaseCollection, CreateCollection
+  - GetCollection, GetCollectionIncludingDeleted, ListCollections
+  - UpdateCollection, DeleteCollection
 
 Dependencies
-  - GetDependencies
-  - FindCandidates
-  - BuildDependencyGraph
-  - ExplainDependencyResolution
+  - GetDependencies, FindCandidates
+  - BuildDependencyGraph, ExplainDependencyResolution
+
+Packages
+  - PublishArtifactPackage
+  - GetArtifactPackage, ListArtifactPackagesForSource
 
 Transfer
-  - ExportRecord
-  - ImportDefinition
-  - CaptureRecord
-  - ForkRecord
+  - ImportDefinition, CaptureRecord, ForkRecord
+
+Runtime-facing source projection
+  - MaterializeSource
 ```
 
 ---
 
 # 15. Artifact Store persistence
 
-Artifact Store should use one metadata repository.
-
-Recommended initial implementation:
-
-```text
-SQLite metadata database
-+ filesystem blob and asset store
-```
-
-The metadata repository persists:
+The default Store uses two durable repositories with different ownership
+boundaries:
 
 ```text
-artifact_roots
-artifact_sources
-root_source_attachments
-artifact_packages
-catalog_resources
-canonical_definitions
-artifact_records
-artifact_collections
-root_catalog_generations
-artifact_dependencies
-artifact_transfer_provenance
+SQLite metadata
+  - roots, sources, attachments, collections, records
+  - package observations, source catalog resources, revisions
+  - root catalog generations and immutable resource snapshots
+  - dependency snapshots and transfer provenance
+
+MapStore portable content
+  - canonical definition files by digest
+  - immutable asset files by digest
+  - portable package manifests
 ```
 
-No runtime state is persisted in these tables.
+SQLite metadata does not store authoritative canonical definition bodies, assets,
+or portable package-manifest bodies. Catalog and record rows retain digests and
+app-local occurrence metadata only.
+
+The metadata adapter owns transactions for root-scan publication, record
+synchronization, transfer metadata publication, and dependency snapshot
+replacement. Portable-content writes are content-addressed and occur outside
+those SQLite transactions.
+
+No runtime state, live connection, secret value, policy decision, or execution
+state is persisted by either Artifact Store repository.
 
 ---
 
-# Part B: Workspace Feature
+# Part B: Workspace Feature, planned
 
 ## 16. Workspace feature purpose
 
-Workspace is a typed Artifact Store consumer.
+Workspace is not implemented in this repository. There is currently no
+`WorkspaceService`, Workspace root hook, Workspace frontend, discovery planner,
+record synchronization policy, catalog service, projector, or Workspace
+persistence schema.
 
-Workspace provides:
+The remainder of Part B is a target integration design. It describes the
+boundaries a future Workspace implementation must preserve when composed with
+the implemented Artifact Store.
+
+When implemented, Workspace will provide:
 
 - Workspace Root semantics.
 - Workspace discovery plans.
@@ -1102,7 +1208,7 @@ Workspace does not own a separate persistence database.
 
 ## 17. Workspace root model
 
-A Workspace Root is:
+A planned Workspace Root is:
 
 ```text
 ArtifactRoot
@@ -1128,7 +1234,7 @@ Empty Workspace Root has no primary filesystem source.
 
 ## 18. Workspace source attachments
 
-A Filesystem Workspace Root has:
+A planned filesystem Workspace Root will have:
 
 ```text
 RootSourceAttachment
@@ -1157,7 +1263,7 @@ RootSourceAttachment
 
 ## 19. Workspace definition kinds
 
-Workspace registers artifact frontends for canonical kinds such as:
+When implemented, Workspace may register artifact frontends for canonical kinds such as:
 
 ```text
 flexigpt.workspace.definition
@@ -1255,7 +1361,9 @@ ArtifactRecord.RecordID
 
 ## 22. Workspace components
 
-| Component                    | Responsibility                                        |
+The following components are planned. None currently exists in the repository.
+
+| Component                    | Planned responsibility                                |
 | ---------------------------- | ----------------------------------------------------- |
 | `WorkspaceService`           | Typed façade over Artifact Store                      |
 | `WorkspaceRootKindHook`      | Validates `flexigpt.workspace` root data              |
@@ -1276,19 +1384,19 @@ ArtifactRecord.RecordID
 
 ```text
 Frontend
--> WorkspaceService.SelectFilesystemRoot(path)
+-> planned WorkspaceService.SelectFilesystemRoot(path)
 
 WorkspaceService
--> ArtifactService.CreateRoot(
+-> artifactstore.Store.CreateRoot(
      kind=flexigpt.workspace,
    )
 
--> ArtifactService.CreateSource(
+-> artifactstore.Store.CreateSource(
      kind=fs-directory,
      config={rootPath:path},
    )
 
--> ArtifactService.AttachSource(
+-> artifactstore.Store.AttachSource(
      rootID,
      sourceID,
      role=primary,
@@ -1296,12 +1404,12 @@ WorkspaceService
 
 -> WorkspaceDiscoveryPlanner.BuildBootstrapPlan
 
--> ArtifactService.ScanRoot(
+-> artifactstore.Store.ScanRoot(
      rootID,
      bootstrapPlan,
    )
 
--> ArtifactService.SyncRecords(
+-> artifactstore.Store.SyncRecords(
      rootID,
      workspaceRecordPolicy,
    )
@@ -1386,7 +1494,7 @@ The frontend does not need to understand Artifact Store keys or source locators.
 
 # 25. Current store integration
 
-Current stores remain installed-resource providers.
+This is a planned compatibility integration. Existing stores remain installed-resource providers.
 
 ```text
 Current SkillStore
@@ -1431,7 +1539,8 @@ The existing store persistence formats do not change.
 
 # 26. Workspace runtime boundary
 
-Artifact Store does not construct runtime objects.
+Artifact Store does not construct runtime objects, and a future Workspace
+implementation must not add runtime behavior to Artifact Store.
 
 Workspace runtime projectors consume Artifact Records and Canonical Definitions.
 
@@ -1443,6 +1552,10 @@ Artifact Record
 + trust and policy state
 = runtime projection
 ```
+
+If a runtime library requires a directory rather than `fs.FS`-style source
+access, Workspace may request `MaterializeSource` through the configured
+`SourceMaterializer`. The resulting `RootPath` remains app-local runtime data.
 
 Examples:
 
@@ -1469,13 +1582,13 @@ Workspace Tool Record
 # 27. Workspace refresh workflow
 
 ```text
-Workspace refresh
+Planned Workspace refresh
 -> WorkspaceDiscoveryPlanner.BuildCurrentPlan
--> ArtifactService.ScanRoot
+-> artifactstore.Store.ScanRoot
 -> Artifact Store updates Catalog Resources
 -> new Canonical Definition digests where content changed
--> Artifact Store synchronizes Artifact Records
 -> Artifact Store publishes new root catalog generation
+-> Artifact Store synchronizes Artifact Records
 -> WorkspaceCatalogService reloads
 ```
 
@@ -1493,17 +1606,23 @@ Outcomes:
 
 # 28. Workspace import and fork workflow
 
+This is a planned use of the implemented generic transfer workflow.
+
 ```text
 Workspace Artifact Record
 -> Canonical Definition digest
--> Artifact Transfer Service
--> app-local fs-directory source
+-> artifactstore.Store.ImportDefinition, CaptureRecord, or ForkRecord
+-> enabled attached destination source and DefinitionMaterializer
+-> source-kind-specific DefinitionMaterializer
 -> new Catalog Resource
 -> new Artifact Record
 -> target Artifact Collection
 ```
 
-The original Workspace Artifact Record remains linked to source.
+Transfer publication invalidates the destination source observation. Workspace
+must rescan the destination root before relying on a current root catalog.
+
+The original Workspace Artifact Record remains linked to its source.
 
 The imported or forked Artifact Record becomes independent.
 

@@ -29,7 +29,6 @@ import {
 	getAttachmentContentBlockModeTooltip,
 } from '@/chats/composer/attachments/attachment_mode_menu_utils';
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
-import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
 /**
@@ -181,7 +180,7 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 		errorMessage: call.errorMessage,
 	};
 
-	const label = formatToolCallLabel(tmpCall);
+	const label = getPrettyToolName(tmpCall.name);
 
 	const statusLabel = call.status ? ` (${call.status})` : '';
 	const isAutoExecute =
@@ -334,7 +333,7 @@ function MessageWebSearchCallChip({ call, fullWidth = false, onClick }: MessageW
 		items.find(it => it?.searchItem?.query)?.searchItem?.query ??
 		items.find(it => it?.findItem?.pattern)?.findItem?.pattern;
 
-	const fallback = formatToolCallLabel(call);
+	const fallback = getPrettyToolName(call.name);
 	const label = firstQuery || fallback;
 
 	const title = `Web search query: ${label}`;

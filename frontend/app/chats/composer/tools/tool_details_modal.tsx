@@ -18,7 +18,7 @@ import {
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
-import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';
+import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 import { formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
 
 function buildToolOutputItemLabel(item: ToolOutputUnion, index: number): string {
@@ -108,7 +108,7 @@ function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; 
 		case 'call': {
 			const call = state.call;
 			return {
-				title: `Tool call • ${formatToolCallLabel(call)}`,
+				title: `Tool call • ${getPrettyToolName(call.name)}`,
 				payload: normalizeStructuredJSONStringDeep(call),
 			};
 		}
