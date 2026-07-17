@@ -89,6 +89,7 @@ func (w *WorkspaceWrapper) MountBuiltInSkills(
 	discoverImmediately bool,
 ) (workspace.Workspace, error) {
 	return middleware.WithRecoveryResp(func() (workspace.Workspace, error) {
+		recursive := true
 		return w.service.MountEmbeddedSource(
 			context.Background(),
 			workspace.EmbeddedSourceAttachmentRequest{
@@ -98,6 +99,7 @@ func (w *WorkspaceWrapper) MountBuiltInSkills(
 				RootLocator:         artifactstoreSpec.SourceLocator(builtin.BuiltInSkillBundlesRootDir),
 				Role:                workspace.RoleBuiltIn,
 				Priority:            priority,
+				AttachmentData:      workspace.AttachmentData{Recursive: &recursive},
 				DiscoverImmediately: discoverImmediately,
 			},
 		)

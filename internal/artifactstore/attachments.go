@@ -44,10 +44,6 @@ func (s *Store) AttachSource(ctx context.Context, draft RootSourceAttachmentDraf
 	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
-	source, err := s.repository.GetSource(ctx, draft.SourceID)
-	if err != nil {
-		return spec.RootSourceAttachment{}, err
-	}
 	now := s.nowUTC()
 	attachment := spec.RootSourceAttachment{
 		RootID:       draft.RootID,
@@ -59,9 +55,6 @@ func (s *Store) AttachSource(ctx context.Context, draft RootSourceAttachmentDraf
 		Data:         normalizedJSONObject(draft.Data),
 		CreatedAt:    now,
 		ModifiedAt:   now,
-	}
-	if err := s.validateAttachment(ctx, root, attachment, source); err != nil {
-		return spec.RootSourceAttachment{}, err
 	}
 	attachments, err := s.repository.ListRootSourceAttachments(ctx, draft.RootID)
 	if err != nil {
@@ -126,10 +119,6 @@ func (s *Store) UpdateRootSourceAttachment(
 	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
-	source, err := s.repository.GetSource(ctx, sourceID)
-	if err != nil {
-		return spec.RootSourceAttachment{}, err
-	}
 	if err := requireExpectedModifiedAt(
 		"root/source attachment "+string(rootID)+"/"+string(sourceID),
 		attachment.ModifiedAt,
@@ -151,9 +140,6 @@ func (s *Store) UpdateRootSourceAttachment(
 	attachment.DataSchemaID = update.DataSchemaID
 	attachment.Data = nextData
 	attachment.ModifiedAt = s.nextModifiedAt(attachment.ModifiedAt)
-	if err := s.validateAttachment(ctx, root, attachment, source); err != nil {
-		return spec.RootSourceAttachment{}, err
-	}
 	attachments, err := s.repository.ListRootSourceAttachments(ctx, rootID)
 	if err != nil {
 		return spec.RootSourceAttachment{}, err

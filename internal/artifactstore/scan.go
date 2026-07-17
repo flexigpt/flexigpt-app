@@ -371,14 +371,6 @@ func (s *Store) scanSource(
 			continue
 		}
 		decoded, diagnostics := frontend.Decode(ctx, candidate)
-		if len(decoded) == 0 {
-			diagnostics = append(diagnostics, spec.Diagnostic{
-				Severity: spec.DiagnosticSeverityError,
-				Code:     "artifactstore.frontend.decode-empty",
-				Message:  "the selected frontend emitted no definitions",
-				Location: &spec.DiagnosticLocation{Locator: entry.Locator},
-			})
-		}
 		if err := validate.ValidateDiagnostics(diagnostics); err != nil {
 			return result, publication, fmt.Errorf(
 				"%w: frontend %q returned invalid diagnostics: %w",
@@ -387,7 +379,7 @@ func (s *Store) scanSource(
 				err,
 			)
 		}
-		if err := errorDiagnostics("frontend decode", diagnostics); err != nil || len(decoded) == 0 {
+		if err := errorDiagnostics("frontend decode", diagnostics); err != nil {
 			invalid := invalidCandidateResources(
 				source.SourceID,
 				entry.Locator,
@@ -407,6 +399,12 @@ func (s *Store) scanSource(
 				diagnostics...,
 			)
 			continue
+		}
+		if len(decoded) == 0 {
+			result.Diagnostics = appendBoundedDiagnostics(
+				result.Diagnostics,
+				diagnostics...,
+			)
 		}
 		for _, decodedArtifact := range decoded {
 			resourceKey := string(entry.Locator) + "\x00" + string(decodedArtifact.SubresourceLocator)

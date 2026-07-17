@@ -88,11 +88,11 @@
 | ID      | Status                  | Decision                                                                                                                                              |
 | ------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AS-01` | Implemented             | Artifact Store owns app-local artifact lifecycle metadata and coordinates portable content through repository ports.                                  |
-| `AS-02` | Planned                 | Workspace will not introduce a separate persistent Workspace Store database.                                                                          |
-| `AS-03` | Planned                 | Workspace will be a typed consumer of Artifact Store.                                                                                                 |
-| `AS-04` | Planned                 | Existing domain stores should remain physically unchanged during Workspace adoption.                                                                  |
-| `AS-05` | Planned mapping         | A current Bundle maps to generic `ArtifactCollection`.                                                                                                |
-| `AS-06` | Planned mapping         | A current item maps to generic `ArtifactRecord`.                                                                                                      |
+| `AS-02` | Implemented             | Workspace does not introduce a separate persistent Workspace Store database.                                                                          |
+| `AS-03` | Implemented             | Workspace is a typed consumer of Artifact Store.                                                                                                      |
+| `AS-04` | Implemented             | Existing domain stores remain physically unchanged during Workspace adoption.                                                                         |
+| `AS-05` | Implemented mapping     | A current Bundle maps to generic `ArtifactCollection`.                                                                                                |
+| `AS-06` | Implemented mapping     | A current item maps to generic `ArtifactRecord`.                                                                                                      |
 | `AS-07` | Implemented             | Portable package content and app-local collections are separate concepts and storage domains.                                                         |
 | `AS-08` | Implemented             | Portable definitions exclude app IDs, local paths, secrets, runtime state, and conversation state.                                                    |
 | `AS-09` | Implemented             | Source transport is an Artifact Store extension port registered during composition, not behavior implemented by frontends or consumer features.       |
@@ -102,8 +102,8 @@
 | `AS-13` | Implemented             | `ArtifactRecord` is the sole generic app-side artifact item.                                                                                          |
 | `AS-14` | Implemented             | Registered frontends own source-format recognition and decoding. The portable-definition frontend is registered by default.                           |
 | `AS-15` | Implemented             | Runtime projections and execution remain outside Artifact Store.                                                                                      |
-| `AS-16` | Planned                 | A Workspace Root will be `ArtifactRoot(kind=workspace.root)`.                                                                                         |
-| `AS-17` | Planned                 | Workspace discovery will synchronize selected catalog resources into root-local records.                                                              |
+| `AS-16` | Implemented             | A Workspace Root is `ArtifactRoot(kind=workspace.root)`.                                                                                              |
+| `AS-17` | Implemented             | Workspace discovery synchronizes selected catalog resources into root-local records.                                                                  |
 | `AS-18` | Implemented generically | Linked, captured, forked, and app-local record modes exist. Their Workspace-specific use is planned.                                                  |
 | `AS-19` | Implemented             | Root scans atomically publish source observations and immutable root catalog snapshots in metadata storage.                                           |
 | `AS-20` | Implemented             | Read-only source projection and source-kind-specific transfer writes use separate optional materializer ports.                                        |
@@ -159,7 +159,7 @@ transport behavior.
 | Portable content adapter | `internal/artifactstore/contentstore`                    | MapStore-backed definitions, assets, and portable package manifests                                     | Roots, sources, records, collections, catalog publication           |
 | Source adapters          | `internal/artifactstore/sourcedriver`                    | Source configuration, traversal safety, reads, snapshots, source generations                            | Catalog persistence, frontend selection, domain interpretation      |
 | Materialization adapters | `internal/artifactstore/materializer` and injected ports | Stable source projection and source-kind-specific transfer writes                                       | Root metadata and runtime execution                                 |
-| Typed consumer           | Future Workspace or another feature                      | Typed semantics, frontend semantics, scan plans, record derivation, projections                         | Generic storage adapters and source transport                       |
+| Typed consumer           | Workspace or another feature                             | Typed semantics, frontend semantics, scan plans, record derivation, projections                         | Generic storage adapters and source transport                       |
 
 `NewStore(baseDir)` opens SQLite metadata at `artifactstore.sqlite`, opens a
 MapStore-backed portable content repository under `artifact-content`, registers

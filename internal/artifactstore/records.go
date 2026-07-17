@@ -440,7 +440,12 @@ func (s *Store) validateRecord(
 			}
 		}
 	}
-	if resource != nil && definition != nil && resource.State == spec.CatalogStateValid {
+	if resource != nil &&
+		definition != nil &&
+		resource.State == spec.CatalogStateValid &&
+		resource.CurrentDefinitionDigest != nil &&
+		*resource.CurrentDefinitionDigest == definition.Digest &&
+		resource.Kind == definition.Kind {
 		record.Diagnostics = append(
 			[]spec.Diagnostic(nil),
 			resource.Diagnostics...,

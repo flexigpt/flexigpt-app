@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -145,26 +146,18 @@ func NewStore(baseDir string, options ...StoreOption) (*Store, error) {
 	}
 	cleanBaseDir := filepath.Clean(baseDir)
 
-	// Open MapStore first. Besides preserving the files-only portable-content
-	// boundary, this lets the approved storage adapter prepare its hierarchy
-	// before SQLite opens a database beneath the same application directory.
-	defaultContent, err := contentstore.NewMapStorePortableContentRepository(
-		filepath.Join(cleanBaseDir, "artifact-content"),
-	)
-	if err != nil {
-		return nil, err
+	if err := os.MkdirAll(cleanBaseDir, 0o700); err != nil {
+		return nil, fmt.Errorf("create artifact store directory: %w", err)
 	}
 	metadata, err := metadatastore.OpenMetadataStore(
 		context.Background(),
 		filepath.Join(cleanBaseDir, "artifactstore.sqlite"),
 	)
 	if err != nil {
-		_ = defaultContent.Close()
 		return nil, err
 	}
 	store, err := newStore(metadata, nil)
 	if err != nil {
-		_ = defaultContent.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -173,20 +166,19 @@ func NewStore(baseDir string, options ...StoreOption) (*Store, error) {
 			continue
 		}
 		if err := option(store); err != nil {
-			_ = defaultContent.Close()
 			_ = store.Close()
 			return nil, err
 		}
 	}
 	if store.portableContent == nil {
-		store.portableContent = defaultContent
-		defaultContent = nil
-	}
-	if defaultContent != nil {
-		if err := defaultContent.Close(); err != nil {
+		content, err := contentstore.NewMapStorePortableContentRepository(
+			filepath.Join(cleanBaseDir, "artifact-content"),
+		)
+		if err != nil {
 			_ = store.Close()
-			return nil, fmt.Errorf("close replaced default portable content repository: %w", err)
+			return nil, err
 		}
+		store.portableContent = content
 	}
 	if err := store.installRequiredSourceDrivers(); err != nil {
 		_ = store.Close()

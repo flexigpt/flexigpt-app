@@ -229,15 +229,20 @@ func (f *nativeFrontend) decodeMCPCollection(
 	object map[string]json.RawMessage,
 ) ([]artifactstoreSpec.DecodedArtifact, error) {
 	var servers map[string]json.RawMessage
+	foundServers := false
 	for _, field := range []string{"mcpServers", "servers"} {
 		if value, ok := object[field]; ok {
 			if err := json.Unmarshal(value, &servers); err != nil {
 				return nil, fmt.Errorf("%s must be an object: %w", field, err)
 			}
+			if servers == nil {
+				return nil, fmt.Errorf("%s must be an object", field)
+			}
+			foundServers = true
 			break
 		}
 	}
-	if len(servers) == 0 {
+	if !foundServers {
 		name := stringField(object, "name", "id")
 		if name == "" {
 			name = sourceLogicalName(locator)
