@@ -341,9 +341,9 @@ function AddInstructionSkillModalContent({
 				</div>
 
 				<div>
-					<label className="label py-1">
+					<div className="label py-1">
 						<span className="text-sm">Bundle</span>
-					</label>
+					</div>
 					<Dropdown<string>
 						dropdownItems={bundleDropdownItems}
 						orderedKeys={bundles.map(bundle => bundle.id)}
@@ -360,10 +360,11 @@ function AddInstructionSkillModalContent({
 				</div>
 
 				<div>
-					<label className="label py-1">
+					<label htmlFor="instruction-skill-display-name" className="label py-1">
 						<span className="text-sm">Display name</span>
 					</label>
 					<input
+						id="instruction-skill-display-name"
 						className="input w-full rounded-xl"
 						value={displayName}
 						onChange={event => {
@@ -374,10 +375,11 @@ function AddInstructionSkillModalContent({
 				</div>
 
 				<div>
-					<label className="label py-1">
+					<label htmlFor="instruction-skill-name" className="label py-1">
 						<span className="text-sm">Skill name and slug</span>
 					</label>
 					<input
+						id="instruction-skill-name"
 						className={`input w-full rounded-xl ${nameError ? 'input-error' : ''}`}
 						value={name}
 						onChange={event => {
@@ -394,10 +396,11 @@ function AddInstructionSkillModalContent({
 				</div>
 
 				<div>
-					<label className="label py-1">
+					<label htmlFor="instruction-skill-body" className="label py-1">
 						<span className="text-sm">Instructions</span>
 					</label>
 					<textarea
+						id="instruction-skill-body"
 						className={`textarea h-36 w-full rounded-xl ${bodyError ? 'textarea-error' : ''}`}
 						value={body}
 						onChange={event => {
@@ -796,6 +799,8 @@ export function SkillsBottomBarChip({
 					</div>
 				</div>
 
+				{/* Child buttons need to stop propagation so the enclosing menu item does not toggle. */}
+				{/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions */}
 				<div className="ml-2 flex w-full items-center justify-end gap-1" onClick={stop} onPointerDown={stop}>
 					{isInstruction ? (
 						checked ? (

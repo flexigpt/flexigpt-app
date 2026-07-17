@@ -514,12 +514,13 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 
 			<form onSubmit={handleSubmit} className="space-y-4 p-6">
 				<div className="grid grid-cols-12 items-center gap-2">
-					<label className="label col-span-4 cursor-pointer">
+					<label htmlFor="advanced-stream" className="label col-span-4 cursor-pointer">
 						<span className="text-sm">Streaming</span>
 						<HelpHint content="Stream data continuously." />
 					</label>
 					<div className="col-span-8">
 						<input
+							id="advanced-stream"
 							type="checkbox"
 							checked={stream}
 							onChange={e => {
@@ -531,12 +532,13 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				</div>
 
 				<div className="grid grid-cols-12 items-center gap-2">
-					<label className="label col-span-4">
+					<label htmlFor="advanced-max-prompt-length" className="label col-span-4">
 						<span className="text-sm">Max Prompt Tokens</span>
 						<HelpHint content="Maximum tokens for input prompt" />
 					</label>
 					<div className="col-span-8">
 						<input
+							id="advanced-max-prompt-length"
 							ref={maxPromptLengthInputRef}
 							type="text"
 							value={maxPromptLength}
@@ -558,12 +560,13 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				</div>
 
 				<div className="grid grid-cols-12 items-center gap-2">
-					<label className="label col-span-4">
+					<label htmlFor="advanced-max-output-length" className="label col-span-4">
 						<span className="text-sm">Max Output Tokens</span>
 						<HelpHint content="Maximum tokens for model output" />
 					</label>
 					<div className="col-span-8">
 						<input
+							id="advanced-max-output-length"
 							type="text"
 							value={maxOutputLength}
 							onChange={e => {
@@ -584,12 +587,13 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				</div>
 
 				<div className="grid grid-cols-12 items-center gap-2">
-					<label className="label col-span-4">
+					<label htmlFor="advanced-timeout" className="label col-span-4">
 						<span className="text-sm">Timeout (s)</span>
 						<HelpHint content="Maximum time a request can take (seconds)" />
 					</label>
 					<div className="col-span-8">
 						<input
+							id="advanced-timeout"
 							type="text"
 							value={timeoutSec}
 							onChange={e => {
@@ -610,7 +614,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				</div>
 
 				<div className="grid grid-cols-12 items-center gap-2">
-					<label className="label col-span-4">
+					<div className="label col-span-4">
 						<span className="text-sm">Reasoning Summary</span>
 						<HelpHint
 							content={
@@ -619,7 +623,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 									: 'This model is currently using temperature mode (no reasoning params active).'
 							}
 						/>
-					</label>
+					</div>
 					<div className="col-span-8">
 						<Dropdown<SummaryStyleChoice>
 							dropdownItems={reasoningSummaryStyleItems}
@@ -635,10 +639,10 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				</div>
 
 				<div className="grid grid-cols-12 items-center gap-2">
-					<label className="label col-span-4">
+					<div className="label col-span-4">
 						<span className="text-sm">Output Format</span>
 						<HelpHint content="Controls output formatting. Verbosity is set in the top bar." />
-					</label>
+					</div>
 					<div className="col-span-8">
 						<Dropdown<OutputFormatChoice>
 							dropdownItems={outputFormatItems}
@@ -654,11 +658,12 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				{outputFormatChoice === 'jsonSchema' && (
 					<>
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-4">
+							<label htmlFor="advanced-json-schema-name" className="label col-span-4">
 								<span className="text-sm">Schema Name</span>
 							</label>
 							<div className="col-span-8">
 								<input
+									id="advanced-json-schema-name"
 									type="text"
 									className={`input w-full rounded-xl ${errors.jsonSchemaName ? 'input-error' : ''}`}
 									value={jsonSchemaName}
@@ -679,11 +684,12 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-4">
+							<label htmlFor="advanced-json-schema-description" className="label col-span-4">
 								<span className="text-sm">Description</span>
 							</label>
 							<div className="col-span-8">
 								<input
+									id="advanced-json-schema-description"
 									type="text"
 									className="input w-full rounded-xl"
 									value={jsonSchemaDescription}
@@ -697,11 +703,12 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-4 cursor-pointer">
+							<label htmlFor="advanced-json-schema-strict" className="label col-span-4 cursor-pointer">
 								<span className="text-sm">Strict</span>
 							</label>
 							<div className="col-span-8">
 								<input
+									id="advanced-json-schema-strict"
 									type="checkbox"
 									checked={jsonSchemaStrict}
 									onChange={e => {
@@ -713,11 +720,12 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 						</div>
 
 						<div className="grid grid-cols-12 items-start gap-2">
-							<label className="label col-span-4">
+							<label htmlFor="advanced-json-schema" className="label col-span-4">
 								<span className="text-sm">Schema JSON</span>
 							</label>
 							<div className="col-span-8">
 								<textarea
+									id="advanced-json-schema"
 									className={`textarea w-full rounded-xl ${errors.jsonSchema ? 'textarea-error' : ''}`}
 									rows={8}
 									value={jsonSchemaText}
@@ -742,13 +750,14 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				{(supportsManualCacheControl || supportsAutomaticProviderCaching) && (
 					<>
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-4 cursor-pointer">
+							<div className="label col-span-4">
 								<span className="text-sm">Cache Control</span>
 								<HelpHint content="Top-level request cache control, when supported by the selected provider SDK." />
-							</label>
+							</div>
 							<div className="col-span-8">
 								{supportsManualCacheControl ? (
 									<input
+										aria-label="Cache Control"
 										type="checkbox"
 										checked={cacheControlEnabled}
 										onChange={e => {
@@ -774,9 +783,9 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 						{supportsManualCacheControl && cacheControlEnabled && (
 							<>
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-4">
+									<div className="label col-span-4">
 										<span className="text-sm">Cache Kind</span>
-									</label>
+									</div>
 									<div className="col-span-8">
 										<Dropdown<CacheControlKind>
 											dropdownItems={cacheControlKindItems}
@@ -792,9 +801,9 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-4">
+									<div className="label col-span-4">
 										<span className="text-sm">Cache TTL</span>
-									</label>
+									</div>
 									<div className="col-span-8">
 										<Dropdown<CacheControlTTLSelection>
 											dropdownItems={cacheControlTTLItems}
@@ -811,11 +820,12 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 
 								{supportsCacheKey && (
 									<div className="grid grid-cols-12 items-center gap-2">
-										<label className="label col-span-4">
+										<label htmlFor="advanced-cache-key" className="label col-span-4">
 											<span className="text-sm">Cache Key</span>
 										</label>
 										<div className="col-span-8">
 											<input
+												id="advanced-cache-key"
 												type="text"
 												value={cacheControlKey}
 												onChange={e => {
@@ -835,7 +845,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 
 				{stopPolicy.isSupported && (
 					<div className="grid grid-cols-12 items-start gap-2">
-						<label className="label col-span-4">
+						<label htmlFor="advanced-stop-sequences" className="label col-span-4">
 							<span className="text-sm">Stop Sequences</span>
 							<HelpHint
 								content={
@@ -847,6 +857,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 						</label>
 						<div className="col-span-8">
 							<textarea
+								id="advanced-stop-sequences"
 								disabled={stopSequencesDisabledBecauseReasoning}
 								className={`textarea w-full rounded-xl ${
 									errors.stopSequences ? 'textarea-error' : ''

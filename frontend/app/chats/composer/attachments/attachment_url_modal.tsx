@@ -129,10 +129,11 @@ function UrlAttachmentModalContent({ onAttachURL }: UrlAttachmentModalContentPro
 				<form noValidate onSubmit={handleSubmit} className="space-y-4 p-6">
 					{/* URL input */}
 					<div>
-						<label className="label p-1">
+						<label htmlFor="attachment-url" className="label p-1">
 							<span className="text-sm">URL</span>
 						</label>
 						<input
+							id="attachment-url"
 							ref={inputRef}
 							type="url"
 							value={formData.url}

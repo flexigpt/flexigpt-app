@@ -67,14 +67,19 @@ export function ConversationSearchFlatRow({
 		<li
 			key={result.searchConversation.id}
 			data-index={index}
-			onClick={() => {
-				onPick(result.searchConversation);
-			}}
 			className={`hover:bg-base-100 flex cursor-pointer items-center justify-between px-12 py-2 ${
 				isFocused ? 'bg-base-100' : ''
 			}`}
 		>
-			<span className="truncate">{result.searchConversation.title}</span>
+			<button
+				type="button"
+				className="flex min-w-0 flex-1 cursor-pointer items-center text-left"
+				onClick={() => {
+					onPick(result.searchConversation);
+				}}
+			>
+				<span className="truncate">{result.searchConversation.title}</span>
+			</button>
 
 			<span className="app-text-neutral hidden text-xs lg:block">
 				<ConversationSearchRowMeta

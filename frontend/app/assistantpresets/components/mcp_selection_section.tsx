@@ -312,11 +312,12 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 
 							<div className="mt-3 grid grid-cols-12 gap-4">
 								<div className="col-span-12 md:col-span-4">
-									<label className="label py-1">
+									<label htmlFor={`mcp-include-instructions-${serverKey}`} className="label py-1">
 										<span className="text-sm">Include Instructions</span>
 									</label>
 									<div>
 										<input
+											id={`mcp-include-instructions-${serverKey}`}
 											type="checkbox"
 											className="toggle toggle-accent"
 											checked={Boolean(selection.includeServerInstructions)}
@@ -327,9 +328,9 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 									</div>
 								</div>
 								<div className="col-span-12 md:col-span-4">
-									<label className="label py-1">
+									<div className="label py-1">
 										<span className="text-sm">Tool Exposure</span>
-									</label>
+									</div>
 									<Dropdown<MCPToolExposure>
 										dropdownItems={toolExposureDropdownItems}
 										orderedKeys={TOOL_EXPOSURE_OPTIONS}

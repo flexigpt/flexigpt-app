@@ -105,6 +105,8 @@ function CheckboxRow({
 	onChange: (next: boolean) => void;
 }) {
 	return (
+		// The native label preserves checkbox activation while preventing its enclosing menu item from activating.
+		// oxlint-disable-next-line jsx-a11y/click-events-have-key-events jsx-a11y/no-noninteractive-element-interactions
 		<label
 			className={`hover:bg-base-200 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs ${
 				disabled ? 'opacity-60' : ''
@@ -328,7 +330,9 @@ function MCPArgumentFields({
 							/>
 							<datalist id={listID}>
 								{(completionsByArg[arg.name] ?? []).map(option => (
-									<option key={option} value={option} />
+									<option key={option} value={option}>
+										{option}
+									</option>
 								))}
 							</datalist>
 						</label>

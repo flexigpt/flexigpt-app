@@ -15,7 +15,7 @@ interface MermaidZoomModalProps {
 
 function MermaidZoomModalContent({ svgNode, surfaceStyle }: Omit<MermaidZoomModalProps, 'isOpen' | 'onClose'>) {
 	const { requestClose } = useModalDialogController();
-	const modalRef = useRef<HTMLDivElement | null>(null);
+	const modalRef = useRef<HTMLSpanElement | null>(null);
 
 	// Inject the SVG into the modal container whenever we have one and the modal is open
 	useEffect(() => {
@@ -47,16 +47,18 @@ function MermaidZoomModalContent({ svgNode, surfaceStyle }: Omit<MermaidZoomModa
 
 	return (
 		<>
-			<div
-				className="modal-box app-bg-mermaid flex h-[90vh] max-w-[90vw] cursor-zoom-out items-center justify-center"
+			<button
+				type="button"
+				className="modal-box app-bg-mermaid flex h-[90vh] max-w-[90vw] cursor-zoom-out items-center justify-center border-0"
 				style={surfaceStyle}
+				aria-label="Close enlarged Mermaid diagram"
 				onClick={() => {
 					requestClose();
 				}}
 			>
 				{/* enlarged diagram; pointer events disabled so clicks bubble to the container */}
-				<div ref={modalRef} className="w-full overflow-auto" style={{ pointerEvents: 'none' }} />
-			</div>
+				<span ref={modalRef} className="block w-full overflow-auto" style={{ pointerEvents: 'none' }} />
+			</button>
 
 			<ModalBackdrop enabled={true} />
 		</>

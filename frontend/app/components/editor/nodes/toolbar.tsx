@@ -30,10 +30,14 @@ export const ToolbarToggleGroup = forwardRef<HTMLDivElement, HTMLAttributes<HTML
  * @public
  */
 export const ToolbarLink = forwardRef<HTMLAnchorElement, AnchorHTMLAttributes<HTMLAnchorElement>>(function ToolbarLink(
-	{ className, ...props },
+	{ children, className, ...props },
 	ref
 ) {
-	return <a ref={ref} className={cn('link link-hover font-medium', className)} {...props} />;
+	return (
+		<a ref={ref} className={cn('link link-hover font-medium', className)} {...props}>
+			{children}
+		</a>
+	);
 });
 
 /* Vertical separator */

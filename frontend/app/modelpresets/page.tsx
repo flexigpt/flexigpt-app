@@ -593,7 +593,7 @@ export default function ModelPresetsPage() {
 
 					<div className="bg-base-100 mb-8 rounded-2xl px-4 py-2 shadow-lg">
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-							<label className="text-sm font-medium sm:w-48">Default Provider</label>
+							<div className="text-sm font-medium sm:w-48">Default Provider</div>
 
 							<div className="min-w-0 grow">
 								{enabledProviderNames.length > 0 && safeDefaultKey ? (

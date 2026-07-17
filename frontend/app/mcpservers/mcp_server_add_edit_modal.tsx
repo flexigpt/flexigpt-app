@@ -1,5 +1,5 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiAlertCircle, FiPlus, FiTrash2, FiUpload, FiX } from 'react-icons/fi';
 
@@ -385,6 +385,21 @@ function AddEditMCPServerModalContent({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const { requestClose, unmountingRef } = useModalDialogController();
+
+	const serverIDInputRef = useRef<HTMLInputElement | null>(null);
+
+	useEffect(() => {
+		if (isEditMode) {
+			return;
+		}
+
+		const frame = window.requestAnimationFrame(() => {
+			serverIDInputRef.current?.focus({ preventScroll: true });
+		});
+		return () => {
+			window.cancelAnimationFrame(frame);
+		};
+	}, [isEditMode]);
 
 	const prefillSourceMap = useMemo<Record<string, MCPServerConfig>>(
 		() => Object.fromEntries(prefillServers.map(server => [buildMCPServerPrefillKey(server), server] as const)),
@@ -1047,6 +1062,7 @@ function AddEditMCPServerModalContent({
 							>
 								<input
 									id="mcp-server-id"
+									ref={serverIDInputRef}
 									type="text"
 									name="serverID"
 									value={formData.serverID}
@@ -1055,7 +1071,6 @@ function AddEditMCPServerModalContent({
 									className={`input w-full rounded-xl ${errors.serverID ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
-									autoFocus={!isEditMode}
 									disabled={isSubmitting}
 									aria-invalid={Boolean(errors.serverID)}
 								/>

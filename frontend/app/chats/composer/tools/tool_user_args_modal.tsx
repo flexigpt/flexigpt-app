@@ -215,7 +215,7 @@ function ToolUserArgsModalContent({
 						{/* Editor */}
 						<div className="space-y-2">
 							<div className="flex items-center justify-between">
-								<label className="label p-1">
+								<label htmlFor="tool-user-args-json" className="label p-1">
 									<span className="text-sm">Options (JSON)</span>
 								</label>
 
@@ -245,6 +245,7 @@ function ToolUserArgsModalContent({
 
 							<textarea
 								ref={textareaRef}
+								id="tool-user-args-json"
 								className={`textarea w-full rounded-xl font-mono text-xs ${error ? 'textarea-error' : ''}`}
 								rows={12}
 								value={formData.rawJson}

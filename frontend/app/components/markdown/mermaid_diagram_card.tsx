@@ -375,9 +375,20 @@ export function MermaidDiagram({
 					</div>
 				</div>
 
-				<div
+				{/* A native button would wrap Mermaid SVG links, so retain a keyboard-operable composite trigger. */}
+				<button
 					className="flex min-h-65 w-full cursor-zoom-in items-center justify-center overflow-auto p-1 text-center"
+					type="button"
+					tabIndex={0}
+					aria-label="Enlarge Mermaid diagram"
 					onClick={handleOpenZoom}
+					onKeyDown={event => {
+						if (event.key !== 'Enter' && event.key !== ' ') {
+							return;
+						}
+						event.preventDefault();
+						handleOpenZoom();
+					}}
 				>
 					<div
 						ref={inlineDiagramRef}
@@ -385,7 +396,7 @@ export function MermaidDiagram({
 						// oxlint-disable-next-line react/no-danger
 						dangerouslySetInnerHTML={{ __html: svgMarkup }}
 					/>
-				</div>
+				</button>
 			</div>
 
 			<MermaidZoomModal

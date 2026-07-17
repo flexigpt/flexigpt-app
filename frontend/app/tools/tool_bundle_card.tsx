@@ -248,11 +248,11 @@ export function ToolBundleCard({
 				}
 			>
 				{toolLoadError ? (
-					<div className="alert alert-warning mt-4 rounded-2xl text-sm" role="status">
-						<div className="min-w-0 grow">
-							<div className="font-semibold">Tools could not be loaded</div>
-							<div className="wrap-break-word">{toolLoadError}</div>
-						</div>
+					<output className="alert alert-warning mt-4 rounded-2xl text-sm">
+						<span className="min-w-0 grow">
+							<span className="block font-semibold">Tools could not be loaded</span>
+							<span className="block wrap-break-word">{toolLoadError}</span>
+						</span>
 						<button
 							type="button"
 							className="btn btn-sm rounded-xl"
@@ -264,7 +264,7 @@ export function ToolBundleCard({
 							<FiRefreshCw size={14} />
 							<span>{isPending('bundle:refresh') ? 'Reloading' : 'Retry'}</span>
 						</button>
-					</div>
+					</output>
 				) : null}
 
 				{isExpanded ? (

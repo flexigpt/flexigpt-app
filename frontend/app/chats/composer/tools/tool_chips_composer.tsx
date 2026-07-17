@@ -291,10 +291,11 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 	const title = titleLines.join('\n');
 
 	return (
-		<div
+		// This composite control contains nested retry and remove buttons, which cannot be nested in a native button.
+		<button
+			type="button"
 			className={`flex min-w-48 shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors ${isError ? 'border-warning/70 bg-warning/10 text-warning-content border' : 'bg-base-200 text-base-content hover:bg-base-300/80'}`}
 			title={title}
-			role="button"
 			tabIndex={0}
 			onClick={onOpen}
 			onKeyDown={e => {
@@ -345,6 +346,6 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 					<FiX size={12} />
 				</button>
 			</div>
-		</div>
+		</button>
 	);
 }

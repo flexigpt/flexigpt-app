@@ -710,7 +710,10 @@ function AddEditSkillModalContent({
 						{isAddMode && (
 							<ModalSection title="Source">
 								<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-									<label className="border-base-content/10 hover:bg-base-200 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
+									<label
+										aria-label="Create managed SKILL.md"
+										className="border-base-content/10 hover:bg-base-200 flex cursor-pointer items-start gap-3 rounded-2xl border p-3"
+									>
 										<input
 											type="radio"
 											className="radio radio-sm mt-1"
@@ -726,7 +729,10 @@ function AddEditSkillModalContent({
 											</span>
 										</span>
 									</label>
-									<label className="border-base-content/10 hover:bg-base-200 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
+									<label
+										aria-label="Register existing skill folder"
+										className="border-base-content/10 hover:bg-base-200 flex cursor-pointer items-start gap-3 rounded-2xl border p-3"
+									>
 										<input
 											type="radio"
 											className="radio radio-sm mt-1"
@@ -748,9 +754,9 @@ function AddEditSkillModalContent({
 
 						{isAddMode && (
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<div className="label col-span-3">
 									<span className="text-sm">Prefill from Existing</span>
-								</label>
+								</div>
 
 								<div className="col-span-9 flex items-center gap-2">
 									{!prefillMode && (
@@ -807,7 +813,7 @@ function AddEditSkillModalContent({
 								<div className="collapse-title text-sm font-semibold">Managed SKILL.md content</div>
 								<div className="collapse-content space-y-4 text-sm">
 									<div className="grid grid-cols-12 items-start gap-2">
-										<label className="label col-span-12 sm:col-span-3">
+										<div className="label col-span-12 sm:col-span-3">
 											<span className="text-sm">Insert</span>
 											<span
 												className="tooltip tooltip-right"
@@ -815,7 +821,7 @@ function AddEditSkillModalContent({
 											>
 												<FiHelpCircle size={12} />
 											</span>
-										</label>
+										</div>
 										<div className="col-span-12 space-y-1 sm:col-span-9">
 											<Dropdown<SkillInsert>
 												dropdownItems={skillInsertDropdownItems}
@@ -831,7 +837,7 @@ function AddEditSkillModalContent({
 									</div>
 
 									<div className="grid grid-cols-12 items-start gap-2">
-										<label className="label col-span-12 sm:col-span-3">
+										<label htmlFor="skill-scaffold-arguments" className="label col-span-12 sm:col-span-3">
 											<span className="text-sm">Arguments</span>
 											<span
 												className="tooltip tooltip-right"
@@ -842,6 +848,7 @@ function AddEditSkillModalContent({
 										</label>
 										<div className="col-span-12 sm:col-span-9">
 											<textarea
+												id="skill-scaffold-arguments"
 												className="textarea h-24 w-full rounded-xl font-mono text-xs"
 												value={scaffoldArgumentsText}
 												onChange={e => {
@@ -867,11 +874,12 @@ function AddEditSkillModalContent({
 									</div>
 
 									<div className="grid grid-cols-12 items-start gap-2">
-										<label className="label col-span-12 sm:col-span-3">
+										<label htmlFor="skill-scaffold-body" className="label col-span-12 sm:col-span-3">
 											<span className="text-sm">Body</span>
 										</label>
 										<div className="col-span-12 sm:col-span-9">
 											<textarea
+												id="skill-scaffold-body"
 												className="textarea h-28 w-full rounded-xl"
 												value={scaffoldBody}
 												onChange={e => {

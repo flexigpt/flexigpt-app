@@ -945,9 +945,9 @@ function AddEditModelPresetModalContent({
 								description="Copy non-secret runtime defaults from another configured model preset."
 							>
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<div className="label col-span-3">
 										<span className="text-sm">Prefill from Existing</span>
-									</label>
+									</div>
 
 									<div className="col-span-9 flex items-center gap-2">
 										{!prefillMode && (
@@ -1033,7 +1033,7 @@ function AddEditModelPresetModalContent({
 							</ModalField>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="model-preset-name" className="label col-span-3">
 									<span className="text-sm">Model Name*</span>
 									<span
 										className="tooltip tooltip-right"
@@ -1045,6 +1045,7 @@ function AddEditModelPresetModalContent({
 								<div className="col-span-9">
 									<input
 										ref={modelNameInputRef}
+										id="model-preset-name"
 										name="name"
 										type="text"
 										className={`input w-full rounded-xl ${errors.name ? 'input-error' : ''}`}
@@ -1068,7 +1069,7 @@ function AddEditModelPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="model-preset-label" className="label col-span-3">
 									<span className="text-sm">Preset Label*</span>
 									<span className="tooltip tooltip-right" data-tip="Friendly name shown in the UI">
 										<FiHelpCircle size={12} />
@@ -1076,6 +1077,7 @@ function AddEditModelPresetModalContent({
 								</label>
 								<div className="col-span-9">
 									<input
+										id="model-preset-label"
 										name="presetLabel"
 										type="text"
 										className={`input w-full rounded-xl ${errors.presetLabel ? 'input-error' : ''}`}
@@ -1101,11 +1103,12 @@ function AddEditModelPresetModalContent({
 
 						<ModalSection title="Presentation" description="Controls whether this preset is selectable and streamed.">
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3 cursor-pointer">
+								<label htmlFor="model-preset-enabled" className="label col-span-3 cursor-pointer">
 									<span className="text-sm">Enabled</span>
 								</label>
 								<div className="col-span-9">
 									<input
+										id="model-preset-enabled"
 										type="checkbox"
 										name="isEnabled"
 										className="toggle toggle-accent disabled:opacity-80"
@@ -1117,11 +1120,12 @@ function AddEditModelPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3 cursor-pointer">
+								<label htmlFor="model-preset-stream" className="label col-span-3 cursor-pointer">
 									<span className="text-sm">Streaming</span>
 								</label>
 								<div className="col-span-9">
 									<input
+										id="model-preset-stream"
 										type="checkbox"
 										name="stream"
 										className="toggle toggle-accent disabled:opacity-80"
@@ -1138,7 +1142,7 @@ function AddEditModelPresetModalContent({
 							description="Enable provider-specific reasoning configuration when supported."
 						>
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3 cursor-pointer">
+								<label htmlFor="model-preset-reasoning-support" className="label col-span-3 cursor-pointer">
 									<span className="text-sm">Supports Reasoning</span>
 									<span className="tooltip tooltip-right" data-tip="If enabled, configure below">
 										<FiHelpCircle size={12} />
@@ -1146,6 +1150,7 @@ function AddEditModelPresetModalContent({
 								</label>
 								<div className="col-span-9">
 									<input
+										id="model-preset-reasoning-support"
 										type="checkbox"
 										name="reasoningSupport"
 										className="toggle toggle-accent disabled:opacity-80"
@@ -1169,9 +1174,9 @@ function AddEditModelPresetModalContent({
 							{formData.reasoningSupport && (
 								<>
 									<div className="grid grid-cols-12 items-center gap-2">
-										<label className="label col-span-3">
+										<div className="label col-span-3">
 											<span className="text-sm">Reasoning Type</span>
-										</label>
+										</div>
 										<div className="col-span-9">
 											{isReadOnly ? (
 												<ReadOnlyValue
@@ -1196,9 +1201,9 @@ function AddEditModelPresetModalContent({
 
 									{formData.reasoningType === ReasoningType.SingleWithLevels && (
 										<div className="grid grid-cols-12 items-center gap-2">
-											<label className="label col-span-3">
+											<div className="label col-span-3">
 												<span className="text-sm">Reasoning Level</span>
-											</label>
+											</div>
 											<div className="col-span-9">
 												{isReadOnly ? (
 													<ReadOnlyValue
@@ -1222,11 +1227,12 @@ function AddEditModelPresetModalContent({
 
 									{formData.reasoningType === ReasoningType.HybridWithTokens && (
 										<div className="grid grid-cols-12 items-center gap-2">
-											<label className="label col-span-3">
+											<label htmlFor="model-preset-reasoning-tokens" className="label col-span-3">
 												<span className="text-sm">Reasoning Tokens</span>
 											</label>
 											<div className="col-span-9">
 												<input
+													id="model-preset-reasoning-tokens"
 													name="reasoningTokens"
 													type="text"
 													className={`input w-full rounded-xl ${errors.reasoningTokens ? 'input-error' : ''}`}
@@ -1249,12 +1255,12 @@ function AddEditModelPresetModalContent({
 									)}
 
 									<div className="grid grid-cols-12 items-center gap-2">
-										<label className="label col-span-3">
+										<div className="label col-span-3">
 											<span className="text-sm">Reasoning Summary</span>
 											<span className="tooltip tooltip-right" data-tip="Optional, reasoning summary style.">
 												<FiHelpCircle size={12} />
 											</span>
-										</label>
+										</div>
 										<div className="col-span-9">
 											{isReadOnly ? (
 												<ReadOnlyValue value={reasoningSummaryStyleItems[formData.reasoningSummaryStyle].displayName} />
@@ -1278,7 +1284,7 @@ function AddEditModelPresetModalContent({
 
 						<ModalSection title="Runtime limits" description="Set request limits and the normal sampling parameters.">
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="model-preset-temperature" className="label col-span-3">
 									<span className="text-sm">Temperature (0-1)</span>
 									<span className="tooltip tooltip-right" data-tip="This or Reasoning is needed">
 										<FiHelpCircle size={12} />
@@ -1286,6 +1292,7 @@ function AddEditModelPresetModalContent({
 								</label>
 								<div className="col-span-9">
 									<input
+										id="model-preset-temperature"
 										name="temperature"
 										type="text"
 										className={`input w-full rounded-xl ${errors.temperature ? 'input-error' : ''}`}
@@ -1307,11 +1314,12 @@ function AddEditModelPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="model-preset-timeout" className="label col-span-3">
 									<span className="text-sm">Timeout (seconds)</span>
 								</label>
 								<div className="col-span-9">
 									<input
+										id="model-preset-timeout"
 										name="timeout"
 										type="text"
 										className={`input w-full rounded-xl ${errors.timeout ? 'input-error' : ''}`}
@@ -1369,7 +1377,7 @@ function AddEditModelPresetModalContent({
 								description="Configure request-level cache behavior when the selected provider supports it."
 							>
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3 cursor-pointer">
+									<label htmlFor="model-preset-cache-control" className="label col-span-3 cursor-pointer">
 										<span className="text-sm">Cache Control</span>
 										<span
 											className="tooltip tooltip-right"
@@ -1380,6 +1388,7 @@ function AddEditModelPresetModalContent({
 									</label>
 									<div className="col-span-9 flex items-center gap-2">
 										<input
+											id="model-preset-cache-control"
 											type="checkbox"
 											name="cacheControlEnabled"
 											className="toggle toggle-accent disabled:opacity-80"
@@ -1405,9 +1414,9 @@ function AddEditModelPresetModalContent({
 								{formData.cacheControlEnabled && (
 									<>
 										<div className="grid grid-cols-12 items-center gap-2">
-											<label className="label col-span-3">
+											<div className="label col-span-3">
 												<span className="text-sm">Cache Kind</span>
-											</label>
+											</div>
 											<div className="col-span-9">
 												{isReadOnly ? (
 													<ReadOnlyValue
@@ -1431,9 +1440,9 @@ function AddEditModelPresetModalContent({
 										</div>
 
 										<div className="grid grid-cols-12 items-center gap-2">
-											<label className="label col-span-3">
+											<div className="label col-span-3">
 												<span className="text-sm">Cache TTL</span>
-											</label>
+											</div>
 											<div className="col-span-9">
 												{isReadOnly ? (
 													<ReadOnlyValue value={cacheControlTTLItems[formData.cacheControlTTL].displayName} />
@@ -1463,11 +1472,12 @@ function AddEditModelPresetModalContent({
 
 										{supportsCacheKey && (
 											<div className="grid grid-cols-12 items-center gap-2">
-												<label className="label col-span-3">
+												<label htmlFor="model-preset-cache-key" className="label col-span-3">
 													<span className="text-sm">Cache Key</span>
 												</label>
 												<div className="col-span-9">
 													<input
+														id="model-preset-cache-key"
 														name="cacheControlKey"
 														type="text"
 														className={`input w-full rounded-xl ${errors.cacheControlKey ? 'input-error' : ''}`}
@@ -1497,11 +1507,12 @@ function AddEditModelPresetModalContent({
 							description="Set the optional default system prompt and stop sequences used for this model preset."
 						>
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="model-preset-system-prompt" className="label col-span-3">
 									<span className="text-sm">System Prompt</span>
 								</label>
 								<div className="col-span-9">
 									<textarea
+										id="model-preset-system-prompt"
 										name="systemPrompt"
 										className="textarea h-24 w-full rounded-xl"
 										value={formData.systemPrompt}
@@ -1514,17 +1525,18 @@ function AddEditModelPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-start gap-2">
-								<label className="label col-span-3">
+								<div className="label col-span-3">
 									<span className="text-sm">Stop Sequences</span>
 									<span className="tooltip tooltip-right" data-tip="One per line (commas also supported).">
 										<FiHelpCircle size={12} />
 									</span>
-								</label>
+								</div>
 								<div className="col-span-9">
 									{isReadOnly ? (
 										<ReadOnlyValue value={parseStopSequencesRaw(formData.stopSequencesRaw).join(', ') || '—'} />
 									) : (
 										<textarea
+											aria-label="Stop Sequences"
 											name="stopSequencesRaw"
 											className="textarea h-20 w-full rounded-xl"
 											value={formData.stopSequencesRaw}
@@ -1543,7 +1555,7 @@ function AddEditModelPresetModalContent({
 							description="Configure provider output formatting and verbosity defaults."
 						>
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<div className="label col-span-3">
 									<span className="text-sm">Output Format Kind</span>
 									<span
 										className="tooltip tooltip-right"
@@ -1551,7 +1563,7 @@ function AddEditModelPresetModalContent({
 									>
 										<FiHelpCircle size={12} />
 									</span>
-								</label>
+								</div>
 								<div className="col-span-9">
 									{isReadOnly ? (
 										<ReadOnlyValue
@@ -1686,9 +1698,9 @@ function AddEditModelPresetModalContent({
 							) : null}
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<div className="label col-span-3">
 									<span className="text-sm">Output Verbosity/Effort</span>
-								</label>
+								</div>
 								<div className="col-span-9">
 									{isReadOnly ? (
 										<ReadOnlyValue

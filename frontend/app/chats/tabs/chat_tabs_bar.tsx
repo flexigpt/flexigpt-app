@@ -75,6 +75,20 @@ function ChatTabsBarContent({
 }: ChatTabsBarContentProps) {
 	const [editingTabId, setEditingTabId] = useState<string | null>(null);
 	const [draftTitle, setDraftTitle] = useState('');
+	const renameInputRef = useRef<HTMLInputElement | null>(null);
+
+	useEffect(() => {
+		if (!editingTabId) {
+			return;
+		}
+
+		const frame = window.requestAnimationFrame(() => {
+			renameInputRef.current?.focus({ preventScroll: true });
+		});
+		return () => {
+			window.cancelAnimationFrame(frame);
+		};
+	}, [editingTabId]);
 
 	const finishRename = useCallback(() => {
 		if (!editingTabId) {
@@ -121,8 +135,8 @@ function ChatTabsBarContent({
 				<div className="min-w-0 flex-1 px-2 text-sm">
 					{isEditing ? (
 						<input
+							ref={renameInputRef}
 							data-disable-chat-shortcuts="true"
-							autoFocus
 							value={draftTitle}
 							onChange={e => {
 								setDraftTitle(e.target.value);

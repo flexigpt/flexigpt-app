@@ -1,5 +1,5 @@
 import type { SubmitEventHandler } from 'react';
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { FiAlertCircle } from 'react-icons/fi';
 
@@ -103,6 +103,7 @@ function ManagementBundleCreateModalContent({
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const submittingRef = useRef(false);
+	const slugInputRef = useRef<HTMLInputElement | null>(null);
 
 	const slugID = useId();
 	const displayNameID = useId();
@@ -114,6 +115,16 @@ function ManagementBundleCreateModalContent({
 	);
 
 	const { requestClose, unmountingRef } = useModalDialogController();
+
+	useEffect(() => {
+		const frame = window.requestAnimationFrame(() => {
+			slugInputRef.current?.focus({ preventScroll: true });
+		});
+
+		return () => {
+			window.cancelAnimationFrame(frame);
+		};
+	}, []);
 
 	const updateField = (field: keyof BundleFormData, value: string) => {
 		const nextValue = field === 'slug' ? normalizeBundleSlugInput(value) : value;
@@ -198,6 +209,7 @@ function ManagementBundleCreateModalContent({
 					>
 						<input
 							id={slugID}
+							ref={slugInputRef}
 							type="text"
 							className={`input w-full rounded-xl ${visibleError('slug') ? 'input-error' : ''}`}
 							value={formData.slug}
@@ -211,7 +223,6 @@ function ManagementBundleCreateModalContent({
 							placeholder="my-custom-bundle"
 							spellCheck="false"
 							autoComplete="off"
-							autoFocus
 							disabled={isSubmitting}
 							aria-invalid={Boolean(visibleError('slug'))}
 						/>

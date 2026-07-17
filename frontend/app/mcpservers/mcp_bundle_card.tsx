@@ -346,11 +346,11 @@ export function MCPBundleCard({
 				}
 			>
 				{serverLoadError ? (
-					<div className="alert alert-warning mt-3 rounded-2xl text-sm" role="status">
-						<div className="min-w-0 grow">
-							<div className="font-semibold">Servers could not be loaded</div>
-							<div className="wrap-break-word">{serverLoadError}</div>
-						</div>
+					<output className="alert alert-warning mt-3 rounded-2xl text-sm">
+						<span className="min-w-0 grow">
+							<span className="block font-semibold">Servers could not be loaded</span>
+							<span className="block wrap-break-word">{serverLoadError}</span>
+						</span>
 						<button
 							type="button"
 							className="btn btn-sm rounded-xl"
@@ -360,7 +360,7 @@ export function MCPBundleCard({
 							<FiRefreshCw size={14} />
 							<span>{isPending('bundle:refresh') ? 'Reloading' : 'Retry'}</span>
 						</button>
-					</div>
+					</output>
 				) : null}
 
 				{isExpanded && (

@@ -608,9 +608,9 @@ function AddEditProviderPresetModalContent({
 								description="Copy endpoint and compatibility settings. API keys are never copied."
 							>
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<div className="label col-span-3">
 										<span className="text-sm">Prefill from Existing</span>
-									</label>
+									</div>
 
 									<div className="col-span-9 flex items-center gap-2">
 										{!prefillMode && (
@@ -668,7 +668,7 @@ function AddEditProviderPresetModalContent({
 							description="Choose the compatible SDK before configuring the provider endpoint."
 						>
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<div className="label col-span-3">
 									<span className="text-sm">SDK Type*</span>
 									<span
 										className="tooltip tooltip-right"
@@ -676,7 +676,7 @@ function AddEditProviderPresetModalContent({
 									>
 										<FiHelpCircle size={12} />
 									</span>
-								</label>
+								</div>
 								<div className="col-span-9">
 									{isReadOnly ? (
 										<ReadOnlyValue value={SDK_DISPLAY_NAME[formData.sdkType]} />
@@ -723,11 +723,12 @@ function AddEditProviderPresetModalContent({
 							</ModalField>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="provider-display-name" className="label col-span-3">
 									<span className="text-sm">Display Name*</span>
 								</label>
 								<div className="col-span-9">
 									<input
+										id="provider-display-name"
 										ref={displayNameInputRef}
 										type="text"
 										name="displayName"
@@ -755,11 +756,12 @@ function AddEditProviderPresetModalContent({
 							description="Configure the provider origin, chat endpoint path, and stable request headers."
 						>
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="provider-origin" className="label col-span-3">
 									<span className="text-sm">Origin*</span>
 								</label>
 								<div className="col-span-9">
 									<input
+										id="provider-origin"
 										ref={originInputRef}
 										type="url"
 										name="origin"
@@ -783,7 +785,7 @@ function AddEditProviderPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="provider-chat-path" className="label col-span-3">
 									<span className="text-sm">Chat Path*</span>
 									<span className="tooltip tooltip-right" data-tip="Endpoint path for chat completions.">
 										<FiHelpCircle size={12} />
@@ -791,6 +793,7 @@ function AddEditProviderPresetModalContent({
 								</label>
 								<div className="col-span-9">
 									<input
+										id="provider-chat-path"
 										type="text"
 										name="chatCompletionPathPrefix"
 										value={formData.chatCompletionPathPrefix}
@@ -812,11 +815,12 @@ function AddEditProviderPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="provider-api-key-header" className="label col-span-3">
 									<span className="text-sm">API-Key Header Key</span>
 								</label>
 								<div className="col-span-9">
 									<input
+										id="provider-api-key-header"
 										type="text"
 										name="apiKeyHeaderKey"
 										value={formData.apiKeyHeaderKey}
@@ -839,11 +843,12 @@ function AddEditProviderPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-start gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="provider-default-headers" className="label col-span-3">
 									<span className="text-sm">Default Headers (JSON)</span>
 								</label>
 								<div className="col-span-9">
 									<textarea
+										id="provider-default-headers"
 										name="defaultHeadersRawJSON"
 										value={formData.defaultHeadersRawJSON}
 										onChange={handleInput}
@@ -868,7 +873,7 @@ function AddEditProviderPresetModalContent({
 							description="Provider API keys remain write-only. Leaving an existing key blank preserves it."
 						>
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3 flex flex-col items-start gap-0.5">
+								<label htmlFor="provider-api-key" className="label col-span-3 flex flex-col items-start gap-0.5">
 									<span className="text-sm">API-Key*</span>
 									{(mode === 'edit' || mode === 'view') && apiKeyAlreadySet && (
 										<span className="text-xs">
@@ -878,6 +883,7 @@ function AddEditProviderPresetModalContent({
 								</label>
 								<div className="col-span-9">
 									<input
+										id="provider-api-key"
 										type="password"
 										name="apiKey"
 										value={formData.apiKey}
@@ -900,11 +906,12 @@ function AddEditProviderPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3 cursor-pointer">
+								<label htmlFor="provider-enabled" className="label col-span-3 cursor-pointer">
 									<span className="text-sm">Enabled</span>
 								</label>
 								<div className="col-span-9">
 									<input
+										id="provider-enabled"
 										type="checkbox"
 										name="isEnabled"
 										checked={formData.isEnabled}

@@ -26,9 +26,9 @@ export function GroupedMenuSection({
 }: GroupedMenuSectionProps) {
 	return (
 		<>
-			{separatorBefore ? <div role="separator" className={groupedMenuSeparatorClasses} /> : null}
+			{separatorBefore ? <hr className={groupedMenuSeparatorClasses} /> : null}
 
-			<div role="group" aria-label={ariaLabel ?? title} className={className}>
+			<section aria-label={ariaLabel ?? title} className={className}>
 				<div className={headerClassName}>
 					<div className="flex min-w-0 items-center justify-between gap-2">
 						<div className="min-w-0">
@@ -40,7 +40,7 @@ export function GroupedMenuSection({
 				</div>
 
 				{children}
-			</div>
+			</section>
 		</>
 	);
 }

@@ -66,6 +66,7 @@ export function ProviderSetupStatus({
 	return (
 		<button
 			type="button"
+			aria-label="Add an API key to start"
 			className="group border-warning/40 bg-warning/10 hover:border-warning/70 mt-4 block w-full max-w-lg rounded-2xl border text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
 			onClick={onAddKey}
 		>

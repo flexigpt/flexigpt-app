@@ -41,14 +41,19 @@ export function GroupedDropdown<T>({
 								<li
 									key={getKey(item)}
 									data-index={globalIndex}
-									onClick={() => {
-										onPick(item);
-									}}
 									className={`hover:bg-base-100 flex cursor-pointer items-center justify-between px-12 py-2 ${
 										isFocused ? 'bg-base-100' : ''
 									}`}
 								>
-									<span className="truncate">{getLabel(item)}</span>
+									<button
+										type="button"
+										className="flex min-w-0 flex-1 cursor-pointer items-center text-left"
+										onClick={() => {
+											onPick(item);
+										}}
+									>
+										<span className="truncate">{getLabel(item)}</span>
+									</button>
 
 									{renderItemExtra && (
 										<span className="app-text-neutral hidden text-xs lg:block">{renderItemExtra(item)}</span>

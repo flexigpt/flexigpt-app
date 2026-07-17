@@ -1750,12 +1750,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					</div>
 				) : null}
 				{!submitError && erroredToolOutputsReadyToSubmit ? (
-					<div className="alert alert-warning mx-4 mt-3 mb-1 flex items-start gap-2 text-sm" role="status">
+					<output className="alert alert-warning mx-4 mt-3 mb-1 flex items-start gap-2 text-sm">
 						<FiTool size={16} className="mt-0.5" />
 						<span>
 							A tool returned an error result. It is ready to submit as tool output, or you can retry/discard it.
 						</span>
-					</div>
+					</output>
 				) : null}
 
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>

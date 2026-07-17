@@ -173,6 +173,8 @@ export function ToolMenuRow({
 				{/* auto-exec column */}
 				<div className="col-span-2 shrink-0 justify-self-center whitespace-nowrap">
 					{supportsAutoExecute ? (
+						// The native label must stop events so its checkbox does not activate the enclosing menu item.
+						// oxlint-disable-next-line jsx-a11y/click-events-have-key-events jsx-a11y/no-noninteractive-element-interactions
 						<label
 							className="flex items-center gap-1 text-xs"
 							title={autoExecuteTitle}

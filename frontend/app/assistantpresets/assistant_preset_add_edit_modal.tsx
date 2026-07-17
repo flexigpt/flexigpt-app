@@ -379,6 +379,7 @@ function AddEditAssistantPresetModalContent({
 	const [prefillMode, setPrefillMode] = useState(false);
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 	const mcpState = useComposerMCP();
+	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 	const restoredInitialMCPContextRef = useRef(false);
 
 	const initialPresetID = initialData?.preset?.id;
@@ -387,6 +388,19 @@ function AddEditAssistantPresetModalContent({
 
 	const forceCatalogReloadRef = useRef(false);
 	const { requestClose, unmountingRef } = useModalDialogController();
+
+	useEffect(() => {
+		if (isViewMode) {
+			return;
+		}
+
+		const frame = window.requestAnimationFrame(() => {
+			displayNameInputRef.current?.focus({ preventScroll: true });
+		});
+		return () => {
+			window.cancelAnimationFrame(frame);
+		};
+	}, [isViewMode]);
 
 	const loadCatalogResource = useCallback(async (signal: AbortSignal): Promise<AssistantPresetEditorCatalog> => {
 		const force = forceCatalogReloadRef.current;
@@ -1230,9 +1244,9 @@ function AddEditAssistantPresetModalContent({
 						>
 							{effectiveMode === 'add' && (
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<div className="label col-span-3">
 										<span className="text-sm">Prefill from Existing</span>
-									</label>
+									</div>
 
 									<div className="col-span-9 flex items-center gap-2">
 										{!prefillMode && (
@@ -1295,6 +1309,7 @@ function AddEditAssistantPresetModalContent({
 							>
 								<input
 									id="assistant-preset-display-name"
+									ref={displayNameInputRef}
 									type="text"
 									value={formData.displayName}
 									onChange={e => {
@@ -1305,13 +1320,12 @@ function AddEditAssistantPresetModalContent({
 									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
-									autoFocus={!isViewMode}
 									aria-invalid={Boolean(errors.displayName)}
 								/>
 							</ModalField>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="assistant-preset-slug" className="label col-span-3">
 									<span className="text-sm">Slug*</span>
 									<span className="tooltip tooltip-right" data-tip="Short URL-friendly identifier">
 										<FiHelpCircle size={12} />
@@ -1319,6 +1333,7 @@ function AddEditAssistantPresetModalContent({
 								</label>
 								<div className="col-span-9">
 									<input
+										id="assistant-preset-slug"
 										type="text"
 										value={formData.slug}
 										onChange={e => {
@@ -1342,7 +1357,7 @@ function AddEditAssistantPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="assistant-preset-version" className="label col-span-3">
 									<span className="text-sm">Version*</span>
 									<span
 										className="tooltip tooltip-right"
@@ -1353,6 +1368,7 @@ function AddEditAssistantPresetModalContent({
 								</label>
 								<div className="col-span-9">
 									<input
+										id="assistant-preset-version"
 										type="text"
 										value={formData.version}
 										onChange={e => {
@@ -1385,11 +1401,12 @@ function AddEditAssistantPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3 cursor-pointer">
+								<label htmlFor="assistant-preset-enabled" className="label col-span-3 cursor-pointer">
 									<span className="text-sm">Enabled</span>
 								</label>
 								<div className="col-span-9">
 									<input
+										id="assistant-preset-enabled"
 										type="checkbox"
 										checked={formData.isEnabled}
 										onChange={e => {
@@ -1402,11 +1419,12 @@ function AddEditAssistantPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-start gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="assistant-preset-description" className="label col-span-3">
 									<span className="text-sm">Description</span>
 								</label>
 								<div className="col-span-9">
 									<textarea
+										id="assistant-preset-description"
 										value={formData.description}
 										onChange={e => {
 											const value = e.target.value;
@@ -1420,7 +1438,7 @@ function AddEditAssistantPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-start gap-2">
-								<label className="label col-span-3">
+								<label htmlFor="assistant-preset-starting-text" className="label col-span-3">
 									<span className="text-sm">Starting Text</span>
 									<span
 										className="tooltip tooltip-right"
@@ -1431,6 +1449,7 @@ function AddEditAssistantPresetModalContent({
 								</label>
 								<div className="col-span-9">
 									<textarea
+										id="assistant-preset-starting-text"
 										value={formData.startingText}
 										onChange={e => {
 											const value = e.target.value;
@@ -1452,7 +1471,7 @@ function AddEditAssistantPresetModalContent({
 
 						<ModalSection title="Runtime" description="Choose the starting model and optional runtime patch.">
 							<div className="grid grid-cols-12 items-start gap-2">
-								<label className="label col-span-3">
+								<div className="label col-span-3">
 									<span className="text-sm">Model Preset</span>
 									<span
 										className="tooltip tooltip-right"
@@ -1460,7 +1479,7 @@ function AddEditAssistantPresetModalContent({
 									>
 										<FiHelpCircle size={12} />
 									</span>
-								</label>
+								</div>
 								<div className="col-span-9">
 									<div className={errors.modelPreset ? 'ring-error/50 rounded-2xl ring-1' : ''}>
 										<Dropdown<string>
@@ -1525,7 +1544,7 @@ function AddEditAssistantPresetModalContent({
 							</div>
 
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<div className="label col-span-3">
 									<span className="text-sm">Include Model System Prompt</span>
 									<span
 										className="tooltip tooltip-right"
@@ -1533,7 +1552,7 @@ function AddEditAssistantPresetModalContent({
 									>
 										<FiHelpCircle size={12} />
 									</span>
-								</label>
+								</div>
 								<div className="col-span-9">
 									<Dropdown<TriStateBoolean>
 										dropdownItems={TRI_STATE_DROPDOWN_ITEMS}

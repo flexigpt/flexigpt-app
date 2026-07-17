@@ -677,9 +677,9 @@ function AddEditToolModalContent({
 
 						{effectiveMode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
+								<div className="label col-span-3">
 									<span className="text-sm">Prefill from Existing</span>
-								</label>
+								</div>
 
 								<div className="col-span-9 flex items-center gap-2">
 									{!prefillMode && (
@@ -747,7 +747,7 @@ function AddEditToolModalContent({
 						</ModalField>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
+							<label htmlFor="tool-slug" className="label col-span-3">
 								<span className="text-sm">Slug*</span>
 								<span className="tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
 									<FiHelpCircle size={12} />
@@ -755,6 +755,7 @@ function AddEditToolModalContent({
 							</label>
 							<div className="col-span-9">
 								<input
+									id="tool-slug"
 									type="text"
 									name="slug"
 									value={formData.slug}
@@ -776,7 +777,7 @@ function AddEditToolModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
+							<label htmlFor="tool-version" className="label col-span-3">
 								<span className="text-sm">Version*</span>
 								<span
 									className="tooltip tooltip-right"
@@ -787,6 +788,7 @@ function AddEditToolModalContent({
 							</label>
 							<div className="col-span-9">
 								<input
+									id="tool-version"
 									type="text"
 									name="version"
 									value={formData.version}
@@ -821,11 +823,12 @@ function AddEditToolModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3 cursor-pointer">
+							<label htmlFor="tool-enabled" className="label col-span-3 cursor-pointer">
 								<span className="text-sm">Enabled</span>
 							</label>
 							<div className="col-span-9">
 								<input
+									id="tool-enabled"
 									type="checkbox"
 									name="isEnabled"
 									checked={formData.isEnabled}
@@ -837,11 +840,12 @@ function AddEditToolModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3 cursor-pointer">
+							<label htmlFor="tool-user-callable" className="label col-span-3 cursor-pointer">
 								<span className="text-sm">User Callable</span>
 							</label>
 							<div className="col-span-9">
 								<input
+									id="tool-user-callable"
 									type="checkbox"
 									name="userCallable"
 									checked={formData.userCallable}
@@ -853,11 +857,12 @@ function AddEditToolModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3 cursor-pointer">
+							<label htmlFor="tool-llm-callable" className="label col-span-3 cursor-pointer">
 								<span className="text-sm">LLM Callable</span>
 							</label>
 							<div className="col-span-9">
 								<input
+									id="tool-llm-callable"
 									type="checkbox"
 									name="llmCallable"
 									checked={formData.llmCallable}
@@ -869,11 +874,12 @@ function AddEditToolModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3 cursor-pointer">
+							<label htmlFor="tool-auto-execute" className="label col-span-3 cursor-pointer">
 								<span className="text-sm">AutoExecute</span>
 							</label>
 							<div className="col-span-9">
 								<input
+									id="tool-auto-execute"
 									type="checkbox"
 									name="autoExecReco"
 									checked={formData.autoExecReco}
@@ -885,9 +891,9 @@ function AddEditToolModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
+							<div className="label col-span-3">
 								<span className="text-sm">Type*</span>
-							</label>
+							</div>
 							<div className="col-span-9">
 								{isEditMode || isViewMode ? (
 									<ReadOnlyValue value={toolTypeDropdownItems[formData.type].displayName} />
@@ -912,11 +918,12 @@ function AddEditToolModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
+							<label htmlFor="tool-description" className="label col-span-3">
 								<span className="text-sm">Description</span>
 							</label>
 							<div className="col-span-9">
 								<textarea
+									id="tool-description"
 									name="description"
 									value={formData.description}
 									onChange={handleInput}
@@ -928,7 +935,7 @@ function AddEditToolModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-start gap-2">
-							<label className="label col-span-3">
+							<label htmlFor="tool-arg-schema" className="label col-span-3">
 								<span className="text-sm">Arg JSONSchema*</span>
 								<span className="tooltip tooltip-right" data-tip="JSON Schema for arguments">
 									<FiHelpCircle size={12} />
@@ -936,6 +943,7 @@ function AddEditToolModalContent({
 							</label>
 							<div className="col-span-9">
 								<textarea
+									id="tool-arg-schema"
 									name="argSchema"
 									value={formData.argSchema}
 									onChange={handleInput}
@@ -966,11 +974,12 @@ function AddEditToolModalContent({
 									</div>
 								</div>
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-url" className="label col-span-3">
 										<span className="text-sm">HTTP URL*</span>
 									</label>
 									<div className="col-span-9">
 										<input
+											id="tool-http-url"
 											ref={httpUrlInputRef}
 											type="url"
 											name="httpUrl"
@@ -1000,11 +1009,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-method" className="label col-span-3">
 										<span className="text-sm">HTTP Method</span>
 									</label>
 									<div className="col-span-9">
 										<input
+											id="tool-http-method"
 											type="text"
 											name="httpMethod"
 											value={formData.httpMethod}
@@ -1018,11 +1028,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-start gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-headers" className="label col-span-3">
 										<span className="text-sm">Headers (JSON)</span>
 									</label>
 									<div className="col-span-9">
 										<textarea
+											id="tool-http-headers"
 											name="httpHeaders"
 											value={formData.httpHeaders}
 											onChange={handleInput}
@@ -1041,11 +1052,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-start gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-query" className="label col-span-3">
 										<span className="text-sm">Query (JSON)</span>
 									</label>
 									<div className="col-span-9">
 										<textarea
+											id="tool-http-query"
 											name="httpQuery"
 											value={formData.httpQuery}
 											onChange={handleInput}
@@ -1064,11 +1076,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-start gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-body" className="label col-span-3">
 										<span className="text-sm">Body</span>
 									</label>
 									<div className="col-span-9">
 										<textarea
+											id="tool-http-body"
 											name="httpBody"
 											value={formData.httpBody}
 											onChange={handleInput}
@@ -1080,11 +1093,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-timeout" className="label col-span-3">
 										<span className="text-sm">Timeout (ms)</span>
 									</label>
 									<div className="col-span-9">
 										<input
+											id="tool-http-timeout"
 											type="text"
 											name="httpTimeoutMS"
 											value={formData.httpTimeoutMS}
@@ -1105,11 +1119,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-auth-type" className="label col-span-3">
 										<span className="text-sm">Auth Type</span>
 									</label>
 									<div className="col-span-9">
 										<input
+											id="tool-http-auth-type"
 											type="text"
 											name="httpAuthType"
 											value={formData.httpAuthType}
@@ -1123,11 +1138,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-auth-in" className="label col-span-3">
 										<span className="text-sm">Auth In</span>
 									</label>
 									<div className="col-span-9">
 										<input
+											id="tool-http-auth-in"
 											type="text"
 											name="httpAuthIn"
 											value={formData.httpAuthIn}
@@ -1141,11 +1157,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-auth-name" className="label col-span-3">
 										<span className="text-sm">Auth Name</span>
 									</label>
 									<div className="col-span-9">
 										<input
+											id="tool-http-auth-name"
 											type="text"
 											name="httpAuthName"
 											value={formData.httpAuthName}
@@ -1159,11 +1176,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-auth-value-template" className="label col-span-3">
 										<span className="text-sm">Auth Value Template</span>
 									</label>
 									<div className="col-span-9">
 										<input
+											id="tool-http-auth-value-template"
 											type="text"
 											name="httpAuthValueTemplate"
 											value={formData.httpAuthValueTemplate}
@@ -1185,11 +1203,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-response-codes" className="label col-span-3">
 										<span className="text-sm">Success Codes (comma)</span>
 									</label>
 									<div className="col-span-9">
 										<input
+											id="tool-http-response-codes"
 											type="text"
 											name="httpResponseCodes"
 											value={formData.httpResponseCodes}
@@ -1210,11 +1229,12 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<label htmlFor="tool-http-response-error-mode" className="label col-span-3">
 										<span className="text-sm">Error Mode</span>
 									</label>
 									<div className="col-span-9">
 										<input
+											id="tool-http-response-error-mode"
 											type="text"
 											name="httpResponseErrorMode"
 											value={formData.httpResponseErrorMode}
@@ -1228,9 +1248,9 @@ function AddEditToolModalContent({
 								</div>
 
 								<div className="grid grid-cols-12 items-center gap-2">
-									<label className="label col-span-3">
+									<div className="label col-span-3">
 										<span className="text-sm">Body Output Mode</span>
-									</label>
+									</div>
 									<div className="col-span-9">
 										{isViewMode ? (
 											<ReadOnlyValue value={bodyOutputModeItems[formData.httpResponseBodyOutputMode].displayName} />
@@ -1252,11 +1272,12 @@ function AddEditToolModalContent({
 						)}
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
+							<label htmlFor="tool-tags" className="label col-span-3">
 								<span className="text-sm">Tags</span>
 							</label>
 							<div className="col-span-9">
 								<input
+									id="tool-tags"
 									type="text"
 									name="tags"
 									value={formData.tags}

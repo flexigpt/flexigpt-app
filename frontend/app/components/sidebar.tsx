@@ -25,7 +25,7 @@ interface SidebarProps {
 export function Sidebar({ children }: SidebarProps) {
 	const [drawerOpen, setDrawerOpen] = useState(false);
 	const toggle = () => {
-		setDrawerOpen(!drawerOpen);
+		setDrawerOpen(open => !open);
 	};
 
 	const dropRef = useRef<HTMLDivElement | null>(null);
@@ -61,50 +61,98 @@ export function Sidebar({ children }: SidebarProps) {
 				</div>
 			</div>
 			<div className="drawer-side z-10">
-				<label htmlFor="my-drawer" />
+				<label htmlFor="my-drawer" aria-label="Close navigation drawer" />
 				<ul className="menu bg-base-300 text-base-content ms-0 h-full w-12 justify-between ps-0">
 					<div className="mt-8 flex-col p-0">
-						<li className="mt-4" title="Chats" onClick={toggle} aria-label="Chats">
-							<Link to="/chats/" className="flex size-12 items-center justify-center rounded-full p-0">
+						<li className="mt-4">
+							<Link
+								to="/chats/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="Chats"
+								title="Chats"
+							>
 								<FiMessageSquare size={24} />
 							</Link>
 						</li>
 					</div>
 					<div className="mb-8 flex-col p-0">
-						<li className="mt-4" title="Assistant Presets" onClick={toggle} aria-label="Assistant Presets">
-							<Link to="/assistantpresets/" className="flex size-12 items-center justify-center rounded-full p-0">
+						<li className="mt-4">
+							<Link
+								to="/assistantpresets/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="Assistant Presets"
+								title="Assistant Presets"
+							>
 								<FiLayers size={24} />
 							</Link>
 						</li>
-						<li className="mt-4" title="MCP Servers" onClick={toggle} aria-label="MCP Servers">
-							<Link to="/mcpservers/" className="flex size-12 items-center justify-center rounded-full p-0">
+						<li className="mt-4">
+							<Link
+								to="/mcpservers/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="MCP Servers"
+								title="MCP Servers"
+							>
 								<FiServer size={24} />
 							</Link>
 						</li>
-						<li className="mt-4" title="Tools" onClick={toggle} aria-label="Tools">
-							<Link to="/tools/" className="flex size-12 items-center justify-center rounded-full p-0">
+						<li className="mt-4">
+							<Link
+								to="/tools/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="Tools"
+								title="Tools"
+							>
 								<FiTool size={24} />
 							</Link>
 						</li>
-						<li className="mt-4" title="Skills" onClick={toggle} aria-label="Skills">
-							<Link to="/skills/" className="flex size-12 items-center justify-center rounded-full p-0">
+						<li className="mt-4">
+							<Link
+								to="/skills/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="Skills"
+								title="Skills"
+							>
 								<FiFilePlus size={24} />
 							</Link>
 						</li>
-						<li className="mt-4" title="Model Presets" onClick={toggle} aria-label="Model Presets">
-							<Link to="/modelpresets/" className="flex size-12 items-center justify-center rounded-full p-0">
+						<li className="mt-4">
+							<Link
+								to="/modelpresets/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="Model Presets"
+								title="Model Presets"
+							>
 								<FiSliders size={24} />
 							</Link>
 						</li>
 
-						<li className="mt-4" title="Settings" onClick={toggle} aria-label="Settings">
-							<Link to="/settings/" className="flex size-12 items-center justify-center rounded-full p-0">
+						<li className="mt-4">
+							<Link
+								to="/settings/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="Settings"
+								title="Settings"
+							>
 								<FiSettings size={24} />
 							</Link>
 						</li>
 
-						<li className="mt-4" title="Docs" onClick={toggle} aria-label="Docs">
-							<Link to="/docs/" className="flex size-12 items-center justify-center rounded-full p-0">
+						<li className="mt-4">
+							<Link
+								to="/docs/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="Docs"
+								title="Docs"
+							>
 								<FiBookOpen size={24} />
 							</Link>
 						</li>

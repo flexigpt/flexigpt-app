@@ -179,8 +179,6 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 	const menu = (
 		<ul
 			ref={menuRef}
-			role="listbox"
-			aria-label={title}
 			className={`menu border-neutral/20 bg-base-300 flex w-full flex-col flex-nowrap overflow-x-hidden overflow-y-auto rounded-2xl border shadow-lg ${
 				inlineMenu ? 'mt-2' : ''
 			}`}
@@ -200,8 +198,7 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 					<li key={key} className="w-full">
 						<button
 							type="button"
-							role="option"
-							aria-selected={key === selectedKey}
+							aria-current={key === selectedKey ? 'true' : undefined}
 							disabled={isItemDisabled}
 							className="m-1 flex w-[calc(100%-0.5rem)] min-w-0 items-center justify-between gap-2 rounded-xl p-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
 							onClick={() => {
@@ -251,7 +248,7 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 				aria-expanded={isOpen}
 				aria-disabled={disabled}
 				tabIndex={disabled ? -1 : 0}
-				aria-haspopup="listbox"
+				aria-label={`${title}: ${selectedKey ? getItemDisplayName(selectedKey) : placeholderLabel}`}
 				onClick={event => {
 					if (disabled) {
 						event.preventDefault();
