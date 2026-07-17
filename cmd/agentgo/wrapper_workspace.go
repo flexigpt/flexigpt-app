@@ -12,7 +12,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
-const workspaceBuiltInSkillsProviderKey = "flexigpt-builtin-skills"
+const (
+	workspaceBuiltInSkillsProviderKey = "flexigpt-builtin-skills"
+	workspaceBuiltInSkillsDisplayName = "Built-in Skills"
+)
 
 type WorkspaceWrapper struct {
 	artifactStore *artifactstore.Store
@@ -75,6 +78,29 @@ func (w *WorkspaceWrapper) MountEmbeddedSource(
 ) (workspace.Workspace, error) {
 	return middleware.WithRecoveryResp(func() (workspace.Workspace, error) {
 		return w.service.MountEmbeddedSource(context.Background(), request)
+	})
+}
+
+// MountBuiltInSkills attaches FlexiGPT's registered embedded skill packages to
+// a Workspace without requiring a frontend client to know the provider key.
+func (w *WorkspaceWrapper) MountBuiltInSkills(
+	rootID artifactstoreSpec.RootID,
+	priority int,
+	discoverImmediately bool,
+) (workspace.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (workspace.Workspace, error) {
+		return w.service.MountEmbeddedSource(
+			context.Background(),
+			workspace.EmbeddedSourceAttachmentRequest{
+				RootID:              rootID,
+				DisplayName:         workspaceBuiltInSkillsDisplayName,
+				ProviderKey:         workspaceBuiltInSkillsProviderKey,
+				RootLocator:         artifactstoreSpec.SourceLocator(builtin.BuiltInSkillBundlesRootDir),
+				Role:                workspace.RoleBuiltIn,
+				Priority:            priority,
+				DiscoverImmediately: discoverImmediately,
+			},
+		)
 	})
 }
 

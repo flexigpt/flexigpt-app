@@ -446,6 +446,9 @@ func (s *Service) GetWorkspace(
 	ctx context.Context,
 	rootID artifactstoreSpec.RootID,
 ) (Workspace, error) {
+	if s == nil || s.store == nil {
+		return Workspace{}, fmt.Errorf("%w: service is not configured", ErrInvalidWorkspace)
+	}
 	root, err := s.store.GetRoot(ctx, rootID)
 	if err != nil {
 		return Workspace{}, err
@@ -453,15 +456,51 @@ func (s *Service) GetWorkspace(
 	if root.Kind != RootKind {
 		return Workspace{}, fmt.Errorf("%w: root %q has kind %q", ErrNotWorkspace, rootID, root.Kind)
 	}
+
 	data, err := decodeRootData(root.Data)
 	if err != nil {
 		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
 	}
+	if err := validateRootData(data); err != nil {
+		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
+	}
+
 	attachments, err := s.store.ListRootSources(ctx, rootID)
 	if err != nil {
 		return Workspace{}, err
 	}
+	if err := validateWorkspaceAttachmentSet(data, attachments); err != nil {
+		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
+	}
+
+	hook := rootKindHook{}
+	for _, attachment := range attachments {
+		if err := workspaceDiagnosticsError(
+			"workspace attachment",
+			hook.ValidateSourceAttachment(ctx, root, attachment),
+		); err != nil {
+			return Workspace{}, err
+		}
+	}
+
 	return Workspace{Root: root, Data: data, Attachments: attachments}, nil
+}
+
+func workspaceDiagnosticsError(
+	scope string,
+	diagnostics []artifactstoreSpec.Diagnostic,
+) error {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == artifactstoreSpec.DiagnosticSeverityError {
+			return fmt.Errorf(
+				"%w: %s: %s",
+				ErrInvalidWorkspace,
+				scope,
+				diagnostic.Message,
+			)
+		}
+	}
+	return nil
 }
 
 func (s *Service) ListWorkspaces(ctx context.Context) ([]Workspace, error) {

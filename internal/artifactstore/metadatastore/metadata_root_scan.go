@@ -27,7 +27,11 @@ const (
 		SET last_observed_generation = ?,
 		    last_scanned_at = ?,
 		    observation_revision = observation_revision + ?,
-		    diagnostics_json = ?
+		    diagnostics_json = ?,
+		    modified_at = CASE
+				WHEN modified_at > ? THEN modified_at
+				ELSE ?
+			END
 		WHERE source_id = ?
 		  AND observation_revision = ?
 		  AND enabled = 1`
@@ -504,6 +508,8 @@ func publishRootScanSourceCatalog(
 		formatTime(publication.ObservedAt),
 		boolToInt(publication.AdvanceObservationRevision),
 		diagnostics,
+		formatTime(publication.ObservedAt),
+		formatTime(publication.ObservedAt),
 		string(publication.SourceID),
 		publication.ExpectedObservationRevision,
 	)

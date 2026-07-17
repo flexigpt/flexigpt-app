@@ -31,28 +31,17 @@ func (s *Store) EnsureBaseCollection(ctx context.Context, draft spec.CollectionD
 		return spec.ArtifactCollection{}, err
 	}
 	defer finish()
+	if _, err := s.repository.GetRoot(ctx, draft.RootID, false); err != nil {
+		return spec.ArtifactCollection{}, err
+	}
 	collection, err := s.repository.GetCollectionByRootSlug(ctx, draft.RootID, draft.Slug, true)
 	if err == nil {
-		if collection.SoftDeletedAt != nil {
-			return spec.ArtifactCollection{}, fmt.Errorf(
-				"%w: collection %q is soft-deleted",
-				spec.ErrConflict,
-				collection.CollectionID,
-			)
-		}
-		if collection.RootID != draft.RootID || collection.Kind != draft.Kind {
-			return spec.ArtifactCollection{}, fmt.Errorf(
-				"%w: collection slug %q already belongs to kind %q",
-				spec.ErrConflict,
-				draft.Slug,
-				collection.Kind,
-			)
-		}
-		return collection, nil
+		return s.ensureActiveBaseCollection(ctx, collection, draft)
 	}
 	if !isNotFound(err) {
 		return spec.ArtifactCollection{}, err
 	}
+
 	collection, err = s.CreateCollection(ctx, draft)
 	if err == nil {
 		return collection, nil
@@ -64,13 +53,14 @@ func (s *Store) EnsureBaseCollection(ctx context.Context, draft spec.CollectionD
 	if reloadErr != nil {
 		return spec.ArtifactCollection{}, errors.Join(err, reloadErr)
 	}
-	if collection.SoftDeletedAt != nil {
-		return spec.ArtifactCollection{}, fmt.Errorf(
-			"%w: collection %q is soft-deleted",
-			spec.ErrConflict,
-			collection.CollectionID,
-		)
-	}
+	return s.ensureActiveBaseCollection(ctx, collection, draft)
+}
+
+func (s *Store) ensureActiveBaseCollection(
+	ctx context.Context,
+	collection spec.ArtifactCollection,
+	draft spec.CollectionDraft,
+) (spec.ArtifactCollection, error) {
 	if collection.RootID != draft.RootID || collection.Kind != draft.Kind {
 		return spec.ArtifactCollection{}, fmt.Errorf(
 			"%w: collection slug %q already belongs to kind %q",
@@ -79,7 +69,44 @@ func (s *Store) EnsureBaseCollection(ctx context.Context, draft spec.CollectionD
 			collection.Kind,
 		)
 	}
-	return collection, nil
+
+	if collection.SoftDeletedAt == nil {
+		return collection, nil
+	}
+
+	restored := collection
+	restored.DisplayName = draft.DisplayName
+	restored.Description = draft.Description
+	restored.Enabled = draft.Enabled
+	restored.DataSchemaID = draft.DataSchemaID
+	restored.Data = normalizedJSONObject(draft.Data)
+	restored.SoftDeletedAt = nil
+	restored.ModifiedAt = s.nextModifiedAt(collection.ModifiedAt)
+
+	if err := s.validateCollection(ctx, restored); err != nil {
+		return spec.ArtifactCollection{}, err
+	}
+	if err := s.repository.UpdateCollection(ctx, restored, collection.ModifiedAt); err == nil {
+		return restored, nil
+	} else if !isConflict(err) {
+		return spec.ArtifactCollection{}, err
+	} else {
+		reloaded, reloadErr := s.repository.GetCollectionByRootSlug(
+			ctx,
+			draft.RootID,
+			draft.Slug,
+			true,
+		)
+		if reloadErr != nil {
+			return spec.ArtifactCollection{}, errors.Join(err, reloadErr)
+		}
+		if reloaded.RootID == draft.RootID &&
+			reloaded.Kind == draft.Kind &&
+			reloaded.SoftDeletedAt == nil {
+			return reloaded, nil
+		}
+		return spec.ArtifactCollection{}, err
+	}
 }
 
 // CreateCollection creates an app-local grouping of records.
@@ -192,12 +219,23 @@ func (s *Store) UpdateCollection(
 	if _, err := s.repository.GetRoot(ctx, collection.RootID, false); err != nil {
 		return spec.ArtifactCollection{}, err
 	}
+
+	nextData := normalizedJSONObject(update.Data)
+	if collection.DisplayName == update.DisplayName &&
+		collection.Description == update.Description &&
+		collection.Enabled == update.Enabled &&
+		collection.DataSchemaID == update.DataSchemaID &&
+		equivalentJSONObjects(collection.Data, nextData) {
+		return collection, nil
+	}
+
 	collection.DisplayName = update.DisplayName
 	collection.Description = update.Description
 	collection.Enabled = update.Enabled
 	collection.DataSchemaID = update.DataSchemaID
-	collection.Data = normalizedJSONObject(update.Data)
+	collection.Data = nextData
 	collection.ModifiedAt = s.nextModifiedAt(collection.ModifiedAt)
+
 	if err := s.validateCollection(ctx, collection); err != nil {
 		return spec.ArtifactCollection{}, err
 	}

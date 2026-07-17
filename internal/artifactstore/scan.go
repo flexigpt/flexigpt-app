@@ -276,7 +276,7 @@ func (s *Store) scanSource(
 	if err != nil {
 		return spec.SourceScanResult{}, spec.SourceCatalogPublication{}, err
 	}
-	now := s.nowUTC()
+	now := s.nextModifiedAt(source.ModifiedAt)
 	publication := spec.SourceCatalogPublication{
 		SourceID:                    source.SourceID,
 		ExpectedObservationRevision: source.ObservationRevision,

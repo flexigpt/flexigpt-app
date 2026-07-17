@@ -1,8 +1,8 @@
 package workspace
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"sort"
@@ -100,12 +100,11 @@ func attachmentDiscoveryBehavior(
 	default:
 		authoritative = false
 	}
-	if len(attachment.Data) == 0 ||
-		string(attachment.Data) == "{}" {
+	if len(bytes.TrimSpace(attachment.Data)) == 0 {
 		return recursive, authoritative, nil
 	}
 	var data AttachmentData
-	if err := json.Unmarshal(attachment.Data, &data); err != nil {
+	if err := decodeStrictJSONObject(attachment.Data, &data, true); err != nil {
 		return false, false, fmt.Errorf("decode attachment discovery data: %w", err)
 	}
 	if data.Recursive != nil {

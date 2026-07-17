@@ -558,6 +558,15 @@ func normalizedJSONObject(raw json.RawMessage) json.RawMessage {
 	if len(raw) == 0 {
 		return json.RawMessage("{}")
 	}
+
+	canonical, err := baseutils.CanonicalizeJSON(raw)
+	if err == nil && len(canonical) != 0 && canonical[0] == '{' {
+		return json.RawMessage(canonical)
+	}
+
+	// Callers validate the returned value before persistence. Preserve invalid
+	// input here so validation can return the relevant request error instead of
+	// silently replacing caller data.
 	return append(json.RawMessage(nil), raw...)
 }
 

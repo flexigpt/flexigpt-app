@@ -1431,20 +1431,23 @@ ArtifactRecord.RecordID
 
 ### Planned Components
 
-The following components are planned. None currently exists in the repository.
+Workspace is implemented as the typed Artifact Store consumer described above.
+The implementation keeps domain persistence and runtime construction outside
+Workspace while providing typed discovery, validation, synchronization, catalog,
+reference, load-plan, and projection boundaries.
 
-| Component                    | Planned responsibility                                |
-| ---------------------------- | ----------------------------------------------------- |
-| `WorkspaceService`           | Typed façade over Artifact Store                      |
-| `WorkspaceRootKindHook`      | Validates `workspace` root data                       |
-| `WorkspaceDiscoveryPlanner`  | Builds bootstrap and expanded scan plans              |
-| `WorkspaceArtifactFrontends` | Parses Workspace-specific source formats              |
-| `WorkspaceCatalogService`    | Groups root catalog records into Workspace categories |
-| `WorkspaceCollectionPolicy`  | Creates derived collections where required            |
-| `WorkspaceResourceProjector` | Maps Artifact Records to existing domain shapes       |
-| `WorkspaceReferenceResolver` | Resolves Workspace artifact references                |
-| `WorkspaceLoadComposer`      | Produces Workspace Load Plans                         |
-| `WorkspaceRuntimeProjectors` | Builds runtime-ready domain inputs                    |
+| Component                    | Planned responsibility                               |
+| ---------------------------- | ---------------------------------------------------- |
+| `WorkspaceService`           | Implemented typed façade over Artifact Store         |
+| `WorkspaceRootKindHook`      | Implemented validation of `workspace.root` data      |
+| `WorkspaceDiscoveryPlanner`  | Implemented bootstrap and expanded scan planning     |
+| `WorkspaceArtifactFrontends` | Implemented native JSON, YAML, and Markdown frontend |
+| `WorkspaceCatalogService`    | Implemented root catalog and record view             |
+| `WorkspaceCollectionPolicy`  | Implemented derived collection synchronization       |
+| `WorkspaceResourceProjector` | Implemented default and injectable projectors        |
+| `WorkspaceReferenceResolver` | Implemented record and selector resolution           |
+| `WorkspaceLoadComposer`      | Implemented load-plan composition                    |
+| `WorkspaceRuntimeProjectors` | Consumer-specific extension point                    |
 
 ---
 
@@ -1586,6 +1589,10 @@ Current AssistantPresetStore
 Workspace creates additional providers:
 
 ```text
+Workspace providers are not persisted through the existing stores.
+They project Workspace records and canonical definitions directly, preserving
+the Artifact Store boundary and allowing each runtime consumer to opt in.
+
 WorkspaceSkillProvider
 WorkspaceToolProvider
 WorkspaceMCPProvider

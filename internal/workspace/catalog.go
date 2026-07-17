@@ -62,6 +62,14 @@ func (s *Service) Catalog(
 	recorded := make(map[string]struct{}, len(records))
 	resources := make([]CatalogResource, 0, len(records))
 	for _, record := range records {
+		key := workspaceOccurrenceKey(
+			record.SourceID,
+			record.Locator,
+			record.SubresourceLocator,
+			record.Kind,
+		)
+		recorded[key] = struct{}{}
+
 		if record.LastResolvedDefinitionDigest == nil {
 			continue
 		}
@@ -72,12 +80,6 @@ func (s *Service) Catalog(
 		if err != nil {
 			return Catalog{}, err
 		}
-		key := workspaceOccurrenceKey(
-			record.SourceID,
-			record.Locator,
-			record.SubresourceLocator,
-			record.Kind,
-		)
 		var occurrence *artifactstoreSpec.CatalogResource
 		if value, exists := occurrencesByKey[key]; exists {
 			copyValue := value
@@ -300,6 +302,14 @@ func (s *Service) ComposeLoadPlan(
 			resource.Record.State != artifactstoreSpec.RecordStateAvailable {
 			return LoadPlan{}, fmt.Errorf(
 				"%w: record %q is not enabled and available",
+				artifactstoreSpec.ErrConflict,
+				resource.Record.RecordID,
+			)
+		}
+		if resource.Record.TrackingMode == artifactstoreSpec.TrackingModeFollowSource &&
+			!resource.CatalogCurrent {
+			return LoadPlan{}, fmt.Errorf(
+				"%w: follow-source record %q is not synchronized to the current catalog occurrence",
 				artifactstoreSpec.ErrConflict,
 				resource.Record.RecordID,
 			)

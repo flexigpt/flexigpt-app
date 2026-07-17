@@ -101,43 +101,49 @@ func (s *Store) UpdateSource(
 	); err != nil {
 		return spec.ArtifactSource{}, err
 	}
-	previousEnabled := source.Enabled
-	previousConfigSchemaID := source.ConfigSchemaID
-	previousConfig := append(json.RawMessage(nil), source.Config...)
-
-	source.DisplayName = update.DisplayName
-	source.Enabled = update.Enabled
-	source.ConfigSchemaID = update.ConfigSchemaID
-	source.Config = normalizedJSONObject(update.Config)
-	source.ModifiedAt = s.nextModifiedAt(source.ModifiedAt)
-	if err := s.validateSource(ctx, &source); err != nil {
+	next := source
+	next.DisplayName = update.DisplayName
+	next.Enabled = update.Enabled
+	next.ConfigSchemaID = update.ConfigSchemaID
+	next.Config = normalizedJSONObject(update.Config)
+	if err := s.validateSource(ctx, &next); err != nil {
 		return spec.ArtifactSource{}, err
 	}
-	observationInvalidated := previousEnabled != source.Enabled ||
-		previousConfigSchemaID != source.ConfigSchemaID ||
-		!bytes.Equal(previousConfig, source.Config)
+
+	changed := source.DisplayName != next.DisplayName ||
+		source.Enabled != next.Enabled ||
+		source.ConfigSchemaID != next.ConfigSchemaID ||
+		!bytes.Equal(source.Config, next.Config)
+	if !changed {
+		return source, nil
+	}
+
+	observationInvalidated := source.Enabled != next.Enabled ||
+		source.ConfigSchemaID != next.ConfigSchemaID ||
+		!bytes.Equal(source.Config, next.Config)
+	next.ModifiedAt = s.nextModifiedAt(source.ModifiedAt)
 	if observationInvalidated {
-		if source.ObservationRevision >= spec.MaxObservationRevision {
+		if next.ObservationRevision >= spec.MaxObservationRevision {
 			return spec.ArtifactSource{}, fmt.Errorf(
 				"%w: source observation revision is exhausted",
 				spec.ErrConflict,
 			)
 		}
-		source.LastObservedGeneration = nil
-		source.LastScannedAt = nil
-		source.ObservationRevision++
+		next.LastObservedGeneration = nil
+		next.LastScannedAt = nil
+		next.ObservationRevision++
 	}
-	if err := validate.ValidateArtifactSource(source); err != nil {
+	if err := validate.ValidateArtifactSource(next); err != nil {
 		return spec.ArtifactSource{}, fmt.Errorf(
 			"%w: updated source: %w",
 			spec.ErrInvalidRequest,
 			err,
 		)
 	}
-	if err := s.repository.UpdateSource(ctx, source, update.ExpectedModifiedAt); err != nil {
+	if err := s.repository.UpdateSource(ctx, next, update.ExpectedModifiedAt); err != nil {
 		return spec.ArtifactSource{}, err
 	}
-	return source, nil
+	return next, nil
 }
 
 // DeleteSource removes an app-local source registration only when repository
