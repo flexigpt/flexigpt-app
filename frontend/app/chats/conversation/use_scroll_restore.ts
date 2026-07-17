@@ -29,6 +29,29 @@ function getMessageScrollTop(el: HTMLElement, message: HTMLElement): number {
 	return Math.max(0, messageTop);
 }
 
+function getCurrentMessageIndex(el: HTMLElement, messages: HTMLElement[]): number {
+	if (messages.length === 0) {
+		return -1;
+	}
+
+	const currentTop = el.scrollTop;
+
+	// The last message whose top is at or above the viewport is the current
+	// anchor, so the previous target is the item before it.
+	for (let index = messages.length - 1; index >= 0; index -= 1) {
+		const message = messages[index];
+		if (!message) {
+			continue;
+		}
+
+		if (getMessageScrollTop(el, message) <= currentTop + MESSAGE_SCROLL_POSITION_TOLERANCE) {
+			return index;
+		}
+	}
+
+	return 0;
+}
+
 function getPreviousMessageIndex(el: HTMLElement, messages: HTMLElement[]): number {
 	if (messages.length === 0) {
 		return -1;
@@ -37,20 +60,8 @@ function getPreviousMessageIndex(el: HTMLElement, messages: HTMLElement[]): numb
 		return -1;
 	}
 
-	const currentTop = el.scrollTop;
-
-	for (let index = messages.length - 1; index >= 0; index -= 1) {
-		const message = messages[index];
-		if (!message) {
-			continue;
-		}
-
-		if (getMessageScrollTop(el, message) < currentTop - MESSAGE_SCROLL_POSITION_TOLERANCE) {
-			return index;
-		}
-	}
-
-	return -1;
+	const currentIndex = getCurrentMessageIndex(el, messages);
+	return currentIndex > 0 ? currentIndex - 1 : -1;
 }
 
 function getNextMessageIndex(el: HTMLElement, messages: HTMLElement[]): number {

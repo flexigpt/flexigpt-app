@@ -414,7 +414,7 @@ func (f *nativeFrontend) definitionFor(
 	return artifactstoreSpec.CanonicalDefinition{
 		Kind:           kind,
 		SchemaID:       descriptor.DefinitionSchemaID,
-		SchemaVersion:  "1",
+		SchemaVersion:  workspaceDefinitionSchemaV1,
 		LogicalName:    name,
 		LogicalVersion: artifactstoreSpec.LogicalVersion(stringField(object, "version")),
 		DisplayName:    stringField(object, "displayName"),
@@ -429,39 +429,39 @@ func classifyNativeDocument(locator artifactstoreSpec.SourceLocator) (nativeDocu
 	value := strings.ToLower(string(locator))
 	base := strings.ToLower(path.Base(value))
 	switch value {
-	case ".flexigpt/workspace.json":
+	case workspaceDefinitionJSONLocator:
 		return nativeDocumentClass{Kind: KindWorkspaceDefinition, Format: formatJSON}, true
-	case ".flexigpt/workspace.yaml", ".flexigpt/workspace.yml":
+	case workspaceDefinitionYAMLLocator, workspaceDefinitionYMLLocator:
 		return nativeDocumentClass{Kind: KindWorkspaceDefinition, Format: formatYAML}, true
-	case "agents.md":
+	case strings.ToLower(workspaceAgentsLocator):
 		return nativeDocumentClass{Kind: KindInstructionDocument, Format: formatMarkdown}, true
-	case "readme.md":
+	case strings.ToLower(workspaceReadmeLocator):
 		return nativeDocumentClass{Kind: KindContextDocument, Format: formatMarkdown}, true
-	case ".mcp.json", ".mcps.json", "mcp.json", "mcps.json":
+	case workspaceMCPDotJSONLocator, workspaceMCPDotsJSONLocator, workspaceMCPJSONLocator, workspaceMCPsJSONLocator:
 		return nativeDocumentClass{
 			Kind:          KindMCPServerDefinition,
 			Format:        formatJSON,
 			MCPCollection: true,
 		}, true
 	}
-	if base == "skill.md" {
+	if base == workspaceSkillMarkdownFileName {
 		return nativeDocumentClass{Kind: KindSkillDefinition, Format: formatMarkdown}, true
 	}
 	if path.Ext(value) != ".json" {
 		return nativeDocumentClass{}, false
 	}
 	switch {
-	case hasPathPrefix(value, ".flexigpt/agents/"):
+	case hasPathPrefix(value, workspaceAgentsDirectory):
 		return nativeDocumentClass{Kind: KindAgentDefinition, Format: formatJSON}, true
-	case hasPathPrefix(value, ".flexigpt/models/"):
+	case hasPathPrefix(value, workspaceModelsDirectory):
 		return nativeDocumentClass{Kind: KindModelDefinition, Format: formatJSON}, true
-	case hasPathPrefix(value, ".flexigpt/mcp/"):
+	case hasPathPrefix(value, workspaceMCPDirectory):
 		return nativeDocumentClass{
 			Kind:          KindMCPServerDefinition,
 			Format:        formatJSON,
 			MCPCollection: true,
 		}, true
-	case hasPathPrefix(value, ".flexigpt/tools/"):
+	case hasPathPrefix(value, workspaceToolsDirectory):
 		return nativeDocumentClass{Kind: KindToolDefinition, Format: formatJSON}, true
 	default:
 		return nativeDocumentClass{}, false
@@ -497,11 +497,11 @@ func stringField(object map[string]json.RawMessage, fields ...string) string {
 
 func splitMarkdownFrontmatter(value string) (string, error) {
 	lines := strings.Split(value, "\n")
-	if len(lines) == 0 || lines[0] != "---" {
+	if len(lines) == 0 || lines[0] != yamlSeparator {
 		return "", errors.New("SKILL.md must begin with YAML frontmatter")
 	}
 	for index := 1; index < len(lines); index++ {
-		if lines[index] == "---" {
+		if lines[index] == yamlSeparator {
 			frontmatter := strings.Join(lines[1:index], "\n")
 			if strings.TrimSpace(frontmatter) == "" {
 				return "", errors.New("SKILL.md frontmatter must not be empty")

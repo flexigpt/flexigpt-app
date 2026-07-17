@@ -101,12 +101,19 @@ func (s *MetadataStore) UpdateRoot(
 	ctx context.Context,
 	root spec.ArtifactRoot,
 	expectedModifiedAt time.Time,
+	expectedMountRevision uint64,
 ) error {
 	if err := validate.ValidateArtifactRoot(root); err != nil {
 		return fmt.Errorf("validate root for persistence: %w", err)
 	}
 	if err := validateExpectedModifiedAt("root", expectedModifiedAt); err != nil {
 		return err
+	}
+	if expectedMountRevision == 0 {
+		return fmt.Errorf(
+			"%w: root expected mount revision is required",
+			spec.ErrInvalidRequest,
+		)
 	}
 	result, err := s.db.ExecContext(ctx, updateRootSQL,
 		root.DisplayName,
@@ -119,6 +126,7 @@ func (s *MetadataStore) UpdateRoot(
 		nullableTime(root.SoftDeletedAt),
 		string(root.RootID),
 		formatTime(expectedModifiedAt),
+		expectedMountRevision,
 	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("update root: %w", err))

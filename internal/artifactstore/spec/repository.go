@@ -14,7 +14,12 @@ type ArtifactMetadataRepository interface {
 	CreateRoot(ctx context.Context, root ArtifactRoot) error
 	GetRoot(ctx context.Context, rootID RootID, includeSoftDeleted bool) (ArtifactRoot, error)
 	ListRoots(ctx context.Context, includeSoftDeleted bool) ([]ArtifactRoot, error)
-	UpdateRoot(ctx context.Context, root ArtifactRoot, expectedModifiedAt time.Time) error
+	UpdateRoot(
+		ctx context.Context,
+		root ArtifactRoot,
+		expectedModifiedAt time.Time,
+		expectedMountRevision uint64,
+	) error
 
 	CreateSource(ctx context.Context, source ArtifactSource) error
 	GetSource(ctx context.Context, sourceID SourceID) (ArtifactSource, error)

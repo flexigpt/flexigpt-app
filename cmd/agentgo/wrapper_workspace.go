@@ -62,6 +62,37 @@ func (w *WorkspaceWrapper) CreateEmptyWorkspace(
 	})
 }
 
+func (w *WorkspaceWrapper) AttachSource(
+	request workspace.AttachSourceRequest,
+) (workspace.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (workspace.Workspace, error) {
+		return w.service.AttachSource(context.Background(), request)
+	})
+}
+
+func (w *WorkspaceWrapper) MountEmbeddedSource(
+	request workspace.EmbeddedSourceAttachmentRequest,
+) (workspace.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (workspace.Workspace, error) {
+		return w.service.MountEmbeddedSource(context.Background(), request)
+	})
+}
+
+func (w *WorkspaceWrapper) DetachSource(
+	rootID artifactstoreSpec.RootID,
+	sourceID artifactstoreSpec.SourceID,
+	discoverImmediately bool,
+) (workspace.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (workspace.Workspace, error) {
+		return w.service.DetachSource(
+			context.Background(),
+			rootID,
+			sourceID,
+			discoverImmediately,
+		)
+	})
+}
+
 func (w *WorkspaceWrapper) GetWorkspace(
 	rootID artifactstoreSpec.RootID,
 ) (workspace.Workspace, error) {
@@ -89,6 +120,32 @@ func (w *WorkspaceWrapper) Catalog(
 ) (workspace.Catalog, error) {
 	return middleware.WithRecoveryResp(func() (workspace.Catalog, error) {
 		return w.service.Catalog(context.Background(), rootID)
+	})
+}
+
+func (w *WorkspaceWrapper) Project(
+	recordID artifactstoreSpec.RecordID,
+) (workspace.Projection, error) {
+	return middleware.WithRecoveryResp(func() (workspace.Projection, error) {
+		return w.service.Project(context.Background(), recordID)
+	})
+}
+
+func (w *WorkspaceWrapper) ResolveReference(
+	rootID artifactstoreSpec.RootID,
+	reference workspace.Reference,
+) (workspace.CatalogResource, error) {
+	return middleware.WithRecoveryResp(func() (workspace.CatalogResource, error) {
+		return w.service.ResolveReference(context.Background(), rootID, reference)
+	})
+}
+
+func (w *WorkspaceWrapper) ComposeLoadPlan(
+	rootID artifactstoreSpec.RootID,
+	recordIDs []artifactstoreSpec.RecordID,
+) (workspace.LoadPlan, error) {
+	return middleware.WithRecoveryResp(func() (workspace.LoadPlan, error) {
+		return w.service.ComposeLoadPlan(context.Background(), rootID, recordIDs)
 	})
 }
 

@@ -114,6 +114,28 @@ func (rootKindHook) ValidateSourceAttachment(
 	return nil
 }
 
+func (rootKindHook) ValidateSourceAttachmentSource(
+	_ context.Context,
+	_ artifactstoreSpec.ArtifactRoot,
+	attachment artifactstoreSpec.RootSourceAttachment,
+	source artifactstoreSpec.ArtifactSource,
+) []artifactstoreSpec.Diagnostic {
+	if attachment.Role != RolePrimary {
+		return nil
+	}
+	if source.Kind != artifactstoreSpec.SourceKindFSDirectory {
+		return workspaceDiagnostics(
+			"workspace.attachment.primary-source",
+			fmt.Sprintf(
+				"primary workspace attachment source kind must be %q, got %q",
+				artifactstoreSpec.SourceKindFSDirectory,
+				source.Kind,
+			),
+		)
+	}
+	return nil
+}
+
 func (rootKindHook) ValidateSourceAttachments(
 	_ context.Context,
 	root artifactstoreSpec.ArtifactRoot,
@@ -465,7 +487,8 @@ func truncateUTF8(value string, maximum int) string {
 }
 
 var (
-	_ artifactstoreSpec.RootKindHook          = rootKindHook{}
-	_ artifactstoreSpec.CollectionKindHook    = collectionKindHook{}
-	_ artifactstoreSpec.RootAttachmentSetHook = rootKindHook{}
+	_ artifactstoreSpec.RootKindHook             = rootKindHook{}
+	_ artifactstoreSpec.CollectionKindHook       = collectionKindHook{}
+	_ artifactstoreSpec.RootAttachmentSetHook    = rootKindHook{}
+	_ artifactstoreSpec.RootAttachmentSourceHook = rootKindHook{}
 )

@@ -119,28 +119,28 @@ func attachmentDiscoveryBehavior(
 
 func bootstrapLocators(includeReadme bool) []artifactstoreSpec.SourceLocator {
 	out := []artifactstoreSpec.SourceLocator{
-		".flexigpt/workspace.json",
-		".flexigpt/workspace.yaml",
-		".flexigpt/workspace.yml",
-		".mcp.json",
-		".mcps.json",
-		"mcp.json",
-		"mcps.json",
-		"AGENTS.md",
+		workspaceDefinitionJSONLocator,
+		workspaceDefinitionYAMLLocator,
+		workspaceDefinitionYMLLocator,
+		workspaceMCPDotJSONLocator,
+		workspaceMCPDotsJSONLocator,
+		workspaceMCPJSONLocator,
+		workspaceMCPsJSONLocator,
+		workspaceAgentsLocator,
 	}
 	if includeReadme {
-		out = append(out, "README.md")
+		out = append(out, workspaceReadmeLocator)
 	}
 	return out
 }
 
 func bootstrapRoots() []artifactstoreSpec.DirectoryScanRoot {
 	return []artifactstoreSpec.DirectoryScanRoot{
-		{Root: ".flexigpt/agents", Recursive: true},
-		{Root: ".flexigpt/models", Recursive: true},
-		{Root: ".flexigpt/mcp", Recursive: true},
-		{Root: ".flexigpt/tools", Recursive: true},
-		{Root: ".skills", Recursive: true},
+		{Root: artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceAgentsDirectory, "/")), Recursive: true},
+		{Root: artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceModelsDirectory, "/")), Recursive: true},
+		{Root: artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceMCPDirectory, "/")), Recursive: true},
+		{Root: artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceToolsDirectory, "/")), Recursive: true},
+		{Root: workspaceSkillsDirectory, Recursive: true},
 	}
 }
 

@@ -44,7 +44,8 @@ func (s *Store) AttachSource(ctx context.Context, draft RootSourceAttachmentDraf
 	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
-	if _, err := s.repository.GetSource(ctx, draft.SourceID); err != nil {
+	source, err := s.repository.GetSource(ctx, draft.SourceID)
+	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
 	now := s.nowUTC()
@@ -59,7 +60,7 @@ func (s *Store) AttachSource(ctx context.Context, draft RootSourceAttachmentDraf
 		CreatedAt:    now,
 		ModifiedAt:   now,
 	}
-	if err := s.validateAttachment(ctx, root, attachment); err != nil {
+	if err := s.validateAttachment(ctx, root, attachment, source); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
 	attachments, err := s.repository.ListRootSourceAttachments(ctx, draft.RootID)
@@ -125,6 +126,10 @@ func (s *Store) UpdateRootSourceAttachment(
 	if err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
+	source, err := s.repository.GetSource(ctx, sourceID)
+	if err != nil {
+		return spec.RootSourceAttachment{}, err
+	}
 	if err := requireExpectedModifiedAt(
 		"root/source attachment "+string(rootID)+"/"+string(sourceID),
 		attachment.ModifiedAt,
@@ -146,7 +151,7 @@ func (s *Store) UpdateRootSourceAttachment(
 	attachment.DataSchemaID = update.DataSchemaID
 	attachment.Data = nextData
 	attachment.ModifiedAt = s.nextModifiedAt(attachment.ModifiedAt)
-	if err := s.validateAttachment(ctx, root, attachment); err != nil {
+	if err := s.validateAttachment(ctx, root, attachment, source); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
 	attachments, err := s.repository.ListRootSourceAttachments(ctx, rootID)
@@ -227,6 +232,7 @@ func (s *Store) validateAttachment(
 	ctx context.Context,
 	root spec.ArtifactRoot,
 	attachment spec.RootSourceAttachment,
+	source spec.ArtifactSource,
 ) error {
 	if err := validate.ValidateRootSourceAttachment(attachment); err != nil {
 		return fmt.Errorf("%w: source attachment: %w", spec.ErrInvalidRequest, err)
@@ -238,6 +244,14 @@ func (s *Store) validateAttachment(
 		); err != nil {
 			return err
 		}
+		if sourceHook, ok := hook.(spec.RootAttachmentSourceHook); ok {
+			if err := errorDiagnostics(
+				"root attachment source "+string(root.Kind),
+				sourceHook.ValidateSourceAttachmentSource(ctx, root, attachment, source),
+			); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -247,6 +261,16 @@ func (s *Store) validateAttachmentSet(
 	root spec.ArtifactRoot,
 	attachments []spec.RootSourceAttachment,
 ) error {
+	for _, attachment := range attachments {
+		source, err := s.repository.GetSource(ctx, attachment.SourceID)
+		if err != nil {
+			return err
+		}
+		if err := s.validateAttachment(ctx, root, attachment, source); err != nil {
+			return err
+		}
+	}
+
 	hook, ok := s.rootHookFor(root.Kind)
 	if !ok {
 		return nil

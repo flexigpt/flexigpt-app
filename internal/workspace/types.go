@@ -22,6 +22,26 @@ const (
 )
 
 const (
+	workspaceDefinitionJSONLocator = ".flexigpt/workspace.json"
+	workspaceDefinitionYAMLLocator = ".flexigpt/workspace.yaml"
+	workspaceDefinitionYMLLocator  = ".flexigpt/workspace.yml"
+	workspaceMCPDotJSONLocator     = ".mcp.json"
+	workspaceMCPDotsJSONLocator    = ".mcps.json"
+	workspaceMCPJSONLocator        = "mcp.json"
+	workspaceMCPsJSONLocator       = "mcps.json"
+	workspaceAgentsLocator         = "AGENTS.md"
+	workspaceReadmeLocator         = "README.md"
+	workspaceAgentsDirectory       = ".flexigpt/agents/"
+	workspaceModelsDirectory       = ".flexigpt/models/"
+	workspaceMCPDirectory          = ".flexigpt/mcp/"
+	workspaceToolsDirectory        = ".flexigpt/tools/"
+	workspaceSkillsDirectory       = ".skills"
+	workspaceSkillMarkdownFileName = "skill.md"
+	workspaceDefinitionSchemaV1    = "1"
+	workspacePrimaryPriority       = artifactstoreSpec.MaxAttachmentPriority
+)
+
+const (
 	KindWorkspaceDefinition artifactstoreSpec.ArtifactKind = "workspace.definition"
 	KindAgentDefinition     artifactstoreSpec.ArtifactKind = "agent.definition"
 	KindSkillDefinition     artifactstoreSpec.ArtifactKind = "skill.definition"
@@ -117,6 +137,30 @@ type EmptyWorkspaceRequest struct {
 	Description         string
 	TrustReference      string
 	Discovery           DiscoveryPreferences
+	DiscoverImmediately bool
+}
+
+// AttachSourceRequest attaches an existing Artifact Store source to a
+// Workspace. Source lifecycle remains owned by Artifact Store.
+type AttachSourceRequest struct {
+	RootID              artifactstoreSpec.RootID
+	SourceID            artifactstoreSpec.SourceID
+	Role                artifactstoreSpec.AttachmentRole
+	Priority            int
+	AttachmentData      AttachmentData
+	DiscoverImmediately bool
+}
+
+// EmbeddedSourceAttachmentRequest creates an app-local embedded filesystem
+// source and attaches it to an existing Workspace.
+type EmbeddedSourceAttachmentRequest struct {
+	RootID              artifactstoreSpec.RootID
+	DisplayName         string
+	ProviderKey         string
+	RootLocator         artifactstoreSpec.SourceLocator
+	Role                artifactstoreSpec.AttachmentRole
+	Priority            int
+	AttachmentData      AttachmentData
 	DiscoverImmediately bool
 }
 
@@ -273,7 +317,7 @@ type YAMLDecoder func(ctx context.Context, content []byte) (json.RawMessage, err
 
 // YAMLDecoder implementations must reject duplicate mapping keys, multiple
 // documents, non-string mapping keys, unsafe tags, and alias expansion. They
-// must return one bounded JSON object.
+// must return one canonical, bounded JSON object.
 
 type ArtifactStore interface {
 	RegisterArtifactFrontend(frontend artifactstoreSpec.ArtifactFrontend) error
@@ -299,10 +343,21 @@ type ArtifactStore interface {
 		ctx context.Context,
 		draft artifactstore.RootSourceAttachmentDraft,
 	) (artifactstoreSpec.RootSourceAttachment, error)
+	GetRootSourceAttachment(
+		ctx context.Context,
+		rootID artifactstoreSpec.RootID,
+		sourceID artifactstoreSpec.SourceID,
+	) (artifactstoreSpec.RootSourceAttachment, error)
 	ListRootSources(
 		ctx context.Context,
 		rootID artifactstoreSpec.RootID,
 	) ([]artifactstoreSpec.RootSourceAttachment, error)
+	DetachSource(
+		ctx context.Context,
+		rootID artifactstoreSpec.RootID,
+		sourceID artifactstoreSpec.SourceID,
+		expectedModifiedAt time.Time,
+	) error
 
 	ScanRoot(
 		ctx context.Context,

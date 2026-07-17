@@ -205,7 +205,18 @@ func (s *Store) validateSource(ctx context.Context, source *spec.ArtifactSource)
 		); err != nil {
 			return err
 		}
-		source.Config = normalizedJSONObject(normalized)
+		canonicalConfig, err = baseutils.CanonicalizeJSON(normalized)
+		if err != nil {
+			return fmt.Errorf(
+				"%w: normalized source configuration: %w",
+				spec.ErrInvalidRequest,
+				err,
+			)
+		}
+		if len(canonicalConfig) == 0 || canonicalConfig[0] != '{' {
+			return fmt.Errorf("%w: normalized source configuration must be a JSON object", spec.ErrInvalidRequest)
+		}
+		source.Config = json.RawMessage(canonicalConfig)
 		diagnostics = appendBoundedDiagnostics(diagnostics, normalizationDiagnostics...)
 	}
 	if err := validate.ValidateArtifactSource(*source); err != nil {

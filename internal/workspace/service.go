@@ -96,6 +96,7 @@ func NewService(store ArtifactStore, options ...Option) (*Service, error) {
 	config := serviceConfig{
 		descriptors: defaultKindDescriptors(),
 		projectors:  defaultProjectors(),
+		yamlDecoder: DecodeYAML,
 	}
 	for _, option := range options {
 		if option == nil {
@@ -104,12 +105,6 @@ func NewService(store ArtifactStore, options ...Option) (*Service, error) {
 		if err := option(&config); err != nil {
 			return nil, err
 		}
-	}
-	if config.yamlDecoder == nil {
-		return nil, fmt.Errorf(
-			"%w: an approved YAML decoder is required for SKILL.md and workspace YAML",
-			ErrInvalidWorkspace,
-		)
 	}
 	for kind := range config.projectors {
 		if _, exists := config.descriptors[kind]; !exists {
@@ -241,7 +236,7 @@ func (s *Service) SelectFilesystemRoot(
 		RootID:   root.RootID,
 		SourceID: source.SourceID,
 		Role:     RolePrimary,
-		Priority: 1_000_000,
+		Priority: workspacePrimaryPriority,
 		Enabled:  true,
 		Data:     json.RawMessage("{}"),
 	})
@@ -301,6 +296,150 @@ func (s *Service) CreateEmptyWorkspace(
 		return s.GetWorkspace(ctx, root.RootID)
 	}
 	return workspace, nil
+}
+
+// AttachSource attaches an existing Artifact Store source to a Workspace.
+// Source configuration and source-kind validation remain Artifact Store
+// responsibilities. Workspace owns only the typed attachment role and data.
+func (s *Service) AttachSource(
+	ctx context.Context,
+	request AttachSourceRequest,
+) (Workspace, error) {
+	if s == nil || s.store == nil {
+		return Workspace{}, fmt.Errorf("%w: service is not configured", ErrInvalidWorkspace)
+	}
+	if request.RootID == "" || request.SourceID == "" || request.Role == "" {
+		return Workspace{}, fmt.Errorf(
+			"%w: rootID, sourceID, and role are required",
+			ErrInvalidWorkspace,
+		)
+	}
+	if _, err := s.GetWorkspace(ctx, request.RootID); err != nil {
+		return Workspace{}, err
+	}
+	dataSchemaID, data, err := encodeAttachmentData(request.AttachmentData)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if _, err := s.store.AttachSource(ctx, artifactstore.RootSourceAttachmentDraft{
+		RootID:       request.RootID,
+		SourceID:     request.SourceID,
+		Role:         request.Role,
+		Priority:     request.Priority,
+		Enabled:      true,
+		DataSchemaID: dataSchemaID,
+		Data:         data,
+	}); err != nil {
+		return Workspace{}, err
+	}
+	workspace, err := s.GetWorkspace(ctx, request.RootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if !request.DiscoverImmediately {
+		return workspace, nil
+	}
+	if _, err := s.Refresh(ctx, request.RootID); err != nil {
+		return workspace, err
+	}
+	return s.GetWorkspace(ctx, request.RootID)
+}
+
+// MountEmbeddedSource creates an embedded-fs-directory source and attaches it
+// to a Workspace. The provider must already have been registered while the
+// Artifact Store composition was being built.
+func (s *Service) MountEmbeddedSource(
+	ctx context.Context,
+	request EmbeddedSourceAttachmentRequest,
+) (Workspace, error) {
+	if strings.TrimSpace(request.DisplayName) == "" ||
+		strings.TrimSpace(request.ProviderKey) == "" ||
+		request.RootID == "" {
+		return Workspace{}, fmt.Errorf(
+			"%w: rootID, displayName, and providerKey are required",
+			ErrInvalidWorkspace,
+		)
+	}
+	role := request.Role
+	if role == "" {
+		role = RoleBuiltIn
+	}
+	if role == RolePrimary {
+		return Workspace{}, fmt.Errorf(
+			"%w: an embedded source cannot be a primary filesystem workspace source",
+			ErrInvalidWorkspace,
+		)
+	}
+	rootLocator := request.RootLocator
+	if rootLocator == "" {
+		rootLocator = "."
+	}
+	config, err := json.Marshal(artifactstoreSpec.EmbeddedFSDirectorySourceConfig{
+		ProviderKey: request.ProviderKey,
+		RootLocator: rootLocator,
+	})
+	if err != nil {
+		return Workspace{}, err
+	}
+	source, err := s.store.CreateSource(ctx, artifactstoreSpec.SourceDraft{
+		Kind:           artifactstoreSpec.SourceKindEmbeddedFSDirectory,
+		DisplayName:    request.DisplayName,
+		Enabled:        true,
+		ConfigSchemaID: artifactstoreSpec.EmbeddedFSDirectoryConfigSchemaID,
+		Config:         config,
+	})
+	if err != nil {
+		return Workspace{}, err
+	}
+	workspace, attachErr := s.AttachSource(ctx, AttachSourceRequest{
+		RootID:         request.RootID,
+		SourceID:       source.SourceID,
+		Role:           role,
+		Priority:       request.Priority,
+		AttachmentData: request.AttachmentData,
+	})
+	if attachErr != nil {
+		deleteErr := s.store.DeleteSource(ctx, source.SourceID, source.ModifiedAt)
+		return Workspace{}, errors.Join(attachErr, deleteErr)
+	}
+	if !request.DiscoverImmediately {
+		return workspace, nil
+	}
+	if _, err := s.Refresh(ctx, request.RootID); err != nil {
+		return workspace, err
+	}
+	return s.GetWorkspace(ctx, request.RootID)
+}
+
+// DetachSource removes only the Workspace root/source relationship. It does
+// not delete the source registration, source catalog, records, or definitions.
+func (s *Service) DetachSource(
+	ctx context.Context,
+	rootID artifactstoreSpec.RootID,
+	sourceID artifactstoreSpec.SourceID,
+	discoverImmediately bool,
+) (Workspace, error) {
+	if _, err := s.GetWorkspace(ctx, rootID); err != nil {
+		return Workspace{}, err
+	}
+	attachment, err := s.store.GetRootSourceAttachment(ctx, rootID, sourceID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if err := s.store.DetachSource(ctx, rootID, sourceID, attachment.ModifiedAt); err != nil {
+		return Workspace{}, err
+	}
+	workspace, err := s.GetWorkspace(ctx, rootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if !discoverImmediately {
+		return workspace, nil
+	}
+	if _, err := s.Refresh(ctx, rootID); err != nil {
+		return workspace, err
+	}
+	return s.GetWorkspace(ctx, rootID)
 }
 
 func (s *Service) GetWorkspace(
@@ -535,6 +674,21 @@ func encodeRootData(data RootData) (json.RawMessage, error) {
 		return nil, err
 	}
 	return json.RawMessage(canonical), nil
+}
+
+func encodeAttachmentData(data AttachmentData) (artifactstoreSpec.SchemaID, json.RawMessage, error) {
+	if data.Recursive == nil && data.Authoritative == nil {
+		return "", json.RawMessage("{}"), nil
+	}
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return "", nil, err
+	}
+	canonical, err := baseutils.CanonicalizeJSON(raw)
+	if err != nil {
+		return "", nil, err
+	}
+	return AttachmentDataSchemaID, json.RawMessage(canonical), nil
 }
 
 type recordSyncPolicy struct {

@@ -127,6 +127,21 @@ type RootKindHook interface {
 	) []Diagnostic
 }
 
+// RootAttachmentSourceHook is an optional RootKindHook companion for root
+// kinds that need to validate an attachment against its registered source
+// kind or normalized source configuration.
+//
+// Artifact Store owns source retrieval. Consumers receive the source only for
+// typed attachment validation and must not perform source transport directly.
+type RootAttachmentSourceHook interface {
+	ValidateSourceAttachmentSource(
+		ctx context.Context,
+		root ArtifactRoot,
+		attachment RootSourceAttachment,
+		source ArtifactSource,
+	) []Diagnostic
+}
+
 // RootAttachmentSetHook is an optional RootKindHook companion for root kinds
 // whose typed data constrains the complete source-attachment set. Artifact
 // Store invokes it against the proposed set before attachment mutations and

@@ -11,7 +11,8 @@ const updateRootSQL = `
 	       modified_at = ?,
 	       soft_deleted_at = ?
 	 WHERE root_id = ?
-	   AND modified_at = ?`
+	   AND modified_at = ?
+	   AND mount_revision = ?`
 
 const updateSourceSQL = `
 	UPDATE artifact_sources
