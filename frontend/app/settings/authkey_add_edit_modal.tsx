@@ -79,8 +79,12 @@ function AddEditAuthKeyModalContent({
 	providerOnly = false,
 	defaultKeyName = null,
 	intro = null,
-	onBusyChange,
-}: Omit<AddEditAuthKeyModalProps, 'isOpen' | 'onClose'> & { onBusyChange?: (isBusy: boolean) => void }) {
+	isSubmitting,
+	setIsSubmitting,
+}: Omit<AddEditAuthKeyModalProps, 'isOpen' | 'onClose'> & {
+	isSubmitting: boolean;
+	setIsSubmitting: (next: boolean) => void;
+}) {
 	const isEdit = Boolean(initial); // “edit” = we already have that record
 	const isPrefilled = !isEdit && !!prefill; // “add”, but (type,keyName) should be fixed
 	const isReadOnly = isEdit || isPrefilled; // helper for rendering
@@ -98,19 +102,11 @@ function AddEditAuthKeyModalContent({
 	const [formData, setFormData] = useState<FormData>(() => getInitialFormData(initial, prefill, defaultKeyName));
 	const [errors, setErrors] = useState<FormErrors>({});
 	const [submitError, setSubmitError] = useState('');
-	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	/* raw provider presets fetched from backend */
 	const [providerPresets, setProviderPresets] = useState<Record<ProviderName, ProviderPreset>>({});
 
 	const { requestClose, unmountingRef } = useModalDialogController();
-	useEffect(() => {
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
-		onBusyChange?.(isSubmitting);
-		return () => {
-			onBusyChange?.(false);
-		};
-	}, [isSubmitting, onBusyChange]);
 
 	/* list of *types* that already exist (for dropdown) */
 	const existingTypes = useMemo(() => [...new Set(existing.map(k => k.type))], [existing]);
@@ -533,12 +529,8 @@ function AddEditAuthKeyModalContent({
 	);
 }
 
-export function AddEditAuthKeyModal(props: AddEditAuthKeyModalProps) {
+function AddEditAuthKeyModalSession(props: AddEditAuthKeyModalProps) {
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	if (!props.isOpen) {
-		return null;
-	}
-
 	const modalKey = props.initial
 		? `edit:${props.initial.type}:${props.initial.keyName}`
 		: props.prefill
@@ -549,7 +541,19 @@ export function AddEditAuthKeyModal(props: AddEditAuthKeyModalProps) {
 
 	return (
 		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} isBusy={isSubmitting}>
-			<AddEditAuthKeyModalContent key={modalKey} {...props} onBusyChange={setIsSubmitting} />
+			<AddEditAuthKeyModalContent
+				key={modalKey}
+				{...props}
+				isSubmitting={isSubmitting}
+				setIsSubmitting={setIsSubmitting}
+			/>
 		</ModalDialog>
 	);
+}
+
+export function AddEditAuthKeyModal(props: AddEditAuthKeyModalProps) {
+	if (!props.isOpen) {
+		return null;
+	}
+	return <AddEditAuthKeyModalSession {...props} />;
 }

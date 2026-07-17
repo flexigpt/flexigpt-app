@@ -1,5 +1,5 @@
 import type { DialogHTMLAttributes, ReactNode } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { FiAlertCircle } from 'react-icons/fi';
 
@@ -101,7 +101,9 @@ function ModalConfirmDialogContent({
 }: ModalConfirmDialogProps) {
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [confirmError, setConfirmError] = useState<string | null>(null);
+	const confirmingRef = useRef(false);
 	const effectiveBusy = isBusy || isConfirming;
+
 	const resolvedConfirmLabel = confirmLabel ?? (onConfirm ? 'Confirm' : 'OK');
 	const headerTitle = icon ? (
 		<span className="flex items-center gap-2">
@@ -124,7 +126,7 @@ function ModalConfirmDialogContent({
 		>
 			{({ requestClose, unmountingRef }) => {
 				const handleConfirm = () => {
-					if (effectiveBusy || confirmDisabled) {
+					if (effectiveBusy || confirmingRef.current || confirmDisabled) {
 						return;
 					}
 
@@ -133,23 +135,30 @@ function ModalConfirmDialogContent({
 						return;
 					}
 
+					confirmingRef.current = true;
+					setConfirmError(null);
+					setIsConfirming(true);
+
 					const complete = () => {
+						confirmingRef.current = false;
 						if (unmountingRef.current) {
 							return;
 						}
+
 						setIsConfirming(false);
 						if (closeOnConfirm) {
 							requestClose(true);
 						}
 					};
+
 					const fail = (failure: unknown) => {
+						confirmingRef.current = false;
 						if (!unmountingRef.current) {
 							setIsConfirming(false);
 							setConfirmError(getErrorMessage(failure));
 						}
 					};
 
-					setConfirmError(null);
 					try {
 						const result = onConfirm();
 						if (!isPromiseLike(result)) {
@@ -157,7 +166,6 @@ function ModalConfirmDialogContent({
 							return;
 						}
 
-						setIsConfirming(true);
 						void Promise.resolve(result).then(complete, fail);
 					} catch (failure) {
 						fail(failure);
@@ -212,7 +220,7 @@ function ModalConfirmDialogContent({
 							</ModalActions>
 						</div>
 
-						<ModalBackdrop enabled={allowBackdropClose && !effectiveBusy} />
+						<ModalBackdrop enabled={allowBackdropClose && !blockCancel && !effectiveBusy} />
 					</>
 				);
 			}}

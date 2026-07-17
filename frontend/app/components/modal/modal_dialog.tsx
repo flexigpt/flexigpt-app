@@ -86,8 +86,11 @@ export function ModalDialog({
 
 	const handleNativeCancel: NativeCancelHandler = event => {
 		handleCancel(event);
-		onCancel?.(event);
+		if (!event.defaultPrevented) {
+			onCancel?.(event);
+		}
 	};
+
 	const content =
 		typeof children === 'function' ? (
 			<ModalDialogChildrenRenderer controller={controller} render={children} />

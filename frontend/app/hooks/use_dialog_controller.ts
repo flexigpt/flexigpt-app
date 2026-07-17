@@ -1,5 +1,7 @@
 import type { SyntheticEvent } from 'react';
-import { createContext, useCallback, useContext, useLayoutEffect, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef } from 'react';
+
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 interface UseDialogControllerOptions {
 	onClose: () => void;
@@ -31,7 +33,7 @@ export function useDialogController({
 	 * invoke the parent's onClose handler and unmount a just-opened modal.
 	 * Let conditional rendering remove the dialog on a real unmount instead.
 	 */
-	useLayoutEffect(() => {
+	useIsomorphicLayoutEffect(() => {
 		if (!isOpen) {
 			unmountingRef.current = true;
 			return;
@@ -71,7 +73,7 @@ export function useDialogController({
 			}
 
 			const dialog = dialogRef.current;
-			if (dialog?.open) {
+			if (dialog?.open && typeof dialog.close === 'function') {
 				dialog.close();
 				return;
 			}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { FiAlertCircle, FiExternalLink } from 'react-icons/fi';
 
@@ -33,19 +33,15 @@ function MCPOAuthAuthorizationModalContent({
 	authHealth,
 	onOpenURL,
 	onCancel,
-	onBusyChange,
-}: MCPOAuthAuthorizationModalProps & { onBusyChange?: (isBusy: boolean) => void }) {
-	const [isCancelling, setIsCancelling] = useState(false);
+	isCancelling,
+	setIsCancelling,
+}: MCPOAuthAuthorizationModalProps & {
+	isCancelling: boolean;
+	setIsCancelling: (next: boolean) => void;
+}) {
 	const [cancelError, setCancelError] = useState('');
 
 	const { requestClose, unmountingRef } = useModalDialogController();
-	useEffect(() => {
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
-		onBusyChange?.(isCancelling);
-		return () => {
-			onBusyChange?.(false);
-		};
-	}, [isCancelling, onBusyChange]);
 
 	const authState = getEffectiveMCPAuthHealthState(server ?? undefined, authHealth);
 	const authorizationURL = isMCPAuthActionable(authHealth, server ?? undefined)
@@ -200,20 +196,25 @@ function MCPOAuthAuthorizationModalContent({
 	);
 }
 
-export function MCPOAuthAuthorizationModal(props: MCPOAuthAuthorizationModalProps) {
+function MCPOAuthAuthorizationModalSession(props: MCPOAuthAuthorizationModalProps) {
 	const [isCancelling, setIsCancelling] = useState(false);
-
-	if (!props.isOpen) {
-		return null;
-	}
 
 	return (
 		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} isBusy={isCancelling}>
 			<MCPOAuthAuthorizationModalContent
 				key="mcp-oauth-authorization-modal"
 				{...props}
-				onBusyChange={setIsCancelling}
+				isCancelling={isCancelling}
+				setIsCancelling={setIsCancelling}
 			/>
 		</ModalDialog>
 	);
+}
+
+export function MCPOAuthAuthorizationModal(props: MCPOAuthAuthorizationModalProps) {
+	if (!props.isOpen) {
+		return null;
+	}
+
+	return <MCPOAuthAuthorizationModalSession {...props} />;
 }
