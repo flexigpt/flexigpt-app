@@ -214,6 +214,12 @@ func (s *Store) buildTransferPayload(
 ) (spec.DefinitionTransferPayload, error) {
 	switch mode {
 	case spec.TransferMaterializeDefinitionOnly:
+		if len(exported.Definition.Definition.AssetManifest) != 0 {
+			return spec.DefinitionTransferPayload{}, fmt.Errorf(
+				"%w: definition-only transfer cannot omit declared assets",
+				spec.ErrInvalidRequest,
+			)
+		}
 		return spec.DefinitionTransferPayload{
 			RootDefinitionDigest: exported.Definition.Definition.Digest,
 			Definitions:          []spec.ArtifactDefinitionFile{exported.Definition},
@@ -242,6 +248,7 @@ func (s *Store) buildTransferPayload(
 		RootDefinitionDigest: rootDigest,
 		Definitions:          make([]spec.ArtifactDefinitionFile, 0, len(digests)),
 	}
+	expectedAssets := make(map[spec.PortablePath]spec.AssetManifestEntry)
 	for _, digest := range digests {
 		definition, err := s.GetDefinitionByDigest(ctx, digest)
 		if err != nil {
@@ -251,6 +258,22 @@ func (s *Store) buildTransferPayload(
 			Format:     spec.ArtifactDefinitionFileFormatV1,
 			Definition: definition,
 		})
+		for _, asset := range definition.AssetManifest {
+			if previous, exists := expectedAssets[asset.Path]; exists && previous != asset {
+				return spec.DefinitionTransferPayload{}, fmt.Errorf(
+					"%w: definitions declare conflicting asset metadata for %q",
+					spec.ErrInvalidRequest,
+					asset.Path,
+				)
+			}
+			expectedAssets[asset.Path] = asset
+		}
+	}
+	if len(expectedAssets) != len(exported.Closure.Assets) {
+		return spec.DefinitionTransferPayload{}, fmt.Errorf(
+			"%w: export closure does not contain the exact declared asset set",
+			spec.ErrInvalidRequest,
+		)
 	}
 
 	seenPaths := make(map[spec.PortablePath]struct{}, len(exported.Closure.Assets))
@@ -258,6 +281,14 @@ func (s *Store) buildTransferPayload(
 	for _, manifest := range exported.Closure.Assets {
 		if err := validate.ValidateAssetManifestEntry(manifest); err != nil {
 			return spec.DefinitionTransferPayload{}, err
+		}
+		expected, exists := expectedAssets[manifest.Path]
+		if !exists || expected != manifest {
+			return spec.DefinitionTransferPayload{}, fmt.Errorf(
+				"%w: export asset %q is not declared by the transferred definitions",
+				spec.ErrInvalidRequest,
+				manifest.Path,
+			)
 		}
 		if _, exists := seenPaths[manifest.Path]; exists {
 			return spec.DefinitionTransferPayload{}, fmt.Errorf(
@@ -308,6 +339,17 @@ func (s *Store) publishTransferredRecord(
 
 	if err := validateDefinitionTransferPayload(payload, definition.Digest); err != nil {
 		return spec.ArtifactRecord{}, err
+	}
+	root, err := s.repository.GetRoot(ctx, destination.RootID, false)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if !root.Enabled {
+		return spec.ArtifactRecord{}, fmt.Errorf(
+			"%w: destination root %q is disabled",
+			spec.ErrConflict,
+			destination.RootID,
+		)
 	}
 	source, err := s.repository.GetSource(ctx, destination.SourceID)
 	if err != nil {
@@ -501,6 +543,7 @@ func (s *Store) publishTransferredRecord(
 		ExpectedSourceModifiedAt:          source.ModifiedAt,
 		ExpectedSourceObservationRevision: source.ObservationRevision,
 		ExpectedAttachmentModifiedAt:      attachment.ModifiedAt,
+		ExpectedRootRevision:              root.MountRevision,
 	}); err != nil {
 		discardErr := materializer.DiscardDefinition(
 			context.WithoutCancel(ctx),
@@ -536,6 +579,7 @@ func validateDefinitionTransferPayload(
 		)
 	}
 	seenDefinitions := make(map[spec.Digest]struct{}, len(payload.Definitions))
+	expectedAssets := make(map[spec.PortablePath]spec.AssetManifestEntry)
 	rootSeen := false
 	for _, file := range payload.Definitions {
 		if err := validate.ValidateArtifactDefinitionFile(file); err != nil {
@@ -554,6 +598,16 @@ func validateDefinitionTransferPayload(
 		}
 		seenDefinitions[canonical.Digest] = struct{}{}
 		rootSeen = rootSeen || canonical.Digest == rootDigest
+		for _, asset := range canonical.AssetManifest {
+			if previous, exists := expectedAssets[asset.Path]; exists && previous != asset {
+				return fmt.Errorf(
+					"%w: transferred definitions declare conflicting asset metadata for %q",
+					spec.ErrInvalidRequest,
+					asset.Path,
+				)
+			}
+			expectedAssets[asset.Path] = asset
+		}
 	}
 	if !rootSeen {
 		return fmt.Errorf(
@@ -563,6 +617,12 @@ func validateDefinitionTransferPayload(
 	}
 	var totalBytes int64
 	seenAssets := make(map[spec.PortablePath]struct{}, len(payload.Assets))
+	if len(expectedAssets) != len(payload.Assets) {
+		return fmt.Errorf(
+			"%w: transfer payload does not contain the exact declared asset set",
+			spec.ErrInvalidRequest,
+		)
+	}
 	for _, asset := range payload.Assets {
 		if err := validate.ValidateAssetManifestEntry(asset.Manifest); err != nil {
 			return fmt.Errorf("%w: transfer asset: %w", spec.ErrInvalidRequest, err)
@@ -575,6 +635,14 @@ func validateDefinitionTransferPayload(
 			)
 		}
 		seenAssets[asset.Manifest.Path] = struct{}{}
+		expected, exists := expectedAssets[asset.Manifest.Path]
+		if !exists || expected != asset.Manifest {
+			return fmt.Errorf(
+				"%w: transfer asset %q is not declared by a transferred definition",
+				spec.ErrInvalidRequest,
+				asset.Manifest.Path,
+			)
+		}
 		if int64(len(asset.Content)) != asset.Manifest.SizeBytes ||
 			baseutils.DigestBytes(asset.Content) != asset.Manifest.Digest {
 			return fmt.Errorf(

@@ -22,14 +22,26 @@ const rootSourceAttachmentColumns = `
 	created_at,
 	modified_at`
 
-func (s *MetadataStore) CreateRootSourceAttachment(ctx context.Context, attachment spec.RootSourceAttachment) error {
+func (s *MetadataStore) CreateRootSourceAttachment(
+	ctx context.Context,
+	attachment spec.RootSourceAttachment,
+	expectedRootRevision uint64,
+) error {
 	if err := validate.ValidateRootSourceAttachment(attachment); err != nil {
 		return fmt.Errorf("validate root source attachment for persistence: %w", err)
 	}
-	_, err := s.db.ExecContext(ctx, `
+	if expectedRootRevision == 0 {
+		return fmt.Errorf("%w: expected root revision is required", spec.ErrInvalidRequest)
+	}
+	result, err := s.db.ExecContext(ctx, `
 		INSERT INTO root_source_attachments (
 			root_id, source_id, role, priority, enabled, data_schema_id, data_json, created_at, modified_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		)
+		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+		  FROM artifact_roots
+		 WHERE root_id = ? AND mount_revision = ?
+		   AND mount_revision < 9223372036854775807
+		   AND soft_deleted_at IS NULL`,
 		string(attachment.RootID),
 		string(attachment.SourceID),
 		string(attachment.Role),
@@ -39,11 +51,16 @@ func (s *MetadataStore) CreateRootSourceAttachment(ctx context.Context, attachme
 		[]byte(attachment.Data),
 		formatTime(attachment.CreatedAt),
 		formatTime(attachment.ModifiedAt),
+		string(attachment.RootID),
+		expectedRootRevision,
 	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("insert root source attachment: %w", err))
 	}
-	return nil
+	return optimisticMutationResult(
+		result,
+		"root/source attachment "+string(attachment.RootID)+"/"+string(attachment.SourceID),
+	)
 }
 
 func (s *MetadataStore) GetRootSourceAttachment(
@@ -103,12 +120,16 @@ func (s *MetadataStore) UpdateRootSourceAttachment(
 	ctx context.Context,
 	attachment spec.RootSourceAttachment,
 	expectedModifiedAt time.Time,
+	expectedRootRevision uint64,
 ) error {
 	if err := validate.ValidateRootSourceAttachment(attachment); err != nil {
 		return fmt.Errorf("validate root source attachment for persistence: %w", err)
 	}
 	if err := validateExpectedModifiedAt("root/source attachment", expectedModifiedAt); err != nil {
 		return err
+	}
+	if expectedRootRevision == 0 {
+		return fmt.Errorf("%w: expected root revision is required", spec.ErrInvalidRequest)
 	}
 	result, err := s.db.ExecContext(ctx, updateRootSourceAttachmentSQL,
 		string(attachment.Role),
@@ -120,6 +141,7 @@ func (s *MetadataStore) UpdateRootSourceAttachment(
 		string(attachment.RootID),
 		string(attachment.SourceID),
 		formatTime(expectedModifiedAt),
+		expectedRootRevision,
 	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("update root source attachment: %w", err))
@@ -135,9 +157,13 @@ func (s *MetadataStore) DeleteRootSourceAttachment(
 	rootID spec.RootID,
 	sourceID spec.SourceID,
 	expectedModifiedAt time.Time,
+	expectedRootRevision uint64,
 ) error {
 	if err := validateExpectedModifiedAt("root/source attachment", expectedModifiedAt); err != nil {
 		return err
+	}
+	if expectedRootRevision == 0 {
+		return fmt.Errorf("%w: expected root revision is required", spec.ErrInvalidRequest)
 	}
 	result, err := s.db.ExecContext(
 		ctx,
@@ -145,6 +171,7 @@ func (s *MetadataStore) DeleteRootSourceAttachment(
 		string(rootID),
 		string(sourceID),
 		formatTime(expectedModifiedAt),
+		expectedRootRevision,
 	)
 	if err != nil {
 		return sqliteError(fmt.Errorf("delete root source attachment: %w", err))

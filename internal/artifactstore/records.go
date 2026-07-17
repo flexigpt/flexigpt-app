@@ -17,12 +17,26 @@ func (s *Store) CreateRecord(ctx context.Context, draft spec.ArtifactRecordDraft
 		return spec.ArtifactRecord{}, err
 	}
 	defer finish()
+	generation, err := s.repository.GetRootCatalogGeneration(ctx, draft.RootID)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if err := s.ensureRootCatalogCurrent(ctx, draft.RootID, generation); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
 	record, _, _, err := s.prepareRecord(ctx, draft)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 
-	if err := s.repository.CreateRecord(ctx, record); err != nil {
+	if err := s.repository.PublishRecordSynchronization(
+		ctx,
+		spec.RecordSynchronizationPublication{
+			RootID:                    draft.RootID,
+			ExpectedCatalogGeneration: generation.Generation,
+			Creates:                   []spec.ArtifactRecord{record},
+		},
+	); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	return record, nil
@@ -431,7 +445,16 @@ func (s *Store) validateRecord(
 			[]spec.Diagnostic(nil),
 			resource.Diagnostics...,
 		)
-		if frontend, ok := s.frontendFor(resource.FrontendID); ok {
+		frontend, ok := s.frontendFor(resource.FrontendID)
+		if !ok {
+			return fmt.Errorf(
+				"%w: frontend %q required to validate record %q",
+				spec.ErrFrontendUnavailable,
+				resource.FrontendID,
+				record.RecordID,
+			)
+		}
+		{
 			diagnostics := frontend.ValidateRecordData(
 				ctx,
 				*definition,
@@ -614,7 +637,8 @@ func (s *Store) DetachRecord(
 		)
 	}
 	digest := *record.LastResolvedDefinitionDigest
-	if _, err := s.GetDefinitionByDigest(ctx, digest); err != nil {
+	definition, err := s.GetDefinitionByDigest(ctx, digest)
+	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	record.RecordMode = spec.RecordModeCaptured
@@ -624,7 +648,7 @@ func (s *Store) DetachRecord(
 	record.State = spec.RecordStateAvailable
 	record.Diagnostics = nil
 	record.ModifiedAt = s.nextModifiedAt(record.ModifiedAt)
-	if err := validate.ValidateArtifactRecord(record); err != nil {
+	if err := s.validateRecord(ctx, &record, nil, &definition); err != nil {
 		return spec.ArtifactRecord{}, err
 	}
 	if err := s.repository.UpdateRecord(ctx, record, expectedModifiedAt); err != nil {

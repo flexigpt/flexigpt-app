@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	selectRootScanRootSQL = `SELECT enabled, modified_at, soft_deleted_at
+	selectRootScanRootSQL = `SELECT enabled, modified_at, soft_deleted_at, mount_revision
 		FROM artifact_roots
 		WHERE root_id = ?`
 	selectRootScanAttachmentsSQL = `SELECT source_id, modified_at, enabled
@@ -32,12 +32,6 @@ const (
 		  AND modified_at = ?
 		  AND observation_revision = ?
 		  AND enabled = 1`
-	selectRootScanSourceResourcesSQL = `SELECT locator, subresource_locator
-		FROM catalog_resources
-		WHERE source_id = ?`
-	markRootScanResourceMissingSQL = `UPDATE catalog_resources
-		SET state = ?, diagnostics_json = ?
-		WHERE source_id = ? AND locator = ? AND subresource_locator = ?`
 	selectCurrentRootCatalogSQL = `SELECT
 		c.source_id,
 		c.locator,
@@ -71,12 +65,13 @@ const (
 	insertRootCatalogGenerationSQL = `INSERT INTO root_catalog_generations (
 			root_id,
 			generation,
-			source_generations_json,
+			root_revision,
+			source_versions_json,
 			scan_plan_digest,
 			catalog_digest,
 			created_at,
 			diagnostics_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?)`
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	insertRootCatalogResourceSnapshotSQL = `INSERT INTO root_catalog_resource_snapshots (
 			root_id,
 			generation,
@@ -131,6 +126,8 @@ func (s *MetadataStore) PublishRootScan(
 ) (spec.RootCatalogGeneration, error) {
 	if publication.RootCatalog.RootID == "" ||
 		publication.ExpectedRootModifiedAt.IsZero() ||
+		publication.ExpectedRootRevision == 0 ||
+		publication.RootCatalog.RootRevision != publication.ExpectedRootRevision ||
 		publication.RootCatalog.CreatedAt.IsZero() {
 		return spec.RootCatalogGeneration{}, fmt.Errorf(
 			"%w: root scan publication is incomplete",
@@ -185,10 +182,10 @@ func (s *MetadataStore) PublishRootScan(
 		}
 	}
 
-	if err := validateRootSourceGenerations(
+	if err := validateRootSourceVersions(
 		ctx,
 		tx,
-		publication.RootCatalog.SourceGenerations,
+		publication.RootCatalog.SourceVersions,
 		attachments,
 		sources,
 	); err != nil {
@@ -210,7 +207,7 @@ func (s *MetadataStore) PublishRootScan(
 		)
 	}
 
-	sourceGenerations, err := encodeSourceGenerations(publication.RootCatalog.SourceGenerations)
+	sourceVersions, err := encodeSourceVersions(publication.RootCatalog.SourceVersions)
 	if err != nil {
 		return spec.RootCatalogGeneration{}, err
 	}
@@ -232,13 +229,14 @@ func (s *MetadataStore) PublishRootScan(
 	}
 
 	result := spec.RootCatalogGeneration{
-		RootID:            publication.RootCatalog.RootID,
-		Generation:        generation,
-		SourceGenerations: publication.RootCatalog.SourceGenerations,
-		ScanPlanDigest:    publication.RootCatalog.ScanPlanDigest,
-		CatalogDigest:     publication.RootCatalog.CatalogDigest,
-		CreatedAt:         publication.RootCatalog.CreatedAt,
-		Diagnostics:       publication.RootCatalog.Diagnostics,
+		RootID:         publication.RootCatalog.RootID,
+		Generation:     generation,
+		RootRevision:   publication.RootCatalog.RootRevision,
+		SourceVersions: publication.RootCatalog.SourceVersions,
+		ScanPlanDigest: publication.RootCatalog.ScanPlanDigest,
+		CatalogDigest:  publication.RootCatalog.CatalogDigest,
+		CreatedAt:      publication.RootCatalog.CreatedAt,
+		Diagnostics:    publication.RootCatalog.Diagnostics,
 	}
 	if err := validate.ValidateRootCatalogGeneration(result); err != nil {
 		return spec.RootCatalogGeneration{}, err
@@ -249,7 +247,8 @@ func (s *MetadataStore) PublishRootScan(
 		insertRootCatalogGenerationSQL,
 		string(result.RootID),
 		result.Generation,
-		sourceGenerations,
+		result.RootRevision,
+		sourceVersions,
 		string(result.ScanPlanDigest),
 		string(result.CatalogDigest),
 		formatTime(result.CreatedAt),
@@ -349,11 +348,12 @@ func validateRootScanExpectations(
 	var enabled int
 	var modifiedAt string
 	var softDeletedAt sql.NullString
+	var mountRevision uint64
 	err = tx.QueryRowContext(
 		ctx,
 		selectRootScanRootSQL,
 		string(publication.RootCatalog.RootID),
-	).Scan(&enabled, &modifiedAt, &softDeletedAt)
+	).Scan(&enabled, &modifiedAt, &softDeletedAt, &mountRevision)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, fmt.Errorf(
 			"%w: root %q",
@@ -371,7 +371,8 @@ func validateRootScanExpectations(
 			publication.RootCatalog.RootID,
 		)
 	}
-	if modifiedAt != formatTime(publication.ExpectedRootModifiedAt) {
+	if modifiedAt != formatTime(publication.ExpectedRootModifiedAt) ||
+		mountRevision != publication.ExpectedRootRevision {
 		return nil, nil, fmt.Errorf(
 			"%w: root %q changed while it was being scanned",
 			spec.ErrConflict,
@@ -604,67 +605,13 @@ func publishRootScanSourceCatalog(
 			return err
 		}
 	}
-	if !publication.Authoritative {
-		return nil
-	}
-
-	rows, err := tx.QueryContext(
-		ctx,
-		selectRootScanSourceResourcesSQL,
-		string(publication.SourceID),
-	)
-	if err != nil {
-		return err
-	}
-	missing := make([]spec.CatalogResourceKey, 0)
-	for rows.Next() {
-		var locator, subresource string
-		if err := rows.Scan(&locator, &subresource); err != nil {
-			//nolint:sqlclosecheck // Closing before return.
-			_ = rows.Close()
-			return err
-		}
-		if _, ok := seen[locator+"\x00"+subresource]; ok {
-			continue
-		}
-		missing = append(missing, spec.CatalogResourceKey{
-			SourceID:           publication.SourceID,
-			Locator:            spec.SourceLocator(locator),
-			SubresourceLocator: spec.SubresourceLocator(subresource),
-		})
-	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return err
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-
-	emptyDiagnostics, err := encodeDiagnostics([]spec.Diagnostic{})
-	if err != nil {
-		return err
-	}
-	for _, key := range missing {
-		if _, err := tx.ExecContext(
-			ctx,
-			markRootScanResourceMissingSQL,
-			string(spec.CatalogStateMissing),
-			emptyDiagnostics,
-			string(key.SourceID),
-			string(key.Locator),
-			string(key.SubresourceLocator),
-		); err != nil {
-			return sqliteError(fmt.Errorf("mark catalog resource missing: %w", err))
-		}
-	}
 	return nil
 }
 
-func validateRootSourceGenerations(
+func validateRootSourceVersions(
 	ctx context.Context,
 	tx *sql.Tx,
-	generations map[spec.SourceID]spec.SourceGeneration,
+	versions map[spec.SourceID]spec.SourceCatalogVersion,
 	attachments map[spec.SourceID]rootScanAttachmentState,
 	sources map[spec.SourceID]rootScanSourceState,
 ) error {
@@ -672,7 +619,7 @@ func validateRootSourceGenerations(
 	for sourceID, attachment := range attachments {
 		source := sources[sourceID]
 		if !attachment.Enabled || !source.Enabled {
-			if _, exists := generations[sourceID]; exists {
+			if _, exists := versions[sourceID]; exists {
 				return fmt.Errorf(
 					"%w: disabled source %q appears in source generations",
 					spec.ErrInvalidRequest,
@@ -692,7 +639,7 @@ func validateRootSourceGenerations(
 			return err
 		}
 		if !generation.Valid || generation.String == "" {
-			if _, exists := generations[sourceID]; exists {
+			if _, exists := versions[sourceID]; exists {
 				return fmt.Errorf(
 					"%w: unobserved source %q has a supplied generation",
 					spec.ErrInvalidRequest,
@@ -702,16 +649,18 @@ func validateRootSourceGenerations(
 			continue
 		}
 		expectedCount++
-		supplied, exists := generations[sourceID]
-		if !exists || string(supplied) != generation.String {
+		supplied, exists := versions[sourceID]
+		if !exists ||
+			string(supplied.Generation) != generation.String ||
+			supplied.ObservationRevision != observationRevision {
 			return fmt.Errorf(
-				"%w: source generation for %q changed during publication",
+				"%w: source catalog version for %q changed during publication",
 				spec.ErrConflict,
 				sourceID,
 			)
 		}
 	}
-	if len(generations) != expectedCount {
+	if len(versions) != expectedCount {
 		return fmt.Errorf(
 			"%w: source generations contain a source outside the active root attachments",
 			spec.ErrInvalidRequest,

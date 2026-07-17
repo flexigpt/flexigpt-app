@@ -119,6 +119,14 @@ func (s *MetadataStore) ReplaceDependencySnapshots(
 			spec.ErrConflict,
 		)
 	}
+	if err := ensureRootCatalogCurrentTx(
+		ctx,
+		tx,
+		publication.RootID,
+		publication.CatalogGeneration,
+	); err != nil {
+		return err
+	}
 
 	var recordRootID, recordModifiedAt string
 	var recordDigest sql.NullString

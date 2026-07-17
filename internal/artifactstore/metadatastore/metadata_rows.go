@@ -12,6 +12,7 @@ type artifactRootRow struct {
 	DisplayName   string
 	Description   string
 	Enabled       int
+	MountRevision uint64
 	DataSchemaID  string
 	Data          []byte
 	CreatedAt     string
@@ -26,6 +27,7 @@ func (r *artifactRootRow) destinations() []any {
 		&r.DisplayName,
 		&r.Description,
 		&r.Enabled,
+		&r.MountRevision,
 		&r.DataSchemaID,
 		&r.Data,
 		&r.CreatedAt,

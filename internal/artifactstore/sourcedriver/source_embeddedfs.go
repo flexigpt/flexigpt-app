@@ -131,14 +131,14 @@ func (d *EmbeddedFSDirectoryDriver) Snapshot(
 					entry.Locator,
 				)
 			}
-			totalBytes += entry.SizeBytes
-			if totalBytes > spec.DefaultMaxMaterializedBytes {
+			if entry.SizeBytes > spec.DefaultMaxMaterializedBytes-totalBytes {
 				return "", fmt.Errorf(
 					"%w: embedded source exceeds %d bytes",
 					spec.ErrInvalidRequest,
 					spec.DefaultMaxMaterializedBytes,
 				)
 			}
+			totalBytes += entry.SizeBytes
 		}
 	}
 

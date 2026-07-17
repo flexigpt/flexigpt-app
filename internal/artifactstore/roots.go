@@ -38,15 +38,16 @@ func (s *Store) CreateRoot(ctx context.Context, draft spec.RootDraft) (spec.Arti
 	}
 	now := s.nowUTC()
 	root := spec.ArtifactRoot{
-		RootID:       spec.RootID(id),
-		Kind:         draft.Kind,
-		DisplayName:  draft.DisplayName,
-		Description:  draft.Description,
-		Enabled:      draft.Enabled,
-		DataSchemaID: draft.DataSchemaID,
-		Data:         normalizedJSONObject(draft.Data),
-		CreatedAt:    now,
-		ModifiedAt:   now,
+		RootID:        spec.RootID(id),
+		Kind:          draft.Kind,
+		DisplayName:   draft.DisplayName,
+		Description:   draft.Description,
+		Enabled:       draft.Enabled,
+		MountRevision: 1,
+		DataSchemaID:  draft.DataSchemaID,
+		Data:          normalizedJSONObject(draft.Data),
+		CreatedAt:     now,
+		ModifiedAt:    now,
 	}
 	if err := s.validateRoot(ctx, root); err != nil {
 		return spec.ArtifactRoot{}, err
@@ -109,12 +110,19 @@ func (s *Store) UpdateRoot(ctx context.Context, rootID spec.RootID, update RootU
 	if current.SoftDeletedAt != nil {
 		return spec.ArtifactRoot{}, fmt.Errorf("%w: root %q is soft-deleted", spec.ErrConflict, rootID)
 	}
+	if current.MountRevision >= spec.MaxObservationRevision {
+		return spec.ArtifactRoot{}, fmt.Errorf(
+			"%w: root mount revision is exhausted",
+			spec.ErrConflict,
+		)
+	}
 	current.DisplayName = update.DisplayName
 	current.Description = update.Description
 	current.Enabled = update.Enabled
 	current.DataSchemaID = update.DataSchemaID
 	current.Data = normalizedJSONObject(update.Data)
 	current.ModifiedAt = s.nextModifiedAt(current.ModifiedAt)
+	current.MountRevision++
 	if err := s.validateRoot(ctx, current); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
@@ -147,8 +155,15 @@ func (s *Store) DeleteRoot(
 	if current.SoftDeletedAt != nil {
 		return spec.ArtifactRoot{}, fmt.Errorf("%w: root %q is already soft-deleted", spec.ErrConflict, rootID)
 	}
+	if current.MountRevision >= spec.MaxObservationRevision {
+		return spec.ArtifactRoot{}, fmt.Errorf(
+			"%w: root mount revision is exhausted",
+			spec.ErrConflict,
+		)
+	}
 	now := s.nextModifiedAt(current.ModifiedAt)
 	current.Enabled = false
+	current.MountRevision++
 	current.ModifiedAt = now
 	current.SoftDeletedAt = &now
 	if err := s.validateRoot(ctx, current); err != nil {

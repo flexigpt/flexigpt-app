@@ -13,7 +13,7 @@ import (
 
 const (
 	metadataSchemaVersion     = 1
-	metadataSchemaFingerprint = "flexigpt.artifactstore.metadata.schema-1.2026-04-atomic-root-catalog"
+	metadataSchemaFingerprint = "artifactstore.metadata.schema-1.2026-05-workspace-root-catalog"
 )
 
 const (
@@ -26,7 +26,7 @@ const (
 	);`
 	insertMetadataSchemaIdentitySQL = `INSERT INTO artifact_store_schema (
 		schema_version, schema_fingerprint
-	) VALUES (1, 'flexigpt.artifactstore.metadata.schema-1.2026-04-atomic-root-catalog');`
+	) VALUES (1, 'artifactstore.metadata.schema-1.2026-05-workspace-root-catalog');`
 	readMetadataSchemaIdentitySQL = `SELECT schema_fingerprint
 		FROM artifact_store_schema
 		WHERE schema_version = 1;`
@@ -37,6 +37,7 @@ const (
 		display_name TEXT NOT NULL,
 		description TEXT NOT NULL,
 		enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+		mount_revision INTEGER NOT NULL CHECK (mount_revision BETWEEN 1 AND 9223372036854775807),
 		data_schema_id TEXT NOT NULL,
 		data_json TEXT NOT NULL CHECK (json_valid(data_json) AND json_type(data_json) = 'object'),
 		created_at TEXT NOT NULL,
@@ -57,7 +58,9 @@ const (
 		config_json TEXT NOT NULL CHECK (json_valid(config_json) AND json_type(config_json) = 'object'),
 		last_observed_generation TEXT,
 		last_scanned_at TEXT,
-		observation_revision INTEGER NOT NULL CHECK (observation_revision >= 0),
+		observation_revision INTEGER NOT NULL CHECK (
+			observation_revision BETWEEN 0 AND 9223372036854775807
+		),
 		diagnostics_json TEXT NOT NULL CHECK (
 			json_valid(diagnostics_json) AND json_type(diagnostics_json) = 'array'
 		),
@@ -200,8 +203,9 @@ const (
 	createRootCatalogGenerationsSQL = `CREATE TABLE root_catalog_generations (
 		root_id TEXT NOT NULL REFERENCES artifact_roots(root_id) ON DELETE RESTRICT,
 		generation INTEGER NOT NULL CHECK (generation > 0),
-		source_generations_json TEXT NOT NULL CHECK (
-			json_valid(source_generations_json) AND json_type(source_generations_json) = 'object'
+		root_revision INTEGER NOT NULL CHECK (root_revision BETWEEN 1 AND 9223372036854775807),
+		source_versions_json TEXT NOT NULL CHECK (
+			json_valid(source_versions_json) AND json_type(source_versions_json) = 'object'
 		),
 		scan_plan_digest TEXT NOT NULL,
 		catalog_digest TEXT NOT NULL,
@@ -301,6 +305,21 @@ const (
 		BEGIN
 			SELECT RAISE(ABORT, 'artifactstore conflict: attachment root is not active');
 		END;`
+	createAttachmentRootRevisionInsertTriggerSQL = `CREATE TRIGGER trg_root_source_attachments_revision_insert
+		AFTER INSERT ON root_source_attachments
+		BEGIN
+			UPDATE artifact_roots SET mount_revision = mount_revision + 1 WHERE root_id = NEW.root_id;
+		END;`
+	createAttachmentRootRevisionUpdateTriggerSQL = `CREATE TRIGGER trg_root_source_attachments_revision_update
+		AFTER UPDATE ON root_source_attachments
+		BEGIN
+			UPDATE artifact_roots SET mount_revision = mount_revision + 1 WHERE root_id = NEW.root_id;
+		END;`
+	createAttachmentRootRevisionDeleteTriggerSQL = `CREATE TRIGGER trg_root_source_attachments_revision_delete
+		AFTER DELETE ON root_source_attachments
+		BEGIN
+			UPDATE artifact_roots SET mount_revision = mount_revision + 1 WHERE root_id = OLD.root_id;
+		END;`
 	createRecordCollectionInsertTriggerSQL = `CREATE TRIGGER trg_artifact_records_collection_insert
 		BEFORE INSERT ON artifact_records
 		WHEN NEW.collection_id IS NOT NULL
@@ -350,6 +369,7 @@ const (
 			   AND a.source_id = NEW.source_id
 			   AND a.enabled = 1
 			   AND s.enabled = 1
+			   AND r.enabled = 1
 			   AND r.soft_deleted_at IS NULL
 		 )
 		BEGIN
@@ -407,6 +427,9 @@ var metadataSchemaStatements = []string{
 	createArtifactTransferProvenanceSQL,
 	createArtifactDependenciesSQL,
 	createActiveAttachmentRootTriggerSQL,
+	createAttachmentRootRevisionInsertTriggerSQL,
+	createAttachmentRootRevisionUpdateTriggerSQL,
+	createAttachmentRootRevisionDeleteTriggerSQL,
 	createRecordCollectionInsertTriggerSQL,
 	createRecordCollectionUpdateTriggerSQL,
 	createNonemptyCollectionDeleteTriggerSQL,

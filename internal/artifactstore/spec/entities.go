@@ -86,11 +86,12 @@ type PortablePackageManifest struct {
 
 // ArtifactRoot is app-local metadata. It is never part of a portable package.
 type ArtifactRoot struct {
-	RootID      RootID   `json:"rootID"`
-	Kind        RootKind `json:"kind"`
-	DisplayName string   `json:"displayName"`
-	Description string   `json:"description,omitempty"`
-	Enabled     bool     `json:"enabled"`
+	RootID        RootID   `json:"rootID"`
+	Kind          RootKind `json:"kind"`
+	DisplayName   string   `json:"displayName"`
+	Description   string   `json:"description,omitempty"`
+	Enabled       bool     `json:"enabled"`
+	MountRevision uint64   `json:"mountRevision"`
 
 	DataSchemaID SchemaID        `json:"dataSchemaID,omitempty"`
 	Data         json.RawMessage `json:"data"`
@@ -245,16 +246,25 @@ type ArtifactCollection struct {
 	SoftDeletedAt *time.Time `json:"softDeletedAt,omitempty"`
 }
 
+// SourceCatalogVersion is the freshness identity of one source catalog.
+// Generation identifies source content while ObservationRevision identifies
+// the exact catalog observation published for that content.
+type SourceCatalogVersion struct {
+	Generation          SourceGeneration `json:"generation"`
+	ObservationRevision uint64           `json:"observationRevision"`
+}
+
 // RootCatalogGeneration is app-local durable scan-publication metadata. Its
 // natural key is RootID + Generation.
 type RootCatalogGeneration struct {
-	RootID            RootID                        `json:"rootID"`
-	Generation        uint64                        `json:"generation"`
-	SourceGenerations map[SourceID]SourceGeneration `json:"sourceGenerations"`
-	ScanPlanDigest    Digest                        `json:"scanPlanDigest"`
-	CatalogDigest     Digest                        `json:"catalogDigest"`
-	CreatedAt         time.Time                     `json:"createdAt"`
-	Diagnostics       []Diagnostic                  `json:"diagnostics,omitempty"`
+	RootID         RootID                            `json:"rootID"`
+	Generation     uint64                            `json:"generation"`
+	RootRevision   uint64                            `json:"rootRevision"`
+	SourceVersions map[SourceID]SourceCatalogVersion `json:"sourceVersions"`
+	ScanPlanDigest Digest                            `json:"scanPlanDigest"`
+	CatalogDigest  Digest                            `json:"catalogDigest"`
+	CreatedAt      time.Time                         `json:"createdAt"`
+	Diagnostics    []Diagnostic                      `json:"diagnostics,omitempty"`
 }
 
 // DependencyCandidateRef is the durable, app-local representation of a

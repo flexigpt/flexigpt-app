@@ -36,6 +36,12 @@ func ValidateArtifactRoot(v spec.ArtifactRoot) error {
 	if err := validateDescription("root.description", v.Description); err != nil {
 		return err
 	}
+	if v.MountRevision == 0 || v.MountRevision > spec.MaxObservationRevision {
+		return invalidf(
+			"root.mountRevision must be between 1 and %d",
+			spec.MaxObservationRevision,
+		)
+	}
 	if err := validateSchemaBoundJSONObject(
 		"root.data",
 		v.Data,
@@ -615,12 +621,28 @@ func ValidateRootCatalogGeneration(v spec.RootCatalogGeneration) error {
 	if v.Generation == 0 {
 		return invalidf("catalog generation.generation must be greater than zero")
 	}
-	for sourceID, generation := range v.SourceGenerations {
-		if err := validateID("catalog generation.sourceGenerations sourceID", string(sourceID)); err != nil {
+	if v.RootRevision == 0 || v.RootRevision > spec.MaxObservationRevision {
+		return invalidf(
+			"catalog generation.rootRevision must be between 1 and %d",
+			spec.MaxObservationRevision,
+		)
+	}
+	for sourceID, version := range v.SourceVersions {
+		if err := validateID("catalog generation.sourceVersions sourceID", string(sourceID)); err != nil {
 			return err
 		}
-		if err := validateSourceGeneration("catalog generation.sourceGenerations value", generation); err != nil {
+		if err := validateSourceGeneration(
+			"catalog generation.sourceVersions generation",
+			version.Generation,
+		); err != nil {
 			return err
+		}
+		if version.ObservationRevision == 0 ||
+			version.ObservationRevision > spec.MaxObservationRevision {
+			return invalidf(
+				"catalog generation source observation revision must be between 1 and %d",
+				spec.MaxObservationRevision,
+			)
 		}
 	}
 	if err := validateDigest("catalog generation.scanPlanDigest", v.ScanPlanDigest); err != nil {

@@ -46,7 +46,7 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 	)
 	sourceExpectations := make([]spec.RootScanSourceExpectation, 0, len(attachments))
 	catalogByOccurrence := make(map[string]spec.CatalogResource)
-	sourceGenerations := map[spec.SourceID]spec.SourceGeneration{}
+	sourceVersions := map[spec.SourceID]spec.SourceCatalogVersion{}
 	for _, attachment := range attachments {
 		attached[attachment.SourceID] = attachment
 		attachmentExpectations = append(attachmentExpectations, spec.RootScanAttachmentExpectation{
@@ -69,7 +69,10 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 			continue
 		}
 		if source.LastObservedGeneration != nil {
-			sourceGenerations[source.SourceID] = *source.LastObservedGeneration
+			sourceVersions[source.SourceID] = spec.SourceCatalogVersion{
+				Generation:          *source.LastObservedGeneration,
+				ObservationRevision: source.ObservationRevision,
+			}
 		}
 		resources, err := s.repository.ListCatalogResourcesForSource(ctx, source.SourceID)
 		if err != nil {
@@ -125,6 +128,9 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 				rootID,
 			)
 		}
+		if err := s.validateSourceScanPlan(sourcePlan); err != nil {
+			return spec.ScanResult{}, err
+		}
 		plans[sourcePlan.SourceID] = sourcePlan
 	}
 	hasExplicitSourcePlans := len(plan.SourcePlans) > 0
@@ -159,7 +165,13 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 				Authoritative:  true,
 			}
 		}
+		if err := s.validateSourceScanPlan(sourcePlan); err != nil {
+			return spec.ScanResult{}, err
+		}
 		executedPlan.SourcePlans = append(executedPlan.SourcePlans, sourcePlan)
+		if source.ObservationRevision >= spec.MaxObservationRevision {
+			return spec.ScanResult{}, fmt.Errorf("%w: source observation revision is exhausted", spec.ErrConflict)
+		}
 		sourceResult, publication, err := s.scanSource(ctx, source, sourcePlan)
 		if err != nil {
 			return spec.ScanResult{}, err
@@ -167,7 +179,10 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 		sourcePublications = append(sourcePublications, publication)
 		applySourceCatalogPublication(catalogByOccurrence, publication)
 		result.Sources = append(result.Sources, sourceResult)
-		sourceGenerations[source.SourceID] = sourceResult.Generation
+		sourceVersions[source.SourceID] = spec.SourceCatalogVersion{
+			Generation:          sourceResult.Generation,
+			ObservationRevision: source.ObservationRevision + 1,
+		}
 		result.Diagnostics = appendBoundedDiagnostics(
 			result.Diagnostics,
 			sourceResult.Diagnostics...,
@@ -186,14 +201,16 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 		ctx,
 		spec.RootScanPublication{
 			RootCatalog: spec.RootCatalogPublication{
-				RootID:            rootID,
-				SourceGenerations: sourceGenerations,
-				ScanPlanDigest:    planDigest,
-				CatalogDigest:     catalogDigest,
-				CreatedAt:         s.nowUTC(),
-				Diagnostics:       result.Diagnostics,
+				RootID:         rootID,
+				RootRevision:   root.MountRevision,
+				SourceVersions: sourceVersions,
+				ScanPlanDigest: planDigest,
+				CatalogDigest:  catalogDigest,
+				CreatedAt:      s.nowUTC(),
+				Diagnostics:    result.Diagnostics,
 			},
 			ExpectedRootModifiedAt: root.ModifiedAt,
+			ExpectedRootRevision:   root.MountRevision,
 			Attachments:            attachmentExpectations,
 			Sources:                sourceExpectations,
 			SourceCatalogs:         sourcePublications,
@@ -246,7 +263,6 @@ func (s *Store) scanSource(
 		ExpectedObservationRevision: source.ObservationRevision,
 		ObservedGeneration:          generation,
 		ObservedAt:                  now,
-		Authoritative:               plan.Authoritative,
 	}
 	result := spec.SourceScanResult{SourceID: source.SourceID, Generation: generation}
 	seenResources := make(map[string]struct{})
@@ -525,6 +541,29 @@ func (s *Store) scanSource(
 		}
 	}
 
+	if plan.Authoritative {
+		published := make(map[string]struct{}, len(publication.Resources))
+		for _, resource := range publication.Resources {
+			published[recordOccurrenceKey(
+				resource.SourceID,
+				resource.Locator,
+				resource.SubresourceLocator,
+			)] = struct{}{}
+		}
+		for _, existing := range existingResources {
+			if !sourceLocatorInScanScope(existing.Locator, plan) {
+				continue
+			}
+			key := recordOccurrenceKey(existing.SourceID, existing.Locator, existing.SubresourceLocator)
+			if _, ok := published[key]; ok {
+				continue
+			}
+			existing.State = spec.CatalogStateMissing
+			existing.Diagnostics = []spec.Diagnostic{}
+			publication.Resources = append(publication.Resources, existing)
+		}
+	}
+
 	confirmedGeneration, err := driver.Snapshot(ctx, source)
 	if err != nil {
 		return result, publication, err
@@ -584,6 +623,60 @@ func (s *Store) selectFrontend(
 		)
 	}
 	return selected, nil
+}
+
+func (s *Store) validateSourceScanPlan(plan spec.SourceScanPlan) error {
+	if plan.SourceID == "" {
+		return fmt.Errorf("%w: scan source ID is empty", spec.ErrInvalidRequest)
+	}
+	if plan.MaxFileBytes < 0 ||
+		plan.MaxCandidates < 0 ||
+		plan.MaxTraversalEntries < 0 ||
+		plan.MaxTraversalDepth < 0 {
+		return fmt.Errorf("%w: scan limits must not be negative", spec.ErrInvalidRequest)
+	}
+	if plan.Authoritative &&
+		len(plan.ExplicitLocators) == 0 &&
+		len(plan.DirectoryRoots) == 0 {
+		return fmt.Errorf(
+			"%w: an authoritative scan requires an explicit locator or directory scope",
+			spec.ErrInvalidRequest,
+		)
+	}
+	seenFrontends := make(map[spec.FrontendID]struct{}, len(plan.AllowedFrontendIDs))
+	for _, id := range plan.AllowedFrontendIDs {
+		if _, duplicate := seenFrontends[id]; duplicate {
+			return fmt.Errorf("%w: duplicate allowed frontend %q", spec.ErrInvalidRequest, id)
+		}
+		seenFrontends[id] = struct{}{}
+		if _, ok := s.frontendFor(id); !ok {
+			return fmt.Errorf("%w: allowed frontend %q", spec.ErrFrontendUnavailable, id)
+		}
+	}
+	seenLocators := make(map[spec.SourceLocator]struct{}, len(plan.ExplicitLocators))
+	for _, locator := range plan.ExplicitLocators {
+		if _, duplicate := seenLocators[locator]; duplicate {
+			return fmt.Errorf("%w: duplicate explicit locator %q", spec.ErrInvalidRequest, locator)
+		}
+		seenLocators[locator] = struct{}{}
+	}
+	return nil
+}
+
+func sourceLocatorInScanScope(locator spec.SourceLocator, plan spec.SourceScanPlan) bool {
+	if slices.Contains(plan.ExplicitLocators, locator) {
+		return true
+	}
+	for _, root := range plan.DirectoryRoots {
+		walkRoot := root.Root
+		if walkRoot == "" {
+			walkRoot = "."
+		}
+		if matchesDirectoryRoot(walkRoot, locator, root) {
+			return true
+		}
+	}
+	return false
 }
 
 func collectSourceCandidates(
@@ -927,14 +1020,12 @@ func applySourceCatalogPublication(
 	resources map[string]spec.CatalogResource,
 	publication spec.SourceCatalogPublication,
 ) {
-	seen := make(map[string]struct{}, len(publication.Resources))
 	for _, incoming := range publication.Resources {
 		key := recordOccurrenceKey(
 			incoming.SourceID,
 			incoming.Locator,
 			incoming.SubresourceLocator,
 		)
-		seen[key] = struct{}{}
 		if existing, ok := resources[key]; ok {
 			incoming.FirstSeenAt = existing.FirstSeenAt
 			if incoming.PackageManifestLocator == "" {
@@ -960,20 +1051,6 @@ func applySourceCatalogPublication(
 			}
 		}
 		resources[key] = incoming
-	}
-	if !publication.Authoritative {
-		return
-	}
-	for key, resource := range resources {
-		if resource.SourceID != publication.SourceID {
-			continue
-		}
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		resource.State = spec.CatalogStateMissing
-		resource.Diagnostics = []spec.Diagnostic{}
-		resources[key] = resource
 	}
 }
 

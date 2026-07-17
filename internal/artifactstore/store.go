@@ -45,14 +45,15 @@ type Store struct {
 	rootHooks               map[spec.RootKind]spec.RootKindHook
 	collectionHooks         map[spec.CollectionKind]spec.CollectionKindHook
 
-	scanMu           sync.Mutex
-	lifeMu           sync.Mutex
-	lifeCond         *sync.Cond
-	closing          bool
-	closed           bool
-	activeOperations int
-	closeErr         error
-	now              func() time.Time
+	scanMu            sync.Mutex
+	lifeMu            sync.Mutex
+	lifeCond          *sync.Cond
+	compositionSealed bool
+	closing           bool
+	closed            bool
+	activeOperations  int
+	closeErr          error
+	now               func() time.Time
 }
 
 type StoreOption func(*Store) error
@@ -294,13 +295,13 @@ func (s *Store) RegisterSourceDriver(driver spec.SourceDriver) error {
 	if strings.TrimSpace(string(kind)) == "" {
 		return fmt.Errorf("%w: source driver kind is empty", spec.ErrInvalidRequest)
 	}
-	s.registryMu.Lock()
-	defer s.registryMu.Unlock()
-	if _, exists := s.drivers[kind]; exists {
-		return fmt.Errorf("%w: source driver %q", spec.ErrConflict, kind)
-	}
-	s.drivers[kind] = driver
-	return nil
+	return s.mutateRegistry(func() error {
+		if _, exists := s.drivers[kind]; exists {
+			return fmt.Errorf("%w: source driver %q", spec.ErrConflict, kind)
+		}
+		s.drivers[kind] = driver
+		return nil
+	})
 }
 
 func (s *Store) RegisterDefinitionMaterializer(materializer spec.DefinitionMaterializer) error {
@@ -311,13 +312,13 @@ func (s *Store) RegisterDefinitionMaterializer(materializer spec.DefinitionMater
 	if strings.TrimSpace(string(kind)) == "" {
 		return fmt.Errorf("%w: definition materializer kind is empty", spec.ErrInvalidRequest)
 	}
-	s.registryMu.Lock()
-	defer s.registryMu.Unlock()
-	if _, exists := s.definitionMaterializers[kind]; exists {
-		return fmt.Errorf("%w: definition materializer %q", spec.ErrConflict, kind)
-	}
-	s.definitionMaterializers[kind] = materializer
-	return nil
+	return s.mutateRegistry(func() error {
+		if _, exists := s.definitionMaterializers[kind]; exists {
+			return fmt.Errorf("%w: definition materializer %q", spec.ErrConflict, kind)
+		}
+		s.definitionMaterializers[kind] = materializer
+		return nil
+	})
 }
 
 func (s *Store) RegisterArtifactVersionMatcher(matcher spec.ArtifactVersionMatcher) error {
@@ -328,13 +329,13 @@ func (s *Store) RegisterArtifactVersionMatcher(matcher spec.ArtifactVersionMatch
 	if strings.TrimSpace(string(kind)) == "" {
 		return fmt.Errorf("%w: artifact version matcher kind is empty", spec.ErrInvalidRequest)
 	}
-	s.registryMu.Lock()
-	defer s.registryMu.Unlock()
-	if _, exists := s.versionMatchers[kind]; exists {
-		return fmt.Errorf("%w: artifact version matcher %q", spec.ErrConflict, kind)
-	}
-	s.versionMatchers[kind] = matcher
-	return nil
+	return s.mutateRegistry(func() error {
+		if _, exists := s.versionMatchers[kind]; exists {
+			return fmt.Errorf("%w: artifact version matcher %q", spec.ErrConflict, kind)
+		}
+		s.versionMatchers[kind] = matcher
+		return nil
+	})
 }
 
 func (s *Store) RegisterArtifactFrontend(frontend spec.ArtifactFrontend) error {
@@ -345,14 +346,14 @@ func (s *Store) RegisterArtifactFrontend(frontend spec.ArtifactFrontend) error {
 	if strings.TrimSpace(string(id)) == "" {
 		return fmt.Errorf("%w: artifact frontend ID is empty", spec.ErrInvalidRequest)
 	}
-	s.registryMu.Lock()
-	defer s.registryMu.Unlock()
-	if _, exists := s.frontends[id]; exists {
-		return fmt.Errorf("%w: artifact frontend %q", spec.ErrConflict, id)
-	}
-	s.frontends[id] = frontend
-	s.frontendOrder = append(s.frontendOrder, id)
-	return nil
+	return s.mutateRegistry(func() error {
+		if _, exists := s.frontends[id]; exists {
+			return fmt.Errorf("%w: artifact frontend %q", spec.ErrConflict, id)
+		}
+		s.frontends[id] = frontend
+		s.frontendOrder = append(s.frontendOrder, id)
+		return nil
+	})
 }
 
 func (s *Store) RegisterRootKindHook(hook spec.RootKindHook) error {
@@ -363,13 +364,13 @@ func (s *Store) RegisterRootKindHook(hook spec.RootKindHook) error {
 	if strings.TrimSpace(string(kind)) == "" {
 		return fmt.Errorf("%w: root kind hook kind is empty", spec.ErrInvalidRequest)
 	}
-	s.registryMu.Lock()
-	defer s.registryMu.Unlock()
-	if _, exists := s.rootHooks[kind]; exists {
-		return fmt.Errorf("%w: root kind hook %q", spec.ErrConflict, kind)
-	}
-	s.rootHooks[kind] = hook
-	return nil
+	return s.mutateRegistry(func() error {
+		if _, exists := s.rootHooks[kind]; exists {
+			return fmt.Errorf("%w: root kind hook %q", spec.ErrConflict, kind)
+		}
+		s.rootHooks[kind] = hook
+		return nil
+	})
 }
 
 func (s *Store) RegisterCollectionKindHook(hook spec.CollectionKindHook) error {
@@ -380,13 +381,33 @@ func (s *Store) RegisterCollectionKindHook(hook spec.CollectionKindHook) error {
 	if strings.TrimSpace(string(kind)) == "" {
 		return fmt.Errorf("%w: collection kind hook kind is empty", spec.ErrInvalidRequest)
 	}
+	return s.mutateRegistry(func() error {
+		if _, exists := s.collectionHooks[kind]; exists {
+			return fmt.Errorf("%w: collection kind hook %q", spec.ErrConflict, kind)
+		}
+		s.collectionHooks[kind] = hook
+		return nil
+	})
+}
+
+func (s *Store) mutateRegistry(mutate func() error) error {
+	if s == nil || mutate == nil {
+		return spec.ErrClosed
+	}
+	s.lifeMu.Lock()
+	defer s.lifeMu.Unlock()
+	if s.closed || s.closing || s.repository == nil {
+		return spec.ErrClosed
+	}
+	if s.compositionSealed {
+		return fmt.Errorf(
+			"%w: artifact store composition is sealed",
+			spec.ErrConflict,
+		)
+	}
 	s.registryMu.Lock()
 	defer s.registryMu.Unlock()
-	if _, exists := s.collectionHooks[kind]; exists {
-		return fmt.Errorf("%w: collection kind hook %q", spec.ErrConflict, kind)
-	}
-	s.collectionHooks[kind] = hook
-	return nil
+	return mutate()
 }
 
 func (s *Store) installRequiredSourceDrivers() error {
@@ -423,6 +444,7 @@ func (s *Store) beginOperation(ctx context.Context) (context.Context, func(), er
 		s.lifeMu.Unlock()
 		return ctx, nil, spec.ErrClosed
 	}
+	s.compositionSealed = true
 	s.activeOperations++
 	lease := &storeOperationLease{store: s, refs: 1, active: true}
 	s.lifeMu.Unlock()

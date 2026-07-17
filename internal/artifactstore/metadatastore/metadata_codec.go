@@ -46,27 +46,27 @@ func decodeDiagnostics(raw []byte) ([]spec.Diagnostic, error) {
 	return value, nil
 }
 
-func encodeSourceGenerations(value map[spec.SourceID]spec.SourceGeneration) ([]byte, error) {
+func encodeSourceVersions(value map[spec.SourceID]spec.SourceCatalogVersion) ([]byte, error) {
 	if value == nil {
-		value = map[spec.SourceID]spec.SourceGeneration{}
+		value = map[spec.SourceID]spec.SourceCatalogVersion{}
 	}
 	encoded, err := json.Marshal(value)
 	if err != nil {
-		return nil, fmt.Errorf("encode source generations: %w", err)
+		return nil, fmt.Errorf("encode source versions: %w", err)
 	}
 	return encoded, nil
 }
 
-func decodeSourceGenerations(raw []byte) (map[spec.SourceID]spec.SourceGeneration, error) {
+func decodeSourceVersions(raw []byte) (map[spec.SourceID]spec.SourceCatalogVersion, error) {
 	if len(raw) == 0 {
-		return map[spec.SourceID]spec.SourceGeneration{}, nil
+		return map[spec.SourceID]spec.SourceCatalogVersion{}, nil
 	}
-	var value map[spec.SourceID]spec.SourceGeneration
+	var value map[spec.SourceID]spec.SourceCatalogVersion
 	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, fmt.Errorf("decode source generations: %w", err)
+		return nil, fmt.Errorf("decode source versions: %w", err)
 	}
 	if value == nil {
-		value = map[spec.SourceID]spec.SourceGeneration{}
+		value = map[spec.SourceID]spec.SourceCatalogVersion{}
 	}
 	return value, nil
 }

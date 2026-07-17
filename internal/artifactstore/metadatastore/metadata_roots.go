@@ -17,6 +17,7 @@ const rootColumns = `
 	display_name,
 	description,
 	enabled,
+	mount_revision,
 	data_schema_id,
 	data_json,
 	created_at,
@@ -30,13 +31,14 @@ func (s *MetadataStore) CreateRoot(ctx context.Context, root spec.ArtifactRoot) 
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO artifact_roots (
 			root_id, kind, display_name, description, enabled,
-			data_schema_id, data_json, created_at, modified_at, soft_deleted_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			mount_revision, data_schema_id, data_json, created_at, modified_at, soft_deleted_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(root.RootID),
 		string(root.Kind),
 		root.DisplayName,
 		root.Description,
 		boolToInt(root.Enabled),
+		root.MountRevision,
 		string(root.DataSchemaID),
 		[]byte(root.Data),
 		formatTime(root.CreatedAt),
@@ -110,6 +112,7 @@ func (s *MetadataStore) UpdateRoot(
 		root.DisplayName,
 		root.Description,
 		boolToInt(root.Enabled),
+		root.MountRevision,
 		string(root.DataSchemaID),
 		string(root.Data),
 		formatTime(root.ModifiedAt),
@@ -146,6 +149,7 @@ func scanRoot(scanner sqlScanner) (spec.ArtifactRoot, error) {
 		DisplayName:   row.DisplayName,
 		Description:   row.Description,
 		Enabled:       row.Enabled != 0,
+		MountRevision: row.MountRevision,
 		DataSchemaID:  spec.SchemaID(row.DataSchemaID),
 		Data:          append([]byte(nil), row.Data...),
 		CreatedAt:     created,

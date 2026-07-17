@@ -22,7 +22,11 @@ type ArtifactMetadataRepository interface {
 	UpdateSource(ctx context.Context, source ArtifactSource, expectedModifiedAt time.Time) error
 	DeleteSource(ctx context.Context, sourceID SourceID, expectedModifiedAt time.Time) error
 
-	CreateRootSourceAttachment(ctx context.Context, attachment RootSourceAttachment) error
+	CreateRootSourceAttachment(
+		ctx context.Context,
+		attachment RootSourceAttachment,
+		expectedRootRevision uint64,
+	) error
 	GetRootSourceAttachment(
 		ctx context.Context,
 		rootID RootID,
@@ -33,12 +37,14 @@ type ArtifactMetadataRepository interface {
 		ctx context.Context,
 		attachment RootSourceAttachment,
 		expectedModifiedAt time.Time,
+		expectedRootRevision uint64,
 	) error
 	DeleteRootSourceAttachment(
 		ctx context.Context,
 		rootID RootID,
 		sourceID SourceID,
 		expectedModifiedAt time.Time,
+		expectedRootRevision uint64,
 	) error
 
 	CreateCollection(ctx context.Context, collection ArtifactCollection) error

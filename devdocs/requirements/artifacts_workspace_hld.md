@@ -102,7 +102,7 @@
 | `AS-13` | Implemented             | `ArtifactRecord` is the sole generic app-side artifact item.                                                                                          |
 | `AS-14` | Implemented             | Registered frontends own source-format recognition and decoding. The portable-definition frontend is registered by default.                           |
 | `AS-15` | Implemented             | Runtime projections and execution remain outside Artifact Store.                                                                                      |
-| `AS-16` | Planned                 | A Workspace Root will be `ArtifactRoot(kind=flexigpt.workspace)`.                                                                                     |
+| `AS-16` | Planned                 | A Workspace Root will be `ArtifactRoot(kind=workspace.root)`.                                                                                         |
 | `AS-17` | Planned                 | Workspace discovery will synchronize selected catalog resources into root-local records.                                                              |
 | `AS-18` | Implemented generically | Linked, captured, forked, and app-local record modes exist. Their Workspace-specific use is planned.                                                  |
 | `AS-19` | Implemented             | Root scans atomically publish source observations and immutable root catalog snapshots in metadata storage.                                           |
@@ -243,10 +243,10 @@ ArtifactRoot
 Examples:
 
 ```text
-flexigpt.workspace
-flexigpt.app-library
-flexigpt.builtin
-flexigpt.package-mount
+workspace.root
+app-library
+builtin
+package-mount
 ```
 
 `Data` is opaque to Artifact Store.
@@ -321,7 +321,7 @@ Example configuration:
 
 ```json
 {
-  "providerKey": "flexigpt.builtins",
+  "providerKey": "builtins",
   "rootLocator": "artifact-bundles"
 }
 ```
@@ -1282,7 +1282,7 @@ A planned Workspace Root is:
 
 ```text
 ArtifactRoot
-  Kind = flexigpt.workspace
+  Kind = workspace.root
 ```
 
 ### Workspace root data
@@ -1336,14 +1336,14 @@ RootSourceAttachment
 When implemented, Workspace may register artifact frontends for canonical kinds such as:
 
 ```text
-flexigpt.workspace.definition
-flexigpt.agent.definition
-flexigpt.skill.definition
-flexigpt.model.definition
-flexigpt.mcp.server.definition
-flexigpt.tool.definition
-flexigpt.instruction.document
-flexigpt.context.document
+workspace.definition
+agent.definition
+skill.definition
+model.definition
+mcp.server.definition
+tool.definition
+instruction.document
+context.document
 ```
 
 These canonical kinds may be emitted from source formats such as:
@@ -1377,7 +1377,7 @@ Catalog Resource:
   SourceID: backend-fs
   Locator: .skills/code-review/SKILL.md
   Subresource: skill
-  Kind: flexigpt.skill.definition
+  Kind: skill.definition
 
 Canonical Definition:
   Digest: sha256:abc...
@@ -1385,7 +1385,7 @@ Canonical Definition:
 Artifact Record:
   RecordID: 019f...
   RootID: backend-workspace
-  Kind: flexigpt.skill.definition
+  Kind: skill.definition
   RecordMode: linked
   TrackingMode: follow-source
 ```
@@ -1436,7 +1436,7 @@ The following components are planned. None currently exists in the repository.
 | Component                    | Planned responsibility                                |
 | ---------------------------- | ----------------------------------------------------- |
 | `WorkspaceService`           | Typed façade over Artifact Store                      |
-| `WorkspaceRootKindHook`      | Validates `flexigpt.workspace` root data              |
+| `WorkspaceRootKindHook`      | Validates `workspace` root data                       |
 | `WorkspaceDiscoveryPlanner`  | Builds bootstrap and expanded scan plans              |
 | `WorkspaceArtifactFrontends` | Parses Workspace-specific source formats              |
 | `WorkspaceCatalogService`    | Groups root catalog records into Workspace categories |
@@ -1458,7 +1458,7 @@ Frontend
 
 WorkspaceService
 -> artifactstore.Store.CreateRoot(
-     kind=flexigpt.workspace,
+     kind=workspace.root,
    )
 
 -> artifactstore.Store.CreateSource(
@@ -1546,15 +1546,15 @@ Artifact Record
 = existing domain response and runtime projector input
 ```
 
-| Artifact kind                    | Existing domain shape                             |
-| -------------------------------- | ------------------------------------------------- |
-| `flexigpt.skill.definition`      | `Skill` and `SkillRef`                            |
-| `flexigpt.tool.definition`       | `Tool` and `ToolRef`                              |
-| `flexigpt.mcp.server.definition` | `MCPServerConfig` and MCP refs                    |
-| `flexigpt.model.definition`      | `ProviderPreset`, `ModelPreset`, `ModelPresetRef` |
-| `flexigpt.agent.definition`      | Assistant or Agent option                         |
-| `flexigpt.instruction.document`  | instruction contributor                           |
-| `flexigpt.context.document`      | context contributor                               |
+| Artifact kind           | Existing domain shape                             |
+| ----------------------- | ------------------------------------------------- |
+| `skill.definition`      | `Skill` and `SkillRef`                            |
+| `tool.definition`       | `Tool` and `ToolRef`                              |
+| `mcp.server.definition` | `MCPServerConfig` and MCP refs                    |
+| `model.definition`      | `ProviderPreset`, `ModelPreset`, `ModelPresetRef` |
+| `agent.definition`      | Assistant or Agent option                         |
+| `instruction.document`  | instruction contributor                           |
+| `context.document`      | context contributor                               |
 
 The mapping is performed by Workspace projectors.
 
@@ -1746,7 +1746,7 @@ Artifact Root
   is the app-local mount that groups sources, records, collections, and catalog generations.
 
 Workspace Root
-  is ArtifactRoot(kind=flexigpt.workspace).
+  is ArtifactRoot(workspace.root).
 
 Workspace
   is a typed Artifact Store consumer.

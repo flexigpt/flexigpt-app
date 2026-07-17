@@ -17,9 +17,11 @@ const selectLatestRootGenerationForSynchronizationSQL = `SELECT generation
 	ORDER BY generation DESC
 	LIMIT 1`
 
-const selectTransferAttachmentSQL = `SELECT modified_at, enabled
-	FROM root_source_attachments
-	WHERE root_id = ? AND source_id = ?`
+const selectTransferAttachmentSQL = `SELECT
+		a.modified_at, a.enabled, r.enabled, r.soft_deleted_at, r.mount_revision
+	FROM root_source_attachments a
+	JOIN artifact_roots r ON r.root_id = a.root_id
+	WHERE a.root_id = ? AND a.source_id = ?`
 
 const invalidateTransferredSourceSQL = `UPDATE artifact_sources
 	SET last_observed_generation = NULL,
@@ -196,6 +198,14 @@ func (s *MetadataStore) PublishRecordSynchronization(
 			spec.ErrConflict,
 		)
 	}
+	if err := ensureRootCatalogCurrentTx(
+		ctx,
+		tx,
+		publication.RootID,
+		publication.ExpectedCatalogGeneration,
+	); err != nil {
+		return err
+	}
 
 	for _, record := range publication.Creates {
 		if record.RootID != publication.RootID {
@@ -308,13 +318,21 @@ func (s *MetadataStore) PublishRecordTransfer(
 	defer func() { _ = tx.Rollback() }()
 
 	var attachmentModifiedAt string
-	var attachmentEnabled int
+	var softDeletedAt sql.NullString
+	var attachmentEnabled, rootEnabled int
+	var rootRevision uint64
 	err = tx.QueryRowContext(
 		ctx,
 		selectTransferAttachmentSQL,
 		string(publication.Record.RootID),
 		string(publication.Record.SourceID),
-	).Scan(&attachmentModifiedAt, &attachmentEnabled)
+	).Scan(
+		&attachmentModifiedAt,
+		&attachmentEnabled,
+		&rootEnabled,
+		&softDeletedAt,
+		&rootRevision,
+	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf(
 			"%w: destination source is no longer attached to the root",
@@ -325,9 +343,12 @@ func (s *MetadataStore) PublishRecordTransfer(
 		return fmt.Errorf("read transfer attachment: %w", err)
 	}
 	if attachmentEnabled == 0 ||
-		attachmentModifiedAt != formatTime(publication.ExpectedAttachmentModifiedAt) {
+		rootEnabled == 0 ||
+		softDeletedAt.Valid ||
+		attachmentModifiedAt != formatTime(publication.ExpectedAttachmentModifiedAt) ||
+		rootRevision != publication.ExpectedRootRevision {
 		return fmt.Errorf(
-			"%w: destination source attachment changed during transfer",
+			"%w: destination root or source attachment changed during transfer",
 			spec.ErrConflict,
 		)
 	}

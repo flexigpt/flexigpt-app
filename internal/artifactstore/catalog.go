@@ -3,6 +3,7 @@ package artifactstore
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/baseutils"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
@@ -57,7 +58,21 @@ func (s *Store) ListCatalogResourcesForRoot(
 	if err := s.ensureRootCatalogCurrent(ctx, rootID, generation); err != nil {
 		return nil, err
 	}
-	return s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
+	resources, err := s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	confirmed, err := s.repository.GetRootCatalogGeneration(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	if confirmed.Generation != generation.Generation {
+		return nil, fmt.Errorf("%w: root catalog changed while it was being read", spec.ErrConflict)
+	}
+	if err := s.ensureRootCatalogCurrent(ctx, rootID, confirmed); err != nil {
+		return nil, err
+	}
+	return resources, nil
 }
 
 // GetRootCatalogGeneration returns the most recently published generation for
@@ -140,6 +155,14 @@ func (s *Store) ensureRootCatalogCurrent(
 	if !root.Enabled {
 		return fmt.Errorf("%w: root %q is disabled", spec.ErrConflict, rootID)
 	}
+	if root.MountRevision != generation.RootRevision {
+		return fmt.Errorf(
+			"%w: root %q mount changed after catalog generation %d; rescan the root",
+			spec.ErrConflict,
+			rootID,
+			generation.Generation,
+		)
+	}
 	if generation.RootID != rootID {
 		return fmt.Errorf(
 			"%w: catalog generation belongs to a different root",
@@ -151,7 +174,7 @@ func (s *Store) ensureRootCatalogCurrent(
 	if err != nil {
 		return err
 	}
-	current := make(map[spec.SourceID]spec.SourceGeneration)
+	current := make(map[spec.SourceID]spec.SourceCatalogVersion)
 	for _, attachment := range attachments {
 		source, err := s.repository.GetSource(ctx, attachment.SourceID)
 		if err != nil {
@@ -168,26 +191,18 @@ func (s *Store) ensureRootCatalogCurrent(
 				source.SourceID,
 			)
 		}
-		current[source.SourceID] = *source.LastObservedGeneration
+		current[source.SourceID] = spec.SourceCatalogVersion{
+			Generation:          *source.LastObservedGeneration,
+			ObservationRevision: source.ObservationRevision,
+		}
 	}
-	if len(current) != len(generation.SourceGenerations) {
+	if !maps.Equal(current, generation.SourceVersions) {
 		return fmt.Errorf(
-			"%w: root %q source attachments changed after catalog generation %d; rescan the root",
+			"%w: root %q source catalogs changed after catalog generation %d; rescan the root",
 			spec.ErrConflict,
 			rootID,
 			generation.Generation,
 		)
-	}
-	for sourceID, observed := range current {
-		published, ok := generation.SourceGenerations[sourceID]
-		if !ok || published != observed {
-			return fmt.Errorf(
-				"%w: source %q changed after root catalog generation %d; rescan the root",
-				spec.ErrConflict,
-				sourceID,
-				generation.Generation,
-			)
-		}
 	}
 	return nil
 }
@@ -197,14 +212,7 @@ func (s *Store) publishedCatalogResource(
 	rootID spec.RootID,
 	key spec.CatalogResourceKey,
 ) (spec.CatalogResource, error) {
-	generation, err := s.repository.GetRootCatalogGeneration(ctx, rootID)
-	if err != nil {
-		return spec.CatalogResource{}, err
-	}
-	if err := s.ensureRootCatalogCurrent(ctx, rootID, generation); err != nil {
-		return spec.CatalogResource{}, err
-	}
-	resources, err := s.repository.ListPublishedCatalogResourcesForRoot(ctx, rootID)
+	resources, err := s.ListCatalogResourcesForRoot(ctx, rootID)
 	if err != nil {
 		return spec.CatalogResource{}, err
 	}

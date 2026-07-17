@@ -16,18 +16,18 @@ type SourceCatalogPublication struct {
 	Diagnostics                 []Diagnostic
 	Resources                   []CatalogResource
 	Revisions                   []CatalogResourceRevision
-	Authoritative               bool
 }
 
 // RootCatalogPublication records a durable root-level catalog generation after
 // one or more source publications have completed.
 type RootCatalogPublication struct {
-	RootID            RootID
-	SourceGenerations map[SourceID]SourceGeneration
-	ScanPlanDigest    Digest
-	CatalogDigest     Digest
-	CreatedAt         time.Time
-	Diagnostics       []Diagnostic
+	RootID         RootID
+	RootRevision   uint64
+	SourceVersions map[SourceID]SourceCatalogVersion
+	ScanPlanDigest Digest
+	CatalogDigest  Digest
+	CreatedAt      time.Time
+	Diagnostics    []Diagnostic
 }
 
 // RootScanAttachmentExpectation protects a scan against concurrent attachment
@@ -54,6 +54,7 @@ type RootScanSourceExpectation struct {
 type RootScanPublication struct {
 	RootCatalog            RootCatalogPublication
 	ExpectedRootModifiedAt time.Time
+	ExpectedRootRevision   uint64
 	Attachments            []RootScanAttachmentExpectation
 	Sources                []RootScanSourceExpectation
 	SourceCatalogs         []SourceCatalogPublication
@@ -115,6 +116,7 @@ type RecordTransferPublication struct {
 	ExpectedSourceModifiedAt          time.Time
 	ExpectedSourceObservationRevision uint64
 	ExpectedAttachmentModifiedAt      time.Time
+	ExpectedRootRevision              uint64
 }
 
 // ExportedRecord is the portable result of exporting an app-local record. The

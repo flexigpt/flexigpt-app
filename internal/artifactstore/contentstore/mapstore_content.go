@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	portableAssetFileFormatV1 = "flexigpt.artifact-asset/v1"
+	portableAssetFileFormatV1 = "artifact-asset/v1"
 )
 
 type mapStorePortableContentRepository struct {

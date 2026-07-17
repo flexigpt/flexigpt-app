@@ -5,6 +5,7 @@ const updateRootSQL = `
 	   SET display_name = ?,
 	       description = ?,
 	       enabled = ?,
+	       mount_revision = ?,
 	       data_schema_id = ?,
 	       data_json = ?,
 	       modified_at = ?,
@@ -41,13 +42,29 @@ const updateRootSourceAttachmentSQL = `
 	       modified_at = ?
 	 WHERE root_id = ?
 	   AND source_id = ?
-	   AND modified_at = ?`
+	   AND modified_at = ?
+	   AND EXISTS (
+			SELECT 1
+			  FROM artifact_roots
+			 WHERE root_id = root_source_attachments.root_id
+			   AND mount_revision = ?
+			   AND mount_revision < 9223372036854775807
+			   AND soft_deleted_at IS NULL
+	   )`
 
 const deleteRootSourceAttachmentSQL = `
 	DELETE FROM root_source_attachments
 	 WHERE root_id = ?
 	   AND source_id = ?
-	   AND modified_at = ?`
+	   AND modified_at = ?
+	   AND EXISTS (
+			SELECT 1
+			  FROM artifact_roots
+			 WHERE root_id = root_source_attachments.root_id
+			   AND mount_revision = ?
+			   AND mount_revision < 9223372036854775807
+			   AND soft_deleted_at IS NULL
+	   )`
 
 const updateCollectionSQL = `
 	UPDATE artifact_collections

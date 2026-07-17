@@ -61,7 +61,11 @@ func (s *Store) AttachSource(ctx context.Context, draft RootSourceAttachmentDraf
 	if err := s.validateAttachment(ctx, root, attachment); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
-	if err := s.repository.CreateRootSourceAttachment(ctx, attachment); err != nil {
+	if err := s.repository.CreateRootSourceAttachment(
+		ctx,
+		attachment,
+		root.MountRevision,
+	); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
 	return attachment, nil
@@ -132,6 +136,7 @@ func (s *Store) UpdateRootSourceAttachment(
 		ctx,
 		attachment,
 		update.ExpectedModifiedAt,
+		root.MountRevision,
 	); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
@@ -151,6 +156,10 @@ func (s *Store) DetachSource(
 		return err
 	}
 	defer finish()
+	root, err := s.repository.GetRoot(ctx, rootID, false)
+	if err != nil {
+		return err
+	}
 	attachment, err := s.repository.GetRootSourceAttachment(ctx, rootID, sourceID)
 	if err != nil {
 		return err
@@ -162,7 +171,13 @@ func (s *Store) DetachSource(
 	); err != nil {
 		return err
 	}
-	return s.repository.DeleteRootSourceAttachment(ctx, rootID, sourceID, expectedModifiedAt)
+	return s.repository.DeleteRootSourceAttachment(
+		ctx,
+		rootID,
+		sourceID,
+		expectedModifiedAt,
+		root.MountRevision,
+	)
 }
 
 func (s *Store) validateAttachment(
