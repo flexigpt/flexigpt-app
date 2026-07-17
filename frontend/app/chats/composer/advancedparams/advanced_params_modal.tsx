@@ -1,9 +1,9 @@
 import type { Dispatch, SetStateAction, SubmitEventHandler } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
 
 import type { CacheControlKind, JSONSchemaParam, OutputParam } from '@/spec/inference';
 import { OutputFormatKind, ReasoningSummaryStyle } from '@/spec/inference';
@@ -11,7 +11,11 @@ import type { UIChatOption } from '@/spec/modelpreset';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
 import { Dropdown } from '@/components/dropdown';
+import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 import type { CacheControlTTLSelection } from '@/modelpresets/lib/cache_control_utils';
 import {
@@ -127,19 +131,6 @@ function getInitialReasoningSummaryStyle(
 	return summaryStyleSupported ? ((currentModel.reasoning?.summaryStyle as SummaryStyleChoice) ?? '') : '';
 }
 
-function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
-	if (!dialog?.open) {
-		return false;
-	}
-
-	try {
-		dialog.close();
-		return true;
-	} catch {
-		return false;
-	}
-}
-
 function HelpHint({ content }: { content: string }) {
 	return (
 		<span className="tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
@@ -154,7 +145,7 @@ function AdvancedParamsModalInner({
 	effectiveReasoningEnabled,
 	onSave,
 }: AdvancedParamsModalInnerProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose });
 	const maxPromptLengthInputRef = useRef<HTMLInputElement | null>(null);
 	const supportedOutputFormats = useMemo(
 		() => getSupportedOutputFormats(currentModel.capabilitiesOverride),
@@ -263,19 +254,8 @@ function AdvancedParamsModalInner({
 	const [errors, setErrors] = useState<Partial<Record<ErrorKey, string>>>({});
 
 	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
 		let raf1 = 0;
 		let raf2 = 0;
-		try {
-			if (!dialog.open) {
-				dialog.showModal();
-			}
-		} catch {
-			// Ignore showModal errors if the dialog is already open or not ready.
-		}
 		raf1 = window.requestAnimationFrame(() => {
 			raf2 = window.requestAnimationFrame(() => {
 				focusTextInputAtEnd(maxPromptLengthInputRef.current);
@@ -287,16 +267,6 @@ function AdvancedParamsModalInner({
 			window.cancelAnimationFrame(raf2);
 		};
 	}, []);
-
-	const handleDialogClose = useCallback(() => {
-		onClose();
-	}, [onClose]);
-
-	const requestClose = useCallback(() => {
-		if (!closeDialogSafely(dialogRef.current)) {
-			onClose();
-		}
-	}, [onClose]);
 
 	const validateNumberField = (field: 'maxPromptLength' | 'maxOutputLength' | 'timeout', value: string) => {
 		const n = parsePositiveIntAllowBlank(value);
@@ -540,24 +510,16 @@ function AdvancedParamsModalInner({
 	};
 
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={e => {
-				e.preventDefault();
-				requestClose();
-			}}
-		>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl">
-				<div className="mb-4 flex items-center justify-between">
-					<h3 className="text-lg font-bold">Advanced Model Parameters</h3>
-					<button type="button" className="btn btn-sm btn-circle bg-base-300" onClick={requestClose} aria-label="Close">
-						<FiX size={12} />
-					</button>
-				</div>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl p-0">
+				<ModalHeader
+					title="Advanced Model Parameters"
+					onClose={() => {
+						requestClose();
+					}}
+				/>
 
-				<form onSubmit={handleSubmit} className="space-y-4">
+				<form onSubmit={handleSubmit} className="space-y-4 p-6">
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4 cursor-pointer">
 							<span className="text-sm">Streaming</span>
@@ -922,14 +884,20 @@ function AdvancedParamsModalInner({
 						</div>
 					)}
 
-					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+					<ModalActions className="-mx-6 mt-6 -mb-6">
+						<button
+							type="button"
+							className="btn bg-base-300 rounded-xl"
+							onClick={() => {
+								requestClose();
+							}}
+						>
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary rounded-xl" disabled={formHasErrors}>
 							Save
 						</button>
-					</div>
+					</ModalActions>
 				</form>
 			</div>
 		</dialog>

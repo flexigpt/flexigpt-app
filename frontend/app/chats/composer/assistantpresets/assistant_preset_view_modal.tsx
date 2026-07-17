@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiServer, FiSliders, FiTool, FiX, FiZap } from 'react-icons/fi';
+import { FiServer, FiSliders, FiTool, FiZap } from 'react-icons/fi';
 
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import type { MCPConversationContext } from '@/spec/mcp';
@@ -11,7 +11,11 @@ import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 import type {
 	AssistantPresetModificationSummary,
@@ -24,19 +28,6 @@ import {
 	normalizeAssistantPresetMCPContext,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
-
-function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
-	if (!dialog?.open) {
-		return false;
-	}
-
-	try {
-		dialog.close();
-		return true;
-	} catch {
-		return false;
-	}
-}
 
 function formatToolLabel(choice: {
 	displayName?: string;
@@ -293,28 +284,7 @@ export function AssistantPresetViewModal({
 	instructionSources,
 	modificationSummary,
 }: AssistantPresetViewModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			dialog.showModal();
-		}
-
-		return () => {
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, [isOpen]);
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose, isOpen });
 
 	const instructionSourcesByKey = useMemo(() => {
 		return new Map(
@@ -402,40 +372,16 @@ export function AssistantPresetViewModal({
 	const showCurrentMCP = shouldShowActiveComparison && modificationSummary.mcp;
 
 	return createPortal(
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={onClose}
-			onCancel={event => {
-				event.preventDefault();
-				if (!closeDialogSafely(dialogRef.current)) {
-					onClose();
-				}
-			}}
-		>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-4xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
-					<div className="mb-4 flex items-center justify-between gap-3">
-						<div>
-							<h3 className="text-lg font-bold">{viewedPreset.displayName}</h3>
-							<div className="mt-1 text-xs opacity-70">
-								{viewedPreset.bundleDisplayName} • {viewedPreset.preset.slug}@{viewedPreset.preset.version}
-							</div>
-						</div>
-
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => {
-								if (!closeDialogSafely(dialogRef.current)) {
-									onClose();
-								}
-							}}
-							aria-label="Close"
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader
+						title={viewedPreset.displayName}
+						description={`${viewedPreset.bundleDisplayName} • ${viewedPreset.preset.slug}@${viewedPreset.preset.version}`}
+						onClose={() => {
+							requestClose();
+						}}
+					/>
 
 					<div className="mb-4 rounded-2xl border p-4">
 						{description ? (
@@ -636,19 +582,17 @@ export function AssistantPresetViewModal({
 						) : null}
 					</div>
 
-					<div className="mt-6 flex justify-end">
+					<ModalActions className="-mx-6 mt-6 -mb-6">
 						<button
 							type="button"
 							className="btn bg-base-300 rounded-xl"
 							onClick={() => {
-								if (!closeDialogSafely(dialogRef.current)) {
-									onClose();
-								}
+								requestClose();
 							}}
 						>
 							Close
 						</button>
-					</div>
+					</ModalActions>
 				</div>
 			</div>
 

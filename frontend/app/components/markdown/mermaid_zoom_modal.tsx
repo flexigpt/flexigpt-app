@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 interface MermaidZoomModalProps {
@@ -12,41 +14,13 @@ interface MermaidZoomModalProps {
 	surfaceStyle?: CSSProperties;
 }
 
-export function MermaidZoomModal({ isOpen, onClose, svgNode, surfaceStyle }: MermaidZoomModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
+function MermaidZoomModalContent({ onClose, svgNode, surfaceStyle }: Omit<MermaidZoomModalProps, 'isOpen'>) {
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose });
 	const modalRef = useRef<HTMLDivElement | null>(null);
-
-	// Open the dialog natively when isOpen becomes true
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			dialog.showModal();
-		}
-
-		return () => {
-			// If the component unmounts while the dialog is still open, close it.
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, [isOpen]);
-
-	// Sync parent state whenever the dialog is closed (Esc, backdrop, or dialog.close()).
-	const handleDialogClose = () => {
-		onClose();
-	};
 
 	// Inject the SVG into the modal container whenever we have one and the modal is open
 	useEffect(() => {
-		if (!isOpen || !modalRef.current) {
+		if (!modalRef.current) {
 			return;
 		}
 
@@ -70,20 +44,21 @@ export function MermaidZoomModal({ isOpen, onClose, svgNode, surfaceStyle }: Mer
 			bg.setAttribute('fill', 'transparent');
 		}
 		container.append(newNode);
-	}, [isOpen, svgNode]);
+	}, [svgNode]);
 
-	if (!isOpen) {
-		return null;
-	}
-
-	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose} aria-label="Enlarged Mermaid diagram">
+	return (
+		<dialog
+			ref={dialogRef}
+			className="modal"
+			onClose={handleClose}
+			onCancel={handleCancel}
+			aria-label="Enlarged Mermaid diagram"
+		>
 			<div
 				className="modal-box app-bg-mermaid flex h-[90vh] max-w-[90vw] cursor-zoom-out items-center justify-center"
 				style={surfaceStyle}
 				onClick={() => {
-					// Close via native dialog API; this will trigger handleDialogClose -> parent onClose()
-					dialogRef.current?.close();
+					requestClose();
 				}}
 			>
 				{/* enlarged diagram; pointer events disabled so clicks bubble to the container */}
@@ -91,7 +66,17 @@ export function MermaidZoomModal({ isOpen, onClose, svgNode, surfaceStyle }: Mer
 			</div>
 
 			<ModalBackdrop enabled={true} />
-		</dialog>,
+		</dialog>
+	);
+}
+
+export function MermaidZoomModal(props: MermaidZoomModalProps) {
+	if (!props.isOpen || typeof document === 'undefined' || !document.body) {
+		return null;
+	}
+
+	return createPortal(
+		<MermaidZoomModalContent onClose={props.onClose} svgNode={props.svgNode} surfaceStyle={props.surfaceStyle} />,
 		document.body
 	);
 }

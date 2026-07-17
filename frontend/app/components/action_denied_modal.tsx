@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
-
 import { createPortal } from 'react-dom';
 
 import { FiAlertTriangle } from 'react-icons/fi';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 interface ActionDeniedAlertModalProps {
@@ -13,67 +14,48 @@ interface ActionDeniedAlertModalProps {
 	title?: string;
 }
 
-export function ActionDeniedAlertModal({
-	isOpen,
+function ActionDeniedAlertModalContent({
 	onClose,
 	message,
 	title = 'Action Not Allowed',
-}: ActionDeniedAlertModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
+}: Omit<ActionDeniedAlertModalProps, 'isOpen'>) {
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose });
 
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
+	return (
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+			<div className="modal-box bg-base-200 flex max-h-[80vh] w-[calc(100%-1rem)] max-w-md flex-col overflow-hidden rounded-2xl p-0">
+				<div className="mb-4 flex items-center px-4 pt-4 sm:px-6 sm:pt-6">
+					<FiAlertTriangle size={24} className="text-warning mr-3" />
+					<h3 className="text-lg font-bold">{title}</h3>
+				</div>
+				<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">
+					<p className="py-2">{message}</p>
+				</div>
+				<ModalActions>
+					<button
+						type="button"
+						className="btn btn-primary rounded-xl"
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						OK
+					</button>
+				</ModalActions>
+			</div>
 
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
+			<ModalBackdrop enabled={true} />
+		</dialog>
+	);
+}
 
-		if (!dialog.open) {
-			dialog.showModal();
-		}
-
-		return () => {
-			// If the component unmounts while the dialog is still open, close it.
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, [isOpen]);
-
-	// Keep parent isOpen in sync with native dialog closing
-	const handleDialogClose = () => {
-		onClose();
-	};
-
-	const handleOkClick = () => {
-		// Close via native dialog API; this will trigger handleDialogClose -> parent onClose()
-		dialogRef.current?.close();
-	};
-
-	if (!isOpen) {
+export function ActionDeniedAlertModal(props: ActionDeniedAlertModalProps) {
+	if (!props.isOpen || typeof document === 'undefined' || !document.body) {
 		return null;
 	}
 
 	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
-			<div className="modal-box max-h-[80vh] max-w-md overflow-auto rounded-2xl">
-				<div className="mb-4 flex items-center">
-					<FiAlertTriangle size={24} className="text-warning mr-3" />
-					<h3 className="text-lg font-bold">{title}</h3>
-				</div>
-				<p className="py-2">{message}</p>
-				<div className="modal-action">
-					<button type="button" className="btn btn-primary rounded-xl" onClick={handleOkClick}>
-						OK
-					</button>
-				</div>
-			</div>
-
-			<ModalBackdrop enabled={true} />
-		</dialog>,
+		<ActionDeniedAlertModalContent onClose={props.onClose} message={props.message} title={props.title} />,
 		document.body
 	);
 }

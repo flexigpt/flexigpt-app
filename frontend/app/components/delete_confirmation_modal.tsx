@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react';
-
 import { createPortal } from 'react-dom';
 
-import { FiAlertTriangle, FiX } from 'react-icons/fi';
+import { FiAlertTriangle } from 'react-icons/fi';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 interface DeleteConfirmationModalProps {
 	isOpen: boolean;
@@ -15,91 +17,75 @@ interface DeleteConfirmationModalProps {
 	confirmButtonText: string;
 }
 
-export function DeleteConfirmationModal({
-	isOpen,
+function DeleteConfirmationModalContent({
 	onClose,
 	onConfirm,
 	title,
 	message,
 	confirmButtonText,
-}: DeleteConfirmationModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
+}: Omit<DeleteConfirmationModalProps, 'isOpen'>) {
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose });
 
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
+	return (
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+			<div className="modal-box bg-base-200 flex max-h-[80vh] w-[calc(100%-1rem)] max-w-md flex-col overflow-hidden rounded-2xl p-0">
+				<ModalHeader
+					title={
+						<span className="flex items-center gap-2">
+							<FiAlertTriangle size={16} className="text-warning" />
+							<span>{title}</span>
+						</span>
+					}
+					onClose={() => {
+						requestClose();
+					}}
+				/>
 
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
+				<div className="min-h-0 flex-1 overflow-y-auto p-4 sm:px-6">
+					<p className="py-2">{message}</p>
+				</div>
 
-		if (!dialog.open) {
-			dialog.showModal();
-		}
+				<ModalActions>
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						className="btn btn-error rounded-xl"
+						onClick={() => {
+							onConfirm();
+							requestClose();
+						}}
+					>
+						{confirmButtonText}
+					</button>
+				</ModalActions>
+			</div>
 
-		return () => {
-			// If the component unmounts while the dialog is still open, close it.
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, [isOpen]);
+			<ModalBackdrop enabled={true} />
+		</dialog>
+	);
+}
 
-	// Sync parent state whenever the dialog is closed (Esc, backdrop, or dialog.close()).
-	const handleDialogClose = () => {
-		onClose();
-	};
-
-	const handleCancelClick = () => {
-		// Close via native dialog API; this will trigger handleDialogClose -> parent onClose()
-		dialogRef.current?.close();
-	};
-
-	const handleConfirmClick = () => {
-		onConfirm();
-		// Close via native dialog API; this will trigger handleDialogClose -> parent onClose()
-		dialogRef.current?.close();
-	};
-
-	if (!isOpen) {
+export function DeleteConfirmationModal(props: DeleteConfirmationModalProps) {
+	if (!props.isOpen || typeof document === 'undefined' || !document.body) {
 		return null;
 	}
 
 	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-md overflow-auto rounded-2xl">
-				{/* header (matches UrlAttachment / MessageDetails pattern) */}
-				<div className="mb-4 flex items-center justify-between">
-					<h3 className="flex items-center gap-2 text-lg font-bold">
-						<FiAlertTriangle size={16} className="text-warning" />
-						<span>{title}</span>
-					</h3>
-					<button
-						type="button"
-						className="btn btn-sm btn-circle bg-base-300"
-						onClick={handleCancelClick}
-						aria-label="Close"
-					>
-						<FiX size={12} />
-					</button>
-				</div>
-
-				<p className="py-2">{message}</p>
-
-				<div className="modal-action">
-					<button type="button" className="btn bg-base-300 rounded-xl" onClick={handleCancelClick}>
-						Cancel
-					</button>
-					<button type="button" className="btn btn-error rounded-xl" onClick={handleConfirmClick}>
-						{confirmButtonText}
-					</button>
-				</div>
-			</div>
-
-			<ModalBackdrop enabled={true} />
-		</dialog>,
+		<DeleteConfirmationModalContent
+			onClose={props.onClose}
+			onConfirm={props.onConfirm}
+			title={props.title}
+			message={props.message}
+			confirmButtonText={props.confirmButtonText}
+		/>,
 		document.body
 	);
 }

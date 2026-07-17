@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiX } from 'react-icons/fi';
+import { FiAlertCircle } from 'react-icons/fi';
 
 import type { MCPServerConfig, MCPServerSetupInput, MCPServerSetupInputValue } from '@/spec/mcp';
 import { MCPServerSetupInputKind } from '@/spec/mcp';
@@ -12,7 +12,9 @@ import { validateHTTPHeaderName, validateHTTPURLSecurity } from '@/lib/http_inpu
 
 import { useDialogController } from '@/hooks/use_dialog_controller';
 
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 import { getMCPSetupInputKindLabel, isMCPSetupInputConfigured } from '@/mcpservers/lib/mcp_server_utils';
 
@@ -237,25 +239,14 @@ function MCPServerSetupModalContent({
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl overflow-hidden rounded-2xl p-0">
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
-					<div className="mb-4 flex items-center justify-between">
-						<div>
-							<h3 className="text-lg font-bold">Configure {server.displayName}</h3>
-							<p className="text-base-content/70 mt-1 text-sm">
-								Provide the values this MCP server needs. Stored secrets are never displayed.
-							</p>
-						</div>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => {
-								requestClose();
-							}}
-							aria-label="Close"
-							disabled={isSubmitting}
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader
+						title={`Configure ${server.displayName}`}
+						description="Provide the values this MCP server needs. Stored secrets are never displayed."
+						onClose={() => {
+							requestClose();
+						}}
+						closeDisabled={isSubmitting}
+					/>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-4" aria-busy={isSubmitting}>
 						{server.setup?.note && <div className="bg-base-100 rounded-2xl p-3 text-sm">{server.setup.note}</div>}
@@ -370,7 +361,7 @@ function MCPServerSetupModalContent({
 							</label>
 						)}
 
-						<div className="modal-action">
+						<ModalActions className="-mx-4 mt-6 -mb-4 sm:-mx-6 sm:-mb-6">
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
@@ -384,7 +375,7 @@ function MCPServerSetupModalContent({
 							<button type="submit" className="btn btn-primary rounded-xl" disabled={isSubmitting}>
 								{isSubmitting ? 'Saving...' : 'Save'}
 							</button>
-						</div>
+						</ModalActions>
 					</form>
 				</div>
 			</div>

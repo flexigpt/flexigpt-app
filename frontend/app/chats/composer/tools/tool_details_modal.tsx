@@ -1,5 +1,3 @@
-import { useEffect, useRef } from 'react';
-
 import { createPortal } from 'react-dom';
 
 import { FiTool } from 'react-icons/fi';
@@ -15,6 +13,9 @@ import {
 	normalizeStructuredJSONStringDeep,
 } from '@/lib/jsonschema_utils';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalHeader } from '@/components/modal/modal_header';
 
@@ -215,37 +216,10 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 }
 
 export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isEffectCleanupCloseRef = useRef(false);
-
-	useEffect(() => {
-		if (!state) {
-			return;
-		}
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-		if (!dialog.open) {
-			dialog.showModal();
-		}
-
-		return () => {
-			if (dialog.open) {
-				isEffectCleanupCloseRef.current = true;
-				dialog.close();
-			}
-		};
-	}, [state]);
-
-	const handleDialogClose = () => {
-		if (isEffectCleanupCloseRef.current) {
-			isEffectCleanupCloseRef.current = false;
-			return;
-		}
-
-		onClose();
-	};
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({
+		onClose,
+		isOpen: Boolean(state),
+	});
 
 	if (!state) {
 		return null;
@@ -279,7 +253,7 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 	}
 
 	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 flex max-h-[80vh] max-w-[80vw] flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={
@@ -288,7 +262,9 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 							<span>{title}</span>
 						</span>
 					}
-					onClose={() => dialogRef.current?.close()}
+					onClose={() => {
+						requestClose();
+					}}
 				/>
 				<div className="min-h-0 flex-1 overflow-y-auto p-6">
 					{/* Primary, human-friendly view (semantics first) */}
@@ -321,6 +297,17 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 						/>
 					</div>
 				</div>
+				<ModalActions>
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						Close
+					</button>
+				</ModalActions>
 			</div>
 
 			<ModalBackdrop enabled={true} />

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiRefreshCcw, FiTool, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiRefreshCcw, FiTool } from 'react-icons/fi';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 import type { JSONObject, JSONSchema } from '@/lib/jsonschema_utils';
@@ -14,7 +14,11 @@ import {
 	getRequiredFromJSONSchema,
 } from '@/lib/jsonschema_utils';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
@@ -60,8 +64,7 @@ function getInitialRawJson(existingInstance?: string): string {
 }
 
 function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance, onSave }: ToolUserArgsModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isUnmountingRef = useRef(false);
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose });
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
 	const [formData, setFormData] = useState<FormState>(() => ({
@@ -85,19 +88,8 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 	const exampleMarkdown = useMemo(() => asJsonMarkdownBlock(examplePretty), [examplePretty]);
 
 	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
 		let raf1 = 0;
 		let raf2 = 0;
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// Ignore if the dialog cannot be shown safely.
-			}
-		}
 		raf1 = window.requestAnimationFrame(() => {
 			raf2 = window.requestAnimationFrame(() => {
 				focusTextInputAtEnd(textareaRef.current);
@@ -106,31 +98,8 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 		return () => {
 			window.cancelAnimationFrame(raf1);
 			window.cancelAnimationFrame(raf2);
-			isUnmountingRef.current = true;
-
-			if (dialog.open) {
-				dialog.close();
-			}
 		};
 	}, []);
-
-	const requestClose = () => {
-		const dialog = dialogRef.current;
-
-		if (dialog?.open) {
-			dialog.close();
-			return;
-		}
-
-		onClose();
-	};
-
-	const handleDialogClose = () => {
-		if (isUnmountingRef.current) {
-			return;
-		}
-		onClose();
-	};
 
 	const handleFormat = () => {
 		const raw = formData.rawJson.trim();
@@ -191,26 +160,19 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 	};
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-[80vw] min-w-0 overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
-					{/* header */}
-					<div className="mb-4 flex items-center justify-between gap-2">
-						<h3 className="flex items-center gap-2 text-lg font-bold">
-							<FiTool size={16} />
-							<span>Tool options</span>
-							<span className="badge badge-neutral">{toolLabel}</span>
-						</h3>
-
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
-							aria-label="Close"
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader
+						title={
+							<span className="flex items-center gap-2">
+								<FiTool size={16} />
+								<span>Tool options</span>
+								<span className="badge badge-neutral">{toolLabel}</span>
+							</span>
+						}
+						onClose={requestClose}
+					/>
 
 					{/* stacked content */}
 					<form
@@ -337,14 +299,20 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 						</div>
 
 						{/* footer */}
-						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+						<ModalActions className="-mx-6 mt-6 -mb-6">
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={() => {
+									requestClose();
+								}}
+							>
 								Cancel
 							</button>
 							<button type="submit" className="btn btn-primary rounded-xl">
 								Save
 							</button>
-						</div>
+						</ModalActions>
 					</form>
 				</div>
 			</div>

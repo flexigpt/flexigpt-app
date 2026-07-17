@@ -5,6 +5,7 @@ interface UseDialogControllerOptions {
 	onClose: () => void;
 	blockCancel?: boolean;
 	isBusy?: boolean;
+	isOpen?: boolean;
 }
 
 /**
@@ -12,9 +13,15 @@ interface UseDialogControllerOptions {
  *
  * It prevents close callbacks caused by unmount cleanup, blocks accidental
  * cancellation while saving, and keeps programmatic and native close paths
- * consistent.
+ * consistent. Callers may conditionally mount dialog content or provide
+ * `isOpen` when a component remains mounted while the dialog is hidden.
  */
-export function useDialogController({ onClose, blockCancel = false, isBusy = false }: UseDialogControllerOptions) {
+export function useDialogController({
+	onClose,
+	blockCancel = false,
+	isBusy = false,
+	isOpen = true,
+}: UseDialogControllerOptions) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const unmountingRef = useRef(false);
 
@@ -25,6 +32,11 @@ export function useDialogController({ onClose, blockCancel = false, isBusy = fal
 	 * Let conditional rendering remove the dialog on a real unmount instead.
 	 */
 	useLayoutEffect(() => {
+		if (!isOpen) {
+			unmountingRef.current = true;
+			return;
+		}
+
 		unmountingRef.current = false;
 
 		const dialog = dialogRef.current;
@@ -50,7 +62,7 @@ export function useDialogController({ onClose, blockCancel = false, isBusy = fal
 		return () => {
 			unmountingRef.current = true;
 		};
-	}, []);
+	}, [isOpen]);
 
 	const requestClose = useCallback(
 		(force = false) => {

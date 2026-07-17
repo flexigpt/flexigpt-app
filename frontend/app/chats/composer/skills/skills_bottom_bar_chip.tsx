@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction, SubmitEventHandler, SyntheticEvent } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -9,6 +9,8 @@ import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { SkillBundle, SkillListItem, SkillRef } from '@/spec/skill';
+
+import { useDialogController } from '@/hooks/use_dialog_controller';
 
 import { skillStoreAPI } from '@/apis/baseapi';
 import { getAllSkillBundles } from '@/apis/list_helper';
@@ -22,6 +24,8 @@ import {
 } from '@/components/action_trigger_chip';
 import { Dropdown } from '@/components/dropdown';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
+import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalHeader } from '@/components/modal/modal_header';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,
@@ -194,8 +198,12 @@ function AddInstructionSkillModal({
 	const [body, setBody] = useState(initial.body);
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isUnmountingRef = useRef(false);
+	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
+		onClose,
+		blockCancel: true,
+		isBusy: isSubmitting,
+		isOpen,
+	});
 
 	useEffect(() => {
 		if (!isOpen) {
@@ -225,45 +233,6 @@ function AddInstructionSkillModal({
 			cancelled = true;
 		};
 	}, [initialDraft, isOpen]);
-
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// Keep safe.
-			}
-		}
-		return () => {
-			isUnmountingRef.current = true;
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, [isOpen]);
-
-	const requestClose = useCallback(() => {
-		const dialog = dialogRef.current;
-		if (dialog?.open) {
-			dialog.close();
-			return;
-		}
-		onClose();
-	}, [onClose]);
-
-	const handleDialogClose = useCallback(() => {
-		if (isUnmountingRef.current) {
-			return;
-		}
-		onClose();
-	}, [onClose]);
 
 	const existingSlugsForBundle = useMemo(
 		() => new Set(allSkills.filter(item => item.bundleID === bundleID).map(item => item.skillSlug)),
@@ -319,13 +288,19 @@ function AddInstructionSkillModal({
 					isBuiltIn: false,
 					skillDefinition: resp,
 				});
-				requestClose();
+				if (!unmountingRef.current) {
+					requestClose(true);
+				}
 			})
 			.catch((error: unknown) => {
-				setSubmitError(error instanceof Error ? error.message : 'Failed to create instruction skill.');
+				if (!unmountingRef.current) {
+					setSubmitError(error instanceof Error ? error.message : 'Failed to create instruction skill.');
+				}
 			})
 			.finally(() => {
-				setIsSubmitting(false);
+				if (!unmountingRef.current) {
+					setIsSubmitting(false);
+				}
 			});
 	};
 
@@ -338,23 +313,17 @@ function AddInstructionSkillModal({
 	);
 
 	return createPortal(
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={event => {
-				event.preventDefault();
-			}}
-		>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-xl overflow-auto rounded-2xl">
-				<div className="mb-4 flex items-center justify-between">
-					<h3 className="text-lg font-bold">{mode === 'fork' ? 'Fork Instruction Skill' : 'Add Instruction Skill'}</h3>
-					<button type="button" className="btn btn-sm btn-circle bg-base-300" onClick={requestClose} aria-label="Close">
-						<FiX size={12} />
-					</button>
-				</div>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+			<div className="modal-box bg-base-200 max-h-[80vh] max-w-xl overflow-auto rounded-2xl p-0">
+				<ModalHeader
+					title={mode === 'fork' ? 'Fork Instruction Skill' : 'Add Instruction Skill'}
+					onClose={() => {
+						requestClose();
+					}}
+					closeDisabled={isSubmitting}
+				/>
 
-				<form className="space-y-4" onSubmit={handleSubmit}>
+				<form className="space-y-4 p-6" onSubmit={handleSubmit} aria-busy={isSubmitting}>
 					{submitError ? (
 						<div className="alert alert-error rounded-2xl text-sm">
 							<FiAlertCircle size={14} />
@@ -442,14 +411,20 @@ function AddInstructionSkillModal({
 						{bodyError ? <div className="text-error mt-1 text-xs">{bodyError}</div> : null}
 					</div>
 
-					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+					<ModalActions className="-mx-6 mt-6 -mb-6">
+						<button
+							type="button"
+							className="btn bg-base-300 rounded-xl"
+							onClick={() => {
+								requestClose();
+							}}
+						>
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary rounded-xl" disabled={!canSubmit}>
 							{isSubmitting ? 'Creating…' : mode === 'fork' ? 'Fork and add to instructions' : 'Create and add'}
 						</button>
-					</div>
+					</ModalActions>
 				</form>
 			</div>
 		</dialog>,

@@ -2,14 +2,16 @@ import { useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiExternalLink, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiExternalLink } from 'react-icons/fi';
 
 import type { MCPAuthHealth, MCPServerConfig } from '@/spec/mcp';
 import { MCPAuthHealthState } from '@/spec/mcp';
 
 import { useDialogController } from '@/hooks/use_dialog_controller';
 
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 import {
 	getEffectiveMCPAuthHealthState,
@@ -78,27 +80,14 @@ function MCPOAuthAuthorizationModalContent({
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl p-0">
 				<div className="app-scrollbar-thin p-4 sm:p-6">
-					<div className="mb-4 flex items-start justify-between gap-4">
-						<div>
-							<h3 className="text-lg font-bold">OAuth authorization required</h3>
-							<p className="text-base-content/70 mt-1 text-sm">
-								{server?.displayName ?? server?.id ?? 'This MCP server'} needs browser authorization before FlexiGPT can
-								connect.
-							</p>
-						</div>
-
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => {
-								requestClose();
-							}}
-							aria-label="Close"
-							disabled={isCancelling}
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader
+						title="OAuth authorization required"
+						description={`${server?.displayName ?? server?.id ?? 'This MCP server'} needs browser authorization before FlexiGPT can connect.`}
+						onClose={() => {
+							requestClose();
+						}}
+						closeDisabled={isCancelling}
+					/>
 
 					<div className="mb-4 flex items-center gap-2">
 						<span className={`badge rounded-xl ${getMCPServerAuthHealthBadgeClass(server ?? undefined, authHealth)}`}>
@@ -162,7 +151,7 @@ function MCPOAuthAuthorizationModalContent({
 						</div>
 					)}
 
-					<div className="modal-action">
+					<ModalActions className="-mx-4 mt-6 -mb-4 sm:-mx-6 sm:-mb-6">
 						{isPending && onCancel && (
 							<button
 								type="button"
@@ -200,7 +189,7 @@ function MCPOAuthAuthorizationModalContent({
 						>
 							Close
 						</button>
-					</div>
+					</ModalActions>
 				</div>
 			</div>
 			<ModalBackdrop enabled={!isCancelling} />

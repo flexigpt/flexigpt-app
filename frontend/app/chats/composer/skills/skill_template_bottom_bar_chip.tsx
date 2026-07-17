@@ -1,15 +1,17 @@
 import type { RefObject, SubmitEventHandler } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiFile, FiFilePlus, FiPaperclip, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiFile, FiFilePlus, FiPaperclip } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { SkillArgument, SkillListItem } from '@/spec/skill';
 import { SkillType } from '@/spec/skill';
+
+import { useDialogController } from '@/hooks/use_dialog_controller';
 
 import { skillStoreAPI } from '@/apis/baseapi';
 
@@ -21,6 +23,8 @@ import {
 } from '@/components/action_trigger_chip';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
+import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalHeader } from '@/components/modal/modal_header';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,
@@ -492,54 +496,14 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 	const [submitError, setSubmitError] = useState('');
 	const [submitting, setSubmitting] = useState(false);
 	const [insertedWithAttachmentWarning, setInsertedWithAttachmentWarning] = useState(false);
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
+		onClose,
+		blockCancel: true,
+		isBusy: submitting,
+	});
 	const [selectedSkillAttachmentPaths, setSelectedSkillAttachmentPaths] = useState<Set<string>>(
 		() => new Set(skillAttachmentPaths)
 	);
-	const isUnmountingRef = useRef(false);
-
-	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// Keep rendering safely if showModal fails.
-			}
-		}
-		return () => {
-			isUnmountingRef.current = true;
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, []);
-
-	const requestClose = useCallback(
-		(force = false) => {
-			if (submitting && !force) {
-				return;
-			}
-
-			const dialog = dialogRef.current;
-			if (dialog?.open) {
-				dialog.close();
-				return;
-			}
-			onClose();
-		},
-		[onClose, submitting]
-	);
-
-	const handleDialogClose = useCallback(() => {
-		if (isUnmountingRef.current) {
-			return;
-		}
-		onClose();
-	}, [onClose]);
 
 	const selectedAttachmentPaths = skillAttachmentPaths.filter(path => selectedSkillAttachmentPaths.has(path));
 	const canInsert = !submitting;
@@ -566,7 +530,7 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 					attachedSkillPaths: selectedAttachmentPaths.length > 0 ? selectedAttachmentPaths : undefined,
 				});
 
-				if (isUnmountingRef.current) {
+				if (unmountingRef.current) {
 					return;
 				}
 
@@ -579,12 +543,12 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 				requestClose(true);
 			})
 			.catch((error: unknown) => {
-				if (!isUnmountingRef.current) {
+				if (!unmountingRef.current) {
 					setSubmitError(error instanceof Error ? error.message : 'Failed to render template.');
 				}
 			})
 			.finally(() => {
-				if (!isUnmountingRef.current) {
+				if (!unmountingRef.current) {
 					setSubmitting(false);
 				}
 			});
@@ -597,35 +561,17 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 	const resourceCount = item.skillDefinition.resources?.totalCount ?? 0;
 
 	return createPortal(
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={event => {
-				event.preventDefault();
-			}}
-		>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-2xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
-					<div className="mb-4 flex items-center justify-between gap-3">
-						<div>
-							<h3 className="text-lg font-bold">Use Template</h3>
-							<p className="text-base-content/70 mt-1 text-xs">
-								{getSkillTemplateLabel(item)} renders into plain composer text.
-							</p>
-						</div>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => {
-								requestClose();
-							}}
-							disabled={submitting}
-							aria-label="Close"
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader
+						title="Use Template"
+						description={`${getSkillTemplateLabel(item)} renders into plain composer text.`}
+						onClose={() => {
+							requestClose();
+						}}
+						closeDisabled={submitting}
+					/>
 
 					<form className="space-y-4" onSubmit={handleSubmit}>
 						{submitError ? (
@@ -720,7 +666,7 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 							</div>
 						) : null}
 
-						<div className="modal-action">
+						<ModalActions className="-mx-6 mt-6 -mb-6">
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
@@ -749,7 +695,7 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 											? `Insert with ${selectedAttachmentPaths.length} resource attachment${selectedAttachmentPaths.length === 1 ? '' : 's'}`
 											: 'Insert'}
 							</button>
-						</div>
+						</ModalActions>
 					</form>
 				</div>
 			</div>

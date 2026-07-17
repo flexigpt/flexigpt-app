@@ -2,12 +2,16 @@ import { useEffect, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiX } from 'react-icons/fi';
+import { FiAlertCircle } from 'react-icons/fi';
 
 import type { MCPApprovalSummary } from '@/spec/mcp';
 import { MCPApprovalResolution } from '@/spec/mcp';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 import type { MCPApprovalRequest } from '@/chats/composer/mcp/use_mcp_approval';
 import { getMCPToolRiskLabel } from '@/mcpservers/lib/mcp_server_utils';
@@ -32,33 +36,7 @@ function formatArguments(summary?: MCPApprovalSummary): string {
 }
 
 export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const resolvedApprovalIDRef = useRef<string | null>(null);
-
-	useEffect(() => {
-		if (!approvalRequest) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// Ignore showModal errors and keep rendering safely.
-			}
-		}
-
-		return () => {
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, [approvalRequest]);
 
 	useEffect(() => {
 		if (!approvalRequest) {
@@ -68,17 +46,9 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 		resolvedApprovalIDRef.current = null;
 	}, [approvalRequest]);
 
-	if (!approvalRequest) {
-		return null;
-	}
-	if (typeof document === 'undefined' || !document.body) {
-		return null;
-	}
-
-	const { approvalID, summary, reason } = approvalRequest;
-
 	const resolveOnce = (resolution: MCPApprovalResolution) => {
-		if (resolvedApprovalIDRef.current === approvalID) {
+		const approvalID = approvalRequest?.approvalID;
+		if (!approvalID || resolvedApprovalIDRef.current === approvalID) {
 			return;
 		}
 
@@ -90,6 +60,20 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 		resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
 	};
 
+	const { dialogRef, handleClose } = useDialogController({
+		onClose: closeAsDenyOnce,
+		isOpen: Boolean(approvalRequest),
+	});
+
+	if (!approvalRequest) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
+
+	const { summary, reason } = approvalRequest;
+
 	return createPortal(
 		<dialog
 			ref={dialogRef}
@@ -98,23 +82,11 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 				e.preventDefault();
 				closeAsDenyOnce();
 			}}
-			onClose={() => {
-				closeAsDenyOnce();
-			}}
+			onClose={handleClose}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
-					<div className="mb-4 flex items-center justify-between gap-3">
-						<h3 className="text-lg font-bold">MCP approval required</h3>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={closeAsDenyOnce}
-							aria-label="Close"
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader title="MCP approval required" onClose={closeAsDenyOnce} />
 
 					<div className="space-y-4">
 						<div className="grid grid-cols-12 gap-2 text-sm">
@@ -156,49 +128,50 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 						</div>
 					</div>
 
-					<div className="modal-action flex flex-wrap items-center justify-between gap-2">
-						<div className="flex flex-wrap gap-2">
-							<button
-								type="button"
-								className="btn btn-sm bg-base-300 rounded-xl"
-								onClick={() => {
-									resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
-								}}
-							>
-								Deny once
-							</button>
-							<button
-								type="button"
-								className="btn btn-sm btn-error rounded-xl"
-								onClick={() => {
-									resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyAlways);
-								}}
-							>
-								Deny always
-							</button>
-						</div>
-
-						<div className="flex flex-wrap gap-2">
-							<button
-								type="button"
-								className="btn btn-sm bg-base-300 rounded-xl"
-								onClick={() => {
-									resolveOnce(MCPApprovalResolution.MCPApprovalResolutionAllowOnce);
-								}}
-							>
-								Allow once
-							</button>
-							<button
-								type="button"
-								className="btn btn-sm btn-primary rounded-xl"
-								onClick={() => {
-									resolveOnce(MCPApprovalResolution.MCPApprovalResolutionAllowAlways);
-								}}
-							>
-								Allow always
-							</button>
-						</div>
-					</div>
+					<ModalActions
+						className="-mx-6 mt-6 -mb-6"
+						leading={
+							<div className="flex flex-wrap gap-2">
+								<button
+									type="button"
+									className="btn btn-sm bg-base-300 rounded-xl"
+									onClick={() => {
+										resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+									}}
+								>
+									Deny once
+								</button>
+								<button
+									type="button"
+									className="btn btn-sm btn-error rounded-xl"
+									onClick={() => {
+										resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyAlways);
+									}}
+								>
+									Deny always
+								</button>
+							</div>
+						}
+					>
+						<button
+							type="button"
+							className="btn btn-sm bg-base-300 rounded-xl"
+							onClick={() => {
+								resolveOnce(MCPApprovalResolution.MCPApprovalResolutionAllowOnce);
+							}}
+						>
+							Allow once
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-primary rounded-xl"
+							onClick={() => {
+								resolveOnce(MCPApprovalResolution.MCPApprovalResolutionAllowAlways);
+							}}
+						>
+							Allow always
+						</button>
+					</ModalActions>
 				</div>
 			</div>
 

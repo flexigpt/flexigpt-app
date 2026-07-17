@@ -1,11 +1,12 @@
-import { useEffect, useRef } from 'react';
-
 import { createPortal } from 'react-dom';
 
 import { FiCode } from 'react-icons/fi';
 
 import type { ReasoningContent } from '@/spec/inference';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalHeader } from '@/components/modal/modal_header';
 
@@ -37,8 +38,7 @@ function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'sum
 	return parts.join('\n\n').trim();
 }
 
-export function MessageDetailsModal({
-	isOpen,
+function MessageDetailsModalContent({
 	onClose,
 	messageID,
 	title,
@@ -48,8 +48,7 @@ export function MessageDetailsModal({
 	streamedThinking = '',
 	showReasoningAtTop = false,
 }: MessageDetailsModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isEffectCleanupCloseRef = useRef(false);
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({ onClose });
 
 	const summaryText = joinReasoningParts(reasoningContents, 'summary');
 	const finalThinkingText = joinReasoningParts(reasoningContents, 'thinking');
@@ -60,46 +59,8 @@ export function MessageDetailsModal({
 	const hasReasoningSection = showReasoningAtTop && (hasSummary || hasThinking);
 	const hasDebugContent = content.trim().length > 0;
 
-	// Open the dialog natively when isOpen becomes true
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			dialog.showModal();
-		}
-
-		return () => {
-			// If the component unmounts while the dialog is still open, close it.
-			if (dialog.open) {
-				isEffectCleanupCloseRef.current = true;
-				dialog.close();
-			}
-		};
-	}, [isOpen]);
-
-	// Sync parent state whenever the dialog is closed (Esc, backdrop, or dialog.close()).
-	const handleDialogClose = () => {
-		if (isEffectCleanupCloseRef.current) {
-			isEffectCleanupCloseRef.current = false;
-			return;
-		}
-
-		onClose();
-	};
-
-	if (!isOpen) {
-		return null;
-	}
-
-	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
+	return (
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 flex max-h-[80vh] max-w-[80vw] flex-col overflow-hidden rounded-2xl p-0">
 				<ModalHeader
 					title={
@@ -108,7 +69,9 @@ export function MessageDetailsModal({
 							<span>{title}</span>
 						</span>
 					}
-					onClose={() => dialogRef.current?.close()}
+					onClose={() => {
+						requestClose();
+					}}
 				/>
 				<div className="min-h-0 flex-1 overflow-y-auto p-6">
 					<div className="mt-2">
@@ -162,10 +125,28 @@ export function MessageDetailsModal({
 						) : null}
 					</div>
 				</div>
+				<ModalActions>
+					<button
+						type="button"
+						className="btn bg-base-300 rounded-xl"
+						onClick={() => {
+							requestClose();
+						}}
+					>
+						Close
+					</button>
+				</ModalActions>
 			</div>
 
 			<ModalBackdrop enabled={true} />
-		</dialog>,
-		document.body
+		</dialog>
 	);
+}
+
+export function MessageDetailsModal(props: MessageDetailsModalProps) {
+	if (!props.isOpen || typeof document === 'undefined' || !document.body) {
+		return null;
+	}
+
+	return createPortal(<MessageDetailsModalContent {...props} />, document.body);
 }

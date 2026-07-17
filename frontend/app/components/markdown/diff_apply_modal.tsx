@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -6,6 +6,8 @@ import { FiChevronRight, FiGitPullRequest, FiX } from 'react-icons/fi';
 
 import type { ApplyUnifiedDiffDiagnostic, ApplyUnifiedDiffFileTarget, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 import { ApplyUnifiedDiffDiagnosticLevel, ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
+
+import { useDialogController } from '@/hooks/use_dialog_controller';
 
 import type { DiagnosticSeverityCounts, HeaderButtonTone } from '@/components/markdown/diff_diagnostic';
 import {
@@ -36,6 +38,7 @@ import {
 	toAbsolutePath,
 	uniqueStrings,
 } from '@/components/markdown/unified_diff_block';
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 interface ModalRunningAction {
@@ -587,7 +590,10 @@ export function DiffApplyModal({
 	onDryRun,
 	onApply,
 }: DiffApplyModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({
+		onClose,
+		isOpen,
+	});
 
 	const baseTargets = useMemo(() => {
 		if (!isOpen) {
@@ -629,28 +635,7 @@ export function DiffApplyModal({
 		...collectPatchLevelDiagnostics(output),
 	]);
 
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			dialog.showModal();
-		}
-
-		return () => {
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, [isOpen]);
-
-	if (!isOpen || typeof document === 'undefined') {
+	if (!isOpen || typeof document === 'undefined' || !document.body) {
 		return null;
 	}
 
@@ -773,7 +758,13 @@ export function DiffApplyModal({
 	const globalApplying = runningAction?.key === 'global' && runningAction.kind === 'apply';
 
 	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={onClose} data-disable-chat-shortcuts="true">
+		<dialog
+			ref={dialogRef}
+			className="modal"
+			onClose={handleClose}
+			onCancel={handleCancel}
+			data-disable-chat-shortcuts="true"
+		>
 			<div className="modal-box bg-base-100 flex max-h-[calc(100dvh-2rem)] w-11/12 max-w-5xl flex-col overflow-hidden rounded-2xl p-0 shadow-2xl">
 				<div className="border-base-300 bg-base-100 border-b px-4 py-3 sm:px-5">
 					<div className="flex items-start justify-between gap-4">
@@ -814,7 +805,9 @@ export function DiffApplyModal({
 						<button
 							type="button"
 							className="btn btn-ghost btn-sm btn-circle"
-							onClick={() => dialogRef.current?.close()}
+							onClick={() => {
+								requestClose();
+							}}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -1051,8 +1044,14 @@ export function DiffApplyModal({
 					</div>
 				</div>
 
-				<div className="border-base-300 bg-base-100 flex shrink-0 flex-wrap items-center justify-end gap-2 border-t px-4 py-3 sm:px-5">
-					<button type="button" className="btn btn-sm" onClick={() => dialogRef.current?.close()}>
+				<ModalActions className="bg-base-100">
+					<button
+						type="button"
+						className="btn btn-sm"
+						onClick={() => {
+							requestClose();
+						}}
+					>
 						Close
 					</button>
 
@@ -1080,7 +1079,7 @@ export function DiffApplyModal({
 						{globalApplying ? <span className="loading loading-spinner loading-xs" /> : null}
 						Apply all
 					</button>
-				</div>
+				</ModalActions>
 			</div>
 
 			<ModalBackdrop enabled={true} />

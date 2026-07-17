@@ -3,11 +3,13 @@ import { useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiX } from 'react-icons/fi';
+import { FiAlertCircle } from 'react-icons/fi';
 
 import { useDialogController } from '@/hooks/use_dialog_controller';
 
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 interface MCPSettingsModalProps {
 	isOpen: boolean;
@@ -120,20 +122,13 @@ function MCPSettingsModalContent({
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-w-2xl rounded-2xl p-0">
 				<div className="p-6">
-					<div className="mb-4 flex items-center justify-between">
-						<h3 className="text-lg font-bold">MCP OAuth Settings</h3>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => {
-								requestClose();
-							}}
-							aria-label="Close"
-							disabled={isSubmitting}
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader
+						title="MCP OAuth Settings"
+						onClose={() => {
+							requestClose();
+						}}
+						closeDisabled={isSubmitting}
+					/>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-8" aria-busy={isSubmitting}>
 						{submitError && (
@@ -188,7 +183,7 @@ function MCPSettingsModalContent({
 							</p>
 						</div>
 
-						<div className="modal-action">
+						<ModalActions className="-mx-6 mt-6 -mb-6">
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
@@ -202,7 +197,7 @@ function MCPSettingsModalContent({
 							<button type="submit" className="btn btn-primary rounded-xl" disabled={isSubmitting}>
 								{isSubmitting ? 'Saving...' : 'Save'}
 							</button>
-						</div>
+						</ModalActions>
 					</form>
 				</div>
 			</div>
