@@ -26,16 +26,18 @@ type App struct {
 	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
+	workspaceAPI            *WorkspaceWrapper
 
 	dataBasePath string
 
-	settingsDirPath         string
-	conversationsDirPath    string
-	modelPresetsDirPath     string
-	toolsDirPath            string
-	skillsDirPath           string
-	mcpsDirPath             string
-	assistantPresetsDirPath string
+	settingsDirPath           string
+	conversationsDirPath      string
+	modelPresetsDirPath       string
+	toolsDirPath              string
+	skillsDirPath             string
+	mcpsDirPath               string
+	assistantPresetsDirPath   string
+	workspaceArtifactsDirPath string
 }
 
 func NewApp() *App {
@@ -57,12 +59,14 @@ func NewApp() *App {
 	app.skillsDirPath = filepath.Join(app.dataBasePath, "skillsv1")
 	app.mcpsDirPath = filepath.Join(app.dataBasePath, "mcpserversv1")
 	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, "assistantpresetsv1")
+	app.workspaceArtifactsDirPath = filepath.Join(app.dataBasePath, "workspace-artifacts-v1")
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
 		app.modelPresetsDirPath == "" ||
 		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" || app.skillsDirPath == "" || app.mcpsDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
+			"workspaceArtifactsDirPath", app.workspaceArtifactsDirPath,
 			"settingsDirPath", app.settingsDirPath,
 			"conversationsDirPath", app.conversationsDirPath,
 			"modelPresetsDirPath", app.modelPresetsDirPath,
@@ -84,6 +88,7 @@ func NewApp() *App {
 	app.mcpAPI = &MCPWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
+	app.workspaceAPI = &WorkspaceWrapper{}
 	app.assistantPresetStoreAPI = &AssistantPresetStoreWrapper{}
 
 	if err := os.MkdirAll(app.settingsDirPath, os.FileMode(0o770)); err != nil {
@@ -144,6 +149,14 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create assistant presets directory")
 	}
+	if err := os.MkdirAll(app.workspaceArtifactsDirPath, os.FileMode(0o770)); err != nil {
+		slog.Error(
+			"failed to create Workspace artifact directory",
+			"workspaceArtifactsDirPath", app.workspaceArtifactsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize app: could not create Workspace artifact directory")
+	}
 
 	slog.Info(
 		"flexiGPT paths initialized",
@@ -155,6 +168,7 @@ func NewApp() *App {
 		"skillsDirPath", app.skillsDirPath,
 		"mcpsDirPath", app.mcpsDirPath,
 		"assistantPresetsDirPath", app.assistantPresetsDirPath,
+		"workspaceArtifactsDirPath", app.workspaceArtifactsDirPath,
 	)
 	return app
 }
@@ -289,6 +303,16 @@ func (a *App) initManagers() {
 	}
 
 	slog.Info("aggregate initialized", "dir", a.modelPresetsDirPath)
+	err = InitWorkspaceWrapper(a.workspaceAPI, a.workspaceArtifactsDirPath)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Workspace service",
+			"directory", a.workspaceArtifactsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: Workspace initialization failed\n" + err.Error())
+	}
+	slog.Info("workspace initialized", "directory", a.workspaceArtifactsDirPath)
 }
 
 // startup is called at application startup.
@@ -317,6 +341,9 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 
 	// Stop background goroutines + flushes for stores that need it.
 
+	if a.workspaceAPI != nil {
+		a.workspaceAPI.close()
+	}
 	if a.assistantPresetStoreAPI != nil {
 		a.assistantPresetStoreAPI.close()
 	}

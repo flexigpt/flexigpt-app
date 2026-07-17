@@ -138,6 +138,13 @@ func (s *Store) UpdateRoot(ctx context.Context, rootID spec.RootID, update RootU
 	if err := s.validateRoot(ctx, current); err != nil {
 		return spec.ArtifactRoot{}, err
 	}
+	attachments, err := s.repository.ListRootSourceAttachments(ctx, rootID)
+	if err != nil {
+		return spec.ArtifactRoot{}, err
+	}
+	if err := s.validateAttachmentSet(ctx, current, attachments); err != nil {
+		return spec.ArtifactRoot{}, err
+	}
 	if err := s.repository.UpdateRoot(ctx, current, update.ExpectedModifiedAt); err != nil {
 		return spec.ArtifactRoot{}, err
 	}

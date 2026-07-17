@@ -81,12 +81,43 @@ func (p documentProjector) Project(
 	return projected, nil
 }
 
+type structuredDefinitionProjector struct {
+	kind artifactstoreSpec.ArtifactKind
+}
+
+func (p structuredDefinitionProjector) Kind() artifactstoreSpec.ArtifactKind {
+	return p.kind
+}
+
+func (p structuredDefinitionProjector) Project(
+	_ context.Context,
+	input ProjectionInput,
+) (any, []artifactstoreSpec.Diagnostic) {
+	var document map[string]json.RawMessage
+	if err := decodeStrictJSONObject(input.Definition.DefinitionJSON, &document, false); err != nil {
+		return nil, projectorDiagnostics(input, fmt.Errorf("decode structured definition: %w", err))
+	}
+	return ProjectedStructuredDefinition{
+		RecordID:         input.Record.RecordID,
+		DefinitionDigest: input.Definition.Digest,
+		Kind:             input.Record.Kind,
+		SourceID:         input.Record.SourceID,
+		Locator:          input.Record.Locator,
+		Name:             string(input.Definition.LogicalName),
+		Definition:       append(json.RawMessage(nil), input.Definition.DefinitionJSON...),
+	}, nil
+}
+
 func defaultProjectors() map[artifactstoreSpec.ArtifactKind]ResourceProjector {
 	return map[artifactstoreSpec.ArtifactKind]ResourceProjector{
 		KindWorkspaceDefinition: workspaceDefinitionProjector{},
 		KindSkillDefinition:     skillProjector{},
 		KindInstructionDocument: documentProjector{kind: KindInstructionDocument},
 		KindContextDocument:     documentProjector{kind: KindContextDocument},
+		KindAgentDefinition:     structuredDefinitionProjector{kind: KindAgentDefinition},
+		KindModelDefinition:     structuredDefinitionProjector{kind: KindModelDefinition},
+		KindMCPServerDefinition: structuredDefinitionProjector{kind: KindMCPServerDefinition},
+		KindToolDefinition:      structuredDefinitionProjector{kind: KindToolDefinition},
 	}
 }
 
@@ -103,6 +134,9 @@ func validateWorkspaceCanonicalDefinition(
 	case KindInstructionDocument, KindContextDocument:
 		_, err := parseDocumentDefinition(definition)
 		return err
+	case KindAgentDefinition, KindModelDefinition, KindMCPServerDefinition, KindToolDefinition:
+		var document map[string]json.RawMessage
+		return decodeStrictJSONObject(definition.DefinitionJSON, &document, false)
 	default:
 		return nil
 	}
@@ -310,4 +344,5 @@ var (
 	_ ResourceProjector = workspaceDefinitionProjector{}
 	_ ResourceProjector = skillProjector{}
 	_ ResourceProjector = documentProjector{}
+	_ ResourceProjector = structuredDefinitionProjector{}
 )

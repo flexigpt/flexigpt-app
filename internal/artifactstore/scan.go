@@ -285,7 +285,6 @@ func (s *Store) scanSource(
 	}
 	result := spec.SourceScanResult{SourceID: source.SourceID, Generation: generation}
 	seenResources := make(map[string]struct{})
-	skippedLocators := make(map[spec.SourceLocator]struct{})
 	for _, entry := range entries {
 		result.Candidates++
 		maximum := plan.MaxFileBytes
@@ -293,7 +292,6 @@ func (s *Store) scanSource(
 			maximum = spec.MaxDefinitionJSONBytes
 		}
 		if entry.SizeBytes < 0 || entry.SizeBytes > maximum {
-			skippedLocators[entry.Locator] = struct{}{}
 			diagnostics := []spec.Diagnostic{{
 				Severity: spec.DiagnosticSeverityWarning,
 				Code:     "artifactstore.candidate.too-large",
@@ -303,6 +301,20 @@ func (s *Store) scanSource(
 				),
 				Location: &spec.DiagnosticLocation{Locator: entry.Locator},
 			}}
+			invalid := invalidCandidateResources(
+				source.SourceID,
+				entry.Locator,
+				"",
+				now,
+				nil,
+				diagnostics,
+				catalogResourcesForFrontendScope(
+					existingByLocator[entry.Locator],
+					plan.AllowedFrontendIDs,
+				),
+			)
+			publication.Resources = append(publication.Resources, invalid...)
+			result.InvalidResources += len(invalid)
 			result.Diagnostics = appendBoundedDiagnostics(
 				result.Diagnostics,
 				diagnostics...,
@@ -320,7 +332,7 @@ func (s *Store) scanSource(
 			SourceContentDigest: digest,
 			Content:             content,
 		}
-		frontend, recognized, err := s.selectFrontend(
+		frontend, err := s.selectFrontend(
 			ctx,
 			candidate,
 			plan.AllowedFrontendIDs,
@@ -329,10 +341,6 @@ func (s *Store) scanSource(
 			return result, publication, err
 		}
 		if frontend == nil {
-			if recognized {
-				skippedLocators[entry.Locator] = struct{}{}
-				continue
-			}
 			prior := catalogResourcesForFrontendScope(
 				existingByLocator[entry.Locator],
 				plan.AllowedFrontendIDs,
@@ -578,9 +586,6 @@ func (s *Store) scanSource(
 			)] = struct{}{}
 		}
 		for _, existing := range existingResources {
-			if _, skipped := skippedLocators[existing.Locator]; skipped {
-				continue
-			}
 			if !catalogResourceInAuthoritativeScope(existing, plan) {
 				continue
 			}
@@ -628,7 +633,7 @@ func (s *Store) selectFrontend(
 	ctx context.Context,
 	candidate spec.ArtifactCandidate,
 	allowed []spec.FrontendID,
-) (spec.ArtifactFrontend, bool, error) {
+) (spec.ArtifactFrontend, error) {
 	allowedSet := map[spec.FrontendID]struct{}{}
 	for _, id := range allowed {
 		allowedSet[id] = struct{}{}
@@ -637,9 +642,14 @@ func (s *Store) selectFrontend(
 	best := spec.RecognitionNone
 	tied := make([]spec.FrontendID, 0, 2)
 	for _, frontend := range s.frontendsSnapshot() {
+		if len(allowedSet) != 0 {
+			if _, permitted := allowedSet[frontend.ID()]; !permitted {
+				continue
+			}
+		}
 		recognition := frontend.Recognizes(ctx, candidate)
 		if recognition < spec.RecognitionNone || recognition > spec.RecognitionPreferred {
-			return nil, false, fmt.Errorf(
+			return nil, fmt.Errorf(
 				"%w: frontend %q returned invalid recognition %d",
 				spec.ErrInvalidRequest,
 				frontend.ID(),
@@ -655,7 +665,7 @@ func (s *Store) selectFrontend(
 	}
 	if len(tied) > 1 {
 		slices.Sort(tied)
-		return nil, false, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: candidate %q is equally recognized by frontends %v",
 			spec.ErrConflict,
 			candidate.Locator,
@@ -663,14 +673,10 @@ func (s *Store) selectFrontend(
 		)
 	}
 	if selected == nil {
-		return nil, false, nil
+		//nolint:nilnil // Ok.
+		return nil, nil
 	}
-	if len(allowedSet) > 0 {
-		if _, allowed := allowedSet[selected.ID()]; !allowed {
-			return nil, true, nil
-		}
-	}
-	return selected, true, nil
+	return selected, nil
 }
 
 func (s *Store) validateSourceScanPlan(plan spec.SourceScanPlan) error {
@@ -889,6 +895,9 @@ func matchesDirectoryRoot(root, locator spec.SourceLocator, plan spec.DirectoryS
 	base := string(root)
 	value := string(locator)
 	relative := value
+	if base == "" {
+		base = "."
+	}
 	if base != "." {
 		prefix := base + "/"
 		if !strings.HasPrefix(value, prefix) {

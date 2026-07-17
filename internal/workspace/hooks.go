@@ -60,6 +60,9 @@ func (rootKindHook) ValidateSourceAttachment(
 	if err != nil {
 		return workspaceDiagnostics("workspace.attachment.root-data", err.Error())
 	}
+	if err := validateRootData(data); err != nil {
+		return workspaceDiagnostics("workspace.attachment.root-data", err.Error())
+	}
 	switch attachment.Role {
 	case RolePrimary, RoleAttachedPackage, RoleBuiltIn, RoleAppLibrary, RoleOverlay:
 	default:
@@ -69,6 +72,12 @@ func (rootKindHook) ValidateSourceAttachment(
 		)
 	}
 	if attachment.Role == RolePrimary {
+		if !attachment.Enabled {
+			return workspaceDiagnostics(
+				"workspace.attachment.primary",
+				"the primary workspace attachment must be enabled",
+			)
+		}
 		if data.Mode != RootModeFilesystem || data.PrimarySourceID != attachment.SourceID {
 			return workspaceDiagnostics(
 				"workspace.attachment.primary",
@@ -101,6 +110,63 @@ func (rootKindHook) ValidateSourceAttachment(
 	var typed AttachmentData
 	if err := decodeStrictJSONObject(attachment.Data, &typed, true); err != nil {
 		return workspaceDiagnostics("workspace.attachment.data", err.Error())
+	}
+	return nil
+}
+
+func (rootKindHook) ValidateSourceAttachments(
+	_ context.Context,
+	root artifactstoreSpec.ArtifactRoot,
+	attachments []artifactstoreSpec.RootSourceAttachment,
+) []artifactstoreSpec.Diagnostic {
+	data, err := decodeRootData(root.Data)
+	if err != nil {
+		return workspaceDiagnostics("workspace.attachment-set.root-data", err.Error())
+	}
+	if err := validateRootData(data); err != nil {
+		return workspaceDiagnostics("workspace.attachment-set.root-data", err.Error())
+	}
+	if err := validateWorkspaceAttachmentSet(data, attachments); err != nil {
+		return workspaceDiagnostics("workspace.attachment-set", err.Error())
+	}
+	return nil
+}
+
+func validateWorkspaceAttachmentSet(
+	data RootData,
+	attachments []artifactstoreSpec.RootSourceAttachment,
+) error {
+	primaryCount := 0
+	for _, attachment := range attachments {
+		if attachment.Role == RolePrimary {
+			primaryCount++
+			if data.Mode != RootModeFilesystem {
+				return errors.New("only filesystem workspaces may have a primary attachment")
+			}
+			if attachment.SourceID != data.PrimarySourceID {
+				return errors.New("primary attachment does not match primarySourceID")
+			}
+			if !attachment.Enabled {
+				return errors.New("primary attachment must be enabled")
+			}
+			continue
+		}
+		if attachment.SourceID == data.PrimarySourceID {
+			return errors.New("primarySourceID must use the primary attachment role")
+		}
+	}
+	switch data.Mode {
+	case RootModeFilesystem:
+		if primaryCount != 1 {
+			return fmt.Errorf(
+				"filesystem workspace requires exactly one primary attachment, found %d",
+				primaryCount,
+			)
+		}
+	case RootModeEmpty:
+		if primaryCount != 0 {
+			return errors.New("empty workspace must not have a primary attachment")
+		}
 	}
 	return nil
 }
@@ -399,6 +465,7 @@ func truncateUTF8(value string, maximum int) string {
 }
 
 var (
-	_ artifactstoreSpec.RootKindHook       = rootKindHook{}
-	_ artifactstoreSpec.CollectionKindHook = collectionKindHook{}
+	_ artifactstoreSpec.RootKindHook          = rootKindHook{}
+	_ artifactstoreSpec.CollectionKindHook    = collectionKindHook{}
+	_ artifactstoreSpec.RootAttachmentSetHook = rootKindHook{}
 )

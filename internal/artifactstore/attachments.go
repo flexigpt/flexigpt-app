@@ -62,6 +62,14 @@ func (s *Store) AttachSource(ctx context.Context, draft RootSourceAttachmentDraf
 	if err := s.validateAttachment(ctx, root, attachment); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
+	attachments, err := s.repository.ListRootSourceAttachments(ctx, draft.RootID)
+	if err != nil {
+		return spec.RootSourceAttachment{}, err
+	}
+	attachments = append(attachments, attachment)
+	if err := s.validateAttachmentSet(ctx, root, attachments); err != nil {
+		return spec.RootSourceAttachment{}, err
+	}
 	if err := s.repository.CreateRootSourceAttachment(
 		ctx,
 		attachment,
@@ -141,6 +149,19 @@ func (s *Store) UpdateRootSourceAttachment(
 	if err := s.validateAttachment(ctx, root, attachment); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
+	attachments, err := s.repository.ListRootSourceAttachments(ctx, rootID)
+	if err != nil {
+		return spec.RootSourceAttachment{}, err
+	}
+	for index := range attachments {
+		if attachments[index].SourceID == sourceID {
+			attachments[index] = attachment
+			break
+		}
+	}
+	if err := s.validateAttachmentSet(ctx, root, attachments); err != nil {
+		return spec.RootSourceAttachment{}, err
+	}
 	if err := s.repository.UpdateRootSourceAttachment(
 		ctx,
 		attachment,
@@ -180,6 +201,19 @@ func (s *Store) DetachSource(
 	); err != nil {
 		return err
 	}
+	attachments, err := s.repository.ListRootSourceAttachments(ctx, rootID)
+	if err != nil {
+		return err
+	}
+	remaining := make([]spec.RootSourceAttachment, 0, len(attachments)-1)
+	for _, value := range attachments {
+		if value.SourceID != sourceID {
+			remaining = append(remaining, value)
+		}
+	}
+	if err := s.validateAttachmentSet(ctx, root, remaining); err != nil {
+		return err
+	}
 	return s.repository.DeleteRootSourceAttachment(
 		ctx,
 		rootID,
@@ -204,6 +238,28 @@ func (s *Store) validateAttachment(
 		); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (s *Store) validateAttachmentSet(
+	ctx context.Context,
+	root spec.ArtifactRoot,
+	attachments []spec.RootSourceAttachment,
+) error {
+	hook, ok := s.rootHookFor(root.Kind)
+	if !ok {
+		return nil
+	}
+	setHook, ok := hook.(spec.RootAttachmentSetHook)
+	if !ok {
+		return nil
+	}
+	if err := errorDiagnostics(
+		"root attachment set "+string(root.Kind),
+		setHook.ValidateSourceAttachments(ctx, root, append([]spec.RootSourceAttachment(nil), attachments...)),
+	); err != nil {
+		return err
 	}
 	return nil
 }

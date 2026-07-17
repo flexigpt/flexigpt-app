@@ -127,6 +127,18 @@ type RootKindHook interface {
 	) []Diagnostic
 }
 
+// RootAttachmentSetHook is an optional RootKindHook companion for root kinds
+// whose typed data constrains the complete source-attachment set. Artifact
+// Store invokes it against the proposed set before attachment mutations and
+// root-data updates are published.
+type RootAttachmentSetHook interface {
+	ValidateSourceAttachments(
+		ctx context.Context,
+		root ArtifactRoot,
+		attachments []RootSourceAttachment,
+	) []Diagnostic
+}
+
 // CollectionKindHook validates app-local typed collection data and record
 // placement without interpreting the record's runtime behavior.
 type CollectionKindHook interface {

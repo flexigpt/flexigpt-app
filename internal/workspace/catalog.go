@@ -91,11 +91,17 @@ func (s *Service) Catalog(
 				collection = &copyValue
 			}
 		}
+		catalogCurrent := occurrence != nil &&
+			occurrence.State == artifactstoreSpec.CatalogStateValid &&
+			occurrence.CurrentDefinitionDigest != nil &&
+			record.LastResolvedDefinitionDigest != nil &&
+			*occurrence.CurrentDefinitionDigest == *record.LastResolvedDefinitionDigest
 		resources = append(resources, CatalogResource{
-			Record:     record,
-			Definition: definition,
-			Collection: collection,
-			Occurrence: occurrence,
+			Record:         record,
+			Definition:     definition,
+			Collection:     collection,
+			Occurrence:     occurrence,
+			CatalogCurrent: catalogCurrent,
 		})
 	}
 	sort.Slice(resources, func(left, right int) bool {
@@ -247,6 +253,9 @@ func (s *Service) ResolveReference(
 			resource.Record.Locator == candidate.Locator &&
 			resource.Record.SubresourceLocator == candidate.SubresourceLocator &&
 			resource.Record.Kind == candidate.Kind {
+			if !resource.CatalogCurrent {
+				continue
+			}
 			if err := s.ensureCatalogGeneration(ctx, catalog.Generation); err != nil {
 				return CatalogResource{}, err
 			}
@@ -291,6 +300,13 @@ func (s *Service) ComposeLoadPlan(
 			resource.Record.State != artifactstoreSpec.RecordStateAvailable {
 			return LoadPlan{}, fmt.Errorf(
 				"%w: record %q is not enabled and available",
+				artifactstoreSpec.ErrConflict,
+				resource.Record.RecordID,
+			)
+		}
+		if resource.Collection != nil && !resource.Collection.Enabled {
+			return LoadPlan{}, fmt.Errorf(
+				"%w: record %q collection is disabled",
 				artifactstoreSpec.ErrConflict,
 				resource.Record.RecordID,
 			)

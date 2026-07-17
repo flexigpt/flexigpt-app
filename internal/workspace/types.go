@@ -137,10 +137,11 @@ type KindDescriptor struct {
 }
 
 type CatalogResource struct {
-	Record     artifactstoreSpec.ArtifactRecord
-	Definition artifactstoreSpec.CanonicalDefinition
-	Collection *artifactstoreSpec.ArtifactCollection
-	Occurrence *artifactstoreSpec.CatalogResource
+	Record         artifactstoreSpec.ArtifactRecord
+	Definition     artifactstoreSpec.CanonicalDefinition
+	Collection     *artifactstoreSpec.ArtifactCollection
+	Occurrence     *artifactstoreSpec.CatalogResource
+	CatalogCurrent bool
 }
 
 type Catalog struct {
@@ -223,6 +224,20 @@ type ProjectedDocument struct {
 	Locator          artifactstoreSpec.SourceLocator
 	Name             string
 	Markdown         string
+}
+
+// ProjectedStructuredDefinition is the default projection for native Workspace
+// artifact kinds whose external domain adapter has not been installed. The
+// original canonical JSON remains available without coupling Workspace to a
+// legacy persistence model.
+type ProjectedStructuredDefinition struct {
+	RecordID         artifactstoreSpec.RecordID
+	DefinitionDigest artifactstoreSpec.Digest
+	Kind             artifactstoreSpec.ArtifactKind
+	SourceID         artifactstoreSpec.SourceID
+	Locator          artifactstoreSpec.SourceLocator
+	Name             string
+	Definition       json.RawMessage
 }
 
 type ResourceProjector interface {

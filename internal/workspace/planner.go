@@ -67,7 +67,10 @@ func buildWorkspacePlan(input DiscoveryInput, expanded bool) (artifactstoreSpec.
 				sourcePlan.Authoritative = true
 			}
 		default:
-			recursive, authoritative, err := attachmentDiscoveryBehavior(attachment)
+			recursive, authoritative, err := attachmentDiscoveryBehavior(
+				attachment,
+				input.Workspace.Data.AttachedPackagePreferences.DiscoverRecursively,
+			)
 			if err != nil {
 				return artifactstoreSpec.ScanPlan{}, err
 			}
@@ -88,8 +91,9 @@ func buildWorkspacePlan(input DiscoveryInput, expanded bool) (artifactstoreSpec.
 
 func attachmentDiscoveryBehavior(
 	attachment artifactstoreSpec.RootSourceAttachment,
+	defaultRecursive bool,
 ) (recursive, authoritative bool, err error) {
-	recursive = true
+	recursive = defaultRecursive
 	switch attachment.Role {
 	case RoleAttachedPackage, RoleBuiltIn, RoleAppLibrary, RoleOverlay:
 		authoritative = true

@@ -47,7 +47,7 @@
   - [Record Synchronization Workflow](#record-synchronization-workflow)
   - [Public API](#public-api)
   - [Persistence](#persistence)
-- [Planned Workspace Integration](#planned-workspace-integration)
+- [Workspace Integration](#workspace-integration)
   - [Workspace Purpose](#workspace-purpose)
   - [Workspace Root Model](#workspace-root-model)
   - [Workspace root data](#workspace-root-data)
@@ -72,7 +72,7 @@
 
 | Attribute  | Details                                                                                                               |
 | ---------- | --------------------------------------------------------------------------------------------------------------------- |
-| Status     | Artifact Store is the implementation baseline. Workspace is a planned consumer.                                       |
+| Status     | Artifact Store and Workspace are implementation baselines.                                                            |
 | Scope      | The internal Artifact Store foundation and the Workspace feature built on it.                                         |
 | Exclusions | Conversation configuration and persistence, runtime lifecycle, secret values, policy evaluation, and execution logic. |
 | Objective  | Establish a durable, minimal artifact lifecycle model that Workspace uses first and other stores may adopt later.     |
@@ -80,7 +80,7 @@
 ### Reading Guide
 
 - `Artifact Store Architecture` describes the implemented `internal/artifactstore` architecture.
-- `Planned Workspace Integration` is a target design for a future typed consumer; it is not an available Workspace API.
+- `Workspace Integration` describes the implemented typed Workspace consumer.
 - `implemented` describes code currently present in Artifact Store. `planned` describes intended future behavior.
 
 ## Architectural Decisions
@@ -1249,18 +1249,18 @@ those SQLite transactions.
 No runtime state, live connection, secret value, policy decision, or execution
 state is persisted by either Artifact Store repository.
 
-## Planned Workspace Integration
+## Workspace Integration
 
 ### Workspace Purpose
 
-Workspace is not implemented in this repository. There is currently no
-`WorkspaceService`, Workspace root hook, Workspace frontend, discovery planner,
-record synchronization policy, catalog service, projector, or Workspace
-persistence schema.
+Workspace is implemented as a typed Artifact Store consumer in
+`internal/workspace`. It provides a Workspace root hook, collection hook,
+native source frontend, internal YAML decoder, discovery planner, record
+synchronization policy, catalog service, default projectors, reference
+resolution, and load-plan composition.
 
-The remainder of Part B is a target integration design. It describes the
-boundaries a future Workspace implementation must preserve when composed with
-the implemented Artifact Store.
+Workspace owns no persistence database. Artifact Store remains the durable
+owner of roots, sources, catalog generations, records, and collections.
 
 When implemented, Workspace will provide:
 
