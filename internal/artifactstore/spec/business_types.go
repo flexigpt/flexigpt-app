@@ -9,8 +9,8 @@ import (
 // source. A repository publishes it atomically to app-local metadata.
 type SourceCatalogPublication struct {
 	SourceID                    SourceID
-	ExpectedSourceModifiedAt    time.Time
 	ExpectedObservationRevision uint64
+	AdvanceObservationRevision  bool
 	ObservedGeneration          SourceGeneration
 	ObservedAt                  time.Time
 	Diagnostics                 []Diagnostic
@@ -30,19 +30,10 @@ type RootCatalogPublication struct {
 	Diagnostics    []Diagnostic
 }
 
-// RootScanAttachmentExpectation protects a scan against concurrent attachment
-// changes, including attaching or detaching another source.
-type RootScanAttachmentExpectation struct {
-	SourceID   SourceID
-	ModifiedAt time.Time
-	Enabled    bool
-}
-
-// RootScanSourceExpectation protects both source configuration and mutable
-// source observation state used to construct a root catalog snapshot.
+// RootScanSourceExpectation protects source configuration, enabled state, and
+// mutable source observation state used to construct a root catalog snapshot.
 type RootScanSourceExpectation struct {
 	SourceID            SourceID
-	ModifiedAt          time.Time
 	ObservationRevision uint64
 	Enabled             bool
 }
@@ -52,13 +43,11 @@ type RootScanSourceExpectation struct {
 // calculated by the business layer. The repository verifies it against the
 // post-publication source catalog before committing.
 type RootScanPublication struct {
-	RootCatalog            RootCatalogPublication
-	ExpectedRootModifiedAt time.Time
-	ExpectedRootRevision   uint64
-	Attachments            []RootScanAttachmentExpectation
-	Sources                []RootScanSourceExpectation
-	SourceCatalogs         []SourceCatalogPublication
-	CatalogResources       []CatalogResource
+	RootCatalog          RootCatalogPublication
+	ExpectedRootRevision uint64
+	Sources              []RootScanSourceExpectation
+	SourceCatalogs       []SourceCatalogPublication
+	CatalogResources     []CatalogResource
 }
 
 // DependencySnapshotPublication replaces one record's resolution snapshot for
@@ -113,9 +102,7 @@ type RecordTransferPublication struct {
 	Revision                          CatalogResourceRevision
 	Record                            ArtifactRecord
 	Provenance                        TransferProvenance
-	ExpectedSourceModifiedAt          time.Time
 	ExpectedSourceObservationRevision uint64
-	ExpectedAttachmentModifiedAt      time.Time
 	ExpectedRootRevision              uint64
 }
 

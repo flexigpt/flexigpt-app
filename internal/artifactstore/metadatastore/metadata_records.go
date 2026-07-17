@@ -18,7 +18,7 @@ const selectLatestRootGenerationForSynchronizationSQL = `SELECT generation
 	LIMIT 1`
 
 const selectTransferAttachmentSQL = `SELECT
-		a.modified_at, a.enabled, r.enabled, r.soft_deleted_at, r.mount_revision
+		a.enabled, r.enabled, r.soft_deleted_at, r.mount_revision
 	FROM root_source_attachments a
 	JOIN artifact_roots r ON r.root_id = a.root_id
 	WHERE a.root_id = ? AND a.source_id = ?`
@@ -28,7 +28,6 @@ const invalidateTransferredSourceSQL = `UPDATE artifact_sources
 	    last_scanned_at = NULL,
 	    observation_revision = observation_revision + 1
 	WHERE source_id = ?
-	  AND modified_at = ?
 	  AND observation_revision = ?
 	  AND observation_revision < ?
 	  AND enabled = 1`
@@ -291,8 +290,7 @@ func (s *MetadataStore) PublishRecordTransfer(
 		publication.Provenance.TargetRecordID != publication.Record.RecordID {
 		return fmt.Errorf("%w: inconsistent record transfer publication", spec.ErrInvalidRequest)
 	}
-	if publication.ExpectedSourceModifiedAt.IsZero() ||
-		publication.ExpectedAttachmentModifiedAt.IsZero() {
+	if publication.ExpectedRootRevision == 0 {
 		return fmt.Errorf(
 			"%w: record transfer optimistic expectations are incomplete",
 			spec.ErrInvalidRequest,
@@ -317,7 +315,6 @@ func (s *MetadataStore) PublishRecordTransfer(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var attachmentModifiedAt string
 	var softDeletedAt sql.NullString
 	var attachmentEnabled, rootEnabled int
 	var rootRevision uint64
@@ -327,7 +324,6 @@ func (s *MetadataStore) PublishRecordTransfer(
 		string(publication.Record.RootID),
 		string(publication.Record.SourceID),
 	).Scan(
-		&attachmentModifiedAt,
 		&attachmentEnabled,
 		&rootEnabled,
 		&softDeletedAt,
@@ -345,7 +341,6 @@ func (s *MetadataStore) PublishRecordTransfer(
 	if attachmentEnabled == 0 ||
 		rootEnabled == 0 ||
 		softDeletedAt.Valid ||
-		attachmentModifiedAt != formatTime(publication.ExpectedAttachmentModifiedAt) ||
 		rootRevision != publication.ExpectedRootRevision {
 		return fmt.Errorf(
 			"%w: destination root or source attachment changed during transfer",
@@ -357,7 +352,6 @@ func (s *MetadataStore) PublishRecordTransfer(
 		ctx,
 		invalidateTransferredSourceSQL,
 		string(publication.Record.SourceID),
-		formatTime(publication.ExpectedSourceModifiedAt),
 		publication.ExpectedSourceObservationRevision,
 		spec.MaxObservationRevision,
 	)

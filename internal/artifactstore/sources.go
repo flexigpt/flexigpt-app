@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/baseutils"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
@@ -170,6 +171,24 @@ func (s *Store) validateSource(ctx context.Context, source *spec.ArtifactSource)
 	if source == nil {
 		return fmt.Errorf("%w: source is nil", spec.ErrInvalidRequest)
 	}
+	if len(source.Config) > spec.MaxConfigJSONBytes {
+		return fmt.Errorf(
+			"%w: source configuration exceeds %d bytes",
+			spec.ErrInvalidRequest,
+			spec.MaxConfigJSONBytes,
+		)
+	}
+	canonicalConfig, err := baseutils.CanonicalizeJSON(source.Config)
+	if err != nil {
+		return fmt.Errorf("%w: source configuration: %w", spec.ErrInvalidRequest, err)
+	}
+	if len(canonicalConfig) == 0 || canonicalConfig[0] != '{' {
+		return fmt.Errorf(
+			"%w: source configuration must be a JSON object",
+			spec.ErrInvalidRequest,
+		)
+	}
+	source.Config = json.RawMessage(canonicalConfig)
 	driver, ok := s.driverFor(source.Kind)
 	if !ok {
 		return fmt.Errorf("%w: source kind %q", spec.ErrDriverUnavailable, source.Kind)

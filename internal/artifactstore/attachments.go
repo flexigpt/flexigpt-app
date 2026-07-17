@@ -1,6 +1,7 @@
 package artifactstore
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -123,11 +124,19 @@ func (s *Store) UpdateRootSourceAttachment(
 	); err != nil {
 		return spec.RootSourceAttachment{}, err
 	}
+	nextData := normalizedJSONObject(update.Data)
+	if attachment.Role == update.Role &&
+		attachment.Priority == update.Priority &&
+		attachment.Enabled == update.Enabled &&
+		attachment.DataSchemaID == update.DataSchemaID &&
+		bytes.Equal(attachment.Data, nextData) {
+		return attachment, nil
+	}
 	attachment.Role = update.Role
 	attachment.Priority = update.Priority
 	attachment.Enabled = update.Enabled
 	attachment.DataSchemaID = update.DataSchemaID
-	attachment.Data = normalizedJSONObject(update.Data)
+	attachment.Data = nextData
 	attachment.ModifiedAt = s.nextModifiedAt(attachment.ModifiedAt)
 	if err := s.validateAttachment(ctx, root, attachment); err != nil {
 		return spec.RootSourceAttachment{}, err

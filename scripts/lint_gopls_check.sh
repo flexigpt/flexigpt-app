@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# gopls_check.sh  [PATH] [JOBS]
+# lint_gopls_check.sh  [PATH] [JOBS]
 #
 # Runs "gopls check" on every *.go file under PATH (default ".")
-# using JOBS parallel workers (default 4).  Aggregates the results
+# using JOBS parallel workers (default 8).  Aggregates the results
 # and fails the build if any file reports diagnostics.
 
 set -euo pipefail
 
 TARGET=${1:-'.'}
-JOBS=${2:-4}
+JOBS=${2:-8}
 
 echo "==> gopls check (up to $JOBS parallel jobs)"
 

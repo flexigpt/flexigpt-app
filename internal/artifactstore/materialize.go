@@ -69,5 +69,19 @@ func (s *Store) MaterializeSource(
 			spec.ErrMaterializerUnavailable,
 		)
 	}
+	confirmed, err := s.repository.GetSource(ctx, request.SourceID)
+	if err != nil {
+		return spec.MaterializedSource{}, err
+	}
+	if !confirmed.Enabled ||
+		confirmed.Kind != source.Kind ||
+		confirmed.ObservationRevision != source.ObservationRevision ||
+		!equivalentJSONObjects(confirmed.Config, source.Config) {
+		return spec.MaterializedSource{}, fmt.Errorf(
+			"%w: source %q changed while it was being materialized",
+			spec.ErrConflict,
+			request.SourceID,
+		)
+	}
 	return result, nil
 }

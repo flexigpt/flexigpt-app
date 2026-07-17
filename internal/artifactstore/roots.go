@@ -110,7 +110,17 @@ func (s *Store) UpdateRoot(ctx context.Context, rootID spec.RootID, update RootU
 	if current.SoftDeletedAt != nil {
 		return spec.ArtifactRoot{}, fmt.Errorf("%w: root %q is soft-deleted", spec.ErrConflict, rootID)
 	}
-	if current.MountRevision >= spec.MaxObservationRevision {
+	nextData := normalizedJSONObject(update.Data)
+	mountChanged := current.Enabled != update.Enabled ||
+		current.DataSchemaID != update.DataSchemaID ||
+		!equivalentJSONObjects(current.Data, nextData)
+	changed := mountChanged ||
+		current.DisplayName != update.DisplayName ||
+		current.Description != update.Description
+	if !changed {
+		return current, nil
+	}
+	if mountChanged && current.MountRevision >= spec.MaxObservationRevision {
 		return spec.ArtifactRoot{}, fmt.Errorf(
 			"%w: root mount revision is exhausted",
 			spec.ErrConflict,
@@ -120,9 +130,11 @@ func (s *Store) UpdateRoot(ctx context.Context, rootID spec.RootID, update RootU
 	current.Description = update.Description
 	current.Enabled = update.Enabled
 	current.DataSchemaID = update.DataSchemaID
-	current.Data = normalizedJSONObject(update.Data)
+	current.Data = nextData
 	current.ModifiedAt = s.nextModifiedAt(current.ModifiedAt)
-	current.MountRevision++
+	if mountChanged {
+		current.MountRevision++
+	}
 	if err := s.validateRoot(ctx, current); err != nil {
 		return spec.ArtifactRoot{}, err
 	}

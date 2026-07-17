@@ -44,7 +44,9 @@ func (f *nativeFrontend) Recognizes(
 	if !ok {
 		return artifactstoreSpec.RecognitionNone
 	}
-	if class.Format == formatYAML && f.yamlDecoder == nil {
+	if f.yamlDecoder == nil &&
+		(class.Format == formatYAML ||
+			(class.Format == formatMarkdown && class.Kind == KindSkillDefinition)) {
 		return artifactstoreSpec.RecognitionNone
 	}
 	if class.Format == formatJSON {
@@ -73,9 +75,9 @@ func (f *nativeFrontend) Decode(
 	)
 	switch class.Format {
 	case formatMarkdown:
-		decoded, err = f.decodeMarkdown(class.Kind, candidate.Content)
+		decoded, err = f.decodeMarkdown(ctx, class.Kind, candidate.Content)
 	case formatJSON, formatYAML:
-		decoded, err = f.decodeStructured(ctx, class, candidate.Content)
+		decoded, err = f.decodeStructured(ctx, class, candidate.Locator, candidate.Content)
 	default:
 		err = fmt.Errorf("unsupported workspace source format %q", class.Format)
 	}
@@ -118,17 +120,11 @@ func (f *nativeFrontend) ValidateSemantic(
 	_ context.Context,
 	definition artifactstoreSpec.CanonicalDefinition,
 ) []artifactstoreSpec.Diagnostic {
-	if definition.Kind != KindWorkspaceDefinition {
-		return nil
-	}
-	var document struct {
-		Discovery DiscoveryPreferences `json:"discovery"`
-	}
-	if err := json.Unmarshal(definition.DefinitionJSON, &document); err != nil {
-		return workspaceDiagnostics("workspace.definition.decode", err.Error())
-	}
-	if err := validateDiscoveryPreferences(document.Discovery); err != nil {
-		return workspaceDiagnostics("workspace.definition.discovery", err.Error())
+	if err := validateWorkspaceCanonicalDefinition(definition); err != nil {
+		return workspaceDiagnostics(
+			"workspace.frontend.semantic",
+			err.Error(),
+		)
 	}
 	return nil
 }
@@ -167,6 +163,7 @@ func (f *nativeFrontend) DescribeExportClosure(
 func (f *nativeFrontend) decodeStructured(
 	ctx context.Context,
 	class nativeDocumentClass,
+	locator artifactstoreSpec.SourceLocator,
 	content []byte,
 ) ([]artifactstoreSpec.DecodedArtifact, error) {
 	raw := json.RawMessage(content)
@@ -177,6 +174,12 @@ func (f *nativeFrontend) decodeStructured(
 		decoded, err := f.yamlDecoder(ctx, append([]byte(nil), content...))
 		if err != nil {
 			return nil, err
+		}
+		if len(decoded) > artifactstoreSpec.MaxDefinitionJSONBytes {
+			return nil, fmt.Errorf(
+				"decoded YAML exceeds %d bytes",
+				artifactstoreSpec.MaxDefinitionJSONBytes,
+			)
 		}
 		raw = decoded
 	}
@@ -195,11 +198,14 @@ func (f *nativeFrontend) decodeStructured(
 		return nil, err
 	}
 	if class.MCPCollection {
-		return f.decodeMCPCollection(class, object)
+		return f.decodeMCPCollection(class, locator, object)
 	}
 	name := fixedLogicalName(class.Kind)
 	if name == "" {
 		name = stringField(object, "name", "slug", "id")
+	}
+	if name == "" {
+		name = sourceLogicalName(locator)
 	}
 	if strings.TrimSpace(name) == "" || strings.TrimSpace(name) != name {
 		return nil, errors.New("workspace artifact name is required and must be trimmed")
@@ -219,6 +225,7 @@ func (f *nativeFrontend) decodeStructured(
 
 func (f *nativeFrontend) decodeMCPCollection(
 	class nativeDocumentClass,
+	locator artifactstoreSpec.SourceLocator,
 	object map[string]json.RawMessage,
 ) ([]artifactstoreSpec.DecodedArtifact, error) {
 	var servers map[string]json.RawMessage
@@ -232,6 +239,9 @@ func (f *nativeFrontend) decodeMCPCollection(
 	}
 	if len(servers) == 0 {
 		name := stringField(object, "name", "id")
+		if name == "" {
+			name = sourceLogicalName(locator)
+		}
 		if strings.TrimSpace(name) == "" {
 			return nil, errors.New("MCP document must contain mcpServers, servers, or a server name")
 		}
@@ -257,7 +267,6 @@ func (f *nativeFrontend) decodeMCPCollection(
 		names = append(names, name)
 	}
 	slices.Sort(names)
-	seenSubresources := map[artifactstoreSpec.SubresourceLocator]struct{}{}
 	out := make([]artifactstoreSpec.DecodedArtifact, 0, len(names))
 	for _, name := range names {
 		if strings.TrimSpace(name) == "" || strings.TrimSpace(name) != name {
@@ -274,14 +283,10 @@ func (f *nativeFrontend) decodeMCPCollection(
 		if err := json.Unmarshal(raw, &serverObject); err != nil {
 			return nil, err
 		}
-		subresource := artifactstoreSpec.SubresourceLocator("servers/" + portableSegment(name))
-		if _, duplicate := seenSubresources[subresource]; duplicate {
-			digest := strings.TrimPrefix(string(baseutils.DigestBytes([]byte(name))), "sha256:")
-			subresource = artifactstoreSpec.SubresourceLocator(
-				"servers/" + portableSegment(name) + "-" + digest[:12],
-			)
-		}
-		seenSubresources[subresource] = struct{}{}
+		digest := strings.TrimPrefix(string(baseutils.DigestBytes([]byte(name))), "sha256:")
+		subresource := artifactstoreSpec.SubresourceLocator(
+			"servers/" + portableSegment(name) + "-" + digest[:12],
+		)
 		definition, err := f.definitionFor(
 			KindMCPServerDefinition,
 			artifactstoreSpec.LogicalName(name),
@@ -301,30 +306,67 @@ func (f *nativeFrontend) decodeMCPCollection(
 }
 
 func (f *nativeFrontend) decodeMarkdown(
+	ctx context.Context,
 	kind artifactstoreSpec.ArtifactKind,
 	content []byte,
 ) ([]artifactstoreSpec.DecodedArtifact, error) {
 	if !bytes.Equal(bytes.ToValidUTF8(content, nil), content) {
 		return nil, errors.New("workspace Markdown must be valid UTF-8")
 	}
-	text := string(content)
+	text := strings.ReplaceAll(string(content), "\r\n", "\n")
 	if strings.TrimSpace(text) == "" {
 		return nil, errors.New("workspace Markdown must not be empty")
 	}
 	name := fixedLogicalName(kind)
+	object := map[string]json.RawMessage{}
+	var frontmatter json.RawMessage
 	if kind == KindSkillDefinition {
-		name = markdownFrontmatterName(text)
-		if name == "" {
+		if f.yamlDecoder == nil {
+			return nil, errors.New("YAML decoder is required for SKILL.md")
+		}
+		yamlFrontmatter, err := splitMarkdownFrontmatter(text)
+		if err != nil {
+			return nil, err
+		}
+		decoded, err := f.yamlDecoder(ctx, []byte(yamlFrontmatter))
+		if err != nil {
+			return nil, fmt.Errorf("decode SKILL.md frontmatter: %w", err)
+		}
+		if len(decoded) > artifactstoreSpec.MaxExtensionsJSONBytes {
+			return nil, fmt.Errorf(
+				"SKILL.md frontmatter exceeds %d bytes",
+				artifactstoreSpec.MaxExtensionsJSONBytes,
+			)
+		}
+		if err := validateJSONDocument(decoded); err != nil {
+			return nil, fmt.Errorf("validate SKILL.md frontmatter: %w", err)
+		}
+		canonical, err := baseutils.CanonicalizeJSON(decoded)
+		if err != nil {
+			return nil, err
+		}
+		if len(canonical) == 0 || canonical[0] != '{' {
+			return nil, errors.New("SKILL.md frontmatter must be a YAML object")
+		}
+		frontmatter = json.RawMessage(canonical)
+		if err := json.Unmarshal(frontmatter, &object); err != nil {
+			return nil, err
+		}
+		name = stringField(object, "name")
+		if strings.TrimSpace(name) == "" {
 			return nil, errors.New("SKILL.md requires a top-level frontmatter name")
 		}
 	}
 	raw, err := json.Marshal(struct {
-		Markdown string `json:"markdown"`
-	}{Markdown: text})
+		Markdown    string          `json:"markdown"`
+		Frontmatter json.RawMessage `json:"frontmatter,omitempty"`
+	}{
+		Markdown:    text,
+		Frontmatter: frontmatter,
+	})
 	if err != nil {
 		return nil, err
 	}
-	object := map[string]json.RawMessage{}
 	definition, err := f.definitionFor(
 		kind,
 		artifactstoreSpec.LogicalName(name),
@@ -391,10 +433,6 @@ func classifyNativeDocument(locator artifactstoreSpec.SourceLocator) (nativeDocu
 		return nativeDocumentClass{Kind: KindWorkspaceDefinition, Format: formatJSON}, true
 	case ".flexigpt/workspace.yaml", ".flexigpt/workspace.yml":
 		return nativeDocumentClass{Kind: KindWorkspaceDefinition, Format: formatYAML}, true
-	}
-	switch base {
-	case "skill.md":
-		return nativeDocumentClass{Kind: KindSkillDefinition, Format: formatMarkdown}, true
 	case "agents.md":
 		return nativeDocumentClass{Kind: KindInstructionDocument, Format: formatMarkdown}, true
 	case "readme.md":
@@ -405,6 +443,9 @@ func classifyNativeDocument(locator artifactstoreSpec.SourceLocator) (nativeDocu
 			Format:        formatJSON,
 			MCPCollection: true,
 		}, true
+	}
+	if base == "skill.md" {
+		return nativeDocumentClass{Kind: KindSkillDefinition, Format: formatMarkdown}, true
 	}
 	if path.Ext(value) != ".json" {
 		return nativeDocumentClass{}, false
@@ -428,7 +469,7 @@ func classifyNativeDocument(locator artifactstoreSpec.SourceLocator) (nativeDocu
 }
 
 func hasPathPrefix(value, prefix string) bool {
-	return strings.HasPrefix(value, prefix) || strings.Contains(value, "/"+prefix)
+	return strings.HasPrefix(value, prefix)
 }
 
 func fixedLogicalName(kind artifactstoreSpec.ArtifactKind) string {
@@ -454,25 +495,29 @@ func stringField(object map[string]json.RawMessage, fields ...string) string {
 	return ""
 }
 
-func markdownFrontmatterName(value string) string {
-	lines := strings.Split(strings.ReplaceAll(value, "\r\n", "\n"), "\n")
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
-		return ""
+func splitMarkdownFrontmatter(value string) (string, error) {
+	lines := strings.Split(value, "\n")
+	if len(lines) == 0 || lines[0] != "---" {
+		return "", errors.New("SKILL.md must begin with YAML frontmatter")
 	}
-	for _, line := range lines[1:] {
-		if strings.TrimSpace(line) == "---" {
-			break
-		}
-		if after, ok := strings.CutPrefix(line, "name:"); ok {
-			value := strings.TrimSpace(after)
-			var decoded string
-			if json.Unmarshal([]byte(value), &decoded) == nil {
-				return strings.TrimSpace(decoded)
+	for index := 1; index < len(lines); index++ {
+		if lines[index] == "---" {
+			frontmatter := strings.Join(lines[1:index], "\n")
+			if strings.TrimSpace(frontmatter) == "" {
+				return "", errors.New("SKILL.md frontmatter must not be empty")
 			}
-			return strings.Trim(strings.TrimSpace(value), "'")
+			return frontmatter, nil
 		}
 	}
-	return ""
+	return "", errors.New("SKILL.md YAML frontmatter is not terminated")
+}
+
+func sourceLogicalName(locator artifactstoreSpec.SourceLocator) string {
+	base := path.Base(string(locator))
+	extension := path.Ext(base)
+	name := strings.TrimSuffix(base, extension)
+	name = strings.TrimPrefix(name, ".")
+	return strings.TrimSpace(name)
 }
 
 func portableSegment(value string) string {

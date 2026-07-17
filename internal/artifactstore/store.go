@@ -1,6 +1,7 @@
 package artifactstore
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/baseutils"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/contentstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/metadatastore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/sourcedriver"
@@ -557,4 +559,16 @@ func normalizedJSONObject(raw json.RawMessage) json.RawMessage {
 		return json.RawMessage("{}")
 	}
 	return append(json.RawMessage(nil), raw...)
+}
+
+func equivalentJSONObjects(left, right json.RawMessage) bool {
+	leftCanonical, err := baseutils.CanonicalizeJSON(left)
+	if err != nil {
+		return false
+	}
+	rightCanonical, err := baseutils.CanonicalizeJSON(right)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(leftCanonical, rightCanonical)
 }

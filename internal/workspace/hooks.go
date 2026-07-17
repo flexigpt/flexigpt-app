@@ -378,13 +378,24 @@ func workspaceDiagnostics(code, message string) []artifactstoreSpec.Diagnostic {
 		return character
 	}, message)
 	if len(message) > artifactstoreSpec.MaxDiagnosticMessageBytes {
-		message = message[:artifactstoreSpec.MaxDiagnosticMessageBytes]
+		message = truncateUTF8(message, artifactstoreSpec.MaxDiagnosticMessageBytes)
 	}
 	return []artifactstoreSpec.Diagnostic{{
 		Severity: artifactstoreSpec.DiagnosticSeverityError,
 		Code:     code,
 		Message:  message,
 	}}
+}
+
+func truncateUTF8(value string, maximum int) string {
+	if maximum <= 0 || len(value) <= maximum {
+		return value
+	}
+	end := maximum
+	for end > 0 && !utf8.ValidString(value[:end]) {
+		end--
+	}
+	return value[:end]
 }
 
 var (

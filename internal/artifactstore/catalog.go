@@ -89,7 +89,14 @@ func (s *Store) GetRootCatalogGeneration(
 	if _, err := s.repository.GetRoot(ctx, rootID, false); err != nil {
 		return spec.RootCatalogGeneration{}, err
 	}
-	return s.repository.GetRootCatalogGeneration(ctx, rootID)
+	generation, err := s.repository.GetRootCatalogGeneration(ctx, rootID)
+	if err != nil {
+		return spec.RootCatalogGeneration{}, err
+	}
+	if err := s.ensureRootCatalogCurrent(ctx, rootID, generation); err != nil {
+		return spec.RootCatalogGeneration{}, err
+	}
+	return generation, nil
 }
 
 // ListDefinitionHistory returns retained digest revisions for one source-local

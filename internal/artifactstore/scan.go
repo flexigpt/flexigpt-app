@@ -39,21 +39,11 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 	}
 	attached := make(map[spec.SourceID]spec.RootSourceAttachment, len(attachments))
 	sources := make(map[spec.SourceID]spec.ArtifactSource, len(attachments))
-	attachmentExpectations := make(
-		[]spec.RootScanAttachmentExpectation,
-		0,
-		len(attachments),
-	)
 	sourceExpectations := make([]spec.RootScanSourceExpectation, 0, len(attachments))
 	catalogByOccurrence := make(map[string]spec.CatalogResource)
 	sourceVersions := map[spec.SourceID]spec.SourceCatalogVersion{}
 	for _, attachment := range attachments {
 		attached[attachment.SourceID] = attachment
-		attachmentExpectations = append(attachmentExpectations, spec.RootScanAttachmentExpectation{
-			SourceID:   attachment.SourceID,
-			ModifiedAt: attachment.ModifiedAt,
-			Enabled:    attachment.Enabled,
-		})
 		source, err := s.repository.GetSource(ctx, attachment.SourceID)
 		if err != nil {
 			return spec.ScanResult{}, err
@@ -61,7 +51,6 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 		sources[source.SourceID] = source
 		sourceExpectations = append(sourceExpectations, spec.RootScanSourceExpectation{
 			SourceID:            source.SourceID,
-			ModifiedAt:          source.ModifiedAt,
 			ObservationRevision: source.ObservationRevision,
 			Enabled:             source.Enabled,
 		})
@@ -169,24 +158,57 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 			return spec.ScanResult{}, err
 		}
 		executedPlan.SourcePlans = append(executedPlan.SourcePlans, sourcePlan)
-		if source.ObservationRevision >= spec.MaxObservationRevision {
-			return spec.ScanResult{}, fmt.Errorf("%w: source observation revision is exhausted", spec.ErrConflict)
-		}
 		sourceResult, publication, err := s.scanSource(ctx, source, sourcePlan)
 		if err != nil {
 			return spec.ScanResult{}, err
+		}
+		nextObservationRevision := source.ObservationRevision
+		if publication.AdvanceObservationRevision {
+			if nextObservationRevision >= spec.MaxObservationRevision {
+				return spec.ScanResult{}, fmt.Errorf(
+					"%w: source observation revision is exhausted",
+					spec.ErrConflict,
+				)
+			}
+			nextObservationRevision++
 		}
 		sourcePublications = append(sourcePublications, publication)
 		applySourceCatalogPublication(catalogByOccurrence, publication)
 		result.Sources = append(result.Sources, sourceResult)
 		sourceVersions[source.SourceID] = spec.SourceCatalogVersion{
 			Generation:          sourceResult.Generation,
-			ObservationRevision: source.ObservationRevision + 1,
+			ObservationRevision: nextObservationRevision,
 		}
 		result.Diagnostics = appendBoundedDiagnostics(
 			result.Diagnostics,
 			sourceResult.Diagnostics...,
 		)
+	}
+
+	// Confirm all scanned sources after every source has been scanned. Confirming
+	// one source before scanning later sources leaves an avoidable publication
+	// window in which an earlier source can change unnoticed.
+	for _, sourceResult := range result.Sources {
+		source := sources[sourceResult.SourceID]
+		driver, ok := s.driverFor(source.Kind)
+		if !ok {
+			return spec.ScanResult{}, fmt.Errorf(
+				"%w: source kind %q",
+				spec.ErrDriverUnavailable,
+				source.Kind,
+			)
+		}
+		confirmedGeneration, err := driver.Snapshot(ctx, source)
+		if err != nil {
+			return spec.ScanResult{}, err
+		}
+		if confirmedGeneration != sourceResult.Generation {
+			return spec.ScanResult{}, fmt.Errorf(
+				"%w: source %q changed while the root was being scanned",
+				spec.ErrConflict,
+				source.SourceID,
+			)
+		}
 	}
 	resources := catalogResourcesFromMap(catalogByOccurrence)
 	planDigest, err := digestScanPlan(executedPlan)
@@ -209,12 +231,10 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 				CreatedAt:      s.nowUTC(),
 				Diagnostics:    result.Diagnostics,
 			},
-			ExpectedRootModifiedAt: root.ModifiedAt,
-			ExpectedRootRevision:   root.MountRevision,
-			Attachments:            attachmentExpectations,
-			Sources:                sourceExpectations,
-			SourceCatalogs:         sourcePublications,
-			CatalogResources:       resources,
+			ExpectedRootRevision: root.MountRevision,
+			Sources:              sourceExpectations,
+			SourceCatalogs:       sourcePublications,
+			CatalogResources:     resources,
 		},
 	)
 	if err != nil {
@@ -259,13 +279,13 @@ func (s *Store) scanSource(
 	now := s.nowUTC()
 	publication := spec.SourceCatalogPublication{
 		SourceID:                    source.SourceID,
-		ExpectedSourceModifiedAt:    source.ModifiedAt,
 		ExpectedObservationRevision: source.ObservationRevision,
 		ObservedGeneration:          generation,
 		ObservedAt:                  now,
 	}
 	result := spec.SourceScanResult{SourceID: source.SourceID, Generation: generation}
 	seenResources := make(map[string]struct{})
+	skippedLocators := make(map[spec.SourceLocator]struct{})
 	for _, entry := range entries {
 		result.Candidates++
 		maximum := plan.MaxFileBytes
@@ -273,45 +293,23 @@ func (s *Store) scanSource(
 			maximum = spec.MaxDefinitionJSONBytes
 		}
 		if entry.SizeBytes < 0 || entry.SizeBytes > maximum {
-			prior := existingByLocator[entry.Locator]
-			severity := spec.DiagnosticSeverityWarning
-			message := fmt.Sprintf(
-				"candidate exceeds the configured %d byte limit and was skipped",
-				maximum,
-			)
-			if len(prior) > 0 {
-				severity = spec.DiagnosticSeverityError
-				message = fmt.Sprintf(
-					"previously cataloged candidate exceeds the configured %d byte limit",
-					maximum,
-				)
-			}
+			skippedLocators[entry.Locator] = struct{}{}
 			diagnostics := []spec.Diagnostic{{
-				Severity: severity,
+				Severity: spec.DiagnosticSeverityWarning,
 				Code:     "artifactstore.candidate.too-large",
-				Message:  message,
+				Message: fmt.Sprintf(
+					"candidate exceeds the configured %d byte limit and was skipped",
+					maximum,
+				),
 				Location: &spec.DiagnosticLocation{Locator: entry.Locator},
 			}}
-			if len(prior) > 0 {
-				invalid := invalidCandidateResources(
-					source.SourceID,
-					entry.Locator,
-					"",
-					now,
-					nil,
-					diagnostics,
-					prior,
-				)
-				publication.Resources = append(publication.Resources, invalid...)
-				result.InvalidResources += len(invalid)
-			}
 			result.Diagnostics = appendBoundedDiagnostics(
 				result.Diagnostics,
 				diagnostics...,
 			)
 			continue
 		}
-		content, err := readCandidate(ctx, driver, source, entry, plan.MaxFileBytes)
+		content, err := readCandidate(ctx, driver, source, entry, maximum)
 		if err != nil {
 			return result, publication, err
 		}
@@ -322,12 +320,23 @@ func (s *Store) scanSource(
 			SourceContentDigest: digest,
 			Content:             content,
 		}
-		frontend, err := s.selectFrontend(ctx, candidate, plan.AllowedFrontendIDs)
+		frontend, recognized, err := s.selectFrontend(
+			ctx,
+			candidate,
+			plan.AllowedFrontendIDs,
+		)
 		if err != nil {
 			return result, publication, err
 		}
 		if frontend == nil {
-			prior := existingByLocator[entry.Locator]
+			if recognized {
+				skippedLocators[entry.Locator] = struct{}{}
+				continue
+			}
+			prior := catalogResourcesForFrontendScope(
+				existingByLocator[entry.Locator],
+				plan.AllowedFrontendIDs,
+			)
 			if len(prior) > 0 {
 				diagnostics := []spec.Diagnostic{{
 					Severity: spec.DiagnosticSeverityError,
@@ -378,7 +387,10 @@ func (s *Store) scanSource(
 				now,
 				&digest,
 				diagnostics,
-				existingByLocator[entry.Locator],
+				catalogResourcesForFrontendScope(
+					existingByLocator[entry.Locator],
+					plan.AllowedFrontendIDs,
+				),
 			)
 			publication.Resources = append(publication.Resources, invalid...)
 			result.InvalidResources += len(invalid)
@@ -539,6 +551,21 @@ func (s *Store) scanSource(
 				allDiagnostics...,
 			)
 		}
+
+		// Once a candidate has decoded successfully, the emitted subresource set
+		// is authoritative for that candidate. Otherwise removed MCP servers and
+		// other multi-resource children remain valid forever after partial scans.
+		for _, previous := range existingByLocator[entry.Locator] {
+			if !frontendInScanScope(previous.FrontendID, plan.AllowedFrontendIDs) {
+				continue
+			}
+			if _, emitted := seenResources[string(entry.Locator)+"\x00"+string(previous.SubresourceLocator)]; emitted {
+				continue
+			}
+			previous.State = spec.CatalogStateMissing
+			previous.Diagnostics = []spec.Diagnostic{}
+			publication.Resources = append(publication.Resources, previous)
+		}
 	}
 
 	if plan.Authoritative {
@@ -551,7 +578,10 @@ func (s *Store) scanSource(
 			)] = struct{}{}
 		}
 		for _, existing := range existingResources {
-			if !sourceLocatorInScanScope(existing.Locator, plan) {
+			if _, skipped := skippedLocators[existing.Locator]; skipped {
+				continue
+			}
+			if !catalogResourceInAuthoritativeScope(existing, plan) {
 				continue
 			}
 			key := recordOccurrenceKey(existing.SourceID, existing.Locator, existing.SubresourceLocator)
@@ -564,13 +594,28 @@ func (s *Store) scanSource(
 		}
 	}
 
-	confirmedGeneration, err := driver.Snapshot(ctx, source)
+	beforeDigest, err := digestCatalog(existingResources)
 	if err != nil {
 		return result, publication, err
 	}
-	if confirmedGeneration != generation {
+	projected := make(map[string]spec.CatalogResource, len(existingResources))
+	for _, existing := range existingResources {
+		projected[recordOccurrenceKey(
+			existing.SourceID,
+			existing.Locator,
+			existing.SubresourceLocator,
+		)] = existing
+	}
+	applySourceCatalogPublication(projected, publication)
+	afterDigest, err := digestCatalog(catalogResourcesFromMap(projected))
+	if err != nil {
+		return result, publication, err
+	}
+	publication.AdvanceObservationRevision = source.LastObservedGeneration == nil || beforeDigest != afterDigest
+	if publication.AdvanceObservationRevision &&
+		source.ObservationRevision >= spec.MaxObservationRevision {
 		return result, publication, fmt.Errorf(
-			"%w: source %q changed while it was being scanned",
+			"%w: source %q observation revision is exhausted",
 			spec.ErrConflict,
 			source.SourceID,
 		)
@@ -583,7 +628,7 @@ func (s *Store) selectFrontend(
 	ctx context.Context,
 	candidate spec.ArtifactCandidate,
 	allowed []spec.FrontendID,
-) (spec.ArtifactFrontend, error) {
+) (spec.ArtifactFrontend, bool, error) {
 	allowedSet := map[spec.FrontendID]struct{}{}
 	for _, id := range allowed {
 		allowedSet[id] = struct{}{}
@@ -592,14 +637,9 @@ func (s *Store) selectFrontend(
 	best := spec.RecognitionNone
 	tied := make([]spec.FrontendID, 0, 2)
 	for _, frontend := range s.frontendsSnapshot() {
-		if len(allowedSet) > 0 {
-			if _, ok := allowedSet[frontend.ID()]; !ok {
-				continue
-			}
-		}
 		recognition := frontend.Recognizes(ctx, candidate)
 		if recognition < spec.RecognitionNone || recognition > spec.RecognitionPreferred {
-			return nil, fmt.Errorf(
+			return nil, false, fmt.Errorf(
 				"%w: frontend %q returned invalid recognition %d",
 				spec.ErrInvalidRequest,
 				frontend.ID(),
@@ -615,14 +655,22 @@ func (s *Store) selectFrontend(
 	}
 	if len(tied) > 1 {
 		slices.Sort(tied)
-		return nil, fmt.Errorf(
+		return nil, false, fmt.Errorf(
 			"%w: candidate %q is equally recognized by frontends %v",
 			spec.ErrConflict,
 			candidate.Locator,
 			tied,
 		)
 	}
-	return selected, nil
+	if selected == nil {
+		return nil, false, nil
+	}
+	if len(allowedSet) > 0 {
+		if _, allowed := allowedSet[selected.ID()]; !allowed {
+			return nil, true, nil
+		}
+	}
+	return selected, true, nil
 }
 
 func (s *Store) validateSourceScanPlan(plan spec.SourceScanPlan) error {
@@ -677,6 +725,39 @@ func sourceLocatorInScanScope(locator spec.SourceLocator, plan spec.SourceScanPl
 		}
 	}
 	return false
+}
+
+func frontendInScanScope(
+	frontendID spec.FrontendID,
+	allowed []spec.FrontendID,
+) bool {
+	if frontendID == "" || len(allowed) == 0 {
+		return true
+	}
+	return slices.Contains(allowed, frontendID)
+}
+
+func catalogResourcesForFrontendScope(
+	resources []spec.CatalogResource,
+	allowed []spec.FrontendID,
+) []spec.CatalogResource {
+	out := make([]spec.CatalogResource, 0, len(resources))
+	for _, resource := range resources {
+		if frontendInScanScope(resource.FrontendID, allowed) {
+			out = append(out, resource)
+		}
+	}
+	return out
+}
+
+func catalogResourceInAuthoritativeScope(
+	resource spec.CatalogResource,
+	plan spec.SourceScanPlan,
+) bool {
+	if !sourceLocatorInScanScope(resource.Locator, plan) {
+		return false
+	}
+	return frontendInScanScope(resource.FrontendID, plan.AllowedFrontendIDs)
 }
 
 func collectSourceCandidates(
@@ -1028,27 +1109,6 @@ func applySourceCatalogPublication(
 		)
 		if existing, ok := resources[key]; ok {
 			incoming.FirstSeenAt = existing.FirstSeenAt
-			if incoming.PackageManifestLocator == "" {
-				incoming.PackageManifestLocator = existing.PackageManifestLocator
-			}
-			if incoming.Kind == "" {
-				incoming.Kind = existing.Kind
-			}
-			if incoming.LogicalName == "" {
-				incoming.LogicalName = existing.LogicalName
-			}
-			if incoming.LogicalVersion == "" {
-				incoming.LogicalVersion = existing.LogicalVersion
-			}
-			if incoming.CurrentDefinitionDigest == nil {
-				incoming.CurrentDefinitionDigest = cloneDigest(existing.CurrentDefinitionDigest)
-			}
-			if incoming.SourceContentDigest == nil {
-				incoming.SourceContentDigest = cloneDigest(existing.SourceContentDigest)
-			}
-			if incoming.FrontendID == "" {
-				incoming.FrontendID = existing.FrontendID
-			}
 		}
 		resources[key] = incoming
 	}

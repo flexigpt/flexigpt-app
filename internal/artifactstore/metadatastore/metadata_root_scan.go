@@ -13,23 +13,22 @@ import (
 )
 
 const (
-	selectRootScanRootSQL = `SELECT enabled, modified_at, soft_deleted_at, mount_revision
+	selectRootScanRootSQL = `SELECT enabled, soft_deleted_at, mount_revision
 		FROM artifact_roots
 		WHERE root_id = ?`
-	selectRootScanAttachmentsSQL = `SELECT source_id, modified_at, enabled
+	selectRootScanAttachmentsSQL = `SELECT source_id, enabled
 		FROM root_source_attachments
 		WHERE root_id = ?
 		ORDER BY source_id`
-	selectRootScanSourceSQL = `SELECT modified_at, observation_revision, enabled
+	selectRootScanSourceSQL = `SELECT observation_revision, enabled
 		FROM artifact_sources
 		WHERE source_id = ?`
 	updateRootScanSourceObservationSQL = `UPDATE artifact_sources
 		SET last_observed_generation = ?,
 		    last_scanned_at = ?,
-		    observation_revision = observation_revision + 1,
+		    observation_revision = observation_revision + ?,
 		    diagnostics_json = ?
 		WHERE source_id = ?
-		  AND modified_at = ?
 		  AND observation_revision = ?
 		  AND enabled = 1`
 	selectCurrentRootCatalogSQL = `SELECT
@@ -125,7 +124,6 @@ func (s *MetadataStore) PublishRootScan(
 	publication spec.RootScanPublication,
 ) (spec.RootCatalogGeneration, error) {
 	if publication.RootCatalog.RootID == "" ||
-		publication.ExpectedRootModifiedAt.IsZero() ||
 		publication.ExpectedRootRevision == 0 ||
 		publication.RootCatalog.RootRevision != publication.ExpectedRootRevision ||
 		publication.RootCatalog.CreatedAt.IsZero() {
@@ -326,12 +324,10 @@ func (s *MetadataStore) ListPublishedCatalogResourcesForRoot(
 }
 
 type rootScanAttachmentState struct {
-	ModifiedAt string
-	Enabled    bool
+	Enabled bool
 }
 
 type rootScanSourceState struct {
-	ModifiedAt          string
 	ObservationRevision uint64
 	Enabled             bool
 }
@@ -346,14 +342,13 @@ func validateRootScanExpectations(
 	err error,
 ) {
 	var enabled int
-	var modifiedAt string
 	var softDeletedAt sql.NullString
 	var mountRevision uint64
 	err = tx.QueryRowContext(
 		ctx,
 		selectRootScanRootSQL,
 		string(publication.RootCatalog.RootID),
-	).Scan(&enabled, &modifiedAt, &softDeletedAt, &mountRevision)
+	).Scan(&enabled, &softDeletedAt, &mountRevision)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, fmt.Errorf(
 			"%w: root %q",
@@ -371,34 +366,12 @@ func validateRootScanExpectations(
 			publication.RootCatalog.RootID,
 		)
 	}
-	if modifiedAt != formatTime(publication.ExpectedRootModifiedAt) ||
-		mountRevision != publication.ExpectedRootRevision {
+	if mountRevision != publication.ExpectedRootRevision {
 		return nil, nil, fmt.Errorf(
 			"%w: root %q changed while it was being scanned",
 			spec.ErrConflict,
 			publication.RootCatalog.RootID,
 		)
-	}
-
-	expectedAttachments := make(
-		map[spec.SourceID]spec.RootScanAttachmentExpectation,
-		len(publication.Attachments),
-	)
-	for _, expected := range publication.Attachments {
-		if expected.SourceID == "" || expected.ModifiedAt.IsZero() {
-			return nil, nil, fmt.Errorf(
-				"%w: invalid root scan attachment expectation",
-				spec.ErrInvalidRequest,
-			)
-		}
-		if _, duplicate := expectedAttachments[expected.SourceID]; duplicate {
-			return nil, nil, fmt.Errorf(
-				"%w: duplicate attachment expectation %q",
-				spec.ErrInvalidRequest,
-				expected.SourceID,
-			)
-		}
-		expectedAttachments[expected.SourceID] = expected
 	}
 
 	rows, err := tx.QueryContext(
@@ -411,31 +384,16 @@ func validateRootScanExpectations(
 	}
 	attachments = make(map[spec.SourceID]rootScanAttachmentState)
 	for rows.Next() {
-		var sourceID, attachmentModifiedAt string
+		var sourceID string
 		var attachmentEnabled int
-		if err := rows.Scan(
-			&sourceID,
-			&attachmentModifiedAt,
-			&attachmentEnabled,
-		); err != nil {
+		if err := rows.Scan(&sourceID, &attachmentEnabled); err != nil {
 			//nolint:sqlclosecheck // Closing before return.
 			_ = rows.Close()
 			return nil, nil, err
 		}
 		id := spec.SourceID(sourceID)
-		expected, ok := expectedAttachments[id]
-		if !ok ||
-			attachmentModifiedAt != formatTime(expected.ModifiedAt) ||
-			(attachmentEnabled != 0) != expected.Enabled {
-			_ = rows.Close()
-			return nil, nil, fmt.Errorf(
-				"%w: root attachments changed while the root was being scanned",
-				spec.ErrConflict,
-			)
-		}
 		attachments[id] = rootScanAttachmentState{
-			ModifiedAt: attachmentModifiedAt,
-			Enabled:    attachmentEnabled != 0,
+			Enabled: attachmentEnabled != 0,
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -445,19 +403,13 @@ func validateRootScanExpectations(
 	if err := rows.Close(); err != nil {
 		return nil, nil, err
 	}
-	if len(attachments) != len(expectedAttachments) {
-		return nil, nil, fmt.Errorf(
-			"%w: root attachments changed while the root was being scanned",
-			spec.ErrConflict,
-		)
-	}
 
 	expectedSources := make(
 		map[spec.SourceID]spec.RootScanSourceExpectation,
 		len(publication.Sources),
 	)
 	for _, expected := range publication.Sources {
-		if expected.SourceID == "" || expected.ModifiedAt.IsZero() {
+		if expected.SourceID == "" {
 			return nil, nil, fmt.Errorf(
 				"%w: invalid root scan source expectation",
 				spec.ErrInvalidRequest,
@@ -488,22 +440,20 @@ func validateRootScanExpectations(
 
 	sources = make(map[spec.SourceID]rootScanSourceState, len(expectedSources))
 	for sourceID, expected := range expectedSources {
-		var sourceModifiedAt string
 		var observationRevision uint64
 		var sourceEnabled int
 		err := tx.QueryRowContext(
 			ctx,
 			selectRootScanSourceSQL,
 			string(sourceID),
-		).Scan(&sourceModifiedAt, &observationRevision, &sourceEnabled)
+		).Scan(&observationRevision, &sourceEnabled)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, fmt.Errorf("%w: source %q", spec.ErrNotFound, sourceID)
 		}
 		if err != nil {
 			return nil, nil, fmt.Errorf("read root scan source %q: %w", sourceID, err)
 		}
-		if sourceModifiedAt != formatTime(expected.ModifiedAt) ||
-			observationRevision != expected.ObservationRevision ||
+		if observationRevision != expected.ObservationRevision ||
 			(sourceEnabled != 0) != expected.Enabled {
 			return nil, nil, fmt.Errorf(
 				"%w: source %q changed while the root was being scanned",
@@ -512,7 +462,6 @@ func validateRootScanExpectations(
 			)
 		}
 		sources[sourceID] = rootScanSourceState{
-			ModifiedAt:          sourceModifiedAt,
 			ObservationRevision: observationRevision,
 			Enabled:             sourceEnabled != 0,
 		}
@@ -526,7 +475,6 @@ func publishRootScanSourceCatalog(
 	publication spec.SourceCatalogPublication,
 ) error {
 	if publication.SourceID == "" ||
-		publication.ExpectedSourceModifiedAt.IsZero() ||
 		publication.ObservedGeneration == "" ||
 		publication.ObservedAt.IsZero() {
 		return fmt.Errorf(
@@ -534,7 +482,8 @@ func publishRootScanSourceCatalog(
 			spec.ErrInvalidRequest,
 		)
 	}
-	if publication.ExpectedObservationRevision >= spec.MaxObservationRevision {
+	if publication.AdvanceObservationRevision &&
+		publication.ExpectedObservationRevision >= spec.MaxObservationRevision {
 		return fmt.Errorf(
 			"%w: source %q observation revision is exhausted",
 			spec.ErrConflict,
@@ -553,9 +502,9 @@ func publishRootScanSourceCatalog(
 		updateRootScanSourceObservationSQL,
 		string(publication.ObservedGeneration),
 		formatTime(publication.ObservedAt),
+		boolToInt(publication.AdvanceObservationRevision),
 		diagnostics,
 		string(publication.SourceID),
-		formatTime(publication.ExpectedSourceModifiedAt),
 		publication.ExpectedObservationRevision,
 	)
 	if err != nil {

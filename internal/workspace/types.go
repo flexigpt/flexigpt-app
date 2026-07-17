@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
@@ -167,6 +168,63 @@ type Projection struct {
 	Diagnostics []artifactstoreSpec.Diagnostic
 }
 
+type ProjectionDiagnosticError struct {
+	Kind        artifactstoreSpec.ArtifactKind
+	Diagnostics []artifactstoreSpec.Diagnostic
+}
+
+func (e *ProjectionDiagnosticError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return fmt.Sprintf(
+		"workspace projector for %q reported %d diagnostic(s)",
+		e.Kind,
+		len(e.Diagnostics),
+	)
+}
+
+func (e *ProjectionDiagnosticError) Unwrap() error {
+	return ErrProjectionUnavailable
+}
+
+type ProjectedWorkspaceDefinition struct {
+	RecordID   artifactstoreSpec.RecordID
+	Discovery  DiscoveryPreferences
+	Definition json.RawMessage
+}
+
+type ProjectedSkillArgument struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Default     string `json:"default,omitempty"`
+	Required    bool   `json:"required,omitempty"`
+}
+
+type ProjectedSkill struct {
+	RecordID         artifactstoreSpec.RecordID
+	DefinitionDigest artifactstoreSpec.Digest
+	SourceID         artifactstoreSpec.SourceID
+	Locator          artifactstoreSpec.SourceLocator
+	Name             string
+	DisplayName      string
+	Description      string
+	Insert           string
+	Arguments        []ProjectedSkillArgument
+	Markdown         string
+	Frontmatter      json.RawMessage
+}
+
+type ProjectedDocument struct {
+	RecordID         artifactstoreSpec.RecordID
+	DefinitionDigest artifactstoreSpec.Digest
+	Kind             artifactstoreSpec.ArtifactKind
+	SourceID         artifactstoreSpec.SourceID
+	Locator          artifactstoreSpec.SourceLocator
+	Name             string
+	Markdown         string
+}
+
 type ResourceProjector interface {
 	Kind() artifactstoreSpec.ArtifactKind
 	Project(ctx context.Context, input ProjectionInput) (any, []artifactstoreSpec.Diagnostic)
@@ -197,6 +255,10 @@ type DiscoveryPlanner interface {
 }
 
 type YAMLDecoder func(ctx context.Context, content []byte) (json.RawMessage, error)
+
+// YAMLDecoder implementations must reject duplicate mapping keys, multiple
+// documents, non-string mapping keys, unsafe tags, and alias expansion. They
+// must return one bounded JSON object.
 
 type ArtifactStore interface {
 	RegisterArtifactFrontend(frontend artifactstoreSpec.ArtifactFrontend) error

@@ -540,9 +540,7 @@ func (s *Store) publishTransferredRecord(
 		Revision:                          revision,
 		Record:                            record,
 		Provenance:                        provenance,
-		ExpectedSourceModifiedAt:          source.ModifiedAt,
 		ExpectedSourceObservationRevision: source.ObservationRevision,
-		ExpectedAttachmentModifiedAt:      attachment.ModifiedAt,
 		ExpectedRootRevision:              root.MountRevision,
 	}); err != nil {
 		discardErr := materializer.DiscardDefinition(

@@ -141,7 +141,41 @@ func (s *MetadataStore) DeleteSource(
 	if err := validateExpectedModifiedAt("source", expectedModifiedAt); err != nil {
 		return err
 	}
-	result, err := s.db.ExecContext(
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin source deletion: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	observationDeletes := []struct {
+		label string
+		query string
+	}{
+		{
+			label: "root catalog snapshots",
+			query: `DELETE FROM root_catalog_resource_snapshots WHERE source_id = ?`,
+		},
+		{
+			label: "artifact packages",
+			query: `DELETE FROM artifact_packages WHERE source_id = ?`,
+		},
+		{
+			label: "catalog revisions",
+			query: `DELETE FROM catalog_resource_revisions WHERE source_id = ?`,
+		},
+		{
+			label: "catalog resources",
+			query: `DELETE FROM catalog_resources WHERE source_id = ?`,
+		},
+	}
+	for _, deletion := range observationDeletes {
+		if _, err := tx.ExecContext(ctx, deletion.query, string(sourceID)); err != nil {
+			return sqliteError(fmt.Errorf("delete source %s: %w", deletion.label, err))
+		}
+	}
+
+	result, err := tx.ExecContext(
 		ctx,
 		deleteSourceSQL,
 		string(sourceID),
@@ -150,7 +184,13 @@ func (s *MetadataStore) DeleteSource(
 	if err != nil {
 		return sqliteError(fmt.Errorf("delete source: %w", err))
 	}
-	return optimisticMutationResult(result, "source "+string(sourceID))
+	if err := optimisticMutationResult(result, "source "+string(sourceID)); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit source deletion: %w", err)
+	}
+	return nil
 }
 
 func scanSource(scanner sqlScanner) (spec.ArtifactSource, error) {

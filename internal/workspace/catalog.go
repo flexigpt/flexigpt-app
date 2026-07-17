@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"maps"
 	"sort"
@@ -40,9 +39,7 @@ func (s *Service) Catalog(
 	if err != nil {
 		return Catalog{}, err
 	}
-	if confirmed.Generation != generation.Generation ||
-		confirmed.RootRevision != generation.RootRevision ||
-		!maps.Equal(confirmed.SourceVersions, generation.SourceVersions) {
+	if !sameCatalogGeneration(confirmed, generation) {
 		return Catalog{}, fmt.Errorf(
 			"%w: root catalog changed while Workspace catalog was loading",
 			artifactstoreSpec.ErrConflict,
@@ -157,13 +154,22 @@ func (s *Service) Project(
 	if err != nil {
 		return Projection{}, err
 	}
+	descriptor, known := s.descriptors[record.Kind]
+	if !known || definition.SchemaID != descriptor.DefinitionSchemaID {
+		return Projection{}, fmt.Errorf(
+			"%w: definition schema %q is not registered for kind %q",
+			ErrProjectionUnavailable,
+			definition.SchemaID,
+			record.Kind,
+		)
+	}
 	projector, exists := s.projectors[record.Kind]
 	if !exists {
-		return Projection{
-			Kind:     record.Kind,
-			RecordID: recordID,
-			Value:    append(json.RawMessage(nil), definition.DefinitionJSON...),
-		}, nil
+		return Projection{}, fmt.Errorf(
+			"%w: no projector is registered for kind %q",
+			ErrProjectionUnavailable,
+			record.Kind,
+		)
 	}
 	value, diagnostics := projector.Project(ctx, ProjectionInput{
 		Workspace:  workspace,
@@ -178,21 +184,21 @@ func (s *Service) Project(
 			err,
 		)
 	}
-	for _, diagnostic := range diagnostics {
-		if diagnostic.Severity == artifactstoreSpec.DiagnosticSeverityError {
-			return Projection{}, fmt.Errorf(
-				"%w: projector %q reported an error",
-				ErrProjectionUnavailable,
-				record.Kind,
-			)
-		}
-	}
-	return Projection{
+	projection := Projection{
 		Kind:        record.Kind,
 		RecordID:    recordID,
 		Value:       value,
-		Diagnostics: diagnostics,
-	}, nil
+		Diagnostics: append([]artifactstoreSpec.Diagnostic(nil), diagnostics...),
+	}
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == artifactstoreSpec.DiagnosticSeverityError {
+			return projection, &ProjectionDiagnosticError{
+				Kind:        record.Kind,
+				Diagnostics: append([]artifactstoreSpec.Diagnostic(nil), diagnostics...),
+			}
+		}
+	}
+	return projection, nil
 }
 
 func (s *Service) ResolveReference(
@@ -241,6 +247,9 @@ func (s *Service) ResolveReference(
 			resource.Record.Locator == candidate.Locator &&
 			resource.Record.SubresourceLocator == candidate.SubresourceLocator &&
 			resource.Record.Kind == candidate.Kind {
+			if err := s.ensureCatalogGeneration(ctx, catalog.Generation); err != nil {
+				return CatalogResource{}, err
+			}
 			return resource, nil
 		}
 	}
@@ -306,6 +315,9 @@ func (s *Service) ComposeLoadPlan(
 			ErrReferenceUnresolved,
 		)
 	}
+	if err := s.ensureCatalogGeneration(ctx, catalog.Generation); err != nil {
+		return LoadPlan{}, err
+	}
 	sort.Slice(items, func(left, right int) bool {
 		return items[left].Resource.Record.RecordID <
 			items[right].Resource.Record.RecordID
@@ -321,6 +333,35 @@ func (s *Service) ComposeLoadPlan(
 		Items:       items,
 		Diagnostics: diagnostics,
 	}, nil
+}
+
+func (s *Service) ensureCatalogGeneration(
+	ctx context.Context,
+	expected artifactstoreSpec.RootCatalogGeneration,
+) error {
+	current, err := s.store.GetRootCatalogGeneration(ctx, expected.RootID)
+	if err != nil {
+		return err
+	}
+	if !sameCatalogGeneration(current, expected) {
+		return fmt.Errorf(
+			"%w: root catalog changed while Workspace data was loading",
+			artifactstoreSpec.ErrConflict,
+		)
+	}
+	return nil
+}
+
+func sameCatalogGeneration(
+	left artifactstoreSpec.RootCatalogGeneration,
+	right artifactstoreSpec.RootCatalogGeneration,
+) bool {
+	return left.RootID == right.RootID &&
+		left.Generation == right.Generation &&
+		left.RootRevision == right.RootRevision &&
+		left.ScanPlanDigest == right.ScanPlanDigest &&
+		left.CatalogDigest == right.CatalogDigest &&
+		maps.Equal(left.SourceVersions, right.SourceVersions)
 }
 
 func workspaceOccurrenceKey(

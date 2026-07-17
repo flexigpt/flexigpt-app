@@ -168,9 +168,10 @@ type DirectoryScanRoot struct {
 	Recursive       bool          `json:"recursive"`
 }
 
-// SourceScanPlan controls candidate discovery for one attached source. An
-// authoritative plan marks previously known resources outside this result as
-// missing; partial scans must leave Authoritative false.
+// SourceScanPlan controls candidate discovery for one attached source.
+// An authoritative plan marks previously known resources inside its declared
+// locator, directory, and allowed-frontend scope as missing when they are no
+// longer observed. Resources outside that scope remain unchanged.
 type SourceScanPlan struct {
 	SourceID            SourceID            `json:"sourceID"`
 	ExplicitLocators    []SourceLocator     `json:"explicitLocators,omitempty"`

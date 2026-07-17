@@ -37,8 +37,12 @@ func (portableDefinitionFrontend) Decode(
 	_ context.Context,
 	candidate spec.ArtifactCandidate,
 ) ([]spec.DecodedArtifact, []spec.Diagnostic) {
+	canonicalJSON, err := baseutils.CanonicalizeJSON(candidate.Content)
+	if err != nil {
+		return nil, portableDefinitionDiagnostic(err.Error())
+	}
 	var file spec.ArtifactDefinitionFile
-	decoder := json.NewDecoder(bytes.NewReader(candidate.Content))
+	decoder := json.NewDecoder(bytes.NewReader(canonicalJSON))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&file); err != nil {
 		return nil, portableDefinitionDiagnostic(err.Error())

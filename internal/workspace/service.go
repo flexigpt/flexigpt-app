@@ -51,9 +51,8 @@ func WithKindDescriptor(descriptor KindDescriptor) Option {
 			strings.TrimSpace(descriptor.CollectionDisplayName) == "" {
 			return fmt.Errorf("%w: incomplete kind descriptor", ErrInvalidWorkspace)
 		}
-		if _, exists := config.descriptors[descriptor.Kind]; exists {
-			return fmt.Errorf("%w: duplicate workspace kind %q", ErrInvalidWorkspace, descriptor.Kind)
-		}
+		// Explicit options replace defaults so application composition can swap
+		// schemas without retaining a hidden compatibility descriptor.
 		config.descriptors[descriptor.Kind] = descriptor
 		return nil
 	}
@@ -74,9 +73,7 @@ func WithResourceProjector(projector ResourceProjector) Option {
 		if projector == nil || projector.Kind() == "" {
 			return fmt.Errorf("%w: resource projector is invalid", ErrInvalidWorkspace)
 		}
-		if _, exists := config.projectors[projector.Kind()]; exists {
-			return fmt.Errorf("%w: duplicate projector for %q", ErrInvalidWorkspace, projector.Kind())
-		}
+		// A caller-supplied projector intentionally replaces the default.
 		config.projectors[projector.Kind()] = projector
 		return nil
 	}
@@ -98,7 +95,7 @@ func NewService(store ArtifactStore, options ...Option) (*Service, error) {
 	}
 	config := serviceConfig{
 		descriptors: defaultKindDescriptors(),
-		projectors:  map[artifactstoreSpec.ArtifactKind]ResourceProjector{},
+		projectors:  defaultProjectors(),
 	}
 	for _, option := range options {
 		if option == nil {
@@ -107,6 +104,41 @@ func NewService(store ArtifactStore, options ...Option) (*Service, error) {
 		if err := option(&config); err != nil {
 			return nil, err
 		}
+	}
+	if config.yamlDecoder == nil {
+		return nil, fmt.Errorf(
+			"%w: an approved YAML decoder is required for SKILL.md and workspace YAML",
+			ErrInvalidWorkspace,
+		)
+	}
+	for kind := range config.projectors {
+		if _, exists := config.descriptors[kind]; !exists {
+			return nil, fmt.Errorf(
+				"%w: projector kind %q has no descriptor",
+				ErrInvalidWorkspace,
+				kind,
+			)
+		}
+	}
+	seenFrontendIDs := map[artifactstoreSpec.FrontendID]struct{}{
+		NativeFrontendID: {},
+		artifactstoreSpec.PortableDefinitionFrontendID: {},
+	}
+	for _, extra := range config.extraFrontends {
+		if extra == nil || strings.TrimSpace(string(extra.ID())) == "" {
+			return nil, fmt.Errorf(
+				"%w: Workspace frontend has an empty ID",
+				ErrInvalidWorkspace,
+			)
+		}
+		if _, duplicate := seenFrontendIDs[extra.ID()]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: duplicate Workspace frontend %q",
+				ErrInvalidWorkspace,
+				extra.ID(),
+			)
+		}
+		seenFrontendIDs[extra.ID()] = struct{}{}
 	}
 
 	frontend := &nativeFrontend{
@@ -143,7 +175,7 @@ func NewService(store ArtifactStore, options ...Option) (*Service, error) {
 		store:       store,
 		planner:     planner,
 		descriptors: cloneDescriptors(config.descriptors),
-		projectors:  config.projectors,
+		projectors:  maps.Clone(config.projectors),
 		frontendIDs: frontendIDs,
 	}, nil
 }
@@ -519,8 +551,26 @@ func (p *recordSyncPolicy) DeriveRecord(
 	if p == nil {
 		return artifactstoreSpec.RecordDerivation{}, false, nil
 	}
-	if _, known := p.descriptors[resource.Kind]; !known {
+	descriptor, known := p.descriptors[resource.Kind]
+	if !known {
 		return artifactstoreSpec.RecordDerivation{}, false, nil
+	}
+	if definition.SchemaID != descriptor.DefinitionSchemaID {
+		return artifactstoreSpec.RecordDerivation{}, false, workspaceDiagnostics(
+			"workspace.synchronization.schema",
+			fmt.Sprintf(
+				"definition schema %q does not match Workspace schema %q for kind %q",
+				definition.SchemaID,
+				descriptor.DefinitionSchemaID,
+				resource.Kind,
+			),
+		)
+	}
+	if err := validateWorkspaceCanonicalDefinition(definition); err != nil {
+		return artifactstoreSpec.RecordDerivation{}, false, workspaceDiagnostics(
+			"workspace.synchronization.definition",
+			err.Error(),
+		)
 	}
 	collectionID, exists := p.collections[resource.Kind]
 	if !exists {
