@@ -17,6 +17,7 @@ interface CodeProps {
 	isBusy: boolean;
 	hideMermaidCode: boolean;
 	diffCandidatePaths?: string[];
+	defaultExpanded?: boolean;
 }
 
 interface MermaidResultState {
@@ -74,7 +75,14 @@ function useNearViewport(enabled: boolean) {
 	return { elementRef, activated };
 }
 
-export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandidatePaths }: CodeProps) {
+export function CodeBlock({
+	language,
+	value,
+	isBusy,
+	hideMermaidCode,
+	diffCandidatePaths,
+	defaultExpanded = true,
+}: CodeProps) {
 	const codeBodyId = useId();
 
 	const normalizedLanguage = language.toLowerCase();
@@ -99,10 +107,10 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 	const hasMermaidSyntaxError = isMermaid && mermaidRenderStatus === 'error';
 
 	// Default behavior:
-	// - normal code: expanded
+	// - normal code: caller-controlled (expanded unless explicitly collapsed)
 	// - valid/rendering Mermaid: collapsed
 	// - errored Mermaid: expanded unless the caller requested hidden Mermaid code behavior
-	const defaultIsExpanded = isMermaid ? hasMermaidSyntaxError && !hideMermaidCode : true;
+	const defaultIsExpanded = isMermaid ? hasMermaidSyntaxError && !hideMermaidCode : defaultExpanded;
 	const isExpanded = expansionOverride?.key === codeBlockKey ? expansionOverride.isExpanded : defaultIsExpanded;
 
 	const { elementRef, activated: richCodeWorkActivated } = useNearViewport(!isBusy);

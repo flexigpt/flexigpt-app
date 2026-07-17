@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import {
 	FiChevronRight,
 	FiCode,
@@ -48,6 +50,176 @@ function getAttachmentPath(att: Attachment): string {
 	return '';
 }
 
+type MessageBarChipTone = 'default' | 'info' | 'secondary';
+
+interface MessageBarChipProps {
+	icon: ReactNode;
+	label: ReactNode;
+	title?: string;
+	dataMessageChip: string;
+	fullWidth?: boolean;
+	onClick?: () => void;
+	trailing?: ReactNode;
+	children?: ReactNode;
+	tone?: MessageBarChipTone;
+	maxLabelWidthClass?: string;
+}
+
+function getMessageBarChipClassName(tone: MessageBarChipTone, fullWidth: boolean, interactive: boolean): string {
+	const toneClass =
+		tone === 'info'
+			? 'bg-info/10 border-info/50 gap-1'
+			: tone === 'secondary'
+				? 'bg-secondary/10 border-secondary/40 gap-1'
+				: 'border-base-content/20 mx-1 justify-between gap-2 bg-inherit';
+
+	return [
+		'text-base-content flex items-center rounded-2xl border px-2 py-0',
+		toneClass,
+		fullWidth ? 'w-full' : 'shrink-0',
+		interactive ? 'cursor-pointer' : '',
+	]
+		.filter(Boolean)
+		.join(' ');
+}
+
+/** Shared visual and interaction shell for every chip in the message attachments bar. */
+function MessageBarChip({
+	icon,
+	label,
+	title,
+	dataMessageChip,
+	fullWidth = false,
+	onClick,
+	trailing,
+	children,
+	tone = 'default',
+	maxLabelWidthClass = 'max-w-44',
+}: MessageBarChipProps) {
+	const className = getMessageBarChipClassName(tone, fullWidth, Boolean(onClick));
+	const content = (
+		<>
+			<span className="shrink-0">{icon}</span>
+			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : `${maxLabelWidthClass} truncate`}>{label}</span>
+			{trailing}
+			{children}
+		</>
+	);
+
+	if (onClick) {
+		return (
+			<button type="button" className={className} title={title} data-message-chip={dataMessageChip} onClick={onClick}>
+				{content}
+			</button>
+		);
+	}
+
+	return (
+		<div className={className} title={title} data-message-chip={dataMessageChip}>
+			{content}
+		</div>
+	);
+}
+
+interface MessageBarGroupChipProps<T> {
+	items: T[];
+	icon: ReactNode;
+	label: string;
+	menuLabel: string;
+	title: string;
+	ariaLabel: string;
+	dataMessageChip: string;
+	itemKey: (item: T, index: number) => string;
+	renderItem: (item: T, options: { fullWidth: boolean; onClick?: () => void }) => ReactNode;
+	onItemDetails?: (item: T) => void;
+	maxLabelWidthClass?: string;
+	countClassName?: string;
+}
+
+/**
+ * Shared one-or-many behavior for attachment-bar collections. A single item
+ * renders directly; multiple items use the same lazy Ariakit menu.
+ */
+function MessageBarGroupChip<T>({
+	items,
+	icon,
+	label,
+	menuLabel,
+	title,
+	ariaLabel,
+	dataMessageChip,
+	itemKey,
+	renderItem,
+	onItemDetails,
+	maxLabelWidthClass = 'max-w-24',
+	countClassName = 'text-base-content/60 whitespace-nowrap',
+}: MessageBarGroupChipProps<T>) {
+	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
+	const open = useStoreState(menu, 'open');
+	const count = items.length;
+
+	const getItemClick = (item: T) =>
+		onItemDetails
+			? () => {
+					onItemDetails(item);
+				}
+			: undefined;
+
+	if (count === 0) {
+		return null;
+	}
+
+	if (count === 1) {
+		const item = items[0];
+		return renderItem(item, { fullWidth: false, onClick: getItemClick(item) });
+	}
+
+	return (
+		<div className="shrink-0">
+			<MenuButton
+				store={menu}
+				className={getMessageBarChipClassName('info', false, true)}
+				title={title}
+				data-message-chip={dataMessageChip}
+				aria-label={ariaLabel}
+			>
+				<span className="shrink-0">{icon}</span>
+				<span className={`${maxLabelWidthClass} truncate`}>{label}</span>
+				<span className={countClassName}>{count}</span>
+				<FiChevronRight
+					className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+					aria-hidden="true"
+					size={14}
+				/>
+			</MenuButton>
+
+			{open ? (
+				<Menu
+					store={menu}
+					gutter={8}
+					overflowPadding={8}
+					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+					autoFocusOnShow
+				>
+					<div className="text-base-content/70 mb-1 text-xs font-semibold">{menuLabel}</div>
+
+					{items.map((item, index) => (
+						<MenuItem
+							key={itemKey(item, index)}
+							store={menu}
+							hideOnClick={Boolean(onItemDetails)}
+							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+							onClick={getItemClick(item)}
+						>
+							{renderItem(item, { fullWidth: true })}
+						</MenuItem>
+					))}
+				</Menu>
+			) : null}
+		</div>
+	);
+}
+
 interface MessageAttachmentInfoChipProps {
 	attachment: Attachment;
 	fullWidth?: boolean;
@@ -89,22 +261,18 @@ function MessageAttachmentInfoChip({ attachment, fullWidth = false }: MessageAtt
 	const modeTooltip = getAttachmentContentBlockModeTooltip(mode);
 
 	return (
-		<div
-			className={[
-				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
-				fullWidth ? 'w-full' : 'shrink-0',
-			]
-				.filter(Boolean)
-				.join(' ')}
+		<MessageBarChip
+			icon={icon}
+			label={truncated}
 			title={title}
-			data-message-chip="attachment"
-		>
-			<span className="shrink-0">{icon}</span>
-			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{truncated}</span>
-			<span className="badge badge-ghost badge-xs" title={modeTooltip} data-attachment-mode-pill>
-				{modeLabel}
-			</span>
-		</div>
+			dataMessageChip="attachment"
+			fullWidth={fullWidth}
+			trailing={
+				<span className="badge badge-ghost badge-xs" title={modeTooltip} data-attachment-mode-pill>
+					{modeLabel}
+				</span>
+			}
+		/>
 	);
 }
 
@@ -126,33 +294,15 @@ function MessageToolChoiceChip({ tool, fullWidth = false, onClick }: MessageTool
 	}
 
 	return (
-		<div
-			className={[
-				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
-				fullWidth ? 'w-full' : 'shrink-0',
-				onClick ? 'cursor-pointer' : '',
-			]
-				.filter(Boolean)
-				.join(' ')}
+		<MessageBarChip
+			icon={<FiTool size={14} />}
+			label={name}
 			title={tooltipLines.join('\n')}
-			data-message-chip="tool-choice"
+			dataMessageChip="tool-choice"
+			fullWidth={fullWidth}
 			onClick={onClick}
-			role={onClick ? 'button' : undefined}
-			tabIndex={onClick ? 0 : undefined}
-			onKeyDown={
-				onClick
-					? e => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								onClick();
-							}
-						}
-					: undefined
-			}
-		>
-			<FiTool size={14} />
-			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{name}</span>
-			<FiCode className="text-base-content/60" title="Details" size={14} />
-		</div>
+			trailing={<FiCode className="text-base-content/60" title="Details" size={14} />}
+		/>
 	);
 }
 
@@ -192,35 +342,20 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 		: '';
 	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}${mcpLabel}`;
 	return (
-		<div
-			className={[
-				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
-				fullWidth ? 'w-full' : 'shrink-0',
-				onClick ? 'cursor-pointer' : '',
-			]
-				.filter(Boolean)
-				.join(' ')}
+		<MessageBarChip
+			icon={<FiTerminal size={14} />}
+			label={label}
 			title={title}
-			data-message-chip="tool-suggested"
+			dataMessageChip="tool-suggested"
+			fullWidth={fullWidth}
 			onClick={onClick}
-			role={onClick ? 'button' : undefined}
-			tabIndex={onClick ? 0 : undefined}
-			onKeyDown={
-				onClick
-					? e => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault();
-								onClick();
-							}
-						}
-					: undefined
+			trailing={
+				<>
+					{isAutoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
+					<FiCode className="text-base-content/60" title="Details" size={14} />
+				</>
 			}
-		>
-			<FiTerminal size={14} />
-			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{label}</span>
-			{isAutoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
-			<FiCode className="text-base-content/60" title="Details" size={14} />
-		</div>
+		/>
 	);
 }
 
@@ -245,34 +380,15 @@ function MessageToolOutputChip({ output, fullWidth = false, onClick }: MessageTo
 	const title = titleLines.join('\n');
 
 	return (
-		<div
-			className={[
-				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
-				fullWidth ? 'w-full' : 'shrink-0',
-				onClick ? 'cursor-pointer' : '',
-			]
-				.filter(Boolean)
-				.join(' ')}
+		<MessageBarChip
+			icon={<FiTool size={14} />}
+			label={label}
 			title={title}
-			data-message-chip="tool-output"
+			dataMessageChip="tool-output"
+			fullWidth={fullWidth}
 			onClick={onClick}
-			role={onClick ? 'button' : undefined}
-			tabIndex={onClick ? 0 : undefined}
-			onKeyDown={
-				onClick
-					? e => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault();
-								onClick();
-							}
-						}
-					: undefined
-			}
-		>
-			<FiTool size={14} />
-			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{label}</span>
-			<FiCode className="text-base-content/60" title="Details" size={14} />
-		</div>
+			trailing={<FiCode className="text-base-content/60" title="Details" size={14} />}
+		/>
 	);
 }
 
@@ -289,34 +405,15 @@ function MessageWebSearchOutputChip({ output, fullWidth = false, onClick }: Mess
 	const title = [`Web search results`, `Tool: ${output.name}`, `Call ID: ${output.callID}`].join('\n');
 
 	return (
-		<div
-			className={[
-				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
-				fullWidth ? 'w-full' : 'shrink-0',
-				onClick ? 'cursor-pointer' : '',
-			]
-				.filter(Boolean)
-				.join(' ')}
+		<MessageBarChip
+			icon={<FiGlobe size={14} />}
+			label={label}
 			title={title}
-			data-message-chip="websearch-output"
+			dataMessageChip="websearch-output"
+			fullWidth={fullWidth}
 			onClick={onClick}
-			role={onClick ? 'button' : undefined}
-			tabIndex={onClick ? 0 : undefined}
-			onKeyDown={
-				onClick
-					? e => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault();
-								onClick();
-							}
-						}
-					: undefined
-			}
-		>
-			<FiGlobe size={14} />
-			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{label}</span>
-			<FiCode className="text-base-content/60" title="Details" size={14} />
-		</div>
+			trailing={<FiCode className="text-base-content/60" title="Details" size={14} />}
+		/>
 	);
 }
 
@@ -339,34 +436,15 @@ function MessageWebSearchCallChip({ call, fullWidth = false, onClick }: MessageW
 	const title = `Web search query: ${label}`;
 
 	return (
-		<div
-			className={[
-				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
-				fullWidth ? 'w-full' : 'shrink-0',
-				onClick ? 'cursor-pointer' : '',
-			]
-				.filter(Boolean)
-				.join(' ')}
+		<MessageBarChip
+			icon={<FiGlobe size={14} />}
+			label={label}
 			title={title}
-			data-message-chip="websearch-call"
+			dataMessageChip="websearch-call"
+			fullWidth={fullWidth}
 			onClick={onClick}
-			role={onClick ? 'button' : undefined}
-			tabIndex={onClick ? 0 : undefined}
-			onKeyDown={
-				onClick
-					? e => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault();
-								onClick();
-							}
-						}
-					: undefined
-			}
-		>
-			<FiGlobe size={14} />
-			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{label}</span>
-			<FiCode className="text-base-content/60" title="Details" size={14} />
-		</div>
+			trailing={<FiCode className="text-base-content/60" title="Details" size={14} />}
+		/>
 	);
 }
 
@@ -376,34 +454,15 @@ function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: Me
 	const title = [name, slug, tool.description].filter(Boolean).join('\n');
 
 	return (
-		<div
-			className={[
-				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
-				fullWidth ? 'w-full' : 'shrink-0',
-				onClick ? 'cursor-pointer' : '',
-			]
-				.filter(Boolean)
-				.join(' ')}
+		<MessageBarChip
+			icon={<FiGlobe size={14} />}
+			label={name}
 			title={title}
-			data-message-chip="websearch-tool-choice"
+			dataMessageChip="websearch-tool-choice"
+			fullWidth={fullWidth}
 			onClick={onClick}
-			role={onClick ? 'button' : undefined}
-			tabIndex={onClick ? 0 : undefined}
-			onKeyDown={
-				onClick
-					? e => {
-							if (e.key === 'Enter' || e.key === ' ') {
-								e.preventDefault();
-								onClick();
-							}
-						}
-					: undefined
-			}
-		>
-			<FiGlobe size={14} />
-			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{name}</span>
-			<FiCode className="text-base-content/60" title="Details" size={14} />
-		</div>
+			trailing={<FiCode className="text-base-content/60" title="Details" size={14} />}
+		/>
 	);
 }
 
@@ -441,16 +500,20 @@ function MessageSkillsContextChip({
 	];
 
 	return (
-		<div
-			className="bg-secondary/10 text-base-content border-secondary/40 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
+		<MessageBarChip
+			icon={<FiZap size={14} />}
+			label="Skills"
 			title={titleLines.join('\n')}
-			data-message-chip="skills-context"
-		>
-			<FiZap size={14} />
-			<span className="max-w-24 truncate">Skills</span>
-			<span className="text-base-content/60 whitespace-nowrap">{enabledCount}</span>
-			{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
-		</div>
+			dataMessageChip="skills-context"
+			tone="secondary"
+			maxLabelWidthClass="max-w-24"
+			trailing={
+				<>
+					<span className="text-base-content/60 whitespace-nowrap">{enabledCount}</span>
+					{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
+				</>
+			}
+		/>
 	);
 }
 
@@ -461,60 +524,21 @@ interface AttachmentsGroupChipProps {
 function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 	const count = attachments.length;
 
-	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-	const open = useStoreState(menu, 'open');
-
-	const titleLines = ['Attachments', `${count} item${count === 1 ? '' : 's'} attached`];
-	const title = titleLines.join('\n');
-	if (count === 0) {
-		return null;
-	}
-	// If there's only one item, show the single chip (no dropdown/group chip)
-	if (count === 1) {
-		return <MessageAttachmentInfoChip attachment={attachments[0]} />;
-	}
 	return (
-		<div
-			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
-			title={title}
-			data-message-chip="attachments-group"
-		>
-			<FiPaperclip size={14} />
-			<span className="max-w-24 truncate">Attachments</span>
-			<span className="text-base-content/70 text-xs whitespace-nowrap">{count}</span>
-
-			<MenuButton
-				store={menu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
-				aria-label="Show attachments for this message"
-				title="Show attachments for this message"
-			>
-				<FiChevronRight size={14} />
-			</MenuButton>
-
-			{open ? (
-				<Menu
-					store={menu}
-					gutter={8}
-					overflowPadding={8}
-					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-					autoFocusOnShow
-				>
-					<div className="text-base-content/70 mb-1 text-xs font-semibold">Attachments</div>
-
-					{attachments.map((att, index) => (
-						<MenuItem
-							key={`${att.kind}:${att.label}:${index}`}
-							store={menu}
-							hideOnClick={false}
-							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-						>
-							<MessageAttachmentInfoChip attachment={att} fullWidth />
-						</MenuItem>
-					))}
-				</Menu>
-			) : null}
-		</div>
+		<MessageBarGroupChip
+			items={attachments}
+			icon={<FiPaperclip size={14} />}
+			label="Attachments"
+			menuLabel="Attachments"
+			title={['Attachments', `${count} item${count === 1 ? '' : 's'} attached`].join('\n')}
+			ariaLabel="Show attachments for this message"
+			dataMessageChip="attachments-group"
+			itemKey={(attachment, index) => `${attachment.kind}:${attachment.label}:${index}`}
+			renderItem={(attachment, options) => (
+				<MessageAttachmentInfoChip attachment={attachment} fullWidth={options.fullWidth} />
+			)}
+			countClassName="text-base-content/70 text-xs whitespace-nowrap"
+		/>
 	);
 }
 
@@ -526,77 +550,21 @@ interface ToolChoicesGroupChipProps {
 function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupChipProps) {
 	const count = tools.length;
 
-	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-	const open = useStoreState(menu, 'open');
-	const titleLines = ['Tools', `${count} tool${count === 1 ? '' : 's'} used for this turn`];
-	const title = titleLines.join('\n');
-	if (count === 0) {
-		return null;
-	}
-	// If there's only one item, show the single chip (no dropdown/group chip)
-	if (count === 1) {
-		const tool = tools[0];
-		return (
-			<MessageToolChoiceChip
-				tool={tool}
-				onClick={
-					onToolChoiceDetails
-						? () => {
-								onToolChoiceDetails(tool);
-							}
-						: undefined
-				}
-			/>
-		);
-	}
 	return (
-		<div
-			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
-			title={title}
-			data-message-chip="tools-group"
-		>
-			<FiTool size={14} />
-			<span className="max-w-24 truncate">Tools</span>
-			<span className="text-base-content/60 whitespace-nowrap"> {count}</span>
-
-			<MenuButton
-				store={menu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
-				aria-label="Show tools for this message"
-				title="Show tools for this message"
-			>
-				<FiChevronRight size={14} />
-			</MenuButton>
-			{open ? (
-				<Menu
-					store={menu}
-					gutter={8}
-					overflowPadding={8}
-					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-					autoFocusOnShow
-				>
-					<div className="text-base-content/70 mb-1 text-xs font-semibold">Tools</div>
-
-					{tools.map(tool => (
-						<MenuItem
-							key={tool.toolID ?? `${tool.bundleID}-${tool.toolSlug}-${tool.toolVersion}`}
-							store={menu}
-							hideOnClick={false}
-							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-							onClick={
-								onToolChoiceDetails
-									? () => {
-											onToolChoiceDetails(tool);
-										}
-									: undefined
-							}
-						>
-							<MessageToolChoiceChip tool={tool} fullWidth />
-						</MenuItem>
-					))}
-				</Menu>
-			) : null}
-		</div>
+		<MessageBarGroupChip
+			items={tools}
+			icon={<FiTool size={14} />}
+			label="Tools"
+			menuLabel="Tools"
+			title={['Tools', `${count} tool${count === 1 ? '' : 's'} used for this turn`].join('\n')}
+			ariaLabel="Show tools for this message"
+			dataMessageChip="tools-group"
+			itemKey={tool => tool.toolID ?? `${tool.bundleID}-${tool.toolSlug}-${tool.toolVersion}`}
+			renderItem={(tool, options) => (
+				<MessageToolChoiceChip tool={tool} fullWidth={options.fullWidth} onClick={options.onClick} />
+			)}
+			onItemDetails={onToolChoiceDetails}
+		/>
 	);
 }
 
@@ -608,77 +576,21 @@ interface ToolOutputsGroupChipProps {
 function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroupChipProps) {
 	const count = outputs.length;
 
-	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-	const open = useStoreState(menu, 'open');
-	const titleLines = ['Tool outputs', `${count} result${count === 1 ? '' : 's'} used for this turn`];
-	const title = titleLines.join('\n');
-	if (count === 0) {
-		return null;
-	}
-	// If there's only one item, show the single chip (no dropdown/group chip)
-	if (count === 1) {
-		const out = outputs[0];
-		return (
-			<MessageToolOutputChip
-				output={out}
-				onClick={
-					onToolOutputDetails
-						? () => {
-								onToolOutputDetails(out);
-							}
-						: undefined
-				}
-			/>
-		);
-	}
 	return (
-		<div
-			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
-			title={title}
-			data-message-chip="tool-outputs-group"
-		>
-			<FiTool size={14} />
-			<span className="max-w-24 truncate">Tool results</span>
-			<span className="text-base-content/60 whitespace-nowrap">{count}</span>
-
-			<MenuButton
-				store={menu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
-				aria-label="Show tool results for this message"
-				title="Show tool results for this message"
-			>
-				<FiChevronRight size={14} />
-			</MenuButton>
-			{open ? (
-				<Menu
-					store={menu}
-					gutter={8}
-					overflowPadding={8}
-					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-					autoFocusOnShow
-				>
-					<div className="text-base-content/70 mb-1 text-xs font-semibold">Tool results</div>
-
-					{outputs.map(out => (
-						<MenuItem
-							key={out.id}
-							store={menu}
-							hideOnClick={false}
-							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-							onClick={
-								onToolOutputDetails
-									? () => {
-											onToolOutputDetails(out);
-										}
-									: undefined
-							}
-						>
-							<MessageToolOutputChip output={out} fullWidth />
-						</MenuItem>
-					))}
-				</Menu>
-			) : null}
-		</div>
+		<MessageBarGroupChip
+			items={outputs}
+			icon={<FiTool size={14} />}
+			label="Tool results"
+			menuLabel="Tool results"
+			title={['Tool outputs', `${count} result${count === 1 ? '' : 's'} used for this turn`].join('\n')}
+			ariaLabel="Show tool results for this message"
+			dataMessageChip="tool-outputs-group"
+			itemKey={output => output.id}
+			renderItem={(output, options) => (
+				<MessageToolOutputChip output={output} fullWidth={options.fullWidth} onClick={options.onClick} />
+			)}
+			onItemDetails={onToolOutputDetails}
+		/>
 	);
 }
 
@@ -690,77 +602,21 @@ interface ToolCallsGroupChipProps {
 function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProps) {
 	const count = calls.length;
 
-	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-	const open = useStoreState(menu, 'open');
-	const titleLines = ['Suggested tool calls', `${count} suggestion${count === 1 ? '' : 's'} from assistant`];
-	const title = titleLines.join('\n');
-	if (count === 0) {
-		return null;
-	}
-	// If there's only one item, show the single chip (no dropdown/group chip)
-	if (count === 1) {
-		const call = calls[0];
-		return (
-			<MessageToolCallChip
-				call={call}
-				onClick={
-					onToolCallDetails
-						? () => {
-								onToolCallDetails(call);
-							}
-						: undefined
-				}
-			/>
-		);
-	}
 	return (
-		<div
-			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
-			title={title}
-			data-message-chip="tool-calls-group"
-		>
-			<FiTerminal size={14} />
-			<span className="max-w-24 truncate">Tool calls</span>
-			<span className="text-base-content/60 whitespace-nowrap">{count}</span>
-
-			<MenuButton
-				store={menu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
-				aria-label="Show suggested tool calls for this message"
-				title="Show suggested tool calls for this message"
-			>
-				<FiChevronRight size={14} />
-			</MenuButton>
-			{open ? (
-				<Menu
-					store={menu}
-					gutter={8}
-					overflowPadding={8}
-					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-					autoFocusOnShow
-				>
-					<div className="text-base-content/70 mb-1 text-xs font-semibold">Suggested tool calls</div>
-
-					{calls.map(call => (
-						<MenuItem
-							key={call.id || call.callID}
-							store={menu}
-							hideOnClick={false}
-							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-							onClick={
-								onToolCallDetails
-									? () => {
-											onToolCallDetails(call);
-										}
-									: undefined
-							}
-						>
-							<MessageToolCallChip call={call} fullWidth />
-						</MenuItem>
-					))}
-				</Menu>
-			) : null}
-		</div>
+		<MessageBarGroupChip
+			items={calls}
+			icon={<FiTerminal size={14} />}
+			label="Tool calls"
+			menuLabel="Suggested tool calls"
+			title={['Suggested tool calls', `${count} suggestion${count === 1 ? '' : 's'} from assistant`].join('\n')}
+			ariaLabel="Show suggested tool calls for this message"
+			dataMessageChip="tool-calls-group"
+			itemKey={call => call.id || call.callID}
+			renderItem={(call, options) => (
+				<MessageToolCallChip call={call} fullWidth={options.fullWidth} onClick={options.onClick} />
+			)}
+			onItemDetails={onToolCallDetails}
+		/>
 	);
 }
 
@@ -772,76 +628,23 @@ interface WebSearchOutputsGroupChipProps {
 function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutputsGroupChipProps) {
 	const count = outputs.length;
 
-	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-	const open = useStoreState(menu, 'open');
-	const title = ['Web search results', `${count} result set${count === 1 ? '' : 's'} for this turn`].join('\n');
-	if (count === 0) {
-		return null;
-	}
-	// If there's only one item, show the single chip (no dropdown/group chip)
-	if (count === 1) {
-		const out = outputs[0];
-		return (
-			<MessageWebSearchOutputChip
-				output={out}
-				onClick={
-					onOutputDetails
-						? () => {
-								onOutputDetails(out);
-							}
-						: undefined
-				}
-			/>
-		);
-	}
 	return (
-		<div
-			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
-			title={title}
-			data-message-chip="websearch-outputs-group"
-		>
-			<FiGlobe size={14} />
-			<span className="max-w-32 truncate">Web results</span>
-			<span className="text-xs whitespace-nowrap opacity-80">{count}</span>
-
-			<MenuButton
-				store={menu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
-				aria-label="Show web‑search results for this turn"
-				title="Show web‑search results for this turn"
-			>
-				<FiChevronRight size={14} />
-			</MenuButton>
-			{open ? (
-				<Menu
-					store={menu}
-					gutter={8}
-					overflowPadding={8}
-					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-					autoFocusOnShow
-				>
-					<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search results</div>
-
-					{outputs.map(out => (
-						<MenuItem
-							key={out.id}
-							store={menu}
-							hideOnClick={false}
-							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-							onClick={
-								onOutputDetails
-									? () => {
-											onOutputDetails(out);
-										}
-									: undefined
-							}
-						>
-							<MessageWebSearchOutputChip output={out} fullWidth />
-						</MenuItem>
-					))}
-				</Menu>
-			) : null}
-		</div>
+		<MessageBarGroupChip
+			items={outputs}
+			icon={<FiGlobe size={14} />}
+			label="Web results"
+			menuLabel="Web search results"
+			title={['Web search results', `${count} result set${count === 1 ? '' : 's'} for this turn`].join('\n')}
+			ariaLabel="Show web-search results for this turn"
+			dataMessageChip="websearch-outputs-group"
+			itemKey={output => output.id}
+			renderItem={(output, options) => (
+				<MessageWebSearchOutputChip output={output} fullWidth={options.fullWidth} onClick={options.onClick} />
+			)}
+			onItemDetails={onOutputDetails}
+			maxLabelWidthClass="max-w-32"
+			countClassName="text-xs whitespace-nowrap opacity-80"
+		/>
 	);
 }
 
@@ -853,76 +656,22 @@ interface WebSearchCallsGroupChipProps {
 function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupChipProps) {
 	const count = calls.length;
 
-	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-	const open = useStoreState(menu, 'open');
-	const title = ['Web search activity', `${count} web‑search quer${count === 1 ? 'y' : 'ies'} this turn`].join('\n');
-	if (count === 0) {
-		return null;
-	}
-	// If there's only one item, show the single chip (no dropdown/group chip)
-	if (count === 1) {
-		const call = calls[0];
-		return (
-			<MessageWebSearchCallChip
-				call={call}
-				onClick={
-					onCallDetails
-						? () => {
-								onCallDetails(call);
-							}
-						: undefined
-				}
-			/>
-		);
-	}
 	return (
-		<div
-			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
-			title={title}
-			data-message-chip="websearch-calls-group"
-		>
-			<FiGlobe size={14} />
-			<span className="max-w-24 truncate">Web search</span>
-			<span className="text-xs whitespace-nowrap opacity-80">{count}</span>
-
-			<MenuButton
-				store={menu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
-				aria-label="Show web‑search queries for this turn"
-				title="Show web‑search queries for this turn"
-			>
-				<FiChevronRight size={14} />
-			</MenuButton>
-			{open ? (
-				<Menu
-					store={menu}
-					gutter={8}
-					overflowPadding={8}
-					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-					autoFocusOnShow
-				>
-					<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search queries</div>
-
-					{calls.map(call => (
-						<MenuItem
-							key={call.id || call.callID}
-							store={menu}
-							hideOnClick={false}
-							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-							onClick={
-								onCallDetails
-									? () => {
-											onCallDetails(call);
-										}
-									: undefined
-							}
-						>
-							<MessageWebSearchCallChip call={call} fullWidth />
-						</MenuItem>
-					))}
-				</Menu>
-			) : null}
-		</div>
+		<MessageBarGroupChip
+			items={calls}
+			icon={<FiGlobe size={14} />}
+			label="Web search"
+			menuLabel="Web search queries"
+			title={['Web search activity', `${count} web-search quer${count === 1 ? 'y' : 'ies'} this turn`].join('\n')}
+			ariaLabel="Show web-search queries for this turn"
+			dataMessageChip="websearch-calls-group"
+			itemKey={call => call.id || call.callID}
+			renderItem={(call, options) => (
+				<MessageWebSearchCallChip call={call} fullWidth={options.fullWidth} onClick={options.onClick} />
+			)}
+			onItemDetails={onCallDetails}
+			countClassName="text-xs whitespace-nowrap opacity-80"
+		/>
 	);
 }
 
@@ -934,78 +683,22 @@ interface WebSearchChoicesGroupChipProps {
 function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoicesGroupChipProps) {
 	const count = choices.length;
 
-	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-	const open = useStoreState(menu, 'open');
-	const title = ['Web search configuration', `${count} web‑search tool${count === 1 ? '' : 's'} in this turn`].join(
-		'\n'
-	);
-	if (count === 0) {
-		return null;
-	}
-	// If there's only one item, show the single chip (no dropdown/group chip)
-	if (count === 1) {
-		const choice = choices[0];
-		return (
-			<MessageWebSearchToolChoiceChip
-				tool={choice}
-				onClick={
-					onChoiceDetails
-						? () => {
-								onChoiceDetails(choice);
-							}
-						: undefined
-				}
-			/>
-		);
-	}
 	return (
-		<div
-			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
-			title={title}
-			data-message-chip="websearch-tools-group"
-		>
-			<FiGlobe size={14} />
-			<span className="max-w-24 truncate">Web search</span>
-			<span className="text-xs whitespace-nowrap opacity-80">{count}</span>
-
-			<MenuButton
-				store={menu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
-				aria-label="Show web‑search configuration for this turn"
-				title="Show web‑search configuration for this turn"
-			>
-				<FiChevronRight size={14} />
-			</MenuButton>
-			{open ? (
-				<Menu
-					store={menu}
-					gutter={8}
-					overflowPadding={8}
-					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-					autoFocusOnShow
-				>
-					<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search configuration</div>
-
-					{choices.map(choice => (
-						<MenuItem
-							key={choice.toolID ?? `${choice.bundleID}-${choice.toolSlug}-${choice.toolVersion}`}
-							store={menu}
-							hideOnClick={false}
-							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-							onClick={
-								onChoiceDetails
-									? () => {
-											onChoiceDetails(choice);
-										}
-									: undefined
-							}
-						>
-							<MessageWebSearchToolChoiceChip tool={choice} fullWidth />
-						</MenuItem>
-					))}
-				</Menu>
-			) : null}
-		</div>
+		<MessageBarGroupChip
+			items={choices}
+			icon={<FiGlobe size={14} />}
+			label="Web search"
+			menuLabel="Web search configuration"
+			title={['Web search configuration', `${count} web-search tool${count === 1 ? '' : 's'} in this turn`].join('\n')}
+			ariaLabel="Show web-search configuration for this turn"
+			dataMessageChip="websearch-tools-group"
+			itemKey={choice => choice.toolID ?? `${choice.bundleID}-${choice.toolSlug}-${choice.toolVersion}`}
+			renderItem={(choice, options) => (
+				<MessageWebSearchToolChoiceChip tool={choice} fullWidth={options.fullWidth} onClick={options.onClick} />
+			)}
+			onItemDetails={onChoiceDetails}
+			countClassName="text-xs whitespace-nowrap opacity-80"
+		/>
 	);
 }
 
@@ -1103,17 +796,17 @@ export function MessageAttachmentsBar({
 
 			{hasMCP && <MCPMessageContextChip context={mcpContext} />}
 			{hasMCPAppContext && (
-				<div
-					className="bg-secondary/10 text-base-content border-secondary/40 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
+				<MessageBarChip
+					icon={<FiServer size={14} />}
+					label="App context"
 					title={`MCP App model context\n${mcpAppContextUpdates?.length ?? 0} update${
 						(mcpAppContextUpdates?.length ?? 0) === 1 ? '' : 's'
 					}`}
-					data-message-chip="mcp-app-context"
-				>
-					<FiServer size={14} />
-					<span className="max-w-28 truncate">App context</span>
-					<span className="text-base-content/60 whitespace-nowrap">{mcpAppContextUpdates?.length ?? 0}</span>
-				</div>
+					dataMessageChip="mcp-app-context"
+					tone="secondary"
+					maxLabelWidthClass="max-w-28"
+					trailing={<span className="text-base-content/60 whitespace-nowrap">{mcpAppContextUpdates?.length ?? 0}</span>}
+				/>
 			)}
 			{hasSkillContext && <MessageSkillsContextChip enabledSkillRefs={enabledSkills} activeSkillRefs={activeSkills} />}
 

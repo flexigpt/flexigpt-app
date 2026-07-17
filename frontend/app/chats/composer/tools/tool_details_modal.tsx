@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiTool, FiX } from 'react-icons/fi';
+import { FiTool } from 'react-icons/fi';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { ToolOutputUnion, ToolStoreChoice } from '@/spec/tool';
@@ -16,6 +16,7 @@ import {
 } from '@/lib/jsonschema_utils';
 
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
@@ -272,24 +273,17 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-[80vw] overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
-					{/* header */}
-					<div className="mb-4 flex items-center justify-between">
-						<h3 className="flex items-center gap-2 text-lg font-bold">
+			<div className="modal-box bg-base-200 flex max-h-[80vh] max-w-[80vw] flex-col overflow-hidden rounded-2xl p-0">
+				<ModalHeader
+					title={
+						<span className="flex items-center gap-2">
 							<FiTool size={16} />
 							<span>{title}</span>
-						</h3>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => dialogRef.current?.close()}
-							aria-label="Close"
-						>
-							<FiX size={12} />
-						</button>
-					</div>
-
+						</span>
+					}
+					onClose={() => dialogRef.current?.close()}
+				/>
+				<div className="min-h-0 flex-1 overflow-y-auto p-6">
 					{/* Primary, human-friendly view (semantics first) */}
 					{primaryContent.trim().length > 0 && (
 						<div className="mb-4">
@@ -301,6 +295,7 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 								isBusy={false}
 								align="items-start text-left"
 								renderAsMarkdown={true}
+								defaultCodeBlockExpanded={false}
 							/>
 						</div>
 					)}
@@ -315,6 +310,7 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 							isBusy={false}
 							align="items-start text-left"
 							renderAsMarkdown={true}
+							defaultCodeBlockExpanded={false}
 						/>
 					</div>
 				</div>

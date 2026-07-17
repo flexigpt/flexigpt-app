@@ -1,15 +1,89 @@
-# Artifact Store and Workspace HLD
+# Artifact Store and Workspace High-Level Design
 
-## 1. Document status
+- [Document Status and Scope](#document-status-and-scope)
+  - [Reading Guide](#reading-guide)
+- [Architectural Decisions](#architectural-decisions)
+- [Artifact Store Architecture](#artifact-store-architecture)
+  - [Purpose](#purpose)
+  - [Architecture and Ownership](#architecture-and-ownership)
+  - [Domain Model](#domain-model)
+  - [Entity Definitions](#entity-definitions)
+    - [Artifact Root](#artifact-root)
+    - [Artifact Source](#artifact-source)
+    - [Root Source Attachment](#root-source-attachment)
+    - [Artifact Package](#artifact-package)
+    - [Catalog Resource](#catalog-resource)
+    - [Canonical Definition](#canonical-definition)
+    - [Artifact Record](#artifact-record)
+    - [Artifact Collection](#artifact-collection)
+    - [Root Catalog Generation](#root-catalog-generation)
+  - [Workspace Compatibility Mapping](#workspace-compatibility-mapping)
+    - [Current Model](#current-model)
+    - [Generic Artifact Store Model](#generic-artifact-store-model)
+    - [Portable Package Model](#portable-package-model)
+    - [Full Relationship](#full-relationship)
+    - [Concept Mapping](#concept-mapping)
+  - [Responsibilities](#responsibilities)
+    - [Root Lifecycle](#root-lifecycle)
+    - [Source Lifecycle](#source-lifecycle)
+    - [Package Lifecycle](#package-lifecycle)
+    - [Catalog Lifecycle](#catalog-lifecycle)
+    - [Record Synchronization](#record-synchronization)
+    - [Collection Lifecycle](#collection-lifecycle)
+    - [Transfer Lifecycle](#transfer-lifecycle)
+    - [Dependency Lifecycle](#dependency-lifecycle)
+    - [Source Materialization](#source-materialization)
+  - [Validation Model](#validation-model)
+  - [Source Model](#source-model)
+    - [Source Kind Ownership](#source-kind-ownership)
+    - [Materialization Rule](#materialization-rule)
+    - [Future Acquisition Integration](#future-acquisition-integration)
+    - [Source Driver Contract](#source-driver-contract)
+  - [Extension Points](#extension-points)
+    - [Root Kind Hook](#root-kind-hook)
+    - [Artifact Frontend](#artifact-frontend)
+    - [Collection Kind Hook](#collection-kind-hook)
+  - [Scanning Workflow](#scanning-workflow)
+  - [Record Synchronization Workflow](#record-synchronization-workflow)
+  - [Public API](#public-api)
+  - [Persistence](#persistence)
+- [Planned Workspace Integration](#planned-workspace-integration)
+  - [Workspace Purpose](#workspace-purpose)
+  - [Workspace Root Model](#workspace-root-model)
+  - [Workspace root data](#workspace-root-data)
+  - [Workspace Source Attachments](#workspace-source-attachments)
+  - [Workspace Definition Kinds](#workspace-definition-kinds)
+  - [Workspace Artifact Records](#workspace-artifact-records)
+  - [Workspace Derived Collections](#workspace-derived-collections)
+  - [Planned Components](#planned-components)
+  - [Discovery Workflow](#discovery-workflow)
+    - [Select a Filesystem Workspace Root](#select-a-filesystem-workspace-root)
+    - [Bootstrap Discovery](#bootstrap-discovery)
+    - [Expanded Discovery](#expanded-discovery)
+  - [Resource Projection](#resource-projection)
+  - [Existing Store Integration](#existing-store-integration)
+  - [Runtime Boundary](#runtime-boundary)
+  - [Refresh Workflow](#refresh-workflow)
+  - [Import and Fork Workflow](#import-and-fork-workflow)
+  - [Ownership Summary](#ownership-summary)
+  - [Architecture Summary](#architecture-summary)
 
-- Status: Artifact Store implementation baseline, Workspace design pending implementation
-- Scope: Internal Artifact Store foundation and Workspace feature built on it
-- Excludes: Conversation configuration, conversation persistence, runtime lifecycle, secret values, policy evaluation, and execution logic
-- Primary objective: Establish a durable, minimal artifact lifecycle model that Workspace uses first and other stores may adopt later
-- Reading rule: Part A describes the implemented `internal/artifactstore` architecture. Part B is a target design for a future Workspace consumer.
-- Terminology: `implemented` describes code currently present in Artifact Store. `planned` describes intended Workspace integration and is not an available Workspace API.
+## Document Status and Scope
 
-## 2. Architectural decisions
+| Attribute  | Details                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------- |
+| Status     | Artifact Store is the implementation baseline. Workspace is a planned consumer.                                       |
+| Scope      | The internal Artifact Store foundation and the Workspace feature built on it.                                         |
+| Exclusions | Conversation configuration and persistence, runtime lifecycle, secret values, policy evaluation, and execution logic. |
+| Objective  | Establish a durable, minimal artifact lifecycle model that Workspace uses first and other stores may adopt later.     |
+
+### Reading Guide
+
+- `Artifact Store Architecture` describes the implemented `internal/artifactstore` architecture.
+- `Planned Workspace Integration` is a target design for a future typed consumer; it is not an available Workspace API.
+- `implemented` describes code currently present in Artifact Store. `planned` describes intended future behavior.
+
+## Architectural Decisions
 
 | ID      | Status                  | Decision                                                                                                                                              |
 | ------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -34,11 +108,9 @@
 | `AS-19` | Implemented             | Root scans atomically publish source observations and immutable root catalog snapshots in metadata storage.                                           |
 | `AS-20` | Implemented             | Read-only source projection and source-kind-specific transfer writes use separate optional materializer ports.                                        |
 
----
+## Artifact Store Architecture
 
-# Part A: Artifact Store
-
-## 3. Purpose
+### Purpose
 
 Artifact Store is a generic internal FlexiGPT component that manages portable artifact definitions and app-local artifact records.
 
@@ -71,7 +143,7 @@ It does not interpret domain behavior.
 
 It does not know what a Skill, MCP server, Tool, Model Preset, Workspace, Agent, or Assistant Preset means.
 
-## 4. Implemented decomposition and ownership
+### Architecture and Ownership
 
 The implementation separates domain orchestration from persistence, portable
 content, source I/O, and runtime projection. `artifactstore.Store` is the
@@ -99,7 +171,7 @@ definition materializer, typed hook, version matcher, or consumer frontend.
 Portable-content-dependent operations remain unavailable until a
 `PortableContentRepository` is supplied during composition.
 
-## 5. Entity model
+### Domain Model
 
 ```text
 ArtifactSource
@@ -122,9 +194,9 @@ Records retain their local identity and data independently of a source
 occurrence. A captured, forked, or detached record can remain resolvable even
 when its original source occurrence is no longer present in a root catalog.
 
-## 6. Entity definitions
+### Entity Definitions
 
-## 6.1 Artifact Root
+#### Artifact Root
 
 An Artifact Root is an app-owned logical mount.
 
@@ -148,7 +220,7 @@ App Library
 Imported Company Package
 ```
 
-### Fields
+##### Fields
 
 ```text
 ArtifactRoot
@@ -184,7 +256,7 @@ schema ID when the object is not empty. A registered `RootKindHook`, when one
 exists for the root kind, performs typed root-data and source-attachment
 validation. Interpretation remains the responsibility of the consumer.
 
-## 6.2 Artifact Source
+#### Artifact Source
 
 An Artifact Source is a content provider.
 
@@ -197,7 +269,7 @@ fs-directory
 embedded-fs-directory
 ```
 
-### Fields
+##### Fields
 
 ```text
 ArtifactSource
@@ -217,7 +289,7 @@ ArtifactSource
 
 `SourceID` is generated and stable.
 
-### `fs-directory` source
+##### `fs-directory` Source
 
 Example configuration:
 
@@ -243,7 +315,7 @@ The `fs-directory` driver delegates local file reads, stats, and directory
 listing to `LLMTools` `FSTool`. Artifact Store business logic does not perform
 direct operating-system filesystem I/O.
 
-### `embedded-fs-directory` source
+##### `embedded-fs-directory` Source
 
 Example configuration:
 
@@ -264,7 +336,7 @@ Artifact Store can then:
 - Synchronize records.
 - Treat it like any other directory source.
 
-## 6.3 Root Source Attachment
+#### Root Source Attachment
 
 A Root Source Attachment connects an Artifact Source to an Artifact Root.
 
@@ -280,7 +352,7 @@ Detaching removes only this app-local relationship. It does not delete the
 source registration, source content, source catalog history, records, or
 portable definitions.
 
-### Fields
+##### Fields
 
 ```text
 RootSourceAttachment
@@ -309,7 +381,7 @@ Artifact Store stores role and priority.
 
 The consumer feature interprets their meaning.
 
-## 6.4 Artifact Package
+#### Artifact Package
 
 An Artifact Package is app-local metadata for an observed portable
 package-manifest occurrence. The portable `PortablePackageManifest` body belongs
@@ -329,7 +401,7 @@ Its natural key is:
 SourceID + manifest locator
 ```
 
-### Fields
+##### Fields
 
 ```text
 ArtifactPackage
@@ -351,7 +423,7 @@ A source may have:
 - Multiple packages.
 - Resources outside any package.
 
-## 6.5 Catalog Resource
+#### Catalog Resource
 
 A Catalog Resource is a discovered source-local artifact occurrence.
 
@@ -385,7 +457,7 @@ Locator: .skills/code-review/SKILL.md
 SubresourceLocator: skill
 ```
 
-### Fields
+##### Fields
 
 ```text
 CatalogResource
@@ -414,7 +486,7 @@ source resources are copied into the newly published root catalog snapshot.
 Root catalog readers use that immutable snapshot only after verifying that the
 root's attachments and observed source generations are still current.
 
-## 6.6 Canonical Definition
+#### Canonical Definition
 
 A Canonical Definition is normalized portable content.
 
@@ -424,7 +496,7 @@ It is identified by canonical SHA-256 digest.
 DefinitionDigest = sha256(canonical normalized definition)
 ```
 
-### Fields
+##### Fields
 
 ```text
 CanonicalDefinition
@@ -450,7 +522,7 @@ There is no generated `RevisionID`.
 Definitions may be deduplicated by digest even when found in different sources.
 Definition bodies are stored through `PortableContentRepository`, not in SQLite.
 
-## 6.7 Artifact Record
+#### Artifact Record
 
 An Artifact Record is the local app item.
 
@@ -466,7 +538,7 @@ MCP server registration
 
 It has a generated stable `RecordID`.
 
-### Fields
+##### Fields
 
 ```text
 ArtifactRecord
@@ -514,13 +586,13 @@ Artifact Record is the only generic app-side artifact entity.
 
 There is no separate generic binding entity.
 
-## 6.8 Artifact Collection
+#### Artifact Collection
 
 An Artifact Collection is an app-local grouping of Artifact Records.
 
 It maps directly to current Bundle semantics.
 
-### Fields
+##### Fields
 
 ```text
 ArtifactCollection
@@ -540,7 +612,7 @@ ArtifactCollection
 
 `CollectionID` is generated and stable.
 
-## 6.9 Root Catalog Generation
+#### Root Catalog Generation
 
 A Root Catalog Generation is a durable scan publication record.
 
@@ -552,7 +624,7 @@ Its identity is:
 RootID + Generation
 ```
 
-### Fields
+##### Fields
 
 ```text
 RootCatalogGeneration
@@ -573,9 +645,9 @@ root-catalog reads conflict until another `ScanRoot` publication succeeds.
 
 ---
 
-# 7. Planned Workspace bundle, package, collection, and item mapping
+### Workspace Compatibility Mapping
 
-## 7.1 Current model
+#### Current Model
 
 ```text
 Bundle
@@ -586,7 +658,7 @@ This is a target Workspace compatibility mapping. Workspace itself is not
 implemented yet, and Artifact Store has not changed any existing Bundle or item
 persistence.
 
-## 7.2 Generic Artifact Store model
+#### Generic Artifact Store Model
 
 ```text
 ArtifactCollection
@@ -598,14 +670,14 @@ ArtifactSource
     -> CanonicalDefinition digest
 ```
 
-## 7.3 Portable package model
+#### Portable Package Model
 
 ```text
 ArtifactPackage
   -> observed portable package manifest metadata
 ```
 
-## 7.4 Full relationship
+#### Full Relationship
 
 ```text
 ArtifactPackage
@@ -620,7 +692,7 @@ ArtifactCollection
 
 An Artifact Package may cause a derived Artifact Collection to be created, but they remain separate objects.
 
-## 7.5 Mapping table
+#### Concept Mapping
 
 | Current concept       | Generic artifact equivalent |
 | --------------------- | --------------------------- |
@@ -644,9 +716,9 @@ An Artifact Package may cause a derived Artifact Collection to be created, but t
 
 ---
 
-# 8. Artifact Store responsibilities
+### Responsibilities
 
-## 8.1 Root lifecycle
+#### Root Lifecycle
 
 Artifact Store provides:
 
@@ -661,7 +733,7 @@ Artifact Store provides:
 - List root attachments.
 - Validate root typed data through registered root kind hook.
 
-## 8.2 Source lifecycle
+#### Source Lifecycle
 
 Artifact Store provides:
 
@@ -676,7 +748,7 @@ Artifact Store provides:
 - Store source diagnostics.
 - Scan source content.
 
-## 8.3 Package lifecycle
+#### Package Lifecycle
 
 Artifact Store provides app-local package-observation persistence:
 
@@ -691,7 +763,7 @@ workflows. Portable package-manifest storage is available through
 `PortableContentRepository`, not through a separate Store-level package export
 operation.
 
-## 8.4 Catalog lifecycle
+#### Catalog Lifecycle
 
 Artifact Store provides:
 
@@ -709,7 +781,7 @@ Artifact Store provides:
 The public scan entry point is `ScanRoot`. Source scanning is an internal part
 of a root scan and is not exposed as a standalone `ScanSource` API.
 
-## 8.5 Record synchronization
+#### Record Synchronization
 
 Artifact Store provides:
 
@@ -728,7 +800,7 @@ Artifact Store provides:
 `RecordSyncPolicy` is consumer-owned. It decides whether a valid catalog
 resource creates a linked record and supplies only local derivation values.
 
-## 8.6 Collection lifecycle
+#### Collection Lifecycle
 
 Artifact Store provides:
 
@@ -743,7 +815,7 @@ Artifact Store provides:
 - Reject deletion when records remain.
 - Change or clear record placement through `UpdateRecord`.
 
-## 8.7 Transfer lifecycle
+#### Transfer Lifecycle
 
 Artifact Store provides:
 
@@ -765,7 +837,7 @@ Portable content is immutable and may be persisted before the metadata
 transaction. It can therefore remain content-addressed storage even if a later
 metadata publication conflicts.
 
-## 8.8 Dependency lifecycle
+#### Dependency Lifecycle
 
 Artifact Store provides:
 
@@ -779,7 +851,7 @@ Artifact Store provides:
 
 Artifact Store does not choose consumer precedence rules.
 
-## 8.9 Source materialization
+#### Source Materialization
 
 `MaterializeSource` produces an app-local, stable real-directory projection for
 consumers that require a directory path. It reads through the source driver and
@@ -790,7 +862,7 @@ import, capture, and fork. Neither materializer is installed by default.
 
 ---
 
-# 9. Artifact Store validation model
+### Validation Model
 
 | Validation layer              | Owner                                        | Examples                                                              |
 | ----------------------------- | -------------------------------------------- | --------------------------------------------------------------------- |
@@ -808,9 +880,9 @@ import, capture, and fork. Neither materializer is installed by default.
 
 ---
 
-# 10. Artifact Store source model
+### Source Model
 
-## 10.1 Source kind ownership
+#### Source Kind Ownership
 
 Source kinds are registered with `artifactstore.Store` during application
 composition. Typed consumers use those drivers through Artifact Store; they do
@@ -828,7 +900,7 @@ without changing Store business logic.
 | `zip-directory`         | Artifact Store | Future optional                                     |
 | `cas-directory`         | Artifact Store | Future optional                                     |
 
-## 10.2 Materialization rule
+#### Materialization Rule
 
 Artifact Store has two intentionally separate materialization boundaries:
 
@@ -841,7 +913,7 @@ The Store does not provide a default publisher or definition writer. Runtime
 code and typed consumers must not bypass these ports by reading source paths or
 writing source content directly.
 
-## 10.3 Future acquisition integration
+#### Future Acquisition Integration
 
 A remote acquisition flow may materialize its verified result into an Artifact
 Store-supported directory source. Network, Git, archive, credential, and trust
@@ -859,7 +931,7 @@ ZIP importer
 -> fs-directory source
 ```
 
-## 10.4 Source driver contract
+#### Source Driver Contract
 
 ```go
 type SourceDriver interface {
@@ -909,9 +981,9 @@ uses that generation to protect scans and root catalog freshness.
 
 ---
 
-# 11. Artifact Store extension model
+### Extension Points
 
-## 11.1 Root kind hook
+#### Root Kind Hook
 
 ```go
 type RootKindHook interface {
@@ -930,7 +1002,7 @@ type RootKindHook interface {
 }
 ```
 
-## 11.2 Artifact frontend
+#### Artifact Frontend
 
 ```go
 type ArtifactFrontend interface {
@@ -979,7 +1051,7 @@ definition emitted by a frontend. Artifact Store canonicalizes the definition,
 calculates its digest, and persists portable content only after frontend
 diagnostics pass generic validation.
 
-## 11.3 Collection kind hook
+#### Collection Kind Hook
 
 ```go
 type CollectionKindHook interface {
@@ -1000,7 +1072,7 @@ type CollectionKindHook interface {
 
 ---
 
-# 12. Artifact Store scanning workflow
+### Scanning Workflow
 
 `ScanRoot` is the public scan operation. It serializes scan publication within
 one Store instance and performs the following work:
@@ -1054,7 +1126,7 @@ planned; an already observed unplanned source remains part of the root catalog.
 
 ---
 
-# 13. Artifact Store record synchronization workflow
+### Record Synchronization Workflow
 
 ```text
 Root catalog generation
@@ -1103,7 +1175,7 @@ returns its ID as the placement for a newly derived record.
 
 ---
 
-# 14. Artifact Store API surface
+### Public API
 
 ```text
 Roots and attachments
@@ -1122,7 +1194,7 @@ Scanning and catalog
   - GetDefinitionByDigest, ListDefinitionHistory
 
 Records
-  - CreateRecord, GetRecord, ListRecords, UpdateRecord, RefreshRecord
+  - CreateRecord, GetRecord, ListRecords, UpdateRecord, RefreshRecord, SyncRecords
   - PinRecord, DetachRecord, DeleteRecord, ExportRecord
 
 Collections
@@ -1147,7 +1219,7 @@ Runtime-facing source projection
 
 ---
 
-# 15. Artifact Store persistence
+### Persistence
 
 The default Store uses two durable repositories with different ownership
 boundaries:
@@ -1177,11 +1249,9 @@ those SQLite transactions.
 No runtime state, live connection, secret value, policy decision, or execution
 state is persisted by either Artifact Store repository.
 
----
+## Planned Workspace Integration
 
-# Part B: Workspace Feature, planned
-
-## 16. Workspace feature purpose
+### Workspace Purpose
 
 Workspace is not implemented in this repository. There is currently no
 `WorkspaceService`, Workspace root hook, Workspace frontend, discovery planner,
@@ -1206,7 +1276,7 @@ When implemented, Workspace will provide:
 
 Workspace does not own a separate persistence database.
 
-## 17. Workspace root model
+### Workspace Root Model
 
 A planned Workspace Root is:
 
@@ -1232,7 +1302,7 @@ Filesystem path is stored in the attached `fs-directory` source config.
 
 Empty Workspace Root has no primary filesystem source.
 
-## 18. Workspace source attachments
+### Workspace Source Attachments
 
 A planned filesystem Workspace Root will have:
 
@@ -1261,7 +1331,7 @@ RootSourceAttachment
   Role: built-in
 ```
 
-## 19. Workspace definition kinds
+### Workspace Definition Kinds
 
 When implemented, Workspace may register artifact frontends for canonical kinds such as:
 
@@ -1291,7 +1361,7 @@ legacy assistant JSON
 
 No source file needs to use a common artifact envelope.
 
-## 20. Workspace artifact records
+### Workspace Artifact Records
 
 Workspace scans produce Catalog Resources and Canonical Definitions.
 
@@ -1324,7 +1394,7 @@ The Artifact Record is the Workspace-local app item.
 
 No current `SkillStore` item is created.
 
-## 21. Workspace derived collections
+### Workspace Derived Collections
 
 Workspace may create derived Artifact Collections to support current bundle-oriented APIs.
 
@@ -1359,7 +1429,7 @@ ArtifactRecord.RecordID
 -> existing ItemID
 ```
 
-## 22. Workspace components
+### Planned Components
 
 The following components are planned. None currently exists in the repository.
 
@@ -1378,9 +1448,9 @@ The following components are planned. None currently exists in the repository.
 
 ---
 
-# 23. Workspace discovery workflow
+### Discovery Workflow
 
-## 23.1 Select Filesystem Workspace Root
+#### Select a Filesystem Workspace Root
 
 ```text
 Frontend
@@ -1417,7 +1487,7 @@ WorkspaceService
 -> WorkspaceCatalogService.Query(rootID)
 ```
 
-## 23.2 Bootstrap discovery
+#### Bootstrap Discovery
 
 Workspace bootstrap plan may inspect:
 
@@ -1439,14 +1509,14 @@ Workspace owns these conventions.
 
 Artifact Store only executes the plan.
 
-## 23.3 Expanded discovery
+#### Expanded Discovery
 
 After a Workspace Definition is identified:
 
 ```text
 Workspace Definition
 -> WorkspaceDiscoveryPlanner.BuildExpandedPlan
--> ArtifactService.ScanRoot
+-> artifactstore.Store.ScanRoot
 -> ArtifactService.SyncRecords
 -> new root catalog generation
 -> WorkspaceCatalogService.Query
@@ -1465,7 +1535,7 @@ The Workspace Definition may add paths for:
 
 ---
 
-# 24. Workspace resource projection
+### Resource Projection
 
 Workspace must project Artifact Records into existing domain resource shapes.
 
@@ -1492,7 +1562,7 @@ The frontend does not need to understand Artifact Store keys or source locators.
 
 ---
 
-# 25. Current store integration
+### Existing Store Integration
 
 This is a planned compatibility integration. Existing stores remain installed-resource providers.
 
@@ -1537,7 +1607,7 @@ The existing store persistence formats do not change.
 
 ---
 
-# 26. Workspace runtime boundary
+### Runtime Boundary
 
 Artifact Store does not construct runtime objects, and a future Workspace
 implementation must not add runtime behavior to Artifact Store.
@@ -1579,7 +1649,7 @@ Workspace Tool Record
 
 ---
 
-# 27. Workspace refresh workflow
+### Refresh Workflow
 
 ```text
 Planned Workspace refresh
@@ -1604,7 +1674,7 @@ Outcomes:
 
 ---
 
-# 28. Workspace import and fork workflow
+### Import and Fork Workflow
 
 This is a planned use of the implemented generic transfer workflow.
 
@@ -1628,7 +1698,7 @@ The imported or forked Artifact Record becomes independent.
 
 ---
 
-# 29. Artifact Store and Workspace ownership summary
+### Ownership Summary
 
 | Concern                         | Artifact Store |                    Workspace | Runtime |
 | ------------------------------- | -------------: | ---------------------------: | ------: |
@@ -1651,7 +1721,7 @@ The imported or forked Artifact Record becomes independent.
 
 ---
 
-# 30. Final architecture statement
+### Architecture Summary
 
 ```text
 Artifact Collection

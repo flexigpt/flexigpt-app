@@ -21,6 +21,7 @@ interface MessageContentCardProps {
 	renderAsMarkdown?: boolean;
 	diffCandidatePaths?: string[];
 	streamSource?: MessageStreamSource;
+	defaultCodeBlockExpanded?: boolean;
 }
 
 function AppendOnlyStreamingText(props: { source: MessageStreamSource; align: string }) {
@@ -103,7 +104,8 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 		prev.align === next.align &&
 		prev.renderAsMarkdown === next.renderAsMarkdown &&
 		prev.diffCandidatePaths === next.diffCandidatePaths &&
-		prev.streamSource === next.streamSource
+		prev.streamSource === next.streamSource &&
+		prev.defaultCodeBlockExpanded === next.defaultCodeBlockExpanded
 	);
 }
 
@@ -117,6 +119,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 	renderAsMarkdown = true,
 	diffCandidatePaths,
 	streamSource,
+	defaultCodeBlockExpanded = true,
 }: MessageContentCardProps) {
 	const liveText = isStreaming ? streamedText : content;
 	const textToRender = liveText;
@@ -163,6 +166,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 				align={align}
 				isBusy={renderBusy}
 				diffCandidatePaths={diffCandidatePaths}
+				defaultCodeBlockExpanded={defaultCodeBlockExpanded}
 			/>
 		</div>
 	);

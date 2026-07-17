@@ -71,6 +71,7 @@ interface EnhancedMarkdownProps {
 	hideMermaidCode?: boolean;
 	hideH1Title?: boolean;
 	diffCandidatePaths?: string[];
+	defaultCodeBlockExpanded?: boolean;
 	onLinkClick?: (href: string, event: ReactMouseEvent<HTMLAnchorElement>) => boolean;
 }
 
@@ -83,6 +84,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	hideMermaidCode = false,
 	hideH1Title = false,
 	diffCandidatePaths,
+	defaultCodeBlockExpanded = true,
 	onLinkClick,
 }: EnhancedMarkdownProps) {
 	const processedText = useMemo(() => {
@@ -286,11 +288,12 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 						isBusy={isBusy}
 						hideMermaidCode={hideMermaidCode}
 						diffCandidatePaths={diffCandidatePaths}
+						defaultExpanded={defaultCodeBlockExpanded}
 					/>
 				);
 			},
 		};
-	}, [align, diffCandidatePaths, hideH1Title, hideMermaidCode, isBusy, onLinkClick]);
+	}, [align, defaultCodeBlockExpanded, diffCandidatePaths, hideH1Title, hideMermaidCode, isBusy, onLinkClick]);
 
 	return (
 		<MdErrorBoundary source={processedText}>
