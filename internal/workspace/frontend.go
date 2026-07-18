@@ -76,7 +76,7 @@ func (f *nativeFrontend) Decode(
 	)
 	switch class.Format {
 	case formatMarkdown:
-		decoded, err = f.decodeMarkdown(ctx, class.Kind, candidate.Content)
+		decoded, err = f.decodeMarkdown(ctx, class.Kind, candidate.Locator, candidate.Content)
 	case formatJSON, formatYAML:
 		decoded, err = f.decodeStructured(ctx, class, candidate.Locator, candidate.Content)
 	default:
@@ -180,18 +180,6 @@ func (f *nativeFrontend) DescribeExportClosure(
 	}, nil
 }
 
-func (*nativeFrontend) MatchesVersionConstraint(
-	_ context.Context,
-	constraint string,
-	version artifactstoreSpec.LogicalVersion,
-) (bool, error) {
-	constraint = strings.TrimSpace(constraint)
-	if after, ok := strings.CutPrefix(constraint, "="); ok {
-		constraint = strings.TrimSpace(after)
-	}
-	return constraint == string(version), nil
-}
-
 func (f *nativeFrontend) decodeStructured(
 	ctx context.Context,
 	class nativeDocumentClass,
@@ -265,22 +253,18 @@ func (f *nativeFrontend) decodeMCPCollection(
 	object map[string]json.RawMessage,
 ) ([]artifactstoreSpec.DecodedArtifact, error) {
 	var servers map[string]json.RawMessage
-	foundServers := false
-	for _, field := range []string{"mcpServers", "servers"} {
-		if value, ok := object[field]; ok {
-			if err := json.Unmarshal(value, &servers); err != nil {
-				return nil, fmt.Errorf("%s must be an object: %w", field, err)
-			}
-			if servers == nil {
-				return nil, fmt.Errorf("%s must be an object", field)
-			}
-			foundServers = true
-			break
+	rawServers, foundServers := object["mcpServers"]
+	if foundServers {
+		if err := json.Unmarshal(rawServers, &servers); err != nil {
+			return nil, fmt.Errorf("mcpServers must be an object: %w", err)
+		}
+		if servers == nil {
+			return nil, errors.New("mcpServers must be an object")
 		}
 	}
 	if !foundServers {
 		if class.RequireMCPCollection {
-			return nil, errors.New("MCP collection document must contain mcpServers or servers")
+			return nil, errors.New("MCP collection document must contain mcpServers")
 		}
 		name := nativeLogicalName(KindMCPServerDefinition, object, locator)
 		if strings.TrimSpace(name) == "" {
@@ -359,6 +343,7 @@ func (f *nativeFrontend) decodeMCPCollection(
 func (f *nativeFrontend) decodeMarkdown(
 	ctx context.Context,
 	kind artifactstoreSpec.ArtifactKind,
+	locator artifactstoreSpec.SourceLocator,
 	content []byte,
 ) ([]artifactstoreSpec.DecodedArtifact, error) {
 	if !bytes.Equal(bytes.ToValidUTF8(content, nil), content) {
@@ -428,7 +413,14 @@ func (f *nativeFrontend) decodeMarkdown(
 	if err != nil {
 		return nil, err
 	}
-	return []artifactstoreSpec.DecodedArtifact{{Definition: definition}}, nil
+	decoded := artifactstoreSpec.DecodedArtifact{Definition: definition}
+	if kind == KindSkillDefinition {
+		decoded.AssetRoots = []artifactstoreSpec.SourceAssetRoot{{
+			Root:      artifactstoreSpec.SourceLocator(path.Dir(string(locator))),
+			Recursive: true,
+		}}
+	}
+	return []artifactstoreSpec.DecodedArtifact{decoded}, nil
 }
 
 func (f *nativeFrontend) definitionFor(
@@ -625,7 +617,4 @@ func portableSegment(value string) string {
 	return "artifact-" + digest[:12]
 }
 
-var (
-	_ artifactstoreSpec.ArtifactFrontend       = (*nativeFrontend)(nil)
-	_ artifactstoreSpec.FrontendVersionMatcher = (*nativeFrontend)(nil)
-)
+var _ artifactstoreSpec.ArtifactFrontend = (*nativeFrontend)(nil)

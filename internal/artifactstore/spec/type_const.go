@@ -39,14 +39,33 @@ const (
 	MaxPortablePackageDefinitions = 4096
 	MaxAttachmentPriority         = 1_000_000
 	MaxSlugRunes                  = 64
+	MaxSourcePlansPerScan         = 1024
+	MaxExplicitLocatorsPerSource  = 10_000
+	MaxDirectoryRootsPerSource    = 1024
+	MaxFrontendIDsPerSource       = 256
+	MaxIncludePatternsPerRoot     = 256
+	MaxAssetRootsPerDefinition    = 16
 	DefaultMaxScanCandidates      = 10_000
 	DefaultMaxScanEntries         = 100_000
 	DefaultMaxTraversalDepth      = 64
+	DefaultMaxScanAssetFiles      = 10_000
+	MaxScanTotalBytes             = int64(512 << 20)
 	DefaultMaxMaterializedEntries = 100_000
 	DefaultMaxMaterializedFiles   = 50_000
 	DefaultMaxMaterializedBytes   = int64(512 << 20)
 	MaxTransferPayloadBytes       = int64(512 << 20)
+	MaxTransferReceiptBytes       = 2 << 20
+	MaxTransferMaterializedFiles  = MaxPortablePackageDefinitions + MaxAssetsPerDefinition
 	MaxObservationRevision        = uint64(1<<63 - 1)
+)
+
+const (
+	// ManagedArtifactDataDirectoryName and ManagedArtifactTrashDirectoryName
+	// are reserved in app-managed filesystem sources. Source drivers must not
+	// expose their contents as scan candidates.
+	ManagedArtifactDataDirectoryName        = ".flexigpt-artifacts"
+	ManagedArtifactDefinitionsDirectoryName = ".flexigpt-artifacts/definitions"
+	ManagedArtifactTrashDirectoryName       = ".artifactstore-trash"
 )
 
 var ErrInvalid = errors.New("artifactstore: invalid")

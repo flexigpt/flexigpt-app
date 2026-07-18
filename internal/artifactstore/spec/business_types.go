@@ -116,22 +116,23 @@ type ExportedRecord struct {
 
 // DependencyCandidate is one catalog definition matching a portable selector.
 type DependencyCandidate struct {
-	Resource   CatalogResource
-	Definition CanonicalDefinition
+	Resource   CatalogResource     `json:"resource"`
+	Definition CanonicalDefinition `json:"definition"`
 }
 
 // DependencyExplanation preserves all candidates because Artifact Store does
 // not choose feature-specific precedence rules.
 type DependencyExplanation struct {
-	Selector    ArtifactSelector
-	Candidates  []DependencyCandidate
-	Diagnostics []Diagnostic
+	Selector    ArtifactSelector      `json:"selector"`
+	Candidates  []DependencyCandidate `json:"candidates"`
+	Selected    *DependencyCandidate  `json:"selected,omitempty"`
+	Diagnostics []Diagnostic          `json:"diagnostics,omitempty"`
 }
 
 // DependencyGraph is a diagnostic graph rooted at one record definition.
 type DependencyGraph struct {
-	RootRecordID RecordID
-	Nodes        map[Digest]CanonicalDefinition
-	Edges        map[Digest][]DependencyExplanation
-	Diagnostics  []Diagnostic
+	RootRecordID RecordID                           `json:"rootRecordID"`
+	Nodes        map[Digest]CanonicalDefinition     `json:"nodes"`
+	Edges        map[Digest][]DependencyExplanation `json:"edges"`
+	Diagnostics  []Diagnostic                       `json:"diagnostics,omitempty"`
 }

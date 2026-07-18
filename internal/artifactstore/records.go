@@ -3,6 +3,7 @@ package artifactstore
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"sort"
 	"time"
@@ -70,10 +71,11 @@ func (s *Store) UpdateRecord(
 			spec.ErrInvalidRequest,
 		)
 	}
-	record, err := s.repository.GetRecord(ctx, recordID)
+	record, err := s.GetRecord(ctx, recordID)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
+	original := record
 	if err := requireExpectedModifiedAt(
 		"record "+string(recordID),
 		record.ModifiedAt,
@@ -94,6 +96,12 @@ func (s *Store) UpdateRecord(
 	}
 	if update.Data != nil {
 		record.Data = normalizedJSONObject(*update.Data)
+	}
+	if reflect.DeepEqual(original.CollectionID, record.CollectionID) &&
+		original.Enabled == record.Enabled &&
+		original.DataSchemaID == record.DataSchemaID &&
+		equivalentJSONObjects(original.Data, record.Data) {
+		return original, nil
 	}
 
 	var resource *spec.CatalogResource
@@ -135,7 +143,7 @@ func (s *Store) RefreshRecord(ctx context.Context, recordID spec.RecordID) (spec
 	}
 	defer finish()
 
-	record, err := s.repository.GetRecord(ctx, recordID)
+	record, err := s.GetRecord(ctx, recordID)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
@@ -189,7 +197,7 @@ func (s *Store) DeleteRecord(
 		return err
 	}
 	defer finish()
-	record, err := s.repository.GetRecord(ctx, recordID)
+	record, err := s.GetRecord(ctx, recordID)
 	if err != nil {
 		return err
 	}
@@ -209,7 +217,7 @@ func (s *Store) ExportRecord(ctx context.Context, recordID spec.RecordID) (spec.
 }
 
 func (s *Store) exportRecord(ctx context.Context, recordID spec.RecordID) (spec.ExportedRecord, error) {
-	record, err := s.repository.GetRecord(ctx, recordID)
+	record, err := s.GetRecord(ctx, recordID)
 	if err != nil {
 		return spec.ExportedRecord{}, err
 	}
@@ -220,7 +228,8 @@ func (s *Store) exportRecord(ctx context.Context, recordID spec.RecordID) (spec.
 	if err != nil {
 		return spec.ExportedRecord{}, err
 	}
-	resource, resourceErr := s.repository.GetCatalogResource(
+	var resource *spec.CatalogResource
+	resourceValue, resourceErr := s.repository.GetCatalogResource(
 		ctx,
 		spec.CatalogResourceKey{
 			SourceID:           record.SourceID,
@@ -231,22 +240,27 @@ func (s *Store) exportRecord(ctx context.Context, recordID spec.RecordID) (spec.
 	if resourceErr != nil && !isNotFound(resourceErr) {
 		return spec.ExportedRecord{}, resourceErr
 	}
-	closure := spec.ExportClosure{DefinitionDigests: []spec.Digest{definition.Digest}, Assets: definition.AssetManifest}
 	if resourceErr == nil {
-		frontend, ok := s.frontendFor(resource.FrontendID)
-		if !ok {
-			return spec.ExportedRecord{}, fmt.Errorf(
-				"%w: frontend %q required to export record %q",
-				spec.ErrFrontendUnavailable,
-				resource.FrontendID,
-				record.RecordID,
-			)
-		}
+		resource = &resourceValue
+	}
+	closure := spec.ExportClosure{DefinitionDigests: []spec.Digest{definition.Digest}, Assets: definition.AssetManifest}
+	frontend, found, err := s.recordFrontendForDefinition(ctx, record, resource, &definition)
+	if err != nil {
+		return spec.ExportedRecord{}, err
+	}
+	if found {
 		candidate, diagnostics := frontend.DescribeExportClosure(ctx, definition)
 		if err := errorDiagnostics("export closure", diagnostics); err != nil {
 			return spec.ExportedRecord{}, err
 		}
 		closure = candidate
+	} else if resource != nil && resource.FrontendID != "" {
+		return spec.ExportedRecord{}, fmt.Errorf(
+			"%w: frontend %q required to export record %q",
+			spec.ErrFrontendUnavailable,
+			resource.FrontendID,
+			record.RecordID,
+		)
 	}
 	if err := validate.ValidateExportClosure(definition, closure); err != nil {
 		return spec.ExportedRecord{}, fmt.Errorf(
@@ -303,6 +317,13 @@ func (s *Store) prepareRecordForResolved(
 	source, err := s.repository.GetSource(ctx, draft.SourceID)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
+	}
+	if draft.RecordMode == spec.RecordModeEmbeddedOverlay &&
+		source.Kind != spec.SourceKindEmbeddedFSDirectory {
+		return spec.ArtifactRecord{}, fmt.Errorf(
+			"%w: embedded-overlay record requires an embedded filesystem source",
+			spec.ErrInvalidRequest,
+		)
 	}
 	attachment, err := s.repository.GetRootSourceAttachment(ctx, draft.RootID, draft.SourceID)
 	if err != nil {
@@ -417,22 +438,6 @@ func (s *Store) resolveRecordTarget(
 	return resource, definition, digest, nil
 }
 
-func (s *Store) GetRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
-	ctx, finish, err := s.beginOperation(ctx)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	defer finish()
-	record, err := s.repository.GetRecord(ctx, recordID)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	if _, err := s.repository.GetRoot(ctx, record.RootID, false); err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	return record, nil
-}
-
 func (s *Store) PinRecord(
 	ctx context.Context,
 	recordID spec.RecordID,
@@ -445,7 +450,7 @@ func (s *Store) PinRecord(
 	}
 	defer finish()
 
-	record, err := s.repository.GetRecord(ctx, recordID)
+	record, err := s.GetRecord(ctx, recordID)
 	if err != nil {
 		return spec.ArtifactRecord{}, err
 	}
@@ -507,6 +512,72 @@ func (s *Store) PinRecord(
 	return record, nil
 }
 
+// DetachRecord pins the existing occurrence in place. It is deliberately
+// distinct from CaptureRecord and ForkRecord, which create new occurrences.
+func (s *Store) DetachRecord(
+	ctx context.Context,
+	recordID spec.RecordID,
+	expectedModifiedAt time.Time,
+) (spec.ArtifactRecord, error) {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	defer finish()
+
+	record, err := s.GetRecord(ctx, recordID)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if err := requireExpectedModifiedAt("record "+string(recordID), record.ModifiedAt, expectedModifiedAt); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if isDetachedPinnedRecord(record) {
+		return record, nil
+	}
+	if record.LastResolvedDefinitionDigest == nil {
+		return spec.ArtifactRecord{}, fmt.Errorf(
+			"%w: record has no resolved definition",
+			spec.ErrConflict,
+		)
+	}
+	digest := *record.LastResolvedDefinitionDigest
+	definition, err := s.GetDefinitionByDigest(ctx, digest)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	record.RecordMode = spec.RecordModeCaptured
+	record.TrackingMode = spec.TrackingModePinDigest
+	record.PinnedDefinitionDigest = &digest
+	record.LastResolvedDefinitionDigest = &digest
+	record.State = spec.RecordStateAvailable
+	record.Diagnostics = nil
+	record.ModifiedAt = s.nextModifiedAt(record.ModifiedAt)
+	if err := s.validateRecord(ctx, &record, nil, &definition); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if err := s.repository.UpdateRecord(ctx, record, expectedModifiedAt); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	return record, nil
+}
+
+func (s *Store) GetRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
+	ctx, finish, err := s.beginOperation(ctx)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	defer finish()
+	record, err := s.repository.GetRecord(ctx, recordID)
+	if err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	if _, err := s.repository.GetRoot(ctx, record.RootID, false); err != nil {
+		return spec.ArtifactRecord{}, err
+	}
+	return record, nil
+}
+
 func (s *Store) definitionBelongsToRecordOccurrence(
 	ctx context.Context,
 	record spec.ArtifactRecord,
@@ -537,59 +608,36 @@ func (s *Store) definitionBelongsToRecordOccurrence(
 	return false, nil
 }
 
-// DetachRecord pins the existing occurrence in place. It is deliberately
-// distinct from CaptureRecord and ForkRecord, which create new occurrences.
-func (s *Store) DetachRecord(
-	ctx context.Context,
-	recordID spec.RecordID,
-	expectedModifiedAt time.Time,
-) (spec.ArtifactRecord, error) {
-	ctx, finish, err := s.beginOperation(ctx)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	defer finish()
-
-	record, err := s.repository.GetRecord(ctx, recordID)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	if err := requireExpectedModifiedAt("record "+string(recordID), record.ModifiedAt, expectedModifiedAt); err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	if record.LastResolvedDefinitionDigest == nil {
-		return spec.ArtifactRecord{}, fmt.Errorf(
-			"%w: record has no resolved definition",
-			spec.ErrConflict,
-		)
-	}
-	digest := *record.LastResolvedDefinitionDigest
-	definition, err := s.GetDefinitionByDigest(ctx, digest)
-	if err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	record.RecordMode = spec.RecordModeCaptured
-	record.TrackingMode = spec.TrackingModePinDigest
-	record.PinnedDefinitionDigest = &digest
-	record.LastResolvedDefinitionDigest = &digest
-	record.State = spec.RecordStateAvailable
-	record.Diagnostics = nil
-	record.ModifiedAt = s.nextModifiedAt(record.ModifiedAt)
-	if err := s.validateRecord(ctx, &record, nil, &definition); err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	if err := s.repository.UpdateRecord(ctx, record, expectedModifiedAt); err != nil {
-		return spec.ArtifactRecord{}, err
-	}
-	return record, nil
-}
-
 func (s *Store) validateRecord(
 	ctx context.Context,
 	record *spec.ArtifactRecord,
 	resource *spec.CatalogResource,
 	definition *spec.CanonicalDefinition,
 ) error {
+	if record == nil {
+		return fmt.Errorf("%w: record is nil", spec.ErrInvalidRequest)
+	}
+	if definition != nil && definition.Kind != record.Kind {
+		return fmt.Errorf(
+			"%w: definition kind %q does not match record kind %q",
+			spec.ErrInvalidRequest,
+			definition.Kind,
+			record.Kind,
+		)
+	}
+	if definition != nil &&
+		resource != nil &&
+		resource.State == spec.CatalogStateValid &&
+		resource.CurrentDefinitionDigest != nil &&
+		*resource.CurrentDefinitionDigest == definition.Digest &&
+		resource.Kind == definition.Kind {
+		record.Diagnostics = append([]spec.Diagnostic(nil), resource.Diagnostics...)
+	} else if definition != nil && record.State == spec.RecordStateAvailable {
+		record.Diagnostics = nil
+	}
+	if err := validate.ValidateArtifactRecord(*record); err != nil {
+		return fmt.Errorf("%w: record: %w", spec.ErrInvalidRequest, err)
+	}
 	if record.CollectionID != nil {
 		collection, err := s.repository.GetCollection(ctx, *record.CollectionID, false)
 		if err != nil {
@@ -607,57 +655,88 @@ func (s *Store) validateRecord(
 			}
 		}
 	}
-	if resource != nil &&
-		definition != nil &&
-		resource.State == spec.CatalogStateValid &&
-		resource.CurrentDefinitionDigest != nil &&
-		*resource.CurrentDefinitionDigest == definition.Digest &&
-		resource.Kind == definition.Kind {
-		record.Diagnostics = append(
-			[]spec.Diagnostic(nil),
-			resource.Diagnostics...,
-		)
-		frontend, ok := s.frontendFor(resource.FrontendID)
-		if !ok {
+	if definition != nil {
+		frontend, found, err := s.recordFrontendForDefinition(ctx, *record, resource, definition)
+		if err != nil {
+			return err
+		}
+		if !found {
 			return fmt.Errorf(
-				"%w: frontend %q required to validate record %q",
+				"%w: frontend ownership for record %q definition %q is unavailable",
 				spec.ErrFrontendUnavailable,
-				resource.FrontendID,
 				record.RecordID,
+				definition.Digest,
 			)
 		}
-		{
-			diagnostics := frontend.ValidateRecordData(
-				ctx,
-				*definition,
-				spec.ArtifactRecordDraft{
-					RootID:                 record.RootID,
-					CollectionID:           record.CollectionID,
-					Kind:                   record.Kind,
-					Name:                   record.Name,
-					Version:                record.Version,
-					SourceID:               record.SourceID,
-					Locator:                record.Locator,
-					SubresourceLocator:     record.SubresourceLocator,
-					RecordMode:             record.RecordMode,
-					TrackingMode:           record.TrackingMode,
-					PinnedDefinitionDigest: record.PinnedDefinitionDigest,
-					Enabled:                record.Enabled,
-					DataSchemaID:           record.DataSchemaID,
-					Data:                   record.Data,
-				},
-			)
-			if err := errorDiagnostics("record data", diagnostics); err != nil {
-				return err
-			}
-			record.Diagnostics = appendBoundedDiagnostics(
-				record.Diagnostics,
-				diagnostics...,
-			)
+		diagnostics := frontend.ValidateRecordData(
+			ctx,
+			*definition,
+			spec.ArtifactRecordDraft{
+				RootID:                 record.RootID,
+				CollectionID:           record.CollectionID,
+				Kind:                   record.Kind,
+				Name:                   record.Name,
+				Version:                record.Version,
+				SourceID:               record.SourceID,
+				Locator:                record.Locator,
+				SubresourceLocator:     record.SubresourceLocator,
+				RecordMode:             record.RecordMode,
+				TrackingMode:           record.TrackingMode,
+				PinnedDefinitionDigest: record.PinnedDefinitionDigest,
+				Enabled:                record.Enabled,
+				DataSchemaID:           record.DataSchemaID,
+				Data:                   record.Data,
+			},
+		)
+		if err := errorDiagnostics("record data", diagnostics); err != nil {
+			return err
 		}
+		record.Diagnostics = appendBoundedDiagnostics(record.Diagnostics, diagnostics...)
 	}
 	if err := validate.ValidateArtifactRecord(*record); err != nil {
-		return err
+		return fmt.Errorf("%w: record: %w", spec.ErrInvalidRequest, err)
 	}
 	return nil
+}
+
+func (s *Store) recordFrontendForDefinition(
+	ctx context.Context,
+	record spec.ArtifactRecord,
+	resource *spec.CatalogResource,
+	definition *spec.CanonicalDefinition,
+) (spec.ArtifactFrontend, bool, error) {
+	if definition == nil {
+		return nil, false, nil
+	}
+	resolve := func(id spec.FrontendID) (spec.ArtifactFrontend, bool, error) {
+		if id == "" {
+			return nil, false, nil
+		}
+		frontend, ok := s.frontendFor(id)
+		if !ok {
+			return nil, false, fmt.Errorf("%w: frontend %q", spec.ErrFrontendUnavailable, id)
+		}
+		return frontend, true, nil
+	}
+	if resource != nil &&
+		resource.Kind == definition.Kind &&
+		resource.CurrentDefinitionDigest != nil &&
+		*resource.CurrentDefinitionDigest == definition.Digest {
+		return resolve(resource.FrontendID)
+	}
+	revisions, err := s.repository.ListCatalogResourceRevisions(ctx, spec.CatalogResourceKey{
+		SourceID:           record.SourceID,
+		Locator:            record.Locator,
+		SubresourceLocator: record.SubresourceLocator,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	for _, revision := range revisions {
+		if revision.DefinitionDigest == definition.Digest &&
+			revision.Kind == definition.Kind {
+			return resolve(revision.FrontendID)
+		}
+	}
+	return nil, false, nil
 }

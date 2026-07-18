@@ -58,10 +58,15 @@ func (p *recordSyncPolicy) DeriveRecord(
 	}
 	return artifactstoreSpec.RecordDerivation{
 		CollectionID: &collectionID,
-		Name:         workspaceRecordName(definition.LogicalName, definition.Digest),
-		Version:      artifactstoreSpec.RecordVersion(definition.LogicalVersion),
-		Enabled:      true,
-		Data:         json.RawMessage("{}"),
+		Name: workspaceRecordName(
+			definition.LogicalName,
+			resource.SourceID,
+			resource.Locator,
+			resource.SubresourceLocator,
+		),
+		Version: artifactstoreSpec.RecordVersion(definition.LogicalVersion),
+		Enabled: true,
+		Data:    json.RawMessage("{}"),
 	}, true, nil
 }
 
@@ -208,6 +213,9 @@ func NewService(store ArtifactStore, options ...Option) (*Service, error) {
 	if err := store.RegisterCollectionKindHook(collectionKindHook{}); err != nil {
 		return nil, fmt.Errorf("register Workspace collection hook: %w", err)
 	}
+	if err := store.RegisterDependencyResolver(workspaceDependencyResolver{}); err != nil {
+		return nil, fmt.Errorf("register Workspace dependency resolver: %w", err)
+	}
 	if err := store.RegisterArtifactFrontend(frontend); err != nil {
 		return nil, fmt.Errorf("register Workspace native frontend: %w", err)
 	}
@@ -308,7 +316,7 @@ func (s *Service) SelectFilesystemRoot(
 		deleteErr := s.store.DeleteSource(ctx, source.SourceID, source.ModifiedAt)
 		return Workspace{}, errors.Join(err, deleteErr)
 	}
-	_, err = s.store.AttachSource(ctx, artifactstore.RootSourceAttachmentDraft{
+	attachment, err := s.store.AttachSource(ctx, artifactstore.RootSourceAttachmentDraft{
 		RootID:   root.RootID,
 		SourceID: source.SourceID,
 		Role:     RolePrimary,
@@ -323,7 +331,15 @@ func (s *Service) SelectFilesystemRoot(
 	}
 	workspace, err := s.GetWorkspace(ctx, root.RootID)
 	if err != nil {
-		return Workspace{}, err
+		detachErr := s.store.DetachSource(
+			context.WithoutCancel(ctx),
+			root.RootID,
+			source.SourceID,
+			attachment.ModifiedAt,
+		)
+		_, rootDeleteErr := s.store.DeleteRoot(context.WithoutCancel(ctx), root.RootID, root.ModifiedAt)
+		sourceDeleteErr := s.store.DeleteSource(context.WithoutCancel(ctx), source.SourceID, source.ModifiedAt)
+		return Workspace{}, errors.Join(err, detachErr, rootDeleteErr, sourceDeleteErr)
 	}
 	if request.DiscoverImmediately {
 		_, refreshErr := s.Refresh(ctx, root.RootID)
@@ -421,11 +437,12 @@ func (s *Service) MountEmbeddedSource(
 		return Workspace{}, err
 	}
 	workspace, attachErr := s.AttachSource(ctx, AttachSourceRequest{
-		RootID:         request.RootID,
-		SourceID:       source.SourceID,
-		Role:           role,
-		Priority:       request.Priority,
-		AttachmentData: request.AttachmentData,
+		RootID:              request.RootID,
+		SourceID:            source.SourceID,
+		Role:                role,
+		Priority:            request.Priority,
+		AttachmentData:      request.AttachmentData,
+		DiscoverImmediately: false,
 	})
 	if attachErr != nil {
 		deleteErr := s.store.DeleteSource(ctx, source.SourceID, source.ModifiedAt)
@@ -463,7 +480,7 @@ func (s *Service) AttachSource(
 	if err != nil {
 		return Workspace{}, err
 	}
-	if _, err := s.store.AttachSource(ctx, artifactstore.RootSourceAttachmentDraft{
+	attachment, err := s.store.AttachSource(ctx, artifactstore.RootSourceAttachmentDraft{
 		RootID:       request.RootID,
 		SourceID:     request.SourceID,
 		Role:         request.Role,
@@ -471,8 +488,15 @@ func (s *Service) AttachSource(
 		Enabled:      true,
 		DataSchemaID: dataSchemaID,
 		Data:         data,
-	}); err != nil {
-		return Workspace{}, err
+	})
+	if err != nil {
+		detachErr := s.store.DetachSource(
+			context.WithoutCancel(ctx),
+			request.RootID,
+			request.SourceID,
+			attachment.ModifiedAt,
+		)
+		return Workspace{}, errors.Join(err, detachErr)
 	}
 	workspace, err := s.GetWorkspace(ctx, request.RootID)
 	if err != nil {
@@ -654,6 +678,8 @@ func (s *Service) GetWorkspace(
 		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
 	}
 
+	sources := make([]AttachedSource, 0, len(attachments))
+
 	hook := rootKindHook{}
 	for _, attachment := range attachments {
 		if err := workspaceDiagnosticsError(
@@ -677,9 +703,13 @@ func (s *Service) GetWorkspace(
 		); err != nil {
 			return Workspace{}, err
 		}
+		sources = append(sources, AttachedSource{
+			Attachment: attachment,
+			Source:     source,
+		})
 	}
 
-	return Workspace{Root: root, Data: data, Attachments: attachments}, nil
+	return Workspace{Root: root, Data: data, Attachments: attachments, Sources: sources}, nil
 }
 
 func (s *Service) workspaceDefinitionPreferences(
@@ -758,47 +788,52 @@ func (s *Service) ensureCollections(
 
 	out := make(map[artifactstoreSpec.ArtifactKind]artifactstoreSpec.CollectionID, len(ordered))
 	for _, kind := range ordered {
-		descriptor := s.descriptors[kind]
-		data, err := json.Marshal(CollectionData{ArtifactKind: kind})
+		collectionID, err := s.ensureCollectionForKind(ctx, rootID, kind)
 		if err != nil {
 			return nil, err
 		}
-		collection, err := s.store.EnsureBaseCollection(ctx, artifactstoreSpec.CollectionDraft{
-			RootID:       rootID,
-			Kind:         CollectionKind,
-			Slug:         descriptor.CollectionSlug,
-			DisplayName:  descriptor.CollectionDisplayName,
-			Enabled:      true,
-			DataSchemaID: CollectionDataSchemaID,
-			Data:         data,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if collection.DataSchemaID != CollectionDataSchemaID {
-			return nil, fmt.Errorf(
-				"%w: collection %q has schema %q",
-				artifactstoreSpec.ErrConflict,
-				collection.CollectionID,
-				collection.DataSchemaID,
-			)
-		}
-		var collectionData CollectionData
-		if err := decodeStrictJSONObject(collection.Data, &collectionData, true); err != nil {
-			return nil, err
-		}
-		if collectionData.ArtifactKind != kind {
-			return nil, fmt.Errorf(
-				"%w: collection %q is for artifact kind %q, expected %q",
-				artifactstoreSpec.ErrConflict,
-				collection.CollectionID,
-				collectionData.ArtifactKind,
-				kind,
-			)
-		}
-		out[kind] = collection.CollectionID
+		out[kind] = collectionID
 	}
 	return out, nil
+}
+
+func (s *Service) ensureCollectionForKind(
+	ctx context.Context,
+	rootID artifactstoreSpec.RootID,
+	kind artifactstoreSpec.ArtifactKind,
+) (artifactstoreSpec.CollectionID, error) {
+	descriptor, known := s.descriptors[kind]
+	if !known {
+		return "", fmt.Errorf("%w: unsupported artifact kind %q", ErrProjectionUnavailable, kind)
+	}
+	data, err := json.Marshal(CollectionData{ArtifactKind: kind})
+	if err != nil {
+		return "", err
+	}
+	collection, err := s.store.EnsureBaseCollection(ctx, artifactstoreSpec.CollectionDraft{
+		RootID:       rootID,
+		Kind:         CollectionKind,
+		Slug:         descriptor.CollectionSlug,
+		DisplayName:  descriptor.CollectionDisplayName,
+		Enabled:      true,
+		DataSchemaID: CollectionDataSchemaID,
+		Data:         data,
+	})
+	if err != nil {
+		return "", err
+	}
+	var collectionData CollectionData
+	if collection.DataSchemaID != CollectionDataSchemaID ||
+		decodeStrictJSONObject(collection.Data, &collectionData, true) != nil ||
+		collectionData.ArtifactKind != kind {
+		return "", fmt.Errorf(
+			"%w: collection %q is incompatible with artifact kind %q",
+			artifactstoreSpec.ErrConflict,
+			collection.CollectionID,
+			kind,
+		)
+	}
+	return collection.CollectionID, nil
 }
 
 func workspaceDiagnosticsError(
@@ -850,8 +885,16 @@ func encodeAttachmentData(data AttachmentData) (artifactstoreSpec.SchemaID, json
 
 func workspaceRecordName(
 	logicalName artifactstoreSpec.LogicalName,
-	digest artifactstoreSpec.Digest,
+	sourceID artifactstoreSpec.SourceID,
+	locator artifactstoreSpec.SourceLocator,
+	subresource artifactstoreSpec.SubresourceLocator,
 ) artifactstoreSpec.RecordName {
+	occurrenceDigest := baseutils.DigestBytes([]byte(
+		string(sourceID) + "\x00" + string(locator) + "\x00" + string(subresource),
+	))
+	hash := strings.TrimPrefix(string(occurrenceDigest), "sha256:")[:workspaceRecordNameHashLength]
+	suffix := "-" + hash
+	maximumBaseRunes := artifactstoreSpec.MaxSlugRunes - len(suffix)
 	var builder strings.Builder
 	hyphen := false
 	runes := 0
@@ -868,19 +911,15 @@ func workspaceRecordName(
 				runes++
 			}
 		}
-		if runes >= artifactstoreSpec.MaxSlugRunes {
+		if runes >= maximumBaseRunes {
 			break
 		}
 	}
 	value := strings.Trim(builder.String(), "-")
 	if value == "" {
-		hash := strings.TrimPrefix(string(digest), "sha256:")
-		if len(hash) > 12 {
-			hash = hash[:12]
-		}
-		value = "artifact-" + hash
+		value = workspaceRecordNameFallback
 	}
-	return artifactstoreSpec.RecordName(value)
+	return artifactstoreSpec.RecordName(value + suffix)
 }
 
 func defaultKindDescriptors() map[artifactstoreSpec.ArtifactKind]KindDescriptor {

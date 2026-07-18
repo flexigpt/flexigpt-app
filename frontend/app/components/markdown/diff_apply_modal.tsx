@@ -30,6 +30,7 @@ import {
 	getPathIdentity,
 	haveSharedPathIdentity,
 	isAbsolutePath,
+	isNewUnifiedDiffFile,
 	isTerminalUnifiedDiffStatus,
 	mergeNumberMax,
 	summaryLabel,
@@ -158,47 +159,61 @@ function mergeEditableTargetForModal(
 ): EditableUnifiedDiffTarget {
 	const targetPath = toAbsolutePath(target.targetPath);
 	const resolvedPath = toAbsolutePath(target.resolvedPath);
+	const knownTargetPaths = absolutePathStrings(target.knownTargetPaths ?? []);
+	const isNewFile = isNewUnifiedDiffFile(target);
 
 	if (!existing) {
 		return {
 			...target,
 			targetPath,
 			resolvedPath: resolvedPath || undefined,
-			candidatePaths: absolutePathStrings([
-				...(target.candidatePaths ?? []),
-				targetPath,
-				resolvedPath,
-				target.newPath,
-				target.oldPath,
-			]),
+			candidatePaths: isNewFile
+				? absolutePathStrings([...knownTargetPaths, targetPath])
+				: absolutePathStrings([
+						...knownTargetPaths,
+						...(target.candidatePaths ?? []),
+						targetPath,
+						resolvedPath,
+						target.newPath,
+						target.oldPath,
+					]),
+			knownTargetPaths,
 			sectionKeys: uniqueStrings([target.fileKey, ...(target.sectionKeys ?? [])]),
 		};
 	}
 
 	const existingTargetPath = toAbsolutePath(existing.targetPath);
 	const existingResolvedPath = toAbsolutePath(existing.resolvedPath);
+	const oldPath = target.oldPath || existing.oldPath;
+	const newPath = target.newPath || existing.newPath;
+	const mergedKnownTargetPaths = absolutePathStrings([...(existing.knownTargetPaths ?? []), ...knownTargetPaths]);
+	const mergedIsNewFile = isNewUnifiedDiffFile({ oldPath, newPath });
 
 	return {
 		...existing,
 		...target,
 		fileKey: existing.fileKey || target.fileKey,
-		oldPath: target.oldPath || existing.oldPath,
-		newPath: target.newPath || existing.newPath,
+		oldPath,
+		newPath,
 		targetPath: targetPath || existingTargetPath,
 		targetPathInput: target.targetPathInput ?? existing.targetPathInput,
 		resolvedPath: resolvedPath || existingResolvedPath || undefined,
-		candidatePaths: absolutePathStrings([
-			...(existing.candidatePaths ?? []),
-			...(target.candidatePaths ?? []),
-			existingTargetPath,
-			targetPath,
-			existingResolvedPath,
-			resolvedPath,
-			existing.newPath,
-			target.newPath,
-			existing.oldPath,
-			target.oldPath,
-		]),
+		candidatePaths: mergedIsNewFile
+			? absolutePathStrings([...mergedKnownTargetPaths, existingTargetPath, targetPath])
+			: absolutePathStrings([
+					...mergedKnownTargetPaths,
+					...(existing.candidatePaths ?? []),
+					...(target.candidatePaths ?? []),
+					existingTargetPath,
+					targetPath,
+					existingResolvedPath,
+					resolvedPath,
+					existing.newPath,
+					target.newPath,
+					existing.oldPath,
+					target.oldPath,
+				]),
+		knownTargetPaths: mergedKnownTargetPaths,
 		diffText: target.diffText || existing.diffText,
 		sectionKeys: uniqueStrings([
 			...(existing.sectionKeys ?? []),
@@ -235,16 +250,16 @@ function mergeEditableTargetPreservingLocalPath(
 ): EditableUnifiedDiffTarget {
 	const merged = mergeEditableTargetForModal(local, base);
 	const localTargetPathInput = local.targetPathInput ?? local.targetPath;
+	const knownTargetPaths = absolutePathStrings(merged.knownTargetPaths ?? []);
+	const isNewFile = isNewUnifiedDiffFile(merged);
 
 	return {
 		...merged,
 		targetPath: toAbsolutePath(local.targetPath),
 		targetPathInput: localTargetPathInput,
-		candidatePaths: absolutePathStrings([
-			local.targetPath,
-			...(local.candidatePaths ?? []),
-			...(merged.candidatePaths ?? []),
-		]),
+		candidatePaths: isNewFile
+			? absolutePathStrings([...knownTargetPaths, local.targetPath])
+			: absolutePathStrings([local.targetPath, ...(local.candidatePaths ?? []), ...(merged.candidatePaths ?? [])]),
 	};
 }
 
@@ -358,7 +373,11 @@ function getPatchPathsForDisplayTarget(target: EditableUnifiedDiffTarget): strin
 	return uniqueStrings([target.newPath, target.oldPath]).filter(path => path !== '/dev/null');
 }
 
-function scoreDisplayCandidatePath(candidateRaw: string, target: EditableUnifiedDiffTarget): number {
+function scoreDisplayCandidatePath(
+	candidateRaw: string,
+	target: EditableUnifiedDiffTarget,
+	knownPathKeys: ReadonlySet<string>
+): number {
 	const candidate = normalizePathForDisplayScore(candidateRaw);
 	if (!candidate || candidate === '/dev/null') {
 		return Number.NEGATIVE_INFINITY;
@@ -416,22 +435,41 @@ function scoreDisplayCandidatePath(candidateRaw: string, target: EditableUnified
 		}
 	}
 
+	const candidateKey = trimTrailingSlashesForDisplayScore(candidate);
+	if (knownPathKeys.has(candidateKey)) {
+		score = Math.max(score, 200_000);
+	}
+
 	return score;
 }
 
 function buildDisplayCandidatePathsForTarget(
 	target: EditableUnifiedDiffTarget,
-	globalCandidatePaths: string[],
 	limit = DISPLAY_CANDIDATE_PATH_LIMIT
 ): DisplayCandidatePathList {
-	const rawCandidates = absolutePathStrings([
-		target.resolvedPath,
-		target.targetPath,
-		...(target.candidatePaths ?? []),
-		target.newPath,
-		target.oldPath,
-		...globalCandidatePaths,
-	]);
+	const knownTargetPaths = absolutePathStrings(target.knownTargetPaths ?? []);
+	const knownPathKeys = new Set(
+		knownTargetPaths.map(path => trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(path))).filter(Boolean)
+	);
+	const isNewFile = isNewUnifiedDiffFile(target);
+	const selectedPathKey = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(target.targetPath));
+	const allowedNewFilePathKeys = new Set([...knownPathKeys, selectedPathKey].filter(Boolean));
+	const targetCandidatePaths = absolutePathStrings(target.candidatePaths ?? []);
+	const safeTargetCandidatePaths = isNewFile
+		? targetCandidatePaths.filter(path =>
+				allowedNewFilePathKeys.has(trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(path)))
+			)
+		: targetCandidatePaths;
+	const rawCandidates = isNewFile
+		? absolutePathStrings([target.targetPath, ...knownTargetPaths, ...safeTargetCandidatePaths])
+		: absolutePathStrings([
+				...knownTargetPaths,
+				target.resolvedPath,
+				target.targetPath,
+				...safeTargetCandidatePaths,
+				target.newPath,
+				target.oldPath,
+			]);
 
 	const byKey = new Map<string, { path: string; score: number; firstIndex: number }>();
 
@@ -446,7 +484,7 @@ function buildDisplayCandidatePathsForTarget(
 			continue;
 		}
 
-		const score = scoreDisplayCandidatePath(path, target);
+		const score = scoreDisplayCandidatePath(path, target, knownPathKeys);
 		const existing = byKey.get(key);
 
 		if (!existing) {
@@ -569,6 +607,7 @@ interface DiffApplyModalProps {
 	output?: ApplyUnifiedDiffOut;
 	error?: string;
 	candidatePaths: string[];
+	workspaceRoots: string[];
 	fileTargets: ApplyUnifiedDiffFileTarget[];
 	strict: boolean;
 	onStrictChange: (strict: boolean) => void;
@@ -583,6 +622,7 @@ function DiffApplyModalContent({
 	output,
 	error,
 	candidatePaths,
+	workspaceRoots,
 	fileTargets,
 	strict,
 	onStrictChange,
@@ -596,7 +636,7 @@ function DiffApplyModalContent({
 			return [];
 		}
 
-		const fromOutput = buildEditableTargetsFromOutput(output, fallbackParsed, candidatePaths);
+		const fromOutput = buildEditableTargetsFromOutput(output, fallbackParsed, candidatePaths, workspaceRoots);
 		const byKey = new Map<string, EditableUnifiedDiffTarget>();
 
 		for (const target of fromOutput) {
@@ -609,12 +649,13 @@ function DiffApplyModalContent({
 				oldPath: target.oldPath,
 				newPath: target.newPath,
 				targetPath: target.targetPath,
-				candidatePaths: absolutePathStrings([target.targetPath, target.newPath, target.oldPath]),
+				candidatePaths: absolutePathStrings([target.targetPath]),
+				knownTargetPaths: [],
 			});
 		}
 
 		return [...byKey.values()];
-	}, [candidatePaths, fallbackParsed, fileTargets, isOpen, output]);
+	}, [candidatePaths, fallbackParsed, fileTargets, isOpen, output, workspaceRoots]);
 
 	// This array contains only user-edited target paths. Backend/parser state
 	// remains derived from props and cannot become stale.
@@ -657,7 +698,9 @@ function DiffApplyModalContent({
 			...currentTarget,
 			targetPath: toAbsolutePath(targetPath),
 			targetPathInput: targetPath,
-			candidatePaths: absolutePathStrings([targetPath, ...(currentTarget.candidatePaths ?? [])]),
+			candidatePaths: isNewUnifiedDiffFile(currentTarget)
+				? absolutePathStrings([...(currentTarget.knownTargetPaths ?? []), targetPath])
+				: absolutePathStrings([targetPath, ...(currentTarget.candidatePaths ?? [])]),
 		};
 
 		setLocalTargets(previous => {
@@ -868,8 +911,9 @@ function DiffApplyModalContent({
 							const missing = !isAbsolutePath(target.targetPath);
 							const targetPathInput = target.targetPathInput ?? target.targetPath;
 							const inputId = `diff-apply-target-${target.fileKey ?? index}`;
-							const candidateDisplay = buildDisplayCandidatePathsForTarget(target, candidatePaths);
+							const candidateDisplay = buildDisplayCandidatePathsForTarget(target);
 							const candidates = candidateDisplay.paths;
+							const isNewFile = isNewUnifiedDiffFile(target);
 							const targetDiagnostics = uniqueDiagnostics(target.diagnostics ?? []);
 							const targetKey = getLocalTargetKey(target, index);
 							const isTargetDryRunning = runningAction?.key === targetKey && runningAction.kind === 'dry-run';
@@ -977,16 +1021,20 @@ function DiffApplyModalContent({
 
 									{missing ? (
 										<div className="text-error mt-1 text-xs">
-											{targetPathInput.trim()
-												? 'Target path must be absolute before applying this file patch.'
-												: 'Target path is required before applying this file patch.'}
+											{isNewFile && candidates.length === 0
+												? 'No attachment, tool path, or workspace root supports this new file location. Enter an absolute local target path.'
+												: isNewFile
+													? 'Select an evidence-backed target path or enter an absolute local target path.'
+													: targetPathInput.trim()
+														? 'Target path must be absolute before applying this file patch.'
+														: 'Target path is required before applying this file patch.'}
 										</div>
 									) : null}
 
 									{candidates.length > 0 ? (
 										<details className="group border-base-300 bg-base-100 mt-3 overflow-hidden rounded-lg border">
 											<summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold">
-												<span>Candidate paths</span>
+												<span>{isNewFile ? 'Supported target paths' : 'Candidate paths'}</span>
 												<span className="text-base-content/50 inline-flex items-center gap-1 font-normal">
 													<FiChevronRight size={11} className="transition group-open:rotate-90" />
 													{candidateDisplay.isLimited

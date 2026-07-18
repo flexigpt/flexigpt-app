@@ -42,6 +42,14 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 	if record.LastResolvedDefinitionDigest == nil {
 		return spec.DependencyGraph{}, fmt.Errorf("%w: record has no resolved definition", spec.ErrConflict)
 	}
+	root, err := s.repository.GetRoot(ctx, record.RootID, false)
+	if err != nil {
+		return spec.DependencyGraph{}, err
+	}
+	attachments, err := s.repository.ListRootSourceAttachments(ctx, record.RootID)
+	if err != nil {
+		return spec.DependencyGraph{}, err
+	}
 	generation, err := s.GetRootCatalogGeneration(ctx, record.RootID)
 	if err != nil {
 		return spec.DependencyGraph{}, err
@@ -82,7 +90,12 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 		visiting[digest] = true
 		defer delete(visiting, digest)
 		for selectorIndex, selector := range definition.DependencySelectors {
-			explanation, err := s.ExplainDependencyResolution(ctx, record.RootID, selector)
+			explanation, err := s.explainDependencyResolution(
+				ctx,
+				root,
+				attachments,
+				selector,
+			)
 			if err != nil {
 				return err
 			}
@@ -103,11 +116,16 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 					DefinitionDigest: candidate.Definition.Digest,
 				})
 			}
-			state := spec.DependencyResolutionStateResolved
-			switch len(candidateRefs) {
-			case 0:
+			snapshotCandidates := candidateRefs
+			var state spec.DependencyResolutionState
+			switch {
+			case explanation.Selected != nil:
+				state = spec.DependencyResolutionStateResolved
+				snapshotCandidates = []spec.DependencyCandidateRef{
+					dependencyCandidateRef(*explanation.Selected),
+				}
+			case len(candidateRefs) == 0:
 				state = spec.DependencyResolutionStateMissing
-			case 1:
 			default:
 				state = spec.DependencyResolutionStateAmbiguous
 			}
@@ -120,7 +138,7 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 				SelectorIndex:        selectorIndex,
 				Selector:             selector,
 				State:                state,
-				Candidates:           candidateRefs,
+				Candidates:           snapshotCandidates,
 				Diagnostics:          append([]spec.Diagnostic(nil), explanation.Diagnostics...),
 				ModifiedAt:           now,
 			}
@@ -128,8 +146,8 @@ func (s *Store) BuildDependencyGraph(ctx context.Context, recordID spec.RecordID
 				return err
 			}
 			snapshots = append(snapshots, snapshot)
-			if len(explanation.Candidates) == 1 {
-				if err := visit(explanation.Candidates[0].Definition.Digest); err != nil {
+			if explanation.Selected != nil {
+				if err := visit(explanation.Selected.Definition.Digest); err != nil {
 					return err
 				}
 			}
@@ -175,11 +193,94 @@ func (s *Store) ExplainDependencyResolution(
 		return spec.DependencyExplanation{}, err
 	}
 	defer finish()
-	candidates, err := s.FindCandidates(ctx, rootID, selector)
+	generation, err := s.GetRootCatalogGeneration(ctx, rootID)
+	if err != nil {
+		return spec.DependencyExplanation{}, err
+	}
+	root, err := s.repository.GetRoot(ctx, rootID, false)
+	if err != nil {
+		return spec.DependencyExplanation{}, err
+	}
+	attachments, err := s.repository.ListRootSourceAttachments(ctx, rootID)
+	if err != nil {
+		return spec.DependencyExplanation{}, err
+	}
+	explanation, err := s.explainDependencyResolution(ctx, root, attachments, selector)
+	if err != nil {
+		return spec.DependencyExplanation{}, err
+	}
+	confirmed, err := s.GetRootCatalogGeneration(ctx, rootID)
+	if err != nil {
+		return spec.DependencyExplanation{}, err
+	}
+	if confirmed.Generation != generation.Generation {
+		return spec.DependencyExplanation{}, fmt.Errorf(
+			"%w: root catalog changed during dependency resolution",
+			spec.ErrConflict,
+		)
+	}
+	return explanation, nil
+}
+
+func (s *Store) explainDependencyResolution(
+	ctx context.Context,
+	root spec.ArtifactRoot,
+	attachments []spec.RootSourceAttachment,
+	selector spec.ArtifactSelector,
+) (spec.DependencyExplanation, error) {
+	candidates, err := s.FindCandidates(ctx, root.RootID, selector)
 	if err != nil {
 		return spec.DependencyExplanation{}, err
 	}
 	explanation := spec.DependencyExplanation{Selector: selector, Candidates: candidates}
+	if resolver, ok := s.dependencyResolverFor(root.Kind); ok {
+		selected, diagnostics := resolver.ResolveDependency(
+			ctx,
+			root,
+			append([]spec.RootSourceAttachment(nil), attachments...),
+			selector,
+			append([]spec.DependencyCandidate(nil), candidates...),
+		)
+		if err := validate.ValidateDiagnostics(diagnostics); err != nil {
+			return spec.DependencyExplanation{}, fmt.Errorf(
+				"%w: dependency resolver for root kind %q returned invalid diagnostics: %w",
+				spec.ErrInvalidRequest,
+				root.Kind,
+				err,
+			)
+		}
+		explanation.Diagnostics = append([]spec.Diagnostic(nil), diagnostics...)
+		if selected == nil {
+			if len(candidates) == 1 {
+				return spec.DependencyExplanation{}, fmt.Errorf(
+					"%w: dependency resolver for root kind %q did not select the sole candidate",
+					spec.ErrInvalidRequest,
+					root.Kind,
+				)
+			}
+			return explanation, nil
+		}
+		for _, diagnostic := range diagnostics {
+			if diagnostic.Severity == spec.DiagnosticSeverityError {
+				return spec.DependencyExplanation{}, fmt.Errorf(
+					"%w: dependency resolver selected a candidate while reporting an error",
+					spec.ErrInvalidRequest,
+				)
+			}
+		}
+		for index := range candidates {
+			if dependencyCandidatesIdentifySameDefinition(candidates[index], *selected) {
+				selectedCopy := candidates[index]
+				explanation.Selected = &selectedCopy
+				return explanation, nil
+			}
+		}
+		return spec.DependencyExplanation{}, fmt.Errorf(
+			"%w: dependency resolver selected a candidate outside the supplied candidate set",
+			spec.ErrInvalidRequest,
+		)
+	}
+
 	switch len(candidates) {
 	case 0:
 		explanation.Diagnostics = []spec.Diagnostic{
@@ -190,6 +291,8 @@ func (s *Store) ExplainDependencyResolution(
 			},
 		}
 	case 1:
+		selected := candidates[0]
+		explanation.Selected = &selected
 	default:
 		explanation.Diagnostics = []spec.Diagnostic{
 			{
@@ -200,6 +303,28 @@ func (s *Store) ExplainDependencyResolution(
 		}
 	}
 	return explanation, nil
+}
+
+func dependencyCandidateRef(candidate spec.DependencyCandidate) spec.DependencyCandidateRef {
+	return spec.DependencyCandidateRef{
+		Resource: spec.CatalogResourceKey{
+			SourceID:           candidate.Resource.SourceID,
+			Locator:            candidate.Resource.Locator,
+			SubresourceLocator: candidate.Resource.SubresourceLocator,
+		},
+		DefinitionDigest: candidate.Definition.Digest,
+	}
+}
+
+func dependencyCandidatesIdentifySameDefinition(
+	left spec.DependencyCandidate,
+	right spec.DependencyCandidate,
+) bool {
+	return left.Resource.SourceID == right.Resource.SourceID &&
+		left.Resource.Locator == right.Resource.Locator &&
+		left.Resource.SubresourceLocator == right.Resource.SubresourceLocator &&
+		left.Resource.Kind == right.Resource.Kind &&
+		left.Definition.Digest == right.Definition.Digest
 }
 
 func (s *Store) FindCandidates(

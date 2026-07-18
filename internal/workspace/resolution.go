@@ -28,60 +28,32 @@ func (exactVersionMatcher) MatchesVersionConstraint(
 	return constraint == string(version), nil
 }
 
+type workspaceDependencyResolver struct{}
+
+func (workspaceDependencyResolver) RootKind() artifactstoreSpec.RootKind {
+	return RootKind
+}
+
+func (workspaceDependencyResolver) ResolveDependency(
+	_ context.Context,
+	root artifactstoreSpec.ArtifactRoot,
+	attachments []artifactstoreSpec.RootSourceAttachment,
+	_ artifactstoreSpec.ArtifactSelector,
+	candidates []artifactstoreSpec.DependencyCandidate,
+) (*artifactstoreSpec.DependencyCandidate, []artifactstoreSpec.Diagnostic) {
+	return selectWorkspaceCandidate(
+		Workspace{Root: root, Attachments: attachments},
+		candidates,
+	)
+}
+
 func (s *Service) buildWorkspaceDependencyGraph(
 	ctx context.Context,
 	catalog Catalog,
 	root CatalogResource,
 ) (artifactstoreSpec.DependencyGraph, error) {
-	graph := artifactstoreSpec.DependencyGraph{
-		RootRecordID: root.Record.RecordID,
-		Nodes:        map[artifactstoreSpec.Digest]artifactstoreSpec.CanonicalDefinition{},
-		Edges:        map[artifactstoreSpec.Digest][]artifactstoreSpec.DependencyExplanation{},
-	}
-	visiting := map[artifactstoreSpec.Digest]bool{}
-
-	var visit func(artifactstoreSpec.CanonicalDefinition) error
-	visit = func(definition artifactstoreSpec.CanonicalDefinition) error {
-		if visiting[definition.Digest] {
-			graph.Diagnostics = append(graph.Diagnostics, artifactstoreSpec.Diagnostic{
-				Severity: artifactstoreSpec.DiagnosticSeverityError,
-				Code:     "workspace.dependency.cycle",
-				Message:  fmt.Sprintf("dependency cycle detected at definition %q", definition.Digest),
-			})
-			return nil
-		}
-		if _, exists := graph.Nodes[definition.Digest]; exists {
-			return nil
-		}
-		graph.Nodes[definition.Digest] = definition
-		visiting[definition.Digest] = true
-		defer delete(visiting, definition.Digest)
-
-		for _, selector := range definition.DependencySelectors {
-			candidates, err := s.store.FindCandidates(ctx, catalog.Workspace.Root.RootID, selector)
-			if err != nil {
-				return err
-			}
-			selected, diagnostics := selectWorkspaceCandidate(catalog.Workspace, candidates)
-			explanation := artifactstoreSpec.DependencyExplanation{
-				Selector:    selector,
-				Candidates:  candidates,
-				Diagnostics: append([]artifactstoreSpec.Diagnostic(nil), diagnostics...),
-			}
-			graph.Edges[definition.Digest] = append(
-				graph.Edges[definition.Digest],
-				explanation,
-			)
-			graph.Diagnostics = append(graph.Diagnostics, diagnostics...)
-			if selected != nil {
-				if err := visit(selected.Definition); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-	if err := visit(root.Definition); err != nil {
+	graph, err := s.store.BuildDependencyGraph(ctx, root.Record.RecordID)
+	if err != nil {
 		return artifactstoreSpec.DependencyGraph{}, err
 	}
 	if err := s.ensureCatalogGeneration(ctx, catalog.Generation); err != nil {
@@ -139,4 +111,7 @@ func selectWorkspaceCandidate(
 	return &selected, nil
 }
 
-var _ artifactstoreSpec.ArtifactVersionMatcher = exactVersionMatcher{}
+var (
+	_ artifactstoreSpec.ArtifactVersionMatcher = exactVersionMatcher{}
+	_ artifactstoreSpec.DependencyResolver     = workspaceDependencyResolver{}
+)

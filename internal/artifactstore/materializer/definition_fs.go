@@ -24,8 +24,6 @@ import (
 
 const (
 	fsDefinitionReceiptFormat = "artifactstore.fs-definition-receipt/v1"
-	fsDefinitionSidecarDir    = ".flexigpt-artifacts/definitions"
-	fsDefinitionTrashDir      = ".artifactstore-trash"
 	binaryEncoding            = "binary"
 )
 
@@ -231,7 +229,7 @@ func buildFSDefinitionFiles(
 			hexDigest := strings.TrimPrefix(string(canonical.Digest), "sha256:")
 			locator = spec.SourceLocator(path.Join(
 				destinationDir,
-				fsDefinitionSidecarDir,
+				spec.ManagedArtifactDefinitionsDirectoryName,
 				"definition-"+hexDigest+".json",
 			))
 		} else {
@@ -313,7 +311,7 @@ func discardFSMaterializedFiles(
 		}
 		_, err = tool.DeleteFile(ctx, fstool.DeleteFileArgs{
 			Path:     string(file.Locator),
-			TrashDir: filepath.Join(config.RootPath, fsDefinitionTrashDir),
+			TrashDir: filepath.Join(config.RootPath, spec.ManagedArtifactTrashDirectoryName),
 		})
 		if err != nil {
 			discardErrors = append(discardErrors, err)
@@ -405,9 +403,22 @@ func encodeFSDefinitionReceipt(receipt fsDefinitionReceipt) (string, error) {
 }
 
 func decodeFSDefinitionReceipt(value string) (fsDefinitionReceipt, error) {
-	raw, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(value))
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > spec.MaxTransferReceiptBytes*2 {
+		return fsDefinitionReceipt{}, fmt.Errorf(
+			"%w: filesystem definition receipt size is invalid",
+			spec.ErrInvalidRequest,
+		)
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(value)
 	if err != nil {
 		return fsDefinitionReceipt{}, fmt.Errorf("decode filesystem definition receipt: %w", err)
+	}
+	if len(raw) > spec.MaxTransferReceiptBytes {
+		return fsDefinitionReceipt{}, fmt.Errorf(
+			"%w: filesystem definition receipt is too large",
+			spec.ErrInvalidRequest,
+		)
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
@@ -424,11 +435,35 @@ func decodeFSDefinitionReceipt(value string) (fsDefinitionReceipt, error) {
 	if receipt.Format != fsDefinitionReceiptFormat ||
 		receipt.SourceID == "" ||
 		receipt.ConfigDigest == "" ||
-		len(receipt.Files) == 0 {
+		len(receipt.Files) == 0 ||
+		len(receipt.Files) > spec.MaxTransferMaterializedFiles {
 		return fsDefinitionReceipt{}, fmt.Errorf(
 			"%w: malformed filesystem definition receipt",
 			spec.ErrInvalidRequest,
 		)
+	}
+	if err := validate.ValidateDigest(receipt.ConfigDigest); err != nil {
+		return fsDefinitionReceipt{}, fmt.Errorf("%w: receipt config digest: %w", spec.ErrInvalidRequest, err)
+	}
+	seen := make(map[spec.SourceLocator]struct{}, len(receipt.Files))
+	for _, file := range receipt.Files {
+		if err := validate.ValidateCatalogResourceKey(spec.CatalogResourceKey{
+			SourceID: receipt.SourceID,
+			Locator:  file.Locator,
+		}); err != nil {
+			return fsDefinitionReceipt{}, fmt.Errorf("%w: receipt file: %w", spec.ErrInvalidRequest, err)
+		}
+		if err := validate.ValidateDigest(file.Digest); err != nil {
+			return fsDefinitionReceipt{}, fmt.Errorf("%w: receipt file digest: %w", spec.ErrInvalidRequest, err)
+		}
+		if _, duplicate := seen[file.Locator]; duplicate {
+			return fsDefinitionReceipt{}, fmt.Errorf(
+				"%w: duplicate receipt locator %q",
+				spec.ErrInvalidRequest,
+				file.Locator,
+			)
+		}
+		seen[file.Locator] = struct{}{}
 	}
 	return receipt, nil
 }

@@ -45,6 +45,8 @@ const (
 	workspaceSkillMarkdownFileName = "skill.md"
 	workspaceDefinitionSchemaV1    = "1"
 	workspacePrimaryPriority       = artifactstoreSpec.MaxAttachmentPriority
+	workspaceRecordNameHashLength  = 12
+	workspaceRecordNameFallback    = "artifact"
 )
 
 const (
@@ -121,71 +123,77 @@ type CollectionData struct {
 	ArtifactKind artifactstoreSpec.ArtifactKind `json:"artifactKind"`
 }
 
+type AttachedSource struct {
+	Attachment artifactstoreSpec.RootSourceAttachment `json:"attachment"`
+	Source     artifactstoreSpec.ArtifactSource       `json:"source"`
+}
+
 type Workspace struct {
-	Root        artifactstoreSpec.ArtifactRoot
-	Data        RootData
-	Attachments []artifactstoreSpec.RootSourceAttachment
+	Root        artifactstoreSpec.ArtifactRoot           `json:"root"`
+	Data        RootData                                 `json:"data"`
+	Attachments []artifactstoreSpec.RootSourceAttachment `json:"attachments"`
+	Sources     []AttachedSource                         `json:"sources"`
 }
 
 type FilesystemSelectionRequest struct {
-	DisplayName         string
-	Description         string
-	RootPath            string
-	FollowSymlinks      bool
-	ManagedByApp        bool
-	TrustReference      string
-	Discovery           DiscoveryPreferences
-	DiscoverImmediately bool
+	DisplayName         string               `json:"displayName"`
+	Description         string               `json:"description,omitempty"`
+	RootPath            string               `json:"rootPath"`
+	FollowSymlinks      bool                 `json:"followSymlinks"`
+	ManagedByApp        bool                 `json:"managedByApp"`
+	TrustReference      string               `json:"trustReference,omitempty"`
+	Discovery           DiscoveryPreferences `json:"discovery"`
+	DiscoverImmediately bool                 `json:"discoverImmediately"`
 }
 
 type EmptyWorkspaceRequest struct {
-	DisplayName         string
-	Description         string
-	TrustReference      string
-	Discovery           DiscoveryPreferences
-	DiscoverImmediately bool
+	DisplayName         string               `json:"displayName"`
+	Description         string               `json:"description,omitempty"`
+	TrustReference      string               `json:"trustReference,omitempty"`
+	Discovery           DiscoveryPreferences `json:"discovery"`
+	DiscoverImmediately bool                 `json:"discoverImmediately"`
 }
 
 type UpdateWorkspaceRequest struct {
-	RootID              artifactstoreSpec.RootID
-	ExpectedModifiedAt  time.Time
-	DisplayName         *string
-	Description         *string
-	Enabled             *bool
-	TrustReference      *string
-	Discovery           *DiscoveryPreferences
-	AttachedPackages    *AttachedPackagePreferences
-	DisplayPreferences  *DisplayPreferences
-	DiscoverImmediately bool
+	RootID              artifactstoreSpec.RootID    `json:"rootID"`
+	ExpectedModifiedAt  time.Time                   `json:"expectedModifiedAt"`
+	DisplayName         *string                     `json:"displayName,omitempty"`
+	Description         *string                     `json:"description,omitempty"`
+	Enabled             *bool                       `json:"enabled,omitempty"`
+	TrustReference      *string                     `json:"trustReference,omitempty"`
+	Discovery           *DiscoveryPreferences       `json:"discovery,omitempty"`
+	AttachedPackages    *AttachedPackagePreferences `json:"attachedPackages,omitempty"`
+	DisplayPreferences  *DisplayPreferences         `json:"displayPreferences,omitempty"`
+	DiscoverImmediately bool                        `json:"discoverImmediately"`
 }
 
 type DeleteWorkspaceRequest struct {
-	RootID             artifactstoreSpec.RootID
-	ExpectedModifiedAt time.Time
+	RootID             artifactstoreSpec.RootID `json:"rootID"`
+	ExpectedModifiedAt time.Time                `json:"expectedModifiedAt"`
 }
 
 // AttachSourceRequest attaches an existing Artifact Store source to a
 // Workspace. Source lifecycle remains owned by Artifact Store.
 type AttachSourceRequest struct {
-	RootID              artifactstoreSpec.RootID
-	SourceID            artifactstoreSpec.SourceID
-	Role                artifactstoreSpec.AttachmentRole
-	Priority            int
-	AttachmentData      AttachmentData
-	DiscoverImmediately bool
+	RootID              artifactstoreSpec.RootID         `json:"rootID"`
+	SourceID            artifactstoreSpec.SourceID       `json:"sourceID"`
+	Role                artifactstoreSpec.AttachmentRole `json:"role"`
+	Priority            int                              `json:"priority"`
+	AttachmentData      AttachmentData                   `json:"attachmentData"`
+	DiscoverImmediately bool                             `json:"discoverImmediately"`
 }
 
 // EmbeddedSourceAttachmentRequest creates an app-local embedded filesystem
 // source and attaches it to an existing Workspace.
 type EmbeddedSourceAttachmentRequest struct {
-	RootID              artifactstoreSpec.RootID
-	DisplayName         string
-	ProviderKey         string
-	RootLocator         artifactstoreSpec.SourceLocator
-	Role                artifactstoreSpec.AttachmentRole
-	Priority            int
-	AttachmentData      AttachmentData
-	DiscoverImmediately bool
+	RootID              artifactstoreSpec.RootID         `json:"rootID"`
+	DisplayName         string                           `json:"displayName"`
+	ProviderKey         string                           `json:"providerKey"`
+	RootLocator         artifactstoreSpec.SourceLocator  `json:"rootLocator"`
+	Role                artifactstoreSpec.AttachmentRole `json:"role"`
+	Priority            int                              `json:"priority"`
+	AttachmentData      AttachmentData                   `json:"attachmentData"`
+	DiscoverImmediately bool                             `json:"discoverImmediately"`
 }
 
 type CatalogResource struct {
@@ -268,7 +276,6 @@ type ProjectedSkillArgument struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Default     string `json:"default,omitempty"`
-	Required    bool   `json:"required,omitempty"`
 }
 
 type ProjectedSkill struct {
@@ -283,6 +290,7 @@ type ProjectedSkill struct {
 	Arguments        []ProjectedSkillArgument
 	Markdown         string
 	Frontmatter      json.RawMessage
+	Assets           []artifactstoreSpec.AssetManifestEntry
 
 	Skill    skillSpec.Skill
 	SkillRef skillSpec.SkillRef
@@ -415,6 +423,7 @@ type ArtifactStore interface {
 	RegisterArtifactFrontend(frontend artifactstoreSpec.ArtifactFrontend) error
 	RegisterRootKindHook(hook artifactstoreSpec.RootKindHook) error
 	RegisterCollectionKindHook(hook artifactstoreSpec.CollectionKindHook) error
+	RegisterDependencyResolver(resolver artifactstoreSpec.DependencyResolver) error
 	RegisterArtifactVersionMatcher(matcher artifactstoreSpec.ArtifactVersionMatcher) error
 
 	CreateRoot(ctx context.Context, draft artifactstoreSpec.RootDraft) (artifactstoreSpec.ArtifactRoot, error)
@@ -503,6 +512,11 @@ type ArtifactStore interface {
 		rootID artifactstoreSpec.RootID,
 		selector artifactstoreSpec.ArtifactSelector,
 	) ([]artifactstoreSpec.DependencyCandidate, error)
+	ExplainDependencyResolution(
+		ctx context.Context,
+		rootID artifactstoreSpec.RootID,
+		selector artifactstoreSpec.ArtifactSelector,
+	) (artifactstoreSpec.DependencyExplanation, error)
 	BuildDependencyGraph(
 		ctx context.Context,
 		recordID artifactstoreSpec.RecordID,

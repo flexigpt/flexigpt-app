@@ -44,6 +44,7 @@ func buildWorkspacePlan(input DiscoveryInput, expanded bool) (artifactstoreSpec.
 			SourceID:            attachment.SourceID,
 			AllowedFrontendIDs:  append([]artifactstoreSpec.FrontendID(nil), input.FrontendIDs...),
 			MaxFileBytes:        artifactstoreSpec.MaxDefinitionJSONBytes,
+			MaxTotalBytes:       artifactstoreSpec.MaxScanTotalBytes,
 			MaxCandidates:       artifactstoreSpec.DefaultMaxScanCandidates,
 			MaxTraversalEntries: artifactstoreSpec.DefaultMaxScanEntries,
 			MaxTraversalDepth:   artifactstoreSpec.DefaultMaxTraversalDepth,

@@ -167,6 +167,21 @@ func applyDomainSkillProjection(input ProjectionInput, projected *ProjectedSkill
 		return fmt.Errorf("decode projected skill tags: %w", err)
 	}
 
+	resources := skillSpec.SkillResourceInfo{}
+	if len(input.Definition.AssetManifest) > 0 {
+		resources.HasResources = true
+		resources.TotalCount = len(input.Definition.AssetManifest)
+		maximum := min(len(input.Definition.AssetManifest), skillSpec.MaxSkillResourceLocations)
+		resources.Locations = make([]string, 0, maximum)
+		for index, asset := range input.Definition.AssetManifest {
+			if index >= maximum {
+				break
+			}
+			resources.Locations = append(resources.Locations, string(asset.Path))
+		}
+		resources.MoreLocations = len(input.Definition.AssetManifest) > maximum
+	}
+
 	isBuiltIn := projectionIsBuiltIn(input)
 	skillType := skillSpec.SkillTypeFS
 	if isBuiltIn {
@@ -188,7 +203,9 @@ func applyDomainSkillProjection(input ProjectionInput, projected *ProjectedSkill
 		Tags:           append([]string(nil), metadata.Tags...),
 		Insert:         skillSpec.SkillInsert(projected.Insert),
 		Arguments:      arguments,
+		Resources:      resources,
 		RawFrontmatter: rawFrontmatter,
+		Digest:         string(input.Definition.Digest),
 		IsEnabled:      input.Record.Enabled,
 		IsBuiltIn:      isBuiltIn,
 		CreatedAt:      input.Record.CreatedAt,
@@ -533,13 +550,18 @@ func validationProjectionInput(
 			RootID:       projectionValidationRootID,
 			CollectionID: &collectionID,
 			Kind:         definition.Kind,
-			Name:         workspaceRecordName(definition.LogicalName, definition.Digest),
-			Version:      version,
-			SourceID:     projectionValidationSourceID,
-			Locator:      locator,
-			Enabled:      true,
-			CreatedAt:    now,
-			ModifiedAt:   now,
+			Name: workspaceRecordName(
+				definition.LogicalName,
+				projectionValidationSourceID,
+				locator,
+				"",
+			),
+			Version:    version,
+			SourceID:   projectionValidationSourceID,
+			Locator:    locator,
+			Enabled:    true,
+			CreatedAt:  now,
+			ModifiedAt: now,
 		},
 		Definition: definition,
 	}

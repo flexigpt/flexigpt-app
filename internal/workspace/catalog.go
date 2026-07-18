@@ -72,15 +72,19 @@ func (s *Service) ResolveReference(
 		)
 	}
 
-	candidates, err := s.store.FindCandidates(ctx, rootID, *reference.Selector)
+	explanation, err := s.store.ExplainDependencyResolution(
+		ctx,
+		rootID,
+		*reference.Selector,
+	)
 	if err != nil {
 		return CatalogResource{}, err
 	}
-	selected, diagnostics := selectWorkspaceCandidate(catalog.Workspace, candidates)
+	selected := explanation.Selected
 	if selected == nil {
-		message := fmt.Sprintf("selector resolved to %d catalog candidates", len(candidates))
-		if len(diagnostics) != 0 {
-			message = diagnostics[0].Message
+		message := fmt.Sprintf("selector resolved to %d catalog candidates", len(explanation.Candidates))
+		if len(explanation.Diagnostics) != 0 {
+			message = explanation.Diagnostics[0].Message
 		}
 		return CatalogResource{}, fmt.Errorf(
 			"%w: %s",

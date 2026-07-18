@@ -547,6 +547,18 @@ func ValidateArtifactRecord(v spec.ArtifactRecord) error {
 				spec.TrackingModePinDigest,
 			)
 		}
+		if v.LastResolvedDefinitionDigest == nil {
+			return invalidf(
+				"record.lastResolvedDefinitionDigest is required when record.trackingMode is %q",
+				spec.TrackingModePinDigest,
+			)
+		}
+		if *v.PinnedDefinitionDigest != *v.LastResolvedDefinitionDigest {
+			return invalidf(
+				"record.lastResolvedDefinitionDigest must equal record.pinnedDefinitionDigest when record.trackingMode is %q",
+				spec.TrackingModePinDigest,
+			)
+		}
 	case spec.TrackingModeFollowSource, spec.TrackingModeManualRefresh:
 		if v.PinnedDefinitionDigest != nil {
 			return invalidf(
@@ -554,6 +566,19 @@ func ValidateArtifactRecord(v spec.ArtifactRecord) error {
 				spec.TrackingModePinDigest,
 			)
 		}
+	}
+	switch v.RecordMode {
+	case spec.RecordModeCaptured, spec.RecordModeForked, spec.RecordModeAppLocal:
+		if v.TrackingMode != spec.TrackingModePinDigest {
+			return invalidf(
+				"record.recordMode %q requires record.trackingMode %q",
+				v.RecordMode,
+				spec.TrackingModePinDigest,
+			)
+		}
+	case spec.RecordModeLinked, spec.RecordModeEmbeddedOverlay:
+	default:
+		return invalidf("record.recordMode %q is invalid", v.RecordMode)
 	}
 	if err := validateRecordState("record.state", v.State); err != nil {
 		return err
@@ -784,6 +809,21 @@ func ValidateCatalogResourceKey(v spec.CatalogResourceKey) error {
 		return err
 	}
 	return validateSubresourceLocator("catalog resource.subresourceLocator", v.SubresourceLocator)
+}
+
+// ValidateDigest validates a public content-addressed digest value.
+func ValidateDigest(v spec.Digest) error {
+	return validateDigest("digest", v)
+}
+
+// ValidateSourceLocator validates a source-relative locator.
+func ValidateSourceLocator(v spec.SourceLocator, allowRoot bool) error {
+	return validateSourceLocator("source locator", v, allowRoot)
+}
+
+// ValidatePortablePath validates a portable package-relative path.
+func ValidatePortablePath(v spec.PortablePath, allowRoot bool) error {
+	return validatePortablePath("portable path", v, allowRoot)
 }
 
 // ValidateDiagnostics validates a bounded current diagnostic collection.

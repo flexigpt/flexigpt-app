@@ -46,6 +46,10 @@ const RICH_RENDER_IDLE_TIMEOUT_MS = 250;
 const DIFF_MARKDOWN_SIGNAL_PATTERN =
 	/```(?:diff|patch|udiff)\b|^diff --git\s|^\*\*\*\s+Begin\s+Patch\s*$|^---\s+.+\n\+\+\+\s+/m;
 
+function textContainsDiffPayload(text: string | undefined): boolean {
+	return !!text && DIFF_MARKDOWN_SIGNAL_PATTERN.test(text);
+}
+
 const ABSOLUTE_PATH_PATTERN = /(?:[A-Za-z]:[\\/][^\s"'`<>|]+|\\\\[^\s"'`<>|]+|\/[^\s"'`<>|]+)/g;
 const RELATIVE_PATH_PATTERN = /(?:\.{1,2}[\\/])?(?:[A-Za-z0-9_.@+-]+[\\/]){1,}[A-Za-z0-9_.@+-]+/g;
 const PATH_LIKE_KEY_PATTERN =
@@ -269,10 +273,13 @@ function getAttachmentCandidatePathSources(attachment: Attachment): CandidatePat
 }
 
 function extractPathMentionsFromText(text: string | undefined): string[] {
-	if (!text) {
+	if (!text || textContainsDiffPayload(text)) {
 		return [];
 	}
 
+	// A patch's file headers are identifiers, not trusted local filesystem
+	// evidence. In particular, do not let appendCandidatePathSource derive
+	// parent directories from the patch body itself.
 	const out: string[] = [];
 
 	for (const match of text.matchAll(ABSOLUTE_PATH_PATTERN)) {
@@ -314,14 +321,17 @@ function extractPathMentionsFromText(text: string | undefined): string[] {
 
 function valueLooksPathLike(value: string): boolean {
 	const cleaned = cleanCandidatePathToken(value);
+	if (!cleaned || textContainsDiffPayload(value)) {
+		return false;
+	}
+
 	return (
-		!!cleaned &&
-		(isAbsoluteCandidatePath(cleaned) ||
-			looksLikeDirectoryPath(cleaned) ||
-			cleaned.includes('/') ||
-			cleaned.includes('\\') ||
-			cleaned.startsWith('./') ||
-			cleaned.startsWith('../'))
+		isAbsoluteCandidatePath(cleaned) ||
+		looksLikeDirectoryPath(cleaned) ||
+		cleaned.includes('/') ||
+		cleaned.includes('\\') ||
+		cleaned.startsWith('./') ||
+		cleaned.startsWith('../')
 	);
 }
 
@@ -331,6 +341,10 @@ function collectPathLikeStringsFromJSON(value: unknown, out: string[], keyHint =
 	}
 
 	if (typeof value === 'string') {
+		if (textContainsDiffPayload(value)) {
+			return;
+		}
+
 		if (PATH_LIKE_KEY_PATTERN.test(keyHint) || valueLooksPathLike(value)) {
 			out.push(value);
 		}
@@ -356,10 +370,9 @@ function extractPathMentionsFromStructuredText(text: string | undefined): string
 		return [];
 	}
 
-	const out = [...extractPathMentionsFromText(text)];
-
 	try {
 		const parsed = JSON.parse(text) as unknown;
+		const out: string[] = [];
 		const jsonStrings: string[] = [];
 		collectPathLikeStringsFromJSON(parsed, jsonStrings);
 
@@ -369,11 +382,12 @@ function extractPathMentionsFromStructuredText(text: string | undefined): string
 			}
 			out.push(...extractPathMentionsFromText(value));
 		}
+
+		return out;
 	} catch {
 		// Tool arguments are usually JSON, but may also be plain text.
+		return extractPathMentionsFromText(text);
 	}
-
-	return out;
 }
 
 interface CachedMessageCandidatePathSources {

@@ -43,6 +43,7 @@
     - [Root Kind Hook](#root-kind-hook)
     - [Artifact Frontend](#artifact-frontend)
     - [Collection Kind Hook](#collection-kind-hook)
+    - [Dependency Resolver](#dependency-resolver)
   - [Scanning Workflow](#scanning-workflow)
   - [Record Synchronization Workflow](#record-synchronization-workflow)
   - [Public API](#public-api)
@@ -55,7 +56,7 @@
   - [Workspace Definition Kinds](#workspace-definition-kinds)
   - [Workspace Artifact Records](#workspace-artifact-records)
   - [Workspace Derived Collections](#workspace-derived-collections)
-  - [Planned Components](#planned-components)
+  - [Implemented Components](#implemented-components)
   - [Discovery Workflow](#discovery-workflow)
     - [Select a Filesystem Workspace Root](#select-a-filesystem-workspace-root)
     - [Bootstrap Discovery](#bootstrap-discovery)
@@ -67,6 +68,8 @@
   - [Import and Fork Workflow](#import-and-fork-workflow)
   - [Ownership Summary](#ownership-summary)
   - [Architecture Summary](#architecture-summary)
+  - [Current state record](#current-state-record)
+  - [Remaining risks and next steps](#remaining-risks-and-next-steps)
 
 ## Document Status and Scope
 
@@ -85,28 +88,33 @@
 
 ## Architectural Decisions
 
-| ID      | Status                  | Decision                                                                                                                                              |
-| ------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AS-01` | Implemented             | Artifact Store owns app-local artifact lifecycle metadata and coordinates portable content through repository ports.                                  |
-| `AS-02` | Implemented             | Workspace does not introduce a separate persistent Workspace Store database.                                                                          |
-| `AS-03` | Implemented             | Workspace is a typed consumer of Artifact Store.                                                                                                      |
-| `AS-04` | Implemented             | Existing domain stores remain physically unchanged during Workspace adoption.                                                                         |
-| `AS-05` | Implemented mapping     | A current Bundle maps to generic `ArtifactCollection`.                                                                                                |
-| `AS-06` | Implemented mapping     | A current item maps to generic `ArtifactRecord`.                                                                                                      |
-| `AS-07` | Implemented             | Portable package content and app-local collections are separate concepts and storage domains.                                                         |
-| `AS-08` | Implemented             | Portable definitions exclude app IDs, local paths, secrets, runtime state, and conversation state.                                                    |
-| `AS-09` | Implemented             | Source transport is an Artifact Store extension port registered during composition, not behavior implemented by frontends or consumer features.       |
-| `AS-10` | Implemented             | `NewStore` installs `fs-directory` and `embedded-fs-directory`. `memory-directory` is a contract and test-only injection point, not a default driver. |
-| `AS-11` | Implemented             | Artifact revisions are canonical definition digests, not generated revision IDs.                                                                      |
-| `AS-12` | Implemented             | Catalog resources use source occurrence identity, not generated resource IDs.                                                                         |
-| `AS-13` | Implemented             | `ArtifactRecord` is the sole generic app-side artifact item.                                                                                          |
-| `AS-14` | Implemented             | Registered frontends own source-format recognition and decoding. The portable-definition frontend is registered by default.                           |
-| `AS-15` | Implemented             | Runtime projections and execution remain outside Artifact Store.                                                                                      |
-| `AS-16` | Implemented             | A Workspace Root is `ArtifactRoot(kind=workspace.root)`.                                                                                              |
-| `AS-17` | Implemented             | Workspace discovery synchronizes selected catalog resources into root-local records.                                                                  |
-| `AS-18` | Implemented generically | Linked, captured, forked, and app-local record modes exist. Their Workspace-specific use is planned.                                                  |
-| `AS-19` | Implemented             | Root scans atomically publish source observations and immutable root catalog snapshots in metadata storage.                                           |
-| `AS-20` | Implemented             | Read-only source projection and source-kind-specific transfer writes use separate optional materializer ports.                                        |
+| ID      | Status                  | Decision                                                                                                                                                          |
+| ------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AS-01` | Implemented             | Artifact Store owns app-local artifact lifecycle metadata and coordinates portable content through repository ports.                                              |
+| `AS-02` | Implemented             | Workspace does not introduce a separate persistent Workspace Store database.                                                                                      |
+| `AS-03` | Implemented             | Workspace is a typed consumer of Artifact Store.                                                                                                                  |
+| `AS-04` | Implemented             | Existing domain stores remain physically unchanged during Workspace adoption.                                                                                     |
+| `AS-05` | Implemented mapping     | A current Bundle maps to generic `ArtifactCollection`.                                                                                                            |
+| `AS-06` | Implemented mapping     | A current item maps to generic `ArtifactRecord`.                                                                                                                  |
+| `AS-07` | Implemented             | Portable package content and app-local collections are separate concepts and storage domains.                                                                     |
+| `AS-08` | Implemented             | Portable definitions exclude app IDs, local paths, secrets, runtime state, and conversation state.                                                                |
+| `AS-09` | Implemented             | Source transport is an Artifact Store extension port registered during composition, not behavior implemented by frontends or consumer features.                   |
+| `AS-10` | Implemented             | `NewStore` installs `fs-directory` and `embedded-fs-directory`. `memory-directory` is a contract and test-only injection point, not a default driver.             |
+| `AS-11` | Implemented             | Artifact revisions are canonical definition digests, not generated revision IDs.                                                                                  |
+| `AS-12` | Implemented             | Catalog resources use source occurrence identity, not generated resource IDs.                                                                                     |
+| `AS-13` | Implemented             | `ArtifactRecord` is the sole generic app-side artifact item.                                                                                                      |
+| `AS-14` | Implemented             | Registered frontends own source-format recognition and decoding. The portable-definition frontend is registered by default.                                       |
+| `AS-15` | Implemented             | Runtime projections and execution remain outside Artifact Store.                                                                                                  |
+| `AS-16` | Implemented             | A Workspace Root is `ArtifactRoot(kind=workspace.root)`.                                                                                                          |
+| `AS-17` | Implemented             | Workspace discovery synchronizes selected catalog resources into root-local records.                                                                              |
+| `AS-18` | Implemented generically | Linked, captured, forked, and app-local record modes exist. Their Workspace-specific use is planned.                                                              |
+| `AS-19` | Implemented             | Root scans atomically publish source observations and immutable root catalog snapshots in metadata storage.                                                       |
+| `AS-20` | Implemented             | Read-only source projection and source-kind-specific transfer writes use separate optional materializer ports.                                                    |
+| `AS-21` | Implemented             | Frontend ownership is selected against the complete Store registry. Scan allowlists limit publication but cannot cause a different frontend to claim a candidate. |
+| `AS-22` | Implemented             | Frontends may declaratively request bounded source asset roots. Artifact Store owns traversal, reads, digests, and portable-content persistence.                  |
+| `AS-23` | Implemented             | Root-kind dependency resolvers choose consumer precedence while Artifact Store owns graph construction, cycle detection, and snapshot persistence.                |
+| `AS-24` | Implemented             | Workspace-derived record names include a stable source-occurrence suffix and do not depend on mutable definition content.                                         |
+| `AS-25` | Implemented             | App-managed sidecar and compensation directories are reserved source paths and are excluded by the filesystem source driver.                                      |
 
 ## Artifact Store Architecture
 
@@ -582,6 +590,11 @@ pin-digest
 manual-refresh
 ```
 
+Captured, forked, and app-local records always use `pin-digest`. For every
+pin-digest record, `PinnedDefinitionDigest` and
+`LastResolvedDefinitionDigest` are both required and equal. This keeps detached
+record resolution independent of mutable source state.
+
 Artifact Record is the only generic app-side artifact entity.
 
 There is no separate generic binding entity.
@@ -849,6 +862,10 @@ Artifact Store provides:
 - Report ambiguous candidates.
 - Persist dependency-resolution snapshots against a root catalog generation.
 
+When a root-kind dependency resolver is registered, it may select one candidate
+from the complete candidate set. The explanation retains every candidate while
+the persisted resolved snapshot contains the selected candidate.
+
 Artifact Store does not choose consumer precedence rules.
 
 #### Source Materialization
@@ -1046,6 +1063,20 @@ type ArtifactFrontend interface {
 }
 ```
 
+`DecodedArtifact` may include declarative source asset roots:
+
+```text
+SourceAssetRoot
+  - Root
+  - PortablePrefix
+  - IncludePatterns
+  - Recursive
+```
+
+Frontends do not receive source readers. Artifact Store executes these requests
+through the source driver under scan entry, depth, file-count, per-definition
+asset-count, and total-byte limits.
+
 `DecodedArtifact` carries a source-local `SubresourceLocator` as well as the
 definition emitted by a frontend. Artifact Store canonicalizes the definition,
 calculates its digest, and persists portable content only after frontend
@@ -1070,7 +1101,23 @@ type CollectionKindHook interface {
 }
 ```
 
----
+#### Dependency Resolver
+
+```go
+type DependencyResolver interface {
+  RootKind() RootKind
+
+  ResolveDependency(
+    ctx context.Context,
+    root ArtifactRoot,
+    attachments []RootSourceAttachment,
+    selector ArtifactSelector,
+    candidates []DependencyCandidate,
+  ) (*DependencyCandidate, []Diagnostic)
+}
+```
+
+The resolver does not query source content, build graphs, or persist snapshots.
 
 ### Scanning Workflow
 
@@ -1110,6 +1157,7 @@ A scan plan may contain:
 - Recursion settings.
 - Allowed frontend IDs.
 - Maximum file sizes.
+- Maximum total source-read bytes.
 - Maximum candidate count.
 - Maximum traversal entries.
 - Maximum traversal depth.
@@ -1118,6 +1166,11 @@ A scan plan may contain:
 Artifact Store executes plans.
 
 Consumers define plans.
+
+Frontend recognition always runs against the complete registered frontend set.
+An allowlist is checked only after the globally winning frontend is known. This
+prevents two roots from assigning different frontend ownership to the same
+source occurrence.
 
 With no source plans, `ScanRoot` performs an authoritative recursive scan of
 every enabled attachment. With explicit plans, every planned source must be an
@@ -1205,6 +1258,8 @@ Collections
 Dependencies
   - GetDependencies, FindCandidates
   - BuildDependencyGraph, ExplainDependencyResolution
+  - ListDependencySnapshots
+  - ListTransferProvenance
 
 Packages
   - PublishArtifactPackage
@@ -1216,8 +1271,6 @@ Transfer
 Runtime-facing source projection
   - MaterializeSource
 ```
-
----
 
 ### Persistence
 
@@ -1262,7 +1315,7 @@ resolution, and load-plan composition.
 Workspace owns no persistence database. Artifact Store remains the durable
 owner of roots, sources, catalog generations, records, and collections.
 
-When implemented, Workspace will provide:
+Workspace provides:
 
 - Workspace Root semantics.
 - Workspace discovery plans.
@@ -1278,7 +1331,7 @@ Workspace does not own a separate persistence database.
 
 ### Workspace Root Model
 
-A planned Workspace Root is:
+A Workspace Root is:
 
 ```text
 ArtifactRoot
@@ -1429,27 +1482,25 @@ ArtifactRecord.RecordID
 -> existing ItemID
 ```
 
-### Planned Components
+### Implemented Components
 
 Workspace is implemented as the typed Artifact Store consumer described above.
 The implementation keeps domain persistence and runtime construction outside
 Workspace while providing typed discovery, validation, synchronization, catalog,
 reference, load-plan, and projection boundaries.
 
-| Component                    | Planned responsibility                               |
-| ---------------------------- | ---------------------------------------------------- |
-| `WorkspaceService`           | Implemented typed façade over Artifact Store         |
-| `WorkspaceRootKindHook`      | Implemented validation of `workspace.root` data      |
-| `WorkspaceDiscoveryPlanner`  | Implemented bootstrap and expanded scan planning     |
-| `WorkspaceArtifactFrontends` | Implemented native JSON, YAML, and Markdown frontend |
-| `WorkspaceCatalogService`    | Implemented root catalog and record view             |
-| `WorkspaceCollectionPolicy`  | Implemented derived collection synchronization       |
-| `WorkspaceResourceProjector` | Implemented default and injectable projectors        |
-| `WorkspaceReferenceResolver` | Implemented record and selector resolution           |
-| `WorkspaceLoadComposer`      | Implemented load-plan composition                    |
-| `WorkspaceRuntimeProjectors` | Consumer-specific extension point                    |
-
----
+| Component                    | Current responsibility                                                 |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `WorkspaceService`           | Typed façade over Artifact Store                                       |
+| `WorkspaceRootKindHook`      | Validation of `workspace.root` data                                    |
+| `WorkspaceDiscoveryPlanner`  | Bootstrap and expanded scan planning                                   |
+| `WorkspaceArtifactFrontends` | Native JSON, restricted YAML, Markdown, and declared Skill asset roots |
+| `WorkspaceCatalogService`    | Root catalog and record view                                           |
+| `WorkspaceCollectionPolicy`  | Derived collection synchronization and transfer defaults               |
+| `WorkspaceResourceProjector` | Default and injectable management projectors                           |
+| `WorkspaceReferenceResolver` | Attachment-priority dependency resolver                                |
+| `WorkspaceLoadComposer`      | Load-plan composition through Artifact Store dependency graphs         |
+| `WorkspaceRuntimeProjectors` | Consumer-specific extension point                                      |
 
 ### Discovery Workflow
 
@@ -1536,8 +1587,6 @@ The Workspace Definition may add paths for:
 - Context.
 - Packages.
 
----
-
 ### Resource Projection
 
 Workspace must project Artifact Records into existing domain resource shapes.
@@ -1563,7 +1612,11 @@ The mapping is performed by Workspace projectors.
 
 The frontend does not need to understand Artifact Store keys or source locators.
 
----
+Projected domain values are management projections. They are not inserted into
+the existing stores. File-oriented runtime adapters must resolve
+`SourceID + Locator`, or materialize canonical definition assets, before
+constructing runtime objects. In particular, a projected Skill's source-relative
+location is not an installed `SkillStore` filesystem registration.
 
 ### Existing Store Integration
 
@@ -1612,8 +1665,6 @@ ScopedSkillService
 
 The existing store persistence formats do not change.
 
----
-
 ### Runtime Boundary
 
 Artifact Store does not construct runtime objects, and a future Workspace
@@ -1634,6 +1685,10 @@ If a runtime library requires a directory rather than `fs.FS`-style source
 access, Workspace may request `MaterializeSource` through the configured
 `SourceMaterializer`. The resulting `RootPath` remains app-local runtime data.
 
+No default `SourceMaterializer` or directory publisher is installed by the app
+composition in this baseline. Filesystem definition transfer uses atomic
+individual file writes and does not require rename support.
+
 Examples:
 
 ```text
@@ -1653,8 +1708,6 @@ Workspace Tool Record
 -> Tool projector
 -> Tool Gateway configuration
 ```
-
----
 
 ### Refresh Workflow
 
@@ -1679,8 +1732,6 @@ Outcomes:
 | New file        | New catalog resource   | New derived linked record when policy allows           |
 | Invalid file    | Invalid resource state | Existing record remains diagnosable                    |
 
----
-
 ### Import and Fork Workflow
 
 This is a planned use of the implemented generic transfer workflow.
@@ -1699,11 +1750,13 @@ Workspace Artifact Record
 Transfer publication invalidates the destination source observation. Workspace
 must rescan the destination root before relying on a current root catalog.
 
+When a Workspace transfer omits `CollectionID`, Workspace ensures the derived
+collection for the definition kind. Missing local name and version values are
+derived from source occurrence identity and portable definition metadata.
+
 The original Workspace Artifact Record remains linked to its source.
 
 The imported or forked Artifact Record becomes independent.
-
----
 
 ### Ownership Summary
 
@@ -1725,8 +1778,6 @@ The imported or forked Artifact Record becomes independent.
 | MCP connections                 |             No |                           No |     Yes |
 | Model clients                   |             No |                           No |     Yes |
 | Tool execution                  |             No |                           No |     Yes |
-
----
 
 ### Architecture Summary
 
@@ -1786,3 +1837,60 @@ local item record
 source definition
 runtime behavior
 ```
+
+### Current state record
+
+- Workspace scan ownership is deterministic across roots.
+- Scans and declarative asset acquisition are bounded.
+- Skill resources become portable assets and participate in definition digests.
+- Managed transfer internals cannot reappear as catalog artifacts.
+- Dependency precedence is consumer-owned without duplicating graph logic.
+- Dependency snapshots are persisted for Workspace load plans.
+- Pinned and detached records retain frontend validation.
+- Export uses historical frontend ownership.
+- Workspace-derived local identities are collision-resistant and stable across content changes.
+- Workspace transfers create projectable records by default.
+- Initialization and attachment sagas have safer compensation.
+- The local Workspace API exposes normalized source registrations.
+- The HLD reflects the implemented architecture and current runtime boundary.
+
+### Remaining risks and next steps
+
+- Filesystem generation currently relies on entry metadata such as size and modification time. A same-size content rewrite with a restored timestamp may evade generation comparison. A hardened content-generation strategy needs either:
+  - content hashing by the source driver, or
+  - a trusted filesystem generation/watch provider.
+
+- External source reads and SQLite publication cannot be one atomic transaction. The existing pre-publication generation confirmation minimizes, but cannot eliminate, the final filesystem-to-database race.
+
+- Filesystem transfer is a bounded multi-file saga. Individual writes are atomic, but process termination between files can leave unreferenced files. Production crash recovery should add a durable transfer journal or generation marker.
+
+- Workspace management projections do not yet constitute complete runtime providers. In particular:
+  - canonical Skill assets need a runtime materializer for pinned and captured Skills,
+  - embedded source Skills need an app-local real-directory projection when used by `agentskills-go`,
+  - MCP relative commands and working directories need a runtime source resolver,
+  - Workspace records are intentionally not inserted into existing stores.
+
+- `NewService` performs several independent registry mutations. The wrapper closes the Store on failure, but an injected shared Store can remain partially composed. A future atomic `RegisterConsumerComponents` composition API would remove this edge case.
+
+- Workspace catalog loading combines an immutable source catalog generation with separately read local collections and records. Concurrent local record mutations can produce an eventually consistent view. A repository-level Workspace read snapshot would be required for a fully atomic combined view.
+
+- Tests still need to cover:
+  - two roots scanning one source with different frontend allowlists,
+  - source asset traversal limits and path containment,
+  - transfer compensation directories remaining undiscoverable,
+  - historical frontend validation,
+  - dependency resolver ties and snapshot persistence,
+  - record-mode invariants,
+  - occurrence-derived name collisions,
+  - attachment compensation,
+  - transfer auto-collection,
+  - Windows path and SQLite locking behavior.
+
+Additional files useful for the next pass:
+
+- `go.mod`, `go.sum`, and `go.work`, if present, to validate Go and dependency versions.
+- Existing Artifact Store and Workspace tests or test fixtures.
+- The built-in `skills`, `tools`, `mcp`, and `assistantpresets` asset trees, not only their loaders.
+- Wails binding-generation configuration and expected frontend JSON contracts.
+- Any intended production `SourceMaterializer` or directory publisher implementation.
+- Runtime provider interfaces that will merge installed and Workspace resources.

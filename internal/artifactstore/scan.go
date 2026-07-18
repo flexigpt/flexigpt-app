@@ -26,6 +26,13 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 	s.scanMu.Lock()
 	defer s.scanMu.Unlock()
 
+	if len(plan.SourcePlans) > spec.MaxSourcePlansPerScan {
+		return spec.ScanResult{}, fmt.Errorf(
+			"%w: scan contains more than %d source plans",
+			spec.ErrInvalidRequest,
+			spec.MaxSourcePlansPerScan,
+		)
+	}
 	root, err := s.repository.GetRoot(ctx, rootID, false)
 	if err != nil {
 		return spec.ScanResult{}, err
@@ -151,6 +158,7 @@ func (s *Store) ScanRoot(ctx context.Context, rootID spec.RootID, plan spec.Scan
 				SourceID:       source.SourceID,
 				DirectoryRoots: []spec.DirectoryScanRoot{{Root: ".", Recursive: true}},
 				MaxFileBytes:   spec.MaxDefinitionJSONBytes,
+				MaxTotalBytes:  spec.MaxScanTotalBytes,
 				Authoritative:  true,
 			}
 		}
@@ -285,6 +293,7 @@ func (s *Store) scanSource(
 	}
 	result := spec.SourceScanResult{SourceID: source.SourceID, Generation: generation}
 	seenResources := make(map[string]struct{})
+	readBudget := sourceScanReadBudget{}
 	for _, entry := range entries {
 		result.Candidates++
 		maximum := plan.MaxFileBytes
@@ -321,10 +330,30 @@ func (s *Store) scanSource(
 			)
 			continue
 		}
+		totalMaximum := plan.MaxTotalBytes
+		if totalMaximum <= 0 {
+			totalMaximum = spec.MaxScanTotalBytes
+		}
+		if entry.SizeBytes < 0 ||
+			entry.SizeBytes > totalMaximum-readBudget.Bytes {
+			return result, publication, fmt.Errorf(
+				"%w: source scan exceeds the configured %d byte total",
+				spec.ErrInvalidRequest,
+				totalMaximum,
+			)
+		}
 		content, err := readCandidate(ctx, driver, source, entry, maximum)
 		if err != nil {
 			return result, publication, err
 		}
+		if int64(len(content)) > totalMaximum-readBudget.Bytes {
+			return result, publication, fmt.Errorf(
+				"%w: source scan exceeds the configured %d byte total",
+				spec.ErrInvalidRequest,
+				totalMaximum,
+			)
+		}
+		readBudget.Bytes += int64(len(content))
 		digest := baseutils.DigestBytes(content)
 		candidate := spec.ArtifactCandidate{
 			Source:              source,
@@ -444,6 +473,33 @@ func (s *Store) scanSource(
 					canonicalDiagnostics...,
 				)
 				continue
+			}
+			if len(decodedArtifact.AssetRoots) > 0 {
+				if len(definition.AssetManifest) != 0 {
+					return result, publication, fmt.Errorf(
+						"%w: frontend %q supplied both an asset manifest and source asset roots",
+						spec.ErrInvalidRequest,
+						frontend.ID(),
+					)
+				}
+				manifest, err := s.collectDecodedAssetManifest(
+					ctx,
+					driver,
+					source,
+					entry.Locator,
+					decodedArtifact.AssetRoots,
+					plan,
+					&readBudget,
+				)
+				if err != nil {
+					return result, publication, err
+				}
+				definition.AssetManifest = manifest
+				definition.Digest = ""
+				definition, err = baseutils.CanonicalizeDefinition(definition)
+				if err != nil {
+					return result, publication, err
+				}
 			}
 			allDiagnostics := append([]spec.Diagnostic{}, diagnostics...)
 			allDiagnostics = append(allDiagnostics, frontend.ValidateStructure(ctx, definition)...)
@@ -640,11 +696,6 @@ func (s *Store) selectFrontend(
 	best := spec.RecognitionNone
 	tied := make([]spec.FrontendID, 0, 2)
 	for _, frontend := range s.frontendsSnapshot() {
-		if len(allowedSet) != 0 {
-			if _, permitted := allowedSet[frontend.ID()]; !permitted {
-				continue
-			}
-		}
 		recognition := frontend.Recognizes(ctx, candidate)
 		if recognition < spec.RecognitionNone || recognition > spec.RecognitionPreferred {
 			return nil, fmt.Errorf(
@@ -674,18 +725,41 @@ func (s *Store) selectFrontend(
 		//nolint:nilnil // Ok.
 		return nil, nil
 	}
+	if len(allowedSet) != 0 {
+		if _, permitted := allowedSet[selected.ID()]; !permitted {
+			//nolint:nilnil // The allowlist limits publication, not ownership. An alternate frontend must not claim a
+			// candidate merely because the globally winning frontend was omitted from this plan.
+			return nil, nil
+		}
+	}
 	return selected, nil
 }
 
 func (s *Store) validateSourceScanPlan(plan spec.SourceScanPlan) error {
-	if plan.SourceID == "" {
-		return fmt.Errorf("%w: scan source ID is empty", spec.ErrInvalidRequest)
+	if err := validate.ValidateCatalogResourceKey(spec.CatalogResourceKey{
+		SourceID: plan.SourceID,
+		Locator:  ".",
+	}); err != nil {
+		return fmt.Errorf("%w: scan source identity: %w", spec.ErrInvalidRequest, err)
 	}
 	if plan.MaxFileBytes < 0 ||
+		plan.MaxTotalBytes < 0 ||
 		plan.MaxCandidates < 0 ||
 		plan.MaxTraversalEntries < 0 ||
 		plan.MaxTraversalDepth < 0 {
 		return fmt.Errorf("%w: scan limits must not be negative", spec.ErrInvalidRequest)
+	}
+	if plan.MaxTotalBytes > spec.MaxScanTotalBytes {
+		return fmt.Errorf(
+			"%w: scan total-byte limit exceeds %d",
+			spec.ErrInvalidRequest,
+			spec.MaxScanTotalBytes,
+		)
+	}
+	if len(plan.ExplicitLocators) > spec.MaxExplicitLocatorsPerSource ||
+		len(plan.DirectoryRoots) > spec.MaxDirectoryRootsPerSource ||
+		len(plan.AllowedFrontendIDs) > spec.MaxFrontendIDsPerSource {
+		return fmt.Errorf("%w: scan plan shape exceeds configured limits", spec.ErrInvalidRequest)
 	}
 	if plan.Authoritative &&
 		len(plan.ExplicitLocators) == 0 &&
@@ -707,10 +781,43 @@ func (s *Store) validateSourceScanPlan(plan spec.SourceScanPlan) error {
 	}
 	seenLocators := make(map[spec.SourceLocator]struct{}, len(plan.ExplicitLocators))
 	for _, locator := range plan.ExplicitLocators {
+		if err := validate.ValidateSourceLocator(locator, false); err != nil {
+			return fmt.Errorf("%w: explicit locator %q: %w", spec.ErrInvalidRequest, locator, err)
+		}
 		if _, duplicate := seenLocators[locator]; duplicate {
 			return fmt.Errorf("%w: duplicate explicit locator %q", spec.ErrInvalidRequest, locator)
 		}
 		seenLocators[locator] = struct{}{}
+	}
+	seenRoots := make(map[spec.SourceLocator]struct{}, len(plan.DirectoryRoots))
+	for _, root := range plan.DirectoryRoots {
+		if err := validate.ValidateSourceLocator(root.Root, true); err != nil {
+			return fmt.Errorf("%w: directory root %q: %w", spec.ErrInvalidRequest, root.Root, err)
+		}
+		if _, duplicate := seenRoots[root.Root]; duplicate {
+			return fmt.Errorf("%w: duplicate directory root %q", spec.ErrInvalidRequest, root.Root)
+		}
+		seenRoots[root.Root] = struct{}{}
+		if len(root.IncludePatterns) > spec.MaxIncludePatternsPerRoot {
+			return fmt.Errorf(
+				"%w: directory root %q contains too many include patterns",
+				spec.ErrInvalidRequest,
+				root.Root,
+			)
+		}
+		seenPatterns := make(map[string]struct{}, len(root.IncludePatterns))
+		for _, pattern := range root.IncludePatterns {
+			if strings.TrimSpace(pattern) != pattern || pattern == "" {
+				return fmt.Errorf("%w: include pattern must be non-empty and trimmed", spec.ErrInvalidRequest)
+			}
+			if _, duplicate := seenPatterns[pattern]; duplicate {
+				return fmt.Errorf("%w: duplicate include pattern %q", spec.ErrInvalidRequest, pattern)
+			}
+			seenPatterns[pattern] = struct{}{}
+			if _, err := path.Match(pattern, "candidate"); err != nil {
+				return fmt.Errorf("%w: invalid include pattern %q: %w", spec.ErrInvalidRequest, pattern, err)
+			}
+		}
 	}
 	return nil
 }
@@ -798,6 +905,13 @@ func collectSourceCandidates(
 			}
 			return nil, err
 		}
+		included, err := sourceEntryIncluded(ctx, driver, source, entry)
+		if err != nil {
+			return nil, err
+		}
+		if !included {
+			continue
+		}
 		if entry.IsRegular {
 			if err := add(entry); err != nil {
 				return nil, err
@@ -834,6 +948,13 @@ func collectSourceCandidates(
 				walkRoot,
 			)
 		}
+		included, err := sourceEntryIncluded(ctx, driver, source, rootEntry)
+		if err != nil {
+			return nil, err
+		}
+		if !included {
+			continue
+		}
 		var visit func(spec.SourceLocator, int) error
 		visit = func(directory spec.SourceLocator, depth int) error {
 			entries, err := driver.ReadDir(ctx, source, directory)
@@ -861,6 +982,13 @@ func collectSourceCandidates(
 						entry.Locator,
 					)
 				}
+				included, err := sourceEntryIncluded(ctx, driver, source, entry)
+				if err != nil {
+					return err
+				}
+				if !included {
+					continue
+				}
 				if entry.IsDirectory {
 					if root.Recursive {
 						if err := visit(entry.Locator, entryDepth); err != nil {
@@ -887,6 +1015,19 @@ func collectSourceCandidates(
 	}
 	sort.Slice(out, func(left, right int) bool { return out[left].Locator < out[right].Locator })
 	return out, nil
+}
+
+func sourceEntryIncluded(
+	ctx context.Context,
+	driver spec.SourceDriver,
+	source spec.ArtifactSource,
+	entry spec.SourceEntry,
+) (bool, error) {
+	filter, ok := driver.(spec.SourceScanFilter)
+	if !ok {
+		return true, nil
+	}
+	return filter.IncludeSourceEntry(ctx, source, entry)
 }
 
 func matchesDirectoryRoot(root, locator spec.SourceLocator, plan spec.DirectoryScanRoot) bool {

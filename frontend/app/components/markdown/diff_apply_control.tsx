@@ -33,6 +33,7 @@ import {
 	buildEditableTargetsFromOutput,
 	buildFileStatusCounts,
 	buildUnifiedDiffTextForTarget,
+	filterDiffOwnedCandidatePaths,
 	getErrorMessage,
 	haveSharedPathIdentity,
 	isTerminalUnifiedDiffStatus,
@@ -129,13 +130,10 @@ function resolveRequestDiffText(
 
 function buildRequestTargetsFromParsedDiff(
 	fallbackParsed: ReturnType<typeof parseUnifiedDiffForUI>,
-	candidatePaths: string[]
+	candidatePaths: string[],
+	workspaceRoots: string[]
 ): ApplyUnifiedDiffFileTarget[] | undefined {
-	if (!fallbackParsed.isOpenAIPatch) {
-		return undefined;
-	}
-
-	const parsedTargets = buildEditableTargetsFromOutput(undefined, fallbackParsed, candidatePaths);
+	const parsedTargets = buildEditableTargetsFromOutput(undefined, fallbackParsed, candidatePaths, workspaceRoots);
 	const fileTargets = editableTargetsToFileTargets(parsedTargets);
 
 	return fileTargets.length > 0 ? fileTargets : undefined;
@@ -573,6 +571,7 @@ interface DiffApplyControlProps {
 	diffText: string;
 	isBusy: boolean;
 	candidatePaths?: string[];
+	workspaceRoots?: string[];
 }
 
 type ControlStatus =
@@ -585,10 +584,29 @@ interface DiffApplyState {
 	error?: string;
 }
 
-export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }: DiffApplyControlProps) {
+export function DiffApplyControl({
+	language,
+	diffText,
+	isBusy,
+	candidatePaths,
+	workspaceRoots,
+}: DiffApplyControlProps) {
 	const isDiffLike = useMemo(() => looksLikeUnifiedDiff(diffText, language), [diffText, language]);
 	const fallbackParsed = useMemo(() => parseUnifiedDiffForUI(diffText, language), [diffText, language]);
-	const normalizedCandidatePaths = useMemo(() => absolutePathStrings(candidatePaths ?? []), [candidatePaths]);
+	const suppliedCandidatePaths = useMemo(() => absolutePathStrings(candidatePaths ?? []), [candidatePaths]);
+	const suppliedWorkspaceRoots = useMemo(() => absolutePathStrings(workspaceRoots ?? []), [workspaceRoots]);
+	const normalizedCandidatePaths = useMemo(
+		() => filterDiffOwnedCandidatePaths(fallbackParsed, suppliedCandidatePaths),
+		[fallbackParsed, suppliedCandidatePaths]
+	);
+	const normalizedWorkspaceRoots = useMemo(
+		() => filterDiffOwnedCandidatePaths(fallbackParsed, suppliedWorkspaceRoots),
+		[fallbackParsed, suppliedWorkspaceRoots]
+	);
+	const backendCandidatePaths = useMemo(
+		() => uniqueStrings([...normalizedCandidatePaths, ...normalizedWorkspaceRoots]),
+		[normalizedCandidatePaths, normalizedWorkspaceRoots]
+	);
 
 	const [state, setState] = useState<DiffApplyState>({ status: 'idle' });
 	const [fileTargets, setFileTargets] = useState<ApplyUnifiedDiffFileTarget[]>([]);
@@ -618,7 +636,12 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 	const deriveAndStoreTargets = useCallback(
 		(output: ApplyUnifiedDiffOut | undefined, previousTargets?: ApplyUnifiedDiffFileTarget[]) => {
-			const editable = buildEditableTargetsFromOutput(output, fallbackParsed, normalizedCandidatePaths);
+			const editable = buildEditableTargetsFromOutput(
+				output,
+				fallbackParsed,
+				normalizedCandidatePaths,
+				normalizedWorkspaceRoots
+			);
 			const next = editableTargetsToFileTargets(editable);
 			const nextWithPrevious =
 				previousTargets && previousTargets.length > 0 ? mergeApplyFileTargets(next, previousTargets) : next;
@@ -646,7 +669,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 			return [];
 		},
-		[fallbackParsed, normalizedCandidatePaths]
+		[fallbackParsed, normalizedCandidatePaths, normalizedWorkspaceRoots]
 	);
 
 	const buildDiffTextForEditableTargets = useCallback(
@@ -712,7 +735,9 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			const seq = ++requestSeqRef.current;
 			const requestDiffText = prepareUnifiedDiffTextForApply(options?.diffText ?? diffText, language);
 			const requestTargets =
-				targets.length > 0 ? targets : buildRequestTargetsFromParsedDiff(fallbackParsed, normalizedCandidatePaths);
+				targets.length > 0
+					? targets
+					: buildRequestTargetsFromParsedDiff(fallbackParsed, normalizedCandidatePaths, normalizedWorkspaceRoots);
 
 			setControlState(previous => ({
 				...previous,
@@ -727,7 +752,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 					dryRun: true,
 					strict: nextStrict,
 					fileTargets: requestTargets,
-					candidatePaths: normalizedCandidatePaths.length > 0 ? normalizedCandidatePaths : undefined,
+					candidatePaths: backendCandidatePaths.length > 0 ? backendCandidatePaths : undefined,
 				});
 
 				if (seq !== requestSeqRef.current) {
@@ -759,7 +784,16 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				return undefined;
 			}
 		},
-		[deriveAndStoreTargets, diffText, normalizedCandidatePaths, setControlState, fallbackParsed, language]
+		[
+			backendCandidatePaths,
+			deriveAndStoreTargets,
+			diffText,
+			fallbackParsed,
+			language,
+			normalizedCandidatePaths,
+			normalizedWorkspaceRoots,
+			setControlState,
+		]
 	);
 
 	const runApply = async (
@@ -831,7 +865,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				dryRun: false,
 				strict: nextStrict,
 				fileTargets: applyTargets.length > 0 ? applyTargets : undefined,
-				candidatePaths: normalizedCandidatePaths.length > 0 ? normalizedCandidatePaths : undefined,
+				candidatePaths: backendCandidatePaths.length > 0 ? backendCandidatePaths : undefined,
 			});
 			if (applySeq !== requestSeqRef.current) {
 				return;
@@ -885,7 +919,8 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 	const editableTargetsForHeader = buildEditableTargetsFromOutput(
 		state.output,
 		fallbackParsed,
-		normalizedCandidatePaths
+		normalizedCandidatePaths,
+		normalizedWorkspaceRoots
 	);
 	const applicableTargets = getApplicableTargetsForOutput(editableTargetsForHeader, state.output);
 	const applicableTargetsHaveMissingPaths =
@@ -1074,6 +1109,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				output={state.output}
 				error={state.error}
 				candidatePaths={normalizedCandidatePaths}
+				workspaceRoots={normalizedWorkspaceRoots}
 				fileTargets={fileTargets}
 				strict={strict}
 				onStrictChange={setStrict}

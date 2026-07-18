@@ -34,6 +34,9 @@ func (s *Store) ListCatalogResourcesForSource(
 		return nil, err
 	}
 	defer finish()
+	if _, err := s.repository.GetSource(ctx, sourceID); err != nil {
+		return nil, err
+	}
 	return s.repository.ListCatalogResourcesForSource(ctx, sourceID)
 }
 
@@ -137,6 +140,9 @@ func (s *Store) ListDefinitionHistory(
 		return nil, err
 	}
 	defer finish()
+	if _, err := s.repository.GetSource(ctx, key.SourceID); err != nil {
+		return nil, err
+	}
 	return s.repository.ListCatalogResourceRevisions(ctx, key)
 }
 

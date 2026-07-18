@@ -298,6 +298,32 @@ func (d *llmToolsFSDirectoryDriver) Stat(
 	}, nil
 }
 
+func (*llmToolsFSDirectoryDriver) IncludeSourceEntry(
+	ctx context.Context,
+	source spec.ArtifactSource,
+	entry spec.SourceEntry,
+) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if source.Kind != spec.SourceKindFSDirectory {
+		return false, fmt.Errorf(
+			"%w: fs scan filter received source kind %q",
+			spec.ErrInvalidRequest,
+			source.Kind,
+		)
+	}
+	for segment := range strings.SplitSeq(string(entry.Locator), "/") {
+		switch segment {
+		case spec.ManagedArtifactDataDirectoryName,
+			spec.ManagedArtifactTrashDirectoryName:
+			return false, nil
+		default:
+		}
+	}
+	return true, nil
+}
+
 type llmToolsFSConfig struct {
 	RootPath       string
 	FollowSymlinks bool
@@ -423,4 +449,7 @@ func joinSourceLocator(parent spec.SourceLocator, name string) (spec.SourceLocat
 	return spec.SourceLocator(string(parent) + "/" + name), nil
 }
 
-var _ spec.SourceConfigNormalizer = (*llmToolsFSDirectoryDriver)(nil)
+var (
+	_ spec.SourceConfigNormalizer = (*llmToolsFSDirectoryDriver)(nil)
+	_ spec.SourceScanFilter       = (*llmToolsFSDirectoryDriver)(nil)
+)

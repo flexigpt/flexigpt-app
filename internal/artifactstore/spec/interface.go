@@ -37,12 +37,23 @@ type ArtifactCandidate struct {
 	PackageManifestLocator SourceLocator
 }
 
+// SourceAssetRoot declaratively requests portable assets beneath a candidate's
+// directory. The frontend declares scope only. Artifact Store retains source
+// transport, traversal, limits, digesting, and persistence ownership.
+type SourceAssetRoot struct {
+	Root            SourceLocator
+	PortablePrefix  PortablePath
+	IncludePatterns []string
+	Recursive       bool
+}
+
 // DecodedArtifact maps a portable definition to one source-local subresource.
 // The frontend leaves Digest empty; Artifact Store canonicalizes and calculates
 // it before storage.
 type DecodedArtifact struct {
 	SubresourceLocator SubresourceLocator
 	Definition         CanonicalDefinition
+	AssetRoots         []SourceAssetRoot
 }
 
 // ExportClosure describes portable definition and asset content required to
@@ -188,6 +199,20 @@ type RecordSyncPolicy interface {
 	) (RecordDerivation, bool, []Diagnostic)
 }
 
+// DependencyResolver selects at most one candidate using root-kind-specific
+// precedence. Artifact Store still discovers candidates, validates the result,
+// builds the graph, detects cycles, and persists dependency snapshots.
+type DependencyResolver interface {
+	RootKind() RootKind
+	ResolveDependency(
+		ctx context.Context,
+		root ArtifactRoot,
+		attachments []RootSourceAttachment,
+		selector ArtifactSelector,
+		candidates []DependencyCandidate,
+	) (*DependencyCandidate, []Diagnostic)
+}
+
 // DirectoryScanRoot selects regular files beneath a source-relative directory.
 type DirectoryScanRoot struct {
 	// IncludePatterns use path.Match syntax. A pattern without a slash is also
@@ -208,6 +233,7 @@ type SourceScanPlan struct {
 	DirectoryRoots      []DirectoryScanRoot `json:"directoryRoots,omitempty"`
 	AllowedFrontendIDs  []FrontendID        `json:"allowedFrontendIDs,omitempty"`
 	MaxFileBytes        int64               `json:"maxFileBytes,omitempty"`
+	MaxTotalBytes       int64               `json:"maxTotalBytes,omitempty"`
 	MaxCandidates       int                 `json:"maxCandidates,omitempty"`
 	MaxTraversalEntries int                 `json:"maxTraversalEntries,omitempty"`
 	MaxTraversalDepth   int                 `json:"maxTraversalDepth,omitempty"`
@@ -288,6 +314,13 @@ type SourceConfigNormalizer interface {
 		ctx context.Context,
 		config json.RawMessage,
 	) (json.RawMessage, []Diagnostic)
+}
+
+// SourceScanFilter optionally hides transport-owned or app-managed entries
+// from candidate and asset discovery. A false result for a directory also
+// prevents traversal beneath that directory.
+type SourceScanFilter interface {
+	IncludeSourceEntry(ctx context.Context, source ArtifactSource, entry SourceEntry) (bool, error)
 }
 
 // SourceDriver owns source transport, traversal safety, and generation

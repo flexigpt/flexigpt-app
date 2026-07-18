@@ -53,6 +53,7 @@ type Store struct {
 	frontendOrder           []spec.FrontendID
 	rootHooks               map[spec.RootKind]spec.RootKindHook
 	collectionHooks         map[spec.CollectionKind]spec.CollectionKindHook
+	dependencyResolvers     map[spec.RootKind]spec.DependencyResolver
 
 	scanMu            sync.Mutex
 	lifeMu            sync.Mutex
@@ -127,6 +128,10 @@ func WithRootKindHook(hook spec.RootKindHook) StoreOption {
 
 func WithCollectionKindHook(hook spec.CollectionKindHook) StoreOption {
 	return func(store *Store) error { return store.RegisterCollectionKindHook(hook) }
+}
+
+func WithDependencyResolver(resolver spec.DependencyResolver) StoreOption {
+	return func(store *Store) error { return store.RegisterDependencyResolver(resolver) }
 }
 
 func WithPortableContentRepository(repository spec.PortableContentRepository) StoreOption {
@@ -233,6 +238,7 @@ func newStore(repository spec.ArtifactMetadataRepository, content spec.PortableC
 		frontends:               make(map[spec.FrontendID]spec.ArtifactFrontend),
 		rootHooks:               make(map[spec.RootKind]spec.RootKindHook),
 		collectionHooks:         make(map[spec.CollectionKind]spec.CollectionKindHook),
+		dependencyResolvers:     make(map[spec.RootKind]spec.DependencyResolver),
 		now: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -386,6 +392,23 @@ func (s *Store) RegisterCollectionKindHook(hook spec.CollectionKindHook) error {
 			return fmt.Errorf("%w: collection kind hook %q", spec.ErrConflict, kind)
 		}
 		s.collectionHooks[kind] = hook
+		return nil
+	})
+}
+
+func (s *Store) RegisterDependencyResolver(resolver spec.DependencyResolver) error {
+	if s == nil || resolver == nil {
+		return fmt.Errorf("%w: dependency resolver is nil", spec.ErrInvalidRequest)
+	}
+	kind := resolver.RootKind()
+	if strings.TrimSpace(string(kind)) == "" {
+		return fmt.Errorf("%w: dependency resolver root kind is empty", spec.ErrInvalidRequest)
+	}
+	return s.mutateRegistry(func() error {
+		if _, exists := s.dependencyResolvers[kind]; exists {
+			return fmt.Errorf("%w: dependency resolver for root kind %q", spec.ErrConflict, kind)
+		}
+		s.dependencyResolvers[kind] = resolver
 		return nil
 	})
 }
@@ -553,6 +576,13 @@ func (s *Store) collectionHookFor(kind spec.CollectionKind) (spec.CollectionKind
 	defer s.registryMu.RUnlock()
 	hook, ok := s.collectionHooks[kind]
 	return hook, ok
+}
+
+func (s *Store) dependencyResolverFor(kind spec.RootKind) (spec.DependencyResolver, bool) {
+	s.registryMu.RLock()
+	defer s.registryMu.RUnlock()
+	resolver, ok := s.dependencyResolvers[kind]
+	return resolver, ok
 }
 
 func normalizedJSONObject(raw json.RawMessage) json.RawMessage {

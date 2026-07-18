@@ -30,6 +30,9 @@ func (s *Store) ListArtifactPackagesForSource(
 		return nil, err
 	}
 	defer finish()
+	if _, err := s.repository.GetSource(ctx, sourceID); err != nil {
+		return nil, err
+	}
 	return s.repository.ListArtifactPackagesForSource(ctx, sourceID)
 }
 

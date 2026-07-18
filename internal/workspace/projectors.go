@@ -5,18 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	artifactstoreSpec "github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
-
-const (
-	projectedSkillInsertInstructions = "instructions"
-	projectedSkillInsertUserMessage  = "user-message"
-)
-
-var projectedSkillNameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 
 type workspaceDefinitionProjector struct{}
 
@@ -105,8 +98,7 @@ func validateWorkspaceCanonicalDefinition(
 		_, err := parseWorkspaceDefinition(definition)
 		return err
 	case KindSkillDefinition:
-		_, err := parseSkillDefinition(definition)
-		return err
+		return validateDomainDefinition(definition)
 	case KindInstructionDocument, KindContextDocument:
 		_, err := parseDocumentDefinition(definition)
 		return err
@@ -174,11 +166,6 @@ func parseSkillDefinition(
 	if err != nil {
 		return ProjectedSkill{}, err
 	}
-	if !projectedSkillNameRE.MatchString(name) {
-		return ProjectedSkill{}, errors.New(
-			"skill name must contain lowercase letters, numbers, and hyphens and be at most 64 characters",
-		)
-	}
 	if artifactstoreSpec.LogicalName(name) != definition.LogicalName {
 		return ProjectedSkill{}, fmt.Errorf(
 			"skill frontmatter name %q does not match logical name %q",
@@ -200,36 +187,19 @@ func parseSkillDefinition(
 		return ProjectedSkill{}, err
 	}
 	if insert == "" {
-		insert = projectedSkillInsertInstructions
+		insert = string(skillSpec.SkillInsertInstructions)
 	}
 	switch insert {
-	case projectedSkillInsertInstructions, projectedSkillInsertUserMessage:
+	case string(skillSpec.SkillInsertInstructions), string(skillSpec.SkillInsertUserMessage):
 	default:
 		return ProjectedSkill{}, fmt.Errorf("unsupported skill insert %q", insert)
 	}
 
 	var arguments []ProjectedSkillArgument
 	if rawArguments, exists := fields["arguments"]; exists {
-		if err := json.Unmarshal(rawArguments, &arguments); err != nil {
+		if err := decodeStrictJSONObject(rawArguments, &arguments, true); err != nil {
 			return ProjectedSkill{}, fmt.Errorf("decode skill arguments: %w", err)
 		}
-	}
-	seenArguments := make(map[string]struct{}, len(arguments))
-	for index, argument := range arguments {
-		if strings.TrimSpace(argument.Name) == "" ||
-			strings.TrimSpace(argument.Name) != argument.Name {
-			return ProjectedSkill{}, fmt.Errorf(
-				"skill arguments[%d].name must be non-empty and trimmed",
-				index,
-			)
-		}
-		if _, duplicate := seenArguments[argument.Name]; duplicate {
-			return ProjectedSkill{}, fmt.Errorf(
-				"duplicate skill argument %q",
-				argument.Name,
-			)
-		}
-		seenArguments[argument.Name] = struct{}{}
 	}
 
 	if displayName == "" {
@@ -246,6 +216,7 @@ func parseSkillDefinition(
 		Arguments:   append([]ProjectedSkillArgument(nil), arguments...),
 		Markdown:    document.Markdown,
 		Frontmatter: append(json.RawMessage(nil), document.Frontmatter...),
+		Assets:      append([]artifactstoreSpec.AssetManifestEntry(nil), definition.AssetManifest...),
 	}, nil
 }
 

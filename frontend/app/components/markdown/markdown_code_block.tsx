@@ -17,6 +17,7 @@ interface CodeProps {
 	isBusy: boolean;
 	hideMermaidCode: boolean;
 	diffCandidatePaths?: string[];
+	diffWorkspaceRoots?: string[];
 	defaultExpanded?: boolean;
 }
 
@@ -81,6 +82,7 @@ export function CodeBlock({
 	isBusy,
 	hideMermaidCode,
 	diffCandidatePaths,
+	diffWorkspaceRoots,
 	defaultExpanded = true,
 }: CodeProps) {
 	const codeBodyId = useId();
@@ -181,6 +183,7 @@ export function CodeBlock({
 								diffText={value}
 								isBusy={isBusy}
 								candidatePaths={diffCandidatePaths}
+								workspaceRoots={diffWorkspaceRoots}
 							/>
 						) : null}
 					</div>
