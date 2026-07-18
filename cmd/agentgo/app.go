@@ -12,7 +12,19 @@ import (
 	"github.com/adrg/xdg"
 )
 
-const AppTitle = "FlexiGPT"
+const (
+	AppTitle = "FlexiGPT"
+
+	settingsDirectoryName           = "settings"
+	conversationsDirectoryName      = "conversationsv1"
+	modelPresetsDirectoryName       = "modelpresetsv1"
+	toolsDirectoryName              = "toolsv1"
+	skillsDirectoryName             = "skillsv1"
+	mcpDirectoryName                = "mcpserversv1"
+	assistantPresetsDirectoryName   = "assistantpresetsv1"
+	workspaceArtifactsDirectoryName = "workspace-artifacts"
+	appDirectoryMode                = 0o770
+)
 
 type App struct {
 	ctx context.Context
@@ -52,18 +64,20 @@ func NewApp() *App {
 	app := &App{}
 	app.dataBasePath = filepath.Join(xdg.DataHome, strings.ToLower(AppTitle))
 
-	app.settingsDirPath = filepath.Join(app.dataBasePath, "settings")
-	app.conversationsDirPath = filepath.Join(app.dataBasePath, "conversationsv1")
-	app.modelPresetsDirPath = filepath.Join(app.dataBasePath, "modelpresetsv1")
-	app.toolsDirPath = filepath.Join(app.dataBasePath, "toolsv1")
-	app.skillsDirPath = filepath.Join(app.dataBasePath, "skillsv1")
-	app.mcpsDirPath = filepath.Join(app.dataBasePath, "mcpserversv1")
-	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, "assistantpresetsv1")
-	app.workspaceArtifactsDirPath = filepath.Join(app.dataBasePath, "workspace-artifacts-v1")
+	app.settingsDirPath = filepath.Join(app.dataBasePath, settingsDirectoryName)
+	app.conversationsDirPath = filepath.Join(app.dataBasePath, conversationsDirectoryName)
+	app.modelPresetsDirPath = filepath.Join(app.dataBasePath, modelPresetsDirectoryName)
+	app.toolsDirPath = filepath.Join(app.dataBasePath, toolsDirectoryName)
+	app.skillsDirPath = filepath.Join(app.dataBasePath, skillsDirectoryName)
+	app.mcpsDirPath = filepath.Join(app.dataBasePath, mcpDirectoryName)
+	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, assistantPresetsDirectoryName)
+	app.workspaceArtifactsDirPath = filepath.Join(app.dataBasePath, workspaceArtifactsDirectoryName)
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
 		app.modelPresetsDirPath == "" ||
-		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" || app.skillsDirPath == "" || app.mcpsDirPath == "" {
+		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" ||
+		app.skillsDirPath == "" || app.mcpsDirPath == "" ||
+		app.workspaceArtifactsDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"workspaceArtifactsDirPath", app.workspaceArtifactsDirPath,
@@ -91,7 +105,7 @@ func NewApp() *App {
 	app.workspaceAPI = &WorkspaceWrapper{}
 	app.assistantPresetStoreAPI = &AssistantPresetStoreWrapper{}
 
-	if err := os.MkdirAll(app.settingsDirPath, os.FileMode(0o770)); err != nil {
+	if err := os.MkdirAll(app.settingsDirPath, os.FileMode(appDirectoryMode)); err != nil {
 		slog.Error(
 			"failed to create settings directory",
 			"settings path", app.settingsDirPath,
@@ -99,7 +113,7 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create settings directory")
 	}
-	if err := os.MkdirAll(app.conversationsDirPath, os.FileMode(0o770)); err != nil {
+	if err := os.MkdirAll(app.conversationsDirPath, os.FileMode(appDirectoryMode)); err != nil {
 		slog.Error(
 			"failed to create conversations directory",
 			"conversations path", app.conversationsDirPath,
@@ -107,7 +121,7 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create conversations directory")
 	}
-	if err := os.MkdirAll(app.modelPresetsDirPath, os.FileMode(0o770)); err != nil {
+	if err := os.MkdirAll(app.modelPresetsDirPath, os.FileMode(appDirectoryMode)); err != nil {
 		slog.Error(
 			"failed to create model presets directory",
 			"model presets path", app.modelPresetsDirPath,
@@ -116,7 +130,7 @@ func NewApp() *App {
 		panic("failed to initialize app: could not create model presets directory")
 	}
 
-	if err := os.MkdirAll(app.toolsDirPath, os.FileMode(0o770)); err != nil {
+	if err := os.MkdirAll(app.toolsDirPath, os.FileMode(appDirectoryMode)); err != nil {
 		slog.Error(
 			"failed to create tools directory",
 			"tools path", app.toolsDirPath,
@@ -124,7 +138,7 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create tools directory")
 	}
-	if err := os.MkdirAll(app.skillsDirPath, os.FileMode(0o770)); err != nil {
+	if err := os.MkdirAll(app.skillsDirPath, os.FileMode(appDirectoryMode)); err != nil {
 		slog.Error(
 			"failed to create skills directory",
 			"skills path", app.skillsDirPath,
@@ -132,7 +146,7 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create skills directory")
 	}
-	if err := os.MkdirAll(app.mcpsDirPath, os.FileMode(0o770)); err != nil {
+	if err := os.MkdirAll(app.mcpsDirPath, os.FileMode(appDirectoryMode)); err != nil {
 		slog.Error(
 			"failed to create mcp directory",
 			"mcps path", app.mcpsDirPath,
@@ -141,7 +155,7 @@ func NewApp() *App {
 		panic("failed to initialize app: could not create mcp server directory")
 
 	}
-	if err := os.MkdirAll(app.assistantPresetsDirPath, os.FileMode(0o770)); err != nil {
+	if err := os.MkdirAll(app.assistantPresetsDirPath, os.FileMode(appDirectoryMode)); err != nil {
 		slog.Error(
 			"failed to create assistant presets directory",
 			"assistant presets path", app.assistantPresetsDirPath,
@@ -149,7 +163,7 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create assistant presets directory")
 	}
-	if err := os.MkdirAll(app.workspaceArtifactsDirPath, os.FileMode(0o770)); err != nil {
+	if err := os.MkdirAll(app.workspaceArtifactsDirPath, os.FileMode(appDirectoryMode)); err != nil {
 		slog.Error(
 			"failed to create Workspace artifact directory",
 			"workspaceArtifactsDirPath", app.workspaceArtifactsDirPath,

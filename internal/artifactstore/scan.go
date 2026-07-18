@@ -715,6 +715,29 @@ func (s *Store) validateSourceScanPlan(plan spec.SourceScanPlan) error {
 	return nil
 }
 
+func catalogResourcesForFrontendScope(
+	resources []spec.CatalogResource,
+	allowed []spec.FrontendID,
+) []spec.CatalogResource {
+	out := make([]spec.CatalogResource, 0, len(resources))
+	for _, resource := range resources {
+		if frontendInScanScope(resource.FrontendID, allowed) {
+			out = append(out, resource)
+		}
+	}
+	return out
+}
+
+func catalogResourceInAuthoritativeScope(
+	resource spec.CatalogResource,
+	plan spec.SourceScanPlan,
+) bool {
+	if !sourceLocatorInScanScope(resource.Locator, plan) {
+		return false
+	}
+	return frontendInScanScope(resource.FrontendID, plan.AllowedFrontendIDs)
+}
+
 func sourceLocatorInScanScope(locator spec.SourceLocator, plan spec.SourceScanPlan) bool {
 	if slices.Contains(plan.ExplicitLocators, locator) {
 		return true
@@ -739,29 +762,6 @@ func frontendInScanScope(
 		return true
 	}
 	return slices.Contains(allowed, frontendID)
-}
-
-func catalogResourcesForFrontendScope(
-	resources []spec.CatalogResource,
-	allowed []spec.FrontendID,
-) []spec.CatalogResource {
-	out := make([]spec.CatalogResource, 0, len(resources))
-	for _, resource := range resources {
-		if frontendInScanScope(resource.FrontendID, allowed) {
-			out = append(out, resource)
-		}
-	}
-	return out
-}
-
-func catalogResourceInAuthoritativeScope(
-	resource spec.CatalogResource,
-	plan spec.SourceScanPlan,
-) bool {
-	if !sourceLocatorInScanScope(resource.Locator, plan) {
-		return false
-	}
-	return frontendInScanScope(resource.FrontendID, plan.AllowedFrontendIDs)
 }
 
 func collectSourceCandidates(
@@ -913,6 +913,11 @@ func matchesDirectoryRoot(root, locator spec.SourceLocator, plan spec.DirectoryS
 		if matched, _ := path.Match(pattern, relative); matched {
 			return true
 		}
+		if !strings.Contains(pattern, "/") {
+			if matched, _ := path.Match(pattern, path.Base(relative)); matched {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -955,29 +960,16 @@ func readCandidate(
 			maximum,
 		)
 	}
-	return content, nil
-}
-
-func invalidCatalogResource(
-	sourceID spec.SourceID,
-	locator spec.SourceLocator,
-	subresource spec.SubresourceLocator,
-	frontendID spec.FrontendID,
-	now time.Time,
-	sourceContentDigest *spec.Digest,
-	diagnostics []spec.Diagnostic,
-) spec.CatalogResource {
-	return spec.CatalogResource{
-		SourceID:            sourceID,
-		Locator:             locator,
-		SubresourceLocator:  subresource,
-		SourceContentDigest: sourceContentDigest,
-		FrontendID:          frontendID,
-		State:               spec.CatalogStateInvalid,
-		FirstSeenAt:         now,
-		LastSeenAt:          now,
-		Diagnostics:         diagnostics,
+	if entry.SizeBytes >= 0 && int64(len(content)) != entry.SizeBytes {
+		return nil, fmt.Errorf(
+			"%w: candidate %q changed size from %d to %d bytes while being read",
+			spec.ErrConflict,
+			entry.Locator,
+			entry.SizeBytes,
+			len(content),
+		)
 	}
+	return content, nil
 }
 
 func invalidCandidateResources(
@@ -1013,6 +1005,28 @@ func invalidCandidateResources(
 		out = append(out, resource)
 	}
 	return out
+}
+
+func invalidCatalogResource(
+	sourceID spec.SourceID,
+	locator spec.SourceLocator,
+	subresource spec.SubresourceLocator,
+	frontendID spec.FrontendID,
+	now time.Time,
+	sourceContentDigest *spec.Digest,
+	diagnostics []spec.Diagnostic,
+) spec.CatalogResource {
+	return spec.CatalogResource{
+		SourceID:            sourceID,
+		Locator:             locator,
+		SubresourceLocator:  subresource,
+		SourceContentDigest: sourceContentDigest,
+		FrontendID:          frontendID,
+		State:               spec.CatalogStateInvalid,
+		FirstSeenAt:         now,
+		LastSeenAt:          now,
+		Diagnostics:         diagnostics,
+	}
 }
 
 func digestScanPlan(plan spec.ScanPlan) (spec.Digest, error) {

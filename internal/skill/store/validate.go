@@ -10,11 +10,40 @@ import (
 )
 
 const (
-	maxDisplayNameLen = 256
-	maxDescriptionLen = 4096
-	maxLocationLen    = 4096
-	maxNameLen        = 256
+	maxDisplayNameLen              = 256
+	maxDescriptionLen              = 4096
+	maxSkillArtifactDescriptionLen = 1024
+	maxLocationLen                 = 4096
+	maxNameLen                     = 256
 )
+
+// ValidateSkill applies the Skill Store's structural rules to a projected
+// Skill. Callers retain ownership of the supplied value.
+func ValidateSkill(skill *spec.Skill) error {
+	return validateSkill(skill)
+}
+
+// ValidateSkillArtifactMetadata applies the source-package rules shared by
+// managed Skill creation and Workspace SKILL.md projection.
+func ValidateSkillArtifactMetadata(
+	name string,
+	description string,
+	arguments []spec.SkillArgument,
+) error {
+	if err := validateSkillArtifactName(name); err != nil {
+		return fmt.Errorf("name: %w", err)
+	}
+	if strings.TrimSpace(description) == "" {
+		return errors.New("description is required")
+	}
+	if strings.TrimSpace(description) != description {
+		return errors.New("description has leading or trailing whitespace")
+	}
+	if len(description) > maxSkillArtifactDescriptionLen {
+		return fmt.Errorf("description too long, maximum is %d bytes", maxSkillArtifactDescriptionLen)
+	}
+	return validateSkillArguments(arguments)
+}
 
 func validateSkillBundle(b *spec.SkillBundle) error {
 	if b == nil {

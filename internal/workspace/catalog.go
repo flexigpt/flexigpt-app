@@ -10,132 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/validate"
 )
 
-func (s *Service) Catalog(
-	ctx context.Context,
-	rootID artifactstoreSpec.RootID,
-) (Catalog, error) {
-	workspace, err := s.GetWorkspace(ctx, rootID)
-	if err != nil {
-		return Catalog{}, err
-	}
-	generation, err := s.store.GetRootCatalogGeneration(ctx, rootID)
-	if err != nil {
-		return Catalog{}, err
-	}
-	occurrences, err := s.store.ListCatalogResourcesForRoot(ctx, rootID)
-	if err != nil {
-		return Catalog{}, err
-	}
-	records, err := s.store.ListRecords(ctx, rootID)
-	if err != nil {
-		return Catalog{}, err
-	}
-	collections, err := s.store.ListCollections(ctx, rootID, false)
-	if err != nil {
-		return Catalog{}, err
-	}
-
-	confirmed, err := s.store.GetRootCatalogGeneration(ctx, rootID)
-	if err != nil {
-		return Catalog{}, err
-	}
-	if !sameCatalogGeneration(confirmed, generation) {
-		return Catalog{}, fmt.Errorf(
-			"%w: root catalog changed while Workspace catalog was loading",
-			artifactstoreSpec.ErrConflict,
-		)
-	}
-
-	collectionsByID := make(map[artifactstoreSpec.CollectionID]artifactstoreSpec.ArtifactCollection)
-	for _, collection := range collections {
-		collectionsByID[collection.CollectionID] = collection
-	}
-	occurrencesByKey := make(map[string]artifactstoreSpec.CatalogResource, len(occurrences))
-	for _, occurrence := range occurrences {
-		occurrencesByKey[workspaceOccurrenceKey(
-			occurrence.SourceID,
-			occurrence.Locator,
-			occurrence.SubresourceLocator,
-			occurrence.Kind,
-		)] = occurrence
-	}
-	recorded := make(map[string]struct{}, len(records))
-	resources := make([]CatalogResource, 0, len(records))
-	for _, record := range records {
-		key := workspaceOccurrenceKey(
-			record.SourceID,
-			record.Locator,
-			record.SubresourceLocator,
-			record.Kind,
-		)
-		recorded[key] = struct{}{}
-
-		if record.LastResolvedDefinitionDigest == nil {
-			continue
-		}
-		definition, err := s.store.GetDefinitionByDigest(
-			ctx,
-			*record.LastResolvedDefinitionDigest,
-		)
-		if err != nil {
-			return Catalog{}, err
-		}
-		var occurrence *artifactstoreSpec.CatalogResource
-		if value, exists := occurrencesByKey[key]; exists {
-			copyValue := value
-			occurrence = &copyValue
-			recorded[key] = struct{}{}
-		}
-		var collection *artifactstoreSpec.ArtifactCollection
-		if record.CollectionID != nil {
-			if value, exists := collectionsByID[*record.CollectionID]; exists {
-				copyValue := value
-				collection = &copyValue
-			}
-		}
-		catalogCurrent := occurrence != nil &&
-			occurrence.State == artifactstoreSpec.CatalogStateValid &&
-			occurrence.CurrentDefinitionDigest != nil &&
-			record.LastResolvedDefinitionDigest != nil &&
-			*occurrence.CurrentDefinitionDigest == *record.LastResolvedDefinitionDigest
-		resources = append(resources, CatalogResource{
-			Record:         record,
-			Definition:     definition,
-			Collection:     collection,
-			Occurrence:     occurrence,
-			CatalogCurrent: catalogCurrent,
-		})
-	}
-	sort.Slice(resources, func(left, right int) bool {
-		if resources[left].Record.Kind != resources[right].Record.Kind {
-			return resources[left].Record.Kind < resources[right].Record.Kind
-		}
-		if resources[left].Record.Name != resources[right].Record.Name {
-			return resources[left].Record.Name < resources[right].Record.Name
-		}
-		return resources[left].Record.RecordID < resources[right].Record.RecordID
-	})
-
-	unrecorded := make([]artifactstoreSpec.CatalogResource, 0)
-	for _, occurrence := range occurrences {
-		key := workspaceOccurrenceKey(
-			occurrence.SourceID,
-			occurrence.Locator,
-			occurrence.SubresourceLocator,
-			occurrence.Kind,
-		)
-		if _, exists := recorded[key]; !exists {
-			unrecorded = append(unrecorded, occurrence)
-		}
-	}
-	return Catalog{
-		Workspace:  workspace,
-		Generation: generation,
-		Resources:  resources,
-		Unrecorded: unrecorded,
-	}, nil
-}
-
 func (s *Service) Project(
 	ctx context.Context,
 	recordID artifactstoreSpec.RecordID,
@@ -162,51 +36,11 @@ func (s *Service) Project(
 	if err != nil {
 		return Projection{}, err
 	}
-	descriptor, known := s.descriptors[record.Kind]
-	if !known || definition.SchemaID != descriptor.DefinitionSchemaID {
-		return Projection{}, fmt.Errorf(
-			"%w: definition schema %q is not registered for kind %q",
-			ErrProjectionUnavailable,
-			definition.SchemaID,
-			record.Kind,
-		)
-	}
-	projector, exists := s.projectors[record.Kind]
-	if !exists {
-		return Projection{}, fmt.Errorf(
-			"%w: no projector is registered for kind %q",
-			ErrProjectionUnavailable,
-			record.Kind,
-		)
-	}
-	value, diagnostics := projector.Project(ctx, ProjectionInput{
+	return s.projectLoaded(ctx, ProjectionInput{
 		Workspace:  workspace,
 		Record:     record,
 		Definition: definition,
 	})
-	if err := validate.ValidateDiagnostics(diagnostics); err != nil {
-		return Projection{}, fmt.Errorf(
-			"%w: projector %q returned invalid diagnostics: %w",
-			ErrProjectionUnavailable,
-			record.Kind,
-			err,
-		)
-	}
-	projection := Projection{
-		Kind:        record.Kind,
-		RecordID:    recordID,
-		Value:       value,
-		Diagnostics: append([]artifactstoreSpec.Diagnostic(nil), diagnostics...),
-	}
-	for _, diagnostic := range diagnostics {
-		if diagnostic.Severity == artifactstoreSpec.DiagnosticSeverityError {
-			return projection, &ProjectionDiagnosticError{
-				Kind:        record.Kind,
-				Diagnostics: append([]artifactstoreSpec.Diagnostic(nil), diagnostics...),
-			}
-		}
-	}
-	return projection, nil
 }
 
 func (s *Service) ResolveReference(
@@ -242,14 +76,19 @@ func (s *Service) ResolveReference(
 	if err != nil {
 		return CatalogResource{}, err
 	}
-	if len(candidates) != 1 {
+	selected, diagnostics := selectWorkspaceCandidate(catalog.Workspace, candidates)
+	if selected == nil {
+		message := fmt.Sprintf("selector resolved to %d catalog candidates", len(candidates))
+		if len(diagnostics) != 0 {
+			message = diagnostics[0].Message
+		}
 		return CatalogResource{}, fmt.Errorf(
-			"%w: selector resolved to %d catalog candidates",
+			"%w: %s",
 			ErrReferenceUnresolved,
-			len(candidates),
+			message,
 		)
 	}
-	candidate := candidates[0].Resource
+	candidate := selected.Resource
 	for _, resource := range catalog.Resources {
 		if resource.Record.SourceID == candidate.SourceID &&
 			resource.Record.Locator == candidate.Locator &&
@@ -321,11 +160,15 @@ func (s *Service) ComposeLoadPlan(
 				resource.Record.RecordID,
 			)
 		}
-		projection, err := s.Project(ctx, resource.Record.RecordID)
+		projection, err := s.projectLoaded(ctx, ProjectionInput{
+			Workspace:  catalog.Workspace,
+			Record:     resource.Record,
+			Definition: resource.Definition,
+		})
 		if err != nil {
 			return LoadPlan{}, err
 		}
-		graph, err := s.store.BuildDependencyGraph(ctx, resource.Record.RecordID)
+		graph, err := s.buildWorkspaceDependencyGraph(ctx, catalog, resource)
 		if err != nil {
 			return LoadPlan{}, err
 		}
@@ -359,6 +202,206 @@ func (s *Service) ComposeLoadPlan(
 		Items:       items,
 		Diagnostics: diagnostics,
 	}, nil
+}
+
+func (s *Service) Catalog(
+	ctx context.Context,
+	rootID artifactstoreSpec.RootID,
+) (Catalog, error) {
+	workspace, err := s.GetWorkspace(ctx, rootID)
+	if err != nil {
+		return Catalog{}, err
+	}
+	generation, err := s.store.GetRootCatalogGeneration(ctx, rootID)
+	if err != nil {
+		return Catalog{}, err
+	}
+	occurrences, err := s.store.ListCatalogResourcesForRoot(ctx, rootID)
+	if err != nil {
+		return Catalog{}, err
+	}
+	records, err := s.store.ListRecords(ctx, rootID)
+	if err != nil {
+		return Catalog{}, err
+	}
+	collections, err := s.store.ListCollections(ctx, rootID, false)
+	if err != nil {
+		return Catalog{}, err
+	}
+
+	confirmed, err := s.store.GetRootCatalogGeneration(ctx, rootID)
+	if err != nil {
+		return Catalog{}, err
+	}
+	if !sameCatalogGeneration(confirmed, generation) {
+		return Catalog{}, fmt.Errorf(
+			"%w: root catalog changed while Workspace catalog was loading",
+			artifactstoreSpec.ErrConflict,
+		)
+	}
+
+	collectionsByID := make(map[artifactstoreSpec.CollectionID]artifactstoreSpec.ArtifactCollection)
+	for _, collection := range collections {
+		collectionsByID[collection.CollectionID] = collection
+	}
+	occurrencesByKey := make(map[string]artifactstoreSpec.CatalogResource, len(occurrences))
+	for _, occurrence := range occurrences {
+		occurrencesByKey[workspaceSourceOccurrenceKey(
+			occurrence.SourceID,
+			occurrence.Locator,
+			occurrence.SubresourceLocator,
+		)] = occurrence
+	}
+	recorded := make(map[string]struct{}, len(records))
+	resources := make([]CatalogResource, 0, len(records))
+	unresolved := make([]artifactstoreSpec.ArtifactRecord, 0)
+	for _, record := range records {
+		key := workspaceOccurrenceKey(
+			record.SourceID,
+			record.Locator,
+			record.SubresourceLocator,
+			record.Kind,
+		)
+		recorded[key] = struct{}{}
+
+		if record.LastResolvedDefinitionDigest == nil {
+			unresolved = append(unresolved, record)
+			continue
+		}
+		definition, err := s.store.GetDefinitionByDigest(
+			ctx,
+			*record.LastResolvedDefinitionDigest,
+		)
+		if err != nil {
+			return Catalog{}, err
+		}
+		var occurrence *artifactstoreSpec.CatalogResource
+		sourceKey := workspaceSourceOccurrenceKey(
+			record.SourceID,
+			record.Locator,
+			record.SubresourceLocator,
+		)
+		if value, exists := occurrencesByKey[sourceKey]; exists {
+			copyValue := value
+			occurrence = &copyValue
+			recorded[key] = struct{}{}
+		}
+		var collection *artifactstoreSpec.ArtifactCollection
+		if record.CollectionID != nil {
+			if value, exists := collectionsByID[*record.CollectionID]; exists {
+				copyValue := value
+				collection = &copyValue
+			}
+		}
+		catalogCurrent := occurrence != nil &&
+			occurrence.State == artifactstoreSpec.CatalogStateValid &&
+			occurrence.CurrentDefinitionDigest != nil &&
+			record.LastResolvedDefinitionDigest != nil &&
+			*occurrence.CurrentDefinitionDigest == *record.LastResolvedDefinitionDigest
+		resources = append(resources, CatalogResource{
+			Record:         record,
+			Definition:     definition,
+			Collection:     collection,
+			Occurrence:     occurrence,
+			CatalogCurrent: catalogCurrent,
+		})
+	}
+	sort.Slice(resources, func(left, right int) bool {
+		if resources[left].Record.Kind != resources[right].Record.Kind {
+			return resources[left].Record.Kind < resources[right].Record.Kind
+		}
+		if resources[left].Record.Name != resources[right].Record.Name {
+			return resources[left].Record.Name < resources[right].Record.Name
+		}
+		return resources[left].Record.RecordID < resources[right].Record.RecordID
+	})
+
+	unrecorded := make([]artifactstoreSpec.CatalogResource, 0)
+	for _, occurrence := range occurrences {
+		key := workspaceOccurrenceKey(
+			occurrence.SourceID,
+			occurrence.Locator,
+			occurrence.SubresourceLocator,
+			occurrence.Kind,
+		)
+		if _, exists := recorded[key]; !exists {
+			unrecorded = append(unrecorded, occurrence)
+		}
+	}
+	sort.Slice(unresolved, func(left, right int) bool {
+		return unresolved[left].RecordID < unresolved[right].RecordID
+	})
+	return Catalog{
+		Workspace:         workspace,
+		Generation:        generation,
+		Resources:         resources,
+		Unrecorded:        unrecorded,
+		UnresolvedRecords: unresolved,
+	}, nil
+}
+
+func (s *Service) projectLoaded(
+	ctx context.Context,
+	input ProjectionInput,
+) (Projection, error) {
+	record := input.Record
+	definition := input.Definition
+	if definition.Kind != record.Kind {
+		return Projection{}, fmt.Errorf(
+			"%w: definition kind %q does not match record kind %q",
+			ErrProjectionUnavailable,
+			definition.Kind,
+			record.Kind,
+		)
+	}
+	descriptor, known := s.descriptors[record.Kind]
+	if !known || definition.SchemaID != descriptor.DefinitionSchemaID {
+		return Projection{}, fmt.Errorf(
+			"%w: definition schema %q is not registered for kind %q",
+			ErrProjectionUnavailable,
+			definition.SchemaID,
+			record.Kind,
+		)
+	}
+	projector, exists := s.projectors[record.Kind]
+	if !exists {
+		return Projection{}, fmt.Errorf(
+			"%w: no projector is registered for kind %q",
+			ErrProjectionUnavailable,
+			record.Kind,
+		)
+	}
+	value, diagnostics := projector.Project(ctx, input)
+	if err := validate.ValidateDiagnostics(diagnostics); err != nil {
+		return Projection{}, fmt.Errorf(
+			"%w: projector %q returned invalid diagnostics: %w",
+			ErrProjectionUnavailable,
+			record.Kind,
+			err,
+		)
+	}
+	projection := Projection{
+		Kind:        record.Kind,
+		RecordID:    record.RecordID,
+		Value:       value,
+		Diagnostics: append([]artifactstoreSpec.Diagnostic(nil), diagnostics...),
+	}
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == artifactstoreSpec.DiagnosticSeverityError {
+			return projection, &ProjectionDiagnosticError{
+				Kind:        record.Kind,
+				Diagnostics: append([]artifactstoreSpec.Diagnostic(nil), diagnostics...),
+			}
+		}
+	}
+	if value == nil {
+		return projection, fmt.Errorf(
+			"%w: projector for kind %q returned a nil value",
+			ErrProjectionUnavailable,
+			record.Kind,
+		)
+	}
+	return projection, nil
 }
 
 func (s *Service) ensureCatalogGeneration(
@@ -400,4 +443,14 @@ func workspaceOccurrenceKey(
 		string(locator) + "\x00" +
 		string(subresource) + "\x00" +
 		string(kind)
+}
+
+func workspaceSourceOccurrenceKey(
+	sourceID artifactstoreSpec.SourceID,
+	locator artifactstoreSpec.SourceLocator,
+	subresource artifactstoreSpec.SubresourceLocator,
+) string {
+	return string(sourceID) + "\x00" +
+		string(locator) + "\x00" +
+		string(subresource)
 }

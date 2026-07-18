@@ -55,9 +55,6 @@ func (s *SkillStore) PutSkillArtifact(
 	if name == "" {
 		name = string(req.SkillSlug)
 	}
-	if err := validateSkillArtifactName(name); err != nil {
-		return nil, fmt.Errorf("%w: invalid skill artifact name: %w", spec.ErrSkillInvalidRequest, err)
-	}
 
 	insert := req.Body.Insert
 	if insert == "" {
@@ -70,8 +67,12 @@ func (s *SkillStore) PutSkillArtifact(
 	}
 
 	arguments := append([]spec.SkillArgument(nil), req.Body.Arguments...)
-	if err := validateSkillArguments(arguments); err != nil {
-		return nil, fmt.Errorf("%w: invalid arguments: %w", spec.ErrSkillInvalidRequest, err)
+	if err := ValidateSkillArtifactMetadata(name, req.Body.Description, arguments); err != nil {
+		return nil, fmt.Errorf(
+			"%w: invalid skill artifact metadata: %w",
+			spec.ErrSkillInvalidRequest,
+			err,
+		)
 	}
 
 	markdownBody := req.Body.MarkdownBody
@@ -212,6 +213,9 @@ func validateSkillArtifactName(name string) error {
 	}
 	if !skillArtifactNameRE.MatchString(name) {
 		return errors.New("name must contain only lowercase letters, numbers, and hyphens, max 64 chars")
+	}
+	if strings.Contains(name, "--") {
+		return errors.New("name must not contain consecutive hyphens")
 	}
 	return nil
 }

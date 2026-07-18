@@ -9,6 +9,12 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	artifactstoreSpec "github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	assistantpresetSpec "github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
 const (
@@ -140,6 +146,24 @@ type EmptyWorkspaceRequest struct {
 	DiscoverImmediately bool
 }
 
+type UpdateWorkspaceRequest struct {
+	RootID              artifactstoreSpec.RootID
+	ExpectedModifiedAt  time.Time
+	DisplayName         *string
+	Description         *string
+	Enabled             *bool
+	TrustReference      *string
+	Discovery           *DiscoveryPreferences
+	AttachedPackages    *AttachedPackagePreferences
+	DisplayPreferences  *DisplayPreferences
+	DiscoverImmediately bool
+}
+
+type DeleteWorkspaceRequest struct {
+	RootID             artifactstoreSpec.RootID
+	ExpectedModifiedAt time.Time
+}
+
 // AttachSourceRequest attaches an existing Artifact Store source to a
 // Workspace. Source lifecycle remains owned by Artifact Store.
 type AttachSourceRequest struct {
@@ -164,6 +188,22 @@ type EmbeddedSourceAttachmentRequest struct {
 	DiscoverImmediately bool
 }
 
+type CatalogResource struct {
+	Record         artifactstoreSpec.ArtifactRecord
+	Definition     artifactstoreSpec.CanonicalDefinition
+	Collection     *artifactstoreSpec.ArtifactCollection
+	Occurrence     *artifactstoreSpec.CatalogResource
+	CatalogCurrent bool
+}
+
+type Catalog struct {
+	Workspace         Workspace
+	Generation        artifactstoreSpec.RootCatalogGeneration
+	Resources         []CatalogResource
+	Unrecorded        []artifactstoreSpec.CatalogResource
+	UnresolvedRecords []artifactstoreSpec.ArtifactRecord
+}
+
 type RefreshResult struct {
 	Workspace   Workspace
 	Bootstrap   *artifactstoreSpec.ScanResult
@@ -178,21 +218,6 @@ type KindDescriptor struct {
 	DefinitionSchemaID    artifactstoreSpec.SchemaID
 	CollectionSlug        artifactstoreSpec.CollectionSlug
 	CollectionDisplayName string
-}
-
-type CatalogResource struct {
-	Record         artifactstoreSpec.ArtifactRecord
-	Definition     artifactstoreSpec.CanonicalDefinition
-	Collection     *artifactstoreSpec.ArtifactCollection
-	Occurrence     *artifactstoreSpec.CatalogResource
-	CatalogCurrent bool
-}
-
-type Catalog struct {
-	Workspace  Workspace
-	Generation artifactstoreSpec.RootCatalogGeneration
-	Resources  []CatalogResource
-	Unrecorded []artifactstoreSpec.CatalogResource
 }
 
 type Reference struct {
@@ -258,6 +283,9 @@ type ProjectedSkill struct {
 	Arguments        []ProjectedSkillArgument
 	Markdown         string
 	Frontmatter      json.RawMessage
+
+	Skill    skillSpec.Skill
+	SkillRef skillSpec.SkillRef
 }
 
 type ProjectedDocument struct {
@@ -270,10 +298,74 @@ type ProjectedDocument struct {
 	Markdown         string
 }
 
-// ProjectedStructuredDefinition is the default projection for native Workspace
-// artifact kinds whose external domain adapter has not been installed. The
-// original canonical JSON remains available without coupling Workspace to a
-// legacy persistence model.
+type ProjectedTool struct {
+	Tool    toolSpec.Tool
+	ToolRef toolSpec.ToolRef
+}
+
+type ProjectedMCPServer struct {
+	Server mcpSpec.MCPServerConfig
+}
+
+type ProjectedModel struct {
+	Provider modelpresetSpec.ProviderPreset
+	Model    modelpresetSpec.ModelPreset
+	Ref      modelpresetSpec.ModelPresetRef
+}
+
+type AgentToolSelection struct {
+	Selector        artifactstoreSpec.ArtifactSelector `json:"selector"`
+	ToolChoicePatch *toolSpec.ToolChoicePatch          `json:"toolChoicePatch,omitempty"`
+}
+
+type AgentSkillSelection struct {
+	Selector          artifactstoreSpec.ArtifactSelector `json:"selector"`
+	PreLoadAsActive   bool                               `json:"preLoadAsActive,omitempty"`
+	UseAsInstructions bool                               `json:"useAsInstructions,omitempty"`
+}
+
+type AgentMCPToolSelection struct {
+	ToolName       string                    `json:"toolName"`
+	ApprovalRule   *mcpSpec.MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode  *mcpSpec.MCPExecutionMode `json:"executionMode,omitempty"`
+	AppResourceURI string                    `json:"appResourceURI,omitempty"`
+	Visibility     []string                  `json:"visibility,omitempty"`
+}
+
+type AgentMCPServerSelection struct {
+	Selector                  artifactstoreSpec.ArtifactSelector `json:"selector"`
+	ToolExposure              mcpSpec.MCPToolExposure            `json:"toolExposure,omitempty"`
+	SelectedTools             []AgentMCPToolSelection            `json:"selectedTools,omitempty"`
+	IncludeServerInstructions bool                               `json:"includeServerInstructions,omitempty"`
+}
+
+// AgentDefinitionDocument is the portable agent data stored in a canonical
+// definition. References use selectors and therefore contain no app-local
+// bundle, item, source, or record IDs.
+type AgentDefinitionDocument struct {
+	StartingText                     string                              `json:"startingText,omitempty"`
+	StartingIncludeModelSystemPrompt *bool                               `json:"startingIncludeModelSystemPrompt,omitempty"`
+	StartingModel                    *artifactstoreSpec.ArtifactSelector `json:"startingModel,omitempty"`
+	StartingTools                    []AgentToolSelection                `json:"startingTools,omitempty"`
+	StartingSkills                   []AgentSkillSelection               `json:"startingSkills,omitempty"`
+	StartingMCPServers               []AgentMCPServerSelection           `json:"startingMCPServers,omitempty"`
+}
+
+type ProjectedAgent struct {
+	BundleID           bundleitemutils.BundleID
+	Preset             assistantpresetSpec.AssistantPreset
+	StartingModel      *artifactstoreSpec.ArtifactSelector
+	StartingTools      []AgentToolSelection
+	StartingSkills     []AgentSkillSelection
+	StartingMCPServers []AgentMCPServerSelection
+	Definition         json.RawMessage
+}
+
+type TransferResult struct {
+	Record  artifactstoreSpec.ArtifactRecord
+	Refresh *RefreshResult
+}
+
 type ProjectedStructuredDefinition struct {
 	RecordID         artifactstoreSpec.RecordID
 	DefinitionDigest artifactstoreSpec.Digest
@@ -323,6 +415,7 @@ type ArtifactStore interface {
 	RegisterArtifactFrontend(frontend artifactstoreSpec.ArtifactFrontend) error
 	RegisterRootKindHook(hook artifactstoreSpec.RootKindHook) error
 	RegisterCollectionKindHook(hook artifactstoreSpec.CollectionKindHook) error
+	RegisterArtifactVersionMatcher(matcher artifactstoreSpec.ArtifactVersionMatcher) error
 
 	CreateRoot(ctx context.Context, draft artifactstoreSpec.RootDraft) (artifactstoreSpec.ArtifactRoot, error)
 	GetRoot(ctx context.Context, rootID artifactstoreSpec.RootID) (artifactstoreSpec.ArtifactRoot, error)
@@ -332,8 +425,14 @@ type ArtifactStore interface {
 		rootID artifactstoreSpec.RootID,
 		expectedModifiedAt time.Time,
 	) (artifactstoreSpec.ArtifactRoot, error)
+	UpdateRoot(
+		ctx context.Context,
+		rootID artifactstoreSpec.RootID,
+		update artifactstore.RootUpdate,
+	) (artifactstoreSpec.ArtifactRoot, error)
 
 	CreateSource(ctx context.Context, draft artifactstoreSpec.SourceDraft) (artifactstoreSpec.ArtifactSource, error)
+	GetSource(ctx context.Context, sourceID artifactstoreSpec.SourceID) (artifactstoreSpec.ArtifactSource, error)
 	DeleteSource(
 		ctx context.Context,
 		sourceID artifactstoreSpec.SourceID,
@@ -408,6 +507,23 @@ type ArtifactStore interface {
 		ctx context.Context,
 		recordID artifactstoreSpec.RecordID,
 	) (artifactstoreSpec.DependencyGraph, error)
+
+	ExportRecord(
+		ctx context.Context,
+		recordID artifactstoreSpec.RecordID,
+	) (artifactstoreSpec.ExportedRecord, error)
+	ImportDefinition(
+		ctx context.Context,
+		request artifactstoreSpec.ImportDefinitionRequest,
+	) (artifactstoreSpec.ArtifactRecord, error)
+	CaptureRecord(
+		ctx context.Context,
+		request artifactstoreSpec.CaptureRecordRequest,
+	) (artifactstoreSpec.ArtifactRecord, error)
+	ForkRecord(
+		ctx context.Context,
+		request artifactstoreSpec.ForkRecordRequest,
+	) (artifactstoreSpec.ArtifactRecord, error)
 }
 
 var _ ArtifactStore = (*artifactstore.Store)(nil)

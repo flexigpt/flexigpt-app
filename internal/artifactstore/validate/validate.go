@@ -424,23 +424,6 @@ func ValidatePortablePackageManifest(v spec.PortablePackageManifest) error {
 	return nil
 }
 
-// ValidateAssetManifestEntry validates one portable asset reference.
-func ValidateAssetManifestEntry(v spec.AssetManifestEntry) error {
-	if err := validatePortablePath("asset.path", v.Path, false); err != nil {
-		return err
-	}
-	if err := validateDigest("asset.digest", v.Digest); err != nil {
-		return err
-	}
-	if err := validateOptionalText("asset.mediaType", v.MediaType, spec.MaxKindBytes); err != nil {
-		return err
-	}
-	if v.SizeBytes < 0 {
-		return invalidf("asset.sizeBytes must not be negative")
-	}
-	return nil
-}
-
 // ValidateExportClosure validates the generic portable closure returned by an
 // artifact frontend. The root definition and all of its declared assets must
 // remain present in the closure.
@@ -491,6 +474,23 @@ func ValidateExportClosure(
 				required.Path,
 			)
 		}
+	}
+	return nil
+}
+
+// ValidateAssetManifestEntry validates one portable asset reference.
+func ValidateAssetManifestEntry(v spec.AssetManifestEntry) error {
+	if err := validatePortablePath("asset.path", v.Path, false); err != nil {
+		return err
+	}
+	if err := validateDigest("asset.digest", v.Digest); err != nil {
+		return err
+	}
+	if err := validateOptionalText("asset.mediaType", v.MediaType, spec.MaxKindBytes); err != nil {
+		return err
+	}
+	if v.SizeBytes < 0 {
+		return invalidf("asset.sizeBytes must not be negative")
 	}
 	return nil
 }

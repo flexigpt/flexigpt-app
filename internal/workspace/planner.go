@@ -28,10 +28,13 @@ func (defaultDiscoveryPlanner) BuildExpandedPlan(
 }
 
 func buildWorkspacePlan(input DiscoveryInput, expanded bool) (artifactstoreSpec.ScanPlan, error) {
-	preferences := mergeDiscoveryPreferences(
+	preferences, err := mergeDiscoveryPreferences(
 		input.Workspace.Data.DiscoveryPreferences,
 		input.DefinitionPreferences,
 	)
+	if err != nil {
+		return artifactstoreSpec.ScanPlan{}, err
+	}
 	plans := make([]artifactstoreSpec.SourceScanPlan, 0, len(input.Workspace.Attachments))
 	for _, attachment := range input.Workspace.Attachments {
 		if !attachment.Enabled {
@@ -64,8 +67,8 @@ func buildWorkspacePlan(input DiscoveryInput, expanded bool) (artifactstoreSpec.
 						},
 					)
 				}
-				sourcePlan.Authoritative = true
 			}
+			sourcePlan.Authoritative = true
 		default:
 			recursive, authoritative, err := attachmentDiscoveryBehavior(
 				attachment,
@@ -75,10 +78,11 @@ func buildWorkspacePlan(input DiscoveryInput, expanded bool) (artifactstoreSpec.
 				return artifactstoreSpec.ScanPlan{}, err
 			}
 			sourcePlan.DirectoryRoots = []artifactstoreSpec.DirectoryScanRoot{{
-				Root:      ".",
-				Recursive: recursive,
+				Root:            ".",
+				Recursive:       recursive,
+				IncludePatterns: workspaceCandidatePatterns(),
 			}}
-			sourcePlan.Authoritative = expanded && authoritative
+			sourcePlan.Authoritative = authoritative
 		}
 		normalizeSourcePlan(&sourcePlan)
 		plans = append(plans, sourcePlan)
@@ -135,18 +139,40 @@ func bootstrapLocators(includeReadme bool) []artifactstoreSpec.SourceLocator {
 
 func bootstrapRoots() []artifactstoreSpec.DirectoryScanRoot {
 	return []artifactstoreSpec.DirectoryScanRoot{
-		{Root: artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceAgentsDirectory, "/")), Recursive: true},
-		{Root: artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceModelsDirectory, "/")), Recursive: true},
-		{Root: artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceMCPDirectory, "/")), Recursive: true},
-		{Root: artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceToolsDirectory, "/")), Recursive: true},
-		{Root: workspaceSkillsDirectory, Recursive: true},
+		{
+			Root:            artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceAgentsDirectory, "/")),
+			Recursive:       true,
+			IncludePatterns: structuredCandidatePatterns(),
+		},
+		{
+			Root:            artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceModelsDirectory, "/")),
+			Recursive:       true,
+			IncludePatterns: structuredCandidatePatterns(),
+		},
+		{
+			Root:            artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceMCPDirectory, "/")),
+			Recursive:       true,
+			IncludePatterns: structuredCandidatePatterns(),
+		},
+		{
+			Root:            artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceToolsDirectory, "/")),
+			Recursive:       true,
+			IncludePatterns: structuredCandidatePatterns(),
+		},
+		{Root: workspaceSkillsDirectory, Recursive: true, IncludePatterns: []string{"SKILL.md"}},
 	}
 }
 
 func mergeDiscoveryPreferences(
 	left DiscoveryPreferences,
 	right DiscoveryPreferences,
-) DiscoveryPreferences {
+) (DiscoveryPreferences, error) {
+	if err := validateDiscoveryPreferences(left); err != nil {
+		return DiscoveryPreferences{}, err
+	}
+	if err := validateDiscoveryPreferences(right); err != nil {
+		return DiscoveryPreferences{}, err
+	}
 	out := DiscoveryPreferences{
 		IncludeReadme: left.IncludeReadme || right.IncludeReadme,
 	}
@@ -163,29 +189,34 @@ func mergeDiscoveryPreferences(
 			out.AdditionalLocators = append(out.AdditionalLocators, locator)
 		}
 	}
-	roots := map[string]struct{}{}
+	roots := map[artifactstoreSpec.SourceLocator]DiscoveryRoot{}
 	for _, values := range [][]DiscoveryRoot{left.AdditionalRoots, right.AdditionalRoots} {
 		for _, root := range values {
-			key := fmt.Sprintf(
-				"%s\x00%t\x00%s",
-				root.Root,
-				root.Recursive,
-				strings.Join(root.IncludePatterns, "\x00"),
-			)
-			if _, exists := roots[key]; exists {
-				continue
+			if current, exists := roots[root.Root]; exists {
+				current.Recursive = current.Recursive || root.Recursive
+				current.IncludePatterns = mergeIncludePatterns(
+					current.IncludePatterns,
+					root.IncludePatterns,
+				)
+				roots[root.Root] = current
+			} else {
+				root.IncludePatterns = append([]string(nil), root.IncludePatterns...)
+				roots[root.Root] = root
 			}
-			roots[key] = struct{}{}
-			root.IncludePatterns = append([]string(nil), root.IncludePatterns...)
-			sort.Strings(root.IncludePatterns)
-			out.AdditionalRoots = append(out.AdditionalRoots, root)
 		}
+	}
+	for _, root := range roots {
+		sort.Strings(root.IncludePatterns)
+		out.AdditionalRoots = append(out.AdditionalRoots, root)
 	}
 	slices.Sort(out.AdditionalLocators)
 	sort.Slice(out.AdditionalRoots, func(left, right int) bool {
 		return out.AdditionalRoots[left].Root < out.AdditionalRoots[right].Root
 	})
-	return out
+	if err := validateDiscoveryPreferences(out); err != nil {
+		return DiscoveryPreferences{}, err
+	}
+	return out, nil
 }
 
 func normalizeSourcePlan(plan *artifactstoreSpec.SourceScanPlan) {
@@ -216,8 +247,24 @@ func normalizeSourcePlan(plan *artifactstoreSpec.SourceScanPlan) {
 	slices.Sort(filteredFrontends)
 	plan.AllowedFrontendIDs = filteredFrontends
 
-	for index := range plan.DirectoryRoots {
-		sort.Strings(plan.DirectoryRoots[index].IncludePatterns)
+	roots := make(map[artifactstoreSpec.SourceLocator]artifactstoreSpec.DirectoryScanRoot)
+	for _, root := range plan.DirectoryRoots {
+		if current, exists := roots[root.Root]; exists {
+			current.Recursive = current.Recursive || root.Recursive
+			current.IncludePatterns = mergeIncludePatterns(
+				current.IncludePatterns,
+				root.IncludePatterns,
+			)
+			roots[root.Root] = current
+		} else {
+			root.IncludePatterns = append([]string(nil), root.IncludePatterns...)
+			roots[root.Root] = root
+		}
+	}
+	plan.DirectoryRoots = plan.DirectoryRoots[:0]
+	for _, root := range roots {
+		sort.Strings(root.IncludePatterns)
+		plan.DirectoryRoots = append(plan.DirectoryRoots, root)
 	}
 	sort.Slice(plan.DirectoryRoots, func(left, right int) bool {
 		if plan.DirectoryRoots[left].Root != plan.DirectoryRoots[right].Root {
@@ -225,6 +272,33 @@ func normalizeSourcePlan(plan *artifactstoreSpec.SourceScanPlan) {
 		}
 		return !plan.DirectoryRoots[left].Recursive && plan.DirectoryRoots[right].Recursive
 	})
+}
+
+func structuredCandidatePatterns() []string {
+	return []string{"*.json", "*.yaml", "*.yml"}
+}
+
+func workspaceCandidatePatterns() []string {
+	return []string{"*.json", "*.yaml", "*.yml", "SKILL.md"}
+}
+
+func mergeIncludePatterns(left, right []string) []string {
+	if len(left) == 0 || len(right) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(left)+len(right))
+	out := make([]string, 0, len(left)+len(right))
+	for _, values := range [][]string{left, right} {
+		for _, value := range values {
+			if _, exists := seen[value]; exists {
+				continue
+			}
+			seen[value] = struct{}{}
+			out = append(out, value)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 var _ DiscoveryPlanner = defaultDiscoveryPlanner{}

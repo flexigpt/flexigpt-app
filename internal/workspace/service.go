@@ -8,12 +8,62 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/baseutils"
 	artifactstoreSpec "github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 )
+
+type recordSyncPolicy struct {
+	descriptors map[artifactstoreSpec.ArtifactKind]KindDescriptor
+	collections map[artifactstoreSpec.ArtifactKind]artifactstoreSpec.CollectionID
+}
+
+func (p *recordSyncPolicy) DeriveRecord(
+	_ context.Context,
+	_ artifactstoreSpec.ArtifactRoot,
+	resource artifactstoreSpec.CatalogResource,
+	definition artifactstoreSpec.CanonicalDefinition,
+) (artifactstoreSpec.RecordDerivation, bool, []artifactstoreSpec.Diagnostic) {
+	if p == nil {
+		return artifactstoreSpec.RecordDerivation{}, false, nil
+	}
+	descriptor, known := p.descriptors[resource.Kind]
+	if !known {
+		return artifactstoreSpec.RecordDerivation{}, false, nil
+	}
+	if definition.SchemaID != descriptor.DefinitionSchemaID {
+		return artifactstoreSpec.RecordDerivation{}, false, workspaceDiagnostics(
+			"workspace.synchronization.schema",
+			fmt.Sprintf(
+				"definition schema %q does not match Workspace schema %q for kind %q",
+				definition.SchemaID,
+				descriptor.DefinitionSchemaID,
+				resource.Kind,
+			),
+		)
+	}
+	if err := validateWorkspaceCanonicalDefinition(definition); err != nil {
+		return artifactstoreSpec.RecordDerivation{}, false, workspaceDiagnostics(
+			"workspace.synchronization.definition",
+			err.Error(),
+		)
+	}
+	collectionID, exists := p.collections[resource.Kind]
+	if !exists {
+		return artifactstoreSpec.RecordDerivation{}, false, workspaceDiagnostics(
+			"workspace.synchronization.collection",
+			fmt.Sprintf("collection for artifact kind %q is unavailable", resource.Kind),
+		)
+	}
+	return artifactstoreSpec.RecordDerivation{
+		CollectionID: &collectionID,
+		Name:         workspaceRecordName(definition.LogicalName, definition.Digest),
+		Version:      artifactstoreSpec.RecordVersion(definition.LogicalVersion),
+		Enabled:      true,
+		Data:         json.RawMessage("{}"),
+	}, true, nil
+}
 
 type Service struct {
 	store       ArtifactStore
@@ -24,11 +74,12 @@ type Service struct {
 }
 
 type serviceConfig struct {
-	planner        DiscoveryPlanner
-	descriptors    map[artifactstoreSpec.ArtifactKind]KindDescriptor
-	projectors     map[artifactstoreSpec.ArtifactKind]ResourceProjector
-	extraFrontends []artifactstoreSpec.ArtifactFrontend
-	yamlDecoder    YAMLDecoder
+	planner         DiscoveryPlanner
+	descriptors     map[artifactstoreSpec.ArtifactKind]KindDescriptor
+	projectors      map[artifactstoreSpec.ArtifactKind]ResourceProjector
+	extraFrontends  []artifactstoreSpec.ArtifactFrontend
+	yamlDecoder     YAMLDecoder
+	versionMatchers map[artifactstoreSpec.ArtifactKind]artifactstoreSpec.ArtifactVersionMatcher
 }
 
 type Option func(*serviceConfig) error
@@ -89,14 +140,25 @@ func WithYAMLDecoder(decoder YAMLDecoder) Option {
 	}
 }
 
+func WithArtifactVersionMatcher(matcher artifactstoreSpec.ArtifactVersionMatcher) Option {
+	return func(config *serviceConfig) error {
+		if matcher == nil || matcher.Kind() == "" {
+			return fmt.Errorf("%w: artifact version matcher is invalid", ErrInvalidWorkspace)
+		}
+		config.versionMatchers[matcher.Kind()] = matcher
+		return nil
+	}
+}
+
 func NewService(store ArtifactStore, options ...Option) (*Service, error) {
 	if store == nil {
 		return nil, fmt.Errorf("%w: artifact store is nil", ErrInvalidWorkspace)
 	}
 	config := serviceConfig{
-		descriptors: defaultKindDescriptors(),
-		projectors:  defaultProjectors(),
-		yamlDecoder: DecodeYAML,
+		descriptors:     defaultKindDescriptors(),
+		projectors:      defaultProjectors(),
+		yamlDecoder:     DecodeYAML,
+		versionMatchers: map[artifactstoreSpec.ArtifactKind]artifactstoreSpec.ArtifactVersionMatcher{},
 	}
 	for _, option := range options {
 		if option == nil {
@@ -159,6 +221,20 @@ func NewService(store ArtifactStore, options ...Option) (*Service, error) {
 			return nil, fmt.Errorf("register Workspace frontend %q: %w", extra.ID(), err)
 		}
 		frontendIDs = append(frontendIDs, extra.ID())
+	}
+	kinds := make([]artifactstoreSpec.ArtifactKind, 0, len(config.descriptors))
+	for kind := range config.descriptors {
+		kinds = append(kinds, kind)
+	}
+	slices.Sort(kinds)
+	for _, kind := range kinds {
+		matcher := config.versionMatchers[kind]
+		if matcher == nil {
+			matcher = exactVersionMatcher{kind: kind}
+		}
+		if err := store.RegisterArtifactVersionMatcher(matcher); err != nil {
+			return nil, fmt.Errorf("register Workspace version matcher for %q: %w", kind, err)
+		}
 	}
 	slices.Sort(frontendIDs)
 
@@ -298,53 +374,6 @@ func (s *Service) CreateEmptyWorkspace(
 	return workspace, nil
 }
 
-// AttachSource attaches an existing Artifact Store source to a Workspace.
-// Source configuration and source-kind validation remain Artifact Store
-// responsibilities. Workspace owns only the typed attachment role and data.
-func (s *Service) AttachSource(
-	ctx context.Context,
-	request AttachSourceRequest,
-) (Workspace, error) {
-	if s == nil || s.store == nil {
-		return Workspace{}, fmt.Errorf("%w: service is not configured", ErrInvalidWorkspace)
-	}
-	if request.RootID == "" || request.SourceID == "" || request.Role == "" {
-		return Workspace{}, fmt.Errorf(
-			"%w: rootID, sourceID, and role are required",
-			ErrInvalidWorkspace,
-		)
-	}
-	if _, err := s.GetWorkspace(ctx, request.RootID); err != nil {
-		return Workspace{}, err
-	}
-	dataSchemaID, data, err := encodeAttachmentData(request.AttachmentData)
-	if err != nil {
-		return Workspace{}, err
-	}
-	if _, err := s.store.AttachSource(ctx, artifactstore.RootSourceAttachmentDraft{
-		RootID:       request.RootID,
-		SourceID:     request.SourceID,
-		Role:         request.Role,
-		Priority:     request.Priority,
-		Enabled:      true,
-		DataSchemaID: dataSchemaID,
-		Data:         data,
-	}); err != nil {
-		return Workspace{}, err
-	}
-	workspace, err := s.GetWorkspace(ctx, request.RootID)
-	if err != nil {
-		return Workspace{}, err
-	}
-	if !request.DiscoverImmediately {
-		return workspace, nil
-	}
-	if _, err := s.Refresh(ctx, request.RootID); err != nil {
-		return workspace, err
-	}
-	return s.GetWorkspace(ctx, request.RootID)
-}
-
 // MountEmbeddedSource creates an embedded-fs-directory source and attaches it
 // to a Workspace. The provider must already have been registered while the
 // Artifact Store composition was being built.
@@ -411,6 +440,53 @@ func (s *Service) MountEmbeddedSource(
 	return s.GetWorkspace(ctx, request.RootID)
 }
 
+// AttachSource attaches an existing Artifact Store source to a Workspace.
+// Source configuration and source-kind validation remain Artifact Store
+// responsibilities. Workspace owns only the typed attachment role and data.
+func (s *Service) AttachSource(
+	ctx context.Context,
+	request AttachSourceRequest,
+) (Workspace, error) {
+	if s == nil || s.store == nil {
+		return Workspace{}, fmt.Errorf("%w: service is not configured", ErrInvalidWorkspace)
+	}
+	if request.RootID == "" || request.SourceID == "" || request.Role == "" {
+		return Workspace{}, fmt.Errorf(
+			"%w: rootID, sourceID, and role are required",
+			ErrInvalidWorkspace,
+		)
+	}
+	if _, err := s.GetWorkspace(ctx, request.RootID); err != nil {
+		return Workspace{}, err
+	}
+	dataSchemaID, data, err := encodeAttachmentData(request.AttachmentData)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if _, err := s.store.AttachSource(ctx, artifactstore.RootSourceAttachmentDraft{
+		RootID:       request.RootID,
+		SourceID:     request.SourceID,
+		Role:         request.Role,
+		Priority:     request.Priority,
+		Enabled:      true,
+		DataSchemaID: dataSchemaID,
+		Data:         data,
+	}); err != nil {
+		return Workspace{}, err
+	}
+	workspace, err := s.GetWorkspace(ctx, request.RootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if !request.DiscoverImmediately {
+		return workspace, nil
+	}
+	if _, err := s.Refresh(ctx, request.RootID); err != nil {
+		return workspace, err
+	}
+	return s.GetWorkspace(ctx, request.RootID)
+}
+
 // DetachSource removes only the Workspace root/source relationship. It does
 // not delete the source registration, source catalog, records, or definitions.
 func (s *Service) DetachSource(
@@ -426,6 +502,12 @@ func (s *Service) DetachSource(
 	if err != nil {
 		return Workspace{}, err
 	}
+	if attachment.Role == RolePrimary {
+		return Workspace{}, fmt.Errorf(
+			"%w: the primary source cannot be detached from a filesystem workspace",
+			ErrInvalidWorkspace,
+		)
+	}
 	if err := s.store.DetachSource(ctx, rootID, sourceID, attachment.ModifiedAt); err != nil {
 		return Workspace{}, err
 	}
@@ -440,67 +522,6 @@ func (s *Service) DetachSource(
 		return workspace, err
 	}
 	return s.GetWorkspace(ctx, rootID)
-}
-
-func (s *Service) GetWorkspace(
-	ctx context.Context,
-	rootID artifactstoreSpec.RootID,
-) (Workspace, error) {
-	if s == nil || s.store == nil {
-		return Workspace{}, fmt.Errorf("%w: service is not configured", ErrInvalidWorkspace)
-	}
-	root, err := s.store.GetRoot(ctx, rootID)
-	if err != nil {
-		return Workspace{}, err
-	}
-	if root.Kind != RootKind {
-		return Workspace{}, fmt.Errorf("%w: root %q has kind %q", ErrNotWorkspace, rootID, root.Kind)
-	}
-
-	data, err := decodeRootData(root.Data)
-	if err != nil {
-		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
-	}
-	if err := validateRootData(data); err != nil {
-		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
-	}
-
-	attachments, err := s.store.ListRootSources(ctx, rootID)
-	if err != nil {
-		return Workspace{}, err
-	}
-	if err := validateWorkspaceAttachmentSet(data, attachments); err != nil {
-		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
-	}
-
-	hook := rootKindHook{}
-	for _, attachment := range attachments {
-		if err := workspaceDiagnosticsError(
-			"workspace attachment",
-			hook.ValidateSourceAttachment(ctx, root, attachment),
-		); err != nil {
-			return Workspace{}, err
-		}
-	}
-
-	return Workspace{Root: root, Data: data, Attachments: attachments}, nil
-}
-
-func workspaceDiagnosticsError(
-	scope string,
-	diagnostics []artifactstoreSpec.Diagnostic,
-) error {
-	for _, diagnostic := range diagnostics {
-		if diagnostic.Severity == artifactstoreSpec.DiagnosticSeverityError {
-			return fmt.Errorf(
-				"%w: %s: %s",
-				ErrInvalidWorkspace,
-				scope,
-				diagnostic.Message,
-			)
-		}
-	}
-	return nil
 }
 
 func (s *Service) ListWorkspaces(ctx context.Context) ([]Workspace, error) {
@@ -602,6 +623,65 @@ func (s *Service) Refresh(
 	return result, nil
 }
 
+func (s *Service) GetWorkspace(
+	ctx context.Context,
+	rootID artifactstoreSpec.RootID,
+) (Workspace, error) {
+	if s == nil || s.store == nil {
+		return Workspace{}, fmt.Errorf("%w: service is not configured", ErrInvalidWorkspace)
+	}
+	root, err := s.store.GetRoot(ctx, rootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if root.Kind != RootKind {
+		return Workspace{}, fmt.Errorf("%w: root %q has kind %q", ErrNotWorkspace, rootID, root.Kind)
+	}
+
+	data, err := decodeRootData(root.Data)
+	if err != nil {
+		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
+	}
+	if err := validateRootData(data); err != nil {
+		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
+	}
+
+	attachments, err := s.store.ListRootSources(ctx, rootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if err := validateWorkspaceAttachmentSet(data, attachments); err != nil {
+		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
+	}
+
+	hook := rootKindHook{}
+	for _, attachment := range attachments {
+		if err := workspaceDiagnosticsError(
+			"workspace attachment",
+			hook.ValidateSourceAttachment(ctx, root, attachment),
+		); err != nil {
+			return Workspace{}, err
+		}
+		source, err := s.store.GetSource(ctx, attachment.SourceID)
+		if err != nil {
+			return Workspace{}, err
+		}
+		if err := workspaceDiagnosticsError(
+			"workspace attachment source",
+			hook.ValidateSourceAttachmentSource(
+				ctx,
+				root,
+				attachment,
+				source,
+			),
+		); err != nil {
+			return Workspace{}, err
+		}
+	}
+
+	return Workspace{Root: root, Data: data, Attachments: attachments}, nil
+}
+
 func (s *Service) workspaceDefinitionPreferences(
 	ctx context.Context,
 	workspace Workspace,
@@ -695,9 +775,47 @@ func (s *Service) ensureCollections(
 		if err != nil {
 			return nil, err
 		}
+		if collection.DataSchemaID != CollectionDataSchemaID {
+			return nil, fmt.Errorf(
+				"%w: collection %q has schema %q",
+				artifactstoreSpec.ErrConflict,
+				collection.CollectionID,
+				collection.DataSchemaID,
+			)
+		}
+		var collectionData CollectionData
+		if err := decodeStrictJSONObject(collection.Data, &collectionData, true); err != nil {
+			return nil, err
+		}
+		if collectionData.ArtifactKind != kind {
+			return nil, fmt.Errorf(
+				"%w: collection %q is for artifact kind %q, expected %q",
+				artifactstoreSpec.ErrConflict,
+				collection.CollectionID,
+				collectionData.ArtifactKind,
+				kind,
+			)
+		}
 		out[kind] = collection.CollectionID
 	}
 	return out, nil
+}
+
+func workspaceDiagnosticsError(
+	scope string,
+	diagnostics []artifactstoreSpec.Diagnostic,
+) error {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == artifactstoreSpec.DiagnosticSeverityError {
+			return fmt.Errorf(
+				"%w: %s: %s",
+				ErrInvalidWorkspace,
+				scope,
+				diagnostic.Message,
+			)
+		}
+	}
+	return nil
 }
 
 func encodeRootData(data RootData) (json.RawMessage, error) {
@@ -730,57 +848,6 @@ func encodeAttachmentData(data AttachmentData) (artifactstoreSpec.SchemaID, json
 	return AttachmentDataSchemaID, json.RawMessage(canonical), nil
 }
 
-type recordSyncPolicy struct {
-	descriptors map[artifactstoreSpec.ArtifactKind]KindDescriptor
-	collections map[artifactstoreSpec.ArtifactKind]artifactstoreSpec.CollectionID
-}
-
-func (p *recordSyncPolicy) DeriveRecord(
-	_ context.Context,
-	_ artifactstoreSpec.ArtifactRoot,
-	resource artifactstoreSpec.CatalogResource,
-	definition artifactstoreSpec.CanonicalDefinition,
-) (artifactstoreSpec.RecordDerivation, bool, []artifactstoreSpec.Diagnostic) {
-	if p == nil {
-		return artifactstoreSpec.RecordDerivation{}, false, nil
-	}
-	descriptor, known := p.descriptors[resource.Kind]
-	if !known {
-		return artifactstoreSpec.RecordDerivation{}, false, nil
-	}
-	if definition.SchemaID != descriptor.DefinitionSchemaID {
-		return artifactstoreSpec.RecordDerivation{}, false, workspaceDiagnostics(
-			"workspace.synchronization.schema",
-			fmt.Sprintf(
-				"definition schema %q does not match Workspace schema %q for kind %q",
-				definition.SchemaID,
-				descriptor.DefinitionSchemaID,
-				resource.Kind,
-			),
-		)
-	}
-	if err := validateWorkspaceCanonicalDefinition(definition); err != nil {
-		return artifactstoreSpec.RecordDerivation{}, false, workspaceDiagnostics(
-			"workspace.synchronization.definition",
-			err.Error(),
-		)
-	}
-	collectionID, exists := p.collections[resource.Kind]
-	if !exists {
-		return artifactstoreSpec.RecordDerivation{}, false, workspaceDiagnostics(
-			"workspace.synchronization.collection",
-			fmt.Sprintf("collection for artifact kind %q is unavailable", resource.Kind),
-		)
-	}
-	return artifactstoreSpec.RecordDerivation{
-		CollectionID: &collectionID,
-		Name:         workspaceRecordName(definition.LogicalName, definition.Digest),
-		Version:      artifactstoreSpec.RecordVersion(definition.LogicalVersion),
-		Enabled:      true,
-		Data:         json.RawMessage("{}"),
-	}, true, nil
-}
-
 func workspaceRecordName(
 	logicalName artifactstoreSpec.LogicalName,
 	digest artifactstoreSpec.Digest,
@@ -790,7 +857,7 @@ func workspaceRecordName(
 	runes := 0
 	for _, character := range strings.ToLower(string(logicalName)) {
 		switch {
-		case unicode.IsLetter(character), unicode.IsDigit(character):
+		case character >= 'a' && character <= 'z', character >= '0' && character <= '9':
 			builder.WriteRune(character)
 			hyphen = false
 			runes++

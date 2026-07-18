@@ -70,7 +70,16 @@ func (s *Store) ensureActiveBaseCollection(
 		)
 	}
 
+	expectedData := normalizedJSONObject(draft.Data)
 	if collection.SoftDeletedAt == nil {
+		if collection.DataSchemaID != draft.DataSchemaID ||
+			!equivalentJSONObjects(collection.Data, expectedData) {
+			return spec.ArtifactCollection{}, fmt.Errorf(
+				"%w: collection slug %q already has incompatible typed data",
+				spec.ErrConflict,
+				draft.Slug,
+			)
+		}
 		return collection, nil
 	}
 
@@ -79,7 +88,7 @@ func (s *Store) ensureActiveBaseCollection(
 	restored.Description = draft.Description
 	restored.Enabled = draft.Enabled
 	restored.DataSchemaID = draft.DataSchemaID
-	restored.Data = normalizedJSONObject(draft.Data)
+	restored.Data = expectedData
 	restored.SoftDeletedAt = nil
 	restored.ModifiedAt = s.nextModifiedAt(collection.ModifiedAt)
 

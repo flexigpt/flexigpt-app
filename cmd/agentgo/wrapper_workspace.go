@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/materializer"
 	artifactstoreSpec "github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
@@ -13,8 +14,14 @@ import (
 )
 
 const (
-	workspaceBuiltInSkillsProviderKey = "flexigpt-builtin-skills"
-	workspaceBuiltInSkillsDisplayName = "Built-in Skills"
+	workspaceBuiltInSkillsProviderKey           = "flexigpt-builtin-skills"
+	workspaceBuiltInSkillsDisplayName           = "Built-in Skills"
+	workspaceBuiltInToolsProviderKey            = "flexigpt-builtin-tools"
+	workspaceBuiltInToolsDisplayName            = "Built-in Tools"
+	workspaceBuiltInMCPProviderKey              = "flexigpt-builtin-mcp"
+	workspaceBuiltInMCPDisplayName              = "Built-in MCP Servers"
+	workspaceBuiltInAssistantPresetsProviderKey = "flexigpt-builtin-assistant-presets"
+	workspaceBuiltInAssistantPresetsDisplayName = "Built-in Assistant Presets"
 )
 
 type WorkspaceWrapper struct {
@@ -29,9 +36,24 @@ func InitWorkspaceWrapper(wrapper *WorkspaceWrapper, baseDir string) error {
 
 	store, err := artifactstore.NewStore(
 		baseDir,
+		artifactstore.WithDefinitionMaterializer(
+			materializer.NewFSDefinitionMaterializer(),
+		),
 		artifactstore.WithEmbeddedFSProvider(
 			workspaceBuiltInSkillsProviderKey,
 			builtin.BuiltInSkillBundlesFS,
+		),
+		artifactstore.WithEmbeddedFSProvider(
+			workspaceBuiltInToolsProviderKey,
+			builtin.BuiltInToolBundlesFS,
+		),
+		artifactstore.WithEmbeddedFSProvider(
+			workspaceBuiltInMCPProviderKey,
+			builtin.BuiltInMCPBundlesFS,
+		),
+		artifactstore.WithEmbeddedFSProvider(
+			workspaceBuiltInAssistantPresetsProviderKey,
+			builtin.BuiltInAssistantPresetBundlesFS,
 		),
 	)
 	if err != nil {
@@ -65,6 +87,22 @@ func (w *WorkspaceWrapper) CreateEmptyWorkspace(
 	})
 }
 
+func (w *WorkspaceWrapper) UpdateWorkspace(
+	request workspace.UpdateWorkspaceRequest,
+) (workspace.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (workspace.Workspace, error) {
+		return w.service.UpdateWorkspace(context.Background(), request)
+	})
+}
+
+func (w *WorkspaceWrapper) DeleteWorkspace(
+	request workspace.DeleteWorkspaceRequest,
+) (artifactstoreSpec.ArtifactRoot, error) {
+	return middleware.WithRecoveryResp(func() (artifactstoreSpec.ArtifactRoot, error) {
+		return w.service.DeleteWorkspace(context.Background(), request)
+	})
+}
+
 func (w *WorkspaceWrapper) AttachSource(
 	request workspace.AttachSourceRequest,
 ) (workspace.Workspace, error) {
@@ -81,29 +119,64 @@ func (w *WorkspaceWrapper) MountEmbeddedSource(
 	})
 }
 
-// MountBuiltInSkills attaches FlexiGPT's registered embedded skill packages to
-// a Workspace without requiring a frontend client to know the provider key.
 func (w *WorkspaceWrapper) MountBuiltInSkills(
 	rootID artifactstoreSpec.RootID,
 	priority int,
 	discoverImmediately bool,
 ) (workspace.Workspace, error) {
-	return middleware.WithRecoveryResp(func() (workspace.Workspace, error) {
-		recursive := true
-		return w.service.MountEmbeddedSource(
-			context.Background(),
-			workspace.EmbeddedSourceAttachmentRequest{
-				RootID:              rootID,
-				DisplayName:         workspaceBuiltInSkillsDisplayName,
-				ProviderKey:         workspaceBuiltInSkillsProviderKey,
-				RootLocator:         artifactstoreSpec.SourceLocator(builtin.BuiltInSkillBundlesRootDir),
-				Role:                workspace.RoleBuiltIn,
-				Priority:            priority,
-				AttachmentData:      workspace.AttachmentData{Recursive: &recursive},
-				DiscoverImmediately: discoverImmediately,
-			},
-		)
-	})
+	return w.mountBuiltInSource(
+		rootID,
+		priority,
+		discoverImmediately,
+		workspaceBuiltInSkillsProviderKey,
+		workspaceBuiltInSkillsDisplayName,
+		builtin.BuiltInSkillBundlesRootDir,
+	)
+}
+
+func (w *WorkspaceWrapper) MountBuiltInTools(
+	rootID artifactstoreSpec.RootID,
+	priority int,
+	discoverImmediately bool,
+) (workspace.Workspace, error) {
+	return w.mountBuiltInSource(
+		rootID,
+		priority,
+		discoverImmediately,
+		workspaceBuiltInToolsProviderKey,
+		workspaceBuiltInToolsDisplayName,
+		builtin.BuiltInToolBundlesRootDir,
+	)
+}
+
+func (w *WorkspaceWrapper) MountBuiltInMCPServers(
+	rootID artifactstoreSpec.RootID,
+	priority int,
+	discoverImmediately bool,
+) (workspace.Workspace, error) {
+	return w.mountBuiltInSource(
+		rootID,
+		priority,
+		discoverImmediately,
+		workspaceBuiltInMCPProviderKey,
+		workspaceBuiltInMCPDisplayName,
+		builtin.BuiltInMCPBundlesRootDir,
+	)
+}
+
+func (w *WorkspaceWrapper) MountBuiltInAssistantPresets(
+	rootID artifactstoreSpec.RootID,
+	priority int,
+	discoverImmediately bool,
+) (workspace.Workspace, error) {
+	return w.mountBuiltInSource(
+		rootID,
+		priority,
+		discoverImmediately,
+		workspaceBuiltInAssistantPresetsProviderKey,
+		workspaceBuiltInAssistantPresetsDisplayName,
+		builtin.BuiltInAssistantPresetBundlesRootDir,
+	)
 }
 
 func (w *WorkspaceWrapper) DetachSource(
@@ -174,6 +247,67 @@ func (w *WorkspaceWrapper) ComposeLoadPlan(
 ) (workspace.LoadPlan, error) {
 	return middleware.WithRecoveryResp(func() (workspace.LoadPlan, error) {
 		return w.service.ComposeLoadPlan(context.Background(), rootID, recordIDs)
+	})
+}
+
+func (w *WorkspaceWrapper) ExportWorkspaceRecord(
+	recordID artifactstoreSpec.RecordID,
+) (artifactstoreSpec.ExportedRecord, error) {
+	return middleware.WithRecoveryResp(func() (artifactstoreSpec.ExportedRecord, error) {
+		return w.service.ExportRecord(context.Background(), recordID)
+	})
+}
+
+func (w *WorkspaceWrapper) ImportWorkspaceDefinition(
+	request artifactstoreSpec.ImportDefinitionRequest,
+	discoverImmediately bool,
+) (workspace.TransferResult, error) {
+	return middleware.WithRecoveryResp(func() (workspace.TransferResult, error) {
+		return w.service.ImportDefinition(context.Background(), request, discoverImmediately)
+	})
+}
+
+func (w *WorkspaceWrapper) CaptureWorkspaceRecord(
+	request artifactstoreSpec.CaptureRecordRequest,
+	discoverImmediately bool,
+) (workspace.TransferResult, error) {
+	return middleware.WithRecoveryResp(func() (workspace.TransferResult, error) {
+		return w.service.CaptureRecord(context.Background(), request, discoverImmediately)
+	})
+}
+
+func (w *WorkspaceWrapper) ForkWorkspaceRecord(
+	request artifactstoreSpec.ForkRecordRequest,
+	discoverImmediately bool,
+) (workspace.TransferResult, error) {
+	return middleware.WithRecoveryResp(func() (workspace.TransferResult, error) {
+		return w.service.ForkRecord(context.Background(), request, discoverImmediately)
+	})
+}
+
+func (w *WorkspaceWrapper) mountBuiltInSource(
+	rootID artifactstoreSpec.RootID,
+	priority int,
+	discoverImmediately bool,
+	providerKey string,
+	displayName string,
+	rootLocator string,
+) (workspace.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (workspace.Workspace, error) {
+		recursive := true
+		return w.service.MountEmbeddedSource(
+			context.Background(),
+			workspace.EmbeddedSourceAttachmentRequest{
+				RootID:              rootID,
+				DisplayName:         displayName,
+				ProviderKey:         providerKey,
+				RootLocator:         artifactstoreSpec.SourceLocator(rootLocator),
+				Role:                workspace.RoleBuiltIn,
+				Priority:            priority,
+				AttachmentData:      workspace.AttachmentData{Recursive: &recursive},
+				DiscoverImmediately: discoverImmediately,
+			},
+		)
 	})
 }
 

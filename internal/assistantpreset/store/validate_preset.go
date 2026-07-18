@@ -15,6 +15,13 @@ import (
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
+// ValidateAssistantPresetStructure exposes the owning store's structural
+// validation for read-only projections. It intentionally does not resolve
+// installed-resource references.
+func ValidateAssistantPresetStructure(preset *spec.AssistantPreset) error {
+	return validateAssistantPresetStructure(preset)
+}
+
 func validateAssistantPresetBundle(bundle *spec.AssistantPresetBundle) error {
 	if bundle == nil {
 		return errors.New("bundle is nil")

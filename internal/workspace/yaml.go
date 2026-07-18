@@ -70,8 +70,16 @@ func rejectUnsafeYAMLSyntax(content string) error {
 	seenContent := false
 	documentStarted := false
 	documentEnded := false
+	blockScalarIndent := -1
 
 	for lineNumber, line := range strings.Split(content, "\n") {
+		indent := leadingYAMLIndent(line)
+		if blockScalarIndent >= 0 {
+			if strings.TrimSpace(line) == "" || indent > blockScalarIndent {
+				continue
+			}
+			blockScalarIndent = -1
+		}
 		code, err := yamlCodeWithoutCommentsOrUnsafeNodes(line)
 		if err != nil {
 			return fmt.Errorf("YAML line %d: %w", lineNumber+1, err)
@@ -80,14 +88,14 @@ func rejectUnsafeYAMLSyntax(content string) error {
 		if trimmed == "" {
 			continue
 		}
-		if trimmed == yamlSeparator {
+		if indent == 0 && trimmed == yamlSeparator {
 			if documentStarted || seenContent || documentEnded {
 				return fmt.Errorf("YAML line %d: multiple YAML documents are not supported", lineNumber+1)
 			}
 			documentStarted = true
 			continue
 		}
-		if trimmed == "..." {
+		if indent == 0 && trimmed == "..." {
 			if !seenContent || documentEnded {
 				return fmt.Errorf("YAML line %d: invalid YAML document terminator", lineNumber+1)
 			}
@@ -98,6 +106,9 @@ func rejectUnsafeYAMLSyntax(content string) error {
 			return fmt.Errorf("YAML line %d: content after YAML document terminator", lineNumber+1)
 		}
 		seenContent = true
+		if startsYAMLBlockScalar(trimmed) {
+			blockScalarIndent = indent
+		}
 	}
 	return nil
 }
@@ -145,10 +156,49 @@ func yamlCodeWithoutCommentsOrUnsafeNodes(line string) (string, error) {
 			quote = character
 			code.WriteByte(character)
 		case '!', '&', '*':
-			return "", errors.New("YAML tags, anchors, and aliases are not supported")
+			if yamlNodeIndicatorAt(line, index, character) {
+				return "", errors.New("YAML tags, anchors, and aliases are not supported")
+			}
+			code.WriteByte(character)
 		default:
 			code.WriteByte(character)
 		}
 	}
 	return code.String(), nil
+}
+
+func yamlNodeIndicatorAt(line string, index int, indicator byte) bool {
+	if index > 0 && !strings.ContainsRune(" \t[{,:?-", rune(line[index-1])) {
+		return false
+	}
+	if indicator == '!' {
+		return true
+	}
+	return index+1 < len(line) && line[index+1] != ' ' && line[index+1] != '\t'
+}
+
+func leadingYAMLIndent(line string) int {
+	count := 0
+	for count < len(line) && line[count] == ' ' {
+		count++
+	}
+	return count
+}
+
+func startsYAMLBlockScalar(trimmed string) bool {
+	fields := strings.Fields(trimmed)
+	if len(fields) == 0 {
+		return false
+	}
+	last := fields[len(fields)-1]
+	if last == "" || (last[0] != '|' && last[0] != '>') {
+		return false
+	}
+	for _, character := range last[1:] {
+		if character != '+' && character != '-' &&
+			(character < '1' || character > '9') {
+			return false
+		}
+	}
+	return true
 }

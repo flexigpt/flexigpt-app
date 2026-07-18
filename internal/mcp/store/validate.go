@@ -26,6 +26,13 @@ const (
 
 var mcpServerIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
+// ValidateServerConfig exposes MCP Store structural validation for projected
+// server definitions. Runtime connection, secret resolution, and policy
+// evaluation remain outside projection.
+func ValidateServerConfig(config *spec.MCPServerConfig) error {
+	return validateServerConfig(config)
+}
+
 func validateBundle(b *spec.MCPBundle) error {
 	if b == nil {
 		return errors.New("bundle is nil")

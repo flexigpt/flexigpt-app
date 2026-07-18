@@ -22,9 +22,10 @@ const (
 )
 
 type nativeDocumentClass struct {
-	Kind          artifactstoreSpec.ArtifactKind
-	Format        string
-	MCPCollection bool
+	Kind                 artifactstoreSpec.ArtifactKind
+	Format               string
+	MCPCollection        bool
+	RequireMCPCollection bool
 }
 
 type nativeFrontend struct {
@@ -40,7 +41,7 @@ func (f *nativeFrontend) Recognizes(
 	_ context.Context,
 	candidate artifactstoreSpec.ArtifactCandidate,
 ) artifactstoreSpec.Recognition {
-	class, ok := classifyNativeDocument(candidate.Locator)
+	class, ok := classifyNativeDocument(candidate.Locator, candidate.Content)
 	if !ok {
 		return artifactstoreSpec.RecognitionNone
 	}
@@ -65,7 +66,7 @@ func (f *nativeFrontend) Decode(
 	ctx context.Context,
 	candidate artifactstoreSpec.ArtifactCandidate,
 ) ([]artifactstoreSpec.DecodedArtifact, []artifactstoreSpec.Diagnostic) {
-	class, ok := classifyNativeDocument(candidate.Locator)
+	class, ok := classifyNativeDocument(candidate.Locator, candidate.Content)
 	if !ok {
 		return nil, nil
 	}
@@ -139,7 +140,26 @@ func (f *nativeFrontend) ExtractDependencies(
 	if err := json.Unmarshal(definition.DefinitionJSON, &document); err != nil {
 		return nil, workspaceDiagnostics("workspace.dependencies.decode", err.Error())
 	}
-	return document.Dependencies, nil
+	selectors := append([]artifactstoreSpec.ArtifactSelector(nil), document.Dependencies...)
+	if definition.Kind == KindAgentDefinition {
+		var agent AgentDefinitionDocument
+		if err := json.Unmarshal(definition.DefinitionJSON, &agent); err != nil {
+			return nil, workspaceDiagnostics("workspace.dependencies.decode", err.Error())
+		}
+		if agent.StartingModel != nil {
+			selectors = append(selectors, *agent.StartingModel)
+		}
+		for _, selection := range agent.StartingTools {
+			selectors = append(selectors, selection.Selector)
+		}
+		for _, selection := range agent.StartingSkills {
+			selectors = append(selectors, selection.Selector)
+		}
+		for _, selection := range agent.StartingMCPServers {
+			selectors = append(selectors, selection.Selector)
+		}
+	}
+	return selectors, nil
 }
 
 func (f *nativeFrontend) ValidateRecordData(
@@ -158,6 +178,18 @@ func (f *nativeFrontend) DescribeExportClosure(
 		DefinitionDigests: []artifactstoreSpec.Digest{definition.Digest},
 		Assets:            append([]artifactstoreSpec.AssetManifestEntry(nil), definition.AssetManifest...),
 	}, nil
+}
+
+func (*nativeFrontend) MatchesVersionConstraint(
+	_ context.Context,
+	constraint string,
+	version artifactstoreSpec.LogicalVersion,
+) (bool, error) {
+	constraint = strings.TrimSpace(constraint)
+	if after, ok := strings.CutPrefix(constraint, "="); ok {
+		constraint = strings.TrimSpace(after)
+	}
+	return constraint == string(version), nil
 }
 
 func (f *nativeFrontend) decodeStructured(
@@ -202,20 +234,24 @@ func (f *nativeFrontend) decodeStructured(
 	}
 	name := fixedLogicalName(class.Kind)
 	if name == "" {
-		name = stringField(object, "name", "slug", "id")
-	}
-	if name == "" {
-		name = sourceLogicalName(locator)
+		name = nativeLogicalName(class.Kind, object, locator)
 	}
 	if strings.TrimSpace(name) == "" || strings.TrimSpace(name) != name {
 		return nil, errors.New("workspace artifact name is required and must be trimmed")
+	}
+	normalizedRaw, normalizedObject, err := normalizeNativeStructuredDocument(
+		class.Kind,
+		object,
+	)
+	if err != nil {
+		return nil, err
 	}
 	definition, err := f.definitionFor(
 		class.Kind,
 		artifactstoreSpec.LogicalName(name),
 		class.Format,
-		canonical,
-		object,
+		normalizedRaw,
+		normalizedObject,
 	)
 	if err != nil {
 		return nil, err
@@ -243,14 +279,17 @@ func (f *nativeFrontend) decodeMCPCollection(
 		}
 	}
 	if !foundServers {
-		name := stringField(object, "name", "id")
-		if name == "" {
-			name = sourceLogicalName(locator)
+		if class.RequireMCPCollection {
+			return nil, errors.New("MCP collection document must contain mcpServers or servers")
 		}
+		name := nativeLogicalName(KindMCPServerDefinition, object, locator)
 		if strings.TrimSpace(name) == "" {
-			return nil, errors.New("MCP document must contain mcpServers, servers, or a server name")
+			return nil, errors.New("MCP server name is required")
 		}
-		canonical, err := baseutils.CanonicalizeJSON(mustJSON(object))
+		normalizedRaw, normalizedObject, err := normalizeNativeStructuredDocument(
+			KindMCPServerDefinition,
+			object,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -258,8 +297,8 @@ func (f *nativeFrontend) decodeMCPCollection(
 			KindMCPServerDefinition,
 			artifactstoreSpec.LogicalName(name),
 			class.Format,
-			canonical,
-			object,
+			normalizedRaw,
+			normalizedObject,
 		)
 		if err != nil {
 			return nil, err
@@ -288,6 +327,13 @@ func (f *nativeFrontend) decodeMCPCollection(
 		if err := json.Unmarshal(raw, &serverObject); err != nil {
 			return nil, err
 		}
+		normalizedRaw, normalizedObject, err := normalizeNativeStructuredDocument(
+			KindMCPServerDefinition,
+			serverObject,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("MCP server %q: %w", name, err)
+		}
 		digest := strings.TrimPrefix(string(baseutils.DigestBytes([]byte(name))), "sha256:")
 		subresource := artifactstoreSpec.SubresourceLocator(
 			"servers/" + portableSegment(name) + "-" + digest[:12],
@@ -296,8 +342,8 @@ func (f *nativeFrontend) decodeMCPCollection(
 			KindMCPServerDefinition,
 			artifactstoreSpec.LogicalName(name),
 			class.Format,
-			raw,
-			serverObject,
+			normalizedRaw,
+			normalizedObject,
 		)
 		if err != nil {
 			return nil, err
@@ -416,6 +462,14 @@ func (f *nativeFrontend) definitionFor(
 	if len(labels) == 0 {
 		labels = nil
 	}
+	if kind == KindModelDefinition {
+		if providerName := nativeModelProviderName(object); providerName != "" {
+			if labels == nil {
+				labels = map[string]string{}
+			}
+			labels["provider"] = providerName
+		}
+	}
 	return artifactstoreSpec.CanonicalDefinition{
 		Kind:           kind,
 		SchemaID:       descriptor.DefinitionSchemaID,
@@ -430,7 +484,20 @@ func (f *nativeFrontend) definitionFor(
 	}, nil
 }
 
-func classifyNativeDocument(locator artifactstoreSpec.SourceLocator) (nativeDocumentClass, bool) {
+func classifyNativeDocument(
+	locator artifactstoreSpec.SourceLocator,
+	content []byte,
+) (nativeDocumentClass, bool) {
+	if class, ok := classifyNativePath(locator); ok {
+		return class, true
+	}
+	if strings.EqualFold(path.Ext(string(locator)), ".json") {
+		return classifyCurrentDomainDocument(content)
+	}
+	return nativeDocumentClass{}, false
+}
+
+func classifyNativePath(locator artifactstoreSpec.SourceLocator) (nativeDocumentClass, bool) {
 	value := strings.ToLower(string(locator))
 	base := strings.ToLower(path.Base(value))
 	switch value {
@@ -444,30 +511,37 @@ func classifyNativeDocument(locator artifactstoreSpec.SourceLocator) (nativeDocu
 		return nativeDocumentClass{Kind: KindContextDocument, Format: formatMarkdown}, true
 	case workspaceMCPDotJSONLocator, workspaceMCPDotsJSONLocator, workspaceMCPJSONLocator, workspaceMCPsJSONLocator:
 		return nativeDocumentClass{
-			Kind:          KindMCPServerDefinition,
-			Format:        formatJSON,
-			MCPCollection: true,
+			Kind:                 KindMCPServerDefinition,
+			Format:               formatJSON,
+			MCPCollection:        true,
+			RequireMCPCollection: true,
 		}, true
 	}
 	if base == workspaceSkillMarkdownFileName {
 		return nativeDocumentClass{Kind: KindSkillDefinition, Format: formatMarkdown}, true
 	}
-	if path.Ext(value) != ".json" {
+	var format string
+	switch path.Ext(value) {
+	case ".json":
+		format = formatJSON
+	case ".yaml", ".yml":
+		format = formatYAML
+	default:
 		return nativeDocumentClass{}, false
 	}
 	switch {
 	case hasPathPrefix(value, workspaceAgentsDirectory):
-		return nativeDocumentClass{Kind: KindAgentDefinition, Format: formatJSON}, true
+		return nativeDocumentClass{Kind: KindAgentDefinition, Format: format}, true
 	case hasPathPrefix(value, workspaceModelsDirectory):
-		return nativeDocumentClass{Kind: KindModelDefinition, Format: formatJSON}, true
+		return nativeDocumentClass{Kind: KindModelDefinition, Format: format}, true
 	case hasPathPrefix(value, workspaceMCPDirectory):
 		return nativeDocumentClass{
 			Kind:          KindMCPServerDefinition,
-			Format:        formatJSON,
+			Format:        format,
 			MCPCollection: true,
 		}, true
 	case hasPathPrefix(value, workspaceToolsDirectory):
-		return nativeDocumentClass{Kind: KindToolDefinition, Format: formatJSON}, true
+		return nativeDocumentClass{Kind: KindToolDefinition, Format: format}, true
 	default:
 		return nativeDocumentClass{}, false
 	}
@@ -551,12 +625,7 @@ func portableSegment(value string) string {
 	return "artifact-" + digest[:12]
 }
 
-func mustJSON(value any) []byte {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return []byte("{}")
-	}
-	return raw
-}
-
-var _ artifactstoreSpec.ArtifactFrontend = (*nativeFrontend)(nil)
+var (
+	_ artifactstoreSpec.ArtifactFrontend       = (*nativeFrontend)(nil)
+	_ artifactstoreSpec.FrontendVersionMatcher = (*nativeFrontend)(nil)
+)

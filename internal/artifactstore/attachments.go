@@ -214,34 +214,6 @@ func (s *Store) DetachSource(
 	)
 }
 
-func (s *Store) validateAttachment(
-	ctx context.Context,
-	root spec.ArtifactRoot,
-	attachment spec.RootSourceAttachment,
-	source spec.ArtifactSource,
-) error {
-	if err := validate.ValidateRootSourceAttachment(attachment); err != nil {
-		return fmt.Errorf("%w: source attachment: %w", spec.ErrInvalidRequest, err)
-	}
-	if hook, ok := s.rootHookFor(root.Kind); ok {
-		if err := errorDiagnostics(
-			"root attachment "+string(root.Kind),
-			hook.ValidateSourceAttachment(ctx, root, attachment),
-		); err != nil {
-			return err
-		}
-		if sourceHook, ok := hook.(spec.RootAttachmentSourceHook); ok {
-			if err := errorDiagnostics(
-				"root attachment source "+string(root.Kind),
-				sourceHook.ValidateSourceAttachmentSource(ctx, root, attachment, source),
-			); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func (s *Store) validateAttachmentSet(
 	ctx context.Context,
 	root spec.ArtifactRoot,
@@ -270,6 +242,34 @@ func (s *Store) validateAttachmentSet(
 		setHook.ValidateSourceAttachments(ctx, root, append([]spec.RootSourceAttachment(nil), attachments...)),
 	); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s *Store) validateAttachment(
+	ctx context.Context,
+	root spec.ArtifactRoot,
+	attachment spec.RootSourceAttachment,
+	source spec.ArtifactSource,
+) error {
+	if err := validate.ValidateRootSourceAttachment(attachment); err != nil {
+		return fmt.Errorf("%w: source attachment: %w", spec.ErrInvalidRequest, err)
+	}
+	if hook, ok := s.rootHookFor(root.Kind); ok {
+		if err := errorDiagnostics(
+			"root attachment "+string(root.Kind),
+			hook.ValidateSourceAttachment(ctx, root, attachment),
+		); err != nil {
+			return err
+		}
+		if sourceHook, ok := hook.(spec.RootAttachmentSourceHook); ok {
+			if err := errorDiagnostics(
+				"root attachment source "+string(root.Kind),
+				sourceHook.ValidateSourceAttachmentSource(ctx, root, attachment, source),
+			); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

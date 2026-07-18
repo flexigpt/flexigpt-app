@@ -21,6 +21,12 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	artifactMetadataFileName   = "artifactstore.sqlite"
+	artifactContentDirectory   = "artifact-content"
+	artifactStoreDirectoryMode = 0o700
+)
+
 func isNotFound(err error) bool {
 	return errors.Is(err, spec.ErrNotFound)
 }
@@ -146,12 +152,12 @@ func NewStore(baseDir string, options ...StoreOption) (*Store, error) {
 	}
 	cleanBaseDir := filepath.Clean(baseDir)
 
-	if err := os.MkdirAll(cleanBaseDir, 0o700); err != nil {
+	if err := os.MkdirAll(cleanBaseDir, artifactStoreDirectoryMode); err != nil {
 		return nil, fmt.Errorf("create artifact store directory: %w", err)
 	}
 	metadata, err := metadatastore.OpenMetadataStore(
 		context.Background(),
-		filepath.Join(cleanBaseDir, "artifactstore.sqlite"),
+		filepath.Join(cleanBaseDir, artifactMetadataFileName),
 	)
 	if err != nil {
 		return nil, err
@@ -172,7 +178,7 @@ func NewStore(baseDir string, options ...StoreOption) (*Store, error) {
 	}
 	if store.portableContent == nil {
 		content, err := contentstore.NewMapStorePortableContentRepository(
-			filepath.Join(cleanBaseDir, "artifact-content"),
+			filepath.Join(cleanBaseDir, artifactContentDirectory),
 		)
 		if err != nil {
 			_ = store.Close()
@@ -180,7 +186,7 @@ func NewStore(baseDir string, options ...StoreOption) (*Store, error) {
 		}
 		store.portableContent = content
 	}
-	if err := store.installRequiredSourceDrivers(); err != nil {
+	if err := installRequiredSourceDrivers(store); err != nil {
 		_ = store.Close()
 		return nil, err
 	}
@@ -207,7 +213,7 @@ func NewStoreWithMetadataRepository(
 			return nil, err
 		}
 	}
-	if err := store.installRequiredSourceDrivers(); err != nil {
+	if err := installRequiredSourceDrivers(store); err != nil {
 		_ = store.Close()
 		return nil, err
 	}
@@ -236,6 +242,23 @@ func newStore(repository spec.ArtifactMetadataRepository, content spec.PortableC
 		return nil, err
 	}
 	return store, nil
+}
+
+func installRequiredSourceDrivers(s *Store) error {
+	if s == nil {
+		return errors.New("nil source")
+	}
+	if _, ok := s.driverFor(spec.SourceKindFSDirectory); !ok {
+		if err := s.RegisterSourceDriver(sourcedriver.NewLLMToolsFSDirectoryDriver()); err != nil {
+			return err
+		}
+	}
+	if _, ok := s.driverFor(spec.SourceKindEmbeddedFSDirectory); !ok {
+		if err := s.RegisterSourceDriver(sourcedriver.NewEmbeddedFSDirectoryDriver()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) Close() error {
@@ -279,23 +302,6 @@ func (s *Store) Close() error {
 	s.lifeCond.Broadcast()
 	s.lifeMu.Unlock()
 	return err
-}
-
-func (s *Store) RegisterSourceDriver(driver spec.SourceDriver) error {
-	if s == nil || driver == nil {
-		return fmt.Errorf("%w: source driver is nil", spec.ErrInvalidRequest)
-	}
-	kind := driver.Kind()
-	if strings.TrimSpace(string(kind)) == "" {
-		return fmt.Errorf("%w: source driver kind is empty", spec.ErrInvalidRequest)
-	}
-	return s.mutateRegistry(func() error {
-		if _, exists := s.drivers[kind]; exists {
-			return fmt.Errorf("%w: source driver %q", spec.ErrConflict, kind)
-		}
-		s.drivers[kind] = driver
-		return nil
-	})
 }
 
 func (s *Store) RegisterDefinitionMaterializer(materializer spec.DefinitionMaterializer) error {
@@ -384,6 +390,23 @@ func (s *Store) RegisterCollectionKindHook(hook spec.CollectionKindHook) error {
 	})
 }
 
+func (s *Store) RegisterSourceDriver(driver spec.SourceDriver) error {
+	if s == nil || driver == nil {
+		return fmt.Errorf("%w: source driver is nil", spec.ErrInvalidRequest)
+	}
+	kind := driver.Kind()
+	if strings.TrimSpace(string(kind)) == "" {
+		return fmt.Errorf("%w: source driver kind is empty", spec.ErrInvalidRequest)
+	}
+	return s.mutateRegistry(func() error {
+		if _, exists := s.drivers[kind]; exists {
+			return fmt.Errorf("%w: source driver %q", spec.ErrConflict, kind)
+		}
+		s.drivers[kind] = driver
+		return nil
+	})
+}
+
 func (s *Store) mutateRegistry(mutate func() error) error {
 	if s == nil || mutate == nil {
 		return spec.ErrClosed
@@ -402,20 +425,6 @@ func (s *Store) mutateRegistry(mutate func() error) error {
 	s.registryMu.Lock()
 	defer s.registryMu.Unlock()
 	return mutate()
-}
-
-func (s *Store) installRequiredSourceDrivers() error {
-	if _, ok := s.driverFor(spec.SourceKindFSDirectory); !ok {
-		if err := s.RegisterSourceDriver(sourcedriver.NewLLMToolsFSDirectoryDriver()); err != nil {
-			return err
-		}
-	}
-	if _, ok := s.driverFor(spec.SourceKindEmbeddedFSDirectory); !ok {
-		if err := s.RegisterSourceDriver(sourcedriver.NewEmbeddedFSDirectoryDriver()); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (s *Store) beginOperation(ctx context.Context) (context.Context, func(), error) {

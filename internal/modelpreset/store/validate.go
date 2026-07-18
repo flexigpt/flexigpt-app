@@ -11,6 +11,18 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
+// ValidateProviderPreset exposes ModelPresetStore structural validation for
+// read-only Workspace projections.
+func ValidateProviderPreset(provider *spec.ProviderPreset) error {
+	return validateProviderPreset(provider)
+}
+
+// ValidateModelPreset exposes ModelPresetStore structural validation for
+// read-only Workspace projections.
+func ValidateModelPreset(model *spec.ModelPreset) error {
+	return validateModelPreset(model)
+}
+
 // validateProviderPreset performs structural and referential checks for a
 // provider together with its embedded model presets.
 func validateProviderPreset(pp *spec.ProviderPreset) error {

@@ -417,84 +417,6 @@ func (s *Store) resolveRecordTarget(
 	return resource, definition, digest, nil
 }
 
-func (s *Store) validateRecord(
-	ctx context.Context,
-	record *spec.ArtifactRecord,
-	resource *spec.CatalogResource,
-	definition *spec.CanonicalDefinition,
-) error {
-	if record.CollectionID != nil {
-		collection, err := s.repository.GetCollection(ctx, *record.CollectionID, false)
-		if err != nil {
-			return err
-		}
-		if collection.RootID != record.RootID {
-			return fmt.Errorf("%w: record collection belongs to another root", spec.ErrInvalidRequest)
-		}
-		if hook, ok := s.collectionHookFor(collection.Kind); ok {
-			if err := errorDiagnostics(
-				"record placement",
-				hook.ValidateRecordPlacement(ctx, collection, *record),
-			); err != nil {
-				return err
-			}
-		}
-	}
-	if resource != nil &&
-		definition != nil &&
-		resource.State == spec.CatalogStateValid &&
-		resource.CurrentDefinitionDigest != nil &&
-		*resource.CurrentDefinitionDigest == definition.Digest &&
-		resource.Kind == definition.Kind {
-		record.Diagnostics = append(
-			[]spec.Diagnostic(nil),
-			resource.Diagnostics...,
-		)
-		frontend, ok := s.frontendFor(resource.FrontendID)
-		if !ok {
-			return fmt.Errorf(
-				"%w: frontend %q required to validate record %q",
-				spec.ErrFrontendUnavailable,
-				resource.FrontendID,
-				record.RecordID,
-			)
-		}
-		{
-			diagnostics := frontend.ValidateRecordData(
-				ctx,
-				*definition,
-				spec.ArtifactRecordDraft{
-					RootID:                 record.RootID,
-					CollectionID:           record.CollectionID,
-					Kind:                   record.Kind,
-					Name:                   record.Name,
-					Version:                record.Version,
-					SourceID:               record.SourceID,
-					Locator:                record.Locator,
-					SubresourceLocator:     record.SubresourceLocator,
-					RecordMode:             record.RecordMode,
-					TrackingMode:           record.TrackingMode,
-					PinnedDefinitionDigest: record.PinnedDefinitionDigest,
-					Enabled:                record.Enabled,
-					DataSchemaID:           record.DataSchemaID,
-					Data:                   record.Data,
-				},
-			)
-			if err := errorDiagnostics("record data", diagnostics); err != nil {
-				return err
-			}
-			record.Diagnostics = appendBoundedDiagnostics(
-				record.Diagnostics,
-				diagnostics...,
-			)
-		}
-	}
-	if err := validate.ValidateArtifactRecord(*record); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *Store) GetRecord(ctx context.Context, recordID spec.RecordID) (spec.ArtifactRecord, error) {
 	ctx, finish, err := s.beginOperation(ctx)
 	if err != nil {
@@ -660,4 +582,82 @@ func (s *Store) DetachRecord(
 		return spec.ArtifactRecord{}, err
 	}
 	return record, nil
+}
+
+func (s *Store) validateRecord(
+	ctx context.Context,
+	record *spec.ArtifactRecord,
+	resource *spec.CatalogResource,
+	definition *spec.CanonicalDefinition,
+) error {
+	if record.CollectionID != nil {
+		collection, err := s.repository.GetCollection(ctx, *record.CollectionID, false)
+		if err != nil {
+			return err
+		}
+		if collection.RootID != record.RootID {
+			return fmt.Errorf("%w: record collection belongs to another root", spec.ErrInvalidRequest)
+		}
+		if hook, ok := s.collectionHookFor(collection.Kind); ok {
+			if err := errorDiagnostics(
+				"record placement",
+				hook.ValidateRecordPlacement(ctx, collection, *record),
+			); err != nil {
+				return err
+			}
+		}
+	}
+	if resource != nil &&
+		definition != nil &&
+		resource.State == spec.CatalogStateValid &&
+		resource.CurrentDefinitionDigest != nil &&
+		*resource.CurrentDefinitionDigest == definition.Digest &&
+		resource.Kind == definition.Kind {
+		record.Diagnostics = append(
+			[]spec.Diagnostic(nil),
+			resource.Diagnostics...,
+		)
+		frontend, ok := s.frontendFor(resource.FrontendID)
+		if !ok {
+			return fmt.Errorf(
+				"%w: frontend %q required to validate record %q",
+				spec.ErrFrontendUnavailable,
+				resource.FrontendID,
+				record.RecordID,
+			)
+		}
+		{
+			diagnostics := frontend.ValidateRecordData(
+				ctx,
+				*definition,
+				spec.ArtifactRecordDraft{
+					RootID:                 record.RootID,
+					CollectionID:           record.CollectionID,
+					Kind:                   record.Kind,
+					Name:                   record.Name,
+					Version:                record.Version,
+					SourceID:               record.SourceID,
+					Locator:                record.Locator,
+					SubresourceLocator:     record.SubresourceLocator,
+					RecordMode:             record.RecordMode,
+					TrackingMode:           record.TrackingMode,
+					PinnedDefinitionDigest: record.PinnedDefinitionDigest,
+					Enabled:                record.Enabled,
+					DataSchemaID:           record.DataSchemaID,
+					Data:                   record.Data,
+				},
+			)
+			if err := errorDiagnostics("record data", diagnostics); err != nil {
+				return err
+			}
+			record.Diagnostics = appendBoundedDiagnostics(
+				record.Diagnostics,
+				diagnostics...,
+			)
+		}
+	}
+	if err := validate.ValidateArtifactRecord(*record); err != nil {
+		return err
+	}
+	return nil
 }

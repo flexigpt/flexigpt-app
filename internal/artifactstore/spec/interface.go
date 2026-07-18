@@ -190,6 +190,9 @@ type RecordSyncPolicy interface {
 
 // DirectoryScanRoot selects regular files beneath a source-relative directory.
 type DirectoryScanRoot struct {
+	// IncludePatterns use path.Match syntax. A pattern without a slash is also
+	// matched against each entry's basename, allowing recursive selection such
+	// as "*.json" or "SKILL.md".
 	Root            SourceLocator `json:"root"`
 	IncludePatterns []string      `json:"includePatterns"`
 	Recursive       bool          `json:"recursive"`

@@ -37,6 +37,32 @@ func (s *Store) ListCatalogResourcesForSource(
 	return s.repository.ListCatalogResourcesForSource(ctx, sourceID)
 }
 
+func (s *Store) publishedCatalogResource(
+	ctx context.Context,
+	rootID spec.RootID,
+	key spec.CatalogResourceKey,
+) (spec.CatalogResource, error) {
+	resources, err := s.ListCatalogResourcesForRoot(ctx, rootID)
+	if err != nil {
+		return spec.CatalogResource{}, err
+	}
+	for _, resource := range resources {
+		if resource.SourceID == key.SourceID &&
+			resource.Locator == key.Locator &&
+			resource.SubresourceLocator == key.SubresourceLocator {
+			return resource, nil
+		}
+	}
+	return spec.CatalogResource{}, fmt.Errorf(
+		"%w: catalog resource %q/%q/%q is not published for root %q",
+		spec.ErrNotFound,
+		key.SourceID,
+		key.Locator,
+		key.SubresourceLocator,
+		rootID,
+	)
+}
+
 // ListCatalogResourcesForRoot lists resources from enabled source attachments
 // belonging to one active root.
 func (s *Store) ListCatalogResourcesForRoot(
@@ -212,30 +238,4 @@ func (s *Store) ensureRootCatalogCurrent(
 		)
 	}
 	return nil
-}
-
-func (s *Store) publishedCatalogResource(
-	ctx context.Context,
-	rootID spec.RootID,
-	key spec.CatalogResourceKey,
-) (spec.CatalogResource, error) {
-	resources, err := s.ListCatalogResourcesForRoot(ctx, rootID)
-	if err != nil {
-		return spec.CatalogResource{}, err
-	}
-	for _, resource := range resources {
-		if resource.SourceID == key.SourceID &&
-			resource.Locator == key.Locator &&
-			resource.SubresourceLocator == key.SubresourceLocator {
-			return resource, nil
-		}
-	}
-	return spec.CatalogResource{}, fmt.Errorf(
-		"%w: catalog resource %q/%q/%q is not published for root %q",
-		spec.ErrNotFound,
-		key.SourceID,
-		key.Locator,
-		key.SubresourceLocator,
-		rootID,
-	)
 }
