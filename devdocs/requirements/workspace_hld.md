@@ -873,3 +873,20 @@ The current implementation is an Artifact Store and Workspace management foundat
   - Packages, import, capture, fork, and transfer provenance address `WS-F15`.
   - Generic source and asset materialization addresses `WS-F16`.
   - Dependency graphs, resolution snapshots, reproducibility reports, and historical catalog support address `WS-F17`.
+
+Deliver the repository-resource MVP before expanding Workspace capability.
+
+- Complete default discovery paths by adding `CLAUDE.md` and testing `AGENTS.md`, `CLAUDE.md`, `.skills/**/SKILL.md`, and `.flexigpt/mcp.json`.
+
+- Add minimal source-linked artifact kinds:
+  - Context definitions for `AGENTS.md` and `CLAUDE.md`.
+  - Skill definitions for `.skills/<skill-name>/SKILL.md`.
+  - One MCP definition per server in `.flexigpt/mcp.json` and multiple servers in some `.mcps.json` files.
+
+- For each kind, register its decoder in `system.Config.Decoders`, its ID in `workspace.Config.DecoderIDs`, and its schema descriptor in `workspace.Config.Descriptors`.
+
+- Add read-only Workspace Context, Skill, and MCP providers that consume validated load-plan definitions. They must not execute Skills, start or connect MCP servers, resolve secrets, or copy resources into installed stores.
+
+- Add one end-to-end repository fixture covering valid resources, invalid resources, updates, missing files, record preservation, and typed load-plan output.
+
+- Defer Workspace YAML, packages and import, Skill resource files, MCP secrets, runtime execution, dependency graphs, source materialization, installed-provider aggregation, and historical catalogs.
