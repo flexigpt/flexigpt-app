@@ -20,7 +20,7 @@ const (
 	skillBundleUserPutEnabled   = "user-put-enabled"
 	skillBundleUserPutDisabled  = "user-put-disabled"
 	skillBundleDupSkillSlug     = "dup-skill"
-	skillBundlePatchSkillSlug   = patchSkillOperationID
+	skillBundlePatchSkillSlug   = "patch-skill"
 	skillBundleDupeSkillName    = "dupe-skill"
 	skillBundleDupe1Slug        = "dupe-1"
 	skillBundleDupe2Slug        = "dupe-2"

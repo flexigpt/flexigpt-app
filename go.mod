@@ -5,7 +5,6 @@ go 1.26
 // Tools: These are installed via the taskfile. check the associated task.
 require (
 	github.com/adrg/xdg v0.5.3
-	github.com/danielgtaylor/huma/v2 v2.39.0
 	github.com/flexigpt/agentskills-go v0.18.0
 	github.com/flexigpt/inference-go v0.22.5
 	github.com/flexigpt/llmtools-go v0.22.1
@@ -58,7 +57,6 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.14.0 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -92,8 +90,6 @@ require (
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
-	github.com/spf13/cobra v1.10.2 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tetratelabs/wazero v1.8.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
