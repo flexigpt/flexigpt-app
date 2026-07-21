@@ -749,3 +749,78 @@ Artifact Store is successful when:
 - A missing source artifact does not silently delete its local record.
 - Portable exports contain no app-local identities, paths, or secret values.
 - Runtime code can consume definitions without depending on metadata persistence details.
+
+## 20. Current implementation status
+
+This mapping assesses the attached implementation, rather than planned architecture.
+
+- `Implemented` means the required behavior has a concrete implementation in the current code.
+- `Partial` means that a foundation or subset exists, but the full HLD requirement is not yet met.
+- `Not implemented` means no implementation currently provides the requirement.
+
+The current implementation still requires the test coverage listed in the next steps. These statuses describe implemented code paths, not completed contract verification.
+
+### 20.1 Functional requirement mapping
+
+| ID       | Requirement                                                                 | Status            | Current state and notes                                                                                                                                                                                                                                         |
+| -------- | --------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AS-F01` | Register and manage app-local sources.                                      | `Implemented`     | `source.Service` supports create, read, list, update, and delete operations. SQLite persists source metadata, while source adapters normalize app-local configuration.                                                                                          |
+| `AS-F02` | Create logical roots and attach multiple sources.                           | `Implemented`     | `catalog.Service` manages roots and root-to-source attachments. The SQLite store persists attachments independently from sources and roots.                                                                                                                     |
+| `AS-F03` | Allow consumers to define source roles and precedence metadata.             | `Implemented`     | Attachments provide consumer-owned `Role`, `Priority`, `Enabled`, and canonical local `Data` fields. Artifact Store does not impose feature-specific precedence.                                                                                                |
+| `AS-F04` | Discover bounded source candidates safely.                                  | `Implemented`     | Discovery limits candidate count, entry count, depth, per-candidate bytes, and total bytes. Filesystem and embedded adapters validate relative locators and reject symbolic links.                                                                              |
+| `AS-F05` | Support multiple native source formats through format adapters.             | `Partial`         | The decoder registry, recognition process, and decoder ownership rules are implemented. The attached state provides only the Workspace JSON definition decoder; native Skill, MCP, and other artifact decoders are still absent.                                |
+| `AS-F06` | Allow one candidate to produce zero, one, or multiple artifact occurrences. | `Implemented`     | A decoder returns a slice of decoded subresources. Discovery validates subresource locators, prevents duplicate emitted occurrence keys, and handles decoders that emit no resources.                                                                           |
+| `AS-F07` | Normalize valid artifacts into immutable portable definitions.              | `Implemented`     | Decoders produce `definition.Definition` values, which are canonicalized and stored by immutable digest-addressed content files.                                                                                                                                |
+| `AS-F08` | Identify definitions by deterministic content digest.                       | `Implemented`     | Canonical JSON and SHA-256 digests are implemented. Definitions verify supplied digests and reject digest mismatches. Golden digest tests are still pending.                                                                                                    |
+| `AS-F09` | Publish one coherent current catalog for a root.                            | `Implemented`     | Refresh confirms source snapshots, checks root and source revisions, then atomically publishes catalog occurrences and record reconciliation changes in one SQLite transaction.                                                                                 |
+| `AS-F10` | Preserve invalid and missing occurrence states with diagnostics.            | `Implemented`     | Current catalogs persist valid, invalid, and missing occurrences with structured diagnostics. Authoritative discovery marks prior in-scope occurrences missing rather than deleting their records.                                                              |
+| `AS-F11` | Maintain stable app-local records for artifacts requiring local state.      | `Implemented`     | Records have stable UUIDv7 identities and retain root, occurrence, local data, enablement, state, diagnostics, and revision independently of definitions.                                                                                                       |
+| `AS-F12` | Preserve local record settings during source refresh.                       | `Implemented`     | Reconciliation updates source-derived definition, state, and diagnostics while preserving local record name, enablement, local data, mode, and pin configuration.                                                                                               |
+| `AS-F13` | Support follow-current and pin-definition behavior.                         | `Implemented`     | Linked and pinned record modes are implemented. Pinning resolves a retained definition digest; following marks the record stale until the next refresh resolves the source occurrence.                                                                          |
+| `AS-F14` | Resolve candidate definitions using portable selectors.                     | `Partial`         | Portable selector values exist, and Workspace implements current-catalog selector matching. Artifact Store does not yet provide a generic candidate matching service, complete version constraint support, dependency resolution, or dependency graph handling. |
+| `AS-F15` | Let consumers decide ambiguity and precedence rules.                        | `Implemented`     | Generic storage retains attachment priority without applying a resolution policy. Workspace owns selector precedence and explicitly reports priority ties as ambiguous.                                                                                         |
+| `AS-F16` | Export or import portable definitions and assets.                           | `Not implemented` | There is no package manifest, asset closure, import, export, capture, or fork capability.                                                                                                                                                                       |
+| `AS-F17` | Retain historical definition occurrence revisions.                          | `Not implemented` | SQLite retains only `artifact_current_catalogs` and current occurrences. Historical catalog generations and occurrence revisions are not stored.                                                                                                                |
+| `AS-F18` | Persist dependency resolution snapshots.                                    | `Not implemented` | Definitions can declare selectors, but dependency graph construction, resolution snapshots, and reproducibility reports do not exist.                                                                                                                           |
+| `AS-F19` | Materialize source content for path-oriented runtimes.                      | `Not implemented` | Sources can be read through snapshots, but no generic materialization or source-content closure capability exists.                                                                                                                                              |
+| `AS-F20` | Record transfer provenance.                                                 | `Not implemented` | Transfer workflows and provenance metadata are not implemented.                                                                                                                                                                                                 |
+
+### 20.2 Quality requirement mapping
+
+| HLD section | Requirement                 | Status        | Current state and notes                                                                                                                                                                                                                                                   |
+| ----------- | --------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `12.1`      | Determinism                 | `Implemented` | Candidate traversal and occurrences are sorted, decoder ties fail explicitly, and canonical definition digests are deterministic for equivalent decoded content. Publication and observation timestamps intentionally vary between refreshes.                             |
+| `12.2`      | Safety                      | `Partial`     | Locator validation, containment checks, symlink rejection, and discovery bounds are implemented. Portable asset declarations, asset traversal, and asset-specific limits are not implemented because asset support is not yet present.                                    |
+| `12.3`      | Coherent publication        | `Implemented` | A refresh publishes one current catalog transactionally or leaves the prior catalog in place. Source snapshots are confirmed before publication.                                                                                                                          |
+| `12.4`      | Conflict detection          | `Partial`     | Root, source, attachment-through-root, and record revisions use optimistic conflict checks. Snapshot confirmation exists, but the filesystem generation fingerprint is metadata-based and can miss content changes that preserve path, size, mode, and modification time. |
+| `12.5`      | Portability                 | `Partial`     | The canonical definition envelope excludes app-local metadata by design. Definition bodies remain schema-owned opaque JSON, so each artifact decoder must still enforce that its body contains no local paths, local identities, or secret values.                        |
+| `12.6`      | Diagnosability              | `Partial`     | Structured diagnostics include severity, stable code, message, and source-relative locations. Candidate failures are cataloged, but some structural refresh failures are returned only as errors and are not persisted as root-level diagnostics.                         |
+| `12.7`      | Graceful capability failure | `Partial`     | Explicit unsupported and unavailable errors exist, but unavailable optional capabilities do not yet expose dedicated capability endpoints or consistent unsupported-operation responses.                                                                                  |
+| `12.8`      | Extensibility               | `Implemented` | Source adapters, decoder registries, root-local attachment data, record policies, and consumer-owned resolution allow new transports and artifact formats without changing generic traversal or persistence concepts.                                                     |
+
+## 21. Next steps
+
+- Establish behavioral confidence before adding new artifact kinds.
+  - Add unit tests for each Artifact Store package.
+  - Add source adapter contract tests for filesystem and embedded snapshots.
+  - Add SQLite repository and publication transaction contract tests.
+  - Add refresh conflict, corrupt persistence, concurrent update, and source-change tests.
+  - Add golden canonical JSON and definition digest tests.
+  - Add end-to-end root, source, discovery, reconciliation, pin, follow, invalid, and missing occurrence tests.
+
+- Close the remaining core gaps.
+  - Add generic current-catalog candidate matching for portable selectors while keeping final precedence decisions in consumer features.
+  - Define complete version constraint behavior before selectors are used for dependencies.
+  - Strengthen filesystem source confirmation so it detects relevant content changes rather than relying only on metadata fingerprints.
+  - Ensure structural discovery and publication failures can be surfaced through consistent, root-scoped diagnostics where appropriate.
+
+- Add the first concrete artifact kinds as focused modules.
+  - Add a Skill artifact kind with `SKILL.md` decoding, restricted YAML frontmatter, portable Skill definitions, semantic validation, resource declarations, and filesystem and embedded content resolution.
+  - Add an MCP artifact kind with source document decoders, multi-server subresources, portable MCP definitions, semantic validation, local setup storage, and secret-reference handling outside portable definitions.
+  - Migrate and remove the existing Skill and MCP Store implementations only when their Workspace and runtime replacements are complete.
+
+- Keep optional capabilities deferred until a committed workflow requires them.
+  - Packages, import, export, capture, fork, transfer provenance, generic asset closure, and generic materialization address `AS-F16`, `AS-F19`, and `AS-F20`.
+  - Dependency graph construction, version matcher registries, persisted resolution snapshots, and reproducibility reporting address `AS-F18`.
+  - Historical catalogs, occurrence revision history, historical source observations, and catalog comparison address `AS-F17`.
+  - Runtime providers, trust evaluation, secret resolution, and feature-specific precedence remain outside Artifact Store.
