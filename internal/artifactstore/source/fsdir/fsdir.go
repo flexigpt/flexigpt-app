@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -126,15 +127,15 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 }
 
 func fingerprint(ctx context.Context, root string) (string, error) {
-	type item struct {
+	type entry struct {
 		relative string
 		mode     os.FileMode
 		size     int64
 		modified time.Time
 	}
 
-	values := make([]item, 0)
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+	values := make([]entry, 0)
+	err := filepath.WalkDir(root, func(path string, dirEntry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -174,7 +175,14 @@ func fingerprint(ctx context.Context, root string) (string, error) {
 				filepath.ToSlash(relative),
 			)
 		}
-		values = append(values, item{
+		if !info.IsDir() && !info.Mode().IsRegular() {
+			return fmt.Errorf(
+				"%w: source contains unsupported entry %q",
+				artifactstore.ErrInvalid,
+				filepath.ToSlash(relative),
+			)
+		}
+		values = append(values, entry{
 			relative: filepath.ToSlash(relative),
 			mode:     info.Mode(),
 			size:     info.Size(),
@@ -190,6 +198,8 @@ func fingerprint(ctx context.Context, root string) (string, error) {
 	})
 
 	hash := sha256.New()
+	var totalBytes int64
+
 	for _, value := range values {
 		_, _ = fmt.Fprintf(
 			hash,
@@ -199,6 +209,57 @@ func fingerprint(ctx context.Context, root string) (string, error) {
 			value.size,
 			value.modified.Format(time.RFC3339Nano),
 		)
+		if !value.mode.IsRegular() {
+			continue
+		}
+		if value.size < 0 ||
+			value.size > artifactstore.MaxScanBytes-totalBytes {
+			return "", fmt.Errorf(
+				"%w: source exceeds byte limit",
+				artifactstore.ErrInvalid,
+			)
+		}
+
+		path := filepath.Join(root, filepath.FromSlash(value.relative))
+		file, err := os.Open(path)
+		if err != nil {
+			return "", err
+		}
+		info, statErr := file.Stat()
+		if statErr != nil {
+			_ = file.Close()
+			return "", statErr
+		}
+		if !info.Mode().IsRegular() || info.Size() != value.size {
+			_ = file.Close()
+			return "", fmt.Errorf(
+				"%w: source entry %q changed during fingerprinting",
+				artifactstore.ErrConflict,
+				value.relative,
+			)
+		}
+
+		_, _ = io.WriteString(hash, "content\x00")
+		written, copyErr := io.Copy(
+			hash,
+			io.LimitReader(file, value.size+1),
+		)
+		closeErr := file.Close()
+		if copyErr != nil {
+			return "", copyErr
+		}
+		if closeErr != nil {
+			return "", closeErr
+		}
+		if written != value.size {
+			return "", fmt.Errorf(
+				"%w: source entry %q changed during fingerprinting",
+				artifactstore.ErrConflict,
+				value.relative,
+			)
+		}
+		_, _ = hash.Write([]byte{0})
+		totalBytes += written
 	}
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
 }

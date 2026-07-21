@@ -10,19 +10,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
-type Components struct {
-	Service   *engine.Service
-	Refresher *engine.Refresher
-	Query     *engine.QueryService
+type components struct {
+	service   *engine.Service
+	refresher *engine.Refresher
+	query     *engine.QueryService
 
-	ContextAdapter *contextadapter.Adapter
-	SkillAdapter   *skilladapter.Adapter
+	contextAdapter *contextadapter.Adapter
+	skillAdapter   *skilladapter.Adapter
 }
 
-func NewComponents(
+func newComponents(
 	artifacts *system.Components,
 	config Config,
-) (*Components, error) {
+) (*components, error) {
 	if artifacts == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store components are nil",
@@ -105,11 +105,11 @@ func NewComponents(
 	if err != nil {
 		return nil, err
 	}
-	return &Components{
-		Service:        service,
-		Refresher:      refresher,
-		Query:          query,
-		ContextAdapter: contextAdapter,
-		SkillAdapter:   skillAdapter,
+	return &components{
+		service:        service,
+		refresher:      refresher,
+		query:          query,
+		contextAdapter: contextAdapter,
+		skillAdapter:   skillAdapter,
 	}, nil
 }

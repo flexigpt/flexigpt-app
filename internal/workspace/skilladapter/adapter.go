@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
@@ -49,11 +48,6 @@ type WorkspaceSkill struct {
 	Locator          artifactstore.Locator  `json:"locator"`
 	Skill            SkillSummary           `json:"skill"`
 	MarkdownBody     string                 `json:"markdownBody,omitempty"`
-
-	// RuntimeDefinition intentionally remains available to trusted Go callers
-	// but must never cross the JSON API boundary because it contains an
-	// absolute source filesystem location.
-	RuntimeDefinition agentskillsSpec.SkillDef `json:"-"`
 }
 
 type SkillLoadPlan struct {
@@ -213,11 +207,6 @@ func projectWorkspaceSkill(
 		Locator:          resourceValue.Record.Occurrence.Locator,
 		Skill:            skillSummary(resourceValue.Record.ID, runtimeSkill),
 		MarkdownBody:     markdownBody,
-		RuntimeDefinition: agentskillsSpec.SkillDef{
-			Type:     string(spec.SkillTypeFS),
-			Name:     body.Name,
-			Location: location,
-		},
 	}, nil
 }
 

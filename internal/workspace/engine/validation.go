@@ -160,6 +160,14 @@ func validateWorkspaceState(
 				attachment.Role,
 			)
 		}
+		if _, err := decodeAttachmentData(attachment.Data); err != nil {
+			return fmt.Errorf(
+				"%w: invalid attachment data for source %q: %w",
+				ErrInvalidWorkspace,
+				attachment.SourceID,
+				err,
+			)
+		}
 		sourceValue, exists := sourcesByID[attachment.SourceID]
 		if !exists {
 			return fmt.Errorf(

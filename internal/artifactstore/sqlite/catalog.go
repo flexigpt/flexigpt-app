@@ -34,10 +34,28 @@ func (s *Store) createRoot(
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	for _, attachment := range attachments {
+	seenSources := make(map[artifactstore.SourceID]struct{}, len(attachments))
+	for index, attachment := range attachments {
 		if err := attachment.Validate(); err != nil {
 			return err
 		}
+		if attachment.RootID != value.ID {
+			return fmt.Errorf(
+				"%w: attachment %d belongs to root %q, not root %q",
+				artifactstore.ErrInvalid,
+				index,
+				attachment.RootID,
+				value.ID,
+			)
+		}
+		if _, duplicate := seenSources[attachment.SourceID]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate attachment source %q",
+				artifactstore.ErrInvalid,
+				attachment.SourceID,
+			)
+		}
+		seenSources[attachment.SourceID] = struct{}{}
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -600,12 +618,20 @@ func getRootTx(
 	tx *sql.Tx,
 	id artifactstore.RootID,
 ) (root.Root, error) {
-	return scanRoot(tx.QueryRowContext(
+	value, err := scanRoot(tx.QueryRowContext(
 		ctx,
 		`SELECT `+rootColumns+` FROM artifact_roots
 		 WHERE id = ? AND deleted_at IS NULL`,
 		string(id),
 	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return root.Root{}, fmt.Errorf(
+			"%w: root %q",
+			artifactstore.ErrNotFound,
+			id,
+		)
+	}
+	return value, err
 }
 
 func scanRoot(row scanner) (root.Root, error) {

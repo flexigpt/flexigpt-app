@@ -127,6 +127,17 @@ type AttachRequest struct {
 	Data                 AttachmentData               `json:"data"`
 }
 
+type UpdateAttachmentRequest struct {
+	RootID                     artifactstore.RootID
+	SourceID                   artifactstore.SourceID
+	ExpectedRootRevision       uint64
+	ExpectedAttachmentRevision uint64
+	Role                       artifactstore.AttachmentRole
+	Priority                   int
+	Enabled                    bool
+	Data                       AttachmentData
+}
+
 type CatalogView struct {
 	Workspace         Workspace            `json:"-"`
 	Catalog           catalog.Snapshot     `json:"-"`

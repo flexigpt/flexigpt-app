@@ -204,7 +204,7 @@ func (p *Publisher) Publish(
 	if err := snapshot.Validate(); err != nil {
 		return catalog.Snapshot{}, err
 	}
-	return snapshot, nil
+	return catalog.CloneSnapshot(snapshot), nil
 }
 
 func currentAttachedSourceRevisions(

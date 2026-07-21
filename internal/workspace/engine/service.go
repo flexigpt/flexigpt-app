@@ -221,6 +221,64 @@ func (s *Service) Attach(
 	return s.Get(ctx, request.RootID)
 }
 
+func (s *Service) UpdateAttachment(
+	ctx context.Context,
+	request UpdateAttachmentRequest,
+) (Workspace, error) {
+	if err := validateRole(request.Role); err != nil {
+		return Workspace{}, err
+	}
+	targetOperation, _ := attachmentOperationFor(request.Role)
+	if !targetOperation.canAttach {
+		return Workspace{}, ErrPrimarySourceImmutable
+	}
+	if _, err := s.Get(ctx, request.RootID); err != nil {
+		return Workspace{}, err
+	}
+	current, err := s.roots.GetAttachment(
+		ctx,
+		request.RootID,
+		request.SourceID,
+	)
+	if err != nil {
+		return Workspace{}, err
+	}
+	currentOperation, _ := attachmentOperationFor(current.Role)
+	if !currentOperation.canAttach {
+		return Workspace{}, ErrPrimarySourceImmutable
+	}
+	sourceValue, err := s.sources.Get(ctx, request.SourceID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if request.Enabled && !sourceValue.Enabled {
+		return Workspace{}, fmt.Errorf(
+			"%w: enabled attachment cannot use disabled source",
+			ErrInvalidWorkspace,
+		)
+	}
+	data, err := encodeAttachmentData(request.Data)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if _, _, err := s.roots.UpdateAttachment(
+		ctx,
+		request.RootID,
+		request.SourceID,
+		root.AttachmentUpdate{
+			ExpectedRootRevision:       request.ExpectedRootRevision,
+			ExpectedAttachmentRevision: request.ExpectedAttachmentRevision,
+			Role:                       request.Role,
+			Priority:                   request.Priority,
+			Enabled:                    request.Enabled,
+			Data:                       data,
+		},
+	); err != nil {
+		return Workspace{}, err
+	}
+	return s.Get(ctx, request.RootID)
+}
+
 func (s *Service) Detach(
 	ctx context.Context,
 	rootID artifactstore.RootID,
@@ -228,6 +286,9 @@ func (s *Service) Detach(
 	expectedRootRevision uint64,
 	expectedAttachmentRevision uint64,
 ) (Workspace, error) {
+	if _, err := s.Get(ctx, rootID); err != nil {
+		return Workspace{}, err
+	}
 	attachment, err := s.roots.GetAttachment(ctx, rootID, sourceID)
 	if err != nil {
 		return Workspace{}, err

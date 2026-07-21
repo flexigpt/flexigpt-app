@@ -84,6 +84,13 @@ type workspaceRootStore interface {
 		rootID artifactstore.RootID,
 	) ([]root.Attachment, error)
 
+	UpdateAttachment(
+		ctx context.Context,
+		rootID artifactstore.RootID,
+		sourceID artifactstore.SourceID,
+		update root.AttachmentUpdate,
+	) (root.Root, root.Attachment, error)
+
 	Detach(
 		ctx context.Context,
 		rootID artifactstore.RootID,

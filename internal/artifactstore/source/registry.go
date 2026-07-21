@@ -46,6 +46,9 @@ func (r *Registry) Open(
 	if ctx == nil {
 		return nil, artifactstore.ErrInvalid
 	}
+	if err := value.Validate(); err != nil {
+		return nil, err
+	}
 	adapter, exists := r.adapter(value.Kind)
 	if !exists {
 		return nil, fmt.Errorf(
