@@ -10,14 +10,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-type sourceReader interface {
+type sourceLookup interface {
 	Get(
 		ctx context.Context,
 		id artifactstore.SourceID,
 	) (source.Source, error)
 }
 
-type recordReader interface {
+type recordLookup interface {
 	Get(
 		ctx context.Context,
 		id artifactstore.RecordID,
@@ -29,14 +29,14 @@ type recordReader interface {
 	) ([]record.Record, error)
 }
 
-type definitionReader interface {
+type definitionLookup interface {
 	Get(
 		ctx context.Context,
 		digest artifactstore.Digest,
 	) (definition.Definition, error)
 }
 
-type rootManager interface {
+type workspaceRootStore interface {
 	CreateRoot(
 		ctx context.Context,
 		draft catalog.RootDraft,
@@ -90,7 +90,9 @@ type rootManager interface {
 		expectedRootRevision uint64,
 		expectedAttachmentRevision uint64,
 	) (catalog.Root, error)
+}
 
+type catalogSnapshotReader interface {
 	Current(
 		ctx context.Context,
 		rootID artifactstore.RootID,

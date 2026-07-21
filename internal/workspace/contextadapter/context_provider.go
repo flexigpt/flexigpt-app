@@ -32,23 +32,23 @@ type ContextLoadPlan struct {
 	Diagnostics     []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
 }
 
-type ContextProvider struct {
+type Adapter struct {
 	query *engine.QueryService
 }
 
-func NewContextProvider(
+func NewAdapter(
 	query *engine.QueryService,
-) (*ContextProvider, error) {
+) (*Adapter, error) {
 	if query == nil {
 		return nil, fmt.Errorf(
-			"%w: Workspace context provider query is nil",
+			"%w: Workspace context adapter query is nil",
 			engine.ErrInvalidWorkspace,
 		)
 	}
-	return &ContextProvider{query: query}, nil
+	return &Adapter{query: query}, nil
 }
 
-func (p *ContextProvider) Compose(
+func (p *Adapter) Compose(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 	recordIDs []artifactstore.RecordID,
@@ -114,7 +114,7 @@ func (p *ContextProvider) Compose(
 	return output, nil
 }
 
-func (p *ContextProvider) List(
+func (p *Adapter) List(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) ([]ContextContribution, error) {

@@ -23,6 +23,37 @@ func (s ArtifactSupport) Validate() error {
 	return artifactstore.ValidateDecoderID(s.DecoderID)
 }
 
+func validateDiscoveryProfiles(value DiscoveryProfiles) error {
+	if err := validateDiscoveryProfile(value.Primary); err != nil {
+		return err
+	}
+	return validateDiscoveryProfile(value.Attached)
+}
+
+func validateDiscoveryProfile(value DiscoveryProfile) error {
+	roots := make([]DiscoveryRoot, 0, len(value.DirectoryRoots))
+	for _, root := range value.DirectoryRoots {
+		roots = append(roots, DiscoveryRoot{
+			Root:            root.Root,
+			Recursive:       root.Recursive,
+			IncludePatterns: append([]string(nil), root.IncludePatterns...),
+		})
+	}
+	if err := validateDiscoveryPreferences(DiscoveryPreferences{
+		AdditionalLocators: append(
+			[]artifactstore.Locator(nil),
+			value.ExplicitLocators...,
+		),
+		AdditionalRoots: roots,
+	}); err != nil {
+		return err
+	}
+	if value.ReadmeLocator == "" {
+		return nil
+	}
+	return artifactstore.ValidateLocator(value.ReadmeLocator, false)
+}
+
 func encodeRootData(value RootData) (json.RawMessage, error) {
 	if err := validateRootData(value); err != nil {
 		return nil, err

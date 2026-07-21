@@ -55,14 +55,6 @@ var contextFileSupportMatrix = []contextFileSupport{
 	},
 }
 
-var discoveryProfile = engine.DiscoveryProfile{
-	ExplicitLocators: []artifactstore.Locator{
-		agentsLocator,
-		claudeLocator,
-	},
-	ReadmeLocator: readmeLocator,
-}
-
 var artifactSupport = engine.ArtifactSupport{
 	Kind:      contextKind,
 	SchemaID:  contextSchemaID,

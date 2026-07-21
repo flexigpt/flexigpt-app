@@ -27,7 +27,13 @@ func (*ContextDecoder) ID() artifactstore.DecoderID {
 }
 
 func DiscoveryProfile() engine.DiscoveryProfile {
-	return discoveryProfile
+	return engine.DiscoveryProfile{
+		ExplicitLocators: []artifactstore.Locator{
+			agentsLocator,
+			claudeLocator,
+		},
+		ReadmeLocator: readmeLocator,
+	}
 }
 
 func ArtifactSupport() engine.ArtifactSupport {

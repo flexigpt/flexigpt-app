@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
@@ -16,10 +15,69 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
-type WorkspaceWrapper struct {
-	artifacts   *system.Components
-	workspace   *workspace.Components
-	provisioner *provision.Service
+// WorkspaceView is the API-safe workspace representation. It deliberately
+// excludes source configuration and raw catalog persistence data.
+type WorkspaceView struct {
+	RootID            artifactstore.RootID      `json:"rootID"`
+	Revision          uint64                    `json:"revision"`
+	DisplayName       string                    `json:"displayName"`
+	Description       string                    `json:"description,omitempty"`
+	Enabled           bool                      `json:"enabled"`
+	Mode              string                    `json:"mode"`
+	PrimarySourceID   artifactstore.SourceID    `json:"primarySourceID,omitempty"`
+	HasTrustReference bool                      `json:"hasTrustReference"`
+	Discovery         WorkspaceDiscoveryView    `json:"discovery"`
+	Attachments       []WorkspaceAttachmentView `json:"attachments"`
+}
+
+type WorkspaceDiscoveryView struct {
+	AdditionalLocators []artifactstore.Locator      `json:"additionalLocators,omitempty"`
+	AdditionalRoots    []WorkspaceDiscoveryRootView `json:"additionalRoots,omitempty"`
+	IncludeReadme      bool                         `json:"includeReadme,omitempty"`
+}
+
+type WorkspaceDiscoveryRootView struct {
+	Root            artifactstore.Locator `json:"root"`
+	Recursive       bool                  `json:"recursive"`
+	IncludePatterns []string              `json:"includePatterns,omitempty"`
+}
+
+type WorkspaceAttachmentView struct {
+	SourceID artifactstore.SourceID       `json:"sourceID"`
+	Role     artifactstore.AttachmentRole `json:"role"`
+	Priority int                          `json:"priority"`
+	Enabled  bool                         `json:"enabled"`
+}
+
+type WorkspaceRecordView struct {
+	ID                 artifactstore.RecordID     `json:"id"`
+	Revision           uint64                     `json:"revision"`
+	Name               string                     `json:"name"`
+	Kind               artifactstore.ArtifactKind `json:"kind"`
+	Enabled            bool                       `json:"enabled"`
+	State              string                     `json:"state"`
+	ResolvedDefinition *artifactstore.Digest      `json:"resolvedDefinition,omitempty"`
+}
+
+type WorkspaceResourceView struct {
+	Record           WorkspaceRecordView    `json:"record"`
+	DefinitionDigest artifactstore.Digest   `json:"definitionDigest"`
+	SourceID         artifactstore.SourceID `json:"sourceID"`
+	Locator          artifactstore.Locator  `json:"locator"`
+	CatalogCurrent   bool                   `json:"catalogCurrent"`
+}
+
+type WorkspaceCatalogView struct {
+	Workspace             WorkspaceView           `json:"workspace"`
+	CatalogRevision       uint64                  `json:"catalogRevision"`
+	Resources             []WorkspaceResourceView `json:"resources"`
+	UnrecordedCount       int                     `json:"unrecordedCount"`
+	UnresolvedRecordCount int                     `json:"unresolvedRecordCount"`
+}
+
+type WorkspaceDeleteResult struct {
+	RootID   artifactstore.RootID `json:"rootID"`
+	Revision uint64               `json:"revision"`
 }
 
 type WorkspaceDeleteRequest struct {
@@ -45,6 +103,12 @@ type WorkspaceRecordEnabledRequest struct {
 	RecordID         artifactstore.RecordID `json:"recordID"`
 	ExpectedRevision uint64                 `json:"expectedRevision"`
 	Enabled          bool                   `json:"enabled"`
+}
+
+type WorkspaceWrapper struct {
+	artifacts   *system.Components
+	workspace   *workspace.Components
+	provisioner *provision.Service
 }
 
 func InitWorkspaceWrapper(
@@ -85,65 +149,95 @@ func InitWorkspaceWrapper(
 
 func (w *WorkspaceWrapper) CreateFilesystem(
 	request *provision.Request,
-) (*engine.Workspace, error) {
-	return middleware.WithRecoveryResp(func() (*engine.Workspace, error) {
+) (*WorkspaceView, error) {
+	return middleware.WithRecoveryResp(func() (*WorkspaceView, error) {
 		value, err := w.provisioner.CreateFilesystem(
 			context.Background(),
 			*request,
 		)
-		return &value, err
+		if err != nil {
+			return nil, err
+		}
+		output := workspaceViewOf(value)
+		return &output, nil
 	})
 }
 
 func (w *WorkspaceWrapper) CreateEmpty(
 	request *engine.EmptyWorkspaceRequest,
-) (*engine.Workspace, error) {
-	return middleware.WithRecoveryResp(func() (*engine.Workspace, error) {
+) (*WorkspaceView, error) {
+	return middleware.WithRecoveryResp(func() (*WorkspaceView, error) {
 		value, err := w.workspace.Service.CreateEmpty(
 			context.Background(),
 			*request,
 		)
-		return &value, err
+		if err != nil {
+			return nil, err
+		}
+		output := workspaceViewOf(value)
+		return &output, nil
 	})
 }
 
 func (w *WorkspaceWrapper) Get(
 	rootID artifactstore.RootID,
-) (*engine.Workspace, error) {
-	return middleware.WithRecoveryResp(func() (*engine.Workspace, error) {
+) (*WorkspaceView, error) {
+	return middleware.WithRecoveryResp(func() (*WorkspaceView, error) {
 		value, err := w.workspace.Service.Get(context.Background(), rootID)
-		return &value, err
+		if err != nil {
+			return nil, err
+		}
+		output := workspaceViewOf(value)
+		return &output, nil
 	})
 }
 
-func (w *WorkspaceWrapper) List() ([]engine.Workspace, error) {
-	return middleware.WithRecoveryResp(func() ([]engine.Workspace, error) {
-		return w.workspace.Service.List(context.Background())
+func (w *WorkspaceWrapper) List() ([]WorkspaceView, error) {
+	return middleware.WithRecoveryResp(func() ([]WorkspaceView, error) {
+		values, err := w.workspace.Service.List(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		output := make([]WorkspaceView, 0, len(values))
+		for _, value := range values {
+			output = append(output, workspaceViewOf(value))
+		}
+		return output, nil
 	})
 }
 
 func (w *WorkspaceWrapper) Update(
 	request *engine.UpdateRequest,
-) (*engine.Workspace, error) {
-	return middleware.WithRecoveryResp(func() (*engine.Workspace, error) {
+) (*WorkspaceView, error) {
+	return middleware.WithRecoveryResp(func() (*WorkspaceView, error) {
 		value, err := w.workspace.Service.Update(
 			context.Background(),
 			*request,
 		)
-		return &value, err
+		if err != nil {
+			return nil, err
+		}
+		output := workspaceViewOf(value)
+		return &output, nil
 	})
 }
 
 func (w *WorkspaceWrapper) Delete(
 	request *WorkspaceDeleteRequest,
-) (*catalog.Root, error) {
-	return middleware.WithRecoveryResp(func() (*catalog.Root, error) {
+) (*WorkspaceDeleteResult, error) {
+	return middleware.WithRecoveryResp(func() (*WorkspaceDeleteResult, error) {
 		value, err := w.workspace.Service.Delete(
 			context.Background(),
 			request.RootID,
 			request.ExpectedRevision,
 		)
-		return &value, err
+		if err != nil {
+			return nil, err
+		}
+		return &WorkspaceDeleteResult{
+			RootID:   value.ID,
+			Revision: value.Revision,
+		}, nil
 	})
 }
 
@@ -161,13 +255,17 @@ func (w *WorkspaceWrapper) Refresh(
 
 func (w *WorkspaceWrapper) Catalog(
 	rootID artifactstore.RootID,
-) (*engine.CatalogView, error) {
-	return middleware.WithRecoveryResp(func() (*engine.CatalogView, error) {
+) (*WorkspaceCatalogView, error) {
+	return middleware.WithRecoveryResp(func() (*WorkspaceCatalogView, error) {
 		value, err := w.workspace.Query.Catalog(
 			context.Background(),
 			rootID,
 		)
-		return &value, err
+		if err != nil {
+			return nil, err
+		}
+		output := workspaceCatalogViewOf(value)
+		return &output, nil
 	})
 }
 
@@ -175,7 +273,7 @@ func (w *WorkspaceWrapper) ComposeContext(
 	request *WorkspaceContextRequest,
 ) (*contextadapter.ContextLoadPlan, error) {
 	return middleware.WithRecoveryResp(func() (*contextadapter.ContextLoadPlan, error) {
-		value, err := w.workspace.Context.Compose(
+		value, err := w.workspace.ContextAdapter.Compose(
 			context.Background(),
 			request.RootID,
 			request.RecordIDs,
@@ -188,7 +286,7 @@ func (w *WorkspaceWrapper) ListWorkspaceSkills(
 	rootID artifactstore.RootID,
 ) ([]skilladapter.WorkspaceSkill, error) {
 	return middleware.WithRecoveryResp(func() ([]skilladapter.WorkspaceSkill, error) {
-		return w.workspace.Skills.List(context.Background(), rootID)
+		return w.workspace.SkillAdapter.List(context.Background(), rootID)
 	})
 }
 
@@ -196,7 +294,7 @@ func (w *WorkspaceWrapper) LoadWorkspaceSkills(
 	request *WorkspaceSkillLoadRequest,
 ) (*skilladapter.SkillLoadPlan, error) {
 	return middleware.WithRecoveryResp(func() (*skilladapter.SkillLoadPlan, error) {
-		value, err := w.workspace.Skills.Load(
+		value, err := w.workspace.SkillAdapter.Load(
 			context.Background(),
 			request.RootID,
 			request.RecordIDs,
@@ -207,15 +305,19 @@ func (w *WorkspaceWrapper) LoadWorkspaceSkills(
 
 func (w *WorkspaceWrapper) SetRecordEnabled(
 	request *WorkspaceRecordEnabledRequest,
-) (*record.Record, error) {
-	return middleware.WithRecoveryResp(func() (*record.Record, error) {
+) (*WorkspaceRecordView, error) {
+	return middleware.WithRecoveryResp(func() (*WorkspaceRecordView, error) {
 		value, err := w.artifacts.Records.SetEnabled(
 			context.Background(),
 			request.RecordID,
 			request.ExpectedRevision,
 			request.Enabled,
 		)
-		return &value, err
+		if err != nil {
+			return nil, err
+		}
+		output := workspaceRecordViewOf(value)
+		return &output, nil
 	})
 }
 
@@ -224,4 +326,92 @@ func (w *WorkspaceWrapper) close() {
 		return
 	}
 	_ = w.artifacts.Close()
+}
+
+func workspaceViewOf(value engine.Workspace) WorkspaceView {
+	attachments := make(
+		[]WorkspaceAttachmentView,
+		0,
+		len(value.Attachments),
+	)
+	for _, attachment := range value.Attachments {
+		attachments = append(attachments, WorkspaceAttachmentView{
+			SourceID: attachment.SourceID,
+			Role:     attachment.Role,
+			Priority: attachment.Priority,
+			Enabled:  attachment.Enabled,
+		})
+	}
+	return WorkspaceView{
+		RootID:            value.Root.ID,
+		Revision:          value.Root.Revision,
+		DisplayName:       value.Root.DisplayName,
+		Description:       value.Root.Description,
+		Enabled:           value.Root.Enabled,
+		Mode:              string(value.Data.Mode),
+		PrimarySourceID:   value.Data.PrimarySourceID,
+		HasTrustReference: value.Data.TrustReference != "",
+		Discovery:         workspaceDiscoveryViewOf(value.Data.Discovery),
+		Attachments:       attachments,
+	}
+}
+
+func workspaceDiscoveryViewOf(
+	value engine.DiscoveryPreferences,
+) WorkspaceDiscoveryView {
+	output := WorkspaceDiscoveryView{
+		AdditionalLocators: append(
+			[]artifactstore.Locator(nil),
+			value.AdditionalLocators...,
+		),
+		IncludeReadme: value.IncludeReadme,
+	}
+	for _, root := range value.AdditionalRoots {
+		output.AdditionalRoots = append(
+			output.AdditionalRoots,
+			WorkspaceDiscoveryRootView{
+				Root:            root.Root,
+				Recursive:       root.Recursive,
+				IncludePatterns: append([]string(nil), root.IncludePatterns...),
+			},
+		)
+	}
+	return output
+}
+
+func workspaceRecordViewOf(value record.Record) WorkspaceRecordView {
+	var digest *artifactstore.Digest
+	if value.ResolvedDefinition != nil {
+		copied := *value.ResolvedDefinition
+		digest = &copied
+	}
+	return WorkspaceRecordView{
+		ID:                 value.ID,
+		Revision:           value.Revision,
+		Name:               value.Name,
+		Kind:               value.Kind,
+		Enabled:            value.Enabled,
+		State:              string(value.State),
+		ResolvedDefinition: digest,
+	}
+}
+
+func workspaceCatalogViewOf(value engine.CatalogView) WorkspaceCatalogView {
+	output := WorkspaceCatalogView{
+		Workspace:             workspaceViewOf(value.Workspace),
+		CatalogRevision:       value.Catalog.Revision,
+		Resources:             make([]WorkspaceResourceView, 0, len(value.Resources)),
+		UnrecordedCount:       len(value.Unrecorded),
+		UnresolvedRecordCount: len(value.UnresolvedRecords),
+	}
+	for _, resource := range value.Resources {
+		output.Resources = append(output.Resources, WorkspaceResourceView{
+			Record:           workspaceRecordViewOf(resource.Record),
+			DefinitionDigest: resource.Definition.Digest,
+			SourceID:         resource.Source.ID,
+			Locator:          resource.Record.Occurrence.Locator,
+			CatalogCurrent:   resource.CatalogCurrent,
+		})
+	}
+	return output
 }

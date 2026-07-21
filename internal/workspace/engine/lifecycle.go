@@ -11,13 +11,13 @@ import (
 )
 
 type Service struct {
-	roots   rootManager
-	sources sourceReader
+	roots   workspaceRootStore
+	sources sourceLookup
 }
 
 func NewService(
-	roots rootManager,
-	sources sourceReader,
+	roots workspaceRootStore,
+	sources sourceLookup,
 ) (*Service, error) {
 	if roots == nil || sources == nil {
 		return nil, fmt.Errorf(

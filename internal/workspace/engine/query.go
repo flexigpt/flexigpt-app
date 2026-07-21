@@ -16,21 +16,21 @@ import (
 
 type QueryService struct {
 	workspaces  *Service
-	roots       rootManager
-	sources     sourceReader
-	records     recordReader
-	definitions definitionReader
+	catalogs    catalogSnapshotReader
+	sources     sourceLookup
+	records     recordLookup
+	definitions definitionLookup
 }
 
 func NewQueryService(
 	workspaces *Service,
-	roots rootManager,
-	sources sourceReader,
-	records recordReader,
-	definitions definitionReader,
+	catalogs catalogSnapshotReader,
+	sources sourceLookup,
+	records recordLookup,
+	definitions definitionLookup,
 ) (*QueryService, error) {
 	if workspaces == nil ||
-		roots == nil ||
+		catalogs == nil ||
 		sources == nil ||
 		records == nil ||
 		definitions == nil {
@@ -41,7 +41,7 @@ func NewQueryService(
 	}
 	return &QueryService{
 		workspaces:  workspaces,
-		roots:       roots,
+		catalogs:    catalogs,
 		sources:     sources,
 		records:     records,
 		definitions: definitions,
@@ -206,7 +206,7 @@ func (q *QueryService) Catalog(
 	if err != nil {
 		return CatalogView{}, err
 	}
-	snapshot, err := q.roots.Current(ctx, rootID)
+	snapshot, err := q.catalogs.Current(ctx, rootID)
 	if err != nil {
 		return CatalogView{}, err
 	}

@@ -14,12 +14,9 @@ type Components struct {
 	Service   *engine.Service
 	Refresher *engine.Refresher
 	Query     *engine.QueryService
-	Policy    *engine.RecordPolicy
-	Planner   *engine.Planner
-	Loader    *engine.DefinitionLoader
 
-	Context *contextadapter.ContextProvider
-	Skills  *skilladapter.SkillFacade
+	ContextAdapter *contextadapter.Adapter
+	SkillAdapter   *skilladapter.Adapter
 }
 
 func NewComponents(
@@ -101,22 +98,19 @@ func NewComponents(
 	if err != nil {
 		return nil, err
 	}
-	contextProvider, err := contextadapter.NewContextProvider(query)
+	contextAdapter, err := contextadapter.NewAdapter(query)
 	if err != nil {
 		return nil, err
 	}
-	skillFacade, err := skilladapter.NewSkillFacade(query)
+	skillAdapter, err := skilladapter.NewAdapter(query)
 	if err != nil {
 		return nil, err
 	}
 	return &Components{
-		Service:   service,
-		Refresher: refresher,
-		Query:     query,
-		Policy:    policy,
-		Planner:   planner,
-		Loader:    loader,
-		Context:   contextProvider,
-		Skills:    skillFacade,
+		Service:        service,
+		Refresher:      refresher,
+		Query:          query,
+		ContextAdapter: contextAdapter,
+		SkillAdapter:   skillAdapter,
 	}, nil
 }

@@ -11,16 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
 
-func DecodeDefinitionBody[T any](
-	raw json.RawMessage,
-) (T, error) {
-	var output T
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return output, err
-	}
-	return output, nil
-}
-
 type DefinitionDecoder struct{}
 
 func NewDefinitionDecoder() *DefinitionDecoder {

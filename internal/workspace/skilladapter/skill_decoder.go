@@ -33,7 +33,15 @@ func NewSkillDecoder() *SkillDecoder {
 }
 
 func DiscoveryProfile() engine.DiscoveryProfile {
-	return discoveryProfile
+	return engine.DiscoveryProfile{
+		DirectoryRoots: []discovery.DirectoryRoot{{
+			Root:      artifactstore.Locator(workspaceSkillsDirectory),
+			Recursive: true,
+			IncludePatterns: []string{
+				skillDefinitionFileName,
+			},
+		}},
+	}
 }
 
 func ArtifactSupport() engine.ArtifactSupport {

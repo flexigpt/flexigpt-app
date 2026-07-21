@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
@@ -18,15 +19,41 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
+type SkillArgument struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Default     string `json:"default,omitempty"`
+}
+
+type SkillSummary struct {
+	SchemaVersion string                 `json:"schemaVersion"`
+	ID            artifactstore.RecordID `json:"id"`
+	Slug          string                 `json:"slug"`
+	Type          string                 `json:"type"`
+	Name          string                 `json:"name"`
+	DisplayName   string                 `json:"displayName"`
+	Description   string                 `json:"description"`
+	Tags          []string               `json:"tags,omitempty"`
+	Insert        string                 `json:"insert"`
+	Arguments     []SkillArgument        `json:"arguments,omitempty"`
+	IsEnabled     bool                   `json:"isEnabled"`
+	CreatedAt     time.Time              `json:"createdAt"`
+	ModifiedAt    time.Time              `json:"modifiedAt"`
+}
+
 type WorkspaceSkill struct {
-	RootID            artifactstore.RootID     `json:"rootID"`
-	RecordID          artifactstore.RecordID   `json:"recordID"`
-	DefinitionDigest  artifactstore.Digest     `json:"definitionDigest"`
-	SourceID          artifactstore.SourceID   `json:"sourceID"`
-	Locator           artifactstore.Locator    `json:"locator"`
-	Skill             spec.Skill               `json:"skill"`
-	MarkdownBody      string                   `json:"markdownBody"`
-	RuntimeDefinition agentskillsSpec.SkillDef `json:"runtimeDefinition"`
+	RootID           artifactstore.RootID   `json:"rootID"`
+	RecordID         artifactstore.RecordID `json:"recordID"`
+	DefinitionDigest artifactstore.Digest   `json:"definitionDigest"`
+	SourceID         artifactstore.SourceID `json:"sourceID"`
+	Locator          artifactstore.Locator  `json:"locator"`
+	Skill            SkillSummary           `json:"skill"`
+	MarkdownBody     string                 `json:"markdownBody,omitempty"`
+
+	// RuntimeDefinition intentionally remains available to trusted Go callers
+	// but must never cross the JSON API boundary because it contains an
+	// absolute source filesystem location.
+	RuntimeDefinition agentskillsSpec.SkillDef `json:"-"`
 }
 
 type SkillLoadPlan struct {
@@ -36,23 +63,23 @@ type SkillLoadPlan struct {
 	Diagnostics     []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
 }
 
-type SkillFacade struct {
+type Adapter struct {
 	query *engine.QueryService
 }
 
-func NewSkillFacade(
+func NewAdapter(
 	query *engine.QueryService,
-) (*SkillFacade, error) {
+) (*Adapter, error) {
 	if query == nil {
 		return nil, fmt.Errorf(
-			"%w: Workspace Skill facade query is nil",
+			"%w: Workspace Skill adapter query is nil",
 			engine.ErrInvalidWorkspace,
 		)
 	}
-	return &SkillFacade{query: query}, nil
+	return &Adapter{query: query}, nil
 }
 
-func (f *SkillFacade) List(
+func (f *Adapter) List(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) ([]WorkspaceSkill, error) {
@@ -68,7 +95,7 @@ func (f *SkillFacade) List(
 			!resourceValue.Record.Enabled {
 			continue
 		}
-		value, err := projectWorkspaceSkill(rootID, resourceValue)
+		value, err := projectWorkspaceSkill(rootID, resourceValue, false)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +105,7 @@ func (f *SkillFacade) List(
 	return output, nil
 }
 
-func (f *SkillFacade) Load(
+func (f *Adapter) Load(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 	recordIDs []artifactstore.RecordID,
@@ -106,7 +133,7 @@ func (f *SkillFacade) Load(
 			Definition: item.Definition,
 			Source:     item.Source,
 		}
-		projected, err := projectWorkspaceSkill(rootID, resourceValue)
+		projected, err := projectWorkspaceSkill(rootID, resourceValue, true)
 		if err != nil {
 			return SkillLoadPlan{}, err
 		}
@@ -119,6 +146,7 @@ func (f *SkillFacade) Load(
 func projectWorkspaceSkill(
 	rootID artifactstore.RootID,
 	resourceValue engine.Resource,
+	includeMarkdown bool,
 ) (WorkspaceSkill, error) {
 	body, err := engine.DecodeDefinitionBody[skillDefinition](
 		resourceValue.Definition.Body,
@@ -144,7 +172,7 @@ func projectWorkspaceSkill(
 		})
 	}
 	insert := spec.SkillInsert(body.Insert)
-	projected := spec.Skill{
+	runtimeSkill := spec.Skill{
 		SchemaVersion:  spec.SkillSchemaVersion,
 		ID:             spec.SkillID(resourceValue.Record.ID),
 		Slug:           spec.SkillSlug(body.Name),
@@ -165,12 +193,16 @@ func projectWorkspaceSkill(
 		CreatedAt:  resourceValue.Record.CreatedAt,
 		ModifiedAt: resourceValue.Record.ModifiedAt,
 	}
-	if err := skillStore.ValidateSkill(&projected); err != nil {
+	if err := skillStore.ValidateSkill(&runtimeSkill); err != nil {
 		return WorkspaceSkill{}, fmt.Errorf(
 			"%w: project Workspace Skill: %w",
 			engine.ErrInvalidWorkspace,
 			err,
 		)
+	}
+	markdownBody := ""
+	if includeMarkdown {
+		markdownBody = body.MarkdownBody
 	}
 
 	return WorkspaceSkill{
@@ -179,14 +211,43 @@ func projectWorkspaceSkill(
 		DefinitionDigest: resourceValue.Definition.Digest,
 		SourceID:         resourceValue.Source.ID,
 		Locator:          resourceValue.Record.Occurrence.Locator,
-		Skill:            projected,
-		MarkdownBody:     body.MarkdownBody,
+		Skill:            skillSummary(resourceValue.Record.ID, runtimeSkill),
+		MarkdownBody:     markdownBody,
 		RuntimeDefinition: agentskillsSpec.SkillDef{
 			Type:     string(spec.SkillTypeFS),
 			Name:     body.Name,
 			Location: location,
 		},
 	}, nil
+}
+
+func skillSummary(
+	id artifactstore.RecordID,
+	value spec.Skill,
+) SkillSummary {
+	arguments := make([]SkillArgument, 0, len(value.Arguments))
+	for _, argument := range value.Arguments {
+		arguments = append(arguments, SkillArgument{
+			Name:        argument.Name,
+			Description: argument.Description,
+			Default:     argument.Default,
+		})
+	}
+	return SkillSummary{
+		SchemaVersion: value.SchemaVersion,
+		ID:            id,
+		Slug:          string(value.Slug),
+		Type:          string(value.Type),
+		Name:          value.Name,
+		DisplayName:   value.DisplayName,
+		Description:   value.Description,
+		Tags:          append([]string(nil), value.Tags...),
+		Insert:        string(value.Insert),
+		Arguments:     arguments,
+		IsEnabled:     value.IsEnabled,
+		CreatedAt:     value.CreatedAt,
+		ModifiedAt:    value.ModifiedAt,
+	}
 }
 
 func workspaceSkillLocation(

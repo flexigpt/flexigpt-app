@@ -2,7 +2,6 @@ package skilladapter
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
@@ -61,14 +60,4 @@ var artifactSupport = engine.ArtifactSupport{
 	Kind:      skillKind,
 	SchemaID:  skillSchemaID,
 	DecoderID: skillDecoderID,
-}
-
-var discoveryProfile = engine.DiscoveryProfile{
-	DirectoryRoots: []discovery.DirectoryRoot{{
-		Root:      artifactstore.Locator(workspaceSkillsDirectory),
-		Recursive: true,
-		IncludePatterns: []string{
-			skillDefinitionFileName,
-		},
-	}},
 }
