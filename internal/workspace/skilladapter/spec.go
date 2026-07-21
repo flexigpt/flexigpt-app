@@ -46,14 +46,13 @@ type skillArgumentDefinition struct {
 }
 
 type skillDefinition struct {
-	Name           string                    `json:"name"`
-	DisplayName    string                    `json:"displayName,omitempty"`
-	Description    string                    `json:"description"`
-	Insert         string                    `json:"insert"`
-	Arguments      []skillArgumentDefinition `json:"arguments,omitempty"`
-	Tags           []string                  `json:"tags,omitempty"`
-	MarkdownBody   string                    `json:"markdownBody"`
-	RawFrontmatter map[string]any            `json:"rawFrontmatter,omitempty"`
+	Name         string                    `json:"name"`
+	DisplayName  string                    `json:"displayName,omitempty"`
+	Description  string                    `json:"description"`
+	Insert       string                    `json:"insert"`
+	Arguments    []skillArgumentDefinition `json:"arguments,omitempty"`
+	Tags         []string                  `json:"tags,omitempty"`
+	MarkdownBody string                    `json:"markdownBody"`
 }
 
 var artifactSupport = engine.ArtifactSupport{

@@ -494,9 +494,10 @@ export function buildUnifiedDiffTextForTarget(
 		newPath?: string;
 		targetPath?: string;
 		sectionKeys?: string[];
-	}
+	},
+	parsedSource?: ParsedUnifiedDiffForUI
 ): UnifiedDiffTextForTarget | undefined {
-	const parsed = parseUnifiedDiffForUI(value, language);
+	const parsed = parsedSource ?? parseUnifiedDiffForUI(value, language);
 	let matches = parsed.files.filter(file => parsedFileMatchesTarget(file, target));
 
 	if (matches.length === 0 && parsed.files.length === 1) {

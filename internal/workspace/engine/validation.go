@@ -132,7 +132,7 @@ func validateWorkspaceState(
 	r root.Root,
 	data RootData,
 	attachments []root.Attachment,
-	sources []source.Source,
+	sources []source.Summary,
 ) error {
 	if r.Kind != RootKind {
 		return fmt.Errorf(
@@ -145,7 +145,7 @@ func validateWorkspaceState(
 	if err := validateRootData(data); err != nil {
 		return err
 	}
-	sourcesByID := make(map[artifactstore.SourceID]source.Source, len(sources))
+	sourcesByID := make(map[artifactstore.SourceID]source.Summary, len(sources))
 	for _, value := range sources {
 		sourcesByID[value.ID] = value
 	}

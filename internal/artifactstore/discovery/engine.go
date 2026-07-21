@@ -220,7 +220,7 @@ func (e *Engine) Discover(
 		}
 
 		decoded, diagnostics := decoder.Decode(ctx, cloneCandidate(candidate))
-		if err := artifactstore.ValidateDiagnostics(diagnostics); err != nil {
+		if err := validateCandidateDiagnostics(entry.Locator, diagnostics); err != nil {
 			return Result{}, fmt.Errorf(
 				"%w: decoder %q returned invalid diagnostics: %w",
 				artifactstore.ErrInvalid,
@@ -281,10 +281,42 @@ func (e *Engine) Discover(
 			}
 			emittedForLocator[key] = struct{}{}
 			seenKeys[key] = struct{}{}
+			if err := validateDecodedDiagnostics(
+				entry.Locator,
+				item.SubresourceLocator,
+				item.Diagnostics,
+			); err != nil {
+				return Result{}, fmt.Errorf(
+					"%w: decoder %q returned invalid decoded diagnostics: %w",
+					artifactstore.ErrInvalid,
+					decoder.ID(),
+					err,
+				)
+			}
+			result.Diagnostics = artifactstore.AppendDiagnostics(
+				result.Diagnostics,
+				item.Diagnostics...,
+			)
+			itemDiagnostics := artifactstore.AppendDiagnostics(
+				diagnostics,
+				item.Diagnostics...,
+			)
+			if artifactstore.ContainsErrorDiagnostic(item.Diagnostics) {
+				occurrences[key] = catalog.Occurrence{
+					RootID:              rootID,
+					Key:                 key,
+					SourceContentDigest: &sourceDigest,
+					DecoderID:           decoder.ID(),
+					State:               catalog.OccurrenceInvalid,
+					Diagnostics:         itemDiagnostics,
+					ObservedAt:          now,
+				}
+				continue
+			}
 
 			canonical, err := definition.Canonicalize(item.Definition)
 			if err != nil {
-				itemDiagnostics := []artifactstore.Diagnostic{{
+				definitionDiagnostics := []artifactstore.Diagnostic{{
 					Severity: artifactstore.DiagnosticError,
 					Code:     DiagnosticCodeDefinitionInvalid,
 					Message:  err.Error(),
@@ -293,6 +325,10 @@ func (e *Engine) Discover(
 						SubresourceLocator: item.SubresourceLocator,
 					},
 				}}
+				itemDiagnostics = artifactstore.AppendDiagnostics(
+					itemDiagnostics,
+					definitionDiagnostics...,
+				)
 				occurrences[key] = catalog.Occurrence{
 					RootID:              rootID,
 					Key:                 key,
@@ -304,7 +340,7 @@ func (e *Engine) Discover(
 				}
 				result.Diagnostics = artifactstore.AppendDiagnostics(
 					result.Diagnostics,
-					itemDiagnostics...,
+					definitionDiagnostics...,
 				)
 				continue
 			}
@@ -320,7 +356,7 @@ func (e *Engine) Discover(
 				SourceContentDigest: &sourceDigest,
 				DecoderID:           decoder.ID(),
 				State:               catalog.OccurrenceValid,
-				Diagnostics:         artifactstore.CloneDiagnostics(diagnostics),
+				Diagnostics:         artifactstore.CloneDiagnostics(itemDiagnostics),
 				ObservedAt:          now,
 			}
 			result.Definitions[canonical.Digest] = canonical
@@ -443,6 +479,70 @@ func cloneCandidate(value Candidate) Candidate {
 	output := value
 	output.Content = append([]byte(nil), value.Content...)
 	return output
+}
+
+func validateCandidateDiagnostics(
+	locator artifactstore.Locator,
+	values []artifactstore.Diagnostic,
+) error {
+	if err := artifactstore.ValidateDiagnostics(values); err != nil {
+		return err
+	}
+	for index, value := range values {
+		if value.Location == nil {
+			continue
+		}
+		if value.Location.Locator != "" &&
+			value.Location.Locator != locator {
+			return fmt.Errorf(
+				"diagnostics[%d]: location %q does not belong to candidate %q",
+				index,
+				value.Location.Locator,
+				locator,
+			)
+		}
+		if value.Location.SubresourceLocator != "" {
+			return fmt.Errorf(
+				"diagnostics[%d]: candidate diagnostic cannot target a subresource",
+				index,
+			)
+		}
+	}
+	return nil
+}
+
+func validateDecodedDiagnostics(
+	locator artifactstore.Locator,
+	subresource artifactstore.SubresourceLocator,
+	values []artifactstore.Diagnostic,
+) error {
+	if err := artifactstore.ValidateDiagnostics(values); err != nil {
+		return err
+	}
+	for index, value := range values {
+		if value.Location == nil {
+			continue
+		}
+		if value.Location.Locator != "" &&
+			value.Location.Locator != locator {
+			return fmt.Errorf(
+				"diagnostics[%d]: location %q does not belong to candidate %q",
+				index,
+				value.Location.Locator,
+				locator,
+			)
+		}
+		if value.Location.SubresourceLocator != "" &&
+			value.Location.SubresourceLocator != subresource {
+			return fmt.Errorf(
+				"diagnostics[%d]: subresource %q does not belong to decoded resource %q",
+				index,
+				value.Location.SubresourceLocator,
+				subresource,
+			)
+		}
+	}
+	return nil
 }
 
 func collectCandidates(

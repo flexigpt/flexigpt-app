@@ -35,12 +35,12 @@ func (p SourcePlan) Validate() error {
 			artifactstore.ErrInvalid,
 		)
 	}
-	if err := artifactstore.ValidateOptionalText(
-		"expected source generation",
-		p.ExpectedGeneration,
-		artifactstore.MaxLocatorBytes,
-	); err != nil {
-		return err
+	if p.ExpectedGeneration != "" {
+		if err := artifactstore.ValidateSourceGeneration(
+			p.ExpectedGeneration,
+		); err != nil {
+			return err
+		}
 	}
 	if p.MaxCandidateBytes < 0 ||
 		p.MaxTotalBytes < 0 ||

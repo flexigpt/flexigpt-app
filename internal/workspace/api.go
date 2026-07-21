@@ -680,7 +680,6 @@ func workspaceSkillViewOf(value skilladapter.WorkspaceSkill) WorkspaceSkillView 
 		SchemaVersion: value.Skill.SchemaVersion,
 		ID:            value.Skill.ID,
 		Slug:          value.Skill.Slug,
-		Type:          value.Skill.Type,
 		Name:          value.Skill.Name,
 		DisplayName:   value.Skill.DisplayName,
 		Description:   value.Skill.Description,

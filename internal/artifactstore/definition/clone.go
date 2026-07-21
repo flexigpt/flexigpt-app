@@ -2,7 +2,6 @@ package definition
 
 import (
 	"maps"
-	"sort"
 )
 
 func cloneSelectors(input []Selector) []Selector {
@@ -23,22 +22,5 @@ func cloneLabels(input map[string]string) map[string]string {
 	}
 	output := make(map[string]string, len(input))
 	maps.Copy(output, input)
-	return output
-}
-
-func sortedLabels(input map[string]string) map[string]string {
-	if len(input) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(input))
-	for key := range input {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	output := make(map[string]string, len(input))
-	for _, key := range keys {
-		output[key] = input[key]
-	}
 	return output
 }

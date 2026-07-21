@@ -98,18 +98,8 @@ func (r Record) Validate() error {
 			return err
 		}
 	}
-	switch r.State {
-	case StateAvailable, StateStale, StateIncompatible:
-		if r.ResolvedDefinition == nil {
-			return fmt.Errorf(
-				"%w: record state %q requires a resolved definition",
-				artifactstore.ErrInvalid,
-				r.State,
-			)
-		}
-	case StateMissing, StateInvalid:
-	default:
-		return fmt.Errorf("%w: invalid record state %q", artifactstore.ErrInvalid, r.State)
+	if err := validateState(r.State, r.ResolvedDefinition); err != nil {
+		return err
 	}
 	if _, err := jsoncanon.CanonicalizeObject(
 		r.Data,
@@ -131,6 +121,26 @@ func (r Record) Validate() error {
 			"%w: record modified time precedes creation",
 			artifactstore.ErrInvalid,
 		)
+	}
+	return nil
+}
+
+func validateState(
+	state State,
+	resolvedDefinition *artifactstore.Digest,
+) error {
+	switch state {
+	case StateAvailable, StateStale, StateIncompatible:
+		if resolvedDefinition == nil {
+			return fmt.Errorf(
+				"%w: record state %q requires a resolved definition",
+				artifactstore.ErrInvalid,
+				state,
+			)
+		}
+	case StateMissing, StateInvalid:
+	default:
+		return fmt.Errorf("%w: invalid record state %q", artifactstore.ErrInvalid, state)
 	}
 	return nil
 }

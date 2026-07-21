@@ -57,7 +57,15 @@ func (r *Registry) Open(
 			value.Kind,
 		)
 	}
-	return adapter.Open(ctx, value)
+	snapshot, err := adapter.Open(ctx, value.Clone())
+	if err != nil {
+		return nil, err
+	}
+	if err := validateSnapshot(snapshot); err != nil {
+		_ = snapshot.Close()
+		return nil, err
+	}
+	return snapshot, nil
 }
 
 func (r *Registry) Kinds() []artifactstore.SourceKind {

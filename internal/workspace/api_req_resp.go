@@ -114,7 +114,6 @@ type WorkspaceSkillSummary struct {
 	SchemaVersion string                   `json:"schemaVersion"`
 	ID            artifactstore.RecordID   `json:"id"`
 	Slug          string                   `json:"slug"`
-	Type          string                   `json:"type"`
 	Name          string                   `json:"name"`
 	DisplayName   string                   `json:"displayName"`
 	Description   string                   `json:"description"`

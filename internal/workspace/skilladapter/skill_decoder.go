@@ -125,6 +125,9 @@ func decodeSkillMarkdown(
 	if err := decodeRestrictedYAML(frontmatter, &rawProperties); err != nil {
 		return skillDefinition{}, err
 	}
+	if err := validateSkillFrontmatterKeys(rawProperties); err != nil {
+		return skillDefinition{}, err
+	}
 
 	name, ok := rawProperties[skillFrontmatterNameKey].(string)
 	if !ok {
@@ -201,14 +204,13 @@ func decodeSkillMarkdown(
 	}
 
 	return skillDefinition{
-		Name:           name,
-		DisplayName:    displayName,
-		Description:    description,
-		Insert:         insert,
-		Arguments:      arguments,
-		Tags:           tags,
-		MarkdownBody:   normalizedBody,
-		RawFrontmatter: rawProperties,
+		Name:         name,
+		DisplayName:  displayName,
+		Description:  description,
+		Insert:       insert,
+		Arguments:    arguments,
+		Tags:         tags,
+		MarkdownBody: normalizedBody,
 	}, nil
 }
 
@@ -245,6 +247,25 @@ func splitSkillFrontmatter(
 		return nil, "", err
 	}
 	return []byte(frontmatter.String()), string(body), nil
+}
+
+func validateSkillFrontmatterKeys(properties map[string]any) error {
+	for key := range properties {
+		switch key {
+		case skillFrontmatterNameKey,
+			skillFrontmatterDescriptionKey,
+			skillFrontmatterInsertKey,
+			skillFrontmatterArgumentsKey,
+			skillFrontmatterTagsKey:
+			continue
+		default:
+			return fmt.Errorf(
+				"unsupported SKILL.md frontmatter field %q",
+				key,
+			)
+		}
+	}
+	return nil
 }
 
 func decodeSkillArguments(

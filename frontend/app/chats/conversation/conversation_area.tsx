@@ -40,7 +40,7 @@ const EMPTY_DIFF_CANDIDATE_PATHS = new Map<string, string[]>();
 const MAX_DIFF_CANDIDATE_PATHS = 1024;
 const RICH_RENDER_DEFER_MESSAGE_COUNT = 4;
 const RICH_RENDER_DEFER_TEXT_LENGTH = 4_000;
-const RICH_RENDER_BATCH_SIZE = 1;
+const RICH_RENDER_BATCH_SIZE = 4;
 const RICH_RENDER_IDLE_TIMEOUT_MS = 250;
 
 const DIFF_MARKDOWN_SIGNAL_PATTERN =
@@ -115,6 +115,7 @@ function getMountedInputPaneSignature(
 				tab.tabId === selectedTabId ? '1' : '0',
 				tab.isBusy ? '1' : '0',
 				tab.isHydrating ? '1' : '0',
+				(tab.isLoaded ?? true) ? '1' : '0',
 				tab.editingMessageId ?? '',
 			].join('|')
 		);
@@ -1061,7 +1062,7 @@ function ConversationAreaInner(
 							tabId={tab.tabId}
 							active={tab.tabId === selectedTabId}
 							isBusy={tab.isBusy}
-							isHydrating={tab.isHydrating || !tab.isLoaded}
+							isHydrating={tab.isHydrating || !(tab.isLoaded ?? true)}
 							editingMessageId={tab.editingMessageId}
 							setInputRef={setInputRef}
 							getAbortRef={getAbortRef}

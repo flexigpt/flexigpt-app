@@ -54,6 +54,12 @@ func (r *Reconciler) Reconcile(
 			artifactstore.ErrInvalid,
 		)
 	}
+	if definitions == nil {
+		return Reconciliation{}, fmt.Errorf(
+			"%w: definition reader is nil",
+			artifactstore.ErrInvalid,
+		)
+	}
 	if err := rootValue.Validate(); err != nil {
 		return Reconciliation{}, err
 	}
@@ -62,6 +68,9 @@ func (r *Reconciler) Reconcile(
 		len(occurrences),
 	)
 	for _, occurrence := range occurrences {
+		if err := occurrence.Validate(); err != nil {
+			return Reconciliation{}, fmt.Errorf("validate occurrence: %w", err)
+		}
 		if occurrence.RootID != rootValue.ID {
 			return Reconciliation{}, fmt.Errorf(
 				"%w: occurrence belongs to another root",
@@ -83,6 +92,9 @@ func (r *Reconciler) Reconcile(
 
 	recordsByIdentity := make(map[recordIdentity]Record, len(existing))
 	for _, value := range existing {
+		if err := value.Validate(); err != nil {
+			return Reconciliation{}, fmt.Errorf("validate existing record: %w", err)
+		}
 		if value.RootID != rootValue.ID {
 			return Reconciliation{}, fmt.Errorf(
 				"%w: record belongs to another root",
@@ -95,6 +107,12 @@ func (r *Reconciler) Reconcile(
 				Occurrence: value.Occurrence,
 			},
 			Kind: value.Kind,
+		}
+		if _, duplicate := recordsByIdentity[key]; duplicate {
+			return Reconciliation{}, fmt.Errorf(
+				"%w: duplicate record for source occurrence",
+				artifactstore.ErrInvalid,
+			)
 		}
 		recordsByIdentity[key] = value
 	}
@@ -161,9 +179,15 @@ func (r *Reconciler) Reconcile(
 				err,
 			)
 		}
-		result.Updates = append(result.Updates, UpdatePublication{
-			Record:           next,
-			ExpectedRevision: current.Revision,
+		result.Updates = append(result.Updates, SourceStateUpdate{
+			RecordID:           next.ID,
+			RootID:             next.RootID,
+			ResolvedDefinition: cloneDigest(next.ResolvedDefinition),
+			State:              next.State,
+			Diagnostics:        artifactstore.CloneDiagnostics(next.Diagnostics),
+			Revision:           next.Revision,
+			ModifiedAt:         next.ModifiedAt,
+			ExpectedRevision:   current.Revision,
 		})
 	}
 
@@ -183,7 +207,11 @@ func (r *Reconciler) Reconcile(
 			continue
 		}
 
-		value, err := definitions.Get(ctx, *occurrence.DefinitionDigest)
+		value, err := definition.ReadCanonical(
+			ctx,
+			definitions,
+			*occurrence.DefinitionDigest,
+		)
 		if err != nil {
 			return Reconciliation{}, err
 		}

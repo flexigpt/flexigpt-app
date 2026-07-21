@@ -13,7 +13,7 @@ const placeholderDigest artifactstore.Digest = artifactstore.DigestSHA256Prefix 
 
 func Canonicalize(input Definition) (Definition, error) {
 	output := input
-	output.Labels = sortedLabels(cloneLabels(input.Labels))
+	output.Labels = cloneLabels(input.Labels)
 	output.Dependencies = cloneSelectors(input.Dependencies)
 	output.Body = append(json.RawMessage(nil), input.Body...)
 

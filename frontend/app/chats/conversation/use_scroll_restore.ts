@@ -29,89 +29,85 @@ function getMessageScrollTop(el: HTMLElement, message: HTMLElement): number {
 	return Math.max(0, messageTop);
 }
 
-function getCurrentMessageIndex(el: HTMLElement, messages: HTMLElement[]): number {
-	if (messages.length === 0) {
+function findFirstMessageIndexAfter(messageTops: number[], threshold: number): number {
+	let low = 0;
+	let high = messageTops.length;
+
+	while (low < high) {
+		const middle = low + Math.floor((high - low) / 2);
+		if (messageTops[middle] <= threshold) {
+			low = middle + 1;
+		} else {
+			high = middle;
+		}
+	}
+
+	return low < messageTops.length ? low : -1;
+}
+
+function getCurrentMessageIndex(el: HTMLElement, messageTops: number[]): number {
+	if (messageTops.length === 0) {
 		return -1;
 	}
 
 	const currentTop = el.scrollTop;
+	const nextIndex = findFirstMessageIndexAfter(messageTops, currentTop + MESSAGE_SCROLL_POSITION_TOLERANCE);
 
-	// The last message whose top is at or above the viewport is the current
-	// anchor, so the previous target is the item before it.
-	for (let index = messages.length - 1; index >= 0; index -= 1) {
-		const message = messages[index];
-		if (!message) {
-			continue;
-		}
-
-		if (getMessageScrollTop(el, message) <= currentTop + MESSAGE_SCROLL_POSITION_TOLERANCE) {
-			return index;
-		}
+	if (nextIndex < 0) {
+		return messageTops.length - 1;
 	}
 
-	return 0;
+	return Math.max(0, nextIndex - 1);
 }
 
-function getPreviousMessageIndex(el: HTMLElement, messages: HTMLElement[]): number {
-	if (messages.length === 0) {
+function getPreviousMessageIndex(el: HTMLElement, messageTops: number[]): number {
+	if (messageTops.length === 0) {
 		return -1;
 	}
 	if (isElementAtTop(el)) {
 		return -1;
 	}
 
-	const currentIndex = getCurrentMessageIndex(el, messages);
+	const currentIndex = getCurrentMessageIndex(el, messageTops);
 	return currentIndex > 0 ? currentIndex - 1 : -1;
 }
 
-function getNextMessageIndex(el: HTMLElement, messages: HTMLElement[]): number {
-	if (messages.length === 0 || isElementAtBottom(el)) {
+function getNextMessageIndex(el: HTMLElement, messageTops: number[]): number {
+	if (messageTops.length === 0 || isElementAtBottom(el)) {
 		return -1;
 	}
 
 	// At absolute scroll top, the first message can be offset by the
 	// scroller's padding. Treat that first message as the current anchor
 	// so Down moves to the second message rather than re-targeting the first.
-	const firstMessage = messages[0];
-	const currentTop = isElementAtTop(el) && firstMessage ? getMessageScrollTop(el, firstMessage) : el.scrollTop;
+	const currentTop = isElementAtTop(el) ? (messageTops[0] ?? el.scrollTop) : el.scrollTop;
 
-	for (let index = 0; index < messages.length; index += 1) {
-		const message = messages[index];
-		if (!message) {
-			continue;
-		}
-
-		if (getMessageScrollTop(el, message) > currentTop + MESSAGE_SCROLL_POSITION_TOLERANCE) {
-			return index;
-		}
-	}
-
-	return -1;
+	return findFirstMessageIndexAfter(messageTops, currentTop + MESSAGE_SCROLL_POSITION_TOLERANCE);
 }
 
-function scrollMessageAtIndex(el: HTMLElement, messages: HTMLElement[], index: number): boolean {
-	const target = messages[index];
-	if (!target) {
+function scrollMessageAtIndex(el: HTMLElement, messageTops: number[], index: number): boolean {
+	const targetTop = messageTops[index];
+	if (targetTop === undefined) {
 		return false;
 	}
 
 	const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
 
 	el.scrollTo({
-		top: Math.min(maxScrollTop, getMessageScrollTop(el, target)),
+		top: Math.min(maxScrollTop, targetTop),
 		behavior: 'auto',
 	});
 	return true;
 }
 
-function getMessageJumpAvailability(el: HTMLElement | null, messages: HTMLElement[]) {
-	if (!el || messages.length <= 1) {
+function getMessageJumpAvailability(el: HTMLElement | null, messageTops: number[]) {
+	if (!el || messageTops.length <= 1) {
 		return { canJumpToPreviousMessage: false, canJumpToNextMessage: false };
 	}
 
 	return {
-		canJumpToPreviousMessage: getPreviousMessageIndex(el, messages) >= 0,
-		canJumpToNextMessage: getNextMessageIndex(el, messages) >= 0,
+		canJumpToPreviousMessage: getPreviousMessageIndex(el, messageTops) >= 0,
+		canJumpToNextMessage: getNextMessageIndex(el, messageTops) >= 0,
 	};
 }
 
@@ -151,7 +147,8 @@ export function useScrollRestore({
 
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const scrollContentRef = useRef<HTMLDivElement | null>(null);
-	const messageElementsRef = useRef<HTMLElement[]>([]);
+	const messageScrollTopsRef = useRef<number[]>([]);
+	const messagePositionsDirtyRef = useRef(true);
 
 	const scrollTopByTabRef = useRef(new Map<string, number>());
 	const shouldAutoFollowRef = useRef(true);
@@ -161,20 +158,24 @@ export function useScrollRestore({
 
 	const refreshMessageElementCache = useCallback(() => {
 		const contentEl = scrollContentRef.current;
-		if (!contentEl) {
-			messageElementsRef.current = [];
+		const scrollerEl = scrollContainerRef.current;
+		if (!contentEl || !scrollerEl) {
+			messageScrollTopsRef.current = [];
+			messagePositionsDirtyRef.current = false;
 			return;
 		}
 
-		const next: HTMLElement[] = [];
+		const nextTops: number[] = [];
 		for (const child of contentEl.children) {
 			if (child instanceof HTMLElement && child.dataset.chatMessageIndex !== undefined) {
-				next.push(child);
+				nextTops.push(getMessageScrollTop(scrollerEl, child));
 			}
 		}
 
-		messageElementsRef.current = next;
+		messageScrollTopsRef.current = nextTops;
+		messagePositionsDirtyRef.current = false;
 	}, []);
+
 	useLayoutEffect(() => {
 		activeTabIsHydratingRef.current = activeTabIsHydrating;
 	}, [activeTabIsHydrating]);
@@ -229,8 +230,12 @@ export function useScrollRestore({
 			const nextAtBottom = isElementAtBottom(el);
 			shouldAutoFollowRef.current = shouldElementAutoFollow(el);
 
+			if (includeMessageJumps && messagePositionsDirtyRef.current) {
+				refreshMessageElementCache();
+			}
+
 			const jumpState = includeMessageJumps
-				? getMessageJumpAvailability(el, messageElementsRef.current)
+				? getMessageJumpAvailability(el, messageScrollTopsRef.current)
 				: {
 						canJumpToPreviousMessage: scrollIndicatorStateRef.current.canJumpToPreviousMessage,
 						canJumpToNextMessage: scrollIndicatorStateRef.current.canJumpToNextMessage,
@@ -244,7 +249,7 @@ export function useScrollRestore({
 			});
 		},
 
-		[setScrollIndicatorStateIfChanged]
+		[refreshMessageElementCache, setScrollIndicatorStateIfChanged]
 	);
 
 	const scheduleScrollStateUpdate = useCallback(
@@ -298,6 +303,7 @@ export function useScrollRestore({
 	const setScrollContainerRef = useCallback(
 		(el: HTMLDivElement | null) => {
 			scrollContainerRef.current = el;
+			messagePositionsDirtyRef.current = true;
 			scheduleScrollStateUpdate(true);
 		},
 		[scheduleScrollStateUpdate]
@@ -305,6 +311,7 @@ export function useScrollRestore({
 
 	const setScrollContentRef = useCallback((el: HTMLDivElement | null) => {
 		scrollContentRef.current = el;
+		messagePositionsDirtyRef.current = true;
 	}, []);
 
 	const handleScroll = useCallback(() => {
@@ -400,6 +407,7 @@ export function useScrollRestore({
 			}
 
 			observedContentSizeRef.current = { width, height };
+			messagePositionsDirtyRef.current = true;
 
 			if (resizeObserverRafRef.current !== null) {
 				return;
@@ -502,17 +510,21 @@ export function useScrollRestore({
 			return;
 		}
 
-		const messages = messageElementsRef.current;
-		const previousIndex = getPreviousMessageIndex(el, messages);
+		if (messagePositionsDirtyRef.current) {
+			refreshMessageElementCache();
+		}
+
+		const messageTops = messageScrollTopsRef.current;
+		const previousIndex = getPreviousMessageIndex(el, messageTops);
 		if (previousIndex < 0) {
 			return;
 		}
 
-		if (scrollMessageAtIndex(el, messages, previousIndex)) {
+		if (scrollMessageAtIndex(el, messageTops, previousIndex)) {
 			persistScrollPosition(tabId, el);
 			updateScrollStateNow(el);
 		}
-	}, [persistScrollPosition, selectedTabIdRef, updateScrollStateNow]);
+	}, [persistScrollPosition, refreshMessageElementCache, selectedTabIdRef, updateScrollStateNow]);
 
 	const scrollActiveToNextMessage = useCallback(() => {
 		const el = scrollContainerRef.current;
@@ -521,17 +533,21 @@ export function useScrollRestore({
 			return;
 		}
 
-		const messages = messageElementsRef.current;
-		const nextIndex = getNextMessageIndex(el, messages);
+		if (messagePositionsDirtyRef.current) {
+			refreshMessageElementCache();
+		}
+
+		const messageTops = messageScrollTopsRef.current;
+		const nextIndex = getNextMessageIndex(el, messageTops);
 		if (nextIndex < 0) {
 			return;
 		}
 
-		if (scrollMessageAtIndex(el, messages, nextIndex)) {
+		if (scrollMessageAtIndex(el, messageTops, nextIndex)) {
 			persistScrollPosition(tabId, el);
 			updateScrollStateNow(el);
 		}
-	}, [persistScrollPosition, selectedTabIdRef, updateScrollStateNow]);
+	}, [persistScrollPosition, refreshMessageElementCache, selectedTabIdRef, updateScrollStateNow]);
 
 	const scrollActivePageBy = useCallback(
 		(direction: 1 | -1) => {

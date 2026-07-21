@@ -29,21 +29,18 @@ func occurrenceKindIdentity(
 type QueryService struct {
 	workspaces  *Service
 	catalogs    catalogSnapshotReader
-	sources     sourceLookup
-	records     recordLookup
+	records     recordLister
 	definitions definitionLookup
 }
 
 func NewQueryService(
 	workspaces *Service,
 	catalogs catalogSnapshotReader,
-	sources sourceLookup,
-	records recordLookup,
+	records recordLister,
 	definitions definitionLookup,
 ) (*QueryService, error) {
 	if workspaces == nil ||
 		catalogs == nil ||
-		sources == nil ||
 		records == nil ||
 		definitions == nil {
 		return nil, fmt.Errorf(
@@ -54,7 +51,6 @@ func NewQueryService(
 	return &QueryService{
 		workspaces:  workspaces,
 		catalogs:    catalogs,
-		sources:     sources,
 		records:     records,
 		definitions: definitions,
 	}, nil
@@ -242,7 +238,7 @@ func (q *QueryService) Catalog(
 		occurrencesByKey[key] = occurrence
 	}
 
-	sourcesByID := make(map[artifactstore.SourceID]source.Source)
+	sourcesByID := make(map[artifactstore.SourceID]source.Summary)
 	for _, value := range workspaceValue.Sources {
 		sourcesByID[value.ID] = value
 	}
@@ -266,8 +262,9 @@ func (q *QueryService) Catalog(
 			)
 			continue
 		}
-		definitionValue, err := q.definitions.Get(
+		definitionValue, err := definition.ReadCanonical(
 			ctx,
+			q.definitions,
 			*localRecord.ResolvedDefinition,
 		)
 		if err != nil {

@@ -30,6 +30,12 @@ type Summary struct {
 	ModifiedAt  time.Time                `json:"modifiedAt"`
 }
 
+func (s Source) Clone() Source {
+	output := s
+	output.Config = append(json.RawMessage(nil), s.Config...)
+	return output
+}
+
 func (s Source) Validate() error {
 	if err := artifactstore.ValidateSourceID(s.ID); err != nil {
 		return err

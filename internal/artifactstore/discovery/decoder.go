@@ -28,11 +28,16 @@ type Candidate struct {
 type Decoded struct {
 	SubresourceLocator artifactstore.SubresourceLocator
 	Definition         definition.Definition
+	Diagnostics        []artifactstore.Diagnostic
 }
 
 type Decoder interface {
 	ID() artifactstore.DecoderID
 	Recognize(ctx context.Context, candidate Candidate) Recognition
+
+	// Decode returns candidate-level diagnostics as its second result.
+	//
+	// Diagnostics attached to Decoded apply only to that emitted subresource.
 	Decode(
 		ctx context.Context,
 		candidate Candidate,

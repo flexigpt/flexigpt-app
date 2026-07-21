@@ -75,14 +75,14 @@ type Workspace struct {
 	Root        root.Root         `json:"-"`
 	Data        RootData          `json:"-"`
 	Attachments []root.Attachment `json:"-"`
-	Sources     []source.Source   `json:"-"`
+	Sources     []source.Summary  `json:"-"`
 }
 
 type Resource struct {
 	Record         record.Record         `json:"-"`
 	Definition     definition.Definition `json:"-"`
 	Occurrence     *catalog.Occurrence   `json:"-"`
-	Source         source.Source         `json:"-"`
+	Source         source.Summary        `json:"-"`
 	CatalogCurrent bool                  `json:"-"`
 }
 
@@ -157,7 +157,7 @@ type Reference struct {
 type LoadPlanItem struct {
 	Record     record.Record         `json:"-"`
 	Definition definition.Definition `json:"-"`
-	Source     source.Source         `json:"-"`
+	Source     source.Summary        `json:"-"`
 }
 
 type LoadPlan struct {

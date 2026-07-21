@@ -779,6 +779,11 @@ export function DiffApplyControl({
 				return sourceDiffText;
 			}
 
+			const sourceParsed =
+				sourceDiffText === diffText && sourceLanguage === language
+					? fallbackParsed
+					: parseUnifiedDiffForUI(sourceDiffText, sourceLanguage);
+
 			// Unsupported OpenAI Update/Delete sections still need their original
 			// wrapper. Never turn a per-file action into an unrequested full-patch action.
 			if (fallbackParsed.isOpenAIPatch && !canScopeOpenAIAddPatch) {
@@ -789,7 +794,7 @@ export function DiffApplyControl({
 			const seen = new Set<string>();
 
 			for (const target of targets) {
-				const split = buildUnifiedDiffTextForTarget(sourceDiffText, sourceLanguage, target);
+				const split = buildUnifiedDiffTextForTarget(sourceDiffText, sourceLanguage, target, sourceParsed);
 				const part = split?.diffText ?? (canScopeOpenAIAddPatch ? undefined : target.diffText);
 
 				if (!part?.trim()) {
@@ -821,7 +826,7 @@ export function DiffApplyControl({
 			}
 			return joinDiffTextParts(parts);
 		},
-		[diffText, fallbackParsed.files.length, fallbackParsed.isOpenAIPatch, language]
+		[diffText, fallbackParsed, language]
 	);
 
 	const runDryRun = useCallback(

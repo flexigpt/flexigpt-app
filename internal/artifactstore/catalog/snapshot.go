@@ -43,8 +43,8 @@ func (s Snapshot) Validate() error {
 				artifactstore.ErrInvalid,
 			)
 		}
-		if generation == "" {
-			return fmt.Errorf("%w: source generation is empty", artifactstore.ErrInvalid)
+		if err := artifactstore.ValidateSourceGeneration(generation); err != nil {
+			return err
 		}
 	}
 	if s.PublishedAt.IsZero() {

@@ -33,6 +33,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const pendingAssistantTurnsRef = useRef(new Map<string, PendingAssistantTurn>());
 	const pendingConversationContextsRef = useRef(new Map<string, Conversation>());
 	const pendingWorkflowStartersRef = useRef(new Map<string, ChatWorkflowStarter>());
+	const workflowStarterLoadsRef = useRef(new Map<string, ChatWorkflowStarter>());
 	const inputRefCallbacksRef = useRef(new Map<string, (inst: ComposerBoxHandle | null) => void>());
 	const pendingInputFlushTimerRef = useRef<number | null>(null);
 	const flushPendingDropsRef = useRef<() => void>(() => {});
@@ -167,6 +168,13 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 				continue;
 			}
 
+			// Loading a workflow starter is asynchronous. A composer mount or
+			// another pending-input flush must not start the same load again.
+			if (workflowStarterLoadsRef.current.has(tabId)) {
+				continue;
+			}
+
+			workflowStarterLoadsRef.current.set(tabId, starter);
 			void tryApplyWorkflowStarterToTab(tabId, starter)
 				.then(applied => {
 					if (applied && pendingWorkflowStartersRef.current.get(tabId) === starter) {
@@ -175,6 +183,18 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 				})
 				.catch((error: unknown) => {
 					console.error('Failed to apply pending workflow starter:', error);
+				})
+				.finally(() => {
+					if (workflowStarterLoadsRef.current.get(tabId) === starter) {
+						workflowStarterLoadsRef.current.delete(tabId);
+					}
+
+					// A newer starter may have replaced this one while the
+					// asynchronous load was running.
+					const queuedStarter = pendingWorkflowStartersRef.current.get(tabId);
+					if (queuedStarter && queuedStarter !== starter) {
+						flushPendingWorkflowStartersRef.current();
+					}
 				});
 		}
 	}, [tabExists, tryApplyWorkflowStarterToTab]);
@@ -251,9 +271,12 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 			}
 
 			pendingWorkflowStartersRef.current.set(tabId, starter);
+			// The composer may have mounted after the failed direct attempt but
+			// before the starter was inserted into the pending map.
+			schedulePendingInputFlush();
 			return true;
 		},
-		[tabExists, tryApplyWorkflowStarterToTab]
+		[schedulePendingInputFlush, tabExists, tryApplyWorkflowStarterToTab]
 	);
 
 	const setInputRef = useCallback(
@@ -316,6 +339,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const disposeInputRuntime = useCallback((tabId: string) => {
 		inputRefs.current.delete(tabId);
 		pendingWorkflowStartersRef.current.delete(tabId);
+		workflowStarterLoadsRef.current.delete(tabId);
 		pendingConversationContextsRef.current.delete(tabId);
 		pendingAssistantTurnsRef.current.delete(tabId);
 		inputRefCallbacksRef.current.delete(tabId);

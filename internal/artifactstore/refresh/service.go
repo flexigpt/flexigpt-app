@@ -18,9 +18,8 @@ import (
 type Service struct {
 	roots       RootReader
 	catalogs    catalog.Reader
-	sources     SourceReader
+	sources     source.Runtime
 	records     RecordReader
-	opener      source.Opener
 	discovery   *discovery.Engine
 	definitions definition.Repository
 	reconciler  *record.Reconciler
@@ -31,9 +30,8 @@ type Service struct {
 func NewService(
 	roots RootReader,
 	catalogs catalog.Reader,
-	sources SourceReader,
+	sources source.Runtime,
 	records RecordReader,
-	opener source.Opener,
 	discoveryEngine *discovery.Engine,
 	definitions definition.Repository,
 	reconciler *record.Reconciler,
@@ -44,7 +42,6 @@ func NewService(
 		catalogs == nil ||
 		sources == nil ||
 		records == nil ||
-		opener == nil ||
 		discoveryEngine == nil ||
 		definitions == nil ||
 		reconciler == nil ||
@@ -60,7 +57,6 @@ func NewService(
 		catalogs:    catalogs,
 		sources:     sources,
 		records:     records,
-		opener:      opener,
 		discovery:   discoveryEngine,
 		definitions: definitions,
 		reconciler:  reconciler,
@@ -164,7 +160,7 @@ func (s *Service) Refresh(
 			)
 		}
 
-		snapshot, err := s.opener.Open(ctx, sourceValue)
+		snapshot, err := s.sources.Open(ctx, sourceValue)
 		if err != nil {
 			return Result{}, err
 		}
@@ -261,7 +257,7 @@ func (s *Service) Refresh(
 		result.CreatedRecords = append(result.CreatedRecords, value.ID)
 	}
 	for _, value := range reconciliation.Updates {
-		result.UpdatedRecords = append(result.UpdatedRecords, value.Record.ID)
+		result.UpdatedRecords = append(result.UpdatedRecords, value.RecordID)
 	}
 	return result, nil
 }

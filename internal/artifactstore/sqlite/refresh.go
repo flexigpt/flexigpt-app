@@ -177,12 +177,7 @@ func (p *Publisher) Publish(
 		}
 	}
 	for _, update := range publication.RecordUpdates {
-		if err := updateRecordTx(
-			ctx,
-			tx,
-			update.Record,
-			update.ExpectedRevision,
-		); err != nil {
+		if err := updateRecordTx(ctx, tx, update); err != nil {
 			return catalog.Snapshot{}, err
 		}
 	}
@@ -279,8 +274,7 @@ func insertRecordTx(
 func updateRecordTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	value record.Record,
-	expectedRevision uint64,
+	value record.SourceStateUpdate,
 ) error {
 	diagnostics, err := encodeJSON(value.Diagnostics)
 	if err != nil {
@@ -300,9 +294,9 @@ func updateRecordTx(
 		diagnostics,
 		value.Revision,
 		timeValue(value.ModifiedAt),
-		string(value.ID),
+		string(value.RecordID),
 		string(value.RootID),
-		expectedRevision,
+		value.ExpectedRevision,
 	)
 	if err != nil {
 		return sqliteError(err)
@@ -315,7 +309,7 @@ func updateRecordTx(
 		return fmt.Errorf(
 			"%w: record %q changed during refresh",
 			artifactstore.ErrConflict,
-			value.ID,
+			value.RecordID,
 		)
 	}
 	return nil

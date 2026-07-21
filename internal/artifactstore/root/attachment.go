@@ -43,5 +43,11 @@ func (a Attachment) Validate() error {
 	if a.CreatedAt.IsZero() || a.ModifiedAt.IsZero() {
 		return fmt.Errorf("%w: attachment timestamps are required", artifactstore.ErrInvalid)
 	}
+	if a.ModifiedAt.Before(a.CreatedAt) {
+		return fmt.Errorf(
+			"%w: attachment modified time precedes creation",
+			artifactstore.ErrInvalid,
+		)
+	}
 	return nil
 }

@@ -2,19 +2,12 @@ package skilladapter
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"path"
-	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
-	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
@@ -28,7 +21,6 @@ type SkillSummary struct {
 	SchemaVersion string                 `json:"schemaVersion"`
 	ID            artifactstore.RecordID `json:"id"`
 	Slug          string                 `json:"slug"`
-	Type          string                 `json:"type"`
 	Name          string                 `json:"name"`
 	DisplayName   string                 `json:"displayName"`
 	Description   string                 `json:"description"`
@@ -148,52 +140,6 @@ func projectWorkspaceSkill(
 	if err != nil {
 		return WorkspaceSkill{}, err
 	}
-	location, err := workspaceSkillLocation(
-		resourceValue.Source.Kind,
-		resourceValue.Source.Config,
-		resourceValue.Record.Occurrence.Locator,
-	)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-
-	arguments := make([]spec.SkillArgument, 0, len(body.Arguments))
-	for _, value := range body.Arguments {
-		arguments = append(arguments, spec.SkillArgument{
-			Name:        value.Name,
-			Description: value.Description,
-			Default:     value.Default,
-		})
-	}
-	insert := spec.SkillInsert(body.Insert)
-	runtimeSkill := spec.Skill{
-		SchemaVersion:  spec.SkillSchemaVersion,
-		ID:             spec.SkillID(resourceValue.Record.ID),
-		Slug:           spec.SkillSlug(body.Name),
-		Type:           spec.SkillTypeFS,
-		Location:       location,
-		Name:           body.Name,
-		DisplayName:    body.DisplayName,
-		Description:    body.Description,
-		Tags:           append([]string(nil), body.Tags...),
-		Insert:         insert,
-		Arguments:      arguments,
-		RawFrontmatter: cloneMap(body.RawFrontmatter),
-		Presence: &spec.SkillPresence{
-			Status: spec.SkillPresencePresent,
-		},
-		IsEnabled:  resourceValue.Record.Enabled,
-		IsBuiltIn:  false,
-		CreatedAt:  resourceValue.Record.CreatedAt,
-		ModifiedAt: resourceValue.Record.ModifiedAt,
-	}
-	if err := skillStore.ValidateSkill(&runtimeSkill); err != nil {
-		return WorkspaceSkill{}, fmt.Errorf(
-			"%w: project Workspace Skill: %w",
-			engine.ErrInvalidWorkspace,
-			err,
-		)
-	}
 	markdownBody := ""
 	if includeMarkdown {
 		markdownBody = body.MarkdownBody
@@ -205,81 +151,38 @@ func projectWorkspaceSkill(
 		DefinitionDigest: resourceValue.Definition.Digest,
 		SourceID:         resourceValue.Source.ID,
 		Locator:          resourceValue.Record.Occurrence.Locator,
-		Skill:            skillSummary(resourceValue.Record.ID, runtimeSkill),
-		MarkdownBody:     markdownBody,
+		Skill: skillSummary(
+			resourceValue.Record,
+			body,
+		),
+		MarkdownBody: markdownBody,
 	}, nil
 }
 
 func skillSummary(
-	id artifactstore.RecordID,
-	value spec.Skill,
+	recordValue record.Record,
+	value skillDefinition,
 ) SkillSummary {
 	arguments := make([]SkillArgument, 0, len(value.Arguments))
 	for _, argument := range value.Arguments {
-		arguments = append(arguments, SkillArgument{
-			Name:        argument.Name,
-			Description: argument.Description,
-			Default:     argument.Default,
-		})
+		arguments = append(arguments, SkillArgument(argument))
 	}
 	return SkillSummary{
-		SchemaVersion: value.SchemaVersion,
-		ID:            id,
-		Slug:          string(value.Slug),
-		Type:          string(value.Type),
-		Name:          value.Name,
-		DisplayName:   value.DisplayName,
-		Description:   value.Description,
-		Tags:          append([]string(nil), value.Tags...),
-		Insert:        string(value.Insert),
-		Arguments:     arguments,
-		IsEnabled:     value.IsEnabled,
-		CreatedAt:     value.CreatedAt,
-		ModifiedAt:    value.ModifiedAt,
-	}
-}
+		SchemaVersion: workspaceSkillsSchemaVersionV1,
 
-func workspaceSkillLocation(
-	kind artifactstore.SourceKind,
-	config json.RawMessage,
-	locator artifactstore.Locator,
-) (string, error) {
-	if kind != fsdir.Kind {
-		return "", fmt.Errorf(
-			"%w: Workspace Skill source kind %q cannot provide a filesystem runtime location",
-			artifactstore.ErrUnsupported,
-			kind,
-		)
-	}
-	var value fsdir.Config
-	if err := json.Unmarshal(config, &value); err != nil {
-		return "", err
-	}
-	if !filepath.IsAbs(value.RootPath) {
-		return "", fmt.Errorf(
-			"%w: Workspace Skill source root is not absolute",
-			engine.ErrInvalidWorkspace,
-		)
-	}
+		ID:   recordValue.ID,
+		Slug: value.Name,
 
-	relativeDirectory := path.Dir(string(locator))
-	location := filepath.Clean(filepath.Join(
-		value.RootPath,
-		filepath.FromSlash(relativeDirectory),
-	))
-	relative, err := filepath.Rel(value.RootPath, location)
-	if err != nil {
-		return "", err
+		Name:        value.Name,
+		DisplayName: value.DisplayName,
+		Description: value.Description,
+		Tags:        append([]string(nil), value.Tags...),
+		Insert:      value.Insert,
+		Arguments:   arguments,
+		IsEnabled:   recordValue.Enabled,
+		CreatedAt:   recordValue.CreatedAt,
+		ModifiedAt:  recordValue.ModifiedAt,
 	}
-	if relative == parentDirectoryPath ||
-		strings.HasPrefix(relative, parentDirectoryPath+string(filepath.Separator)) ||
-		filepath.IsAbs(relative) {
-		return "", fmt.Errorf(
-			"%w: Workspace Skill location escapes source root",
-			engine.ErrInvalidWorkspace,
-		)
-	}
-	return location, nil
 }
 
 func sortWorkspaceSkills(values []WorkspaceSkill) {
@@ -289,19 +192,4 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 		}
 		return values[left].RecordID < values[right].RecordID
 	})
-}
-
-func cloneMap(input map[string]any) map[string]any {
-	if input == nil {
-		return nil
-	}
-	raw, err := json.Marshal(input)
-	if err != nil {
-		return nil
-	}
-	var output map[string]any
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return nil
-	}
-	return output
 }

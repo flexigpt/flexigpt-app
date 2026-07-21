@@ -55,7 +55,7 @@ func newComponents(
 
 	service, err := engine.NewService(
 		artifacts.Roots,
-		artifacts.SourceRuntime,
+		artifacts.Sources,
 	)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,6 @@ func newComponents(
 	query, err := engine.NewQueryService(
 		service,
 		artifacts.Catalogs,
-		artifacts.SourceRuntime,
 		artifacts.Records,
 		artifacts.Definitions,
 	)

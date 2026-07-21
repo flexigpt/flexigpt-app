@@ -2,7 +2,7 @@ package source
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 )
@@ -34,8 +34,9 @@ func NewRuntime(
 	opener Opener,
 ) (Runtime, error) {
 	if reader == nil || opener == nil {
-		return nil, errors.New(
-			"source runtime dependencies are incomplete",
+		return nil, fmt.Errorf(
+			"%w: source runtime dependencies are incomplete",
+			artifactstore.ErrInvalid,
 		)
 	}
 	return &runtime{
@@ -48,7 +49,25 @@ func (r *runtime) Get(
 	ctx context.Context,
 	id artifactstore.SourceID,
 ) (Source, error) {
-	return r.reader.Get(ctx, id)
+	if err := artifactstore.ValidateSourceID(id); err != nil {
+		return Source{}, err
+	}
+	value, err := r.reader.Get(ctx, id)
+	if err != nil {
+		return Source{}, err
+	}
+	if value.ID != id {
+		return Source{}, fmt.Errorf(
+			"%w: source reader returned %q for requested source %q",
+			artifactstore.ErrInvalid,
+			value.ID,
+			id,
+		)
+	}
+	if err := value.Validate(); err != nil {
+		return Source{}, fmt.Errorf("invalid source returned by runtime reader: %w", err)
+	}
+	return value.Clone(), nil
 }
 
 func (r *runtime) Open(
@@ -58,7 +77,29 @@ func (r *runtime) Open(
 	if err := value.Validate(); err != nil {
 		return nil, err
 	}
-	return r.opener.Open(ctx, value)
+	snapshot, err := r.opener.Open(ctx, value.Clone())
+	if err != nil {
+		return nil, err
+	}
+	if err := validateSnapshot(snapshot); err != nil {
+		_ = snapshot.Close()
+		return nil, err
+	}
+	return snapshot, nil
+}
+
+func validateSnapshot(snapshot Snapshot) error {
+	if snapshot == nil {
+		return fmt.Errorf("%w: source opener returned a nil snapshot", artifactstore.ErrInvalid)
+	}
+	if err := artifactstore.ValidateSourceGeneration(snapshot.Generation()); err != nil {
+		return fmt.Errorf(
+			"%w: source snapshot returned an invalid generation: %w",
+			artifactstore.ErrInvalid,
+			err,
+		)
+	}
+	return nil
 }
 
 var _ Runtime = (*runtime)(nil)

@@ -112,7 +112,7 @@ func (s *Service) Pin(
 			id,
 		)
 	}
-	definitionValue, err := s.definitions.Get(ctx, digest)
+	definitionValue, err := definition.ReadCanonical(ctx, s.definitions, digest)
 	if err != nil {
 		return Record{}, err
 	}

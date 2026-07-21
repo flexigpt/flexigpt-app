@@ -12,12 +12,12 @@ import (
 
 type Service struct {
 	roots   workspaceRootStore
-	sources sourceLookup
+	sources sourceSummaryLookup
 }
 
 func NewService(
 	roots workspaceRootStore,
-	sources sourceLookup,
+	sources sourceSummaryLookup,
 ) (*Service, error) {
 	if roots == nil || sources == nil {
 		return nil, fmt.Errorf(
@@ -344,7 +344,7 @@ func (s *Service) Get(
 	if err != nil {
 		return Workspace{}, err
 	}
-	sources := make([]source.Source, 0, len(attachments))
+	sources := make([]source.Summary, 0, len(attachments))
 	for _, attachment := range attachments {
 		value, err := s.sources.Get(ctx, attachment.SourceID)
 		if err != nil {

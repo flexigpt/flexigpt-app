@@ -21,6 +21,7 @@ const (
 	MaxDescriptionBytes       = 16 * 1024
 	MaxLogicalNameBytes       = 256
 	MaxVersionBytes           = 256
+	MaxSourceGenerationBytes  = 1024
 	MaxLocatorBytes           = 4096
 	MaxDiagnosticCodeBytes    = 128
 	MaxDiagnosticMessageBytes = 4096
@@ -132,6 +133,14 @@ func ValidateAttachmentRole(value AttachmentRole) error {
 
 func ValidateDecoderID(value DecoderID) error {
 	return ValidateIdentifier("decoder ID", string(value), MaxKindBytes)
+}
+
+func ValidateSourceGeneration(value string) error {
+	return ValidateRequiredText(
+		"source generation",
+		value,
+		MaxSourceGenerationBytes,
+	)
 }
 
 func ValidateDigest(value Digest) error {

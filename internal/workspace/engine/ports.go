@@ -11,19 +11,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-type sourceLookup interface {
+type sourceSummaryLookup interface {
 	Get(
 		ctx context.Context,
 		id artifactstore.SourceID,
-	) (source.Source, error)
+	) (source.Summary, error)
 }
 
-type recordLookup interface {
-	Get(
-		ctx context.Context,
-		id artifactstore.RecordID,
-	) (record.Record, error)
-
+type recordLister interface {
 	ListByRoot(
 		ctx context.Context,
 		rootID artifactstore.RootID,

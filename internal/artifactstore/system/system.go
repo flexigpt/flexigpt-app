@@ -177,9 +177,8 @@ func Open(
 	refreshService, err := refresh.NewService(
 		rootRepository,
 		catalogRepository,
-		sourceRepository,
+		sourceRuntime,
 		recordRepository,
-		sourceRegistry,
 		discoveryEngine,
 		content,
 		reconciler,

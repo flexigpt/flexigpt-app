@@ -10,7 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 type RootReader interface {
@@ -24,13 +23,6 @@ type RootReader interface {
 		ctx context.Context,
 		rootID artifactstore.RootID,
 	) ([]root.Attachment, error)
-}
-
-type SourceReader interface {
-	Get(
-		ctx context.Context,
-		id artifactstore.SourceID,
-	) (source.Source, error)
 }
 
 type RecordReader interface {
@@ -47,7 +39,7 @@ type Publication struct {
 	SourceGenerations       map[artifactstore.SourceID]string
 	Occurrences             []catalog.Occurrence
 	RecordCreates           []record.Record
-	RecordUpdates           []record.UpdatePublication
+	RecordUpdates           []record.SourceStateUpdate
 	Diagnostics             []artifactstore.Diagnostic
 	PublishedAt             time.Time
 }
@@ -86,11 +78,8 @@ func (p Publication) Validate() error {
 				sourceID,
 			)
 		}
-		if generation == "" {
-			return fmt.Errorf(
-				"%w: source generation is required",
-				artifactstore.ErrInvalid,
-			)
+		if err := artifactstore.ValidateSourceGeneration(generation); err != nil {
+			return err
 		}
 	}
 	seenOccurrences := make(map[catalog.OccurrenceKey]struct{}, len(p.Occurrences))
@@ -161,15 +150,23 @@ func (p Publication) Validate() error {
 		}
 	}
 	for index, update := range p.RecordUpdates {
-		if update.ExpectedRevision == 0 {
+		if err := update.Validate(); err != nil {
+			return fmt.Errorf("record update %d: %w", index, err)
+		}
+		if update.RootID != p.RootID {
 			return fmt.Errorf(
-				"%w: expected record revision is required",
+				"%w: record update belongs to another root",
 				artifactstore.ErrInvalid,
 			)
 		}
-		if err := validateRecord(update.Record); err != nil {
-			return fmt.Errorf("record update %d: %w", index, err)
+		if _, duplicate := seenRecords[update.RecordID]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate record publication %q",
+				artifactstore.ErrInvalid,
+				update.RecordID,
+			)
 		}
+		seenRecords[update.RecordID] = struct{}{}
 	}
 	if err := artifactstore.ValidateDiagnostics(p.Diagnostics); err != nil {
 		return err
