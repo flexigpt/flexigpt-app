@@ -92,18 +92,11 @@ func definitionDiagnostics(
 	locator artifactstore.Locator,
 	err error,
 ) []artifactstore.Diagnostic {
-	message := err.Error()
-	if len(message) > artifactstore.MaxDiagnosticMessageBytes {
-		message = message[:artifactstore.MaxDiagnosticMessageBytes]
-	}
-	return []artifactstore.Diagnostic{{
-		Severity: artifactstore.DiagnosticError,
-		Code:     DiagnosticCodeDefinitionInvalid,
-		Message:  message,
-		Location: &artifactstore.DiagnosticLocation{
-			Locator: locator,
-		},
-	}}
+	return WorkspaceArtifactDiagnostics(
+		locator,
+		DiagnosticCodeDefinitionInvalid,
+		err.Error(),
+	)
 }
 
 var _ discovery.Decoder = (*DefinitionDecoder)(nil)

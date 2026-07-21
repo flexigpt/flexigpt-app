@@ -2,6 +2,8 @@ package skilladapter
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 const (
@@ -53,4 +55,20 @@ type skillDefinition struct {
 	Tags           []string                  `json:"tags,omitempty"`
 	MarkdownBody   string                    `json:"markdownBody"`
 	RawFrontmatter map[string]any            `json:"rawFrontmatter,omitempty"`
+}
+
+var artifactSupport = engine.ArtifactSupport{
+	Kind:      skillKind,
+	SchemaID:  skillSchemaID,
+	DecoderID: skillDecoderID,
+}
+
+var discoveryProfile = engine.DiscoveryProfile{
+	DirectoryRoots: []discovery.DirectoryRoot{{
+		Root:      artifactstore.Locator(workspaceSkillsDirectory),
+		Recursive: true,
+		IncludePatterns: []string{
+			skillDefinitionFileName,
+		},
+	}},
 }

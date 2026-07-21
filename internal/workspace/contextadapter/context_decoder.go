@@ -26,22 +26,12 @@ func (*ContextDecoder) ID() artifactstore.DecoderID {
 	return contextDecoderID
 }
 
-func PrimaryDiscoveryProfile() engine.DiscoveryProfile {
-	return engine.DiscoveryProfile{
-		ExplicitLocators: []artifactstore.Locator{
-			agentsLocator,
-			claudeLocator,
-		},
-		ReadmeLocator: readmeLocator,
-	}
+func DiscoveryProfile() engine.DiscoveryProfile {
+	return discoveryProfile
 }
 
-func GetContextArtifactSupport() engine.ArtifactSupport {
-	return engine.ArtifactSupport{
-		Kind:      contextKind,
-		SchemaID:  contextSchemaID,
-		DecoderID: contextDecoderID,
-	}
+func ArtifactSupport() engine.ArtifactSupport {
+	return artifactSupport
 }
 
 func (*ContextDecoder) Recognize(

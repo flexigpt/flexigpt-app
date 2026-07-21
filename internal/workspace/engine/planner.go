@@ -129,6 +129,13 @@ func (p *Planner) Build(
 		}
 		if operation.allowsAttachmentDiscoveryOverrides {
 			if attachmentData.Recursive != nil {
+				if len(sourcePlan.DirectoryRoots) == 0 {
+					return discovery.Plan{}, fmt.Errorf(
+						"%w: attachment role %q has no directory root to override",
+						ErrInvalidWorkspace,
+						attachment.Role,
+					)
+				}
 				sourcePlan.DirectoryRoots[0].Recursive = *attachmentData.Recursive
 			}
 			if attachmentData.Authoritative != nil {

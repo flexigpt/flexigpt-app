@@ -32,24 +32,12 @@ func NewSkillDecoder() *SkillDecoder {
 	return &SkillDecoder{}
 }
 
-func GetSkillArtifactSupport() engine.ArtifactSupport {
-	return engine.ArtifactSupport{
-		Kind:      skillKind,
-		SchemaID:  skillSchemaID,
-		DecoderID: skillDecoderID,
-	}
+func DiscoveryProfile() engine.DiscoveryProfile {
+	return discoveryProfile
 }
 
-func PrimaryDiscoveryProfile() engine.DiscoveryProfile {
-	return engine.DiscoveryProfile{
-		DirectoryRoots: []discovery.DirectoryRoot{{
-			Root:      artifactstore.Locator(workspaceSkillsDirectory),
-			Recursive: true,
-			IncludePatterns: []string{
-				skillDefinitionFileName,
-			},
-		}},
-	}
+func ArtifactSupport() engine.ArtifactSupport {
+	return artifactSupport
 }
 
 func (*SkillDecoder) ID() artifactstore.DecoderID {

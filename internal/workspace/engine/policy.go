@@ -53,6 +53,21 @@ func (p *RecordPolicy) Derive(
 	if !supported {
 		return record.Draft{}, false, nil
 	}
+	if value.Kind != occurrence.Kind {
+		return record.Draft{}, false, []artifactstore.Diagnostic{{
+			Severity: artifactstore.DiagnosticError,
+			Code:     DiagnosticCodeRecordKindMismatch,
+			Message: fmt.Sprintf(
+				"definition kind %q does not match occurrence kind %q",
+				value.Kind,
+				occurrence.Kind,
+			),
+			Location: &artifactstore.DiagnosticLocation{
+				Locator:            occurrence.Key.Locator,
+				SubresourceLocator: occurrence.Key.SubresourceLocator,
+			},
+		}}
+	}
 	if value.SchemaID != schemaID {
 		return record.Draft{}, false, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,

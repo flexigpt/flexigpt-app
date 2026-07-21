@@ -68,7 +68,7 @@ func (p *ContextProvider) Compose(
 		return ContextLoadPlan{}, err
 	}
 
-	workspaceValue, err := p.query.Workspaces.Get(ctx, rootID)
+	workspaceValue, err := p.query.GetWorkspace(ctx, rootID)
 	if err != nil {
 		return ContextLoadPlan{}, err
 	}

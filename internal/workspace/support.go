@@ -35,13 +35,13 @@ var builtinArtifactSupportMatrix = []builtinArtifactSupport{
 		},
 	},
 	{
-		support: contextadapter.GetContextArtifactSupport(),
+		support: contextadapter.ArtifactSupport(),
 		newDecoder: func() discovery.Decoder {
 			return contextadapter.NewContextDecoder()
 		},
 	},
 	{
-		support: skilladapter.GetSkillArtifactSupport(),
+		support: skilladapter.ArtifactSupport(),
 		newDecoder: func() discovery.Decoder {
 			return skilladapter.NewSkillDecoder()
 		},
@@ -139,14 +139,14 @@ func BuiltinDecoders() []discovery.Decoder {
 func BuiltinDiscoveryProfiles() engine.DiscoveryProfiles {
 	profiles := engine.DefaultDiscoveryProfiles()
 
-	contextProfile := contextadapter.PrimaryDiscoveryProfile()
+	contextProfile := contextadapter.DiscoveryProfile()
 	profiles.Primary.ExplicitLocators = append(
 		profiles.Primary.ExplicitLocators,
 		contextProfile.ExplicitLocators...,
 	)
 	profiles.Primary.ReadmeLocator = contextProfile.ReadmeLocator
 
-	skillProfile := skilladapter.PrimaryDiscoveryProfile()
+	skillProfile := skilladapter.DiscoveryProfile()
 	profiles.Primary.DirectoryRoots = append(
 		profiles.Primary.DirectoryRoots,
 		skillProfile.DirectoryRoots...,

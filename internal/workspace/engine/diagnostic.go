@@ -12,6 +12,7 @@ const (
 	DiagnosticCodeContextInvalidUTF8      = "workspace.context.invalid-utf8"
 	DiagnosticCodeDefinitionInvalid       = "workspace.definition.invalid"
 	DiagnosticCodeRecordSchemaUnsupported = "workspace.record.schema-unsupported"
+	DiagnosticCodeRecordKindMismatch      = "workspace.record.kind-mismatch"
 	DiagnosticCodeSkillInvalid            = "workspace.skill.invalid"
 )
 

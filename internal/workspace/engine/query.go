@@ -15,7 +15,7 @@ import (
 )
 
 type QueryService struct {
-	Workspaces  *Service
+	workspaces  *Service
 	roots       rootManager
 	sources     sourceReader
 	records     recordReader
@@ -40,12 +40,19 @@ func NewQueryService(
 		)
 	}
 	return &QueryService{
-		Workspaces:  workspaces,
+		workspaces:  workspaces,
 		roots:       roots,
 		sources:     sources,
 		records:     records,
 		definitions: definitions,
 	}, nil
+}
+
+func (q *QueryService) GetWorkspace(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+) (Workspace, error) {
+	return q.workspaces.Get(ctx, rootID)
 }
 
 func (q *QueryService) Resolve(
@@ -195,7 +202,7 @@ func (q *QueryService) Catalog(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) (CatalogView, error) {
-	workspaceValue, err := q.Workspaces.Get(ctx, rootID)
+	workspaceValue, err := q.workspaces.Get(ctx, rootID)
 	if err != nil {
 		return CatalogView{}, err
 	}

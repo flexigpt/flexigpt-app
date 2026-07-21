@@ -2,6 +2,7 @@ package contextadapter
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 const workspaceContextSchemaVersionV1 = "v1"
@@ -52,6 +53,20 @@ var contextFileSupportMatrix = []contextFileSupport{
 		fileName: readmeFileName,
 		role:     contextRoleProjectReadme,
 	},
+}
+
+var discoveryProfile = engine.DiscoveryProfile{
+	ExplicitLocators: []artifactstore.Locator{
+		agentsLocator,
+		claudeLocator,
+	},
+	ReadmeLocator: readmeLocator,
+}
+
+var artifactSupport = engine.ArtifactSupport{
+	Kind:      contextKind,
+	SchemaID:  contextSchemaID,
+	DecoderID: contextDecoderID,
 }
 
 type contextDefinition struct {
