@@ -287,7 +287,31 @@ Workspace may recognize conventions such as:
 - Structured model definitions
 - Structured tool definitions
 
-These are Workspace conventions.
+### 11.1 Repository resource MVP conventions
+
+The initial repository-resource MVP must support source-linked discovery and loading of the following primary-source conventions:
+
+| Repository convention           | Intended artifact behavior                                                                                            |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `AGENTS.md`                     | A project instruction or context document.                                                                            |
+| `CLAUDE.md`                     | A project instruction or context document.                                                                            |
+| `.skills/<skill-name>/SKILL.md` | A Skill definition. The containing Skill directory remains the source-relative location for declared Skill resources. |
+| `.mcps.json`                    | An MCP configuration document. One document may emit one or more MCP server definition occurrences.                   |
+
+`README.md` may be included only when enabled by Workspace discovery preferences. It is not a required repository-context convention.
+
+The MVP must provide, for each convention:
+
+- Discovery scope that includes the convention by default for a filesystem Workspace.
+- A native decoder and portable canonical definition.
+- Semantic validation and structured diagnostics.
+- Workspace record derivation and catalog visibility.
+- A management projection or context contributor.
+- A runtime or product consumer appropriate to the artifact kind.
+
+These resources remain source-linked for the MVP. Discovering a repository resource must not copy it into an installed-resource store. Import, capture, and fork remain optional transfer workflows under `WS-F15`.
+
+These are Workspace conventions. they should be maintained and supported that a new file or pattern or convention semantic can be added very easily later. Eg we should be able to add context file names or skill dir names to scan or mcp json to scan very easily.
 
 Artifact Store only provides candidate traversal and format-adapter invocation.
 
