@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -129,17 +129,17 @@ func decodeAttachmentData(
 }
 
 func validateWorkspaceState(
-	root catalog.Root,
+	r root.Root,
 	data RootData,
-	attachments []catalog.Attachment,
+	attachments []root.Attachment,
 	sources []source.Source,
 ) error {
-	if root.Kind != RootKind {
+	if r.Kind != RootKind {
 		return fmt.Errorf(
 			"%w: root %q has kind %q",
 			ErrNotWorkspace,
-			root.ID,
-			root.Kind,
+			r.ID,
+			r.Kind,
 		)
 	}
 	if err := validateRootData(data); err != nil {

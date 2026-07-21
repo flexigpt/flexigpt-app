@@ -7,6 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 )
 
 type Repository interface {
@@ -42,9 +43,9 @@ type Draft struct {
 type Policy interface {
 	Derive(
 		ctx context.Context,
-		root catalog.Root,
+		value root.Root,
 		occurrence catalog.Occurrence,
-		value definition.Definition,
+		def definition.Definition,
 	) (Draft, bool, []artifactstore.Diagnostic)
 }
 

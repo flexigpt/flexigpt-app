@@ -126,15 +126,11 @@ func (r Record) Validate() error {
 	if r.CreatedAt.IsZero() || r.ModifiedAt.IsZero() {
 		return fmt.Errorf("%w: record timestamps are required", artifactstore.ErrInvalid)
 	}
+	if r.ModifiedAt.Before(r.CreatedAt) {
+		return fmt.Errorf(
+			"%w: record modified time precedes creation",
+			artifactstore.ErrInvalid,
+		)
+	}
 	return nil
-}
-
-func TypedOccurrenceKey(
-	rootID artifactstore.RootID,
-	key catalog.OccurrenceKey,
-	kind artifactstore.ArtifactKind,
-) string {
-	return string(rootID) + "\x00" +
-		key.String() + "\x00" +
-		string(kind)
 }

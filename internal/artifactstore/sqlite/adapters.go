@@ -7,6 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -14,7 +15,7 @@ type SourceRepository struct {
 	store *Store
 }
 
-type CatalogRepository struct {
+type RootRepository struct {
 	store *Store
 }
 
@@ -22,16 +23,24 @@ type RecordRepository struct {
 	store *Store
 }
 
+type CatalogRepository struct {
+	store *Store
+}
+
 func (s *Store) Sources() *SourceRepository {
 	return &SourceRepository{store: s}
 }
 
-func (s *Store) Catalog() *CatalogRepository {
-	return &CatalogRepository{store: s}
+func (s *Store) Roots() *RootRepository {
+	return &RootRepository{store: s}
 }
 
 func (s *Store) Records() *RecordRepository {
 	return &RecordRepository{store: s}
+}
+
+func (s *Store) Catalogs() *CatalogRepository {
+	return &CatalogRepository{store: s}
 }
 
 func (r *SourceRepository) Create(
@@ -70,66 +79,66 @@ func (r *SourceRepository) Delete(
 	return r.store.deleteSource(ctx, id, expectedRevision)
 }
 
-func (r *CatalogRepository) CreateRoot(
+func (r *RootRepository) Create(
 	ctx context.Context,
-	root catalog.Root,
-	attachments []catalog.Attachment,
+	value root.Root,
+	attachments []root.Attachment,
 ) error {
-	return r.store.createRoot(ctx, root, attachments)
+	return r.store.createRoot(ctx, value, attachments)
 }
 
-func (r *CatalogRepository) GetRoot(
+func (r *RootRepository) Get(
 	ctx context.Context,
 	id artifactstore.RootID,
 	includeDeleted bool,
-) (catalog.Root, error) {
+) (root.Root, error) {
 	return r.store.getRoot(ctx, id, includeDeleted)
 }
 
-func (r *CatalogRepository) ListRoots(
+func (r *RootRepository) List(
 	ctx context.Context,
 	includeDeleted bool,
-) ([]catalog.Root, error) {
+) ([]root.Root, error) {
 	return r.store.listRoots(ctx, includeDeleted)
 }
 
-func (r *CatalogRepository) UpdateRoot(
+func (r *RootRepository) Update(
 	ctx context.Context,
-	value catalog.Root,
+	value root.Root,
 	expectedRevision uint64,
 ) error {
 	return r.store.updateRoot(ctx, value, expectedRevision)
 }
 
-func (r *CatalogRepository) Attach(
+func (r *RootRepository) Attach(
 	ctx context.Context,
-	value catalog.Attachment,
+	value root.Attachment,
 	expectedRootRevision uint64,
-) (catalog.Root, error) {
+) (root.Root, error) {
 	return r.store.attach(ctx, value, expectedRootRevision)
 }
 
-func (r *CatalogRepository) GetAttachment(
+func (r *RootRepository) GetAttachment(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 	sourceID artifactstore.SourceID,
-) (catalog.Attachment, error) {
+) (root.Attachment, error) {
 	return r.store.getAttachment(ctx, rootID, sourceID)
 }
 
-func (r *CatalogRepository) ListAttachments(
+func (r *RootRepository) ListAttachments(
 	ctx context.Context,
 	rootID artifactstore.RootID,
-) ([]catalog.Attachment, error) {
+) ([]root.Attachment, error) {
 	return r.store.listAttachments(ctx, rootID)
 }
 
-func (r *CatalogRepository) UpdateAttachment(
+func (r *RootRepository) UpdateAttachment(
 	ctx context.Context,
-	value catalog.Attachment,
+	value root.Attachment,
 	expectedRootRevision uint64,
 	expectedAttachmentRevision uint64,
-) (catalog.Root, error) {
+) (root.Root, error) {
 	return r.store.updateAttachment(
 		ctx,
 		value,
@@ -138,14 +147,14 @@ func (r *CatalogRepository) UpdateAttachment(
 	)
 }
 
-func (r *CatalogRepository) Detach(
+func (r *RootRepository) Detach(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 	sourceID artifactstore.SourceID,
 	expectedRootRevision uint64,
 	expectedAttachmentRevision uint64,
 	modifiedAt time.Time,
-) (catalog.Root, error) {
+) (root.Root, error) {
 	return r.store.detach(
 		ctx,
 		rootID,
@@ -156,7 +165,7 @@ func (r *CatalogRepository) Detach(
 	)
 }
 
-func (r *CatalogRepository) GetCurrentCatalog(
+func (r *CatalogRepository) GetCurrent(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) (catalog.Snapshot, error) {
@@ -192,9 +201,3 @@ func (r *RecordRepository) Delete(
 ) error {
 	return r.store.deleteRecord(ctx, id, expectedRevision)
 }
-
-var (
-	_ source.Repository  = (*SourceRepository)(nil)
-	_ catalog.Repository = (*CatalogRepository)(nil)
-	_ record.Repository  = (*RecordRepository)(nil)
-)

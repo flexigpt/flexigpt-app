@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -67,25 +68,28 @@ type AttachmentData struct {
 	Authoritative *bool `json:"authoritative,omitempty"`
 }
 
+// Workspace is an internal privileged aggregate. API packages must project it
+// into explicit view models instead of serializing source configuration, root
+// data, or attachment data.
 type Workspace struct {
-	Root        catalog.Root         `json:"root"`
-	Data        RootData             `json:"data"`
-	Attachments []catalog.Attachment `json:"attachments"`
-	Sources     []source.Source      `json:"sources"`
+	Root        root.Root         `json:"-"`
+	Data        RootData          `json:"-"`
+	Attachments []root.Attachment `json:"-"`
+	Sources     []source.Source   `json:"-"`
 }
 
 type Resource struct {
-	Record         record.Record
-	Definition     definition.Definition
-	Occurrence     *catalog.Occurrence
-	Source         source.Source
-	CatalogCurrent bool
+	Record         record.Record         `json:"-"`
+	Definition     definition.Definition `json:"-"`
+	Occurrence     *catalog.Occurrence   `json:"-"`
+	Source         source.Source         `json:"-"`
+	CatalogCurrent bool                  `json:"-"`
 }
 
 type ResourceGroup struct {
-	Kind       artifactstore.ArtifactKind `json:"kind"`
-	Resources  []Resource                 `json:"resources"`
-	Unrecorded []catalog.Occurrence       `json:"unrecorded,omitempty"`
+	Kind       artifactstore.ArtifactKind `json:"-"`
+	Resources  []Resource                 `json:"-"`
+	Unrecorded []catalog.Occurrence       `json:"-"`
 }
 
 type EmptyWorkspaceRequest struct {
@@ -124,17 +128,17 @@ type AttachRequest struct {
 }
 
 type CatalogView struct {
-	Workspace         Workspace
-	Catalog           catalog.Snapshot
-	Resources         []Resource
-	Unrecorded        []catalog.Occurrence
-	UnresolvedRecords []record.Record
-	Groups            []ResourceGroup
+	Workspace         Workspace            `json:"-"`
+	Catalog           catalog.Snapshot     `json:"-"`
+	Resources         []Resource           `json:"-"`
+	Unrecorded        []catalog.Occurrence `json:"-"`
+	UnresolvedRecords []record.Record      `json:"-"`
+	Groups            []ResourceGroup      `json:"-"`
 }
 
 type Reference struct {
-	RecordID *artifactstore.RecordID
-	Selector *definition.Selector
+	RecordID *artifactstore.RecordID `json:"-"`
+	Selector *definition.Selector    `json:"-"`
 }
 
 type LoadPlanItem struct {
@@ -144,10 +148,10 @@ type LoadPlanItem struct {
 }
 
 type LoadPlan struct {
-	RootID          artifactstore.RootID
-	CatalogRevision uint64
-	Items           []LoadPlanItem
-	Diagnostics     []artifactstore.Diagnostic
+	RootID          artifactstore.RootID       `json:"-"`
+	CatalogRevision uint64                     `json:"-"`
+	Items           []LoadPlanItem             `json:"-"`
+	Diagnostics     []artifactstore.Diagnostic `json:"-"`
 }
 
 type DefinitionDocument struct {

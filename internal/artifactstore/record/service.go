@@ -53,6 +53,12 @@ func (s *Service) SetEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (Record, error) {
+	if expectedRevision == 0 {
+		return Record{}, fmt.Errorf(
+			"%w: expected record revision is required",
+			artifactstore.ErrInvalid,
+		)
+	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
 		return Record{}, err
@@ -86,6 +92,15 @@ func (s *Service) Pin(
 	expectedRevision uint64,
 	digest artifactstore.Digest,
 ) (Record, error) {
+	if expectedRevision == 0 {
+		return Record{}, fmt.Errorf(
+			"%w: expected record revision is required",
+			artifactstore.ErrInvalid,
+		)
+	}
+	if err := artifactstore.ValidateDigest(digest); err != nil {
+		return Record{}, err
+	}
 	if _, err := s.definitions.Get(ctx, digest); err != nil {
 		return Record{}, err
 	}
@@ -122,6 +137,12 @@ func (s *Service) Follow(
 	id artifactstore.RecordID,
 	expectedRevision uint64,
 ) (Record, error) {
+	if expectedRevision == 0 {
+		return Record{}, fmt.Errorf(
+			"%w: expected record revision is required",
+			artifactstore.ErrInvalid,
+		)
+	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
 		return Record{}, err
@@ -161,6 +182,12 @@ func (s *Service) Delete(
 	id artifactstore.RecordID,
 	expectedRevision uint64,
 ) error {
+	if expectedRevision == 0 {
+		return fmt.Errorf(
+			"%w: expected record revision is required",
+			artifactstore.ErrInvalid,
+		)
+	}
 	return s.repository.Delete(ctx, id, expectedRevision)
 }
 

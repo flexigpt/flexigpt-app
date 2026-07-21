@@ -9,25 +9,21 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 type RootReader interface {
-	GetRoot(
+	Get(
 		ctx context.Context,
 		id artifactstore.RootID,
 		includeDeleted bool,
-	) (catalog.Root, error)
+	) (root.Root, error)
 
 	ListAttachments(
 		ctx context.Context,
 		rootID artifactstore.RootID,
-	) ([]catalog.Attachment, error)
-
-	GetCurrentCatalog(
-		ctx context.Context,
-		rootID artifactstore.RootID,
-	) (catalog.Snapshot, error)
+	) ([]root.Attachment, error)
 }
 
 type SourceReader interface {

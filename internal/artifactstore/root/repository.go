@@ -1,4 +1,4 @@
-package catalog
+package root
 
 import (
 	"context"
@@ -42,24 +42,24 @@ type AttachmentUpdate struct {
 }
 
 type Repository interface {
-	CreateRoot(
+	Create(
 		ctx context.Context,
 		root Root,
 		attachments []Attachment,
 	) error
 
-	GetRoot(
+	Get(
 		ctx context.Context,
 		id artifactstore.RootID,
 		includeDeleted bool,
 	) (Root, error)
 
-	ListRoots(
+	List(
 		ctx context.Context,
 		includeDeleted bool,
 	) ([]Root, error)
 
-	UpdateRoot(
+	Update(
 		ctx context.Context,
 		value Root,
 		expectedRevision uint64,
@@ -97,9 +97,4 @@ type Repository interface {
 		expectedAttachmentRevision uint64,
 		modifiedAt time.Time,
 	) (Root, error)
-
-	GetCurrentCatalog(
-		ctx context.Context,
-		rootID artifactstore.RootID,
-	) (Snapshot, error)
 }

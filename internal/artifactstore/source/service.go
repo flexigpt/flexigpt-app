@@ -38,20 +38,20 @@ func NewService(
 func (s *Service) Create(
 	ctx context.Context,
 	draft Draft,
-) (Source, error) {
+) (Summary, error) {
 	if err := artifactstore.ValidateSourceKind(draft.Kind); err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
 	if err := artifactstore.ValidateRequiredText(
 		"source display name",
 		draft.DisplayName,
 		artifactstore.MaxDisplayNameBytes,
 	); err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
-	adapter, exists := s.registry.Adapter(draft.Kind)
+	adapter, exists := s.registry.adapter(draft.Kind)
 	if !exists {
-		return Source{}, fmt.Errorf(
+		return Summary{}, fmt.Errorf(
 			"%w: source adapter %q",
 			artifactstore.ErrSourceUnavailable,
 			draft.Kind,
@@ -59,19 +59,19 @@ func (s *Service) Create(
 	}
 	config, err := adapter.NormalizeConfig(ctx, draft.Config)
 	if err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
 	config, err = jsoncanon.CanonicalizeObject(
 		config,
 		artifactstore.MaxConfigBytes,
 	)
 	if err != nil {
-		return Source{}, fmt.Errorf("%w: source config: %w", artifactstore.ErrInvalid, err)
+		return Summary{}, fmt.Errorf("%w: source config: %w", artifactstore.ErrInvalid, err)
 	}
 
 	id, err := s.ids.NewID(ctx)
 	if err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
 	now := s.clock.Now().UTC()
 	value := Source{
@@ -85,54 +85,66 @@ func (s *Service) Create(
 		ModifiedAt:  now,
 	}
 	if err := value.Validate(); err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
 	if err := s.repository.Create(ctx, value); err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
-	return value, nil
+	return value.Summary(), nil
 }
 
 func (s *Service) Get(
 	ctx context.Context,
 	id artifactstore.SourceID,
-) (Source, error) {
+) (Summary, error) {
 	if err := artifactstore.ValidateSourceID(id); err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
-	return s.repository.Get(ctx, id)
+	value, err := s.repository.Get(ctx, id)
+	if err != nil {
+		return Summary{}, err
+	}
+	return value.Summary(), nil
 }
 
-func (s *Service) List(ctx context.Context) ([]Source, error) {
-	return s.repository.List(ctx)
+func (s *Service) List(ctx context.Context) ([]Summary, error) {
+	values, err := s.repository.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	output := make([]Summary, len(values))
+	for index, value := range values {
+		output[index] = value.Summary()
+	}
+	return output, nil
 }
 
 func (s *Service) Update(
 	ctx context.Context,
 	id artifactstore.SourceID,
 	update Update,
-) (Source, error) {
+) (Summary, error) {
 	if update.ExpectedRevision == 0 {
-		return Source{}, fmt.Errorf(
+		return Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
 			artifactstore.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
 	if current.Revision != update.ExpectedRevision {
-		return Source{}, fmt.Errorf(
+		return Summary{}, fmt.Errorf(
 			"%w: source %q changed since it was read",
 			artifactstore.ErrConflict,
 			id,
 		)
 	}
 
-	adapter, exists := s.registry.Adapter(current.Kind)
+	adapter, exists := s.registry.adapter(current.Kind)
 	if !exists {
-		return Source{}, fmt.Errorf(
+		return Summary{}, fmt.Errorf(
 			"%w: source adapter %q",
 			artifactstore.ErrSourceUnavailable,
 			current.Kind,
@@ -140,14 +152,14 @@ func (s *Service) Update(
 	}
 	config, err := adapter.NormalizeConfig(ctx, update.Config)
 	if err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
 	config, err = jsoncanon.CanonicalizeObject(
 		config,
 		artifactstore.MaxConfigBytes,
 	)
 	if err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
 
 	next := current
@@ -159,7 +171,7 @@ func (s *Service) Update(
 		current.Enabled == next.Enabled &&
 		jsoncanon.Equal(current.Config, next.Config)
 	if unchanged {
-		return current, nil
+		return current.Summary(), nil
 	}
 
 	next.Revision++
@@ -168,12 +180,12 @@ func (s *Service) Update(
 		next.ModifiedAt = current.ModifiedAt.Add(1)
 	}
 	if err := next.Validate(); err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
 	if err := s.repository.Update(ctx, next, update.ExpectedRevision); err != nil {
-		return Source{}, err
+		return Summary{}, err
 	}
-	return next, nil
+	return next.Summary(), nil
 }
 
 func (s *Service) Delete(
@@ -190,6 +202,6 @@ func (s *Service) Delete(
 	return s.repository.Delete(ctx, id, expectedRevision)
 }
 
-func (s *Service) Registry() *Registry {
-	return s.registry
+func (s *Service) Kinds() []artifactstore.SourceKind {
+	return s.registry.Kinds()
 }

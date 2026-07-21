@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 )
 
 type RecordPolicy struct {
@@ -45,7 +47,7 @@ func NewRecordPolicy(
 
 func (p *RecordPolicy) Derive(
 	_ context.Context,
-	_ catalog.Root,
+	_ root.Root,
 	occurrence catalog.Occurrence,
 	value definition.Definition,
 ) (record.Draft, bool, []artifactstore.Diagnostic) {
@@ -99,17 +101,24 @@ func recordName(
 	if base == "" {
 		base = defaultRecordName
 	}
-	digest := definition.DigestBytes([]byte(key.String()))
+	digest := definition.DigestBytes([]byte(occurrenceKeyDigestInput(key)))
 	suffix := strings.TrimPrefix(
 		string(digest),
 		artifactstore.DigestSHA256Prefix,
 	)
 	suffix = suffix[:recordNameDigestLength]
 	maximum := artifactstore.MaxDisplayNameBytes - len(suffix) - len(recordNameSeparator)
-	if len(base) > maximum {
-		base = base[:maximum]
+	for len(base) > maximum {
+		_, size := utf8.DecodeLastRuneInString(base)
+		base = base[:len(base)-size]
 	}
 	return base + recordNameSeparator + suffix
 }
 
 var _ record.Policy = (*RecordPolicy)(nil)
+
+func occurrenceKeyDigestInput(key catalog.OccurrenceKey) string {
+	return string(key.SourceID) + "\x00" +
+		string(key.Locator) + "\x00" +
+		string(key.SubresourceLocator)
+}

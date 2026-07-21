@@ -47,7 +47,16 @@ func (s Snapshot) Validate() error {
 	if err := artifactstore.ValidateDiagnostics(s.Diagnostics); err != nil {
 		return err
 	}
+	seenOccurrences := make(map[OccurrenceKey]struct{}, len(s.Occurrences))
 	for index, occurrence := range s.Occurrences {
+		if _, duplicate := seenOccurrences[occurrence.Key]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate occurrence %d",
+				artifactstore.ErrInvalid,
+				index,
+			)
+		}
+		seenOccurrences[occurrence.Key] = struct{}{}
 		if occurrence.RootID != s.RootID {
 			return fmt.Errorf(
 				"%w: occurrence %d belongs to another root",

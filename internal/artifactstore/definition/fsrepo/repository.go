@@ -60,7 +60,7 @@ func (r *Repository) Put(
 	if err != nil {
 		return definition.Definition{}, err
 	}
-	content, err := definition.EncodeFile(canonical)
+	content, err := encodeFile(canonical)
 	if err != nil {
 		return definition.Definition{}, err
 	}
@@ -76,7 +76,7 @@ func (r *Repository) Put(
 	}
 
 	if existing, readErr := os.ReadFile(path); readErr == nil {
-		decoded, decodeErr := definition.DecodeFile(existing)
+		decoded, decodeErr := decodeFile(existing)
 		if decodeErr != nil {
 			return definition.Definition{}, fmt.Errorf(
 				"decode existing definition %q: %w",
@@ -169,7 +169,7 @@ func (r *Repository) Get(
 			err,
 		)
 	}
-	value, err := definition.DecodeFile(content)
+	value, err := decodeFile(content)
 	if err != nil {
 		return definition.Definition{}, err
 	}

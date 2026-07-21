@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/embedded"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
@@ -31,20 +32,17 @@ type Config struct {
 
 type Components struct {
 	Sources *source.Service
-	Catalog *catalog.Service
+	Roots   *root.Service
 	Records *record.Service
 	Refresh *refresh.Service
 
-	Definitions       definition.Repository
-	SourceRepository  source.Repository
-	CatalogRepository catalog.Repository
-	RecordRepository  record.Repository
+	Catalogs      catalog.Reader
+	Definitions   definition.Reader
+	SourceRuntime source.Runtime
 
-	SourceRegistry  *source.Registry
-	DecoderRegistry *discovery.DecoderRegistry
-
-	metadata *sqlite.Store
-	content  *fsrepo.Repository
+	metadata   *sqlite.Store
+	content    *fsrepo.Repository
+	decoderIDs map[artifactstore.DecoderID]struct{}
 }
 
 func Open(
@@ -109,8 +107,18 @@ func Open(
 	}
 
 	sourceRepository := metadata.Sources()
-	catalogRepository := metadata.Catalog()
+	rootRepository := metadata.Roots()
+	catalogRepository := metadata.Catalogs()
 	recordRepository := metadata.Records()
+	sourceRuntime, err := source.NewRuntime(
+		sourceRepository,
+		sourceRegistry,
+	)
+	if err != nil {
+		_ = content.Close()
+		_ = metadata.Close()
+		return nil, err
+	}
 
 	sourceService, err := source.NewService(
 		sourceRepository,
@@ -123,8 +131,8 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	catalogService, err := catalog.NewService(
-		catalogRepository,
+	rootService, err := root.NewService(
+		rootRepository,
 		config.IDGenerator,
 		config.Clock,
 	)
@@ -161,7 +169,13 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
+	decoderIDs := make(map[artifactstore.DecoderID]struct{}, len(config.Decoders))
+	for _, decoder := range config.Decoders {
+		decoderIDs[decoder.ID()] = struct{}{}
+	}
+
 	refreshService, err := refresh.NewService(
+		rootRepository,
 		catalogRepository,
 		sourceRepository,
 		recordRepository,
@@ -180,20 +194,25 @@ func Open(
 
 	return &Components{
 		Sources: sourceService,
-		Catalog: catalogService,
+		Roots:   rootService,
 		Records: recordService,
 		Refresh: refreshService,
 
-		Definitions:       content,
-		SourceRepository:  sourceRepository,
-		CatalogRepository: catalogRepository,
-		RecordRepository:  recordRepository,
-
-		SourceRegistry:  sourceRegistry,
-		DecoderRegistry: decoderRegistry,
-		metadata:        metadata,
-		content:         content,
+		Catalogs:      catalogRepository,
+		Definitions:   content,
+		SourceRuntime: sourceRuntime,
+		metadata:      metadata,
+		content:       content,
+		decoderIDs:    decoderIDs,
 	}, nil
+}
+
+func (c *Components) HasDecoder(id artifactstore.DecoderID) bool {
+	if c == nil {
+		return false
+	}
+	_, exists := c.decoderIDs[id]
+	return exists
 }
 
 func (c *Components) Close() error {

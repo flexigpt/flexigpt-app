@@ -17,9 +17,10 @@ import (
 
 type Service struct {
 	roots       RootReader
+	catalogs    catalog.Reader
 	sources     SourceReader
 	records     RecordReader
-	registry    *source.Registry
+	opener      source.Opener
 	discovery   *discovery.Engine
 	definitions definition.Repository
 	reconciler  *record.Reconciler
@@ -29,9 +30,10 @@ type Service struct {
 
 func NewService(
 	roots RootReader,
+	catalogs catalog.Reader,
 	sources SourceReader,
 	records RecordReader,
-	registry *source.Registry,
+	opener source.Opener,
 	discoveryEngine *discovery.Engine,
 	definitions definition.Repository,
 	reconciler *record.Reconciler,
@@ -39,9 +41,10 @@ func NewService(
 	clock artifactstore.Clock,
 ) (*Service, error) {
 	if roots == nil ||
+		catalogs == nil ||
 		sources == nil ||
 		records == nil ||
-		registry == nil ||
+		opener == nil ||
 		discoveryEngine == nil ||
 		definitions == nil ||
 		reconciler == nil ||
@@ -54,9 +57,10 @@ func NewService(
 	}
 	return &Service{
 		roots:       roots,
+		catalogs:    catalogs,
 		sources:     sources,
 		records:     records,
-		registry:    registry,
+		opener:      opener,
 		discovery:   discoveryEngine,
 		definitions: definitions,
 		reconciler:  reconciler,
@@ -81,7 +85,7 @@ func (s *Service) Refresh(
 		return Result{}, err
 	}
 
-	root, err := s.roots.GetRoot(ctx, rootID, false)
+	root, err := s.roots.Get(ctx, rootID, false)
 	if err != nil {
 		return Result{}, err
 	}
@@ -100,7 +104,7 @@ func (s *Service) Refresh(
 	plansBySource := plan.BySource()
 
 	var previous catalog.Snapshot
-	previous, err = s.roots.GetCurrentCatalog(ctx, rootID)
+	previous, err = s.catalogs.GetCurrent(ctx, rootID)
 	if err != nil && !errors.Is(err, artifactstore.ErrCatalogUnavailable) {
 		return Result{}, err
 	}
@@ -160,7 +164,7 @@ func (s *Service) Refresh(
 			)
 		}
 
-		snapshot, err := s.registry.Open(ctx, sourceValue)
+		snapshot, err := s.opener.Open(ctx, sourceValue)
 		if err != nil {
 			return Result{}, err
 		}
@@ -170,7 +174,8 @@ func (s *Service) Refresh(
 		discovered, err := s.discovery.Discover(
 			ctx,
 			rootID,
-			sourceValue,
+			sourceValue.ID,
+			sourceValue.Kind,
 			snapshot,
 			sourcePlan,
 			previousBySource[sourceValue.ID],

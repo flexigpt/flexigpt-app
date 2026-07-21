@@ -46,7 +46,7 @@ func (r *Registry) Open(
 	if ctx == nil {
 		return nil, artifactstore.ErrInvalid
 	}
-	adapter, exists := r.Adapter(value.Kind)
+	adapter, exists := r.adapter(value.Kind)
 	if !exists {
 		return nil, fmt.Errorf(
 			"%w: source adapter %q",
@@ -57,7 +57,14 @@ func (r *Registry) Open(
 	return adapter.Open(ctx, value)
 }
 
-func (r *Registry) Adapter(
+func (r *Registry) Kinds() []artifactstore.SourceKind {
+	if r == nil {
+		return nil
+	}
+	return append([]artifactstore.SourceKind(nil), r.kinds...)
+}
+
+func (r *Registry) adapter(
 	kind artifactstore.SourceKind,
 ) (Adapter, bool) {
 	if r == nil {
@@ -65,11 +72,4 @@ func (r *Registry) Adapter(
 	}
 	value, exists := r.adapters[kind]
 	return value, exists
-}
-
-func (r *Registry) Kinds() []artifactstore.SourceKind {
-	if r == nil {
-		return nil
-	}
-	return append([]artifactstore.SourceKind(nil), r.kinds...)
 }

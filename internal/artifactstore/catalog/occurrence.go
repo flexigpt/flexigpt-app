@@ -43,6 +43,34 @@ func (o Occurrence) Validate() error {
 	if err := o.Key.Validate(); err != nil {
 		return err
 	}
+	if o.Kind != "" {
+		if err := artifactstore.ValidateArtifactKind(o.Kind); err != nil {
+			return err
+		}
+	}
+	if o.LogicalName != "" {
+		if err := artifactstore.ValidateLogicalName(o.LogicalName); err != nil {
+			return err
+		}
+	}
+	if err := artifactstore.ValidateLogicalVersion(o.LogicalVersion, true); err != nil {
+		return err
+	}
+	if o.DefinitionDigest != nil {
+		if err := artifactstore.ValidateDigest(*o.DefinitionDigest); err != nil {
+			return err
+		}
+	}
+	if o.SourceContentDigest != nil {
+		if err := artifactstore.ValidateDigest(*o.SourceContentDigest); err != nil {
+			return err
+		}
+	}
+	if o.DecoderID != "" {
+		if err := artifactstore.ValidateDecoderID(o.DecoderID); err != nil {
+			return err
+		}
+	}
 	switch o.State {
 	case OccurrenceValid:
 		if err := artifactstore.ValidateArtifactKind(o.Kind); err != nil {
@@ -71,12 +99,6 @@ func (o Occurrence) Validate() error {
 		}
 
 	case OccurrenceInvalid, OccurrenceMissing:
-		if o.DefinitionDigest != nil {
-			if err := artifactstore.ValidateDigest(*o.DefinitionDigest); err != nil {
-				return err
-			}
-		}
-
 	default:
 		return fmt.Errorf(
 			"%w: invalid occurrence state %q",
@@ -101,12 +123,6 @@ func (k OccurrenceKey) Validate() error {
 		return err
 	}
 	return artifactstore.ValidateSubresourceLocator(k.SubresourceLocator)
-}
-
-func (k OccurrenceKey) String() string {
-	return string(k.SourceID) + "\x00" +
-		string(k.Locator) + "\x00" +
-		string(k.SubresourceLocator)
 }
 
 func SortOccurrences(values []Occurrence) {

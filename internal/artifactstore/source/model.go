@@ -20,6 +20,16 @@ type Source struct {
 	ModifiedAt  time.Time                `json:"modifiedAt"`
 }
 
+type Summary struct {
+	ID          artifactstore.SourceID   `json:"id"`
+	Kind        artifactstore.SourceKind `json:"kind"`
+	DisplayName string                   `json:"displayName"`
+	Enabled     bool                     `json:"enabled"`
+	Revision    uint64                   `json:"revision"`
+	CreatedAt   time.Time                `json:"createdAt"`
+	ModifiedAt  time.Time                `json:"modifiedAt"`
+}
+
 func (s Source) Validate() error {
 	if err := artifactstore.ValidateSourceID(s.ID); err != nil {
 		return err
@@ -50,6 +60,18 @@ func (s Source) Validate() error {
 		return fmt.Errorf("%w: source modified time precedes creation", artifactstore.ErrInvalid)
 	}
 	return nil
+}
+
+func (s Source) Summary() Summary {
+	return Summary{
+		ID:          s.ID,
+		Kind:        s.Kind,
+		DisplayName: s.DisplayName,
+		Enabled:     s.Enabled,
+		Revision:    s.Revision,
+		CreatedAt:   s.CreatedAt,
+		ModifiedAt:  s.ModifiedAt,
+	}
 }
 
 type Draft struct {

@@ -80,7 +80,7 @@ func sqliteError(err error) error {
 	message := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(message, "unique constraint failed"):
-		return fmt.Errorf("%w: %w", artifactstore.ErrConflict, err)
+		return fmt.Errorf("%w: metadata already exists", artifactstore.ErrConflict)
 	case strings.Contains(message, "foreign key constraint failed"):
 		return fmt.Errorf("%w: related metadata is missing or still referenced", artifactstore.ErrConflict)
 	case strings.Contains(message, "database is locked"),

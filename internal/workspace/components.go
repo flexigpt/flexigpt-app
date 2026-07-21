@@ -29,9 +29,9 @@ func NewComponents(
 			engine.ErrInvalidWorkspace,
 		)
 	}
-	if artifacts.DecoderRegistry == nil {
+	if artifacts.SourceRuntime == nil {
 		return nil, fmt.Errorf(
-			"%w: Artifact Store decoder registry is nil",
+			"%w: artifact store source runtime is nil",
 			engine.ErrInvalidWorkspace,
 		)
 	}
@@ -43,9 +43,9 @@ func NewComponents(
 	profiles := config.normalizedDiscoveryProfiles()
 	decoderIDs := make([]artifactstore.DecoderID, 0, len(supports))
 	for _, support := range supports {
-		if _, exists := artifacts.DecoderRegistry.Get(support.DecoderID); !exists {
+		if !artifacts.HasDecoder(support.DecoderID) {
 			return nil, fmt.Errorf(
-				"%w: Workspace decoder %q was not registered with Artifact Store",
+				"%w: workspace decoder %q is not registered with artifact store",
 				engine.ErrInvalidWorkspace,
 				support.DecoderID,
 			)
@@ -54,8 +54,8 @@ func NewComponents(
 	}
 
 	service, err := engine.NewService(
-		artifacts.Catalog,
-		artifacts.Sources,
+		artifacts.Roots,
+		artifacts.SourceRuntime,
 	)
 	if err != nil {
 		return nil, err
@@ -68,8 +68,7 @@ func NewComponents(
 		return nil, err
 	}
 	loader, err := engine.NewDefinitionLoader(
-		artifacts.SourceRepository,
-		artifacts.SourceRegistry,
+		artifacts.SourceRuntime,
 	)
 	if err != nil {
 		return nil, err
@@ -90,8 +89,8 @@ func NewComponents(
 	}
 	query, err := engine.NewQueryService(
 		service,
-		artifacts.Catalog,
-		artifacts.Sources,
+		artifacts.Catalogs,
+		artifacts.SourceRuntime,
 		artifacts.Records,
 		artifacts.Definitions,
 	)

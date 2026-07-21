@@ -65,6 +65,12 @@ func (d Diagnostic) Validate() error {
 		}
 	}
 	if d.Location.SubresourceLocator != "" {
+		if d.Location.Locator == "" {
+			return fmt.Errorf(
+				"%w: diagnostic subresource location requires a locator",
+				ErrInvalid,
+			)
+		}
 		if err := ValidateSubresourceLocator(d.Location.SubresourceLocator); err != nil {
 			return fmt.Errorf("diagnostic subresource location: %w", err)
 		}
@@ -84,19 +90,58 @@ func ContainsErrorDiagnostic(values []Diagnostic) bool {
 	return false
 }
 
+func CloneDiagnostics(values []Diagnostic) []Diagnostic {
+	if values == nil {
+		return nil
+	}
+	output := make([]Diagnostic, len(values))
+	copy(output, values)
+	for index := range output {
+		if output[index].Location == nil {
+			continue
+		}
+		location := *output[index].Location
+		output[index].Location = &location
+	}
+	return output
+}
+
+func EqualDiagnostics(left, right []Diagnostic) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index].Severity != right[index].Severity ||
+			left[index].Code != right[index].Code ||
+			left[index].Message != right[index].Message {
+			return false
+		}
+		if left[index].Location == nil || right[index].Location == nil {
+			if left[index].Location != nil || right[index].Location != nil {
+				return false
+			}
+			continue
+		}
+		if *left[index].Location != *right[index].Location {
+			return false
+		}
+	}
+	return true
+}
+
 func AppendDiagnostics(
 	current []Diagnostic,
 	incoming ...Diagnostic,
 ) []Diagnostic {
 	if len(incoming) == 0 {
-		return current
+		return CloneDiagnostics(current)
 	}
 	if len(current) >= MaxDiagnostics {
-		return current[:MaxDiagnostics]
+		return CloneDiagnostics(current[:MaxDiagnostics])
 	}
 	remaining := MaxDiagnostics - len(current)
 	if len(incoming) > remaining {
 		incoming = incoming[:remaining]
 	}
-	return append(current, incoming...)
+	return append(CloneDiagnostics(current), CloneDiagnostics(incoming)...)
 }

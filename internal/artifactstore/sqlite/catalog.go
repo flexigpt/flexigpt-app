@@ -9,6 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 )
 
 const rootColumns = `
@@ -27,10 +28,10 @@ const occurrenceColumns = `
 
 func (s *Store) createRoot(
 	ctx context.Context,
-	root catalog.Root,
-	attachments []catalog.Attachment,
+	value root.Root,
+	attachments []root.Attachment,
 ) error {
-	if err := root.Validate(); err != nil {
+	if err := value.Validate(); err != nil {
 		return err
 	}
 	for _, attachment := range attachments {
@@ -51,16 +52,16 @@ func (s *Store) createRoot(
 			id, kind, display_name, description, enabled, data_json,
 			revision, created_at, modified_at, deleted_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		string(root.ID),
-		string(root.Kind),
-		root.DisplayName,
-		root.Description,
-		boolInt(root.Enabled),
-		[]byte(root.Data),
-		root.Revision,
-		timeValue(root.CreatedAt),
-		timeValue(root.ModifiedAt),
-		nullableTime(root.DeletedAt),
+		string(value.ID),
+		string(value.Kind),
+		value.DisplayName,
+		value.Description,
+		boolInt(value.Enabled),
+		[]byte(value.Data),
+		value.Revision,
+		timeValue(value.CreatedAt),
+		timeValue(value.ModifiedAt),
+		nullableTime(value.DeletedAt),
 	)
 	if err != nil {
 		return sqliteError(err)
@@ -92,14 +93,14 @@ func (s *Store) getRoot(
 	ctx context.Context,
 	id artifactstore.RootID,
 	includeDeleted bool,
-) (catalog.Root, error) {
+) (root.Root, error) {
 	query := `SELECT ` + rootColumns + ` FROM artifact_roots WHERE id = ?`
 	if !includeDeleted {
 		query += ` AND deleted_at IS NULL`
 	}
 	value, err := scanRoot(s.db.QueryRowContext(ctx, query, string(id)))
 	if errors.Is(err, sql.ErrNoRows) {
-		return catalog.Root{}, fmt.Errorf(
+		return root.Root{}, fmt.Errorf(
 			"%w: root %q",
 			artifactstore.ErrNotFound,
 			id,
@@ -111,7 +112,7 @@ func (s *Store) getRoot(
 func (s *Store) listRoots(
 	ctx context.Context,
 	includeDeleted bool,
-) ([]catalog.Root, error) {
+) ([]root.Root, error) {
 	query := `SELECT ` + rootColumns + ` FROM artifact_roots`
 	if !includeDeleted {
 		query += ` WHERE deleted_at IS NULL`
@@ -124,7 +125,7 @@ func (s *Store) listRoots(
 	}
 	defer rows.Close()
 
-	output := make([]catalog.Root, 0)
+	output := make([]root.Root, 0)
 	for rows.Next() {
 		value, err := scanRoot(rows)
 		if err != nil {
@@ -137,7 +138,7 @@ func (s *Store) listRoots(
 
 func (s *Store) updateRoot(
 	ctx context.Context,
-	value catalog.Root,
+	value root.Root,
 	expectedRevision uint64,
 ) error {
 	if err := value.Validate(); err != nil {
@@ -183,21 +184,24 @@ func (s *Store) updateRoot(
 
 func (s *Store) attach(
 	ctx context.Context,
-	attachment catalog.Attachment,
+	attachment root.Attachment,
 	expectedRootRevision uint64,
-) (catalog.Root, error) {
+) (root.Root, error) {
+	if err := attachment.Validate(); err != nil {
+		return root.Root{}, err
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	root, err := getRootTx(ctx, tx, attachment.RootID)
+	r, err := getRootTx(ctx, tx, attachment.RootID)
 	if err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
-	if root.Revision != expectedRootRevision {
-		return catalog.Root{}, artifactstore.ErrConflict
+	if r.Revision != expectedRootRevision {
+		return root.Root{}, artifactstore.ErrConflict
 	}
 	if _, err := tx.ExecContext(
 		ctx,
@@ -215,29 +219,29 @@ func (s *Store) attach(
 		timeValue(attachment.CreatedAt),
 		timeValue(attachment.ModifiedAt),
 	); err != nil {
-		return catalog.Root{}, sqliteError(err)
+		return root.Root{}, sqliteError(err)
 	}
-	root.Revision++
-	root.ModifiedAt = attachment.ModifiedAt
+	r.Revision++
+	r.ModifiedAt = attachment.ModifiedAt
 	if err := updateRootRevisionTx(
 		ctx,
 		tx,
-		root,
+		r,
 		expectedRootRevision,
 	); err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
-	return root, nil
+	return r, nil
 }
 
 func (s *Store) getAttachment(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 	sourceID artifactstore.SourceID,
-) (catalog.Attachment, error) {
+) (root.Attachment, error) {
 	value, err := scanAttachment(s.db.QueryRowContext(
 		ctx,
 		`SELECT `+attachmentColumns+`
@@ -247,7 +251,7 @@ func (s *Store) getAttachment(
 		string(sourceID),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		return catalog.Attachment{}, fmt.Errorf(
+		return root.Attachment{}, fmt.Errorf(
 			"%w: root/source attachment",
 			artifactstore.ErrNotFound,
 		)
@@ -258,7 +262,7 @@ func (s *Store) getAttachment(
 func (s *Store) listAttachments(
 	ctx context.Context,
 	rootID artifactstore.RootID,
-) ([]catalog.Attachment, error) {
+) ([]root.Attachment, error) {
 	rows, err := s.db.QueryContext(
 		ctx,
 		`SELECT `+attachmentColumns+`
@@ -272,7 +276,7 @@ func (s *Store) listAttachments(
 	}
 	defer rows.Close()
 
-	output := make([]catalog.Attachment, 0)
+	output := make([]root.Attachment, 0)
 	for rows.Next() {
 		value, err := scanAttachment(rows)
 		if err != nil {
@@ -285,22 +289,25 @@ func (s *Store) listAttachments(
 
 func (s *Store) updateAttachment(
 	ctx context.Context,
-	value catalog.Attachment,
+	value root.Attachment,
 	expectedRootRevision uint64,
 	expectedAttachmentRevision uint64,
-) (catalog.Root, error) {
+) (root.Root, error) {
+	if err := value.Validate(); err != nil {
+		return root.Root{}, err
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	root, err := getRootTx(ctx, tx, value.RootID)
+	r, err := getRootTx(ctx, tx, value.RootID)
 	if err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
-	if root.Revision != expectedRootRevision {
-		return catalog.Root{}, artifactstore.ErrConflict
+	if r.Revision != expectedRootRevision {
+		return root.Root{}, artifactstore.ErrConflict
 	}
 
 	result, err := tx.ExecContext(
@@ -320,30 +327,30 @@ func (s *Store) updateAttachment(
 		expectedAttachmentRevision,
 	)
 	if err != nil {
-		return catalog.Root{}, sqliteError(err)
+		return root.Root{}, sqliteError(err)
 	}
 	changed, err := result.RowsAffected()
 	if err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
 	if changed != 1 {
-		return catalog.Root{}, artifactstore.ErrConflict
+		return root.Root{}, artifactstore.ErrConflict
 	}
 
-	root.Revision++
-	root.ModifiedAt = value.ModifiedAt
+	r.Revision++
+	r.ModifiedAt = value.ModifiedAt
 	if err := updateRootRevisionTx(
 		ctx,
 		tx,
-		root,
+		r,
 		expectedRootRevision,
 	); err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
-	return root, nil
+	return r, nil
 }
 
 func (s *Store) detach(
@@ -353,19 +360,19 @@ func (s *Store) detach(
 	expectedRootRevision uint64,
 	expectedAttachmentRevision uint64,
 	modifiedAt time.Time,
-) (catalog.Root, error) {
+) (root.Root, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	root, err := getRootTx(ctx, tx, rootID)
+	r, err := getRootTx(ctx, tx, rootID)
 	if err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
-	if root.Revision != expectedRootRevision {
-		return catalog.Root{}, artifactstore.ErrConflict
+	if r.Revision != expectedRootRevision {
+		return root.Root{}, artifactstore.ErrConflict
 	}
 
 	result, err := tx.ExecContext(
@@ -377,30 +384,30 @@ func (s *Store) detach(
 		expectedAttachmentRevision,
 	)
 	if err != nil {
-		return catalog.Root{}, sqliteError(err)
+		return root.Root{}, sqliteError(err)
 	}
 	changed, err := result.RowsAffected()
 	if err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
 	if changed != 1 {
-		return catalog.Root{}, artifactstore.ErrConflict
+		return root.Root{}, artifactstore.ErrConflict
 	}
 
-	root.Revision++
-	root.ModifiedAt = modifiedAt
+	r.Revision++
+	r.ModifiedAt = modifiedAt
 	if err := updateRootRevisionTx(
 		ctx,
 		tx,
-		root,
+		r,
 		expectedRootRevision,
 	); err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
-	return root, nil
+	return r, nil
 }
 
 func (s *Store) getCurrentCatalog(
@@ -497,7 +504,7 @@ func (s *Store) getCurrentCatalog(
 	return value, nil
 }
 
-func scanAttachment(row scanner) (catalog.Attachment, error) {
+func scanAttachment(row scanner) (root.Attachment, error) {
 	var (
 		rootID, sourceID, role string
 		priority, enabled      int
@@ -516,9 +523,9 @@ func scanAttachment(row scanner) (catalog.Attachment, error) {
 		&createdAt,
 		&modifiedAt,
 	); err != nil {
-		return catalog.Attachment{}, err
+		return root.Attachment{}, err
 	}
-	value := catalog.Attachment{
+	value := root.Attachment{
 		RootID:     artifactstore.RootID(rootID),
 		SourceID:   artifactstore.SourceID(sourceID),
 		Role:       artifactstore.AttachmentRole(role),
@@ -530,7 +537,7 @@ func scanAttachment(row scanner) (catalog.Attachment, error) {
 		ModifiedAt: parseTime(modifiedAt),
 	}
 	if err := value.Validate(); err != nil {
-		return catalog.Attachment{}, err
+		return root.Attachment{}, err
 	}
 	return value, nil
 }
@@ -592,7 +599,7 @@ func getRootTx(
 	ctx context.Context,
 	tx *sql.Tx,
 	id artifactstore.RootID,
-) (catalog.Root, error) {
+) (root.Root, error) {
 	return scanRoot(tx.QueryRowContext(
 		ctx,
 		`SELECT `+rootColumns+` FROM artifact_roots
@@ -601,7 +608,7 @@ func getRootTx(
 	))
 }
 
-func scanRoot(row scanner) (catalog.Root, error) {
+func scanRoot(row scanner) (root.Root, error) {
 	var (
 		id, kind, displayName, description string
 		enabled                            int
@@ -622,9 +629,9 @@ func scanRoot(row scanner) (catalog.Root, error) {
 		&modifiedAt,
 		&deletedAt,
 	); err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
-	value := catalog.Root{
+	value := root.Root{
 		ID:          artifactstore.RootID(id),
 		Kind:        artifactstore.RootKind(kind),
 		DisplayName: displayName,
@@ -637,7 +644,7 @@ func scanRoot(row scanner) (catalog.Root, error) {
 		DeletedAt:   parseNullableTime(deletedAt),
 	}
 	if err := value.Validate(); err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
 	return value, nil
 }
@@ -645,7 +652,7 @@ func scanRoot(row scanner) (catalog.Root, error) {
 func updateRootRevisionTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	value catalog.Root,
+	value root.Root,
 	expectedRevision uint64,
 ) error {
 	result, err := tx.ExecContext(

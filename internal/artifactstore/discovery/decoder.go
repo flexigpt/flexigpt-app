@@ -7,7 +7,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 type Recognition int
@@ -19,7 +18,8 @@ const (
 )
 
 type Candidate struct {
-	Source              source.Source
+	SourceID            artifactstore.SourceID
+	SourceKind          artifactstore.SourceKind
 	Locator             artifactstore.Locator
 	SourceContentDigest artifactstore.Digest
 	Content             []byte
@@ -76,7 +76,7 @@ func NewDecoderRegistry(
 	}, nil
 }
 
-func (r *DecoderRegistry) Get(
+func (r *DecoderRegistry) find(
 	id artifactstore.DecoderID,
 ) (Decoder, bool) {
 	if r == nil {
@@ -86,7 +86,7 @@ func (r *DecoderRegistry) Get(
 	return value, exists
 }
 
-func (r *DecoderRegistry) All() []Decoder {
+func (r *DecoderRegistry) registered() []Decoder {
 	if r == nil {
 		return nil
 	}

@@ -9,7 +9,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 )
+
+type occurrenceIdentity struct {
+	RootID     artifactstore.RootID
+	Occurrence catalog.OccurrenceKey
+}
+
+type recordIdentity struct {
+	Occurrence occurrenceIdentity
+	Kind       artifactstore.ArtifactKind
+}
 
 type Reconciler struct {
 	ids   artifactstore.IDGenerator
@@ -31,7 +42,7 @@ func NewReconciler(
 
 func (r *Reconciler) Reconcile(
 	ctx context.Context,
-	root catalog.Root,
+	rootValue root.Root,
 	occurrences []catalog.Occurrence,
 	existing []Record,
 	definitions definition.Reader,
@@ -43,27 +54,60 @@ func (r *Reconciler) Reconcile(
 			artifactstore.ErrInvalid,
 		)
 	}
-	occurrencesByTypedKey := make(map[string]catalog.Occurrence, len(occurrences))
+	if err := rootValue.Validate(); err != nil {
+		return Reconciliation{}, err
+	}
+	occurrencesByKey := make(
+		map[occurrenceIdentity]catalog.Occurrence,
+		len(occurrences),
+	)
 	for _, occurrence := range occurrences {
-		if occurrence.Kind == "" {
-			continue
+		if occurrence.RootID != rootValue.ID {
+			return Reconciliation{}, fmt.Errorf(
+				"%w: occurrence belongs to another root",
+				artifactstore.ErrInvalid,
+			)
 		}
-		key := TypedOccurrenceKey(root.ID, occurrence.Key, occurrence.Kind)
-		occurrencesByTypedKey[key] = occurrence
+		key := occurrenceIdentity{
+			RootID:     rootValue.ID,
+			Occurrence: occurrence.Key,
+		}
+		if _, duplicate := occurrencesByKey[key]; duplicate {
+			return Reconciliation{}, fmt.Errorf(
+				"%w: duplicate source occurrence",
+				artifactstore.ErrInvalid,
+			)
+		}
+		occurrencesByKey[key] = occurrence
 	}
 
-	recordsByTypedKey := make(map[string]Record, len(existing))
+	recordsByIdentity := make(map[recordIdentity]Record, len(existing))
 	for _, value := range existing {
-		key := TypedOccurrenceKey(value.RootID, value.Occurrence, value.Kind)
-		recordsByTypedKey[key] = value
+		if value.RootID != rootValue.ID {
+			return Reconciliation{}, fmt.Errorf(
+				"%w: record belongs to another root",
+				artifactstore.ErrInvalid,
+			)
+		}
+		key := recordIdentity{
+			Occurrence: occurrenceIdentity{
+				RootID:     value.RootID,
+				Occurrence: value.Occurrence,
+			},
+			Kind: value.Kind,
+		}
+		recordsByIdentity[key] = value
 	}
 
 	result := Reconciliation{}
 	now := r.clock.Now().UTC()
 
 	for _, current := range existing {
-		key := TypedOccurrenceKey(current.RootID, current.Occurrence, current.Kind)
-		occurrence, found := occurrencesByTypedKey[key]
+		key := occurrenceIdentity{
+			RootID:     current.RootID,
+			Occurrence: current.Occurrence,
+		}
+		occurrence, found := occurrencesByKey[key]
 		next := current
 
 		if current.Mode == ModePinned {
@@ -82,9 +126,8 @@ func (r *Reconciler) Reconcile(
 
 			case occurrence.State == catalog.OccurrenceInvalid:
 				next.State = StateInvalid
-				next.Diagnostics = append(
-					[]artifactstore.Diagnostic(nil),
-					occurrence.Diagnostics...,
+				next.Diagnostics = artifactstore.CloneDiagnostics(
+					occurrence.Diagnostics,
 				)
 
 			case occurrence.State == catalog.OccurrenceValid &&
@@ -99,10 +142,7 @@ func (r *Reconciler) Reconcile(
 			case occurrence.State == catalog.OccurrenceValid:
 				next.ResolvedDefinition = cloneDigest(occurrence.DefinitionDigest)
 				next.State = StateAvailable
-				next.Diagnostics = append(
-					[]artifactstore.Diagnostic(nil),
-					occurrence.Diagnostics...,
-				)
+				next.Diagnostics = artifactstore.CloneDiagnostics(occurrence.Diagnostics)
 			}
 		}
 
@@ -132,8 +172,14 @@ func (r *Reconciler) Reconcile(
 			occurrence.DefinitionDigest == nil {
 			continue
 		}
-		typedKey := TypedOccurrenceKey(root.ID, occurrence.Key, occurrence.Kind)
-		if _, exists := recordsByTypedKey[typedKey]; exists {
+		identity := recordIdentity{
+			Occurrence: occurrenceIdentity{
+				RootID:     rootValue.ID,
+				Occurrence: occurrence.Key,
+			},
+			Kind: occurrence.Kind,
+		}
+		if _, exists := recordsByIdentity[identity]; exists {
 			continue
 		}
 
@@ -143,7 +189,7 @@ func (r *Reconciler) Reconcile(
 		}
 		draft, create, diagnostics := policy.Derive(
 			ctx,
-			root,
+			rootValue,
 			occurrence,
 			value,
 		)
@@ -175,7 +221,7 @@ func (r *Reconciler) Reconcile(
 		resolved := *occurrence.DefinitionDigest
 		created := Record{
 			ID:                 artifactstore.RecordID(id),
-			RootID:             root.ID,
+			RootID:             rootValue.ID,
 			Occurrence:         occurrence.Key,
 			Kind:               occurrence.Kind,
 			Name:               draft.Name,
@@ -184,13 +230,10 @@ func (r *Reconciler) Reconcile(
 			ResolvedDefinition: &resolved,
 			Data:               json.RawMessage(data),
 			State:              StateAvailable,
-			Diagnostics: append(
-				[]artifactstore.Diagnostic(nil),
-				occurrence.Diagnostics...,
-			),
-			Revision:   1,
-			CreatedAt:  now,
-			ModifiedAt: now,
+			Diagnostics:        artifactstore.CloneDiagnostics(occurrence.Diagnostics),
+			Revision:           1,
+			CreatedAt:          now,
+			ModifiedAt:         now,
 		}
 		if err := created.Validate(); err != nil {
 			return Reconciliation{}, fmt.Errorf(
@@ -199,7 +242,7 @@ func (r *Reconciler) Reconcile(
 			)
 		}
 		result.Creates = append(result.Creates, created)
-		recordsByTypedKey[typedKey] = created
+		recordsByIdentity[identity] = created
 	}
 	return result, nil
 }
@@ -211,17 +254,7 @@ func equivalentSourceState(left, right Record) bool {
 	if !digestPointersEqual(left.ResolvedDefinition, right.ResolvedDefinition) {
 		return false
 	}
-	if len(left.Diagnostics) != len(right.Diagnostics) {
-		return false
-	}
-	for index := range left.Diagnostics {
-		if left.Diagnostics[index].Severity != right.Diagnostics[index].Severity ||
-			left.Diagnostics[index].Code != right.Diagnostics[index].Code ||
-			left.Diagnostics[index].Message != right.Diagnostics[index].Message {
-			return false
-		}
-	}
-	return true
+	return artifactstore.EqualDiagnostics(left.Diagnostics, right.Diagnostics)
 }
 
 func cloneDigest(value *artifactstore.Digest) *artifactstore.Digest {

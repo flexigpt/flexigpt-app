@@ -17,25 +17,22 @@ import (
 // DefinitionLoader reads the primary workspace definition before discovery so
 // its discovery preferences can be incorporated into the generated plan.
 type DefinitionLoader struct {
-	sources  sourceLookup
-	registry *source.Registry
-	decoder  *DefinitionDecoder
+	runtime source.Runtime
+	decoder *DefinitionDecoder
 }
 
 func NewDefinitionLoader(
-	sources sourceLookup,
-	registry *source.Registry,
+	runtime source.Runtime,
 ) (*DefinitionLoader, error) {
-	if sources == nil || registry == nil {
+	if runtime == nil {
 		return nil, fmt.Errorf(
-			"%w: Workspace definition loader dependencies are incomplete",
+			"%w: workspace definition loader runtime is nil",
 			ErrInvalidWorkspace,
 		)
 	}
 	return &DefinitionLoader{
-		sources:  sources,
-		registry: registry,
-		decoder:  NewDefinitionDecoder(),
+		runtime: runtime,
+		decoder: NewDefinitionDecoder(),
 	}, nil
 }
 
@@ -46,11 +43,11 @@ func (l *DefinitionLoader) Load(
 	if value.Data.PrimarySourceID == "" {
 		return DefinitionObservation{}, nil
 	}
-	sourceValue, err := l.sources.Get(ctx, value.Data.PrimarySourceID)
+	sourceValue, err := l.runtime.Get(ctx, value.Data.PrimarySourceID)
 	if err != nil {
 		return DefinitionObservation{}, err
 	}
-	snapshot, err := l.registry.Open(ctx, sourceValue)
+	snapshot, err := l.runtime.Open(ctx, sourceValue)
 	if err != nil {
 		return DefinitionObservation{}, err
 	}
@@ -99,7 +96,8 @@ func (l *DefinitionLoader) Load(
 	}
 
 	candidate := discovery.Candidate{
-		Source:              sourceValue,
+		SourceID:            sourceValue.ID,
+		SourceKind:          sourceValue.Kind,
 		Locator:             DefinitionLocator,
 		SourceContentDigest: definition.DigestBytes(content),
 		Content:             content,

@@ -7,6 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -37,51 +38,51 @@ type definitionLookup interface {
 }
 
 type workspaceRootStore interface {
-	CreateRoot(
+	Create(
 		ctx context.Context,
-		draft catalog.RootDraft,
-		attachments []catalog.AttachmentDraft,
-	) (catalog.Root, []catalog.Attachment, error)
+		draft root.RootDraft,
+		attachments []root.AttachmentDraft,
+	) (root.Root, []root.Attachment, error)
 
-	GetRoot(
+	Get(
 		ctx context.Context,
 		id artifactstore.RootID,
-	) (catalog.Root, error)
+	) (root.Root, error)
 
-	ListRoots(
+	List(
 		ctx context.Context,
 		includeDeleted bool,
-	) ([]catalog.Root, error)
+	) ([]root.Root, error)
 
-	UpdateRoot(
+	Update(
 		ctx context.Context,
 		id artifactstore.RootID,
-		update catalog.RootUpdate,
-	) (catalog.Root, error)
+		update root.RootUpdate,
+	) (root.Root, error)
 
-	DeleteRoot(
+	Delete(
 		ctx context.Context,
 		id artifactstore.RootID,
 		expectedRevision uint64,
-	) (catalog.Root, error)
+	) (root.Root, error)
 
 	Attach(
 		ctx context.Context,
 		rootID artifactstore.RootID,
 		expectedRootRevision uint64,
-		draft catalog.AttachmentDraft,
-	) (catalog.Root, catalog.Attachment, error)
+		draft root.AttachmentDraft,
+	) (root.Root, root.Attachment, error)
 
 	GetAttachment(
 		ctx context.Context,
 		rootID artifactstore.RootID,
 		sourceID artifactstore.SourceID,
-	) (catalog.Attachment, error)
+	) (root.Attachment, error)
 
 	ListAttachments(
 		ctx context.Context,
 		rootID artifactstore.RootID,
-	) ([]catalog.Attachment, error)
+	) ([]root.Attachment, error)
 
 	Detach(
 		ctx context.Context,
@@ -89,11 +90,11 @@ type workspaceRootStore interface {
 		sourceID artifactstore.SourceID,
 		expectedRootRevision uint64,
 		expectedAttachmentRevision uint64,
-	) (catalog.Root, error)
+	) (root.Root, error)
 }
 
 type catalogSnapshotReader interface {
-	Current(
+	GetCurrent(
 		ctx context.Context,
 		rootID artifactstore.RootID,
 	) (catalog.Snapshot, error)

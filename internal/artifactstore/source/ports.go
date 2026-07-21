@@ -8,9 +8,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 )
 
-type Repository interface {
-	Create(ctx context.Context, value Source) error
+type Reader interface {
 	Get(ctx context.Context, id artifactstore.SourceID) (Source, error)
+}
+
+type Repository interface {
+	Reader
+
+	Create(
+		ctx context.Context,
+		value Source,
+	) error
+
 	List(ctx context.Context) ([]Source, error)
 	Update(
 		ctx context.Context,
@@ -22,6 +31,13 @@ type Repository interface {
 		id artifactstore.SourceID,
 		expectedRevision uint64,
 	) error
+}
+
+type Opener interface {
+	Open(
+		ctx context.Context,
+		value Source,
+	) (Snapshot, error)
 }
 
 type Snapshot interface {

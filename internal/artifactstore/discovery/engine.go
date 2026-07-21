@@ -63,7 +63,8 @@ func NewEngine(
 func (e *Engine) Discover(
 	ctx context.Context,
 	rootID artifactstore.RootID,
-	sourceValue source.Source,
+	sourceID artifactstore.SourceID,
+	sourceKind artifactstore.SourceKind,
 	snapshot source.Snapshot,
 	plan SourcePlan,
 	previous []catalog.Occurrence,
@@ -72,7 +73,7 @@ func (e *Engine) Discover(
 	if err := plan.Validate(); err != nil {
 		return Result{}, err
 	}
-	if plan.SourceID != sourceValue.ID {
+	if plan.SourceID != sourceID {
 		return Result{}, fmt.Errorf(
 			"%w: discovery plan source mismatch",
 			artifactstore.ErrInvalid,
@@ -83,13 +84,13 @@ func (e *Engine) Discover(
 		return Result{}, fmt.Errorf(
 			"%w: source %q changed after discovery planning",
 			artifactstore.ErrConflict,
-			sourceValue.ID,
+			sourceID,
 		)
 	}
 
 	allowed := make(map[artifactstore.DecoderID]struct{}, len(plan.AllowedDecoderIDs))
 	for _, decoderID := range plan.AllowedDecoderIDs {
-		if _, exists := e.decoders.Get(decoderID); !exists {
+		if _, exists := e.decoders.find(decoderID); !exists {
 			return Result{}, fmt.Errorf(
 				"%w: decoder %q",
 				artifactstore.ErrDecoderUnavailable,
@@ -104,18 +105,18 @@ func (e *Engine) Discover(
 		return Result{}, err
 	}
 
-	occurrences := make(map[string]catalog.Occurrence, len(previous))
+	occurrences := make(map[catalog.OccurrenceKey]catalog.Occurrence, len(previous))
 	for _, value := range previous {
-		if value.Key.SourceID != sourceValue.ID {
+		if value.Key.SourceID != sourceID {
 			continue
 		}
-		occurrences[value.Key.String()] = value
+		occurrences[value.Key] = value
 	}
 
 	result := Result{
 		Definitions: make(map[artifactstore.Digest]definition.Definition),
 	}
-	seenKeys := make(map[string]struct{})
+	seenKeys := make(map[catalog.OccurrenceKey]struct{})
 	var consumed int64
 	now := e.clock.Now().UTC()
 
@@ -139,7 +140,7 @@ func (e *Engine) Discover(
 			applyInvalidForLocator(
 				occurrences,
 				rootID,
-				sourceValue.ID,
+				sourceID,
 				entry.Locator,
 				nil,
 				"",
@@ -149,7 +150,7 @@ func (e *Engine) Discover(
 			markObservedKeysForLocator(
 				seenKeys,
 				occurrences,
-				sourceValue.ID,
+				sourceID,
 				entry.Locator,
 			)
 			result.Diagnostics = artifactstore.AppendDiagnostics(
@@ -183,7 +184,8 @@ func (e *Engine) Discover(
 		}
 		sourceDigest := definition.DigestBytes(content)
 		candidate := Candidate{
-			Source:              sourceValue,
+			SourceID:            sourceID,
+			SourceKind:          sourceKind,
 			Locator:             entry.Locator,
 			SourceContentDigest: sourceDigest,
 			Content:             content,
@@ -194,7 +196,7 @@ func (e *Engine) Discover(
 			applyInvalidForLocator(
 				occurrences,
 				rootID,
-				sourceValue.ID,
+				sourceID,
 				entry.Locator,
 				&sourceDigest,
 				"",
@@ -204,7 +206,7 @@ func (e *Engine) Discover(
 			markObservedKeysForLocator(
 				seenKeys,
 				occurrences,
-				sourceValue.ID,
+				sourceID,
 				entry.Locator,
 			)
 			result.Diagnostics = artifactstore.AppendDiagnostics(
@@ -217,7 +219,7 @@ func (e *Engine) Discover(
 			continue
 		}
 
-		decoded, diagnostics := decoder.Decode(ctx, candidate)
+		decoded, diagnostics := decoder.Decode(ctx, cloneCandidate(candidate))
 		if err := artifactstore.ValidateDiagnostics(diagnostics); err != nil {
 			return Result{}, fmt.Errorf(
 				"%w: decoder %q returned invalid diagnostics: %w",
@@ -235,7 +237,7 @@ func (e *Engine) Discover(
 			applyInvalidForLocator(
 				occurrences,
 				rootID,
-				sourceValue.ID,
+				sourceID,
 				entry.Locator,
 				&sourceDigest,
 				decoder.ID(),
@@ -245,13 +247,13 @@ func (e *Engine) Discover(
 			markObservedKeysForLocator(
 				seenKeys,
 				occurrences,
-				sourceValue.ID,
+				sourceID,
 				entry.Locator,
 			)
 			continue
 		}
 
-		emittedForLocator := make(map[string]struct{}, len(decoded))
+		emittedForLocator := make(map[catalog.OccurrenceKey]struct{}, len(decoded))
 		for _, item := range decoded {
 			if err := artifactstore.ValidateSubresourceLocator(
 				item.SubresourceLocator,
@@ -264,20 +266,21 @@ func (e *Engine) Discover(
 				)
 			}
 			key := catalog.OccurrenceKey{
-				SourceID:           sourceValue.ID,
+				SourceID:           sourceID,
 				Locator:            entry.Locator,
 				SubresourceLocator: item.SubresourceLocator,
 			}
-			if _, duplicate := emittedForLocator[key.String()]; duplicate {
+			if _, duplicate := emittedForLocator[key]; duplicate {
 				return Result{}, fmt.Errorf(
-					"%w: decoder %q emitted duplicate resource %q",
+					"%w: decoder %q emitted duplicate resource at %q and %q",
 					artifactstore.ErrInvalid,
 					decoder.ID(),
-					key.String(),
+					key.Locator,
+					key.SubresourceLocator,
 				)
 			}
-			emittedForLocator[key.String()] = struct{}{}
-			seenKeys[key.String()] = struct{}{}
+			emittedForLocator[key] = struct{}{}
+			seenKeys[key] = struct{}{}
 
 			canonical, err := definition.Canonicalize(item.Definition)
 			if err != nil {
@@ -290,7 +293,7 @@ func (e *Engine) Discover(
 						SubresourceLocator: item.SubresourceLocator,
 					},
 				}}
-				occurrences[key.String()] = catalog.Occurrence{
+				occurrences[key] = catalog.Occurrence{
 					RootID:              rootID,
 					Key:                 key,
 					SourceContentDigest: &sourceDigest,
@@ -307,7 +310,7 @@ func (e *Engine) Discover(
 			}
 
 			definitionDigest := canonical.Digest
-			occurrences[key.String()] = catalog.Occurrence{
+			occurrences[key] = catalog.Occurrence{
 				RootID:              rootID,
 				Key:                 key,
 				Kind:                canonical.Kind,
@@ -317,14 +320,14 @@ func (e *Engine) Discover(
 				SourceContentDigest: &sourceDigest,
 				DecoderID:           decoder.ID(),
 				State:               catalog.OccurrenceValid,
-				Diagnostics:         append([]artifactstore.Diagnostic(nil), diagnostics...),
+				Diagnostics:         artifactstore.CloneDiagnostics(diagnostics),
 				ObservedAt:          now,
 			}
 			result.Definitions[canonical.Digest] = canonical
 		}
 
 		for key, previousValue := range occurrences {
-			if previousValue.Key.SourceID != sourceValue.ID ||
+			if previousValue.Key.SourceID != sourceID ||
 				previousValue.Key.Locator != entry.Locator {
 				continue
 			}
@@ -348,7 +351,7 @@ func (e *Engine) Discover(
 
 	if plan.Authoritative {
 		for key, previousValue := range occurrences {
-			if previousValue.Key.SourceID != sourceValue.ID {
+			if previousValue.Key.SourceID != sourceID {
 				continue
 			}
 			if _, observed := seenKeys[key]; observed {
@@ -388,14 +391,14 @@ func (e *Engine) selectDecoder(
 	best := RecognitionNone
 	tied := make([]artifactstore.DecoderID, 0)
 
-	for _, decoder := range e.decoders.All() {
+	for _, decoder := range e.decoders.registered() {
 		if len(allowed) != 0 {
 			if _, permitted := allowed[decoder.ID()]; !permitted {
 				continue
 			}
 		}
 
-		recognition := decoder.Recognize(ctx, candidate)
+		recognition := decoder.Recognize(ctx, cloneCandidate(candidate))
 		if recognition < RecognitionNone ||
 			recognition > RecognitionPreferred {
 			return nil, []artifactstore.Diagnostic{{
@@ -434,6 +437,12 @@ func (e *Engine) selectDecoder(
 		}}
 	}
 	return selected, nil
+}
+
+func cloneCandidate(value Candidate) Candidate {
+	output := value
+	output.Content = append([]byte(nil), value.Content...)
+	return output
 }
 
 func collectCandidates(
@@ -591,7 +600,7 @@ func readEntry(
 }
 
 func applyInvalidForLocator(
-	values map[string]catalog.Occurrence,
+	values map[catalog.OccurrenceKey]catalog.Occurrence,
 	rootID artifactstore.RootID,
 	sourceID artifactstore.SourceID,
 	locator artifactstore.Locator,
@@ -610,7 +619,7 @@ func applyInvalidForLocator(
 		previous.SourceContentDigest = cloneDigest(sourceDigest)
 		previous.DecoderID = decoderID
 		previous.State = catalog.OccurrenceInvalid
-		previous.Diagnostics = append([]artifactstore.Diagnostic(nil), diagnostics...)
+		previous.Diagnostics = artifactstore.CloneDiagnostics(diagnostics)
 		previous.ObservedAt = now
 		values[key] = previous
 	}
@@ -621,20 +630,20 @@ func applyInvalidForLocator(
 		SourceID: sourceID,
 		Locator:  locator,
 	}
-	values[key.String()] = catalog.Occurrence{
+	values[key] = catalog.Occurrence{
 		RootID:              rootID,
 		Key:                 key,
 		SourceContentDigest: cloneDigest(sourceDigest),
 		DecoderID:           decoderID,
 		State:               catalog.OccurrenceInvalid,
-		Diagnostics:         append([]artifactstore.Diagnostic(nil), diagnostics...),
+		Diagnostics:         artifactstore.CloneDiagnostics(diagnostics),
 		ObservedAt:          now,
 	}
 }
 
 func markObservedKeysForLocator(
-	seenKeys map[string]struct{},
-	values map[string]catalog.Occurrence,
+	seenKeys map[catalog.OccurrenceKey]struct{},
+	values map[catalog.OccurrenceKey]catalog.Occurrence,
 	sourceID artifactstore.SourceID,
 	locator artifactstore.Locator,
 ) {

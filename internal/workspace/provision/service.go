@@ -16,7 +16,7 @@ type sourceManager interface {
 	Create(
 		ctx context.Context,
 		draft source.Draft,
-	) (source.Source, error)
+	) (source.Summary, error)
 
 	Delete(
 		ctx context.Context,

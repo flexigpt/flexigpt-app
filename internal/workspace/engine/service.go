@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -45,9 +45,9 @@ func (s *Service) CreateEmpty(
 	if err != nil {
 		return Workspace{}, err
 	}
-	root, _, err := s.roots.CreateRoot(
+	createdRoot, _, err := s.roots.Create(
 		ctx,
-		catalog.RootDraft{
+		root.RootDraft{
 			Kind:        RootKind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
@@ -59,7 +59,7 @@ func (s *Service) CreateEmpty(
 	if err != nil {
 		return Workspace{}, err
 	}
-	return s.Get(ctx, root.ID)
+	return s.Get(ctx, createdRoot.ID)
 }
 
 func (s *Service) CreateFilesystem(
@@ -99,16 +99,16 @@ func (s *Service) CreateFilesystem(
 	if err != nil {
 		return Workspace{}, err
 	}
-	root, _, err := s.roots.CreateRoot(
+	createdRoot, _, err := s.roots.Create(
 		ctx,
-		catalog.RootDraft{
+		root.RootDraft{
 			Kind:        RootKind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
 			Enabled:     true,
 			Data:        raw,
 		},
-		[]catalog.AttachmentDraft{{
+		[]root.AttachmentDraft{{
 			SourceID: sourceValue.ID,
 			Role:     RolePrimary,
 			Priority: primaryOperation.defaultPriority,
@@ -119,13 +119,13 @@ func (s *Service) CreateFilesystem(
 	if err != nil {
 		return Workspace{}, err
 	}
-	return s.Get(ctx, root.ID)
+	return s.Get(ctx, createdRoot.ID)
 }
 
 func (s *Service) List(
 	ctx context.Context,
 ) ([]Workspace, error) {
-	roots, err := s.roots.ListRoots(ctx, false)
+	roots, err := s.roots.List(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -159,10 +159,10 @@ func (s *Service) Update(
 	if err != nil {
 		return Workspace{}, err
 	}
-	_, err = s.roots.UpdateRoot(
+	_, err = s.roots.Update(
 		ctx,
 		request.RootID,
-		catalog.RootUpdate{
+		root.RootUpdate{
 			ExpectedRevision: request.ExpectedRevision,
 			DisplayName:      request.DisplayName,
 			Description:      request.Description,
@@ -208,7 +208,7 @@ func (s *Service) Attach(
 		ctx,
 		request.RootID,
 		request.ExpectedRootRevision,
-		catalog.AttachmentDraft{
+		root.AttachmentDraft{
 			SourceID: request.SourceID,
 			Role:     request.Role,
 			Priority: request.Priority,
@@ -252,30 +252,30 @@ func (s *Service) Delete(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 	expectedRevision uint64,
-) (catalog.Root, error) {
+) (root.Root, error) {
 	if _, err := s.Get(ctx, rootID); err != nil {
-		return catalog.Root{}, err
+		return root.Root{}, err
 	}
-	return s.roots.DeleteRoot(ctx, rootID, expectedRevision)
+	return s.roots.Delete(ctx, rootID, expectedRevision)
 }
 
 func (s *Service) Get(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) (Workspace, error) {
-	root, err := s.roots.GetRoot(ctx, rootID)
+	r, err := s.roots.Get(ctx, rootID)
 	if err != nil {
 		return Workspace{}, err
 	}
-	if root.Kind != RootKind {
+	if r.Kind != RootKind {
 		return Workspace{}, fmt.Errorf(
 			"%w: root %q has kind %q",
 			ErrNotWorkspace,
 			rootID,
-			root.Kind,
+			r.Kind,
 		)
 	}
-	data, err := decodeRootData(root.Data)
+	data, err := decodeRootData(r.Data)
 	if err != nil {
 		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
 	}
@@ -291,14 +291,14 @@ func (s *Service) Get(
 		}
 		sources = append(sources, value)
 	}
-	if err := validateWorkspaceState(root, data, attachments, sources); err != nil {
+	if err := validateWorkspaceState(r, data, attachments, sources); err != nil {
 		return Workspace{}, err
 	}
 	sort.Slice(sources, func(left, right int) bool {
 		return sources[left].ID < sources[right].ID
 	})
 	return Workspace{
-		Root:        root,
+		Root:        r,
 		Data:        data,
 		Attachments: attachments,
 		Sources:     sources,

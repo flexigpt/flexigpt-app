@@ -1,4 +1,4 @@
-package catalog
+package root
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func NewService(
 ) (*Service, error) {
 	if repository == nil || ids == nil || clock == nil {
 		return nil, fmt.Errorf(
-			"%w: catalog service dependencies are incomplete",
+			"%w: root service dependencies are incomplete",
 			artifactstore.ErrInvalid,
 		)
 	}
@@ -34,7 +34,7 @@ func NewService(
 	}, nil
 }
 
-func (s *Service) CreateRoot(
+func (s *Service) Create(
 	ctx context.Context,
 	draft RootDraft,
 	attachmentDrafts []AttachmentDraft,
@@ -106,34 +106,34 @@ func (s *Service) CreateRoot(
 		attachments = append(attachments, attachment)
 	}
 
-	if err := s.repository.CreateRoot(ctx, root, attachments); err != nil {
+	if err := s.repository.Create(ctx, root, attachments); err != nil {
 		return Root{}, nil, err
 	}
 	return root, attachments, nil
 }
 
-func (s *Service) GetRoot(
+func (s *Service) Get(
 	ctx context.Context,
 	id artifactstore.RootID,
 ) (Root, error) {
-	return s.repository.GetRoot(ctx, id, false)
+	return s.repository.Get(ctx, id, false)
 }
 
-func (s *Service) GetRootIncludingDeleted(
+func (s *Service) GetIncludingDeleted(
 	ctx context.Context,
 	id artifactstore.RootID,
 ) (Root, error) {
-	return s.repository.GetRoot(ctx, id, true)
+	return s.repository.Get(ctx, id, true)
 }
 
-func (s *Service) ListRoots(
+func (s *Service) List(
 	ctx context.Context,
 	includeDeleted bool,
 ) ([]Root, error) {
-	return s.repository.ListRoots(ctx, includeDeleted)
+	return s.repository.List(ctx, includeDeleted)
 }
 
-func (s *Service) UpdateRoot(
+func (s *Service) Update(
 	ctx context.Context,
 	id artifactstore.RootID,
 	update RootUpdate,
@@ -144,7 +144,7 @@ func (s *Service) UpdateRoot(
 			artifactstore.ErrInvalid,
 		)
 	}
-	current, err := s.repository.GetRoot(ctx, id, false)
+	current, err := s.repository.Get(ctx, id, false)
 	if err != nil {
 		return Root{}, err
 	}
@@ -182,13 +182,13 @@ func (s *Service) UpdateRoot(
 	if err := next.Validate(); err != nil {
 		return Root{}, err
 	}
-	if err := s.repository.UpdateRoot(ctx, next, update.ExpectedRevision); err != nil {
+	if err := s.repository.Update(ctx, next, update.ExpectedRevision); err != nil {
 		return Root{}, err
 	}
 	return next, nil
 }
 
-func (s *Service) DeleteRoot(
+func (s *Service) Delete(
 	ctx context.Context,
 	id artifactstore.RootID,
 	expectedRevision uint64,
@@ -199,7 +199,7 @@ func (s *Service) DeleteRoot(
 			artifactstore.ErrInvalid,
 		)
 	}
-	current, err := s.repository.GetRoot(ctx, id, false)
+	current, err := s.repository.Get(ctx, id, false)
 	if err != nil {
 		return Root{}, err
 	}
@@ -219,7 +219,7 @@ func (s *Service) DeleteRoot(
 	if err := next.Validate(); err != nil {
 		return Root{}, err
 	}
-	if err := s.repository.UpdateRoot(ctx, next, expectedRevision); err != nil {
+	if err := s.repository.Update(ctx, next, expectedRevision); err != nil {
 		return Root{}, err
 	}
 	return next, nil
@@ -244,7 +244,7 @@ func (s *Service) Attach(
 	if err != nil {
 		return Root{}, Attachment{}, err
 	}
-	currentRoot, err := s.repository.GetRoot(ctx, rootID, false)
+	currentRoot, err := s.repository.Get(ctx, rootID, false)
 	if err != nil {
 		return Root{}, Attachment{}, err
 	}
@@ -309,7 +309,7 @@ func (s *Service) UpdateAttachment(
 	if err != nil {
 		return Root{}, Attachment{}, err
 	}
-	root, err := s.repository.GetRoot(ctx, rootID, false)
+	root, err := s.repository.Get(ctx, rootID, false)
 	if err != nil {
 		return Root{}, Attachment{}, err
 	}
@@ -382,7 +382,7 @@ func (s *Service) Detach(
 			artifactstore.ErrInvalid,
 		)
 	}
-	currentRoot, err := s.repository.GetRoot(ctx, rootID, false)
+	currentRoot, err := s.repository.Get(ctx, rootID, false)
 	if err != nil {
 		return Root{}, err
 	}
@@ -401,13 +401,6 @@ func (s *Service) Detach(
 		expectedAttachmentRevision,
 		s.nextModifiedAt(currentRoot.ModifiedAt),
 	)
-}
-
-func (s *Service) Current(
-	ctx context.Context,
-	rootID artifactstore.RootID,
-) (Snapshot, error) {
-	return s.repository.GetCurrentCatalog(ctx, rootID)
 }
 
 func (s *Service) nextModifiedAt(previous time.Time) time.Time {

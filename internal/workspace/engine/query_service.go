@@ -14,6 +14,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
+type occurrenceKindKey struct {
+	Occurrence catalog.OccurrenceKey
+	Kind       artifactstore.ArtifactKind
+}
+
+func occurrenceKindIdentity(
+	key catalog.OccurrenceKey,
+	kind artifactstore.ArtifactKind,
+) occurrenceKindKey {
+	return occurrenceKindKey{Occurrence: key, Kind: kind}
+}
+
 type QueryService struct {
 	workspaces  *Service
 	catalogs    catalogSnapshotReader
@@ -206,29 +218,28 @@ func (q *QueryService) Catalog(
 	if err != nil {
 		return CatalogView{}, err
 	}
-	snapshot, err := q.catalogs.Current(ctx, rootID)
+	snapshot, err := q.catalogs.GetCurrent(ctx, rootID)
 	if err != nil {
 		return CatalogView{}, err
 	}
 	if err := q.ensureCurrent(ctx, workspaceValue, snapshot); err != nil {
 		return CatalogView{}, err
 	}
+
 	records, err := q.records.ListByRoot(ctx, rootID)
 	if err != nil {
 		return CatalogView{}, err
 	}
-
-	occurrencesByTypedKey := make(map[string]catalog.Occurrence)
+	occurrencesByKey := make(map[occurrenceKindKey]catalog.Occurrence)
 	for _, occurrence := range snapshot.Occurrences {
 		if occurrence.Kind == "" {
 			continue
 		}
-		key := record.TypedOccurrenceKey(
-			rootID,
+		key := occurrenceKindIdentity(
 			occurrence.Key,
 			occurrence.Kind,
 		)
-		occurrencesByTypedKey[key] = occurrence
+		occurrencesByKey[key] = occurrence
 	}
 
 	sourcesByID := make(map[artifactstore.SourceID]source.Source)
@@ -236,18 +247,17 @@ func (q *QueryService) Catalog(
 		sourcesByID[value.ID] = value
 	}
 
-	recorded := make(map[string]struct{}, len(records))
+	recorded := make(map[occurrenceKindKey]struct{}, len(records))
 	view := CatalogView{
 		Workspace: workspaceValue,
 		Catalog:   snapshot,
 	}
 	for _, localRecord := range records {
-		typedKey := record.TypedOccurrenceKey(
-			rootID,
+		key := occurrenceKindIdentity(
 			localRecord.Occurrence,
 			localRecord.Kind,
 		)
-		recorded[typedKey] = struct{}{}
+		recorded[key] = struct{}{}
 
 		if localRecord.ResolvedDefinition == nil {
 			view.UnresolvedRecords = append(
@@ -264,7 +274,7 @@ func (q *QueryService) Catalog(
 			return CatalogView{}, err
 		}
 		var occurrencePointer *catalog.Occurrence
-		occurrence, found := occurrencesByTypedKey[typedKey]
+		occurrence, found := occurrencesByKey[key]
 		if found {
 			copyValue := occurrence
 			occurrencePointer = &copyValue
@@ -296,12 +306,11 @@ func (q *QueryService) Catalog(
 		if occurrence.Kind == "" {
 			continue
 		}
-		typedKey := record.TypedOccurrenceKey(
-			rootID,
+		key := occurrenceKindIdentity(
 			occurrence.Key,
 			occurrence.Kind,
 		)
-		if _, exists := recorded[typedKey]; !exists {
+		if _, exists := recorded[key]; !exists {
 			view.Unrecorded = append(view.Unrecorded, occurrence)
 		}
 	}
