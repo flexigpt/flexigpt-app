@@ -60,6 +60,14 @@ func (p *Planner) Build(
 		if !attachment.Enabled {
 			continue
 		}
+		operation, supported := attachmentOperationFor(attachment.Role)
+		if !supported {
+			return discovery.Plan{}, fmt.Errorf(
+				"%w: unsupported attachment role %q",
+				ErrInvalidWorkspace,
+				attachment.Role,
+			)
+		}
 		attachmentData, err := decodeAttachmentData(attachment.Data)
 		if err != nil {
 			return discovery.Plan{}, err
@@ -70,83 +78,45 @@ func (p *Planner) Build(
 				[]artifactstore.DecoderID(nil),
 				p.decoderIDs...,
 			),
-			Authoritative:     true,
+			Authoritative:     operation.defaultAuthoritative,
 			MaxCandidateBytes: artifactstore.MaxCandidateBytes,
 			MaxTotalBytes:     artifactstore.MaxScanBytes,
 			MaxCandidates:     artifactstore.DefaultMaxCandidates,
 			MaxEntries:        artifactstore.DefaultMaxEntries,
 			MaxDepth:          artifactstore.DefaultMaxDepth,
+			ExplicitLocators: append(
+				[]artifactstore.Locator(nil),
+				operation.profile.explicitLocators...,
+			),
+			DirectoryRoots: cloneDirectoryRoots(
+				operation.profile.directoryRoots,
+			),
 		}
 
-		if attachment.Role == RolePrimary {
-			sourcePlan.ExplicitLocators = []artifactstore.Locator{
-				DefinitionLocator,
-				"AGENTS.md",
-				"CLAUDE.md",
-			}
-			if preferences.IncludeReadme {
-				sourcePlan.ExplicitLocators = append(
-					sourcePlan.ExplicitLocators,
-					"README.md",
-				)
-			}
-			sourcePlan.ExplicitLocators = append(
+		if operation.includeReadmeWhenRequested &&
+			preferences.IncludeReadme {
+			sourcePlan.ExplicitLocators = appendUniqueLocators(
+				sourcePlan.ExplicitLocators,
+				ContextReadmeLocator,
+			)
+		}
+		if operation.appliesWorkspaceDiscoveryPreferences {
+			sourcePlan.ExplicitLocators = appendUniqueLocators(
 				sourcePlan.ExplicitLocators,
 				preferences.AdditionalLocators...,
 			)
-			sourcePlan.DirectoryRoots = []discovery.DirectoryRoot{
-				{
-					Root:      ".flexigpt",
-					Recursive: true,
-					IncludePatterns: []string{
-						"*.json",
-						"*.yaml",
-						"*.yml",
-						"*.md",
-					},
-				},
-				{
-					Root:      ".skills",
-					Recursive: true,
-					IncludePatterns: []string{
-						"SKILL.md",
-					},
-				},
-			}
-			for _, root := range preferences.AdditionalRoots {
-				sourcePlan.DirectoryRoots = append(
-					sourcePlan.DirectoryRoots,
-					discovery.DirectoryRoot{
-						Root:      root.Root,
-						Recursive: root.Recursive,
-						IncludePatterns: append(
-							[]string(nil),
-							root.IncludePatterns...,
-						),
-					},
-				)
-			}
-		} else {
-			recursive := true
-			authoritative := true
+			sourcePlan.DirectoryRoots = appendDiscoveryRoots(
+				sourcePlan.DirectoryRoots,
+				preferences.AdditionalRoots,
+			)
+		}
+		if operation.allowsAttachmentDiscoveryOverrides {
 			if attachmentData.Recursive != nil {
-				recursive = *attachmentData.Recursive
+				sourcePlan.DirectoryRoots[0].Recursive = *attachmentData.Recursive
 			}
 			if attachmentData.Authoritative != nil {
-				authoritative = *attachmentData.Authoritative
+				sourcePlan.Authoritative = *attachmentData.Authoritative
 			}
-			sourcePlan.Authoritative = authoritative
-			sourcePlan.DirectoryRoots = []discovery.DirectoryRoot{{
-				Root:      ".",
-				Recursive: recursive,
-				IncludePatterns: []string{
-					"*.json",
-					"*.yaml",
-					"*.yml",
-					"*.md",
-					"SKILL.md",
-				},
-			}}
 		}
 		sourcePlan.ApplyDefaults()
 		plans = append(plans, sourcePlan)
@@ -159,6 +129,71 @@ func (p *Planner) Build(
 		return discovery.Plan{}, err
 	}
 	return valuePlan, nil
+}
+
+func cloneDirectoryRoots(
+	values []discovery.DirectoryRoot,
+) []discovery.DirectoryRoot {
+	output := make([]discovery.DirectoryRoot, len(values))
+	for index, value := range values {
+		output[index] = value
+		output[index].IncludePatterns = append(
+			[]string(nil),
+			value.IncludePatterns...,
+		)
+	}
+	return output
+}
+
+func appendUniqueLocators(
+	values []artifactstore.Locator,
+	additions ...artifactstore.Locator,
+) []artifactstore.Locator {
+	seen := make(map[artifactstore.Locator]struct{}, len(values)+len(additions))
+	for _, value := range values {
+		seen[value] = struct{}{}
+	}
+	for _, value := range additions {
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		values = append(values, value)
+	}
+	return values
+}
+
+func appendDiscoveryRoots(
+	values []discovery.DirectoryRoot,
+	additions []DiscoveryRoot,
+) []discovery.DirectoryRoot {
+	for _, addition := range additions {
+		merged := false
+		for index := range values {
+			if values[index].Root != addition.Root {
+				continue
+			}
+			values[index].Recursive = values[index].Recursive || addition.Recursive
+			values[index].IncludePatterns = mergePatterns(
+				values[index].IncludePatterns,
+				addition.IncludePatterns,
+			)
+			merged = true
+			break
+		}
+		if merged {
+			continue
+		}
+		values = append(values, discovery.DirectoryRoot{
+			Root:      addition.Root,
+			Recursive: addition.Recursive,
+			IncludePatterns: append(
+				[]string(nil),
+				addition.IncludePatterns...,
+			),
+		})
+	}
+	return values
 }
 
 type DefinitionLoader struct {

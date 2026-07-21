@@ -354,7 +354,10 @@ func matchesSelector(
 	if constraint == "" {
 		return true
 	}
-	constraint = strings.TrimSpace(strings.TrimPrefix(constraint, "="))
+	constraint = strings.TrimSpace(strings.TrimPrefix(
+		constraint,
+		exactVersionConstraintOp,
+	))
 	return constraint == string(value.LogicalVersion)
 }
 

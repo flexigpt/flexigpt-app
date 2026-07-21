@@ -28,12 +28,12 @@ func (*ContextDecoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	switch strings.ToUpper(path.Base(string(candidate.Locator))) {
-	case "AGENTS.MD", "CLAUDE.MD", "README.MD":
-		return discovery.RecognitionPreferred
-	default:
+	if _, supported := contextFileSupportFor(
+		path.Base(string(candidate.Locator)),
+	); !supported {
 		return discovery.RecognitionNone
 	}
+	return discovery.RecognitionPreferred
 }
 
 func (*ContextDecoder) Decode(
@@ -43,14 +43,14 @@ func (*ContextDecoder) Decode(
 	if !utf8.Valid(candidate.Content) {
 		return nil, workspaceArtifactDiagnostics(
 			candidate.Locator,
-			"workspace.context.invalid-utf8",
+			diagnosticCodeContextInvalidUTF8,
 			"context file must contain valid UTF-8",
 		)
 	}
 	if bytes.ContainsRune(candidate.Content, 0) {
 		return nil, workspaceArtifactDiagnostics(
 			candidate.Locator,
-			"workspace.context.invalid-content",
+			diagnosticCodeContextInvalidContent,
 			"context file contains a NUL byte",
 		)
 	}
@@ -60,7 +60,7 @@ func (*ContextDecoder) Decode(
 	document := ContextDefinition{
 		Name:      name,
 		Role:      role,
-		MediaType: "text/markdown",
+		MediaType: contextMarkdownMediaType,
 		Content:   strings.ReplaceAll(string(candidate.Content), "\r\n", "\n"),
 	}
 	raw, err := json.Marshal(document)
@@ -78,13 +78,13 @@ func (*ContextDecoder) Decode(
 	value := definition.Definition{
 		Kind:          ContextKind,
 		SchemaID:      ContextSchemaID,
-		SchemaVersion: "1",
+		SchemaVersion: workspaceSchemaVersionV1,
 		LogicalName: artifactstore.LogicalName(
 			strings.ToLower(strings.TrimSuffix(name, path.Ext(name))),
 		),
 		DisplayName: name,
 		Labels: map[string]string{
-			"context.role": role,
+			contextRoleLabelKey: role,
 		},
 		Body: raw,
 	}
@@ -92,16 +92,20 @@ func (*ContextDecoder) Decode(
 }
 
 func contextRole(name string) string {
-	switch strings.ToUpper(name) {
-	case "AGENTS.MD":
-		return "agent-instructions"
-	case "CLAUDE.MD":
-		return "assistant-instructions"
-	case "README.MD":
-		return "project-readme"
-	default:
-		return "project-context"
+	support, found := contextFileSupportFor(name)
+	if !found {
+		return contextRoleProjectContext
 	}
+	return support.role
+}
+
+func contextFileSupportFor(name string) (contextFileSupport, bool) {
+	for _, support := range contextFileSupportMatrix {
+		if strings.EqualFold(name, support.fileName) {
+			return support, true
+		}
+	}
+	return contextFileSupport{}, false
 }
 
 func workspaceArtifactErrorDiagnostics(
@@ -110,7 +114,7 @@ func workspaceArtifactErrorDiagnostics(
 ) []artifactstore.Diagnostic {
 	return workspaceArtifactDiagnostics(
 		locator,
-		"workspace.artifact.invalid",
+		diagnosticCodeArtifactInvalid,
 		err.Error(),
 	)
 }

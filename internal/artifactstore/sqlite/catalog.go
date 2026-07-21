@@ -352,6 +352,7 @@ func (s *Store) detach(
 	sourceID artifactstore.SourceID,
 	expectedRootRevision uint64,
 	expectedAttachmentRevision uint64,
+	modifiedAt time.Time,
 ) (catalog.Root, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -387,7 +388,7 @@ func (s *Store) detach(
 	}
 
 	root.Revision++
-	root.ModifiedAt = time.Now().UTC()
+	root.ModifiedAt = modifiedAt
 	if err := updateRootRevisionTx(
 		ctx,
 		tx,

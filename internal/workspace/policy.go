@@ -9,32 +9,38 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 )
 
 type RecordPolicy struct {
-	descriptors map[artifactstore.ArtifactKind]Descriptor
+	schemaIDs map[artifactstore.ArtifactKind]artifactstore.SchemaID
 }
 
 func NewRecordPolicy(
-	descriptors ...Descriptor,
+	supports ...ArtifactSupport,
 ) (*RecordPolicy, error) {
-	values := map[artifactstore.ArtifactKind]Descriptor{
-		DefinitionKind: {
-			Kind:     DefinitionKind,
-			SchemaID: DefinitionSchemaID,
-		},
+	if len(supports) == 0 {
+		return nil, fmt.Errorf(
+			"%w: workspace artifact support is required",
+			ErrInvalidWorkspace,
+		)
 	}
-	for _, descriptor := range descriptors {
-		if err := artifactstore.ValidateArtifactKind(descriptor.Kind); err != nil {
+	values := make(map[artifactstore.ArtifactKind]artifactstore.SchemaID, len(supports))
+	for _, support := range supports {
+		if err := support.Validate(); err != nil {
 			return nil, err
 		}
-		if err := artifactstore.ValidateSchemaID(descriptor.SchemaID); err != nil {
-			return nil, err
+		if _, duplicate := values[support.Kind]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: duplicate workspace artifact kind %q",
+				ErrInvalidWorkspace,
+				support.Kind,
+			)
 		}
-		values[descriptor.Kind] = descriptor
+		values[support.Kind] = support.SchemaID
 	}
-	return &RecordPolicy{descriptors: values}, nil
+	return &RecordPolicy{schemaIDs: values}, nil
 }
 
 func (p *RecordPolicy) Derive(
@@ -43,14 +49,14 @@ func (p *RecordPolicy) Derive(
 	occurrence catalog.Occurrence,
 	value definition.Definition,
 ) (record.Draft, bool, []artifactstore.Diagnostic) {
-	descriptor, supported := p.descriptors[occurrence.Kind]
+	schemaID, supported := p.schemaIDs[occurrence.Kind]
 	if !supported {
 		return record.Draft{}, false, nil
 	}
-	if value.SchemaID != descriptor.SchemaID {
+	if value.SchemaID != schemaID {
 		return record.Draft{}, false, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,
-			Code:     "workspace.record.schema-unsupported",
+			Code:     diagnosticCodeRecordSchemaUnsupported,
 			Message: fmt.Sprintf(
 				"definition schema %q is not supported for kind %q",
 				value.SchemaID,
@@ -66,7 +72,7 @@ func (p *RecordPolicy) Derive(
 	return record.Draft{
 		Name:    name,
 		Enabled: true,
-		Data:    json.RawMessage("{}"),
+		Data:    json.RawMessage(jsoncanon.EmptyObject),
 	}, true, nil
 }
 
@@ -76,15 +82,19 @@ func recordName(
 ) string {
 	base := strings.TrimSpace(string(logicalName))
 	if base == "" {
-		base = "artifact"
+		base = defaultRecordName
 	}
 	digest := definition.DigestBytes([]byte(key.String()))
-	suffix := strings.TrimPrefix(string(digest), "sha256:")[:12]
-	maximum := artifactstore.MaxDisplayNameBytes - len(suffix) - 1
+	suffix := strings.TrimPrefix(
+		string(digest),
+		artifactstore.DigestSHA256Prefix,
+	)
+	suffix = suffix[:recordNameDigestLength]
+	maximum := artifactstore.MaxDisplayNameBytes - len(suffix) - len(recordNameSeparator)
 	if len(base) > maximum {
 		base = base[:maximum]
 	}
-	return base + "-" + suffix
+	return base + recordNameSeparator + suffix
 }
 
 var _ record.Policy = (*RecordPolicy)(nil)

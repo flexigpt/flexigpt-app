@@ -11,8 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
 
-const DefinitionLocator artifactstore.Locator = ".flexigpt/workspace.json"
-
 type DefinitionDecoder struct{}
 
 func NewDefinitionDecoder() *DefinitionDecoder {
@@ -70,9 +68,9 @@ func (*DefinitionDecoder) Decode(
 	value := definition.Definition{
 		Kind:          DefinitionKind,
 		SchemaID:      DefinitionSchemaID,
-		SchemaVersion: "1",
-		LogicalName:   "workspace",
-		DisplayName:   "Workspace",
+		SchemaVersion: workspaceSchemaVersionV1,
+		LogicalName:   workspaceDefinitionLogicalName,
+		DisplayName:   workspaceDefinitionDisplayName,
 		Body:          body,
 	}
 	return []discovery.Decoded{{
@@ -90,7 +88,7 @@ func definitionDiagnostics(
 	}
 	return []artifactstore.Diagnostic{{
 		Severity: artifactstore.DiagnosticError,
-		Code:     "workspace.definition.invalid",
+		Code:     diagnosticCodeDefinitionInvalid,
 		Message:  message,
 		Location: &artifactstore.DiagnosticLocation{
 			Locator: locator,

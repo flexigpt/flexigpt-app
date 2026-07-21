@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -143,6 +144,7 @@ func (r *CatalogRepository) Detach(
 	sourceID artifactstore.SourceID,
 	expectedRootRevision uint64,
 	expectedAttachmentRevision uint64,
+	modifiedAt time.Time,
 ) (catalog.Root, error) {
 	return r.store.detach(
 		ctx,
@@ -150,6 +152,7 @@ func (r *CatalogRepository) Detach(
 		sourceID,
 		expectedRootRevision,
 		expectedAttachmentRevision,
+		modifiedAt,
 	)
 }
 

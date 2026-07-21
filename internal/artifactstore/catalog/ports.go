@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 )
@@ -94,6 +95,7 @@ type Repository interface {
 		sourceID artifactstore.SourceID,
 		expectedRootRevision uint64,
 		expectedAttachmentRevision uint64,
+		modifiedAt time.Time,
 	) (Root, error)
 
 	GetCurrentCatalog(

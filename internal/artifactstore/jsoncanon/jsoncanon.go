@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const EmptyObject = "{}"
+
 func Canonicalize(raw []byte) ([]byte, error) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
@@ -32,7 +34,7 @@ func Canonicalize(raw []byte) ([]byte, error) {
 
 func CanonicalizeObject(raw []byte, maximum int) ([]byte, error) {
 	if len(raw) == 0 {
-		raw = []byte("{}")
+		raw = []byte(EmptyObject)
 	}
 	if len(raw) > maximum {
 		return nil, fmt.Errorf("JSON object exceeds %d bytes", maximum)

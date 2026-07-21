@@ -59,7 +59,8 @@ func (p *ContextProvider) List(
 	for _, resourceValue := range view.Resources {
 		if resourceValue.Definition.Kind != ContextKind ||
 			resourceValue.Definition.SchemaID != ContextSchemaID ||
-			resourceValue.Record.State != record.StateAvailable {
+			resourceValue.Record.State != record.StateAvailable ||
+			!resourceValue.Record.Enabled {
 			continue
 		}
 		value, err := projectContext(resourceValue, priorities)
@@ -187,17 +188,17 @@ func composeContextPrompt(values []ContextContribution) string {
 	var output strings.Builder
 	for index, value := range values {
 		if index > 0 {
-			output.WriteString("\n\n")
+			output.WriteString(contextPromptSeparator)
 		}
 		fmt.Fprintf(
 			&output,
-			"<<<WORKSPACE_CONTEXT name=%q role=%q source=%q>>>\n",
+			contextPromptStartFormat,
 			value.Name,
 			value.Role,
 			value.Locator,
 		)
 		output.WriteString(strings.TrimSpace(value.Content))
-		output.WriteString("\n<<<END_WORKSPACE_CONTEXT>>>")
+		output.WriteString(contextPromptEndMarker)
 	}
 	return output.String()
 }

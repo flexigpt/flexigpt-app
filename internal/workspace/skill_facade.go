@@ -180,7 +180,7 @@ func projectWorkspaceSkill(
 		Skill:            projected,
 		MarkdownBody:     body.MarkdownBody,
 		RuntimeDefinition: agentskillsSpec.SkillDef{
-			Type:     "fs",
+			Type:     string(spec.SkillTypeFS),
 			Name:     body.Name,
 			Location: location,
 		},
@@ -219,8 +219,8 @@ func workspaceSkillLocation(
 	if err != nil {
 		return "", err
 	}
-	if relative == ".." ||
-		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
+	if relative == parentDirectoryPath ||
+		strings.HasPrefix(relative, parentDirectoryPath+string(filepath.Separator)) ||
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: Workspace Skill location escapes source root",

@@ -160,6 +160,7 @@ func validateDiscoveryPreferences(
 			)
 		}
 		seenRoots[root.Root] = struct{}{}
+		seenPatterns := make(map[string]struct{}, len(root.IncludePatterns))
 		for _, pattern := range root.IncludePatterns {
 			if strings.TrimSpace(pattern) != pattern || pattern == "" {
 				return fmt.Errorf(
@@ -167,6 +168,14 @@ func validateDiscoveryPreferences(
 					artifactstore.ErrInvalid,
 				)
 			}
+			if _, duplicate := seenPatterns[pattern]; duplicate {
+				return fmt.Errorf(
+					"%w: duplicate include pattern %q",
+					artifactstore.ErrInvalid,
+					pattern,
+				)
+			}
+			seenPatterns[pattern] = struct{}{}
 			if _, err := path.Match(pattern, "candidate"); err != nil {
 				return err
 			}
@@ -199,8 +208,13 @@ func validateWorkspaceState(
 
 	primaryCount := 0
 	for _, attachment := range attachments {
-		if err := validateRole(attachment.Role); err != nil {
-			return err
+		operation, supported := attachmentOperationFor(attachment.Role)
+		if !supported {
+			return fmt.Errorf(
+				"%w: unsupported attachment role %q",
+				ErrInvalidWorkspace,
+				attachment.Role,
+			)
 		}
 		sourceValue, exists := sourcesByID[attachment.SourceID]
 		if !exists {
@@ -210,7 +224,7 @@ func validateWorkspaceState(
 				attachment.SourceID,
 			)
 		}
-		if attachment.Role == RolePrimary {
+		if operation.isPrimary {
 			primaryCount++
 			if data.Mode != ModeFilesystem {
 				return fmt.Errorf(
@@ -230,7 +244,7 @@ func validateWorkspaceState(
 					ErrInvalidWorkspace,
 				)
 			}
-			if sourceValue.Kind != FilesystemSourceKind {
+			if sourceValue.Kind != operation.requiredSourceKind {
 				return fmt.Errorf(
 					"%w: primary source must be a filesystem source",
 					ErrInvalidWorkspace,
@@ -258,18 +272,12 @@ func validateWorkspaceState(
 }
 
 func validateRole(role artifactstore.AttachmentRole) error {
-	switch role {
-	case RolePrimary,
-		RoleBuiltIn,
-		RoleLibrary,
-		RoleAttachedPackage,
-		RoleOverlay:
+	if _, supported := attachmentOperationFor(role); supported {
 		return nil
-	default:
-		return fmt.Errorf(
-			"%w: unsupported attachment role %q",
-			ErrInvalidWorkspace,
-			role,
-		)
 	}
+	return fmt.Errorf(
+		"%w: unsupported attachment role %q",
+		ErrInvalidWorkspace,
+		role,
+	)
 }

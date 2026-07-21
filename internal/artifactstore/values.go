@@ -13,6 +13,8 @@ import (
 )
 
 const (
+	DigestSHA256Prefix = "sha256:"
+
 	MaxKindBytes              = 128
 	MaxSchemaIDBytes          = 256
 	MaxDisplayNameBytes       = 256
@@ -42,7 +44,7 @@ var (
 	identifierPattern = regexp.MustCompile(
 		`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`,
 	)
-	digestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	digestPattern = regexp.MustCompile(`^` + DigestSHA256Prefix + `[0-9a-f]{64}$`)
 )
 
 type (

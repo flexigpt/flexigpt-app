@@ -12,6 +12,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 )
 
+const (
+	DiagnosticCodeCandidateTooLarge         = "artifact.discovery.candidate-too-large"
+	DiagnosticCodeDecoderAmbiguous          = "artifact.discovery.decoder-ambiguous"
+	DiagnosticCodeDecoderInvalidRecognition = "artifact.discovery.decoder-invalid-recognition"
+	DiagnosticCodeDefinitionInvalid         = "artifact.discovery.definition-invalid"
+	DiagnosticCodeResourceMissing           = "artifact.discovery.resource-missing"
+	DiagnosticCodeSubresourceMissing        = "artifact.discovery.subresource-missing"
+)
+
 type DirectoryRoot struct {
 	Root            artifactstore.Locator
 	Recursive       bool
@@ -60,15 +69,36 @@ func (p *SourcePlan) Validate() error {
 			artifactstore.ErrInvalid,
 		)
 	}
+	seenLocators := make(map[artifactstore.Locator]struct{}, len(p.ExplicitLocators))
 	for _, locator := range p.ExplicitLocators {
 		if err := artifactstore.ValidateLocator(locator, false); err != nil {
 			return err
 		}
+		if _, duplicate := seenLocators[locator]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate explicit discovery locator %q",
+				artifactstore.ErrInvalid,
+				locator,
+			)
+		}
+		seenLocators[locator] = struct{}{}
 	}
+
+	seenRoots := make(map[artifactstore.Locator]struct{}, len(p.DirectoryRoots))
 	for _, root := range p.DirectoryRoots {
 		if err := artifactstore.ValidateLocator(root.Root, true); err != nil {
 			return err
 		}
+		if _, duplicate := seenRoots[root.Root]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate discovery root %q",
+				artifactstore.ErrInvalid,
+				root.Root,
+			)
+		}
+		seenRoots[root.Root] = struct{}{}
+
+		seenPatterns := make(map[string]struct{}, len(root.IncludePatterns))
 		for _, pattern := range root.IncludePatterns {
 			if strings.TrimSpace(pattern) != pattern || pattern == "" {
 				return fmt.Errorf(
@@ -76,6 +106,14 @@ func (p *SourcePlan) Validate() error {
 					artifactstore.ErrInvalid,
 				)
 			}
+			if _, duplicate := seenPatterns[pattern]; duplicate {
+				return fmt.Errorf(
+					"%w: duplicate discovery pattern %q",
+					artifactstore.ErrInvalid,
+					pattern,
+				)
+			}
+			seenPatterns[pattern] = struct{}{}
 			if _, err := path.Match(pattern, "candidate"); err != nil {
 				return fmt.Errorf(
 					"%w: invalid discovery pattern %q: %w",
@@ -86,10 +124,20 @@ func (p *SourcePlan) Validate() error {
 			}
 		}
 	}
+
+	seenDecoders := make(map[artifactstore.DecoderID]struct{}, len(p.AllowedDecoderIDs))
 	for _, decoderID := range p.AllowedDecoderIDs {
 		if err := artifactstore.ValidateDecoderID(decoderID); err != nil {
 			return err
 		}
+		if _, duplicate := seenDecoders[decoderID]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate allowed decoder %q",
+				artifactstore.ErrInvalid,
+				decoderID,
+			)
+		}
+		seenDecoders[decoderID] = struct{}{}
 	}
 	return nil
 }

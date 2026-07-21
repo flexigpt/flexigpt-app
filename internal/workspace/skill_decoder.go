@@ -21,10 +21,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
 
-const maxWorkspaceSkillBytes = 2 << 20
-
 var workspaceSkillNamePattern = regexp.MustCompile(
-	`^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$`,
+	workspaceSkillNamePatternText,
 )
 
 type SkillDecoder struct{}
@@ -41,7 +39,7 @@ func (*SkillDecoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if path.Base(string(candidate.Locator)) != "SKILL.md" {
+	if path.Base(string(candidate.Locator)) != skillDefinitionFileName {
 		return discovery.RecognitionNone
 	}
 	return discovery.RecognitionPreferred
@@ -55,7 +53,7 @@ func (*SkillDecoder) Decode(
 	if err != nil {
 		return nil, workspaceArtifactDiagnostics(
 			candidate.Locator,
-			"workspace.skill.invalid",
+			diagnosticCodeSkillInvalid,
 			err.Error(),
 		)
 	}
@@ -73,12 +71,12 @@ func (*SkillDecoder) Decode(
 	}
 
 	labels := map[string]string{
-		"skill.insert": document.Insert,
+		skillInsertLabelKey: document.Insert,
 	}
 	value := definition.Definition{
 		Kind:          SkillKind,
 		SchemaID:      SkillSchemaID,
-		SchemaVersion: "1",
+		SchemaVersion: workspaceSchemaVersionV1,
 		LogicalName:   artifactstore.LogicalName(document.Name),
 		DisplayName:   document.DisplayName,
 		Description:   document.Description,
@@ -111,12 +109,12 @@ func decodeSkillMarkdown(
 		return SkillDefinition{}, err
 	}
 
-	name, ok := rawProperties["name"].(string)
+	name, ok := rawProperties[skillFrontmatterNameKey].(string)
 	if !ok {
 		return SkillDefinition{}, errors.New("frontmatter.name must be a string")
 	}
 	if !workspaceSkillNamePattern.MatchString(name) ||
-		strings.Contains(name, "--") {
+		strings.Contains(name, skillNameRepeatedHyphen) {
 		return SkillDefinition{}, errors.New(
 			"frontmatter.name must be a lowercase hyphenated name of at most 64 characters",
 		)
@@ -130,7 +128,7 @@ func decodeSkillMarkdown(
 		)
 	}
 
-	description, ok := rawProperties["description"].(string)
+	description, ok := rawProperties[skillFrontmatterDescriptionKey].(string)
 	if !ok ||
 		strings.TrimSpace(description) != description ||
 		description == "" {
@@ -138,14 +136,14 @@ func decodeSkillMarkdown(
 			"frontmatter.description must be a non-empty trimmed string",
 		)
 	}
-	if len(description) > 1024 {
+	if len(description) > maxSkillDescriptionBytes {
 		return SkillDefinition{}, errors.New(
 			"frontmatter.description exceeds 1024 bytes",
 		)
 	}
 
 	insert := string(agentskillsSpec.SkillInsertInstructions)
-	if rawInsert, exists := rawProperties["insert"]; exists {
+	if rawInsert, exists := rawProperties[skillFrontmatterInsertKey]; exists {
 		value, ok := rawInsert.(string)
 		if !ok {
 			return SkillDefinition{}, errors.New(
@@ -164,11 +162,11 @@ func decodeSkillMarkdown(
 		}
 	}
 
-	arguments, err := decodeSkillArguments(rawProperties["arguments"])
+	arguments, err := decodeSkillArguments(rawProperties[skillFrontmatterArgumentsKey])
 	if err != nil {
 		return SkillDefinition{}, err
 	}
-	tags, err := decodeSkillTags(rawProperties["tags"])
+	tags, err := decodeSkillTags(rawProperties[skillFrontmatterTagsKey])
 	if err != nil {
 		return SkillDefinition{}, err
 	}
@@ -205,7 +203,7 @@ func splitSkillFrontmatter(
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, "", err
 	}
-	if strings.TrimSpace(strings.TrimRight(first, "\r\n")) != "---" {
+	if strings.TrimSpace(strings.TrimRight(first, "\r\n")) != yamlDocumentStart {
 		return nil, "", errors.New("SKILL.md requires YAML frontmatter")
 	}
 
@@ -215,7 +213,7 @@ func splitSkillFrontmatter(
 		if readErr != nil && !errors.Is(readErr, io.EOF) {
 			return nil, "", readErr
 		}
-		if strings.TrimSpace(strings.TrimRight(line, "\r\n")) == "---" {
+		if strings.TrimSpace(strings.TrimRight(line, "\r\n")) == yamlDocumentStart {
 			break
 		}
 		frontmatter.WriteString(line)
@@ -253,7 +251,7 @@ func decodeSkillArguments(
 				index,
 			)
 		}
-		name, ok := properties["name"].(string)
+		name, ok := properties[skillArgumentNameKey].(string)
 		if !ok || !validSkillArgumentName(name) {
 			return nil, fmt.Errorf(
 				"frontmatter.arguments[%d].name is invalid",
@@ -265,11 +263,11 @@ func decodeSkillArguments(
 		}
 		seen[name] = struct{}{}
 
-		description, err := optionalString(properties, "description")
+		description, err := optionalString(properties, skillArgumentDescriptionKey)
 		if err != nil {
 			return nil, err
 		}
-		defaultValue, err := optionalString(properties, "default")
+		defaultValue, err := optionalString(properties, skillArgumentDefaultKey)
 		if err != nil {
 			return nil, err
 		}
@@ -332,7 +330,7 @@ func validSkillArgumentName(value string) bool {
 func firstSkillHeading(body string) string {
 	for line := range strings.SplitSeq(body, "\n") {
 		line = strings.TrimSpace(line)
-		if after, ok := strings.CutPrefix(line, "# "); ok {
+		if after, ok := strings.CutPrefix(line, skillMarkdownHeadingPrefix); ok {
 			return strings.TrimSpace(after)
 		}
 	}

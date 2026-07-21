@@ -190,7 +190,10 @@ func (r *Repository) pathFor(
 	if err := artifactstore.ValidateDigest(digest); err != nil {
 		return "", err
 	}
-	value := strings.TrimPrefix(string(digest), "sha256:")
+	value := strings.TrimPrefix(
+		string(digest),
+		artifactstore.DigestSHA256Prefix,
+	)
 	return filepath.Join(r.root, "definition-"+value+".json"), nil
 }
 

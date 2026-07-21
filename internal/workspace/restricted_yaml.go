@@ -12,7 +12,7 @@ import (
 )
 
 var topLevelYAMLKey = regexp.MustCompile(
-	`^([A-Za-z][A-Za-z0-9_.-]*)[ \t]*:`,
+	restrictedYAMLTopLevelKeyPattern,
 )
 
 func decodeRestrictedYAML(
@@ -36,7 +36,7 @@ func decodeRestrictedYAML(
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
 
-		if trimmed == "---" || trimmed == "..." {
+		if trimmed == yamlDocumentStart || trimmed == yamlDocumentEnd {
 			return fmt.Errorf(
 				"%w: YAML frontmatter must contain one document",
 				ErrInvalidWorkspace,
@@ -127,5 +127,5 @@ func hasRestrictedYAMLToken(line string) bool {
 			return true
 		}
 	}
-	return strings.Contains(line, "<<:")
+	return strings.Contains(line, yamlMergeKey)
 }

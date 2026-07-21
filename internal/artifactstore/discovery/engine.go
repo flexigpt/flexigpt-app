@@ -65,6 +65,18 @@ func (e *Engine) Discover(
 		)
 	}
 
+	allowed := make(map[artifactstore.DecoderID]struct{}, len(plan.AllowedDecoderIDs))
+	for _, decoderID := range plan.AllowedDecoderIDs {
+		if _, exists := e.decoders.Get(decoderID); !exists {
+			return Result{}, fmt.Errorf(
+				"%w: decoder %q",
+				artifactstore.ErrDecoderUnavailable,
+				decoderID,
+			)
+		}
+		allowed[decoderID] = struct{}{}
+	}
+
 	entries, err := collectCandidates(ctx, snapshot, plan)
 	if err != nil {
 		return Result{}, err
@@ -81,18 +93,6 @@ func (e *Engine) Discover(
 	result := Result{
 		Definitions: make(map[artifactstore.Digest]definition.Definition),
 	}
-	allowed := make(map[artifactstore.DecoderID]struct{}, len(plan.AllowedDecoderIDs))
-	for _, decoderID := range plan.AllowedDecoderIDs {
-		if _, exists := e.decoders.Get(decoderID); !exists {
-			return Result{}, fmt.Errorf(
-				"%w: decoder %q",
-				artifactstore.ErrDecoderUnavailable,
-				decoderID,
-			)
-		}
-		allowed[decoderID] = struct{}{}
-	}
-
 	seenKeys := make(map[string]struct{})
 	var consumed int64
 	now := e.clock.Now().UTC()
@@ -105,7 +105,7 @@ func (e *Engine) Discover(
 		if entry.SizeBytes > plan.MaxCandidateBytes {
 			diagnostics := []artifactstore.Diagnostic{{
 				Severity: artifactstore.DiagnosticError,
-				Code:     "artifact.discovery.candidate-too-large",
+				Code:     DiagnosticCodeCandidateTooLarge,
 				Message: fmt.Sprintf(
 					"candidate exceeds the %d byte limit",
 					plan.MaxCandidateBytes,
@@ -123,6 +123,12 @@ func (e *Engine) Discover(
 				"",
 				diagnostics,
 				now,
+			)
+			markObservedKeysForLocator(
+				seenKeys,
+				occurrences,
+				sourceValue.ID,
+				entry.Locator,
 			)
 			result.Diagnostics = artifactstore.AppendDiagnostics(
 				result.Diagnostics,
@@ -161,7 +167,7 @@ func (e *Engine) Discover(
 			Content:             content,
 		}
 
-		decoder, diagnostics := e.selectDecoder(ctx, candidate)
+		decoder, diagnostics := e.selectDecoder(ctx, candidate, allowed)
 		if len(diagnostics) != 0 {
 			applyInvalidForLocator(
 				occurrences,
@@ -173,6 +179,12 @@ func (e *Engine) Discover(
 				diagnostics,
 				now,
 			)
+			markObservedKeysForLocator(
+				seenKeys,
+				occurrences,
+				sourceValue.ID,
+				entry.Locator,
+			)
 			result.Diagnostics = artifactstore.AppendDiagnostics(
 				result.Diagnostics,
 				diagnostics...,
@@ -181,11 +193,6 @@ func (e *Engine) Discover(
 		}
 		if decoder == nil {
 			continue
-		}
-		if len(allowed) != 0 {
-			if _, permitted := allowed[decoder.ID()]; !permitted {
-				continue
-			}
 		}
 
 		decoded, diagnostics := decoder.Decode(ctx, candidate)
@@ -212,6 +219,12 @@ func (e *Engine) Discover(
 				decoder.ID(),
 				diagnostics,
 				now,
+			)
+			markObservedKeysForLocator(
+				seenKeys,
+				occurrences,
+				sourceValue.ID,
+				entry.Locator,
 			)
 			continue
 		}
@@ -248,7 +261,7 @@ func (e *Engine) Discover(
 			if err != nil {
 				itemDiagnostics := []artifactstore.Diagnostic{{
 					Severity: artifactstore.DiagnosticError,
-					Code:     "artifact.discovery.definition-invalid",
+					Code:     DiagnosticCodeDefinitionInvalid,
 					Message:  err.Error(),
 					Location: &artifactstore.DiagnosticLocation{
 						Locator:            entry.Locator,
@@ -299,7 +312,7 @@ func (e *Engine) Discover(
 			previousValue.State = catalog.OccurrenceMissing
 			previousValue.Diagnostics = []artifactstore.Diagnostic{{
 				Severity: artifactstore.DiagnosticWarning,
-				Code:     "artifact.discovery.subresource-missing",
+				Code:     DiagnosticCodeSubresourceMissing,
 				Message:  "the decoder no longer emits this subresource",
 				Location: &artifactstore.DiagnosticLocation{
 					Locator:            previousValue.Key.Locator,
@@ -325,7 +338,7 @@ func (e *Engine) Discover(
 			previousValue.State = catalog.OccurrenceMissing
 			previousValue.Diagnostics = []artifactstore.Diagnostic{{
 				Severity: artifactstore.DiagnosticWarning,
-				Code:     "artifact.discovery.resource-missing",
+				Code:     DiagnosticCodeResourceMissing,
 				Message:  "the source occurrence was not found during authoritative discovery",
 				Location: &artifactstore.DiagnosticLocation{
 					Locator:            previousValue.Key.Locator,
@@ -347,18 +360,25 @@ func (e *Engine) Discover(
 func (e *Engine) selectDecoder(
 	ctx context.Context,
 	candidate Candidate,
+	allowed map[artifactstore.DecoderID]struct{},
 ) (Decoder, []artifactstore.Diagnostic) {
 	var selected Decoder
 	best := RecognitionNone
 	tied := make([]artifactstore.DecoderID, 0)
 
 	for _, decoder := range e.decoders.All() {
+		if len(allowed) != 0 {
+			if _, permitted := allowed[decoder.ID()]; !permitted {
+				continue
+			}
+		}
+
 		recognition := decoder.Recognize(ctx, candidate)
 		if recognition < RecognitionNone ||
 			recognition > RecognitionPreferred {
 			return nil, []artifactstore.Diagnostic{{
 				Severity: artifactstore.DiagnosticError,
-				Code:     "artifact.discovery.decoder-invalid-recognition",
+				Code:     DiagnosticCodeDecoderInvalidRecognition,
 				Message: fmt.Sprintf(
 					"decoder %q returned invalid recognition %d",
 					decoder.ID(),
@@ -381,7 +401,7 @@ func (e *Engine) selectDecoder(
 		slices.Sort(tied)
 		return nil, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,
-			Code:     "artifact.discovery.decoder-ambiguous",
+			Code:     DiagnosticCodeDecoderAmbiguous,
 			Message: fmt.Sprintf(
 				"candidate is equally recognized by decoders %v",
 				tied,
@@ -587,6 +607,21 @@ func applyInvalidForLocator(
 		State:               catalog.OccurrenceInvalid,
 		Diagnostics:         append([]artifactstore.Diagnostic(nil), diagnostics...),
 		ObservedAt:          now,
+	}
+}
+
+func markObservedKeysForLocator(
+	seenKeys map[string]struct{},
+	values map[string]catalog.Occurrence,
+	sourceID artifactstore.SourceID,
+	locator artifactstore.Locator,
+) {
+	for key, value := range values {
+		if value.Key.SourceID != sourceID ||
+			value.Key.Locator != locator {
+			continue
+		}
+		seenKeys[key] = struct{}{}
 	}
 }
 

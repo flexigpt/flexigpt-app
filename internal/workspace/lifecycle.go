@@ -70,11 +70,12 @@ func (s *Service) CreateFilesystem(
 	if err != nil {
 		return Workspace{}, err
 	}
-	if sourceValue.Kind != FilesystemSourceKind {
+	primaryOperation, _ := attachmentOperationFor(RolePrimary)
+	if sourceValue.Kind != primaryOperation.requiredSourceKind {
 		return Workspace{}, fmt.Errorf(
 			"%w: primary source must have kind %q",
 			ErrInvalidWorkspace,
-			FilesystemSourceKind,
+			primaryOperation.requiredSourceKind,
 		)
 	}
 	if !sourceValue.Enabled {
@@ -110,7 +111,7 @@ func (s *Service) CreateFilesystem(
 		[]catalog.AttachmentDraft{{
 			SourceID: sourceValue.ID,
 			Role:     RolePrimary,
-			Priority: PrimaryPriority,
+			Priority: primaryOperation.defaultPriority,
 			Enabled:  true,
 			Data:     attachmentData,
 		}},
@@ -225,11 +226,12 @@ func (s *Service) Attach(
 	ctx context.Context,
 	request AttachRequest,
 ) (Workspace, error) {
-	if request.Role == RolePrimary {
-		return Workspace{}, ErrPrimarySourceImmutable
-	}
 	if err := validateRole(request.Role); err != nil {
 		return Workspace{}, err
+	}
+	operation, _ := attachmentOperationFor(request.Role)
+	if !operation.canAttach {
+		return Workspace{}, ErrPrimarySourceImmutable
 	}
 	if _, err := s.Get(ctx, request.RootID); err != nil {
 		return Workspace{}, err
@@ -276,7 +278,8 @@ func (s *Service) Detach(
 	if err != nil {
 		return Workspace{}, err
 	}
-	if attachment.Role == RolePrimary {
+	operation, _ := attachmentOperationFor(attachment.Role)
+	if !operation.canAttach {
 		return Workspace{}, ErrPrimarySourceImmutable
 	}
 	if _, err := s.roots.Detach(

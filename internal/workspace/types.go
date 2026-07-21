@@ -12,33 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-const (
-	RootKind artifactstore.RootKind = "workspace.root"
-
-	RolePrimary         artifactstore.AttachmentRole = "primary"
-	RoleBuiltIn         artifactstore.AttachmentRole = "built-in"
-	RoleLibrary         artifactstore.AttachmentRole = "library"
-	RoleAttachedPackage artifactstore.AttachmentRole = "attached-package"
-	RoleOverlay         artifactstore.AttachmentRole = "overlay"
-
-	FilesystemSourceKind artifactstore.SourceKind = "fs-directory"
-
-	DefinitionKind      artifactstore.ArtifactKind = "workspace.definition"
-	DefinitionSchemaID  artifactstore.SchemaID     = "workspace.definition.v1"
-	DefinitionDecoderID artifactstore.DecoderID    = "workspace.definition-json"
-
-	ContextKind      artifactstore.ArtifactKind = "workspace.context"
-	ContextSchemaID  artifactstore.SchemaID     = "workspace.context.v1"
-	ContextDecoderID artifactstore.DecoderID    = "workspace.context-markdown"
-
-	SkillKind      artifactstore.ArtifactKind = "workspace.skill"
-	SkillSchemaID  artifactstore.SchemaID     = "workspace.skill.v1"
-	SkillDecoderID artifactstore.DecoderID    = "workspace.skill-markdown"
-
-	CapabilityProfileVersion = "1"
-	PrimaryPriority          = 1_000_000
-)
-
 var (
 	ErrInvalidWorkspace           = errors.New("workspace: invalid")
 	ErrNotWorkspace               = errors.New("workspace: root is not a Workspace")
@@ -127,11 +100,6 @@ type AttachRequest struct {
 	Priority             int                          `json:"priority"`
 	Enabled              bool                         `json:"enabled"`
 	Data                 AttachmentData               `json:"data"`
-}
-
-type Descriptor struct {
-	Kind     artifactstore.ArtifactKind
-	SchemaID artifactstore.SchemaID
 }
 
 type Resource struct {

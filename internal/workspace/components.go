@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 )
 
@@ -19,32 +18,6 @@ type Components struct {
 	Skills    *SkillFacade
 }
 
-type Config struct {
-	Descriptors []Descriptor
-	DecoderIDs  []artifactstore.DecoderID
-}
-
-func DefaultConfig() Config {
-	return Config{
-		Descriptors: []Descriptor{
-			{Kind: ContextKind, SchemaID: ContextSchemaID},
-			{Kind: SkillKind, SchemaID: SkillSchemaID},
-		},
-		DecoderIDs: []artifactstore.DecoderID{
-			ContextDecoderID,
-			SkillDecoderID,
-		},
-	}
-}
-
-func BuiltinDecoders() []discovery.Decoder {
-	return []discovery.Decoder{
-		NewDefinitionDecoder(),
-		NewContextDecoder(),
-		NewSkillDecoder(),
-	}
-}
-
 func NewComponents(
 	artifacts *system.Components,
 	config Config,
@@ -55,20 +28,27 @@ func NewComponents(
 			ErrInvalidWorkspace,
 		)
 	}
-	if _, exists := artifacts.DecoderRegistry.Get(DefinitionDecoderID); !exists {
+	if artifacts.DecoderRegistry == nil {
 		return nil, fmt.Errorf(
-			"%w: Workspace definition decoder was not registered with Artifact Store",
+			"%w: Artifact Store decoder registry is nil",
 			ErrInvalidWorkspace,
 		)
 	}
-	for _, decoderID := range config.DecoderIDs {
-		if _, exists := artifacts.DecoderRegistry.Get(decoderID); !exists {
+
+	supports, err := config.normalizedSupports()
+	if err != nil {
+		return nil, err
+	}
+	decoderIDs := make([]artifactstore.DecoderID, 0, len(supports))
+	for _, support := range supports {
+		if _, exists := artifacts.DecoderRegistry.Get(support.DecoderID); !exists {
 			return nil, fmt.Errorf(
 				"%w: Workspace decoder %q was not registered with Artifact Store",
 				ErrInvalidWorkspace,
-				decoderID,
+				support.DecoderID,
 			)
 		}
+		decoderIDs = append(decoderIDs, support.DecoderID)
 	}
 
 	service, err := NewService(
@@ -78,7 +58,7 @@ func NewComponents(
 	if err != nil {
 		return nil, err
 	}
-	planner, err := NewPlanner(config.DecoderIDs...)
+	planner, err := NewPlanner(decoderIDs...)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +69,7 @@ func NewComponents(
 	if err != nil {
 		return nil, err
 	}
-	policy, err := NewRecordPolicy(config.Descriptors...)
+	policy, err := NewRecordPolicy(supports...)
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
@@ -177,10 +178,7 @@ func (s *Service) UpdateRoot(
 	}
 
 	next.Revision++
-	next.ModifiedAt = s.clock.Now().UTC()
-	if !next.ModifiedAt.After(current.ModifiedAt) {
-		next.ModifiedAt = current.ModifiedAt.Add(1)
-	}
+	next.ModifiedAt = s.nextModifiedAt(current.ModifiedAt)
 	if err := next.Validate(); err != nil {
 		return Root{}, err
 	}
@@ -195,6 +193,12 @@ func (s *Service) DeleteRoot(
 	id artifactstore.RootID,
 	expectedRevision uint64,
 ) (Root, error) {
+	if expectedRevision == 0 {
+		return Root{}, fmt.Errorf(
+			"%w: expected root revision is required",
+			artifactstore.ErrInvalid,
+		)
+	}
 	current, err := s.repository.GetRoot(ctx, id, false)
 	if err != nil {
 		return Root{}, err
@@ -206,11 +210,11 @@ func (s *Service) DeleteRoot(
 			id,
 		)
 	}
-	now := s.clock.Now().UTC()
+	modifiedAt := s.nextModifiedAt(current.ModifiedAt)
 	next := current
 	next.Enabled = false
-	next.DeletedAt = &now
-	next.ModifiedAt = now
+	next.DeletedAt = &modifiedAt
+	next.ModifiedAt = modifiedAt
 	next.Revision++
 	if err := next.Validate(); err != nil {
 		return Root{}, err
@@ -227,6 +231,12 @@ func (s *Service) Attach(
 	expectedRootRevision uint64,
 	draft AttachmentDraft,
 ) (Root, Attachment, error) {
+	if expectedRootRevision == 0 {
+		return Root{}, Attachment{}, fmt.Errorf(
+			"%w: expected root revision is required",
+			artifactstore.ErrInvalid,
+		)
+	}
 	data, err := jsoncanon.CanonicalizeObject(
 		draft.Data,
 		artifactstore.MaxLocalDataBytes,
@@ -234,7 +244,18 @@ func (s *Service) Attach(
 	if err != nil {
 		return Root{}, Attachment{}, err
 	}
-	now := s.clock.Now().UTC()
+	currentRoot, err := s.repository.GetRoot(ctx, rootID, false)
+	if err != nil {
+		return Root{}, Attachment{}, err
+	}
+	if currentRoot.Revision != expectedRootRevision {
+		return Root{}, Attachment{}, fmt.Errorf(
+			"%w: root %q changed since it was read",
+			artifactstore.ErrConflict,
+			rootID,
+		)
+	}
+	now := s.nextModifiedAt(currentRoot.ModifiedAt)
 	value := Attachment{
 		RootID:     rootID,
 		SourceID:   draft.SourceID,
@@ -277,9 +298,27 @@ func (s *Service) UpdateAttachment(
 	sourceID artifactstore.SourceID,
 	update AttachmentUpdate,
 ) (Root, Attachment, error) {
+	if update.ExpectedRootRevision == 0 ||
+		update.ExpectedAttachmentRevision == 0 {
+		return Root{}, Attachment{}, fmt.Errorf(
+			"%w: expected root and attachment revisions are required",
+			artifactstore.ErrInvalid,
+		)
+	}
 	current, err := s.repository.GetAttachment(ctx, rootID, sourceID)
 	if err != nil {
 		return Root{}, Attachment{}, err
+	}
+	root, err := s.repository.GetRoot(ctx, rootID, false)
+	if err != nil {
+		return Root{}, Attachment{}, err
+	}
+	if root.Revision != update.ExpectedRootRevision {
+		return Root{}, Attachment{}, fmt.Errorf(
+			"%w: root %q changed since it was read",
+			artifactstore.ErrConflict,
+			rootID,
+		)
 	}
 	if current.Revision != update.ExpectedAttachmentRevision {
 		return Root{}, Attachment{}, fmt.Errorf(
@@ -305,19 +344,19 @@ func (s *Service) UpdateAttachment(
 		current.Enabled == next.Enabled &&
 		jsoncanon.Equal(current.Data, next.Data)
 	if unchanged {
-		root, err := s.repository.GetRoot(ctx, rootID, false)
-		return root, current, err
+		return root, current, nil
 	}
 
 	next.Revision++
-	next.ModifiedAt = s.clock.Now().UTC()
-	if !next.ModifiedAt.After(current.ModifiedAt) {
-		next.ModifiedAt = current.ModifiedAt.Add(1)
+	previousModifiedAt := current.ModifiedAt
+	if root.ModifiedAt.After(previousModifiedAt) {
+		previousModifiedAt = root.ModifiedAt
 	}
+	next.ModifiedAt = s.nextModifiedAt(previousModifiedAt)
 	if err := next.Validate(); err != nil {
 		return Root{}, Attachment{}, err
 	}
-	root, err := s.repository.UpdateAttachment(
+	root, err = s.repository.UpdateAttachment(
 		ctx,
 		next,
 		update.ExpectedRootRevision,
@@ -336,12 +375,31 @@ func (s *Service) Detach(
 	expectedRootRevision uint64,
 	expectedAttachmentRevision uint64,
 ) (Root, error) {
+	if expectedRootRevision == 0 ||
+		expectedAttachmentRevision == 0 {
+		return Root{}, fmt.Errorf(
+			"%w: expected root and attachment revisions are required",
+			artifactstore.ErrInvalid,
+		)
+	}
+	currentRoot, err := s.repository.GetRoot(ctx, rootID, false)
+	if err != nil {
+		return Root{}, err
+	}
+	if currentRoot.Revision != expectedRootRevision {
+		return Root{}, fmt.Errorf(
+			"%w: root %q changed since it was read",
+			artifactstore.ErrConflict,
+			rootID,
+		)
+	}
 	return s.repository.Detach(
 		ctx,
 		rootID,
 		sourceID,
 		expectedRootRevision,
 		expectedAttachmentRevision,
+		s.nextModifiedAt(currentRoot.ModifiedAt),
 	)
 }
 
@@ -350,4 +408,12 @@ func (s *Service) Current(
 	rootID artifactstore.RootID,
 ) (Snapshot, error) {
 	return s.repository.GetCurrentCatalog(ctx, rootID)
+}
+
+func (s *Service) nextModifiedAt(previous time.Time) time.Time {
+	next := s.clock.Now().UTC()
+	if !next.After(previous) {
+		return previous.Add(time.Nanosecond)
+	}
+	return next
 }

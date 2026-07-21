@@ -10,11 +10,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
 
-const placeholderDigest artifactstore.Digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+const placeholderDigest artifactstore.Digest = artifactstore.DigestSHA256Prefix +
+	"0000000000000000000000000000000000000000000000000000000000000000"
 
 func DigestBytes(content []byte) artifactstore.Digest {
 	sum := sha256.Sum256(content)
-	return artifactstore.Digest("sha256:" + hex.EncodeToString(sum[:]))
+	return artifactstore.Digest(
+		artifactstore.DigestSHA256Prefix + hex.EncodeToString(sum[:]),
+	)
 }
 
 func Canonicalize(input Definition) (Definition, error) {
