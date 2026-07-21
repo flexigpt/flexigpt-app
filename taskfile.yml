@@ -119,10 +119,6 @@ tasks:
       - pnpm -F frontend run build:wails
       - task: run-dev
 
-  run-gobackend:
-    cmds:
-      - "./scripts/run_backend.sh"
-
   lint-gopls:
     cmds:
       - ./scripts/lint_gopls_check.sh
