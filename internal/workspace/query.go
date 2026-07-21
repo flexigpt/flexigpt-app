@@ -169,6 +169,7 @@ func (q *QueryService) Catalog(
 		return view.Resources[left].Record.ID <
 			view.Resources[right].Record.ID
 	})
+	view.Groups = groupCatalogResources(view.Resources, view.Unrecorded)
 	return view, nil
 }
 
@@ -355,4 +356,40 @@ func matchesSelector(
 	}
 	constraint = strings.TrimSpace(strings.TrimPrefix(constraint, "="))
 	return constraint == string(value.LogicalVersion)
+}
+
+func groupCatalogResources(
+	resources []Resource,
+	unrecorded []catalog.Occurrence,
+) []ResourceGroup {
+	values := make(map[artifactstore.ArtifactKind]*ResourceGroup)
+	for _, resourceValue := range resources {
+		kind := resourceValue.Definition.Kind
+		group := values[kind]
+		if group == nil {
+			group = &ResourceGroup{Kind: kind}
+			values[kind] = group
+		}
+		group.Resources = append(group.Resources, resourceValue)
+	}
+	for _, occurrence := range unrecorded {
+		if occurrence.Kind == "" {
+			continue
+		}
+		group := values[occurrence.Kind]
+		if group == nil {
+			group = &ResourceGroup{Kind: occurrence.Kind}
+			values[occurrence.Kind] = group
+		}
+		group.Unrecorded = append(group.Unrecorded, occurrence)
+	}
+
+	output := make([]ResourceGroup, 0, len(values))
+	for _, group := range values {
+		output = append(output, *group)
+	}
+	sort.Slice(output, func(left, right int) bool {
+		return output[left].Kind < output[right].Kind
+	})
+	return output
 }

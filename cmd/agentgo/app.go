@@ -38,6 +38,7 @@ type App struct {
 	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
+	workspaceAPI            *WorkspaceWrapper
 
 	dataBasePath string
 
@@ -101,6 +102,7 @@ func NewApp() *App {
 	app.mcpAPI = &MCPWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
+	app.workspaceAPI = &WorkspaceWrapper{}
 
 	app.assistantPresetStoreAPI = &AssistantPresetStoreWrapper{}
 
@@ -236,6 +238,20 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill store initialized", "directory", a.skillsDirPath)
 
+	err = InitWorkspaceWrapper(
+		a.workspaceAPI,
+		a.workspaceArtifactsDirPath,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Workspace",
+			"directory", a.workspaceArtifactsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: Workspace initialization failed\n" + err.Error())
+	}
+	slog.Info("workspace initialized", "directory", a.workspaceArtifactsDirPath)
+
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
 		slog.Error(
@@ -359,6 +375,9 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	}
 	if a.skillStoreAPI != nil {
 		a.skillStoreAPI.close()
+	}
+	if a.workspaceAPI != nil {
+		a.workspaceAPI.close()
 	}
 	if a.toolStoreAPI != nil {
 		a.toolStoreAPI.close()

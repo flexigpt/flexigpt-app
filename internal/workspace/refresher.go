@@ -50,13 +50,22 @@ func (r *Refresher) Refresh(
 	if err != nil {
 		return refresh.Result{}, err
 	}
-	definitionPreferences, err := r.loader.Load(ctx, value)
+	observation, err := r.loader.Load(ctx, value)
 	if err != nil {
 		return refresh.Result{}, err
 	}
-	plan, err := r.planner.Build(value, definitionPreferences)
+	plan, err := r.planner.Build(value, observation.Preferences)
 	if err != nil {
 		return refresh.Result{}, err
+	}
+	if observation.SourceID != "" {
+		for index := range plan.Sources {
+			if plan.Sources[index].SourceID != observation.SourceID {
+				continue
+			}
+			plan.Sources[index].ExpectedGeneration = observation.Generation
+			break
+		}
 	}
 	return r.runner.Refresh(ctx, rootID, plan, r.policy)
 }

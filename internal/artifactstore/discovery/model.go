@@ -19,16 +19,17 @@ type DirectoryRoot struct {
 }
 
 type SourcePlan struct {
-	SourceID          artifactstore.SourceID
-	ExplicitLocators  []artifactstore.Locator
-	DirectoryRoots    []DirectoryRoot
-	AllowedDecoderIDs []artifactstore.DecoderID
-	Authoritative     bool
-	MaxCandidateBytes int64
-	MaxTotalBytes     int64
-	MaxCandidates     int
-	MaxEntries        int
-	MaxDepth          int
+	SourceID           artifactstore.SourceID
+	ExplicitLocators   []artifactstore.Locator
+	DirectoryRoots     []DirectoryRoot
+	ExpectedGeneration string
+	AllowedDecoderIDs  []artifactstore.DecoderID
+	Authoritative      bool
+	MaxCandidateBytes  int64
+	MaxTotalBytes      int64
+	MaxCandidates      int
+	MaxEntries         int
+	MaxDepth           int
 }
 
 func (p *SourcePlan) Validate() error {
@@ -41,6 +42,13 @@ func (p *SourcePlan) Validate() error {
 			"%w: source discovery plan has no scope",
 			artifactstore.ErrInvalid,
 		)
+	}
+	if err := artifactstore.ValidateOptionalText(
+		"expected source generation",
+		p.ExpectedGeneration,
+		artifactstore.MaxLocatorBytes,
+	); err != nil {
+		return err
 	}
 	if p.MaxCandidateBytes < 0 ||
 		p.MaxTotalBytes < 0 ||

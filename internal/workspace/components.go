@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 )
 
@@ -14,11 +15,34 @@ type Components struct {
 	Policy    *RecordPolicy
 	Planner   *Planner
 	Loader    *DefinitionLoader
+	Context   *ContextProvider
+	Skills    *SkillFacade
 }
 
 type Config struct {
 	Descriptors []Descriptor
 	DecoderIDs  []artifactstore.DecoderID
+}
+
+func DefaultConfig() Config {
+	return Config{
+		Descriptors: []Descriptor{
+			{Kind: ContextKind, SchemaID: ContextSchemaID},
+			{Kind: SkillKind, SchemaID: SkillSchemaID},
+		},
+		DecoderIDs: []artifactstore.DecoderID{
+			ContextDecoderID,
+			SkillDecoderID,
+		},
+	}
+}
+
+func BuiltinDecoders() []discovery.Decoder {
+	return []discovery.Decoder{
+		NewDefinitionDecoder(),
+		NewContextDecoder(),
+		NewSkillDecoder(),
+	}
 }
 
 func NewComponents(
@@ -36,6 +60,15 @@ func NewComponents(
 			"%w: Workspace definition decoder was not registered with Artifact Store",
 			ErrInvalidWorkspace,
 		)
+	}
+	for _, decoderID := range config.DecoderIDs {
+		if _, exists := artifacts.DecoderRegistry.Get(decoderID); !exists {
+			return nil, fmt.Errorf(
+				"%w: Workspace decoder %q was not registered with Artifact Store",
+				ErrInvalidWorkspace,
+				decoderID,
+			)
+		}
 	}
 
 	service, err := NewService(
@@ -80,6 +113,14 @@ func NewComponents(
 	if err != nil {
 		return nil, err
 	}
+	contextProvider, err := NewContextProvider(query)
+	if err != nil {
+		return nil, err
+	}
+	skillFacade, err := NewSkillFacade(query)
+	if err != nil {
+		return nil, err
+	}
 	return &Components{
 		Service:   service,
 		Refresher: refresher,
@@ -87,5 +128,7 @@ func NewComponents(
 		Policy:    policy,
 		Planner:   planner,
 		Loader:    loader,
+		Context:   contextProvider,
+		Skills:    skillFacade,
 	}, nil
 }

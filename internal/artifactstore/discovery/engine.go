@@ -56,6 +56,14 @@ func (e *Engine) Discover(
 			artifactstore.ErrInvalid,
 		)
 	}
+	if plan.ExpectedGeneration != "" &&
+		snapshot.Generation() != plan.ExpectedGeneration {
+		return Result{}, fmt.Errorf(
+			"%w: source %q changed after discovery planning",
+			artifactstore.ErrConflict,
+			sourceValue.ID,
+		)
+	}
 
 	entries, err := collectCandidates(ctx, snapshot, plan)
 	if err != nil {

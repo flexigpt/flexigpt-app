@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
@@ -25,6 +26,14 @@ const (
 	DefinitionKind      artifactstore.ArtifactKind = "workspace.definition"
 	DefinitionSchemaID  artifactstore.SchemaID     = "workspace.definition.v1"
 	DefinitionDecoderID artifactstore.DecoderID    = "workspace.definition-json"
+
+	ContextKind      artifactstore.ArtifactKind = "workspace.context"
+	ContextSchemaID  artifactstore.SchemaID     = "workspace.context.v1"
+	ContextDecoderID artifactstore.DecoderID    = "workspace.context-markdown"
+
+	SkillKind      artifactstore.ArtifactKind = "workspace.skill"
+	SkillSchemaID  artifactstore.SchemaID     = "workspace.skill.v1"
+	SkillDecoderID artifactstore.DecoderID    = "workspace.skill-markdown"
 
 	CapabilityProfileVersion = "1"
 	PrimaryPriority          = 1_000_000
@@ -79,39 +88,45 @@ type Workspace struct {
 	Sources     []source.Source      `json:"sources"`
 }
 
+type ResourceGroup struct {
+	Kind       artifactstore.ArtifactKind `json:"kind"`
+	Resources  []Resource                 `json:"resources"`
+	Unrecorded []catalog.Occurrence       `json:"unrecorded,omitempty"`
+}
+
 type EmptyWorkspaceRequest struct {
-	DisplayName    string
-	Description    string
-	TrustReference string
-	Discovery      DiscoveryPreferences
+	DisplayName    string               `json:"displayName"`
+	Description    string               `json:"description,omitempty"`
+	TrustReference string               `json:"trustReference,omitempty"`
+	Discovery      DiscoveryPreferences `json:"discovery"`
 }
 
 type FilesystemWorkspaceRequest struct {
-	DisplayName     string
-	Description     string
-	PrimarySourceID artifactstore.SourceID
-	TrustReference  string
-	Discovery       DiscoveryPreferences
+	DisplayName     string                 `json:"displayName"`
+	Description     string                 `json:"description,omitempty"`
+	PrimarySourceID artifactstore.SourceID `json:"primarySourceID"`
+	TrustReference  string                 `json:"trustReference,omitempty"`
+	Discovery       DiscoveryPreferences   `json:"discovery"`
 }
 
 type UpdateRequest struct {
-	RootID           artifactstore.RootID
-	ExpectedRevision uint64
-	DisplayName      string
-	Description      string
-	Enabled          bool
-	TrustReference   string
-	Discovery        DiscoveryPreferences
+	RootID           artifactstore.RootID `json:"rootID"`
+	ExpectedRevision uint64               `json:"expectedRevision"`
+	DisplayName      string               `json:"displayName"`
+	Description      string               `json:"description,omitempty"`
+	Enabled          bool                 `json:"enabled"`
+	TrustReference   string               `json:"trustReference,omitempty"`
+	Discovery        DiscoveryPreferences `json:"discovery"`
 }
 
 type AttachRequest struct {
-	RootID               artifactstore.RootID
-	ExpectedRootRevision uint64
-	SourceID             artifactstore.SourceID
-	Role                 artifactstore.AttachmentRole
-	Priority             int
-	Enabled              bool
-	Data                 AttachmentData
+	RootID               artifactstore.RootID         `json:"rootID"`
+	ExpectedRootRevision uint64                       `json:"expectedRootRevision"`
+	SourceID             artifactstore.SourceID       `json:"sourceID"`
+	Role                 artifactstore.AttachmentRole `json:"role"`
+	Priority             int                          `json:"priority"`
+	Enabled              bool                         `json:"enabled"`
+	Data                 AttachmentData               `json:"data"`
 }
 
 type Descriptor struct {
@@ -133,6 +148,7 @@ type CatalogView struct {
 	Resources         []Resource
 	Unrecorded        []catalog.Occurrence
 	UnresolvedRecords []record.Record
+	Groups            []ResourceGroup
 }
 
 type Reference struct {
@@ -155,6 +171,46 @@ type LoadPlan struct {
 
 type DefinitionDocument struct {
 	Discovery DiscoveryPreferences `json:"discovery"`
+}
+
+type DefinitionObservation struct {
+	Preferences DiscoveryPreferences
+	SourceID    artifactstore.SourceID
+	Generation  string
+}
+
+type ContextDefinition struct {
+	Name      string `json:"name"`
+	Role      string `json:"role"`
+	MediaType string `json:"mediaType"`
+	Content   string `json:"content"`
+}
+
+type SkillArgumentDefinition struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Default     string `json:"default,omitempty"`
+}
+
+type SkillDefinition struct {
+	Name           string                    `json:"name"`
+	DisplayName    string                    `json:"displayName,omitempty"`
+	Description    string                    `json:"description"`
+	Insert         string                    `json:"insert"`
+	Arguments      []SkillArgumentDefinition `json:"arguments,omitempty"`
+	Tags           []string                  `json:"tags,omitempty"`
+	MarkdownBody   string                    `json:"markdownBody"`
+	RawFrontmatter map[string]any            `json:"rawFrontmatter,omitempty"`
+}
+
+func decodeDefinitionBody[T any](
+	raw json.RawMessage,
+) (T, error) {
+	var output T
+	if err := json.Unmarshal(raw, &output); err != nil {
+		return output, err
+	}
+	return output, nil
 }
 
 type rootManager interface {

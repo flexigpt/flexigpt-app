@@ -82,6 +82,7 @@ func (p *Planner) Build(
 			sourcePlan.ExplicitLocators = []artifactstore.Locator{
 				DefinitionLocator,
 				"AGENTS.md",
+				"CLAUDE.md",
 			}
 			if preferences.IncludeReadme {
 				sourcePlan.ExplicitLocators = append(
@@ -186,36 +187,43 @@ func NewDefinitionLoader(
 func (l *DefinitionLoader) Load(
 	ctx context.Context,
 	value Workspace,
-) (DiscoveryPreferences, error) {
+) (DefinitionObservation, error) {
 	if value.Data.PrimarySourceID == "" {
-		return DiscoveryPreferences{}, nil
+		return DefinitionObservation{}, nil
 	}
 	sourceValue, err := l.sources.Get(ctx, value.Data.PrimarySourceID)
 	if err != nil {
-		return DiscoveryPreferences{}, err
+		return DefinitionObservation{}, err
 	}
 	snapshot, err := l.registry.Open(ctx, sourceValue)
 	if err != nil {
-		return DiscoveryPreferences{}, err
+		return DefinitionObservation{}, err
 	}
 	defer snapshot.Close()
 
+	observation := DefinitionObservation{
+		SourceID:   sourceValue.ID,
+		Generation: snapshot.Generation(),
+	}
 	entry, err := snapshot.Stat(ctx, DefinitionLocator)
 	if errors.Is(err, artifactstore.ErrNotFound) {
-		return DiscoveryPreferences{}, nil
+		if err := snapshot.Confirm(ctx); err != nil {
+			return DefinitionObservation{}, err
+		}
+		return observation, nil
 	}
 	if err != nil {
-		return DiscoveryPreferences{}, err
+		return DefinitionObservation{}, err
 	}
 	if entry.SizeBytes > artifactstore.MaxDefinitionBodyBytes {
-		return DiscoveryPreferences{}, fmt.Errorf(
+		return DefinitionObservation{}, fmt.Errorf(
 			"%w: Workspace definition exceeds byte limit",
 			ErrWorkspaceDefinitionInvalid,
 		)
 	}
 	reader, err := snapshot.Open(ctx, DefinitionLocator)
 	if err != nil {
-		return DiscoveryPreferences{}, err
+		return DefinitionObservation{}, err
 	}
 	content, readErr := io.ReadAll(io.LimitReader(
 		reader,
@@ -223,16 +231,16 @@ func (l *DefinitionLoader) Load(
 	))
 	closeErr := reader.Close()
 	if readErr != nil {
-		return DiscoveryPreferences{}, readErr
+		return DefinitionObservation{}, readErr
 	}
 	if closeErr != nil {
-		return DiscoveryPreferences{}, closeErr
+		return DefinitionObservation{}, closeErr
 	}
 	if len(content) > artifactstore.MaxDefinitionBodyBytes {
-		return DiscoveryPreferences{}, ErrWorkspaceDefinitionInvalid
+		return DefinitionObservation{}, ErrWorkspaceDefinitionInvalid
 	}
 	if err := snapshot.Confirm(ctx); err != nil {
-		return DiscoveryPreferences{}, err
+		return DefinitionObservation{}, err
 	}
 
 	candidate := discovery.Candidate{
@@ -243,23 +251,24 @@ func (l *DefinitionLoader) Load(
 	}
 	decoded, diagnostics := l.decoder.Decode(ctx, candidate)
 	if artifactstore.ContainsErrorDiagnostic(diagnostics) {
-		return DiscoveryPreferences{}, fmt.Errorf(
+		return DefinitionObservation{}, fmt.Errorf(
 			"%w: %s",
 			ErrWorkspaceDefinitionInvalid,
 			diagnostics[0].Message,
 		)
 	}
 	if len(decoded) != 1 {
-		return DiscoveryPreferences{}, ErrWorkspaceDefinitionInvalid
+		return DefinitionObservation{}, ErrWorkspaceDefinitionInvalid
 	}
 
 	var document DefinitionDocument
 	decoder := json.NewDecoder(bytes.NewReader(decoded[0].Definition.Body))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&document); err != nil {
-		return DiscoveryPreferences{}, err
+		return DefinitionObservation{}, err
 	}
-	return document.Discovery, nil
+	observation.Preferences = document.Discovery
+	return observation, nil
 }
 
 func mergeDiscoveryPreferences(
