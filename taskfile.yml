@@ -14,39 +14,6 @@ tasks:
       - echo "{{.GREETING}}"
     silent: true
 
-  installtools:
-    cmds:
-      - "{{.INSTALL_TOOL_WAILS}}"
-      - "{{.INSTALL_TOOL_GO_LICENSES}}"
-      - "{{.INSTALL_TOOL_GOPLS}}"
-      - "{{.INSTALL_TOOL_GO_MOD_UPGRADE}}"
-      - "{{.INSTALL_TOOL_REFDIR}}"
-      - "{{.INSTALL_TOOL_GO_TEST_COVERAGE}}"
-      - "{{.INSTALL_TOOL_GODEPGRAPH}}"
-      - "{{.INSTALL_TOOL_GOMAJOR}}"
-
-  uppnpm:
-    cmds:
-      - corepack enable
-      - asdf reshim nodejs
-      - corepack prepare pnpm@11.9.0 --activate
-      - corepack use pnpm@11.9.0
-      - asdf reshim nodejs
-
-  upnodejs:
-    cmds:
-      - asdf install nodejs v24.14.0
-      - asdf set nodejs v24.14.0
-      - task: uppnpm
-      - echo '***Search and update builds***'
-
-  gomod:
-    cmds:
-      - go mod download
-      - go mod tidy
-      - go mod verify
-      # wails doctor ## This can be used to see if system is ready for wails.
-
   licensesgo:
     cmds:
       - go-licenses report ./... --template "{{.LICENSE_TEMPLATE_PATH}}" --ignore "{{.COMMON_PRODUCT_GITPATH}}" > "{{.LICENSE_GO_FILENAME}}"
@@ -64,19 +31,51 @@ tasks:
     cmds:
       - gh act workflow_dispatch -W "./.github/workflows/cloc-report.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}"
 
-  checkupgrade:
+  tagstats:
     cmds:
-      - gomajor list
-      - go-mod-upgrade -l
-      - pnpm outdated -r
+      - ./scripts/git_tag_stats.sh
 
   godepgraph:
     cmds:
       - godepgraph -s -o "{{.COMMON_PRODUCT_GITPATH}}",command-line-arguments "{{.GO_MAIN_ENTRYPOINT}}" | dot -Tpng -o godepgraph.png
 
-  tagstats:
+  install-tools:
     cmds:
-      - ./scripts/git_tag_stats.sh
+      - "{{.INSTALL_TOOL_WAILS}}"
+      - "{{.INSTALL_TOOL_GO_LICENSES}}"
+      - "{{.INSTALL_TOOL_GOPLS}}"
+      - "{{.INSTALL_TOOL_GO_MOD_UPGRADE}}"
+      - "{{.INSTALL_TOOL_REFDIR}}"
+      - "{{.INSTALL_TOOL_GO_TEST_COVERAGE}}"
+      - "{{.INSTALL_TOOL_GODEPGRAPH}}"
+      - "{{.INSTALL_TOOL_GOMAJOR}}"
+
+  upgrade-do:
+    cmds:
+      - go-mod-upgrade -v -f
+      - go mod tidy
+      - pnpm up -r
+
+  upgrade-check:
+    cmds:
+      - gomajor list
+      - go-mod-upgrade -l
+      - pnpm outdated -r
+
+  upgrade-pnpm:
+    cmds:
+      - corepack enable
+      - asdf reshim nodejs
+      - corepack prepare pnpm@11.9.0 --activate
+      - corepack use pnpm@11.9.0
+      - asdf reshim nodejs
+
+  upgrade-nodejs:
+    cmds:
+      - asdf install nodejs v24.14.0
+      - asdf set nodejs v24.14.0
+      - task: uppnpm
+      - echo '***Search and update builds***'
 
   build-linux:
     cmds:
@@ -141,14 +140,19 @@ tasks:
     cmds:
       - golangci-lint run --fix
 
-  fmt-go:
-    cmds:
-      - golangci-lint fmt
-
   lint-go:
     cmds:
       - pnpm run touch:tmp
       - golangci-lint run ./... -v
+
+  lint:
+    cmds:
+      - task: lint-go
+      - pnpm -F frontend run lint
+
+  fmt-go:
+    cmds:
+      - golangci-lint fmt
 
   test-go:
     cmds:
@@ -159,20 +163,15 @@ tasks:
       - go tool cover -func=coverage.out
       - go-test-coverage --config=./.testcoverage.yml
 
-  lt-go:
-    cmds:
-      - task: lint-go
-      - task: test-go
-
-  lint:
-    cmds:
-      - task: lint-go
-      - pnpm -F frontend run lint
-
   test:
     cmds:
       - task: test-go
       - pnpm -F frontend run test
+
+  lt-go:
+    cmds:
+      - task: lint-go
+      - task: test-go
 
   lt:
     cmds:

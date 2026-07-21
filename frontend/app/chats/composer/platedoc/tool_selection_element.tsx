@@ -29,7 +29,7 @@ export function ToolSelectionElement(props: PlateElementProps<any>) {
 				margin: 0,
 				overflow: 'hidden',
 				border: 0,
-				clip: 'rect(0 0 0 0)',
+				clipPath: 'inset(50%)',
 				whiteSpace: 'nowrap',
 			}}
 		>

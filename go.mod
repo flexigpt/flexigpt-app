@@ -5,15 +5,15 @@ go 1.26
 // Tools: These are installed via the taskfile. check the associated task.
 require (
 	github.com/adrg/xdg v0.5.3
-	github.com/danielgtaylor/huma/v2 v2.38.0
+	github.com/danielgtaylor/huma/v2 v2.39.0
 	github.com/flexigpt/agentskills-go v0.18.0
-	github.com/flexigpt/inference-go v0.22.3
+	github.com/flexigpt/inference-go v0.22.5
 	github.com/flexigpt/llmtools-go v0.22.1
 	github.com/flexigpt/mapstore-go v0.3.5
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/uuid v1.6.0
-	github.com/modelcontextprotocol/go-sdk v1.7.0-pre.2
+	github.com/modelcontextprotocol/go-sdk v1.7.0-pre.3
 	github.com/wailsapp/wails/v2 v2.13.0
 	golang.org/x/oauth2 v0.36.0
 )
@@ -30,7 +30,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/RadhiFadlillah/whatlanggo v0.0.0-20240916001553-aac1f0f737fc // indirect
 	github.com/andybalholm/cascadia v1.3.4 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.56.0 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.58.0 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
@@ -65,8 +65,8 @@ require (
 	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
-	github.com/labstack/echo/v4 v4.15.1 // indirect
-	github.com/labstack/gommon v0.4.2 // indirect
+	github.com/labstack/echo/v4 v4.15.2 // indirect
+	github.com/labstack/gommon v0.5.0 // indirect
 	github.com/leaanthony/go-ansi-parser v1.6.1 // indirect
 	github.com/leaanthony/gosod v1.0.4 // indirect
 	github.com/leaanthony/slicer v1.6.0 // indirect
@@ -79,7 +79,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
-	github.com/openai/openai-go/v3 v3.41.1 // indirect
+	github.com/openai/openai-go/v3 v3.44.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/pjbgf/sha1cd v0.6.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
@@ -120,7 +120,7 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/genai v1.63.0 // indirect
+	google.golang.org/genai v1.64.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/grpc v1.81.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
