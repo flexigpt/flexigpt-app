@@ -13,25 +13,6 @@ import (
 
 const EmptyObject = "{}"
 
-func Canonicalize(raw []byte) ([]byte, error) {
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-
-	value, err := decodeValue(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("decode JSON: %w", err)
-	}
-	if err := ensureEOF(decoder); err != nil {
-		return nil, err
-	}
-
-	var output bytes.Buffer
-	if err := appendCanonical(&output, value); err != nil {
-		return nil, err
-	}
-	return output.Bytes(), nil
-}
-
 func CanonicalizeObject(raw []byte, maximum int) ([]byte, error) {
 	if len(raw) == 0 {
 		raw = []byte(EmptyObject)
@@ -59,6 +40,25 @@ func Equal(left, right []byte) bool {
 		return false
 	}
 	return bytes.Equal(leftCanonical, rightCanonical)
+}
+
+func Canonicalize(raw []byte) ([]byte, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+
+	value, err := decodeValue(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("decode JSON: %w", err)
+	}
+	if err := ensureEOF(decoder); err != nil {
+		return nil, err
+	}
+
+	var output bytes.Buffer
+	if err := appendCanonical(&output, value); err != nil {
+		return nil, err
+	}
+	return output.Bytes(), nil
 }
 
 func decodeValue(decoder *json.Decoder) (any, error) {

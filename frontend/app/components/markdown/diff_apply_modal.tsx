@@ -257,6 +257,10 @@ function mergeEditableTargetPreservingLocalPath(
 		...merged,
 		targetPath: toAbsolutePath(local.targetPath),
 		targetPathInput: localTargetPathInput,
+		ok: base.ok,
+		status: base.status,
+		message: base.message,
+		diagnostics: base.diagnostics ? uniqueDiagnostics(base.diagnostics) : undefined,
 		candidatePaths: isNewFile
 			? absolutePathStrings([...knownTargetPaths, local.targetPath])
 			: absolutePathStrings([local.targetPath, ...(local.candidatePaths ?? []), ...(merged.candidatePaths ?? [])]),
@@ -519,9 +523,31 @@ function isTargetProblem(target: EditableUnifiedDiffTarget, missing: boolean): b
 	return (
 		missing ||
 		target.ok === false ||
-		target.status === ApplyUnifiedDiffStatus.Conflict ||
-		target.status === ApplyUnifiedDiffStatus.Error
+		(target.status !== undefined && target.status !== ApplyUnifiedDiffStatus.Applicable.toString())
 	);
+}
+
+function isTargetApplicableForApply(
+	target: EditableUnifiedDiffTarget,
+	output: ApplyUnifiedDiffOut | undefined
+): boolean {
+	if (isTerminalUnifiedDiffStatus(target.status)) {
+		return false;
+	}
+
+	if (target.status !== undefined) {
+		return target.status === ApplyUnifiedDiffStatus.Applicable.toString() && target.ok !== false;
+	}
+
+	if (!output) {
+		return true;
+	}
+
+	if (output.files && output.files.length > 0) {
+		return false;
+	}
+
+	return output.status === ApplyUnifiedDiffStatus.Applicable && output.ok;
 }
 
 function getLocalTargetKey(target: EditableUnifiedDiffTarget, index: number): string {
@@ -679,14 +705,17 @@ function DiffApplyModalContent({
 	const fileDiagnostics = collectFileLevelDiagnostics(output);
 	const summary = summaryLabel(output, fallbackParsed);
 	const counts = buildFileStatusCounts(output, fallbackParsed);
-	const targetsForApply = displayTargets.filter(target => !isTerminalUnifiedDiffStatus(target.status));
+	const targetsForApply = displayTargets.filter(target => isTargetApplicableForApply(target, output));
 	const missingCount = targetsForApply.filter(target => !isAbsolutePath(target.targetPath)).length;
 	const hasAnyTargets = displayTargets.length > 0;
 	const canApplyFromModal = targetsForApply.length > 0 && missingCount === 0 && !isRunning;
 	const patchDiagnosticCounts = getDiagnosticSeverityCounts(patchDiagnostics);
 	const blockedFileCount = Math.max(0, counts.blocked - counts.needsInfo);
 
-	const outputIsSuccessful = output?.ok === true || isTerminalUnifiedDiffStatus(output?.status);
+	const outputIsSuccessful =
+		output?.ok === true ||
+		(output?.status === ApplyUnifiedDiffStatus.Applicable && output.ok) ||
+		isTerminalUnifiedDiffStatus(output?.status);
 
 	const updateTarget = (index: number, targetPath: string) => {
 		const currentTarget = displayTargets[index];
@@ -777,7 +806,7 @@ function DiffApplyModalContent({
 		}
 
 		const target = displayTargets[index];
-		if (!target || isTerminalUnifiedDiffStatus(target.status) || !isAbsolutePath(target.targetPath)) {
+		if (!target || !isTargetApplicableForApply(target, output) || !isAbsolutePath(target.targetPath)) {
 			return;
 		}
 
@@ -919,6 +948,7 @@ function DiffApplyModalContent({
 							const isTargetDryRunning = runningAction?.key === targetKey && runningAction.kind === 'dry-run';
 							const isTargetApplying = runningAction?.key === targetKey && runningAction.kind === 'apply';
 							const isProblem = isTargetProblem(target, missing);
+							const canApplyTarget = isTargetApplicableForApply(target, output) && !missing && !isRunning;
 							const isTerminal = isTerminalUnifiedDiffStatus(target.status);
 							const targetVisualState = getTargetVisualState(target, missing, targetDiagnostics);
 							const targetCardClassName = getTargetCardClassName(targetVisualState);
@@ -993,7 +1023,7 @@ function DiffApplyModalContent({
 											<button
 												type="button"
 												className="btn btn-xs btn-primary"
-												disabled={isRunning || isProblem || isTerminal}
+												disabled={!canApplyTarget || isProblem || isTerminal}
 												onClick={() => {
 													void handleTargetApply(index);
 												}}
@@ -1109,13 +1139,13 @@ function DiffApplyModalContent({
 						type="button"
 						className="btn btn-sm btn-primary"
 						disabled={!canApplyFromModal}
-						title="Runs a dry run first, then applies only if the backend reports it is safe."
+						title="Runs a dry run first, then applies only file patches reported as applicable."
 						onClick={() => {
 							void handleApply();
 						}}
 					>
 						{globalApplying ? <span className="loading loading-spinner loading-xs" /> : null}
-						Apply all
+						Apply applicable ({targetsForApply.length})
 					</button>
 				</ModalActions>
 			</div>

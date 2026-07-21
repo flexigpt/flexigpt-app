@@ -1,4 +1,4 @@
-package workspace
+package contextadapter
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 type ContextContribution struct {
@@ -31,46 +33,19 @@ type ContextLoadPlan struct {
 }
 
 type ContextProvider struct {
-	query *QueryService
+	query *engine.QueryService
 }
 
 func NewContextProvider(
-	query *QueryService,
+	query *engine.QueryService,
 ) (*ContextProvider, error) {
 	if query == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace context provider query is nil",
-			ErrInvalidWorkspace,
+			engine.ErrInvalidWorkspace,
 		)
 	}
 	return &ContextProvider{query: query}, nil
-}
-
-func (p *ContextProvider) List(
-	ctx context.Context,
-	rootID artifactstore.RootID,
-) ([]ContextContribution, error) {
-	view, err := p.query.Catalog(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-	priorities := attachmentPriorities(view.Workspace)
-	output := make([]ContextContribution, 0)
-	for _, resourceValue := range view.Resources {
-		if resourceValue.Definition.Kind != ContextKind ||
-			resourceValue.Definition.SchemaID != ContextSchemaID ||
-			resourceValue.Record.State != record.StateAvailable ||
-			!resourceValue.Record.Enabled {
-			continue
-		}
-		value, err := projectContext(resourceValue, priorities)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, value)
-	}
-	sortContextContributions(output)
-	return output, nil
 }
 
 func (p *ContextProvider) Compose(
@@ -93,7 +68,7 @@ func (p *ContextProvider) Compose(
 		return ContextLoadPlan{}, err
 	}
 
-	workspaceValue, err := p.query.workspaces.Get(ctx, rootID)
+	workspaceValue, err := p.query.Workspaces.Get(ctx, rootID)
 	if err != nil {
 		return ContextLoadPlan{}, err
 	}
@@ -105,15 +80,15 @@ func (p *ContextProvider) Compose(
 		Diagnostics:     loadPlan.Diagnostics,
 	}
 	for _, item := range loadPlan.Items {
-		if item.Definition.Kind != ContextKind ||
-			item.Definition.SchemaID != ContextSchemaID {
+		if item.Definition.Kind != contextKind ||
+			item.Definition.SchemaID != contextSchemaID {
 			return ContextLoadPlan{}, fmt.Errorf(
 				"%w: record %q is not a Workspace context resource",
-				ErrInvalidWorkspace,
+				engine.ErrInvalidWorkspace,
 				item.Record.ID,
 			)
 		}
-		body, err := decodeDefinitionBody[ContextDefinition](
+		body, err := engine.DecodeDefinitionBody[contextDefinition](
 			item.Definition.Body,
 		)
 		if err != nil {
@@ -139,11 +114,38 @@ func (p *ContextProvider) Compose(
 	return output, nil
 }
 
+func (p *ContextProvider) List(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+) ([]ContextContribution, error) {
+	view, err := p.query.Catalog(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	priorities := attachmentPriorities(view.Workspace)
+	output := make([]ContextContribution, 0)
+	for _, resourceValue := range view.Resources {
+		if resourceValue.Definition.Kind != contextKind ||
+			resourceValue.Definition.SchemaID != contextSchemaID ||
+			resourceValue.Record.State != record.StateAvailable ||
+			!resourceValue.Record.Enabled {
+			continue
+		}
+		value, err := projectContext(resourceValue, priorities)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, value)
+	}
+	sortContextContributions(output)
+	return output, nil
+}
+
 func projectContext(
-	value Resource,
+	value engine.Resource,
 	priorities map[artifactstore.SourceID]int,
 ) (ContextContribution, error) {
-	body, err := decodeDefinitionBody[ContextDefinition](
+	body, err := engine.DecodeDefinitionBody[contextDefinition](
 		value.Definition.Body,
 	)
 	if err != nil {
@@ -162,7 +164,7 @@ func projectContext(
 	}, nil
 }
 
-func attachmentPriorities(value Workspace) map[artifactstore.SourceID]int {
+func attachmentPriorities(value engine.Workspace) map[artifactstore.SourceID]int {
 	output := make(map[artifactstore.SourceID]int, len(value.Attachments))
 	for _, attachment := range value.Attachments {
 		if attachment.Enabled {

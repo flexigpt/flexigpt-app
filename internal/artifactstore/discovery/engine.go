@@ -17,6 +17,28 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
+type Result struct {
+	Occurrences []catalog.Occurrence
+	Definitions map[artifactstore.Digest]definition.Definition
+	Diagnostics []artifactstore.Diagnostic
+	Candidates  int
+}
+
+const (
+	DiagnosticCodeCandidateTooLarge         = "artifact.discovery.candidate-too-large"
+	DiagnosticCodeDecoderAmbiguous          = "artifact.discovery.decoder-ambiguous"
+	DiagnosticCodeDecoderInvalidRecognition = "artifact.discovery.decoder-invalid-recognition"
+	DiagnosticCodeDefinitionInvalid         = "artifact.discovery.definition-invalid"
+	DiagnosticCodeResourceMissing           = "artifact.discovery.resource-missing"
+	DiagnosticCodeSubresourceMissing        = "artifact.discovery.subresource-missing"
+)
+
+type DirectoryRoot struct {
+	Root            artifactstore.Locator
+	Recursive       bool
+	IncludePatterns []string
+}
+
 type Engine struct {
 	decoders *DecoderRegistry
 	clock    artifactstore.Clock

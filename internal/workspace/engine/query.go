@@ -1,4 +1,4 @@
-package workspace
+package engine
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 )
 
 type QueryService struct {
-	workspaces  *Service
+	Workspaces  *Service
 	roots       rootManager
 	sources     sourceReader
 	records     recordReader
@@ -40,137 +40,12 @@ func NewQueryService(
 		)
 	}
 	return &QueryService{
-		workspaces:  workspaces,
+		Workspaces:  workspaces,
 		roots:       roots,
 		sources:     sources,
 		records:     records,
 		definitions: definitions,
 	}, nil
-}
-
-func (q *QueryService) Catalog(
-	ctx context.Context,
-	rootID artifactstore.RootID,
-) (CatalogView, error) {
-	workspaceValue, err := q.workspaces.Get(ctx, rootID)
-	if err != nil {
-		return CatalogView{}, err
-	}
-	snapshot, err := q.roots.Current(ctx, rootID)
-	if err != nil {
-		return CatalogView{}, err
-	}
-	if err := q.ensureCurrent(ctx, workspaceValue, snapshot); err != nil {
-		return CatalogView{}, err
-	}
-	records, err := q.records.ListByRoot(ctx, rootID)
-	if err != nil {
-		return CatalogView{}, err
-	}
-
-	occurrencesByTypedKey := make(map[string]catalog.Occurrence)
-	for _, occurrence := range snapshot.Occurrences {
-		if occurrence.Kind == "" {
-			continue
-		}
-		key := record.TypedOccurrenceKey(
-			rootID,
-			occurrence.Key,
-			occurrence.Kind,
-		)
-		occurrencesByTypedKey[key] = occurrence
-	}
-
-	sourcesByID := make(map[artifactstore.SourceID]source.Source)
-	for _, value := range workspaceValue.Sources {
-		sourcesByID[value.ID] = value
-	}
-
-	recorded := make(map[string]struct{}, len(records))
-	view := CatalogView{
-		Workspace: workspaceValue,
-		Catalog:   snapshot,
-	}
-	for _, localRecord := range records {
-		typedKey := record.TypedOccurrenceKey(
-			rootID,
-			localRecord.Occurrence,
-			localRecord.Kind,
-		)
-		recorded[typedKey] = struct{}{}
-
-		if localRecord.ResolvedDefinition == nil {
-			view.UnresolvedRecords = append(
-				view.UnresolvedRecords,
-				localRecord,
-			)
-			continue
-		}
-		definitionValue, err := q.definitions.Get(
-			ctx,
-			*localRecord.ResolvedDefinition,
-		)
-		if err != nil {
-			return CatalogView{}, err
-		}
-		var occurrencePointer *catalog.Occurrence
-		occurrence, found := occurrencesByTypedKey[typedKey]
-		if found {
-			copyValue := occurrence
-			occurrencePointer = &copyValue
-		}
-		sourceValue, exists := sourcesByID[localRecord.Occurrence.SourceID]
-		if !exists {
-			return CatalogView{}, fmt.Errorf(
-				"%w: record source %q is unavailable",
-				ErrInvalidWorkspace,
-				localRecord.Occurrence.SourceID,
-			)
-		}
-		current := occurrencePointer != nil &&
-			occurrencePointer.State == catalog.OccurrenceValid &&
-			occurrencePointer.DefinitionDigest != nil &&
-			*occurrencePointer.DefinitionDigest ==
-				*localRecord.ResolvedDefinition
-
-		view.Resources = append(view.Resources, Resource{
-			Record:         localRecord,
-			Definition:     definitionValue,
-			Occurrence:     occurrencePointer,
-			Source:         sourceValue,
-			CatalogCurrent: current,
-		})
-	}
-
-	for _, occurrence := range snapshot.Occurrences {
-		if occurrence.Kind == "" {
-			continue
-		}
-		typedKey := record.TypedOccurrenceKey(
-			rootID,
-			occurrence.Key,
-			occurrence.Kind,
-		)
-		if _, exists := recorded[typedKey]; !exists {
-			view.Unrecorded = append(view.Unrecorded, occurrence)
-		}
-	}
-	sort.Slice(view.Resources, func(left, right int) bool {
-		if view.Resources[left].Record.Kind !=
-			view.Resources[right].Record.Kind {
-			return view.Resources[left].Record.Kind <
-				view.Resources[right].Record.Kind
-		}
-		if view.Resources[left].Record.Name !=
-			view.Resources[right].Record.Name {
-			return view.Resources[left].Record.Name <
-				view.Resources[right].Record.Name
-		}
-		return view.Resources[left].Record.ID <
-			view.Resources[right].Record.ID
-	})
-	view.Groups = groupCatalogResources(view.Resources, view.Unrecorded)
-	return view, nil
 }
 
 func (q *QueryService) Resolve(
@@ -314,6 +189,131 @@ func (q *QueryService) ComposeLoadPlan(
 		return plan.Items[left].Record.ID < plan.Items[right].Record.ID
 	})
 	return plan, nil
+}
+
+func (q *QueryService) Catalog(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+) (CatalogView, error) {
+	workspaceValue, err := q.Workspaces.Get(ctx, rootID)
+	if err != nil {
+		return CatalogView{}, err
+	}
+	snapshot, err := q.roots.Current(ctx, rootID)
+	if err != nil {
+		return CatalogView{}, err
+	}
+	if err := q.ensureCurrent(ctx, workspaceValue, snapshot); err != nil {
+		return CatalogView{}, err
+	}
+	records, err := q.records.ListByRoot(ctx, rootID)
+	if err != nil {
+		return CatalogView{}, err
+	}
+
+	occurrencesByTypedKey := make(map[string]catalog.Occurrence)
+	for _, occurrence := range snapshot.Occurrences {
+		if occurrence.Kind == "" {
+			continue
+		}
+		key := record.TypedOccurrenceKey(
+			rootID,
+			occurrence.Key,
+			occurrence.Kind,
+		)
+		occurrencesByTypedKey[key] = occurrence
+	}
+
+	sourcesByID := make(map[artifactstore.SourceID]source.Source)
+	for _, value := range workspaceValue.Sources {
+		sourcesByID[value.ID] = value
+	}
+
+	recorded := make(map[string]struct{}, len(records))
+	view := CatalogView{
+		Workspace: workspaceValue,
+		Catalog:   snapshot,
+	}
+	for _, localRecord := range records {
+		typedKey := record.TypedOccurrenceKey(
+			rootID,
+			localRecord.Occurrence,
+			localRecord.Kind,
+		)
+		recorded[typedKey] = struct{}{}
+
+		if localRecord.ResolvedDefinition == nil {
+			view.UnresolvedRecords = append(
+				view.UnresolvedRecords,
+				localRecord,
+			)
+			continue
+		}
+		definitionValue, err := q.definitions.Get(
+			ctx,
+			*localRecord.ResolvedDefinition,
+		)
+		if err != nil {
+			return CatalogView{}, err
+		}
+		var occurrencePointer *catalog.Occurrence
+		occurrence, found := occurrencesByTypedKey[typedKey]
+		if found {
+			copyValue := occurrence
+			occurrencePointer = &copyValue
+		}
+		sourceValue, exists := sourcesByID[localRecord.Occurrence.SourceID]
+		if !exists {
+			return CatalogView{}, fmt.Errorf(
+				"%w: record source %q is unavailable",
+				ErrInvalidWorkspace,
+				localRecord.Occurrence.SourceID,
+			)
+		}
+		current := occurrencePointer != nil &&
+			occurrencePointer.State == catalog.OccurrenceValid &&
+			occurrencePointer.DefinitionDigest != nil &&
+			*occurrencePointer.DefinitionDigest ==
+				*localRecord.ResolvedDefinition
+
+		view.Resources = append(view.Resources, Resource{
+			Record:         localRecord,
+			Definition:     definitionValue,
+			Occurrence:     occurrencePointer,
+			Source:         sourceValue,
+			CatalogCurrent: current,
+		})
+	}
+
+	for _, occurrence := range snapshot.Occurrences {
+		if occurrence.Kind == "" {
+			continue
+		}
+		typedKey := record.TypedOccurrenceKey(
+			rootID,
+			occurrence.Key,
+			occurrence.Kind,
+		)
+		if _, exists := recorded[typedKey]; !exists {
+			view.Unrecorded = append(view.Unrecorded, occurrence)
+		}
+	}
+	sort.Slice(view.Resources, func(left, right int) bool {
+		if view.Resources[left].Record.Kind !=
+			view.Resources[right].Record.Kind {
+			return view.Resources[left].Record.Kind <
+				view.Resources[right].Record.Kind
+		}
+		if view.Resources[left].Record.Name !=
+			view.Resources[right].Record.Name {
+			return view.Resources[left].Record.Name <
+				view.Resources[right].Record.Name
+		}
+		return view.Resources[left].Record.ID <
+			view.Resources[right].Record.ID
+	})
+	view.Groups = groupCatalogResources(view.Resources, view.Unrecorded)
+	return view, nil
 }
 
 func (q *QueryService) ensureCurrent(

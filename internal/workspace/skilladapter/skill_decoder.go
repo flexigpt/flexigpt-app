@@ -1,4 +1,4 @@
-package workspace
+package skilladapter
 
 import (
 	"bufio"
@@ -19,6 +19,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 var workspaceSkillNamePattern = regexp.MustCompile(
@@ -31,8 +32,28 @@ func NewSkillDecoder() *SkillDecoder {
 	return &SkillDecoder{}
 }
 
+func GetSkillArtifactSupport() engine.ArtifactSupport {
+	return engine.ArtifactSupport{
+		Kind:      skillKind,
+		SchemaID:  skillSchemaID,
+		DecoderID: skillDecoderID,
+	}
+}
+
+func PrimaryDiscoveryProfile() engine.DiscoveryProfile {
+	return engine.DiscoveryProfile{
+		DirectoryRoots: []discovery.DirectoryRoot{{
+			Root:      artifactstore.Locator(workspaceSkillsDirectory),
+			Recursive: true,
+			IncludePatterns: []string{
+				skillDefinitionFileName,
+			},
+		}},
+	}
+}
+
 func (*SkillDecoder) ID() artifactstore.DecoderID {
-	return SkillDecoderID
+	return skillDecoderID
 }
 
 func (*SkillDecoder) Recognize(
@@ -51,32 +72,32 @@ func (*SkillDecoder) Decode(
 ) ([]discovery.Decoded, []artifactstore.Diagnostic) {
 	document, err := decodeSkillMarkdown(candidate.Locator, candidate.Content)
 	if err != nil {
-		return nil, workspaceArtifactDiagnostics(
+		return nil, engine.WorkspaceArtifactDiagnostics(
 			candidate.Locator,
-			diagnosticCodeSkillInvalid,
+			engine.DiagnosticCodeSkillInvalid,
 			err.Error(),
 		)
 	}
 
 	raw, err := json.Marshal(document)
 	if err != nil {
-		return nil, workspaceArtifactErrorDiagnostics(candidate.Locator, err)
+		return nil, engine.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
 	}
 	raw, err = jsoncanon.CanonicalizeObject(
 		raw,
 		artifactstore.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
-		return nil, workspaceArtifactErrorDiagnostics(candidate.Locator, err)
+		return nil, engine.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
 	}
 
 	labels := map[string]string{
 		skillInsertLabelKey: document.Insert,
 	}
 	value := definition.Definition{
-		Kind:          SkillKind,
-		SchemaID:      SkillSchemaID,
-		SchemaVersion: workspaceSchemaVersionV1,
+		Kind:          skillKind,
+		SchemaID:      skillSchemaID,
+		SchemaVersion: workspaceSkillsSchemaVersionV1,
 		LogicalName:   artifactstore.LogicalName(document.Name),
 		DisplayName:   document.DisplayName,
 		Description:   document.Description,
@@ -89,39 +110,39 @@ func (*SkillDecoder) Decode(
 func decodeSkillMarkdown(
 	locator artifactstore.Locator,
 	content []byte,
-) (SkillDefinition, error) {
+) (skillDefinition, error) {
 	if len(content) > maxWorkspaceSkillBytes {
-		return SkillDefinition{}, fmt.Errorf(
+		return skillDefinition{}, fmt.Errorf(
 			"SKILL.md exceeds %d bytes",
 			maxWorkspaceSkillBytes,
 		)
 	}
 	if !utf8.Valid(content) {
-		return SkillDefinition{}, errors.New("SKILL.md must contain valid UTF-8")
+		return skillDefinition{}, errors.New("SKILL.md must contain valid UTF-8")
 	}
 
 	frontmatter, body, err := splitSkillFrontmatter(content)
 	if err != nil {
-		return SkillDefinition{}, err
+		return skillDefinition{}, err
 	}
 	rawProperties := map[string]any{}
 	if err := decodeRestrictedYAML(frontmatter, &rawProperties); err != nil {
-		return SkillDefinition{}, err
+		return skillDefinition{}, err
 	}
 
 	name, ok := rawProperties[skillFrontmatterNameKey].(string)
 	if !ok {
-		return SkillDefinition{}, errors.New("frontmatter.name must be a string")
+		return skillDefinition{}, errors.New("frontmatter.name must be a string")
 	}
 	if !workspaceSkillNamePattern.MatchString(name) ||
 		strings.Contains(name, skillNameRepeatedHyphen) {
-		return SkillDefinition{}, errors.New(
+		return skillDefinition{}, errors.New(
 			"frontmatter.name must be a lowercase hyphenated name of at most 64 characters",
 		)
 	}
 	parentName := path.Base(path.Dir(string(locator)))
 	if name != parentName {
-		return SkillDefinition{}, fmt.Errorf(
+		return skillDefinition{}, fmt.Errorf(
 			"frontmatter.name %q must match containing directory %q",
 			name,
 			parentName,
@@ -132,12 +153,12 @@ func decodeSkillMarkdown(
 	if !ok ||
 		strings.TrimSpace(description) != description ||
 		description == "" {
-		return SkillDefinition{}, errors.New(
+		return skillDefinition{}, errors.New(
 			"frontmatter.description must be a non-empty trimmed string",
 		)
 	}
 	if len(description) > maxSkillDescriptionBytes {
-		return SkillDefinition{}, errors.New(
+		return skillDefinition{}, errors.New(
 			"frontmatter.description exceeds 1024 bytes",
 		)
 	}
@@ -146,7 +167,7 @@ func decodeSkillMarkdown(
 	if rawInsert, exists := rawProperties[skillFrontmatterInsertKey]; exists {
 		value, ok := rawInsert.(string)
 		if !ok {
-			return SkillDefinition{}, errors.New(
+			return skillDefinition{}, errors.New(
 				"frontmatter.insert must be a string",
 			)
 		}
@@ -155,7 +176,7 @@ func decodeSkillMarkdown(
 			agentskillsSpec.SkillInsertUserMessage:
 			insert = value
 		default:
-			return SkillDefinition{}, fmt.Errorf(
+			return skillDefinition{}, fmt.Errorf(
 				"unsupported frontmatter.insert value %q",
 				value,
 			)
@@ -164,11 +185,11 @@ func decodeSkillMarkdown(
 
 	arguments, err := decodeSkillArguments(rawProperties[skillFrontmatterArgumentsKey])
 	if err != nil {
-		return SkillDefinition{}, err
+		return skillDefinition{}, err
 	}
 	tags, err := decodeSkillTags(rawProperties[skillFrontmatterTagsKey])
 	if err != nil {
-		return SkillDefinition{}, err
+		return skillDefinition{}, err
 	}
 
 	normalizedBody := strings.TrimLeft(
@@ -176,14 +197,14 @@ func decodeSkillMarkdown(
 		"\n",
 	)
 	if strings.TrimSpace(normalizedBody) == "" {
-		return SkillDefinition{}, errors.New("SKILL.md body is empty")
+		return skillDefinition{}, errors.New("SKILL.md body is empty")
 	}
 	displayName := firstSkillHeading(normalizedBody)
 	if displayName == "" {
 		displayName = name
 	}
 
-	return SkillDefinition{
+	return skillDefinition{
 		Name:           name,
 		DisplayName:    displayName,
 		Description:    description,
@@ -232,7 +253,7 @@ func splitSkillFrontmatter(
 
 func decodeSkillArguments(
 	raw any,
-) ([]SkillArgumentDefinition, error) {
+) ([]skillArgumentDefinition, error) {
 	if raw == nil {
 		return nil, nil
 	}
@@ -241,7 +262,7 @@ func decodeSkillArguments(
 		return nil, errors.New("frontmatter.arguments must be a list")
 	}
 
-	output := make([]SkillArgumentDefinition, 0, len(values))
+	output := make([]skillArgumentDefinition, 0, len(values))
 	seen := make(map[string]struct{}, len(values))
 	for index, value := range values {
 		properties, ok := value.(map[string]any)
@@ -271,7 +292,7 @@ func decodeSkillArguments(
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, SkillArgumentDefinition{
+		output = append(output, skillArgumentDefinition{
 			Name:        name,
 			Description: description,
 			Default:     defaultValue,
@@ -336,5 +357,3 @@ func firstSkillHeading(body string) string {
 	}
 	return ""
 }
-
-var _ discovery.Decoder = (*SkillDecoder)(nil)

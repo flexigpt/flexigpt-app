@@ -17,10 +17,6 @@ func boolInt(value bool) int {
 	return 0
 }
 
-func timeValue(value time.Time) int64 {
-	return value.UTC().UnixNano()
-}
-
 func nullableTime(value *time.Time) any {
 	if value == nil {
 		return nil
@@ -28,8 +24,8 @@ func nullableTime(value *time.Time) any {
 	return timeValue(*value)
 }
 
-func parseTime(value int64) time.Time {
-	return time.Unix(0, value).UTC()
+func timeValue(value time.Time) int64 {
+	return value.UTC().UnixNano()
 }
 
 func parseNullableTime(value sql.NullInt64) *time.Time {
@@ -38,6 +34,10 @@ func parseNullableTime(value sql.NullInt64) *time.Time {
 	}
 	parsed := parseTime(value.Int64)
 	return &parsed
+}
+
+func parseTime(value int64) time.Time {
+	return time.Unix(0, value).UTC()
 }
 
 func nullableDigest(value *artifactstore.Digest) any {

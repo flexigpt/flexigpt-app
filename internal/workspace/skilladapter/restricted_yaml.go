@@ -1,4 +1,4 @@
-package workspace
+package skilladapter
 
 import (
 	"bufio"
@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/goccy/go-yaml"
 )
 
@@ -20,10 +21,10 @@ func decodeRestrictedYAML(
 	target any,
 ) error {
 	if len(raw) == 0 {
-		return fmt.Errorf("%w: YAML document is empty", ErrInvalidWorkspace)
+		return fmt.Errorf("%w: YAML document is empty", engine.ErrInvalidWorkspace)
 	}
 	if bytes.IndexByte(raw, 0) >= 0 {
-		return fmt.Errorf("%w: YAML contains a NUL byte", ErrInvalidWorkspace)
+		return fmt.Errorf("%w: YAML contains a NUL byte", engine.ErrInvalidWorkspace)
 	}
 
 	seenTopLevel := make(map[string]struct{})
@@ -39,20 +40,20 @@ func decodeRestrictedYAML(
 		if trimmed == yamlDocumentStart || trimmed == yamlDocumentEnd {
 			return fmt.Errorf(
 				"%w: YAML frontmatter must contain one document",
-				ErrInvalidWorkspace,
+				engine.ErrInvalidWorkspace,
 			)
 		}
 		if strings.ContainsRune(line, '\t') {
 			return fmt.Errorf(
 				"%w: YAML tabs are not allowed at line %d",
-				ErrInvalidWorkspace,
+				engine.ErrInvalidWorkspace,
 				lineNumber,
 			)
 		}
 		if hasRestrictedYAMLToken(line) {
 			return fmt.Errorf(
 				"%w: YAML aliases, anchors, merge keys, and tags are not allowed at line %d",
-				ErrInvalidWorkspace,
+				engine.ErrInvalidWorkspace,
 				lineNumber,
 			)
 		}
@@ -63,7 +64,7 @@ func decodeRestrictedYAML(
 				if _, duplicate := seenTopLevel[key]; duplicate {
 					return fmt.Errorf(
 						"%w: duplicate YAML key %q",
-						ErrInvalidWorkspace,
+						engine.ErrInvalidWorkspace,
 						key,
 					)
 				}
@@ -77,7 +78,7 @@ func decodeRestrictedYAML(
 	if err := yaml.Unmarshal(raw, target); err != nil {
 		return fmt.Errorf(
 			"%w: decode restricted YAML: %w",
-			ErrInvalidWorkspace,
+			engine.ErrInvalidWorkspace,
 			err,
 		)
 	}

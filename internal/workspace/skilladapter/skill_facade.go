@@ -1,4 +1,4 @@
-package workspace
+package skilladapter
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 type WorkspaceSkill struct {
@@ -36,16 +37,16 @@ type SkillLoadPlan struct {
 }
 
 type SkillFacade struct {
-	query *QueryService
+	query *engine.QueryService
 }
 
 func NewSkillFacade(
-	query *QueryService,
+	query *engine.QueryService,
 ) (*SkillFacade, error) {
 	if query == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Skill facade query is nil",
-			ErrInvalidWorkspace,
+			engine.ErrInvalidWorkspace,
 		)
 	}
 	return &SkillFacade{query: query}, nil
@@ -61,9 +62,10 @@ func (f *SkillFacade) List(
 	}
 	output := make([]WorkspaceSkill, 0)
 	for _, resourceValue := range view.Resources {
-		if resourceValue.Definition.Kind != SkillKind ||
-			resourceValue.Definition.SchemaID != SkillSchemaID ||
-			resourceValue.Record.State != record.StateAvailable {
+		if resourceValue.Definition.Kind != skillKind ||
+			resourceValue.Definition.SchemaID != skillSchemaID ||
+			resourceValue.Record.State != record.StateAvailable ||
+			!resourceValue.Record.Enabled {
 			continue
 		}
 		value, err := projectWorkspaceSkill(rootID, resourceValue)
@@ -91,15 +93,15 @@ func (f *SkillFacade) Load(
 		Diagnostics:     loadPlan.Diagnostics,
 	}
 	for _, item := range loadPlan.Items {
-		if item.Definition.Kind != SkillKind ||
-			item.Definition.SchemaID != SkillSchemaID {
+		if item.Definition.Kind != skillKind ||
+			item.Definition.SchemaID != skillSchemaID {
 			return SkillLoadPlan{}, fmt.Errorf(
 				"%w: record %q is not a Workspace Skill",
-				ErrInvalidWorkspace,
+				engine.ErrInvalidWorkspace,
 				item.Record.ID,
 			)
 		}
-		resourceValue := Resource{
+		resourceValue := engine.Resource{
 			Record:     item.Record,
 			Definition: item.Definition,
 			Source:     item.Source,
@@ -116,9 +118,9 @@ func (f *SkillFacade) Load(
 
 func projectWorkspaceSkill(
 	rootID artifactstore.RootID,
-	resourceValue Resource,
+	resourceValue engine.Resource,
 ) (WorkspaceSkill, error) {
-	body, err := decodeDefinitionBody[SkillDefinition](
+	body, err := engine.DecodeDefinitionBody[skillDefinition](
 		resourceValue.Definition.Body,
 	)
 	if err != nil {
@@ -166,7 +168,7 @@ func projectWorkspaceSkill(
 	if err := skillStore.ValidateSkill(&projected); err != nil {
 		return WorkspaceSkill{}, fmt.Errorf(
 			"%w: project Workspace Skill: %w",
-			ErrInvalidWorkspace,
+			engine.ErrInvalidWorkspace,
 			err,
 		)
 	}
@@ -206,7 +208,7 @@ func workspaceSkillLocation(
 	if !filepath.IsAbs(value.RootPath) {
 		return "", fmt.Errorf(
 			"%w: Workspace Skill source root is not absolute",
-			ErrInvalidWorkspace,
+			engine.ErrInvalidWorkspace,
 		)
 	}
 
@@ -224,7 +226,7 @@ func workspaceSkillLocation(
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: Workspace Skill location escapes source root",
-			ErrInvalidWorkspace,
+			engine.ErrInvalidWorkspace,
 		)
 	}
 	return location, nil

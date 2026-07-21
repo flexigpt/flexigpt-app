@@ -8,24 +8,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 )
-
-const (
-	DiagnosticCodeCandidateTooLarge         = "artifact.discovery.candidate-too-large"
-	DiagnosticCodeDecoderAmbiguous          = "artifact.discovery.decoder-ambiguous"
-	DiagnosticCodeDecoderInvalidRecognition = "artifact.discovery.decoder-invalid-recognition"
-	DiagnosticCodeDefinitionInvalid         = "artifact.discovery.definition-invalid"
-	DiagnosticCodeResourceMissing           = "artifact.discovery.resource-missing"
-	DiagnosticCodeSubresourceMissing        = "artifact.discovery.subresource-missing"
-)
-
-type DirectoryRoot struct {
-	Root            artifactstore.Locator
-	Recursive       bool
-	IncludePatterns []string
-}
 
 type SourcePlan struct {
 	SourceID           artifactstore.SourceID
@@ -163,42 +146,4 @@ func (p *SourcePlan) ApplyDefaults() {
 		return p.DirectoryRoots[left].Root < p.DirectoryRoots[right].Root
 	})
 	slices.Sort(p.AllowedDecoderIDs)
-}
-
-type Plan struct {
-	Sources []SourcePlan
-}
-
-func (p Plan) Validate() error {
-	seen := make(map[artifactstore.SourceID]struct{}, len(p.Sources))
-	for index, sourcePlan := range p.Sources {
-		if err := sourcePlan.Validate(); err != nil {
-			return fmt.Errorf("source plan %d: %w", index, err)
-		}
-		if _, duplicate := seen[sourcePlan.SourceID]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate source plan for %q",
-				artifactstore.ErrInvalid,
-				sourcePlan.SourceID,
-			)
-		}
-		seen[sourcePlan.SourceID] = struct{}{}
-	}
-	return nil
-}
-
-func (p Plan) BySource() map[artifactstore.SourceID]SourcePlan {
-	output := make(map[artifactstore.SourceID]SourcePlan, len(p.Sources))
-	for _, value := range p.Sources {
-		value.ApplyDefaults()
-		output[value.SourceID] = value
-	}
-	return output
-}
-
-type Result struct {
-	Occurrences []catalog.Occurrence
-	Definitions map[artifactstore.Digest]definition.Definition
-	Diagnostics []artifactstore.Diagnostic
-	Candidates  int
 }

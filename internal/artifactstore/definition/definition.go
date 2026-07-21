@@ -3,63 +3,10 @@ package definition
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
-	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
-
-const FileFormatV1 = "artifact-definition/v1"
-
-type Selector struct {
-	Kind              artifactstore.ArtifactKind `json:"kind"`
-	LogicalName       artifactstore.LogicalName  `json:"logicalName,omitempty"`
-	VersionConstraint string                     `json:"versionConstraint,omitempty"`
-	Labels            map[string]string          `json:"labels,omitempty"`
-}
-
-func (s Selector) Validate() error {
-	if err := artifactstore.ValidateArtifactKind(s.Kind); err != nil {
-		return fmt.Errorf("selector: %w", err)
-	}
-	if s.LogicalName != "" {
-		if err := artifactstore.ValidateLogicalName(s.LogicalName); err != nil {
-			return fmt.Errorf("selector: %w", err)
-		}
-	}
-	if len(s.VersionConstraint) > artifactstore.MaxVersionBytes {
-		return fmt.Errorf(
-			"%w: selector version constraint exceeds %d bytes",
-			artifactstore.ErrInvalid,
-			artifactstore.MaxVersionBytes,
-		)
-	}
-	if len(s.Labels) > artifactstore.MaxLabels {
-		return fmt.Errorf(
-			"%w: selector labels exceed %d entries",
-			artifactstore.ErrInvalid,
-			artifactstore.MaxLabels,
-		)
-	}
-	for key, value := range s.Labels {
-		if err := artifactstore.ValidateIdentifier(
-			"selector label key",
-			key,
-			artifactstore.MaxKindBytes,
-		); err != nil {
-			return err
-		}
-		if err := artifactstore.ValidateRequiredText(
-			"selector label value",
-			value,
-			artifactstore.MaxLabelValueBytes,
-		); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 type Definition struct {
 	Digest         artifactstore.Digest         `json:"digest"`
@@ -147,58 +94,4 @@ func (d Definition) Validate() error {
 		}
 	}
 	return nil
-}
-
-type File struct {
-	Format     string     `json:"format"`
-	Definition Definition `json:"definition"`
-}
-
-func (f File) Validate() error {
-	if f.Format != FileFormatV1 {
-		return fmt.Errorf(
-			"%w: unsupported definition file format %q",
-			artifactstore.ErrInvalid,
-			f.Format,
-		)
-	}
-	return f.Definition.Validate()
-}
-
-func cloneLabels(input map[string]string) map[string]string {
-	if input == nil {
-		return nil
-	}
-	output := make(map[string]string, len(input))
-	maps.Copy(output, input)
-	return output
-}
-
-func cloneSelectors(input []Selector) []Selector {
-	if input == nil {
-		return nil
-	}
-	output := make([]Selector, len(input))
-	for index, value := range input {
-		output[index] = value
-		output[index].Labels = cloneLabels(value.Labels)
-	}
-	return output
-}
-
-func sortedLabels(input map[string]string) map[string]string {
-	if len(input) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(input))
-	for key := range input {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	output := make(map[string]string, len(input))
-	for _, key := range keys {
-		output[key] = input[key]
-	}
-	return output
 }

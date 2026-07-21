@@ -1,4 +1,4 @@
-package workspace
+package engine
 
 import (
 	"bytes"
@@ -12,6 +12,16 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
+
+func (s ArtifactSupport) Validate() error {
+	if err := artifactstore.ValidateArtifactKind(s.Kind); err != nil {
+		return err
+	}
+	if err := artifactstore.ValidateSchemaID(s.SchemaID); err != nil {
+		return err
+	}
+	return artifactstore.ValidateDecoderID(s.DecoderID)
+}
 
 func encodeRootData(value RootData) (json.RawMessage, error) {
 	if err := validateRootData(value); err != nil {
@@ -85,6 +95,93 @@ func decodeAttachmentData(
 		return AttachmentData{}, err
 	}
 	return value, nil
+}
+
+func validateWorkspaceState(
+	root catalog.Root,
+	data RootData,
+	attachments []catalog.Attachment,
+	sources []source.Source,
+) error {
+	if root.Kind != RootKind {
+		return fmt.Errorf(
+			"%w: root %q has kind %q",
+			ErrNotWorkspace,
+			root.ID,
+			root.Kind,
+		)
+	}
+	if err := validateRootData(data); err != nil {
+		return err
+	}
+	sourcesByID := make(map[artifactstore.SourceID]source.Source, len(sources))
+	for _, value := range sources {
+		sourcesByID[value.ID] = value
+	}
+
+	primaryCount := 0
+	for _, attachment := range attachments {
+		operation, supported := attachmentOperationFor(attachment.Role)
+		if !supported {
+			return fmt.Errorf(
+				"%w: unsupported attachment role %q",
+				ErrInvalidWorkspace,
+				attachment.Role,
+			)
+		}
+		sourceValue, exists := sourcesByID[attachment.SourceID]
+		if !exists {
+			return fmt.Errorf(
+				"%w: attachment source %q is unavailable",
+				ErrInvalidWorkspace,
+				attachment.SourceID,
+			)
+		}
+		if operation.isPrimary {
+			primaryCount++
+			if data.Mode != ModeFilesystem {
+				return fmt.Errorf(
+					"%w: empty Workspace cannot have a primary attachment",
+					ErrInvalidWorkspace,
+				)
+			}
+			if attachment.SourceID != data.PrimarySourceID {
+				return fmt.Errorf(
+					"%w: primary attachment does not match primary source",
+					ErrInvalidWorkspace,
+				)
+			}
+			if !attachment.Enabled || !sourceValue.Enabled {
+				return fmt.Errorf(
+					"%w: primary source and attachment must be enabled",
+					ErrInvalidWorkspace,
+				)
+			}
+			if sourceValue.Kind != operation.requiredSourceKind {
+				return fmt.Errorf(
+					"%w: primary source must be a filesystem source",
+					ErrInvalidWorkspace,
+				)
+			}
+		}
+	}
+	switch data.Mode {
+	case ModeFilesystem:
+		if primaryCount != 1 {
+			return fmt.Errorf(
+				"%w: filesystem Workspace requires exactly one primary attachment",
+				ErrInvalidWorkspace,
+			)
+		}
+	case ModeEmpty:
+		if primaryCount != 0 {
+			return fmt.Errorf(
+				"%w: empty Workspace cannot have a primary attachment",
+				ErrInvalidWorkspace,
+			)
+		}
+	}
+	return nil
 }
 
 func validateRootData(value RootData) error {
@@ -179,93 +276,6 @@ func validateDiscoveryPreferences(
 			if _, err := path.Match(pattern, "candidate"); err != nil {
 				return err
 			}
-		}
-	}
-	return nil
-}
-
-func validateWorkspaceState(
-	root catalog.Root,
-	data RootData,
-	attachments []catalog.Attachment,
-	sources []source.Source,
-) error {
-	if root.Kind != RootKind {
-		return fmt.Errorf(
-			"%w: root %q has kind %q",
-			ErrNotWorkspace,
-			root.ID,
-			root.Kind,
-		)
-	}
-	if err := validateRootData(data); err != nil {
-		return err
-	}
-	sourcesByID := make(map[artifactstore.SourceID]source.Source, len(sources))
-	for _, value := range sources {
-		sourcesByID[value.ID] = value
-	}
-
-	primaryCount := 0
-	for _, attachment := range attachments {
-		operation, supported := attachmentOperationFor(attachment.Role)
-		if !supported {
-			return fmt.Errorf(
-				"%w: unsupported attachment role %q",
-				ErrInvalidWorkspace,
-				attachment.Role,
-			)
-		}
-		sourceValue, exists := sourcesByID[attachment.SourceID]
-		if !exists {
-			return fmt.Errorf(
-				"%w: attachment source %q is unavailable",
-				ErrInvalidWorkspace,
-				attachment.SourceID,
-			)
-		}
-		if operation.isPrimary {
-			primaryCount++
-			if data.Mode != ModeFilesystem {
-				return fmt.Errorf(
-					"%w: empty Workspace cannot have a primary attachment",
-					ErrInvalidWorkspace,
-				)
-			}
-			if attachment.SourceID != data.PrimarySourceID {
-				return fmt.Errorf(
-					"%w: primary attachment does not match primary source",
-					ErrInvalidWorkspace,
-				)
-			}
-			if !attachment.Enabled || !sourceValue.Enabled {
-				return fmt.Errorf(
-					"%w: primary source and attachment must be enabled",
-					ErrInvalidWorkspace,
-				)
-			}
-			if sourceValue.Kind != operation.requiredSourceKind {
-				return fmt.Errorf(
-					"%w: primary source must be a filesystem source",
-					ErrInvalidWorkspace,
-				)
-			}
-		}
-	}
-	switch data.Mode {
-	case ModeFilesystem:
-		if primaryCount != 1 {
-			return fmt.Errorf(
-				"%w: filesystem Workspace requires exactly one primary attachment",
-				ErrInvalidWorkspace,
-			)
-		}
-	case ModeEmpty:
-		if primaryCount != 0 {
-			return fmt.Errorf(
-				"%w: empty Workspace cannot have a primary attachment",
-				ErrInvalidWorkspace,
-			)
 		}
 	}
 	return nil

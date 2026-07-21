@@ -1,4 +1,4 @@
-package workspace
+package engine
 
 import (
 	"context"
@@ -56,7 +56,7 @@ func (p *RecordPolicy) Derive(
 	if value.SchemaID != schemaID {
 		return record.Draft{}, false, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,
-			Code:     diagnosticCodeRecordSchemaUnsupported,
+			Code:     DiagnosticCodeRecordSchemaUnsupported,
 			Message: fmt.Sprintf(
 				"definition schema %q is not supported for kind %q",
 				value.SchemaID,

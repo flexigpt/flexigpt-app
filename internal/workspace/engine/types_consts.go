@@ -1,13 +1,12 @@
-package workspace
+package engine
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
@@ -28,6 +27,20 @@ const (
 	ModeEmpty      Mode = "empty"
 	ModeFilesystem Mode = "filesystem"
 )
+
+// DiscoveryProfile defines discovery rules for one attachment class.
+//
+// Artifact adapters contribute their own conventions through this type.
+type DiscoveryProfile struct {
+	ExplicitLocators []artifactstore.Locator
+	ReadmeLocator    artifactstore.Locator
+	DirectoryRoots   []discovery.DirectoryRoot
+}
+
+type DiscoveryProfiles struct {
+	Primary  DiscoveryProfile
+	Attached DiscoveryProfile
+}
 
 type DiscoveryRoot struct {
 	Root            artifactstore.Locator `json:"root"`
@@ -59,6 +72,14 @@ type Workspace struct {
 	Data        RootData             `json:"data"`
 	Attachments []catalog.Attachment `json:"attachments"`
 	Sources     []source.Source      `json:"sources"`
+}
+
+type Resource struct {
+	Record         record.Record
+	Definition     definition.Definition
+	Occurrence     *catalog.Occurrence
+	Source         source.Source
+	CatalogCurrent bool
 }
 
 type ResourceGroup struct {
@@ -102,14 +123,6 @@ type AttachRequest struct {
 	Data                 AttachmentData               `json:"data"`
 }
 
-type Resource struct {
-	Record         record.Record
-	Definition     definition.Definition
-	Occurrence     *catalog.Occurrence
-	Source         source.Source
-	CatalogCurrent bool
-}
-
 type CatalogView struct {
 	Workspace         Workspace
 	Catalog           catalog.Snapshot
@@ -147,123 +160,20 @@ type DefinitionObservation struct {
 	Generation  string
 }
 
-type ContextDefinition struct {
-	Name      string `json:"name"`
-	Role      string `json:"role"`
-	MediaType string `json:"mediaType"`
-	Content   string `json:"content"`
+type attachmentOperation struct {
+	role                                 artifactstore.AttachmentRole
+	canAttach                            bool
+	isPrimary                            bool
+	requiredSourceKind                   artifactstore.SourceKind
+	defaultPriority                      int
+	defaultAuthoritative                 bool
+	includeReadmeWhenRequested           bool
+	appliesWorkspaceDiscoveryPreferences bool
+	allowsAttachmentDiscoveryOverrides   bool
 }
 
-type SkillArgumentDefinition struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Default     string `json:"default,omitempty"`
-}
-
-type SkillDefinition struct {
-	Name           string                    `json:"name"`
-	DisplayName    string                    `json:"displayName,omitempty"`
-	Description    string                    `json:"description"`
-	Insert         string                    `json:"insert"`
-	Arguments      []SkillArgumentDefinition `json:"arguments,omitempty"`
-	Tags           []string                  `json:"tags,omitempty"`
-	MarkdownBody   string                    `json:"markdownBody"`
-	RawFrontmatter map[string]any            `json:"rawFrontmatter,omitempty"`
-}
-
-func decodeDefinitionBody[T any](
-	raw json.RawMessage,
-) (T, error) {
-	var output T
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return output, err
-	}
-	return output, nil
-}
-
-type rootManager interface {
-	CreateRoot(
-		ctx context.Context,
-		draft catalog.RootDraft,
-		attachments []catalog.AttachmentDraft,
-	) (catalog.Root, []catalog.Attachment, error)
-
-	GetRoot(
-		ctx context.Context,
-		id artifactstore.RootID,
-	) (catalog.Root, error)
-
-	ListRoots(
-		ctx context.Context,
-		includeDeleted bool,
-	) ([]catalog.Root, error)
-
-	UpdateRoot(
-		ctx context.Context,
-		id artifactstore.RootID,
-		update catalog.RootUpdate,
-	) (catalog.Root, error)
-
-	DeleteRoot(
-		ctx context.Context,
-		id artifactstore.RootID,
-		expectedRevision uint64,
-	) (catalog.Root, error)
-
-	Attach(
-		ctx context.Context,
-		rootID artifactstore.RootID,
-		expectedRootRevision uint64,
-		draft catalog.AttachmentDraft,
-	) (catalog.Root, catalog.Attachment, error)
-
-	GetAttachment(
-		ctx context.Context,
-		rootID artifactstore.RootID,
-		sourceID artifactstore.SourceID,
-	) (catalog.Attachment, error)
-
-	ListAttachments(
-		ctx context.Context,
-		rootID artifactstore.RootID,
-	) ([]catalog.Attachment, error)
-
-	Detach(
-		ctx context.Context,
-		rootID artifactstore.RootID,
-		sourceID artifactstore.SourceID,
-		expectedRootRevision uint64,
-		expectedAttachmentRevision uint64,
-	) (catalog.Root, error)
-
-	Current(
-		ctx context.Context,
-		rootID artifactstore.RootID,
-	) (catalog.Snapshot, error)
-}
-
-type sourceReader interface {
-	Get(
-		ctx context.Context,
-		id artifactstore.SourceID,
-	) (source.Source, error)
-}
-
-type recordReader interface {
-	Get(
-		ctx context.Context,
-		id artifactstore.RecordID,
-	) (record.Record, error)
-
-	ListByRoot(
-		ctx context.Context,
-		rootID artifactstore.RootID,
-	) ([]record.Record, error)
-}
-
-type definitionReader interface {
-	Get(
-		ctx context.Context,
-		digest artifactstore.Digest,
-	) (definition.Definition, error)
+type ArtifactSupport struct {
+	Kind      artifactstore.ArtifactKind
+	SchemaID  artifactstore.SchemaID
+	DecoderID artifactstore.DecoderID
 }

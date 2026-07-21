@@ -1,4 +1,4 @@
-package workspace
+package engine
 
 import (
 	"bytes"
@@ -18,11 +18,21 @@ import (
 
 type Planner struct {
 	decoderIDs []artifactstore.DecoderID
+	profiles   DiscoveryProfiles
 }
 
 func NewPlanner(
+	profiles DiscoveryProfiles,
 	decoderIDs ...artifactstore.DecoderID,
 ) (*Planner, error) {
+	if len(profiles.Primary.ExplicitLocators) == 0 &&
+		len(profiles.Primary.DirectoryRoots) == 0 {
+		return nil, fmt.Errorf(
+			"%w: primary discovery profile is required",
+			ErrInvalidWorkspace,
+		)
+	}
+
 	seen := make(map[artifactstore.DecoderID]struct{}, len(decoderIDs))
 	values := make([]artifactstore.DecoderID, 0, len(decoderIDs)+1)
 
@@ -40,7 +50,10 @@ func NewPlanner(
 		values = append(values, decoderID)
 	}
 	slices.Sort(values)
-	return &Planner{decoderIDs: values}, nil
+	return &Planner{
+		decoderIDs: values,
+		profiles:   cloneDiscoveryProfiles(profiles),
+	}, nil
 }
 
 func (p *Planner) Build(
@@ -68,6 +81,10 @@ func (p *Planner) Build(
 				attachment.Role,
 			)
 		}
+		profile := p.profiles.Attached
+		if operation.isPrimary {
+			profile = p.profiles.Primary
+		}
 		attachmentData, err := decodeAttachmentData(attachment.Data)
 		if err != nil {
 			return discovery.Plan{}, err
@@ -86,18 +103,18 @@ func (p *Planner) Build(
 			MaxDepth:          artifactstore.DefaultMaxDepth,
 			ExplicitLocators: append(
 				[]artifactstore.Locator(nil),
-				operation.profile.explicitLocators...,
+				profile.ExplicitLocators...,
 			),
 			DirectoryRoots: cloneDirectoryRoots(
-				operation.profile.directoryRoots,
+				profile.DirectoryRoots,
 			),
 		}
 
 		if operation.includeReadmeWhenRequested &&
-			preferences.IncludeReadme {
+			preferences.IncludeReadme && profile.ReadmeLocator != "" {
 			sourcePlan.ExplicitLocators = appendUniqueLocators(
 				sourcePlan.ExplicitLocators,
-				ContextReadmeLocator,
+				profile.ReadmeLocator,
 			)
 		}
 		if operation.appliesWorkspaceDiscoveryPreferences {
@@ -129,6 +146,21 @@ func (p *Planner) Build(
 		return discovery.Plan{}, err
 	}
 	return valuePlan, nil
+}
+
+func cloneDiscoveryProfiles(value DiscoveryProfiles) DiscoveryProfiles {
+	return DiscoveryProfiles{
+		Primary: DiscoveryProfile{
+			ExplicitLocators: append([]artifactstore.Locator(nil), value.Primary.ExplicitLocators...),
+			ReadmeLocator:    value.Primary.ReadmeLocator,
+			DirectoryRoots:   cloneDirectoryRoots(value.Primary.DirectoryRoots),
+		},
+		Attached: DiscoveryProfile{
+			ExplicitLocators: append([]artifactstore.Locator(nil), value.Attached.ExplicitLocators...),
+			ReadmeLocator:    value.Attached.ReadmeLocator,
+			DirectoryRoots:   cloneDirectoryRoots(value.Attached.DirectoryRoots),
+		},
+	}
 }
 
 func cloneDirectoryRoots(

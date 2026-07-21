@@ -13,11 +13,35 @@ import (
 const placeholderDigest artifactstore.Digest = artifactstore.DigestSHA256Prefix +
 	"0000000000000000000000000000000000000000000000000000000000000000"
 
-func DigestBytes(content []byte) artifactstore.Digest {
-	sum := sha256.Sum256(content)
-	return artifactstore.Digest(
-		artifactstore.DigestSHA256Prefix + hex.EncodeToString(sum[:]),
-	)
+func EncodeFile(value Definition) ([]byte, error) {
+	canonical, err := Canonicalize(value)
+	if err != nil {
+		return nil, err
+	}
+	file := File{
+		Format:     FileFormatV1,
+		Definition: canonical,
+	}
+	raw, err := json.Marshal(file)
+	if err != nil {
+		return nil, fmt.Errorf("marshal definition file: %w", err)
+	}
+	return jsoncanon.Canonicalize(raw)
+}
+
+func DecodeFile(raw []byte) (Definition, error) {
+	canonicalFile, err := jsoncanon.Canonicalize(raw)
+	if err != nil {
+		return Definition{}, err
+	}
+	var file File
+	if err := json.Unmarshal(canonicalFile, &file); err != nil {
+		return Definition{}, fmt.Errorf("decode definition file: %w", err)
+	}
+	if err := file.Validate(); err != nil {
+		return Definition{}, err
+	}
+	return Canonicalize(file.Definition)
 }
 
 func Canonicalize(input Definition) (Definition, error) {
@@ -93,33 +117,9 @@ func Canonicalize(input Definition) (Definition, error) {
 	return output, nil
 }
 
-func EncodeFile(value Definition) ([]byte, error) {
-	canonical, err := Canonicalize(value)
-	if err != nil {
-		return nil, err
-	}
-	file := File{
-		Format:     FileFormatV1,
-		Definition: canonical,
-	}
-	raw, err := json.Marshal(file)
-	if err != nil {
-		return nil, fmt.Errorf("marshal definition file: %w", err)
-	}
-	return jsoncanon.Canonicalize(raw)
-}
-
-func DecodeFile(raw []byte) (Definition, error) {
-	canonicalFile, err := jsoncanon.Canonicalize(raw)
-	if err != nil {
-		return Definition{}, err
-	}
-	var file File
-	if err := json.Unmarshal(canonicalFile, &file); err != nil {
-		return Definition{}, fmt.Errorf("decode definition file: %w", err)
-	}
-	if err := file.Validate(); err != nil {
-		return Definition{}, err
-	}
-	return Canonicalize(file.Definition)
+func DigestBytes(content []byte) artifactstore.Digest {
+	sum := sha256.Sum256(content)
+	return artifactstore.Digest(
+		artifactstore.DigestSHA256Prefix + hex.EncodeToString(sum[:]),
+	)
 }

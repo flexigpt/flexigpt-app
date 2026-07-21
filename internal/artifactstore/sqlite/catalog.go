@@ -497,47 +497,6 @@ func (s *Store) getCurrentCatalog(
 	return value, nil
 }
 
-func scanRoot(row scanner) (catalog.Root, error) {
-	var (
-		id, kind, displayName, description string
-		enabled                            int
-		data                               []byte
-		revision                           uint64
-		createdAt, modifiedAt              int64
-		deletedAt                          sql.NullInt64
-	)
-	if err := row.Scan(
-		&id,
-		&kind,
-		&displayName,
-		&description,
-		&enabled,
-		&data,
-		&revision,
-		&createdAt,
-		&modifiedAt,
-		&deletedAt,
-	); err != nil {
-		return catalog.Root{}, err
-	}
-	value := catalog.Root{
-		ID:          artifactstore.RootID(id),
-		Kind:        artifactstore.RootKind(kind),
-		DisplayName: displayName,
-		Description: description,
-		Enabled:     enabled != 0,
-		Data:        append([]byte(nil), data...),
-		Revision:    revision,
-		CreatedAt:   parseTime(createdAt),
-		ModifiedAt:  parseTime(modifiedAt),
-		DeletedAt:   parseNullableTime(deletedAt),
-	}
-	if err := value.Validate(); err != nil {
-		return catalog.Root{}, err
-	}
-	return value, nil
-}
-
 func scanAttachment(row scanner) (catalog.Attachment, error) {
 	var (
 		rootID, sourceID, role string
@@ -640,6 +599,47 @@ func getRootTx(
 		 WHERE id = ? AND deleted_at IS NULL`,
 		string(id),
 	))
+}
+
+func scanRoot(row scanner) (catalog.Root, error) {
+	var (
+		id, kind, displayName, description string
+		enabled                            int
+		data                               []byte
+		revision                           uint64
+		createdAt, modifiedAt              int64
+		deletedAt                          sql.NullInt64
+	)
+	if err := row.Scan(
+		&id,
+		&kind,
+		&displayName,
+		&description,
+		&enabled,
+		&data,
+		&revision,
+		&createdAt,
+		&modifiedAt,
+		&deletedAt,
+	); err != nil {
+		return catalog.Root{}, err
+	}
+	value := catalog.Root{
+		ID:          artifactstore.RootID(id),
+		Kind:        artifactstore.RootKind(kind),
+		DisplayName: displayName,
+		Description: description,
+		Enabled:     enabled != 0,
+		Data:        append([]byte(nil), data...),
+		Revision:    revision,
+		CreatedAt:   parseTime(createdAt),
+		ModifiedAt:  parseTime(modifiedAt),
+		DeletedAt:   parseNullableTime(deletedAt),
+	}
+	if err := value.Validate(); err != nil {
+		return catalog.Root{}, err
+	}
+	return value, nil
 }
 
 func updateRootRevisionTx(

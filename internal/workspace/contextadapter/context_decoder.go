@@ -1,4 +1,4 @@
-package workspace
+package contextadapter
 
 import (
 	"bytes"
@@ -12,6 +12,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 type ContextDecoder struct{}
@@ -21,7 +23,25 @@ func NewContextDecoder() *ContextDecoder {
 }
 
 func (*ContextDecoder) ID() artifactstore.DecoderID {
-	return ContextDecoderID
+	return contextDecoderID
+}
+
+func PrimaryDiscoveryProfile() engine.DiscoveryProfile {
+	return engine.DiscoveryProfile{
+		ExplicitLocators: []artifactstore.Locator{
+			agentsLocator,
+			claudeLocator,
+		},
+		ReadmeLocator: readmeLocator,
+	}
+}
+
+func GetContextArtifactSupport() engine.ArtifactSupport {
+	return engine.ArtifactSupport{
+		Kind:      contextKind,
+		SchemaID:  contextSchemaID,
+		DecoderID: contextDecoderID,
+	}
 }
 
 func (*ContextDecoder) Recognize(
@@ -41,23 +61,23 @@ func (*ContextDecoder) Decode(
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []artifactstore.Diagnostic) {
 	if !utf8.Valid(candidate.Content) {
-		return nil, workspaceArtifactDiagnostics(
+		return nil, engine.WorkspaceArtifactDiagnostics(
 			candidate.Locator,
-			diagnosticCodeContextInvalidUTF8,
+			engine.DiagnosticCodeContextInvalidUTF8,
 			"context file must contain valid UTF-8",
 		)
 	}
 	if bytes.ContainsRune(candidate.Content, 0) {
-		return nil, workspaceArtifactDiagnostics(
+		return nil, engine.WorkspaceArtifactDiagnostics(
 			candidate.Locator,
-			diagnosticCodeContextInvalidContent,
+			engine.DiagnosticCodeContextInvalidContent,
 			"context file contains a NUL byte",
 		)
 	}
 
 	name := path.Base(string(candidate.Locator))
 	role := contextRole(name)
-	document := ContextDefinition{
+	document := contextDefinition{
 		Name:      name,
 		Role:      role,
 		MediaType: contextMarkdownMediaType,
@@ -65,20 +85,20 @@ func (*ContextDecoder) Decode(
 	}
 	raw, err := json.Marshal(document)
 	if err != nil {
-		return nil, workspaceArtifactErrorDiagnostics(candidate.Locator, err)
+		return nil, engine.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
 	}
 	raw, err = jsoncanon.CanonicalizeObject(
 		raw,
 		artifactstore.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
-		return nil, workspaceArtifactErrorDiagnostics(candidate.Locator, err)
+		return nil, engine.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
 	}
 
 	value := definition.Definition{
-		Kind:          ContextKind,
-		SchemaID:      ContextSchemaID,
-		SchemaVersion: workspaceSchemaVersionV1,
+		Kind:          contextKind,
+		SchemaID:      contextSchemaID,
+		SchemaVersion: workspaceContextSchemaVersionV1,
 		LogicalName: artifactstore.LogicalName(
 			strings.ToLower(strings.TrimSuffix(name, path.Ext(name))),
 		),
@@ -107,35 +127,3 @@ func contextFileSupportFor(name string) (contextFileSupport, bool) {
 	}
 	return contextFileSupport{}, false
 }
-
-func workspaceArtifactErrorDiagnostics(
-	locator artifactstore.Locator,
-	err error,
-) []artifactstore.Diagnostic {
-	return workspaceArtifactDiagnostics(
-		locator,
-		diagnosticCodeArtifactInvalid,
-		err.Error(),
-	)
-}
-
-func workspaceArtifactDiagnostics(
-	locator artifactstore.Locator,
-	code string,
-	message string,
-) []artifactstore.Diagnostic {
-	for len(message) > artifactstore.MaxDiagnosticMessageBytes {
-		_, size := utf8.DecodeLastRuneInString(message)
-		message = message[:len(message)-size]
-	}
-	return []artifactstore.Diagnostic{{
-		Severity: artifactstore.DiagnosticError,
-		Code:     code,
-		Message:  message,
-		Location: &artifactstore.DiagnosticLocation{
-			Locator: locator,
-		},
-	}}
-}
-
-var _ discovery.Decoder = (*ContextDecoder)(nil)

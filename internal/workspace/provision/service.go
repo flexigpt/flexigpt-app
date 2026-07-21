@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 type sourceManager interface {
@@ -28,8 +28,8 @@ type sourceManager interface {
 type workspaceManager interface {
 	CreateFilesystem(
 		ctx context.Context,
-		request workspace.FilesystemWorkspaceRequest,
-	) (workspace.Workspace, error)
+		request engine.FilesystemWorkspaceRequest,
+	) (engine.Workspace, error)
 }
 
 type Service struct {
@@ -44,7 +44,7 @@ func NewService(
 	if sources == nil || workspaces == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace provisioner dependencies are incomplete",
-			workspace.ErrInvalidWorkspace,
+			engine.ErrInvalidWorkspace,
 		)
 	}
 	return &Service{
@@ -58,18 +58,18 @@ type Request struct {
 	Description    string
 	RootPath       string
 	TrustReference string
-	Discovery      workspace.DiscoveryPreferences
+	Discovery      engine.DiscoveryPreferences
 }
 
 func (s *Service) CreateFilesystem(
 	ctx context.Context,
 	request Request,
-) (workspace.Workspace, error) {
+) (engine.Workspace, error) {
 	config, err := json.Marshal(fsdir.Config{
 		RootPath: request.RootPath,
 	})
 	if err != nil {
-		return workspace.Workspace{}, err
+		return engine.Workspace{}, err
 	}
 	sourceValue, err := s.sources.Create(
 		ctx,
@@ -81,12 +81,12 @@ func (s *Service) CreateFilesystem(
 		},
 	)
 	if err != nil {
-		return workspace.Workspace{}, err
+		return engine.Workspace{}, err
 	}
 
 	value, createErr := s.workspaces.CreateFilesystem(
 		ctx,
-		workspace.FilesystemWorkspaceRequest{
+		engine.FilesystemWorkspaceRequest{
 			DisplayName:     request.DisplayName,
 			Description:     request.Description,
 			PrimarySourceID: sourceValue.ID,
@@ -103,5 +103,5 @@ func (s *Service) CreateFilesystem(
 		sourceValue.ID,
 		sourceValue.Revision,
 	)
-	return workspace.Workspace{}, errors.Join(createErr, deleteErr)
+	return engine.Workspace{}, errors.Join(createErr, deleteErr)
 }

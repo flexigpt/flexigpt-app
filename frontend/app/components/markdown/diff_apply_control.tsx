@@ -122,9 +122,11 @@ function resolveRequestDiffText(
 	if (options?.diffText?.trim()) {
 		return options.diffText;
 	}
-	if (options?.mergeOutput) {
+
+	if (targets.length > 0) {
 		return buildScopedDiffText(targets);
 	}
+
 	return fullDiffText;
 }
 
@@ -181,7 +183,7 @@ function mapOutputToControlStatus(output: ApplyUnifiedDiffOut): ControlStatus {
 		return 'needs-info';
 	}
 
-	return output.ok ? 'ready' : 'blocked';
+	return output.status === ApplyUnifiedDiffStatus.Applicable && output.ok ? 'ready' : 'blocked';
 }
 
 function getButtonLabel(status: ControlStatus): string {
@@ -333,6 +335,58 @@ function findRequestTargetForOutputFile(
 	return undefined;
 }
 
+function getApplicableRequestTargetsForOutput(
+	output: ApplyUnifiedDiffOut,
+	targets: ApplyUnifiedDiffFileTarget[]
+): ApplyUnifiedDiffFileTarget[] {
+	const normalizedTargets = normalizeApplyFileTargets(targets);
+
+	if (!output.files?.length) {
+		return output.status === ApplyUnifiedDiffStatus.Applicable && output.ok ? normalizedTargets : [];
+	}
+
+	const applicableTargets: ApplyUnifiedDiffFileTarget[] = [];
+	const usedTargetIndexes = new Set<number>();
+	const canUsePositionFallback = output.files.length === normalizedTargets.length;
+
+	for (let index = 0; index < output.files.length; index += 1) {
+		const file = output.files[index];
+		if (!file || file.status !== ApplyUnifiedDiffStatus.Applicable || !file.ok) {
+			continue;
+		}
+
+		const directMatch = findRequestTargetForOutputFile(file, normalizedTargets, usedTargetIndexes);
+		let target = directMatch?.target;
+		let targetIndex = directMatch?.index;
+
+		if (!target && canUsePositionFallback && normalizedTargets[index] && !usedTargetIndexes.has(index)) {
+			target = normalizedTargets[index];
+			targetIndex = index;
+		}
+
+		if (!target || targetIndex === undefined) {
+			continue;
+		}
+
+		usedTargetIndexes.add(targetIndex);
+
+		const [mergedTarget] = normalizeApplyFileTargets([
+			{
+				fileKey: target.fileKey || file.fileKey,
+				oldPath: target.oldPath || file.oldPath,
+				newPath: target.newPath || file.newPath,
+				targetPath: toAbsolutePath(file.targetPath) || toAbsolutePath(file.resolvedPath) || target.targetPath,
+			},
+		]);
+
+		if (mergedTarget) {
+			applicableTargets.push(mergedTarget);
+		}
+	}
+
+	return applicableTargets;
+}
+
 function hydrateApplyOutputWithRequestTargets(
 	output: ApplyUnifiedDiffOut,
 	requestTargets: ApplyUnifiedDiffFileTarget[]
@@ -392,13 +446,51 @@ function mergeApplyUnifiedDiffOutput(
 	previous: ApplyUnifiedDiffOut | undefined,
 	scoped: ApplyUnifiedDiffOut
 ): ApplyUnifiedDiffOut {
-	if (!previous?.files?.length || !scoped.files?.length) {
+	if (!previous?.files?.length) {
 		return scoped;
 	}
 
-	const files = [...previous.files];
+	const previousFiles = previous.files;
+	const scopedFiles: ApplyUnifiedDiffFileOut[] =
+		scoped.files && scoped.files.length > 0
+			? scoped.files
+			: (scoped.fileTargets ?? []).flatMap(target => {
+					const previousFile = previousFiles.find(file => applyOutputFileMatchesTarget(file, target));
+					if (!previousFile) {
+						return [];
+					}
 
-	for (const scopedFile of scoped.files) {
+					const terminal = isTerminalUnifiedDiffStatus(scoped.status);
+					const alreadyAppliedHunks =
+						scoped.status === ApplyUnifiedDiffStatus.AlreadyApplied
+							? Math.max(previousFile.alreadyAppliedHunks, previousFile.hunks)
+							: previousFile.alreadyAppliedHunks;
+					const appliedHunks =
+						scoped.status === ApplyUnifiedDiffStatus.Applied
+							? Math.max(previousFile.appliedHunks, Math.max(0, previousFile.hunks - alreadyAppliedHunks))
+							: previousFile.appliedHunks;
+
+					return [
+						{
+							...previousFile,
+							ok: terminal ? true : scoped.ok,
+							status: scoped.status,
+							message: scoped.message || previousFile.message,
+							diagnostics:
+								terminal || scoped.status === ApplyUnifiedDiffStatus.Applicable ? [] : previousFile.diagnostics,
+							appliedHunks,
+							alreadyAppliedHunks,
+						},
+					];
+				});
+
+	if (scopedFiles.length === 0) {
+		return scoped;
+	}
+
+	const files = [...previousFiles];
+
+	for (const scopedFile of scopedFiles) {
 		const index = files.findIndex(file => applyOutputFilesMatch(file, scopedFile));
 
 		if (index >= 0) {
@@ -408,7 +500,7 @@ function mergeApplyUnifiedDiffOutput(
 				...previousFile,
 
 				...scopedFile,
-				diagnostics: uniqueDiagnostics([...(previousFile.diagnostics ?? []), ...(scopedFile.diagnostics ?? [])]),
+				diagnostics: uniqueDiagnostics(scopedFile.diagnostics ?? []),
 			};
 		} else {
 			files.push(scopedFile);
@@ -418,7 +510,9 @@ function mergeApplyUnifiedDiffOutput(
 	return {
 		...previous,
 		dryRun: scoped.dryRun,
-		ok: files.every(file => file.ok || isTerminalUnifiedDiffStatus(file.status)),
+		ok: files.every(
+			file => isTerminalUnifiedDiffStatus(file.status) || (file.status === ApplyUnifiedDiffStatus.Applicable && file.ok)
+		),
 		status: getAggregateStatusFromFiles(files, scoped.status),
 		message: scoped.message || previous.message,
 		diagnostics: uniqueDiagnostics([...(previous.diagnostics ?? []), ...(scoped.diagnostics ?? [])]),
@@ -686,9 +780,9 @@ export function DiffApplyControl({
 			}
 
 			// Unsupported OpenAI Update/Delete sections still need their original
-			// wrapper. Add-only patches have already been converted and can be scoped.
+			// wrapper. Never turn a per-file action into an unrequested full-patch action.
 			if (fallbackParsed.isOpenAIPatch && !canScopeOpenAIAddPatch) {
-				return diffText;
+				return targets.length === fallbackParsed.files.length ? diffText : undefined;
 			}
 
 			const parts: string[] = [];
@@ -820,35 +914,44 @@ export function DiffApplyControl({
 
 		const dryRunViewOutput = options?.mergeOutput ? (stateRef.current.output ?? dryRunOutput) : dryRunOutput;
 
-		if (!dryRunOutput.ok) {
-			setControlState({
-				status: mapOutputToControlStatus(dryRunViewOutput),
-				message: dryRunOutput.message,
-				output: dryRunViewOutput,
-			});
-			return;
-		}
-
-		if (dryRunOutput.status === ApplyUnifiedDiffStatus.AlreadyApplied) {
-			setControlState({
-				status: mapOutputToControlStatus(dryRunViewOutput),
-				message: dryRunOutput.message || 'Unified diff is already applied.',
-				output: dryRunViewOutput,
-			});
-			return;
-		}
-
-		const applyTargets = deriveAndStoreTargets(dryRunOutput, targets);
+		const applyTargets = getApplicableRequestTargetsForOutput(dryRunOutput, targets);
 
 		if (applyTargets.length === 0) {
 			setControlState({
-				status: 'blocked',
-				error:
-					'No absolute target path is available for this diff. Select or enter an absolute target path before applying.',
+				status: mapOutputToControlStatus(dryRunViewOutput),
+				message:
+					dryRunOutput.message ||
+					(dryRunOutput.status === ApplyUnifiedDiffStatus.AlreadyApplied
+						? 'Unified diff is already applied.'
+						: 'No file patches are currently applicable.'),
 				output: dryRunViewOutput,
 			});
 			return;
 		}
+
+		const isPartialApply = applyTargets.length < targets.length;
+		const applyDiffText = isPartialApply
+			? buildDiffTextForEditableTargets(
+					applyTargets.map(target => ({
+						fileKey: target.fileKey,
+						oldPath: target.oldPath,
+						newPath: target.newPath,
+						targetPath: target.targetPath,
+						candidatePaths: [target.targetPath],
+					}))
+				)
+			: requestDiffText;
+
+		if (!applyDiffText) {
+			setControlState({
+				status: 'blocked',
+				error: 'Could not isolate the applicable file patches. The full diff was not applied.',
+				output: dryRunViewOutput,
+			});
+			return;
+		}
+
+		deriveAndStoreTargets(dryRunViewOutput, applyTargets);
 
 		setControlState(previous => ({
 			...previous,
@@ -861,7 +964,7 @@ export function DiffApplyControl({
 
 		try {
 			const rawOutput = await aggregateAPI.applyUnifiedDiff({
-				diffText: requestDiffText,
+				diffText: applyDiffText,
 				dryRun: false,
 				strict: nextStrict,
 				fileTargets: applyTargets.length > 0 ? applyTargets : undefined,
@@ -1041,7 +1144,7 @@ export function DiffApplyControl({
 						{statusCounts.applied > 0 ? (
 							<button
 								type="button"
-								className={`${getControlButtonClassName('success')} hidden sm:inline-flex`}
+								className={getControlButtonClassName('success')}
 								onClick={() => {
 									setIsDetailsOpen(true);
 								}}
@@ -1055,7 +1158,7 @@ export function DiffApplyControl({
 						{statusCounts.alreadyApplied > 0 ? (
 							<button
 								type="button"
-								className={`${getControlButtonClassName('info')} hidden sm:inline-flex`}
+								className={getControlButtonClassName('info')}
 								onClick={() => {
 									setIsDetailsOpen(true);
 								}}
@@ -1115,7 +1218,7 @@ export function DiffApplyControl({
 				onStrictChange={setStrict}
 				onDryRun={async (nextTargets, nextStrict, options) => {
 					const normalized = editableTargetsToFileTargets(nextTargets);
-					setFileTargets(previous => (options?.mergeOutput ? mergeApplyFileTargets(previous, normalized) : normalized));
+					setFileTargets(previous => mergeApplyFileTargets(previous, normalized));
 
 					const requestDiffText = resolveRequestDiffText(
 						diffText,
@@ -1133,11 +1236,15 @@ export function DiffApplyControl({
 						return;
 					}
 
-					await runDryRun(normalized, nextStrict, { ...options, diffText: requestDiffText });
+					await runDryRun(normalized, nextStrict, {
+						...options,
+						diffText: requestDiffText,
+						mergeOutput: true,
+					});
 				}}
 				onApply={async (nextTargets, nextStrict, options) => {
 					const normalized = editableTargetsToFileTargets(nextTargets);
-					setFileTargets(previous => (options?.mergeOutput ? mergeApplyFileTargets(previous, normalized) : normalized));
+					setFileTargets(previous => mergeApplyFileTargets(previous, normalized));
 
 					const requestDiffText = resolveRequestDiffText(
 						diffText,
@@ -1155,7 +1262,11 @@ export function DiffApplyControl({
 						return;
 					}
 
-					await runApply(normalized, nextStrict, { ...options, diffText: requestDiffText });
+					await runApply(normalized, nextStrict, {
+						...options,
+						diffText: requestDiffText,
+						mergeOutput: true,
+					});
 				}}
 			/>
 		</>

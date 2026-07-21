@@ -39,23 +39,6 @@ func NewRegistry(adapters ...Adapter) (*Registry, error) {
 	return &Registry{adapters: values, kinds: kinds}, nil
 }
 
-func (r *Registry) Adapter(
-	kind artifactstore.SourceKind,
-) (Adapter, bool) {
-	if r == nil {
-		return nil, false
-	}
-	value, exists := r.adapters[kind]
-	return value, exists
-}
-
-func (r *Registry) Kinds() []artifactstore.SourceKind {
-	if r == nil {
-		return nil
-	}
-	return append([]artifactstore.SourceKind(nil), r.kinds...)
-}
-
 func (r *Registry) Open(
 	ctx context.Context,
 	value Source,
@@ -72,4 +55,21 @@ func (r *Registry) Open(
 		)
 	}
 	return adapter.Open(ctx, value)
+}
+
+func (r *Registry) Adapter(
+	kind artifactstore.SourceKind,
+) (Adapter, bool) {
+	if r == nil {
+		return nil, false
+	}
+	value, exists := r.adapters[kind]
+	return value, exists
+}
+
+func (r *Registry) Kinds() []artifactstore.SourceKind {
+	if r == nil {
+		return nil
+	}
+	return append([]artifactstore.SourceKind(nil), r.kinds...)
 }

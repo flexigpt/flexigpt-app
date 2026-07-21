@@ -10,7 +10,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/provision"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
 type WorkspaceWrapper struct {
@@ -82,8 +85,8 @@ func InitWorkspaceWrapper(
 
 func (w *WorkspaceWrapper) CreateFilesystem(
 	request *provision.Request,
-) (*workspace.Workspace, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.Workspace, error) {
+) (*engine.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (*engine.Workspace, error) {
 		value, err := w.provisioner.CreateFilesystem(
 			context.Background(),
 			*request,
@@ -93,9 +96,9 @@ func (w *WorkspaceWrapper) CreateFilesystem(
 }
 
 func (w *WorkspaceWrapper) CreateEmpty(
-	request *workspace.EmptyWorkspaceRequest,
-) (*workspace.Workspace, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.Workspace, error) {
+	request *engine.EmptyWorkspaceRequest,
+) (*engine.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (*engine.Workspace, error) {
 		value, err := w.workspace.Service.CreateEmpty(
 			context.Background(),
 			*request,
@@ -106,23 +109,23 @@ func (w *WorkspaceWrapper) CreateEmpty(
 
 func (w *WorkspaceWrapper) Get(
 	rootID artifactstore.RootID,
-) (*workspace.Workspace, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.Workspace, error) {
+) (*engine.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (*engine.Workspace, error) {
 		value, err := w.workspace.Service.Get(context.Background(), rootID)
 		return &value, err
 	})
 }
 
-func (w *WorkspaceWrapper) List() ([]workspace.Workspace, error) {
-	return middleware.WithRecoveryResp(func() ([]workspace.Workspace, error) {
+func (w *WorkspaceWrapper) List() ([]engine.Workspace, error) {
+	return middleware.WithRecoveryResp(func() ([]engine.Workspace, error) {
 		return w.workspace.Service.List(context.Background())
 	})
 }
 
 func (w *WorkspaceWrapper) Update(
-	request *workspace.UpdateRequest,
-) (*workspace.Workspace, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.Workspace, error) {
+	request *engine.UpdateRequest,
+) (*engine.Workspace, error) {
+	return middleware.WithRecoveryResp(func() (*engine.Workspace, error) {
 		value, err := w.workspace.Service.Update(
 			context.Background(),
 			*request,
@@ -158,8 +161,8 @@ func (w *WorkspaceWrapper) Refresh(
 
 func (w *WorkspaceWrapper) Catalog(
 	rootID artifactstore.RootID,
-) (*workspace.CatalogView, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.CatalogView, error) {
+) (*engine.CatalogView, error) {
+	return middleware.WithRecoveryResp(func() (*engine.CatalogView, error) {
 		value, err := w.workspace.Query.Catalog(
 			context.Background(),
 			rootID,
@@ -170,8 +173,8 @@ func (w *WorkspaceWrapper) Catalog(
 
 func (w *WorkspaceWrapper) ComposeContext(
 	request *WorkspaceContextRequest,
-) (*workspace.ContextLoadPlan, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.ContextLoadPlan, error) {
+) (*contextadapter.ContextLoadPlan, error) {
+	return middleware.WithRecoveryResp(func() (*contextadapter.ContextLoadPlan, error) {
 		value, err := w.workspace.Context.Compose(
 			context.Background(),
 			request.RootID,
@@ -183,16 +186,16 @@ func (w *WorkspaceWrapper) ComposeContext(
 
 func (w *WorkspaceWrapper) ListWorkspaceSkills(
 	rootID artifactstore.RootID,
-) ([]workspace.WorkspaceSkill, error) {
-	return middleware.WithRecoveryResp(func() ([]workspace.WorkspaceSkill, error) {
+) ([]skilladapter.WorkspaceSkill, error) {
+	return middleware.WithRecoveryResp(func() ([]skilladapter.WorkspaceSkill, error) {
 		return w.workspace.Skills.List(context.Background(), rootID)
 	})
 }
 
 func (w *WorkspaceWrapper) LoadWorkspaceSkills(
 	request *WorkspaceSkillLoadRequest,
-) (*workspace.SkillLoadPlan, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.SkillLoadPlan, error) {
+) (*skilladapter.SkillLoadPlan, error) {
+	return middleware.WithRecoveryResp(func() (*skilladapter.SkillLoadPlan, error) {
 		value, err := w.workspace.Skills.Load(
 			context.Background(),
 			request.RootID,

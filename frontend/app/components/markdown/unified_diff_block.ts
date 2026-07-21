@@ -674,6 +674,22 @@ export function buildEditableTargetsFromOutput(
 		});
 	}
 
+	// Aggregate-only backend responses still describe every target in this
+	// request. Propagate that state so file cards do not remain "pending"
+	// when the backend reports applicable, applied, or already applied.
+	if (output && outputFiles.length === 0) {
+		const terminal = isTerminalUnifiedDiffStatus(output.status);
+
+		for (const [key, target] of byKey.entries()) {
+			byKey.set(key, {
+				...target,
+				ok: terminal ? true : output.ok,
+				status: output.status,
+				message: output.message,
+			});
+		}
+	}
+
 	if (byKey.size === 0) {
 		byKey.set('file-1', {
 			fileKey: 'file-1',

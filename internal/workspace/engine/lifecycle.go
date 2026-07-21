@@ -1,4 +1,4 @@
-package workspace
+package engine
 
 import (
 	"context"
@@ -120,52 +120,6 @@ func (s *Service) CreateFilesystem(
 		return Workspace{}, err
 	}
 	return s.Get(ctx, root.ID)
-}
-
-func (s *Service) Get(
-	ctx context.Context,
-	rootID artifactstore.RootID,
-) (Workspace, error) {
-	root, err := s.roots.GetRoot(ctx, rootID)
-	if err != nil {
-		return Workspace{}, err
-	}
-	if root.Kind != RootKind {
-		return Workspace{}, fmt.Errorf(
-			"%w: root %q has kind %q",
-			ErrNotWorkspace,
-			rootID,
-			root.Kind,
-		)
-	}
-	data, err := decodeRootData(root.Data)
-	if err != nil {
-		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
-	}
-	attachments, err := s.roots.ListAttachments(ctx, rootID)
-	if err != nil {
-		return Workspace{}, err
-	}
-	sources := make([]source.Source, 0, len(attachments))
-	for _, attachment := range attachments {
-		value, err := s.sources.Get(ctx, attachment.SourceID)
-		if err != nil {
-			return Workspace{}, err
-		}
-		sources = append(sources, value)
-	}
-	if err := validateWorkspaceState(root, data, attachments, sources); err != nil {
-		return Workspace{}, err
-	}
-	sort.Slice(sources, func(left, right int) bool {
-		return sources[left].ID < sources[right].ID
-	})
-	return Workspace{
-		Root:        root,
-		Data:        data,
-		Attachments: attachments,
-		Sources:     sources,
-	}, nil
 }
 
 func (s *Service) List(
@@ -303,4 +257,61 @@ func (s *Service) Delete(
 		return catalog.Root{}, err
 	}
 	return s.roots.DeleteRoot(ctx, rootID, expectedRevision)
+}
+
+func (s *Service) Get(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+) (Workspace, error) {
+	root, err := s.roots.GetRoot(ctx, rootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if root.Kind != RootKind {
+		return Workspace{}, fmt.Errorf(
+			"%w: root %q has kind %q",
+			ErrNotWorkspace,
+			rootID,
+			root.Kind,
+		)
+	}
+	data, err := decodeRootData(root.Data)
+	if err != nil {
+		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
+	}
+	attachments, err := s.roots.ListAttachments(ctx, rootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	sources := make([]source.Source, 0, len(attachments))
+	for _, attachment := range attachments {
+		value, err := s.sources.Get(ctx, attachment.SourceID)
+		if err != nil {
+			return Workspace{}, err
+		}
+		sources = append(sources, value)
+	}
+	if err := validateWorkspaceState(root, data, attachments, sources); err != nil {
+		return Workspace{}, err
+	}
+	sort.Slice(sources, func(left, right int) bool {
+		return sources[left].ID < sources[right].ID
+	})
+	return Workspace{
+		Root:        root,
+		Data:        data,
+		Attachments: attachments,
+		Sources:     sources,
+	}, nil
+}
+
+func attachmentOperationFor(
+	role artifactstore.AttachmentRole,
+) (attachmentOperation, bool) {
+	for _, operation := range attachmentOperationMatrix {
+		if operation.role == role {
+			return operation, true
+		}
+	}
+	return attachmentOperation{}, false
 }
