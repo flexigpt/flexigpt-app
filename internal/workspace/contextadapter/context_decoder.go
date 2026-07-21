@@ -44,9 +44,7 @@ func (*ContextDecoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if _, supported := contextFileSupportFor(
-		path.Base(string(candidate.Locator)),
-	); !supported {
+	if _, supported := contextFileSupportFor(string(candidate.Locator)); !supported {
 		return discovery.RecognitionNone
 	}
 	return discovery.RecognitionPreferred

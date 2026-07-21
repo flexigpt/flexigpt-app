@@ -141,10 +141,12 @@ type Reference struct {
 	Selector *definition.Selector    `json:"-"`
 }
 
+// LoadPlanItem contains privileged materialized source state. It must be
+// projected into an explicit adapter response before crossing an API boundary.
 type LoadPlanItem struct {
-	Record     record.Record
-	Definition definition.Definition
-	Source     source.Source
+	Record     record.Record         `json:"-"`
+	Definition definition.Definition `json:"-"`
+	Source     source.Source         `json:"-"`
 }
 
 type LoadPlan struct {

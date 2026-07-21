@@ -69,7 +69,7 @@ func (e *Engine) Discover(
 	plan SourcePlan,
 	previous []catalog.Occurrence,
 ) (Result, error) {
-	plan.ApplyDefaults()
+	plan = plan.Normalized()
 	if err := plan.Validate(); err != nil {
 		return Result{}, err
 	}
@@ -182,7 +182,7 @@ func (e *Engine) Discover(
 				artifactstore.ErrInvalid,
 			)
 		}
-		sourceDigest := definition.DigestBytes(content)
+		sourceDigest := artifactstore.DigestBytes(content)
 		candidate := Candidate{
 			SourceID:            sourceID,
 			SourceKind:          sourceKind,
@@ -454,6 +454,20 @@ func collectCandidates(
 	visited := 0
 
 	add := func(entry source.Entry) error {
+		if err := entry.Validate(); err != nil {
+			return fmt.Errorf(
+				"%w: source snapshot returned an invalid entry: %w",
+				artifactstore.ErrInvalid,
+				err,
+			)
+		}
+		if entry.IsSymlink {
+			return fmt.Errorf(
+				"%w: discovery refuses symbolic link %q",
+				artifactstore.ErrInvalid,
+				entry.Locator,
+			)
+		}
 		if !entry.IsRegular {
 			return nil
 		}
@@ -470,7 +484,7 @@ func collectCandidates(
 	}
 
 	for _, locator := range plan.ExplicitLocators {
-		entry, err := snapshot.Stat(ctx, locator)
+		entry, err := statEntry(ctx, snapshot, locator)
 		if errors.Is(err, artifactstore.ErrNotFound) {
 			continue
 		}
@@ -483,7 +497,7 @@ func collectCandidates(
 	}
 
 	for _, root := range plan.DirectoryRoots {
-		rootEntry, err := snapshot.Stat(ctx, root.Root)
+		rootEntry, err := statEntry(ctx, snapshot, root.Root)
 		if errors.Is(err, artifactstore.ErrNotFound) {
 			continue
 		}
@@ -500,7 +514,7 @@ func collectCandidates(
 
 		var visit func(artifactstore.Locator, int) error
 		visit = func(directory artifactstore.Locator, depth int) error {
-			entries, err := snapshot.ReadDir(ctx, directory)
+			entries, err := readDirectoryEntries(ctx, snapshot, directory)
 			if err != nil {
 				return err
 			}
@@ -562,6 +576,92 @@ func collectCandidates(
 		return output[left].Locator < output[right].Locator
 	})
 	return output, nil
+}
+
+func statEntry(
+	ctx context.Context,
+	snapshot source.Snapshot,
+	locator artifactstore.Locator,
+) (source.Entry, error) {
+	entry, err := snapshot.Stat(ctx, locator)
+	if err != nil {
+		return source.Entry{}, err
+	}
+	if err := entry.Validate(); err != nil {
+		return source.Entry{}, fmt.Errorf(
+			"%w: source snapshot returned an invalid stat entry: %w",
+			artifactstore.ErrInvalid,
+			err,
+		)
+	}
+	if entry.Locator != locator {
+		return source.Entry{}, fmt.Errorf(
+			"%w: source snapshot stat for %q returned %q",
+			artifactstore.ErrInvalid,
+			locator,
+			entry.Locator,
+		)
+	}
+	return entry, nil
+}
+
+func readDirectoryEntries(
+	ctx context.Context,
+	snapshot source.Snapshot,
+	directory artifactstore.Locator,
+) ([]source.Entry, error) {
+	values, err := snapshot.ReadDir(ctx, directory)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[artifactstore.Locator]struct{}, len(values))
+	output := make([]source.Entry, 0, len(values))
+	for _, entry := range values {
+		if err := entry.Validate(); err != nil {
+			return nil, fmt.Errorf(
+				"%w: source snapshot returned an invalid directory entry: %w",
+				artifactstore.ErrInvalid,
+				err,
+			)
+		}
+		if !isDirectChild(directory, entry.Locator) {
+			return nil, fmt.Errorf(
+				"%w: source snapshot returned non-child %q for directory %q",
+				artifactstore.ErrInvalid,
+				entry.Locator,
+				directory,
+			)
+		}
+		if _, duplicate := seen[entry.Locator]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: source snapshot returned duplicate directory entry %q",
+				artifactstore.ErrInvalid,
+				entry.Locator,
+			)
+		}
+		seen[entry.Locator] = struct{}{}
+		output = append(output, entry)
+	}
+	sort.Slice(output, func(left, right int) bool {
+		return output[left].Locator < output[right].Locator
+	})
+	return output, nil
+}
+
+func isDirectChild(
+	parent artifactstore.Locator,
+	child artifactstore.Locator,
+) bool {
+	if child == "." {
+		return false
+	}
+	if parent == "." {
+		return !strings.Contains(string(child), "/")
+	}
+	prefix := string(parent) + "/"
+	relative, found := strings.CutPrefix(string(child), prefix)
+	return found && relative != "" && !strings.Contains(relative, "/")
 }
 
 func readEntry(

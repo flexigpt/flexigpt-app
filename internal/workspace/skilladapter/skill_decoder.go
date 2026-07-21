@@ -56,7 +56,7 @@ func (*SkillDecoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if path.Base(string(candidate.Locator)) != skillDefinitionFileName {
+	if !isWorkspaceSkillLocator(candidate.Locator) {
 		return discovery.RecognitionNone
 	}
 	return discovery.RecognitionPreferred
@@ -316,6 +316,15 @@ func decodeSkillTags(raw any) ([]string, error) {
 	slices.Sort(output)
 	output = slices.Compact(output)
 	return output, nil
+}
+
+func isWorkspaceSkillLocator(locator artifactstore.Locator) bool {
+	prefix := workspaceSkillsDirectory + "/"
+	relative, found := strings.CutPrefix(string(locator), prefix)
+	if !found || relative == "" || relative == skillDefinitionFileName {
+		return false
+	}
+	return path.Base(relative) == skillDefinitionFileName
 }
 
 func optionalString(properties map[string]any, key string) (string, error) {

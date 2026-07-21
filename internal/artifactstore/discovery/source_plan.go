@@ -24,7 +24,7 @@ type SourcePlan struct {
 	MaxDepth           int
 }
 
-func (p *SourcePlan) Validate() error {
+func (p SourcePlan) Validate() error {
 	if err := artifactstore.ValidateSourceID(p.SourceID); err != nil {
 		return err
 	}
@@ -125,25 +125,47 @@ func (p *SourcePlan) Validate() error {
 	return nil
 }
 
-func (p *SourcePlan) ApplyDefaults() {
-	if p.MaxCandidateBytes <= 0 {
-		p.MaxCandidateBytes = artifactstore.MaxCandidateBytes
+// Normalized returns an owned, deterministic copy with default limits.
+//
+// It intentionally does not mutate the input plan or its backing slices.
+func (p SourcePlan) Normalized() SourcePlan {
+	output := p
+	output.ExplicitLocators = append(
+		[]artifactstore.Locator(nil),
+		p.ExplicitLocators...,
+	)
+	output.AllowedDecoderIDs = append(
+		[]artifactstore.DecoderID(nil),
+		p.AllowedDecoderIDs...,
+	)
+	output.DirectoryRoots = make([]DirectoryRoot, len(p.DirectoryRoots))
+	for index, root := range p.DirectoryRoots {
+		output.DirectoryRoots[index] = root
+		output.DirectoryRoots[index].IncludePatterns = append(
+			[]string(nil),
+			root.IncludePatterns...,
+		)
 	}
-	if p.MaxTotalBytes <= 0 {
-		p.MaxTotalBytes = artifactstore.MaxScanBytes
+
+	if output.MaxCandidateBytes <= 0 {
+		output.MaxCandidateBytes = artifactstore.MaxCandidateBytes
 	}
-	if p.MaxCandidates <= 0 {
-		p.MaxCandidates = artifactstore.DefaultMaxCandidates
+	if output.MaxTotalBytes <= 0 {
+		output.MaxTotalBytes = artifactstore.MaxScanBytes
 	}
-	if p.MaxEntries <= 0 {
-		p.MaxEntries = artifactstore.DefaultMaxEntries
+	if output.MaxCandidates <= 0 {
+		output.MaxCandidates = artifactstore.DefaultMaxCandidates
 	}
-	if p.MaxDepth <= 0 {
-		p.MaxDepth = artifactstore.DefaultMaxDepth
+	if output.MaxEntries <= 0 {
+		output.MaxEntries = artifactstore.DefaultMaxEntries
 	}
-	slices.Sort(p.ExplicitLocators)
-	sort.Slice(p.DirectoryRoots, func(left, right int) bool {
-		return p.DirectoryRoots[left].Root < p.DirectoryRoots[right].Root
+	if output.MaxDepth <= 0 {
+		output.MaxDepth = artifactstore.DefaultMaxDepth
+	}
+	slices.Sort(output.ExplicitLocators)
+	sort.Slice(output.DirectoryRoots, func(left, right int) bool {
+		return output.DirectoryRoots[left].Root < output.DirectoryRoots[right].Root
 	})
-	slices.Sort(p.AllowedDecoderIDs)
+	slices.Sort(output.AllowedDecoderIDs)
+	return output
 }

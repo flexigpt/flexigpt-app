@@ -101,9 +101,6 @@ func (s *Service) Pin(
 	if err := artifactstore.ValidateDigest(digest); err != nil {
 		return Record{}, err
 	}
-	if _, err := s.definitions.Get(ctx, digest); err != nil {
-		return Record{}, err
-	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
 		return Record{}, err
@@ -113,6 +110,18 @@ func (s *Service) Pin(
 			"%w: record %q changed since it was read",
 			artifactstore.ErrConflict,
 			id,
+		)
+	}
+	definitionValue, err := s.definitions.Get(ctx, digest)
+	if err != nil {
+		return Record{}, err
+	}
+	if definitionValue.Kind != current.Kind {
+		return Record{}, fmt.Errorf(
+			"%w: definition kind %q cannot be pinned to record kind %q",
+			artifactstore.ErrInvalid,
+			definitionValue.Kind,
+			current.Kind,
 		)
 	}
 	next := current

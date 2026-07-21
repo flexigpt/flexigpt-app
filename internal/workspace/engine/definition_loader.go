@@ -9,7 +9,6 @@ import (
 	"io"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
@@ -99,7 +98,7 @@ func (l *DefinitionLoader) Load(
 		SourceID:            sourceValue.ID,
 		SourceKind:          sourceValue.Kind,
 		Locator:             DefinitionLocator,
-		SourceContentDigest: definition.DigestBytes(content),
+		SourceContentDigest: artifactstore.DigestBytes(content),
 		Content:             content,
 	}
 	decoded, diagnostics := l.decoder.Decode(ctx, candidate)

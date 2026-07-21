@@ -142,7 +142,7 @@ func (p *Planner) Build(
 				sourcePlan.Authoritative = *attachmentData.Authoritative
 			}
 		}
-		sourcePlan.ApplyDefaults()
+		sourcePlan = sourcePlan.Normalized()
 		plans = append(plans, sourcePlan)
 	}
 	sort.Slice(plans, func(left, right int) bool {

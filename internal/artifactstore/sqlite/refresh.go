@@ -153,7 +153,7 @@ func (p *Publisher) Publish(
 				definition_digest, source_content_digest, decoder_id,
 				state, diagnostics_json, observed_at
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			string(occurrence.RootID),
+			string(publication.RootID),
 			string(occurrence.Key.SourceID),
 			string(occurrence.Key.Locator),
 			string(occurrence.Key.SubresourceLocator),
@@ -294,13 +294,14 @@ func updateRecordTx(
 		     diagnostics_json = ?,
 		     revision = ?,
 		     modified_at = ?
-		 WHERE id = ? AND revision = ?`,
+		 WHERE id = ? AND root_id = ? AND revision = ?`,
 		nullableDigest(value.ResolvedDefinition),
 		string(value.State),
 		diagnostics,
 		value.Revision,
 		timeValue(value.ModifiedAt),
 		string(value.ID),
+		string(value.RootID),
 		expectedRevision,
 	)
 	if err != nil {

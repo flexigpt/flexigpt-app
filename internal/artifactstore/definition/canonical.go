@@ -1,8 +1,6 @@
 package definition
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -69,7 +67,7 @@ func Canonicalize(input Definition) (Definition, error) {
 		return Definition{}, fmt.Errorf("canonicalize definition payload: %w", err)
 	}
 
-	calculated := DigestBytes(canonicalPayload)
+	calculated := artifactstore.DigestBytes(canonicalPayload)
 	if suppliedDigest != "" && suppliedDigest != calculated {
 		return Definition{}, fmt.Errorf(
 			"%w: supplied definition digest %q, calculated %q",
@@ -84,11 +82,4 @@ func Canonicalize(input Definition) (Definition, error) {
 		return Definition{}, err
 	}
 	return output, nil
-}
-
-func DigestBytes(content []byte) artifactstore.Digest {
-	sum := sha256.Sum256(content)
-	return artifactstore.Digest(
-		artifactstore.DigestSHA256Prefix + hex.EncodeToString(sum[:]),
-	)
 }

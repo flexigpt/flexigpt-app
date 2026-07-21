@@ -37,6 +37,12 @@ func (s Snapshot) Validate() error {
 		if err := artifactstore.ValidateSourceID(sourceID); err != nil {
 			return err
 		}
+		if _, exists := s.SourceRevisions[sourceID]; !exists {
+			return fmt.Errorf(
+				"%w: source generation has no source revision",
+				artifactstore.ErrInvalid,
+			)
+		}
 		if generation == "" {
 			return fmt.Errorf("%w: source generation is empty", artifactstore.ErrInvalid)
 		}

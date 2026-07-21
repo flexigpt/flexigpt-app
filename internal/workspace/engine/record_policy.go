@@ -101,7 +101,7 @@ func recordName(
 	if base == "" {
 		base = defaultRecordName
 	}
-	digest := definition.DigestBytes([]byte(occurrenceKeyDigestInput(key)))
+	digest := artifactstore.DigestBytes([]byte(occurrenceKeyDigestInput(key)))
 	suffix := strings.TrimPrefix(
 		string(digest),
 		artifactstore.DigestSHA256Prefix,

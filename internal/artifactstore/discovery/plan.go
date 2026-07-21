@@ -31,7 +31,7 @@ func (p Plan) Validate() error {
 func (p Plan) BySource() map[artifactstore.SourceID]SourcePlan {
 	output := make(map[artifactstore.SourceID]SourcePlan, len(p.Sources))
 	for _, value := range p.Sources {
-		value.ApplyDefaults()
+		value = value.Normalized()
 		output[value.SourceID] = value
 	}
 	return output

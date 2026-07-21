@@ -62,6 +62,7 @@ func (p Publication) Validate() error {
 			artifactstore.ErrInvalid,
 		)
 	}
+	knownSources := make(map[artifactstore.SourceID]struct{}, len(p.ExpectedSourceRevisions))
 	for sourceID, revision := range p.ExpectedSourceRevisions {
 		if err := artifactstore.ValidateSourceID(sourceID); err != nil {
 			return err
@@ -72,26 +73,102 @@ func (p Publication) Validate() error {
 				artifactstore.ErrInvalid,
 			)
 		}
+		knownSources[sourceID] = struct{}{}
 	}
-	for _, occurrence := range p.Occurrences {
+	for sourceID, generation := range p.SourceGenerations {
+		if err := artifactstore.ValidateSourceID(sourceID); err != nil {
+			return err
+		}
+		if _, exists := knownSources[sourceID]; !exists {
+			return fmt.Errorf(
+				"%w: source generation belongs to an unattached source %q",
+				artifactstore.ErrInvalid,
+				sourceID,
+			)
+		}
+		if generation == "" {
+			return fmt.Errorf(
+				"%w: source generation is required",
+				artifactstore.ErrInvalid,
+			)
+		}
+	}
+	seenOccurrences := make(map[catalog.OccurrenceKey]struct{}, len(p.Occurrences))
+	for index, occurrence := range p.Occurrences {
+		if occurrence.RootID != p.RootID {
+			return fmt.Errorf(
+				"%w: occurrence %d belongs to another root",
+				artifactstore.ErrInvalid,
+				index,
+			)
+		}
+		if _, exists := knownSources[occurrence.Key.SourceID]; !exists {
+			return fmt.Errorf(
+				"%w: occurrence %d belongs to an unattached source",
+				artifactstore.ErrInvalid,
+				index,
+			)
+		}
+		if _, exists := p.SourceGenerations[occurrence.Key.SourceID]; !exists {
+			return fmt.Errorf(
+				"%w: occurrence %d has no source generation",
+				artifactstore.ErrInvalid,
+				index,
+			)
+		}
+		if _, duplicate := seenOccurrences[occurrence.Key]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate occurrence %d",
+				artifactstore.ErrInvalid,
+				index,
+			)
+		}
+		seenOccurrences[occurrence.Key] = struct{}{}
 		if err := occurrence.Validate(); err != nil {
 			return err
 		}
 	}
-	for _, value := range p.RecordCreates {
+	seenRecords := make(map[artifactstore.RecordID]struct{})
+	validateRecord := func(value record.Record) error {
 		if err := value.Validate(); err != nil {
 			return err
 		}
+		if value.RootID != p.RootID {
+			return fmt.Errorf(
+				"%w: record belongs to another root",
+				artifactstore.ErrInvalid,
+			)
+		}
+		if _, exists := knownSources[value.Occurrence.SourceID]; !exists {
+			return fmt.Errorf(
+				"%w: record belongs to an unattached source",
+				artifactstore.ErrInvalid,
+			)
+		}
+		if _, duplicate := seenRecords[value.ID]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate record publication %q",
+				artifactstore.ErrInvalid,
+				value.ID,
+			)
+		}
+		seenRecords[value.ID] = struct{}{}
+		return nil
 	}
-	for _, update := range p.RecordUpdates {
+	for index, value := range p.RecordCreates {
+		if err := validateRecord(value); err != nil {
+			return fmt.Errorf("record create %d: %w", index, err)
+		}
+	}
+	for index, update := range p.RecordUpdates {
 		if update.ExpectedRevision == 0 {
 			return fmt.Errorf(
 				"%w: expected record revision is required",
 				artifactstore.ErrInvalid,
 			)
 		}
-		if err := update.Record.Validate(); err != nil {
-			return err
+		if err := validateRecord(update.Record); err != nil {
+			return fmt.Errorf("record update %d: %w", index, err)
 		}
 	}
 	if err := artifactstore.ValidateDiagnostics(p.Diagnostics); err != nil {

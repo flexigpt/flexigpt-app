@@ -99,6 +99,32 @@ type WorkspaceSkillLoadRequest struct {
 	RecordIDs []artifactstore.RecordID `json:"recordIDs"`
 }
 
+type WorkspaceRefreshResult struct {
+	RootID          artifactstore.RootID       `json:"rootID"`
+	CatalogRevision uint64                     `json:"catalogRevision"`
+	CreatedRecords  []artifactstore.RecordID   `json:"createdRecords"`
+	UpdatedRecords  []artifactstore.RecordID   `json:"updatedRecords"`
+	Diagnostics     []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
+	Candidates      int                        `json:"candidates"`
+}
+
+type WorkspaceSkillView struct {
+	RootID           artifactstore.RootID      `json:"rootID"`
+	RecordID         artifactstore.RecordID    `json:"recordID"`
+	DefinitionDigest artifactstore.Digest      `json:"definitionDigest"`
+	SourceID         artifactstore.SourceID    `json:"sourceID"`
+	Locator          artifactstore.Locator     `json:"locator"`
+	Skill            skilladapter.SkillSummary `json:"skill"`
+	MarkdownBody     string                    `json:"markdownBody,omitempty"`
+}
+
+type WorkspaceSkillLoadView struct {
+	RootID          artifactstore.RootID       `json:"rootID"`
+	CatalogRevision uint64                     `json:"catalogRevision"`
+	Skills          []WorkspaceSkillView       `json:"skills"`
+	Diagnostics     []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
+}
+
 type WorkspaceRecordEnabledRequest struct {
 	RecordID         artifactstore.RecordID `json:"recordID"`
 	ExpectedRevision uint64                 `json:"expectedRevision"`
@@ -243,13 +269,17 @@ func (w *WorkspaceWrapper) Delete(
 
 func (w *WorkspaceWrapper) Refresh(
 	request *WorkspaceRefreshRequest,
-) (*refresh.Result, error) {
-	return middleware.WithRecoveryResp(func() (*refresh.Result, error) {
+) (*WorkspaceRefreshResult, error) {
+	return middleware.WithRecoveryResp(func() (*WorkspaceRefreshResult, error) {
 		value, err := w.workspace.Refresher.Refresh(
 			context.Background(),
 			request.RootID,
 		)
-		return &value, err
+		if err != nil {
+			return nil, err
+		}
+		output := workspaceRefreshResultOf(value)
+		return &output, nil
 	})
 }
 
@@ -284,22 +314,34 @@ func (w *WorkspaceWrapper) ComposeContext(
 
 func (w *WorkspaceWrapper) ListWorkspaceSkills(
 	rootID artifactstore.RootID,
-) ([]skilladapter.WorkspaceSkill, error) {
-	return middleware.WithRecoveryResp(func() ([]skilladapter.WorkspaceSkill, error) {
-		return w.workspace.SkillAdapter.List(context.Background(), rootID)
+) ([]WorkspaceSkillView, error) {
+	return middleware.WithRecoveryResp(func() ([]WorkspaceSkillView, error) {
+		values, err := w.workspace.SkillAdapter.List(context.Background(), rootID)
+		if err != nil {
+			return nil, err
+		}
+		output := make([]WorkspaceSkillView, 0, len(values))
+		for _, value := range values {
+			output = append(output, workspaceSkillViewOf(value))
+		}
+		return output, nil
 	})
 }
 
 func (w *WorkspaceWrapper) LoadWorkspaceSkills(
 	request *WorkspaceSkillLoadRequest,
-) (*skilladapter.SkillLoadPlan, error) {
-	return middleware.WithRecoveryResp(func() (*skilladapter.SkillLoadPlan, error) {
+) (*WorkspaceSkillLoadView, error) {
+	return middleware.WithRecoveryResp(func() (*WorkspaceSkillLoadView, error) {
 		value, err := w.workspace.SkillAdapter.Load(
 			context.Background(),
 			request.RootID,
 			request.RecordIDs,
 		)
-		return &value, err
+		if err != nil {
+			return nil, err
+		}
+		output := workspaceSkillLoadViewOf(value)
+		return &output, nil
 	})
 }
 
@@ -394,6 +436,52 @@ func workspaceRecordViewOf(value record.Record) WorkspaceRecordView {
 		State:              string(value.State),
 		ResolvedDefinition: digest,
 	}
+}
+
+func workspaceRefreshResultOf(value refresh.Result) WorkspaceRefreshResult {
+	return WorkspaceRefreshResult{
+		RootID:          value.Catalog.RootID,
+		CatalogRevision: value.Catalog.Revision,
+		CreatedRecords:  append([]artifactstore.RecordID(nil), value.CreatedRecords...),
+		UpdatedRecords:  append([]artifactstore.RecordID(nil), value.UpdatedRecords...),
+		Diagnostics:     artifactstore.CloneDiagnostics(value.Diagnostics),
+		Candidates:      value.Candidates,
+	}
+}
+
+func workspaceSkillViewOf(
+	value skilladapter.WorkspaceSkill,
+) WorkspaceSkillView {
+	skill := value.Skill
+	skill.Tags = append([]string(nil), value.Skill.Tags...)
+	skill.Arguments = append(
+		[]skilladapter.SkillArgument(nil),
+		value.Skill.Arguments...,
+	)
+	return WorkspaceSkillView{
+		RootID:           value.RootID,
+		RecordID:         value.RecordID,
+		DefinitionDigest: value.DefinitionDigest,
+		SourceID:         value.SourceID,
+		Locator:          value.Locator,
+		Skill:            skill,
+		MarkdownBody:     value.MarkdownBody,
+	}
+}
+
+func workspaceSkillLoadViewOf(
+	value skilladapter.SkillLoadPlan,
+) WorkspaceSkillLoadView {
+	output := WorkspaceSkillLoadView{
+		RootID:          value.RootID,
+		CatalogRevision: value.CatalogRevision,
+		Diagnostics:     artifactstore.CloneDiagnostics(value.Diagnostics),
+		Skills:          make([]WorkspaceSkillView, 0, len(value.Skills)),
+	}
+	for _, skill := range value.Skills {
+		output.Skills = append(output.Skills, workspaceSkillViewOf(skill))
+	}
+	return output
 }
 
 func workspaceCatalogViewOf(value engine.CatalogView) WorkspaceCatalogView {
