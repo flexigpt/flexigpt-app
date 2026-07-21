@@ -3,169 +3,267 @@ package workspace
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"sort"
-	"strings"
 
-	artifactstoreSpec "github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-type defaultDiscoveryPlanner struct{}
-
-func (defaultDiscoveryPlanner) BuildBootstrapPlan(
-	_ context.Context,
-	input DiscoveryInput,
-) (artifactstoreSpec.ScanPlan, error) {
-	return buildWorkspacePlan(input, false)
+type Planner struct {
+	decoderIDs []artifactstore.DecoderID
 }
 
-func (defaultDiscoveryPlanner) BuildExpandedPlan(
-	_ context.Context,
-	input DiscoveryInput,
-) (artifactstoreSpec.ScanPlan, error) {
-	return buildWorkspacePlan(input, true)
+func NewPlanner(
+	decoderIDs ...artifactstore.DecoderID,
+) (*Planner, error) {
+	seen := make(map[artifactstore.DecoderID]struct{}, len(decoderIDs))
+	values := make([]artifactstore.DecoderID, 0, len(decoderIDs)+1)
+
+	values = append(values, DefinitionDecoderID)
+	seen[DefinitionDecoderID] = struct{}{}
+
+	for _, decoderID := range decoderIDs {
+		if err := artifactstore.ValidateDecoderID(decoderID); err != nil {
+			return nil, err
+		}
+		if _, duplicate := seen[decoderID]; duplicate {
+			continue
+		}
+		seen[decoderID] = struct{}{}
+		values = append(values, decoderID)
+	}
+	slices.Sort(values)
+	return &Planner{decoderIDs: values}, nil
 }
 
-func buildWorkspacePlan(input DiscoveryInput, expanded bool) (artifactstoreSpec.ScanPlan, error) {
+func (p *Planner) Build(
+	value Workspace,
+	definitionPreferences DiscoveryPreferences,
+) (discovery.Plan, error) {
 	preferences, err := mergeDiscoveryPreferences(
-		input.Workspace.Data.DiscoveryPreferences,
-		input.DefinitionPreferences,
+		value.Data.Discovery,
+		definitionPreferences,
 	)
 	if err != nil {
-		return artifactstoreSpec.ScanPlan{}, err
+		return discovery.Plan{}, err
 	}
-	plans := make([]artifactstoreSpec.SourceScanPlan, 0, len(input.Workspace.Attachments))
-	for _, attachment := range input.Workspace.Attachments {
+
+	plans := make([]discovery.SourcePlan, 0, len(value.Attachments))
+	for _, attachment := range value.Attachments {
 		if !attachment.Enabled {
 			continue
 		}
-		sourcePlan := artifactstoreSpec.SourceScanPlan{
-			SourceID:            attachment.SourceID,
-			AllowedFrontendIDs:  append([]artifactstoreSpec.FrontendID(nil), input.FrontendIDs...),
-			MaxFileBytes:        artifactstoreSpec.MaxDefinitionJSONBytes,
-			MaxTotalBytes:       artifactstoreSpec.MaxScanTotalBytes,
-			MaxCandidates:       artifactstoreSpec.DefaultMaxScanCandidates,
-			MaxTraversalEntries: artifactstoreSpec.DefaultMaxScanEntries,
-			MaxTraversalDepth:   artifactstoreSpec.DefaultMaxTraversalDepth,
+		attachmentData, err := decodeAttachmentData(attachment.Data)
+		if err != nil {
+			return discovery.Plan{}, err
 		}
-		switch attachment.Role {
-		case RolePrimary:
-			sourcePlan.ExplicitLocators = bootstrapLocators(preferences.IncludeReadme)
-			sourcePlan.DirectoryRoots = bootstrapRoots()
-			if expanded {
+		sourcePlan := discovery.SourcePlan{
+			SourceID: attachment.SourceID,
+			AllowedDecoderIDs: append(
+				[]artifactstore.DecoderID(nil),
+				p.decoderIDs...,
+			),
+			Authoritative:     true,
+			MaxCandidateBytes: artifactstore.MaxCandidateBytes,
+			MaxTotalBytes:     artifactstore.MaxScanBytes,
+			MaxCandidates:     artifactstore.DefaultMaxCandidates,
+			MaxEntries:        artifactstore.DefaultMaxEntries,
+			MaxDepth:          artifactstore.DefaultMaxDepth,
+		}
+
+		if attachment.Role == RolePrimary {
+			sourcePlan.ExplicitLocators = []artifactstore.Locator{
+				DefinitionLocator,
+				"AGENTS.md",
+			}
+			if preferences.IncludeReadme {
 				sourcePlan.ExplicitLocators = append(
 					sourcePlan.ExplicitLocators,
-					preferences.AdditionalLocators...,
+					"README.md",
 				)
-				for _, root := range preferences.AdditionalRoots {
-					sourcePlan.DirectoryRoots = append(
-						sourcePlan.DirectoryRoots,
-						artifactstoreSpec.DirectoryScanRoot{
-							Root:            root.Root,
-							Recursive:       root.Recursive,
-							IncludePatterns: append([]string(nil), root.IncludePatterns...),
-						},
-					)
-				}
 			}
-			sourcePlan.Authoritative = true
-		default:
-			recursive, authoritative, err := attachmentDiscoveryBehavior(
-				attachment,
-				input.Workspace.Data.AttachedPackagePreferences.DiscoverRecursively,
+			sourcePlan.ExplicitLocators = append(
+				sourcePlan.ExplicitLocators,
+				preferences.AdditionalLocators...,
 			)
-			if err != nil {
-				return artifactstoreSpec.ScanPlan{}, err
+			sourcePlan.DirectoryRoots = []discovery.DirectoryRoot{
+				{
+					Root:      ".flexigpt",
+					Recursive: true,
+					IncludePatterns: []string{
+						"*.json",
+						"*.yaml",
+						"*.yml",
+						"*.md",
+					},
+				},
+				{
+					Root:      ".skills",
+					Recursive: true,
+					IncludePatterns: []string{
+						"SKILL.md",
+					},
+				},
 			}
-			sourcePlan.DirectoryRoots = []artifactstoreSpec.DirectoryScanRoot{{
-				Root:            ".",
-				Recursive:       recursive,
-				IncludePatterns: workspaceCandidatePatterns(),
-			}}
+			for _, root := range preferences.AdditionalRoots {
+				sourcePlan.DirectoryRoots = append(
+					sourcePlan.DirectoryRoots,
+					discovery.DirectoryRoot{
+						Root:      root.Root,
+						Recursive: root.Recursive,
+						IncludePatterns: append(
+							[]string(nil),
+							root.IncludePatterns...,
+						),
+					},
+				)
+			}
+		} else {
+			recursive := true
+			authoritative := true
+			if attachmentData.Recursive != nil {
+				recursive = *attachmentData.Recursive
+			}
+			if attachmentData.Authoritative != nil {
+				authoritative = *attachmentData.Authoritative
+			}
 			sourcePlan.Authoritative = authoritative
+			sourcePlan.DirectoryRoots = []discovery.DirectoryRoot{{
+				Root:      ".",
+				Recursive: recursive,
+				IncludePatterns: []string{
+					"*.json",
+					"*.yaml",
+					"*.yml",
+					"*.md",
+					"SKILL.md",
+				},
+			}}
 		}
-		normalizeSourcePlan(&sourcePlan)
+		sourcePlan.ApplyDefaults()
 		plans = append(plans, sourcePlan)
 	}
 	sort.Slice(plans, func(left, right int) bool {
 		return plans[left].SourceID < plans[right].SourceID
 	})
-	return artifactstoreSpec.ScanPlan{SourcePlans: plans}, nil
+	valuePlan := discovery.Plan{Sources: plans}
+	if err := valuePlan.Validate(); err != nil {
+		return discovery.Plan{}, err
+	}
+	return valuePlan, nil
 }
 
-func attachmentDiscoveryBehavior(
-	attachment artifactstoreSpec.RootSourceAttachment,
-	defaultRecursive bool,
-) (recursive, authoritative bool, err error) {
-	recursive = defaultRecursive
-	switch attachment.Role {
-	case RoleAttachedPackage, RoleBuiltIn, RoleAppLibrary, RoleOverlay:
-		authoritative = true
-	default:
-		authoritative = false
-	}
-	if len(bytes.TrimSpace(attachment.Data)) == 0 {
-		return recursive, authoritative, nil
-	}
-	var data AttachmentData
-	if err := decodeStrictJSONObject(attachment.Data, &data, true); err != nil {
-		return false, false, fmt.Errorf("decode attachment discovery data: %w", err)
-	}
-	if data.Recursive != nil {
-		recursive = *data.Recursive
-	}
-	if data.Authoritative != nil {
-		authoritative = *data.Authoritative
-	}
-	return recursive, authoritative, nil
+type DefinitionLoader struct {
+	sources  source.Repository
+	registry *source.Registry
+	decoder  *DefinitionDecoder
 }
 
-func bootstrapLocators(includeReadme bool) []artifactstoreSpec.SourceLocator {
-	out := []artifactstoreSpec.SourceLocator{
-		workspaceDefinitionJSONLocator,
-		workspaceDefinitionYAMLLocator,
-		workspaceDefinitionYMLLocator,
-		workspaceMCPDotJSONLocator,
-		workspaceMCPDotsJSONLocator,
-		workspaceMCPJSONLocator,
-		workspaceMCPsJSONLocator,
-		workspaceAgentsLocator,
+func NewDefinitionLoader(
+	sources source.Repository,
+	registry *source.Registry,
+) (*DefinitionLoader, error) {
+	if sources == nil || registry == nil {
+		return nil, fmt.Errorf(
+			"%w: Workspace definition loader dependencies are incomplete",
+			ErrInvalidWorkspace,
+		)
 	}
-	if includeReadme {
-		out = append(out, workspaceReadmeLocator)
-	}
-	return out
+	return &DefinitionLoader{
+		sources:  sources,
+		registry: registry,
+		decoder:  NewDefinitionDecoder(),
+	}, nil
 }
 
-func bootstrapRoots() []artifactstoreSpec.DirectoryScanRoot {
-	return []artifactstoreSpec.DirectoryScanRoot{
-		{
-			Root:            artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceAgentsDirectory, "/")),
-			Recursive:       true,
-			IncludePatterns: structuredCandidatePatterns(),
-		},
-		{
-			Root:            artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceModelsDirectory, "/")),
-			Recursive:       true,
-			IncludePatterns: structuredCandidatePatterns(),
-		},
-		{
-			Root:            artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceMCPDirectory, "/")),
-			Recursive:       true,
-			IncludePatterns: structuredCandidatePatterns(),
-		},
-		{
-			Root:            artifactstoreSpec.SourceLocator(strings.TrimSuffix(workspaceToolsDirectory, "/")),
-			Recursive:       true,
-			IncludePatterns: structuredCandidatePatterns(),
-		},
-		{Root: workspaceSkillsDirectory, Recursive: true, IncludePatterns: []string{"SKILL.md"}},
+func (l *DefinitionLoader) Load(
+	ctx context.Context,
+	value Workspace,
+) (DiscoveryPreferences, error) {
+	if value.Data.PrimarySourceID == "" {
+		return DiscoveryPreferences{}, nil
 	}
+	sourceValue, err := l.sources.Get(ctx, value.Data.PrimarySourceID)
+	if err != nil {
+		return DiscoveryPreferences{}, err
+	}
+	snapshot, err := l.registry.Open(ctx, sourceValue)
+	if err != nil {
+		return DiscoveryPreferences{}, err
+	}
+	defer snapshot.Close()
+
+	entry, err := snapshot.Stat(ctx, DefinitionLocator)
+	if errors.Is(err, artifactstore.ErrNotFound) {
+		return DiscoveryPreferences{}, nil
+	}
+	if err != nil {
+		return DiscoveryPreferences{}, err
+	}
+	if entry.SizeBytes > artifactstore.MaxDefinitionBodyBytes {
+		return DiscoveryPreferences{}, fmt.Errorf(
+			"%w: Workspace definition exceeds byte limit",
+			ErrWorkspaceDefinitionInvalid,
+		)
+	}
+	reader, err := snapshot.Open(ctx, DefinitionLocator)
+	if err != nil {
+		return DiscoveryPreferences{}, err
+	}
+	content, readErr := io.ReadAll(io.LimitReader(
+		reader,
+		artifactstore.MaxDefinitionBodyBytes+1,
+	))
+	closeErr := reader.Close()
+	if readErr != nil {
+		return DiscoveryPreferences{}, readErr
+	}
+	if closeErr != nil {
+		return DiscoveryPreferences{}, closeErr
+	}
+	if len(content) > artifactstore.MaxDefinitionBodyBytes {
+		return DiscoveryPreferences{}, ErrWorkspaceDefinitionInvalid
+	}
+	if err := snapshot.Confirm(ctx); err != nil {
+		return DiscoveryPreferences{}, err
+	}
+
+	candidate := discovery.Candidate{
+		Source:              sourceValue,
+		Locator:             DefinitionLocator,
+		SourceContentDigest: definition.DigestBytes(content),
+		Content:             content,
+	}
+	decoded, diagnostics := l.decoder.Decode(ctx, candidate)
+	if artifactstore.ContainsErrorDiagnostic(diagnostics) {
+		return DiscoveryPreferences{}, fmt.Errorf(
+			"%w: %s",
+			ErrWorkspaceDefinitionInvalid,
+			diagnostics[0].Message,
+		)
+	}
+	if len(decoded) != 1 {
+		return DiscoveryPreferences{}, ErrWorkspaceDefinitionInvalid
+	}
+
+	var document DefinitionDocument
+	decoder := json.NewDecoder(bytes.NewReader(decoded[0].Definition.Body))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&document); err != nil {
+		return DiscoveryPreferences{}, err
+	}
+	return document.Discovery, nil
 }
 
 func mergeDiscoveryPreferences(
-	left DiscoveryPreferences,
+	left,
 	right DiscoveryPreferences,
 ) (DiscoveryPreferences, error) {
 	if err := validateDiscoveryPreferences(left); err != nil {
@@ -174,11 +272,12 @@ func mergeDiscoveryPreferences(
 	if err := validateDiscoveryPreferences(right); err != nil {
 		return DiscoveryPreferences{}, err
 	}
-	out := DiscoveryPreferences{
+
+	output := DiscoveryPreferences{
 		IncludeReadme: left.IncludeReadme || right.IncludeReadme,
 	}
-	locators := map[artifactstoreSpec.SourceLocator]struct{}{}
-	for _, values := range [][]artifactstoreSpec.SourceLocator{
+	locators := make(map[artifactstore.Locator]struct{})
+	for _, values := range [][]artifactstore.Locator{
 		left.AdditionalLocators,
 		right.AdditionalLocators,
 	} {
@@ -187,119 +286,62 @@ func mergeDiscoveryPreferences(
 				continue
 			}
 			locators[locator] = struct{}{}
-			out.AdditionalLocators = append(out.AdditionalLocators, locator)
+			output.AdditionalLocators = append(
+				output.AdditionalLocators,
+				locator,
+			)
 		}
 	}
-	roots := map[artifactstoreSpec.SourceLocator]DiscoveryRoot{}
-	for _, values := range [][]DiscoveryRoot{left.AdditionalRoots, right.AdditionalRoots} {
+
+	roots := make(map[artifactstore.Locator]DiscoveryRoot)
+	for _, values := range [][]DiscoveryRoot{
+		left.AdditionalRoots,
+		right.AdditionalRoots,
+	} {
 		for _, root := range values {
-			if current, exists := roots[root.Root]; exists {
+			current, exists := roots[root.Root]
+			if !exists {
+				current = root
+				current.IncludePatterns = append(
+					[]string(nil),
+					root.IncludePatterns...,
+				)
+			} else {
 				current.Recursive = current.Recursive || root.Recursive
-				current.IncludePatterns = mergeIncludePatterns(
+				current.IncludePatterns = mergePatterns(
 					current.IncludePatterns,
 					root.IncludePatterns,
 				)
-				roots[root.Root] = current
-			} else {
-				root.IncludePatterns = append([]string(nil), root.IncludePatterns...)
-				roots[root.Root] = root
 			}
-		}
-	}
-	for _, root := range roots {
-		sort.Strings(root.IncludePatterns)
-		out.AdditionalRoots = append(out.AdditionalRoots, root)
-	}
-	slices.Sort(out.AdditionalLocators)
-	sort.Slice(out.AdditionalRoots, func(left, right int) bool {
-		return out.AdditionalRoots[left].Root < out.AdditionalRoots[right].Root
-	})
-	if err := validateDiscoveryPreferences(out); err != nil {
-		return DiscoveryPreferences{}, err
-	}
-	return out, nil
-}
-
-func normalizeSourcePlan(plan *artifactstoreSpec.SourceScanPlan) {
-	if plan == nil {
-		return
-	}
-	locators := map[artifactstoreSpec.SourceLocator]struct{}{}
-	filteredLocators := make([]artifactstoreSpec.SourceLocator, 0, len(plan.ExplicitLocators))
-	for _, locator := range plan.ExplicitLocators {
-		if _, exists := locators[locator]; exists {
-			continue
-		}
-		locators[locator] = struct{}{}
-		filteredLocators = append(filteredLocators, locator)
-	}
-	slices.Sort(filteredLocators)
-	plan.ExplicitLocators = filteredLocators
-
-	frontends := map[artifactstoreSpec.FrontendID]struct{}{}
-	filteredFrontends := make([]artifactstoreSpec.FrontendID, 0, len(plan.AllowedFrontendIDs))
-	for _, frontend := range plan.AllowedFrontendIDs {
-		if _, exists := frontends[frontend]; exists {
-			continue
-		}
-		frontends[frontend] = struct{}{}
-		filteredFrontends = append(filteredFrontends, frontend)
-	}
-	slices.Sort(filteredFrontends)
-	plan.AllowedFrontendIDs = filteredFrontends
-
-	roots := make(map[artifactstoreSpec.SourceLocator]artifactstoreSpec.DirectoryScanRoot)
-	for _, root := range plan.DirectoryRoots {
-		if current, exists := roots[root.Root]; exists {
-			current.Recursive = current.Recursive || root.Recursive
-			current.IncludePatterns = mergeIncludePatterns(
-				current.IncludePatterns,
-				root.IncludePatterns,
-			)
 			roots[root.Root] = current
-		} else {
-			root.IncludePatterns = append([]string(nil), root.IncludePatterns...)
-			roots[root.Root] = root
 		}
 	}
-	plan.DirectoryRoots = plan.DirectoryRoots[:0]
 	for _, root := range roots {
-		sort.Strings(root.IncludePatterns)
-		plan.DirectoryRoots = append(plan.DirectoryRoots, root)
+		output.AdditionalRoots = append(output.AdditionalRoots, root)
 	}
-	sort.Slice(plan.DirectoryRoots, func(left, right int) bool {
-		if plan.DirectoryRoots[left].Root != plan.DirectoryRoots[right].Root {
-			return plan.DirectoryRoots[left].Root < plan.DirectoryRoots[right].Root
-		}
-		return !plan.DirectoryRoots[left].Recursive && plan.DirectoryRoots[right].Recursive
+	slices.Sort(output.AdditionalLocators)
+	sort.Slice(output.AdditionalRoots, func(left, right int) bool {
+		return output.AdditionalRoots[left].Root <
+			output.AdditionalRoots[right].Root
 	})
+	return output, validateDiscoveryPreferences(output)
 }
 
-func structuredCandidatePatterns() []string {
-	return []string{"*.json", "*.yaml", "*.yml"}
-}
-
-func workspaceCandidatePatterns() []string {
-	return []string{"*.json", "*.yaml", "*.yml", "SKILL.md"}
-}
-
-func mergeIncludePatterns(left, right []string) []string {
+func mergePatterns(left, right []string) []string {
 	if len(left) == 0 || len(right) == 0 {
 		return nil
 	}
-	seen := make(map[string]struct{}, len(left)+len(right))
-	out := make([]string, 0, len(left)+len(right))
+	seen := make(map[string]struct{})
+	output := make([]string, 0, len(left)+len(right))
 	for _, values := range [][]string{left, right} {
 		for _, value := range values {
 			if _, exists := seen[value]; exists {
 				continue
 			}
 			seen[value] = struct{}{}
-			out = append(out, value)
+			output = append(output, value)
 		}
 	}
-	sort.Strings(out)
-	return out
+	sort.Strings(output)
+	return output
 }
-
-var _ DiscoveryPlanner = defaultDiscoveryPlanner{}

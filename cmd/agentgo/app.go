@@ -38,7 +38,6 @@ type App struct {
 	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
-	workspaceAPI            *WorkspaceWrapper
 
 	dataBasePath string
 
@@ -102,7 +101,7 @@ func NewApp() *App {
 	app.mcpAPI = &MCPWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
-	app.workspaceAPI = &WorkspaceWrapper{}
+
 	app.assistantPresetStoreAPI = &AssistantPresetStoreWrapper{}
 
 	if err := os.MkdirAll(app.settingsDirPath, os.FileMode(appDirectoryMode)); err != nil {
@@ -317,16 +316,6 @@ func (a *App) initManagers() {
 	}
 
 	slog.Info("aggregate initialized", "dir", a.modelPresetsDirPath)
-	err = InitWorkspaceWrapper(a.workspaceAPI, a.workspaceArtifactsDirPath)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize Workspace service",
-			"directory", a.workspaceArtifactsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: Workspace initialization failed\n" + err.Error())
-	}
-	slog.Info("workspace initialized", "directory", a.workspaceArtifactsDirPath)
 }
 
 // startup is called at application startup.
@@ -355,9 +344,6 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 
 	// Stop background goroutines + flushes for stores that need it.
 
-	if a.workspaceAPI != nil {
-		a.workspaceAPI.close()
-	}
 	if a.assistantPresetStoreAPI != nil {
 		a.assistantPresetStoreAPI.close()
 	}

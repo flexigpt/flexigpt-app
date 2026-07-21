@@ -3,82 +3,301 @@ package workspace
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	artifactstoreSpec "github.com/flexigpt/flexigpt-app/internal/artifactstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-func (s *Service) UpdateWorkspace(
+type Service struct {
+	roots   rootManager
+	sources sourceReader
+}
+
+func NewService(
+	roots rootManager,
+	sources sourceReader,
+) (*Service, error) {
+	if roots == nil || sources == nil {
+		return nil, fmt.Errorf(
+			"%w: Workspace service dependencies are incomplete",
+			ErrInvalidWorkspace,
+		)
+	}
+	return &Service{
+		roots:   roots,
+		sources: sources,
+	}, nil
+}
+
+func (s *Service) CreateEmpty(
 	ctx context.Context,
-	request UpdateWorkspaceRequest,
+	request EmptyWorkspaceRequest,
 ) (Workspace, error) {
-	current, err := s.GetWorkspace(ctx, request.RootID)
+	data := RootData{
+		Mode:                     ModeEmpty,
+		TrustReference:           request.TrustReference,
+		Discovery:                request.Discovery,
+		CapabilityProfileVersion: CapabilityProfileVersion,
+	}
+	raw, err := encodeRootData(data)
 	if err != nil {
 		return Workspace{}, err
 	}
-	root := current.Root
-	data := current.Data
+	root, _, err := s.roots.CreateRoot(
+		ctx,
+		catalog.RootDraft{
+			Kind:        RootKind,
+			DisplayName: request.DisplayName,
+			Description: request.Description,
+			Enabled:     true,
+			Data:        raw,
+		},
+		nil,
+	)
+	if err != nil {
+		return Workspace{}, err
+	}
+	return s.Get(ctx, root.ID)
+}
 
-	if request.DisplayName != nil {
-		root.DisplayName = *request.DisplayName
+func (s *Service) CreateFilesystem(
+	ctx context.Context,
+	request FilesystemWorkspaceRequest,
+) (Workspace, error) {
+	sourceValue, err := s.sources.Get(ctx, request.PrimarySourceID)
+	if err != nil {
+		return Workspace{}, err
 	}
-	if request.Description != nil {
-		root.Description = *request.Description
+	if sourceValue.Kind != FilesystemSourceKind {
+		return Workspace{}, fmt.Errorf(
+			"%w: primary source must have kind %q",
+			ErrInvalidWorkspace,
+			FilesystemSourceKind,
+		)
 	}
-	if request.Enabled != nil {
-		root.Enabled = *request.Enabled
+	if !sourceValue.Enabled {
+		return Workspace{}, fmt.Errorf(
+			"%w: primary source must be enabled",
+			ErrInvalidWorkspace,
+		)
 	}
-	if request.TrustReference != nil {
-		data.RootTrustReference = *request.TrustReference
+	data := RootData{
+		Mode:                     ModeFilesystem,
+		PrimarySourceID:          sourceValue.ID,
+		TrustReference:           request.TrustReference,
+		Discovery:                request.Discovery,
+		CapabilityProfileVersion: CapabilityProfileVersion,
 	}
-	if request.Discovery != nil {
-		data.DiscoveryPreferences = *request.Discovery
-	}
-	if request.AttachedPackages != nil {
-		data.AttachedPackagePreferences = *request.AttachedPackages
-	}
-	if request.DisplayPreferences != nil {
-		data.DisplayPreferences = *request.DisplayPreferences
-	}
-
 	raw, err := encodeRootData(data)
+	if err != nil {
+		return Workspace{}, err
+	}
+	attachmentData, err := encodeAttachmentData(AttachmentData{})
+	if err != nil {
+		return Workspace{}, err
+	}
+	root, _, err := s.roots.CreateRoot(
+		ctx,
+		catalog.RootDraft{
+			Kind:        RootKind,
+			DisplayName: request.DisplayName,
+			Description: request.Description,
+			Enabled:     true,
+			Data:        raw,
+		},
+		[]catalog.AttachmentDraft{{
+			SourceID: sourceValue.ID,
+			Role:     RolePrimary,
+			Priority: PrimaryPriority,
+			Enabled:  true,
+			Data:     attachmentData,
+		}},
+	)
+	if err != nil {
+		return Workspace{}, err
+	}
+	return s.Get(ctx, root.ID)
+}
+
+func (s *Service) Get(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+) (Workspace, error) {
+	root, err := s.roots.GetRoot(ctx, rootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if root.Kind != RootKind {
+		return Workspace{}, fmt.Errorf(
+			"%w: root %q has kind %q",
+			ErrNotWorkspace,
+			rootID,
+			root.Kind,
+		)
+	}
+	data, err := decodeRootData(root.Data)
 	if err != nil {
 		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
 	}
-	updated, err := s.store.UpdateRoot(ctx, request.RootID, artifactstore.RootUpdate{
-		ExpectedModifiedAt: request.ExpectedModifiedAt,
-		DisplayName:        root.DisplayName,
-		Description:        root.Description,
-		Enabled:            root.Enabled,
-		DataSchemaID:       RootDataSchemaID,
-		Data:               raw,
+	attachments, err := s.roots.ListAttachments(ctx, rootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	sources := make([]source.Source, 0, len(attachments))
+	for _, attachment := range attachments {
+		value, err := s.sources.Get(ctx, attachment.SourceID)
+		if err != nil {
+			return Workspace{}, err
+		}
+		sources = append(sources, value)
+	}
+	if err := validateWorkspaceState(root, data, attachments, sources); err != nil {
+		return Workspace{}, err
+	}
+	sort.Slice(sources, func(left, right int) bool {
+		return sources[left].ID < sources[right].ID
 	})
-	if err != nil {
-		return Workspace{}, err
-	}
-	workspace, err := s.GetWorkspace(ctx, updated.RootID)
-	if err != nil {
-		return Workspace{}, err
-	}
-	if !request.DiscoverImmediately || !updated.Enabled {
-		return workspace, nil
-	}
-	if _, err := s.Refresh(ctx, updated.RootID); err != nil {
-		return workspace, err
-	}
-	return s.GetWorkspace(ctx, updated.RootID)
+	return Workspace{
+		Root:        root,
+		Data:        data,
+		Attachments: attachments,
+		Sources:     sources,
+	}, nil
 }
 
-func (s *Service) DeleteWorkspace(
+func (s *Service) List(
 	ctx context.Context,
-	request DeleteWorkspaceRequest,
-) (artifactstoreSpec.ArtifactRoot, error) {
-	if _, err := s.GetWorkspace(ctx, request.RootID); err != nil {
-		return artifactstoreSpec.ArtifactRoot{}, err
+) ([]Workspace, error) {
+	roots, err := s.roots.ListRoots(ctx, false)
+	if err != nil {
+		return nil, err
 	}
-	return s.store.DeleteRoot(
+	output := make([]Workspace, 0)
+	for _, root := range roots {
+		if root.Kind != RootKind {
+			continue
+		}
+		value, err := s.Get(ctx, root.ID)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, value)
+	}
+	return output, nil
+}
+
+func (s *Service) Update(
+	ctx context.Context,
+	request UpdateRequest,
+) (Workspace, error) {
+	current, err := s.Get(ctx, request.RootID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	data := current.Data
+	data.TrustReference = request.TrustReference
+	data.Discovery = request.Discovery
+
+	raw, err := encodeRootData(data)
+	if err != nil {
+		return Workspace{}, err
+	}
+	_, err = s.roots.UpdateRoot(
 		ctx,
 		request.RootID,
-		request.ExpectedModifiedAt,
+		catalog.RootUpdate{
+			ExpectedRevision: request.ExpectedRevision,
+			DisplayName:      request.DisplayName,
+			Description:      request.Description,
+			Enabled:          request.Enabled,
+			Data:             raw,
+		},
 	)
+	if err != nil {
+		return Workspace{}, err
+	}
+	return s.Get(ctx, request.RootID)
+}
+
+func (s *Service) Attach(
+	ctx context.Context,
+	request AttachRequest,
+) (Workspace, error) {
+	if request.Role == RolePrimary {
+		return Workspace{}, ErrPrimarySourceImmutable
+	}
+	if err := validateRole(request.Role); err != nil {
+		return Workspace{}, err
+	}
+	if _, err := s.Get(ctx, request.RootID); err != nil {
+		return Workspace{}, err
+	}
+	sourceValue, err := s.sources.Get(ctx, request.SourceID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if !sourceValue.Enabled && request.Enabled {
+		return Workspace{}, fmt.Errorf(
+			"%w: enabled attachment cannot use disabled source",
+			ErrInvalidWorkspace,
+		)
+	}
+	data, err := encodeAttachmentData(request.Data)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if _, _, err := s.roots.Attach(
+		ctx,
+		request.RootID,
+		request.ExpectedRootRevision,
+		catalog.AttachmentDraft{
+			SourceID: request.SourceID,
+			Role:     request.Role,
+			Priority: request.Priority,
+			Enabled:  request.Enabled,
+			Data:     data,
+		},
+	); err != nil {
+		return Workspace{}, err
+	}
+	return s.Get(ctx, request.RootID)
+}
+
+func (s *Service) Detach(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+	sourceID artifactstore.SourceID,
+	expectedRootRevision uint64,
+	expectedAttachmentRevision uint64,
+) (Workspace, error) {
+	attachment, err := s.roots.GetAttachment(ctx, rootID, sourceID)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if attachment.Role == RolePrimary {
+		return Workspace{}, ErrPrimarySourceImmutable
+	}
+	if _, err := s.roots.Detach(
+		ctx,
+		rootID,
+		sourceID,
+		expectedRootRevision,
+		expectedAttachmentRevision,
+	); err != nil {
+		return Workspace{}, err
+	}
+	return s.Get(ctx, rootID)
+}
+
+func (s *Service) Delete(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+	expectedRevision uint64,
+) (catalog.Root, error) {
+	if _, err := s.Get(ctx, rootID); err != nil {
+		return catalog.Root{}, err
+	}
+	return s.roots.DeleteRoot(ctx, rootID, expectedRevision)
 }
