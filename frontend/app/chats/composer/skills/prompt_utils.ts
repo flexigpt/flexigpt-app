@@ -7,6 +7,7 @@ export interface SystemInstructionSource {
 	sourceSlug: string;
 	displayName: string;
 	text: string;
+	sourceTags?: string[];
 	bundleDisplayName: string;
 	bundleSlug?: string;
 	isBuiltIn: boolean;

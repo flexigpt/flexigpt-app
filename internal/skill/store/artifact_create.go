@@ -2,15 +2,13 @@ package store
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
+	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/mapstore-go/uuidv7filename"
 
@@ -20,19 +18,8 @@ import (
 
 const (
 	userCreatedSkillsDirName = "user-created-skills"
-	skillMDFileName          = "SKILL.md"
+	skillMDFileName          = agentskills.SkillDocumentFileName
 )
-
-var skillArtifactNameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
-
-type managedSkillMarkdownInput struct {
-	Name         string
-	Description  string
-	DisplayName  string
-	Insert       agentskillsSpec.SkillInsert
-	Arguments    []agentskillsSpec.SkillArgument
-	MarkdownBody string
-}
 
 func (s *SkillStore) PutSkillArtifact(
 	ctx context.Context,
@@ -60,24 +47,46 @@ func (s *SkillStore) PutSkillArtifact(
 	if insert == "" {
 		insert = spec.SkillInsertInstructions
 	}
-	switch insert {
-	case spec.SkillInsertInstructions, spec.SkillInsertUserMessage:
-	default:
-		return nil, fmt.Errorf("%w: invalid insert %q", spec.ErrSkillInvalidRequest, insert)
-	}
 
 	arguments := append([]spec.SkillArgument(nil), req.Body.Arguments...)
-	if err := ValidateSkillArtifactMetadata(name, req.Body.Description, arguments); err != nil {
+	tags := append([]string(nil), req.Body.Tags...)
+
+	displayName := strings.TrimSpace(req.Body.DisplayName)
+	if displayName == "" {
+		displayName = humanizeSkillName(name)
+	}
+
+	skillMD, err := agentskills.MarshalSkillDocument(
+		agentskillsSpec.SkillDocument{
+			Name:         name,
+			DisplayName:  displayName,
+			Description:  req.Body.Description,
+			Insert:       insert,
+			Arguments:    arguments,
+			Tags:         tags,
+			MarkdownBody: req.Body.MarkdownBody,
+		},
+	)
+	if err != nil {
 		return nil, fmt.Errorf(
-			"%w: invalid skill artifact metadata: %w",
+			"%w: invalid skill artifact document: %w",
 			spec.ErrSkillInvalidRequest,
 			err,
 		)
 	}
 
-	markdownBody := req.Body.MarkdownBody
-	if strings.TrimSpace(markdownBody) == "" {
-		return nil, fmt.Errorf("%w: markdownBody required", spec.ErrSkillInvalidRequest)
+	document, documentWarnings, err := agentskills.ParseSkillDocument(
+		skillMD,
+		agentskillsSpec.ParseSkillDocumentOptions{
+			ExpectedName: name,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"%w: generated skill artifact is invalid: %w",
+			spec.ErrSkillInvalidRequest,
+			err,
+		)
 	}
 
 	location := filepath.Join(
@@ -119,14 +128,7 @@ func (s *SkillStore) PutSkillArtifact(
 			return userWriteSagaOutcome{}, fmt.Errorf("%w: duplicate skillSlug in bundle", spec.ErrSkillConflict)
 		}
 
-		if err := createManagedSkillPackage(location, buildManagedSkillMarkdown(managedSkillMarkdownInput{
-			Name:         name,
-			Description:  req.Body.Description,
-			Insert:       insert,
-			Arguments:    arguments,
-			MarkdownBody: markdownBody,
-			DisplayName:  req.Body.DisplayName,
-		})); err != nil {
+		if err := createManagedSkillPackage(location, string(skillMD)); err != nil {
 			return userWriteSagaOutcome{}, err
 		}
 		createdDir = location
@@ -137,33 +139,28 @@ func (s *SkillStore) PutSkillArtifact(
 		}
 
 		now := time.Now().UTC()
-		rawFrontmatter := map[string]any{
-			"name":        name,
-			"description": req.Body.Description,
-			"insert":      insert,
-		}
-		if len(arguments) > 0 {
-			rawFrontmatter["arguments"] = arguments
-		}
-
 		sk := spec.Skill{
 			SchemaVersion:  spec.SkillSchemaVersion,
 			ID:             bundleitemutils.ItemID(uuid),
 			Slug:           req.SkillSlug,
 			Type:           spec.SkillTypeFS,
 			Location:       location,
-			Name:           name,
-			DisplayName:    req.Body.DisplayName,
-			Description:    req.Body.Description,
-			Tags:           append([]string(nil), req.Body.Tags...),
-			Insert:         insert,
-			Arguments:      append([]spec.SkillArgument(nil), arguments...),
-			RawFrontmatter: rawFrontmatter,
-			Presence:       &spec.SkillPresence{Status: spec.SkillPresenceUnknown},
-			IsEnabled:      req.Body.IsEnabled,
-			IsBuiltIn:      false,
-			CreatedAt:      now,
-			ModifiedAt:     now,
+			Name:           document.Name,
+			DisplayName:    document.DisplayName,
+			Description:    document.Description,
+			Tags:           tags,
+			Insert:         document.Insert,
+			Arguments:      append([]spec.SkillArgument(nil), document.Arguments...),
+			RawFrontmatter: cloneAnyMap(document.RawFrontmatter),
+			RuntimeWarnings: append(
+				[]string(nil),
+				documentWarnings...,
+			),
+			Presence:   &spec.SkillPresence{Status: spec.SkillPresenceUnknown},
+			IsEnabled:  req.Body.IsEnabled,
+			IsBuiltIn:  false,
+			CreatedAt:  now,
+			ModifiedAt: now,
 		}
 		if err := validateSkill(&sk); err != nil {
 			return userWriteSagaOutcome{}, err
@@ -204,22 +201,6 @@ func (s *SkillStore) PutSkillArtifact(
 	}, nil
 }
 
-func validateSkillArtifactName(name string) error {
-	if strings.TrimSpace(name) == "" {
-		return errors.New("name is empty")
-	}
-	if strings.TrimSpace(name) != name {
-		return errors.New("name has leading/trailing whitespace")
-	}
-	if !skillArtifactNameRE.MatchString(name) {
-		return errors.New("name must contain only lowercase letters, numbers, and hyphens, max 64 chars")
-	}
-	if strings.Contains(name, "--") {
-		return errors.New("name must not contain consecutive hyphens")
-	}
-	return nil
-}
-
 func createManagedSkillPackage(dir, skillMD string) error {
 	if strings.TrimSpace(dir) == "" {
 		return fmt.Errorf("%w: managed skill directory is empty", spec.ErrSkillInvalidRequest)
@@ -236,65 +217,6 @@ func createManagedSkillPackage(dir, skillMD string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, skillMDFileName), []byte(skillMD), 0o600)
-}
-
-func buildManagedSkillMarkdown(in managedSkillMarkdownInput) string {
-	insert := in.Insert
-	if insert == "" {
-		insert = spec.SkillInsertInstructions
-	}
-
-	displayName := strings.TrimSpace(in.DisplayName)
-	if displayName == "" {
-		displayName = humanizeSkillName(in.Name)
-	}
-
-	var b strings.Builder
-	b.WriteString("---\n")
-	b.WriteString("name: ")
-	b.WriteString(yamlQuotedString(in.Name))
-	b.WriteString("\n")
-	b.WriteString("description: ")
-	b.WriteString(yamlQuotedString(in.Description))
-	b.WriteString("\n")
-	b.WriteString("insert: ")
-	b.WriteString(yamlQuotedString(string(insert)))
-	b.WriteString("\n")
-	if len(in.Arguments) > 0 {
-		b.WriteString("arguments:\n")
-		for _, arg := range in.Arguments {
-			b.WriteString("  - name: ")
-			b.WriteString(yamlQuotedString(arg.Name))
-			b.WriteString("\n")
-			if strings.TrimSpace(arg.Description) != "" {
-				b.WriteString("    description: ")
-				b.WriteString(yamlQuotedString(arg.Description))
-				b.WriteString("\n")
-			}
-			if arg.Default != "" {
-				b.WriteString("    default: ")
-				b.WriteString(yamlQuotedString(arg.Default))
-				b.WriteString("\n")
-			}
-		}
-	}
-	b.WriteString("---\n\n")
-	b.WriteString("# ")
-	b.WriteString(displayName)
-	b.WriteString("\n\n")
-	b.WriteString(strings.ReplaceAll(in.MarkdownBody, "\r\n", "\n"))
-	if !strings.HasSuffix(in.MarkdownBody, "\n") {
-		b.WriteString("\n")
-	}
-	return b.String()
-}
-
-func yamlQuotedString(value string) string {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return `""`
-	}
-	return string(raw)
 }
 
 func humanizeSkillName(name string) string {

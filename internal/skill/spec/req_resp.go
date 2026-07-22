@@ -94,10 +94,14 @@ type PutSkillArtifactRequestBody struct {
 	Insert agentskillsSpec.SkillInsert `json:"insert,omitempty"`
 
 	Arguments []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
-	Tags      []string                        `json:"tags,omitempty"`
 
-	// MarkdownBody is written after YAML frontmatter in SKILL.md.
-	MarkdownBody string `json:"markdownBody" required:"true"`
+	// Tags are stored as app-managed tags and are also written into the
+	// managed SKILL.md frontmatter as source tags.
+	Tags []string `json:"tags,omitempty"`
+
+	// MarkdownBody is written after YAML frontmatter in SKILL.md. It may be
+	// empty for resource-oriented skills.
+	MarkdownBody string `json:"markdownBody"`
 }
 
 type PutSkillArtifactRequest struct {

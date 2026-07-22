@@ -122,9 +122,13 @@ type Skill struct {
 	Location string    `json:"location"` // opaque provider/app location; user-created fs skills usually use an absolute base dir.
 	Name     string    `json:"name"`     // name of the skill inside SKILL.md.
 
-	DisplayName string   `json:"displayName,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+	Description string `json:"description,omitempty"`
+
+	// Tags are application-managed tags used for app filtering and
+	// organization. Source tags from SKILL.md are exposed through runtime
+	// projections rather than overwriting this field during indexing.
+	Tags []string `json:"tags,omitempty"`
 
 	// Parsed from SKILL.md frontmatter field "insert".
 	// Missing/empty defaults to "instructions".

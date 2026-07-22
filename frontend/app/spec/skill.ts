@@ -54,6 +54,7 @@ export interface RuntimeSkillListItem {
 	digest?: string;
 	insert?: SkillInsert;
 	arguments?: SkillArgument[];
+	sourceTags?: string[];
 	resources: SkillResourceInfo;
 	rawFrontmatter?: Record<string, any>;
 	warnings?: string[];
@@ -89,6 +90,7 @@ export interface RenderSkillResponse {
 	name: string;
 	description?: string;
 	displayName?: string;
+	sourceTags?: string[];
 	resources: SkillResourceInfo;
 	arguments?: SkillArgument[];
 	appliedArguments?: Record<string, string>;

@@ -13,7 +13,10 @@ import { buildSkillRefKey } from '@/assistantpresets/lib/assistant_preset_utils'
 import type { AssistantPresetPreparedApplication } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import { buildEffectiveSystemPrompt } from '@/chats/composer/skills/prompt_utils';
-import { getSkillInstructionPromptEligibilityReason } from '@/skills/lib/skill_artifact_utils';
+import {
+	getSkillInstructionPromptEligibilityReason,
+	normalizeSkillSourceTags,
+} from '@/skills/lib/skill_artifact_utils';
 
 interface ComposerSystemPromptPreparedSelection {
 	hasIncludeModelSystemPromptSelection: boolean;
@@ -28,6 +31,7 @@ interface RenderedInstructionSkillSource {
 	displayName: string;
 	prompt: string;
 	skillRef: { bundleID: string; skillSlug: string; skillID: string };
+	sourceTags?: string[];
 }
 
 type IncludeModelDefaultPreference = boolean | 'auto';
@@ -84,6 +88,7 @@ function buildInstructionSkillPromptItem(draft: RenderedInstructionSkillSource):
 		displayName: draft.displayName,
 		sourceSlug: draft.skillRef.skillSlug,
 		text: draft.prompt,
+		sourceTags: normalizeSkillSourceTags(draft.sourceTags),
 		isBuiltIn: false,
 	};
 }
@@ -295,6 +300,7 @@ export function useComposerSystemPrompt(args: {
 							displayName:
 								option.skillDefinition.displayName || option.skillDefinition.name || option.skillDefinition.slug,
 							prompt: rendered.text,
+							sourceTags: rendered.sourceTags,
 							skillRef: selection.skillRef,
 						})
 					);

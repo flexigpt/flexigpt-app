@@ -24,6 +24,19 @@ export function normalizeSkillInsert(insert?: string | null): NormalizedSkillIns
 	return { value: 'instructions', isDefaulted: true };
 }
 
+export function normalizeSkillSourceTags(sourceTags?: string[] | null): string[] {
+	const seen = new Set<string>();
+
+	for (const sourceTag of sourceTags ?? []) {
+		const value = sourceTag.trim();
+		if (value) {
+			seen.add(value);
+		}
+	}
+
+	return [...seen];
+}
+
 export function skillMatchesInsertFilter(insert?: string | null, filter: SkillInsertFilter = 'all'): boolean {
 	if (filter === 'all') {
 		return true;

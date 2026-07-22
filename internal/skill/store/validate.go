@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/flexigpt/agentskills-go"
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
 
 const (
-	maxDisplayNameLen              = 256
-	maxDescriptionLen              = 4096
-	maxSkillArtifactDescriptionLen = 1024
-	maxLocationLen                 = 4096
-	maxNameLen                     = 256
+	maxDisplayNameLen = 256
+	maxDescriptionLen = 4096
+	maxLocationLen    = 4096
+	maxNameLen        = 256
 )
 
 // ValidateSkill applies the Skill Store's structural rules to a projected
@@ -24,25 +26,23 @@ func ValidateSkill(skill *spec.Skill) error {
 }
 
 // ValidateSkillArtifactMetadata applies the source-package rules shared by
-// managed Skill creation and Workspace SKILL.md projection.
+// managed Skill creation and other materialized SKILL.md workflows.
 func ValidateSkillArtifactMetadata(
 	name string,
 	description string,
-	arguments []spec.SkillArgument,
+	arguments []agentskillsSpec.SkillArgument,
 ) error {
-	if err := validateSkillArtifactName(name); err != nil {
-		return fmt.Errorf("name: %w", err)
+	_, err := agentskills.MarshalSkillDocument(
+		agentskillsSpec.SkillDocument{
+			Name:        name,
+			Description: description,
+			Arguments:   append([]agentskillsSpec.SkillArgument(nil), arguments...),
+		},
+	)
+	if err != nil {
+		return err
 	}
-	if strings.TrimSpace(description) == "" {
-		return errors.New("description is required")
-	}
-	if strings.TrimSpace(description) != description {
-		return errors.New("description has leading or trailing whitespace")
-	}
-	if len(description) > maxSkillArtifactDescriptionLen {
-		return fmt.Errorf("description too long, maximum is %d bytes", maxSkillArtifactDescriptionLen)
-	}
-	return validateSkillArguments(arguments)
+	return nil
 }
 
 func validateSkillBundle(b *spec.SkillBundle) error {

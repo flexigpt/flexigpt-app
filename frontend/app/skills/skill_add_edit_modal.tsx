@@ -38,6 +38,7 @@ import {
 	getSkillResourceCountLabel,
 	getSkillResourceTooltip,
 	normalizeSkillInsert,
+	normalizeSkillSourceTags,
 	stringifySkillFrontmatter,
 } from '@/skills/lib/skill_artifact_utils';
 
@@ -307,6 +308,7 @@ function AddEditSkillModalContent({
 		insert: SkillInsert;
 		appliedArguments?: Record<string, string>;
 		warnings?: string[];
+		sourceTags: string[];
 	} | null>(null);
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState('');
@@ -511,6 +513,7 @@ function AddEditSkillModalContent({
 					insert: resp.insert,
 					appliedArguments: resp.appliedArguments ?? {},
 					warnings: resp.warnings ?? [],
+					sourceTags: normalizeSkillSourceTags(resp.sourceTags),
 				});
 			}
 		} catch (err) {
@@ -1289,6 +1292,18 @@ function AddEditSkillModalContent({
 													{Object.keys(previewResult.appliedArguments ?? {}).length > 0 ? (
 														<span className="text-base-content/70">Applied arguments captured from the renderer.</span>
 													) : null}
+												</div>
+												<div className="flex flex-wrap items-center gap-1 text-xs">
+													<span className="text-base-content/70 mr-1">Source tags:</span>
+													{previewResult.sourceTags.length > 0 ? (
+														previewResult.sourceTags.map(tag => (
+															<MetadataPill key={tag} label="Source">
+																{tag}
+															</MetadataPill>
+														))
+													) : (
+														<span className="text-base-content/70">None parsed from the skill body.</span>
+													)}
 												</div>
 												<pre className="bg-base-100 max-h-72 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
 													{previewResult.text || '(Rendered output is empty.)'}

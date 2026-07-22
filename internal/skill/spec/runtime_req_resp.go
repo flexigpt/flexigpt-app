@@ -80,6 +80,9 @@ type RenderSkillResponseBody struct {
 	Description string `json:"description,omitempty"`
 	DisplayName string `json:"displayName,omitempty"`
 
+	// SourceTags are tags parsed from SKILL.md frontmatter.
+	SourceTags []string `json:"sourceTags,omitempty"`
+
 	Resources agentskillsSpec.SkillResourceInfo `json:"resources"`
 
 	Arguments        []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
@@ -105,8 +108,10 @@ type RuntimeSkillListItem struct {
 	Description string `json:"description,omitempty"`
 	Digest      string `json:"digest,omitempty"`
 
-	Insert         agentskillsSpec.SkillInsert       `json:"insert,omitempty"`
-	Arguments      []agentskillsSpec.SkillArgument   `json:"arguments,omitempty"`
+	Insert    agentskillsSpec.SkillInsert     `json:"insert,omitempty"`
+	Arguments []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
+	// SourceTags are tags parsed from SKILL.md frontmatter.
+	SourceTags     []string                          `json:"sourceTags,omitempty"`
 	Resources      agentskillsSpec.SkillResourceInfo `json:"resources"`
 	RawFrontmatter map[string]any                    `json:"rawFrontmatter,omitempty"`
 	Warnings       []string                          `json:"warnings,omitempty"`

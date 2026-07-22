@@ -7070,6 +7070,7 @@ export namespace spec {
 	    digest?: string;
 	    insert?: string;
 	    arguments?: SkillArgument[];
+	    sourceTags?: string[];
 	    resources: SkillResourceInfo;
 	    rawFrontmatter?: Record<string, any>;
 	    warnings?: string[];
@@ -7090,6 +7091,7 @@ export namespace spec {
 	        this.digest = source["digest"];
 	        this.insert = source["insert"];
 	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
+	        this.sourceTags = source["sourceTags"];
 	        this.resources = this.convertValues(source["resources"], SkillResourceInfo);
 	        this.rawFrontmatter = source["rawFrontmatter"];
 	        this.warnings = source["warnings"];
@@ -10404,6 +10406,7 @@ export namespace spec {
 	    name: string;
 	    description?: string;
 	    displayName?: string;
+	    sourceTags?: string[];
 	    resources: SkillResourceInfo;
 	    arguments?: SkillArgument[];
 	    appliedArguments?: Record<string, string>;
@@ -10421,6 +10424,7 @@ export namespace spec {
 	        this.name = source["name"];
 	        this.description = source["description"];
 	        this.displayName = source["displayName"];
+	        this.sourceTags = source["sourceTags"];
 	        this.resources = this.convertValues(source["resources"], SkillResourceInfo);
 	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
 	        this.appliedArguments = source["appliedArguments"];

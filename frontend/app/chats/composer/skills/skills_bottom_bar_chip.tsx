@@ -587,6 +587,7 @@ export function SkillsBottomBarChip({
 				displayName: getSkillDisplayLabel(item),
 				prompt: rendered.text,
 				skillRef: skillRefFromListItem(item),
+				sourceTags: rendered.sourceTags,
 			});
 		},
 		[systemPrompt]
@@ -1144,14 +1145,29 @@ export function SkillsBottomBarChip({
 						{systemPrompt.instructionSources.map(source => (
 							<label
 								key={source.identityKey}
-								className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 transition-colors ${
+								className={`flex cursor-pointer items-start justify-between gap-2 rounded-lg px-2 py-1 transition-colors ${
 									selectedInstructionSourceKeySet.has(source.identityKey)
 										? 'bg-secondary/10 hover:bg-secondary/15 focus-within:bg-secondary/15'
 										: 'hover:bg-base-200 focus-within:bg-base-200'
 								}`}
-								title={source.text}
+								title={
+									source.sourceTags?.length
+										? `${source.text}\n\nSource tags: ${source.sourceTags.join(', ')}`
+										: source.text
+								}
 							>
-								<span className="min-w-0 truncate text-xs">{source.displayName}</span>
+								<span className="min-w-0">
+									<span className="block truncate text-xs">{source.displayName}</span>
+									{source.sourceTags?.length ? (
+										<span className="mt-1 flex flex-wrap gap-1">
+											{source.sourceTags.map(tag => (
+												<span key={`${source.identityKey}:${tag}`} className="badge badge-outline badge-xs">
+													{tag}
+												</span>
+											))}
+										</span>
+									) : null}
+								</span>
 								<input
 									type="checkbox"
 									className="checkbox checkbox-xs"
