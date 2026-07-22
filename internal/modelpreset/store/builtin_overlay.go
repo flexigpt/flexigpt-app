@@ -40,7 +40,7 @@ var builtInDefaultModelPresetIDs = map[inferenceSpec.ProviderName]spec.ModelPres
 	modelpreset.ProviderAnthropic:       spec.ModelPresetID(modelpreset.PresetClaudeSonnet5),
 	modelpreset.ProviderLocalAI:         spec.ModelPresetID(modelpreset.PresetGemma426BA4B),
 	modelpreset.ProviderLMStudio:        spec.ModelPresetID(modelpreset.PresetQwen3627B),
-	modelpreset.ProviderGoogleGemini:    spec.ModelPresetID(modelpreset.PresetGemini35Flash),
+	modelpreset.ProviderGoogleGemini:    spec.ModelPresetID(modelpreset.PresetGemini36Flash),
 	modelpreset.ProviderHuggingFace:     spec.ModelPresetID(modelpreset.PresetGLM52FireworksAI),
 	modelpreset.ProviderLlamaCPP:        spec.ModelPresetID(modelpreset.PresetQwen3635BA3B),
 	modelpreset.ProviderMistral:         spec.ModelPresetID(modelpreset.PresetMistralMedium35),
@@ -61,6 +61,11 @@ var builtInDisabledModelPresetIDs = map[inferenceSpec.ProviderName]map[spec.Mode
 		spec.ModelPresetID(modelpreset.PresetClaudeSonnet4):  {},
 	},
 	modelpreset.ProviderGoogleGemini: {
+		spec.ModelPresetID(modelpreset.PresetGemini35Flash): {},
+
+		spec.ModelPresetID(modelpreset.PresetGemini31Pro):       {},
+		spec.ModelPresetID(modelpreset.PresetGemini31FlashLite): {},
+
 		spec.ModelPresetID(modelpreset.PresetGemini3Flash):      {},
 		spec.ModelPresetID(modelpreset.PresetGemini25Flash):     {},
 		spec.ModelPresetID(modelpreset.PresetGemini25FlashLite): {},

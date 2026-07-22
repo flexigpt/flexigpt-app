@@ -66,8 +66,8 @@ tasks:
     cmds:
       - corepack enable
       - asdf reshim nodejs
-      - corepack prepare pnpm@11.9.0 --activate
-      - corepack use pnpm@11.9.0
+      - corepack prepare pnpm@11.15.1 --activate
+      - corepack use pnpm@11.15.1
       - asdf reshim nodejs
 
   upgrade-nodejs:

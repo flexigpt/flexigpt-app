@@ -27,8 +27,8 @@ github.com/andybalholm/cascadia v1.3.4 h1:vM2lgh0Vru9Vwyfm4cQqWP2HHMW0u0+2PAW7Q3
 github.com/andybalholm/cascadia v1.3.4/go.mod h1:BLRmbRjpEtNKieZOCCvYj4RqN+KRA41GBe/5O+G93kM=
 github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be h1:9AeTilPcZAjCFIImctFaOjnTIavg87rW78vTPkQqLI8=
 github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be/go.mod h1:ySMOLuWl6zY27l47sB3qLNK6tF2fkHG55UZxx8oIVo4=
-github.com/anthropics/anthropic-sdk-go v1.58.0 h1:WbvzpIbFpd/eR6H4KK84j7VLuRJnIfKKyAptR1C49EI=
-github.com/anthropics/anthropic-sdk-go v1.58.0/go.mod h1:3EfIfmFqxH6rbiLcIP4tPFyXL/IHakx2wDG4OU+TIEI=
+github.com/anthropics/anthropic-sdk-go v1.58.1 h1:ReZ+Inn6WBDOXUGY64ue7zA1uDoW8FFSzMU/lViFd4E=
+github.com/anthropics/anthropic-sdk-go v1.58.1/go.mod h1:3EfIfmFqxH6rbiLcIP4tPFyXL/IHakx2wDG4OU+TIEI=
 github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de h1:FxWPpzIjnTlhPwqqXc4/vE0f7GvRjuAsbW+HOIe8KnA=
 github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de/go.mod h1:DCaWoUhZrYW9p1lxo/cm8EmUOOzAPSEZNGF2DK1dJgw=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
@@ -70,8 +70,8 @@ github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1m
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/flexigpt/agentskills-go v0.18.0 h1:Vyk1OmaqVOxItKfOXBCu0Bo0mP9JUnQgxXqYk39VusA=
 github.com/flexigpt/agentskills-go v0.18.0/go.mod h1:wv9BZh5/LE4zPQXKRWfi+kFT9IJM1U+B1N4SJ08VYdg=
-github.com/flexigpt/inference-go v0.22.5 h1:0o18YHKt1VIWlo3sFh6yQo38a8m6qtTo23kqxGLf15o=
-github.com/flexigpt/inference-go v0.22.5/go.mod h1:K+Ddag9+LRBCRVzBm0BtnXhooHqU0FRgKPhtxdiVlV8=
+github.com/flexigpt/inference-go v0.22.6 h1:LgS5okvvSLkakxbkLU5wllZlXb5fOHWtQHZxeVYN7/Y=
+github.com/flexigpt/inference-go v0.22.6/go.mod h1:dFMlsHNmHQmaVJpVaI2DcPI/OaF+T7VJLJy5wE53nfY=
 github.com/flexigpt/llmtools-go v0.22.1 h1:wa8h6RTFawXURwkQCzNKbzzmrzBzGSAsHhZvDY0IhBI=
 github.com/flexigpt/llmtools-go v0.22.1/go.mod h1:9VhdxFXI+vg7xs6a2BamjaUCPLuU3IW5LVq8sHoVb0w=
 github.com/flexigpt/mapstore-go v0.3.5 h1:wAUX6u4BT/rEH7fyRCwF74Xq2sEoSYIwvmX3BiI3M6E=
