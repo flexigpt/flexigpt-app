@@ -68,6 +68,10 @@ type AttachmentData struct {
 	Authoritative *bool `json:"authoritative,omitempty"`
 }
 
+type RecordData struct {
+	RuntimeAllowed bool `json:"runtimeAllowed,omitempty"`
+}
+
 // Workspace is an internal privileged aggregate. API packages must project it
 // into explicit view models instead of serializing source configuration, root
 // data, or attachment data.
@@ -79,11 +83,13 @@ type Workspace struct {
 }
 
 type Resource struct {
-	Record         record.Record         `json:"-"`
-	Definition     definition.Definition `json:"-"`
-	Occurrence     *catalog.Occurrence   `json:"-"`
-	Source         source.Summary        `json:"-"`
-	CatalogCurrent bool                  `json:"-"`
+	Record          record.Record              `json:"-"`
+	Definition      definition.Definition      `json:"-"`
+	Occurrence      *catalog.Occurrence        `json:"-"`
+	Source          source.Summary             `json:"-"`
+	CatalogCurrent  bool                       `json:"-"`
+	ProjectionValid bool                       `json:"-"`
+	Diagnostics     []artifactstore.Diagnostic `json:"-"`
 }
 
 type ResourceGroup struct {
@@ -145,6 +151,7 @@ type CatalogView struct {
 	Unrecorded        []catalog.Occurrence `json:"-"`
 	UnresolvedRecords []record.Record      `json:"-"`
 	Groups            []ResourceGroup      `json:"-"`
+	CatalogCurrent    bool                 `json:"-"`
 }
 
 type Reference struct {
@@ -189,8 +196,11 @@ type attachmentOperation struct {
 	allowsAttachmentDiscoveryOverrides   bool
 }
 
+type DefinitionValidator func(definition.Definition) error
+
 type ArtifactSupport struct {
 	Kind      artifactstore.ArtifactKind
 	SchemaID  artifactstore.SchemaID
 	DecoderID artifactstore.DecoderID
+	Validator DefinitionValidator
 }

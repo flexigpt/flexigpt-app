@@ -73,6 +73,9 @@ func (*DefinitionDecoder) Decode(
 		DisplayName:   workspaceDefinitionDisplayName,
 		Body:          body,
 	}
+	if err := ValidateWorkspaceDefinition(value); err != nil {
+		return nil, definitionDiagnostics(candidate.Locator, err)
+	}
 	return []discovery.Decoded{{
 		Definition: value,
 	}}, nil

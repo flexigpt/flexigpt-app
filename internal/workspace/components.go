@@ -5,6 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
+	"github.com/flexigpt/flexigpt-app/internal/skill/provider"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
@@ -17,6 +18,7 @@ type components struct {
 
 	contextAdapter *contextadapter.Adapter
 	skillAdapter   *skilladapter.Adapter
+	skillProvider  provider.Provider
 }
 
 func newComponents(
@@ -40,7 +42,11 @@ func newComponents(
 	if err != nil {
 		return nil, err
 	}
-	profiles := config.normalizedDiscoveryProfiles()
+	skillConventions, err := config.skillConventions()
+	if err != nil {
+		return nil, err
+	}
+	profiles := config.normalizedDiscoveryProfiles(skillConventions)
 	decoderIDs := make([]artifactstore.DecoderID, 0, len(supports))
 	for _, support := range supports {
 		if !artifacts.HasDecoder(support.DecoderID) {
@@ -92,15 +98,28 @@ func newComponents(
 		artifacts.Catalogs,
 		artifacts.Records,
 		artifacts.Definitions,
+		supports...,
 	)
 	if err != nil {
 		return nil, err
 	}
-	contextAdapter, err := contextadapter.NewAdapter(query)
+	runtimePolicy := config.runtimePolicy()
+	contextAdapter, err := contextadapter.NewAdapter(
+		query,
+		runtimePolicy,
+		config.contextCompositionPolicy(),
+	)
 	if err != nil {
 		return nil, err
 	}
-	skillAdapter, err := skilladapter.NewAdapter(query)
+	skillAdapter, err := skilladapter.NewAdapter(
+		query,
+		runtimePolicy,
+	)
+	if err != nil {
+		return nil, err
+	}
+	workspaceSkillProvider, err := provider.NewWorkspace(skillAdapter)
 	if err != nil {
 		return nil, err
 	}
@@ -110,5 +129,6 @@ func newComponents(
 		query:          query,
 		contextAdapter: contextAdapter,
 		skillAdapter:   skillAdapter,
+		skillProvider:  workspaceSkillProvider,
 	}, nil
 }

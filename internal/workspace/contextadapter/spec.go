@@ -1,6 +1,8 @@
 package contextadapter
 
 import (
+	"strings"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
@@ -14,12 +16,9 @@ const (
 )
 
 const (
-	agentsFileName                       = "AGENTS.md"
-	claudeFileName                       = "CLAUDE.md"
-	readmeFileName                       = "README.md"
-	agentsLocator  artifactstore.Locator = agentsFileName
-	claudeLocator  artifactstore.Locator = claudeFileName
-	readmeLocator  artifactstore.Locator = readmeFileName
+	agentsFileName = "AGENTS.md"
+	claudeFileName = "CLAUDE.md"
+	readmeFileName = "README.md"
 )
 
 const (
@@ -30,35 +29,72 @@ const (
 	contextRoleLabelKey              = "context.role"
 	contextMarkdownMediaType         = "text/markdown"
 
+	contextPreferenceNone          = ""
+	contextPreferenceIncludeReadme = "include-readme"
+
 	contextPromptSeparator   = "\n\n"
 	contextPromptStartFormat = "<<<WORKSPACE_CONTEXT name=%q role=%q source=%q>>>\n"
 	contextPromptEndMarker   = "\n<<<END_WORKSPACE_CONTEXT>>>"
 )
 
 type contextFileSupport struct {
-	fileName string
-	role     string
+	FileName         string
+	Role             string
+	DefaultDiscovery bool
+	Preference       string
+	RuntimeOrder     int
 }
 
-var contextFileSupportMatrix = []contextFileSupport{
+var contextConventionRegistry = []contextFileSupport{
 	{
-		fileName: agentsFileName,
-		role:     contextRoleAgentInstructions,
+		FileName:         agentsFileName,
+		Role:             contextRoleAgentInstructions,
+		DefaultDiscovery: true,
+		RuntimeOrder:     100,
 	},
 	{
-		fileName: claudeFileName,
-		role:     contextRoleAssistantInstructions,
+		FileName:         claudeFileName,
+		Role:             contextRoleAssistantInstructions,
+		DefaultDiscovery: true,
+		RuntimeOrder:     200,
 	},
 	{
-		fileName: readmeFileName,
-		role:     contextRoleProjectReadme,
+		FileName:     readmeFileName,
+		Role:         contextRoleProjectReadme,
+		Preference:   contextPreferenceIncludeReadme,
+		RuntimeOrder: 300,
 	},
+}
+
+func contextConventionFor(
+	locator artifactstore.Locator,
+) (contextFileSupport, bool) {
+	value := string(locator)
+	for _, convention := range contextConventionRegistry {
+		if strings.EqualFold(value, convention.FileName) {
+			return convention, true
+		}
+	}
+	return contextFileSupport{}, false
+}
+
+func supportedContextRole(role string) bool {
+	switch role {
+	case contextRoleAgentInstructions,
+		contextRoleAssistantInstructions,
+		contextRoleProjectReadme,
+		contextRoleProjectContext:
+		return true
+	default:
+		return false
+	}
 }
 
 var artifactSupport = engine.ArtifactSupport{
 	Kind:      contextKind,
 	SchemaID:  contextSchemaID,
 	DecoderID: contextDecoderID,
+	Validator: ValidateContextDefinition,
 }
 
 type contextDefinition struct {

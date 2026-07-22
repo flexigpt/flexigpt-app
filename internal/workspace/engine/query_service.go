@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -31,6 +32,7 @@ type QueryService struct {
 	catalogs    catalogSnapshotReader
 	records     recordLister
 	definitions definitionLookup
+	validators  map[artifactstore.ArtifactKind]DefinitionValidator
 }
 
 func NewQueryService(
@@ -38,6 +40,7 @@ func NewQueryService(
 	catalogs catalogSnapshotReader,
 	records recordLister,
 	definitions definitionLookup,
+	supports ...ArtifactSupport,
 ) (*QueryService, error) {
 	if workspaces == nil ||
 		catalogs == nil ||
@@ -48,11 +51,29 @@ func NewQueryService(
 			ErrInvalidWorkspace,
 		)
 	}
+	validators := make(
+		map[artifactstore.ArtifactKind]DefinitionValidator,
+		len(supports),
+	)
+	for _, support := range supports {
+		if err := support.Validate(); err != nil {
+			return nil, err
+		}
+		if _, duplicate := validators[support.Kind]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: duplicate query validator for %q",
+				ErrInvalidWorkspace,
+				support.Kind,
+			)
+		}
+		validators[support.Kind] = support.Validator
+	}
 	return &QueryService{
 		workspaces:  workspaces,
 		catalogs:    catalogs,
 		records:     records,
 		definitions: definitions,
+		validators:  validators,
 	}, nil
 }
 
@@ -77,6 +98,9 @@ func (q *QueryService) Resolve(
 	view, err := q.Catalog(ctx, rootID)
 	if err != nil {
 		return Resource{}, err
+	}
+	if !view.CatalogCurrent {
+		return Resource{}, artifactstore.ErrCatalogStale
 	}
 
 	if reference.RecordID != nil {
@@ -167,26 +191,100 @@ func (q *QueryService) ComposeLoadPlan(
 		RootID:          rootID,
 		CatalogRevision: view.Catalog.Revision,
 	}
-	for _, resourceValue := range view.Resources {
-		if _, selected := requested[resourceValue.Record.ID]; !selected {
+	resources := make(map[artifactstore.RecordID]Resource, len(view.Resources))
+	for _, value := range view.Resources {
+		resources[value.Record.ID] = value
+	}
+	unresolved := make(map[artifactstore.RecordID]record.Record, len(view.UnresolvedRecords))
+	for _, value := range view.UnresolvedRecords {
+		unresolved[value.ID] = value
+	}
+
+	ordered := make([]artifactstore.RecordID, 0, len(requested))
+	for recordID := range requested {
+		ordered = append(ordered, recordID)
+	}
+	slices.Sort(ordered)
+
+	for _, recordID := range ordered {
+		resourceValue, found := resources[recordID]
+		if !found {
+			if unresolvedValue, exists := unresolved[recordID]; exists {
+				plan.Diagnostics = artifactstore.AppendDiagnostics(
+					plan.Diagnostics,
+					recordAvailabilityDiagnostic(
+						unresolvedValue,
+						DiagnosticCodeRecordUnresolved,
+						"the Workspace record has no resolved definition",
+					),
+				)
+			} else {
+				plan.Diagnostics = artifactstore.AppendDiagnostics(
+					plan.Diagnostics,
+					artifactstore.Diagnostic{
+						Severity: artifactstore.DiagnosticError,
+						Code:     DiagnosticCodeRecordUnresolved,
+						Message:  "the requested Workspace record was not found",
+					},
+				)
+			}
 			continue
 		}
-		if !resourceValue.Record.Enabled ||
-			resourceValue.Record.State != record.StateAvailable {
-			return LoadPlan{}, fmt.Errorf(
-				"%w: record %q is not enabled and available",
-				artifactstore.ErrConflict,
-				resourceValue.Record.ID,
+
+		switch {
+		case !view.CatalogCurrent:
+			plan.Diagnostics = artifactstore.AppendDiagnostics(
+				plan.Diagnostics,
+				recordAvailabilityDiagnostic(
+					resourceValue.Record,
+					DiagnosticCodeRecordUnavailable,
+					"the Workspace catalog is stale and must be refreshed",
+				),
 			)
-		}
-		if resourceValue.Record.Mode == record.ModeLinked &&
-			!resourceValue.CatalogCurrent {
-			return LoadPlan{}, fmt.Errorf(
-				"%w: linked record %q is not current",
-				artifactstore.ErrCatalogStale,
-				resourceValue.Record.ID,
+			continue
+
+		case !resourceValue.Record.Enabled:
+			plan.Diagnostics = artifactstore.AppendDiagnostics(
+				plan.Diagnostics,
+				recordAvailabilityDiagnostic(
+					resourceValue.Record,
+					DiagnosticCodeRecordUnavailable,
+					"the Workspace record is disabled",
+				),
 			)
+			continue
+
+		case resourceValue.Record.State != record.StateAvailable:
+			plan.Diagnostics = artifactstore.AppendDiagnostics(
+				plan.Diagnostics,
+				recordAvailabilityDiagnostic(
+					resourceValue.Record,
+					DiagnosticCodeRecordUnavailable,
+					"the Workspace record is not available",
+				),
+			)
+			continue
+
+		case resourceValue.Record.Mode == record.ModeLinked &&
+			!resourceValue.CatalogCurrent:
+			plan.Diagnostics = artifactstore.AppendDiagnostics(
+				plan.Diagnostics,
+				recordAvailabilityDiagnostic(
+					resourceValue.Record,
+					DiagnosticCodeRecordUnavailable,
+					"the linked Workspace record is not catalog-current",
+				),
+			)
+			continue
+
+		case !resourceValue.ProjectionValid:
+			plan.Diagnostics = artifactstore.AppendDiagnostics(
+				plan.Diagnostics,
+				resourceValue.Diagnostics...,
+			)
+			continue
 		}
+
 		plan.Items = append(plan.Items, LoadPlanItem{
 			Record:     resourceValue.Record,
 			Definition: resourceValue.Definition,
@@ -196,9 +294,6 @@ func (q *QueryService) ComposeLoadPlan(
 			plan.Diagnostics,
 			resourceValue.Record.Diagnostics...,
 		)
-	}
-	if len(plan.Items) != len(requested) {
-		return LoadPlan{}, ErrReferenceUnresolved
 	}
 	sort.Slice(plan.Items, func(left, right int) bool {
 		return plan.Items[left].Record.ID < plan.Items[right].Record.ID
@@ -218,9 +313,7 @@ func (q *QueryService) Catalog(
 	if err != nil {
 		return CatalogView{}, err
 	}
-	if err := q.ensureCurrent(ctx, workspaceValue, snapshot); err != nil {
-		return CatalogView{}, err
-	}
+	catalogCurrent := q.catalogIsCurrent(workspaceValue, snapshot)
 
 	records, err := q.records.ListByRoot(ctx, rootID)
 	if err != nil {
@@ -245,8 +338,9 @@ func (q *QueryService) Catalog(
 
 	recorded := make(map[occurrenceKindKey]struct{}, len(records))
 	view := CatalogView{
-		Workspace: workspaceValue,
-		Catalog:   snapshot,
+		Workspace:      workspaceValue,
+		Catalog:        snapshot,
+		CatalogCurrent: catalogCurrent,
 	}
 	for _, localRecord := range records {
 		key := occurrenceKindIdentity(
@@ -270,6 +364,25 @@ func (q *QueryService) Catalog(
 		if err != nil {
 			return CatalogView{}, err
 		}
+		projectionValid := true
+		var projectionDiagnostics []artifactstore.Diagnostic
+		validator, supported := q.validators[definitionValue.Kind]
+		if !supported {
+			projectionValid = false
+			projectionDiagnostics = append(
+				projectionDiagnostics,
+				projectionDiagnostic(
+					localRecord,
+					fmt.Errorf("artifact kind %q has no Workspace validator", definitionValue.Kind),
+				),
+			)
+		} else if err := validator(definitionValue); err != nil {
+			projectionValid = false
+			projectionDiagnostics = append(
+				projectionDiagnostics,
+				projectionDiagnostic(localRecord, err),
+			)
+		}
 		var occurrencePointer *catalog.Occurrence
 		occurrence, found := occurrencesByKey[key]
 		if found {
@@ -284,18 +397,21 @@ func (q *QueryService) Catalog(
 				localRecord.Occurrence.SourceID,
 			)
 		}
-		current := occurrencePointer != nil &&
+		current := catalogCurrent &&
+			occurrencePointer != nil &&
 			occurrencePointer.State == catalog.OccurrenceValid &&
 			occurrencePointer.DefinitionDigest != nil &&
 			*occurrencePointer.DefinitionDigest ==
 				*localRecord.ResolvedDefinition
 
 		view.Resources = append(view.Resources, Resource{
-			Record:         localRecord,
-			Definition:     definitionValue,
-			Occurrence:     occurrencePointer,
-			Source:         sourceValue,
-			CatalogCurrent: current,
+			Record:          localRecord,
+			Definition:      definitionValue,
+			Occurrence:      occurrencePointer,
+			Source:          sourceValue,
+			CatalogCurrent:  current,
+			ProjectionValid: projectionValid,
+			Diagnostics:     projectionDiagnostics,
 		})
 	}
 
@@ -329,22 +445,49 @@ func (q *QueryService) Catalog(
 	return view, nil
 }
 
-func (q *QueryService) ensureCurrent(
-	ctx context.Context,
+func (q *QueryService) catalogIsCurrent(
 	workspaceValue Workspace,
 	snapshot catalog.Snapshot,
-) error {
+) bool {
 	if snapshot.RootRevision != workspaceValue.Root.Revision {
-		return artifactstore.ErrCatalogStale
+		return false
 	}
 	currentRevisions := make(map[artifactstore.SourceID]uint64)
 	for _, sourceValue := range workspaceValue.Sources {
 		currentRevisions[sourceValue.ID] = sourceValue.Revision
 	}
-	if !maps.Equal(currentRevisions, snapshot.SourceRevisions) {
-		return artifactstore.ErrCatalogStale
+	return maps.Equal(currentRevisions, snapshot.SourceRevisions)
+}
+
+func recordAvailabilityDiagnostic(
+	value record.Record,
+	code string,
+	message string,
+) artifactstore.Diagnostic {
+	return artifactstore.Diagnostic{
+		Severity: artifactstore.DiagnosticError,
+		Code:     code,
+		Message:  message,
+		Location: &artifactstore.DiagnosticLocation{
+			Locator:            value.Occurrence.Locator,
+			SubresourceLocator: value.Occurrence.SubresourceLocator,
+		},
 	}
-	return nil
+}
+
+func projectionDiagnostic(
+	value record.Record,
+	err error,
+) artifactstore.Diagnostic {
+	return artifactstore.Diagnostic{
+		Severity: artifactstore.DiagnosticError,
+		Code:     DiagnosticCodeProjectionInvalid,
+		Message:  diagnosticMessage(err.Error()),
+		Location: &artifactstore.DiagnosticLocation{
+			Locator:            value.Occurrence.Locator,
+			SubresourceLocator: value.Occurrence.SubresourceLocator,
+		},
+	}
 }
 
 func matchesSelector(

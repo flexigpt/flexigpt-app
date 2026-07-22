@@ -2,11 +2,13 @@ package record
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
 
 type Service struct {
@@ -75,6 +77,55 @@ func (s *Service) SetEnabled(
 	}
 	next := current
 	next.Enabled = enabled
+	next.Revision++
+	next.ModifiedAt = s.nextTime(current.ModifiedAt)
+	if err := next.Validate(); err != nil {
+		return Record{}, err
+	}
+	if err := s.repository.Update(ctx, next, expectedRevision); err != nil {
+		return Record{}, err
+	}
+	return next, nil
+}
+
+// UpdateData replaces the record-local JSON object while preserving all
+// source-derived state. The caller owns the data schema and must provide the
+// expected record revision.
+func (s *Service) UpdateData(
+	ctx context.Context,
+	id artifactstore.RecordID,
+	expectedRevision uint64,
+	data json.RawMessage,
+) (Record, error) {
+	if expectedRevision == 0 {
+		return Record{}, fmt.Errorf(
+			"%w: expected record revision is required",
+			artifactstore.ErrInvalid,
+		)
+	}
+	canonical, err := jsoncanon.CanonicalizeObject(
+		data,
+		artifactstore.MaxLocalDataBytes,
+	)
+	if err != nil {
+		return Record{}, fmt.Errorf("%w: record data: %w", artifactstore.ErrInvalid, err)
+	}
+	current, err := s.repository.Get(ctx, id)
+	if err != nil {
+		return Record{}, err
+	}
+	if current.Revision != expectedRevision {
+		return Record{}, fmt.Errorf(
+			"%w: record %q changed since it was read",
+			artifactstore.ErrConflict,
+			id,
+		)
+	}
+	if jsoncanon.Equal(current.Data, canonical) {
+		return current, nil
+	}
+	next := current
+	next.Data = json.RawMessage(canonical)
 	next.Revision++
 	next.ModifiedAt = s.nextTime(current.ModifiedAt)
 	if err := next.Validate(); err != nil {

@@ -140,10 +140,7 @@
 			"enumMembers"
 		],
 		"ignore": [
-			"app/apis/wailsjs/go/models.ts",
-			"app/apis/wailsjs/runtime/runtime.js",
-			"app/apis/wailsjs/go/main/ModelPresetStoreWrapper.js",
-			"app/apis/wailsjs/go/main/WorkspaceWrapper.js",
+			"app/apis/wailsjs/**",
 			"app/spec/inference_capabilities.ts",
 			"app/spec/mcp.ts"
 		],

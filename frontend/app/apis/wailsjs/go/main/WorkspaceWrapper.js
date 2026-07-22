@@ -22,8 +22,16 @@ export function DeleteWorkspace(arg1) {
   return window['go']['main']['WorkspaceWrapper']['DeleteWorkspace'](arg1);
 }
 
+export function DeleteWorkspaceRecord(arg1) {
+  return window['go']['main']['WorkspaceWrapper']['DeleteWorkspaceRecord'](arg1);
+}
+
 export function DetachWorkspaceSource(arg1) {
   return window['go']['main']['WorkspaceWrapper']['DetachWorkspaceSource'](arg1);
+}
+
+export function FollowWorkspaceRecord(arg1) {
+  return window['go']['main']['WorkspaceWrapper']['FollowWorkspaceRecord'](arg1);
 }
 
 export function GetWorkspace(arg1) {
@@ -34,6 +42,14 @@ export function GetWorkspaceCatalog(arg1) {
   return window['go']['main']['WorkspaceWrapper']['GetWorkspaceCatalog'](arg1);
 }
 
+export function GetWorkspaceRecord(arg1) {
+  return window['go']['main']['WorkspaceWrapper']['GetWorkspaceRecord'](arg1);
+}
+
+export function ListWorkspaceContexts(arg1) {
+  return window['go']['main']['WorkspaceWrapper']['ListWorkspaceContexts'](arg1);
+}
+
 export function ListWorkspaceSkills(arg1) {
   return window['go']['main']['WorkspaceWrapper']['ListWorkspaceSkills'](arg1);
 }
@@ -42,8 +58,16 @@ export function ListWorkspaces(arg1) {
   return window['go']['main']['WorkspaceWrapper']['ListWorkspaces'](arg1);
 }
 
+export function LoadWorkspaceContexts(arg1) {
+  return window['go']['main']['WorkspaceWrapper']['LoadWorkspaceContexts'](arg1);
+}
+
 export function LoadWorkspaceSkills(arg1) {
   return window['go']['main']['WorkspaceWrapper']['LoadWorkspaceSkills'](arg1);
+}
+
+export function PinWorkspaceRecord(arg1) {
+  return window['go']['main']['WorkspaceWrapper']['PinWorkspaceRecord'](arg1);
 }
 
 export function RefreshWorkspace(arg1) {
@@ -60,4 +84,8 @@ export function UpdateWorkspace(arg1) {
 
 export function UpdateWorkspaceAttachment(arg1) {
   return window['go']['main']['WorkspaceWrapper']['UpdateWorkspaceAttachment'](arg1);
+}
+
+export function UpdateWorkspaceRecordData(arg1) {
+  return window['go']['main']['WorkspaceWrapper']['UpdateWorkspaceRecordData'](arg1);
 }

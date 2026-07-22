@@ -30,6 +30,10 @@ export function InvokeSkillTool(arg1) {
   return window['go']['main']['SkillStoreWrapper']['InvokeSkillTool'](arg1);
 }
 
+export function ListProvidedSkills(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['ListProvidedSkills'](arg1);
+}
+
 export function ListRuntimeSkills(arg1) {
   return window['go']['main']['SkillStoreWrapper']['ListRuntimeSkills'](arg1);
 }
@@ -60,6 +64,10 @@ export function PutSkillArtifact(arg1) {
 
 export function PutSkillBundle(arg1) {
   return window['go']['main']['SkillStoreWrapper']['PutSkillBundle'](arg1);
+}
+
+export function RenderProvidedSkill(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['RenderProvidedSkill'](arg1);
 }
 
 export function RenderSkill(arg1) {

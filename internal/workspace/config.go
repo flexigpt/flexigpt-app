@@ -11,58 +11,72 @@ import (
 )
 
 type Config struct {
-	Supports          []engine.ArtifactSupport
-	DiscoveryProfiles engine.DiscoveryProfiles
+	Supports           []engine.ArtifactSupport
+	DiscoveryProfiles  engine.DiscoveryProfiles
+	SkillRoots         []artifactstore.Locator
+	ContextComposition contextadapter.CompositionPolicy
+	RuntimePolicy      engine.RuntimePolicy
 }
 
 type builtinArtifactSupport struct {
-	support    engine.ArtifactSupport
-	newDecoder func() discovery.Decoder
+	support engine.ArtifactSupport
 }
 
 // builtinArtifactSupportMatrix is the workspace artifact support matrix.
 //
-// DefaultConfig and BuiltinDecoders both derive from this matrix.
+// DefaultConfig and decoder construction both derive from this matrix.
 var builtinArtifactSupportMatrix = []builtinArtifactSupport{
 	{
 		support: engine.ArtifactSupport{
 			Kind:      engine.DefinitionKind,
 			SchemaID:  engine.DefinitionSchemaID,
 			DecoderID: engine.DefinitionDecoderID,
-		},
-		newDecoder: func() discovery.Decoder {
-			return engine.NewDefinitionDecoder()
+			Validator: engine.ValidateWorkspaceDefinition,
 		},
 	},
 	{
 		support: contextadapter.ArtifactSupport(),
-		newDecoder: func() discovery.Decoder {
-			return contextadapter.NewContextDecoder()
-		},
 	},
 	{
 		support: skilladapter.ArtifactSupport(),
-		newDecoder: func() discovery.Decoder {
-			return skilladapter.NewSkillDecoder()
-		},
 	},
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Supports:          BuiltinArtifactSupports(),
-		DiscoveryProfiles: BuiltinDiscoveryProfiles(),
+		Supports:           BuiltinArtifactSupports(),
+		SkillRoots:         skilladapter.DefaultSkillRoots(),
+		ContextComposition: contextadapter.DefaultCompositionPolicy(),
+		RuntimePolicy:      engine.NewRecordRuntimePolicy(),
 	}
 }
 
-func (c Config) normalizedDiscoveryProfiles() engine.DiscoveryProfiles {
+func (c Config) normalizedDiscoveryProfiles(
+	skillConventions *skilladapter.ConventionRegistry,
+) engine.DiscoveryProfiles {
+	var profiles engine.DiscoveryProfiles
 	if len(c.DiscoveryProfiles.Primary.ExplicitLocators) == 0 &&
 		len(c.DiscoveryProfiles.Primary.DirectoryRoots) == 0 &&
 		len(c.DiscoveryProfiles.Attached.ExplicitLocators) == 0 &&
 		len(c.DiscoveryProfiles.Attached.DirectoryRoots) == 0 {
-		return BuiltinDiscoveryProfiles()
+		profiles = engine.DefaultDiscoveryProfiles()
+	} else {
+		profiles = c.DiscoveryProfiles
 	}
-	return c.DiscoveryProfiles
+	contextProfile := contextadapter.DiscoveryProfile()
+	profiles.Primary.ExplicitLocators = append(
+		profiles.Primary.ExplicitLocators,
+		contextProfile.ExplicitLocators...,
+	)
+	profiles.Primary.ReadmeLocator = contextProfile.ReadmeLocator
+	skillProfile := skilladapter.DiscoveryProfileWithConventions(
+		skillConventions,
+	)
+	profiles.Primary.DirectoryRoots = append(
+		profiles.Primary.DirectoryRoots,
+		skillProfile.DirectoryRoots...,
+	)
+	return profiles
 }
 
 func (c Config) normalizedSupports() ([]engine.ArtifactSupport, error) {
@@ -125,31 +139,42 @@ func BuiltinArtifactSupports() []engine.ArtifactSupport {
 }
 
 func BuiltinDecoders() []discovery.Decoder {
-	output := make(
-		[]discovery.Decoder,
-		0,
-		len(builtinArtifactSupportMatrix),
-	)
-	for _, value := range builtinArtifactSupportMatrix {
-		output = append(output, value.newDecoder())
+	config := DefaultConfig()
+	registry, err := config.skillConventions()
+	if err != nil {
+		panic(err)
 	}
-	return output
+	decoder, err := skilladapter.NewSkillDecoderWithConventions(registry)
+	if err != nil {
+		panic(err)
+	}
+	return []discovery.Decoder{
+		engine.NewDefinitionDecoder(),
+		contextadapter.NewContextDecoder(),
+		decoder,
+	}
 }
 
 func BuiltinDiscoveryProfiles() engine.DiscoveryProfiles {
-	profiles := engine.DefaultDiscoveryProfiles()
+	config := DefaultConfig()
+	registry, err := config.skillConventions()
+	if err != nil {
+		panic(err)
+	}
+	return config.normalizedDiscoveryProfiles(registry)
+}
 
-	contextProfile := contextadapter.DiscoveryProfile()
-	profiles.Primary.ExplicitLocators = append(
-		profiles.Primary.ExplicitLocators,
-		contextProfile.ExplicitLocators...,
-	)
-	profiles.Primary.ReadmeLocator = contextProfile.ReadmeLocator
+func (c Config) skillConventions() (*skilladapter.ConventionRegistry, error) {
+	return skilladapter.NewConventionRegistry(c.SkillRoots...)
+}
 
-	skillProfile := skilladapter.DiscoveryProfile()
-	profiles.Primary.DirectoryRoots = append(
-		profiles.Primary.DirectoryRoots,
-		skillProfile.DirectoryRoots...,
-	)
-	return profiles
+func (c Config) runtimePolicy() engine.RuntimePolicy {
+	if c.RuntimePolicy != nil {
+		return c.RuntimePolicy
+	}
+	return engine.NewRecordRuntimePolicy()
+}
+
+func (c Config) contextCompositionPolicy() contextadapter.CompositionPolicy {
+	return c.ContextComposition.Normalized()
 }

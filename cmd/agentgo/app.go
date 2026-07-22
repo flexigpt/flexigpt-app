@@ -252,6 +252,19 @@ func (a *App) initManagers() {
 	}
 	slog.Info("workspace initialized", "directory", a.workspaceArtifactsDirPath)
 
+	err = InitAggregateSkillProvider(
+		a.skillStoreAPI,
+		a.workspaceAPI.api.SkillProvider(),
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize aggregate Skill provider",
+			"error", err,
+		)
+		panic("failed to initialize managers: aggregate Skill provider initialization failed\n" + err.Error())
+	}
+	slog.Info("aggregate Skill provider initialized")
+
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
 		slog.Error(

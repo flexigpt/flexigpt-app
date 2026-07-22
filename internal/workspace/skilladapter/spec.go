@@ -59,4 +59,5 @@ var artifactSupport = engine.ArtifactSupport{
 	Kind:      skillKind,
 	SchemaID:  skillSchemaID,
 	DecoderID: skillDecoderID,
+	Validator: ValidateSkillDefinition,
 }

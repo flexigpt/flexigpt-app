@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
@@ -33,13 +34,19 @@ type SkillSummary struct {
 }
 
 type WorkspaceSkill struct {
-	RootID           artifactstore.RootID   `json:"rootID"`
-	RecordID         artifactstore.RecordID `json:"recordID"`
-	DefinitionDigest artifactstore.Digest   `json:"definitionDigest"`
-	SourceID         artifactstore.SourceID `json:"sourceID"`
-	Locator          artifactstore.Locator  `json:"locator"`
-	Skill            SkillSummary           `json:"skill"`
-	MarkdownBody     string                 `json:"markdownBody,omitempty"`
+	RootID           artifactstore.RootID       `json:"rootID"`
+	RecordID         artifactstore.RecordID     `json:"recordID"`
+	DefinitionDigest artifactstore.Digest       `json:"definitionDigest"`
+	SourceID         artifactstore.SourceID     `json:"sourceID"`
+	Locator          artifactstore.Locator      `json:"locator"`
+	Skill            SkillSummary               `json:"skill"`
+	MarkdownBody     string                     `json:"markdownBody,omitempty"`
+	Priority         int                        `json:"priority"`
+	RecordRevision   uint64                     `json:"recordRevision"`
+	State            record.State               `json:"state"`
+	CatalogCurrent   bool                       `json:"catalogCurrent"`
+	RuntimeAllowed   bool                       `json:"runtimeAllowed"`
+	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type SkillLoadPlan struct {
@@ -50,19 +57,24 @@ type SkillLoadPlan struct {
 }
 
 type Adapter struct {
-	query *engine.QueryService
+	query         *engine.QueryService
+	runtimePolicy engine.RuntimePolicy
 }
 
 func NewAdapter(
 	query *engine.QueryService,
+	runtimePolicy engine.RuntimePolicy,
 ) (*Adapter, error) {
-	if query == nil {
+	if query == nil || runtimePolicy == nil {
 		return nil, fmt.Errorf(
-			"%w: Workspace Skill adapter query is nil",
+			"%w: Workspace Skill adapter dependencies are incomplete",
 			engine.ErrInvalidWorkspace,
 		)
 	}
-	return &Adapter{query: query}, nil
+	return &Adapter{
+		query:         query,
+		runtimePolicy: runtimePolicy,
+	}, nil
 }
 
 func (f *Adapter) List(
@@ -73,17 +85,24 @@ func (f *Adapter) List(
 	if err != nil {
 		return nil, err
 	}
+	priorities := attachmentPriorities(view.Workspace)
 	output := make([]WorkspaceSkill, 0)
 	for _, resourceValue := range view.Resources {
 		if resourceValue.Definition.Kind != skillKind ||
-			resourceValue.Definition.SchemaID != skillSchemaID ||
-			resourceValue.Record.State != record.StateAvailable ||
-			!resourceValue.Record.Enabled {
+			resourceValue.Definition.SchemaID != skillSchemaID {
 			continue
 		}
-		value, err := projectWorkspaceSkill(rootID, resourceValue, false)
+		value, err := projectWorkspaceSkill(
+			rootID,
+			resourceValue,
+			priorities[resourceValue.Source.ID],
+			false,
+		)
 		if err != nil {
-			return nil, err
+			value.Diagnostics = artifactstore.AppendDiagnostics(
+				value.Diagnostics,
+				skillProjectionDiagnostic(resourceValue.Record, err),
+			)
 		}
 		output = append(output, value)
 	}
@@ -100,28 +119,60 @@ func (f *Adapter) Load(
 	if err != nil {
 		return SkillLoadPlan{}, err
 	}
+	workspaceValue, err := f.query.GetWorkspace(ctx, rootID)
+	if err != nil {
+		return SkillLoadPlan{}, err
+	}
+	priorities := attachmentPriorities(workspaceValue)
 	output := SkillLoadPlan{
 		RootID:          rootID,
 		CatalogRevision: loadPlan.CatalogRevision,
 		Diagnostics:     loadPlan.Diagnostics,
 	}
 	for _, item := range loadPlan.Items {
-		if item.Definition.Kind != skillKind ||
-			item.Definition.SchemaID != skillSchemaID {
-			return SkillLoadPlan{}, fmt.Errorf(
-				"%w: record %q is not a Workspace Skill",
-				engine.ErrInvalidWorkspace,
-				item.Record.ID,
+		if err := ValidateSkillDefinition(item.Definition); err != nil {
+			output.Diagnostics = artifactstore.AppendDiagnostics(
+				output.Diagnostics,
+				skillProjectionDiagnostic(item.Record, err),
 			)
+			continue
+		}
+		decision := f.runtimePolicy.Decide(ctx, engine.RuntimePolicyRequest{
+			Use:              engine.RuntimeUseSkill,
+			Workspace:        workspaceValue,
+			Record:           item.Record,
+			DefinitionDigest: item.Definition.Digest,
+			SourceID:         item.Source.ID,
+			TrustReference:   workspaceValue.Data.TrustReference,
+		})
+		if err := decision.Validate(); err != nil {
+			return SkillLoadPlan{}, err
+		}
+		if decision.Disposition != engine.RuntimeAllowed {
+			output.Diagnostics = artifactstore.AppendDiagnostics(
+				output.Diagnostics,
+				engine.RuntimeDecisionDiagnostic(decision, item.Record),
+			)
+			continue
 		}
 		resourceValue := engine.Resource{
-			Record:     item.Record,
-			Definition: item.Definition,
-			Source:     item.Source,
+			Record:          item.Record,
+			Definition:      item.Definition,
+			Source:          item.Source,
+			ProjectionValid: true,
 		}
-		projected, err := projectWorkspaceSkill(rootID, resourceValue, true)
+		projected, err := projectWorkspaceSkill(
+			rootID,
+			resourceValue,
+			priorities[item.Source.ID],
+			true,
+		)
 		if err != nil {
-			return SkillLoadPlan{}, err
+			output.Diagnostics = artifactstore.AppendDiagnostics(
+				output.Diagnostics,
+				skillProjectionDiagnostic(item.Record, err),
+			)
+			continue
 		}
 		output.Skills = append(output.Skills, projected)
 	}
@@ -132,31 +183,45 @@ func (f *Adapter) Load(
 func projectWorkspaceSkill(
 	rootID artifactstore.RootID,
 	resourceValue engine.Resource,
+	priority int,
 	includeMarkdown bool,
 ) (WorkspaceSkill, error) {
+	runtimeAllowed, dataErr := engine.RecordRuntimeAllowed(resourceValue.Record)
+	output := WorkspaceSkill{
+		RootID:           rootID,
+		RecordID:         resourceValue.Record.ID,
+		RecordRevision:   resourceValue.Record.Revision,
+		DefinitionDigest: resourceValue.Definition.Digest,
+		SourceID:         resourceValue.Source.ID,
+		Locator:          resourceValue.Record.Occurrence.Locator,
+		Priority:         priority,
+		State:            resourceValue.Record.State,
+		CatalogCurrent:   resourceValue.CatalogCurrent,
+		RuntimeAllowed:   runtimeAllowed,
+		Diagnostics: artifactstore.AppendDiagnostics(
+			resourceValue.Record.Diagnostics,
+			resourceValue.Diagnostics...,
+		),
+	}
+	if dataErr != nil {
+		return output, dataErr
+	}
+	if err := ValidateSkillDefinition(resourceValue.Definition); err != nil {
+		return output, err
+	}
 	body, err := engine.DecodeDefinitionBody[skillDefinition](
 		resourceValue.Definition.Body,
 	)
 	if err != nil {
-		return WorkspaceSkill{}, err
+		return output, err
 	}
 	markdownBody := ""
 	if includeMarkdown {
 		markdownBody = body.MarkdownBody
 	}
-
-	return WorkspaceSkill{
-		RootID:           rootID,
-		RecordID:         resourceValue.Record.ID,
-		DefinitionDigest: resourceValue.Definition.Digest,
-		SourceID:         resourceValue.Source.ID,
-		Locator:          resourceValue.Record.Occurrence.Locator,
-		Skill: skillSummary(
-			resourceValue.Record,
-			body,
-		),
-		MarkdownBody: markdownBody,
-	}, nil
+	output.Skill = skillSummary(resourceValue.Record, body)
+	output.MarkdownBody = markdownBody
+	return output, nil
 }
 
 func skillSummary(
@@ -192,4 +257,51 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 		}
 		return values[left].RecordID < values[right].RecordID
 	})
+}
+
+func attachmentPriorities(
+	value engine.Workspace,
+) map[artifactstore.SourceID]int {
+	output := make(map[artifactstore.SourceID]int, len(value.Attachments))
+	for _, attachment := range value.Attachments {
+		if attachment.Enabled {
+			output[attachment.SourceID] = attachment.Priority
+		}
+	}
+	return output
+}
+
+func (s WorkspaceSkill) AgentSkillDocument() agentskillsSpec.SkillDocument {
+	arguments := make([]agentskillsSpec.SkillArgument, 0, len(s.Skill.Arguments))
+	for _, argument := range s.Skill.Arguments {
+		arguments = append(arguments, agentskillsSpec.SkillArgument{
+			Name:        argument.Name,
+			Description: argument.Description,
+			Default:     argument.Default,
+		})
+	}
+	return agentskillsSpec.SkillDocument{
+		Name:         s.Skill.Name,
+		DisplayName:  s.Skill.DisplayName,
+		Description:  s.Skill.Description,
+		Insert:       agentskillsSpec.SkillInsert(s.Skill.Insert),
+		Arguments:    arguments,
+		Tags:         append([]string(nil), s.Skill.Tags...),
+		MarkdownBody: s.MarkdownBody,
+	}
+}
+
+func skillProjectionDiagnostic(
+	value record.Record,
+	err error,
+) artifactstore.Diagnostic {
+	return artifactstore.Diagnostic{
+		Severity: artifactstore.DiagnosticError,
+		Code:     engine.DiagnosticCodeProjectionInvalid,
+		Message:  err.Error(),
+		Location: &artifactstore.DiagnosticLocation{
+			Locator:            value.Occurrence.Locator,
+			SubresourceLocator: value.Occurrence.SubresourceLocator,
+		},
+	}
 }

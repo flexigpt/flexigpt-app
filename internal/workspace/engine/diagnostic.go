@@ -13,6 +13,11 @@ const (
 	DiagnosticCodeDefinitionInvalid       = "workspace.definition.invalid"
 	DiagnosticCodeRecordSchemaUnsupported = "workspace.record.schema-unsupported"
 	DiagnosticCodeRecordKindMismatch      = "workspace.record.kind-mismatch"
+	DiagnosticCodeProjectionInvalid       = "workspace.projection.invalid"
+	DiagnosticCodeRecordUnavailable       = "workspace.record.unavailable"
+	DiagnosticCodeRecordUnresolved        = "workspace.record.unresolved"
+	DiagnosticCodeRuntimeDenied           = "workspace.runtime.denied"
+	DiagnosticCodeRuntimeUnavailable      = "workspace.runtime.unavailable"
 	DiagnosticCodeSkillInvalid            = "workspace.skill.invalid"
 )
 

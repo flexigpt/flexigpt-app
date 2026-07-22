@@ -96,6 +96,11 @@ A runtime provider:
 - Projects them into runtime-specific values.
 - Resolves required assets or source-relative resources.
 - Applies trust, policy, secret, and execution configuration outside Artifact Store.
+- May create consumer-scoped runtime state, such as a Skill session, from
+  selected records without changing Artifact Store metadata.
+- Must preserve the consumer's authoritative persistence owner. A runtime
+  projection must not imply that a source-linked Workspace record was copied
+  into an installed-resource store.
 
 ### 4.4 Transfer service
 
@@ -758,7 +763,14 @@ This mapping assesses the attached implementation, rather than planned architect
 - `Partial` means that a foundation or subset exists, but the full HLD requirement is not yet met.
 - `Not implemented` means no implementation currently provides the requirement.
 
-These statuses describe the implemented code paths in the attached state. They do not imply that optional extensions or consumer-specific runtime integration are complete.
+These statuses describe the implemented code paths in the attached state. They
+do not imply that a consumer has completed runtime integration.
+
+Workspace currently demonstrates discovery, canonical definition retention,
+records, catalog publication, and Workspace-specific Context and Skill
+projections. It does not yet demonstrate full Agent Skills runtime parity for
+selected Workspace Skills, including sessions, resources, scripts, and Skill
+tool invocation.
 
 ### 20.1 Functional requirement mapping
 
@@ -776,13 +788,13 @@ These statuses describe the implemented code paths in the attached state. They d
 | `AS-F10` | Preserve invalid and missing occurrence states with diagnostics.            | `Implemented`     | Current catalogs persist valid, invalid, and missing occurrences with structured diagnostics. Authoritative discovery marks prior in-scope occurrences missing rather than deleting their records.                                                                                                                   |
 | `AS-F11` | Maintain stable app-local records for artifacts requiring local state.      | `Implemented`     | Records have stable UUIDv7 identities and retain root, occurrence, local data, enablement, state, diagnostics, and revision independently of definitions.                                                                                                                                                            |
 | `AS-F12` | Preserve local record settings during source refresh.                       | `Implemented`     | Reconciliation updates source-derived definition, state, and diagnostics while preserving local record name, enablement, local data, mode, and pin configuration.                                                                                                                                                    |
-| `AS-F13` | Support follow-current and pin-definition behavior.                         | `Implemented`     | Linked and pinned record modes are implemented. Pinning resolves a retained definition digest; following marks the record stale until the next refresh resolves the source occurrence.                                                                                                                               |
+| `AS-F13` | Support follow-current and pin-definition behavior.                         | `Implemented`     | Linked and pinned record modes, optimistic enablement, record-local data replacement, follow-current, pin, inspection, and removal are implemented and exposed through the Workspace consumer API.                                                                                                                   |
 | `AS-F14` | Resolve candidate definitions using portable selectors.                     | `Partial`         | Portable selector values exist, and Workspace implements current-catalog selector matching. Artifact Store does not yet provide a generic candidate matching service, complete version constraint support, dependency resolution, or dependency graph handling.                                                      |
 | `AS-F15` | Let consumers decide ambiguity and precedence rules.                        | `Implemented`     | Generic storage retains attachment priority without applying a resolution policy. Workspace owns selector precedence and explicitly reports priority ties as ambiguous.                                                                                                                                              |
 | `AS-F16` | Export or import portable definitions and assets.                           | `Not implemented` | There is no package manifest, asset closure, import, export, capture, or fork capability.                                                                                                                                                                                                                            |
 | `AS-F17` | Retain historical definition occurrence revisions.                          | `Not implemented` | SQLite retains only `artifact_current_catalogs` and current occurrences. Historical catalog generations and occurrence revisions are not stored.                                                                                                                                                                     |
 | `AS-F18` | Persist dependency resolution snapshots.                                    | `Not implemented` | Definitions can declare selectors, but dependency graph construction, resolution snapshots, and reproducibility reports do not exist.                                                                                                                                                                                |
-| `AS-F19` | Materialize source content for path-oriented runtimes.                      | `Not implemented` | Sources can be read through snapshots, but no generic materialization or source-content closure capability exists.                                                                                                                                                                                                   |
+| `AS-F19` | Materialize source content for path-oriented runtimes.                      | `Not implemented` | Sources can be read through snapshots, but no generic materialization or source-content closure capability exists. A consumer may implement bounded, private runtime materialization without making it a generic Artifact Store capability.                                                                          |
 | `AS-F20` | Record transfer provenance.                                                 | `Not implemented` | Transfer workflows and provenance metadata are not implemented.                                                                                                                                                                                                                                                      |
 
 ### 20.2 Quality requirement mapping
@@ -794,19 +806,22 @@ These statuses describe the implemented code paths in the attached state. They d
 | `12.3`      | Coherent publication        | `Implemented` | A refresh publishes one current catalog transactionally or leaves the prior catalog in place. Source snapshots are confirmed before publication.                                                                                                                                                                                             |
 | `12.4`      | Conflict detection          | `Partial`     | Root, source, attachment-through-root, and record revisions use optimistic conflict checks. Filesystem snapshot fingerprints include regular-file content and confirmation detects observed source changes. As with any uncontrolled external source, a final change after confirmation cannot be made transactional with local publication. |
 | `12.5`      | Portability                 | `Partial`     | The canonical definition envelope excludes app-local metadata by design. Definition bodies remain schema-owned opaque JSON, so each artifact decoder must still enforce that its body contains no local paths, local identities, or secret values.                                                                                           |
-| `12.6`      | Diagnosability              | `Partial`     | Structured diagnostics include severity, stable code, message, and source-relative locations. Candidate failures are cataloged, but some structural refresh failures are returned only as errors and are not persisted as root-level diagnostics.                                                                                            |
+| `12.6`      | Diagnosability              | `Partial`     | Structured diagnostics include severity, stable code, message, and source-relative locations. Workspace now projects catalog, occurrence, record, semantic, policy, unavailable, exclusion, and truncation diagnostics. Some structural refresh failures are still returned only as errors rather than persisted root diagnostics.           |
 | `12.7`      | Graceful capability failure | `Partial`     | Explicit unsupported and unavailable errors exist, but unavailable optional capabilities do not yet expose dedicated capability endpoints or consistent unsupported-operation responses.                                                                                                                                                     |
 | `12.8`      | Extensibility               | `Implemented` | Source adapters, decoder registries, root-local attachment data, record policies, and consumer-owned resolution allow new transports and artifact formats without changing generic traversal or persistence concepts.                                                                                                                        |
 
 ## 21. Next steps
 
-- Complete the current Workspace Context and Skill adapters without moving Workspace semantics into Artifact Store.
-  - Centralize schema validation so Context and Skill definitions are validated both during decoding and when retained definitions are projected or loaded.
-  - Expose complete consumer-facing catalog state, including occurrences, record state, source provenance, catalog currency, and diagnostics.
-  - Define bounded Context composition behavior, including contribution ordering, aggregate prompt limits, overflow handling, and diagnostics.
-  - Require consumer-owned trust and policy evaluation before discovered Context or Skill content is handed to a runtime.
-  - Decide whether Skills are text-only or may declare bounded source-relative resources; add a read-only resource resolver only if the latter is approved.
-  - Keep convention matching declarative so new Context document names, Skill roots, and source conventions can be added without changing generic discovery behavior.
+- Keep full Workspace Skill runtime support outside Artifact Store.
+  - Workspace must resolve selected records into a consumer-owned runtime
+    projection that preserves source-relative Skill directory identity without
+    exposing source configuration or filesystem paths at API boundaries.
+  - A Workspace runtime projector may materialize a bounded private Skill
+    directory or provide an equivalent Agent Skills provider implementation.
+  - Artifact Store must not gain Skill-specific resource, script, session,
+    prompt, execution, or trust semantics.
+  - Generic Artifact Store materialization remains optional. Workspace may
+    implement only the bounded materialization required for selected Skills.
 
 - Close the remaining core gaps.
   - Add generic current-catalog candidate matching for portable selectors while keeping final precedence decisions in consumer features.
@@ -816,8 +831,16 @@ These statuses describe the implemented code paths in the attached state. They d
 
 - Add the next concrete artifact kinds only with a complete consumer path.
   - Add an MCP artifact kind with source document decoders, multi-server subresources, portable MCP definitions, semantic validation, local setup storage, and secret-reference handling outside portable definitions.
-  - Add provider aggregation for installed and Workspace Skills before migrating, replacing, or duplicating any existing Skill persistence.
+  - Follow the complete target pattern: consumer-owned semantic validation,
+    management projection, explicit runtime policy, and runtime-provider
+    integration. Do not treat discovery-only projections as completed support.
   - Keep runtime construction, trust evaluation, secret resolution, and feature-specific precedence outside Artifact Store.
+
+- Keep Workspace Context and Skill boundaries consumer-owned.
+  - Do not add Context filenames, Skill roots, runtime approval, prompt
+    budgets, Skill rendering, Skill resource behavior, script execution, or
+    provider precedence to Artifact Store.
+  - Continue exposing only API-safe consumer projections at Wails boundaries.
 
 - Keep optional capabilities deferred until a committed workflow requires them.
   - Packages, import, export, capture, fork, transfer provenance, generic asset closure, and generic materialization address `AS-F16`, `AS-F19`, and `AS-F20`.

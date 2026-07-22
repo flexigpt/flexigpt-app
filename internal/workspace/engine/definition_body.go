@@ -1,6 +1,12 @@
 package engine
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
 
 // DecodeDefinitionBody decodes the canonical body held by a definition.
 //
@@ -10,8 +16,25 @@ func DecodeDefinitionBody[T any](
 	raw json.RawMessage,
 ) (T, error) {
 	var output T
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return output, err
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&output); err != nil {
+		return output, fmt.Errorf(
+			"%w: decode Workspace definition body: %w",
+			ErrInvalidWorkspace,
+			err,
+		)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("definition body contains trailing JSON values")
+		}
+		return output, fmt.Errorf(
+			"%w: decode Workspace definition body: %w",
+			ErrInvalidWorkspace,
+			err,
+		)
 	}
 	return output, nil
 }

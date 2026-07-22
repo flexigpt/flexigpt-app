@@ -12,17 +12,29 @@ export function CreateFilesystemWorkspace(arg1:workspace.CreateFilesystemWorkspa
 
 export function DeleteWorkspace(arg1:workspace.DeleteWorkspaceRequest):Promise<workspace.DeleteWorkspaceResponse>;
 
+export function DeleteWorkspaceRecord(arg1:workspace.DeleteWorkspaceRecordRequest):Promise<workspace.DeleteWorkspaceRecordResponse>;
+
 export function DetachWorkspaceSource(arg1:workspace.DetachWorkspaceSourceRequest):Promise<workspace.DetachWorkspaceSourceResponse>;
+
+export function FollowWorkspaceRecord(arg1:workspace.FollowWorkspaceRecordRequest):Promise<workspace.FollowWorkspaceRecordResponse>;
 
 export function GetWorkspace(arg1:workspace.GetWorkspaceRequest):Promise<workspace.GetWorkspaceResponse>;
 
 export function GetWorkspaceCatalog(arg1:workspace.GetWorkspaceCatalogRequest):Promise<workspace.GetWorkspaceCatalogResponse>;
 
+export function GetWorkspaceRecord(arg1:workspace.GetWorkspaceRecordRequest):Promise<workspace.GetWorkspaceRecordResponse>;
+
+export function ListWorkspaceContexts(arg1:workspace.ListWorkspaceContextsRequest):Promise<workspace.ListWorkspaceContextsResponse>;
+
 export function ListWorkspaceSkills(arg1:workspace.ListWorkspaceSkillsRequest):Promise<workspace.ListWorkspaceSkillsResponse>;
 
 export function ListWorkspaces(arg1:workspace.ListWorkspacesRequest):Promise<workspace.ListWorkspacesResponse>;
 
+export function LoadWorkspaceContexts(arg1:workspace.LoadWorkspaceContextsRequest):Promise<workspace.LoadWorkspaceContextsResponse>;
+
 export function LoadWorkspaceSkills(arg1:workspace.LoadWorkspaceSkillsRequest):Promise<workspace.LoadWorkspaceSkillsResponse>;
+
+export function PinWorkspaceRecord(arg1:workspace.PinWorkspaceRecordRequest):Promise<workspace.PinWorkspaceRecordResponse>;
 
 export function RefreshWorkspace(arg1:workspace.RefreshWorkspaceRequest):Promise<workspace.RefreshWorkspaceResponse>;
 
@@ -31,3 +43,5 @@ export function SetWorkspaceRecordEnabled(arg1:workspace.SetWorkspaceRecordEnabl
 export function UpdateWorkspace(arg1:workspace.UpdateWorkspaceRequest):Promise<workspace.UpdateWorkspaceResponse>;
 
 export function UpdateWorkspaceAttachment(arg1:workspace.UpdateWorkspaceAttachmentRequest):Promise<workspace.UpdateWorkspaceAttachmentResponse>;
+
+export function UpdateWorkspaceRecordData(arg1:workspace.UpdateWorkspaceRecordDataRequest):Promise<workspace.UpdateWorkspaceRecordDataResponse>;

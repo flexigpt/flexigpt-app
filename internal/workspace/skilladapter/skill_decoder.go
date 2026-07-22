@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -26,22 +25,42 @@ var workspaceSkillNamePattern = regexp.MustCompile(
 	workspaceSkillNamePatternText,
 )
 
-type SkillDecoder struct{}
+type SkillDecoder struct {
+	conventions *ConventionRegistry
+}
 
 func NewSkillDecoder() *SkillDecoder {
-	return &SkillDecoder{}
+	registry, err := NewConventionRegistry()
+	if err != nil {
+		panic(err)
+	}
+	return &SkillDecoder{conventions: registry}
+}
+
+func NewSkillDecoderWithConventions(
+	registry *ConventionRegistry,
+) (*SkillDecoder, error) {
+	if registry == nil || len(registry.Roots()) == 0 {
+		return nil, fmt.Errorf(
+			"%w: Workspace Skill convention registry is empty",
+			engine.ErrInvalidWorkspace,
+		)
+	}
+	return &SkillDecoder{conventions: registry}, nil
 }
 
 func DiscoveryProfile() engine.DiscoveryProfile {
-	return engine.DiscoveryProfile{
-		DirectoryRoots: []discovery.DirectoryRoot{{
-			Root:      artifactstore.Locator(workspaceSkillsDirectory),
-			Recursive: true,
-			IncludePatterns: []string{
-				skillDefinitionFileName,
-			},
-		}},
+	registry, err := NewConventionRegistry()
+	if err != nil {
+		panic(err)
 	}
+	return registry.DiscoveryProfile()
+}
+
+func DiscoveryProfileWithConventions(
+	registry *ConventionRegistry,
+) engine.DiscoveryProfile {
+	return registry.DiscoveryProfile()
 }
 
 func ArtifactSupport() engine.ArtifactSupport {
@@ -52,26 +71,41 @@ func (*SkillDecoder) ID() artifactstore.DecoderID {
 	return skillDecoderID
 }
 
-func (*SkillDecoder) Recognize(
+func (d *SkillDecoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if !isWorkspaceSkillLocator(candidate.Locator) {
+	if _, supported := d.conventions.Match(candidate.Locator); !supported {
 		return discovery.RecognitionNone
 	}
 	return discovery.RecognitionPreferred
 }
 
-func (*SkillDecoder) Decode(
+func (d *SkillDecoder) Decode(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []artifactstore.Diagnostic) {
+	expectedName, supported := d.conventions.ExpectedName(candidate.Locator)
+	if !supported {
+		return nil, nil
+	}
 	document, err := decodeSkillMarkdown(candidate.Locator, candidate.Content)
 	if err != nil {
 		return nil, engine.WorkspaceArtifactDiagnostics(
 			candidate.Locator,
 			engine.DiagnosticCodeSkillInvalid,
 			err.Error(),
+		)
+	}
+	if document.Name != expectedName {
+		return nil, engine.WorkspaceArtifactDiagnostics(
+			candidate.Locator,
+			engine.DiagnosticCodeSkillInvalid,
+			fmt.Sprintf(
+				"frontmatter.name %q must match containing directory %q",
+				document.Name,
+				expectedName,
+			),
 		)
 	}
 
@@ -99,6 +133,13 @@ func (*SkillDecoder) Decode(
 		Description:   document.Description,
 		Labels:        labels,
 		Body:          raw,
+	}
+	if err := ValidateSkillDefinition(value); err != nil {
+		return nil, engine.WorkspaceArtifactDiagnostics(
+			candidate.Locator,
+			engine.DiagnosticCodeSkillInvalid,
+			err.Error(),
+		)
 	}
 	return []discovery.Decoded{{Definition: value}}, nil
 }
@@ -137,14 +178,6 @@ func decodeSkillMarkdown(
 		strings.Contains(name, skillNameRepeatedHyphen) {
 		return skillDefinition{}, errors.New(
 			"frontmatter.name must be a lowercase hyphenated name of at most 64 characters",
-		)
-	}
-	parentName := path.Base(path.Dir(string(locator)))
-	if name != parentName {
-		return skillDefinition{}, fmt.Errorf(
-			"frontmatter.name %q must match containing directory %q",
-			name,
-			parentName,
 		)
 	}
 
@@ -203,7 +236,7 @@ func decodeSkillMarkdown(
 		displayName = name
 	}
 
-	return skillDefinition{
+	output := skillDefinition{
 		Name:         name,
 		DisplayName:  displayName,
 		Description:  description,
@@ -211,7 +244,11 @@ func decodeSkillMarkdown(
 		Arguments:    arguments,
 		Tags:         tags,
 		MarkdownBody: normalizedBody,
-	}, nil
+	}
+	if err := validateSkillBody(output); err != nil {
+		return skillDefinition{}, err
+	}
+	return output, nil
 }
 
 func splitSkillFrontmatter(
@@ -337,15 +374,6 @@ func decodeSkillTags(raw any) ([]string, error) {
 	slices.Sort(output)
 	output = slices.Compact(output)
 	return output, nil
-}
-
-func isWorkspaceSkillLocator(locator artifactstore.Locator) bool {
-	prefix := workspaceSkillsDirectory + "/"
-	relative, found := strings.CutPrefix(string(locator), prefix)
-	if !found || relative == "" || relative == skillDefinitionFileName {
-		return false
-	}
-	return path.Base(relative) == skillDefinitionFileName
 }
 
 func optionalString(properties map[string]any, key string) (string, error) {

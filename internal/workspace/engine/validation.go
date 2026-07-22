@@ -9,6 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
@@ -20,7 +21,17 @@ func (s ArtifactSupport) Validate() error {
 	if err := artifactstore.ValidateSchemaID(s.SchemaID); err != nil {
 		return err
 	}
-	return artifactstore.ValidateDecoderID(s.DecoderID)
+	if err := artifactstore.ValidateDecoderID(s.DecoderID); err != nil {
+		return err
+	}
+	if s.Validator == nil {
+		return fmt.Errorf(
+			"%w: Workspace artifact support %q has no semantic validator",
+			ErrInvalidWorkspace,
+			s.Kind,
+		)
+	}
+	return nil
 }
 
 func validateDiscoveryProfiles(value DiscoveryProfiles) error {
@@ -126,6 +137,54 @@ func decodeAttachmentData(
 		return AttachmentData{}, err
 	}
 	return value, nil
+}
+
+func EncodeRecordData(
+	value RecordData,
+) (json.RawMessage, error) {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	canonical, err := jsoncanon.CanonicalizeObject(
+		raw,
+		artifactstore.MaxLocalDataBytes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(canonical), nil
+}
+
+func DecodeRecordData(
+	raw json.RawMessage,
+) (RecordData, error) {
+	canonical, err := jsoncanon.CanonicalizeObject(
+		raw,
+		artifactstore.MaxLocalDataBytes,
+	)
+	if err != nil {
+		return RecordData{}, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(canonical))
+	decoder.DisallowUnknownFields()
+	var value RecordData
+	if err := decoder.Decode(&value); err != nil {
+		return RecordData{}, fmt.Errorf(
+			"%w: decode Workspace record data: %w",
+			ErrInvalidWorkspace,
+			err,
+		)
+	}
+	return value, nil
+}
+
+func RecordRuntimeAllowed(value record.Record) (bool, error) {
+	data, err := DecodeRecordData(value.Data)
+	if err != nil {
+		return false, err
+	}
+	return data.RuntimeAllowed, nil
 }
 
 func validateWorkspaceState(

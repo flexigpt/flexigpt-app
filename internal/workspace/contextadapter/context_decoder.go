@@ -27,13 +27,20 @@ func (*ContextDecoder) ID() artifactstore.DecoderID {
 }
 
 func DiscoveryProfile() engine.DiscoveryProfile {
-	return engine.DiscoveryProfile{
-		ExplicitLocators: []artifactstore.Locator{
-			agentsLocator,
-			claudeLocator,
-		},
-		ReadmeLocator: readmeLocator,
+	var profile engine.DiscoveryProfile
+	for _, convention := range contextConventionRegistry {
+		locator := artifactstore.Locator(convention.FileName)
+		switch {
+		case convention.DefaultDiscovery:
+			profile.ExplicitLocators = append(
+				profile.ExplicitLocators,
+				locator,
+			)
+		case convention.Preference == contextPreferenceIncludeReadme:
+			profile.ReadmeLocator = locator
+		}
 	}
+	return profile
 }
 
 func ArtifactSupport() engine.ArtifactSupport {
@@ -44,7 +51,7 @@ func (*ContextDecoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if _, supported := contextFileSupportFor(string(candidate.Locator)); !supported {
+	if _, supported := contextConventionFor(candidate.Locator); !supported {
 		return discovery.RecognitionNone
 	}
 	return discovery.RecognitionPreferred
@@ -70,12 +77,19 @@ func (*ContextDecoder) Decode(
 	}
 
 	name := path.Base(string(candidate.Locator))
-	role := contextRole(name)
+	convention, supported := contextConventionFor(candidate.Locator)
+	if !supported {
+		return nil, nil
+	}
 	document := contextDefinition{
 		Name:      name,
-		Role:      role,
+		Role:      convention.Role,
 		MediaType: contextMarkdownMediaType,
-		Content:   strings.ReplaceAll(string(candidate.Content), "\r\n", "\n"),
+		Content: strings.ReplaceAll(
+			strings.ReplaceAll(string(candidate.Content), "\r\n", "\n"),
+			"\r",
+			"\n",
+		),
 	}
 	raw, err := json.Marshal(document)
 	if err != nil {
@@ -98,26 +112,16 @@ func (*ContextDecoder) Decode(
 		),
 		DisplayName: name,
 		Labels: map[string]string{
-			contextRoleLabelKey: role,
+			contextRoleLabelKey: convention.Role,
 		},
 		Body: raw,
 	}
+	if err := ValidateContextDefinition(value); err != nil {
+		return nil, engine.WorkspaceArtifactDiagnostics(
+			candidate.Locator,
+			engine.DiagnosticCodeContextInvalidContent,
+			err.Error(),
+		)
+	}
 	return []discovery.Decoded{{Definition: value}}, nil
-}
-
-func contextRole(name string) string {
-	support, found := contextFileSupportFor(name)
-	if !found {
-		return contextRoleProjectContext
-	}
-	return support.role
-}
-
-func contextFileSupportFor(name string) (contextFileSupport, bool) {
-	for _, support := range contextFileSupportMatrix {
-		if strings.EqualFold(name, support.fileName) {
-			return support, true
-		}
-	}
-	return contextFileSupport{}, false
 }

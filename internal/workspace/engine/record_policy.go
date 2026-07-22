@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"unicode/utf8"
@@ -10,13 +9,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 )
 
 type RecordPolicy struct {
-	schemaIDs map[artifactstore.ArtifactKind]artifactstore.SchemaID
+	supports map[artifactstore.ArtifactKind]ArtifactSupport
 }
 
 func NewRecordPolicy(
@@ -28,7 +26,7 @@ func NewRecordPolicy(
 			ErrInvalidWorkspace,
 		)
 	}
-	values := make(map[artifactstore.ArtifactKind]artifactstore.SchemaID, len(supports))
+	values := make(map[artifactstore.ArtifactKind]ArtifactSupport, len(supports))
 	for _, support := range supports {
 		if err := support.Validate(); err != nil {
 			return nil, err
@@ -40,9 +38,9 @@ func NewRecordPolicy(
 				support.Kind,
 			)
 		}
-		values[support.Kind] = support.SchemaID
+		values[support.Kind] = support
 	}
-	return &RecordPolicy{schemaIDs: values}, nil
+	return &RecordPolicy{supports: values}, nil
 }
 
 func (p *RecordPolicy) Derive(
@@ -51,7 +49,7 @@ func (p *RecordPolicy) Derive(
 	occurrence catalog.Occurrence,
 	value definition.Definition,
 ) (record.Draft, bool, []artifactstore.Diagnostic) {
-	schemaID, supported := p.schemaIDs[occurrence.Kind]
+	support, supported := p.supports[occurrence.Kind]
 	if !supported {
 		return record.Draft{}, false, nil
 	}
@@ -70,7 +68,7 @@ func (p *RecordPolicy) Derive(
 			},
 		}}
 	}
-	if value.SchemaID != schemaID {
+	if value.SchemaID != support.SchemaID {
 		return record.Draft{}, false, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,
 			Code:     DiagnosticCodeRecordSchemaUnsupported,
@@ -85,11 +83,30 @@ func (p *RecordPolicy) Derive(
 			},
 		}}
 	}
+	if err := support.Validator(value); err != nil {
+		return record.Draft{}, false, []artifactstore.Diagnostic{{
+			Severity: artifactstore.DiagnosticError,
+			Code:     DiagnosticCodeProjectionInvalid,
+			Message:  diagnosticMessage(err.Error()),
+			Location: &artifactstore.DiagnosticLocation{
+				Locator:            occurrence.Key.Locator,
+				SubresourceLocator: occurrence.Key.SubresourceLocator,
+			},
+		}}
+	}
+	data, err := EncodeRecordData(RecordData{})
+	if err != nil {
+		return record.Draft{}, false, []artifactstore.Diagnostic{{
+			Severity: artifactstore.DiagnosticError,
+			Code:     DiagnosticCodeProjectionInvalid,
+			Message:  diagnosticMessage(err.Error()),
+		}}
+	}
 	name := recordName(value.LogicalName, occurrence.Key)
 	return record.Draft{
 		Name:    name,
 		Enabled: true,
-		Data:    json.RawMessage(jsoncanon.EmptyObject),
+		Data:    data,
 	}, true, nil
 }
 
@@ -113,6 +130,14 @@ func recordName(
 		base = base[:len(base)-size]
 	}
 	return base + recordNameSeparator + suffix
+}
+
+func diagnosticMessage(value string) string {
+	for len(value) > artifactstore.MaxDiagnosticMessageBytes {
+		_, size := utf8.DecodeLastRuneInString(value)
+		value = value[:len(value)-size]
+	}
+	return value
 }
 
 var _ record.Policy = (*RecordPolicy)(nil)

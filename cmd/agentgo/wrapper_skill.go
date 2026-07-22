@@ -4,13 +4,16 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/skill/provider"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store"
 )
 
 // SkillStoreWrapper exposes SkillStore APIs to Wails bindings (same pattern as other stores).
 type SkillStoreWrapper struct {
-	store *store.SkillStore
+	store             *store.SkillStore
+	installedProvider provider.Provider
+	provider          provider.Provider
 }
 
 func InitSkillStoreWrapper(s *SkillStoreWrapper, skillsDir string) error {
@@ -19,6 +22,28 @@ func InitSkillStoreWrapper(s *SkillStoreWrapper, skillsDir string) error {
 		return err
 	}
 	s.store = st
+	installed, err := provider.NewInstalled(st)
+	if err != nil {
+		st.Close()
+		return err
+	}
+	s.installedProvider = installed
+	s.provider = installed
+	return nil
+}
+
+func InitAggregateSkillProvider(
+	s *SkillStoreWrapper,
+	workspaceProvider provider.Provider,
+) error {
+	aggregate, err := provider.NewAggregate(
+		s.installedProvider,
+		workspaceProvider,
+	)
+	if err != nil {
+		return err
+	}
+	s.provider = aggregate
 	return nil
 }
 
@@ -137,6 +162,54 @@ func (s *SkillStoreWrapper) InvokeSkillTool(
 ) (*spec.InvokeSkillToolResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.InvokeSkillToolResponse, error) {
 		return s.store.InvokeSkillTool(context.Background(), req)
+	})
+}
+
+func (s *SkillStoreWrapper) ListProvidedSkills(
+	req *provider.ListProvidedSkillsRequest,
+) (*provider.ListProvidedSkillsResponse, error) {
+	return middleware.WithRecoveryResp(func() (*provider.ListProvidedSkillsResponse, error) {
+		if s == nil || s.provider == nil {
+			return nil, spec.ErrSkillInvalidRequest
+		}
+		scope := provider.Scope{}
+		if req != nil {
+			scope.WorkspaceRootID = req.WorkspaceRootID
+		}
+		values, err := s.provider.List(context.Background(), scope)
+		if err != nil {
+			return nil, err
+		}
+		return &provider.ListProvidedSkillsResponse{
+			Body: &provider.ListProvidedSkillsResponseBody{
+				Skills: values,
+			},
+		}, nil
+	})
+}
+
+func (s *SkillStoreWrapper) RenderProvidedSkill(
+	req *provider.RenderProvidedSkillRequest,
+) (*provider.RenderProvidedSkillResponse, error) {
+	return middleware.WithRecoveryResp(func() (*provider.RenderProvidedSkillResponse, error) {
+		if s == nil || s.provider == nil ||
+			req == nil || req.Body == nil {
+			return nil, spec.ErrSkillInvalidRequest
+		}
+		value, err := s.provider.Render(
+			context.Background(),
+			provider.RenderRequest{
+				Scope: provider.Scope{
+					WorkspaceRootID: req.Body.WorkspaceRootID,
+				},
+				Identity:  req.Body.Identity,
+				Arguments: req.Body.Arguments,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return &provider.RenderProvidedSkillResponse{Body: &value}, nil
 	})
 }
 

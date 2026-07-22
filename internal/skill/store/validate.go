@@ -32,17 +32,16 @@ func ValidateSkillArtifactMetadata(
 	description string,
 	arguments []agentskillsSpec.SkillArgument,
 ) error {
-	_, err := agentskills.MarshalSkillDocument(
+	return agentskills.ValidateSkillDocument(
 		agentskillsSpec.SkillDocument{
-			Name:        name,
-			Description: description,
-			Arguments:   append([]agentskillsSpec.SkillArgument(nil), arguments...),
+			Name:         name,
+			DisplayName:  name,
+			Description:  description,
+			Insert:       agentskillsSpec.SkillInsertInstructions,
+			Arguments:    append([]agentskillsSpec.SkillArgument(nil), arguments...),
+			MarkdownBody: "",
 		},
 	)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func validateSkillBundle(b *spec.SkillBundle) error {

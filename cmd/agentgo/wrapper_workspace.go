@@ -114,6 +114,30 @@ func (w *WorkspaceWrapper) GetWorkspaceCatalog(
 	})
 }
 
+func (w *WorkspaceWrapper) GetWorkspaceRecord(
+	request *workspace.GetWorkspaceRecordRequest,
+) (*workspace.GetWorkspaceRecordResponse, error) {
+	return middleware.WithRecoveryResp(func() (*workspace.GetWorkspaceRecordResponse, error) {
+		return w.api.GetWorkspaceRecord(context.Background(), request)
+	})
+}
+
+func (w *WorkspaceWrapper) ListWorkspaceContexts(
+	request *workspace.ListWorkspaceContextsRequest,
+) (*workspace.ListWorkspaceContextsResponse, error) {
+	return middleware.WithRecoveryResp(func() (*workspace.ListWorkspaceContextsResponse, error) {
+		return w.api.ListWorkspaceContexts(context.Background(), request)
+	})
+}
+
+func (w *WorkspaceWrapper) LoadWorkspaceContexts(
+	request *workspace.LoadWorkspaceContextsRequest,
+) (*workspace.LoadWorkspaceContextsResponse, error) {
+	return middleware.WithRecoveryResp(func() (*workspace.LoadWorkspaceContextsResponse, error) {
+		return w.api.LoadWorkspaceContexts(context.Background(), request)
+	})
+}
+
 func (w *WorkspaceWrapper) ComposeWorkspaceContext(
 	request *workspace.ComposeWorkspaceContextRequest,
 ) (*workspace.ComposeWorkspaceContextResponse, error) {
@@ -143,6 +167,38 @@ func (w *WorkspaceWrapper) SetWorkspaceRecordEnabled(
 ) (*workspace.SetWorkspaceRecordEnabledResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.SetWorkspaceRecordEnabledResponse, error) {
 		return w.api.SetWorkspaceRecordEnabled(context.Background(), request)
+	})
+}
+
+func (w *WorkspaceWrapper) PinWorkspaceRecord(
+	request *workspace.PinWorkspaceRecordRequest,
+) (*workspace.PinWorkspaceRecordResponse, error) {
+	return middleware.WithRecoveryResp(func() (*workspace.PinWorkspaceRecordResponse, error) {
+		return w.api.PinWorkspaceRecord(context.Background(), request)
+	})
+}
+
+func (w *WorkspaceWrapper) FollowWorkspaceRecord(
+	request *workspace.FollowWorkspaceRecordRequest,
+) (*workspace.FollowWorkspaceRecordResponse, error) {
+	return middleware.WithRecoveryResp(func() (*workspace.FollowWorkspaceRecordResponse, error) {
+		return w.api.FollowWorkspaceRecord(context.Background(), request)
+	})
+}
+
+func (w *WorkspaceWrapper) DeleteWorkspaceRecord(
+	request *workspace.DeleteWorkspaceRecordRequest,
+) (*workspace.DeleteWorkspaceRecordResponse, error) {
+	return middleware.WithRecoveryResp(func() (*workspace.DeleteWorkspaceRecordResponse, error) {
+		return w.api.DeleteWorkspaceRecord(context.Background(), request)
+	})
+}
+
+func (w *WorkspaceWrapper) UpdateWorkspaceRecordData(
+	request *workspace.UpdateWorkspaceRecordDataRequest,
+) (*workspace.UpdateWorkspaceRecordDataResponse, error) {
+	return middleware.WithRecoveryResp(func() (*workspace.UpdateWorkspaceRecordDataResponse, error) {
+		return w.api.UpdateWorkspaceRecordData(context.Background(), request)
 	})
 }
 
