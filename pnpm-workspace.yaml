@@ -3,6 +3,10 @@ packages:
 
 ignoreWorkspaceRootCheck: true
 
+updateConfig:
+  ignoreDependencies:
+    - "@types/node"
+
 allowBuilds:
   "@tailwindcss/oxide": true
   esbuild: true
