@@ -142,7 +142,8 @@
 		"ignore": [
 			"app/apis/wailsjs/**",
 			"app/spec/inference_capabilities.ts",
-			"app/spec/mcp.ts"
+			"app/spec/mcp.ts",
+			"app/spec/workspace.ts"
 		],
 		"ignoreBinaries": [],
 		"ignoreDependencies": [

@@ -68,6 +68,27 @@ import type {
 import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
+import type {
+	AttachWorkspaceSourcePayload,
+	CreateEmptyWorkspacePayload,
+	CreateFilesystemWorkspacePayload,
+	DeleteWorkspaceResult,
+	UpdateWorkspaceAttachmentPayload,
+	UpdateWorkspacePayload,
+	WorkspaceCatalogView,
+	WorkspaceContextInspectionView,
+	WorkspaceContextLoadPlan,
+	WorkspaceContextView,
+	WorkspaceDigest,
+	WorkspaceRecordID,
+	WorkspaceRecordView,
+	WorkspaceRefreshResult,
+	WorkspaceRootID,
+	WorkspaceSkillLoadView,
+	WorkspaceSkillView,
+	WorkspaceSourceID,
+	WorkspaceView,
+} from '@/spec/workspace';
 
 import type { JSONRawString, JSONSchema } from '@/lib/jsonschema_utils';
 
@@ -272,6 +293,94 @@ export interface ISkillStoreAPI {
 	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
 
 	renderSkill(ref: SkillRef, args?: Record<string, string>): Promise<RenderSkillResponse>;
+}
+
+/**
+ * Flattened frontend-facing Workspace bridge.
+ *
+ * Request and response `Body` wrappers are intentionally kept inside the
+ * Wails bridge. Workspace source configuration and raw internal data are never
+ * exposed to the frontend.
+ */
+export interface IWorkspaceAPI {
+	createFilesystemWorkspace(payload: CreateFilesystemWorkspacePayload): Promise<WorkspaceView>;
+
+	createEmptyWorkspace(payload: CreateEmptyWorkspacePayload): Promise<WorkspaceView>;
+
+	getWorkspace(rootID: WorkspaceRootID): Promise<WorkspaceView>;
+
+	listWorkspaces(): Promise<WorkspaceView[]>;
+
+	updateWorkspace(rootID: WorkspaceRootID, payload: UpdateWorkspacePayload): Promise<WorkspaceView>;
+
+	deleteWorkspace(rootID: WorkspaceRootID, expectedRevision: number): Promise<DeleteWorkspaceResult>;
+
+	attachWorkspaceSource(
+		rootID: WorkspaceRootID,
+		sourceID: WorkspaceSourceID,
+		payload: AttachWorkspaceSourcePayload
+	): Promise<WorkspaceView>;
+
+	updateWorkspaceAttachment(
+		rootID: WorkspaceRootID,
+		sourceID: WorkspaceSourceID,
+		payload: UpdateWorkspaceAttachmentPayload
+	): Promise<WorkspaceView>;
+
+	detachWorkspaceSource(
+		rootID: WorkspaceRootID,
+		sourceID: WorkspaceSourceID,
+		expectedRootRevision: number,
+		expectedAttachmentRevision: number
+	): Promise<WorkspaceView>;
+
+	refreshWorkspace(rootID: WorkspaceRootID): Promise<WorkspaceRefreshResult>;
+
+	getWorkspaceCatalog(rootID: WorkspaceRootID): Promise<WorkspaceCatalogView>;
+
+	getWorkspaceRecord(rootID: WorkspaceRootID, recordID: WorkspaceRecordID): Promise<WorkspaceRecordView>;
+
+	listWorkspaceContexts(rootID: WorkspaceRootID): Promise<WorkspaceContextView[]>;
+
+	loadWorkspaceContexts(
+		rootID: WorkspaceRootID,
+		recordIDs?: WorkspaceRecordID[]
+	): Promise<WorkspaceContextInspectionView>;
+
+	composeWorkspaceContext(rootID: WorkspaceRootID, recordIDs?: WorkspaceRecordID[]): Promise<WorkspaceContextLoadPlan>;
+
+	listWorkspaceSkills(rootID: WorkspaceRootID): Promise<WorkspaceSkillView[]>;
+
+	loadWorkspaceSkills(rootID: WorkspaceRootID, recordIDs: WorkspaceRecordID[]): Promise<WorkspaceSkillLoadView>;
+
+	setWorkspaceRecordEnabled(
+		rootID: WorkspaceRootID,
+		recordID: WorkspaceRecordID,
+		expectedRevision: number,
+		enabled: boolean
+	): Promise<WorkspaceRecordView>;
+
+	pinWorkspaceRecord(
+		rootID: WorkspaceRootID,
+		recordID: WorkspaceRecordID,
+		expectedRevision: number,
+		definitionDigest: WorkspaceDigest
+	): Promise<WorkspaceRecordView>;
+
+	followWorkspaceRecord(
+		rootID: WorkspaceRootID,
+		recordID: WorkspaceRecordID,
+		expectedRevision: number
+	): Promise<WorkspaceRecordView>;
+
+	deleteWorkspaceRecord(rootID: WorkspaceRootID, recordID: WorkspaceRecordID, expectedRevision: number): Promise<void>;
+
+	setWorkspaceRecordRuntimeAllowed(
+		rootID: WorkspaceRootID,
+		recordID: WorkspaceRecordID,
+		expectedRevision: number,
+		runtimeAllowed: boolean
+	): Promise<WorkspaceRecordView>;
 }
 
 export interface IToolRuntimeAPI {

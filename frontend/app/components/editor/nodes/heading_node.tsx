@@ -16,10 +16,7 @@ const headingVariants = cva('relative mb-1', {
 	},
 });
 
-/**
- * @public
- */
-export function HeadingElement({ variant = 'h1', ...props }: PlateElementProps & VariantProps<typeof headingVariants>) {
+function HeadingElement({ variant = 'h1', ...props }: PlateElementProps & VariantProps<typeof headingVariants>) {
 	return (
 		<PlateElement as={variant ? variant : 'h2'} className={headingVariants({ variant })} {...props}>
 			{props.children}

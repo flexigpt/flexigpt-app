@@ -1,4 +1,4 @@
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ComponentType, HTMLAttributes, MouseEvent } from 'react';
+import type { ButtonHTMLAttributes, ComponentType, HTMLAttributes, MouseEvent } from 'react';
 import { forwardRef, useState } from 'react';
 
 import { FiChevronDown } from 'react-icons/fi';
@@ -14,39 +14,6 @@ export const Toolbar = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>
 ) {
 	return <div ref={ref} className={cn('relative flex items-center gap-1 select-none', className)} {...props} />;
 });
-
-/* Grouping container (use with join for button groups) */
-
-/**
- * @public
- */
-export const ToolbarToggleGroup = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-	function ToolbarToggleGroup({ className, ...props }, ref) {
-		return <div ref={ref} className={cn('join flex items-center', className)} {...props} />;
-	}
-);
-
-/**
- * @public
- */
-export const ToolbarLink = forwardRef<HTMLAnchorElement, AnchorHTMLAttributes<HTMLAnchorElement>>(function ToolbarLink(
-	{ children, className, ...props },
-	ref
-) {
-	return (
-		<a ref={ref} className={cn('link link-hover font-medium', className)} {...props}>
-			{children}
-		</a>
-	);
-});
-
-/* Vertical separator */
-/**
- * @public
- */
-export function ToolbarSeparator({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
-	return <span className={cn('bg-base-300 mx-2 my-1 w-px self-stretch', className)} {...props} />;
-}
 
 /* Button variants (DaisyUI) */
 const toolbarButtonVariants = cva(
@@ -104,10 +71,7 @@ type ToolbarToggleItemProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onC
 		onPressedChange?: (pressed: boolean) => void;
 	};
 
-/**
- * @public
- */
-export const ToolbarToggleItem = forwardRef<HTMLButtonElement, ToolbarToggleItemProps>(function ToolbarToggleItem(
+const ToolbarToggleItem = forwardRef<HTMLButtonElement, ToolbarToggleItemProps>(function ToolbarToggleItem(
 	{ className, size = 'sm', variant, pressed, defaultPressed, onPressedChange, onClick, disabled, ...props },
 	ref
 ) {
@@ -193,37 +157,11 @@ const RawToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(funct
 // oxlint-disable-next-line react/only-export-components
 export const ToolbarButton = withTooltip(RawToolbarButton);
 
-/**
- * @public
- */
-export const ToolbarSplitButton = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-	function ToolbarSplitButton({ className, ...props }, ref) {
-		return <div ref={ref} className={cn('join', className)} {...props} />;
-	}
-);
-
-/* Simple grouping wrapper, use ToolbarSeparator between groups */
+/* Simple grouping wrapper */
 export function ToolbarGroup({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
 	return (
 		<div className={cn('flex items-center', className)} {...props}>
 			{children}
 		</div>
-	);
-}
-/* DaisyUI menu group (use inside a <ul className="menu">) */
-/**
- * @public
- */
-export function ToolbarMenuGroup({
-	className,
-	label,
-	children,
-	...props
-}: HTMLAttributes<HTMLLIElement> & { label?: string }) {
-	return (
-		<li className={cn('', className)} {...props}>
-			{label && <h2 className="menu-title">{label}</h2>}
-			<ul>{children}</ul>
-		</li>
 	);
 }

@@ -48,10 +48,7 @@ export const BlockList: RenderNodeWrapper = props => {
 	return props => <List {...props} />;
 };
 
-/**
- * @public
- */
-export function TodoMarker(props: PlateElementProps) {
+function TodoMarker(props: PlateElementProps) {
 	const state = useTodoListElementState({ element: props.element });
 	const { checkboxProps } = useTodoListElement(state);
 	const readOnly = useReadOnly();
@@ -70,10 +67,7 @@ export function TodoMarker(props: PlateElementProps) {
 	);
 }
 
-/**
- * @public
- */
-export function TodoLi(props: PlateElementProps) {
+function TodoLi(props: PlateElementProps) {
 	const isChecked =
 		typeof props.element === 'object' &&
 		'checked' in props.element &&

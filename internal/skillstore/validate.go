@@ -29,7 +29,6 @@ var (
 	errSkillBundleNotEmpty  = errors.New("bundle still contains skills")
 	errSkillNotFound        = errors.New("skill not found")
 	errSkillDisabled        = errors.New("skill is disabled")
-	errSkillIsMissing       = errors.New("skill is marked missing (cannot delete)")
 )
 
 // ValidateSkill applies the Skill Store's structural rules to a projected

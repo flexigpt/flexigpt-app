@@ -15,6 +15,7 @@ import type {
 	ISkillStoreAPI,
 	IToolRuntimeAPI,
 	IToolStoreAPI,
+	IWorkspaceAPI,
 } from '@/apis/interface';
 // oxlint-disable-next-line import/no-namespace
 import * as wailsImpl from '@/apis/wailsapi';
@@ -34,6 +35,10 @@ export let toolStoreAPI: IToolStoreAPI;
 export let toolRuntimeAPI: IToolRuntimeAPI;
 export let skillStoreAPI: ISkillStoreAPI;
 export let assistantPresetStoreAPI: IAssistantPresetStoreAPI;
+/**
+ * @public
+ */
+export let workspaceAPI: IWorkspaceAPI;
 
 // Conditional initialization
 if (IS_WAILS_PLATFORM) {
@@ -52,6 +57,7 @@ if (IS_WAILS_PLATFORM) {
 	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
 	skillStoreAPI = new wailsImpl.WailsSkillStoreAPI();
 	assistantPresetStoreAPI = new wailsImpl.WailsAssistantPresetStoreAPI();
+	workspaceAPI = new wailsImpl.WailsWorkspaceAPI();
 } else {
 	// Error for unsupported platforms
 	throw new Error('Unsupported platform');

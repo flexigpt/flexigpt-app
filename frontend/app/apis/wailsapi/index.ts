@@ -11,3 +11,4 @@ export * from './settingstore';
 export * from './skillstore';
 export * from './toolruntime';
 export * from './toolstore';
+export * from './workspace';
