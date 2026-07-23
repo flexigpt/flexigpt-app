@@ -9,6 +9,7 @@ export default [
 	route('mcpservers', './mcpservers/page.tsx'),
 	route('tools', './tools/page.tsx'),
 	route('skills', './skills/page.tsx'),
+	route('workspaces', './workspaces/page.tsx'),
 	route('modelpresets', './modelpresets/page.tsx'),
 	route('docs', './docs/page.tsx'),
 	route('settings', './settings/page.tsx'),
