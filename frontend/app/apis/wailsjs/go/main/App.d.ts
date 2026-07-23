@@ -12,6 +12,10 @@ export function OpenMultipleFilesAsAttachments(arg1:boolean,arg2:Array<attachmen
 
 export function OpenURLAsAttachment(arg1:string):Promise<attachment.Attachment>;
 
+export function PickDirectory():Promise<string>;
+
+export function PickFiles(arg1:boolean):Promise<Array<string>>;
+
 export function Ping():Promise<string>;
 
 export function SaveFile(arg1:string,arg2:string,arg3:Array<attachment.FileFilter>):Promise<void>;

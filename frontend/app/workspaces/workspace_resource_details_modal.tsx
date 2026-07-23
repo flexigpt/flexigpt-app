@@ -1,10 +1,16 @@
-// oxlint-disable jsreact-hooks/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
-import { FiAlertCircle } from 'react-icons/fi';
-
-import type { WorkspaceContextInspectionView, WorkspaceRecordView, WorkspaceSkillLoadView } from '@/spec/workspace';
+import type {
+	WorkspaceContextInspectionView,
+	WorkspaceRecordView,
+	WorkspaceSkillLoadView,
+	WorkspaceView,
+} from '@/spec/workspace';
 import { WorkspaceArtifactKind } from '@/spec/workspace';
+
+import { throwIfAborted } from '@/lib/async_utils';
+
+import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { workspaceAPI } from '@/apis/baseapi';
 
@@ -12,6 +18,7 @@ import { Loader } from '@/components/loader';
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
+import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
@@ -22,13 +29,14 @@ import {
 	getErrorMessage,
 	getRecordModeLabel,
 	getRecordStateTone,
+	workspaceLocatorToPath,
 } from '@/workspaces/lib/workspace_utils';
 import { WorkspaceDiagnostics } from '@/workspaces/workspace_diagnostics';
 
-interface WorkspaceRecordDetailsModalProps {
+interface WorkspaceResourceDetailsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	rootID: string;
+	workspace: WorkspaceView;
 	record: WorkspaceRecordView | null;
 }
 
@@ -39,126 +47,114 @@ interface RecordInspection {
 	previewError?: string;
 }
 
-export function WorkspaceRecordDetailsModal({ isOpen, onClose, rootID, record }: WorkspaceRecordDetailsModalProps) {
-	const [inspection, setInspection] = useState<RecordInspection | null>(null);
-	const [loadError, setLoadError] = useState('');
-	const [isLoading, setIsLoading] = useState(false);
+function sourceLabel(workspace: WorkspaceView, sourceID: string): string {
+	const attachment = workspace.attachments.find(item => item.sourceID === sourceID);
+	return attachment?.path ?? attachment?.sourceDisplayName ?? 'Workspace source';
+}
 
-	useEffect(() => {
-		if (!isOpen || !record) {
-			return;
-		}
+function WorkspaceResourceDetailsContent({
+	onClose,
+	workspace,
+	record,
+}: Omit<WorkspaceResourceDetailsModalProps, 'isOpen'> & { record: WorkspaceRecordView }) {
+	const loadInspection = useCallback(
+		async (signal: AbortSignal): Promise<RecordInspection> => {
+			const freshRecord = await workspaceAPI.getWorkspaceRecord(workspace.rootID, record.id);
+			throwIfAborted(signal);
 
-		let active = true;
-		setInspection(null);
-		setLoadError('');
-		setIsLoading(true);
+			let context: WorkspaceContextInspectionView | undefined;
+			let skill: WorkspaceSkillLoadView | undefined;
+			let previewError: string | undefined;
 
-		void (async () => {
 			try {
-				const freshRecord = await workspaceAPI.getWorkspaceRecord(rootID, record.id);
-				let context: WorkspaceContextInspectionView | undefined;
-				let skill: WorkspaceSkillLoadView | undefined;
-				let previewError: string | undefined;
-
-				try {
-					if (freshRecord.kind === WorkspaceArtifactKind.Context) {
-						context = await workspaceAPI.loadWorkspaceContexts(rootID, [freshRecord.id]);
-					} else if (freshRecord.kind === WorkspaceArtifactKind.Skill) {
-						skill = await workspaceAPI.loadWorkspaceSkills(rootID, [freshRecord.id]);
-					}
-				} catch (error) {
-					previewError = getErrorMessage(error, 'The artifact content could not be loaded.');
+				if (freshRecord.kind === WorkspaceArtifactKind.Context) {
+					context = await workspaceAPI.loadWorkspaceContexts(workspace.rootID, [freshRecord.id]);
+				} else if (freshRecord.kind === WorkspaceArtifactKind.Skill) {
+					skill = await workspaceAPI.loadWorkspaceSkills(workspace.rootID, [freshRecord.id]);
 				}
-
-				if (active) {
-					setInspection({
-						record: freshRecord,
-						context,
-						skill,
-						previewError,
-					});
-				}
+				throwIfAborted(signal);
 			} catch (error) {
-				if (active) {
-					setLoadError(getErrorMessage(error, 'Workspace record could not be loaded.'));
-				}
-			} finally {
-				if (active) {
-					setIsLoading(false);
-				}
+				previewError = getErrorMessage(error, 'The artifact content could not be loaded.');
 			}
-		})();
 
-		return () => {
-			active = false;
-		};
-	}, [isOpen, record, rootID]);
+			return {
+				record: freshRecord,
+				context,
+				skill,
+				previewError,
+			};
+		},
+		[record.id, workspace.rootID]
+	);
 
-	if (!isOpen || !record) {
-		return null;
-	}
+	const {
+		data: inspection,
+		error,
+		isLoading,
+		isRefreshing,
+		reloadOrThrow,
+	} = useAsyncResource(loadInspection, {
+		initialData: null as RecordInspection | null,
+	});
 
 	const current = inspection?.record ?? record;
 	const contribution = inspection?.context?.contributions.find(item => item.recordID === current.id);
 	const skill = inspection?.skill?.skills.find(item => item.recordID === current.id);
+	const source = sourceLabel(workspace, current.sourceID);
+	const location = workspaceLocatorToPath(
+		workspace.attachments.find(item => item.sourceID === current.sourceID)?.path,
+		current.locator
+	);
 
 	return (
 		<ManagementDetailsModal
-			isOpen={isOpen}
+			isOpen
 			onClose={onClose}
-			title="Workspace Record"
+			title="Workspace Resource"
 			description={current.name}
-			modalKey={`${rootID}:${record.id}:${record.revision}`}
+			modalKey={`${workspace.rootID}:${record.id}:${record.revision}`}
 			width="wide"
 			height="tall"
 		>
-			{isLoading ? <Loader text="Loading workspace record..." /> : null}
-
-			{loadError ? (
-				<div className="alert alert-error rounded-2xl text-sm">
-					<FiAlertCircle size={14} />
-					<span>{loadError}</span>
-				</div>
+			{error ? (
+				<ManagementResourceError
+					title="Workspace resource could not be loaded"
+					error={error}
+					isRetrying={isRefreshing}
+					onRetry={reloadOrThrow}
+				/>
 			) : null}
 
-			<ModalSection title="Record metadata">
+			{isLoading && !inspection ? <Loader text="Loading workspace resource..." /> : null}
+
+			<ModalSection title="Resource details">
 				<ManagementInfoGrid>
 					<ManagementInfoRow label="Name">{current.name}</ManagementInfoRow>
-					<ManagementInfoRow label="Record ID" mono>
-						{current.id}
-					</ManagementInfoRow>
-					<ManagementInfoRow label="Revision">{current.revision}</ManagementInfoRow>
 					<ManagementInfoRow label="Kind">{getArtifactKindLabel(current.kind)}</ManagementInfoRow>
 					<ManagementInfoRow label="State">
 						<StatusBadge tone={getRecordStateTone(current.state)}>{current.state}</StatusBadge>
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Mode">{getRecordModeLabel(current.mode)}</ManagementInfoRow>
+					<ManagementInfoRow label="Tracking">{getRecordModeLabel(current.mode)}</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{current.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
-					<ManagementInfoRow label="Runtime allowed">{current.runtimeAllowed ? 'Yes' : 'No'}</ManagementInfoRow>
-					<ManagementInfoRow label="Source ID" mono>
-						{current.sourceID}
+					<ManagementInfoRow label="Use in conversations">
+						{current.runtimeAllowed ? 'Allowed' : 'Not allowed'}
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Locator" mono>
-						{current.locator}
+					<ManagementInfoRow label="Source">
+						<span className="break-all">{source}</span>
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Subresource" mono>
-						{current.subresourceLocator || 'None'}
+					<ManagementInfoRow label="Location">
+						<span className="font-mono text-xs break-all">{location}</span>
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Resolved definition" mono>
-						{current.resolvedDefinition || 'None'}
-					</ManagementInfoRow>
-					<ManagementInfoRow label="Pinned definition" mono>
-						{current.pinnedDefinition || 'None'}
-					</ManagementInfoRow>
+					{current.subresourceLocator ? (
+						<ManagementInfoRow label="Subresource">
+							<span className="font-mono text-xs break-all">{current.subresourceLocator}</span>
+						</ManagementInfoRow>
+					) : null}
 				</ManagementInfoGrid>
 			</ModalSection>
 
 			{inspection?.previewError ? (
-				<div className="alert alert-warning rounded-2xl text-sm">
-					<FiAlertCircle size={14} />
-					<span>{inspection.previewError}</span>
-				</div>
+				<div className="alert alert-warning rounded-2xl text-sm">{inspection.previewError}</div>
 			) : null}
 
 			{contribution ? (
@@ -179,10 +175,7 @@ export function WorkspaceRecordDetailsModal({ isOpen, onClose, rootID, record }:
 			{skill ? (
 				<ModalSection title="Skill artifact">
 					<ManagementInfoGrid>
-						<ManagementInfoRow label="Display name">{skill.skill.displayName}</ManagementInfoRow>
-						<ManagementInfoRow label="Slug" mono>
-							{skill.skill.slug}
-						</ManagementInfoRow>
+						<ManagementInfoRow label="Display name">{skill.skill.displayName || skill.skill.name}</ManagementInfoRow>
 						<ManagementInfoRow label="Description">{skill.skill.description || 'None'}</ManagementInfoRow>
 						<ManagementInfoRow label="Insert">{skill.skill.insert}</ManagementInfoRow>
 						<ManagementInfoRow label="Arguments">
@@ -219,5 +212,19 @@ export function WorkspaceRecordDetailsModal({ isOpen, onClose, rootID, record }:
 				<WorkspaceDiagnostics diagnostics={current.diagnostics} />
 			</ModalSection>
 		</ManagementDetailsModal>
+	);
+}
+
+export function WorkspaceResourceDetailsModal(props: WorkspaceResourceDetailsModalProps) {
+	if (!props.isOpen || !props.record) {
+		return null;
+	}
+
+	return (
+		<WorkspaceResourceDetailsContent
+			key={`${props.workspace.rootID}:${props.record.id}:${props.record.revision}`}
+			{...props}
+			record={props.record}
+		/>
 	);
 }

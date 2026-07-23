@@ -22,6 +22,14 @@ export function OpenURLAsAttachment(arg1) {
   return window['go']['main']['App']['OpenURLAsAttachment'](arg1);
 }
 
+export function PickDirectory() {
+  return window['go']['main']['App']['PickDirectory']();
+}
+
+export function PickFiles(arg1) {
+  return window['go']['main']['App']['PickFiles'](arg1);
+}
+
 export function Ping() {
   return window['go']['main']['App']['Ping']();
 }

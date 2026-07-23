@@ -2,7 +2,6 @@ import type {
 	WorkspaceCatalogView,
 	WorkspaceContextView,
 	WorkspaceDiagnostic,
-	WorkspaceDiscovery,
 	WorkspaceOccurrenceView,
 	WorkspaceRecordView,
 	WorkspaceSkillView,
@@ -26,6 +25,9 @@ export interface WorkspaceCatalogData {
 	skillLoadError?: string;
 }
 
+export const WORKSPACE_DEFAULT_CONTEXT_FILES = ['AGENTS.md', 'CLAUDE.md'];
+export const WORKSPACE_DEFAULT_SKILL_ROOTS = ['.skills/**/SKILL.md'];
+
 export function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim()) {
 		return error.message;
@@ -33,16 +35,97 @@ export function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
-export function cloneWorkspaceDiscovery(discovery?: WorkspaceDiscovery): WorkspaceDiscovery {
-	return {
-		includeReadme: discovery?.includeReadme ?? true,
-		additionalLocators: [...(discovery?.additionalLocators ?? [])],
-		additionalRoots: (discovery?.additionalRoots ?? []).map(root => ({
-			root: root.root,
-			recursive: root.recursive,
-			includePatterns: root.includePatterns ? [...root.includePatterns] : undefined,
-		})),
-	};
+function cleanFilesystemPath(rawPath: string): string {
+	const value = rawPath.trim().replaceAll('\\', '/');
+	const drive = /^[A-Za-z]:\//.exec(value)?.[0];
+	const isAbsolute = Boolean(drive) || value.startsWith('/');
+	const prefix = drive ?? (value.startsWith('/') ? '/' : '');
+	const remainder = drive ? value.slice(drive.length) : value.startsWith('/') ? value.slice(1) : value;
+	const segments: string[] = [];
+
+	for (const segment of remainder.split('/')) {
+		if (!segment || segment === '.') {
+			continue;
+		}
+		if (segment === '..') {
+			if (segments.length > 0) {
+				segments.pop();
+			} else if (!isAbsolute) {
+				segments.push(segment);
+			}
+			continue;
+		}
+		segments.push(segment);
+	}
+
+	const joined = segments.join('/');
+	if (!joined) {
+		return prefix || '.';
+	}
+	return `${prefix}${joined}`;
+}
+
+function isAbsoluteFilesystemPath(value: string): boolean {
+	return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
+}
+
+function normalizeWorkspaceLocator(value: string, allowRoot = false): string {
+	const normalized = cleanFilesystemPath(value);
+
+	if (
+		normalized === '.' ||
+		normalized.startsWith('/') ||
+		/^[A-Za-z]:\//.test(normalized) ||
+		normalized.split('/').includes('..')
+	) {
+		if (normalized === '.' && allowRoot) {
+			return normalized;
+		}
+		throw new Error('Use a path inside the workspace folder.');
+	}
+
+	if (!normalized || normalized.includes(':')) {
+		throw new Error('Workspace paths must be non-empty relative paths.');
+	}
+
+	return normalized;
+}
+
+export function workspacePathToLocator(rootPath: string, value: string, allowRoot = false): string {
+	if (!isAbsoluteFilesystemPath(value.trim())) {
+		return normalizeWorkspaceLocator(value, allowRoot);
+	}
+
+	const root = cleanFilesystemPath(rootPath);
+	const candidate = cleanFilesystemPath(value);
+	const caseInsensitive = /^[A-Za-z]:\//.test(root);
+	const comparableRoot = caseInsensitive ? root.toLowerCase() : root;
+	const comparableCandidate = caseInsensitive ? candidate.toLowerCase() : candidate;
+
+	if (comparableCandidate === comparableRoot) {
+		if (allowRoot) {
+			return '.';
+		}
+		throw new Error('Choose a file or folder inside the workspace, not the workspace folder itself.');
+	}
+
+	const prefix = comparableRoot === '/' ? '/' : `${comparableRoot}/`;
+	if (!comparableCandidate.startsWith(prefix)) {
+		throw new Error('Selected paths must be inside the workspace folder.');
+	}
+
+	return normalizeWorkspaceLocator(candidate.slice(root.length + (root === '/' ? 0 : 1)), allowRoot);
+}
+
+export function workspaceLocatorToPath(rootPath: string | undefined, locator: string): string {
+	if (!rootPath) {
+		return locator;
+	}
+
+	const separator = rootPath.includes('\\') ? '\\' : '/';
+	const root = rootPath.replace(/[\\/]+$/, '');
+	const relative = locator.replaceAll('/', separator);
+	return root ? `${root}${separator}${relative}` : `${separator}${relative}`;
 }
 
 export function sortWorkspaces(workspaces: WorkspaceView[]): WorkspaceView[] {
@@ -63,13 +146,7 @@ export function workspaceMatchesSearch(workspace: WorkspaceView, rawQuery: strin
 		return true;
 	}
 
-	const haystackParts = [
-		workspace.displayName,
-		workspace.description,
-		workspace.rootID,
-		workspace.mode,
-		workspace.primarySourceID,
-	];
+	const haystackParts = [workspace.displayName, workspace.description, workspace.mode, workspace.primaryPath];
 
 	for (const locator of workspace.discovery.additionalLocators ?? []) {
 		haystackParts.push(locator);
@@ -84,7 +161,7 @@ export function workspaceMatchesSearch(workspace: WorkspaceView, rawQuery: strin
 	}
 
 	for (const attachment of workspace.attachments) {
-		haystackParts.push(attachment.sourceID, attachment.role, String(attachment.priority));
+		haystackParts.push(attachment.path, attachment.sourceDisplayName, attachment.sourceKind, attachment.role);
 	}
 
 	const haystack = haystackParts.filter(Boolean).join('\n').toLowerCase();
@@ -315,15 +392,11 @@ export function workspaceRecordMatchesSearch(record: WorkspaceRecordView, rawQue
 
 	return [
 		record.name,
-		record.id,
 		record.kind,
 		record.state,
 		record.mode,
-		record.sourceID,
 		record.locator,
 		record.subresourceLocator,
-		record.pinnedDefinition,
-		record.resolvedDefinition,
 		...(record.diagnostics ?? []).flatMap(diagnostic => [diagnostic.code, diagnostic.message]),
 	]
 		.filter(Boolean)

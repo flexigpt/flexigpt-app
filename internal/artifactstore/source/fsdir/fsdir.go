@@ -25,17 +25,31 @@ type Config struct {
 	RootPath string `json:"rootPath"`
 }
 
-type Adapter struct{}
-
-func New() *Adapter {
-	return &Adapter{}
+type Adapter struct {
+	traversalPolicy normalizedTraversalPolicy
 }
 
-func (*Adapter) Kind() artifactstore.SourceKind {
+func New() *Adapter {
+	adapter, err := NewWithTraversalPolicy(nil)
+	if err != nil {
+		panic(err)
+	}
+	return adapter
+}
+
+func NewWithTraversalPolicy(policy *TraversalPolicy) (*Adapter, error) {
+	normalized, err := normalizeTraversalPolicy(policy)
+	if err != nil {
+		return nil, err
+	}
+	return &Adapter{traversalPolicy: normalized}, nil
+}
+
+func (a *Adapter) Kind() artifactstore.SourceKind {
 	return Kind
 }
 
-func (*Adapter) NormalizeConfig(
+func (a *Adapter) NormalizeConfig(
 	ctx context.Context,
 	raw json.RawMessage,
 ) (json.RawMessage, error) {
@@ -80,7 +94,7 @@ func (*Adapter) NormalizeConfig(
 	return json.RawMessage(encoded), nil
 }
 
-func (*Adapter) Open(
+func (a *Adapter) Open(
 	ctx context.Context,
 	value source.Source,
 ) (source.Snapshot, error) {
@@ -95,13 +109,14 @@ func (*Adapter) Open(
 	if err != nil {
 		return nil, err
 	}
-	generation, err := fingerprint(ctx, config.RootPath)
+	generation, err := fingerprint(ctx, config.RootPath, a.traversalPolicy)
 	if err != nil {
 		return nil, err
 	}
 	return &snapshot{
-		root:       config.RootPath,
-		generation: generation,
+		root:            config.RootPath,
+		generation:      generation,
+		traversalPolicy: a.traversalPolicy,
 	}, nil
 }
 
@@ -111,7 +126,7 @@ func (*Adapter) Open(
 //
 // The returned path is never part of a portable definition or public API
 // projection.
-func (*Adapter) ResolveLocalPath(
+func (a *Adapter) ResolveLocalPath(
 	ctx context.Context,
 	value source.Source,
 	locator artifactstore.Locator,
@@ -154,7 +169,22 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 	return config, nil
 }
 
-func fingerprint(ctx context.Context, root string) (string, error) {
+func RootPath(value source.Source) (string, error) {
+	if value.Kind != Kind {
+		return "", fmt.Errorf(
+			"%w: filesystem adapter received source kind %q",
+			artifactstore.ErrInvalid,
+			value.Kind,
+		)
+	}
+	config, err := decodeConfig(value.Config)
+	if err != nil {
+		return "", err
+	}
+	return config.RootPath, nil
+}
+
+func fingerprint(ctx context.Context, root string, policy normalizedTraversalPolicy) (string, error) {
 	type entry struct {
 		relative string
 		mode     os.FileMode
@@ -173,6 +203,10 @@ func fingerprint(ctx context.Context, root string) (string, error) {
 		if path == root {
 			return nil
 		}
+		if dirEntry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+
 		if len(values) >= artifactstore.DefaultMaxEntries {
 			return fmt.Errorf(
 				"%w: source exceeds %d entries",
@@ -192,23 +226,21 @@ func fingerprint(ctx context.Context, root string) (string, error) {
 				artifactstore.DefaultMaxDepth,
 			)
 		}
+
 		info, err := os.Lstat(path)
 		if err != nil {
 			return err
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf(
-				"%w: source contains symbolic link %q",
-				artifactstore.ErrInvalid,
-				filepath.ToSlash(relative),
-			)
+			return nil
+		}
+		if info.IsDir() &&
+			(policy.shouldSkipDirectory(info.Name()) ||
+				policy.isGitSubmoduleDirectory(path)) {
+			return filepath.SkipDir
 		}
 		if !info.IsDir() && !info.Mode().IsRegular() {
-			return fmt.Errorf(
-				"%w: source contains unsupported entry %q",
-				artifactstore.ErrInvalid,
-				filepath.ToSlash(relative),
-			)
+			return nil
 		}
 		values = append(values, entry{
 			relative: filepath.ToSlash(relative),

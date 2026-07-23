@@ -108,6 +108,8 @@ export interface IBackendAPI {
 
 	getAppVersion: () => Promise<string>;
 	ping: () => Promise<string>;
+	pickDirectoryPath: () => Promise<string | undefined>;
+	pickFilePaths: (allowMultiple: boolean) => Promise<string[]>;
 	log: (level: string, ...args: unknown[]) => void;
 
 	openURL(url: string): void;
@@ -298,9 +300,10 @@ export interface ISkillStoreAPI {
 /**
  * Flattened frontend-facing Workspace bridge.
  *
- * Request and response `Body` wrappers are intentionally kept inside the
- * Wails bridge. Workspace source configuration and raw internal data are never
- * exposed to the frontend.
+ * Request and response `Body` wrappers are intentionally kept inside the Wails
+ * bridge. Raw source configuration remains private. Local filesystem paths are
+ * exposed through Workspace views because Workspace management intentionally
+ * displays selected project locations.
  */
 export interface IWorkspaceAPI {
 	createFilesystemWorkspace(payload: CreateFilesystemWorkspacePayload): Promise<WorkspaceView>;

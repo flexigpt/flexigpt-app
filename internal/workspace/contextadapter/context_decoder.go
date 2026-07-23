@@ -52,6 +52,10 @@ func (*ContextDecoder) Recognize(
 	candidate discovery.Candidate,
 ) discovery.Recognition {
 	if _, supported := contextConventionFor(candidate.Locator); !supported {
+		if candidate.RequestsDecoder(contextDecoderID) &&
+			strings.EqualFold(path.Ext(string(candidate.Locator)), ".md") {
+			return discovery.RecognitionPossible
+		}
 		return discovery.RecognitionNone
 	}
 	return discovery.RecognitionPreferred
@@ -79,8 +83,15 @@ func (*ContextDecoder) Decode(
 	name := path.Base(string(candidate.Locator))
 	convention, supported := contextConventionFor(candidate.Locator)
 	if !supported {
-		return nil, nil
+		if !candidate.RequestsDecoder(contextDecoderID) ||
+			!strings.EqualFold(path.Ext(string(candidate.Locator)), ".md") {
+			return nil, nil
+		}
+		convention = contextFileSupport{
+			Role: contextRoleProjectContext,
+		}
 	}
+
 	document := contextDefinition{
 		Name:      name,
 		Role:      convention.Role,

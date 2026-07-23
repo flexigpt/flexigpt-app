@@ -15,9 +15,10 @@ import (
 )
 
 type snapshot struct {
-	root       string
-	generation string
-	closed     bool
+	root            string
+	generation      string
+	traversalPolicy normalizedTraversalPolicy
+	closed          bool
 }
 
 func (s *snapshot) Generation() string {
@@ -30,6 +31,13 @@ func (s *snapshot) Stat(
 ) (source.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return source.Entry{}, err
+	}
+	if s.traversalPolicy.excludesLocator(string(locator)) {
+		return source.Entry{}, fmt.Errorf(
+			"%w: source locator %q is excluded by traversal policy",
+			artifactstore.ErrNotFound,
+			locator,
+		)
 	}
 	path, err := s.resolve(locator)
 	if err != nil {
@@ -46,13 +54,6 @@ func (s *snapshot) Stat(
 	if err != nil {
 		return source.Entry{}, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		return source.Entry{}, fmt.Errorf(
-			"%w: symbolic link %q is not allowed",
-			artifactstore.ErrInvalid,
-			locator,
-		)
-	}
 	return entryFromInfo(locator, info), nil
 }
 
@@ -63,10 +64,17 @@ func (s *snapshot) ReadDir(
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
 	}
+	if s.traversalPolicy.excludesLocator(string(locator)) {
+		return []source.Entry{}, nil
+	}
 	path, err := s.resolve(locator)
 	if err != nil {
 		return nil, err
 	}
+	if locator != "." && s.traversalPolicy.isGitSubmoduleDirectory(path) {
+		return []source.Entry{}, nil
+	}
+
 	values, err := os.ReadDir(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
@@ -92,13 +100,14 @@ func (s *snapshot) ReadDir(
 		if err != nil {
 			return nil, err
 		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return nil, fmt.Errorf(
-				"%w: symbolic link %q is not allowed",
-				artifactstore.ErrInvalid,
-				child,
-			)
+		if info.IsDir() &&
+			(s.traversalPolicy.shouldSkipDirectory(info.Name()) ||
+				s.traversalPolicy.isGitSubmoduleDirectory(filepath.Join(path, value.Name()))) {
+			continue
 		}
+
+		// Symlinks remain visible as entries so generic discovery can safely
+		// skip them without treating the source as invalid.
 		output = append(output, entryFromInfo(child, info))
 	}
 	sort.Slice(output, func(left, right int) bool {
@@ -113,6 +122,13 @@ func (s *snapshot) Open(
 ) (io.ReadCloser, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
+	}
+	if s.traversalPolicy.excludesLocator(string(locator)) {
+		return nil, fmt.Errorf(
+			"%w: source locator %q is excluded by traversal policy",
+			artifactstore.ErrNotFound,
+			locator,
+		)
 	}
 	path, err := s.resolve(locator)
 	if err != nil {
@@ -143,7 +159,7 @@ func (s *snapshot) Confirm(ctx context.Context) error {
 	if err := s.ensureOpen(ctx); err != nil {
 		return err
 	}
-	current, err := fingerprint(ctx, s.root)
+	current, err := fingerprint(ctx, s.root, s.traversalPolicy)
 	if err != nil {
 		return err
 	}

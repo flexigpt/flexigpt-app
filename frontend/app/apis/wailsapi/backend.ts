@@ -10,6 +10,8 @@ import {
 	OpenDirectoryAsAttachments,
 	OpenMultipleFilesAsAttachments,
 	OpenURLAsAttachment,
+	PickDirectory,
+	PickFiles,
 	Ping,
 	SaveFile,
 } from '@/apis/wailsjs/go/main/App';
@@ -145,6 +147,17 @@ export class WailsBackendAPI implements IBackendAPI {
 
 	ping(): Promise<string> {
 		return Ping();
+	}
+
+	async pickDirectoryPath(): Promise<string | undefined> {
+		const path = ((await PickDirectory()) ?? '').trim();
+		return path || undefined;
+	}
+
+	async pickFilePaths(allowMultiple: boolean): Promise<string[]> {
+		const paths = await PickFiles(allowMultiple);
+
+		return (paths ?? []).map(path => path.trim()).filter(Boolean);
 	}
 
 	// Implement the log method

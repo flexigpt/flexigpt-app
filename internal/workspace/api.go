@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
@@ -32,7 +33,8 @@ type OpenConfig struct {
 	Clock       artifactstore.Clock
 	IDGenerator artifactstore.IDGenerator
 
-	WorkspaceConfig Config
+	WorkspaceConfig           Config
+	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 }
 
 // API is the workspace aggregate boundary for HTTP, Wails, CLI, and other
@@ -77,12 +79,13 @@ func Open(
 	decoders = append(decoders, config.AdditionalDecoders...)
 
 	artifacts, err := system.Open(ctx, system.Config{
-		BaseDirectory:     config.BaseDirectory,
-		EmbeddedProviders: config.EmbeddedProviders,
-		AdditionalSources: config.AdditionalSourceAdapters,
-		Decoders:          decoders,
-		Clock:             config.Clock,
-		IDGenerator:       config.IDGenerator,
+		BaseDirectory:             config.BaseDirectory,
+		EmbeddedProviders:         config.EmbeddedProviders,
+		AdditionalSources:         config.AdditionalSourceAdapters,
+		Decoders:                  decoders,
+		Clock:                     config.Clock,
+		IDGenerator:               config.IDGenerator,
+		FilesystemTraversalPolicy: config.FilesystemTraversalPolicy,
 	})
 	if err != nil {
 		return nil, err
@@ -144,7 +147,7 @@ func (a *API) CreateFilesystemWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	view, err := workspaceViewOf(value)
+	view, err := a.workspaceViewForAPI(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +176,7 @@ func (a *API) CreateEmptyWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	view, err := workspaceViewOf(value)
+	view, err := a.workspaceViewForAPI(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +197,7 @@ func (a *API) GetWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	view, err := workspaceViewOf(value)
+	view, err := a.workspaceViewForAPI(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +217,7 @@ func (a *API) ListWorkspaces(
 	}
 	output := make([]WorkspaceView, 0, len(values))
 	for _, value := range values {
-		view, err := workspaceViewOf(value)
+		view, err := a.workspaceViewForAPI(ctx, value)
 		if err != nil {
 			return nil, err
 		}
@@ -247,7 +250,7 @@ func (a *API) UpdateWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	view, err := workspaceViewOf(value)
+	view, err := a.workspaceViewForAPI(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +305,7 @@ func (a *API) AttachWorkspaceSource(
 	if err != nil {
 		return nil, err
 	}
-	view, err := workspaceViewOf(value)
+	view, err := a.workspaceViewForAPI(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +338,7 @@ func (a *API) UpdateWorkspaceAttachment(
 	if err != nil {
 		return nil, err
 	}
-	view, err := workspaceViewOf(value)
+	view, err := a.workspaceViewForAPI(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +365,7 @@ func (a *API) DetachWorkspaceSource(
 	if err != nil {
 		return nil, err
 	}
-	view, err := workspaceViewOf(value)
+	view, err := a.workspaceViewForAPI(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +411,7 @@ func (a *API) GetWorkspaceCatalog(
 	if err != nil {
 		return nil, err
 	}
-	output, err := workspaceCatalogViewOf(value)
+	output, err := a.workspaceCatalogViewForAPI(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -731,6 +734,83 @@ func (a *API) ready() error {
 
 func invalidAPIRequest(message string) error {
 	return fmt.Errorf("%w: %s", engine.ErrInvalidWorkspace, message)
+}
+
+func (a *API) workspaceViewForAPI(
+	ctx context.Context,
+	value engine.Workspace,
+) (WorkspaceView, error) {
+	output, err := workspaceViewOf(value)
+	if err != nil {
+		return WorkspaceView{}, err
+	}
+	if err := a.enrichWorkspaceSourcePresentation(ctx, &output, value); err != nil {
+		return WorkspaceView{}, err
+	}
+	return output, nil
+}
+
+func (a *API) workspaceCatalogViewForAPI(
+	ctx context.Context,
+	value engine.CatalogView,
+) (WorkspaceCatalogView, error) {
+	output, err := workspaceCatalogViewOf(value)
+	if err != nil {
+		return WorkspaceCatalogView{}, err
+	}
+	if err := a.enrichWorkspaceSourcePresentation(
+		ctx,
+		&output.Workspace,
+		value.Workspace,
+	); err != nil {
+		return WorkspaceCatalogView{}, err
+	}
+	return output, nil
+}
+
+func (a *API) enrichWorkspaceSourcePresentation(
+	ctx context.Context,
+	output *WorkspaceView,
+	value engine.Workspace,
+) error {
+	for index := range output.Attachments {
+		attachment := &output.Attachments[index]
+		var summaryFound bool
+
+		for _, summary := range value.Sources {
+			if summary.ID != attachment.SourceID {
+				continue
+			}
+			attachment.SourceDisplayName = summary.DisplayName
+			attachment.SourceKind = string(summary.Kind)
+			summaryFound = true
+			break
+		}
+		if !summaryFound {
+			return fmt.Errorf(
+				"%w: Workspace attachment source %q is unavailable",
+				engine.ErrInvalidWorkspace,
+				attachment.SourceID,
+			)
+		}
+		if attachment.SourceKind != string(fsdir.Kind) {
+			continue
+		}
+
+		sourceValue, err := a.artifacts.SourceRuntime.Get(ctx, attachment.SourceID)
+		if err != nil {
+			return err
+		}
+		path, err := fsdir.RootPath(sourceValue)
+		if err != nil {
+			return err
+		}
+		attachment.Path = path
+		if attachment.SourceID == output.PrimarySourceID {
+			output.PrimaryPath = path
+		}
+	}
+	return nil
 }
 
 func workspaceViewOf(value engine.Workspace) (WorkspaceView, error) {

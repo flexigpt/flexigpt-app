@@ -1,28 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-	FiChevronDown,
-	FiChevronUp,
-	FiEdit2,
-	FiEye,
-	FiFileText,
-	FiLink,
-	FiPlus,
-	FiRefreshCw,
-	FiTrash2,
-} from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiFileText, FiLink, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type {
-	AttachWorkspaceSourcePayload,
-	UpdateWorkspaceAttachmentPayload,
 	UpdateWorkspacePayload,
-	WorkspaceAttachmentView,
 	WorkspaceContextView,
 	WorkspaceRecordView,
 	WorkspaceSkillView,
 	WorkspaceView,
 } from '@/spec/workspace';
-import { WorkspaceArtifactKind, WorkspaceAttachmentRole, WorkspaceRecordMode } from '@/spec/workspace';
+import { WorkspaceArtifactKind, WorkspaceMode, WorkspaceRecordMode } from '@/spec/workspace';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
@@ -52,12 +39,11 @@ import {
 	replaceWorkspaceRecord,
 	workspaceRecordMatchesSearch,
 } from '@/workspaces/lib/workspace_utils';
-import { WorkspaceAttachmentModal } from '@/workspaces/workspace_attachment_modal';
-import { WorkspaceContextPreviewModal } from '@/workspaces/workspace_context_preview_modal';
+import { WorkspaceContextPreview } from '@/workspaces/workspace_context_preview';
 import { WorkspaceDiagnostics } from '@/workspaces/workspace_diagnostics';
-import { WorkspaceRecordDetailsModal } from '@/workspaces/workspace_record_details_modal';
-import type { WorkspaceUpsertSubmission } from '@/workspaces/workspace_upsert_modal';
-import { WorkspaceUpsertModal } from '@/workspaces/workspace_upsert_modal';
+import { WorkspaceResourceDetailsModal } from '@/workspaces/workspace_resource_details_modal';
+import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
+import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
 
 type WorkspaceTab = 'records' | 'contexts' | 'skills' | 'sources' | 'diagnostics';
 
@@ -131,13 +117,14 @@ function RecordControls({
 					{runtimeRelevant ? (
 						<EnabledControl
 							id={`workspace-runtime-${workspace.rootID}-${record.id}`}
-							label="Runtime allowed"
+							label="Use in conversations"
 							checked={record.runtimeAllowed}
 							onChange={allowed => {
 								onToggleRuntime(record, allowed);
 							}}
 							disabled={!workspace.enabled}
 							busy={isPending(`${record.id}:runtime`)}
+							title="Allows this discovered item to be used when the workspace is selected for a conversation."
 						/>
 					) : null}
 				</>
@@ -214,11 +201,8 @@ export function WorkspaceCard({
 	const [alertMessage, setAlertMessage] = useState('');
 
 	const [isEditOpen, setIsEditOpen] = useState(false);
-	const [isAttachmentOpen, setIsAttachmentOpen] = useState(false);
-	const [attachmentToEdit, setAttachmentToEdit] = useState<WorkspaceAttachmentView | undefined>();
 	const [recordToInspect, setRecordToInspect] = useState<WorkspaceRecordView | null>(null);
 	const [recordToDelete, setRecordToDelete] = useState<WorkspaceRecordView | null>(null);
-	const [attachmentToDetach, setAttachmentToDetach] = useState<WorkspaceAttachmentView | null>(null);
 	const [isContextPreviewOpen, setIsContextPreviewOpen] = useState(false);
 
 	const requestIDRef = useRef(0);
@@ -226,11 +210,20 @@ export function WorkspaceCard({
 	const { isPending, runAction } = usePendingActions();
 
 	useEffect(() => {
+		mountedRef.current = true;
 		return () => {
 			mountedRef.current = false;
 			requestIDRef.current += 1;
 		};
 	}, []);
+
+	const sourceLabelFor = useCallback(
+		(sourceID: string) => {
+			const attachment = workspace.attachments.find(item => item.sourceID === sourceID);
+			return attachment?.path ?? attachment?.sourceDisplayName ?? 'Workspace source';
+		},
+		[workspace.attachments]
+	);
 
 	const reloadCatalog = useCallback(async () => {
 		const requestID = requestIDRef.current + 1;
@@ -255,13 +248,6 @@ export function WorkspaceCard({
 			}
 		}
 	}, [onWorkspaceChange, workspace.rootID]);
-
-	useEffect(() => {
-		if (isExpanded && !catalogData && !isCatalogLoading && !catalogError) {
-			// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
-			void reloadCatalog().catch(() => undefined);
-		}
-	}, [catalogData, catalogError, isCatalogLoading, isExpanded, reloadCatalog]);
 
 	const records = useMemo(() => (catalogData ? getWorkspaceRecords(catalogData.catalog) : []), [catalogData]);
 	const visibleRecords = useMemo(
@@ -326,38 +312,11 @@ export function WorkspaceCard({
 		}
 	};
 
-	const saveWorkspace = async (submission: WorkspaceUpsertSubmission) => {
+	const saveWorkspace = async (submission: WorkspaceSetupSubmission) => {
 		if (submission.kind !== 'update') {
 			throw new Error('Expected a workspace update.');
 		}
-
 		const updated = await onUpdateWorkspace(submission.payload);
-		onWorkspaceChange(updated);
-	};
-
-	const attachSource = async (sourceID: string, payload: AttachWorkspaceSourcePayload) => {
-		const updated = await workspaceAPI.attachWorkspaceSource(workspace.rootID, sourceID, payload);
-		onWorkspaceChange(updated);
-		setCatalogData(null);
-	};
-
-	const updateAttachment = async (sourceID: string, payload: UpdateWorkspaceAttachmentPayload) => {
-		const updated = await workspaceAPI.updateWorkspaceAttachment(workspace.rootID, sourceID, payload);
-		onWorkspaceChange(updated);
-		setCatalogData(null);
-	};
-
-	const detachAttachment = async () => {
-		if (!attachmentToDetach) {
-			return;
-		}
-
-		const updated = await workspaceAPI.detachWorkspaceSource(
-			workspace.rootID,
-			attachmentToDetach.sourceID,
-			workspace.revision,
-			attachmentToDetach.revision
-		);
 		onWorkspaceChange(updated);
 		setCatalogData(null);
 	};
@@ -394,9 +353,9 @@ export function WorkspaceCard({
 				<>
 					<MetadataPill label="Kind">{getArtifactKindLabel(record.kind)}</MetadataPill>
 					<MetadataPill label="Mode">{getRecordModeLabel(record.mode)}</MetadataPill>
-					<MetadataPill label="Source">{record.sourceID}</MetadataPill>
+					<MetadataPill label="Source">{sourceLabelFor(record.sourceID)}</MetadataPill>
 					{record.kind !== WorkspaceArtifactKind.Definition ? (
-						<MetadataPill label="Runtime">{record.runtimeAllowed ? 'Allowed' : 'Denied'}</MetadataPill>
+						<MetadataPill label="Conversation use">{record.runtimeAllowed ? 'Allowed' : 'Not allowed'}</MetadataPill>
 					) : null}
 					{record.diagnostics?.length ? (
 						<MetadataPill label="Diagnostics">{record.diagnostics.length}</MetadataPill>
@@ -472,7 +431,15 @@ export function WorkspaceCard({
 		<>
 			<ManagementBundleCard
 				title={workspace.displayName}
-				identity={<span className="font-mono">{workspace.rootID}</span>}
+				identity={
+					workspace.primaryPath ? (
+						<span className="font-mono break-all">{workspace.primaryPath}</span>
+					) : workspace.mode === WorkspaceMode.Empty ? (
+						'No project folder attached'
+					) : (
+						'Project folder path unavailable'
+					)
+				}
 				description={workspace.description}
 				status={
 					<>
@@ -480,7 +447,6 @@ export function WorkspaceCard({
 							{workspace.enabled ? 'Enabled' : 'Disabled'}
 						</StatusBadge>
 						<StatusBadge>{workspace.mode}</StatusBadge>
-						{workspace.hasTrustReference ? <StatusBadge tone="info">Trusted</StatusBadge> : null}
 					</>
 				}
 				disclosure={
@@ -488,7 +454,11 @@ export function WorkspaceCard({
 						type="button"
 						className="btn btn-sm btn-ghost rounded-xl"
 						onClick={() => {
-							setIsExpanded(previous => !previous);
+							const nextExpanded = !isExpanded;
+							setIsExpanded(nextExpanded);
+							if (nextExpanded && !catalogData && !isCatalogLoading && !catalogError) {
+								void reloadCatalog().catch(() => undefined);
+							}
 						}}
 						aria-expanded={isExpanded}
 					>
@@ -498,10 +468,9 @@ export function WorkspaceCard({
 				}
 				metadata={
 					<>
-						<MetadataPill label="Revision">{workspace.revision}</MetadataPill>
+						<MetadataPill label="Context files">{workspace.discovery.additionalLocators?.length ?? 0}</MetadataPill>
+						<MetadataPill label="Skill folders">{workspace.discovery.additionalRoots?.length ?? 0}</MetadataPill>
 						<MetadataPill label="Sources">{workspace.attachments.length}</MetadataPill>
-						<MetadataPill label="Additional files">{workspace.discovery.additionalLocators?.length ?? 0}</MetadataPill>
-						<MetadataPill label="Additional folders">{workspace.discovery.additionalRoots?.length ?? 0}</MetadataPill>
 					</>
 				}
 				actionLeading={
@@ -861,25 +830,11 @@ export function WorkspaceCard({
 
 						{activeTab === 'sources' ? (
 							<div className="space-y-3">
-								<div className="flex justify-end">
-									<button
-										type="button"
-										className="btn btn-sm btn-ghost rounded-xl"
-										onClick={() => {
-											setAttachmentToEdit(undefined);
-											setIsAttachmentOpen(true);
-										}}
-									>
-										<FiPlus size={14} />
-										<span>Attach Source</span>
-									</button>
-								</div>
-
 								{workspace.attachments.map(attachment => (
 									<ManagementItemCard
 										key={attachment.sourceID}
-										title={attachment.sourceID}
-										subtitle={`Attachment revision ${attachment.revision}`}
+										title={attachment.path ?? attachment.sourceDisplayName ?? 'Attached source'}
+										subtitle={attachment.path ? attachment.sourceDisplayName : attachment.sourceKind}
 										status={
 											<>
 												<StatusBadge tone={attachment.enabled ? 'success' : 'neutral'}>
@@ -891,36 +846,8 @@ export function WorkspaceCard({
 										metadata={
 											<>
 												<MetadataPill label="Priority">{attachment.priority}</MetadataPill>
-												<MetadataPill label="Recursive">{attachment.settings.recursive ? 'Yes' : 'No'}</MetadataPill>
-												<MetadataPill label="Authoritative">
-													{attachment.settings.authoritative ? 'Yes' : 'No'}
-												</MetadataPill>
-											</>
-										}
-										actions={
-											<>
-												<button
-													type="button"
-													className="btn btn-sm btn-ghost rounded-xl"
-													onClick={() => {
-														setAttachmentToEdit(attachment);
-														setIsAttachmentOpen(true);
-													}}
-												>
-													<FiEdit2 size={14} />
-													<span>Edit</span>
-												</button>
-												{attachment.role !== WorkspaceAttachmentRole.Primary ? (
-													<button
-														type="button"
-														className="btn btn-sm btn-ghost rounded-xl"
-														onClick={() => {
-															setAttachmentToDetach(attachment);
-														}}
-													>
-														<FiTrash2 size={14} />
-														<span>Detach</span>
-													</button>
+												{attachment.sourceKind ? (
+													<MetadataPill label="Type">{attachment.sourceKind}</MetadataPill>
 												) : null}
 											</>
 										}
@@ -930,6 +857,11 @@ export function WorkspaceCard({
 								{workspace.attachments.length === 0 ? (
 									<ManagementEmptyState>No sources attached.</ManagementEmptyState>
 								) : null}
+
+								<div className="text-base-content/60 rounded-2xl px-1 text-xs">
+									Additional project folders are currently configured as discovery paths. A path-based external source
+									attachment API should be added before exposing source attachment management here.
+								</div>
 							</div>
 						) : null}
 
@@ -938,7 +870,7 @@ export function WorkspaceCard({
 				) : null}
 			</ManagementBundleCard>
 
-			<WorkspaceUpsertModal
+			<WorkspaceSetupModal
 				isOpen={isEditOpen}
 				onClose={() => {
 					setIsEditOpen(false);
@@ -948,28 +880,16 @@ export function WorkspaceCard({
 				existingDisplayNames={existingDisplayNames}
 			/>
 
-			<WorkspaceAttachmentModal
-				isOpen={isAttachmentOpen}
-				onClose={() => {
-					setIsAttachmentOpen(false);
-					setAttachmentToEdit(undefined);
-				}}
-				workspace={workspace}
-				attachment={attachmentToEdit}
-				onAttach={attachSource}
-				onUpdate={updateAttachment}
-			/>
-
-			<WorkspaceRecordDetailsModal
+			<WorkspaceResourceDetailsModal
 				isOpen={recordToInspect !== null}
 				onClose={() => {
 					setRecordToInspect(null);
 				}}
-				rootID={workspace.rootID}
+				workspace={workspace}
 				record={recordToInspect}
 			/>
 
-			<WorkspaceContextPreviewModal
+			<WorkspaceContextPreview
 				isOpen={isContextPreviewOpen}
 				onClose={() => {
 					setIsContextPreviewOpen(false);
@@ -997,20 +917,6 @@ export function WorkspaceCard({
 				busyLabel="Deleting..."
 				confirmTone="error"
 				onConfirm={deleteRecord}
-				blockCancel
-			/>
-
-			<ModalConfirmDialog
-				isOpen={attachmentToDetach !== null}
-				onClose={() => {
-					setAttachmentToDetach(null);
-				}}
-				title="Detach Workspace Source"
-				message={`Detach source "${attachmentToDetach?.sourceID ?? ''}" from this workspace?`}
-				confirmLabel="Detach Source"
-				busyLabel="Detaching..."
-				confirmTone="warning"
-				onConfirm={detachAttachment}
 				blockCancel
 			/>
 

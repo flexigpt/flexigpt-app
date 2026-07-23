@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
@@ -23,6 +24,11 @@ type Candidate struct {
 	Locator             artifactstore.Locator
 	SourceContentDigest artifactstore.Digest
 	Content             []byte
+	RequestedDecoderIDs []artifactstore.DecoderID
+}
+
+func (c Candidate) RequestsDecoder(id artifactstore.DecoderID) bool {
+	return slices.Contains(c.RequestedDecoderIDs, id)
 }
 
 type Decoded struct {

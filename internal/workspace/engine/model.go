@@ -119,7 +119,7 @@ type UpdateRequest struct {
 	DisplayName      string               `json:"displayName"`
 	Description      string               `json:"description,omitempty"`
 	Enabled          bool                 `json:"enabled"`
-	TrustReference   string               `json:"trustReference,omitempty"`
+	TrustReference   *string              `json:"trustReference,omitempty"`
 	Discovery        DiscoveryPreferences `json:"discovery"`
 }
 

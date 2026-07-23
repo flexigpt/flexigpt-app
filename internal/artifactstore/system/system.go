@@ -22,12 +22,13 @@ import (
 )
 
 type Config struct {
-	BaseDirectory     string
-	EmbeddedProviders map[string]fs.FS
-	AdditionalSources []source.Adapter
-	Decoders          []discovery.Decoder
-	Clock             artifactstore.Clock
-	IDGenerator       artifactstore.IDGenerator
+	BaseDirectory             string
+	EmbeddedProviders         map[string]fs.FS
+	AdditionalSources         []source.Adapter
+	Decoders                  []discovery.Decoder
+	Clock                     artifactstore.Clock
+	IDGenerator               artifactstore.IDGenerator
+	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 }
 
 type Components struct {
@@ -83,14 +84,24 @@ func Open(
 		return nil, err
 	}
 
+	filesystemAdapter, err := fsdir.NewWithTraversalPolicy(
+		config.FilesystemTraversalPolicy,
+	)
+	if err != nil {
+		_ = content.Close()
+		_ = metadata.Close()
+		return nil, err
+	}
+
 	embeddedAdapter, err := embedded.New(config.EmbeddedProviders)
 	if err != nil {
 		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
+
 	sourceAdapters := make([]source.Adapter, 0, 2)
-	sourceAdapters = append(sourceAdapters, fsdir.New(), embeddedAdapter)
+	sourceAdapters = append(sourceAdapters, filesystemAdapter, embeddedAdapter)
 	sourceAdapters = append(sourceAdapters, config.AdditionalSources...)
 
 	sourceRegistry, err := source.NewRegistry(sourceAdapters...)

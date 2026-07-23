@@ -189,6 +189,7 @@ func (e *Engine) Discover(
 			Locator:             entry.Locator,
 			SourceContentDigest: sourceDigest,
 			Content:             content,
+			RequestedDecoderIDs: plan.RequestedDecoderIDs(entry.Locator),
 		}
 
 		decoder, diagnostics := e.selectDecoder(ctx, candidate, allowed)
@@ -478,6 +479,7 @@ func (e *Engine) selectDecoder(
 func cloneCandidate(value Candidate) Candidate {
 	output := value
 	output.Content = append([]byte(nil), value.Content...)
+	output.RequestedDecoderIDs = append([]artifactstore.DecoderID(nil), value.RequestedDecoderIDs...)
 	return output
 }
 
@@ -562,11 +564,9 @@ func collectCandidates(
 			)
 		}
 		if entry.IsSymlink {
-			return fmt.Errorf(
-				"%w: discovery refuses symbolic link %q",
-				artifactstore.ErrInvalid,
-				entry.Locator,
-			)
+			// A symlink is not a discoverable candidate. It is deliberately
+			// ignored rather than making an otherwise valid Workspace fail.
+			return nil
 		}
 		if !entry.IsRegular {
 			return nil
@@ -639,12 +639,9 @@ func collectCandidates(
 						entry.Locator,
 					)
 				}
+
 				if entry.IsSymlink {
-					return fmt.Errorf(
-						"%w: discovery refuses symbolic link %q",
-						artifactstore.ErrInvalid,
-						entry.Locator,
-					)
+					continue
 				}
 				if entry.IsDirectory {
 					if root.Recursive {

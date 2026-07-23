@@ -11430,6 +11430,9 @@ export namespace workspace {
 	    role: string;
 	    priority: number;
 	    enabled: boolean;
+	    sourceDisplayName?: string;
+	    sourceKind?: string;
+	    path?: string;
 	    settings: WorkspaceAttachmentSettings;
 	
 	    static createFrom(source: any = {}) {
@@ -11443,6 +11446,9 @@ export namespace workspace {
 	        this.role = source["role"];
 	        this.priority = source["priority"];
 	        this.enabled = source["enabled"];
+	        this.sourceDisplayName = source["sourceDisplayName"];
+	        this.sourceKind = source["sourceKind"];
+	        this.path = source["path"];
 	        this.settings = this.convertValues(source["settings"], WorkspaceAttachmentSettings);
 	    }
 	
@@ -11522,6 +11528,7 @@ export namespace workspace {
 	    enabled: boolean;
 	    mode: string;
 	    primarySourceID?: string;
+	    primaryPath?: string;
 	    hasTrustReference: boolean;
 	    discovery: WorkspaceDiscovery;
 	    attachments: WorkspaceAttachmentView[];
@@ -11539,6 +11546,7 @@ export namespace workspace {
 	        this.enabled = source["enabled"];
 	        this.mode = source["mode"];
 	        this.primarySourceID = source["primarySourceID"];
+	        this.primaryPath = source["primaryPath"];
 	        this.hasTrustReference = source["hasTrustReference"];
 	        this.discovery = this.convertValues(source["discovery"], WorkspaceDiscovery);
 	        this.attachments = this.convertValues(source["attachments"], WorkspaceAttachmentView);

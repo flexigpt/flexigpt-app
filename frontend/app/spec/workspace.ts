@@ -106,6 +106,9 @@ export interface WorkspaceAttachmentSettings {
 export interface WorkspaceAttachmentView {
 	sourceID: WorkspaceSourceID;
 	revision: number;
+	sourceDisplayName?: string;
+	sourceKind?: string;
+	path?: string;
 	role: WorkspaceAttachmentRole;
 	priority: number;
 	enabled: boolean;
@@ -113,8 +116,11 @@ export interface WorkspaceAttachmentView {
 }
 
 /**
- * API-safe Workspace projection. Source configuration, source paths, raw root
- * data, attachment data, and the trust reference are intentionally excluded.
+ * Local desktop Workspace projection.
+ *
+ * Filesystem paths are intentionally exposed to the local management UI.
+ * Source configuration, raw source data, attachment data, and trust-reference
+ * contents remain excluded.
  */
 export interface WorkspaceView {
 	rootID: WorkspaceRootID;
@@ -124,6 +130,7 @@ export interface WorkspaceView {
 	enabled: boolean;
 	mode: WorkspaceMode;
 	primarySourceID?: WorkspaceSourceID;
+	primaryPath?: string;
 	hasTrustReference: boolean;
 	discovery: WorkspaceDiscovery;
 	attachments: WorkspaceAttachmentView[];

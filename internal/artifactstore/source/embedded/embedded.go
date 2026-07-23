@@ -191,22 +191,14 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 			return err
 		}
 		if info.Mode()&fs.ModeSymlink != 0 {
-			return fmt.Errorf(
-				"%w: embedded source contains symbolic link %q",
-				artifactstore.ErrInvalid,
-				name,
-			)
+			return nil
 		}
 		if entry.IsDir() {
 			_, _ = io.WriteString(hash, "d\x00"+name+"\x00")
 			return nil
 		}
 		if !info.Mode().IsRegular() {
-			return fmt.Errorf(
-				"%w: embedded source contains unsupported entry %q",
-				artifactstore.ErrInvalid,
-				name,
-			)
+			return nil
 		}
 		if info.Size() < 0 || info.Size() > artifactstore.MaxScanBytes-totalBytes {
 			return fmt.Errorf(

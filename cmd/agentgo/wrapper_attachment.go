@@ -48,6 +48,22 @@ func (a *App) OpenMultipleFilesAsAttachments(
 	})
 }
 
+// PickDirectory opens a directory picker without walking the selected tree or
+// constructing attachment objects. Workspace setup uses this path-only API.
+func (a *App) PickDirectory() (path string, err error) {
+	return middleware.WithRecoveryResp(func() (string, error) {
+		return a.pickDirectory()
+	})
+}
+
+// PickFiles opens a file picker without constructing attachment objects.
+// Workspace setup uses it when selecting explicit Context files.
+func (a *App) PickFiles(allowMultiple bool) (paths []string, err error) {
+	return middleware.WithRecoveryResp(func() ([]string, error) {
+		return a.pickFiles(allowMultiple)
+	})
+}
+
 // OpenDirectoryAsAttachments opens a single directory pick dialog and then does WalkDirectoryWithFiles for fetching max
 // no of files.
 func (a *App) OpenDirectoryAsAttachments(maxFiles int) (*attachment.DirectoryAttachmentsResult, error) {
@@ -249,6 +265,58 @@ func (a *App) openMultipleFilesAsAttachments(
 	}
 
 	return attachments, nil
+}
+
+func (a *App) pickDirectory() (string, error) {
+	if a.ctx == nil {
+		return "", errors.New("context is not initialized")
+	}
+
+	path, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		ShowHiddenFiles:      true,
+		CanCreateDirectories: false,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(path), nil
+}
+
+func (a *App) pickFiles(allowMultiple bool) ([]string, error) {
+	if a.ctx == nil {
+		return nil, errors.New("context is not initialized")
+	}
+
+	options := runtime.OpenDialogOptions{
+		ShowHiddenFiles:      true,
+		CanCreateDirectories: false,
+	}
+
+	var (
+		paths []string
+		err   error
+	)
+	if allowMultiple {
+		paths, err = runtime.OpenMultipleFilesDialog(a.ctx, options)
+	} else {
+		var path string
+		path, err = runtime.OpenFileDialog(a.ctx, options)
+		if path != "" {
+			paths = []string{path}
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if path = strings.TrimSpace(path); path != "" {
+			output = append(output, path)
+		}
+	}
+	return output, nil
 }
 
 func (a *App) openDirectoryAsAttachments(maxFiles int) (*attachment.DirectoryAttachmentsResult, error) {

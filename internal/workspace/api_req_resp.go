@@ -26,7 +26,8 @@ type WorkspaceAttachmentSettings struct {
 // WorkspaceView is the API-safe representation of a workspace.
 //
 // It deliberately excludes source configuration, root data, attachment raw
-// data, source filesystem paths, and the trust reference itself.
+// data, and the trust-reference contents. Local filesystem paths are included
+// because the local Workspace management UI intentionally displays them.
 type WorkspaceView struct {
 	RootID            artifactstore.RootID      `json:"rootID"`
 	Revision          uint64                    `json:"revision"`
@@ -35,18 +36,22 @@ type WorkspaceView struct {
 	Enabled           bool                      `json:"enabled"`
 	Mode              string                    `json:"mode"`
 	PrimarySourceID   artifactstore.SourceID    `json:"primarySourceID,omitempty"`
+	PrimaryPath       string                    `json:"primaryPath,omitempty"`
 	HasTrustReference bool                      `json:"hasTrustReference"`
 	Discovery         WorkspaceDiscovery        `json:"discovery"`
 	Attachments       []WorkspaceAttachmentView `json:"attachments"`
 }
 
 type WorkspaceAttachmentView struct {
-	SourceID artifactstore.SourceID       `json:"sourceID"`
-	Revision uint64                       `json:"revision"`
-	Role     artifactstore.AttachmentRole `json:"role"`
-	Priority int                          `json:"priority"`
-	Enabled  bool                         `json:"enabled"`
-	Settings WorkspaceAttachmentSettings  `json:"settings"`
+	SourceID          artifactstore.SourceID       `json:"sourceID"`
+	Revision          uint64                       `json:"revision"`
+	Role              artifactstore.AttachmentRole `json:"role"`
+	Priority          int                          `json:"priority"`
+	Enabled           bool                         `json:"enabled"`
+	SourceDisplayName string                       `json:"sourceDisplayName,omitempty"`
+	SourceKind        string                       `json:"sourceKind,omitempty"`
+	Path              string                       `json:"path,omitempty"`
+	Settings          WorkspaceAttachmentSettings  `json:"settings"`
 }
 
 type WorkspaceRecordView struct {
@@ -279,7 +284,7 @@ type UpdateWorkspaceRequestBody struct {
 	DisplayName      string             `json:"displayName"              required:"true"`
 	Description      string             `json:"description,omitempty"`
 	Enabled          bool               `json:"enabled"                  required:"true"`
-	TrustReference   string             `json:"trustReference,omitempty"`
+	TrustReference   *string            `json:"trustReference,omitempty"`
 	Discovery        WorkspaceDiscovery `json:"discovery"`
 }
 

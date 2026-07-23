@@ -152,7 +152,9 @@ func (s *Service) Update(
 		return Workspace{}, err
 	}
 	data := current.Data
-	data.TrustReference = request.TrustReference
+	if request.TrustReference != nil {
+		data.TrustReference = *request.TrustReference
+	}
 	data.Discovery = request.Discovery
 
 	raw, err := encodeRootData(data)

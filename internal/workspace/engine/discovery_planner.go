@@ -126,6 +126,10 @@ func (p *Planner) Build(
 				sourcePlan.DirectoryRoots,
 				preferences.AdditionalRoots,
 			)
+			sourcePlan.DecoderHints = appendDiscoveryPreferenceDecoderHints(
+				preferences,
+				p.decoderIDs,
+			)
 		}
 		if operation.allowsAttachmentDiscoveryOverrides {
 			if attachmentData.Recursive != nil {
@@ -153,6 +157,27 @@ func (p *Planner) Build(
 		return discovery.Plan{}, err
 	}
 	return valuePlan, nil
+}
+
+func appendDiscoveryPreferenceDecoderHints(
+	preferences DiscoveryPreferences,
+	decoderIDs []artifactstore.DecoderID,
+) []discovery.DecoderHint {
+	output := make([]discovery.DecoderHint, 0, len(preferences.AdditionalLocators)+len(preferences.AdditionalRoots))
+	for _, locator := range preferences.AdditionalLocators {
+		output = append(output, discovery.DecoderHint{
+			Locator:    locator,
+			DecoderIDs: append([]artifactstore.DecoderID(nil), decoderIDs...),
+		})
+	}
+	for _, root := range preferences.AdditionalRoots {
+		output = append(output, discovery.DecoderHint{
+			Locator:    root.Root,
+			Recursive:  root.Recursive,
+			DecoderIDs: append([]artifactstore.DecoderID(nil), decoderIDs...),
+		})
+	}
+	return output
 }
 
 func cloneDiscoveryProfiles(value DiscoveryProfiles) DiscoveryProfiles {

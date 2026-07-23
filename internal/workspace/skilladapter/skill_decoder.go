@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"strings"
 	"unicode/utf8"
 
@@ -67,7 +68,9 @@ func (d *SkillDecoder) Recognize(
 	candidate discovery.Candidate,
 ) discovery.Recognition {
 	if _, supported := d.conventions.Match(candidate.Locator); !supported {
-		return discovery.RecognitionNone
+		if !isTargetedSkillCandidate(candidate) {
+			return discovery.RecognitionNone
+		}
 	}
 	return discovery.RecognitionPreferred
 }
@@ -77,6 +80,9 @@ func (d *SkillDecoder) Decode(
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []artifactstore.Diagnostic) {
 	expectedName, supported := d.conventions.ExpectedName(candidate.Locator)
+	if !supported {
+		expectedName, supported = targetedSkillExpectedName(candidate)
+	}
 	if !supported {
 		return nil, nil
 	}
@@ -137,6 +143,27 @@ func (d *SkillDecoder) Decode(
 			candidate.Locator,
 			warnings,
 		)
+}
+
+func isTargetedSkillCandidate(candidate discovery.Candidate) bool {
+	if !candidate.RequestsDecoder(skillDecoderID) ||
+		!strings.EqualFold(path.Base(string(candidate.Locator)), skillDefinitionFileName) {
+		return false
+	}
+	parent := path.Dir(string(candidate.Locator))
+	return parent != "." && parent != "/" && parent != ""
+}
+
+func targetedSkillExpectedName(candidate discovery.Candidate) (string, bool) {
+	if !isTargetedSkillCandidate(candidate) {
+		return "", false
+	}
+	parent := path.Dir(string(candidate.Locator))
+	name := path.Base(parent)
+	if name == "." || name == "/" || name == "" {
+		return "", false
+	}
+	return name, true
 }
 
 func decodeSkillMarkdown(

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiFolderPlus, FiSearch, FiX } from 'react-icons/fi';
 
@@ -22,8 +22,8 @@ import { PageFrame } from '@/components/page_frame';
 
 import { getErrorMessage, sortWorkspaces, workspaceMatchesSearch } from '@/workspaces/lib/workspace_utils';
 import { WorkspaceCard } from '@/workspaces/workspace_card';
-import type { WorkspaceUpsertSubmission } from '@/workspaces/workspace_upsert_modal';
-import { WorkspaceUpsertModal } from '@/workspaces/workspace_upsert_modal';
+import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
+import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
 
 async function loadWorkspaces(signal: AbortSignal): Promise<WorkspaceView[]> {
 	const workspaces = await workspaceAPI.listWorkspaces();
@@ -50,6 +50,13 @@ export default function WorkspacesPage() {
 	const [alertMessage, setAlertMessage] = useState('');
 	const mountedRef = useRef(true);
 
+	useEffect(() => {
+		mountedRef.current = true;
+		return () => {
+			mountedRef.current = false;
+		};
+	}, []);
+
 	const existingDisplayNames = useMemo(() => workspaces.map(workspace => workspace.displayName), [workspaces]);
 
 	const visibleWorkspaces = useMemo(
@@ -57,7 +64,7 @@ export default function WorkspacesPage() {
 		[searchQuery, workspaces]
 	);
 
-	const enabledCount = workspaces.filter(workspace => workspace.enabled).length;
+	const enabledCount = useMemo(() => workspaces.filter(workspace => workspace.enabled).length, [workspaces]);
 	const filesystemCount = workspaces.filter(workspace => workspace.mode === WorkspaceMode.Filesystem).length;
 	const sourceCount = workspaces.reduce((total, workspace) => total + workspace.attachments.length, 0);
 
@@ -74,15 +81,12 @@ export default function WorkspacesPage() {
 		[setWorkspaces]
 	);
 
-	const createWorkspace = async (submission: WorkspaceUpsertSubmission) => {
-		if (submission.kind === 'update') {
+	const createWorkspace = async (submission: WorkspaceSetupSubmission) => {
+		if (submission.kind !== 'filesystem') {
 			throw new Error('Expected a new workspace payload.');
 		}
 
-		const created =
-			submission.kind === 'filesystem'
-				? await workspaceAPI.createFilesystemWorkspace(submission.payload)
-				: await workspaceAPI.createEmptyWorkspace(submission.payload);
+		const created = await workspaceAPI.createFilesystemWorkspace(submission.payload);
 
 		replaceWorkspace(created);
 
@@ -160,8 +164,8 @@ export default function WorkspacesPage() {
 						<div className="font-semibold">How workspace discovery works</div>
 						<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5 text-xs">
 							<li>Add a project root path when creating a filesystem workspace.</li>
-							<li>Default context files, README files, and skill folders are discovered by the backend.</li>
-							<li>Add project-specific files or folders from Edit Paths, then refresh the workspace.</li>
+							<li>AGENTS.md, CLAUDE.md, optional README.md, and .skills folders are discovered automatically.</li>
+							<li>Add project-specific Context files or Skill folders from Edit Workspace, then refresh.</li>
 						</ul>
 					</div>
 
@@ -194,7 +198,7 @@ export default function WorkspacesPage() {
 								onChange={event => {
 									setSearchQuery(event.currentTarget.value);
 								}}
-								placeholder="Search workspaces, IDs, paths, and sources..."
+								placeholder="Search workspaces, project paths, and discovery paths..."
 								spellCheck="false"
 							/>
 							{searchQuery ? (
@@ -242,7 +246,7 @@ export default function WorkspacesPage() {
 					</div>
 				</ManagementPageContent>
 
-				<WorkspaceUpsertModal
+				<WorkspaceSetupModal
 					isOpen={isCreateOpen}
 					onClose={() => {
 						setIsCreateOpen(false);
