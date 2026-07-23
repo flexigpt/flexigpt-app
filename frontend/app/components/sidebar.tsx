@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
 	FiBookOpen,
 	FiFilePlus,
-	FiFolder,
 	FiLayers,
 	FiMessageSquare,
 	FiServer,
@@ -89,7 +88,7 @@ export function Sidebar({ children }: SidebarProps) {
 								<FiLayers size={24} />
 							</Link>
 						</li>
-						<li className="mt-4">
+						{/* <li className="mt-4">
 							<Link
 								to="/workspaces/"
 								className="flex size-12 items-center justify-center rounded-full p-0"
@@ -99,7 +98,7 @@ export function Sidebar({ children }: SidebarProps) {
 							>
 								<FiFolder size={24} />
 							</Link>
-						</li>
+						</li> */}
 						<li className="mt-4">
 							<Link
 								to="/mcpservers/"

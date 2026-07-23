@@ -8,13 +8,40 @@ import (
 	"strings"
 )
 
+// defaultSkippedDirectory reports directories that should not be traversed.
+// Dot-prefixed directories are also skipped, including VCS metadata such as .git.
+func defaultSkippedDirectory(name string) bool {
+	if strings.HasPrefix(name, ".") {
+		return true
+	}
+
+	switch strings.ToLower(name) {
+	case "node_modules",
+		"vendor",
+		"bower_components",
+		"__pycache__",
+		"venv",
+		"site-packages",
+		"build",
+		"dist",
+		"out",
+		"target",
+		"coverage",
+		"pods",
+		"deriveddata":
+		return true
+	default:
+		return false
+	}
+}
+
 // WalkDirectoryWithFiles implements:
 //
 //   - Pure BFS over the directory tree starting at dirPath.
 //   - For each directory:
 //   - process all regular, non-dot files first (highest priority),
 //     adding them to Files until maxFiles is reached.
-//   - then enqueue its subdirectories for BFS.
+//   - then enqueue its non-ignored subdirectories for BFS.
 //   - As soon as Files reaches maxFiles, walking stops.
 //   - Remaining directories in the BFS queue are returned as OverflowDirs,
 //     with a shallow os.ReadDir() to get a one-level item count.
@@ -93,23 +120,27 @@ func WalkDirectoryWithFiles(ctx context.Context, dirPath string, maxFiles int) (
 			continue
 		}
 
-		// Split into files and dirs, ignoring hidden entries (names starting with ".").
+		// Split into files and dirs, ignoring hidden entries and known junk directories.
 		// We attach files from this directory before recursing into its subdirectories.
 		fileEntries := make([]os.DirEntry, 0, len(entries))
 		dirEntries := make([]os.DirEntry, 0, len(entries))
 		for _, e := range entries {
 			name := e.Name()
 
-			// Skip dot *files* and dot *dirs* entirely.
+			if e.IsDir() {
+				if defaultSkippedDirectory(name) {
+					continue
+				}
+				dirEntries = append(dirEntries, e)
+				continue
+			}
+
+			// Skip dot files entirely.
 			if strings.HasPrefix(name, ".") {
 				continue
 			}
 
-			if e.IsDir() {
-				dirEntries = append(dirEntries, e)
-			} else {
-				fileEntries = append(fileEntries, e)
-			}
+			fileEntries = append(fileEntries, e)
 		}
 		// Process files first.
 		filesAddedHere := 0
@@ -214,8 +245,11 @@ func WalkDirectoryWithFiles(ctx context.Context, dirPath string, maxFiles int) (
 		} else {
 			for _, e := range entries {
 				name := e.Name()
+				if e.IsDir() && defaultSkippedDirectory(name) {
+					continue
+				}
 				if strings.HasPrefix(name, ".") {
-					// Skip dot files and dot dirs from the overflow count as well.
+					// Skip dot files from the overflow count as well.
 					continue
 				}
 				itemCount++

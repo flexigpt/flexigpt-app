@@ -2,13 +2,21 @@ import type { Attachment, DirectoryOverflowInfo, UIAttachment } from '@/spec/att
 import { AttachmentContentBlockMode, AttachmentErrorReason, AttachmentKind } from '@/spec/attachment';
 
 const MAX_SINGLE_ATTACHMENT_BYTES = 16 * 1024 * 1024; // 16 MiB
+
+// At most this many files from a directory are actively sent with a message.
 export const MAX_FILES_PER_DIRECTORY = 128;
+
+// Ask the backend for a larger candidate set so the user can filter it before
+// deciding which files should occupy the active attachment limit.
+export const MAX_DIRECTORY_FILES_TO_SCAN = 512;
 
 // Directory grouping is UI-only.
 export interface DirectoryAttachmentGroup {
 	id: string;
 	dirPath: string;
 	label: string;
+	scannedFileCount: number;
+	hasMore: boolean;
 	/**
 	 * All attachment keys (uiAttachmentKey) that belong to this folder.
 	 * Includes both "owned" and "referenced" attachments.
@@ -19,6 +27,11 @@ export interface DirectoryAttachmentGroup {
 	 * Used to decide which attachments to remove when the folder is removed.
 	 */
 	ownedAttachmentKeys: string[];
+	/**
+	 * Candidates that are not currently attached. This includes files removed
+	 * by the user and candidates beyond the active 128-file limit.
+	 */
+	removedAttachments: UIAttachment[];
 	/**
 	 * Subdirectories that were not fully walked due to maxFiles limits, etc.
 	 */

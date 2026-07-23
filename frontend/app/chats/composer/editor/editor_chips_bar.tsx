@@ -24,6 +24,8 @@ interface EditorChipsBarProps {
 	onRemoveAttachment: (att: UIAttachment) => void;
 	onChangeAttachmentContentBlockMode: (att: UIAttachment, mode: AttachmentContentBlockMode) => void;
 	onRemoveDirectoryGroup: (groupId: string) => void;
+	onRemoveDirectoryAttachments: (groupId: string, attachments: UIAttachment[]) => void;
+	onRestoreDirectoryAttachments: (groupId: string, attachments: UIAttachment[]) => void;
 	onRemoveOverflowDir?: (groupId: string, dirPath: string) => void;
 	onOpenToolCallDetails?: (call: UIToolCall) => void;
 }
@@ -51,6 +53,8 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	onRemoveAttachment,
 	onChangeAttachmentContentBlockMode,
 	onRemoveDirectoryGroup,
+	onRemoveDirectoryAttachments,
+	onRestoreDirectoryAttachments,
 	onRemoveOverflowDir,
 	onOpenToolCallDetails,
 }: EditorChipsBarProps) {
@@ -100,9 +104,10 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 					key={group.id}
 					group={group}
 					attachments={attachments}
-					onRemoveAttachment={onRemoveAttachment}
 					onChangeAttachmentContentBlockMode={onChangeAttachmentContentBlockMode}
 					onRemoveDirectoryGroup={onRemoveDirectoryGroup}
+					onRemoveDirectoryAttachments={onRemoveDirectoryAttachments}
+					onRestoreDirectoryAttachments={onRestoreDirectoryAttachments}
 					onRemoveOverflowDir={onRemoveOverflowDir}
 				/>
 			))}

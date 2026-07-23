@@ -133,17 +133,25 @@ func TestWalkDirectoryWithFiles_CoreScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "SkipDotFiles_AndTraverseDotDirs",
+			name: "SkipDotEntries_AndKnownJunkDirs",
 			setup: func(t *testing.T) string {
 				t.Helper()
 				root := t.TempDir()
 				// Dotfile at root (should be skipped).
 				mustWriteFile(t, root, ".hidden_root", 10)
 
-				// Dot directory; we should traverse it, but still skip its dotfiles.
+				// Dot directories, including VCS metadata, are skipped entirely.
 				dotGit := mustMkdir(t, root, ".git")
-				mustWriteFile(t, dotGit, "ignored.txt", 20)    // included
-				mustWriteFile(t, dotGit, ".ignored_hidden", 5) // skipped
+				mustWriteFile(t, dotGit, "ignored.txt", 20)
+				mustWriteFile(t, dotGit, ".ignored_hidden", 5)
+
+				// Dependency and generated-output directories are also skipped.
+				nodeModules := mustMkdir(t, root, "node_modules")
+				mustWriteFile(t, nodeModules, "dependency.js", 60)
+				vendor := mustMkdir(t, root, "vendor")
+				mustWriteFile(t, vendor, "dependency.go", 70)
+				build := mustMkdir(t, root, "build")
+				mustWriteFile(t, build, "generated.js", 80)
 
 				// Visible root file.
 				mustWriteFile(t, root, "visible1.txt", 30)

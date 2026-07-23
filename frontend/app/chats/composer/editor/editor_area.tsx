@@ -344,6 +344,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		changeAttachmentMode: handleChangeAttachmentContentBlockMode,
 		removeAttachment: handleRemoveAttachment,
 		removeDirectoryGroup: handleRemoveDirectoryGroup,
+		removeDirectoryAttachments: handleRemoveDirectoryAttachments,
+		restoreDirectoryAttachments: handleRestoreDirectoryAttachments,
 		removeOverflowDir: handleRemoveOverflowDir,
 		applyAttachmentsDrop,
 		clearAttachments,
@@ -1818,6 +1820,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onRemoveAttachment={handleRemoveAttachment}
 									onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
 									onRemoveDirectoryGroup={handleRemoveDirectoryGroup}
+									onRemoveDirectoryAttachments={handleRemoveDirectoryAttachments}
+									onRestoreDirectoryAttachments={handleRestoreDirectoryAttachments}
 									onRemoveOverflowDir={handleRemoveOverflowDir}
 									onOpenToolCallDetails={handleOpenToolCallDetails}
 								/>

@@ -6,6 +6,8 @@ import type { IAttachmentsDropAPI } from '@/apis/interface';
 import { GetPathsAsAttachments } from '@/apis/wailsjs/go/main/App';
 import { EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
+import { MAX_DIRECTORY_FILES_TO_SCAN } from '@/chats/composer/attachments/attachment_editor_utils';
+
 type DropTarget = (payload: AttachmentsDroppedPayload) => void;
 
 let inited = false;
@@ -31,7 +33,7 @@ function initWailsDropListener(): () => void {
 
 		try {
 			console.log('got attachments drop', x, y, paths);
-			const pathResults = await GetPathsAsAttachments(paths, 128);
+			const pathResults = await GetPathsAsAttachments(paths, MAX_DIRECTORY_FILES_TO_SCAN);
 
 			const r = pathResults as PathAttachmentsResult;
 			const dropID = getUUIDv7();
@@ -42,7 +44,7 @@ function initWailsDropListener(): () => void {
 				files: r.fileAttachments,
 				directories: r.dirAttachments,
 				errors: r.errors,
-				maxFilesPerDirectory: 128,
+				maxFilesPerDirectory: MAX_DIRECTORY_FILES_TO_SCAN,
 			};
 			if (activeTarget) {
 				activeTarget(payload);
