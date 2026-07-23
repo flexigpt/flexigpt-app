@@ -1,4 +1,4 @@
-package store
+package skillstore
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 )
 
@@ -115,10 +115,10 @@ func (s *SkillStore) getAnyBundle(ctx context.Context, id bundleitemutils.Bundle
 	}
 	b, ok := all.Bundles[id]
 	if !ok {
-		return spec.SkillBundle{}, false, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotFound, id)
+		return spec.SkillBundle{}, false, fmt.Errorf("%w: %s", errSkillBundleNotFound, id)
 	}
 	if isSoftDeletedSkillBundle(b) {
-		return b, false, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, id)
+		return b, false, fmt.Errorf("%w: %s", errSkillBundleDeleting, id)
 	}
 	return b, false, nil
 }

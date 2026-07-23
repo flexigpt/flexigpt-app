@@ -72,7 +72,7 @@ func (d RuntimeDecision) Validate() error {
 	}
 }
 
-type RuntimePolicy interface {
+type SourceUsePolicy interface {
 	Decide(
 		ctx context.Context,
 		request RuntimePolicyRequest,
@@ -151,5 +151,3 @@ func RuntimeDecisionDiagnostic(
 		},
 	}
 }
-
-var _ RuntimePolicy = (*RecordRuntimePolicy)(nil)

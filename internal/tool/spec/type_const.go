@@ -2,7 +2,6 @@ package spec
 
 import (
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
@@ -21,25 +20,6 @@ const (
 
 	// SchemaVersion  - Current on-disk schema version.
 	SchemaVersion = "2025-07-01"
-)
-
-var (
-	ErrInvalidRequest = errors.New("invalid request")
-	ErrInvalidDir     = errors.New("invalid directory")
-	ErrConflict       = errors.New("resource already exists")
-
-	ErrBuiltInBundleNotFound = errors.New("bundle not found in built-in data")
-	ErrBundleNotFound        = errors.New("bundle not found")
-	ErrBundleDisabled        = errors.New("bundle is disabled")
-	ErrBundleDeleting        = errors.New("bundle is being deleted")
-	ErrBundleNotEmpty        = errors.New("bundle still contains tools")
-
-	ErrToolNotFound = errors.New("tool not found")
-
-	ErrBuiltInReadOnly = errors.New("built-in resource is read-only")
-
-	ErrFTSDisabled  = errors.New("FTS is disabled")
-	ErrToolDisabled = errors.New("tool is disabled")
 )
 
 type (

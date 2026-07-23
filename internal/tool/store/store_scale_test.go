@@ -72,7 +72,7 @@ func TestScale_LotsOfToolBundles(t *testing.T) {
 							ArgSchema: `{}`,
 						},
 					})
-					if err != nil && !errors.Is(err, spec.ErrBundleDisabled) {
+					if err != nil && !errors.Is(err, errBundleDisabled) {
 						errCh <- err
 					}
 				}

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -31,6 +32,19 @@ const (
 	softDeleteGraceTools  = 48 * time.Hour // Soft-delete grace interval.
 	cleanupIntervalTools  = 24 * time.Hour // Sweep interval.
 	builtInSnapshotMaxAge = time.Hour
+)
+
+var (
+	errInvalidRequest        = errors.New("invalid request")
+	errInvalidDir            = errors.New("invalid directory")
+	errConflict              = errors.New("resource already exists")
+	errBuiltInBundleNotFound = errors.New("bundle not found in built-in data")
+	errBundleNotFound        = errors.New("bundle not found")
+	errBundleDisabled        = errors.New("bundle is disabled")
+	errBundleDeleting        = errors.New("bundle is being deleted")
+	errBundleNotEmpty        = errors.New("bundle still contains tools")
+	errToolNotFound          = errors.New("tool not found")
+	errBuiltInReadOnly       = errors.New("built-in resource is read-only")
 )
 
 // ToolStore provides CRUD, soft-delete and optional FTS for Tool bundles.
@@ -144,7 +158,7 @@ func (ts *ToolStore) PutToolBundle(
 ) (*spec.PutToolBundleResponse, error) {
 	if req == nil || req.Body == nil ||
 		req.BundleID == "" || req.Body.Slug == "" || req.Body.DisplayName == "" {
-		return nil, fmt.Errorf("%w: id, slug & displayName required", spec.ErrInvalidRequest)
+		return nil, fmt.Errorf("%w: id, slug & displayName required", errInvalidRequest)
 	}
 	if err := bundleitemutils.ValidateBundleSlug(req.Body.Slug); err != nil {
 		return nil, err
@@ -153,7 +167,7 @@ func (ts *ToolStore) PutToolBundle(
 	// Built-ins are immutable.
 	if ts.builtinData != nil {
 		if _, err := ts.builtinData.GetBuiltInToolBundle(ctx, req.BundleID); err == nil {
-			return nil, fmt.Errorf("%w: bundleID %q", spec.ErrBuiltInReadOnly, req.BundleID)
+			return nil, fmt.Errorf("%w: bundleID %q", errBuiltInReadOnly, req.BundleID)
 		}
 	}
 
@@ -197,7 +211,7 @@ func (ts *ToolStore) PatchToolBundle(
 	ctx context.Context, req *spec.PatchToolBundleRequest,
 ) (*spec.PatchToolBundleResponse, error) {
 	if req == nil || req.Body == nil || req.BundleID == "" {
-		return nil, fmt.Errorf("%w: bundleID required", spec.ErrInvalidRequest)
+		return nil, fmt.Errorf("%w: bundleID required", errInvalidRequest)
 	}
 
 	// Built-in?
@@ -226,7 +240,7 @@ func (ts *ToolStore) PatchToolBundle(
 	}
 	bl, ok := all.Bundles[req.BundleID]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", spec.ErrBundleNotFound, req.BundleID)
+		return nil, fmt.Errorf("%w: %s", errBundleNotFound, req.BundleID)
 	}
 	bl.IsEnabled = req.Body.IsEnabled
 	bl.ModifiedAt = time.Now().UTC()
@@ -243,13 +257,13 @@ func (ts *ToolStore) DeleteToolBundle(
 	ctx context.Context, req *spec.DeleteToolBundleRequest,
 ) (*spec.DeleteToolBundleResponse, error) {
 	if req == nil || req.BundleID == "" {
-		return nil, fmt.Errorf("%w: bundleID required", spec.ErrInvalidRequest)
+		return nil, fmt.Errorf("%w: bundleID required", errInvalidRequest)
 	}
 
 	// Built-ins are immutable.
 	if ts.builtinData != nil {
 		if _, err := ts.builtinData.GetBuiltInToolBundle(ctx, req.BundleID); err == nil {
-			return nil, fmt.Errorf("%w: bundleID %q", spec.ErrBuiltInReadOnly, req.BundleID)
+			return nil, fmt.Errorf("%w: bundleID %q", errBuiltInReadOnly, req.BundleID)
 		}
 	}
 
@@ -262,10 +276,10 @@ func (ts *ToolStore) DeleteToolBundle(
 	}
 	b, ok := all.Bundles[req.BundleID]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", spec.ErrBundleNotFound, req.BundleID)
+		return nil, fmt.Errorf("%w: %s", errBundleNotFound, req.BundleID)
 	}
 	if isSoftDeletedTool(b) {
-		return nil, fmt.Errorf("%w: %s", spec.ErrBundleDeleting, req.BundleID)
+		return nil, fmt.Errorf("%w: %s", errBundleDeleting, req.BundleID)
 	}
 
 	dirInfo, derr := bundleitemutils.BuildBundleDir(b.ID, b.Slug)
@@ -279,7 +293,7 @@ func (ts *ToolStore) DeleteToolBundle(
 		return nil, err
 	}
 	if len(files) > 0 {
-		return nil, fmt.Errorf("%w: %s", spec.ErrBundleNotEmpty, req.BundleID)
+		return nil, fmt.Errorf("%w: %s", errBundleNotEmpty, req.BundleID)
 	}
 
 	now := time.Now().UTC()
@@ -417,13 +431,13 @@ func (ts *ToolStore) PutTool(
 ) (*spec.PutToolResponse, error) {
 	if req == nil || req.Body == nil ||
 		req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", spec.ErrInvalidRequest)
+		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", errInvalidRequest)
 	}
 	if req.Body.Type != spec.ToolTypeHTTP {
-		return nil, fmt.Errorf("%w: only custom http tools can be added", spec.ErrInvalidRequest)
+		return nil, fmt.Errorf("%w: only custom http tools can be added", errInvalidRequest)
 	}
 	if !req.Body.UserCallable && !req.Body.LLMCallable {
-		return nil, fmt.Errorf("%w: a tool needs to be callable", spec.ErrInvalidRequest)
+		return nil, fmt.Errorf("%w: a tool needs to be callable", errInvalidRequest)
 	}
 
 	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
@@ -438,10 +452,10 @@ func (ts *ToolStore) PutTool(
 		return nil, err
 	}
 	if isBI {
-		return nil, fmt.Errorf("%w: bundleID %q", spec.ErrBuiltInReadOnly, req.BundleID)
+		return nil, fmt.Errorf("%w: bundleID %q", errBuiltInReadOnly, req.BundleID)
 	}
 	if !bundle.IsEnabled {
-		return nil, fmt.Errorf("%w: %s", spec.ErrBundleDisabled, req.BundleID)
+		return nil, fmt.Errorf("%w: %s", errBundleDisabled, req.BundleID)
 	}
 
 	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
@@ -461,7 +475,7 @@ func (ts *ToolStore) PutTool(
 	)
 	for _, ex := range list {
 		if filepath.Base(ex.BaseRelativePath) == finf.FileName {
-			return nil, fmt.Errorf("%w: slug+version exists", spec.ErrConflict)
+			return nil, fmt.Errorf("%w: slug+version exists", errConflict)
 		}
 	}
 
@@ -517,7 +531,7 @@ func (ts *ToolStore) PatchTool(
 ) (*spec.PatchToolResponse, error) {
 	if req == nil || req.Body == nil ||
 		req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", spec.ErrInvalidRequest)
+		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", errInvalidRequest)
 	}
 	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
 		return nil, err
@@ -543,7 +557,7 @@ func (ts *ToolStore) PatchTool(
 		return &spec.PatchToolResponse{}, nil
 	}
 	if !bundle.IsEnabled {
-		return nil, fmt.Errorf("%w: %s", spec.ErrBundleDisabled, req.BundleID)
+		return nil, fmt.Errorf("%w: %s", errBundleDisabled, req.BundleID)
 	}
 
 	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
@@ -580,7 +594,7 @@ func (ts *ToolStore) DeleteTool(
 	ctx context.Context, req *spec.DeleteToolRequest,
 ) (*spec.DeleteToolResponse, error) {
 	if req == nil || req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", spec.ErrInvalidRequest)
+		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", errInvalidRequest)
 	}
 	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
 		return nil, err
@@ -593,7 +607,7 @@ func (ts *ToolStore) DeleteTool(
 		return nil, err
 	}
 	if isBI {
-		return nil, fmt.Errorf("%w: bundleID %q", spec.ErrBuiltInReadOnly, req.BundleID)
+		return nil, fmt.Errorf("%w: bundleID %q", errBuiltInReadOnly, req.BundleID)
 	}
 
 	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
@@ -616,7 +630,7 @@ func (ts *ToolStore) GetTool(
 	ctx context.Context, req *spec.GetToolRequest,
 ) (*spec.GetToolResponse, error) {
 	if req == nil || req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", spec.ErrInvalidRequest)
+		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", errInvalidRequest)
 	}
 	bundle, isBI, err := ts.GetAnyToolBundle(ctx, req.BundleID)
 	if err != nil {
@@ -874,7 +888,7 @@ func (ts *ToolStore) findTool(
 	version bundleitemutils.ItemVersion,
 ) (bundleitemutils.FileInfo, string, error) {
 	if slug == "" || version == "" {
-		return bundleitemutils.FileInfo{}, "", spec.ErrInvalidRequest
+		return bundleitemutils.FileInfo{}, "", errInvalidRequest
 	}
 	fi, err := bundleitemutils.BuildItemFileInfo(slug, version)
 	if err != nil {
@@ -883,10 +897,10 @@ func (ts *ToolStore) findTool(
 	key := bundleitemutils.GetBundlePartitionFileKey(fi.FileName, bdi.DirName)
 	raw, err := ts.toolStore.GetFileData(key, false)
 	if err != nil {
-		return fi, "", fmt.Errorf("%w: %s", spec.ErrToolNotFound, slug)
+		return fi, "", fmt.Errorf("%w: %s", errToolNotFound, slug)
 	}
 	if s, _ := raw["slug"].(string); s != string(slug) {
-		return fi, "", fmt.Errorf("%w: %s", spec.ErrToolNotFound, slug)
+		return fi, "", fmt.Errorf("%w: %s", errToolNotFound, slug)
 	}
 	return fi, filepath.Join(bdi.DirName, fi.FileName), nil
 }
@@ -899,10 +913,10 @@ func (ts *ToolStore) getUserBundle(id bundleitemutils.BundleID) (spec.ToolBundle
 	}
 	b, ok := all.Bundles[id]
 	if !ok {
-		return spec.ToolBundle{}, fmt.Errorf("%w: %s", spec.ErrBundleNotFound, id)
+		return spec.ToolBundle{}, fmt.Errorf("%w: %s", errBundleNotFound, id)
 	}
 	if isSoftDeletedTool(b) {
-		return b, fmt.Errorf("%w: %s", spec.ErrBundleDeleting, id)
+		return b, fmt.Errorf("%w: %s", errBundleDeleting, id)
 	}
 	return b, nil
 }

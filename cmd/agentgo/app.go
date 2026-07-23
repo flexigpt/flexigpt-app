@@ -227,17 +227,6 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: tool runtime initialization failed\n" + err.Error())
 	}
 
-	err = InitSkillStoreWrapper(a.skillStoreAPI, a.skillsDirPath)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize skill store",
-			"directory", a.skillsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: skill store initialization failed\n" + err.Error())
-	}
-	slog.Info("skill store initialized", "directory", a.skillsDirPath)
-
 	err = InitWorkspaceWrapper(
 		a.workspaceAPI,
 		a.workspaceArtifactsDirPath,
@@ -252,10 +241,34 @@ func (a *App) initManagers() {
 	}
 	slog.Info("workspace initialized", "directory", a.workspaceArtifactsDirPath)
 
-	err = InitAggregateSkillProvider(
+	err = InitSkillStoreWrapper(
 		a.skillStoreAPI,
-		a.workspaceAPI.api.SkillProvider(),
+		a.skillsDirPath,
+		a.workspaceAPI.api.SkillAdapter(),
 	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Skill services",
+			"directory", a.skillsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: Skill initialization failed\n" + err.Error())
+	}
+	slog.Info("skill services initialized", "directory", a.skillsDirPath)
+
+	err = BindWorkspaceSkillRuntime(
+		a.workspaceAPI,
+		a.skillStoreAPI.runtime,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't bind Workspace Skill runtime",
+			"error", err,
+		)
+		panic("failed to initialize managers: Workspace Skill runtime binding failed\n" + err.Error())
+	}
+
+	err = InitAggregateSkillProvider(a.skillStoreAPI)
 	if err != nil {
 		slog.Error(
 			"couldn't initialize aggregate Skill provider",
@@ -263,8 +276,8 @@ func (a *App) initManagers() {
 		)
 		panic("failed to initialize managers: aggregate Skill provider initialization failed\n" + err.Error())
 	}
-	slog.Info("aggregate Skill provider initialized")
 
+	slog.Info("aggregate Skill provider initialized")
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
 		slog.Error(
@@ -334,6 +347,7 @@ func (a *App) initManagers() {
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.store,
 		a.skillStoreAPI.store,
+		a.skillStoreAPI.runtime,
 		a.mcpAPI.runtime,
 	)
 	if err != nil {

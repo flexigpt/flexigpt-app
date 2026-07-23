@@ -6,7 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -75,7 +75,7 @@ type PutAssistantPresetRequestBody struct {
 
 	StartingIncludeModelSystemPrompt *bool                           `json:"startingIncludeModelSystemPrompt,omitempty"`
 	StartingToolSelections           []toolSpec.ToolSelection        `json:"startingToolSelections,omitempty"`
-	StartingSkillSelections          []skillSpec.SkillSelection      `json:"startingSkillSelections,omitempty"`
+	StartingSkillSelections          []skillstoreSpec.SkillSelection `json:"startingSkillSelections,omitempty"`
 	StartingMCPContext               *mcpSpec.MCPConversationContext `json:"startingMCPContext,omitempty"`
 }
 

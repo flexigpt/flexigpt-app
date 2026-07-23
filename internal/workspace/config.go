@@ -15,7 +15,7 @@ type Config struct {
 	DiscoveryProfiles  engine.DiscoveryProfiles
 	SkillRoots         []artifactstore.Locator
 	ContextComposition contextadapter.CompositionPolicy
-	RuntimePolicy      engine.RuntimePolicy
+	SourceUsePolicy    engine.SourceUsePolicy
 }
 
 type builtinArtifactSupport struct {
@@ -47,7 +47,7 @@ func DefaultConfig() Config {
 		Supports:           BuiltinArtifactSupports(),
 		SkillRoots:         skilladapter.DefaultSkillRoots(),
 		ContextComposition: contextadapter.DefaultCompositionPolicy(),
-		RuntimePolicy:      engine.NewRecordRuntimePolicy(),
+		SourceUsePolicy:    engine.NewRecordRuntimePolicy(),
 	}
 }
 
@@ -168,9 +168,9 @@ func (c Config) skillConventions() (*skilladapter.ConventionRegistry, error) {
 	return skilladapter.NewConventionRegistry(c.SkillRoots...)
 }
 
-func (c Config) runtimePolicy() engine.RuntimePolicy {
-	if c.RuntimePolicy != nil {
-		return c.RuntimePolicy
+func (c Config) runtimePolicy() engine.SourceUsePolicy {
+	if c.SourceUsePolicy != nil {
+		return c.SourceUsePolicy
 	}
 	return engine.NewRecordRuntimePolicy()
 }

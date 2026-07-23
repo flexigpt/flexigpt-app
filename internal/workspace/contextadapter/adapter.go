@@ -62,13 +62,13 @@ type ContextInspection struct {
 
 type Adapter struct {
 	query             *engine.QueryService
-	runtimePolicy     engine.RuntimePolicy
+	runtimePolicy     engine.SourceUsePolicy
 	compositionPolicy CompositionPolicy
 }
 
 func NewAdapter(
 	query *engine.QueryService,
-	runtimePolicy engine.RuntimePolicy,
+	runtimePolicy engine.SourceUsePolicy,
 	compositionPolicy CompositionPolicy,
 ) (*Adapter, error) {
 	if query == nil || runtimePolicy == nil {

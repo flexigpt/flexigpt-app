@@ -11,8 +11,8 @@ import (
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
-	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
@@ -76,7 +76,7 @@ func (a *toolSelectionLookupAdapter) GetToolSummaryForSelection(
 		Version:  selection.ToolRef.ToolVersion,
 	})
 	if err != nil {
-		if errors.Is(err, toolSpec.ErrToolDisabled) || errors.Is(err, toolSpec.ErrBundleDisabled) {
+		if strings.Contains(strings.ToLower(err.Error()), "disabled") {
 			return assistantpresetStore.ToolSummary{IsEnabled: false}, nil
 		}
 		return assistantpresetStore.ToolSummary{}, err
@@ -91,12 +91,12 @@ func (a *toolSelectionLookupAdapter) GetToolSummaryForSelection(
 }
 
 type skillLookupAdapter struct {
-	store *skillStore.SkillStore
+	store *skillstore.SkillStore
 }
 
 func (a *skillLookupAdapter) GetSkillSummaryForSelection(
 	ctx context.Context,
-	selection skillSpec.SkillSelection,
+	selection skillstoreSpec.SkillSelection,
 ) (assistantpresetStore.SkillSummary, error) {
 	if a == nil || a.store == nil {
 		return assistantpresetStore.SkillSummary{}, errors.New("skill lookup adapter is not configured")
@@ -110,13 +110,13 @@ func (a *skillLookupAdapter) GetSkillSummaryForSelection(
 	if err != nil {
 		return assistantpresetStore.SkillSummary{}, err
 	}
-	resp, err := a.store.GetSkill(ctx, &skillSpec.GetSkillRequest{
+	resp, err := a.store.GetSkill(ctx, &skillstoreSpec.GetSkillRequest{
 		BundleID:        selection.SkillRef.BundleID,
 		SkillSlug:       selection.SkillRef.SkillSlug,
 		IncludeDisabled: true,
 	})
 	if err != nil {
-		if errors.Is(err, skillSpec.ErrSkillDisabled) || errors.Is(err, skillSpec.ErrSkillBundleDisabled) {
+		if strings.Contains(strings.ToLower(err.Error()), "disabled") {
 			return assistantpresetStore.SkillSummary{IsEnabled: false}, nil
 		}
 		return assistantpresetStore.SkillSummary{}, err
@@ -182,7 +182,7 @@ type mcpContextLookupAdapter struct {
 func NewAssistantPresetReferenceLookups(
 	modelPresetSt *modelpresetStore.ModelPresetStore,
 	toolSt *toolStore.ToolStore,
-	skillSt *skillStore.SkillStore,
+	skillSt *skillstore.SkillStore,
 	mcpServerStore MCPServerConfigStore,
 	mcpDiscovery MCPDiscoveryLookup,
 ) assistantpresetStore.ReferenceLookups {
@@ -664,17 +664,17 @@ func getToolBundleEnabled(
 		return false, err
 	}
 	if resp == nil || resp.Body == nil || len(resp.Body.ToolBundles) == 0 {
-		return false, toolSpec.ErrBundleNotFound
+		return false, errors.New("bundle not found")
 	}
 	return resp.Body.ToolBundles[0].IsEnabled, nil
 }
 
 func getSkillBundleEnabled(
 	ctx context.Context,
-	store *skillStore.SkillStore,
+	store *skillstore.SkillStore,
 	bundleID bundleitemutils.BundleID,
 ) (bool, error) {
-	resp, err := store.ListSkillBundles(ctx, &skillSpec.ListSkillBundlesRequest{
+	resp, err := store.ListSkillBundles(ctx, &skillstoreSpec.ListSkillBundlesRequest{
 		BundleIDs:       []bundleitemutils.BundleID{bundleID},
 		IncludeDisabled: true,
 		PageSize:        1,
@@ -683,7 +683,7 @@ func getSkillBundleEnabled(
 		return false, err
 	}
 	if resp == nil || resp.Body == nil || len(resp.Body.SkillBundles) == 0 {
-		return false, skillSpec.ErrSkillBundleNotFound
+		return false, errors.New("bundle not found")
 	}
 	return resp.Body.SkillBundles[0].IsEnabled, nil
 }

@@ -1,4 +1,4 @@
-package store
+package skillstore
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/mapstore-go/uuidv7filename"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 const (
@@ -26,15 +26,15 @@ func (s *SkillStore) PutSkillArtifact(
 	req *spec.PutSkillArtifactRequest,
 ) (resp *spec.PutSkillArtifactResponse, err error) {
 	if req == nil || req.Body == nil || req.BundleID == "" || req.SkillSlug == "" {
-		return nil, fmt.Errorf("%w: bundleID, skillSlug and body required", spec.ErrSkillInvalidRequest)
+		return nil, fmt.Errorf("%w: bundleID, skillSlug and body required", errSkillInvalidRequest)
 	}
 	if err := bundleitemutils.ValidateItemSlug(req.SkillSlug); err != nil {
-		return nil, fmt.Errorf("%w: invalid skillSlug", spec.ErrSkillInvalidRequest)
+		return nil, fmt.Errorf("%w: invalid skillSlug", errSkillInvalidRequest)
 	}
 
 	if s.builtin != nil {
 		if _, err := s.builtin.GetBuiltInSkillBundle(ctx, req.BundleID); err == nil {
-			return nil, fmt.Errorf("%w: bundleID %q", spec.ErrSkillBuiltInReadOnly, req.BundleID)
+			return nil, fmt.Errorf("%w: bundleID %q", errSkillBuiltInReadOnly, req.BundleID)
 		}
 	}
 
@@ -70,7 +70,7 @@ func (s *SkillStore) PutSkillArtifact(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: invalid skill artifact document: %w",
-			spec.ErrSkillInvalidRequest,
+			errSkillInvalidRequest,
 			err,
 		)
 	}
@@ -84,7 +84,7 @@ func (s *SkillStore) PutSkillArtifact(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: generated skill artifact is invalid: %w",
-			spec.ErrSkillInvalidRequest,
+			errSkillInvalidRequest,
 			err,
 		)
 	}
@@ -110,13 +110,13 @@ func (s *SkillStore) PutSkillArtifact(
 		}
 	}()
 
-	if err := s.withUserWriteSaga(ctx, "putSkillArtifact", func(sc *skillStoreSchema) (userWriteSagaOutcome, error) {
+	if err := s.withUserWrite(ctx, "putSkillArtifact", func(sc *skillStoreSchema) error {
 		b, ok := sc.Bundles[req.BundleID]
 		if !ok {
-			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotFound, req.BundleID)
+			return fmt.Errorf("%w: %s", errSkillBundleNotFound, req.BundleID)
 		}
 		if isSoftDeletedSkillBundle(b) {
-			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
+			return fmt.Errorf("%w: %s", errSkillBundleDeleting, req.BundleID)
 		}
 
 		sm := sc.Skills[req.BundleID]
@@ -125,17 +125,17 @@ func (s *SkillStore) PutSkillArtifact(
 			sc.Skills[req.BundleID] = sm
 		}
 		if _, exists := sm[req.SkillSlug]; exists {
-			return userWriteSagaOutcome{}, fmt.Errorf("%w: duplicate skillSlug in bundle", spec.ErrSkillConflict)
+			return fmt.Errorf("%w: duplicate skillSlug in bundle", errSkillConflict)
 		}
 
 		if err := createManagedSkillPackage(location, string(skillMD)); err != nil {
-			return userWriteSagaOutcome{}, err
+			return err
 		}
 		createdDir = location
 
 		uuid, err := uuidv7filename.NewUUIDv7String()
 		if err != nil {
-			return userWriteSagaOutcome{}, err
+			return err
 		}
 
 		now := time.Now().UTC()
@@ -163,33 +163,13 @@ func (s *SkillStore) PutSkillArtifact(
 			ModifiedAt: now,
 		}
 		if err := validateSkill(&sk); err != nil {
-			return userWriteSagaOutcome{}, err
-		}
-
-		if b.IsEnabled && sk.IsEnabled {
-			def, err := runtimeDefForUserSkill(sk)
-			if err != nil {
-				return userWriteSagaOutcome{}, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
-			}
-			if _, rec, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
-				return userWriteSagaOutcome{}, fmt.Errorf(
-					"%w: runtime rejected skill artifact: %w",
-					spec.ErrSkillInvalidRequest,
-					rtErr,
-				)
-			} else {
-				applyRuntimeRecordToSkill(&sk, rec)
-			}
-		}
-
-		if err := validateSkill(&sk); err != nil {
-			return userWriteSagaOutcome{}, err
+			return err
 		}
 
 		sm[req.SkillSlug] = sk
 		sc.Skills[req.BundleID] = sm
 		created = sk
-		return userWriteSagaOutcome{}, nil
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -203,7 +183,7 @@ func (s *SkillStore) PutSkillArtifact(
 
 func createManagedSkillPackage(dir, skillMD string) error {
 	if strings.TrimSpace(dir) == "" {
-		return fmt.Errorf("%w: managed skill directory is empty", spec.ErrSkillInvalidRequest)
+		return fmt.Errorf("%w: managed skill directory is empty", errSkillInvalidRequest)
 	}
 
 	parent := filepath.Dir(dir)
@@ -212,7 +192,7 @@ func createManagedSkillPackage(dir, skillMD string) error {
 	}
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		if os.IsExist(err) {
-			return fmt.Errorf("%w: managed skill directory already exists", spec.ErrSkillConflict)
+			return fmt.Errorf("%w: managed skill directory already exists", errSkillConflict)
 		}
 		return err
 	}

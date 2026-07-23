@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -65,7 +65,7 @@ type AssistantPreset struct {
 
 	// Ordered skill selections. PreLoadAsActive is only valid for argumentless "insert=instructions" skills,
 	// "insert=user-message" skills behave like user-message templates.
-	StartingSkillSelections []skillSpec.SkillSelection `json:"startingSkillSelections,omitempty"`
+	StartingSkillSelections []skillstoreSpec.SkillSelection `json:"startingSkillSelections,omitempty"`
 
 	// StartingMCPContext is copied into the first user turn when this preset is applied.
 	StartingMCPContext *mcpSpec.MCPConversationContext `json:"startingMCPContext,omitempty"`

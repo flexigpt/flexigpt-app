@@ -1,4 +1,4 @@
-package provider
+package main
 
 import (
 	"context"
@@ -6,29 +6,30 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 )
 
-type Aggregate struct {
-	providers []Provider
+type aggregateSkillProvider struct {
+	providers []skillruntime.Provider
 }
 
-func NewAggregate(
-	providers ...Provider,
-) (*Aggregate, error) {
-	values := make([]Provider, 0, len(providers))
+func newAggregateSkillProvider(
+	providers ...skillruntime.Provider,
+) (*aggregateSkillProvider, error) {
+	values := make([]skillruntime.Provider, 0, len(providers))
 	for _, provider := range providers {
 		if provider == nil {
-			return nil, errors.New("Skill aggregate provider contains nil")
+			return nil, errors.New("skill aggregate provider contains nil")
 		}
 		values = append(values, provider)
 	}
 	if len(values) == 0 {
-		return nil, errors.New("Skill aggregate provider is empty")
+		return nil, errors.New("skill aggregate provider is empty")
 	}
-	return &Aggregate{providers: values}, nil
+	return &aggregateSkillProvider{providers: values}, nil
 }
 
-func (a *Aggregate) Owns(identity string) bool {
+func (a *aggregateSkillProvider) Owns(identity string) bool {
 	for _, provider := range a.providers {
 		if provider.Owns(identity) {
 			return true
@@ -37,11 +38,11 @@ func (a *Aggregate) Owns(identity string) bool {
 	return false
 }
 
-func (a *Aggregate) List(
+func (a *aggregateSkillProvider) List(
 	ctx context.Context,
-	scope Scope,
-) ([]Skill, error) {
-	var output []Skill
+	scope skillruntime.Scope,
+) ([]skillruntime.Skill, error) {
+	var output []skillruntime.Skill
 	for _, provider := range a.providers {
 		values, err := provider.List(ctx, scope)
 		if err != nil {
@@ -68,27 +69,28 @@ func (a *Aggregate) List(
 	return output, nil
 }
 
-func (a *Aggregate) Render(
+func (a *aggregateSkillProvider) Render(
 	ctx context.Context,
-	request RenderRequest,
-) (RenderedSkill, error) {
+	request skillruntime.RenderRequest,
+) (skillruntime.RenderedSkill, error) {
 	for _, provider := range a.providers {
 		if provider.Owns(request.Identity) {
 			return provider.Render(ctx, request)
 		}
 	}
-	return RenderedSkill{
+	return skillruntime.RenderedSkill{
 		Available: false,
 		Diagnostics: []artifactstore.Diagnostic{
-			unavailableDiagnostic(
-				"skill.provider.identity-unresolved",
-				"the requested Skill provider identity is unresolved",
-			),
+			{
+				Severity: artifactstore.DiagnosticWarning,
+				Code:     "skill.provider.identity-unresolved",
+				Message:  "the requested Skill provider identity is unresolved",
+			},
 		},
 	}, nil
 }
 
-func applyPrecedence(values []Skill) {
+func applyPrecedence(values []skillruntime.Skill) {
 	byName := make(map[string][]int)
 	for index := range values {
 		if !values[index].Enabled || !values[index].Available {
@@ -145,11 +147,9 @@ func applyPrecedence(values []Skill) {
 	}
 }
 
-func originRank(value Skill) int {
-	if value.Origin == OriginWorkspace {
+func originRank(value skillruntime.Skill) int {
+	if value.Origin == skillruntime.OriginWorkspace {
 		return 2
 	}
 	return 1
 }
-
-var _ Provider = (*Aggregate)(nil)

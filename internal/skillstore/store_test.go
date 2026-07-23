@@ -1,4 +1,4 @@
-package store
+package skillstore
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 const (
@@ -123,15 +123,15 @@ func TestSkillStore_PutSkillBundle_Table(t *testing.T) {
 		req     *spec.PutSkillBundleRequest
 		wantErr error
 	}{
-		{"nil-req", nil, spec.ErrSkillInvalidRequest},
-		{"nil-body", &spec.PutSkillBundleRequest{BundleID: "b1", Body: nil}, spec.ErrSkillInvalidRequest},
+		{"nil-req", nil, errSkillInvalidRequest},
+		{"nil-body", &spec.PutSkillBundleRequest{BundleID: "b1", Body: nil}, errSkillInvalidRequest},
 		{
 			"empty-bundleid",
 			&spec.PutSkillBundleRequest{
 				BundleID: "",
 				Body:     &spec.PutSkillBundleRequestBody{Slug: "x", DisplayName: "d", IsEnabled: true},
 			},
-			spec.ErrSkillInvalidRequest,
+			errSkillInvalidRequest,
 		},
 		{
 			"missing-slug",
@@ -139,7 +139,7 @@ func TestSkillStore_PutSkillBundle_Table(t *testing.T) {
 				BundleID: "b1",
 				Body:     &spec.PutSkillBundleRequestBody{Slug: "", DisplayName: "d", IsEnabled: true},
 			},
-			spec.ErrSkillInvalidRequest,
+			errSkillInvalidRequest,
 		},
 		{
 			"missing-displayName",
@@ -147,7 +147,7 @@ func TestSkillStore_PutSkillBundle_Table(t *testing.T) {
 				BundleID: "b1",
 				Body:     &spec.PutSkillBundleRequestBody{Slug: "x", DisplayName: "", IsEnabled: true},
 			},
-			spec.ErrSkillInvalidRequest,
+			errSkillInvalidRequest,
 		},
 		{
 			"invalid-slug",
@@ -249,11 +249,11 @@ func TestSkillStore_PatchAndDeleteSkillBundle_UserPaths(t *testing.T) {
 		BundleID: "b1",
 		Body:     &spec.PatchSkillBundleRequestBody{IsEnabled: true},
 	})
-	if err == nil || !errors.Is(err, spec.ErrSkillBundleDeleting) {
+	if err == nil || !errors.Is(err, errSkillBundleDeleting) {
 		t.Fatalf("expected ErrSkillBundleDeleting, got %v", err)
 	}
 	_, err = s.DeleteSkillBundle(t.Context(), &spec.DeleteSkillBundleRequest{BundleID: "b1"})
-	if err == nil || !errors.Is(err, spec.ErrSkillBundleDeleting) {
+	if err == nil || !errors.Is(err, errSkillBundleDeleting) {
 		t.Fatalf("expected ErrSkillBundleDeleting, got %v", err)
 	}
 }
@@ -316,7 +316,7 @@ func TestSkillStore_GetSkill_DisabledChecks(t *testing.T) {
 	}
 
 	_, err = s.GetSkill(t.Context(), &spec.GetSkillRequest{BundleID: "b1", SkillSlug: "s1"})
-	if err == nil || !errors.Is(err, spec.ErrSkillDisabled) {
+	if err == nil || !errors.Is(err, errSkillDisabled) {
 		t.Fatalf("expected ErrSkillDisabled, got %v", err)
 	}
 
@@ -330,7 +330,7 @@ func TestSkillStore_GetSkill_DisabledChecks(t *testing.T) {
 	}
 
 	_, err = s.GetSkill(t.Context(), &spec.GetSkillRequest{BundleID: "b1", SkillSlug: "s1"})
-	if err == nil || !errors.Is(err, spec.ErrSkillBundleDisabled) {
+	if err == nil || !errors.Is(err, errSkillBundleDisabled) {
 		t.Fatalf("expected ErrSkillBundleDisabled, got %v", err)
 	}
 }
@@ -393,7 +393,7 @@ func TestSkillStore_ListSkillBundles_FiltersAndPaging(t *testing.T) {
 
 	// Invalid token.
 	_, err = s.ListSkillBundles(t.Context(), &spec.ListSkillBundlesRequest{PageToken: "!!!!"})
-	if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
+	if err == nil || !errors.Is(err, errSkillInvalidRequest) {
 		t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
 	}
 }
@@ -501,7 +501,7 @@ func TestSkillStore_ListSkills_UserOnlyFiltersAndPaging(t *testing.T) {
 
 	// Invalid token.
 	_, err = s.ListSkills(t.Context(), &spec.ListSkillsRequest{PageToken: "!!!!"})
-	if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
+	if err == nil || !errors.Is(err, errSkillInvalidRequest) {
 		t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
 	}
 }
@@ -599,13 +599,13 @@ func TestSkillStore_BuiltInReadOnly_Guards(t *testing.T) {
 			IsEnabled:   true,
 		},
 	})
-	if err == nil || !errors.Is(err, spec.ErrSkillBuiltInReadOnly) {
+	if err == nil || !errors.Is(err, errSkillBuiltInReadOnly) {
 		t.Fatalf("expected ErrSkillBuiltInReadOnly, got %v", err)
 	}
 
 	// Delete built-in bundle should be read-only.
 	_, err = s.DeleteSkillBundle(ctx, &spec.DeleteSkillBundleRequest{BundleID: bid})
-	if err == nil || !errors.Is(err, spec.ErrSkillBuiltInReadOnly) {
+	if err == nil || !errors.Is(err, errSkillBuiltInReadOnly) {
 		t.Fatalf("expected ErrSkillBuiltInReadOnly, got %v", err)
 	}
 
@@ -620,7 +620,7 @@ func TestSkillStore_BuiltInReadOnly_Guards(t *testing.T) {
 			IsEnabled: true,
 		},
 	})
-	if err == nil || !errors.Is(err, spec.ErrSkillBuiltInReadOnly) {
+	if err == nil || !errors.Is(err, errSkillBuiltInReadOnly) {
 		t.Fatalf("expected ErrSkillBuiltInReadOnly, got %v", err)
 	}
 
@@ -633,13 +633,13 @@ func TestSkillStore_BuiltInReadOnly_Guards(t *testing.T) {
 			Location: &loc,
 		},
 	})
-	if err == nil || !errors.Is(err, spec.ErrSkillBuiltInReadOnly) {
+	if err == nil || !errors.Is(err, errSkillBuiltInReadOnly) {
 		t.Fatalf("expected ErrSkillBuiltInReadOnly, got %v", err)
 	}
 
 	// DeleteSkill built-in should be read-only.
 	_, err = s.DeleteSkill(ctx, &spec.DeleteSkillRequest{BundleID: bid, SkillSlug: slug})
-	if err == nil || !errors.Is(err, spec.ErrSkillBuiltInReadOnly) {
+	if err == nil || !errors.Is(err, errSkillBuiltInReadOnly) {
 		t.Fatalf("expected ErrSkillBuiltInReadOnly, got %v", err)
 	}
 

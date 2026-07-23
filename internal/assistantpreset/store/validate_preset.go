@@ -11,7 +11,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -196,14 +196,14 @@ func validateAssistantPresetReferences(
 
 		insert := summary.Insert
 		if insert == "" {
-			insert = skillSpec.SkillInsertInstructions
+			insert = skillstoreSpec.SkillInsertInstructions
 		}
 
-		if insert != skillSpec.SkillInsertInstructions {
+		if insert != skillstoreSpec.SkillInsertInstructions {
 			return fmt.Errorf(
 				"startingSkillSelections[%d]: assistant preset skill selections must have insert=%q",
 				i,
-				skillSpec.SkillInsertInstructions,
+				skillstoreSpec.SkillInsertInstructions,
 			)
 		}
 
@@ -294,7 +294,7 @@ func toolSelectionRefKey(selection toolSpec.ToolSelection) (string, error) {
 	return string(raw), nil
 }
 
-func skillSelectionRefKey(selection skillSpec.SkillSelection) (string, error) {
+func skillSelectionRefKey(selection skillstoreSpec.SkillSelection) (string, error) {
 	raw, err := json.Marshal(selection)
 	if err != nil {
 		return "", err

@@ -1,4 +1,4 @@
-package provider
+package skillruntime
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 type Origin string
@@ -27,10 +27,10 @@ type Skill struct {
 	Identity string `json:"identity"`
 	Origin   Origin `json:"origin"`
 
-	InstalledRef      *spec.SkillRef         `json:"installedRef,omitempty"`
-	WorkspaceRootID   artifactstore.RootID   `json:"workspaceRootID,omitempty"`
-	WorkspaceRecordID artifactstore.RecordID `json:"workspaceRecordID,omitempty"`
-	RecordRevision    uint64                 `json:"recordRevision,omitempty"`
+	InstalledRef      *skillstoreSpec.SkillRef `json:"installedRef,omitempty"`
+	WorkspaceRootID   artifactstore.RootID     `json:"workspaceRootID,omitempty"`
+	WorkspaceRecordID artifactstore.RecordID   `json:"workspaceRecordID,omitempty"`
+	RecordRevision    uint64                   `json:"recordRevision,omitempty"`
 
 	Name        string                          `json:"name"`
 	DisplayName string                          `json:"displayName"`
@@ -73,21 +73,17 @@ func (s Skill) Validate() error {
 		}
 	case OriginWorkspace:
 		if s.WorkspaceRootID == "" || s.WorkspaceRecordID == "" {
-			return errors.New("Workspace Skill has no Workspace identity")
+			return errors.New("workspace Skill has no Workspace identity")
 		}
 	default:
 		return fmt.Errorf("unsupported Skill origin %q", s.Origin)
 	}
 	switch s.Insert {
-	case agentskillsSpec.SkillInsertInstructions,
-		agentskillsSpec.SkillInsertUserMessage:
+	case agentskillsSpec.SkillInsertInstructions, agentskillsSpec.SkillInsertUserMessage:
 	default:
 		return fmt.Errorf("unsupported Skill insert behavior %q", s.Insert)
 	}
-	if err := artifactstore.ValidateDiagnostics(s.Diagnostics); err != nil {
-		return err
-	}
-	return nil
+	return artifactstore.ValidateDiagnostics(s.Diagnostics)
 }
 
 type RenderRequest struct {
@@ -138,13 +134,6 @@ type RenderProvidedSkillResponse struct {
 	Body *RenderedSkill
 }
 
-func unavailableDiagnostic(
-	code string,
-	message string,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticWarning,
-		Code:     code,
-		Message:  message,
-	}
+func unavailableDiagnostic(code, message string) artifactstore.Diagnostic {
+	return artifactstore.Diagnostic{Severity: artifactstore.DiagnosticWarning, Code: code, Message: message}
 }

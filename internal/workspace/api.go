@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	"github.com/flexigpt/flexigpt-app/internal/skill/provider"
+
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/provision"
@@ -115,13 +115,13 @@ func (a *API) Close() error {
 	return a.artifacts.Close()
 }
 
-// SkillProvider returns the read-only Workspace Skill provider used by the
-// application aggregate. It does not expose Artifact Store internals.
-func (a *API) SkillProvider() provider.Provider {
+// SkillAdapter returns the Workspace-owned Skill source adapter. Consumers may
+// list or load Workspace Skills, but lifecycle policy remains outside workspace.
+func (a *API) SkillAdapter() *skilladapter.Adapter {
 	if a == nil || a.workspace == nil {
 		return nil
 	}
-	return a.workspace.skillProvider
+	return a.workspace.skillAdapter
 }
 
 func (a *API) CreateFilesystemWorkspace(

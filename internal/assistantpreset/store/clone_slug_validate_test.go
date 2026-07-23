@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -89,9 +89,9 @@ func TestCloneAssistantPreset(t *testing.T) {
 			},
 		},
 	}
-	orig.StartingSkillSelections = []skillSpec.SkillSelection{
+	orig.StartingSkillSelections = []skillstoreSpec.SkillSelection{
 		{
-			SkillRef: skillSpec.SkillRef{
+			SkillRef: skillstoreSpec.SkillRef{
 				BundleID:  bundleitemutils.BundleID("bundle-a"),
 				SkillSlug: testSkillA,
 				SkillID:   testSkillIDA,
@@ -335,8 +335,8 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 			ToolVersion: testItemVersion(t),
 		},
 	}
-	dupSkillSelection := skillSpec.SkillSelection{
-		SkillRef: skillSpec.SkillRef{
+	dupSkillSelection := skillstoreSpec.SkillSelection{
+		SkillRef: skillstoreSpec.SkillRef{
 			BundleID:  bundleitemutils.BundleID("bundle-a"),
 			SkillSlug: testSkillA,
 			SkillID:   testSkillIDA,
@@ -448,7 +448,7 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 			name: "duplicate skill refs",
 			preset: func() *spec.AssistantPreset {
 				p := valid
-				p.StartingSkillSelections = []skillSpec.SkillSelection{dupSkillSelection, dupSkillSelection}
+				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{dupSkillSelection, dupSkillSelection}
 				return &p
 			}(),
 			wantErrContains: "startingSkillSelections[1]: duplicate skillRef",
@@ -498,8 +498,8 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			ToolVersion: version,
 		},
 	}
-	skillSelection := skillSpec.SkillSelection{
-		SkillRef: skillSpec.SkillRef{
+	skillSelection := skillstoreSpec.SkillSelection{
+		SkillRef: skillstoreSpec.SkillRef{
 			BundleID:  bundleitemutils.BundleID("bundle-a"),
 			SkillSlug: testSkillA,
 			SkillID:   testSkillIDA,
@@ -609,7 +609,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "skill lookup missing",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
 				return p
 			}(),
 			wantErrContains: "skill lookup not configured",
@@ -618,11 +618,11 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "skill lookup error",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
+				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
 					return SkillSummary{}, errors.New("skill boom")
 				}),
 			},
@@ -632,11 +632,11 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "skill disabled",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
+				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
 					return SkillSummary{IsEnabled: false}, nil
 				}),
 			},
@@ -646,14 +646,14 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "user-message skill is rejected",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
+				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
 					return SkillSummary{
 						IsEnabled:    true,
-						Insert:       skillSpec.SkillInsertUserMessage,
+						Insert:       skillstoreSpec.SkillInsertUserMessage,
 						HasArguments: true,
 					}, nil
 				}),
@@ -666,7 +666,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				p := makeBase()
 				p.StartingModelPresetRef = &modelRef
 				p.StartingToolSelections = []toolSpec.ToolSelection{toolSel}
-				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
@@ -680,7 +680,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 						return ToolSummary{IsEnabled: true}, nil
 					},
 				),
-				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
+				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
 					return SkillSummary{IsEnabled: true}, nil
 				}),
 			},
@@ -691,14 +691,14 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				p := makeBase()
 				selection := skillSelection
 				selection.PreLoadAsActive = true
-				p.StartingSkillSelections = []skillSpec.SkillSelection{selection}
+				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{selection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
+				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
 					return SkillSummary{
 						IsEnabled:    true,
-						Insert:       skillSpec.SkillInsertInstructions,
+						Insert:       skillstoreSpec.SkillInsertInstructions,
 						HasArguments: true,
 					}, nil
 				}),
@@ -712,12 +712,12 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				selection := skillSelection
 				selection.PreLoadAsActive = true
 				selection.UseAsInstructions = true
-				p.StartingSkillSelections = []skillSpec.SkillSelection{selection}
+				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{selection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
-					return SkillSummary{IsEnabled: true, Insert: skillSpec.SkillInsertInstructions}, nil
+				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
+					return SkillSummary{IsEnabled: true, Insert: skillstoreSpec.SkillInsertInstructions}, nil
 				}),
 			},
 			wantErrContains: "preLoadAsActive and useAsInstructions cannot both be true",
@@ -848,16 +848,16 @@ func TestJSONHelpers(t *testing.T) {
 	})
 
 	t.Run("skillSelectionRefKey stable for same skillRef", func(t *testing.T) {
-		s1 := skillSpec.SkillSelection{
-			SkillRef: skillSpec.SkillRef{
+		s1 := skillstoreSpec.SkillSelection{
+			SkillRef: skillstoreSpec.SkillRef{
 				BundleID:  bundleitemutils.BundleID("bundle-a"),
 				SkillSlug: testSkillA,
 				SkillID:   testSkillIDA,
 			},
 			PreLoadAsActive: false,
 		}
-		s2 := skillSpec.SkillSelection{
-			SkillRef: skillSpec.SkillRef{
+		s2 := skillstoreSpec.SkillSelection{
+			SkillRef: skillstoreSpec.SkillRef{
 				BundleID:  bundleitemutils.BundleID("bundle-a"),
 				SkillSlug: testSkillA,
 				SkillID:   testSkillIDA,

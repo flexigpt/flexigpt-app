@@ -1,4 +1,4 @@
-package store
+package skillstore
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/fsutil"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 const (
@@ -35,7 +35,7 @@ func TestNewBuiltInSkills_InvalidArgs(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !errors.Is(err, spec.ErrSkillInvalidRequest) {
+	if !errors.Is(err, errSkillInvalidRequest) {
 		t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
 	}
 }

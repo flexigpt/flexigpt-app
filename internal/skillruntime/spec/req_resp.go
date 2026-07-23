@@ -1,9 +1,28 @@
 package spec
 
 import (
+	"errors"
+
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
+
+var (
+	ErrInvalidRequest = errors.New("invalid Skill runtime request")
+	ErrSkillNotFound  = errors.New("runtime Skill not found")
+)
+
+// SkillRef is a stable runtime-facing identity.
+//
+// Installed references retain their original fields for compatibility.
+// External sources use Identity, for example workspace/<rootID>/<recordID>.
+type SkillRef struct {
+	Identity  string                       `json:"identity,omitempty"`
+	BundleID  skillstoreSpec.SkillBundleID `json:"bundleID,omitempty"`
+	SkillSlug skillstoreSpec.SkillSlug     `json:"skillSlug,omitempty"`
+	SkillID   skillstoreSpec.SkillID       `json:"skillID,omitempty"`
+}
 
 // JSONRawString mirrors the ToolRuntime API style; it's a raw JSON string.
 type JSONRawString = string
@@ -38,12 +57,11 @@ type CreateSkillSessionRequestBody struct {
 	CloseSessionID agentskillsSpec.SessionID `json:"closeSessionID,omitempty"`
 
 	MaxActivePerSession int        `json:"maxActivePerSession,omitempty"`
-	AllowSkillRefs      []SkillRef `json:"allowSkillRefs,omitempty"`  // enabled allowlist (store ids)
-	ActiveSkillRefs     []SkillRef `json:"activeSkillRefs,omitempty"` // desired initial active (subset of allowlist)
+	AllowSkillRefs      []SkillRef `json:"allowSkillRefs,omitempty"`
+	ActiveSkillRefs     []SkillRef `json:"activeSkillRefs,omitempty"`
 }
 
-// CreateSkillSessionRequest creates a runtime session using store identities (SkillRef),
-// so the backend can translate refs -> runtime SkillDef (including embeddedfs hydration mapping).
+// CreateSkillSessionRequest creates a session using stable source identities.
 type CreateSkillSessionRequest struct {
 	Body *CreateSkillSessionRequestBody
 }

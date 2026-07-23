@@ -58,12 +58,12 @@ type SkillLoadPlan struct {
 
 type Adapter struct {
 	query         *engine.QueryService
-	runtimePolicy engine.RuntimePolicy
+	runtimePolicy engine.SourceUsePolicy
 }
 
 func NewAdapter(
 	query *engine.QueryService,
-	runtimePolicy engine.RuntimePolicy,
+	runtimePolicy engine.SourceUsePolicy,
 ) (*Adapter, error) {
 	if query == nil || runtimePolicy == nil {
 		return nil, fmt.Errorf(

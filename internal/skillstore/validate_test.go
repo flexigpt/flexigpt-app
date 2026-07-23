@@ -1,11 +1,11 @@
-package store
+package skillstore
 
 import (
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 func TestValidateSkillBundle_Table(t *testing.T) {

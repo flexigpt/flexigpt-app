@@ -261,5 +261,3 @@ func (s *Service) Refresh(
 	}
 	return result, nil
 }
-
-var _ Runner = (*Service)(nil)

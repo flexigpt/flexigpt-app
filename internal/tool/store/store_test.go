@@ -136,7 +136,7 @@ func TestToolBuiltInBundleGuards(t *testing.T) {
 			IsEnabled:   true,
 		},
 	})
-	if !errors.Is(err, spec.ErrBuiltInReadOnly) {
+	if !errors.Is(err, errBuiltInReadOnly) {
 		t.Fatalf("expected ErrBuiltInReadOnly, got %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestToolBuiltInBundleGuards(t *testing.T) {
 	_, err = s.DeleteToolBundle(t.Context(), &spec.DeleteToolBundleRequest{
 		BundleID: bid,
 	})
-	if !errors.Is(err, spec.ErrBuiltInReadOnly) {
+	if !errors.Is(err, errBuiltInReadOnly) {
 		t.Fatalf("expected ErrBuiltInReadOnly on delete, got %v", err)
 	}
 
@@ -235,7 +235,7 @@ func TestToolVersionConflict(t *testing.T) {
 			HTTPImpl: dummyHTTPTool(),
 		},
 	})
-	if !errors.Is(err, spec.ErrConflict) {
+	if !errors.Is(err, errConflict) {
 		t.Fatalf("expected ErrConflict, got %v", err)
 	}
 }
@@ -260,7 +260,7 @@ func TestToolDisabledBundleGuard(t *testing.T) {
 			HTTPImpl: dummyHTTPTool(),
 		},
 	})
-	if !errors.Is(err, spec.ErrBundleDisabled) {
+	if !errors.Is(err, errBundleDisabled) {
 		t.Fatalf("expected ErrBundleDisabled, got %v", err)
 	}
 }
@@ -293,7 +293,7 @@ func TestToolMultiVersionExact(t *testing.T) {
 	_, err := s.GetTool(t.Context(), &spec.GetToolRequest{
 		BundleID: testBundleID1, ToolSlug: testToolSlug, Version: "",
 	})
-	if !errors.Is(err, spec.ErrInvalidRequest) {
+	if !errors.Is(err, errInvalidRequest) {
 		t.Fatalf("expected ErrInvalidRequest for missing version, got %v", err)
 	}
 }
@@ -322,7 +322,7 @@ func TestToolBuiltInGuards(t *testing.T) {
 			HTTPImpl: dummyHTTPTool(),
 		},
 	})
-	if !errors.Is(err, spec.ErrBuiltInReadOnly) {
+	if !errors.Is(err, errBuiltInReadOnly) {
 		t.Fatalf("expected ErrBuiltInReadOnly, got %v", err)
 	}
 
@@ -330,7 +330,7 @@ func TestToolBuiltInGuards(t *testing.T) {
 	_, err = s.DeleteTool(t.Context(), &spec.DeleteToolRequest{
 		BundleID: bid, ToolSlug: slug, Version: ver,
 	})
-	if !errors.Is(err, spec.ErrBuiltInReadOnly) {
+	if !errors.Is(err, errBuiltInReadOnly) {
 		t.Fatalf("expected ErrBuiltInReadOnly on delete, got %v", err)
 	}
 
@@ -521,7 +521,7 @@ func TestToolSoftDeleteBehaviour(t *testing.T) {
 		t.Fatalf("DeleteToolBundle() failed: %v", err)
 	}
 
-	if _, err := s.getUserBundle(testBundleID1); !errors.Is(err, spec.ErrBundleDeleting) {
+	if _, err := s.getUserBundle(testBundleID1); !errors.Is(err, errBundleDeleting) {
 		t.Fatalf("expected ErrBundleDeleting, got %v", err)
 	}
 

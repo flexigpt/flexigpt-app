@@ -1,7 +1,6 @@
 package spec
 
 import (
-	"errors"
 	"time"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
@@ -19,22 +18,6 @@ const (
 	BaseSkillBundleSlug        bundleitemutils.BundleSlug = "base"
 	BaseSkillBundleDisplayName                            = "Base"
 	BaseSkillBundleDescription                            = "Editable starter bundle for custom skills and prompt-like skill templates."
-)
-
-var (
-	ErrSkillInvalidRequest = errors.New("invalid request")
-	ErrSkillConflict       = errors.New("resource already exists")
-
-	ErrSkillBuiltInReadOnly = errors.New("built-in resource is read-only")
-
-	ErrSkillBundleNotFound = errors.New("bundle not found")
-	ErrSkillBundleDisabled = errors.New("bundle is disabled")
-	ErrSkillBundleDeleting = errors.New("bundle is being deleted")
-	ErrSkillBundleNotEmpty = errors.New("bundle still contains skills")
-
-	ErrSkillNotFound  = errors.New("skill not found")
-	ErrSkillDisabled  = errors.New("skill is disabled")
-	ErrSkillIsMissing = errors.New("skill is marked missing (cannot delete)")
 )
 
 // SkillType describes *where/how* the skill content is sourced.

@@ -22,8 +22,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
-	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
+	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
+	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
@@ -42,7 +42,7 @@ type ProviderSetAPI struct {
 
 	toolStore          *toolStore.ToolStore
 	mpStore            *modelpresetStore.ModelPresetStore
-	skillStore         *skillStore.SkillStore
+	skillRuntime       *skillruntime.SkillRuntime
 	mcpInferenceBridge *MCPInferenceBridge
 
 	logger             *slog.Logger
@@ -84,17 +84,17 @@ func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 func NewProviderSetAPI(
 	ts *toolStore.ToolStore,
 	mps *modelpresetStore.ModelPresetStore,
-	ss *skillStore.SkillStore,
+	sr *skillruntime.SkillRuntime,
 	mcpBridge *MCPInferenceBridge,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if ts == nil || mps == nil {
-		return nil, errors.New("no tool store or model preset store provided to inference wrapper provider set")
+	if ts == nil || mps == nil || sr == nil || mcpBridge == nil {
+		return nil, errors.New("inferencewrapper: missing input")
 	}
 	ps := &ProviderSetAPI{
 		toolStore:          ts,
 		mpStore:            mps,
-		skillStore:         ss,
+		skillRuntime:       sr,
 		mcpInferenceBridge: mcpBridge,
 	}
 	for _, opt := range opts {
@@ -284,14 +284,14 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	enabledSkillRefs := body.Current.EnabledSkillRefs
 
 	skillSessionID := strings.TrimSpace(body.SkillSessionID)
-	if ps.skillStore != nil && len(enabledSkillRefs) > 0 {
+	if ps.skillRuntime != nil && len(enabledSkillRefs) > 0 {
 		if skillSessionID == "" {
 			return nil, errors.New("enabledSkillRefs provided but skillSessionID is missing")
 		}
 		// Active skills count in this session (restricted to allowlist).
-		activeResp, aerr := ps.skillStore.ListRuntimeSkills(ctx, &skillSpec.ListRuntimeSkillsRequest{
-			Body: &skillSpec.ListRuntimeSkillsRequestBody{
-				Filter: &skillSpec.RuntimeSkillFilter{
+		activeResp, aerr := ps.skillRuntime.ListRuntimeSkills(ctx, &skillruntimeSpec.ListRuntimeSkillsRequest{
+			Body: &skillruntimeSpec.ListRuntimeSkillsRequestBody{
+				Filter: &skillruntimeSpec.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
 					Activity:       agentskillsSpec.SkillActivityActive,
 					AllowSkillRefs: enabledSkillRefs,
@@ -318,9 +318,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			promptActivity = agentskillsSpec.SkillActivityAny
 		}
 
-		promptResp, perr := ps.skillStore.GetSkillsPrompt(ctx, &skillSpec.GetSkillsPromptRequest{
-			Body: &skillSpec.GetSkillsPromptRequestBody{
-				Filter: &skillSpec.RuntimeSkillFilter{
+		promptResp, perr := ps.skillRuntime.GetSkillsPrompt(ctx, &skillruntimeSpec.GetSkillsPromptRequest{
+			Body: &skillruntimeSpec.GetSkillsPromptRequestBody{
+				Filter: &skillruntimeSpec.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
 					Activity:       promptActivity,
 					AllowSkillRefs: enabledSkillRefs,

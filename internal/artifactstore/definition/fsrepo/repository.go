@@ -196,5 +196,3 @@ func (r *Repository) pathFor(
 	)
 	return filepath.Join(r.root, "definition-"+value+".json"), nil
 }
-
-var _ definition.Repository = (*Repository)(nil)

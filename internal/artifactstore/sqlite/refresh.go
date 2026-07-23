@@ -314,5 +314,3 @@ func updateRecordTx(
 	}
 	return nil
 }
-
-var _ refresh.Publisher = (*Publisher)(nil)

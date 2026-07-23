@@ -85,7 +85,7 @@ func NewBuiltInToolData(
 		snapshotMaxAge = time.Hour
 	}
 	if overlayBaseDir == "" {
-		return nil, fmt.Errorf("%w: overlayBaseDir", spec.ErrInvalidDir)
+		return nil, fmt.Errorf("%w: overlayBaseDir", errInvalidDir)
 	}
 	if err := os.MkdirAll(overlayBaseDir, 0o755); err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func (d *BuiltInToolData) SetToolBundleEnabled(
 ) (spec.ToolBundle, error) {
 	if _, ok := d.bundles[id]; !ok {
 		return spec.ToolBundle{}, fmt.Errorf(
-			"bundleID: %q, err: %w", id, spec.ErrBuiltInBundleNotFound)
+			"bundleID: %q, err: %w", id, errBuiltInBundleNotFound)
 	}
 
 	flag, err := d.bundleOverlayFlags.SetFlag(ctx, builtInToolBundleID(id), enabled)
@@ -248,7 +248,7 @@ func (d *BuiltInToolData) GetBuiltInToolBundle(
 	defer d.mu.RUnlock()
 	b, ok := d.viewBundles[id]
 	if !ok {
-		return spec.ToolBundle{}, spec.ErrBundleNotFound
+		return spec.ToolBundle{}, errBundleNotFound
 	}
 	return b, nil
 }
@@ -263,14 +263,14 @@ func (d *BuiltInToolData) GetBuiltInTool(
 	defer d.mu.RUnlock()
 	tools, ok := d.viewTools[bundleID]
 	if !ok {
-		return spec.Tool{}, spec.ErrBundleNotFound
+		return spec.Tool{}, errBundleNotFound
 	}
 	for _, tl := range tools {
 		if tl.Slug == slug && tl.Version == version {
 			return tl, nil
 		}
 	}
-	return spec.Tool{}, spec.ErrToolNotFound
+	return spec.Tool{}, errToolNotFound
 }
 
 func (d *BuiltInToolData) populateDataFromFS(ctx context.Context) error {

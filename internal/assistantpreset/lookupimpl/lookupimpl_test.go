@@ -7,8 +7,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
-	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
@@ -165,35 +165,35 @@ func TestSkillLookupAdapter_GetSkillSummaryForSelection_Errors(t *testing.T) {
 	tests := []struct {
 		name            string
 		adapter         *skillLookupAdapter
-		selection       skillSpec.SkillSelection
+		selection       skillstoreSpec.SkillSelection
 		wantErrContains string
 	}{
 		{
 			name:    testNilReceiver,
 			adapter: nil,
-			selection: skillSpec.SkillSelection{
-				SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: testSkillA},
+			selection: skillstoreSpec.SkillSelection{
+				SkillRef: skillstoreSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: testSkillA},
 			},
 			wantErrContains: testErrNotConfigured,
 		},
 		{
 			name:    testNilStore,
 			adapter: &skillLookupAdapter{},
-			selection: skillSpec.SkillSelection{
-				SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: testSkillA},
+			selection: skillstoreSpec.SkillSelection{
+				SkillRef: skillstoreSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: testSkillA},
 			},
 			wantErrContains: testErrNotConfigured,
 		},
 		{
 			name:            testMissingBundleID,
-			adapter:         &skillLookupAdapter{store: &skillStore.SkillStore{}},
-			selection:       skillSpec.SkillSelection{SkillRef: skillSpec.SkillRef{SkillSlug: testSkillA}},
+			adapter:         &skillLookupAdapter{store: &skillstore.SkillStore{}},
+			selection:       skillstoreSpec.SkillSelection{SkillRef: skillstoreSpec.SkillRef{SkillSlug: testSkillA}},
 			wantErrContains: testErrIncomplete,
 		},
 		{
 			name:            "missing skill slug",
-			adapter:         &skillLookupAdapter{store: &skillStore.SkillStore{}},
-			selection:       skillSpec.SkillSelection{SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA}},
+			adapter:         &skillLookupAdapter{store: &skillstore.SkillStore{}},
+			selection:       skillstoreSpec.SkillSelection{SkillRef: skillstoreSpec.SkillRef{BundleID: testBundleIDA}},
 			wantErrContains: testErrIncomplete,
 		},
 	}

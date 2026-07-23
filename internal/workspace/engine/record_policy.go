@@ -140,8 +140,6 @@ func diagnosticMessage(value string) string {
 	return value
 }
 
-var _ record.Policy = (*RecordPolicy)(nil)
-
 func occurrenceKeyDigestInput(key catalog.OccurrenceKey) string {
 	return string(key.SourceID) + "\x00" +
 		string(key.Locator) + "\x00" +

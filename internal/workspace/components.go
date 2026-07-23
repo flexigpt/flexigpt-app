@@ -5,7 +5,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	"github.com/flexigpt/flexigpt-app/internal/skill/provider"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
@@ -18,7 +17,6 @@ type components struct {
 
 	contextAdapter *contextadapter.Adapter
 	skillAdapter   *skilladapter.Adapter
-	skillProvider  provider.Provider
 }
 
 func newComponents(
@@ -119,16 +117,11 @@ func newComponents(
 	if err != nil {
 		return nil, err
 	}
-	workspaceSkillProvider, err := provider.NewWorkspace(skillAdapter)
-	if err != nil {
-		return nil, err
-	}
 	return &components{
 		service:        service,
 		refresher:      refresher,
 		query:          query,
 		contextAdapter: contextAdapter,
 		skillAdapter:   skillAdapter,
-		skillProvider:  workspaceSkillProvider,
 	}, nil
 }

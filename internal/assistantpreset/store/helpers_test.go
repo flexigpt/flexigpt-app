@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -388,11 +388,11 @@ func (f fakeToolSelectionLookup) GetToolSummaryForSelection(
 	return f(ctx, selection)
 }
 
-type fakeSkillLookup func(context.Context, skillSpec.SkillSelection) (SkillSummary, error)
+type fakeSkillLookup func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error)
 
 func (f fakeSkillLookup) GetSkillSummaryForSelection(
 	ctx context.Context,
-	selection skillSpec.SkillSelection,
+	selection skillstoreSpec.SkillSelection,
 ) (SkillSummary, error) {
 	return f(ctx, selection)
 }

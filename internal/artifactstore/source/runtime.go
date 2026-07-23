@@ -101,5 +101,3 @@ func validateSnapshot(snapshot Snapshot) error {
 	}
 	return nil
 }
-
-var _ Runtime = (*runtime)(nil)

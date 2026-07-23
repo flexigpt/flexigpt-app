@@ -1,4 +1,4 @@
-package store
+package skillstore
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 const (
@@ -70,7 +70,7 @@ func NewBuiltInSkills(
 	opts ...BuiltInSkillsOption,
 ) (b *BuiltInSkills, err error) {
 	if overlayBaseDir == "" {
-		return nil, fmt.Errorf("%w: overlayBaseDir", spec.ErrSkillInvalidRequest)
+		return nil, fmt.Errorf("%w: overlayBaseDir", errSkillInvalidRequest)
 	}
 	if maxSnapshotAge <= 0 {
 		maxSnapshotAge = time.Hour
@@ -188,7 +188,7 @@ func (b *BuiltInSkills) GetBuiltInSkillBundle(
 
 	sb, ok := b.viewBundles[id]
 	if !ok {
-		return spec.SkillBundle{}, spec.ErrSkillBundleNotFound
+		return spec.SkillBundle{}, errSkillBundleNotFound
 	}
 	return cloneBundle(sb), nil
 }
@@ -203,11 +203,11 @@ func (b *BuiltInSkills) GetBuiltInSkill(
 
 	sm, ok := b.viewSkills[bundleID]
 	if !ok {
-		return spec.Skill{}, spec.ErrSkillBundleNotFound
+		return spec.Skill{}, errSkillBundleNotFound
 	}
 	sk, ok := sm[slug]
 	if !ok {
-		return spec.Skill{}, spec.ErrSkillNotFound
+		return spec.Skill{}, errSkillNotFound
 	}
 	return cloneSkill(sk), nil
 }
@@ -218,7 +218,7 @@ func (b *BuiltInSkills) SetSkillBundleEnabled(
 	enabled bool,
 ) (spec.SkillBundle, error) {
 	if _, ok := b.bundles[id]; !ok {
-		return spec.SkillBundle{}, spec.ErrSkillBundleNotFound
+		return spec.SkillBundle{}, errSkillBundleNotFound
 	}
 
 	flag, err := b.bundleFlags.SetFlag(ctx, builtInSkillBundleID(id), enabled)
@@ -247,10 +247,10 @@ func (b *BuiltInSkills) SetSkillEnabled(
 ) (spec.Skill, error) {
 	// Validate existence on base.
 	if _, ok := b.skills[bundleID]; !ok {
-		return spec.Skill{}, spec.ErrSkillBundleNotFound
+		return spec.Skill{}, errSkillBundleNotFound
 	}
 	if _, ok := b.skills[bundleID][slug]; !ok {
-		return spec.Skill{}, spec.ErrSkillNotFound
+		return spec.Skill{}, errSkillNotFound
 	}
 
 	flag, err := b.skillFlags.SetFlag(ctx, getBuiltInSkillKey(bundleID, slug), enabled)

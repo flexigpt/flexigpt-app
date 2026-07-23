@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"errors"
 	"runtime"
 	"strings"
 	"testing"
@@ -856,5 +855,3 @@ func newValidStoreStdioServer(
 		ModifiedAt:    now,
 	}
 }
-
-var _ = errors.New

@@ -146,7 +146,7 @@ func TestInvokeTool(t *testing.T) {
 			mkTool:        func(baseURL string) toolSpec.HTTPToolImpl { return defaultTool(baseURL, "/ok") },
 			args:          `{"msg":"x"}`,
 			disableBundle: true,
-			wantErrIs:     toolSpec.ErrBundleDisabled,
+			wantErrIs:     errors.New("bundle is disabled"),
 		},
 		{
 			name: "tool_disabled",
@@ -156,7 +156,7 @@ func TestInvokeTool(t *testing.T) {
 			mkTool:      func(baseURL string) toolSpec.HTTPToolImpl { return defaultTool(baseURL, "/ok") },
 			args:        `{"msg":"x"}`,
 			disableTool: true,
-			wantErrIs:   toolSpec.ErrToolDisabled,
+			wantErrIs:   errors.New("tool disabled"),
 		},
 		{
 			name: "non_json_text_response_treated_as_text",
@@ -549,7 +549,7 @@ func TestInvokeTool(t *testing.T) {
 			})
 
 			if tc.wantErrIs != nil {
-				if !errors.Is(err, tc.wantErrIs) {
+				if !strings.Contains(err.Error(), tc.wantErrIs.Error()) {
 					t.Fatalf("InvokeTool error = %v, want errors.Is(..., %v)", err, tc.wantErrIs)
 				}
 				return
@@ -597,7 +597,7 @@ func TestInvokeTool_InvalidRequest(t *testing.T) {
 		Version:  "",
 		Body:     &spec.InvokeToolRequestBody{Args: "{}"},
 	})
-	if !errors.Is(err, toolSpec.ErrInvalidRequest) {
+	if !strings.Contains(err.Error(), "invalid request") {
 		t.Fatalf("err = %v, want ErrInvalidRequest", err)
 	}
 }
@@ -1064,7 +1064,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 			},
 			args:          `{}`,
 			disableBundle: true,
-			wantErrIs:     toolSpec.ErrBundleDisabled,
+			wantErrIs:     errors.New("bundle is disabled"),
 		},
 		{
 			name: "tool_disabled",
@@ -1084,7 +1084,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 			},
 			args:        `{}`,
 			disableTool: true,
-			wantErrIs:   toolSpec.ErrToolDisabled,
+			wantErrIs:   errors.New("tool disabled"),
 		},
 	}
 
@@ -1156,7 +1156,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 			})
 
 			if tc.wantErrIs != nil {
-				if !errors.Is(err, tc.wantErrIs) {
+				if !strings.Contains(err.Error(), tc.wantErrIs.Error()) {
 					t.Fatalf("err = %v, want errors.Is(..., %v)", err, tc.wantErrIs)
 				}
 				return

@@ -5,7 +5,7 @@ import (
 
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -19,7 +19,7 @@ type ToolSummary struct {
 
 type SkillSummary struct {
 	IsEnabled bool
-	Insert    skillSpec.SkillInsert
+	Insert    skillstoreSpec.SkillInsert
 
 	// HasArguments is used to reject preloaded instruction skills that need runtime input.
 	HasArguments bool
@@ -49,7 +49,7 @@ type ToolSelectionLookup interface {
 type SkillLookup interface {
 	GetSkillSummaryForSelection(
 		ctx context.Context,
-		selection skillSpec.SkillSelection,
+		selection skillstoreSpec.SkillSelection,
 	) (SkillSummary, error)
 }
 

@@ -3,6 +3,7 @@ package toolruntime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -39,9 +40,8 @@ func (rt *ToolRuntime) InvokeTool(
 ) (*spec.InvokeToolResponse, error) {
 	if req == nil || req.Body == nil ||
 		req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf(
-			"%w: bundleID, toolSlug, version and body required",
-			toolSpec.ErrInvalidRequest,
+		return nil, errors.New(
+			"invalid request: bundleID, toolSlug, version and body required",
 		)
 	}
 	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
@@ -59,7 +59,7 @@ func (rt *ToolRuntime) InvokeTool(
 		return nil, err
 	}
 	if !bundle.IsEnabled {
-		return nil, fmt.Errorf("%w: bundle %s", toolSpec.ErrBundleDisabled, req.BundleID)
+		return nil, fmt.Errorf("bundle is disabled: %s", req.BundleID)
 	}
 
 	gtResp, err := rt.store.GetTool(ctx, &toolSpec.GetToolRequest{
@@ -72,12 +72,11 @@ func (rt *ToolRuntime) InvokeTool(
 	}
 	tool := gtResp.Body
 	if tool == nil {
-		return nil, fmt.Errorf("%w: nil tool body", toolSpec.ErrToolNotFound)
+		return nil, errors.New("tool not found: nil tool body")
 	}
 	if !tool.IsEnabled {
 		return nil, fmt.Errorf(
-			"%w: %s/%s@%s",
-			toolSpec.ErrToolDisabled,
+			"tool disabled: %s/%s@%s",
 			req.BundleID,
 			req.ToolSlug,
 			req.Version,

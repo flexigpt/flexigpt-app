@@ -91,5 +91,3 @@ func definitionDiagnostics(
 		err.Error(),
 	)
 }
-
-var _ discovery.Decoder = (*DefinitionDecoder)(nil)

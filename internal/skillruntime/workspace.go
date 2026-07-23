@@ -1,30 +1,34 @@
-package provider
+package skillruntime
 
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
-const workspaceIdentityPrefix = "workspace/"
-
 type Workspace struct {
+	runtime *SkillRuntime
 	adapter *skilladapter.Adapter
 }
 
 func NewWorkspace(
-	adapter *skilladapter.Adapter,
+	runtime *SkillRuntime,
 ) (*Workspace, error) {
-	if adapter == nil {
+	if runtime == nil || runtime.workspaceSkills == nil {
 		return nil, errors.New("Workspace Skill adapter is nil")
 	}
-	return &Workspace{adapter: adapter}, nil
+	return &Workspace{
+		runtime: runtime,
+		adapter: runtime.workspaceSkills,
+	}, nil
 }
 
 func (*Workspace) Owns(identity string) bool {
@@ -110,7 +114,7 @@ func (p *Workspace) Render(
 	ctx context.Context,
 	request RenderRequest,
 ) (RenderedSkill, error) {
-	rootID, recordID, err := parseWorkspaceIdentity(request.Identity)
+	rootID, _, err := parseWorkspaceIdentity(request.Identity)
 	if err != nil {
 		return RenderedSkill{}, err
 	}
@@ -118,28 +122,22 @@ func (p *Workspace) Render(
 		request.Scope.WorkspaceRootID != rootID {
 		return RenderedSkill{}, errors.New("Workspace Skill belongs to another scope")
 	}
-	plan, err := p.adapter.Load(
+	if err := p.runtime.ResyncWorkspace(ctx, rootID); err != nil {
+		return RenderedSkill{}, err
+	}
+	definition, found := p.runtime.workspaceDefinitionForIdentity(
 		ctx,
-		rootID,
-		[]artifactstore.RecordID{recordID},
+		request.Identity,
 	)
-	if err != nil {
-		return RenderedSkill{}, err
+	if !found {
+		return RenderedSkill{Available: false}, nil
 	}
-	if len(plan.Skills) != 1 {
-		return RenderedSkill{
-			Available:   false,
-			Diagnostics: artifactstore.CloneDiagnostics(plan.Diagnostics),
-		}, nil
-	}
-	value := plan.Skills[0]
-	document := value.AgentSkillDocument()
-	if err := agentskills.ValidateSkillDocument(document); err != nil {
-		return RenderedSkill{}, err
-	}
-	rendered, err := agentskills.RenderSkillDocument(
-		document,
-		request.Arguments,
+	rendered, err := p.runtime.runtime.RenderSkill(
+		ctx,
+		agentskills.RenderSkillParams{
+			Def:       definition,
+			Arguments: request.Arguments,
+		},
 	)
 	if err != nil {
 		return RenderedSkill{}, err
@@ -162,7 +160,7 @@ func (p *Workspace) Render(
 		Insert:           rendered.Insert,
 		Arguments:        append([]agentskillsSpec.SkillArgument(nil), rendered.Arguments...),
 		AppliedArguments: cloneStrings(rendered.AppliedArguments),
-		Diagnostics:      artifactstore.CloneDiagnostics(plan.Diagnostics),
+		Diagnostics:      artifactstore.CloneDiagnostics(projected.Diagnostics),
 	}, nil
 }
 
@@ -195,4 +193,11 @@ func parseWorkspaceIdentity(
 	return rootID, recordID, nil
 }
 
-var _ Provider = (*Workspace)(nil)
+func cloneStrings(value map[string]string) map[string]string {
+	if value == nil {
+		return nil
+	}
+	output := make(map[string]string, len(value))
+	maps.Copy(output, value)
+	return output
+}

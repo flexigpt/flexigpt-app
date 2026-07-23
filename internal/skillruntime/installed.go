@@ -1,42 +1,43 @@
-package provider
+package skillruntime
 
 import (
 	"context"
 	"errors"
-	"maps"
 	"strings"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
-	"github.com/flexigpt/flexigpt-app/internal/skill/store"
+	"github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 const installedIdentityPrefix = "installed/"
 
 type Installed struct {
-	store *store.SkillStore
+	store   *skillstore.SkillStore
+	runtime *SkillRuntime
 }
 
-func NewInstalled(value *store.SkillStore) (*Installed, error) {
+func NewInstalled(value *skillstore.SkillStore, runtime *SkillRuntime) (*Installed, error) {
 	if value == nil {
 		return nil, errors.New("installed Skill Store is nil")
 	}
-	return &Installed{store: value}, nil
+	if runtime == nil {
+		return nil, errors.New("Skill runtime is nil")
+	}
+	return &Installed{store: value, runtime: runtime}, nil
 }
 
 func (*Installed) Owns(identity string) bool {
 	return strings.HasPrefix(identity, installedIdentityPrefix)
 }
 
-func (p *Installed) List(
-	ctx context.Context,
-	_ Scope,
-) ([]Skill, error) {
+func (p *Installed) List(ctx context.Context, _ Scope) ([]Skill, error) {
 	var output []Skill
 	pageToken := ""
 	for {
-		response, err := p.store.ListSkills(ctx, &skillSpec.ListSkillsRequest{
+		response, err := p.store.ListSkills(ctx, &skillstoreSpec.ListSkillsRequest{
 			IncludeDisabled:     true,
 			IncludeMissing:      true,
 			RecommendedPageSize: 256,
@@ -50,22 +51,16 @@ func (p *Installed) List(
 		}
 		for _, item := range response.Body.SkillListItems {
 			value := item.SkillDefinition
-			if err := store.ValidateSkill(&value); err != nil {
+			if err := skillstore.ValidateSkill(&value); err != nil {
 				return nil, err
 			}
-			ref := skillSpec.SkillRef{
-				BundleID:  item.BundleID,
-				SkillSlug: item.SkillSlug,
-				SkillID:   value.ID,
-			}
+			ref := skillstoreSpec.SkillRef{BundleID: item.BundleID, SkillSlug: item.SkillSlug, SkillID: value.ID}
 			insert := value.Insert
 			if insert == "" {
 				insert = agentskillsSpec.SkillInsertInstructions
 			}
-			available := value.Presence == nil ||
-				value.Presence.Status == skillSpec.SkillPresenceUnknown ||
-				value.Presence.Status == skillSpec.SkillPresencePresent
-			diagnostics := installedDiagnostics(value)
+			available := value.Presence == nil || value.Presence.Status == skillstoreSpec.SkillPresenceUnknown ||
+				value.Presence.Status == skillstoreSpec.SkillPresencePresent
 			projected := Skill{
 				Identity:         installedIdentity(ref),
 				Origin:           OriginInstalled,
@@ -84,7 +79,7 @@ func (p *Installed) List(
 				CatalogCurrent:   available,
 				State:            installedState(value),
 				DefinitionDigest: value.Digest,
-				Diagnostics:      diagnostics,
+				Diagnostics:      installedDiagnostics(value),
 				CreatedAt:        value.CreatedAt,
 				ModifiedAt:       value.ModifiedAt,
 			}
@@ -93,8 +88,7 @@ func (p *Installed) List(
 			}
 			output = append(output, projected)
 		}
-		if response.Body.NextPageToken == nil ||
-			*response.Body.NextPageToken == "" {
+		if response.Body.NextPageToken == nil || *response.Body.NextPageToken == "" {
 			break
 		}
 		pageToken = *response.Body.NextPageToken
@@ -102,15 +96,12 @@ func (p *Installed) List(
 	return output, nil
 }
 
-func (p *Installed) Render(
-	ctx context.Context,
-	request RenderRequest,
-) (RenderedSkill, error) {
+func (p *Installed) Render(ctx context.Context, request RenderRequest) (RenderedSkill, error) {
 	ref, err := parseInstalledIdentity(request.Identity)
 	if err != nil {
 		return RenderedSkill{}, err
 	}
-	response, err := p.store.GetSkill(ctx, &skillSpec.GetSkillRequest{
+	response, err := p.store.GetSkill(ctx, &skillstoreSpec.GetSkillRequest{
 		BundleID:        ref.BundleID,
 		SkillSlug:       ref.SkillSlug,
 		IncludeDisabled: true,
@@ -120,27 +111,17 @@ func (p *Installed) Render(
 		return RenderedSkill{
 			Available: false,
 			Diagnostics: []artifactstore.Diagnostic{
-				unavailableDiagnostic(
-					"skill.provider.unavailable",
-					"the installed Skill is unavailable",
-				),
+				unavailableDiagnostic("skill.provider.unavailable", "the installed Skill is unavailable"),
 			},
 		}, nil
 	}
-	value := *response.Body
-	if value.ID != ref.SkillID {
+	if response.Body.ID != ref.SkillID {
 		return RenderedSkill{
 			Available: false,
 			Diagnostics: []artifactstore.Diagnostic{
-				unavailableDiagnostic(
-					"skill.provider.stale-identity",
-					"the installed Skill identity is stale",
-				),
+				unavailableDiagnostic("skill.provider.stale-identity", "the installed Skill identity is stale"),
 			},
 		}, nil
-	}
-	if err := store.ValidateSkill(&value); err != nil {
-		return RenderedSkill{}, err
 	}
 	list, err := p.List(ctx, Scope{})
 	if err != nil {
@@ -160,22 +141,24 @@ func (p *Installed) Render(
 			Diagnostics: append([]artifactstore.Diagnostic(nil), projected.Diagnostics...),
 		}, nil
 	}
-	rendered, err := p.store.RenderSkill(ctx, &skillSpec.RenderSkillRequest{
-		Body: &skillSpec.RenderSkillRequestBody{
-			SkillRef:  ref,
+	rendered, err := p.runtime.RenderSkill(
+		ctx,
+		&spec.RenderSkillRequest{Body: &spec.RenderSkillRequestBody{
+			SkillRef: spec.SkillRef{
+				BundleID:  ref.BundleID,
+				SkillSlug: ref.SkillSlug,
+				SkillID:   ref.SkillID,
+			},
 			Arguments: request.Arguments,
-		},
-	})
-	if err != nil {
+		}},
+	)
+	if err != nil || rendered == nil || rendered.Body == nil {
 		//nolint:nilerr // Explicit rendered skill return.
 		return RenderedSkill{
 			Skill:     projected,
 			Available: false,
 			Diagnostics: []artifactstore.Diagnostic{
-				unavailableDiagnostic(
-					"skill.provider.render-unavailable",
-					"the installed Skill could not be rendered",
-				),
+				unavailableDiagnostic("skill.provider.render-unavailable", "the installed Skill could not be rendered"),
 			},
 		}, nil
 	}
@@ -190,70 +173,57 @@ func (p *Installed) Render(
 	}, nil
 }
 
-func installedIdentity(ref skillSpec.SkillRef) string {
-	return installedIdentityPrefix +
-		string(ref.BundleID) + "/" +
-		string(ref.SkillSlug) + "/" +
-		string(ref.SkillID)
+func installedIdentity(ref skillstoreSpec.SkillRef) string {
+	return installedIdentityPrefix + string(ref.BundleID) + "/" + string(ref.SkillSlug) + "/" + string(ref.SkillID)
 }
 
-func parseInstalledIdentity(value string) (skillSpec.SkillRef, error) {
+func parseInstalledIdentity(value string) (skillstoreSpec.SkillRef, error) {
 	relative, found := strings.CutPrefix(value, installedIdentityPrefix)
 	if !found {
-		return skillSpec.SkillRef{}, errors.New("identity is not an installed Skill")
+		return skillstoreSpec.SkillRef{}, errors.New("identity is not an installed Skill")
 	}
 	parts := strings.Split(relative, "/")
-	if len(parts) != 3 ||
-		parts[0] == "" ||
-		parts[1] == "" ||
-		parts[2] == "" {
-		return skillSpec.SkillRef{}, errors.New("installed Skill identity is invalid")
+	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		return skillstoreSpec.SkillRef{}, errors.New("installed Skill identity is invalid")
 	}
-	return skillSpec.SkillRef{
-		BundleID:  skillSpec.SkillBundleID(parts[0]),
-		SkillSlug: skillSpec.SkillSlug(parts[1]),
-		SkillID:   skillSpec.SkillID(parts[2]),
+	return skillstoreSpec.SkillRef{
+		BundleID:  skillstoreSpec.SkillBundleID(parts[0]),
+		SkillSlug: skillstoreSpec.SkillSlug(parts[1]),
+		SkillID:   skillstoreSpec.SkillID(parts[2]),
 	}, nil
 }
 
-func installedState(value skillSpec.Skill) string {
+func installedState(value skillstoreSpec.Skill) string {
 	if value.Presence == nil {
-		return string(skillSpec.SkillPresenceUnknown)
+		return string(skillstoreSpec.SkillPresenceUnknown)
 	}
 	return string(value.Presence.Status)
 }
 
-func installedDiagnostics(value skillSpec.Skill) []artifactstore.Diagnostic {
+func installedDiagnostics(value skillstoreSpec.Skill) []artifactstore.Diagnostic {
 	var output []artifactstore.Diagnostic
 	for _, warning := range value.RuntimeWarnings {
-		if strings.TrimSpace(warning) == "" {
-			continue
+		if strings.TrimSpace(warning) != "" {
+			output = artifactstore.AppendDiagnostics(
+				output,
+				artifactstore.Diagnostic{
+					Severity: artifactstore.DiagnosticWarning,
+					Code:     "skill.provider.runtime-warning",
+					Message:  warning,
+				},
+			)
 		}
-		output = artifactstore.AppendDiagnostics(output, artifactstore.Diagnostic{
-			Severity: artifactstore.DiagnosticWarning,
-			Code:     "skill.provider.runtime-warning",
-			Message:  warning,
-		})
 	}
-	if value.Presence != nil &&
-		value.Presence.Status != skillSpec.SkillPresencePresent &&
-		value.Presence.Status != skillSpec.SkillPresenceUnknown {
-		output = artifactstore.AppendDiagnostics(output, artifactstore.Diagnostic{
-			Severity: artifactstore.DiagnosticWarning,
-			Code:     "skill.provider.source-unavailable",
-			Message:  "the installed Skill source is not currently available",
-		})
+	if value.Presence != nil && value.Presence.Status != skillstoreSpec.SkillPresencePresent &&
+		value.Presence.Status != skillstoreSpec.SkillPresenceUnknown {
+		output = artifactstore.AppendDiagnostics(
+			output,
+			artifactstore.Diagnostic{
+				Severity: artifactstore.DiagnosticWarning,
+				Code:     "skill.provider.source-unavailable",
+				Message:  "the installed Skill source is not currently available",
+			},
+		)
 	}
 	return output
 }
-
-func cloneStrings(value map[string]string) map[string]string {
-	if value == nil {
-		return nil
-	}
-	output := make(map[string]string, len(value))
-	maps.Copy(output, value)
-	return output
-}
-
-var _ Provider = (*Installed)(nil)

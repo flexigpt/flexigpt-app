@@ -1,4 +1,4 @@
-package store
+package skillstore
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest) (*spec.ListSkillsResponse, error) {
@@ -20,7 +20,7 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 	if req != nil && req.PageToken != "" {
 		t, err := jsonutil.Base64JSONDecode[spec.SkillPageToken](req.PageToken)
 		if err != nil {
-			return nil, fmt.Errorf("%w: bad pageToken", spec.ErrSkillInvalidRequest)
+			return nil, fmt.Errorf("%w: bad pageToken", errSkillInvalidRequest)
 		}
 		tok = t
 	} else if req != nil {
@@ -45,7 +45,7 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 		}
 	}
 	if tok.Phase != spec.ListSkillPhaseBuiltIn && tok.Phase != spec.ListSkillPhaseUser {
-		return nil, fmt.Errorf("%w: invalid phase", spec.ErrSkillInvalidRequest)
+		return nil, fmt.Errorf("%w: invalid phase", errSkillInvalidRequest)
 	}
 	// Defensive: if built-ins are not configured, never stay in built-in phase.
 	if tok.Phase == spec.ListSkillPhaseBuiltIn && s.builtin == nil {
@@ -135,7 +135,7 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 		if tok.BuiltInCursor != "" {
 			parts := strings.Split(tok.BuiltInCursor, "|")
 			if len(parts) != 2 {
-				return nil, fmt.Errorf("%w: bad built-in cursor", spec.ErrSkillInvalidRequest)
+				return nil, fmt.Errorf("%w: bad built-in cursor", errSkillInvalidRequest)
 			}
 			curBid = bundleitemutils.BundleID(parts[0])
 			curSlug = spec.SkillSlug(parts[1])
@@ -271,7 +271,7 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 		if tok.DirTok != "" {
 			c, err := parseSkillCursor(tok.DirTok)
 			if err != nil {
-				return nil, fmt.Errorf("%w: bad cursor", spec.ErrSkillInvalidRequest)
+				return nil, fmt.Errorf("%w: bad cursor", errSkillInvalidRequest)
 			}
 			// Seek strictly after cursor in ordering:
 			// (ModifiedAt desc, BundleID asc, SkillSlug asc).

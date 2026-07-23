@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -73,9 +73,9 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 			},
 		},
 	}
-	preset.StartingSkillSelections = []skillSpec.SkillSelection{
+	preset.StartingSkillSelections = []skillstoreSpec.SkillSelection{
 		{
-			SkillRef: skillSpec.SkillRef{
+			SkillRef: skillstoreSpec.SkillRef{
 				BundleID:  bundleitemutils.BundleID("bundle-a"),
 				SkillSlug: testSkillA,
 				SkillID:   testSkillIDA,
@@ -92,7 +92,7 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 		ToolSelections: fakeToolSelectionLookup(func(context.Context, toolSpec.ToolSelection) (ToolSummary, error) {
 			return ToolSummary{IsEnabled: true}, nil
 		}),
-		Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
+		Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
 			return SkillSummary{IsEnabled: true}, nil
 		}),
 	}

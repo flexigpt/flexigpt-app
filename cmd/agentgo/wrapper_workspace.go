@@ -2,13 +2,18 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
 type WorkspaceWrapper struct {
-	api *workspace.API
+	api          *workspace.API
+	skillRuntime *skillruntime.SkillRuntime
 }
 
 func InitWorkspaceWrapper(
@@ -26,11 +31,39 @@ func InitWorkspaceWrapper(
 	return nil
 }
 
+// BindWorkspaceSkillRuntime is application composition. Workspace does not
+// import or know about skillruntime; the application wrapper decides whether
+// Workspace changes should be reflected in a running Skill runtime.
+func BindWorkspaceSkillRuntime(
+	wrapper *WorkspaceWrapper,
+	runtime *skillruntime.SkillRuntime,
+) error {
+	if wrapper == nil || wrapper.api == nil {
+		return errors.New("workspace wrapper is not initialized")
+	}
+	if runtime == nil {
+		return errors.New("skill runtime is nil")
+	}
+	wrapper.skillRuntime = runtime
+	return nil
+}
+
 func (w *WorkspaceWrapper) CreateFilesystemWorkspace(
 	request *workspace.CreateFilesystemWorkspaceRequest,
 ) (*workspace.CreateFilesystemWorkspaceResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.CreateFilesystemWorkspaceResponse, error) {
-		return w.api.CreateFilesystemWorkspace(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.CreateFilesystemWorkspace(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if response == nil || response.Body == nil {
+			return nil, errors.New("create filesystem Workspace returned an empty response")
+		}
+		if err := w.syncWorkspaceSkills(ctx, response.Body.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -38,7 +71,18 @@ func (w *WorkspaceWrapper) CreateEmptyWorkspace(
 	request *workspace.CreateEmptyWorkspaceRequest,
 ) (*workspace.CreateEmptyWorkspaceResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.CreateEmptyWorkspaceResponse, error) {
-		return w.api.CreateEmptyWorkspace(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.CreateEmptyWorkspace(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if response == nil || response.Body == nil {
+			return nil, errors.New("create empty Workspace returned an empty response")
+		}
+		if err := w.syncWorkspaceSkills(ctx, response.Body.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -62,7 +106,15 @@ func (w *WorkspaceWrapper) UpdateWorkspace(
 	request *workspace.UpdateWorkspaceRequest,
 ) (*workspace.UpdateWorkspaceResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.UpdateWorkspaceResponse, error) {
-		return w.api.UpdateWorkspace(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.UpdateWorkspace(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -70,7 +122,15 @@ func (w *WorkspaceWrapper) DeleteWorkspace(
 	request *workspace.DeleteWorkspaceRequest,
 ) (*workspace.DeleteWorkspaceResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.DeleteWorkspaceResponse, error) {
-		return w.api.DeleteWorkspace(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.DeleteWorkspace(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.removeWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -78,7 +138,15 @@ func (w *WorkspaceWrapper) AttachWorkspaceSource(
 	request *workspace.AttachWorkspaceSourceRequest,
 ) (*workspace.AttachWorkspaceSourceResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.AttachWorkspaceSourceResponse, error) {
-		return w.api.AttachWorkspaceSource(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.AttachWorkspaceSource(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -86,7 +154,15 @@ func (w *WorkspaceWrapper) UpdateWorkspaceAttachment(
 	request *workspace.UpdateWorkspaceAttachmentRequest,
 ) (*workspace.UpdateWorkspaceAttachmentResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.UpdateWorkspaceAttachmentResponse, error) {
-		return w.api.UpdateWorkspaceAttachment(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.UpdateWorkspaceAttachment(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -94,7 +170,15 @@ func (w *WorkspaceWrapper) DetachWorkspaceSource(
 	request *workspace.DetachWorkspaceSourceRequest,
 ) (*workspace.DetachWorkspaceSourceResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.DetachWorkspaceSourceResponse, error) {
-		return w.api.DetachWorkspaceSource(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.DetachWorkspaceSource(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -102,7 +186,15 @@ func (w *WorkspaceWrapper) RefreshWorkspace(
 	request *workspace.RefreshWorkspaceRequest,
 ) (*workspace.RefreshWorkspaceResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.RefreshWorkspaceResponse, error) {
-		return w.api.RefreshWorkspace(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.RefreshWorkspace(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -166,7 +258,15 @@ func (w *WorkspaceWrapper) SetWorkspaceRecordEnabled(
 	request *workspace.SetWorkspaceRecordEnabledRequest,
 ) (*workspace.SetWorkspaceRecordEnabledResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.SetWorkspaceRecordEnabledResponse, error) {
-		return w.api.SetWorkspaceRecordEnabled(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.SetWorkspaceRecordEnabled(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -174,7 +274,15 @@ func (w *WorkspaceWrapper) PinWorkspaceRecord(
 	request *workspace.PinWorkspaceRecordRequest,
 ) (*workspace.PinWorkspaceRecordResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.PinWorkspaceRecordResponse, error) {
-		return w.api.PinWorkspaceRecord(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.PinWorkspaceRecord(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -182,7 +290,15 @@ func (w *WorkspaceWrapper) FollowWorkspaceRecord(
 	request *workspace.FollowWorkspaceRecordRequest,
 ) (*workspace.FollowWorkspaceRecordResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.FollowWorkspaceRecordResponse, error) {
-		return w.api.FollowWorkspaceRecord(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.FollowWorkspaceRecord(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -190,7 +306,15 @@ func (w *WorkspaceWrapper) DeleteWorkspaceRecord(
 	request *workspace.DeleteWorkspaceRecordRequest,
 ) (*workspace.DeleteWorkspaceRecordResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.DeleteWorkspaceRecordResponse, error) {
-		return w.api.DeleteWorkspaceRecord(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.DeleteWorkspaceRecord(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 }
 
@@ -198,8 +322,44 @@ func (w *WorkspaceWrapper) UpdateWorkspaceRecordData(
 	request *workspace.UpdateWorkspaceRecordDataRequest,
 ) (*workspace.UpdateWorkspaceRecordDataResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.UpdateWorkspaceRecordDataResponse, error) {
-		return w.api.UpdateWorkspaceRecordData(context.Background(), request)
+		ctx := context.Background()
+		response, err := w.api.UpdateWorkspaceRecordData(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
+}
+
+func (w *WorkspaceWrapper) syncWorkspaceSkills(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+) error {
+	if w == nil || w.skillRuntime == nil {
+		// Workspace remains usable by itself in tests, tools, and future hosts
+		// that intentionally do not configure an Agent Skills runtime.
+		return nil
+	}
+	if err := w.skillRuntime.ResyncWorkspace(ctx, rootID); err != nil {
+		return fmt.Errorf("sync Workspace Skills: %w", err)
+	}
+	return nil
+}
+
+func (w *WorkspaceWrapper) removeWorkspaceSkills(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+) error {
+	if w == nil || w.skillRuntime == nil {
+		return nil
+	}
+	if err := w.skillRuntime.RemoveWorkspace(ctx, rootID); err != nil {
+		return fmt.Errorf("remove Workspace Skills: %w", err)
+	}
+	return nil
 }
 
 func (w *WorkspaceWrapper) close() {
@@ -207,4 +367,6 @@ func (w *WorkspaceWrapper) close() {
 		return
 	}
 	_ = w.api.Close()
+	w.skillRuntime = nil
+	w.api = nil
 }

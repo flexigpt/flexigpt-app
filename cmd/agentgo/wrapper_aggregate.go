@@ -24,7 +24,8 @@ import (
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
-	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
+	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
@@ -38,7 +39,8 @@ type AggregrateWrapper struct {
 	modelPresetStore *modelpresetStore.ModelPresetStore
 	settingStore     *settingStore.SettingStore
 	toolStore        *toolStore.ToolStore
-	skillStore       *skillStore.SkillStore
+	skillStore       *skillstore.SkillStore
+	skillRuntime     *skillruntime.SkillRuntime
 	providersetAPI   *inferencewrapper.ProviderSetAPI
 
 	appContext          context.Context
@@ -52,10 +54,11 @@ func InitAggregrateWrapper(
 	mps *modelpresetStore.ModelPresetStore,
 	ss *settingStore.SettingStore,
 	ts *toolStore.ToolStore,
-	skillSt *skillStore.SkillStore,
+	skillSt *skillstore.SkillStore,
+	skillRt *skillruntime.SkillRuntime,
 	mr *mcpRuntime.MCPRuntimeManager,
 ) error {
-	if agg == nil || ts == nil || mps == nil || ss == nil {
+	if agg == nil || ts == nil || mps == nil || ss == nil || skillSt == nil || skillRt == nil {
 		panic("initializing aggregate store wrapper on nil receivers")
 	}
 
@@ -63,6 +66,7 @@ func InitAggregrateWrapper(
 	agg.modelPresetStore = mps
 	agg.settingStore = ss
 	agg.skillStore = skillSt
+	agg.skillRuntime = skillRt
 
 	defaultDebugConfig := inferencewrapper.DefaultDebugConfig()
 
@@ -74,7 +78,7 @@ func InitAggregrateWrapper(
 	p, err := inferencewrapper.NewProviderSetAPI(
 		agg.toolStore,
 		agg.modelPresetStore,
-		agg.skillStore,
+		agg.skillRuntime,
 		bridge,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&defaultDebugConfig),

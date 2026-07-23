@@ -1,4 +1,4 @@
-package store
+package skillstore
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ import (
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 const (
@@ -17,6 +17,19 @@ const (
 	maxDescriptionLen = 4096
 	maxLocationLen    = 4096
 	maxNameLen        = 256
+)
+
+var (
+	errSkillInvalidRequest  = errors.New("invalid request")
+	errSkillConflict        = errors.New("resource already exists")
+	errSkillBuiltInReadOnly = errors.New("built-in resource is read-only")
+	errSkillBundleNotFound  = errors.New("bundle not found")
+	errSkillBundleDisabled  = errors.New("bundle is disabled")
+	errSkillBundleDeleting  = errors.New("bundle is being deleted")
+	errSkillBundleNotEmpty  = errors.New("bundle still contains skills")
+	errSkillNotFound        = errors.New("skill not found")
+	errSkillDisabled        = errors.New("skill is disabled")
+	errSkillIsMissing       = errors.New("skill is marked missing (cannot delete)")
 )
 
 // ValidateSkill applies the Skill Store's structural rules to a projected

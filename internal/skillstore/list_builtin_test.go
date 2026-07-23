@@ -1,4 +1,4 @@
-package store
+package skillstore
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 const (
@@ -165,7 +165,7 @@ func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t 
 			CursorID:        "x",
 		})
 		_, err := s.ListSkillBundles(t.Context(), &spec.ListSkillBundlesRequest{PageToken: badTok})
-		if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
+		if err == nil || !errors.Is(err, errSkillInvalidRequest) {
 			t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
 		}
 	})
@@ -293,7 +293,7 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 		t.Parallel()
 		bad := jsonutil.Base64JSONEncode(spec.SkillPageToken{Phase: testNope})
 		_, err := s.ListSkills(t.Context(), &spec.ListSkillsRequest{PageToken: bad})
-		if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
+		if err == nil || !errors.Is(err, errSkillInvalidRequest) {
 			t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
 		}
 	})
@@ -305,7 +305,7 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 			BuiltInCursor: "missing-separator",
 		})
 		_, err := s.ListSkills(t.Context(), &spec.ListSkillsRequest{PageToken: bad})
-		if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
+		if err == nil || !errors.Is(err, errSkillInvalidRequest) {
 			t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
 		}
 	})
@@ -317,7 +317,7 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 			DirTok: "bad",
 		})
 		_, err := s.ListSkills(t.Context(), &spec.ListSkillsRequest{PageToken: bad})
-		if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
+		if err == nil || !errors.Is(err, errSkillInvalidRequest) {
 			t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
 		}
 	})
