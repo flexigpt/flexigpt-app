@@ -2,9 +2,6 @@ package skilladapter
 
 import (
 	"fmt"
-	"slices"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
@@ -85,25 +82,6 @@ func validateSkillBody(value skillDefinition) error {
 			err,
 		)
 	}
-	if strings.TrimSpace(value.MarkdownBody) == "" {
-		return fmt.Errorf(
-			"%w: Workspace Skill body is empty",
-			engine.ErrInvalidWorkspace,
-		)
-	}
-	if !utf8.ValidString(value.MarkdownBody) ||
-		strings.ContainsRune(value.MarkdownBody, 0) {
-		return fmt.Errorf(
-			"%w: Workspace Skill body is not valid UTF-8 text",
-			engine.ErrInvalidWorkspace,
-		)
-	}
-	if !slices.IsSorted(value.Tags) {
-		return fmt.Errorf(
-			"%w: Workspace Skill tags must use canonical sorted order",
-			engine.ErrInvalidWorkspace,
-		)
-	}
 	return nil
 }
 
@@ -123,12 +101,13 @@ func agentSkillDocument(
 		})
 	}
 	return agentskillsSpec.SkillDocument{
-		Name:         value.Name,
-		DisplayName:  value.DisplayName,
-		Description:  value.Description,
-		Insert:       agentskillsSpec.SkillInsert(value.Insert),
-		Arguments:    arguments,
-		Tags:         append([]string(nil), value.Tags...),
-		MarkdownBody: value.MarkdownBody,
+		Name:           value.Name,
+		DisplayName:    value.DisplayName,
+		Description:    value.Description,
+		Insert:         agentskillsSpec.SkillInsert(value.Insert),
+		Arguments:      arguments,
+		Tags:           append([]string(nil), value.Tags...),
+		MarkdownBody:   value.MarkdownBody,
+		RawFrontmatter: value.RawFrontmatter,
 	}
 }

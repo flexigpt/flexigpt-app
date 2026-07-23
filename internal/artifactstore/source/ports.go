@@ -62,6 +62,21 @@ type Snapshot interface {
 	Close() error
 }
 
+// LocalPathResolver is an optional trusted-internal capability exposed by a
+// source adapter when a source-relative locator has a native local filesystem
+// representation.
+//
+// It is deliberately not part of Snapshot and is never exposed through public
+// source summaries or Workspace API views. Consumers use it only after their
+// own runtime policy has approved a selected record.
+type LocalPathResolver interface {
+	ResolveLocalPath(
+		ctx context.Context,
+		value Source,
+		locator artifactstore.Locator,
+	) (string, error)
+}
+
 type Adapter interface {
 	Kind() artifactstore.SourceKind
 

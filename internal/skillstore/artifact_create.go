@@ -2,6 +2,7 @@ package skillstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -89,18 +90,14 @@ func (s *SkillStore) PutSkillArtifact(
 		)
 	}
 
-	location := filepath.Join(
+	location, err := managedSkillPackageLocation(
 		s.baseDir,
-		userCreatedSkillsDirName,
 		string(req.BundleID),
 		name,
 	)
-	location = filepath.Clean(location)
-	locationAbs, err := filepath.Abs(location)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
-	location = locationAbs
 
 	var createdDir string
 	var created spec.Skill
@@ -197,6 +194,67 @@ func createManagedSkillPackage(dir, skillMD string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, skillMDFileName), []byte(skillMD), 0o600)
+}
+
+func validateManagedPathSegment(value, label string) error {
+	if value == "" ||
+		value == "." ||
+		value == ".." ||
+		strings.ContainsAny(value, `/\`) ||
+		filepath.Base(value) != value {
+		return fmt.Errorf("%s is not a safe path segment", label)
+	}
+	return nil
+}
+
+func managedSkillPackageLocation(
+	baseDir string,
+	bundleID string,
+	name string,
+) (string, error) {
+	if err := validateManagedPathSegment(bundleID, "bundleID"); err != nil {
+		return "", err
+	}
+	if err := validateManagedPathSegment(name, "Skill name"); err != nil {
+		return "", err
+	}
+	root, err := filepath.Abs(filepath.Join(
+		baseDir,
+		userCreatedSkillsDirName,
+	))
+	if err != nil {
+		return "", err
+	}
+	location, err := filepath.Abs(filepath.Join(root, bundleID, name))
+	if err != nil {
+		return "", err
+	}
+	relative, err := filepath.Rel(root, location)
+	if err != nil {
+		return "", err
+	}
+	if relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", errors.New("managed Skill location escapes its root")
+	}
+	return location, nil
+}
+
+func isManagedSkillPackageLocation(
+	baseDir string,
+	bundleID string,
+	name string,
+	location string,
+) bool {
+	expected, err := managedSkillPackageLocation(baseDir, bundleID, name)
+	if err != nil {
+		return false
+	}
+	actual, err := filepath.Abs(location)
+	if err != nil {
+		return false
+	}
+	return filepath.Clean(actual) == expected
 }
 
 func humanizeSkillName(name string) string {

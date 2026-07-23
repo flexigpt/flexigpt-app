@@ -3,12 +3,17 @@ package skilladapter
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"sort"
 	"time"
+	"unicode/utf8"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
@@ -47,6 +52,7 @@ type WorkspaceSkill struct {
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
 	RuntimeAllowed   bool                       `json:"runtimeAllowed"`
 	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
+	RuntimeLocation  string                     `json:"-"`
 }
 
 type SkillLoadPlan struct {
@@ -59,13 +65,15 @@ type SkillLoadPlan struct {
 type Adapter struct {
 	query         *engine.QueryService
 	runtimePolicy engine.SourceUsePolicy
+	sourceRuntime source.Runtime
 }
 
 func NewAdapter(
 	query *engine.QueryService,
 	runtimePolicy engine.SourceUsePolicy,
+	sourceRuntime source.Runtime,
 ) (*Adapter, error) {
-	if query == nil || runtimePolicy == nil {
+	if query == nil || runtimePolicy == nil || sourceRuntime == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Skill adapter dependencies are incomplete",
 			engine.ErrInvalidWorkspace,
@@ -74,6 +82,7 @@ func NewAdapter(
 	return &Adapter{
 		query:         query,
 		runtimePolicy: runtimePolicy,
+		sourceRuntime: sourceRuntime,
 	}, nil
 }
 
@@ -159,6 +168,7 @@ func (f *Adapter) Load(
 			Record:          item.Record,
 			Definition:      item.Definition,
 			Source:          item.Source,
+			CatalogCurrent:  item.CatalogCurrent,
 			ProjectionValid: true,
 		}
 		projected, err := projectWorkspaceSkill(
@@ -174,6 +184,15 @@ func (f *Adapter) Load(
 			)
 			continue
 		}
+		runtimeLocation, err := f.resolveRuntimeLocation(ctx, item)
+		if err != nil {
+			output.Diagnostics = artifactstore.AppendDiagnostics(
+				output.Diagnostics,
+				runtimeLocationDiagnostic(item.Record, err),
+			)
+			continue
+		}
+		projected.RuntimeLocation = runtimeLocation
 		output.Skills = append(output.Skills, projected)
 	}
 	sortWorkspaceSkills(output.Skills)
@@ -271,23 +290,147 @@ func attachmentPriorities(
 	return output
 }
 
-func (s WorkspaceSkill) AgentSkillDocument() agentskillsSpec.SkillDocument {
-	arguments := make([]agentskillsSpec.SkillArgument, 0, len(s.Skill.Arguments))
-	for _, argument := range s.Skill.Arguments {
-		arguments = append(arguments, agentskillsSpec.SkillArgument{
-			Name:        argument.Name,
-			Description: argument.Description,
-			Default:     argument.Default,
-		})
+// resolveRuntimeLocation performs the Workspace-owned handoff from a selected
+// source-linked record to a native filesystem skill package. It does not
+// register or execute the skill. Agent Skills runtime lifecycle remains in
+// skillruntime.
+func (f *Adapter) resolveRuntimeLocation(
+	ctx context.Context,
+	item engine.LoadPlanItem,
+) (string, error) {
+	if item.Source.Kind != fsdir.Kind {
+		return "", fmt.Errorf(
+			"%w: Workspace Skill source kind %q has no native filesystem package",
+			artifactstore.ErrUnsupported,
+			item.Source.Kind,
+		)
 	}
-	return agentskillsSpec.SkillDocument{
-		Name:         s.Skill.Name,
-		DisplayName:  s.Skill.DisplayName,
-		Description:  s.Skill.Description,
-		Insert:       agentskillsSpec.SkillInsert(s.Skill.Insert),
-		Arguments:    arguments,
-		Tags:         append([]string(nil), s.Skill.Tags...),
-		MarkdownBody: s.MarkdownBody,
+	if item.SourceContentDigest == "" ||
+		item.OccurrenceDefinitionDigest == "" {
+		return "", fmt.Errorf(
+			"%w: Workspace Skill has no current source occurrence",
+			artifactstore.ErrCatalogStale,
+		)
+	}
+	if item.OccurrenceDefinitionDigest != item.Definition.Digest {
+		return "", fmt.Errorf(
+			"%w: selected Workspace Skill definition does not match its current source occurrence",
+			artifactstore.ErrCatalogStale,
+		)
+	}
+
+	sourceValue, err := f.sourceRuntime.Get(ctx, item.Source.ID)
+	if err != nil {
+		return "", err
+	}
+	if sourceValue.Kind != fsdir.Kind {
+		return "", fmt.Errorf(
+			"%w: Workspace Skill source kind changed from %q to %q",
+			artifactstore.ErrConflict,
+			fsdir.Kind,
+			sourceValue.Kind,
+		)
+	}
+
+	localPaths, supported := f.sourceRuntime.(source.LocalPathRuntime)
+	if !supported {
+		return "", fmt.Errorf(
+			"%w: source runtime cannot resolve native filesystem paths",
+			artifactstore.ErrUnsupported,
+		)
+	}
+	skillMDPath, err := localPaths.ResolveLocalPath(
+		ctx,
+		sourceValue,
+		item.Record.Occurrence.Locator,
+	)
+	if err != nil {
+		return "", err
+	}
+	if filepath.Base(skillMDPath) != skillDefinitionFileName {
+		return "", fmt.Errorf(
+			"%w: Workspace Skill locator %q is not %q",
+			artifactstore.ErrInvalid,
+			item.Record.Occurrence.Locator,
+			skillDefinitionFileName,
+		)
+	}
+	if err := verifySkillMDContent(
+		skillMDPath,
+		item.SourceContentDigest,
+	); err != nil {
+		return "", err
+	}
+	return filepath.Dir(skillMDPath), nil
+}
+
+// verifySkillMDContent prevents a selected Workspace record from silently
+// becoming a runtime handle for different SKILL.md content after refresh.
+// Resource and script contents remain normal live filesystem-provider inputs,
+// just as they are for installed filesystem skills.
+func verifySkillMDContent(
+	location string,
+	expected artifactstore.Digest,
+) error {
+	if err := artifactstore.ValidateDigest(expected); err != nil {
+		return err
+	}
+	info, err := os.Lstat(location)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return fmt.Errorf(
+			"%w: Workspace SKILL.md is not a regular non-symlink file",
+			artifactstore.ErrInvalid,
+		)
+	}
+	file, err := os.Open(location)
+	if err != nil {
+		return err
+	}
+	content, readErr := io.ReadAll(
+		io.LimitReader(file, int64(artifactstore.MaxCandidateBytes)+1),
+	)
+	closeErr := file.Close()
+	if readErr != nil {
+		return readErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if len(content) > artifactstore.MaxCandidateBytes {
+		return fmt.Errorf(
+			"%w: Workspace SKILL.md exceeds runtime verification limit",
+			artifactstore.ErrInvalid,
+		)
+	}
+	if artifactstore.DigestBytes(content) != expected {
+		return fmt.Errorf(
+			"%w: Workspace SKILL.md changed since the current catalog refresh",
+			artifactstore.ErrCatalogStale,
+		)
+	}
+	return nil
+}
+
+func runtimeLocationDiagnostic(
+	value record.Record,
+	err error,
+) artifactstore.Diagnostic {
+	message := err.Error()
+	for len(message) > artifactstore.MaxDiagnosticMessageBytes {
+		_, size := utf8.DecodeLastRuneInString(message)
+		message = message[:len(message)-size]
+	}
+	return artifactstore.Diagnostic{
+		Severity: artifactstore.DiagnosticError,
+		Code:     engine.DiagnosticCodeRuntimeUnavailable,
+		Message:  message,
+		Location: &artifactstore.DiagnosticLocation{
+			Locator:            value.Occurrence.Locator,
+			SubresourceLocator: value.Occurrence.SubresourceLocator,
+		},
 	}
 }
 

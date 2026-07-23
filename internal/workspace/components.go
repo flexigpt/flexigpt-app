@@ -113,6 +113,7 @@ func newComponents(
 	skillAdapter, err := skilladapter.NewAdapter(
 		query,
 		runtimePolicy,
+		artifacts.SourceRuntime,
 	)
 	if err != nil {
 		return nil, err

@@ -222,6 +222,11 @@ Artifact Store owns:
 - Generic candidate matching
 - Optimistic conflict detection
 
+Artifact Store may expose an optional trusted-internal native local-path
+resolver for source adapters that already represent local directories. This is
+not public source metadata, not portable definition data, and not generic
+materialization.
+
 Artifact Store may support, as optional extensions:
 
 - Collections
@@ -617,6 +622,19 @@ Consequence:
 - A source transport can support many formats.
 - A format adapter can operate over many source transports.
 
+### 14.5a Native local path resolution is optional and source-specific
+
+Reason:
+
+- Some runtime libraries already operate safely on an existing local directory.
+- Copying an already materialized source tree adds unnecessary state and drift.
+
+Consequence:
+
+- A filesystem source adapter may expose a trusted internal locator-to-path capability.
+- Non-filesystem sources return unsupported rather than receiving an implicit copied filesystem view.
+- Runtime consumers remain responsible for policy, execution, and public API boundaries.
+
 ### 14.6 Publish a current root catalog atomically from the reader’s perspective
 
 Reason:
@@ -767,10 +785,12 @@ These statuses describe the implemented code paths in the attached state. They
 do not imply that a consumer has completed runtime integration.
 
 Workspace currently demonstrates discovery, canonical definition retention,
-records, catalog publication, and Workspace-specific Context and Skill
-projections. It does not yet demonstrate full Agent Skills runtime parity for
-selected Workspace Skills, including sessions, resources, scripts, and Skill
-tool invocation.
+records, catalog publication, Context composition, and filesystem-backed
+Workspace Skill runtime projection. Selected approved Workspace Skills resolve
+to ordinary Agent Skills `fs` definitions and therefore share the installed
+filesystem provider's indexing, session, rendering, resource-read, and script
+behavior. Non-filesystem Workspace sources remain catalog and management
+sources only until an explicit materialization capability is introduced.
 
 ### 20.1 Functional requirement mapping
 
@@ -794,7 +814,7 @@ tool invocation.
 | `AS-F16` | Export or import portable definitions and assets.                           | `Not implemented` | There is no package manifest, asset closure, import, export, capture, or fork capability.                                                                                                                                                                                                                            |
 | `AS-F17` | Retain historical definition occurrence revisions.                          | `Not implemented` | SQLite retains only `artifact_current_catalogs` and current occurrences. Historical catalog generations and occurrence revisions are not stored.                                                                                                                                                                     |
 | `AS-F18` | Persist dependency resolution snapshots.                                    | `Not implemented` | Definitions can declare selectors, but dependency graph construction, resolution snapshots, and reproducibility reports do not exist.                                                                                                                                                                                |
-| `AS-F19` | Materialize source content for path-oriented runtimes.                      | `Not implemented` | Sources can be read through snapshots, but no generic materialization or source-content closure capability exists. A consumer may implement bounded, private runtime materialization without making it a generic Artifact Store capability.                                                                          |
+| `AS-F19` | Materialize source content for path-oriented runtimes.                      | `Not implemented` | Generic materialization remains absent. Filesystem sources may expose a trusted native locator-to-path capability, which is not materialization and does not create a copied source tree.                                                                                                                            |
 | `AS-F20` | Record transfer provenance.                                                 | `Not implemented` | Transfer workflows and provenance metadata are not implemented.                                                                                                                                                                                                                                                      |
 
 ### 20.2 Quality requirement mapping
@@ -813,11 +833,13 @@ tool invocation.
 ## 21. Next steps
 
 - Keep full Workspace Skill runtime support outside Artifact Store.
-  - Workspace must resolve selected records into a consumer-owned runtime
-    projection that preserves source-relative Skill directory identity without
-    exposing source configuration or filesystem paths at API boundaries.
-  - A Workspace runtime projector may materialize a bounded private Skill
-    directory or provide an equivalent Agent Skills provider implementation.
+  - Workspace resolves approved filesystem-backed records into ordinary
+    filesystem Skill runtime definitions through the optional trusted native
+    local-path resolver.
+  - Artifact Store must not gain Skill-specific resource, script, session,
+    prompt, execution, or trust semantics.
+  - Non-filesystem Workspace sources remain unavailable to path-only runtimes
+    unless a future explicit materialization capability is introduced.
   - Artifact Store must not gain Skill-specific resource, script, session,
     prompt, execution, or trust semantics.
   - Generic Artifact Store materialization remains optional. Workspace may

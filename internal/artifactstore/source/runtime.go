@@ -24,9 +24,23 @@ type Runtime interface {
 	) (Snapshot, error)
 }
 
+// LocalPathRuntime is an optional extension implemented by the trusted source
+// runtime when its opener supports LocalPathResolver.
+//
+// It intentionally accepts a full Source rather than a public Summary because
+// source configuration remains internal to Artifact Store consumers.
+type LocalPathRuntime interface {
+	ResolveLocalPath(
+		ctx context.Context,
+		value Source,
+		locator artifactstore.Locator,
+	) (string, error)
+}
+
 type runtime struct {
-	reader Reader
-	opener Opener
+	reader     Reader
+	opener     Opener
+	localPaths LocalPathResolver
 }
 
 func NewRuntime(
@@ -39,10 +53,14 @@ func NewRuntime(
 			artifactstore.ErrInvalid,
 		)
 	}
-	return &runtime{
+	value := &runtime{
 		reader: reader,
 		opener: opener,
-	}, nil
+	}
+	if resolver, supported := opener.(LocalPathResolver); supported {
+		value.localPaths = resolver
+	}
+	return value, nil
 }
 
 func (r *runtime) Get(
@@ -86,6 +104,32 @@ func (r *runtime) Open(
 		return nil, err
 	}
 	return snapshot, nil
+}
+
+// ResolveLocalPath delegates only to adapters that explicitly support native
+// filesystem paths. Non-filesystem sources remain source-backed but do not
+// become path-backed implicitly.
+func (r *runtime) ResolveLocalPath(
+	ctx context.Context,
+	value Source,
+	locator artifactstore.Locator,
+) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if err := value.Validate(); err != nil {
+		return "", err
+	}
+	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+		return "", err
+	}
+	if r.localPaths == nil {
+		return "", fmt.Errorf(
+			"%w: source runtime has no native path resolver",
+			artifactstore.ErrUnsupported,
+		)
+	}
+	return r.localPaths.ResolveLocalPath(ctx, value.Clone(), locator)
 }
 
 func validateSnapshot(snapshot Snapshot) error {

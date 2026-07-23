@@ -105,6 +105,34 @@ func (*Adapter) Open(
 	}, nil
 }
 
+// ResolveLocalPath returns the existing native path for a locator inside this
+// filesystem source. It is used only by trusted runtime integrations after a
+// consumer has approved a selected record.
+//
+// The returned path is never part of a portable definition or public API
+// projection.
+func (*Adapter) ResolveLocalPath(
+	ctx context.Context,
+	value source.Source,
+	locator artifactstore.Locator,
+) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if value.Kind != Kind {
+		return "", fmt.Errorf(
+			"%w: filesystem adapter received source kind %q",
+			artifactstore.ErrInvalid,
+			value.Kind,
+		)
+	}
+	config, err := decodeConfig(value.Config)
+	if err != nil {
+		return "", err
+	}
+	return resolveNativePath(config.RootPath, locator)
+}
+
 func decodeConfig(raw json.RawMessage) (Config, error) {
 	canonical, err := jsoncanon.CanonicalizeObject(raw, artifactstore.MaxConfigBytes)
 	if err != nil {

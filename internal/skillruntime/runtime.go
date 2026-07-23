@@ -431,11 +431,18 @@ func validateSkillRef(ref spec.SkillRef) error {
 		if ref.BundleID != "" || ref.SkillSlug != "" || ref.SkillID != "" {
 			return errors.New("identity and installed reference fields are mutually exclusive")
 		}
-		if !strings.HasPrefix(ref.Identity, installedIdentityPrefix) &&
-			!strings.HasPrefix(ref.Identity, workspaceIdentityPrefix) {
-			return errors.New("Skill identity has an unsupported source")
+		switch {
+		case strings.HasPrefix(ref.Identity, installedIdentityPrefix):
+			_, err := parseInstalledIdentity(ref.Identity)
+			return err
+		case strings.HasPrefix(ref.Identity, workspaceIdentityPrefix):
+			_, _, err := parseWorkspaceIdentity(ref.Identity)
+			return err
+		default:
+			return errors.New(
+				"Skill identity has an unsupported source",
+			)
 		}
-		return nil
 	}
 	if strings.TrimSpace(string(ref.BundleID)) == "" {
 		return errors.New("bundleID is empty")

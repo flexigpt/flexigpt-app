@@ -183,6 +183,9 @@ func (s *SkillStore) PutSkillBundle(
 	if err := bundleitemutils.ValidateBundleSlug(req.Body.Slug); err != nil {
 		return nil, err
 	}
+	if err := validateManagedPathSegment(string(req.BundleID), "bundleID"); err != nil {
+		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
+	}
 	if s.builtin != nil {
 		if _, err := s.builtin.GetBuiltInSkillBundle(ctx, req.BundleID); err == nil {
 			return nil, fmt.Errorf("%w: bundleID %q", errSkillBuiltInReadOnly, req.BundleID)
@@ -604,6 +607,7 @@ func (s *SkillStore) DeleteSkill(
 		}
 	}
 
+	var deleted spec.Skill
 	if err := s.withUserWrite(ctx, "deleteSkill", func(snapshot *skillStoreSchema) error {
 		bundle, ok := snapshot.Bundles[req.BundleID]
 		if !ok {
@@ -617,9 +621,7 @@ func (s *SkillStore) DeleteSkill(
 		if !ok {
 			return fmt.Errorf("%w: %s", errSkillNotFound, req.SkillSlug)
 		}
-		if skill.Presence != nil && skill.Presence.Status == spec.SkillPresenceMissing {
-			return fmt.Errorf("%w: %s", errSkillIsMissing, req.SkillSlug)
-		}
+		deleted = skill
 		delete(values, req.SkillSlug)
 		snapshot.Skills[req.BundleID] = values
 		return nil
@@ -627,6 +629,20 @@ func (s *SkillStore) DeleteSkill(
 		return nil, err
 	}
 
+	if isManagedSkillPackageLocation(
+		s.baseDir,
+		string(req.BundleID),
+		deleted.Name,
+		deleted.Location,
+	) {
+		if err := os.RemoveAll(deleted.Location); err != nil {
+			slog.Error(
+				"delete managed Skill package failed",
+				"location", deleted.Location,
+				"error", err,
+			)
+		}
+	}
 	slog.Info("deleteSkill", "bundleID", req.BundleID, "skillSlug", req.SkillSlug)
 	return &spec.DeleteSkillResponse{}, nil
 }

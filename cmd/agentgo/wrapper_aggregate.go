@@ -82,6 +82,7 @@ func InitAggregrateWrapper(
 		bridge,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&defaultDebugConfig),
+		inferencewrapper.WithSkillsRunScriptEnabled(skillRt.RunScriptsEnabled()),
 	)
 	if err != nil {
 		return errors.Join(err, errors.New("invalid default provider"))

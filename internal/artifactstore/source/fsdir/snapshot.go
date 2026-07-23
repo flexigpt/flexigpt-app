@@ -194,6 +194,80 @@ func (s *snapshot) resolve(
 	return candidate, nil
 }
 
+// resolveNativePath resolves an existing locator beneath a configured source
+// root while refusing symlinks below that root. The configured root itself may
+// be a symlink, but it is canonicalized first so containment is evaluated
+// against its actual directory.
+func resolveNativePath(
+	root string,
+	locator artifactstore.Locator,
+) (string, error) {
+	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+		return "", err
+	}
+
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf(
+			"%w: resolve filesystem source root: %w",
+			artifactstore.ErrSourceUnavailable,
+			err,
+		)
+	}
+	rootInfo, err := os.Stat(resolvedRoot)
+	if err != nil {
+		return "", err
+	}
+	if !rootInfo.IsDir() {
+		return "", fmt.Errorf(
+			"%w: filesystem source root is not a directory",
+			artifactstore.ErrInvalid,
+		)
+	}
+
+	current := resolvedRoot
+	if locator == "." {
+		return current, nil
+	}
+
+	for part := range strings.SplitSeq(string(locator), "/") {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf(
+				"%w: source locator %q",
+				artifactstore.ErrNotFound,
+				locator,
+			)
+		}
+		if err != nil {
+			return "", err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf(
+				"%w: symbolic link %q is not allowed",
+				artifactstore.ErrInvalid,
+				locator,
+			)
+		}
+	}
+
+	relative, err := filepath.Rel(resolvedRoot, current)
+	if err != nil {
+		return "", err
+	}
+	if relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
+		filepath.IsAbs(relative) {
+		return "", fmt.Errorf(
+			"%w: locator %q escapes source root",
+			artifactstore.ErrInvalid,
+			locator,
+		)
+	}
+	return current, nil
+}
+
 func entryFromInfo(
 	locator artifactstore.Locator,
 	info os.FileInfo,

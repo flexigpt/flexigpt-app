@@ -285,10 +285,23 @@ func (q *QueryService) ComposeLoadPlan(
 			continue
 		}
 
+		occurrenceDefinitionDigest := artifactstore.Digest("")
+		sourceContentDigest := artifactstore.Digest("")
+		if resourceValue.Occurrence != nil {
+			if resourceValue.Occurrence.DefinitionDigest != nil {
+				occurrenceDefinitionDigest = *resourceValue.Occurrence.DefinitionDigest
+			}
+			if resourceValue.Occurrence.SourceContentDigest != nil {
+				sourceContentDigest = *resourceValue.Occurrence.SourceContentDigest
+			}
+		}
 		plan.Items = append(plan.Items, LoadPlanItem{
-			Record:     resourceValue.Record,
-			Definition: resourceValue.Definition,
-			Source:     resourceValue.Source,
+			Record:                     resourceValue.Record,
+			Definition:                 resourceValue.Definition,
+			Source:                     resourceValue.Source,
+			CatalogCurrent:             resourceValue.CatalogCurrent,
+			OccurrenceDefinitionDigest: occurrenceDefinitionDigest,
+			SourceContentDigest:        sourceContentDigest,
 		})
 		plan.Diagnostics = artifactstore.AppendDiagnostics(
 			plan.Diagnostics,

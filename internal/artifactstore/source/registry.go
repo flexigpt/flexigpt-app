@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
@@ -66,6 +67,59 @@ func (r *Registry) Open(
 		return nil, err
 	}
 	return snapshot, nil
+}
+
+// ResolveLocalPath resolves a source-relative locator to a native absolute
+// filesystem path when, and only when, the selected source adapter explicitly
+// supports that capability.
+//
+// This is intentionally a trusted internal capability. Public source APIs
+// continue to expose Summary values only and never reveal source paths.
+func (r *Registry) ResolveLocalPath(
+	ctx context.Context,
+	value Source,
+	locator artifactstore.Locator,
+) (string, error) {
+	if ctx == nil {
+		return "", artifactstore.ErrInvalid
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if err := value.Validate(); err != nil {
+		return "", err
+	}
+	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+		return "", err
+	}
+	adapter, exists := r.adapter(value.Kind)
+	if !exists {
+		return "", fmt.Errorf(
+			"%w: source adapter %q",
+			artifactstore.ErrSourceUnavailable,
+			value.Kind,
+		)
+	}
+	resolver, supported := adapter.(LocalPathResolver)
+	if !supported {
+		return "", fmt.Errorf(
+			"%w: source kind %q has no native filesystem path",
+			artifactstore.ErrUnsupported,
+			value.Kind,
+		)
+	}
+	location, err := resolver.ResolveLocalPath(ctx, value.Clone(), locator)
+	if err != nil {
+		return "", err
+	}
+	location = filepath.Clean(location)
+	if !filepath.IsAbs(location) {
+		return "", fmt.Errorf(
+			"%w: source adapter returned a non-absolute local path",
+			artifactstore.ErrInvalid,
+		)
+	}
+	return location, nil
 }
 
 func (r *Registry) Kinds() []artifactstore.SourceKind {

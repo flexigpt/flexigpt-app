@@ -34,6 +34,35 @@ func (*Installed) Owns(identity string) bool {
 }
 
 func (p *Installed) List(ctx context.Context, _ Scope) ([]Skill, error) {
+	bundleEnabled := map[skillstoreSpec.SkillBundleID]bool{}
+	bundleToken := ""
+	for {
+		response, err := p.store.ListSkillBundles(
+			ctx,
+			&skillstoreSpec.ListSkillBundlesRequest{
+				IncludeDisabled: true,
+				PageSize:        256,
+				PageToken:       bundleToken,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		if response == nil || response.Body == nil {
+			return nil, errors.New(
+				"installed Skill Store returned an empty bundle list response",
+			)
+		}
+		for _, bundle := range response.Body.SkillBundles {
+			bundleEnabled[bundle.ID] = bundle.IsEnabled
+		}
+		if response.Body.NextPageToken == nil ||
+			*response.Body.NextPageToken == "" {
+			break
+		}
+		bundleToken = *response.Body.NextPageToken
+	}
+
 	var output []Skill
 	pageToken := ""
 	for {
@@ -54,6 +83,13 @@ func (p *Installed) List(ctx context.Context, _ Scope) ([]Skill, error) {
 			if err := skillstore.ValidateSkill(&value); err != nil {
 				return nil, err
 			}
+			enabled, found := bundleEnabled[item.BundleID]
+			if !found {
+				return nil, errors.New(
+					"installed Skill references an unavailable bundle",
+				)
+			}
+			enabled = enabled && value.IsEnabled
 			ref := skillstoreSpec.SkillRef{BundleID: item.BundleID, SkillSlug: item.SkillSlug, SkillID: value.ID}
 			insert := value.Insert
 			if insert == "" {
@@ -71,9 +107,9 @@ func (p *Installed) List(ctx context.Context, _ Scope) ([]Skill, error) {
 				Insert:           insert,
 				Arguments:        append([]agentskillsSpec.SkillArgument(nil), value.Arguments...),
 				Tags:             append([]string(nil), value.Tags...),
-				Enabled:          value.IsEnabled,
+				Enabled:          enabled,
 				Available:        available,
-				RuntimeAllowed:   value.IsEnabled,
+				RuntimeAllowed:   enabled,
 				BuiltIn:          value.IsBuiltIn,
 				Priority:         0,
 				CatalogCurrent:   available,

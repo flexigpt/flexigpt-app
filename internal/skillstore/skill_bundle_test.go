@@ -147,47 +147,6 @@ func TestSkillStore_PatchSkill_EmptyPatchRejected(t *testing.T) {
 	}
 }
 
-func TestSkillStore_DeleteSkill_MissingPresenceBlocked(t *testing.T) {
-	t.Parallel()
-	s := newTestSkillStore(t)
-	putBundle(t, s, skillBundleB1, testBundleSlug, testBundleDisplayName, true)
-
-	root := t.TempDir()
-	loc := writeSkillPackage(t, root, skillBundleMissingSkillSlug, "desc", "BODY")
-
-	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  skillBundleB1,
-		SkillSlug: skillBundleMissingSkillSlug,
-		Body: &spec.PutSkillRequestBody{
-			SkillType: spec.SkillTypeFS,
-			Location:  loc,
-			Name:      skillBundleMissingSkillSlug,
-			IsEnabled: true,
-		},
-	})
-	if err != nil {
-		t.Fatalf("PutSkill: %v", err)
-	}
-
-	// Force presence=missing in the persisted store.
-	all, err := readAllUserLocked(t, s, true)
-	if err != nil {
-		t.Fatalf("readAllUser: %v", err)
-	}
-	sk := all.Skills[skillBundleB1][skillBundleMissingSkillSlug]
-	sk.Presence = &spec.SkillPresence{Status: spec.SkillPresenceMissing}
-	all.Skills[skillBundleB1][skillBundleMissingSkillSlug] = sk
-	writeAllUserLocked(t, s, all)
-
-	_, err = s.DeleteSkill(
-		t.Context(),
-		&spec.DeleteSkillRequest{BundleID: skillBundleB1, SkillSlug: skillBundleMissingSkillSlug},
-	)
-	if err == nil || !errors.Is(err, errSkillIsMissing) {
-		t.Fatalf("expected ErrSkillIsMissing, got %v", err)
-	}
-}
-
 func TestSkillStore_DeleteSkillBundle_NotEmpty(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)

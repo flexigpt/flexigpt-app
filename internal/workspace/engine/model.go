@@ -162,9 +162,12 @@ type Reference struct {
 // LoadPlanItem contains privileged materialized source state. It must be
 // projected into an explicit adapter response before crossing an API boundary.
 type LoadPlanItem struct {
-	Record     record.Record         `json:"-"`
-	Definition definition.Definition `json:"-"`
-	Source     source.Summary        `json:"-"`
+	Record                     record.Record         `json:"-"`
+	Definition                 definition.Definition `json:"-"`
+	Source                     source.Summary        `json:"-"`
+	CatalogCurrent             bool                  `json:"-"`
+	OccurrenceDefinitionDigest artifactstore.Digest  `json:"-"`
+	SourceContentDigest        artifactstore.Digest  `json:"-"`
 }
 
 type LoadPlan struct {

@@ -14,6 +14,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
+const workspaceIdentityPrefix = "workspace/"
+
 type Workspace struct {
 	runtime *SkillRuntime
 	adapter *skilladapter.Adapter
@@ -48,23 +50,6 @@ func (p *Workspace) List(
 	}
 	output := make([]Skill, 0, len(values))
 	for _, value := range values {
-		document := value.AgentSkillDocument()
-		if value.MarkdownBody == "" {
-			document.MarkdownBody = "Workspace Skill body is loaded only at runtime."
-		}
-		if err := agentskills.ValidateSkillDocument(document); err != nil {
-			value.Diagnostics = artifactstore.AppendDiagnostics(
-				value.Diagnostics,
-				artifactstore.Diagnostic{
-					Severity: artifactstore.DiagnosticError,
-					Code:     "skill.provider.projection-invalid",
-					Message:  err.Error(),
-					Location: &artifactstore.DiagnosticLocation{
-						Locator: value.Locator,
-					},
-				},
-			)
-		}
 		arguments := make(
 			[]agentskillsSpec.SkillArgument,
 			0,
@@ -121,9 +106,6 @@ func (p *Workspace) Render(
 	if request.Scope.WorkspaceRootID != "" &&
 		request.Scope.WorkspaceRootID != rootID {
 		return RenderedSkill{}, errors.New("Workspace Skill belongs to another scope")
-	}
-	if err := p.runtime.ResyncWorkspace(ctx, rootID); err != nil {
-		return RenderedSkill{}, err
 	}
 	definition, found := p.runtime.workspaceDefinitionForIdentity(
 		ctx,
