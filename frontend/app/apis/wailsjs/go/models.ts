@@ -616,7 +616,7 @@ export namespace capabilityoverride {
 
 }
 
-export namespace provider {
+export namespace skillruntime {
 	
 	export class ListProvidedSkillsRequest {
 	    workspaceRootID?: string;
