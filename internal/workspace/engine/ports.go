@@ -46,7 +46,6 @@ type workspaceRootStore interface {
 
 	List(
 		ctx context.Context,
-		includeDeleted bool,
 	) ([]root.Root, error)
 
 	Update(

@@ -115,21 +115,11 @@ func (s *Service) Get(
 	ctx context.Context,
 	id artifactstore.RootID,
 ) (Root, error) {
-	return s.repository.Get(ctx, id, false)
+	return s.repository.Get(ctx, id)
 }
 
-func (s *Service) GetIncludingDeleted(
-	ctx context.Context,
-	id artifactstore.RootID,
-) (Root, error) {
-	return s.repository.Get(ctx, id, true)
-}
-
-func (s *Service) List(
-	ctx context.Context,
-	includeDeleted bool,
-) ([]Root, error) {
-	return s.repository.List(ctx, includeDeleted)
+func (s *Service) List(ctx context.Context) ([]Root, error) {
+	return s.repository.List(ctx)
 }
 
 func (s *Service) Update(
@@ -143,7 +133,7 @@ func (s *Service) Update(
 			artifactstore.ErrInvalid,
 		)
 	}
-	current, err := s.repository.Get(ctx, id, false)
+	current, err := s.repository.Get(ctx, id)
 	if err != nil {
 		return Root{}, err
 	}
@@ -198,7 +188,7 @@ func (s *Service) Delete(
 			artifactstore.ErrInvalid,
 		)
 	}
-	current, err := s.repository.Get(ctx, id, false)
+	current, err := s.repository.Get(ctx, id)
 	if err != nil {
 		return Root{}, err
 	}
@@ -218,7 +208,7 @@ func (s *Service) Delete(
 	if err := next.Validate(); err != nil {
 		return Root{}, err
 	}
-	if err := s.repository.Update(ctx, next, expectedRevision); err != nil {
+	if err := s.repository.Retire(ctx, next, expectedRevision); err != nil {
 		return Root{}, err
 	}
 	return next, nil
@@ -243,7 +233,7 @@ func (s *Service) Attach(
 	if err != nil {
 		return Root{}, Attachment{}, err
 	}
-	currentRoot, err := s.repository.Get(ctx, rootID, false)
+	currentRoot, err := s.repository.Get(ctx, rootID)
 	if err != nil {
 		return Root{}, Attachment{}, err
 	}
@@ -280,6 +270,9 @@ func (s *Service) GetAttachment(
 	rootID artifactstore.RootID,
 	sourceID artifactstore.SourceID,
 ) (Attachment, error) {
+	if _, err := s.repository.Get(ctx, rootID); err != nil {
+		return Attachment{}, err
+	}
 	return s.repository.GetAttachment(ctx, rootID, sourceID)
 }
 
@@ -287,6 +280,9 @@ func (s *Service) ListAttachments(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) ([]Attachment, error) {
+	if _, err := s.repository.Get(ctx, rootID); err != nil {
+		return nil, err
+	}
 	return s.repository.ListAttachments(ctx, rootID)
 }
 
@@ -303,11 +299,11 @@ func (s *Service) UpdateAttachment(
 			artifactstore.ErrInvalid,
 		)
 	}
-	current, err := s.repository.GetAttachment(ctx, rootID, sourceID)
+	root, err := s.repository.Get(ctx, rootID)
 	if err != nil {
 		return Root{}, Attachment{}, err
 	}
-	root, err := s.repository.Get(ctx, rootID, false)
+	current, err := s.repository.GetAttachment(ctx, rootID, sourceID)
 	if err != nil {
 		return Root{}, Attachment{}, err
 	}
@@ -378,7 +374,7 @@ func (s *Service) Detach(
 			artifactstore.ErrInvalid,
 		)
 	}
-	currentRoot, err := s.repository.Get(ctx, rootID, false)
+	currentRoot, err := s.repository.Get(ctx, rootID)
 	if err != nil {
 		return Root{}, err
 	}

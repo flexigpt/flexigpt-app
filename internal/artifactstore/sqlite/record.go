@@ -40,6 +40,10 @@ func (s *Store) listRecordsByRoot(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) ([]record.Record, error) {
+	if err := s.requireActiveRoot(ctx, rootID); err != nil {
+		return nil, err
+	}
+
 	rows, err := s.db.QueryContext(
 		ctx,
 		`SELECT `+recordColumns+`

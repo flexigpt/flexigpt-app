@@ -90,16 +90,12 @@ func (r *RootRepository) Create(
 func (r *RootRepository) Get(
 	ctx context.Context,
 	id artifactstore.RootID,
-	includeDeleted bool,
 ) (root.Root, error) {
-	return r.store.getRoot(ctx, id, includeDeleted)
+	return r.store.getRoot(ctx, id)
 }
 
-func (r *RootRepository) List(
-	ctx context.Context,
-	includeDeleted bool,
-) ([]root.Root, error) {
-	return r.store.listRoots(ctx, includeDeleted)
+func (r *RootRepository) List(ctx context.Context) ([]root.Root, error) {
+	return r.store.listRoots(ctx)
 }
 
 func (r *RootRepository) Update(
@@ -108,6 +104,14 @@ func (r *RootRepository) Update(
 	expectedRevision uint64,
 ) error {
 	return r.store.updateRoot(ctx, value, expectedRevision)
+}
+
+func (r *RootRepository) Retire(
+	ctx context.Context,
+	value root.Root,
+	expectedRevision uint64,
+) error {
+	return r.store.retireRoot(ctx, value, expectedRevision)
 }
 
 func (r *RootRepository) Attach(

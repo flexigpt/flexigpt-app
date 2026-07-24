@@ -49,15 +49,19 @@ type Repository interface {
 	Get(
 		ctx context.Context,
 		id artifactstore.RootID,
-		includeDeleted bool,
 	) (Root, error)
 
-	List(
-		ctx context.Context,
-		includeDeleted bool,
-	) ([]Root, error)
+	List(ctx context.Context) ([]Root, error)
 
 	Update(
+		ctx context.Context,
+		value Root,
+		expectedRevision uint64,
+	) error
+
+	// Retire soft-deletes a root and removes all active root-scoped state that
+	// would otherwise retain attached sources or expose cataloged resources.
+	Retire(
 		ctx context.Context,
 		value Root,
 		expectedRevision uint64,

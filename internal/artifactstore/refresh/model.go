@@ -16,7 +16,6 @@ type RootReader interface {
 	Get(
 		ctx context.Context,
 		id artifactstore.RootID,
-		includeDeleted bool,
 	) (root.Root, error)
 
 	ListAttachments(

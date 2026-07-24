@@ -81,7 +81,7 @@ func (s *Service) Refresh(
 		return Result{}, err
 	}
 
-	root, err := s.roots.Get(ctx, rootID, false)
+	root, err := s.roots.Get(ctx, rootID)
 	if err != nil {
 		return Result{}, err
 	}

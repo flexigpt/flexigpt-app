@@ -120,7 +120,7 @@ func (s *Service) CreateFilesystem(
 func (s *Service) List(
 	ctx context.Context,
 ) ([]Workspace, error) {
-	roots, err := s.roots.List(ctx, false)
+	roots, err := s.roots.List(ctx)
 	if err != nil {
 		return nil, err
 	}

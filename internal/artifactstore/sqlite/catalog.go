@@ -19,6 +19,23 @@ const attachmentColumns = `
 	root_id, source_id, role, enabled, data_json,
 	revision, created_at, modified_at`
 
+func (s *Store) requireActiveRoot(
+	ctx context.Context,
+	id artifactstore.RootID,
+) error {
+	var marker int
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT 1 FROM artifact_roots
+		 WHERE id = ? AND deleted_at IS NULL`,
+		string(id),
+	).Scan(&marker)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("%w: root %q", artifactstore.ErrNotFound, id)
+	}
+	return err
+}
+
 func (s *Store) createRoot(
 	ctx context.Context,
 	value root.Root,
@@ -102,12 +119,9 @@ func (s *Store) createRoot(
 func (s *Store) getRoot(
 	ctx context.Context,
 	id artifactstore.RootID,
-	includeDeleted bool,
 ) (root.Root, error) {
-	query := `SELECT ` + rootColumns + ` FROM artifact_roots WHERE id = ?`
-	if !includeDeleted {
-		query += ` AND deleted_at IS NULL`
-	}
+	query := `SELECT ` + rootColumns + `
+		FROM artifact_roots WHERE id = ? AND deleted_at IS NULL`
 	value, err := scanRoot(s.db.QueryRowContext(ctx, query, string(id)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return root.Root{}, fmt.Errorf(
@@ -121,12 +135,9 @@ func (s *Store) getRoot(
 
 func (s *Store) listRoots(
 	ctx context.Context,
-	includeDeleted bool,
 ) ([]root.Root, error) {
-	query := `SELECT ` + rootColumns + ` FROM artifact_roots`
-	if !includeDeleted {
-		query += ` WHERE deleted_at IS NULL`
-	}
+	query := `SELECT ` + rootColumns + `
+		FROM artifact_roots WHERE deleted_at IS NULL`
 	query += ` ORDER BY modified_at DESC, id ASC`
 
 	rows, err := s.db.QueryContext(ctx, query)
@@ -192,6 +203,73 @@ func (s *Store) updateRoot(
 	return nil
 }
 
+func (s *Store) retireRoot(
+	ctx context.Context,
+	value root.Root,
+	expectedRevision uint64,
+) error {
+	if err := value.Validate(); err != nil {
+		return err
+	}
+	if expectedRevision == 0 ||
+		value.DeletedAt == nil ||
+		value.Enabled {
+		return fmt.Errorf(
+			"%w: invalid root retirement state",
+			artifactstore.ErrInvalid,
+		)
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := tx.ExecContext(
+		ctx,
+		`UPDATE artifact_roots
+		 SET enabled = 0,
+		     revision = ?,
+		     modified_at = ?,
+		     deleted_at = ?
+		 WHERE id = ? AND revision = ? AND deleted_at IS NULL`,
+		value.Revision,
+		timeValue(value.ModifiedAt),
+		timeValue(*value.DeletedAt),
+		string(value.ID),
+		expectedRevision,
+	)
+	if err != nil {
+		return sqliteError(err)
+	}
+	changed, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if changed != 1 {
+		return fmt.Errorf(
+			"%w: root %q changed or no longer exists",
+			artifactstore.ErrConflict,
+			value.ID,
+		)
+	}
+
+	cleanupStatements := []string{
+		`DELETE FROM artifact_current_occurrences WHERE root_id = ?`,
+		`DELETE FROM artifact_current_catalogs WHERE root_id = ?`,
+		`DELETE FROM artifact_records WHERE root_id = ?`,
+		`DELETE FROM artifact_attachments WHERE root_id = ?`,
+	}
+	for _, statement := range cleanupStatements {
+		if _, err := tx.ExecContext(ctx, statement, string(value.ID)); err != nil {
+			return sqliteError(err)
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (s *Store) attach(
 	ctx context.Context,
 	attachment root.Attachment,
@@ -251,6 +329,10 @@ func (s *Store) getAttachment(
 	rootID artifactstore.RootID,
 	sourceID artifactstore.SourceID,
 ) (root.Attachment, error) {
+	if err := s.requireActiveRoot(ctx, rootID); err != nil {
+		return root.Attachment{}, err
+	}
+
 	value, err := scanAttachment(s.db.QueryRowContext(
 		ctx,
 		`SELECT `+attachmentColumns+`
@@ -272,6 +354,10 @@ func (s *Store) listAttachments(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) ([]root.Attachment, error) {
+	if err := s.requireActiveRoot(ctx, rootID); err != nil {
+		return nil, err
+	}
+
 	rows, err := s.db.QueryContext(
 		ctx,
 		`SELECT `+attachmentColumns+`

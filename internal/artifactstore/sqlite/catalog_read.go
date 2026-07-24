@@ -20,6 +20,10 @@ func (s *Store) getCurrentCatalog(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) (catalog.Snapshot, error) {
+	if err := s.requireActiveRoot(ctx, rootID); err != nil {
+		return catalog.Snapshot{}, err
+	}
+
 	var (
 		revision, rootRevision uint64
 		sourceRevisionsRaw     []byte
