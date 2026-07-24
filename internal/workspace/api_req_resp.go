@@ -59,8 +59,6 @@ type WorkspaceRecordView struct {
 	Kind               artifactstore.ArtifactKind       `json:"kind"`
 	Enabled            bool                             `json:"enabled"`
 	State              string                           `json:"state"`
-	Mode               string                           `json:"mode"`
-	PinnedDefinition   *artifactstore.Digest            `json:"pinnedDefinition,omitempty"`
 	ResolvedDefinition *artifactstore.Digest            `json:"resolvedDefinition,omitempty"`
 	SourceID           artifactstore.SourceID           `json:"sourceID"`
 	Locator            artifactstore.Locator            `json:"locator"`
@@ -449,35 +447,6 @@ type SetWorkspaceRecordEnabledRequest struct {
 }
 
 type SetWorkspaceRecordEnabledResponse struct {
-	Body *WorkspaceRecordView
-}
-
-type PinWorkspaceRecordRequestBody struct {
-	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
-	DefinitionDigest artifactstore.Digest `json:"definitionDigest" required:"true"`
-}
-
-type PinWorkspaceRecordRequest struct {
-	RootID   artifactstore.RootID   `path:"rootID"   required:"true"`
-	RecordID artifactstore.RecordID `path:"recordID" required:"true"`
-	Body     *PinWorkspaceRecordRequestBody
-}
-
-type PinWorkspaceRecordResponse struct {
-	Body *WorkspaceRecordView
-}
-
-type FollowWorkspaceRecordRequestBody struct {
-	ExpectedRevision uint64 `json:"expectedRevision" required:"true"`
-}
-
-type FollowWorkspaceRecordRequest struct {
-	RootID   artifactstore.RootID   `path:"rootID"   required:"true"`
-	RecordID artifactstore.RecordID `path:"recordID" required:"true"`
-	Body     *FollowWorkspaceRecordRequestBody
-}
-
-type FollowWorkspaceRecordResponse struct {
 	Body *WorkspaceRecordView
 }
 

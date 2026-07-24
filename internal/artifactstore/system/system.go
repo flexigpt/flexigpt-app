@@ -154,7 +154,6 @@ func Open(
 	}
 	recordService, err := record.NewService(
 		recordRepository,
-		content,
 		config.Clock,
 	)
 	if err != nil {

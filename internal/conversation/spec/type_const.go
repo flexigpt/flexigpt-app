@@ -65,7 +65,7 @@ type ConversationMessage struct {
 	Error        *inferenceSpec.Error `json:"error,omitempty"`
 	DebugDetails any                  `json:"debugDetails,omitempty"`
 
-	// Arbitrary UI/app metadata (tags, pinned, read state, etc.).
+	// Arbitrary UI/app metadata (tags, read state, etc.).
 	Meta map[string]any `json:"meta,omitempty"`
 }
 

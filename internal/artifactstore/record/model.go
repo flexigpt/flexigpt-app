@@ -10,18 +10,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
 
-type Mode string
-
-const (
-	ModeLinked Mode = "linked"
-	ModePinned Mode = "pinned"
-)
-
 type State string
 
 const (
 	StateAvailable    State = "available"
-	StateStale        State = "stale"
 	StateMissing      State = "missing"
 	StateInvalid      State = "invalid"
 	StateIncompatible State = "incompatible"
@@ -34,8 +26,6 @@ type Record struct {
 	Kind               artifactstore.ArtifactKind `json:"kind"`
 	Name               string                     `json:"name"`
 	Enabled            bool                       `json:"enabled"`
-	Mode               Mode                       `json:"mode"`
-	PinnedDefinition   *artifactstore.Digest      `json:"pinnedDefinition,omitempty"`
 	ResolvedDefinition *artifactstore.Digest      `json:"resolvedDefinition,omitempty"`
 	Data               json.RawMessage            `json:"data"`
 	State              State                      `json:"state"`
@@ -64,34 +54,6 @@ func (r Record) Validate() error {
 		artifactstore.MaxDisplayNameBytes,
 	); err != nil {
 		return err
-	}
-	switch r.Mode {
-	case ModeLinked:
-		if r.PinnedDefinition != nil {
-			return fmt.Errorf(
-				"%w: linked record cannot have a pinned definition",
-				artifactstore.ErrInvalid,
-			)
-		}
-	case ModePinned:
-		if r.PinnedDefinition == nil {
-			return fmt.Errorf(
-				"%w: pinned record requires a pinned definition",
-				artifactstore.ErrInvalid,
-			)
-		}
-		if err := artifactstore.ValidateDigest(*r.PinnedDefinition); err != nil {
-			return err
-		}
-		if r.ResolvedDefinition == nil ||
-			*r.ResolvedDefinition != *r.PinnedDefinition {
-			return fmt.Errorf(
-				"%w: pinned record must resolve to its pinned definition",
-				artifactstore.ErrInvalid,
-			)
-		}
-	default:
-		return fmt.Errorf("%w: invalid record mode %q", artifactstore.ErrInvalid, r.Mode)
 	}
 	if r.ResolvedDefinition != nil {
 		if err := artifactstore.ValidateDigest(*r.ResolvedDefinition); err != nil {
@@ -130,7 +92,7 @@ func validateState(
 	resolvedDefinition *artifactstore.Digest,
 ) error {
 	switch state {
-	case StateAvailable, StateStale, StateIncompatible:
+	case StateAvailable, StateIncompatible:
 		if resolvedDefinition == nil {
 			return fmt.Errorf(
 				"%w: record state %q requires a resolved definition",

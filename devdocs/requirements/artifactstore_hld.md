@@ -47,7 +47,8 @@ Without a common artifact substrate, every feature must independently solve:
 - Diagnostics
 - Import and export
 - Dependency lookup
-- Passing validated source and definition references to runtime consumers
+- Exposing catalog, record, definition, and source-relative references to
+  consumer-owned runtime adapters
 
 That creates duplicated storage models, inconsistent behavior, and unclear ownership.
 
@@ -89,22 +90,27 @@ The management application:
 - Attaches sources.
 - Refreshes catalogs.
 - Browses discovered resources.
-- Enables, disables, pins, or removes local records.
+- Enables, disables, or removes local records.
 - Displays diagnostics.
 
 ### 4.3 Runtime provider
 
-A runtime provider:
+A runtime provider is outside Artifact Store. Its interaction with Artifact
+Store is limited to generic, consumer-selected references:
 
-- Requests validated, resolved definitions.
-- Projects them into runtime-specific values.
-- Resolves required assets or source-relative resources.
-- Applies trust, policy, secret, and execution configuration outside Artifact Store.
-- May create consumer-scoped runtime state, such as a Skill session, from
-  selected records without changing Artifact Store metadata.
+- Reads current catalog, record, and canonical-definition state through
+  Artifact Store ports.
+- May receive a consumer-selected source-relative occurrence reference when
+  the consumer requires source-backed content.
+- May use trusted internal source-runtime access only when the selected source
+  adapter explicitly supports the required capability.
+- Builds runtime-specific values, applies policy, resolves credentials, and
+  manages runtime lifecycle outside Artifact Store.
 - Must preserve the consumer's authoritative persistence owner. A runtime
-  projection must not imply that a source-linked Workspace record was copied
-  into an installed-resource store.
+  projection must not imply copying a source-linked record into another store.
+
+Artifact Store does not define runtime input shapes, runtime registration,
+sessions, prompt construction, resource access, or execution behavior.
 
 ### 4.4 Transfer service
 
@@ -164,23 +170,13 @@ A user may need local settings that are not part of the portable definition:
 
 A stable app-local record preserves these values while the underlying source definition changes.
 
-### 5.5 Follow or pin content
-
-A record may:
-
-- Follow the current definition at a source occurrence.
-- Remain pinned to a known immutable definition.
-- Require explicit refresh before accepting a newer definition.
-
-The core requirement is to distinguish source identity, definition revision, and local record identity.
-
-### 5.6 Diagnose source and definition problems
+### 5.5 Diagnose source and definition problems
 
 Invalid files must remain visible as diagnosable catalog occurrences where possible.
 
 A malformed artifact must not silently disappear or replace the last known valid application state without explanation.
 
-### 5.7 Resolve portable references
+### 5.6 Resolve portable references
 
 A definition may refer to another artifact using portable attributes such as:
 
@@ -222,9 +218,11 @@ Artifact Store owns:
 - Stable local artifact records
 - Current catalog publication
 - Structured diagnostics
-- Basic definition lookup
+- Catalog, record, and definition read references for consumer-owned handoff
 - Generic candidate matching
 - Optimistic conflict detection
+- Trusted internal source-runtime access for consumers that have an explicit
+  source-backed need
 
 Artifact Store may expose an optional trusted-internal native local-path
 resolver for source adapters that already represent local directories. This is
@@ -358,7 +356,6 @@ It references:
 
 - A root
 - A source occurrence
-- A resolved or pinned definition
 - App-local settings
 
 The record survives source refreshes and can preserve user state when source content changes or disappears.
@@ -441,7 +438,7 @@ Artifact Store stops before runtime creation.
 | `AS-F10` | Preserve invalid and missing occurrence states with diagnostics.            | Core                          |
 | `AS-F11` | Maintain stable app-local records for artifacts requiring local state.      | Core                          |
 | `AS-F12` | Preserve local record settings during source refresh.                       | Core                          |
-| `AS-F13` | Support follow-current and pin-definition behavior.                         | Core                          |
+| `AS-F13` | Refresh source-linked records to their current source definition.           | Core                          |
 | `AS-F14` | Resolve candidate definitions using portable selectors.                     | Core when references are used |
 | `AS-F15` | Let consumers decide ambiguity and selection rules.                         | Core when references are used |
 | `AS-F16` | Export or import portable definitions and assets.                           | Optional                      |
@@ -553,11 +550,9 @@ A record moves through:
 
 - Created from a valid occurrence
 - Available
-- Stale
 - Missing
 - Invalid
 - Incompatible
-- Pinned
 - Removed
 
 The record should not be automatically deleted because a source file disappears.
@@ -584,7 +579,7 @@ Reason:
 
 - Equivalent definitions should have equivalent revision identity.
 - A generated revision ID does not establish content equivalence.
-- Digest identity supports deduplication and pinning.
+- Digest identity supports equivalence checks and deduplication.
 
 Consequence:
 
@@ -638,7 +633,11 @@ Consequence:
 
 - A filesystem source adapter may expose a trusted internal locator-to-path capability.
 - Non-filesystem sources return unsupported rather than receiving an implicit copied filesystem view.
-- Runtime consumers remain responsible for policy, execution, and public API boundaries.
+- The consumer retains a source ID and validated locator reference until it
+  explicitly requests this capability.
+- Native paths remain adapter-derived implementation details rather than
+  catalog fields, definition data, or public source metadata.
+- Consumers remain responsible for policy, execution, and public API boundaries.
 
 ### 14.6 Publish a current root catalog atomically from the reader’s perspective
 
@@ -728,12 +727,6 @@ Local mutations use optimistic conflict detection.
 
 A caller acting on stale local state receives a conflict rather than overwriting a concurrent change.
 
-### 16.4 Records and catalogs
-
-A follow-current record may only be considered current when it resolves against the root’s current catalog publication.
-
-A pinned record may remain available independently of the current source occurrence, provided its definition content is retained.
-
 ## 17. Security and trust boundary
 
 Artifact Store treats discovered content as untrusted data.
@@ -772,8 +765,7 @@ Artifact Store is successful when:
 - A valid native artifact becomes a deterministic canonical definition.
 - Invalid content remains diagnosable.
 - A changed artifact receives a new definition digest.
-- A linked local record follows the updated definition without losing local settings.
-- A pinned record remains on its selected definition.
+- A source-linked local record follows the updated definition without losing local settings.
 - A missing source artifact does not silently delete its local record.
 - Portable exports contain no app-local identities, paths, or secret values.
 - Runtime code can consume definitions without depending on metadata persistence details.
@@ -791,10 +783,10 @@ capabilities. Consumer behavior, consumer runtime integration, and product
 completion are assessed by the owning consumer HLDs.
 
 Artifact Store provides generic roots, source access, canonical definitions,
-catalog publication, records, diagnostics, and trusted internal source-runtime
-references. A consumer may use those references to construct its own runtime
-input, but Artifact Store does not define, register, execute, or manage that
-runtime input.
+catalog publication, records, diagnostics, occurrence references, and trusted
+internal source-runtime access. Consumers may use these generic references to
+construct their own runtime inputs, but Artifact Store does not define,
+register, execute, or manage those inputs.
 
 ### 20.1 Functional requirement mapping
 
@@ -803,7 +795,7 @@ runtime input.
 | `AS-F01` | Register and manage app-local sources.                                      | `Implemented`     | `source.Service` supports create, read, list, update, and delete operations. SQLite persists source metadata, while source adapters normalize app-local configuration.                                                             |
 | `AS-F02` | Create logical roots and attach multiple sources.                           | `Implemented`     | `root.Service` manages roots and root-to-source attachments. The SQLite store persists attachments independently from sources and roots.                                                                                           |
 | `AS-F03` | Allow consumers to define source roles and attachment-local metadata.       | `Implemented`     | Attachments provide consumer-owned `Role`, `Enabled`, and canonical local `Data` fields. Artifact Store does not interpret consumer-specific attachment data.                                                                      |
-| `AS-F04` | Discover bounded source candidates safely.                                  | `Implemented`     | Discovery limits candidate count, entry count, depth, per-candidate bytes, and total bytes. Filesystem and embedded adapters validate relative locators and reject symbolic links.                                                 |
+| `AS-F04` | Discover bounded source candidates safely.                                  | `Implemented`     | Discovery limits candidate count, entry count, depth, per-candidate bytes, and total bytes. Filesystem and embedded adapters validate relative locators and do not follow symbolic links; discovery ignores symlink candidates.    |
 | `AS-F05` | Support multiple native source formats through format adapters.             | `Implemented`     | The decoder registry, recognition process, ownership rules, candidate diagnostics, and multi-output decode contract are implemented. Native formats remain consumer-provided extensions.                                           |
 | `AS-F06` | Allow one candidate to produce zero, one, or multiple artifact occurrences. | `Implemented`     | A decoder returns a slice of decoded subresources. Discovery validates subresource locators, prevents duplicate emitted occurrence keys, and handles decoders that emit no resources.                                              |
 | `AS-F07` | Normalize valid artifacts into immutable portable definitions.              | `Implemented`     | Decoders produce `definition.Definition` values, which are canonicalized and stored by immutable digest-addressed content files.                                                                                                   |
@@ -811,8 +803,8 @@ runtime input.
 | `AS-F09` | Publish one coherent current catalog for a root.                            | `Implemented`     | Refresh confirms source snapshots, checks root and source revisions, then atomically publishes catalog occurrences and record reconciliation changes in one SQLite transaction.                                                    |
 | `AS-F10` | Preserve invalid and missing occurrence states with diagnostics.            | `Implemented`     | Current catalogs persist valid, invalid, and missing occurrences with structured diagnostics. Authoritative discovery marks prior in-scope occurrences missing rather than deleting their records.                                 |
 | `AS-F11` | Maintain stable app-local records for artifacts requiring local state.      | `Implemented`     | Records have stable UUIDv7 identities and retain root, occurrence, local data, enablement, state, diagnostics, and revision independently of definitions.                                                                          |
-| `AS-F12` | Preserve local record settings during source refresh.                       | `Implemented`     | Reconciliation updates source-derived definition, state, and diagnostics while preserving local record name, enablement, local data, mode, and pin configuration.                                                                  |
-| `AS-F13` | Support follow-current and pin-definition behavior.                         | `Implemented`     | Linked and pinned record modes, optimistic record updates, record-local data replacement, follow-current, pinning, inspection, and removal are implemented.                                                                        |
+| `AS-F12` | Preserve local record settings during source refresh.                       | `Implemented`     | Reconciliation updates source-derived definition, state, and diagnostics while preserving local record name, enablement, and local data.                                                                                           |
+| `AS-F13` | Refresh source-linked records to their current source definition.           | `Implemented`     | Reconciliation updates valid records to the definition emitted by their current source occurrence and marks missing, invalid, or incompatible records without deleting them.                                                       |
 | `AS-F14` | Resolve candidate definitions using portable selectors.                     | `Partial`         | Definitions can declare and validate portable selectors. Artifact Store does not yet provide generic current-catalog candidate matching, complete version constraint support, dependency resolution, or dependency graph handling. |
 | `AS-F15` | Let consumers decide ambiguity and selection rules.                         | `Implemented`     | Generic storage retains attachments, occurrences, and records without applying any consumer precedence or winner-selection policy.                                                                                                 |
 | `AS-F16` | Export or import portable definitions and assets.                           | `Not implemented` | There is no package manifest, asset closure, import, export, capture, or fork capability.                                                                                                                                          |
@@ -837,15 +829,19 @@ runtime input.
 ## 21. Code guide
 
 This guide describes module responsibilities for code analysis. It is not a
-public API or ownership contract.
+public API or ownership contract. Read from the generic lifecycle outward;
+consumer semantics and runtime behavior deliberately live outside this tree.
 
 - `internal/artifactstore`
-  - Shared identifiers, validation, diagnostics, errors, digests, clocks, and
-    canonical JSON support.
+  - Shared identifiers, invariants, diagnostics, errors, digest utilities,
+    clocks, and generic validation.
   - Defines generic invariants without defining consumer artifact semantics.
+- `internal/artifactstore/jsoncanon`
+  - Canonical JSON encoding and equality rules used by definitions and
+    app-local JSON fields.
 - `internal/artifactstore/source`
   - Source registration lifecycle, adapter registry, operational snapshots,
-    and trusted source-runtime references.
+    and trusted internal source-runtime access.
   - `source/fsdir` provides filesystem traversal and optional local-path
     resolution; `source/embedded` provides read-only embedded trees.
 - `internal/artifactstore/root`
@@ -860,7 +856,7 @@ public API or ownership contract.
   - Current catalog snapshot and occurrence read models.
 - `internal/artifactstore/record`
   - Stable local records, source-derived reconciliation, and local record
-    mutations such as enablement, pinning, and follow-current.
+    mutations such as enablement, local data updates.
 - `internal/artifactstore/refresh`
   - Generic refresh orchestration and atomic publication contract.
 - `internal/artifactstore/sqlite`
@@ -868,19 +864,32 @@ public API or ownership contract.
 - `internal/artifactstore/system`
   - Internal composition of metadata storage, definition storage, source
     adapters, decoders, and generic services.
+  - Exposes only the generic service and trusted-reference capabilities needed
+    by internal consumer composition.
 
 Consumer dependency direction is deliberate:
 
 - Consumer packages such as `internal/workspace` depend on Artifact Store
   roots, sources, catalogs, records, definitions, and refresh services.
-- Runtime packages such as `internal/skillruntime` consume consumer-provided
-  runtime inputs and do not become Artifact Store subpackages.
+- Consumer-owned adapters transform selected catalog and source-relative
+  references into their own management or runtime inputs.
+- Runtime packages consume those consumer-owned inputs and do not become
+  Artifact Store subpackages.
 - `cmd/agentgo` performs application composition and Wails exposure.
 - Artifact Store must not import consumer or runtime packages. Consumer
-  convention, precedence, projection, trust, session, prompt, resource, and
+  convention, precedence, projection, policy, prompt, session, resource, and
   execution behavior remain outside this tree.
 
 ## 22. Next steps
+
+- Keep consumer handoff explicit without expanding Artifact Store into a
+  runtime framework.
+  - Continue to expose generic catalog, record, definition, occurrence, and
+    source-relative references rather than consumer-specific runtime values.
+  - Keep native local-path access trusted, internal, optional, and
+    source-adapter-specific.
+  - Do not add runtime registration, prompt construction, session, trust,
+    credential, resource, or execution semantics to Artifact Store.
 
 - Close the remaining generic selector and diagnostic gaps.
   - Add current-catalog candidate matching for portable selectors while

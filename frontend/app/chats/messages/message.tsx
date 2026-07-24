@@ -34,6 +34,17 @@ interface ChatMessageProps {
 	streamSource?: MessageStreamSource;
 }
 
+function stringArraysEqual(left?: string[], right?: string[]): boolean {
+	if (left === right) {
+		return true;
+	}
+	if (!left || !right || left.length !== right.length) {
+		return false;
+	}
+
+	return left.every((value, index) => value === right[index]);
+}
+
 function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	if (prev.isBusy !== next.isBusy) {
 		return false;
@@ -90,7 +101,10 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	if (prev.message.uiToolOutputs !== next.message.uiToolOutputs) {
 		return false;
 	}
-	if (prev.diffCandidatePaths !== next.diffCandidatePaths) {
+
+	// Equivalent freshly-created arrays must not rebuild the markdown and
+	// Mermaid subtree.
+	if (!stringArraysEqual(prev.diffCandidatePaths, next.diffCandidatePaths)) {
 		return false;
 	}
 

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiMoon, FiSun } from 'react-icons/fi';
 
@@ -45,6 +45,12 @@ type MermaidRenderState =
 			message: string;
 	  };
 
+interface CachedMermaidRender {
+	key: string;
+	renderId: string;
+	svgMarkup: string;
+}
+
 type ZoomState =
 	| {
 			isOpen: false;
@@ -56,6 +62,12 @@ type ZoomState =
 	  };
 
 const MERMAID_ERROR_MESSAGE = 'Failed to render diagram. Please check the syntax.';
+
+// Successful Mermaid renders survive component unmounts. This is important
+// for virtualized or rebuilt markdown trees where scrolling can remount the
+// same diagram.
+const renderedMermaidCache = new Map<string, CachedMermaidRender>();
+const pendingMermaidRenders = new Map<string, Promise<CachedMermaidRender>>();
 
 const appendInlineStyles = (element: Element, styles: Record<string, string>) => {
 	const existingStyle = element.getAttribute('style')?.trim();
@@ -105,6 +117,70 @@ const prepareMermaidSvgMarkup = (svgMarkup: string): string => {
 	}
 };
 
+function getCachedMermaidRender(key: string): CachedMermaidRender | null {
+	return renderedMermaidCache.get(key) ?? null;
+}
+
+function createMermaidRenderState(
+	cached: CachedMermaidRender,
+	instanceRenderId: string
+): Extract<MermaidRenderState, { status: 'rendered' }> {
+	// Mermaid incorporates the supplied render ID into the SVG root ID,
+	// marker IDs, CSS selectors, and URL references. Give each mounted copy
+	// its own ID so identical diagrams can safely coexist in the document.
+	const svgMarkup =
+		cached.renderId === instanceRenderId
+			? cached.svgMarkup
+			: cached.svgMarkup.replaceAll(cached.renderId, instanceRenderId);
+
+	return {
+		key: cached.key,
+		status: 'rendered',
+		svgMarkup,
+	};
+}
+
+function renderMermaidCached(key: string, code: string, config: MermaidConfig): Promise<CachedMermaidRender> {
+	const cached = getCachedMermaidRender(key);
+	if (cached) {
+		return Promise.resolve(cached);
+	}
+
+	const pending = pendingMermaidRenders.get(key);
+	if (pending) {
+		return pending;
+	}
+
+	const renderId = `mermaid-cache-${getUUIDv7()}`;
+	const next = renderMermaidQueued(renderId, code, config).then(renderResult => {
+		const rendered: CachedMermaidRender = {
+			key,
+			renderId,
+			svgMarkup: prepareMermaidSvgMarkup(renderResult.svg),
+		};
+
+		renderedMermaidCache.set(key, rendered);
+		return rendered;
+	});
+
+	pendingMermaidRenders.set(key, next);
+
+	void next.then(
+		() => {
+			if (pendingMermaidRenders.get(key) === next) {
+				pendingMermaidRenders.delete(key);
+			}
+		},
+		() => {
+			if (pendingMermaidRenders.get(key) === next) {
+				pendingMermaidRenders.delete(key);
+			}
+		}
+	);
+
+	return next;
+}
+
 export function MermaidDiagram({
 	code,
 	defaultThemeMode = 'auto',
@@ -116,12 +192,10 @@ export function MermaidDiagram({
 	const wrapperRef = useRef<HTMLDivElement | null>(null);
 	const inlineDiagramRef = useRef<HTMLDivElement | null>(null);
 
-	const [renderState, setRenderState] = useState<MermaidRenderState | null>(null);
 	const [zoomState, setZoomState] = useState<ZoomState>({ isOpen: false, svgNode: null });
 	const [themeMode, setThemeMode] = useState<'auto' | 'light' | 'dark'>(defaultThemeMode);
 
-	const uniqueId = useRef(`mermaid-${getUUIDv7()}`);
-	const renderSeq = useRef(0);
+	const [instanceRenderId] = useState(() => `mermaid-${getUUIDv7()}`);
 	const latestToken = useRef(0);
 
 	// Prevent rendering while code is still settling after streaming/markdown rebuild.
@@ -135,6 +209,8 @@ export function MermaidDiagram({
 	}, [themeMode, isDark]);
 
 	const renderKey = useMemo(() => `${effectiveMermaidTheme}\u0000${stableCode}`, [effectiveMermaidTheme, stableCode]);
+
+	const [renderState, setRenderState] = useState<MermaidRenderState | null>(null);
 
 	// Per-diagram surface override: only when user explicitly selects light/dark.
 	// In auto mode, it stays consistent with the app’s DaisyUI theme.
@@ -167,6 +243,12 @@ export function MermaidDiagram({
 		};
 	}, [effectiveMermaidTheme]);
 
+	const cachedRender = getCachedMermaidRender(renderKey);
+	const cachedRenderState = useMemo(
+		() => (cachedRender ? createMermaidRenderState(cachedRender, instanceRenderId) : null),
+		[cachedRender, instanceRenderId]
+	);
+
 	useEffect(() => {
 		const token = ++latestToken.current;
 
@@ -174,20 +256,21 @@ export function MermaidDiagram({
 			return;
 		}
 
-		let isCancelled = false;
-		const renderId = `${uniqueId.current}-${renderSeq.current++}`;
+		const cached = getCachedMermaidRender(renderKey);
+		if (cached) {
+			onRenderStatusChange?.('rendered');
+			return;
+		}
 
-		renderMermaidQueued(renderId, stableCode, mermaidConfig)
-			.then(renderResult => {
+		let isCancelled = false;
+
+		renderMermaidCached(renderKey, stableCode, mermaidConfig)
+			.then(cr => {
 				if (isCancelled || token !== latestToken.current) {
 					return;
 				}
 
-				setRenderState({
-					key: renderKey,
-					status: 'rendered',
-					svgMarkup: prepareMermaidSvgMarkup(renderResult.svg),
-				});
+				setRenderState(createMermaidRenderState(cr, instanceRenderId));
 
 				onRenderStatusChange?.('rendered');
 			})
@@ -209,11 +292,41 @@ export function MermaidDiagram({
 		return () => {
 			isCancelled = true;
 		};
-	}, [mermaidConfig, onRenderStatusChange, renderKey, stableCode]);
+	}, [instanceRenderId, mermaidConfig, onRenderStatusChange, renderKey, stableCode]);
 
-	const currentRenderState = renderState?.key === renderKey ? renderState : null;
+	const currentRenderState = cachedRenderState ?? (renderState?.key === renderKey ? renderState : null);
 	const svgMarkup = currentRenderState?.status === 'rendered' ? currentRenderState.svgMarkup : null;
 	const hasRenderError = currentRenderState?.status === 'error';
+
+	const attachInlineDiagram = useCallback(
+		(element: HTMLDivElement | null) => {
+			inlineDiagramRef.current = element;
+
+			if (!element) {
+				return;
+			}
+
+			element.replaceChildren();
+
+			if (!svgMarkup) {
+				return;
+			}
+
+			const parser = new DOMParser();
+			const doc = parser.parseFromString(svgMarkup, 'image/svg+xml');
+			if (doc.querySelector('parsererror')) {
+				return;
+			}
+
+			const svg = doc.querySelector('svg');
+			if (!svg) {
+				return;
+			}
+
+			element.append(document.importNode(svg, true));
+		},
+		[svgMarkup]
+	);
 
 	const getDiagramBackgroundColor = (): string => {
 		const el = wrapperRef.current;
@@ -390,12 +503,7 @@ export function MermaidDiagram({
 						handleOpenZoom();
 					}}
 				>
-					<div
-						ref={inlineDiagramRef}
-						className="max-h-[60vh] w-full overflow-auto"
-						// oxlint-disable-next-line react/no-danger
-						dangerouslySetInnerHTML={{ __html: svgMarkup }}
-					/>
+					<div ref={attachInlineDiagram} className="max-h-[60vh] w-full overflow-auto" />
 				</button>
 			</div>
 

@@ -24,6 +24,17 @@ interface MessageContentCardProps {
 	defaultCodeBlockExpanded?: boolean;
 }
 
+function stringArraysEqual(left?: string[], right?: string[]): boolean {
+	if (left === right) {
+		return true;
+	}
+	if (!left || !right || left.length !== right.length) {
+		return false;
+	}
+
+	return left.every((value, index) => value === right[index]);
+}
+
 function AppendOnlyStreamingText(props: { source: MessageStreamSource; align: string }) {
 	const textElementRef = useRef<HTMLDivElement | null>(null);
 	const loaderElementRef = useRef<HTMLDivElement | null>(null);
@@ -103,7 +114,7 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 		prev.isBusy === next.isBusy &&
 		prev.align === next.align &&
 		prev.renderAsMarkdown === next.renderAsMarkdown &&
-		prev.diffCandidatePaths === next.diffCandidatePaths &&
+		stringArraysEqual(prev.diffCandidatePaths, next.diffCandidatePaths) &&
 		prev.streamSource === next.streamSource &&
 		prev.defaultCodeBlockExpanded === next.defaultCodeBlockExpanded
 	);

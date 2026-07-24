@@ -245,8 +245,7 @@ func (q *QueryService) ComposeLoadPlan(
 			)
 			continue
 
-		case resourceValue.Record.Mode == record.ModeLinked &&
-			!resourceValue.CatalogCurrent:
+		case !resourceValue.CatalogCurrent:
 			plan.Diagnostics = artifactstore.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(

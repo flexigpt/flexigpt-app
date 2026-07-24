@@ -270,38 +270,6 @@ func (w *WorkspaceWrapper) SetWorkspaceRecordEnabled(
 	})
 }
 
-func (w *WorkspaceWrapper) PinWorkspaceRecord(
-	request *workspace.PinWorkspaceRecordRequest,
-) (*workspace.PinWorkspaceRecordResponse, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.PinWorkspaceRecordResponse, error) {
-		ctx := context.Background()
-		response, err := w.api.PinWorkspaceRecord(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
-			return nil, err
-		}
-		return response, nil
-	})
-}
-
-func (w *WorkspaceWrapper) FollowWorkspaceRecord(
-	request *workspace.FollowWorkspaceRecordRequest,
-) (*workspace.FollowWorkspaceRecordResponse, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.FollowWorkspaceRecordResponse, error) {
-		ctx := context.Background()
-		response, err := w.api.FollowWorkspaceRecord(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		if err := w.syncWorkspaceSkills(ctx, request.RootID); err != nil {
-			return nil, err
-		}
-		return response, nil
-	})
-}
-
 func (w *WorkspaceWrapper) DeleteWorkspaceRecord(
 	request *workspace.DeleteWorkspaceRecordRequest,
 ) (*workspace.DeleteWorkspaceRecordResponse, error) {

@@ -13,7 +13,7 @@ import (
 	_ "github.com/glebarez/go-sqlite"
 )
 
-const schemaFingerprint = "artifactstore.clean.v2"
+const schemaFingerprint = "artifactstore.clean.v1"
 
 type Store struct {
 	db *sql.DB

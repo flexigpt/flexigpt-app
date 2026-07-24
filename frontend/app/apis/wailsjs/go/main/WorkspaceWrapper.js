@@ -30,10 +30,6 @@ export function DetachWorkspaceSource(arg1) {
   return window['go']['main']['WorkspaceWrapper']['DetachWorkspaceSource'](arg1);
 }
 
-export function FollowWorkspaceRecord(arg1) {
-  return window['go']['main']['WorkspaceWrapper']['FollowWorkspaceRecord'](arg1);
-}
-
 export function GetWorkspace(arg1) {
   return window['go']['main']['WorkspaceWrapper']['GetWorkspace'](arg1);
 }
@@ -64,10 +60,6 @@ export function LoadWorkspaceContexts(arg1) {
 
 export function LoadWorkspaceSkills(arg1) {
   return window['go']['main']['WorkspaceWrapper']['LoadWorkspaceSkills'](arg1);
-}
-
-export function PinWorkspaceRecord(arg1) {
-  return window['go']['main']['WorkspaceWrapper']['PinWorkspaceRecord'](arg1);
 }
 
 export function RefreshWorkspace(arg1) {

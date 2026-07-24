@@ -80,12 +80,10 @@ CREATE TABLE IF NOT EXISTS artifact_records (
 	kind TEXT NOT NULL,
 	name TEXT NOT NULL,
 	enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
-	mode TEXT NOT NULL CHECK (mode IN ('linked', 'pinned')),
-	pinned_definition_digest TEXT,
 	resolved_definition_digest TEXT,
 	data_json BLOB NOT NULL,
 	state TEXT NOT NULL CHECK (
-		state IN ('available', 'stale', 'missing', 'invalid', 'incompatible')
+		state IN ('available', 'missing', 'invalid', 'incompatible')
 	),
 	diagnostics_json BLOB NOT NULL,
 	revision INTEGER NOT NULL CHECK (revision > 0),

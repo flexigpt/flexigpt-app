@@ -12121,139 +12121,6 @@ export namespace workspace {
 		    return a;
 		}
 	}
-	export class FollowWorkspaceRecordRequestBody {
-	    expectedRevision: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new FollowWorkspaceRecordRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.expectedRevision = source["expectedRevision"];
-	    }
-	}
-	export class FollowWorkspaceRecordRequest {
-	    RootID: string;
-	    RecordID: string;
-	    Body?: FollowWorkspaceRecordRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new FollowWorkspaceRecordRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.RootID = source["RootID"];
-	        this.RecordID = source["RecordID"];
-	        this.Body = this.convertValues(source["Body"], FollowWorkspaceRecordRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class WorkspaceRecordView {
-	    id: string;
-	    revision: number;
-	    name: string;
-	    kind: string;
-	    enabled: boolean;
-	    state: string;
-	    mode: string;
-	    pinnedDefinition?: string;
-	    resolvedDefinition?: string;
-	    sourceID: string;
-	    locator: string;
-	    subresourceLocator?: string;
-	    runtimeDisabled: boolean;
-	    diagnostics?: artifactstore.Diagnostic[];
-	
-	    static createFrom(source: any = {}) {
-	        return new WorkspaceRecordView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.revision = source["revision"];
-	        this.name = source["name"];
-	        this.kind = source["kind"];
-	        this.enabled = source["enabled"];
-	        this.state = source["state"];
-	        this.mode = source["mode"];
-	        this.pinnedDefinition = source["pinnedDefinition"];
-	        this.resolvedDefinition = source["resolvedDefinition"];
-	        this.sourceID = source["sourceID"];
-	        this.locator = source["locator"];
-	        this.subresourceLocator = source["subresourceLocator"];
-	        this.runtimeDisabled = source["runtimeDisabled"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class FollowWorkspaceRecordResponse {
-	    Body?: WorkspaceRecordView;
-	
-	    static createFrom(source: any = {}) {
-	        return new FollowWorkspaceRecordResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], WorkspaceRecordView);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class GetWorkspaceCatalogRequest {
 	    RootID: string;
 	
@@ -12332,6 +12199,58 @@ export namespace workspace {
 	        this.kind = source["kind"];
 	        this.resources = this.convertValues(source["resources"], WorkspaceResourceView);
 	        this.unrecorded = this.convertValues(source["unrecorded"], WorkspaceOccurrenceView);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class WorkspaceRecordView {
+	    id: string;
+	    revision: number;
+	    name: string;
+	    kind: string;
+	    enabled: boolean;
+	    state: string;
+	    resolvedDefinition?: string;
+	    sourceID: string;
+	    locator: string;
+	    subresourceLocator?: string;
+	    runtimeDisabled: boolean;
+	    diagnostics?: artifactstore.Diagnostic[];
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceRecordView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.revision = source["revision"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.enabled = source["enabled"];
+	        this.state = source["state"];
+	        this.resolvedDefinition = source["resolvedDefinition"];
+	        this.sourceID = source["sourceID"];
+	        this.locator = source["locator"];
+	        this.subresourceLocator = source["subresourceLocator"];
+	        this.runtimeDisabled = source["runtimeDisabled"];
+	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -13163,85 +13082,6 @@ export namespace workspace {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], WorkspaceSkillLoadView);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class PinWorkspaceRecordRequestBody {
-	    expectedRevision: number;
-	    definitionDigest: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new PinWorkspaceRecordRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.expectedRevision = source["expectedRevision"];
-	        this.definitionDigest = source["definitionDigest"];
-	    }
-	}
-	export class PinWorkspaceRecordRequest {
-	    RootID: string;
-	    RecordID: string;
-	    Body?: PinWorkspaceRecordRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new PinWorkspaceRecordRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.RootID = source["RootID"];
-	        this.RecordID = source["RecordID"];
-	        this.Body = this.convertValues(source["Body"], PinWorkspaceRecordRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class PinWorkspaceRecordResponse {
-	    Body?: WorkspaceRecordView;
-	
-	    static createFrom(source: any = {}) {
-	        return new PinWorkspaceRecordResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], WorkspaceRecordView);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

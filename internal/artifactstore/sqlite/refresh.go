@@ -246,8 +246,7 @@ func insertRecordTx(
 		ctx,
 		`INSERT INTO artifact_records (
 			id, root_id, source_id, locator, subresource_locator,
-			kind, name, enabled, mode, pinned_definition_digest,
-			resolved_definition_digest, data_json, state,
+			kind, name, enabled, resolved_definition_digest, data_json, state,
 			diagnostics_json, revision, created_at, modified_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(value.ID),
@@ -258,8 +257,6 @@ func insertRecordTx(
 		string(value.Kind),
 		value.Name,
 		boolInt(value.Enabled),
-		string(value.Mode),
-		nullableDigest(value.PinnedDefinition),
 		nullableDigest(value.ResolvedDefinition),
 		[]byte(value.Data),
 		string(value.State),

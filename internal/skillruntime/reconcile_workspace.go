@@ -42,7 +42,6 @@ func (s *SkillRuntime) ResyncWorkspace(
 	for _, value := range values {
 		if !value.Skill.IsEnabled ||
 			!value.CatalogCurrent ||
-			!value.RuntimeDisabled ||
 			value.State != record.StateAvailable {
 			continue
 		}

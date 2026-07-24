@@ -9,7 +9,6 @@ import type {
 	WorkspaceContextInspectionView,
 	WorkspaceContextLoadPlan,
 	WorkspaceContextView,
-	WorkspaceDigest,
 	WorkspaceRecordID,
 	WorkspaceRecordView,
 	WorkspaceRefreshResult,
@@ -29,7 +28,6 @@ import {
 	DeleteWorkspace,
 	DeleteWorkspaceRecord,
 	DetachWorkspaceSource,
-	FollowWorkspaceRecord,
 	GetWorkspace,
 	GetWorkspaceCatalog,
 	GetWorkspaceRecord,
@@ -38,7 +36,6 @@ import {
 	ListWorkspaceSkills,
 	LoadWorkspaceContexts,
 	LoadWorkspaceSkills,
-	PinWorkspaceRecord,
 	RefreshWorkspace,
 	SetWorkspaceRecordEnabled,
 	SetWorkspaceRecordRuntimeDisabled,
@@ -263,42 +260,6 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 
 		const response = await SetWorkspaceRecordEnabled(request);
 		return requireResponseBody(response.Body, 'SetWorkspaceRecordEnabled') as WorkspaceRecordView;
-	}
-
-	async pinWorkspaceRecord(
-		rootID: WorkspaceRootID,
-		recordID: WorkspaceRecordID,
-		expectedRevision: number,
-		definitionDigest: WorkspaceDigest
-	): Promise<WorkspaceRecordView> {
-		const request = {
-			RootID: rootID,
-			RecordID: recordID,
-			Body: {
-				expectedRevision,
-				definitionDigest,
-			} as workspaceModel.PinWorkspaceRecordRequestBody,
-		} as workspaceModel.PinWorkspaceRecordRequest;
-
-		const response = await PinWorkspaceRecord(request);
-		return requireResponseBody(response.Body, 'PinWorkspaceRecord') as WorkspaceRecordView;
-	}
-
-	async followWorkspaceRecord(
-		rootID: WorkspaceRootID,
-		recordID: WorkspaceRecordID,
-		expectedRevision: number
-	): Promise<WorkspaceRecordView> {
-		const request = {
-			RootID: rootID,
-			RecordID: recordID,
-			Body: {
-				expectedRevision,
-			} as workspaceModel.FollowWorkspaceRecordRequestBody,
-		} as workspaceModel.FollowWorkspaceRecordRequest;
-
-		const response = await FollowWorkspaceRecord(request);
-		return requireResponseBody(response.Body, 'FollowWorkspaceRecord') as WorkspaceRecordView;
 	}
 
 	async deleteWorkspaceRecord(

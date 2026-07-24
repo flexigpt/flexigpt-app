@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiFileText, FiLink, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiFileText, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type {
 	UpdateWorkspacePayload,
@@ -9,7 +9,7 @@ import type {
 	WorkspaceSkillView,
 	WorkspaceView,
 } from '@/spec/workspace';
-import { WorkspaceArtifactKind, WorkspaceMode, WorkspaceRecordMode } from '@/spec/workspace';
+import { WorkspaceArtifactKind, WorkspaceMode } from '@/spec/workspace';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
@@ -32,7 +32,6 @@ import {
 	getArtifactKindLabel,
 	getErrorMessage,
 	getOccurrenceStateTone,
-	getRecordModeLabel,
 	getRecordStateTone,
 	getWorkspaceRecords,
 	normalizeWorkspaceCatalog,
@@ -84,8 +83,6 @@ function RecordControls({
 	isPending,
 	onToggleEnabled,
 	onSetRuntimeDisabled,
-	onPin,
-	onFollow,
 	onView,
 	onDelete,
 }: {
@@ -94,8 +91,6 @@ function RecordControls({
 	isPending: (key: string) => boolean;
 	onToggleEnabled: (record: WorkspaceRecordView, enabled: boolean) => void;
 	onSetRuntimeDisabled: (record: WorkspaceRecordView, disabled: boolean) => void;
-	onPin: (record: WorkspaceRecordView) => void;
-	onFollow: (record: WorkspaceRecordView) => void;
 	onView: (record: WorkspaceRecordView) => void;
 	onDelete: (record: WorkspaceRecordView) => void;
 }) {
@@ -141,34 +136,6 @@ function RecordControls({
 				<FiEye size={14} />
 				<span>Inspect</span>
 			</button>
-
-			{record.mode === WorkspaceRecordMode.Linked && record.resolvedDefinition ? (
-				<button
-					type="button"
-					className="btn btn-sm btn-ghost rounded-xl"
-					onClick={() => {
-						onPin(record);
-					}}
-					disabled={isPending(`${record.id}:pin`)}
-				>
-					<FiLink size={14} />
-					<span>Pin Current</span>
-				</button>
-			) : null}
-
-			{record.mode === WorkspaceRecordMode.Pinned ? (
-				<button
-					type="button"
-					className="btn btn-sm btn-ghost rounded-xl"
-					onClick={() => {
-						onFollow(record);
-					}}
-					disabled={isPending(`${record.id}:follow`)}
-				>
-					<FiRefreshCw size={14} />
-					<span>Follow Latest</span>
-				</button>
-			) : null}
 
 			<button
 				type="button"
@@ -353,7 +320,6 @@ export function WorkspaceCard({
 			metadata={
 				<>
 					<MetadataPill label="Kind">{getArtifactKindLabel(record.kind)}</MetadataPill>
-					<MetadataPill label="Mode">{getRecordModeLabel(record.mode)}</MetadataPill>
 					<MetadataPill label="Source">{sourceLabelFor(record.sourceID)}</MetadataPill>
 					{record.diagnostics?.length ? (
 						<MetadataPill label="Diagnostics">{record.diagnostics.length}</MetadataPill>
@@ -378,31 +344,6 @@ export function WorkspaceCard({
 						() =>
 							workspaceAPI.setWorkspaceRecordRuntimeDisabled(workspace.rootID, current.id, current.revision, disabled),
 						'Failed to update runtime permission.'
-					);
-				}}
-				onPin={current => {
-					if (!current.resolvedDefinition) {
-						showFailure(undefined, 'The record does not have a resolved definition to pin.');
-						return;
-					}
-
-					void runRecordMutation(
-						`${current.id}:pin`,
-						() =>
-							workspaceAPI.pinWorkspaceRecord(
-								workspace.rootID,
-								current.id,
-								current.revision,
-								current.resolvedDefinition as string
-							),
-						'Failed to pin workspace record.'
-					);
-				}}
-				onFollow={current => {
-					void runRecordMutation(
-						`${current.id}:follow`,
-						() => workspaceAPI.followWorkspaceRecord(workspace.rootID, current.id, current.revision),
-						'Failed to make the record follow the latest definition.'
 					);
 				}}
 				onView={setRecordToInspect}
@@ -681,28 +622,6 @@ export function WorkspaceCard({
 															'Failed to update context runtime permission.'
 														);
 													}}
-													onPin={current => {
-														if (current.resolvedDefinition) {
-															void runRecordMutation(
-																`${current.id}:pin`,
-																() =>
-																	workspaceAPI.pinWorkspaceRecord(
-																		workspace.rootID,
-																		current.id,
-																		current.revision,
-																		current.resolvedDefinition as string
-																	),
-																'Failed to pin context.'
-															);
-														}
-													}}
-													onFollow={current => {
-														void runRecordMutation(
-															`${current.id}:follow`,
-															() => workspaceAPI.followWorkspaceRecord(workspace.rootID, current.id, current.revision),
-															'Failed to follow context.'
-														);
-													}}
 													onView={setRecordToInspect}
 													onDelete={setRecordToDelete}
 												/>
@@ -782,28 +701,6 @@ export function WorkspaceCard({
 																	disabled
 																),
 															'Failed to update skill runtime permission.'
-														);
-													}}
-													onPin={current => {
-														if (current.resolvedDefinition) {
-															void runRecordMutation(
-																`${current.id}:pin`,
-																() =>
-																	workspaceAPI.pinWorkspaceRecord(
-																		workspace.rootID,
-																		current.id,
-																		current.revision,
-																		current.resolvedDefinition as string
-																	),
-																'Failed to pin skill.'
-															);
-														}
-													}}
-													onFollow={current => {
-														void runRecordMutation(
-															`${current.id}:follow`,
-															() => workspaceAPI.followWorkspaceRecord(workspace.rootID, current.id, current.revision),
-															'Failed to follow skill.'
 														);
 													}}
 													onView={setRecordToInspect}

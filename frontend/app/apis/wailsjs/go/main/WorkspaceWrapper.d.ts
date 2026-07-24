@@ -16,8 +16,6 @@ export function DeleteWorkspaceRecord(arg1:workspace.DeleteWorkspaceRecordReques
 
 export function DetachWorkspaceSource(arg1:workspace.DetachWorkspaceSourceRequest):Promise<workspace.DetachWorkspaceSourceResponse>;
 
-export function FollowWorkspaceRecord(arg1:workspace.FollowWorkspaceRecordRequest):Promise<workspace.FollowWorkspaceRecordResponse>;
-
 export function GetWorkspace(arg1:workspace.GetWorkspaceRequest):Promise<workspace.GetWorkspaceResponse>;
 
 export function GetWorkspaceCatalog(arg1:workspace.GetWorkspaceCatalogRequest):Promise<workspace.GetWorkspaceCatalogResponse>;
@@ -33,8 +31,6 @@ export function ListWorkspaces(arg1:workspace.ListWorkspacesRequest):Promise<wor
 export function LoadWorkspaceContexts(arg1:workspace.LoadWorkspaceContextsRequest):Promise<workspace.LoadWorkspaceContextsResponse>;
 
 export function LoadWorkspaceSkills(arg1:workspace.LoadWorkspaceSkillsRequest):Promise<workspace.LoadWorkspaceSkillsResponse>;
-
-export function PinWorkspaceRecord(arg1:workspace.PinWorkspaceRecordRequest):Promise<workspace.PinWorkspaceRecordResponse>;
 
 export function RefreshWorkspace(arg1:workspace.RefreshWorkspaceRequest):Promise<workspace.RefreshWorkspaceResponse>;
 

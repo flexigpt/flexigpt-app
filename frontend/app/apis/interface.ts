@@ -79,7 +79,6 @@ import type {
 	WorkspaceContextInspectionView,
 	WorkspaceContextLoadPlan,
 	WorkspaceContextView,
-	WorkspaceDigest,
 	WorkspaceRecordID,
 	WorkspaceRecordView,
 	WorkspaceRefreshResult,
@@ -361,19 +360,6 @@ export interface IWorkspaceAPI {
 		recordID: WorkspaceRecordID,
 		expectedRevision: number,
 		enabled: boolean
-	): Promise<WorkspaceRecordView>;
-
-	pinWorkspaceRecord(
-		rootID: WorkspaceRootID,
-		recordID: WorkspaceRecordID,
-		expectedRevision: number,
-		definitionDigest: WorkspaceDigest
-	): Promise<WorkspaceRecordView>;
-
-	followWorkspaceRecord(
-		rootID: WorkspaceRootID,
-		recordID: WorkspaceRecordID,
-		expectedRevision: number
 	): Promise<WorkspaceRecordView>;
 
 	deleteWorkspaceRecord(rootID: WorkspaceRootID, recordID: WorkspaceRecordID, expectedRevision: number): Promise<void>;

@@ -590,57 +590,6 @@ func (a *API) SetWorkspaceRecordEnabled(
 	return &SetWorkspaceRecordEnabledResponse{Body: &output}, nil
 }
 
-func (a *API) PinWorkspaceRecord(
-	ctx context.Context,
-	request *PinWorkspaceRecordRequest,
-) (*PinWorkspaceRecordResponse, error) {
-	if err := a.ready(); err != nil {
-		return nil, err
-	}
-	if request == nil || request.Body == nil {
-		return nil, invalidAPIRequest("workspace record pin body is required")
-	}
-	if _, err := a.workspaceRecord(ctx, request.RootID, request.RecordID); err != nil {
-		return nil, err
-	}
-	value, err := a.artifacts.Records.Pin(
-		ctx,
-		request.RecordID,
-		request.Body.ExpectedRevision,
-		request.Body.DefinitionDigest,
-	)
-	if err != nil {
-		return nil, err
-	}
-	output := workspaceRecordViewOf(value)
-	return &PinWorkspaceRecordResponse{Body: &output}, nil
-}
-
-func (a *API) FollowWorkspaceRecord(
-	ctx context.Context,
-	request *FollowWorkspaceRecordRequest,
-) (*FollowWorkspaceRecordResponse, error) {
-	if err := a.ready(); err != nil {
-		return nil, err
-	}
-	if request == nil || request.Body == nil {
-		return nil, invalidAPIRequest("workspace record follow body is required")
-	}
-	if _, err := a.workspaceRecord(ctx, request.RootID, request.RecordID); err != nil {
-		return nil, err
-	}
-	value, err := a.artifacts.Records.Follow(
-		ctx,
-		request.RecordID,
-		request.Body.ExpectedRevision,
-	)
-	if err != nil {
-		return nil, err
-	}
-	output := workspaceRecordViewOf(value)
-	return &FollowWorkspaceRecordResponse{Body: &output}, nil
-}
-
 func (a *API) DeleteWorkspaceRecord(
 	ctx context.Context,
 	request *DeleteWorkspaceRecordRequest,
@@ -916,11 +865,6 @@ func workspaceRecordViewOf(value record.Record) WorkspaceRecordView {
 		copyValue := *value.ResolvedDefinition
 		digest = &copyValue
 	}
-	var pinned *artifactstore.Digest
-	if value.PinnedDefinition != nil {
-		copyValue := *value.PinnedDefinition
-		pinned = &copyValue
-	}
 	runtimeDisabled, _ := engine.RecordRuntimeDisabled(value)
 	return WorkspaceRecordView{
 		ID:                 value.ID,
@@ -929,8 +873,6 @@ func workspaceRecordViewOf(value record.Record) WorkspaceRecordView {
 		Kind:               value.Kind,
 		Enabled:            value.Enabled,
 		State:              string(value.State),
-		Mode:               string(value.Mode),
-		PinnedDefinition:   pinned,
 		ResolvedDefinition: digest,
 		SourceID:           value.Occurrence.SourceID,
 		Locator:            value.Occurrence.Locator,

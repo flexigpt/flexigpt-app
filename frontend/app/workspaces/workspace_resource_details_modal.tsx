@@ -27,7 +27,6 @@ import {
 	formatByteCount,
 	getArtifactKindLabel,
 	getErrorMessage,
-	getRecordModeLabel,
 	getRecordStateTone,
 	workspaceLocatorToPath,
 } from '@/workspaces/lib/workspace_utils';
@@ -134,7 +133,6 @@ function WorkspaceResourceDetailsContent({
 					<ManagementInfoRow label="State">
 						<StatusBadge tone={getRecordStateTone(current.state)}>{current.state}</StatusBadge>
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Tracking">{getRecordModeLabel(current.mode)}</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{current.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Source">
 						<span className="break-all">{source}</span>

@@ -25,15 +25,9 @@ export enum WorkspaceArtifactKind {
 
 export enum WorkspaceRecordState {
 	Available = 'available',
-	Stale = 'stale',
 	Missing = 'missing',
 	Invalid = 'invalid',
 	Incompatible = 'incompatible',
-}
-
-export enum WorkspaceRecordMode {
-	Linked = 'linked',
-	Pinned = 'pinned',
 }
 
 export enum WorkspaceOccurrenceState {
@@ -141,8 +135,6 @@ export interface WorkspaceRecordView {
 	kind: WorkspaceArtifactKind;
 	enabled: boolean;
 	state: WorkspaceRecordState;
-	mode: WorkspaceRecordMode;
-	pinnedDefinition?: WorkspaceDigest;
 	resolvedDefinition?: WorkspaceDigest;
 	sourceID: WorkspaceSourceID;
 	locator: WorkspaceLocator;

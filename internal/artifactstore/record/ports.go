@@ -53,8 +53,7 @@ type Policy interface {
 
 // SourceStateUpdate is the source-derived subset of a record update.
 //
-// Refresh may update this state, but must not alter record-owned fields such
-// as name, enabled state, mode, local data, or pinning.
+// Refresh may update this state, but must not alter record-owned fields.
 type SourceStateUpdate struct {
 	RecordID           artifactstore.RecordID
 	RootID             artifactstore.RootID

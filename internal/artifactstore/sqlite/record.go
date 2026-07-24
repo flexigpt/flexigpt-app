@@ -13,9 +13,8 @@ import (
 
 const recordColumns = `
 	id, root_id, source_id, locator, subresource_locator,
-	kind, name, enabled, mode, pinned_definition_digest,
-	resolved_definition_digest, data_json, state,
-	diagnostics_json, revision, created_at, modified_at`
+	kind, name, enabled, resolved_definition_digest, data_json,
+	state, diagnostics_json, revision, created_at, modified_at`
 
 func (s *Store) getRecord(
 	ctx context.Context,
@@ -82,8 +81,6 @@ func (s *Store) updateRecord(
 		`UPDATE artifact_records
 		 SET name = ?,
 		     enabled = ?,
-		     mode = ?,
-		     pinned_definition_digest = ?,
 		     resolved_definition_digest = ?,
 		     data_json = ?,
 		     state = ?,
@@ -93,8 +90,6 @@ func (s *Store) updateRecord(
 		 WHERE id = ? AND revision = ?`,
 		value.Name,
 		boolInt(value.Enabled),
-		string(value.Mode),
-		nullableDigest(value.PinnedDefinition),
 		nullableDigest(value.ResolvedDefinition),
 		[]byte(value.Data),
 		string(value.State),
@@ -148,9 +143,9 @@ func (s *Store) deleteRecord(
 func scanRecord(row scanner) (record.Record, error) {
 	var (
 		id, rootID, sourceID, locator, subresource string
-		kind, name, mode, state                    string
+		kind, name, state                          string
 		enabled                                    int
-		pinned, resolved                           sql.NullString
+		resolved                                   sql.NullString
 		data, diagnosticsRaw                       []byte
 		revision                                   uint64
 		createdAt, modifiedAt                      int64
@@ -164,8 +159,6 @@ func scanRecord(row scanner) (record.Record, error) {
 		&kind,
 		&name,
 		&enabled,
-		&mode,
-		&pinned,
 		&resolved,
 		&data,
 		&state,
@@ -191,8 +184,6 @@ func scanRecord(row scanner) (record.Record, error) {
 		Kind:               artifactstore.ArtifactKind(kind),
 		Name:               name,
 		Enabled:            enabled != 0,
-		Mode:               record.Mode(mode),
-		PinnedDefinition:   parseDigest(pinned),
 		ResolvedDefinition: parseDigest(resolved),
 		Data:               append([]byte(nil), data...),
 		State:              record.State(state),

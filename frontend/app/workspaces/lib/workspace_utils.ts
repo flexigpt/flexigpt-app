@@ -11,7 +11,6 @@ import {
 	WorkspaceArtifactKind,
 	WorkspaceDiagnosticSeverity,
 	WorkspaceOccurrenceState,
-	WorkspaceRecordMode,
 	WorkspaceRecordState,
 } from '@/spec/workspace';
 
@@ -319,7 +318,6 @@ export function getRecordStateTone(state: WorkspaceRecordState): StatusTone {
 	switch (state) {
 		case WorkspaceRecordState.Available:
 			return 'success';
-		case WorkspaceRecordState.Stale:
 		case WorkspaceRecordState.Missing:
 			return 'warning';
 		case WorkspaceRecordState.Invalid:
@@ -367,10 +365,6 @@ export function getArtifactKindLabel(kind: WorkspaceArtifactKind): string {
 		default:
 			return kind;
 	}
-}
-
-export function getRecordModeLabel(mode: WorkspaceRecordMode): string {
-	return mode === WorkspaceRecordMode.Pinned ? 'Pinned' : 'Following';
 }
 
 export function collectWorkspaceDiagnostics(data: WorkspaceCatalogData): WorkspaceDiagnostic[] {
@@ -432,7 +426,6 @@ export function workspaceRecordMatchesSearch(record: WorkspaceRecordView, rawQue
 		record.name,
 		record.kind,
 		record.state,
-		record.mode,
 		record.locator,
 		record.subresourceLocator,
 		...(record.diagnostics ?? []).flatMap(diagnostic => [diagnostic.code, diagnostic.message]),

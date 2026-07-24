@@ -127,41 +127,34 @@ func (r *Reconciler) Reconcile(
 		}
 		occurrence, found := occurrencesByKey[key]
 		next := current
+		switch {
+		case !found || occurrence.State == catalog.OccurrenceMissing:
+			next.State = StateMissing
+			next.Diagnostics = []artifactstore.Diagnostic{{
+				Severity: artifactstore.DiagnosticWarning,
+				Code:     "artifact.record.source-missing",
+				Message:  "the source occurrence is missing",
+			}}
 
-		if current.Mode == ModePinned {
-			next.ResolvedDefinition = cloneDigest(current.PinnedDefinition)
+		case occurrence.State == catalog.OccurrenceInvalid:
+			next.State = StateInvalid
+			next.Diagnostics = artifactstore.CloneDiagnostics(
+				occurrence.Diagnostics,
+			)
+
+		case occurrence.State == catalog.OccurrenceValid &&
+			occurrence.Kind != current.Kind:
+			next.State = StateIncompatible
+			next.Diagnostics = []artifactstore.Diagnostic{{
+				Severity: artifactstore.DiagnosticError,
+				Code:     "artifact.record.kind-incompatible",
+				Message:  "the source occurrence changed artifact kind",
+			}}
+
+		case occurrence.State == catalog.OccurrenceValid:
+			next.ResolvedDefinition = cloneDigest(occurrence.DefinitionDigest)
 			next.State = StateAvailable
-			next.Diagnostics = nil
-		} else {
-			switch {
-			case !found || occurrence.State == catalog.OccurrenceMissing:
-				next.State = StateMissing
-				next.Diagnostics = []artifactstore.Diagnostic{{
-					Severity: artifactstore.DiagnosticWarning,
-					Code:     "artifact.record.source-missing",
-					Message:  "the source occurrence is missing",
-				}}
-
-			case occurrence.State == catalog.OccurrenceInvalid:
-				next.State = StateInvalid
-				next.Diagnostics = artifactstore.CloneDiagnostics(
-					occurrence.Diagnostics,
-				)
-
-			case occurrence.State == catalog.OccurrenceValid &&
-				occurrence.Kind != current.Kind:
-				next.State = StateIncompatible
-				next.Diagnostics = []artifactstore.Diagnostic{{
-					Severity: artifactstore.DiagnosticError,
-					Code:     "artifact.record.kind-incompatible",
-					Message:  "the source occurrence changed artifact kind",
-				}}
-
-			case occurrence.State == catalog.OccurrenceValid:
-				next.ResolvedDefinition = cloneDigest(occurrence.DefinitionDigest)
-				next.State = StateAvailable
-				next.Diagnostics = artifactstore.CloneDiagnostics(occurrence.Diagnostics)
-			}
+			next.Diagnostics = artifactstore.CloneDiagnostics(occurrence.Diagnostics)
 		}
 
 		if equivalentSourceState(current, next) {
@@ -254,7 +247,6 @@ func (r *Reconciler) Reconcile(
 			Kind:               occurrence.Kind,
 			Name:               draft.Name,
 			Enabled:            draft.Enabled,
-			Mode:               ModeLinked,
 			ResolvedDefinition: &resolved,
 			Data:               json.RawMessage(data),
 			State:              StateAvailable,
