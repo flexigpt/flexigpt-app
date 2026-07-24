@@ -627,12 +627,16 @@ func (a *API) SetWorkspaceRecordRuntimeDisabled(
 	if request == nil || request.Body == nil {
 		return nil, invalidAPIRequest("workspace record data body is required")
 	}
-	if _, err := a.workspaceRecord(ctx, request.RootID, request.RecordID); err != nil {
+	current, err := a.workspaceRecord(ctx, request.RootID, request.RecordID)
+	if err != nil {
 		return nil, err
 	}
-	data, err := engine.EncodeRecordData(engine.RecordData{
-		RuntimeDisabled: request.Body.RuntimeDisabled,
-	})
+	recordData, err := engine.DecodeRecordData(current.Data)
+	if err != nil {
+		return nil, err
+	}
+	recordData.RuntimeDisabled = request.Body.RuntimeDisabled
+	data, err := engine.EncodeRecordData(recordData)
 	if err != nil {
 		return nil, err
 	}
@@ -865,7 +869,24 @@ func workspaceRecordViewOf(value record.Record) WorkspaceRecordView {
 		copyValue := *value.ResolvedDefinition
 		digest = &copyValue
 	}
-	runtimeDisabled, _ := engine.RecordRuntimeDisabled(value)
+	diagnostics := artifactstore.CloneDiagnostics(value.Diagnostics)
+	runtimeDisabled, err := engine.RecordRuntimeDisabled(value)
+	if err != nil {
+		diagnostics = artifactstore.AppendDiagnostics(
+			diagnostics,
+			artifactstore.Diagnostic{
+				Severity: artifactstore.DiagnosticError,
+				Code:     engine.DiagnosticCodeProjectionInvalid,
+				Message: artifactstore.BoundedDiagnosticMessage(
+					"the Workspace record has invalid local data: " + err.Error(),
+				),
+				Location: &artifactstore.DiagnosticLocation{
+					Locator:            value.Occurrence.Locator,
+					SubresourceLocator: value.Occurrence.SubresourceLocator,
+				},
+			},
+		)
+	}
 	return WorkspaceRecordView{
 		ID:                 value.ID,
 		Revision:           value.Revision,
@@ -878,7 +899,7 @@ func workspaceRecordViewOf(value record.Record) WorkspaceRecordView {
 		Locator:            value.Occurrence.Locator,
 		SubresourceLocator: value.Occurrence.SubresourceLocator,
 		RuntimeDisabled:    runtimeDisabled,
-		Diagnostics:        artifactstore.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:        diagnostics,
 	}
 }
 
@@ -924,6 +945,7 @@ func workspaceCatalogViewOf(
 			resourceValue.Record.Occurrence.SourceID,
 			resourceValue.Record.Occurrence.Locator,
 			resourceValue.Record.Occurrence.SubresourceLocator,
+			resourceValue.Record.Kind,
 		)] = resourceValue.Record
 	}
 	for _, localRecord := range value.UnresolvedRecords {
@@ -935,6 +957,7 @@ func workspaceCatalogViewOf(
 			localRecord.Occurrence.SourceID,
 			localRecord.Occurrence.Locator,
 			localRecord.Occurrence.SubresourceLocator,
+			localRecord.Kind,
 		)] = localRecord
 	}
 	for _, occurrence := range value.Catalog.Occurrences {
@@ -997,10 +1020,12 @@ func occurrenceViewKey(
 	sourceID artifactstore.SourceID,
 	locator artifactstore.Locator,
 	subresource artifactstore.SubresourceLocator,
+	kind artifactstore.ArtifactKind,
 ) string {
 	return string(sourceID) + "\x00" +
 		string(locator) + "\x00" +
-		string(subresource)
+		string(subresource) + "\x00" +
+		string(kind)
 }
 
 func workspaceOccurrenceViewOf(
@@ -1023,6 +1048,7 @@ func workspaceOccurrenceViewOf(
 		value.Key.SourceID,
 		value.Key.Locator,
 		value.Key.SubresourceLocator,
+		value.Kind,
 	)]; found {
 		recordID := localRecord.ID
 		output.Recorded = true
@@ -1138,6 +1164,7 @@ func workspaceSkillViewOf(value skilladapter.WorkspaceSkill) WorkspaceSkillView 
 		MarkdownBody:     value.MarkdownBody,
 		RecordRevision:   value.RecordRevision,
 		State:            string(value.State),
+		ProjectionValid:  value.ProjectionValid,
 		CatalogCurrent:   value.CatalogCurrent,
 		RuntimeDisabled:  value.RuntimeDisabled,
 		Diagnostics:      artifactstore.CloneDiagnostics(value.Diagnostics),

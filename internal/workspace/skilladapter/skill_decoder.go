@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
@@ -208,18 +207,17 @@ func skillWarningDiagnostics(
 ) []artifactstore.Diagnostic {
 	output := make([]artifactstore.Diagnostic, 0, len(warnings))
 	for _, warning := range warnings {
+		if len(output) >= artifactstore.MaxDiagnostics {
+			break
+		}
 		message := strings.TrimSpace(warning)
 		if message == "" {
 			continue
 		}
-		for len(message) > artifactstore.MaxDiagnosticMessageBytes {
-			_, size := utf8.DecodeLastRuneInString(message)
-			message = message[:len(message)-size]
-		}
 		output = append(output, artifactstore.Diagnostic{
 			Severity: artifactstore.DiagnosticWarning,
 			Code:     "workspace.skill.parse-warning",
-			Message:  message,
+			Message:  artifactstore.BoundedDiagnosticMessage(message),
 			Location: &artifactstore.DiagnosticLocation{
 				Locator: locator,
 			},

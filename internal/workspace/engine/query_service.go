@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -128,6 +129,8 @@ func (q *QueryService) Resolve(
 		resourceValue := &view.Resources[index]
 		if !resourceValue.Record.Enabled ||
 			resourceValue.Record.State != record.StateAvailable ||
+			!resourceValue.CatalogCurrent ||
+			!resourceValue.ProjectionValid ||
 			!matchesSelector(resourceValue.Definition, selector) {
 			continue
 		}
@@ -192,10 +195,14 @@ func (q *QueryService) ComposeLoadPlan(
 			if unresolvedValue, exists := unresolved[recordID]; exists {
 				plan.Diagnostics = artifactstore.AppendDiagnostics(
 					plan.Diagnostics,
+					unresolvedValue.Diagnostics...,
+				)
+				plan.Diagnostics = artifactstore.AppendDiagnostics(
+					plan.Diagnostics,
 					recordAvailabilityDiagnostic(
 						unresolvedValue,
 						DiagnosticCodeRecordUnresolved,
-						"the Workspace record has no resolved definition",
+						"the Workspace record is unavailable for loading",
 					),
 				)
 			} else {
@@ -281,6 +288,7 @@ func (q *QueryService) ComposeLoadPlan(
 			CatalogCurrent:             resourceValue.CatalogCurrent,
 			OccurrenceDefinitionDigest: occurrenceDefinitionDigest,
 			SourceContentDigest:        sourceContentDigest,
+			SourceGeneration:           view.Catalog.SourceGenerations[resourceValue.Source.ID],
 		})
 		plan.Diagnostics = artifactstore.AppendDiagnostics(
 			plan.Diagnostics,
@@ -301,11 +309,26 @@ func (q *QueryService) Catalog(
 	if err != nil {
 		return CatalogView{}, err
 	}
-	snapshot, err := q.catalogs.GetCurrent(ctx, rootID)
-	if err != nil {
-		return CatalogView{}, err
+	snapshot, catalogErr := q.catalogs.GetCurrent(ctx, rootID)
+	if catalogErr != nil &&
+		!errors.Is(catalogErr, artifactstore.ErrCatalogStale) {
+		return CatalogView{}, catalogErr
 	}
-	catalogCurrent := q.catalogIsCurrent(workspaceValue, snapshot)
+	if snapshot.RootID != rootID {
+		return CatalogView{}, fmt.Errorf(
+			"%w: catalog belongs to another Workspace",
+			ErrInvalidWorkspace,
+		)
+	}
+	if err := snapshot.Validate(); err != nil {
+		return CatalogView{}, fmt.Errorf(
+			"%w: catalog reader returned an invalid catalog: %w",
+			ErrInvalidWorkspace,
+			err,
+		)
+	}
+	catalogCurrent := catalogErr == nil &&
+		q.catalogIsCurrent(workspaceValue, snapshot)
 
 	records, err := q.records.ListByRoot(ctx, rootID)
 	if err != nil {
@@ -341,6 +364,18 @@ func (q *QueryService) Catalog(
 		)
 		recorded[key] = struct{}{}
 
+		sourceValue, exists := sourcesByID[localRecord.Occurrence.SourceID]
+		if !exists {
+			view.UnresolvedRecords = append(
+				view.UnresolvedRecords,
+				recordWithDiagnostic(
+					localRecord,
+					recordSourceUnavailableDiagnostic(localRecord),
+				),
+			)
+			continue
+		}
+
 		if localRecord.ResolvedDefinition == nil {
 			view.UnresolvedRecords = append(
 				view.UnresolvedRecords,
@@ -354,18 +389,43 @@ func (q *QueryService) Catalog(
 			*localRecord.ResolvedDefinition,
 		)
 		if err != nil {
-			return CatalogView{}, err
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return CatalogView{}, ctxErr
+			}
+			view.UnresolvedRecords = append(
+				view.UnresolvedRecords,
+				recordWithDiagnostic(
+					localRecord,
+					recordDefinitionUnavailableDiagnostic(localRecord, err),
+				),
+			)
+			continue
 		}
 		projectionValid := true
 		var projectionDiagnostics []artifactstore.Diagnostic
-		validator, supported := q.validators[definitionValue.Kind]
-		if !supported {
+		if definitionValue.Kind != localRecord.Kind {
 			projectionValid = false
 			projectionDiagnostics = append(
 				projectionDiagnostics,
 				projectionDiagnostic(
 					localRecord,
-					fmt.Errorf("artifact kind %q has no Workspace validator", definitionValue.Kind),
+					fmt.Errorf(
+						"record kind %q does not match resolved definition kind %q",
+						localRecord.Kind,
+						definitionValue.Kind,
+					),
+				),
+			)
+		} else if validator, supported := q.validators[localRecord.Kind]; !supported {
+			projectionValid = false
+			projectionDiagnostics = append(
+				projectionDiagnostics,
+				projectionDiagnostic(
+					localRecord,
+					fmt.Errorf(
+						"artifact kind %q has no Workspace validator",
+						localRecord.Kind,
+					),
 				),
 			)
 		} else if err := validator(definitionValue); err != nil {
@@ -380,14 +440,6 @@ func (q *QueryService) Catalog(
 		if found {
 			copyValue := occurrence
 			occurrencePointer = &copyValue
-		}
-		sourceValue, exists := sourcesByID[localRecord.Occurrence.SourceID]
-		if !exists {
-			return CatalogView{}, fmt.Errorf(
-				"%w: record source %q is unavailable",
-				ErrInvalidWorkspace,
-				localRecord.Occurrence.SourceID,
-			)
 		}
 		current := catalogCurrent &&
 			occurrencePointer != nil &&
@@ -482,6 +534,52 @@ func projectionDiagnostic(
 	}
 }
 
+func recordWithDiagnostic(
+	value record.Record,
+	diagnostic artifactstore.Diagnostic,
+) record.Record {
+	output := value
+	output.Diagnostics = artifactstore.AppendDiagnostics(
+		[]artifactstore.Diagnostic{diagnostic},
+		value.Diagnostics...,
+	)
+	return output
+}
+
+func recordSourceUnavailableDiagnostic(
+	value record.Record,
+) artifactstore.Diagnostic {
+	return artifactstore.Diagnostic{
+		Severity: artifactstore.DiagnosticError,
+		Code:     DiagnosticCodeRecordUnavailable,
+		Message:  "the record source is no longer attached to this Workspace",
+		Location: &artifactstore.DiagnosticLocation{
+			Locator:            value.Occurrence.Locator,
+			SubresourceLocator: value.Occurrence.SubresourceLocator,
+		},
+	}
+}
+
+func recordDefinitionUnavailableDiagnostic(
+	value record.Record,
+	cause error,
+) artifactstore.Diagnostic {
+	return artifactstore.Diagnostic{
+		Severity: artifactstore.DiagnosticError,
+		Code:     DiagnosticCodeRecordUnavailable,
+		Message: artifactstore.BoundedDiagnosticMessage(
+			fmt.Sprintf(
+				"the resolved Workspace definition could not be read: %v",
+				cause,
+			),
+		),
+		Location: &artifactstore.DiagnosticLocation{
+			Locator:            value.Occurrence.Locator,
+			SubresourceLocator: value.Occurrence.SubresourceLocator,
+		},
+	}
+}
+
 func matchesSelector(
 	value definition.Definition,
 	selector definition.Selector,
@@ -515,7 +613,7 @@ func groupCatalogResources(
 ) []ResourceGroup {
 	values := make(map[artifactstore.ArtifactKind]*ResourceGroup)
 	for _, resourceValue := range resources {
-		kind := resourceValue.Definition.Kind
+		kind := resourceValue.Record.Kind
 		group := values[kind]
 		if group == nil {
 			group = &ResourceGroup{Kind: kind}

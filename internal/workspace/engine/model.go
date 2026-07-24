@@ -161,6 +161,7 @@ type LoadPlanItem struct {
 	CatalogCurrent             bool                  `json:"-"`
 	OccurrenceDefinitionDigest artifactstore.Digest  `json:"-"`
 	SourceContentDigest        artifactstore.Digest  `json:"-"`
+	SourceGeneration           string                `json:"-"`
 }
 
 type LoadPlan struct {

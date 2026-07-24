@@ -115,7 +115,7 @@ func applyCompositionPolicy(
 
 	for _, input := range values {
 		value := input
-		content := strings.TrimSpace(value.Content)
+		content := value.Content
 		originalBytes := len(content)
 		status := CompositionIncluded
 		code := ""

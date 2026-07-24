@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"time"
-	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
@@ -51,7 +50,12 @@ type WorkspaceSkill struct {
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
 	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
 	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
-	RuntimeLocation  string                     `json:"-"`
+
+	ProjectionValid     bool                 `json:"-"`
+	FilesystemBacked    bool                 `json:"-"`
+	SourceContentDigest artifactstore.Digest `json:"-"`
+	SourceGeneration    string               `json:"-"`
+	RuntimeLocation     string               `json:"-"`
 }
 
 type SkillLoadPlan struct {
@@ -179,6 +183,8 @@ func (f *Adapter) Load(
 			)
 			continue
 		}
+		projected.SourceContentDigest = item.SourceContentDigest
+		projected.SourceGeneration = item.SourceGeneration
 		runtimeLocation, err := f.resolveRuntimeLocation(ctx, item)
 		if err != nil {
 			output.Diagnostics = artifactstore.AppendDiagnostics(
@@ -214,6 +220,7 @@ func projectWorkspaceSkill(
 			resourceValue.Record.Diagnostics,
 			resourceValue.Diagnostics...,
 		),
+		FilesystemBacked: resourceValue.Source.Kind == fsdir.Kind,
 	}
 	if dataErr != nil {
 		return output, dataErr
@@ -233,6 +240,11 @@ func projectWorkspaceSkill(
 	}
 	output.Skill = skillSummary(resourceValue.Record, body)
 	output.MarkdownBody = markdownBody
+	if resourceValue.Occurrence != nil &&
+		resourceValue.Occurrence.SourceContentDigest != nil {
+		output.SourceContentDigest = *resourceValue.Occurrence.SourceContentDigest
+	}
+	output.ProjectionValid = true
 	return output, nil
 }
 
@@ -303,6 +315,13 @@ func (f *Adapter) resolveRuntimeLocation(
 	sourceValue, err := f.sourceRuntime.Get(ctx, item.Source.ID)
 	if err != nil {
 		return "", err
+	}
+	if sourceValue.ID != item.Source.ID ||
+		sourceValue.Revision != item.Source.Revision {
+		return "", fmt.Errorf(
+			"%w: Workspace Skill source changed after load-plan composition",
+			artifactstore.ErrCatalogStale,
+		)
 	}
 	if sourceValue.Kind != fsdir.Kind {
 		return "", fmt.Errorf(
@@ -399,15 +418,10 @@ func runtimeLocationDiagnostic(
 	value record.Record,
 	err error,
 ) artifactstore.Diagnostic {
-	message := err.Error()
-	for len(message) > artifactstore.MaxDiagnosticMessageBytes {
-		_, size := utf8.DecodeLastRuneInString(message)
-		message = message[:len(message)-size]
-	}
 	return artifactstore.Diagnostic{
 		Severity: artifactstore.DiagnosticError,
 		Code:     engine.DiagnosticCodeRuntimeUnavailable,
-		Message:  message,
+		Message:  artifactstore.BoundedDiagnosticMessage(err.Error()),
 		Location: &artifactstore.DiagnosticLocation{
 			Locator:            value.Occurrence.Locator,
 			SubresourceLocator: value.Occurrence.SubresourceLocator,
@@ -422,7 +436,7 @@ func skillProjectionDiagnostic(
 	return artifactstore.Diagnostic{
 		Severity: artifactstore.DiagnosticError,
 		Code:     engine.DiagnosticCodeProjectionInvalid,
-		Message:  err.Error(),
+		Message:  artifactstore.BoundedDiagnosticMessage(err.Error()),
 		Location: &artifactstore.DiagnosticLocation{
 			Locator:            value.Occurrence.Locator,
 			SubresourceLocator: value.Occurrence.SubresourceLocator,

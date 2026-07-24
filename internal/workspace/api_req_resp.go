@@ -211,6 +211,7 @@ type WorkspaceSkillView struct {
 	MarkdownBody     string                     `json:"markdownBody,omitempty"`
 	RecordRevision   uint64                     `json:"recordRevision"`
 	State            string                     `json:"state"`
+	ProjectionValid  bool                       `json:"projectionValid"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
 	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
 	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`

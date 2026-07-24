@@ -81,12 +81,13 @@ func (s *SkillRuntime) ResyncInstalled(ctx context.Context) error {
 	if err := s.ensureConfigured(); err != nil {
 		return err
 	}
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
 	view, err := s.installedDesiredView(ctx, true)
 	if err != nil {
 		return err
 	}
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
+
 	return s.reconcilePartitionsLocked(
 		ctx,
 		view,
@@ -118,12 +119,13 @@ func (s *SkillRuntime) resyncInstalledBestEffort(ctx context.Context) error {
 	if err := s.ensureConfigured(); err != nil {
 		return err
 	}
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
 	view, err := s.installedDesiredView(ctx, true)
 	if err != nil {
 		return err
 	}
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
+
 	return s.reconcilePartitionsLocked(
 		ctx,
 		view,
@@ -247,12 +249,16 @@ func (s *SkillRuntime) reconcilePartitionsLocked(
 		desired,
 		mode,
 	)
-	if err != nil {
-		return err
-	}
+	// Agent Skills has no transaction spanning remove/add operations. Keep
+	// desired state and observed runtime state separately even after a partial
+	// failure so the next reconciliation converges instead of starting from
+	// stale bookkeeping.
 	s.managedInstalled = cloneRuntimeDesiredView(installed)
 	s.managedWorkspaces = cloneWorkspaceDesiredViews(workspaces)
 	s.managedRuntime = managed
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -287,6 +287,7 @@ export interface WorkspaceSkillView {
 	markdownBody?: string;
 	recordRevision: number;
 	state: WorkspaceRecordState;
+	projectionValid: boolean;
 	catalogCurrent: boolean;
 	runtimeDisabled: boolean;
 	diagnostics?: WorkspaceDiagnostic[];

@@ -1,10 +1,6 @@
 package engine
 
-import (
-	"unicode/utf8"
-
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-)
+import "github.com/flexigpt/flexigpt-app/internal/artifactstore"
 
 const (
 	DiagnosticCodeArtifactInvalid         = "workspace.artifact.invalid"
@@ -37,14 +33,10 @@ func WorkspaceArtifactDiagnostics(
 	code string,
 	message string,
 ) []artifactstore.Diagnostic {
-	for len(message) > artifactstore.MaxDiagnosticMessageBytes {
-		_, size := utf8.DecodeLastRuneInString(message)
-		message = message[:len(message)-size]
-	}
 	return []artifactstore.Diagnostic{{
 		Severity: artifactstore.DiagnosticError,
 		Code:     code,
-		Message:  message,
+		Message:  artifactstore.BoundedDiagnosticMessage(message),
 		Location: &artifactstore.DiagnosticLocation{
 			Locator: locator,
 		},

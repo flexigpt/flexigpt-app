@@ -69,8 +69,26 @@ func (p *Planner) Build(
 	}
 
 	plans := make([]discovery.SourcePlan, 0, len(value.Attachments))
+	sourcesByID := make(
+		map[artifactstore.SourceID]bool,
+		len(value.Sources),
+	)
+	for _, sourceValue := range value.Sources {
+		sourcesByID[sourceValue.ID] = sourceValue.Enabled
+	}
 	for _, attachment := range value.Attachments {
 		if !attachment.Enabled {
+			continue
+		}
+		sourceEnabled, exists := sourcesByID[attachment.SourceID]
+		if !exists {
+			return discovery.Plan{}, fmt.Errorf(
+				"%w: attachment source %q is unavailable",
+				ErrInvalidWorkspace,
+				attachment.SourceID,
+			)
+		}
+		if !sourceEnabled {
 			continue
 		}
 		operation, supported := attachmentOperationFor(attachment.Role)

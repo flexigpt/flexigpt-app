@@ -27,6 +27,8 @@ func (s *SkillRuntime) ResyncWorkspace(
 	if err := artifactstore.ValidateRootID(rootID); err != nil {
 		return err
 	}
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
 
 	values, err := s.workspaceSkills.List(ctx, rootID)
 	if err != nil {
@@ -40,7 +42,9 @@ func (s *SkillRuntime) ResyncWorkspace(
 	desired := newRuntimeDesiredView()
 	recordIDs := make([]artifactstore.RecordID, 0, len(values))
 	for _, value := range values {
-		if !value.Skill.IsEnabled ||
+		if !value.ProjectionValid ||
+			!value.FilesystemBacked ||
+			!value.Skill.IsEnabled ||
 			!value.CatalogCurrent ||
 			value.State != record.StateAvailable {
 			continue
@@ -59,13 +63,11 @@ func (s *SkillRuntime) ResyncWorkspace(
 			}
 			desired.add(
 				definition,
-				"workspace:"+string(value.DefinitionDigest),
+				workspaceRuntimeVersion(value),
 			)
 		}
 	}
 
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
 	workspaces := cloneWorkspaceDesiredViews(s.managedWorkspaces)
 	workspaces[rootID] = desired
 	return s.reconcilePartitionsLocked(
@@ -131,6 +133,15 @@ func (s *SkillRuntime) workspaceDefinitionForIdentity(
 // provider. Workspace identity remains outside Agent Skills as
 // workspace/<rootID>/<recordID>; the runtime definition is only an ephemeral
 // local projection for a selected, approved filesystem package.
+func workspaceRuntimeVersion(value skilladapter.WorkspaceSkill) string {
+	input := string(value.DefinitionDigest) + "\x00" +
+		string(value.SourceContentDigest) + "\x00" +
+		value.SourceGeneration
+	return "workspace:" + string(
+		artifactstore.DigestBytes([]byte(input)),
+	)
+}
+
 func workspaceRuntimeDefinition(
 	value skilladapter.WorkspaceSkill,
 ) (agentskillsSpec.SkillDef, error) {

@@ -90,7 +90,10 @@ func (a *aggregateSkillProvider) Render(
 func applyPrecedence(values []skillruntime.Skill) {
 	byName := make(map[string][]int)
 	for index := range values {
-		if !values[index].Enabled || !values[index].Available {
+		if !values[index].Enabled ||
+			!values[index].Available ||
+			!values[index].RuntimeAllowed ||
+			!values[index].CatalogCurrent {
 			continue
 		}
 		byName[values[index].Name] = append(

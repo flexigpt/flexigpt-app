@@ -12704,6 +12704,7 @@ export namespace workspace {
 	    markdownBody?: string;
 	    recordRevision: number;
 	    state: string;
+	    projectionValid: boolean;
 	    catalogCurrent: boolean;
 	    runtimeDisabled: boolean;
 	    diagnostics?: artifactstore.Diagnostic[];
@@ -12723,6 +12724,7 @@ export namespace workspace {
 	        this.markdownBody = source["markdownBody"];
 	        this.recordRevision = source["recordRevision"];
 	        this.state = source["state"];
+	        this.projectionValid = source["projectionValid"];
 	        this.catalogCurrent = source["catalogCurrent"];
 	        this.runtimeDisabled = source["runtimeDisabled"];
 	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);

@@ -136,11 +136,7 @@ func recordName(
 }
 
 func diagnosticMessage(value string) string {
-	for len(value) > artifactstore.MaxDiagnosticMessageBytes {
-		_, size := utf8.DecodeLastRuneInString(value)
-		value = value[:len(value)-size]
-	}
-	return value
+	return artifactstore.BoundedDiagnosticMessage(value)
 }
 
 func occurrenceKeyDigestInput(key catalog.OccurrenceKey) string {

@@ -50,6 +50,9 @@ func (p *Workspace) List(
 	}
 	output := make([]Skill, 0, len(values))
 	for _, value := range values {
+		if !value.ProjectionValid {
+			continue
+		}
 		arguments := make(
 			[]agentskillsSpec.SkillArgument,
 			0,
@@ -61,6 +64,21 @@ func (p *Workspace) List(
 				Description: argument.Description,
 				Default:     argument.Default,
 			})
+		}
+		diagnostics := artifactstore.CloneDiagnostics(value.Diagnostics)
+		runtimeAllowed := value.Skill.IsEnabled &&
+			value.State == record.StateAvailable &&
+			value.CatalogCurrent &&
+			!value.RuntimeDisabled &&
+			value.FilesystemBacked
+		if !value.FilesystemBacked {
+			diagnostics = artifactstore.AppendDiagnostics(
+				diagnostics,
+				unavailableDiagnostic(
+					"skill.provider.runtime-unavailable",
+					"the Workspace Skill source has no native filesystem runtime path",
+				),
+			)
 		}
 		projected := Skill{
 			Identity:          workspaceIdentity(value.RootID, value.RecordID),
@@ -76,13 +94,13 @@ func (p *Workspace) List(
 			Tags:              append([]string(nil), value.Skill.Tags...),
 			Enabled:           value.Skill.IsEnabled,
 			Available:         value.State == record.StateAvailable,
-			RuntimeAllowed:    !value.RuntimeDisabled,
+			RuntimeAllowed:    runtimeAllowed,
 			CatalogCurrent:    value.CatalogCurrent,
 			State:             string(value.State),
 			DefinitionDigest:  string(value.DefinitionDigest),
 			SourceID:          value.SourceID,
 			Locator:           value.Locator,
-			Diagnostics:       artifactstore.CloneDiagnostics(value.Diagnostics),
+			Diagnostics:       diagnostics,
 			CreatedAt:         value.Skill.CreatedAt,
 			ModifiedAt:        value.Skill.ModifiedAt,
 		}
@@ -111,7 +129,15 @@ func (p *Workspace) Render(
 		request.Identity,
 	)
 	if !found {
-		return RenderedSkill{Available: false}, nil
+		return RenderedSkill{
+			Available: false,
+			Diagnostics: []artifactstore.Diagnostic{
+				unavailableDiagnostic(
+					"skill.provider.workspace-unavailable",
+					"the Workspace Skill is unavailable or no longer current",
+				),
+			},
+		}, nil
 	}
 	rendered, err := p.runtime.runtime.RenderSkill(
 		ctx,
@@ -121,7 +147,18 @@ func (p *Workspace) Render(
 		},
 	)
 	if err != nil {
-		return RenderedSkill{}, err
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return RenderedSkill{}, ctxErr
+		}
+		return RenderedSkill{
+			Available: false,
+			Diagnostics: []artifactstore.Diagnostic{
+				unavailableDiagnostic(
+					"skill.provider.render-unavailable",
+					"the Workspace Skill could not be rendered",
+				),
+			},
+		}, nil
 	}
 	list, err := p.List(ctx, Scope{WorkspaceRootID: rootID})
 	if err != nil {
@@ -133,6 +170,17 @@ func (p *Workspace) Render(
 			projected = item
 			break
 		}
+	}
+	if projected.Identity == "" {
+		return RenderedSkill{
+			Available: false,
+			Diagnostics: []artifactstore.Diagnostic{
+				unavailableDiagnostic(
+					"skill.provider.workspace-unavailable",
+					"the Workspace Skill became unavailable while it was rendered",
+				),
+			},
+		}, nil
 	}
 	return RenderedSkill{
 		Skill:            projected,

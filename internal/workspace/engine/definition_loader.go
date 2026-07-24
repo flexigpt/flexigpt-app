@@ -90,6 +90,12 @@ func (l *DefinitionLoader) Load(
 	if len(content) > artifactstore.MaxDefinitionBodyBytes {
 		return DefinitionObservation{}, ErrWorkspaceDefinitionInvalid
 	}
+	if int64(len(content)) != entry.SizeBytes {
+		return DefinitionObservation{}, fmt.Errorf(
+			"%w: Workspace definition changed size during bootstrap observation",
+			artifactstore.ErrConflict,
+		)
+	}
 	if err := snapshot.Confirm(ctx); err != nil {
 		return DefinitionObservation{}, err
 	}

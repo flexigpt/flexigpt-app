@@ -376,7 +376,7 @@ func contextProjectionDiagnostic(
 	return artifactstore.Diagnostic{
 		Severity: artifactstore.DiagnosticError,
 		Code:     engine.DiagnosticCodeProjectionInvalid,
-		Message:  err.Error(),
+		Message:  artifactstore.BoundedDiagnosticMessage(err.Error()),
 		Location: &artifactstore.DiagnosticLocation{
 			Locator:            value.Occurrence.Locator,
 			SubresourceLocator: value.Occurrence.SubresourceLocator,
