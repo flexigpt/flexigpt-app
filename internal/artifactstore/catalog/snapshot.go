@@ -70,6 +70,20 @@ func (s Snapshot) Validate() error {
 				index,
 			)
 		}
+		if _, exists := s.SourceRevisions[occurrence.Key.SourceID]; !exists {
+			return fmt.Errorf(
+				"%w: occurrence %d has no source revision",
+				artifactstore.ErrInvalid,
+				index,
+			)
+		}
+		if _, exists := s.SourceGenerations[occurrence.Key.SourceID]; !exists {
+			return fmt.Errorf(
+				"%w: occurrence %d has no source generation",
+				artifactstore.ErrInvalid,
+				index,
+			)
+		}
 		if err := occurrence.Validate(); err != nil {
 			return fmt.Errorf("occurrence %d: %w", index, err)
 		}

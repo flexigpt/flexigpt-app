@@ -9,9 +9,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
-const EmptyObject = "{}"
+const (
+	EmptyObject  = "{}"
+	maximumDepth = 256
+)
 
 func CanonicalizeObject(raw []byte, maximum int) ([]byte, error) {
 	if len(raw) == 0 {
@@ -43,10 +47,13 @@ func Equal(left, right []byte) bool {
 }
 
 func Canonicalize(raw []byte) ([]byte, error) {
+	if !utf8.Valid(raw) {
+		return nil, errors.New("JSON contains invalid UTF-8")
+	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
 
-	value, err := decodeValue(decoder)
+	value, err := decodeValue(decoder, 0)
 	if err != nil {
 		return nil, fmt.Errorf("decode JSON: %w", err)
 	}
@@ -55,13 +62,16 @@ func Canonicalize(raw []byte) ([]byte, error) {
 	}
 
 	var output bytes.Buffer
-	if err := appendCanonical(&output, value); err != nil {
+	if err := appendCanonical(&output, value, 0); err != nil {
 		return nil, err
 	}
 	return output.Bytes(), nil
 }
 
-func decodeValue(decoder *json.Decoder) (any, error) {
+func decodeValue(decoder *json.Decoder, depth int) (any, error) {
+	if depth > maximumDepth {
+		return nil, fmt.Errorf("JSON nesting exceeds %d levels", maximumDepth)
+	}
 	token, err := decoder.Token()
 	if err != nil {
 		return nil, err
@@ -87,7 +97,7 @@ func decodeValue(decoder *json.Decoder) (any, error) {
 			if _, exists := object[key]; exists {
 				return nil, fmt.Errorf("duplicate JSON object key %q", key)
 			}
-			value, err := decodeValue(decoder)
+			value, err := decodeValue(decoder, depth+1)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"decode object value for %q: %w",
@@ -109,7 +119,7 @@ func decodeValue(decoder *json.Decoder) (any, error) {
 	case '[':
 		array := make([]any, 0)
 		for decoder.More() {
-			value, err := decodeValue(decoder)
+			value, err := decodeValue(decoder, depth+1)
 			if err != nil {
 				return nil, fmt.Errorf("decode array value: %w", err)
 			}
@@ -142,7 +152,10 @@ func ensureEOF(decoder *json.Decoder) error {
 	}
 }
 
-func appendCanonical(output *bytes.Buffer, value any) error {
+func appendCanonical(output *bytes.Buffer, value any, depth int) error {
+	if depth > maximumDepth {
+		return fmt.Errorf("JSON nesting exceeds %d levels", maximumDepth)
+	}
 	switch typed := value.(type) {
 	case nil:
 		output.WriteString("null")
@@ -174,7 +187,7 @@ func appendCanonical(output *bytes.Buffer, value any) error {
 			if index > 0 {
 				output.WriteByte(',')
 			}
-			if err := appendCanonical(output, item); err != nil {
+			if err := appendCanonical(output, item, depth+1); err != nil {
 				return err
 			}
 		}
@@ -198,7 +211,7 @@ func appendCanonical(output *bytes.Buffer, value any) error {
 			}
 			output.Write(encodedKey)
 			output.WriteByte(':')
-			if err := appendCanonical(output, typed[key]); err != nil {
+			if err := appendCanonical(output, typed[key], depth+1); err != nil {
 				return err
 			}
 		}

@@ -22,12 +22,12 @@ func (s Selector) Validate() error {
 			return fmt.Errorf("selector: %w", err)
 		}
 	}
-	if len(s.VersionConstraint) > artifactstore.MaxVersionBytes {
-		return fmt.Errorf(
-			"%w: selector version constraint exceeds %d bytes",
-			artifactstore.ErrInvalid,
-			artifactstore.MaxVersionBytes,
-		)
+	if err := artifactstore.ValidateOptionalText(
+		"selector version constraint",
+		s.VersionConstraint,
+		artifactstore.MaxVersionBytes,
+	); err != nil {
+		return err
 	}
 	if len(s.Labels) > artifactstore.MaxLabels {
 		return fmt.Errorf(

@@ -68,13 +68,17 @@ func verifySchema(
 	if err == sql.ErrNoRows {
 		if _, err := db.ExecContext(
 			ctx,
-			`INSERT INTO artifact_schema(version, fingerprint) VALUES (?, ?)`,
+			`INSERT OR IGNORE INTO artifact_schema(version, fingerprint) VALUES (?, ?)`,
 			schemaVersion,
 			schemaFingerprint,
 		); err != nil {
 			return fmt.Errorf("record artifact schema identity: %w", err)
 		}
-		return nil
+		err = db.QueryRowContext(
+			ctx,
+			`SELECT fingerprint FROM artifact_schema WHERE version = ?`,
+			schemaVersion,
+		).Scan(&fingerprint)
 	}
 	if err != nil {
 		return fmt.Errorf("read artifact schema identity: %w", err)

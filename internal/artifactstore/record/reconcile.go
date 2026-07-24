@@ -227,6 +227,10 @@ func (r *Reconciler) Reconcile(
 		if !create || artifactstore.ContainsErrorDiagnostic(diagnostics) {
 			continue
 		}
+		recordDiagnostics := artifactstore.AppendDiagnostics(
+			occurrence.Diagnostics,
+			diagnostics...,
+		)
 
 		data, err := jsoncanon.CanonicalizeObject(
 			draft.Data,
@@ -250,7 +254,7 @@ func (r *Reconciler) Reconcile(
 			ResolvedDefinition: &resolved,
 			Data:               json.RawMessage(data),
 			State:              StateAvailable,
-			Diagnostics:        artifactstore.CloneDiagnostics(occurrence.Diagnostics),
+			Diagnostics:        recordDiagnostics,
 			Revision:           1,
 			CreatedAt:          now,
 			ModifiedAt:         now,

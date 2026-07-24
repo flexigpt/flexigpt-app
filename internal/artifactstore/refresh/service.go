@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
@@ -101,8 +102,22 @@ func (s *Service) Refresh(
 
 	var previous catalog.Snapshot
 	previous, err = s.catalogs.GetCurrent(ctx, rootID)
-	if err != nil && !errors.Is(err, artifactstore.ErrCatalogUnavailable) {
+	hasPrevious := err == nil || errors.Is(err, artifactstore.ErrCatalogStale)
+	if !hasPrevious &&
+		!errors.Is(err, artifactstore.ErrCatalogUnavailable) {
 		return Result{}, err
+	}
+	if hasPrevious {
+		if err := previous.Validate(); err != nil {
+			return Result{}, fmt.Errorf(
+				"%w: catalog reader returned an invalid catalog: %w",
+				artifactstore.ErrInvalid,
+				err,
+			)
+		}
+		if previous.RootID != rootID {
+			return Result{}, fmt.Errorf("%w: catalog belongs to another root", artifactstore.ErrInvalid)
+		}
 	}
 	previousBySource := make(
 		map[artifactstore.SourceID][]catalog.Occurrence,
@@ -200,14 +215,13 @@ func (s *Service) Refresh(
 			)
 		}
 	}
-	for _, value := range definitions {
-		if _, err := s.definitions.Put(ctx, value); err != nil {
-			return Result{}, err
-		}
+	digests := make([]artifactstore.Digest, 0, len(definitions))
+	for digest := range definitions {
+		digests = append(digests, digest)
 	}
-
-	for _, snapshot := range snapshots {
-		if err := snapshot.Confirm(ctx); err != nil {
+	slices.Sort(digests)
+	for _, digest := range digests {
+		if _, err := s.definitions.Put(ctx, definitions[digest]); err != nil {
 			return Result{}, err
 		}
 	}
@@ -232,8 +246,18 @@ func (s *Service) Refresh(
 		reconciliation.Diagnostics...,
 	)
 
+	// Confirm immediately before publication, after all potentially slow
+	// definition and policy work. A final instant of external change remains
+	// unavoidable, but this closes the current large confirmation gap.
+	for _, snapshot := range snapshots {
+		if err := snapshot.Confirm(ctx); err != nil {
+			return Result{}, err
+		}
+	}
+
 	publication := Publication{
 		RootID:                  rootID,
+		ExpectedCatalogRevision: previous.Revision,
 		ExpectedRootRevision:    root.Revision,
 		ExpectedSourceRevisions: expectedSourceRevisions,
 		SourceGenerations:       sourceGenerations,

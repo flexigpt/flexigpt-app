@@ -58,8 +58,18 @@ func (r Root) Validate() error {
 	if r.ModifiedAt.Before(r.CreatedAt) {
 		return fmt.Errorf("%w: root modified time precedes creation", artifactstore.ErrInvalid)
 	}
-	if r.DeletedAt != nil && r.Enabled {
-		return fmt.Errorf("%w: deleted root cannot be enabled", artifactstore.ErrInvalid)
+	if r.DeletedAt != nil {
+		if r.DeletedAt.IsZero() ||
+			r.DeletedAt.Before(r.CreatedAt) ||
+			r.DeletedAt.Before(r.ModifiedAt) {
+			return fmt.Errorf(
+				"%w: root deletion time is invalid",
+				artifactstore.ErrInvalid,
+			)
+		}
+		if r.Enabled {
+			return fmt.Errorf("%w: deleted root cannot be enabled", artifactstore.ErrInvalid)
+		}
 	}
 	return nil
 }

@@ -101,6 +101,12 @@ func (u SourceStateUpdate) Validate() error {
 			artifactstore.ErrInvalid,
 		)
 	}
+	if u.Revision != u.ExpectedRevision+1 {
+		return fmt.Errorf(
+			"%w: record revision must advance by one",
+			artifactstore.ErrInvalid,
+		)
+	}
 	return nil
 }
 

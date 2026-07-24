@@ -1,6 +1,11 @@
 package artifactstore
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+)
 
 type DiagnosticSeverity string
 
@@ -90,6 +95,37 @@ func ContainsErrorDiagnostic(values []Diagnostic) bool {
 	return false
 }
 
+// BoundedDiagnosticMessage converts dynamically generated text into a value
+// accepted by Diagnostic.Validate. It is intended for internal errors whose
+// text can contain untrusted JSON keys, paths, or decoder output.
+func BoundedDiagnosticMessage(value string) string {
+	value = strings.ToValidUTF8(value, "\uFFFD")
+	value = strings.Map(func(character rune) rune {
+		if unicode.IsControl(character) {
+			return ' '
+		}
+		return character
+	}, value)
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "unspecified diagnostic"
+	}
+	if len(value) <= MaxDiagnosticMessageBytes {
+		return value
+	}
+
+	const suffix = "..."
+	value = value[:MaxDiagnosticMessageBytes-len(suffix)]
+	for !utf8.ValidString(value) {
+		value = value[:len(value)-1]
+	}
+	value = strings.TrimRightFunc(value, unicode.IsSpace)
+	if value == "" {
+		return "diagnostic"
+	}
+	return value + suffix
+}
+
 func CloneDiagnostics(values []Diagnostic) []Diagnostic {
 	if values == nil {
 		return nil
@@ -133,15 +169,33 @@ func AppendDiagnostics(
 	current []Diagnostic,
 	incoming ...Diagnostic,
 ) []Diagnostic {
-	if len(incoming) == 0 {
-		return CloneDiagnostics(current)
+	output := append(CloneDiagnostics(current), CloneDiagnostics(incoming)...)
+	if len(output) <= MaxDiagnostics {
+		return output
 	}
-	if len(current) >= MaxDiagnostics {
-		return CloneDiagnostics(current[:MaxDiagnostics])
+
+	keep := make([]bool, len(output))
+	for index := range keep {
+		keep[index] = true
 	}
-	remaining := MaxDiagnostics - len(current)
-	if len(incoming) > remaining {
-		incoming = incoming[:remaining]
+	excess := len(output) - MaxDiagnostics
+	for index := len(output) - 1; index >= 0 && excess > 0; index-- {
+		if output[index].Severity == DiagnosticError {
+			continue
+		}
+		keep[index] = false
+		excess--
 	}
-	return append(CloneDiagnostics(current), CloneDiagnostics(incoming)...)
+	for index := len(output) - 1; index >= 0 && excess > 0; index-- {
+		keep[index] = false
+		excess--
+	}
+
+	trimmed := make([]Diagnostic, 0, MaxDiagnostics)
+	for index, value := range output {
+		if keep[index] {
+			trimmed = append(trimmed, value)
+		}
+	}
+	return trimmed
 }

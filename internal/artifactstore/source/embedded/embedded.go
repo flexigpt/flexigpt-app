@@ -186,6 +186,9 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 				artifactstore.DefaultMaxDepth,
 			)
 		}
+		if entry.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
 		info, err := entry.Info()
 		if err != nil {
 			return err
@@ -213,13 +216,20 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 			return err
 		}
 		_, _ = io.WriteString(hash, "f\x00"+name+"\x00")
-		_, copyErr := io.Copy(hash, file)
+		written, copyErr := io.Copy(hash, io.LimitReader(file, info.Size()+1))
 		closeErr := file.Close()
 		if copyErr != nil {
 			return copyErr
 		}
 		if closeErr != nil {
 			return closeErr
+		}
+		if written != info.Size() {
+			return fmt.Errorf(
+				"%w: embedded source entry %q changed during fingerprinting",
+				artifactstore.ErrConflict,
+				name,
+			)
 		}
 		_, _ = hash.Write([]byte{0})
 		return nil

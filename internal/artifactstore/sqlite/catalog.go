@@ -165,6 +165,14 @@ func (s *Store) updateRoot(
 	if err := value.Validate(); err != nil {
 		return err
 	}
+	if expectedRevision == 0 ||
+		value.Revision != expectedRevision+1 ||
+		value.DeletedAt != nil {
+		return fmt.Errorf(
+			"%w: invalid normal root update revision or deletion state",
+			artifactstore.ErrInvalid,
+		)
+	}
 	result, err := s.db.ExecContext(
 		ctx,
 		`UPDATE artifact_roots
@@ -173,16 +181,14 @@ func (s *Store) updateRoot(
 		     enabled = ?,
 		     data_json = ?,
 		     revision = ?,
-		     modified_at = ?,
-		     deleted_at = ?
-		 WHERE id = ? AND revision = ?`,
+		     modified_at = ?
+		 WHERE id = ? AND revision = ? AND deleted_at IS NULL`,
 		value.DisplayName,
 		value.Description,
 		boolInt(value.Enabled),
 		[]byte(value.Data),
 		value.Revision,
 		timeValue(value.ModifiedAt),
-		nullableTime(value.DeletedAt),
 		string(value.ID),
 		expectedRevision,
 	)
@@ -214,8 +220,11 @@ func (s *Store) retireRoot(
 	if expectedRevision == 0 ||
 		value.DeletedAt == nil ||
 		value.Enabled {
+		return fmt.Errorf("%w: invalid root retirement state", artifactstore.ErrInvalid)
+	}
+	if value.Revision != expectedRevision+1 {
 		return fmt.Errorf(
-			"%w: invalid root retirement state",
+			"%w: invalid root retirement revision",
 			artifactstore.ErrInvalid,
 		)
 	}
@@ -611,7 +620,7 @@ func updateRootRevisionTx(
 		ctx,
 		`UPDATE artifact_roots
 		 SET revision = ?, modified_at = ?
-		 WHERE id = ? AND revision = ?`,
+		 WHERE id = ? AND revision = ? AND deleted_at IS NULL`,
 		value.Revision,
 		timeValue(value.ModifiedAt),
 		string(value.ID),

@@ -105,6 +105,18 @@ func (p *Publisher) Publish(
 	} else if err != nil {
 		return catalog.Snapshot{}, err
 	}
+	if currentCatalogRevision != publication.ExpectedCatalogRevision {
+		return catalog.Snapshot{}, fmt.Errorf(
+			"%w: catalog changed during refresh",
+			artifactstore.ErrConflict,
+		)
+	}
+	if currentCatalogRevision == ^uint64(0) {
+		return catalog.Snapshot{}, fmt.Errorf(
+			"%w: catalog revision is exhausted",
+			artifactstore.ErrInvalid,
+		)
+	}
 	nextCatalogRevision := currentCatalogRevision + 1
 
 	_, err = tx.ExecContext(
@@ -248,7 +260,7 @@ func insertRecordTx(
 			id, root_id, source_id, locator, subresource_locator,
 			kind, name, enabled, resolved_definition_digest, data_json, state,
 			diagnostics_json, revision, created_at, modified_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(value.ID),
 		string(value.RootID),
 		string(value.Occurrence.SourceID),

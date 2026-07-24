@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -20,7 +21,27 @@ func (s *Store) getCurrentCatalog(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) (catalog.Snapshot, error) {
-	if err := s.requireActiveRoot(ctx, rootID); err != nil {
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return catalog.Snapshot{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var currentRootRevision uint64
+	err = tx.QueryRowContext(
+		ctx,
+		`SELECT revision FROM artifact_roots
+		 WHERE id = ? AND deleted_at IS NULL`,
+		string(rootID),
+	).Scan(&currentRootRevision)
+	if errors.Is(err, sql.ErrNoRows) {
+		return catalog.Snapshot{}, fmt.Errorf(
+			"%w: root %q",
+			artifactstore.ErrNotFound,
+			rootID,
+		)
+	}
+	if err != nil {
 		return catalog.Snapshot{}, err
 	}
 
@@ -31,7 +52,7 @@ func (s *Store) getCurrentCatalog(
 		publishedAt            int64
 		diagnosticsRaw         []byte
 	)
-	err := s.db.QueryRowContext(
+	err = tx.QueryRowContext(
 		ctx,
 		`SELECT revision, root_revision, source_revisions_json,
 		        source_generations_json, published_at, diagnostics_json
@@ -70,7 +91,7 @@ func (s *Store) getCurrentCatalog(
 		return catalog.Snapshot{}, err
 	}
 
-	rows, err := s.db.QueryContext(
+	rows, err := tx.QueryContext(
 		ctx,
 		`SELECT `+occurrenceColumns+`
 		 FROM artifact_current_occurrences
@@ -82,6 +103,7 @@ func (s *Store) getCurrentCatalog(
 		return catalog.Snapshot{}, err
 	}
 	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	occurrences := make([]catalog.Occurrence, 0)
 	for rows.Next() {
@@ -92,6 +114,9 @@ func (s *Store) getCurrentCatalog(
 		occurrences = append(occurrences, value)
 	}
 	if err := rows.Err(); err != nil {
+		return catalog.Snapshot{}, err
+	}
+	if err := rows.Close(); err != nil {
 		return catalog.Snapshot{}, err
 	}
 
@@ -111,7 +136,28 @@ func (s *Store) getCurrentCatalog(
 			err,
 		)
 	}
-	return value, nil
+	currentSourceRevisions, err := currentAttachedSourceRevisions(
+		ctx,
+		tx,
+		rootID,
+	)
+	if err != nil {
+		return catalog.Snapshot{}, err
+	}
+	stale := value.RootRevision != currentRootRevision ||
+		!maps.Equal(value.SourceRevisions, currentSourceRevisions)
+
+	if err := tx.Commit(); err != nil {
+		return catalog.Snapshot{}, err
+	}
+	if stale {
+		return catalog.CloneSnapshot(value), fmt.Errorf(
+			"%w: catalog for root %q does not match current metadata",
+			artifactstore.ErrCatalogStale,
+			rootID,
+		)
+	}
+	return catalog.CloneSnapshot(value), nil
 }
 
 func scanOccurrence(row scanner) (catalog.Occurrence, error) {

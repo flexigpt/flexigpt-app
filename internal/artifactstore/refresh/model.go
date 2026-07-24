@@ -32,7 +32,12 @@ type RecordReader interface {
 }
 
 type Publication struct {
-	RootID                  artifactstore.RootID
+	RootID artifactstore.RootID
+
+	// ExpectedCatalogRevision is zero when the root has no prior publication.
+	// It prevents a concurrent refresh from replacing a newer catalog with an
+	// older source observation.
+	ExpectedCatalogRevision uint64
 	ExpectedRootRevision    uint64
 	ExpectedSourceRevisions map[artifactstore.SourceID]uint64
 	SourceGenerations       map[artifactstore.SourceID]string

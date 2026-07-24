@@ -33,9 +33,13 @@ const (
 	MaxDefinitionBodyBytes    = 4 << 20
 	MaxCandidateBytes         = 4 << 20
 	MaxScanBytes              = int64(512 << 20)
-	DefaultMaxCandidates      = 10_000
-	DefaultMaxEntries         = 100_000
-	DefaultMaxDepth           = 64
+
+	DefaultMaxCandidates   = 10_000
+	DefaultMaxEntries      = 100_000
+	DefaultMaxDepth        = 64
+	MaxDiscoveryCandidates = 100_000
+	MaxDiscoveryEntries    = 1_000_000
+	MaxDiscoveryDepth      = 256
 )
 
 var (

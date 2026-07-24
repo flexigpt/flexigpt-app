@@ -60,6 +60,16 @@ func (p SourcePlan) Validate() error {
 			artifactstore.ErrInvalid,
 		)
 	}
+	if p.MaxCandidateBytes > artifactstore.MaxCandidateBytes ||
+		p.MaxTotalBytes > artifactstore.MaxScanBytes ||
+		p.MaxCandidates > artifactstore.MaxDiscoveryCandidates ||
+		p.MaxEntries > artifactstore.MaxDiscoveryEntries ||
+		p.MaxDepth > artifactstore.MaxDiscoveryDepth {
+		return fmt.Errorf(
+			"%w: discovery limits exceed hard safety limits",
+			artifactstore.ErrInvalid,
+		)
+	}
 	seenLocators := make(map[artifactstore.Locator]struct{}, len(p.ExplicitLocators))
 	for _, locator := range p.ExplicitLocators {
 		if err := artifactstore.ValidateLocator(locator, false); err != nil {
@@ -188,19 +198,19 @@ func (p SourcePlan) Normalized() SourcePlan {
 		)
 	}
 
-	if output.MaxCandidateBytes <= 0 {
+	if output.MaxCandidateBytes == 0 {
 		output.MaxCandidateBytes = artifactstore.MaxCandidateBytes
 	}
-	if output.MaxTotalBytes <= 0 {
+	if output.MaxTotalBytes == 0 {
 		output.MaxTotalBytes = artifactstore.MaxScanBytes
 	}
-	if output.MaxCandidates <= 0 {
+	if output.MaxCandidates == 0 {
 		output.MaxCandidates = artifactstore.DefaultMaxCandidates
 	}
-	if output.MaxEntries <= 0 {
+	if output.MaxEntries == 0 {
 		output.MaxEntries = artifactstore.DefaultMaxEntries
 	}
-	if output.MaxDepth <= 0 {
+	if output.MaxDepth == 0 {
 		output.MaxDepth = artifactstore.DefaultMaxDepth
 	}
 	slices.Sort(output.ExplicitLocators)

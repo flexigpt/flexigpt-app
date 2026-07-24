@@ -69,10 +69,32 @@ func (e *Engine) Discover(
 	plan SourcePlan,
 	previous []catalog.Occurrence,
 ) (Result, error) {
-	plan = plan.Normalized()
+	if ctx == nil {
+		return Result{}, fmt.Errorf("%w: discovery context is nil", artifactstore.ErrInvalid)
+	}
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
+	if err := artifactstore.ValidateRootID(rootID); err != nil {
+		return Result{}, err
+	}
+	if err := artifactstore.ValidateSourceID(sourceID); err != nil {
+		return Result{}, err
+	}
+	if err := artifactstore.ValidateSourceKind(sourceKind); err != nil {
+		return Result{}, err
+	}
+	if snapshot == nil {
+		return Result{}, fmt.Errorf("%w: source snapshot is nil", artifactstore.ErrInvalid)
+	}
+	generation := snapshot.Generation()
+	if err := artifactstore.ValidateSourceGeneration(generation); err != nil {
+		return Result{}, fmt.Errorf("%w: invalid source snapshot generation: %w", artifactstore.ErrInvalid, err)
+	}
 	if err := plan.Validate(); err != nil {
 		return Result{}, err
 	}
+	plan = plan.Normalized()
 	if plan.SourceID != sourceID {
 		return Result{}, fmt.Errorf(
 			"%w: discovery plan source mismatch",
@@ -80,7 +102,7 @@ func (e *Engine) Discover(
 		)
 	}
 	if plan.ExpectedGeneration != "" &&
-		snapshot.Generation() != plan.ExpectedGeneration {
+		generation != plan.ExpectedGeneration {
 		return Result{}, fmt.Errorf(
 			"%w: source %q changed after discovery planning",
 			artifactstore.ErrConflict,
@@ -106,11 +128,29 @@ func (e *Engine) Discover(
 	}
 
 	occurrences := make(map[catalog.OccurrenceKey]catalog.Occurrence, len(previous))
-	for _, value := range previous {
+	for index, value := range previous {
 		if value.Key.SourceID != sourceID {
 			continue
 		}
-		occurrences[value.Key] = value
+		if err := value.Validate(); err != nil {
+			return Result{}, fmt.Errorf(
+				"%w: previous occurrence %d is invalid: %w",
+				artifactstore.ErrInvalid,
+				index,
+				err,
+			)
+		}
+		if value.RootID != rootID {
+			return Result{}, fmt.Errorf(
+				"%w: previous occurrence %d belongs to another root",
+				artifactstore.ErrInvalid,
+				index,
+			)
+		}
+		if _, exists := occurrences[value.Key]; exists {
+			return Result{}, fmt.Errorf("%w: duplicate previous occurrence", artifactstore.ErrInvalid)
+		}
+		occurrences[value.Key] = catalog.CloneOccurrence(value)
 	}
 
 	result := Result{
@@ -320,7 +360,7 @@ func (e *Engine) Discover(
 				definitionDiagnostics := []artifactstore.Diagnostic{{
 					Severity: artifactstore.DiagnosticError,
 					Code:     DiagnosticCodeDefinitionInvalid,
-					Message:  err.Error(),
+					Message:  artifactstore.BoundedDiagnosticMessage(err.Error()),
 					Location: &artifactstore.DiagnosticLocation{
 						Locator:            entry.Locator,
 						SubresourceLocator: item.SubresourceLocator,
@@ -461,13 +501,26 @@ func (e *Engine) selectDecoder(
 	}
 	if len(tied) > 1 {
 		slices.Sort(tied)
+		listed := tied
+		const maximumListedDecoders = 16
+		if len(listed) > maximumListedDecoders {
+			listed = listed[:maximumListedDecoders]
+		}
+		message := fmt.Sprintf(
+			"candidate is equally recognized by decoders %v",
+			listed,
+		)
+		if len(tied) > len(listed) {
+			message = fmt.Sprintf(
+				"candidate is equally recognized by %v and %d additional decoders",
+				listed,
+				len(tied)-len(listed),
+			)
+		}
 		return nil, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,
 			Code:     DiagnosticCodeDecoderAmbiguous,
-			Message: fmt.Sprintf(
-				"candidate is equally recognized by decoders %v",
-				tied,
-			),
+			Message:  artifactstore.BoundedDiagnosticMessage(message),
 			Location: &artifactstore.DiagnosticLocation{
 				Locator: candidate.Locator,
 			},
