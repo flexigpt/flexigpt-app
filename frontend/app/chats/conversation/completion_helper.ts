@@ -16,6 +16,7 @@ import type {
 } from '@/spec/inference';
 import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status } from '@/spec/inference';
 import type { MCPConversationContext, MCPProviderToolMapping, MCPToolSelection } from '@/spec/mcp';
+import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
 import type { ModelPresetID } from '@/spec/modelpreset';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
@@ -302,11 +303,39 @@ function mcpSelectionKeys(selection: MCPToolSelection): string[] {
 	return keys;
 }
 
+function mergeMCPToolSelections(existing: MCPToolSelection, incoming: MCPToolSelection): MCPToolSelection {
+	return {
+		...existing,
+		...incoming,
+		bundleID: incoming.bundleID || existing.bundleID,
+		serverID: incoming.serverID || existing.serverID,
+		toolName: incoming.toolName || existing.toolName,
+		providerToolName: incoming.providerToolName || existing.providerToolName,
+		choiceID: incoming.choiceID || existing.choiceID,
+		digest: incoming.digest || existing.digest,
+		approvalRule: incoming.approvalRule ?? existing.approvalRule,
+		executionMode: incoming.executionMode ?? existing.executionMode,
+		appResourceUri: incoming.appResourceUri || existing.appResourceUri,
+		visibility: incoming.visibility?.length ? incoming.visibility : existing.visibility,
+	};
+}
+
 function addMCPToolSelectionToMap(map: Map<string, MCPToolSelection>, selection: MCPToolSelection) {
-	for (const key of mcpSelectionKeys(selection)) {
-		map.set(key, selection);
+	const keys = mcpSelectionKeys(selection);
+	let merged = selection;
+
+	for (const key of keys) {
+		const existing = map.get(key);
+		if (existing) {
+			merged = mergeMCPToolSelections(existing, merged);
+		}
+	}
+
+	for (const key of keys) {
+		map.set(key, merged);
 	}
 }
+
 function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefined {
 	const obj = asRecord(mapping);
 	if (!obj) {
@@ -318,8 +347,11 @@ function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefin
 	const providerToolName = obj.providerToolName;
 	const choiceID = obj.choiceID;
 	const toolDigest = obj.toolDigest;
+	const approvalRule = obj.approvalRule;
+	const executionMode = obj.executionMode;
 	const appResourceUri = obj.appResourceUri;
 	const visibility = obj.visibility;
+
 	if (typeof bundleID !== 'string' || !bundleID) {
 		return undefined;
 	}
@@ -336,8 +368,18 @@ function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefin
 		providerToolName: typeof providerToolName === 'string' ? providerToolName : undefined,
 		choiceID: typeof choiceID === 'string' ? choiceID : undefined,
 		digest: typeof toolDigest === 'string' ? toolDigest : undefined,
+		approvalRule: isMCPApprovalRule(approvalRule) ? approvalRule : undefined,
+		executionMode: isMCPExecutionMode(executionMode) ? executionMode : undefined,
 		appResourceUri: typeof appResourceUri === 'string' ? appResourceUri : undefined,
-		visibility: Array.isArray(visibility) ? visibility.filter((v): v is string => typeof v === 'string') : undefined,
+		visibility: Array.isArray(visibility)
+			? visibility.some(v => {
+					return isMCPAppVisibility(v);
+				})
+				? visibility.filter(v => {
+						return isMCPAppVisibility(v);
+					})
+				: undefined
+			: undefined,
 	};
 }
 

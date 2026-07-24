@@ -11,10 +11,11 @@ import type {
 	WorkspaceSkillView,
 	WorkspaceView,
 } from '@/spec/workspace';
-import { WorkspaceRecordState } from '@/spec/workspace';
+import { WorkspaceRecordState, WorkspaceSkillInsert } from '@/spec/workspace';
 
 import { workspaceAPI } from '@/apis/baseapi';
 
+import type { LoadedWorkspaceSelectionCatalog } from '@/chats/composer/workspaces/workspace_selection_loader';
 import { loadWorkspaceSelectionCatalog } from '@/chats/composer/workspaces/workspace_selection_loader';
 import {
 	createWorkspaceSkillRef,
@@ -84,14 +85,19 @@ function contextIsEligible(context: WorkspaceContextView): boolean {
 }
 
 function skillProviderAllowsConversation(provider?: ProvidedSkill): boolean {
-	return (
-		!provider ||
-		(provider.enabled && provider.available && provider.runtimeAllowed && provider.catalogCurrent && !provider.shadowed)
+	return Boolean(
+		provider &&
+		provider.enabled &&
+		provider.available &&
+		provider.runtimeAllowed &&
+		provider.catalogCurrent &&
+		!provider.shadowed
 	);
 }
 
-function skillIsEligible(skill: WorkspaceSkillView, provider?: ProvidedSkill): boolean {
+export function isWorkspaceSkillSessionEligible(skill: WorkspaceSkillView, provider?: ProvidedSkill): boolean {
 	return (
+		skill.skill.insert === WorkspaceSkillInsert.Instructions &&
 		skill.skill.isEnabled &&
 		skill.state === WorkspaceRecordState.Available &&
 		skill.projectionValid &&
@@ -99,6 +105,49 @@ function skillIsEligible(skill: WorkspaceSkillView, provider?: ProvidedSkill): b
 		!skill.runtimeDisabled &&
 		skillProviderAllowsConversation(provider)
 	);
+}
+
+function getWorkspaceSkillProvidersByRecordID(providedSkills: ProvidedSkill[]): Map<string, ProvidedSkill> {
+	return new Map(
+		providedSkills
+			.filter(skill => skill.workspaceRecordID)
+			.map(skill => [skill.workspaceRecordID as string, skill] as const)
+	);
+}
+
+function resolveWorkspaceSessionSkillRefs(
+	selection: WorkspaceConversationSelection | undefined,
+	workspaceSkills: WorkspaceSkillView[],
+	workspaceSkillProvidersByRecordID: ReadonlyMap<string, ProvidedSkill>
+): SkillRef[] {
+	if (!selection) {
+		return [];
+	}
+
+	const skillsByRecordID = new Map(
+		workspaceSkills.filter(skill => skill.rootID === selection.rootID).map(skill => [skill.recordID, skill] as const)
+	);
+	const refs: SkillRef[] = [];
+
+	for (const selectionRef of selection.skillRefs ?? []) {
+		const skill = skillsByRecordID.get(selectionRef.recordID);
+		const provider = workspaceSkillProvidersByRecordID.get(selectionRef.recordID);
+
+		if (!skill || !isWorkspaceSkillSessionEligible(skill, provider)) {
+			continue;
+		}
+
+		const normalized = normalizeSkillRef({ identity: selectionRef.identity });
+		const parts = normalized ? getWorkspaceSkillRefParts(normalized) : undefined;
+
+		if (!normalized || !parts || parts.rootID !== selection.rootID || parts.recordID !== selectionRef.recordID) {
+			continue;
+		}
+
+		refs.push(normalized);
+	}
+
+	return refs;
 }
 
 function contextSelectionRef(context: WorkspaceContextView): WorkspaceConversationResourceSelectionRef {
@@ -186,12 +235,7 @@ export function useComposerWorkspace({
 	}, []);
 
 	const workspaceSkillProvidersByRecordID = useMemo(
-		() =>
-			new Map(
-				providedSkills
-					.filter(skill => skill.workspaceRecordID)
-					.map(skill => [skill.workspaceRecordID as string, skill] as const)
-			),
+		() => getWorkspaceSkillProvidersByRecordID(providedSkills),
 		[providedSkills]
 	);
 
@@ -222,20 +266,17 @@ export function useComposerWorkspace({
 	const replaceWorkspaceSkillRefs = useCallback(
 		async (
 			nextSelection: WorkspaceConversationSelection | undefined,
-			syncSession: SkillSelectionApplyOptions['syncSession']
+			syncSession: SkillSelectionApplyOptions['syncSession'],
+			loadedCatalog?: Pick<LoadedWorkspaceSelectionCatalog, 'skills' | 'providedSkills'>
 		) => {
 			const installedEnabled = getCurrentEnabledSkillRefs().filter(ref => !isWorkspaceSkillRef(ref));
 			const installedActive = getCurrentActiveSkillRefs().filter(ref => !isWorkspaceSkillRef(ref));
 
-			const workspaceEnabled: SkillRef[] = [];
-			for (const ref of nextSelection?.skillRefs ?? []) {
-				const normalized = normalizeSkillRef({ identity: ref.identity });
-				const parts = normalized ? getWorkspaceSkillRefParts(normalized) : undefined;
-
-				if (normalized && parts && parts.rootID === nextSelection?.rootID && parts.recordID === ref.recordID) {
-					workspaceEnabled.push(normalized);
-				}
-			}
+			const workspaceSkills = loadedCatalog?.skills ?? skills;
+			const providersByRecordID = loadedCatalog
+				? getWorkspaceSkillProvidersByRecordID(loadedCatalog.providedSkills)
+				: workspaceSkillProvidersByRecordID;
+			const workspaceEnabled = resolveWorkspaceSessionSkillRefs(nextSelection, workspaceSkills, providersByRecordID);
 
 			const selectedKeys = new Set(
 				workspaceEnabled.map(r => {
@@ -254,7 +295,13 @@ export function useComposerWorkspace({
 				}
 			);
 		},
-		[applySkillSelectionState, getCurrentActiveSkillRefs, getCurrentEnabledSkillRefs]
+		[
+			applySkillSelectionState,
+			getCurrentActiveSkillRefs,
+			getCurrentEnabledSkillRefs,
+			skills,
+			workspaceSkillProvidersByRecordID,
+		]
 	);
 
 	const loadSelection = useCallback(
@@ -272,13 +319,6 @@ export function useComposerWorkspace({
 			setSelectionLoading(true);
 			setSelectionError(null);
 
-			if (syncSkills) {
-				await replaceWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.EnsureIfEnabled);
-				if (!mountedRef.current || loadVersionRef.current !== version) {
-					return;
-				}
-			}
-
 			const loaded = await loadWorkspaceSelectionCatalog(nextSelection.rootID);
 			if (!mountedRef.current || loadVersionRef.current !== version) {
 				return;
@@ -290,6 +330,16 @@ export function useComposerWorkspace({
 			setProvidedSkills(loaded.providedSkills);
 			setCatalogKnown(loaded.catalogKnown);
 			setCatalogRevision(loaded.catalogRevision ?? nextSelection.catalogRevision);
+
+			await replaceWorkspaceSkillRefs(
+				nextSelection,
+				syncSkills ? SkillSessionSyncMode.EnsureIfEnabled : SkillSessionSyncMode.None,
+				loaded
+			);
+			if (!mountedRef.current || loadVersionRef.current !== version) {
+				return;
+			}
+
 			setSelectionError(loaded.errors.length > 0 ? loaded.errors.join(' ') : null);
 			setSelectionLoading(false);
 		},
@@ -332,7 +382,7 @@ export function useComposerWorkspace({
 						}),
 					skillRefs: loaded.skills
 						.filter(r => {
-							return skillIsEligible(r, providersByRecordID.get(r.recordID));
+							return isWorkspaceSkillSessionEligible(r, providersByRecordID.get(r.recordID));
 						})
 						.map(r => {
 							return skillSelectionRef(r);
@@ -346,7 +396,7 @@ export function useComposerWorkspace({
 				setProvidedSkills(loaded.providedSkills);
 				setCatalogKnown(loaded.catalogKnown);
 				setCatalogRevision(loaded.catalogRevision);
-				await replaceWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.EnsureIfEnabled);
+				await replaceWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.EnsureIfEnabled, loaded);
 				if (!mountedRef.current || loadVersionRef.current !== version) {
 					return;
 				}
@@ -428,7 +478,7 @@ export function useComposerWorkspace({
 				}),
 			skillRefs: skills
 				.filter(r => {
-					return skillIsEligible(r, workspaceSkillProvidersByRecordID.get(r.recordID));
+					return isWorkspaceSkillSessionEligible(r, workspaceSkillProvidersByRecordID.get(r.recordID));
 				})
 				.map(r => {
 					return skillSelectionRef(r);
@@ -473,7 +523,10 @@ export function useComposerWorkspace({
 	const toggleSkill = useCallback(
 		async (skill: WorkspaceSkillView, selected: boolean) => {
 			const current = selectionRef.current;
-			if (!current || (selected && !skillIsEligible(skill, workspaceSkillProvidersByRecordID.get(skill.recordID)))) {
+			if (
+				!current ||
+				(selected && !isWorkspaceSkillSessionEligible(skill, workspaceSkillProvidersByRecordID.get(skill.recordID)))
+			) {
 				return;
 			}
 
@@ -657,7 +710,7 @@ export function useComposerWorkspace({
 		for (const skill of skills) {
 			if (
 				selectedSkillIDs.has(skill.recordID) &&
-				!skillIsEligible(skill, workspaceSkillProvidersByRecordID.get(skill.recordID))
+				!isWorkspaceSkillSessionEligible(skill, workspaceSkillProvidersByRecordID.get(skill.recordID))
 			) {
 				count += 1;
 			}

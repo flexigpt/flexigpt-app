@@ -6,7 +6,7 @@ import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiUpload, FiX } from 'react-i
 import type { MCPConversationContext } from '@/spec/mcp';
 import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
-import type { AssistantSkillOption } from '@/spec/skill';
+import type { AssistantSkillOption, SkillSelection } from '@/spec/skill';
 import type { AssistantToolOption } from '@/spec/tool';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
@@ -61,6 +61,7 @@ import {
 	getSkillPreloadEligibilityReason,
 	isInstructionInsertSkill,
 } from '@/skills/lib/skill_artifact_utils';
+import { isInstalledSkillRef } from '@/skills/lib/skill_identity_utils';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface AddEditAssistantPresetModalProps {
@@ -259,6 +260,21 @@ function getSuggestedNextVersion(initialData: PresetItem, existingPresets: Prese
 	).suggested;
 }
 
+function cloneSkillSelectionForForm(selection: SkillSelection): SkillSelection {
+	const ref = selection.skillRef;
+
+	return {
+		skillRef: {
+			...(ref.identity !== undefined ? { identity: ref.identity } : {}),
+			...(ref.bundleID !== undefined ? { bundleID: ref.bundleID } : {}),
+			...(ref.skillSlug !== undefined ? { skillSlug: ref.skillSlug } : {}),
+			...(ref.skillID !== undefined ? { skillID: ref.skillID } : {}),
+		},
+		preLoadAsActive: selection.preLoadAsActive,
+		useAsInstructions: selection.useAsInstructions,
+	};
+}
+
 function buildAssistantPresetPrefillKey(item: PresetItem): string {
 	return `${item.bundleID}:${item.preset.id}:${item.preset.version}`;
 }
@@ -297,7 +313,9 @@ function getInitialFormData(
 				autoExecuteMode: booleanToTriState(selection.toolChoicePatch?.autoExecute),
 				userArgSchemaInstance: selection.toolChoicePatch?.userArgSchemaInstance ?? '',
 			})),
-			startingSkillSelections: (src.startingSkillSelections ?? []).map(selection => cloneSkillSelection(selection)),
+			startingSkillSelections: (src.startingSkillSelections ?? []).map(s => {
+				return cloneSkillSelectionForForm(s);
+			}),
 			startingMCPContext: cloneMCPConversationContext(src.startingMCPContext),
 		};
 	}
@@ -663,12 +681,18 @@ function AddEditAssistantPresetModalContent({
 					nextErrors.startingSkillSelections = 'Skill selections must be unique.';
 				} else {
 					const invalid = state.startingSkillSelections.find(sel => {
+						if (!isInstalledSkillRef(sel.skillRef)) {
+							return true;
+						}
+
 						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
 						return option ? !option.isSelectable : !skillCatalogUnavailable;
 					});
 
 					if (invalid) {
-						nextErrors.startingSkillSelections = 'Every selected skill must still exist and be enabled.';
+						nextErrors.startingSkillSelections = !isInstalledSkillRef(invalid.skillRef)
+							? 'Assistant presets may only contain installed Skill Store references, not Workspace Skill references.'
+							: 'Every selected skill must still exist and be enabled.';
 					}
 
 					const invalidPreload = state.startingSkillSelections.find(sel => {
@@ -810,10 +834,12 @@ function AddEditAssistantPresetModalContent({
 			formData.startingSkillSelections.map(sel => {
 				const ref = sel.skillRef;
 				const key = buildSkillRefKey(ref);
+				const installedRef = isInstalledSkillRef(ref);
 				const option = skillOptionByKey.get(key);
 				const useAsInstructionsDisabledReason = option
 					? getSkillInstructionPromptEligibilityReason(option.skillDefinition)
 					: 'The referenced skill is unavailable.';
+
 				const preLoadAsActiveDisabledReason = option
 					? getSkillPreloadEligibilityReason(option.skillDefinition)
 					: 'The referenced skill is unavailable.';
@@ -824,11 +850,13 @@ function AddEditAssistantPresetModalContent({
 					subtitle: option
 						? `${option.bundleDisplayName} · ${option.skillDefinition.type}`
 						: 'Reference no longer exists in catalog.',
-					statusLabel: option
-						? option.isSelectable
-							? undefined
-							: (option.availabilityReason ?? 'Unavailable')
-						: 'Missing reference',
+					statusLabel: !installedRef
+						? 'Workspace Skill references are not valid in Assistant Presets.'
+						: option
+							? option.isSelectable
+								? undefined
+								: (option.availabilityReason ?? 'Unavailable')
+							: 'Missing reference',
 					preLoadAsActive: sel.preLoadAsActive,
 					useAsInstructions: sel.useAsInstructions,
 					canUseAsInstructions: Boolean(option) && !useAsInstructionsDisabledReason,

@@ -167,54 +167,6 @@ export interface RenderProvidedSkillResponse {
 	diagnostics?: SkillProviderDiagnostic[];
 }
 
-export interface SkillProviderDiagnostic {
-	severity: 'error' | 'warning' | 'info';
-	code: string;
-	message: string;
-	location?: {
-		locator?: string;
-		subresourceLocator?: string;
-		line?: number;
-		column?: number;
-	};
-}
-
-export interface ProvidedSkill {
-	identity: string;
-	origin: SkillProviderOrigin;
-	installedRef?: SkillRef;
-	workspaceRootID?: string;
-	workspaceRecordID?: string;
-	recordRevision?: number;
-	name: string;
-	displayName?: string;
-	description?: string;
-	insert?: SkillInsert;
-	arguments?: SkillArgument[];
-	tags?: string[];
-	enabled: boolean;
-	available: boolean;
-	runtimeAllowed: boolean;
-	catalogCurrent: boolean;
-	shadowed: boolean;
-	shadowedBy?: string;
-	definitionDigest?: string;
-	sourceID?: string;
-	locator?: string;
-	state?: string;
-	diagnostics?: SkillProviderDiagnostic[];
-}
-
-export interface RenderProvidedSkillResponse {
-	skill: ProvidedSkill;
-	available: boolean;
-	text?: string;
-	insert?: SkillInsert;
-	arguments?: SkillArgument[];
-	appliedArguments?: Record<string, string>;
-	diagnostics?: SkillProviderDiagnostic[];
-}
-
 export interface ListSkillsRequest {
 	bundleIDs?: string[];
 	types?: SkillType[];

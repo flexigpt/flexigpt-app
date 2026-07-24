@@ -4,7 +4,8 @@ import {
 	BASE_ASSISTANT_PRESET_SLUG,
 	BASE_ASSISTANT_PRESET_VERSION,
 } from '@/spec/assistantpreset';
-import type { MCPConversationContext } from '@/spec/mcp';
+import type { MCPAppVisibility, MCPConversationContext } from '@/spec/mcp';
+import { isMCPAppVisibility } from '@/spec/mcp';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
@@ -219,8 +220,14 @@ export function mapAssistantPresetWebSearchTemplatesToChoices(templates: WebSear
 	}));
 }
 
-function normalizeComparableStringList(values?: string[]): string[] | undefined {
-	const out = [...new Set((values ?? []).map(value => value.trim()).filter(Boolean))].toSorted();
+function normalizeMCPAppVisibility(values?: readonly unknown[]): MCPAppVisibility[] | undefined {
+	const out = [
+		...new Set(
+			(values ?? []).filter(v => {
+				return isMCPAppVisibility(v);
+			})
+		),
+	].toSorted();
 
 	return out.length > 0 ? out : undefined;
 }
@@ -265,7 +272,7 @@ export function normalizeAssistantPresetMCPContext(
 			const selectedTools: MCPSelectedTool[] = (server.selectedTools ?? [])
 				.filter(tool => tool.toolName?.trim())
 				.map(tool => {
-					const visibility = normalizeComparableStringList(tool.visibility);
+					const visibility = normalizeMCPAppVisibility(tool.visibility);
 
 					const selectedTool: MCPSelectedTool = {
 						bundleID: tool.bundleID || server.bundleID,

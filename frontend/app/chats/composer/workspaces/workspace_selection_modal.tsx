@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { FiAlertCircle, FiCheck, FiFileText, FiRefreshCw, FiZap } from 'react-icons/fi';
 
 import type { SkillRef } from '@/spec/skill';
-import { WorkspaceRecordState } from '@/spec/workspace';
+import { WorkspaceRecordState, WorkspaceSkillInsert } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -13,7 +13,7 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
-import { isInstructionInsertSkill, skillCanBePreloadedAsActive } from '@/skills/lib/skill_artifact_utils';
+import { isWorkspaceSkillSessionEligible } from '@/chats/composer/workspaces/use_composer_workspace';
 import { createWorkspaceSkillRef, isWorkspaceSkillRef, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
 interface WorkspaceSelectionModalProps {
@@ -187,27 +187,20 @@ function WorkspaceSelectionModalContent({
 							}
 							const active = activeKeys.has(skillRefKey(ref));
 							const provider = state.workspaceSkillProvidersByRecordID.get(skill.recordID);
-							const usable =
-								skill.skill.isEnabled &&
-								skill.state === WorkspaceRecordState.Available &&
-								skill.catalogCurrent &&
-								skill.projectionValid &&
-								!skill.runtimeDisabled &&
-								(!provider ||
-									(provider.enabled &&
-										provider.available &&
-										provider.runtimeAllowed &&
-										provider.catalogCurrent &&
-										!provider.shadowed));
-							const instruction = isInstructionInsertSkill({
-								insert: skill.skill.insert,
-							});
-							const canActivate =
-								instruction &&
-								skillCanBePreloadedAsActive({
-									insert: skill.skill.insert,
-									arguments: skill.skill.arguments,
-								});
+							const instruction = skill.skill.insert === WorkspaceSkillInsert.Instructions;
+							const usable = isWorkspaceSkillSessionEligible(skill, provider);
+							const canActivate = instruction && (skill.skill.arguments?.length ?? 0) === 0;
+							const unavailableLabel = !instruction
+								? 'Template'
+								: !provider
+									? 'Runtime unavailable'
+									: provider.shadowed
+										? 'Shadowed'
+										: !provider.runtimeAllowed
+											? 'Runtime denied'
+											: skill.runtimeDisabled
+												? 'Runtime disabled'
+												: skill.state;
 
 							return (
 								<div
@@ -239,15 +232,7 @@ function WorkspaceSelectionModalContent({
 										<span className="flex shrink-0 flex-wrap justify-end gap-1">
 											<span className="badge badge-ghost badge-xs">{skill.skill.insert}</span>
 											<span className={`badge badge-xs ${usable ? 'badge-success' : 'badge-warning'}`}>
-												{usable
-													? 'Available'
-													: provider?.shadowed
-														? 'Shadowed'
-														: provider && !provider.runtimeAllowed
-															? 'Runtime denied'
-															: skill.runtimeDisabled
-																? 'Runtime disabled'
-																: skill.state}
+												{usable ? 'Available' : unavailableLabel}
 											</span>
 											{provider?.diagnostics?.length ? (
 												<span className="badge badge-warning badge-xs" title={diagnosticTitle(provider.diagnostics)}>
@@ -262,9 +247,11 @@ function WorkspaceSelectionModalContent({
 											<label
 												className="flex items-center gap-2 text-xs"
 												title={
-													canActivate
-														? 'Load this instruction Skill as active session context.'
-														: 'Argument-backed Skills cannot be preloaded as active.'
+													!usable
+														? `${unavailableLabel}. Resolve this Workspace Skill before activating it.`
+														: canActivate
+															? 'Load this instruction Skill as active session context.'
+															: 'Argument-backed Skills cannot be preloaded as active.'
 												}
 											>
 												<span>Active</span>
@@ -272,7 +259,7 @@ function WorkspaceSelectionModalContent({
 													type="checkbox"
 													className="toggle toggle-accent toggle-sm"
 													checked={active}
-													disabled={isInputLocked || !canActivate}
+													disabled={isInputLocked || !usable || !canActivate}
 													onChange={event => {
 														const checked = event.currentTarget.checked;
 														setActiveSkillRefs(previous => {

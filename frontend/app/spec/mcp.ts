@@ -411,7 +411,7 @@ export interface MCPDiscoveryPageToken {
 
 export interface MCPToolAppInfo {
 	resourceUri?: string;
-	visibility?: string[];
+	visibility?: MCPAppVisibility[];
 }
 
 export interface MCPToolCapability {
@@ -521,7 +521,7 @@ export interface MCPToolSelection {
 	executionMode?: MCPExecutionMode;
 
 	appResourceUri?: string;
-	visibility?: string[];
+	visibility?: MCPAppVisibility[];
 }
 
 export interface MCPProviderToolMapping {
@@ -534,7 +534,7 @@ export interface MCPProviderToolMapping {
 	approvalRule?: MCPApprovalRule;
 	executionMode?: MCPExecutionMode;
 	appResourceUri?: string;
-	visibility?: string[];
+	visibility?: MCPAppVisibility[];
 }
 
 export interface MCPServerSelection {
@@ -764,4 +764,16 @@ export interface MCPAppModelContextUpdate {
 	content?: MCPContent[];
 	structuredContent?: any;
 	updatedAt?: MCPTimestamp;
+}
+
+export function isMCPAppVisibility(value: unknown): value is MCPAppVisibility {
+	return typeof value === 'string' && Object.values(MCPAppVisibility).includes(value as MCPAppVisibility);
+}
+
+export function isMCPExecutionMode(value: unknown): value is MCPExecutionMode {
+	return typeof value === 'string' && Object.values(MCPExecutionMode).includes(value as MCPExecutionMode);
+}
+
+export function isMCPApprovalRule(value: unknown): value is MCPApprovalRule {
+	return typeof value === 'string' && Object.values(MCPApprovalRule).includes(value as MCPApprovalRule);
 }
