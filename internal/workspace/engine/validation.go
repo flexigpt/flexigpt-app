@@ -179,12 +179,12 @@ func DecodeRecordData(
 	return value, nil
 }
 
-func RecordRuntimeAllowed(value record.Record) (bool, error) {
+func RecordRuntimeDisabled(value record.Record) (bool, error) {
 	data, err := DecodeRecordData(value.Data)
 	if err != nil {
 		return false, err
 	}
-	return data.RuntimeAllowed, nil
+	return data.RuntimeDisabled, nil
 }
 
 func validateWorkspaceState(

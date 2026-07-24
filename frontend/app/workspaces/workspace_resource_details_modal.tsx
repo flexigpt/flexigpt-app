@@ -136,9 +136,6 @@ function WorkspaceResourceDetailsContent({
 					</ManagementInfoRow>
 					<ManagementInfoRow label="Tracking">{getRecordModeLabel(current.mode)}</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{current.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
-					<ManagementInfoRow label="Use in conversations">
-						{current.runtimeAllowed ? 'Allowed' : 'Not allowed'}
-					</ManagementInfoRow>
 					<ManagementInfoRow label="Source">
 						<span className="break-all">{source}</span>
 					</ManagementInfoRow>

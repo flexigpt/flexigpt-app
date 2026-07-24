@@ -67,7 +67,7 @@ type WorkspaceRecordView struct {
 	SourceID           artifactstore.SourceID           `json:"sourceID"`
 	Locator            artifactstore.Locator            `json:"locator"`
 	SubresourceLocator artifactstore.SubresourceLocator `json:"subresourceLocator,omitempty"`
-	RuntimeAllowed     bool                             `json:"runtimeAllowed"`
+	RuntimeDisabled    bool                             `json:"runtimeDisabled"`
 	Diagnostics        []artifactstore.Diagnostic       `json:"diagnostics,omitempty"`
 }
 
@@ -175,7 +175,7 @@ type WorkspaceContextView struct {
 	Enabled          bool                       `json:"enabled"`
 	State            string                     `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
-	RuntimeAllowed   bool                       `json:"runtimeAllowed"`
+	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
 	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
 }
 
@@ -219,7 +219,7 @@ type WorkspaceSkillView struct {
 	RecordRevision   uint64                     `json:"recordRevision"`
 	State            string                     `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
-	RuntimeAllowed   bool                       `json:"runtimeAllowed"`
+	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
 	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
 }
 
@@ -505,17 +505,17 @@ type DeleteWorkspaceRecordResponse struct {
 	Body *DeleteWorkspaceRecordResponseBody
 }
 
-type UpdateWorkspaceRecordDataRequestBody struct {
+type SetWorkspaceRecordRuntimeDisabledRequestBody struct {
 	ExpectedRevision uint64 `json:"expectedRevision" required:"true"`
-	RuntimeAllowed   bool   `json:"runtimeAllowed"   required:"true"`
+	RuntimeDisabled  bool   `json:"runtimeDisabled"  required:"true"`
 }
 
-type UpdateWorkspaceRecordDataRequest struct {
+type SetWorkspaceRecordRuntimeDisabledRequest struct {
 	RootID   artifactstore.RootID   `path:"rootID"   required:"true"`
 	RecordID artifactstore.RecordID `path:"recordID" required:"true"`
-	Body     *UpdateWorkspaceRecordDataRequestBody
+	Body     *SetWorkspaceRecordRuntimeDisabledRequestBody
 }
 
-type UpdateWorkspaceRecordDataResponse struct {
+type SetWorkspaceRecordRuntimeDisabledResponse struct {
 	Body *WorkspaceRecordView
 }

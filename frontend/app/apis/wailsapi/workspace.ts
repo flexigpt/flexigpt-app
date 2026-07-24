@@ -41,9 +41,9 @@ import {
 	PinWorkspaceRecord,
 	RefreshWorkspace,
 	SetWorkspaceRecordEnabled,
+	SetWorkspaceRecordRuntimeDisabled,
 	UpdateWorkspace,
 	UpdateWorkspaceAttachment,
-	UpdateWorkspaceRecordData,
 } from '@/apis/wailsjs/go/main/WorkspaceWrapper';
 import type { workspace as workspaceModel } from '@/apis/wailsjs/go/models';
 
@@ -315,22 +315,22 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		requireResponseBody(response.Body, 'DeleteWorkspaceRecord');
 	}
 
-	async setWorkspaceRecordRuntimeAllowed(
+	async setWorkspaceRecordRuntimeDisabled(
 		rootID: WorkspaceRootID,
 		recordID: WorkspaceRecordID,
 		expectedRevision: number,
-		runtimeAllowed: boolean
+		runtimeDisabled: boolean
 	): Promise<WorkspaceRecordView> {
 		const request = {
 			RootID: rootID,
 			RecordID: recordID,
 			Body: {
 				expectedRevision,
-				runtimeAllowed,
-			} as workspaceModel.UpdateWorkspaceRecordDataRequestBody,
-		} as workspaceModel.UpdateWorkspaceRecordDataRequest;
+				runtimeDisabled,
+			} as workspaceModel.SetWorkspaceRecordRuntimeDisabledRequestBody,
+		} as workspaceModel.SetWorkspaceRecordRuntimeDisabledRequest;
 
-		const response = await UpdateWorkspaceRecordData(request);
-		return requireResponseBody(response.Body, 'UpdateWorkspaceRecordData') as WorkspaceRecordView;
+		const response = await SetWorkspaceRecordRuntimeDisabled(request);
+		return requireResponseBody(response.Body, 'SetWorkspaceRecordRuntimeDisabled') as WorkspaceRecordView;
 	}
 }

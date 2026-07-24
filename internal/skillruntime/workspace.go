@@ -76,7 +76,7 @@ func (p *Workspace) List(
 			Tags:              append([]string(nil), value.Skill.Tags...),
 			Enabled:           value.Skill.IsEnabled,
 			Available:         value.State == record.StateAvailable,
-			RuntimeAllowed:    value.RuntimeAllowed,
+			RuntimeAllowed:    !value.RuntimeDisabled,
 			Priority:          value.Priority,
 			CatalogCurrent:    value.CatalogCurrent,
 			State:             string(value.State),

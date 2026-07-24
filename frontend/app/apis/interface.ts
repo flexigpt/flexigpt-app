@@ -378,11 +378,11 @@ export interface IWorkspaceAPI {
 
 	deleteWorkspaceRecord(rootID: WorkspaceRootID, recordID: WorkspaceRecordID, expectedRevision: number): Promise<void>;
 
-	setWorkspaceRecordRuntimeAllowed(
+	setWorkspaceRecordRuntimeDisabled(
 		rootID: WorkspaceRootID,
 		recordID: WorkspaceRecordID,
 		expectedRevision: number,
-		runtimeAllowed: boolean
+		runtimeDisabled: boolean
 	): Promise<WorkspaceRecordView>;
 }
 

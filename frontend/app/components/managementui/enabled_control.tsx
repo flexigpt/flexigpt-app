@@ -22,7 +22,7 @@ export function EnabledControl({
 	return (
 		<label
 			htmlFor={id}
-			className={`flex items-center gap-2 text-sm ${disabled || busy ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+			className={`flex items-center gap-2 text-xs ${disabled || busy ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
 			title={title}
 		>
 			<span>{label}</span>

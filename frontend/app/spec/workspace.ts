@@ -149,7 +149,7 @@ export interface WorkspaceRecordView {
 	sourceID: WorkspaceSourceID;
 	locator: WorkspaceLocator;
 	subresourceLocator?: WorkspaceLocator;
-	runtimeAllowed: boolean;
+	runtimeDisabled: boolean;
 	diagnostics?: WorkspaceDiagnostic[];
 }
 
@@ -257,7 +257,7 @@ export interface WorkspaceContextView {
 	enabled: boolean;
 	state: WorkspaceRecordState;
 	catalogCurrent: boolean;
-	runtimeAllowed: boolean;
+	runtimeDisabled: boolean;
 	diagnostics?: WorkspaceDiagnostic[];
 }
 
@@ -285,8 +285,8 @@ export interface WorkspaceSkillSummary {
 	insert: WorkspaceSkillInsert;
 	arguments?: WorkspaceSkillArgument[];
 	isEnabled: boolean;
-	createdAt: Date;
-	modifiedAt: Date;
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface WorkspaceSkillView {
@@ -301,7 +301,7 @@ export interface WorkspaceSkillView {
 	recordRevision: number;
 	state: WorkspaceRecordState;
 	catalogCurrent: boolean;
-	runtimeAllowed: boolean;
+	runtimeDisabled: boolean;
 	diagnostics?: WorkspaceDiagnostic[];
 }
 

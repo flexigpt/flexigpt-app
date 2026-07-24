@@ -49,7 +49,7 @@ type ContextDocument struct {
 	Enabled          bool                       `json:"enabled"`
 	State            record.State               `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
-	RuntimeAllowed   bool                       `json:"runtimeAllowed"`
+	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
 	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
 }
 
@@ -302,7 +302,7 @@ func projectContextDocument(
 	value engine.Resource,
 	priorities map[artifactstore.SourceID]int,
 ) (ContextDocument, error) {
-	runtimeAllowed, dataErr := engine.RecordRuntimeAllowed(value.Record)
+	runtimeDisabled, dataErr := engine.RecordRuntimeDisabled(value.Record)
 	output := ContextDocument{
 		RecordID:         value.Record.ID,
 		RecordRevision:   value.Record.Revision,
@@ -314,7 +314,7 @@ func projectContextDocument(
 		Enabled:          value.Record.Enabled,
 		State:            value.Record.State,
 		CatalogCurrent:   value.CatalogCurrent,
-		RuntimeAllowed:   runtimeAllowed,
+		RuntimeDisabled:  runtimeDisabled,
 		Diagnostics: artifactstore.AppendDiagnostics(
 			value.Record.Diagnostics,
 			value.Diagnostics...,

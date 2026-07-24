@@ -35,6 +35,7 @@ import {
 	getRecordModeLabel,
 	getRecordStateTone,
 	getWorkspaceRecords,
+	normalizeWorkspaceCatalog,
 	removeWorkspaceRecord,
 	replaceWorkspaceRecord,
 	workspaceRecordMatchesSearch,
@@ -56,7 +57,7 @@ interface WorkspaceCardProps {
 }
 
 async function loadWorkspaceCatalogData(rootID: string): Promise<WorkspaceCatalogData> {
-	const catalog = await workspaceAPI.getWorkspaceCatalog(rootID);
+	const catalog = normalizeWorkspaceCatalog(await workspaceAPI.getWorkspaceCatalog(rootID));
 	const [contextResult, skillResult] = await Promise.allSettled([
 		workspaceAPI.listWorkspaceContexts(rootID),
 		workspaceAPI.listWorkspaceSkills(rootID),
@@ -82,7 +83,7 @@ function RecordControls({
 	record,
 	isPending,
 	onToggleEnabled,
-	onToggleRuntime,
+	onSetRuntimeDisabled,
 	onPin,
 	onFollow,
 	onView,
@@ -92,7 +93,7 @@ function RecordControls({
 	record: WorkspaceRecordView;
 	isPending: (key: string) => boolean;
 	onToggleEnabled: (record: WorkspaceRecordView, enabled: boolean) => void;
-	onToggleRuntime: (record: WorkspaceRecordView, allowed: boolean) => void;
+	onSetRuntimeDisabled: (record: WorkspaceRecordView, disabled: boolean) => void;
 	onPin: (record: WorkspaceRecordView) => void;
 	onFollow: (record: WorkspaceRecordView) => void;
 	onView: (record: WorkspaceRecordView) => void;
@@ -103,7 +104,7 @@ function RecordControls({
 	return (
 		<ActionRow
 			leading={
-				<>
+				<div className="flex gap-8">
 					<EnabledControl
 						id={`workspace-record-${workspace.rootID}-${record.id}`}
 						checked={record.enabled}
@@ -118,16 +119,16 @@ function RecordControls({
 						<EnabledControl
 							id={`workspace-runtime-${workspace.rootID}-${record.id}`}
 							label="Use in conversations"
-							checked={record.runtimeAllowed}
+							checked={!record.runtimeDisabled}
 							onChange={allowed => {
-								onToggleRuntime(record, allowed);
+								onSetRuntimeDisabled(record, !allowed);
 							}}
 							disabled={!workspace.enabled}
 							busy={isPending(`${record.id}:runtime`)}
 							title="Allows this discovered item to be used when the workspace is selected for a conversation."
 						/>
 					) : null}
-				</>
+				</div>
 			}
 		>
 			<button
@@ -192,7 +193,7 @@ export function WorkspaceCard({
 	onRequestDelete,
 }: WorkspaceCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
-	const [activeTab, setActiveTab] = useState<WorkspaceTab>('records');
+	const [activeTab, setActiveTab] = useState<WorkspaceTab>('contexts');
 	const [catalogData, setCatalogData] = useState<WorkspaceCatalogData | null>(null);
 	const [catalogError, setCatalogError] = useState<unknown>(null);
 	const [isCatalogLoading, setIsCatalogLoading] = useState(false);
@@ -354,9 +355,6 @@ export function WorkspaceCard({
 					<MetadataPill label="Kind">{getArtifactKindLabel(record.kind)}</MetadataPill>
 					<MetadataPill label="Mode">{getRecordModeLabel(record.mode)}</MetadataPill>
 					<MetadataPill label="Source">{sourceLabelFor(record.sourceID)}</MetadataPill>
-					{record.kind !== WorkspaceArtifactKind.Definition ? (
-						<MetadataPill label="Conversation use">{record.runtimeAllowed ? 'Allowed' : 'Not allowed'}</MetadataPill>
-					) : null}
 					{record.diagnostics?.length ? (
 						<MetadataPill label="Diagnostics">{record.diagnostics.length}</MetadataPill>
 					) : null}
@@ -374,11 +372,11 @@ export function WorkspaceCard({
 						'Failed to update record enable state.'
 					);
 				}}
-				onToggleRuntime={(current, allowed) => {
+				onSetRuntimeDisabled={(current, disabled) => {
 					void runRecordMutation(
 						`${current.id}:runtime`,
 						() =>
-							workspaceAPI.setWorkspaceRecordRuntimeAllowed(workspace.rootID, current.id, current.revision, allowed),
+							workspaceAPI.setWorkspaceRecordRuntimeDisabled(workspace.rootID, current.id, current.revision, disabled),
 						'Failed to update runtime permission.'
 					);
 				}}
@@ -420,10 +418,10 @@ export function WorkspaceCard({
 		records.find(record => record.id === skill.recordID);
 
 	const tabs: Array<{ key: WorkspaceTab; label: string; count?: number }> = [
-		{ key: 'records', label: 'Records', count: records.length },
 		{ key: 'contexts', label: 'Contexts', count: catalogData?.contexts.length ?? 0 },
 		{ key: 'skills', label: 'Skills', count: catalogData?.skills.length ?? 0 },
 		{ key: 'sources', label: 'Sources', count: workspace.attachments.length },
+		{ key: 'records', label: 'All Catalog Records', count: records.length },
 		{ key: 'diagnostics', label: 'Diagnostics', count: diagnostics.length },
 	];
 
@@ -481,7 +479,6 @@ export function WorkspaceCard({
 							void toggleWorkspace(enabled);
 						}}
 						busy={isPending('workspace:enabled')}
-						compact={false}
 					/>
 				}
 				actions={
@@ -640,7 +637,9 @@ export function WorkspaceCard({
 										<ManagementItemCard
 											key={context.recordID}
 											title={context.name}
-											subtitle={<span className="font-mono">{context.locator}</span>}
+											subtitle={
+												context.name !== context.locator ? <span className="font-mono">{context.locator}</span> : null
+											}
 											status={
 												<>
 													<StatusBadge tone={getRecordStateTone(context.state)}>{context.state}</StatusBadge>
@@ -649,13 +648,7 @@ export function WorkspaceCard({
 													</StatusBadge>
 												</>
 											}
-											metadata={
-												<>
-													<MetadataPill label="Role">{context.role}</MetadataPill>
-													<MetadataPill label="Priority">{context.priority}</MetadataPill>
-													<MetadataPill label="Runtime">{context.runtimeAllowed ? 'Allowed' : 'Denied'}</MetadataPill>
-												</>
-											}
+											metadata={<MetadataPill label="Role">{context.role}</MetadataPill>}
 										>
 											{record ? (
 												<RecordControls
@@ -675,15 +668,15 @@ export function WorkspaceCard({
 															'Failed to update context enable state.'
 														);
 													}}
-													onToggleRuntime={(current, allowed) => {
+													onSetRuntimeDisabled={(current, disabled) => {
 														void runRecordMutation(
 															`${current.id}:runtime`,
 															() =>
-																workspaceAPI.setWorkspaceRecordRuntimeAllowed(
+																workspaceAPI.setWorkspaceRecordRuntimeDisabled(
 																	workspace.rootID,
 																	current.id,
 																	current.revision,
-																	allowed
+																	disabled
 																),
 															'Failed to update context runtime permission.'
 														);
@@ -751,7 +744,6 @@ export function WorkspaceCard({
 												<>
 													<MetadataPill label="Slug">{skill.skill.slug}</MetadataPill>
 													<MetadataPill label="Insert">{skill.skill.insert}</MetadataPill>
-													<MetadataPill label="Priority">{skill.priority}</MetadataPill>
 													<MetadataPill label="Arguments">{skill.skill.arguments?.length ?? 0}</MetadataPill>
 													{skill.skill.tags?.map(tag => (
 														<MetadataPill key={tag} label="Tag">
@@ -779,15 +771,15 @@ export function WorkspaceCard({
 															'Failed to update skill enable state.'
 														);
 													}}
-													onToggleRuntime={(current, allowed) => {
+													onSetRuntimeDisabled={(current, disabled) => {
 														void runRecordMutation(
 															`${current.id}:runtime`,
 															() =>
-																workspaceAPI.setWorkspaceRecordRuntimeAllowed(
+																workspaceAPI.setWorkspaceRecordRuntimeDisabled(
 																	workspace.rootID,
 																	current.id,
 																	current.revision,
-																	allowed
+																	disabled
 																),
 															'Failed to update skill runtime permission.'
 														);
@@ -844,12 +836,7 @@ export function WorkspaceCard({
 											</>
 										}
 										metadata={
-											<>
-												<MetadataPill label="Priority">{attachment.priority}</MetadataPill>
-												{attachment.sourceKind ? (
-													<MetadataPill label="Type">{attachment.sourceKind}</MetadataPill>
-												) : null}
-											</>
+											attachment.sourceKind ? <MetadataPill label="Type">{attachment.sourceKind}</MetadataPill> : null
 										}
 									/>
 								))}

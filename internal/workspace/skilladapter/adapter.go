@@ -50,7 +50,7 @@ type WorkspaceSkill struct {
 	RecordRevision   uint64                     `json:"recordRevision"`
 	State            record.State               `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
-	RuntimeAllowed   bool                       `json:"runtimeAllowed"`
+	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
 	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
 	RuntimeLocation  string                     `json:"-"`
 }
@@ -205,7 +205,7 @@ func projectWorkspaceSkill(
 	priority int,
 	includeMarkdown bool,
 ) (WorkspaceSkill, error) {
-	runtimeAllowed, dataErr := engine.RecordRuntimeAllowed(resourceValue.Record)
+	runtimeDisabled, dataErr := engine.RecordRuntimeDisabled(resourceValue.Record)
 	output := WorkspaceSkill{
 		RootID:           rootID,
 		RecordID:         resourceValue.Record.ID,
@@ -216,7 +216,7 @@ func projectWorkspaceSkill(
 		Priority:         priority,
 		State:            resourceValue.Record.State,
 		CatalogCurrent:   resourceValue.CatalogCurrent,
-		RuntimeAllowed:   runtimeAllowed,
+		RuntimeDisabled:  runtimeDisabled,
 		Diagnostics: artifactstore.AppendDiagnostics(
 			resourceValue.Record.Diagnostics,
 			resourceValue.Diagnostics...,

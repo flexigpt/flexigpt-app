@@ -389,10 +389,16 @@ func (a *API) RefreshWorkspace(
 	output := WorkspaceRefreshResult{
 		RootID:          value.Catalog.RootID,
 		CatalogRevision: value.Catalog.Revision,
-		CreatedRecords:  append([]artifactstore.RecordID(nil), value.CreatedRecords...),
-		UpdatedRecords:  append([]artifactstore.RecordID(nil), value.UpdatedRecords...),
-		Diagnostics:     artifactstore.CloneDiagnostics(value.Diagnostics),
-		Candidates:      value.Candidates,
+		CreatedRecords: append(
+			make([]artifactstore.RecordID, 0, len(value.CreatedRecords)),
+			value.CreatedRecords...,
+		),
+		UpdatedRecords: append(
+			make([]artifactstore.RecordID, 0, len(value.UpdatedRecords)),
+			value.UpdatedRecords...,
+		),
+		Diagnostics: artifactstore.CloneDiagnostics(value.Diagnostics),
+		Candidates:  value.Candidates,
 	}
 	return &RefreshWorkspaceResponse{Body: &output}, nil
 }
@@ -667,10 +673,10 @@ func (a *API) DeleteWorkspaceRecord(
 	}, nil
 }
 
-func (a *API) UpdateWorkspaceRecordData(
+func (a *API) SetWorkspaceRecordRuntimeDisabled(
 	ctx context.Context,
-	request *UpdateWorkspaceRecordDataRequest,
-) (*UpdateWorkspaceRecordDataResponse, error) {
+	request *SetWorkspaceRecordRuntimeDisabledRequest,
+) (*SetWorkspaceRecordRuntimeDisabledResponse, error) {
 	if err := a.ready(); err != nil {
 		return nil, err
 	}
@@ -681,7 +687,7 @@ func (a *API) UpdateWorkspaceRecordData(
 		return nil, err
 	}
 	data, err := engine.EncodeRecordData(engine.RecordData{
-		RuntimeAllowed: request.Body.RuntimeAllowed,
+		RuntimeDisabled: request.Body.RuntimeDisabled,
 	})
 	if err != nil {
 		return nil, err
@@ -696,7 +702,7 @@ func (a *API) UpdateWorkspaceRecordData(
 		return nil, err
 	}
 	output := workspaceRecordViewOf(value)
-	return &UpdateWorkspaceRecordDataResponse{Body: &output}, nil
+	return &SetWorkspaceRecordRuntimeDisabledResponse{Body: &output}, nil
 }
 
 func (a *API) workspaceRecord(
@@ -922,7 +928,7 @@ func workspaceRecordViewOf(value record.Record) WorkspaceRecordView {
 		copyValue := *value.PinnedDefinition
 		pinned = &copyValue
 	}
-	runtimeAllowed, _ := engine.RecordRuntimeAllowed(value)
+	runtimeDisabled, _ := engine.RecordRuntimeDisabled(value)
 	return WorkspaceRecordView{
 		ID:                 value.ID,
 		Revision:           value.Revision,
@@ -936,7 +942,7 @@ func workspaceRecordViewOf(value record.Record) WorkspaceRecordView {
 		SourceID:           value.Occurrence.SourceID,
 		Locator:            value.Occurrence.Locator,
 		SubresourceLocator: value.Occurrence.SubresourceLocator,
-		RuntimeAllowed:     runtimeAllowed,
+		RuntimeDisabled:    runtimeDisabled,
 		Diagnostics:        artifactstore.CloneDiagnostics(value.Diagnostics),
 	}
 }
@@ -956,6 +962,11 @@ func workspaceCatalogViewOf(
 		Resources:             make([]WorkspaceResourceView, 0, len(value.Resources)),
 		Groups:                make([]WorkspaceResourceGroupView, 0, len(value.Groups)),
 		Occurrences:           make([]WorkspaceOccurrenceView, 0, len(value.Catalog.Occurrences)),
+		ValidOccurrences:      make([]WorkspaceOccurrenceView, 0),
+		InvalidOccurrences:    make([]WorkspaceOccurrenceView, 0),
+		MissingOccurrences:    make([]WorkspaceOccurrenceView, 0),
+		UnrecordedOccurrences: make([]WorkspaceOccurrenceView, 0),
+		UnresolvedRecords:     make([]WorkspaceRecordView, 0, len(value.UnresolvedRecords)),
 		UnrecordedCount:       len(value.Unrecorded),
 		UnresolvedRecordCount: len(value.UnresolvedRecords),
 	}
@@ -1157,7 +1168,7 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 		Enabled:          value.Enabled,
 		State:            string(value.State),
 		CatalogCurrent:   value.CatalogCurrent,
-		RuntimeAllowed:   value.RuntimeAllowed,
+		RuntimeDisabled:  value.RuntimeDisabled,
 		Diagnostics:      artifactstore.CloneDiagnostics(value.Diagnostics),
 	}
 }
@@ -1196,7 +1207,7 @@ func workspaceSkillViewOf(value skilladapter.WorkspaceSkill) WorkspaceSkillView 
 		RecordRevision:   value.RecordRevision,
 		State:            string(value.State),
 		CatalogCurrent:   value.CatalogCurrent,
-		RuntimeAllowed:   value.RuntimeAllowed,
+		RuntimeDisabled:  value.RuntimeDisabled,
 		Diagnostics:      artifactstore.CloneDiagnostics(value.Diagnostics),
 	}
 }

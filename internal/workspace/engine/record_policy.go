@@ -94,6 +94,8 @@ func (p *RecordPolicy) Derive(
 			},
 		}}
 	}
+
+	// An empty RecordData means runtime use is enabled by default.
 	data, err := EncodeRecordData(RecordData{})
 	if err != nil {
 		return record.Draft{}, false, []artifactstore.Diagnostic{{
@@ -102,6 +104,7 @@ func (p *RecordPolicy) Derive(
 			Message:  diagnosticMessage(err.Error()),
 		}}
 	}
+
 	name := recordName(value.LogicalName, occurrence.Key)
 	return record.Draft{
 		Name:    name,

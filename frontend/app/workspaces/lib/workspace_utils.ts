@@ -28,6 +28,41 @@ export interface WorkspaceCatalogData {
 export const WORKSPACE_DEFAULT_CONTEXT_FILES = ['AGENTS.md', 'CLAUDE.md'];
 export const WORKSPACE_DEFAULT_SKILL_ROOTS = ['.skills/**/SKILL.md'];
 
+function normalizeRequiredArray<T>(value: T[] | null | undefined): T[] {
+	return Array.isArray(value) ? value : [];
+}
+
+function normalizeOptionalArray<T>(value: T[] | null | undefined): T[] | undefined {
+	return Array.isArray(value) ? value : undefined;
+}
+
+/**
+ * Normalizes collection fields from older or malformed API responses.
+ *
+ * The API contract requires these fields to be arrays. The Go API also
+ * initializes them to empty slices, but this protects the UI when connected
+ * to a still-running older backend that serializes nil slices as null.
+ */
+export function normalizeWorkspaceCatalog(catalog: WorkspaceCatalogView): WorkspaceCatalogView {
+	return {
+		...catalog,
+		diagnostics: normalizeOptionalArray(catalog.diagnostics),
+		resources: normalizeRequiredArray(catalog.resources),
+		groups: normalizeRequiredArray(catalog.groups).map(group =>
+			Object.assign(group, {
+				resources: normalizeRequiredArray(group.resources),
+				unrecorded: normalizeRequiredArray(group.unrecorded),
+			})
+		),
+		occurrences: normalizeRequiredArray(catalog.occurrences),
+		validOccurrences: normalizeRequiredArray(catalog.validOccurrences),
+		invalidOccurrences: normalizeRequiredArray(catalog.invalidOccurrences),
+		missingOccurrences: normalizeRequiredArray(catalog.missingOccurrences),
+		unrecordedOccurrences: normalizeRequiredArray(catalog.unrecordedOccurrences),
+		unresolvedRecords: normalizeRequiredArray(catalog.unresolvedRecords),
+	};
+}
+
 export function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim()) {
 		return error.message;
@@ -185,7 +220,10 @@ export function getWorkspaceRecords(catalog: WorkspaceCatalogView): WorkspaceRec
 		if (kindOrder !== 0) {
 			return kindOrder;
 		}
-		return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+
+		return left.name.localeCompare(right.name, undefined, {
+			sensitivity: 'base',
+		});
 	});
 }
 
@@ -231,7 +269,7 @@ export function replaceWorkspaceRecord(
 						definitionDigest: nextRecord.resolvedDefinition ?? context.definitionDigest,
 						enabled: nextRecord.enabled,
 						state: nextRecord.state,
-						runtimeAllowed: nextRecord.runtimeAllowed,
+						runtimeDisabled: nextRecord.runtimeDisabled,
 						diagnostics: nextRecord.diagnostics,
 					}
 				: context
@@ -243,7 +281,7 @@ export function replaceWorkspaceRecord(
 						recordRevision: nextRecord.revision,
 						definitionDigest: nextRecord.resolvedDefinition ?? skill.definitionDigest,
 						state: nextRecord.state,
-						runtimeAllowed: nextRecord.runtimeAllowed,
+						runtimeDisabled: nextRecord.runtimeDisabled,
 						diagnostics: nextRecord.diagnostics,
 						skill: {
 							...skill.skill,

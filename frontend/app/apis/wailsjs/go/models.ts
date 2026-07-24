@@ -12195,7 +12195,7 @@ export namespace workspace {
 	    sourceID: string;
 	    locator: string;
 	    subresourceLocator?: string;
-	    runtimeAllowed: boolean;
+	    runtimeDisabled: boolean;
 	    diagnostics?: artifactstore.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
@@ -12216,7 +12216,7 @@ export namespace workspace {
 	        this.sourceID = source["sourceID"];
 	        this.locator = source["locator"];
 	        this.subresourceLocator = source["subresourceLocator"];
-	        this.runtimeAllowed = source["runtimeAllowed"];
+	        this.runtimeDisabled = source["runtimeDisabled"];
 	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);
 	    }
 	
@@ -12605,7 +12605,7 @@ export namespace workspace {
 	    enabled: boolean;
 	    state: string;
 	    catalogCurrent: boolean;
-	    runtimeAllowed: boolean;
+	    runtimeDisabled: boolean;
 	    diagnostics?: artifactstore.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
@@ -12626,7 +12626,7 @@ export namespace workspace {
 	        this.enabled = source["enabled"];
 	        this.state = source["state"];
 	        this.catalogCurrent = source["catalogCurrent"];
-	        this.runtimeAllowed = source["runtimeAllowed"];
+	        this.runtimeDisabled = source["runtimeDisabled"];
 	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);
 	    }
 	
@@ -12803,7 +12803,7 @@ export namespace workspace {
 	    recordRevision: number;
 	    state: string;
 	    catalogCurrent: boolean;
-	    runtimeAllowed: boolean;
+	    runtimeDisabled: boolean;
 	    diagnostics?: artifactstore.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
@@ -12823,7 +12823,7 @@ export namespace workspace {
 	        this.recordRevision = source["recordRevision"];
 	        this.state = source["state"];
 	        this.catalogCurrent = source["catalogCurrent"];
-	        this.runtimeAllowed = source["runtimeAllowed"];
+	        this.runtimeDisabled = source["runtimeDisabled"];
 	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);
 	    }
 	
@@ -13441,6 +13441,85 @@ export namespace workspace {
 		    return a;
 		}
 	}
+	export class SetWorkspaceRecordRuntimeDisabledRequestBody {
+	    expectedRevision: number;
+	    runtimeDisabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetWorkspaceRecordRuntimeDisabledRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.expectedRevision = source["expectedRevision"];
+	        this.runtimeDisabled = source["runtimeDisabled"];
+	    }
+	}
+	export class SetWorkspaceRecordRuntimeDisabledRequest {
+	    RootID: string;
+	    RecordID: string;
+	    Body?: SetWorkspaceRecordRuntimeDisabledRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetWorkspaceRecordRuntimeDisabledRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.RootID = source["RootID"];
+	        this.RecordID = source["RecordID"];
+	        this.Body = this.convertValues(source["Body"], SetWorkspaceRecordRuntimeDisabledRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class SetWorkspaceRecordRuntimeDisabledResponse {
+	    Body?: WorkspaceRecordView;
+	
+	    static createFrom(source: any = {}) {
+	        return new SetWorkspaceRecordRuntimeDisabledResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], WorkspaceRecordView);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class UpdateWorkspaceAttachmentRequestBody {
 	    expectedRootRevision: number;
 	    expectedAttachmentRevision: number;
@@ -13526,85 +13605,6 @@ export namespace workspace {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], WorkspaceView);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class UpdateWorkspaceRecordDataRequestBody {
-	    expectedRevision: number;
-	    runtimeAllowed: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new UpdateWorkspaceRecordDataRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.expectedRevision = source["expectedRevision"];
-	        this.runtimeAllowed = source["runtimeAllowed"];
-	    }
-	}
-	export class UpdateWorkspaceRecordDataRequest {
-	    RootID: string;
-	    RecordID: string;
-	    Body?: UpdateWorkspaceRecordDataRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new UpdateWorkspaceRecordDataRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.RootID = source["RootID"];
-	        this.RecordID = source["RecordID"];
-	        this.Body = this.convertValues(source["Body"], UpdateWorkspaceRecordDataRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class UpdateWorkspaceRecordDataResponse {
-	    Body?: WorkspaceRecordView;
-	
-	    static createFrom(source: any = {}) {
-	        return new UpdateWorkspaceRecordDataResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], WorkspaceRecordView);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

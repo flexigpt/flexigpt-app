@@ -78,14 +78,14 @@ export function SetWorkspaceRecordEnabled(arg1) {
   return window['go']['main']['WorkspaceWrapper']['SetWorkspaceRecordEnabled'](arg1);
 }
 
+export function SetWorkspaceRecordRuntimeDisabled(arg1) {
+  return window['go']['main']['WorkspaceWrapper']['SetWorkspaceRecordRuntimeDisabled'](arg1);
+}
+
 export function UpdateWorkspace(arg1) {
   return window['go']['main']['WorkspaceWrapper']['UpdateWorkspace'](arg1);
 }
 
 export function UpdateWorkspaceAttachment(arg1) {
   return window['go']['main']['WorkspaceWrapper']['UpdateWorkspaceAttachment'](arg1);
-}
-
-export function UpdateWorkspaceRecordData(arg1) {
-  return window['go']['main']['WorkspaceWrapper']['UpdateWorkspaceRecordData'](arg1);
 }

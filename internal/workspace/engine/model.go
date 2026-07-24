@@ -69,7 +69,7 @@ type AttachmentData struct {
 }
 
 type RecordData struct {
-	RuntimeAllowed bool `json:"runtimeAllowed,omitempty"`
+	RuntimeDisabled bool `json:"runtimeDisabled,omitempty"`
 }
 
 // Workspace is an internal privileged aggregate. API packages must project it

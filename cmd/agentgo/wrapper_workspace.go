@@ -318,12 +318,12 @@ func (w *WorkspaceWrapper) DeleteWorkspaceRecord(
 	})
 }
 
-func (w *WorkspaceWrapper) UpdateWorkspaceRecordData(
-	request *workspace.UpdateWorkspaceRecordDataRequest,
-) (*workspace.UpdateWorkspaceRecordDataResponse, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.UpdateWorkspaceRecordDataResponse, error) {
+func (w *WorkspaceWrapper) SetWorkspaceRecordRuntimeDisabled(
+	request *workspace.SetWorkspaceRecordRuntimeDisabledRequest,
+) (*workspace.SetWorkspaceRecordRuntimeDisabledResponse, error) {
+	return middleware.WithRecoveryResp(func() (*workspace.SetWorkspaceRecordRuntimeDisabledResponse, error) {
 		ctx := context.Background()
-		response, err := w.api.UpdateWorkspaceRecordData(ctx, request)
+		response, err := w.api.SetWorkspaceRecordRuntimeDisabled(ctx, request)
 		if err != nil {
 			return nil, err
 		}

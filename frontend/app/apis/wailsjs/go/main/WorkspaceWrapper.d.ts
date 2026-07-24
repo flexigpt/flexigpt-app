@@ -40,8 +40,8 @@ export function RefreshWorkspace(arg1:workspace.RefreshWorkspaceRequest):Promise
 
 export function SetWorkspaceRecordEnabled(arg1:workspace.SetWorkspaceRecordEnabledRequest):Promise<workspace.SetWorkspaceRecordEnabledResponse>;
 
+export function SetWorkspaceRecordRuntimeDisabled(arg1:workspace.SetWorkspaceRecordRuntimeDisabledRequest):Promise<workspace.SetWorkspaceRecordRuntimeDisabledResponse>;
+
 export function UpdateWorkspace(arg1:workspace.UpdateWorkspaceRequest):Promise<workspace.UpdateWorkspaceResponse>;
 
 export function UpdateWorkspaceAttachment(arg1:workspace.UpdateWorkspaceAttachmentRequest):Promise<workspace.UpdateWorkspaceAttachmentResponse>;
-
-export function UpdateWorkspaceRecordData(arg1:workspace.UpdateWorkspaceRecordDataRequest):Promise<workspace.UpdateWorkspaceRecordDataResponse>;

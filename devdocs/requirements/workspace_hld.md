@@ -971,7 +971,6 @@ Workspace Skill load projection is not equivalent to a normal runtime Skill.
 
 - Complete frontend Workspace Skill orchestration.
   - Refresh a Workspace before selecting discovered Skills.
-  - Require explicit `RuntimeAllowed` approval before session selection.
   - Persist stable installed or Workspace identities, never runtime locations.
   - Recreate or update a Skill session after Workspace refresh, record
     enablement changes, runtime approval changes, source attachment changes, or

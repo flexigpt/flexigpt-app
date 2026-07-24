@@ -81,8 +81,8 @@ type SourceUsePolicy interface {
 
 // RecordRuntimePolicy is the default local Workspace trust boundary.
 //
-// Discovery and management remain available, but runtime handoff requires the
-// record-local RuntimeAllowed flag to have been set explicitly.
+// Discovery and management remain available. Runtime use is enabled by default
+// unless the record-local RuntimeDisabled flag explicitly disables it.
 type RecordRuntimePolicy struct{}
 
 func NewRecordRuntimePolicy() *RecordRuntimePolicy {
@@ -115,7 +115,7 @@ func (*RecordRuntimePolicy) Decide(
 			Message:     "the Workspace record is not enabled and available",
 		}
 	}
-	allowed, err := RecordRuntimeAllowed(request.Record)
+	disabled, err := RecordRuntimeDisabled(request.Record)
 	if err != nil {
 		return RuntimeDecision{
 			Disposition: RuntimeUnavailable,
@@ -123,11 +123,11 @@ func (*RecordRuntimePolicy) Decide(
 			Message:     "the Workspace record has invalid local runtime policy data",
 		}
 	}
-	if !allowed {
+	if disabled {
 		return RuntimeDecision{
 			Disposition: RuntimeDenied,
 			Code:        DiagnosticCodeRuntimeDenied,
-			Message:     "runtime use requires explicit approval for this Workspace record",
+			Message:     "runtime use is disabled for this Workspace record",
 		}
 	}
 	return RuntimeDecision{Disposition: RuntimeAllowed}
