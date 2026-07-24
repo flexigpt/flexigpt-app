@@ -56,11 +56,9 @@ type DiscoveryPreferences struct {
 }
 
 type RootData struct {
-	Mode                     Mode                   `json:"mode"`
-	PrimarySourceID          artifactstore.SourceID `json:"primarySourceID,omitempty"`
-	TrustReference           string                 `json:"trustReference,omitempty"`
-	Discovery                DiscoveryPreferences   `json:"discovery"`
-	CapabilityProfileVersion string                 `json:"capabilityProfileVersion"`
+	Mode            Mode                   `json:"mode"`
+	PrimarySourceID artifactstore.SourceID `json:"primarySourceID,omitempty"`
+	Discovery       DiscoveryPreferences   `json:"discovery"`
 }
 
 type AttachmentData struct {
@@ -99,17 +97,15 @@ type ResourceGroup struct {
 }
 
 type EmptyWorkspaceRequest struct {
-	DisplayName    string               `json:"displayName"`
-	Description    string               `json:"description,omitempty"`
-	TrustReference string               `json:"trustReference,omitempty"`
-	Discovery      DiscoveryPreferences `json:"discovery"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description,omitempty"`
+	Discovery   DiscoveryPreferences `json:"discovery"`
 }
 
 type FilesystemWorkspaceRequest struct {
 	DisplayName     string                 `json:"displayName"`
 	Description     string                 `json:"description,omitempty"`
 	PrimarySourceID artifactstore.SourceID `json:"primarySourceID"`
-	TrustReference  string                 `json:"trustReference,omitempty"`
 	Discovery       DiscoveryPreferences   `json:"discovery"`
 }
 
@@ -119,7 +115,6 @@ type UpdateRequest struct {
 	DisplayName      string               `json:"displayName"`
 	Description      string               `json:"description,omitempty"`
 	Enabled          bool                 `json:"enabled"`
-	TrustReference   *string              `json:"trustReference,omitempty"`
 	Discovery        DiscoveryPreferences `json:"discovery"`
 }
 
@@ -128,7 +123,6 @@ type AttachRequest struct {
 	ExpectedRootRevision uint64                       `json:"expectedRootRevision"`
 	SourceID             artifactstore.SourceID       `json:"sourceID"`
 	Role                 artifactstore.AttachmentRole `json:"role"`
-	Priority             int                          `json:"priority"`
 	Enabled              bool                         `json:"enabled"`
 	Data                 AttachmentData               `json:"data"`
 }
@@ -139,7 +133,6 @@ type UpdateAttachmentRequest struct {
 	ExpectedRootRevision       uint64
 	ExpectedAttachmentRevision uint64
 	Role                       artifactstore.AttachmentRole
-	Priority                   int
 	Enabled                    bool
 	Data                       AttachmentData
 }
@@ -192,7 +185,6 @@ type attachmentOperation struct {
 	canAttach                            bool
 	isPrimary                            bool
 	requiredSourceKind                   artifactstore.SourceKind
-	defaultPriority                      int
 	defaultAuthoritative                 bool
 	includeReadmeWhenRequested           bool
 	appliesWorkspaceDiscoveryPreferences bool

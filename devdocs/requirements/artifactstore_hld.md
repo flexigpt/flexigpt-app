@@ -74,7 +74,7 @@ A feature such as Workspace defines:
 - Discovery conventions
 - Source attachment roles
 - Record derivation rules
-- Reference precedence
+- Reference-resolution rules
 - Projection into domain-facing models
 
 ### 4.2 Management application
@@ -293,7 +293,6 @@ An attachment makes a source available within a root.
 It carries root-local properties such as:
 
 - Role
-- Priority
 - Enabled state
 - Consumer-specific attachment data
 
@@ -426,7 +425,7 @@ Artifact Store stops before runtime creation.
 | -------- | --------------------------------------------------------------------------- | ----------------------------- |
 | `AS-F01` | Register and manage app-local sources.                                      | Core                          |
 | `AS-F02` | Create logical roots and attach multiple sources.                           | Core                          |
-| `AS-F03` | Allow consumers to define source roles and precedence metadata.             | Core                          |
+| `AS-F03` | Allow consumers to define source roles and attachment-local metadata.       | Core                          |
 | `AS-F04` | Discover bounded source candidates safely.                                  | Core                          |
 | `AS-F05` | Support multiple native source formats through format adapters.             | Core                          |
 | `AS-F06` | Allow one candidate to produce zero, one, or multiple artifact occurrences. | Core                          |
@@ -438,7 +437,7 @@ Artifact Store stops before runtime creation.
 | `AS-F12` | Preserve local record settings during source refresh.                       | Core                          |
 | `AS-F13` | Support follow-current and pin-definition behavior.                         | Core                          |
 | `AS-F14` | Resolve candidate definitions using portable selectors.                     | Core when references are used |
-| `AS-F15` | Let consumers decide ambiguity and precedence rules.                        | Core when references are used |
+| `AS-F15` | Let consumers decide ambiguity and selection rules.                         | Core when references are used |
 | `AS-F16` | Export or import portable definitions and assets.                           | Optional                      |
 | `AS-F17` | Retain historical definition occurrence revisions.                          | Optional                      |
 | `AS-F18` | Persist dependency resolution snapshots.                                    | Optional                      |
@@ -798,7 +797,7 @@ sources only until an explicit materialization capability is introduced.
 | -------- | --------------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AS-F01` | Register and manage app-local sources.                                      | `Implemented`     | `source.Service` supports create, read, list, update, and delete operations. SQLite persists source metadata, while source adapters normalize app-local configuration.                                                                                                                                               |
 | `AS-F02` | Create logical roots and attach multiple sources.                           | `Implemented`     | `root.Service` manages roots and root-to-source attachments. The SQLite store persists attachments independently from sources and roots.                                                                                                                                                                             |
-| `AS-F03` | Allow consumers to define source roles and precedence metadata.             | `Implemented`     | Attachments provide consumer-owned `Role`, `Priority`, `Enabled`, and canonical local `Data` fields. Artifact Store does not impose feature-specific precedence.                                                                                                                                                     |
+| `AS-F03` | Allow consumers to define source roles and attachment-local metadata.       | `Implemented`     | Attachments provide consumer-owned `Role`, `Enabled`, and canonical local `Data` fields. Artifact Store does not interpret consumer-specific attachment data.                                                                                                                                                        |
 | `AS-F04` | Discover bounded source candidates safely.                                  | `Implemented`     | Discovery limits candidate count, entry count, depth, per-candidate bytes, and total bytes. Filesystem and embedded adapters validate relative locators and reject symbolic links.                                                                                                                                   |
 | `AS-F05` | Support multiple native source formats through format adapters.             | `Implemented`     | The decoder registry, recognition process, ownership rules, and Workspace registrations are implemented. The current Workspace consumer registers decoders for its JSON definition, Context Markdown documents, and restricted-YAML `SKILL.md` documents. MCP and other artifact formats remain consumer extensions. |
 | `AS-F06` | Allow one candidate to produce zero, one, or multiple artifact occurrences. | `Implemented`     | A decoder returns a slice of decoded subresources. Discovery validates subresource locators, prevents duplicate emitted occurrence keys, and handles decoders that emit no resources.                                                                                                                                |
@@ -810,7 +809,7 @@ sources only until an explicit materialization capability is introduced.
 | `AS-F12` | Preserve local record settings during source refresh.                       | `Implemented`     | Reconciliation updates source-derived definition, state, and diagnostics while preserving local record name, enablement, local data, mode, and pin configuration.                                                                                                                                                    |
 | `AS-F13` | Support follow-current and pin-definition behavior.                         | `Implemented`     | Linked and pinned record modes, optimistic enablement, record-local data replacement, follow-current, pin, inspection, and removal are implemented and exposed through the Workspace consumer API.                                                                                                                   |
 | `AS-F14` | Resolve candidate definitions using portable selectors.                     | `Partial`         | Portable selector values exist, and Workspace implements current-catalog selector matching. Artifact Store does not yet provide a generic candidate matching service, complete version constraint support, dependency resolution, or dependency graph handling.                                                      |
-| `AS-F15` | Let consumers decide ambiguity and precedence rules.                        | `Implemented`     | Generic storage retains attachment priority without applying a resolution policy. Workspace owns selector precedence and explicitly reports priority ties as ambiguous.                                                                                                                                              |
+| `AS-F15` | Let consumers decide ambiguity and selection rules.                         | `Implemented`     | Generic storage retains attachments without applying a resolution policy. Workspace treats multiple matching selector candidates as ambiguous.                                                                                                                                                                       |
 | `AS-F16` | Export or import portable definitions and assets.                           | `Not implemented` | There is no package manifest, asset closure, import, export, capture, or fork capability.                                                                                                                                                                                                                            |
 | `AS-F17` | Retain historical definition occurrence revisions.                          | `Not implemented` | SQLite retains only `artifact_current_catalogs` and current occurrences. Historical catalog generations and occurrence revisions are not stored.                                                                                                                                                                     |
 | `AS-F18` | Persist dependency resolution snapshots.                                    | `Not implemented` | Definitions can declare selectors, but dependency graph construction, resolution snapshots, and reproducibility reports do not exist.                                                                                                                                                                                |

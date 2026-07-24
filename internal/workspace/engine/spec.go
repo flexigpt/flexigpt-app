@@ -15,9 +15,6 @@ const (
 	DefinitionSchemaID  artifactstore.SchemaID     = "workspace.definition.v1"
 	DefinitionDecoderID artifactstore.DecoderID    = "workspace.definition-json"
 
-	CapabilityProfileVersion = "1"
-	PrimaryPriority          = 1_000_000
-
 	workspaceSchemaVersionV1 = "1"
 
 	WorkspaceMetadataDirectory = ".flexigpt"

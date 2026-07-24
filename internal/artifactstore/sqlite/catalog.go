@@ -16,7 +16,7 @@ const rootColumns = `
 	revision, created_at, modified_at, deleted_at`
 
 const attachmentColumns = `
-	root_id, source_id, role, priority, enabled, data_json,
+	root_id, source_id, role, enabled, data_json,
 	revision, created_at, modified_at`
 
 func (s *Store) createRoot(
@@ -81,13 +81,12 @@ func (s *Store) createRoot(
 		if _, err := tx.ExecContext(
 			ctx,
 			`INSERT INTO artifact_attachments (
-				root_id, source_id, role, priority, enabled, data_json,
+				root_id, source_id, role, enabled, data_json,
 				revision, created_at, modified_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			string(attachment.RootID),
 			string(attachment.SourceID),
 			string(attachment.Role),
-			attachment.Priority,
 			boolInt(attachment.Enabled),
 			[]byte(attachment.Data),
 			attachment.Revision,
@@ -217,13 +216,12 @@ func (s *Store) attach(
 	if _, err := tx.ExecContext(
 		ctx,
 		`INSERT INTO artifact_attachments (
-			root_id, source_id, role, priority, enabled, data_json,
+			root_id, source_id, role, enabled, data_json,
 			revision, created_at, modified_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(attachment.RootID),
 		string(attachment.SourceID),
 		string(attachment.Role),
-		attachment.Priority,
 		boolInt(attachment.Enabled),
 		[]byte(attachment.Data),
 		attachment.Revision,
@@ -279,7 +277,7 @@ func (s *Store) listAttachments(
 		`SELECT `+attachmentColumns+`
 		 FROM artifact_attachments
 		 WHERE root_id = ?
-		 ORDER BY priority DESC, source_id ASC`,
+		 ORDER BY source_id ASC`,
 		string(rootID),
 	)
 	if err != nil {
@@ -324,11 +322,9 @@ func (s *Store) updateAttachment(
 	result, err := tx.ExecContext(
 		ctx,
 		`UPDATE artifact_attachments
-		 SET role = ?, priority = ?, enabled = ?, data_json = ?,
-		     revision = ?, modified_at = ?
+		 SET role = ?, enabled = ?, data_json = ?, revision = ?, modified_at = ?
 		 WHERE root_id = ? AND source_id = ? AND revision = ?`,
 		string(value.Role),
-		value.Priority,
 		boolInt(value.Enabled),
 		[]byte(value.Data),
 		value.Revision,
@@ -424,7 +420,7 @@ func (s *Store) detach(
 func scanAttachment(row scanner) (root.Attachment, error) {
 	var (
 		rootID, sourceID, role string
-		priority, enabled      int
+		enabled                int
 		data                   []byte
 		revision               uint64
 		createdAt, modifiedAt  int64
@@ -433,7 +429,6 @@ func scanAttachment(row scanner) (root.Attachment, error) {
 		&rootID,
 		&sourceID,
 		&role,
-		&priority,
 		&enabled,
 		&data,
 		&revision,
@@ -446,7 +441,6 @@ func scanAttachment(row scanner) (root.Attachment, error) {
 		RootID:     artifactstore.RootID(rootID),
 		SourceID:   artifactstore.SourceID(sourceID),
 		Role:       artifactstore.AttachmentRole(role),
-		Priority:   priority,
 		Enabled:    enabled != 0,
 		Data:       append([]byte(nil), data...),
 		Revision:   revision,

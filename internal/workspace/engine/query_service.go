@@ -121,17 +121,8 @@ func (q *QueryService) Resolve(
 	if err := selector.Validate(); err != nil {
 		return Resource{}, err
 	}
-	priorities := make(map[artifactstore.SourceID]int)
-	for _, attachment := range view.Workspace.Attachments {
-		if attachment.Enabled {
-			priorities[attachment.SourceID] = attachment.Priority
-		}
-	}
 
 	var selected *Resource
-	selectedPriority := 0
-	prioritySet := false
-	tied := false
 
 	for index := range view.Resources {
 		resourceValue := &view.Resources[index]
@@ -140,25 +131,14 @@ func (q *QueryService) Resolve(
 			!matchesSelector(resourceValue.Definition, selector) {
 			continue
 		}
-		priority, attached := priorities[resourceValue.Source.ID]
-		if !attached {
-			continue
+		if selected != nil {
+			return Resource{}, ErrReferenceAmbiguous
 		}
-		if !prioritySet || priority > selectedPriority {
-			copyValue := *resourceValue
-			selected = &copyValue
-			selectedPriority = priority
-			prioritySet = true
-			tied = false
-		} else if priority == selectedPriority {
-			tied = true
-		}
+		copyValue := *resourceValue
+		selected = &copyValue
 	}
 	if selected == nil {
 		return Resource{}, ErrReferenceUnresolved
-	}
-	if tied {
-		return Resource{}, ErrReferenceAmbiguous
 	}
 	return *selected, nil
 }

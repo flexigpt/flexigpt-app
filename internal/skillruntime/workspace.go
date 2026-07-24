@@ -77,7 +77,6 @@ func (p *Workspace) List(
 			Enabled:           value.Skill.IsEnabled,
 			Available:         value.State == record.StateAvailable,
 			RuntimeAllowed:    !value.RuntimeDisabled,
-			Priority:          value.Priority,
 			CatalogCurrent:    value.CatalogCurrent,
 			State:             string(value.State),
 			DefinitionDigest:  string(value.DefinitionDigest),

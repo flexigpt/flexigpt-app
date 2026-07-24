@@ -19,7 +19,6 @@ type RootDraft struct {
 type AttachmentDraft struct {
 	SourceID artifactstore.SourceID
 	Role     artifactstore.AttachmentRole
-	Priority int
 	Enabled  bool
 	Data     json.RawMessage
 }
@@ -36,7 +35,6 @@ type AttachmentUpdate struct {
 	ExpectedRootRevision       uint64
 	ExpectedAttachmentRevision uint64
 	Role                       artifactstore.AttachmentRole
-	Priority                   int
 	Enabled                    bool
 	Data                       json.RawMessage
 }

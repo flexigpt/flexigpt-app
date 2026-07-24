@@ -54,11 +54,10 @@ func NewService(
 }
 
 type Request struct {
-	DisplayName    string
-	Description    string
-	RootPath       string
-	TrustReference string
-	Discovery      engine.DiscoveryPreferences
+	DisplayName string
+	Description string
+	RootPath    string
+	Discovery   engine.DiscoveryPreferences
 }
 
 func (s *Service) CreateFilesystem(
@@ -90,7 +89,6 @@ func (s *Service) CreateFilesystem(
 			DisplayName:     request.DisplayName,
 			Description:     request.Description,
 			PrimarySourceID: sourceValue.ID,
-			TrustReference:  request.TrustReference,
 			Discovery:       request.Discovery,
 		},
 	)

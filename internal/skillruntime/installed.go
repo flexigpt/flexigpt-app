@@ -111,7 +111,6 @@ func (p *Installed) List(ctx context.Context, _ Scope) ([]Skill, error) {
 				Available:        available,
 				RuntimeAllowed:   enabled,
 				BuiltIn:          value.IsBuiltIn,
-				Priority:         0,
 				CatalogCurrent:   available,
 				State:            installedState(value),
 				DefinitionDigest: value.Digest,

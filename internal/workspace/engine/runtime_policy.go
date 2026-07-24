@@ -29,7 +29,6 @@ type RuntimePolicyRequest struct {
 	Record           record.Record
 	DefinitionDigest artifactstore.Digest
 	SourceID         artifactstore.SourceID
-	TrustReference   string
 }
 
 type RuntimeDecision struct {

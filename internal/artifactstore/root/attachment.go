@@ -13,7 +13,6 @@ type Attachment struct {
 	RootID     artifactstore.RootID         `json:"rootID"`
 	SourceID   artifactstore.SourceID       `json:"sourceID"`
 	Role       artifactstore.AttachmentRole `json:"role"`
-	Priority   int                          `json:"priority"`
 	Enabled    bool                         `json:"enabled"`
 	Data       json.RawMessage              `json:"data"`
 	Revision   uint64                       `json:"revision"`

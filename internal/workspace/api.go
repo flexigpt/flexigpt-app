@@ -138,11 +138,10 @@ func (a *API) CreateFilesystemWorkspace(
 		return nil, invalidAPIRequest("filesystem workspace body is required")
 	}
 	value, err := a.provisioner.CreateFilesystem(ctx, provision.Request{
-		DisplayName:    request.Body.DisplayName,
-		Description:    request.Body.Description,
-		RootPath:       request.Body.RootPath,
-		TrustReference: request.Body.TrustReference,
-		Discovery:      discoveryPreferencesOf(request.Body.Discovery),
+		DisplayName: request.Body.DisplayName,
+		Description: request.Body.Description,
+		RootPath:    request.Body.RootPath,
+		Discovery:   discoveryPreferencesOf(request.Body.Discovery),
 	})
 	if err != nil {
 		return nil, err
@@ -167,10 +166,9 @@ func (a *API) CreateEmptyWorkspace(
 	value, err := a.workspace.service.CreateEmpty(
 		ctx,
 		engine.EmptyWorkspaceRequest{
-			DisplayName:    request.Body.DisplayName,
-			Description:    request.Body.Description,
-			TrustReference: request.Body.TrustReference,
-			Discovery:      discoveryPreferencesOf(request.Body.Discovery),
+			DisplayName: request.Body.DisplayName,
+			Description: request.Body.Description,
+			Discovery:   discoveryPreferencesOf(request.Body.Discovery),
 		},
 	)
 	if err != nil {
@@ -244,7 +242,6 @@ func (a *API) UpdateWorkspace(
 		DisplayName:      request.Body.DisplayName,
 		Description:      request.Body.Description,
 		Enabled:          request.Body.Enabled,
-		TrustReference:   request.Body.TrustReference,
 		Discovery:        discoveryPreferencesOf(request.Body.Discovery),
 	})
 	if err != nil {
@@ -298,7 +295,6 @@ func (a *API) AttachWorkspaceSource(
 		ExpectedRootRevision: request.Body.ExpectedRootRevision,
 		SourceID:             request.Body.SourceID,
 		Role:                 request.Body.Role,
-		Priority:             request.Body.Priority,
 		Enabled:              request.Body.Enabled,
 		Data:                 attachmentDataOf(request.Body.Settings),
 	})
@@ -330,7 +326,6 @@ func (a *API) UpdateWorkspaceAttachment(
 			ExpectedRootRevision:       request.Body.ExpectedRootRevision,
 			ExpectedAttachmentRevision: request.Body.ExpectedAttachmentRevision,
 			Role:                       request.Body.Role,
-			Priority:                   request.Body.Priority,
 			Enabled:                    request.Body.Enabled,
 			Data:                       attachmentDataOf(request.Body.Settings),
 		},
@@ -821,16 +816,15 @@ func (a *API) enrichWorkspaceSourcePresentation(
 
 func workspaceViewOf(value engine.Workspace) (WorkspaceView, error) {
 	output := WorkspaceView{
-		RootID:            value.Root.ID,
-		Revision:          value.Root.Revision,
-		DisplayName:       value.Root.DisplayName,
-		Description:       value.Root.Description,
-		Enabled:           value.Root.Enabled,
-		Mode:              string(value.Data.Mode),
-		PrimarySourceID:   value.Data.PrimarySourceID,
-		HasTrustReference: value.Data.TrustReference != "",
-		Discovery:         workspaceDiscoveryOf(value.Data.Discovery),
-		Attachments:       make([]WorkspaceAttachmentView, 0, len(value.Attachments)),
+		RootID:          value.Root.ID,
+		Revision:        value.Root.Revision,
+		DisplayName:     value.Root.DisplayName,
+		Description:     value.Root.Description,
+		Enabled:         value.Root.Enabled,
+		Mode:            string(value.Data.Mode),
+		PrimarySourceID: value.Data.PrimarySourceID,
+		Discovery:       workspaceDiscoveryOf(value.Data.Discovery),
+		Attachments:     make([]WorkspaceAttachmentView, 0, len(value.Attachments)),
 	}
 	for _, attachment := range value.Attachments {
 		settings, err := workspaceAttachmentSettingsOf(attachment.Data)
@@ -841,7 +835,6 @@ func workspaceViewOf(value engine.Workspace) (WorkspaceView, error) {
 			SourceID: attachment.SourceID,
 			Revision: attachment.Revision,
 			Role:     attachment.Role,
-			Priority: attachment.Priority,
 			Enabled:  attachment.Enabled,
 			Settings: settings,
 		})
@@ -1142,7 +1135,6 @@ func contextContributionViewOf(
 		DefinitionDigest: value.DefinitionDigest,
 		SourceID:         value.SourceID,
 		Locator:          value.Locator,
-		Priority:         value.Priority,
 		Name:             value.Name,
 		Role:             value.Role,
 		MediaType:        value.MediaType,
@@ -1161,7 +1153,6 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 		DefinitionDigest: value.DefinitionDigest,
 		SourceID:         value.SourceID,
 		Locator:          value.Locator,
-		Priority:         value.Priority,
 		Name:             value.Name,
 		Role:             value.Role,
 		MediaType:        value.MediaType,
@@ -1203,7 +1194,6 @@ func workspaceSkillViewOf(value skilladapter.WorkspaceSkill) WorkspaceSkillView 
 		Locator:          value.Locator,
 		Skill:            summary,
 		MarkdownBody:     value.MarkdownBody,
-		Priority:         value.Priority,
 		RecordRevision:   value.RecordRevision,
 		State:            string(value.State),
 		CatalogCurrent:   value.CatalogCurrent,

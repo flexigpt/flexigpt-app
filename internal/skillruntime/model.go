@@ -44,7 +44,6 @@ type Skill struct {
 	RuntimeAllowed bool `json:"runtimeAllowed"`
 	BuiltIn        bool `json:"builtIn"`
 
-	Priority       int    `json:"priority"`
 	CatalogCurrent bool   `json:"catalogCurrent"`
 	State          string `json:"state,omitempty"`
 	Shadowed       bool   `json:"shadowed"`

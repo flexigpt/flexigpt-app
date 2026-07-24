@@ -46,7 +46,6 @@ type WorkspaceSkill struct {
 	Locator          artifactstore.Locator      `json:"locator"`
 	Skill            SkillSummary               `json:"skill"`
 	MarkdownBody     string                     `json:"markdownBody,omitempty"`
-	Priority         int                        `json:"priority"`
 	RecordRevision   uint64                     `json:"recordRevision"`
 	State            record.State               `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
@@ -94,7 +93,6 @@ func (f *Adapter) List(
 	if err != nil {
 		return nil, err
 	}
-	priorities := attachmentPriorities(view.Workspace)
 	output := make([]WorkspaceSkill, 0)
 	for _, resourceValue := range view.Resources {
 		if resourceValue.Definition.Kind != skillKind ||
@@ -104,7 +102,6 @@ func (f *Adapter) List(
 		value, err := projectWorkspaceSkill(
 			rootID,
 			resourceValue,
-			priorities[resourceValue.Source.ID],
 			false,
 		)
 		if err != nil {
@@ -132,7 +129,7 @@ func (f *Adapter) Load(
 	if err != nil {
 		return SkillLoadPlan{}, err
 	}
-	priorities := attachmentPriorities(workspaceValue)
+
 	output := SkillLoadPlan{
 		RootID:          rootID,
 		CatalogRevision: loadPlan.CatalogRevision,
@@ -152,7 +149,6 @@ func (f *Adapter) Load(
 			Record:           item.Record,
 			DefinitionDigest: item.Definition.Digest,
 			SourceID:         item.Source.ID,
-			TrustReference:   workspaceValue.Data.TrustReference,
 		})
 		if err := decision.Validate(); err != nil {
 			return SkillLoadPlan{}, err
@@ -174,7 +170,6 @@ func (f *Adapter) Load(
 		projected, err := projectWorkspaceSkill(
 			rootID,
 			resourceValue,
-			priorities[item.Source.ID],
 			true,
 		)
 		if err != nil {
@@ -202,7 +197,6 @@ func (f *Adapter) Load(
 func projectWorkspaceSkill(
 	rootID artifactstore.RootID,
 	resourceValue engine.Resource,
-	priority int,
 	includeMarkdown bool,
 ) (WorkspaceSkill, error) {
 	runtimeDisabled, dataErr := engine.RecordRuntimeDisabled(resourceValue.Record)
@@ -213,7 +207,6 @@ func projectWorkspaceSkill(
 		DefinitionDigest: resourceValue.Definition.Digest,
 		SourceID:         resourceValue.Source.ID,
 		Locator:          resourceValue.Record.Occurrence.Locator,
-		Priority:         priority,
 		State:            resourceValue.Record.State,
 		CatalogCurrent:   resourceValue.CatalogCurrent,
 		RuntimeDisabled:  runtimeDisabled,
@@ -276,18 +269,6 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 		}
 		return values[left].RecordID < values[right].RecordID
 	})
-}
-
-func attachmentPriorities(
-	value engine.Workspace,
-) map[artifactstore.SourceID]int {
-	output := make(map[artifactstore.SourceID]int, len(value.Attachments))
-	for _, attachment := range value.Attachments {
-		if attachment.Enabled {
-			output[attachment.SourceID] = attachment.Priority
-		}
-	}
-	return output
 }
 
 // resolveRuntimeLocation performs the Workspace-owned handoff from a selected

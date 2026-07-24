@@ -15,7 +15,6 @@ type ContextContribution struct {
 	DefinitionDigest artifactstore.Digest   `json:"definitionDigest"`
 	SourceID         artifactstore.SourceID `json:"sourceID"`
 	Locator          artifactstore.Locator  `json:"locator"`
-	Priority         int                    `json:"priority"`
 	Name             string                 `json:"name"`
 	Role             string                 `json:"role"`
 	MediaType        string                 `json:"mediaType"`
@@ -42,7 +41,6 @@ type ContextDocument struct {
 	DefinitionDigest artifactstore.Digest       `json:"definitionDigest"`
 	SourceID         artifactstore.SourceID     `json:"sourceID"`
 	Locator          artifactstore.Locator      `json:"locator"`
-	Priority         int                        `json:"priority"`
 	Name             string                     `json:"name"`
 	Role             string                     `json:"role"`
 	MediaType        string                     `json:"mediaType"`
@@ -114,7 +112,6 @@ func (p *Adapter) Compose(
 	if err != nil {
 		return ContextLoadPlan{}, err
 	}
-	priorities := attachmentPriorities(workspaceValue)
 	output := ContextLoadPlan{
 		RootID:          rootID,
 		CatalogRevision: loadPlan.CatalogRevision,
@@ -134,7 +131,6 @@ func (p *Adapter) Compose(
 			Record:           item.Record,
 			DefinitionDigest: item.Definition.Digest,
 			SourceID:         item.Source.ID,
-			TrustReference:   workspaceValue.Data.TrustReference,
 		})
 		if err := decision.Validate(); err != nil {
 			return ContextLoadPlan{}, err
@@ -171,7 +167,6 @@ func (p *Adapter) Compose(
 				DefinitionDigest: item.Definition.Digest,
 				SourceID:         item.Source.ID,
 				Locator:          item.Record.Occurrence.Locator,
-				Priority:         priorities[item.Source.ID],
 				Name:             body.Name,
 				Role:             body.Role,
 				MediaType:        body.MediaType,
@@ -201,14 +196,13 @@ func (p *Adapter) List(
 	if err != nil {
 		return nil, err
 	}
-	priorities := attachmentPriorities(view.Workspace)
 	output := make([]ContextDocument, 0)
 	for _, resourceValue := range view.Resources {
 		if resourceValue.Definition.Kind != contextKind ||
 			resourceValue.Definition.SchemaID != contextSchemaID {
 			continue
 		}
-		value, err := projectContextDocument(resourceValue, priorities)
+		value, err := projectContextDocument(resourceValue)
 		if err != nil {
 			value.Diagnostics = artifactstore.AppendDiagnostics(
 				value.Diagnostics,
@@ -218,9 +212,6 @@ func (p *Adapter) List(
 		output = append(output, value)
 	}
 	sort.Slice(output, func(left, right int) bool {
-		if output[left].Priority != output[right].Priority {
-			return output[left].Priority > output[right].Priority
-		}
 		leftOrder := contextRuntimeOrder(output[left].Locator)
 		rightOrder := contextRuntimeOrder(output[right].Locator)
 		if leftOrder != rightOrder {
@@ -254,7 +245,6 @@ func (p *Adapter) Load(
 		}
 		requested[recordID] = struct{}{}
 	}
-	priorities := attachmentPriorities(view.Workspace)
 	output := ContextInspection{
 		RootID:          rootID,
 		CatalogRevision: view.Catalog.Revision,
@@ -269,7 +259,7 @@ func (p *Adapter) Load(
 				continue
 			}
 		}
-		contribution, err := projectContext(resourceValue, priorities)
+		contribution, err := projectContext(resourceValue)
 		if err != nil {
 			output.Diagnostics = artifactstore.AppendDiagnostics(
 				output.Diagnostics,
@@ -300,7 +290,6 @@ func (p *Adapter) Load(
 
 func projectContextDocument(
 	value engine.Resource,
-	priorities map[artifactstore.SourceID]int,
 ) (ContextDocument, error) {
 	runtimeDisabled, dataErr := engine.RecordRuntimeDisabled(value.Record)
 	output := ContextDocument{
@@ -309,7 +298,6 @@ func projectContextDocument(
 		DefinitionDigest: value.Definition.Digest,
 		SourceID:         value.Source.ID,
 		Locator:          value.Record.Occurrence.Locator,
-		Priority:         priorities[value.Source.ID],
 		Name:             value.Record.Name,
 		Enabled:          value.Record.Enabled,
 		State:            value.Record.State,
@@ -340,7 +328,6 @@ func projectContextDocument(
 
 func projectContext(
 	value engine.Resource,
-	priorities map[artifactstore.SourceID]int,
 ) (ContextContribution, error) {
 	if err := ValidateContextDefinition(value.Definition); err != nil {
 		return ContextContribution{}, err
@@ -354,7 +341,6 @@ func projectContext(
 		DefinitionDigest: value.Definition.Digest,
 		SourceID:         value.Source.ID,
 		Locator:          value.Record.Occurrence.Locator,
-		Priority:         priorities[value.Source.ID],
 		ConventionOrder:  contextRuntimeOrder(value.Record.Occurrence.Locator),
 		Name:             body.Name,
 		Role:             body.Role,
@@ -363,21 +349,8 @@ func projectContext(
 	}, nil
 }
 
-func attachmentPriorities(value engine.Workspace) map[artifactstore.SourceID]int {
-	output := make(map[artifactstore.SourceID]int, len(value.Attachments))
-	for _, attachment := range value.Attachments {
-		if attachment.Enabled {
-			output[attachment.SourceID] = attachment.Priority
-		}
-	}
-	return output
-}
-
 func sortContextContributions(values []ContextContribution) {
 	sort.Slice(values, func(left, right int) bool {
-		if values[left].Priority != values[right].Priority {
-			return values[left].Priority > values[right].Priority
-		}
 		if values[left].ConventionOrder != values[right].ConventionOrder {
 			return values[left].ConventionOrder <
 				values[right].ConventionOrder

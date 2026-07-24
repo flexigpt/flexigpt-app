@@ -29,24 +29,22 @@ type WorkspaceAttachmentSettings struct {
 // data, and the trust-reference contents. Local filesystem paths are included
 // because the local Workspace management UI intentionally displays them.
 type WorkspaceView struct {
-	RootID            artifactstore.RootID      `json:"rootID"`
-	Revision          uint64                    `json:"revision"`
-	DisplayName       string                    `json:"displayName"`
-	Description       string                    `json:"description,omitempty"`
-	Enabled           bool                      `json:"enabled"`
-	Mode              string                    `json:"mode"`
-	PrimarySourceID   artifactstore.SourceID    `json:"primarySourceID,omitempty"`
-	PrimaryPath       string                    `json:"primaryPath,omitempty"`
-	HasTrustReference bool                      `json:"hasTrustReference"`
-	Discovery         WorkspaceDiscovery        `json:"discovery"`
-	Attachments       []WorkspaceAttachmentView `json:"attachments"`
+	RootID          artifactstore.RootID      `json:"rootID"`
+	Revision        uint64                    `json:"revision"`
+	DisplayName     string                    `json:"displayName"`
+	Description     string                    `json:"description,omitempty"`
+	Enabled         bool                      `json:"enabled"`
+	Mode            string                    `json:"mode"`
+	PrimarySourceID artifactstore.SourceID    `json:"primarySourceID,omitempty"`
+	PrimaryPath     string                    `json:"primaryPath,omitempty"`
+	Discovery       WorkspaceDiscovery        `json:"discovery"`
+	Attachments     []WorkspaceAttachmentView `json:"attachments"`
 }
 
 type WorkspaceAttachmentView struct {
 	SourceID          artifactstore.SourceID       `json:"sourceID"`
 	Revision          uint64                       `json:"revision"`
 	Role              artifactstore.AttachmentRole `json:"role"`
-	Priority          int                          `json:"priority"`
 	Enabled           bool                         `json:"enabled"`
 	SourceDisplayName string                       `json:"sourceDisplayName,omitempty"`
 	SourceKind        string                       `json:"sourceKind,omitempty"`
@@ -133,7 +131,6 @@ type WorkspaceContextContribution struct {
 	DefinitionDigest artifactstore.Digest   `json:"definitionDigest"`
 	SourceID         artifactstore.SourceID `json:"sourceID"`
 	Locator          artifactstore.Locator  `json:"locator"`
-	Priority         int                    `json:"priority"`
 	Name             string                 `json:"name"`
 	Role             string                 `json:"role"`
 	MediaType        string                 `json:"mediaType"`
@@ -168,7 +165,6 @@ type WorkspaceContextView struct {
 	DefinitionDigest artifactstore.Digest       `json:"definitionDigest"`
 	SourceID         artifactstore.SourceID     `json:"sourceID"`
 	Locator          artifactstore.Locator      `json:"locator"`
-	Priority         int                        `json:"priority"`
 	Name             string                     `json:"name"`
 	Role             string                     `json:"role"`
 	MediaType        string                     `json:"mediaType"`
@@ -215,7 +211,6 @@ type WorkspaceSkillView struct {
 	Locator          artifactstore.Locator      `json:"locator"`
 	Skill            WorkspaceSkillSummary      `json:"skill"`
 	MarkdownBody     string                     `json:"markdownBody,omitempty"`
-	Priority         int                        `json:"priority"`
 	RecordRevision   uint64                     `json:"recordRevision"`
 	State            string                     `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
@@ -231,11 +226,10 @@ type WorkspaceSkillLoadView struct {
 }
 
 type CreateFilesystemWorkspaceRequestBody struct {
-	DisplayName    string             `json:"displayName"              required:"true"`
-	Description    string             `json:"description,omitempty"`
-	RootPath       string             `json:"rootPath"                 required:"true"`
-	TrustReference string             `json:"trustReference,omitempty"`
-	Discovery      WorkspaceDiscovery `json:"discovery"`
+	DisplayName string             `json:"displayName"           required:"true"`
+	Description string             `json:"description,omitempty"`
+	RootPath    string             `json:"rootPath"              required:"true"`
+	Discovery   WorkspaceDiscovery `json:"discovery"`
 }
 
 type CreateFilesystemWorkspaceRequest struct {
@@ -247,10 +241,9 @@ type CreateFilesystemWorkspaceResponse struct {
 }
 
 type CreateEmptyWorkspaceRequestBody struct {
-	DisplayName    string             `json:"displayName"              required:"true"`
-	Description    string             `json:"description,omitempty"`
-	TrustReference string             `json:"trustReference,omitempty"`
-	Discovery      WorkspaceDiscovery `json:"discovery"`
+	DisplayName string             `json:"displayName"           required:"true"`
+	Description string             `json:"description,omitempty"`
+	Discovery   WorkspaceDiscovery `json:"discovery"`
 }
 
 type CreateEmptyWorkspaceRequest struct {
@@ -280,11 +273,10 @@ type ListWorkspacesResponse struct {
 }
 
 type UpdateWorkspaceRequestBody struct {
-	ExpectedRevision uint64             `json:"expectedRevision"         required:"true"`
-	DisplayName      string             `json:"displayName"              required:"true"`
+	ExpectedRevision uint64             `json:"expectedRevision"      required:"true"`
+	DisplayName      string             `json:"displayName"           required:"true"`
 	Description      string             `json:"description,omitempty"`
-	Enabled          bool               `json:"enabled"                  required:"true"`
-	TrustReference   *string            `json:"trustReference,omitempty"`
+	Enabled          bool               `json:"enabled"               required:"true"`
 	Discovery        WorkspaceDiscovery `json:"discovery"`
 }
 
@@ -315,7 +307,6 @@ type AttachWorkspaceSourceRequestBody struct {
 	ExpectedRootRevision uint64                       `json:"expectedRootRevision" required:"true"`
 	SourceID             artifactstore.SourceID       `json:"sourceID"             required:"true"`
 	Role                 artifactstore.AttachmentRole `json:"role"                 required:"true"`
-	Priority             int                          `json:"priority"`
 	Enabled              bool                         `json:"enabled"              required:"true"`
 	Settings             WorkspaceAttachmentSettings  `json:"settings"`
 }
@@ -333,7 +324,6 @@ type UpdateWorkspaceAttachmentRequestBody struct {
 	ExpectedRootRevision       uint64                       `json:"expectedRootRevision"       required:"true"`
 	ExpectedAttachmentRevision uint64                       `json:"expectedAttachmentRevision" required:"true"`
 	Role                       artifactstore.AttachmentRole `json:"role"                       required:"true"`
-	Priority                   int                          `json:"priority"`
 	Enabled                    bool                         `json:"enabled"                    required:"true"`
 	Settings                   WorkspaceAttachmentSettings  `json:"settings"`
 }

@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS artifact_attachments (
 	root_id TEXT NOT NULL REFERENCES artifact_roots(id) ON DELETE CASCADE,
 	source_id TEXT NOT NULL REFERENCES artifact_sources(id) ON DELETE RESTRICT,
 	role TEXT NOT NULL,
-	priority INTEGER NOT NULL,
 	enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
 	data_json BLOB NOT NULL,
 	revision INTEGER NOT NULL CHECK (revision > 0),

@@ -158,7 +158,6 @@ function WorkspaceResourceDetailsContent({
 				<ModalSection title="Context content">
 					<div className="flex flex-wrap gap-2">
 						<MetadataPill label="Role">{contribution.role}</MetadataPill>
-						<MetadataPill label="Priority">{contribution.priority}</MetadataPill>
 						<MetadataPill label="Original">{formatByteCount(contribution.originalBytes)}</MetadataPill>
 						<MetadataPill label="Included">{formatByteCount(contribution.includedBytes)}</MetadataPill>
 						{contribution.truncated ? <MetadataPill>Truncated</MetadataPill> : null}

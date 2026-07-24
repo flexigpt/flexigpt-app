@@ -93,7 +93,6 @@ func (s *Service) Create(
 			RootID:     root.ID,
 			SourceID:   attachmentDraft.SourceID,
 			Role:       attachmentDraft.Role,
-			Priority:   attachmentDraft.Priority,
 			Enabled:    attachmentDraft.Enabled,
 			Data:       json.RawMessage(attachmentData),
 			Revision:   1,
@@ -260,7 +259,6 @@ func (s *Service) Attach(
 		RootID:     rootID,
 		SourceID:   draft.SourceID,
 		Role:       draft.Role,
-		Priority:   draft.Priority,
 		Enabled:    draft.Enabled,
 		Data:       json.RawMessage(data),
 		Revision:   1,
@@ -335,12 +333,10 @@ func (s *Service) UpdateAttachment(
 	}
 	next := current
 	next.Role = update.Role
-	next.Priority = update.Priority
 	next.Enabled = update.Enabled
 	next.Data = json.RawMessage(data)
 
 	unchanged := current.Role == next.Role &&
-		current.Priority == next.Priority &&
 		current.Enabled == next.Enabled &&
 		jsoncanon.Equal(current.Data, next.Data)
 	if unchanged {

@@ -51,7 +51,6 @@ var attachmentOperationMatrix = [...]attachmentOperation{
 		role:                                 RolePrimary,
 		isPrimary:                            true,
 		requiredSourceKind:                   fsdir.Kind,
-		defaultPriority:                      PrimaryPriority,
 		defaultAuthoritative:                 true,
 		includeReadmeWhenRequested:           true,
 		appliesWorkspaceDiscoveryPreferences: true,

@@ -61,9 +61,6 @@ func (a *aggregateSkillProvider) List(
 		if originRank(output[left]) != originRank(output[right]) {
 			return originRank(output[left]) > originRank(output[right])
 		}
-		if output[left].Priority != output[right].Priority {
-			return output[left].Priority > output[right].Priority
-		}
 		return output[left].Identity < output[right].Identity
 	})
 	return output, nil
@@ -106,20 +103,16 @@ func applyPrecedence(values []skillruntime.Skill) {
 			continue
 		}
 		bestRank := -1
-		bestPriority := 0
 		best := make([]int, 0, len(indexes))
 		for _, index := range indexes {
 			rank := originRank(values[index])
-			priority := values[index].Priority
 			if len(best) == 0 ||
-				rank > bestRank ||
-				(rank == bestRank && priority > bestPriority) {
+				rank > bestRank {
 				bestRank = rank
-				bestPriority = priority
 				best = []int{index}
 				continue
 			}
-			if rank == bestRank && priority == bestPriority {
+			if rank == bestRank {
 				best = append(best, index)
 			}
 		}
@@ -130,7 +123,7 @@ func applyPrecedence(values []skillruntime.Skill) {
 					artifactstore.Diagnostic{
 						Severity: artifactstore.DiagnosticError,
 						Code:     "skill.provider.precedence-ambiguous",
-						Message:  "multiple Skills have the same highest precedence",
+						Message:  "multiple Skills have the same highest origin precedence",
 					},
 				)
 			}

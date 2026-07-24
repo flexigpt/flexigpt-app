@@ -36,10 +36,8 @@ func (s *Service) CreateEmpty(
 	request EmptyWorkspaceRequest,
 ) (Workspace, error) {
 	data := RootData{
-		Mode:                     ModeEmpty,
-		TrustReference:           request.TrustReference,
-		Discovery:                request.Discovery,
-		CapabilityProfileVersion: CapabilityProfileVersion,
+		Mode:      ModeEmpty,
+		Discovery: request.Discovery,
 	}
 	raw, err := encodeRootData(data)
 	if err != nil {
@@ -85,11 +83,9 @@ func (s *Service) CreateFilesystem(
 		)
 	}
 	data := RootData{
-		Mode:                     ModeFilesystem,
-		PrimarySourceID:          sourceValue.ID,
-		TrustReference:           request.TrustReference,
-		Discovery:                request.Discovery,
-		CapabilityProfileVersion: CapabilityProfileVersion,
+		Mode:            ModeFilesystem,
+		PrimarySourceID: sourceValue.ID,
+		Discovery:       request.Discovery,
 	}
 	raw, err := encodeRootData(data)
 	if err != nil {
@@ -111,7 +107,6 @@ func (s *Service) CreateFilesystem(
 		[]root.AttachmentDraft{{
 			SourceID: sourceValue.ID,
 			Role:     RolePrimary,
-			Priority: primaryOperation.defaultPriority,
 			Enabled:  true,
 			Data:     attachmentData,
 		}},
@@ -152,9 +147,6 @@ func (s *Service) Update(
 		return Workspace{}, err
 	}
 	data := current.Data
-	if request.TrustReference != nil {
-		data.TrustReference = *request.TrustReference
-	}
 	data.Discovery = request.Discovery
 
 	raw, err := encodeRootData(data)
@@ -213,7 +205,6 @@ func (s *Service) Attach(
 		root.AttachmentDraft{
 			SourceID: request.SourceID,
 			Role:     request.Role,
-			Priority: request.Priority,
 			Enabled:  request.Enabled,
 			Data:     data,
 		},
@@ -271,7 +262,6 @@ func (s *Service) UpdateAttachment(
 			ExpectedRootRevision:       request.ExpectedRootRevision,
 			ExpectedAttachmentRevision: request.ExpectedAttachmentRevision,
 			Role:                       request.Role,
-			Priority:                   request.Priority,
 			Enabled:                    request.Enabled,
 			Data:                       data,
 		},

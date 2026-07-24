@@ -647,7 +647,6 @@ export namespace skillruntime {
 	    available: boolean;
 	    runtimeAllowed: boolean;
 	    builtIn: boolean;
-	    priority: number;
 	    catalogCurrent: boolean;
 	    state?: string;
 	    shadowed: boolean;
@@ -683,7 +682,6 @@ export namespace skillruntime {
 	        this.available = source["available"];
 	        this.runtimeAllowed = source["runtimeAllowed"];
 	        this.builtIn = source["builtIn"];
-	        this.priority = source["priority"];
 	        this.catalogCurrent = source["catalogCurrent"];
 	        this.state = source["state"];
 	        this.shadowed = source["shadowed"];
@@ -11355,7 +11353,6 @@ export namespace workspace {
 	    expectedRootRevision: number;
 	    sourceID: string;
 	    role: string;
-	    priority: number;
 	    enabled: boolean;
 	    settings: WorkspaceAttachmentSettings;
 	
@@ -11368,7 +11365,6 @@ export namespace workspace {
 	        this.expectedRootRevision = source["expectedRootRevision"];
 	        this.sourceID = source["sourceID"];
 	        this.role = source["role"];
-	        this.priority = source["priority"];
 	        this.enabled = source["enabled"];
 	        this.settings = this.convertValues(source["settings"], WorkspaceAttachmentSettings);
 	    }
@@ -11428,7 +11424,6 @@ export namespace workspace {
 	    sourceID: string;
 	    revision: number;
 	    role: string;
-	    priority: number;
 	    enabled: boolean;
 	    sourceDisplayName?: string;
 	    sourceKind?: string;
@@ -11444,7 +11439,6 @@ export namespace workspace {
 	        this.sourceID = source["sourceID"];
 	        this.revision = source["revision"];
 	        this.role = source["role"];
-	        this.priority = source["priority"];
 	        this.enabled = source["enabled"];
 	        this.sourceDisplayName = source["sourceDisplayName"];
 	        this.sourceKind = source["sourceKind"];
@@ -11529,7 +11523,6 @@ export namespace workspace {
 	    mode: string;
 	    primarySourceID?: string;
 	    primaryPath?: string;
-	    hasTrustReference: boolean;
 	    discovery: WorkspaceDiscovery;
 	    attachments: WorkspaceAttachmentView[];
 	
@@ -11547,7 +11540,6 @@ export namespace workspace {
 	        this.mode = source["mode"];
 	        this.primarySourceID = source["primarySourceID"];
 	        this.primaryPath = source["primaryPath"];
-	        this.hasTrustReference = source["hasTrustReference"];
 	        this.discovery = this.convertValues(source["discovery"], WorkspaceDiscovery);
 	        this.attachments = this.convertValues(source["attachments"], WorkspaceAttachmentView);
 	    }
@@ -11670,7 +11662,6 @@ export namespace workspace {
 	    definitionDigest: string;
 	    sourceID: string;
 	    locator: string;
-	    priority: number;
 	    name: string;
 	    role: string;
 	    mediaType: string;
@@ -11690,7 +11681,6 @@ export namespace workspace {
 	        this.definitionDigest = source["definitionDigest"];
 	        this.sourceID = source["sourceID"];
 	        this.locator = source["locator"];
-	        this.priority = source["priority"];
 	        this.name = source["name"];
 	        this.role = source["role"];
 	        this.mediaType = source["mediaType"];
@@ -11776,7 +11766,6 @@ export namespace workspace {
 	export class CreateEmptyWorkspaceRequestBody {
 	    displayName: string;
 	    description?: string;
-	    trustReference?: string;
 	    discovery: WorkspaceDiscovery;
 	
 	    static createFrom(source: any = {}) {
@@ -11787,7 +11776,6 @@ export namespace workspace {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
-	        this.trustReference = source["trustReference"];
 	        this.discovery = this.convertValues(source["discovery"], WorkspaceDiscovery);
 	    }
 	
@@ -11874,7 +11862,6 @@ export namespace workspace {
 	    displayName: string;
 	    description?: string;
 	    rootPath: string;
-	    trustReference?: string;
 	    discovery: WorkspaceDiscovery;
 	
 	    static createFrom(source: any = {}) {
@@ -11886,7 +11873,6 @@ export namespace workspace {
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
 	        this.rootPath = source["rootPath"];
-	        this.trustReference = source["trustReference"];
 	        this.discovery = this.convertValues(source["discovery"], WorkspaceDiscovery);
 	    }
 	
@@ -12598,7 +12584,6 @@ export namespace workspace {
 	    definitionDigest: string;
 	    sourceID: string;
 	    locator: string;
-	    priority: number;
 	    name: string;
 	    role: string;
 	    mediaType: string;
@@ -12619,7 +12604,6 @@ export namespace workspace {
 	        this.definitionDigest = source["definitionDigest"];
 	        this.sourceID = source["sourceID"];
 	        this.locator = source["locator"];
-	        this.priority = source["priority"];
 	        this.name = source["name"];
 	        this.role = source["role"];
 	        this.mediaType = source["mediaType"];
@@ -12799,7 +12783,6 @@ export namespace workspace {
 	    locator: string;
 	    skill: WorkspaceSkillSummary;
 	    markdownBody?: string;
-	    priority: number;
 	    recordRevision: number;
 	    state: string;
 	    catalogCurrent: boolean;
@@ -12819,7 +12802,6 @@ export namespace workspace {
 	        this.locator = source["locator"];
 	        this.skill = this.convertValues(source["skill"], WorkspaceSkillSummary);
 	        this.markdownBody = source["markdownBody"];
-	        this.priority = source["priority"];
 	        this.recordRevision = source["recordRevision"];
 	        this.state = source["state"];
 	        this.catalogCurrent = source["catalogCurrent"];
@@ -13524,7 +13506,6 @@ export namespace workspace {
 	    expectedRootRevision: number;
 	    expectedAttachmentRevision: number;
 	    role: string;
-	    priority: number;
 	    enabled: boolean;
 	    settings: WorkspaceAttachmentSettings;
 	
@@ -13537,7 +13518,6 @@ export namespace workspace {
 	        this.expectedRootRevision = source["expectedRootRevision"];
 	        this.expectedAttachmentRevision = source["expectedAttachmentRevision"];
 	        this.role = source["role"];
-	        this.priority = source["priority"];
 	        this.enabled = source["enabled"];
 	        this.settings = this.convertValues(source["settings"], WorkspaceAttachmentSettings);
 	    }
@@ -13630,7 +13610,6 @@ export namespace workspace {
 	    displayName: string;
 	    description?: string;
 	    enabled: boolean;
-	    trustReference?: string;
 	    discovery: WorkspaceDiscovery;
 	
 	    static createFrom(source: any = {}) {
@@ -13643,7 +13622,6 @@ export namespace workspace {
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
 	        this.enabled = source["enabled"];
-	        this.trustReference = source["trustReference"];
 	        this.discovery = this.convertValues(source["discovery"], WorkspaceDiscovery);
 	    }
 	

@@ -110,7 +110,6 @@ export interface WorkspaceAttachmentView {
 	sourceKind?: string;
 	path?: string;
 	role: WorkspaceAttachmentRole;
-	priority: number;
 	enabled: boolean;
 	settings: WorkspaceAttachmentSettings;
 }
@@ -131,7 +130,6 @@ export interface WorkspaceView {
 	mode: WorkspaceMode;
 	primarySourceID?: WorkspaceSourceID;
 	primaryPath?: string;
-	hasTrustReference: boolean;
 	discovery: WorkspaceDiscovery;
 	attachments: WorkspaceAttachmentView[];
 }
@@ -215,7 +213,6 @@ export interface WorkspaceContextContribution {
 	definitionDigest: WorkspaceDigest;
 	sourceID: WorkspaceSourceID;
 	locator: WorkspaceLocator;
-	priority: number;
 	name: string;
 	role: WorkspaceContextRole;
 	mediaType: WorkspaceContextMediaType;
@@ -250,7 +247,6 @@ export interface WorkspaceContextView {
 	definitionDigest: WorkspaceDigest;
 	sourceID: WorkspaceSourceID;
 	locator: WorkspaceLocator;
-	priority: number;
 	name: string;
 	role: WorkspaceContextRole;
 	mediaType: WorkspaceContextMediaType;
@@ -297,7 +293,6 @@ export interface WorkspaceSkillView {
 	locator: WorkspaceLocator;
 	skill: WorkspaceSkillSummary;
 	markdownBody?: string;
-	priority: number;
 	recordRevision: number;
 	state: WorkspaceRecordState;
 	catalogCurrent: boolean;
@@ -316,14 +311,12 @@ export interface CreateFilesystemWorkspacePayload {
 	displayName: string;
 	description?: string;
 	rootPath: string;
-	trustReference?: string;
 	discovery: WorkspaceDiscovery;
 }
 
 export interface CreateEmptyWorkspacePayload {
 	displayName: string;
 	description?: string;
-	trustReference?: string;
 	discovery: WorkspaceDiscovery;
 }
 
@@ -332,13 +325,11 @@ export interface UpdateWorkspacePayload {
 	displayName: string;
 	description?: string;
 	enabled: boolean;
-	trustReference?: string;
 	discovery: WorkspaceDiscovery;
 }
 
 export interface WorkspaceAttachmentPayload {
 	role: WorkspaceAttachmentRole;
-	priority: number;
 	enabled: boolean;
 	settings: WorkspaceAttachmentSettings;
 }

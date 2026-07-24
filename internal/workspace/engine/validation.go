@@ -304,20 +304,6 @@ func validateRootData(value RootData) error {
 			value.Mode,
 		)
 	}
-	if value.CapabilityProfileVersion != CapabilityProfileVersion {
-		return fmt.Errorf(
-			"%w: capability profile version must be %q",
-			ErrInvalidWorkspace,
-			CapabilityProfileVersion,
-		)
-	}
-	if err := artifactstore.ValidateOptionalText(
-		"Workspace trust reference",
-		value.TrustReference,
-		512,
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
-	}
 	if err := validateDiscoveryPreferences(value.Discovery); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
 	}
