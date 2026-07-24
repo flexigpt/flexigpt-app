@@ -27,6 +27,7 @@ import {
 	normalizeAssistantPresetMCPContext,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
+import { formatSkillRef, isWorkspaceSkillRef } from '@/skills/lib/skill_identity_utils';
 
 function formatToolLabel(choice: {
 	displayName?: string;
@@ -346,9 +347,10 @@ function AssistantPresetViewModalContent({
 		.map(selection => formatSkillSelectionLabel(selection));
 	const currentSkillItems = shouldShowActiveComparison
 		? currentRuntimeSnapshot.enabledSkillRefs.map(r => {
+				const identity = formatSkillRef(r);
 				return {
-					title: r.skillSlug,
-					meta: `${r.bundleID} • ${r.skillID}`,
+					title: isWorkspaceSkillRef(r) ? 'Workspace skill' : (r.skillSlug ?? identity),
+					meta: identity,
 				};
 			})
 		: [];

@@ -3,6 +3,7 @@ package inferencewrapper
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -35,6 +36,60 @@ func NewWorkspaceInferenceBridge(
 	resolver WorkspaceConversationResolver,
 ) *WorkspaceInferenceBridge {
 	return &WorkspaceInferenceBridge{resolver: resolver}
+}
+
+// validateWorkspaceSkillRefsForSelection binds runtime-facing Workspace Skill
+// identities to the Workspace selection carried by the same user turn.
+//
+// The frontend keeps these values aligned, but persisted conversations and API
+// callers are untrusted at this boundary. A Workspace Skill must not survive a
+// detach, root switch, or removal from selection.skillRefs.
+func validateWorkspaceSkillRefsForSelection(
+	selection *workspace.ConversationSelection,
+	refs []skillruntimeSpec.SkillRef,
+) error {
+	selected := make(map[string]struct{})
+	if selection != nil {
+		for _, ref := range selection.SkillRefs {
+			if ref.RecordID == "" {
+				continue
+			}
+			selected[workspace.WorkspaceSkillIdentity(selection.RootID, ref.RecordID)] = struct{}{}
+		}
+	}
+
+	for _, ref := range refs {
+		identity := strings.TrimSpace(ref.Identity)
+		if !strings.HasPrefix(identity, workspace.WorkspaceSkillIdentityPrefix) {
+			continue
+		}
+		if ref.BundleID != "" || ref.SkillSlug != "" || ref.SkillID != "" {
+			return fmt.Errorf("workspace Skill ref %q mixes identity and installed fields", identity)
+		}
+		if selection == nil {
+			return fmt.Errorf("workspace Skill ref %q was supplied without a Workspace selection", identity)
+		}
+
+		rootID, recordID, err := workspace.ParseWorkspaceSkillIdentity(identity)
+		if err != nil {
+			return fmt.Errorf("invalid Workspace Skill ref %q: %w", identity, err)
+		}
+		if rootID != selection.RootID {
+			return fmt.Errorf(
+				"workspace Skill ref %q belongs to Workspace %q, not selected Workspace %q",
+				identity,
+				rootID,
+				selection.RootID,
+			)
+		}
+
+		canonical := workspace.WorkspaceSkillIdentity(rootID, recordID)
+		if _, found := selected[canonical]; !found {
+			return fmt.Errorf("workspace Skill ref %q is not selected for this conversation", identity)
+		}
+	}
+
+	return nil
 }
 
 func (b *WorkspaceInferenceBridge) HydrateCompletion(

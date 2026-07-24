@@ -46,9 +46,9 @@ type ConversationResourceSelectionRef struct {
 type ConversationSkillSelectionRef struct {
 	ConversationResourceSelectionRef
 
-	Identity    string `json:"identity"`
-	DisplayName string `json:"displayName,omitempty"`
-	Insert      string `json:"insert,omitempty"`
+	Identity    string               `json:"identity"`
+	DisplayName string               `json:"displayName,omitempty"`
+	Insert      WorkspaceSkillInsert `json:"insert,omitempty"`
 }
 
 type ConversationSelection struct {
@@ -106,11 +106,42 @@ type ConversationResolution struct {
 	Prompt string
 }
 
+const WorkspaceSkillIdentityPrefix = "workspace/"
+
 func WorkspaceSkillIdentity(
 	rootID artifactstore.RootID,
 	recordID artifactstore.RecordID,
 ) string {
-	return "workspace/" + string(rootID) + "/" + string(recordID)
+	return WorkspaceSkillIdentityPrefix + string(rootID) + "/" + string(recordID)
+}
+
+func ParseWorkspaceSkillIdentity(
+	identity string,
+) (artifactstore.RootID, artifactstore.RecordID, error) {
+	value := strings.TrimSpace(identity)
+	if value == "" || value != identity {
+		return "", "", errors.New("workspace Skill identity must be non-empty and trimmed")
+	}
+
+	relative, found := strings.CutPrefix(value, WorkspaceSkillIdentityPrefix)
+	if !found {
+		return "", "", fmt.Errorf("identity %q is not a Workspace Skill", identity)
+	}
+
+	parts := strings.Split(relative, "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("workspace Skill identity %q is invalid", identity)
+	}
+
+	rootID := artifactstore.RootID(parts[0])
+	recordID := artifactstore.RecordID(parts[1])
+	if err := artifactstore.ValidateRootID(rootID); err != nil {
+		return "", "", err
+	}
+	if err := artifactstore.ValidateRecordID(recordID); err != nil {
+		return "", "", err
+	}
+	return rootID, recordID, nil
 }
 
 func (a *API) ResolveConversationSelection(
@@ -138,6 +169,13 @@ func (a *API) ResolveConversationSelection(
 			artifactstore.ErrNotFound,
 			selection.RootID,
 		)
+		return ConversationResolution{
+			Usage: unresolvedConversationUsage(selection, err),
+		}, err
+	}
+
+	if !workspaceValue.Body.Enabled {
+		err := fmt.Errorf("selected Workspace %q is disabled", selection.RootID)
 		return ConversationResolution{
 			Usage: unresolvedConversationUsage(selection, err),
 		}, err
@@ -241,6 +279,7 @@ func (a *API) ResolveConversationSelection(
 	skillUsageByID := make(map[artifactstore.RecordID]int, len(selection.SkillRefs))
 	skillRecordIDs := make([]artifactstore.RecordID, 0, len(selection.SkillRefs))
 
+	invalidSessionSkillSelection := false
 	for _, ref := range selection.SkillRefs {
 		if err := artifactstore.ValidateRecordID(ref.RecordID); err != nil {
 			return ConversationResolution{
@@ -315,6 +354,20 @@ func (a *API) ResolveConversationSelection(
 				current.UsedDefinitionDigest = skill.DefinitionDigest
 				current.Changed = current.SelectedDefinitionDigest != "" &&
 					current.SelectedDefinitionDigest != skill.DefinitionDigest
+
+				if skill.Skill.Insert != WorkspaceSkillInsertInstructions {
+					current.Status = ConversationSkillUsageUnavailable
+					current.Diagnostics = artifactstore.AppendDiagnostics(
+						current.Diagnostics,
+						conversationSelectionDiagnostic(
+							"workspace.conversation.skill-ineligible",
+							"only Workspace Skills with insert=\"instructions\" can enter a conversation Skill session",
+						),
+					)
+					invalidSessionSkillSelection = true
+					continue
+				}
+
 				current.Status = ConversationSkillUsageAvailable
 				current.Diagnostics = artifactstore.AppendDiagnostics(
 					current.Diagnostics,
@@ -325,6 +378,13 @@ func (a *API) ResolveConversationSelection(
 	}
 
 	ResolveConversationUsageStatus(&usage)
+	if invalidSessionSkillSelection {
+		return ConversationResolution{
+				Usage: usage,
+			}, errors.New(
+				"selected Workspace includes a Skill that cannot enter a conversation Skill session",
+			)
+	}
 	if usage.Status == ConversationSelectionUnavailable &&
 		len(usage.Contexts)+len(usage.Skills) > 0 {
 		return ConversationResolution{

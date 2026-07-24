@@ -282,6 +282,24 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		currentInputs,
 	)
 
+	if err := validateWorkspaceSkillRefsForSelection(
+		body.Current.WorkspaceSelection,
+		body.Current.EnabledSkillRefs,
+	); err != nil {
+		//nolint:nilerr // Explicit.
+		return &spec.CompletionResponse{
+			Body: &spec.CompletionResponseBody{
+				InferenceResponse: &inferenceSpec.FetchCompletionResponse{
+					Error: &inferenceSpec.Error{
+						Code:    "workspace_selection_invalid",
+						Message: err.Error(),
+					},
+				},
+				HydratedCurrentInputs: currentInputs,
+			},
+		}, nil
+	}
+
 	var workspaceUsage *workspace.ConversationUsage
 	if body.Current.WorkspaceSelection != nil {
 		hydrated, workspaceErr := ps.workspaceBridge.HydrateCompletion(

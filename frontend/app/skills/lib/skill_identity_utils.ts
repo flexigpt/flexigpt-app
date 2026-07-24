@@ -7,6 +7,10 @@ import type {
 	WorkspaceSkillRef,
 } from '@/spec/skill';
 import { SkillRefKind as SkillRefKindValue } from '@/spec/skill';
+import {
+	workspaceSkillIdentity as buildWorkspaceSkillIdentity,
+	parseWorkspaceSkillIdentity as parseWorkspaceSkillIdentityValue,
+} from '@/spec/workspace';
 
 const INSTALLED_SKILL_IDENTITY_PREFIX = 'installed/';
 const WORKSPACE_SKILL_IDENTITY_PREFIX = 'workspace/';
@@ -51,20 +55,7 @@ function parseInstalledIdentity(identity: string): InstalledSkillRef | undefined
 }
 
 function parseWorkspaceIdentity(identity: string): WorkspaceSkillRefParts | undefined {
-	const value = identity.trim();
-	const relative = value.startsWith(WORKSPACE_SKILL_IDENTITY_PREFIX)
-		? value.slice(WORKSPACE_SKILL_IDENTITY_PREFIX.length)
-		: '';
-	const parts = relative.split('/');
-
-	if (parts.length !== 2 || parts.some(part => !part || part.trim() !== part)) {
-		return undefined;
-	}
-
-	return {
-		rootID: parts[0],
-		recordID: parts[1],
-	};
+	return parseWorkspaceSkillIdentityValue(identity);
 }
 
 function getSkillRefKind(ref: SkillRef | null | undefined): SkillRefKind {
@@ -99,7 +90,7 @@ export function normalizeSkillRef(ref: SkillRef): SkillRef | undefined {
 
 		case SkillRefKindValue.Workspace: {
 			const parts = ref.identity ? parseWorkspaceIdentity(ref.identity) : undefined;
-			return parts ? { identity: `${WORKSPACE_SKILL_IDENTITY_PREFIX}${parts.rootID}/${parts.recordID}` } : undefined;
+			return parts ? { identity: buildWorkspaceSkillIdentity(parts.rootID, parts.recordID) } : undefined;
 		}
 
 		default:
@@ -163,7 +154,7 @@ export function createWorkspaceSkillRef(rootID: string, recordID: string): Works
 	}
 
 	return {
-		identity: `${WORKSPACE_SKILL_IDENTITY_PREFIX}${normalizedRootID}/${normalizedRecordID}`,
+		identity: buildWorkspaceSkillIdentity(normalizedRootID, normalizedRecordID),
 	};
 }
 

@@ -66,7 +66,10 @@ export async function loadWorkspaceSelectionCatalog(rootID: string): Promise<Loa
 						skill => skill.origin === SkillProviderOrigin.Workspace && skill.workspaceRootID === rootID
 					)
 				: [],
-		catalogKnown: contextsResult.status === 'fulfilled' && skillsResult.status === 'fulfilled',
+		catalogKnown:
+			contextsResult.status === 'fulfilled' &&
+			skillsResult.status === 'fulfilled' &&
+			providersResult.status === 'fulfilled',
 		errors,
 	};
 }

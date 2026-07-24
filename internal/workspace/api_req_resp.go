@@ -9,6 +9,28 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
+type WorkspaceContextRole string
+
+const (
+	WorkspaceContextRoleAgentInstructions     WorkspaceContextRole = "agent-instructions"
+	WorkspaceContextRoleAssistantInstructions WorkspaceContextRole = "assistant-instructions"
+	WorkspaceContextRoleProjectReadme         WorkspaceContextRole = "project-readme"
+	WorkspaceContextRoleProjectContext        WorkspaceContextRole = "project-context"
+)
+
+type WorkspaceContextMediaType string
+
+const (
+	WorkspaceContextMediaTypeMarkdown WorkspaceContextMediaType = "text/markdown"
+)
+
+type WorkspaceSkillInsert string
+
+const (
+	WorkspaceSkillInsertInstructions WorkspaceSkillInsert = "instructions"
+	WorkspaceSkillInsertUserMessage  WorkspaceSkillInsert = "user-message"
+)
+
 type WorkspaceDiscovery struct {
 	AdditionalLocators []artifactstore.Locator  `json:"additionalLocators,omitempty"`
 	AdditionalRoots    []WorkspaceDiscoveryRoot `json:"additionalRoots,omitempty"`
@@ -128,18 +150,18 @@ type WorkspaceRefreshResult struct {
 }
 
 type WorkspaceContextContribution struct {
-	RecordID         artifactstore.RecordID `json:"recordID"`
-	DefinitionDigest artifactstore.Digest   `json:"definitionDigest"`
-	SourceID         artifactstore.SourceID `json:"sourceID"`
-	Locator          artifactstore.Locator  `json:"locator"`
-	Name             string                 `json:"name"`
-	Role             string                 `json:"role"`
-	MediaType        string                 `json:"mediaType"`
-	Content          string                 `json:"content"`
-	ConventionOrder  int                    `json:"conventionOrder"`
-	OriginalBytes    int                    `json:"originalBytes"`
-	IncludedBytes    int                    `json:"includedBytes"`
-	Truncated        bool                   `json:"truncated"`
+	RecordID         artifactstore.RecordID    `json:"recordID"`
+	DefinitionDigest artifactstore.Digest      `json:"definitionDigest"`
+	SourceID         artifactstore.SourceID    `json:"sourceID"`
+	Locator          artifactstore.Locator     `json:"locator"`
+	Name             string                    `json:"name"`
+	Role             WorkspaceContextRole      `json:"role"`
+	MediaType        WorkspaceContextMediaType `json:"mediaType"`
+	Content          string                    `json:"content"`
+	ConventionOrder  int                       `json:"conventionOrder"`
+	OriginalBytes    int                       `json:"originalBytes"`
+	IncludedBytes    int                       `json:"includedBytes"`
+	Truncated        bool                      `json:"truncated"`
 }
 
 type WorkspaceContextDecision struct {
@@ -167,8 +189,8 @@ type WorkspaceContextView struct {
 	SourceID         artifactstore.SourceID     `json:"sourceID"`
 	Locator          artifactstore.Locator      `json:"locator"`
 	Name             string                     `json:"name"`
-	Role             string                     `json:"role"`
-	MediaType        string                     `json:"mediaType"`
+	Role             WorkspaceContextRole       `json:"role"`
+	MediaType        WorkspaceContextMediaType  `json:"mediaType"`
 	Enabled          bool                       `json:"enabled"`
 	State            record.State               `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
@@ -197,7 +219,7 @@ type WorkspaceSkillSummary struct {
 	DisplayName   string                   `json:"displayName"`
 	Description   string                   `json:"description"`
 	Tags          []string                 `json:"tags,omitempty"`
-	Insert        string                   `json:"insert"`
+	Insert        WorkspaceSkillInsert     `json:"insert"`
 	Arguments     []WorkspaceSkillArgument `json:"arguments,omitempty"`
 	IsEnabled     bool                     `json:"isEnabled"`
 	CreatedAt     time.Time                `json:"createdAt"`

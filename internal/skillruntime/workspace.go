@@ -11,10 +11,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 
+	"github.com/flexigpt/flexigpt-app/internal/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
-const workspaceIdentityPrefix = "workspace/"
+const workspaceIdentityPrefix = workspace.WorkspaceSkillIdentityPrefix
 
 type Workspace struct {
 	runtime *SkillRuntime
@@ -197,29 +198,13 @@ func workspaceIdentity(
 	rootID artifactstore.RootID,
 	recordID artifactstore.RecordID,
 ) string {
-	return workspaceIdentityPrefix + string(rootID) + "/" + string(recordID)
+	return workspace.WorkspaceSkillIdentity(rootID, recordID)
 }
 
 func parseWorkspaceIdentity(
 	value string,
 ) (artifactstore.RootID, artifactstore.RecordID, error) {
-	relative, found := strings.CutPrefix(value, workspaceIdentityPrefix)
-	if !found {
-		return "", "", errors.New("identity is not a Workspace Skill")
-	}
-	parts := strings.Split(relative, "/")
-	if len(parts) != 2 {
-		return "", "", errors.New("Workspace Skill identity is invalid")
-	}
-	rootID := artifactstore.RootID(parts[0])
-	recordID := artifactstore.RecordID(parts[1])
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
-		return "", "", err
-	}
-	if err := artifactstore.ValidateRecordID(recordID); err != nil {
-		return "", "", err
-	}
-	return rootID, recordID, nil
+	return workspace.ParseWorkspaceSkillIdentity(value)
 }
 
 func cloneStrings(value map[string]string) map[string]string {
