@@ -44,6 +44,7 @@ interface WorkspaceSetupModalProps {
 	onSubmit: (submission: WorkspaceSetupSubmission) => Promise<void>;
 	workspace?: WorkspaceView;
 	existingDisplayNames: readonly string[];
+	presentation?: 'management' | 'composer';
 }
 
 interface WorkspaceSetupForm {
@@ -73,6 +74,28 @@ function unique(values: string[]): string[] {
 function displayNameFromPath(path: string): string {
 	const segments = path.replaceAll('\\', '/').split('/').filter(Boolean);
 	return segments.at(-1) ?? '';
+}
+
+function uniqueDisplayNameFromPath(path: string, existingDisplayNames: readonly string[]): string {
+	const base = displayNameFromPath(path) || 'Workspace';
+	const normalizedExisting = new Set(
+		existingDisplayNames.map(d => {
+			return normalizeIdentity(d);
+		})
+	);
+
+	if (!normalizedExisting.has(normalizeIdentity(base))) {
+		return base;
+	}
+
+	for (let suffix = 2; suffix < 10_000; suffix += 1) {
+		const candidate = `${base} (${suffix})`;
+		if (!normalizedExisting.has(normalizeIdentity(candidate))) {
+			return candidate;
+		}
+	}
+
+	return `${base} (${Date.now().toString(36)})`;
 }
 
 function initialForm(workspace?: WorkspaceView): WorkspaceSetupForm {
@@ -152,6 +175,7 @@ function WorkspaceSetupModalContent({
 	onSubmit,
 	workspace,
 	existingDisplayNames,
+	presentation = 'management',
 }: Omit<WorkspaceSetupModalProps, 'isOpen' | 'onClose'>) {
 	const [form, setForm] = useState<WorkspaceSetupForm>(() => initialForm(workspace));
 	const [submitted, setSubmitted] = useState(false);
@@ -186,7 +210,7 @@ function WorkspaceSetupModalContent({
 			setForm(previous => ({
 				...previous,
 				rootPath: path,
-				displayName: previous.displayName.trim() || displayNameFromPath(path),
+				displayName: previous.displayName.trim() || uniqueDisplayNameFromPath(path, existingDisplayNames),
 			}));
 		} catch (error) {
 			setPickerError(getErrorMessage(error, 'Could not open the folder picker.'));
@@ -331,11 +355,15 @@ function WorkspaceSetupModalContent({
 	return (
 		<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
 			<ModalHeader
-				title={workspace ? 'Edit Workspace' : 'Add Workspace'}
+				title={
+					workspace ? 'Edit Workspace' : presentation === 'composer' ? 'Add Workspace to Conversation' : 'Add Workspace'
+				}
 				description={
 					workspace
 						? 'Manage the project folder, discovery paths, Context files, and Skill folders.'
-						: 'Choose a project folder. Workspace discovery finds standard Context files and Skills automatically.'
+						: presentation === 'composer'
+							? 'Choose or paste a project folder. The Workspace will be created, refreshed, and attached to this conversation.'
+							: 'Choose a project folder. Workspace discovery finds standard Context files and Skills automatically.'
 				}
 				onClose={requestClose}
 				closeDisabled={isSubmitting}
@@ -463,196 +491,211 @@ function WorkspaceSetupModalContent({
 					) : null}
 				</ModalSection>
 
-				<ModalSection
-					title="Discovery"
-					description="Use the defaults for normal projects. Add paths only when a project keeps Context or Skills in non-standard locations."
+				<details
+					open={presentation === 'management'}
+					className={presentation === 'composer' ? 'border-base-content/10 bg-base-100 rounded-2xl border' : ''}
 				>
-					<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3 text-xs">
-						<div className="font-semibold">Default discovery</div>
-						<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5">
-							{WORKSPACE_DEFAULT_CONTEXT_FILES.map(locator => (
-								<li key={locator}>{locator}</li>
-							))}
-							{WORKSPACE_DEFAULT_SKILL_ROOTS.map(locator => (
-								<li key={locator}>{locator}</li>
-							))}
-						</ul>
-					</div>
-
-					<ModalField label="Include README" htmlFor={`${displayNameID}-readme`}>
-						<label className="flex items-center gap-3">
-							<input
-								id={`${displayNameID}-readme`}
-								type="checkbox"
-								className="toggle toggle-accent"
-								checked={form.includeReadme}
-								onChange={event => {
-									updateForm('includeReadme', event.currentTarget.checked);
-								}}
-								disabled={isSubmitting}
-							/>
-							<span className="text-base-content/70 text-xs">
-								Discover README.md as project Context when it exists.
-							</span>
-						</label>
-					</ModalField>
-
-					{submitted && errors.discovery ? (
-						<div className="text-error text-xs" role="alert">
-							{errors.discovery}
-						</div>
+					{presentation === 'composer' ? (
+						<summary className="cursor-pointer list-none p-4 text-sm font-semibold">
+							Additional discovery options
+							<div className="text-base-content/60 mt-1 text-xs font-normal">
+								Add non-standard Context files, Skill folders, or README discovery.
+							</div>
+						</summary>
 					) : null}
-
-					<div className="space-y-3">
-						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-							<div>
-								<div className="text-sm font-medium">Additional Context files</div>
-								<div className="text-base-content/70 mt-1 text-xs">
-									Add Markdown files that should become project Context.
-								</div>
+					<div className={presentation === 'composer' ? 'px-4 pb-4' : ''}>
+						<ModalSection
+							title="Discovery"
+							description="Use the defaults for normal projects. Add paths only when a project keeps Context or Skills in non-standard locations."
+						>
+							<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3 text-xs">
+								<div className="font-semibold">Default discovery</div>
+								<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5">
+									{WORKSPACE_DEFAULT_CONTEXT_FILES.map(locator => (
+										<li key={locator}>{locator}</li>
+									))}
+									{WORKSPACE_DEFAULT_SKILL_ROOTS.map(locator => (
+										<li key={locator}>{locator}</li>
+									))}
+								</ul>
 							</div>
-							<div className="flex flex-wrap gap-2">
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									onClick={() => {
-										updateForm('contextFiles', [...form.contextFiles, '']);
-									}}
-									disabled={isSubmitting || !hasProjectFolder}
-								>
-									<FiPlus size={14} />
-									<span>Add Path</span>
-								</button>
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									onClick={() => {
-										void chooseContextFiles();
-									}}
-									disabled={isSubmitting || !hasProjectFolder}
-								>
-									<FiUpload size={14} />
-									<span>Choose Files</span>
-								</button>
-							</div>
-						</div>
 
-						{form.contextFiles.length === 0 ? (
-							<div className="border-base-content/10 text-base-content/60 rounded-2xl border p-4 text-sm">
-								No additional Context files.
-							</div>
-						) : null}
-
-						{form.contextFiles.map((locator, index) => (
-							<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
-								<div className="flex gap-2">
+							<ModalField label="Include README" htmlFor={`${displayNameID}-readme`}>
+								<label className="flex items-center gap-3">
 									<input
-										type="text"
-										className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
-										value={locator}
+										id={`${displayNameID}-readme`}
+										type="checkbox"
+										className="toggle toggle-accent"
+										checked={form.includeReadme}
 										onChange={event => {
-											updateContextFile(index, event.currentTarget.value);
+											updateForm('includeReadme', event.currentTarget.checked);
 										}}
-										placeholder="docs/project-context.md"
-										spellCheck="false"
 										disabled={isSubmitting}
 									/>
-									<button
-										type="button"
-										className="btn btn-sm btn-ghost rounded-xl"
-										onClick={() => {
-											removeContextFile(index);
-										}}
-										disabled={isSubmitting}
-										aria-label="Remove Context file"
-									>
-										<FiTrash2 size={14} />
-									</button>
+									<span className="text-base-content/70 text-xs">
+										Discover README.md as project Context when it exists.
+									</span>
+								</label>
+							</ModalField>
+
+							{submitted && errors.discovery ? (
+								<div className="text-error text-xs" role="alert">
+									{errors.discovery}
 								</div>
-								{locator.trim() && hasProjectFolder ? (
-									<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
-										{workspaceLocatorToPath(form.rootPath, locator)}
+							) : null}
+
+							<div className="space-y-3">
+								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+									<div>
+										<div className="text-sm font-medium">Additional Context files</div>
+										<div className="text-base-content/70 mt-1 text-xs">
+											Add Markdown files that should become project Context.
+										</div>
+									</div>
+									<div className="flex flex-wrap gap-2">
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												updateForm('contextFiles', [...form.contextFiles, '']);
+											}}
+											disabled={isSubmitting || !hasProjectFolder}
+										>
+											<FiPlus size={14} />
+											<span>Add Path</span>
+										</button>
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												void chooseContextFiles();
+											}}
+											disabled={isSubmitting || !hasProjectFolder}
+										>
+											<FiUpload size={14} />
+											<span>Choose Files</span>
+										</button>
+									</div>
+								</div>
+
+								{form.contextFiles.length === 0 ? (
+									<div className="border-base-content/10 text-base-content/60 rounded-2xl border p-4 text-sm">
+										No additional Context files.
 									</div>
 								) : null}
-							</div>
-						))}
-					</div>
 
-					<div className="space-y-3">
-						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-							<div>
-								<div className="text-sm font-medium">Additional Skill folders</div>
-								<div className="text-base-content/70 mt-1 text-xs">
-									Each selected folder is scanned recursively for SKILL.md files.
+								{form.contextFiles.map((locator, index) => (
+									<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
+										<div className="flex gap-2">
+											<input
+												type="text"
+												className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
+												value={locator}
+												onChange={event => {
+													updateContextFile(index, event.currentTarget.value);
+												}}
+												placeholder="docs/project-context.md"
+												spellCheck="false"
+												disabled={isSubmitting}
+											/>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													removeContextFile(index);
+												}}
+												disabled={isSubmitting}
+												aria-label="Remove Context file"
+											>
+												<FiTrash2 size={14} />
+											</button>
+										</div>
+										{locator.trim() && hasProjectFolder ? (
+											<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
+												{workspaceLocatorToPath(form.rootPath, locator)}
+											</div>
+										) : null}
+									</div>
+								))}
+							</div>
+
+							<div className="space-y-3">
+								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+									<div>
+										<div className="text-sm font-medium">Additional Skill folders</div>
+										<div className="text-base-content/70 mt-1 text-xs">
+											Each selected folder is scanned recursively for SKILL.md files.
+										</div>
+									</div>
+									<div className="flex flex-wrap gap-2">
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												updateForm('skillRoots', [...form.skillRoots, '']);
+											}}
+											disabled={isSubmitting || !hasProjectFolder}
+										>
+											<FiPlus size={14} />
+											<span>Add Path</span>
+										</button>
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												void chooseSkillRoot();
+											}}
+											disabled={isSubmitting || !hasProjectFolder}
+										>
+											<FiFolder size={14} />
+											<span>Choose Folder</span>
+										</button>
+									</div>
 								</div>
-							</div>
-							<div className="flex flex-wrap gap-2">
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									onClick={() => {
-										updateForm('skillRoots', [...form.skillRoots, '']);
-									}}
-									disabled={isSubmitting || !hasProjectFolder}
-								>
-									<FiPlus size={14} />
-									<span>Add Path</span>
-								</button>
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									onClick={() => {
-										void chooseSkillRoot();
-									}}
-									disabled={isSubmitting || !hasProjectFolder}
-								>
-									<FiFolder size={14} />
-									<span>Choose Folder</span>
-								</button>
-							</div>
-						</div>
 
-						{form.skillRoots.length === 0 ? (
-							<div className="border-base-content/10 text-base-content/60 rounded-2xl border p-4 text-sm">
-								No additional Skill folders.
-							</div>
-						) : null}
-
-						{form.skillRoots.map((locator, index) => (
-							<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
-								<div className="flex gap-2">
-									<input
-										type="text"
-										className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
-										value={locator}
-										onChange={event => {
-											updateSkillRoot(index, event.currentTarget.value);
-										}}
-										placeholder=".agent-skills"
-										spellCheck="false"
-										disabled={isSubmitting}
-									/>
-									<button
-										type="button"
-										className="btn btn-sm btn-ghost rounded-xl"
-										onClick={() => {
-											removeSkillRoot(index);
-										}}
-										disabled={isSubmitting}
-										aria-label="Remove Skill folder"
-									>
-										<FiTrash2 size={14} />
-									</button>
-								</div>
-								{locator.trim() && hasProjectFolder ? (
-									<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
-										{workspaceLocatorToPath(form.rootPath, locator)}
+								{form.skillRoots.length === 0 ? (
+									<div className="border-base-content/10 text-base-content/60 rounded-2xl border p-4 text-sm">
+										No additional Skill folders.
 									</div>
 								) : null}
+
+								{form.skillRoots.map((locator, index) => (
+									<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
+										<div className="flex gap-2">
+											<input
+												type="text"
+												className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
+												value={locator}
+												onChange={event => {
+													updateSkillRoot(index, event.currentTarget.value);
+												}}
+												placeholder=".agent-skills"
+												spellCheck="false"
+												disabled={isSubmitting}
+											/>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													removeSkillRoot(index);
+												}}
+												disabled={isSubmitting}
+												aria-label="Remove Skill folder"
+											>
+												<FiTrash2 size={14} />
+											</button>
+										</div>
+										{locator.trim() && hasProjectFolder ? (
+											<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
+												{workspaceLocatorToPath(form.rootPath, locator)}
+											</div>
+										) : null}
+									</div>
+								))}
 							</div>
-						))}
+						</ModalSection>
 					</div>
-				</ModalSection>
+				</details>
 
 				<ModalActions className="-mx-4 -mb-4 sm:-mx-6 sm:-mb-6">
 					<button

@@ -349,6 +349,7 @@ func (a *App) initManagers() {
 		a.skillStoreAPI.store,
 		a.skillStoreAPI.runtime,
 		a.mcpAPI.runtime,
+		a.workspaceAPI.api,
 	)
 	if err != nil {
 		slog.Error(

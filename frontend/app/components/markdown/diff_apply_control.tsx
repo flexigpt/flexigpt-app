@@ -288,12 +288,21 @@ function getApplyResolvedIdentityPaths(file: { resolvedPath?: string; targetPath
 }
 
 function applyOutputFileMatchesTarget(file: ApplyUnifiedDiffFileOut, target: ApplyUnifiedDiffFileTarget): boolean {
-	if (file.fileKey && target.fileKey && file.fileKey === target.fileKey) {
-		return true;
-	}
-
 	const filePatchPaths = getApplyPatchIdentityPaths(file);
 	const targetPatchPaths = getApplyPatchIdentityPaths(target);
+
+	// Scoped patches may cause the backend to renumber file keys. A matching
+	// key must not override contradictory patch-path identity.
+	if (
+		file.fileKey &&
+		target.fileKey &&
+		file.fileKey === target.fileKey &&
+		(filePatchPaths.length === 0 ||
+			targetPatchPaths.length === 0 ||
+			haveSharedPathIdentity(filePatchPaths, targetPatchPaths))
+	) {
+		return true;
+	}
 
 	if (
 		filePatchPaths.length > 0 &&
@@ -586,12 +595,19 @@ function mergeApplyFileTargets(
 }
 
 function applyOutputFilesMatch(left: ApplyUnifiedDiffFileOut, right: ApplyUnifiedDiffFileOut): boolean {
-	if (left.fileKey && right.fileKey && left.fileKey === right.fileKey) {
-		return true;
-	}
-
 	const leftPatchPaths = getApplyPatchIdentityPaths(left);
 	const rightPatchPaths = getApplyPatchIdentityPaths(right);
+
+	if (
+		left.fileKey &&
+		right.fileKey &&
+		left.fileKey === right.fileKey &&
+		(leftPatchPaths.length === 0 ||
+			rightPatchPaths.length === 0 ||
+			haveSharedPathIdentity(leftPatchPaths, rightPatchPaths))
+	) {
+		return true;
+	}
 
 	if (
 		leftPatchPaths.length > 0 &&
@@ -609,11 +625,21 @@ function applyOutputFilesMatch(left: ApplyUnifiedDiffFileOut, right: ApplyUnifie
 }
 
 function fileTargetsMatch(left: ApplyUnifiedDiffFileTarget, right: ApplyUnifiedDiffFileTarget): boolean {
-	if (left.fileKey && right.fileKey && left.fileKey === right.fileKey) {
+	const leftPatchPaths = getApplyPatchIdentityPaths(left);
+	const rightPatchPaths = getApplyPatchIdentityPaths(right);
+
+	if (
+		left.fileKey &&
+		right.fileKey &&
+		left.fileKey === right.fileKey &&
+		(leftPatchPaths.length === 0 ||
+			rightPatchPaths.length === 0 ||
+			haveSharedPathIdentity(leftPatchPaths, rightPatchPaths))
+	) {
 		return true;
 	}
 
-	if (haveSharedPathIdentity([left.newPath, left.oldPath], [right.newPath, right.oldPath])) {
+	if (haveSharedPathIdentity(leftPatchPaths, rightPatchPaths)) {
 		return true;
 	}
 
@@ -899,7 +925,62 @@ export function DiffApplyControl({
 		targets: ApplyUnifiedDiffFileTarget[],
 		nextStrict: boolean,
 		options?: DiffApplyRunOptions
-	) => {
+	): Promise<void> => {
+		if (targets.length > 1) {
+			const normalizedBatchTargets = normalizeApplyFileTargets(targets);
+
+			if (normalizedBatchTargets.length !== targets.length) {
+				setControlState(previous => ({
+					...previous,
+					status: 'blocked',
+					error: 'One or more applicable file patches do not have an absolute target path.',
+				}));
+				return;
+			}
+
+			// Build every scoped request before applying anything. This keeps
+			// "Apply applicable" from partially applying a batch merely because
+			// a later file section cannot be isolated safely.
+			const scopedRequests: Array<{
+				target: ApplyUnifiedDiffFileTarget;
+				diffText: string;
+			}> = [];
+
+			for (const target of normalizedBatchTargets) {
+				const scopedDiffText = buildDiffTextForEditableTargets([
+					{
+						fileKey: target.fileKey,
+						oldPath: target.oldPath,
+						newPath: target.newPath,
+						targetPath: target.targetPath,
+						candidatePaths: [target.targetPath],
+					},
+				]);
+
+				if (!scopedDiffText) {
+					setControlState(previous => ({
+						...previous,
+						status: 'blocked',
+						error: 'Could not isolate every applicable file patch. Nothing was applied; retry per file.',
+					}));
+					return;
+				}
+
+				scopedRequests.push({ target, diffText: scopedDiffText });
+			}
+
+			// Use the same one-file dry-run/apply path as the working individual
+			// Apply button. Merge each result into the aggregate modal state.
+			for (const request of scopedRequests) {
+				await runApply([request.target], nextStrict, {
+					...options,
+					diffText: request.diffText,
+					mergeOutput: true,
+				});
+			}
+			return;
+		}
+
 		const requestDiffText = prepareUnifiedDiffTextForApply(options?.diffText ?? diffText, language);
 
 		setControlState(previous => ({

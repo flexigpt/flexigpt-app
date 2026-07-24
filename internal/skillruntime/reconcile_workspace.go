@@ -46,6 +46,7 @@ func (s *SkillRuntime) ResyncWorkspace(
 			!value.FilesystemBacked ||
 			!value.Skill.IsEnabled ||
 			!value.CatalogCurrent ||
+			value.RuntimeDisabled ||
 			value.State != record.StateAvailable {
 			continue
 		}

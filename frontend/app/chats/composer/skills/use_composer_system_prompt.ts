@@ -3,13 +3,13 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import type { ModelParam } from '@/spec/inference';
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID, PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY } from '@/spec/modelpreset';
+import type { InstalledSkillRef } from '@/spec/skill';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
 
 import { skillStoreAPI } from '@/apis/baseapi';
 
 import { loadSkillOptions } from '@/assistantpresets/lib/assistant_preset_catalog';
-import { buildSkillRefKey } from '@/assistantpresets/lib/assistant_preset_utils';
 import type { AssistantPresetPreparedApplication } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import { buildEffectiveSystemPrompt } from '@/chats/composer/skills/prompt_utils';
@@ -17,6 +17,7 @@ import {
 	getSkillInstructionPromptEligibilityReason,
 	normalizeSkillSourceTags,
 } from '@/skills/lib/skill_artifact_utils';
+import { requireInstalledSkillRef, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
 interface ComposerSystemPromptPreparedSelection {
 	hasIncludeModelSystemPromptSelection: boolean;
@@ -30,7 +31,7 @@ interface RenderedInstructionSkillSource {
 	identityKey?: string;
 	displayName: string;
 	prompt: string;
-	skillRef: { bundleID: string; skillSlug: string; skillID: string };
+	skillRef: InstalledSkillRef;
 	sourceTags?: string[];
 }
 
@@ -77,7 +78,7 @@ function buildPreviousConversationSystemPromptItem(prompt: string): SystemInstru
 }
 
 function buildInstructionSkillPromptItem(draft: RenderedInstructionSkillSource): SystemInstructionSource {
-	const stableKey = `skill-instructions:${buildSkillRefKey(draft.skillRef)}`;
+	const stableKey = `skill-instructions:${skillRefKey(draft.skillRef)}`;
 
 	return {
 		identityKey: draft.identityKey ?? stableKey,
@@ -265,15 +266,16 @@ export function useComposerSystemPrompt(args: {
 
 			if (hasInstructionSourceSelection) {
 				const requestedPromptKeys = dedupeStringArray(
-					instructionSkillSelections.map(sel => `skill-instructions:${buildSkillRefKey(sel.skillRef)}`)
+					instructionSkillSelections.map(sel => `skill-instructions:${skillRefKey(sel.skillRef)}`)
 				);
 
 				const skillOptions = await loadSkillOptions({ force: true });
 				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
 
 				for (const selection of instructionSkillSelections) {
-					const skillKey = buildSkillRefKey(selection.skillRef);
+					const skillKey = skillRefKey(selection.skillRef);
 					const option = skillOptionByKey.get(skillKey);
+					const installedRef = requireInstalledSkillRef(selection.skillRef, 'Assistant preset instruction Skill');
 
 					if (!option || !option.isSelectable) {
 						throw new Error(
@@ -301,7 +303,7 @@ export function useComposerSystemPrompt(args: {
 								option.skillDefinition.displayName || option.skillDefinition.name || option.skillDefinition.slug,
 							prompt: rendered.text,
 							sourceTags: rendered.sourceTags,
-							skillRef: selection.skillRef,
+							skillRef: installedRef,
 						})
 					);
 				}

@@ -1,10 +1,12 @@
 import type { AssistantPreset, PutAssistantPresetPayload } from '@/spec/assistantpreset';
 import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { SkillRef, SkillSelection } from '@/spec/skill';
+import type { InstalledSkillSelection, SkillRef, SkillSelection } from '@/spec/skill';
 import type { ToolRef, ToolSelection } from '@/spec/tool';
 
 import { cloneJSONLike } from '@/lib/jsonschema_utils';
+
+import { requireInstalledSkillRef, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
 export interface AssistantPresetUpsertInput extends PutAssistantPresetPayload {
 	slug: string;
@@ -20,7 +22,7 @@ export function buildToolRefKey(ref: ToolRef): string {
 }
 
 export function buildSkillRefKey(ref: SkillRef): string {
-	return `${ref.bundleID}/${ref.skillSlug}#${ref.skillID}`;
+	return skillRefKey(ref);
 }
 
 function cloneToolSelection(selection: ToolSelection): ToolSelection {
@@ -59,15 +61,16 @@ export function hasAssistantPresetMCPContext(context?: MCPConversationContext): 
 	);
 }
 
-function cloneSkillRef(ref: SkillRef): SkillRef {
+function cloneSkillRef(ref: SkillRef) {
+	const installed = requireInstalledSkillRef(ref, 'Assistant preset Skill reference');
 	return {
-		bundleID: ref.bundleID,
-		skillSlug: ref.skillSlug,
-		skillID: ref.skillID,
+		bundleID: installed.bundleID,
+		skillSlug: installed.skillSlug,
+		skillID: installed.skillID,
 	};
 }
 
-export function cloneSkillSelection(sel: SkillSelection): SkillSelection {
+export function cloneSkillSelection(sel: SkillSelection): InstalledSkillSelection {
 	return {
 		skillRef: cloneSkillRef(sel.skillRef),
 		preLoadAsActive: sel.preLoadAsActive,

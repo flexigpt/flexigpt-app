@@ -33,7 +33,6 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
-import { buildSkillRefKey } from '@/assistantpresets/lib/assistant_preset_utils';
 import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import {
 	getSkillInstructionPromptEligibilityReason,
@@ -41,7 +40,13 @@ import {
 	skillCanBePreloadedAsActive,
 	skillCanBeRenderedAsInstructionPrompt,
 } from '@/skills/lib/skill_artifact_utils';
-import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
+import {
+	dedupeSkillRefs,
+	isInstalledSkillRef,
+	requireInstalledSkillRef,
+	skillRefFromListItem,
+	skillRefKey,
+} from '@/skills/lib/skill_identity_utils';
 
 const SIMPLE_SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const skillRowActionButtonClasses = 'btn btn-ghost btn-xs rounded-lg';
@@ -80,7 +85,7 @@ function getSkillDisplayLabel(item: SkillListItem): string {
 }
 
 function getInstructionSourceIdentityKey(item: SkillListItem): string {
-	return `skill-instructions:${buildSkillRefKey(skillRefFromListItem(item))}`;
+	return `skill-instructions:${skillRefKey(skillRefFromListItem(item))}`;
 }
 
 function compareSkillListItems(a: SkillListItem, b: SkillListItem): number {
@@ -581,12 +586,12 @@ export function SkillsBottomBarChip({
 			if (rendered.insert !== 'instructions') {
 				throw new Error(`Expected instruction skill, but renderer returned insert=${rendered.insert}.`);
 			}
-
+			const skillRef = requireInstalledSkillRef(skillRefFromListItem(item), 'Instruction Skill');
 			systemPrompt.addAndSelectInstructionSkillSource({
 				identityKey: getInstructionSourceIdentityKey(item),
 				displayName: getSkillDisplayLabel(item),
 				prompt: rendered.text,
-				skillRef: skillRefFromListItem(item),
+				skillRef,
 				sourceTags: rendered.sourceTags,
 			});
 		},
@@ -617,7 +622,13 @@ export function SkillsBottomBarChip({
 	const hasSelectedSystemInstructionState =
 		systemPrompt.includeModelDefault || systemPrompt.selectedInstructionSourceKeys.length > 0;
 	const hasClearableSkillState =
-		enabledSkillRefs.length > 0 || activeSkillRefs.length > 0 || hasSelectedSystemInstructionState;
+		enabledSkillRefs.some(r => {
+			return isInstalledSkillRef(r);
+		}) ||
+		activeSkillRefs.some(r => {
+			return isInstalledSkillRef(r);
+		}) ||
+		hasSelectedSystemInstructionState;
 
 	const hoverTipContent = useMemo(
 		() => (

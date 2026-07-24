@@ -1,5 +1,5 @@
 import type { AssistantModelPresetOption, ModelPresetRef, ProviderPreset } from '@/spec/modelpreset';
-import type { AssistantSkillOption, SkillSelection } from '@/spec/skill';
+import type { AssistantSkillOption, InstalledSkillSelection } from '@/spec/skill';
 import { SkillPresenceStatus } from '@/spec/skill';
 import type { AssistantToolOption, ToolRef } from '@/spec/tool';
 
@@ -302,7 +302,7 @@ async function loadSkillOptionsUncached(): Promise<AssistantSkillOption[]> {
 				'User-message skills are composer templates and cannot be assistant preset skill-session selections.';
 		}
 
-		const sel: SkillSelection = {
+		const sel: InstalledSkillSelection = {
 			skillRef: {
 				bundleID: item.bundleID,
 				skillSlug: item.skillSlug,

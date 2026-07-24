@@ -300,6 +300,100 @@ export interface WorkspaceSkillLoadView {
 	diagnostics?: WorkspaceDiagnostic[];
 }
 
+export enum WorkspaceConversationSelectionStatus {
+	Ready = 'ready',
+	Partial = 'partial',
+	Unavailable = 'unavailable',
+}
+
+export enum WorkspaceConversationSkillUsageStatus {
+	Available = 'available',
+	Unavailable = 'unavailable',
+}
+
+export interface WorkspaceConversationResourceSelectionRef {
+	recordID: WorkspaceRecordID;
+	name?: string;
+	locator?: WorkspaceLocator;
+	definitionDigest?: WorkspaceDigest;
+	recordRevision?: number;
+}
+
+export interface WorkspaceConversationSkillSelectionRef extends WorkspaceConversationResourceSelectionRef {
+	identity: string;
+	displayName?: string;
+	insert?: WorkspaceSkillInsert;
+}
+
+export interface WorkspaceConversationSelection {
+	rootID: WorkspaceRootID;
+	displayName?: string;
+	workspaceRevision?: number;
+	catalogRevision?: number;
+	contextRefs?: WorkspaceConversationResourceSelectionRef[];
+	skillRefs?: WorkspaceConversationSkillSelectionRef[];
+}
+
+export interface WorkspaceConversationContextUsage {
+	recordID: WorkspaceRecordID;
+	name?: string;
+	locator?: WorkspaceLocator;
+	selectedDefinitionDigest?: WorkspaceDigest;
+	usedDefinitionDigest?: WorkspaceDigest;
+	status: WorkspaceContextCompositionStatus;
+	code?: string;
+	originalBytes?: number;
+	includedBytes?: number;
+	changed?: boolean;
+	diagnostics?: WorkspaceDiagnostic[];
+}
+
+export interface WorkspaceConversationSkillUsage {
+	recordID: WorkspaceRecordID;
+	identity: string;
+	name?: string;
+	displayName?: string;
+	locator?: WorkspaceLocator;
+	selectedDefinitionDigest?: WorkspaceDigest;
+	usedDefinitionDigest?: WorkspaceDigest;
+	status: WorkspaceConversationSkillUsageStatus;
+	changed?: boolean;
+	sessionAvailable?: boolean;
+	active?: boolean;
+	advertised?: boolean;
+	diagnostics?: WorkspaceDiagnostic[];
+}
+
+export interface WorkspaceConversationUsage {
+	rootID: WorkspaceRootID;
+	displayName?: string;
+	workspaceRevision?: number;
+	catalogRevision?: number;
+	status: WorkspaceConversationSelectionStatus;
+	contexts?: WorkspaceConversationContextUsage[];
+	skills?: WorkspaceConversationSkillUsage[];
+	diagnostics?: WorkspaceDiagnostic[];
+}
+
+export function workspaceSkillIdentity(rootID: WorkspaceRootID, recordID: WorkspaceRecordID): string {
+	return `workspace/${rootID}/${recordID}`;
+}
+
+export function parseWorkspaceSkillIdentity(
+	identity?: string
+): { rootID: WorkspaceRootID; recordID: WorkspaceRecordID } | undefined {
+	const parts = identity?.trim().split('/') ?? [];
+	if (parts.length !== 3 || parts[0] !== 'workspace' || !parts[1] || !parts[2]) {
+		return undefined;
+	}
+
+	return { rootID: parts[1], recordID: parts[2] };
+}
+
+export function isWorkspaceSkillIdentity(identity?: string): boolean {
+	return parseWorkspaceSkillIdentity(identity) !== undefined;
+}
+
 export interface CreateFilesystemWorkspacePayload {
 	displayName: string;
 	description?: string;

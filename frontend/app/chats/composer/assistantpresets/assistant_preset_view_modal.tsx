@@ -58,13 +58,6 @@ function formatToolLabel(choice: {
 	};
 }
 
-function formatSkillLabel(ref: { bundleID: string; skillSlug: string; skillID: string }) {
-	return {
-		title: ref.skillSlug,
-		meta: `${ref.bundleID} • ${ref.skillID}`,
-	};
-}
-
 function formatSkillSelectionLabel(sel: SkillSelection) {
 	const metaParts = [`${sel.skillRef.bundleID} • ${sel.skillRef.skillID}`];
 	if (sel.preLoadAsActive) {
@@ -175,7 +168,10 @@ function formatMCPContextLabelItems(context?: MCPConversationContext): Array<{ t
 	return items;
 }
 
-function renderSimpleList(items: Array<{ title: string; meta?: string }>, emptyText: string): React.ReactNode {
+function renderSimpleList(
+	items: Array<{ title: string | undefined; meta?: string }>,
+	emptyText: string
+): React.ReactNode {
 	if (items.length === 0) {
 		return <div className="text-xs opacity-70">{emptyText}</div>;
 	}
@@ -349,7 +345,12 @@ function AssistantPresetViewModalContent({
 		.filter(selection => !selection.useAsInstructions)
 		.map(selection => formatSkillSelectionLabel(selection));
 	const currentSkillItems = shouldShowActiveComparison
-		? currentRuntimeSnapshot.enabledSkillRefs.map(formatSkillLabel)
+		? currentRuntimeSnapshot.enabledSkillRefs.map(r => {
+				return {
+					title: r.skillSlug,
+					meta: `${r.bundleID} • ${r.skillID}`,
+				};
+			})
 		: [];
 
 	const appliedMCPContext =

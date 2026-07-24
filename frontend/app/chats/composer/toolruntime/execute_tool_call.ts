@@ -402,6 +402,7 @@ export async function executeComposerToolCall({
 					arguments: toolCall.arguments,
 					webSearchToolCallItems: toolCall.webSearchToolCallItems,
 					toolStoreChoice: toolCall.toolStoreChoice,
+					skillRuntimeMeta: resp.meta,
 				},
 			};
 		} catch (err) {

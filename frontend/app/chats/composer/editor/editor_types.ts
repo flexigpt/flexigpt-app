@@ -3,6 +3,7 @@ import type { UIToolOutput } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
+import type { WorkspaceConversationSelection } from '@/spec/workspace';
 
 export interface EditorExternalMessage {
 	text: string;
@@ -13,6 +14,7 @@ export interface EditorExternalMessage {
 	toolOutputs?: UIToolOutput[];
 	enabledSkillRefs?: SkillRef[];
 	activeSkillRefs?: SkillRef[];
+	workspaceSelection?: WorkspaceConversationSelection;
 }
 
 export interface EditorSubmitPayload {
@@ -27,6 +29,7 @@ export interface EditorSubmitPayload {
 	enabledSkillRefs?: SkillRef[];
 	activeSkillRefs?: SkillRef[];
 	skillSessionID?: string;
+	workspaceSelection?: WorkspaceConversationSelection;
 }
 
 export interface AssistantTurnFinishedPayload {

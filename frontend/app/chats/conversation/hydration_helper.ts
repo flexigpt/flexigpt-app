@@ -17,6 +17,7 @@ import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
+import type { WorkspaceConversationSelection } from '@/spec/workspace';
 
 import { stripUndefinedDeep } from '@/lib/obj_utils';
 import { generateTitle } from '@/lib/title_utils';
@@ -116,6 +117,19 @@ function deriveActiveSkillRefsFromMessages(messages: ConversationMessage[]): Ski
 	return [];
 }
 
+function deriveWorkspaceSelectionFromMessages(
+	messages: ConversationMessage[]
+): WorkspaceConversationSelection | undefined {
+	for (let i = messages.length - 1; i >= 0; i -= 1) {
+		const message = messages[i];
+		if (message.role !== RoleEnum.User) {
+			continue;
+		}
+		return message.workspaceSelection;
+	}
+	return undefined;
+}
+
 function findLastModelPresetRef(messages: ConversationMessage[]): ModelPresetRef | undefined {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const ref = messages[i].modelPresetRef;
@@ -192,6 +206,7 @@ export function deriveRestorableConversationContextFromMessages(
 		mcpAppContextUpdates: deriveMCPAppContextUpdatesFromMessages(messages),
 		enabledSkillRefs,
 		activeSkillRefs,
+		workspaceSelection: deriveWorkspaceSelectionFromMessages(messages),
 	};
 }
 
@@ -279,6 +294,7 @@ export function buildUserConversationMessageFromEditor(
 		mcpAppContextUpdates,
 		enabledSkillRefs: enabledSkillRefs.length > 0 ? enabledSkillRefs : undefined,
 		activeSkillRefs: activeSkillRefs.length > 0 ? activeSkillRefs : undefined,
+		workspaceSelection: payload.workspaceSelection,
 		uiContent: text,
 		uiToolOutputs: toolOutputs,
 	};

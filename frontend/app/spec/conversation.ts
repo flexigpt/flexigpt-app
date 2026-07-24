@@ -17,6 +17,7 @@ import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mc
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
+import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
 
 /** Keep in sync with Go's ConversationSchemaVersion. */
 export const CONVERSATION_SCHEMA_VERSION = 'v1.0.0';
@@ -41,6 +42,9 @@ export interface StoreConversationMessage {
 	attachments?: Attachment[];
 	enabledSkillRefs?: SkillRef[];
 	activeSkillRefs?: SkillRef[];
+
+	workspaceSelection?: WorkspaceConversationSelection;
+	workspaceUsage?: WorkspaceConversationUsage;
 
 	usage?: InferenceUsage;
 	error?: InferenceError;
@@ -90,4 +94,5 @@ export interface RestorableConversationContext {
 	webSearchChoices: ToolStoreChoice[];
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
+	workspaceSelection?: WorkspaceConversationSelection;
 }

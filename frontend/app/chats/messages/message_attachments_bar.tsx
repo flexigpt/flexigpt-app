@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import {
+	FiBriefcase,
 	FiChevronRight,
 	FiCode,
 	FiFileText,
@@ -24,6 +25,8 @@ import { MCPExecutionMode } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
+import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
+import { WorkspaceContextCompositionStatus, WorkspaceConversationSkillUsageStatus } from '@/spec/workspace';
 
 import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';
 import {
@@ -31,6 +34,7 @@ import {
 	getAttachmentContentBlockModeTooltip,
 } from '@/chats/composer/attachments/attachment_mode_menu_utils';
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
+import { formatSkillRef, isWorkspaceSkillRef } from '@/skills/lib/skill_identity_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
 /**
@@ -467,7 +471,7 @@ function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: Me
 }
 
 function formatSkillRefForChip(ref: SkillRef): string {
-	return `${ref.bundleID}/${ref.skillSlug}#${ref.skillID}`;
+	return formatSkillRef(ref);
 }
 
 function MessageSkillsContextChip({
@@ -514,6 +518,193 @@ function MessageSkillsContextChip({
 				</>
 			}
 		/>
+	);
+}
+
+function MessageWorkspaceContextChip({
+	selection,
+	usage,
+}: {
+	selection?: WorkspaceConversationSelection;
+	usage?: WorkspaceConversationUsage;
+}) {
+	const menu = useMenuStore({
+		placement: 'bottom-start',
+		focusLoop: true,
+	});
+	const open = useStoreState(menu, 'open');
+
+	if (!selection && !usage) {
+		return null;
+	}
+
+	const displayName = usage?.displayName || selection?.displayName || 'Workspace';
+	const requestedContexts = selection?.contextRefs ?? [];
+	const requestedSkills = selection?.skillRefs ?? [];
+	const hasRecordedUsage = usage !== undefined;
+	const contexts = usage?.contexts ?? [];
+	const skills = usage?.skills ?? [];
+	const includedContextCount = contexts.filter(
+		item =>
+			item.status === WorkspaceContextCompositionStatus.Included ||
+			item.status === WorkspaceContextCompositionStatus.Truncated
+	).length;
+	const availableSkillCount = skills.filter(item => item.sessionAvailable).length;
+	const activeSkillCount = skills.filter(item => item.active).length;
+	const contextBadgeCount = hasRecordedUsage ? includedContextCount : requestedContexts.length;
+	const skillBadgeCount = hasRecordedUsage ? availableSkillCount : requestedSkills.length;
+	const warningCount =
+		contexts.filter(
+			item =>
+				item.status !== WorkspaceContextCompositionStatus.Included &&
+				item.status !== WorkspaceContextCompositionStatus.Truncated
+		).length +
+		skills.filter(item => item.status !== WorkspaceConversationSkillUsageStatus.Available).length +
+		(usage?.diagnostics?.length ?? 0);
+
+	return (
+		<div className="shrink-0">
+			<MenuButton
+				store={menu}
+				className={getMessageBarChipClassName(warningCount > 0 ? 'secondary' : 'info', false, true)}
+				title={`${displayName}\nWorkspace state recorded for this turn`}
+				data-message-chip="workspace-context"
+			>
+				<FiBriefcase size={14} />
+				<span className="max-w-32 truncate">{displayName}</span>
+				{contextBadgeCount > 0 ? (
+					<span className="badge badge-secondary badge-xs">
+						{hasRecordedUsage ? 'Context' : 'Selected'} {contextBadgeCount}
+					</span>
+				) : null}
+				{skillBadgeCount > 0 ? (
+					<span className="badge badge-info badge-xs">
+						{hasRecordedUsage ? 'Skills' : 'Selected'} {skillBadgeCount}
+					</span>
+				) : null}
+				{activeSkillCount > 0 ? <span className="badge badge-success badge-xs">Active {activeSkillCount}</span> : null}
+				{warningCount > 0 ? <span className="badge badge-warning badge-xs">{warningCount}</span> : null}
+				<FiChevronRight size={14} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
+			</MenuButton>
+
+			{open ? (
+				<Menu
+					store={menu}
+					gutter={8}
+					overflowPadding={8}
+					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-96 w-lg max-w-[calc(100vw-1rem)] overflow-y-auto border p-3 shadow-xl"
+					autoFocusOnShow
+				>
+					<div className="text-sm font-semibold">{displayName}</div>
+					<div className="text-base-content/60 mt-1 text-xs">
+						{usage
+							? `Recorded at send time · catalog revision ${usage.catalogRevision ?? 'unknown'}`
+							: 'The Workspace selection was recorded, but an exact backend usage result is unavailable.'}
+					</div>
+
+					{selection ? (
+						<>
+							<div className="mt-3 text-xs font-semibold">Requested selection</div>
+							<div className="mt-1 space-y-1">
+								{requestedContexts.map(item => (
+									<div
+										key={`requested-context:${item.recordID}`}
+										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
+									>
+										<FiFileText size={13} className="mt-0.5" />
+										<div className="min-w-0 flex-1">
+											<div className="truncate text-xs">{item.name || item.recordID}</div>
+											<div className="text-base-content/60 truncate font-mono text-[10px]">
+												{item.locator || item.recordID}
+											</div>
+										</div>
+										<span className="badge badge-secondary badge-xs">Context</span>
+									</div>
+								))}
+
+								{requestedSkills.map(item => (
+									<div
+										key={`requested-skill:${item.identity}`}
+										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
+									>
+										<FiZap size={13} className="mt-0.5" />
+										<div className="min-w-0 flex-1">
+											<div className="truncate text-xs">{item.displayName || item.name || item.recordID}</div>
+											<div className="text-base-content/60 truncate font-mono text-[10px]">{item.identity}</div>
+										</div>
+										<span className="badge badge-info badge-xs">Skill</span>
+									</div>
+								))}
+
+								{requestedContexts.length === 0 && requestedSkills.length === 0 ? (
+									<div className="text-base-content/60 px-1 text-xs">No Context or Skill records were selected.</div>
+								) : null}
+							</div>
+						</>
+					) : null}
+
+					{!usage ? (
+						<div className="border-base-content/10 text-base-content/60 mt-3 rounded-xl border p-2 text-xs">
+							Exact Workspace send-time usage was not recorded for this older message.
+						</div>
+					) : null}
+
+					{usage ? (
+						<>
+							<div className="mt-3 text-xs font-semibold">Send-time Context outcome</div>
+							<div className="mt-1 space-y-1">
+								{contexts.map(item => (
+									<div key={item.recordID} className="bg-base-100 flex items-start gap-2 rounded-xl p-2">
+										<FiFileText size={13} className="mt-0.5" />
+										<div className="min-w-0 flex-1">
+											<div className="truncate text-xs">{item.name || item.recordID}</div>
+											<div className="text-base-content/60 truncate font-mono text-[10px]">
+												{item.locator || item.recordID}
+											</div>
+										</div>
+										<span className="badge badge-ghost badge-xs">{item.status}</span>
+									</div>
+								))}
+							</div>
+
+							<div className="mt-3 text-xs font-semibold">Send-time Workspace Skill outcome</div>
+							<div className="mt-1 space-y-1">
+								{skills.map(item => (
+									<div key={item.identity} className="bg-base-100 flex items-start gap-2 rounded-xl p-2">
+										<FiZap size={13} className="mt-0.5" />
+										<div className="min-w-0 flex-1">
+											<div className="truncate text-xs">{item.displayName || item.name || item.recordID}</div>
+											<div className="text-base-content/60 truncate font-mono text-[10px]">{item.identity}</div>
+										</div>
+										{item.sessionAvailable ? <span className="badge badge-info badge-xs">Available</span> : null}
+										{item.active ? <span className="badge badge-success badge-xs">Active</span> : null}
+										{item.status !== WorkspaceConversationSkillUsageStatus.Available ? (
+											<span className="badge badge-warning badge-xs">{item.status}</span>
+										) : null}
+									</div>
+								))}
+							</div>
+
+							{usage.diagnostics?.length ? (
+								<div className="mt-3">
+									<div className="text-xs font-semibold">Diagnostics</div>
+									<div className="mt-1 space-y-1">
+										{usage.diagnostics.map((diagnostic, index) => (
+											<div
+												key={`${diagnostic.code}:${index}`}
+												className="bg-base-100 text-base-content/70 rounded-xl p-2 text-[10px]"
+											>
+												<span className="font-mono">{diagnostic.code}</span>: {diagnostic.message}
+											</div>
+										))}
+									</div>
+								</div>
+							) : null}
+						</>
+					) : null}
+				</Menu>
+			) : null}
+		</div>
 	);
 }
 
@@ -709,6 +900,8 @@ interface MessageAttachmentsBarProps {
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	enabledSkillRefs?: SkillRef[];
 	activeSkillRefs?: SkillRef[];
+	workspaceSelection?: WorkspaceConversationSelection;
+	workspaceUsage?: WorkspaceConversationUsage;
 	toolCalls?: UIToolCall[];
 	toolOutputs?: UIToolOutput[];
 	onToolChoiceDetails?: (choice: ToolStoreChoice) => void;
@@ -731,6 +924,8 @@ export function MessageAttachmentsBar({
 	mcpAppContextUpdates,
 	enabledSkillRefs,
 	activeSkillRefs,
+	workspaceSelection,
+	workspaceUsage,
 	toolCalls,
 	toolOutputs,
 	onToolChoiceDetails,
@@ -740,8 +935,8 @@ export function MessageAttachmentsBar({
 	const choices = toolChoices ?? [];
 	const calls = toolCalls ?? [];
 	const outputs = toolOutputs ?? [];
-	const enabledSkills = enabledSkillRefs ?? [];
-	const activeSkills = activeSkillRefs ?? [];
+	const enabledSkills = (enabledSkillRefs ?? []).filter(ref => !isWorkspaceSkillRef(ref));
+	const activeSkills = (activeSkillRefs ?? []).filter(ref => !isWorkspaceSkillRef(ref));
 
 	const normalToolChoices = choices.filter(c => c.toolType !== ToolStoreChoiceType.WebSearch);
 	const webSearchChoices = choices.filter(c => c.toolType === ToolStoreChoiceType.WebSearch);
@@ -762,6 +957,7 @@ export function MessageAttachmentsBar({
 		0;
 	const hasMCPAppContext = (mcpAppContextUpdates?.length ?? 0) > 0;
 	const hasSkillContext = enabledSkills.length > 0 || activeSkills.length > 0;
+	const hasWorkspace = Boolean(workspaceSelection || workspaceUsage);
 
 	const hasWebSearchTools = webSearchChoices.length > 0;
 	const hasToolCalls = normalToolCalls.length > 0;
@@ -772,6 +968,7 @@ export function MessageAttachmentsBar({
 	if (
 		!hasAttachments &&
 		!hasTools &&
+		!hasWorkspace &&
 		!hasMCP &&
 		!hasMCPAppContext &&
 		!hasSkillContext &&
@@ -789,6 +986,8 @@ export function MessageAttachmentsBar({
 			className="flex min-h-8 max-w-full min-w-0 items-center gap-1 overflow-x-auto text-xs"
 			style={{ scrollbarGutter: 'stable' }}
 		>
+			{hasWorkspace ? <MessageWorkspaceContextChip selection={workspaceSelection} usage={workspaceUsage} /> : null}
+
 			{hasAttachments && <AttachmentsGroupChip attachments={attachments ?? []} />}
 
 			{/* Regular tools for this turn */}

@@ -51,9 +51,9 @@ function textContainsDiffPayload(text: string | undefined): boolean {
 }
 
 const ABSOLUTE_PATH_PATTERN = /(?:[A-Za-z]:[\\/][^\s"'`<>|]+|\\\\[^\s"'`<>|]+|\/[^\s"'`<>|]+)/g;
-const RELATIVE_PATH_PATTERN = /(?:\.{1,2}[\\/])?(?:[A-Za-z0-9_.@+-]+[\\/]){1,}[A-Za-z0-9_.@+-]+/g;
 const PATH_LIKE_KEY_PATTERN =
 	/(?:^|[_-])(path|paths|file|files|dir|dirs|directory|directories|root|workspace)(?:$|[_-])/i;
+const EMBEDDED_POSIX_PATH_PREFIX_PATTERN = /[A-Za-z0-9_%+.-]/;
 
 interface CandidatePathSource {
 	path: string;
@@ -79,17 +79,6 @@ function isAbsoluteCandidatePath(path: string): boolean {
 function looksLikeDirectoryPath(path: string): boolean {
 	const trimmed = path.trim();
 	return trimmed.endsWith('/') || trimmed.endsWith('\\');
-}
-
-function pathBasename(path: string): string {
-	const normalized = path.trim().replaceAll('\\', '/').replaceAll(/\/+$/g, '');
-	const index = normalized.lastIndexOf('/');
-	return index >= 0 ? normalized.slice(index + 1) : normalized;
-}
-
-function pathBasenameLooksLikeFile(path: string): boolean {
-	const basename = pathBasename(path);
-	return /\.[^./]+$/.test(basename);
 }
 
 function resolveActiveTab(tabs: ChatTabState[], selectedTabId: string): ChatTabState | undefined {
@@ -202,7 +191,7 @@ function pushUniqueCandidatePath(out: string[], seen: Set<string>, path: string)
 
 function appendCandidatePathSource(cumulative: string[], seen: Set<string>, source: CandidatePathSource): string[] {
 	const cleaned = cleanCandidatePathToken(source.path);
-	if (!cleaned) {
+	if (!cleaned || !isAbsoluteCandidatePath(cleaned)) {
 		return cumulative;
 	}
 
@@ -214,36 +203,19 @@ function appendCandidatePathSource(cumulative: string[], seen: Set<string>, sour
 		return pushUniqueCandidatePath(next, seen, path);
 	};
 
-	push(cleaned);
-
-	const isAbsolute = isAbsoluteCandidatePath(cleaned);
-	const directoryHint =
-		source.isDirectory || looksLikeDirectoryPath(cleaned) || (isAbsolute && !pathBasenameLooksLikeFile(cleaned));
-
-	if (directoryHint) {
+	const isDirectory = source.isDirectory === true || looksLikeDirectoryPath(cleaned);
+	if (isDirectory) {
 		push(formatDirectoryCandidate(cleaned));
-	}
-
-	if (!isAbsolute) {
 		return next;
 	}
 
-	let dir =
-		source.isDirectory || looksLikeDirectoryPath(cleaned)
-			? stripTrailingCandidateSlashes(cleaned)
-			: dirnameCandidatePath(cleaned);
-	let depth = 0;
+	push(cleaned);
 
-	while (dir && isAbsoluteCandidatePath(dir) && depth < 12 && next.length < MAX_DIFF_CANDIDATE_PATHS) {
-		push(formatDirectoryCandidate(dir));
-
-		const parent = dirnameCandidatePath(dir);
-		if (!parent || parent === dir) {
-			break;
-		}
-
-		dir = parent;
-		depth += 1;
+	// The containing directory is grounded by the supplied file path. Do not
+	// turn every ancestor, including the filesystem root, into a workspace hint.
+	const parent = dirnameCandidatePath(cleaned);
+	if (parent && isAbsoluteCandidatePath(parent)) {
+		push(formatDirectoryCandidate(parent));
 	}
 
 	return next;
@@ -288,31 +260,19 @@ function extractPathMentionsFromText(text: string | undefined): string[] {
 		const index = match.index ?? 0;
 		const previous = index > 0 ? text[index - 1] : '';
 
-		// Avoid extracting the path part of URLs such as https://host/path.
-		if (previous === ':' || previous === '/') {
+		// Avoid URLs and absolute-looking suffixes inside tokens such as
+		// `10/foo`, `+10/foo`, and `%q/foo`.
+		if (
+			previous === ':' ||
+			previous === '/' ||
+			previous === '\\' ||
+			(raw.startsWith('/') && EMBEDDED_POSIX_PATH_PREFIX_PATTERN.test(previous))
+		) {
 			continue;
 		}
 
 		const cleaned = cleanCandidatePathToken(raw);
-		if (cleaned) {
-			out.push(cleaned);
-		}
-	}
-
-	for (const match of text.matchAll(RELATIVE_PATH_PATTERN)) {
-		const raw = match[0] ?? '';
-		const index = match.index ?? 0;
-		const previous = index > 0 ? text[index - 1] : '';
-
-		if (previous === '/' || previous === '\\' || previous === ':' || /[A-Za-z0-9_.@+-]/.test(previous)) {
-			continue;
-		}
-		if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('www.')) {
-			continue;
-		}
-
-		const cleaned = cleanCandidatePathToken(raw);
-		if (cleaned) {
+		if (cleaned && isAbsoluteCandidatePath(cleaned)) {
 			out.push(cleaned);
 		}
 	}
@@ -326,14 +286,7 @@ function valueLooksPathLike(value: string): boolean {
 		return false;
 	}
 
-	return (
-		isAbsoluteCandidatePath(cleaned) ||
-		looksLikeDirectoryPath(cleaned) ||
-		cleaned.includes('/') ||
-		cleaned.includes('\\') ||
-		cleaned.startsWith('./') ||
-		cleaned.startsWith('../')
-	);
+	return isAbsoluteCandidatePath(cleaned);
 }
 
 function collectPathLikeStringsFromJSON(value: unknown, out: string[], keyHint = '', depth = 0) {
@@ -346,7 +299,7 @@ function collectPathLikeStringsFromJSON(value: unknown, out: string[], keyHint =
 			return;
 		}
 
-		if (PATH_LIKE_KEY_PATTERN.test(keyHint) || valueLooksPathLike(value)) {
+		if (PATH_LIKE_KEY_PATTERN.test(keyHint) && valueLooksPathLike(value)) {
 			out.push(value);
 		}
 		return;
@@ -419,8 +372,12 @@ function getMessageCandidatePathSources(message: ConversationMessage): Candidate
 		out.push(...getAttachmentCandidatePathSources(attachment));
 	}
 
-	for (const path of extractPathMentionsFromText(message.uiContent)) {
-		out.push({ path });
+	// User-authored absolute paths are explicit evidence. Assistant prose is
+	// not filesystem evidence and must not seed later diff target inference.
+	if (message.role === RoleEnum.User) {
+		for (const path of extractPathMentionsFromText(message.uiContent)) {
+			out.push({ path });
+		}
 	}
 
 	for (const call of message.uiToolCalls ?? []) {
@@ -433,19 +390,8 @@ function getMessageCandidatePathSources(message: ConversationMessage): Candidate
 		for (const path of extractPathMentionsFromStructuredText(output.arguments)) {
 			out.push({ path });
 		}
-		for (const path of extractPathMentionsFromText(output.summary)) {
-			out.push({ path });
-		}
-		for (const path of extractPathMentionsFromText(output.errorMessage)) {
-			out.push({ path });
-		}
 
 		for (const item of output.toolOutputs ?? []) {
-			if (item.kind === ToolOutputKind.Text && item.textItem?.text) {
-				for (const path of extractPathMentionsFromText(item.textItem.text)) {
-					out.push({ path });
-				}
-			}
 			if (item.kind === ToolOutputKind.File && item.fileItem?.fileName) {
 				out.push({ path: item.fileItem.fileName });
 			}
@@ -622,6 +568,8 @@ export interface ConversationAreaHandle {
 	openSystemPromptMenu: (tabId: string) => void;
 	openSkillsMenu: (tabId: string) => void;
 	openMCPMenu: (tabId: string) => void;
+	openWorkspaceMenu: (tabId: string) => void;
+
 	requestStopResponse: (tabId: string) => void;
 
 	setScrollTopForTab: (tabId: string, top: number) => void;
@@ -707,6 +655,7 @@ function ConversationAreaInner(
 		openSystemPromptMenu,
 		openSkillsMenu,
 		openMCPMenu,
+		openWorkspaceMenu,
 		requestStopResponse,
 		disposeInputRuntime,
 		applyWorkflowStarterToComposer,
@@ -832,6 +781,7 @@ function ConversationAreaInner(
 			openSystemPromptMenu,
 			openSkillsMenu,
 			openMCPMenu,
+			openWorkspaceMenu,
 			requestStopResponse,
 			setScrollTopForTab,
 			resetScrollToTop,
@@ -847,6 +797,7 @@ function ConversationAreaInner(
 			openSystemPromptMenu,
 			openSkillsMenu,
 			openMCPMenu,
+			openWorkspaceMenu,
 			requestStopResponse,
 			openTemplateMenu,
 			openToolMenu,

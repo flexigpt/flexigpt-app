@@ -1099,16 +1099,16 @@ function resolveEditableTargetPathsForUI(
 	const knownSourcePaths = absolutePathStrings([...externalKnownCandidatePaths, ...externalWorkspaceRoots]);
 	const knownInferences = inferTargetPathsForUI(file, knownSourcePaths, workspaceRootKeys);
 	const isNewFile = isNewUnifiedDiffFile(file);
-	const localSourcePaths = absolutePathStrings([
-		...localCandidatePaths,
-		file.targetPath,
-		file.resolvedPath,
-		file.oldPath,
-		file.newPath,
-	]);
+
+	// Patch headers identify the requested operation, but they are not
+	// independent evidence that the same absolute path exists locally.
+	const explicitResolvedPaths = absolutePathStrings([file.targetPath, file.resolvedPath]);
+	const localSourcePaths = absolutePathStrings([...localCandidatePaths, ...explicitResolvedPaths]).filter(
+		path => pathListIncludes(explicitResolvedPaths, path) || !isPatchPathEcho(path, patchPaths)
+	);
 	const localInferences = isNewFile ? [] : inferTargetPathsForUI(file, localSourcePaths);
 	const knownTargetPaths = uniqueStrings(knownInferences.map(inference => inference.targetPath));
-	const directLocalTargetPaths = absolutePathStrings([file.resolvedPath, file.targetPath]).filter(path =>
+	const directLocalTargetPaths = explicitResolvedPaths.filter(path =>
 		isResolvedPathCompatibleWithPatchPath(path, file)
 	);
 	const fallbackTargetPaths = uniqueStrings([
@@ -1174,13 +1174,7 @@ function chooseEditableTargetPath(
 		return bestLocalTargets.length === 1 ? (bestLocalTargets[0] ?? '') : '';
 	}
 
-	return (
-		getPatchPathsForTargetInference(file)
-			.map(f => {
-				return toAbsolutePath(f);
-			})
-			.find(Boolean) ?? ''
-	);
+	return '';
 }
 
 function isResolvedPathCompatibleWithPatchPath(
@@ -1242,7 +1236,10 @@ function inferTargetPathsForUI(
 ): TargetPathInferenceForUI[] {
 	const inferences: TargetPathInferenceForUI[] = [];
 	const patchPaths = getPatchPathsForTargetInference(file);
-	const sources = absolutePathStrings([...(file.candidatePaths ?? []), ...candidatePaths]);
+
+	// The caller decides which paths are evidence. Do not silently re-add
+	// candidate paths parsed from the patch itself.
+	const sources = absolutePathStrings(candidatePaths);
 
 	for (let patchIndex = 0; patchIndex < patchPaths.length; patchIndex += 1) {
 		const patchPathRaw = patchPaths[patchIndex];
@@ -1507,21 +1504,27 @@ function parsedFileMatchesTarget(
 	}
 ): boolean {
 	const targetFileKey = target.fileKey?.trim();
+	const targetIdentity = getPatchFileIdentity(target);
+	const fileIdentity = getPatchFileIdentity(file);
+	const hasConflictingPatchIdentity = !!targetIdentity && !!fileIdentity && targetIdentity !== fileIdentity;
 
-	if (targetFileKey && (file.fileKey === targetFileKey || file.sectionKeys.includes(targetFileKey))) {
+	if (
+		targetFileKey &&
+		!hasConflictingPatchIdentity &&
+		(file.fileKey === targetFileKey || file.sectionKeys.includes(targetFileKey))
+	) {
 		return true;
 	}
 
 	const targetSectionKeys = uniqueStrings([targetFileKey, ...(target.sectionKeys ?? [])]);
-	if (targetSectionKeys.length > 0) {
+	if (targetSectionKeys.length > 0 && !hasConflictingPatchIdentity) {
 		const fileSectionKeys = uniqueStrings([file.fileKey, ...(file.sectionKeys ?? [])]);
 		if (targetSectionKeys.some(key => fileSectionKeys.includes(key))) {
 			return true;
 		}
 	}
 
-	const targetIdentity = getPatchFileIdentity(target);
-	if (targetIdentity && targetIdentity === getPatchFileIdentity(file)) {
+	if (targetIdentity && targetIdentity === fileIdentity) {
 		return true;
 	}
 

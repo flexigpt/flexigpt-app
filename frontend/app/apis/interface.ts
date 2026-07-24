@@ -54,7 +54,9 @@ import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, Settin
 import type {
 	InvokeSkillToolResponse,
 	ListSkillsRequest,
+	ProvidedSkill,
 	PutSkillArtifactPayload,
+	RenderProvidedSkillResponse,
 	RenderSkillResponse,
 	RuntimeSkillFilter,
 	RuntimeSkillListItem,
@@ -294,6 +296,14 @@ export interface ISkillStoreAPI {
 	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
 
 	renderSkill(ref: SkillRef, args?: Record<string, string>): Promise<RenderSkillResponse>;
+
+	listProvidedSkills(workspaceRootID?: string): Promise<ProvidedSkill[]>;
+
+	renderProvidedSkill(
+		identity: string,
+		args?: Record<string, string>,
+		workspaceRootID?: string
+	): Promise<RenderProvidedSkillResponse>;
 }
 
 /**

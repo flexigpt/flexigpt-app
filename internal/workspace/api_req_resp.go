@@ -4,6 +4,9 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 type WorkspaceDiscovery struct {
@@ -34,7 +37,7 @@ type WorkspaceView struct {
 	DisplayName     string                    `json:"displayName"`
 	Description     string                    `json:"description,omitempty"`
 	Enabled         bool                      `json:"enabled"`
-	Mode            string                    `json:"mode"`
+	Mode            engine.Mode               `json:"mode"`
 	PrimarySourceID artifactstore.SourceID    `json:"primarySourceID,omitempty"`
 	PrimaryPath     string                    `json:"primaryPath,omitempty"`
 	Discovery       WorkspaceDiscovery        `json:"discovery"`
@@ -58,7 +61,7 @@ type WorkspaceRecordView struct {
 	Name               string                           `json:"name"`
 	Kind               artifactstore.ArtifactKind       `json:"kind"`
 	Enabled            bool                             `json:"enabled"`
-	State              string                           `json:"state"`
+	State              record.State                     `json:"state"`
 	ResolvedDefinition *artifactstore.Digest            `json:"resolvedDefinition,omitempty"`
 	SourceID           artifactstore.SourceID           `json:"sourceID"`
 	Locator            artifactstore.Locator            `json:"locator"`
@@ -140,11 +143,11 @@ type WorkspaceContextContribution struct {
 }
 
 type WorkspaceContextDecision struct {
-	RecordID      artifactstore.RecordID `json:"recordID"`
-	Status        string                 `json:"status"`
-	Code          string                 `json:"code,omitempty"`
-	OriginalBytes int                    `json:"originalBytes"`
-	IncludedBytes int                    `json:"includedBytes"`
+	RecordID      artifactstore.RecordID           `json:"recordID"`
+	Status        contextadapter.CompositionStatus `json:"status"`
+	Code          string                           `json:"code,omitempty"`
+	OriginalBytes int                              `json:"originalBytes"`
+	IncludedBytes int                              `json:"includedBytes"`
 }
 
 type WorkspaceContextLoadPlan struct {
@@ -167,7 +170,7 @@ type WorkspaceContextView struct {
 	Role             string                     `json:"role"`
 	MediaType        string                     `json:"mediaType"`
 	Enabled          bool                       `json:"enabled"`
-	State            string                     `json:"state"`
+	State            record.State               `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
 	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
 	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
@@ -210,7 +213,7 @@ type WorkspaceSkillView struct {
 	Skill            WorkspaceSkillSummary      `json:"skill"`
 	MarkdownBody     string                     `json:"markdownBody,omitempty"`
 	RecordRevision   uint64                     `json:"recordRevision"`
-	State            string                     `json:"state"`
+	State            record.State               `json:"state"`
 	ProjectionValid  bool                       `json:"projectionValid"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
 	RuntimeDisabled  bool                       `json:"runtimeDisabled"`

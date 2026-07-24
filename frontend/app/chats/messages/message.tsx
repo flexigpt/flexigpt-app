@@ -101,6 +101,12 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	if (prev.message.uiToolOutputs !== next.message.uiToolOutputs) {
 		return false;
 	}
+	if (prev.message.workspaceSelection !== next.message.workspaceSelection) {
+		return false;
+	}
+	if (prev.message.workspaceUsage !== next.message.workspaceUsage) {
+		return false;
+	}
 
 	// Equivalent freshly-created arrays must not rebuild the markdown and
 	// Mermaid subtree.
@@ -184,6 +190,7 @@ export const ChatMessage = memo(function ChatMessage({
 		(message.mcpContext?.resourceTemplates?.length ?? 0) +
 		(message.mcpContext?.prompts?.length ?? 0);
 	const hasMCPContext = mcpContextItemCount > 0;
+	const hasWorkspaceContext = Boolean(message.workspaceSelection || message.workspaceUsage);
 	const hasSkillContext = (message.enabledSkillRefs?.length ?? 0) > 0 || (message.activeSkillRefs?.length ?? 0) > 0;
 
 	const hasAttachmentsBar =
@@ -193,6 +200,7 @@ export const ChatMessage = memo(function ChatMessage({
 		(message.uiToolCalls?.length ?? 0) > 0 ||
 		(message.uiToolOutputs?.length ?? 0) > 0 ||
 		hasMCPContext ||
+		hasWorkspaceContext ||
 		hasSkillContext;
 
 	// Detect MCP Apps in this message's tool outputs.
@@ -327,6 +335,8 @@ export const ChatMessage = memo(function ChatMessage({
 								mcpAppContextUpdates={message.mcpAppContextUpdates}
 								enabledSkillRefs={message.enabledSkillRefs}
 								activeSkillRefs={message.activeSkillRefs}
+								workspaceSelection={message.workspaceSelection}
+								workspaceUsage={message.workspaceUsage}
 								toolCalls={message.uiToolCalls}
 								toolOutputs={message.uiToolOutputs}
 								onToolChoiceDetails={handleToolChoiceDetails}

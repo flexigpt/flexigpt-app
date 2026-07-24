@@ -129,6 +129,8 @@ func applyPrecedence(values []skillruntime.Skill) {
 						Message:  "multiple Skills have the same highest origin precedence",
 					},
 				)
+				values[index].Available = false
+				values[index].RuntimeAllowed = false
 			}
 			continue
 		}

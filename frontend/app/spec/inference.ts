@@ -1,5 +1,6 @@
 import type { MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp';
 import type { ToolOutputUnion, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { WorkspaceConversationUsage } from '@/spec/workspace';
 
 export type ProviderName = string;
 export enum ProviderSDKType {
@@ -457,6 +458,7 @@ interface FetchCompletionResponse {
 export interface CompletionResponseBody {
 	inferenceResponse?: FetchCompletionResponse;
 	hydratedCurrentInputs?: InputUnion[];
+	workspaceUsage?: WorkspaceConversationUsage;
 }
 
 type UIToolCallStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'discarded';
@@ -527,6 +529,12 @@ export interface UIToolOutput {
 
 	isError?: boolean;
 	errorMessage?: string;
+
+	/**
+	 * UI/runtime metadata returned by built-in Skill orchestration.
+	 * This is not provider tool content and must not be presented as model-authored output.
+	 */
+	skillRuntimeMeta?: Record<string, any>;
 
 	arguments?: string;
 	webSearchToolCallItems?: WebSearchToolCallItemUnion[];

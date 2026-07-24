@@ -317,15 +317,15 @@ export function useSendMessage({
 						modifiedAt: new Date(),
 					};
 
-					if (rawResponse?.hydratedCurrentInputs && currentUserMsg?.id) {
-						const hydratedInputs = rawResponse.hydratedCurrentInputs;
+					if (currentUserMsg?.id && (rawResponse?.hydratedCurrentInputs || rawResponse?.workspaceUsage)) {
 						finalChat = {
 							...finalChat,
 							messages: finalChat.messages.map(message =>
 								message.id === currentUserMsg.id
 									? {
 											...message,
-											inputs: hydratedInputs,
+											inputs: rawResponse?.hydratedCurrentInputs ?? message.inputs,
+											workspaceUsage: rawResponse?.workspaceUsage,
 										}
 									: message
 							),
@@ -606,6 +606,7 @@ export function useSendMessage({
 				toolOutputs: message.uiToolOutputs,
 				enabledSkillRefs: message.enabledSkillRefs,
 				activeSkillRefs: message.activeSkillRefs,
+				workspaceSelection: message.workspaceSelection,
 			};
 
 			inputRefs.current.get(tabId)?.loadExternalMessage(external);

@@ -20,6 +20,8 @@ import { SkillsBottomBarChip } from '@/chats/composer/skills/skills_bottom_bar_c
 import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import { ToolsBottomBarChip } from '@/chats/composer/tools/tools_bottom_bar_chip';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
+import { WorkspaceBottomBarChip } from '@/chats/composer/workspaces/workspace_bottom_bar_chip';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 
 interface EditorBottomBarProps {
@@ -36,6 +38,8 @@ interface EditorBottomBarProps {
 	attachmentMenuState: MenuStore;
 	skillsMenuState: MenuStore;
 	mcpMenuState: MenuStore;
+	workspaceMenuState: MenuStore;
+	workspaceState: ComposerWorkspaceController;
 
 	templateButtonRef: RefObject<HTMLButtonElement | null>;
 	toolButtonRef: RefObject<HTMLButtonElement | null>;
@@ -74,6 +78,8 @@ interface EditorBottomBarProps {
 	onDisableAllSkills: () => void;
 	onRefreshSkills: () => Promise<void>;
 	systemPrompt: ComposerSystemPromptController;
+	workspaceActiveSkillRefs: SkillRef[];
+	setWorkspaceActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	isInputLocked?: boolean;
 	mcpState: UseComposerMCPResult;
 	mcpAppContextUpdateCount?: number;
@@ -93,6 +99,8 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	attachmentMenuState,
 	skillsMenuState,
 	mcpMenuState,
+	workspaceMenuState,
+	workspaceState,
 	templateButtonRef,
 	toolButtonRef,
 	attachmentButtonRef,
@@ -124,6 +132,8 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onDisableAllSkills,
 	onRefreshSkills,
 	systemPrompt,
+	workspaceActiveSkillRefs,
+	setWorkspaceActiveSkillRefs,
 	isInputLocked = false,
 	mcpState,
 	mcpAppContextUpdateCount = 0,
@@ -144,10 +154,18 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		<div
 			className="bg-base-200 w-full shrink-0 overflow-hidden"
 			data-attachments-bottom-bar
-			aria-label="Templates, tools, attachments, skills, and MCP"
+			aria-label="Workspace, attachments, MCP, tools, skills, and templates"
 		>
 			<div className="flex items-center gap-1 overflow-x-auto p-1 text-xs shadow-none">
 				<div className="flex items-center gap-1">
+					<WorkspaceBottomBarChip
+						store={workspaceMenuState}
+						state={workspaceState}
+						activeSkillRefs={workspaceActiveSkillRefs}
+						setActiveSkillRefs={setWorkspaceActiveSkillRefs}
+						isInputLocked={isInputLocked}
+					/>
+
 					<AttachmentBottomBarChip
 						store={attachmentMenuState}
 						buttonRef={attachmentButtonRef}

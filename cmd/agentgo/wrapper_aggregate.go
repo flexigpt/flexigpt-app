@@ -27,6 +27,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/skillstore"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
+	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
 var appSlogLevelVar slog.LevelVar
@@ -57,8 +58,9 @@ func InitAggregrateWrapper(
 	skillSt *skillstore.SkillStore,
 	skillRt *skillruntime.SkillRuntime,
 	mr *mcpRuntime.MCPRuntimeManager,
+	workspaceAPI *workspace.API,
 ) error {
-	if agg == nil || ts == nil || mps == nil || ss == nil || skillSt == nil || skillRt == nil {
+	if agg == nil || ts == nil || mps == nil || ss == nil || skillSt == nil || skillRt == nil || workspaceAPI == nil {
 		panic("initializing aggregate store wrapper on nil receivers")
 	}
 
@@ -75,11 +77,16 @@ func InitAggregrateWrapper(
 		bridge = inferencewrapper.NewMCPInferenceBridge(mr)
 	}
 
+	workspaceBridge := inferencewrapper.NewWorkspaceInferenceBridge(
+		workspaceAPI,
+	)
+
 	p, err := inferencewrapper.NewProviderSetAPI(
 		agg.toolStore,
 		agg.modelPresetStore,
 		agg.skillRuntime,
 		bridge,
+		workspaceBridge,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&defaultDebugConfig),
 		inferencewrapper.WithSkillsRunScriptEnabled(skillRt.RunScriptsEnabled()),
@@ -318,14 +325,23 @@ func (w *AggregrateWrapper) FetchCompletion(
 				}
 				return nil, err
 			}
-			// If we have a partial response, attach error info there and return it.
-			if resp != nil && resp.Body != nil && resp.Body.InferenceResponse != nil {
-				if resp.Body.InferenceResponse.Error == nil {
+			// Preserve hydration metadata even when the provider failed before
+			// producing an inference response. In particular, Workspace Context
+			// hydration must not disappear from the persisted user message.
+			if resp != nil && resp.Body != nil {
+				if resp.Body.InferenceResponse == nil {
+					resp.Body.InferenceResponse = &inferenceSpec.FetchCompletionResponse{
+						Error: &inferenceSpec.Error{
+							Code:    "completion_failed",
+							Message: err.Error(),
+						},
+					}
+				} else if resp.Body.InferenceResponse.Error == nil {
 					resp.Body.InferenceResponse.Error = &inferenceSpec.Error{
+						Code:    "completion_failed",
 						Message: err.Error(),
 					}
 				}
-				// Log, but do not propagate Go error so Wails resolves the Promise.
 				slog.Error("fetchCompletion failed", "provider", provider, "err", err)
 				return resp, nil
 			}

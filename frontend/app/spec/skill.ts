@@ -8,11 +8,106 @@ export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
 
 export type SkillInsert = 'instructions' | 'user-message';
 
-// Store identity for selection/persistence (NOT runtime identity).
-export interface SkillRef {
+export enum SkillSessionSyncMode {
+	None = 'none',
+	IfSessionExists = 'if-session-exists',
+	EnsureIfEnabled = 'ensure-if-enabled',
+}
+
+/**
+ * Source classification for a normalized runtime-facing SkillRef.
+ *
+ * `SkillRef` remains wire-compatible with the current Go API. Consumers must
+ * use the identity helpers instead of inferring source from missing fields.
+ */
+export enum SkillRefKind {
+	Installed = 'installed',
+	Workspace = 'workspace',
+	Invalid = 'invalid',
+}
+
+export interface InstalledSkillRef {
 	bundleID: string;
 	skillSlug: string;
 	skillID: string;
+	identity?: never;
+}
+
+export interface WorkspaceSkillRef {
+	identity: string;
+	bundleID?: never;
+	skillSlug?: never;
+	skillID?: never;
+}
+
+export interface InstalledSkillSelection {
+	skillRef: InstalledSkillRef;
+	preLoadAsActive: boolean;
+	useAsInstructions: boolean;
+}
+
+// Store identity for selection/persistence (NOT runtime identity).
+export interface SkillRef {
+	/**
+	 * External provider identity, for example workspace/<rootID>/<recordID>.
+	 * Mutually exclusive with the installed Skill Store fields below.
+	 */
+	identity?: string;
+	bundleID?: string;
+	skillSlug?: string;
+	skillID?: string;
+}
+
+export enum SkillProviderOrigin {
+	Installed = 'installed',
+	Workspace = 'workspace',
+}
+
+/**
+ * @public
+ */
+export interface SkillProviderDiagnostic {
+	severity: 'error' | 'warning' | 'info';
+	code: string;
+	message: string;
+	location?: {
+		locator?: string;
+		subresourceLocator?: string;
+		line?: number;
+		column?: number;
+	};
+}
+
+/**
+ * Read-only aggregate provider projection.
+ *
+ * This is intentionally separate from `SkillListItem`: Workspace Skills are
+ * not installed-store records and must not be forced into that model.
+ */
+export interface ProvidedSkill {
+	identity: string;
+	origin: SkillProviderOrigin;
+	installedRef?: SkillRef;
+	workspaceRootID?: string;
+	workspaceRecordID?: string;
+	recordRevision?: number;
+	name: string;
+	displayName?: string;
+	description?: string;
+	insert?: SkillInsert;
+	arguments?: SkillArgument[];
+	tags?: string[];
+	enabled: boolean;
+	available: boolean;
+	runtimeAllowed: boolean;
+	catalogCurrent: boolean;
+	shadowed: boolean;
+	shadowedBy?: string;
+	definitionDigest?: string;
+	sourceID?: string;
+	locator?: string;
+	state?: string;
+	diagnostics?: SkillProviderDiagnostic[];
 }
 
 export interface SkillSelection {
@@ -60,6 +155,64 @@ export interface RuntimeSkillListItem {
 	warnings?: string[];
 	isActive: boolean;
 	errorMessage?: string;
+}
+
+export interface RenderProvidedSkillResponse {
+	skill: ProvidedSkill;
+	available: boolean;
+	text?: string;
+	insert?: SkillInsert;
+	arguments?: SkillArgument[];
+	appliedArguments?: Record<string, string>;
+	diagnostics?: SkillProviderDiagnostic[];
+}
+
+export interface SkillProviderDiagnostic {
+	severity: 'error' | 'warning' | 'info';
+	code: string;
+	message: string;
+	location?: {
+		locator?: string;
+		subresourceLocator?: string;
+		line?: number;
+		column?: number;
+	};
+}
+
+export interface ProvidedSkill {
+	identity: string;
+	origin: SkillProviderOrigin;
+	installedRef?: SkillRef;
+	workspaceRootID?: string;
+	workspaceRecordID?: string;
+	recordRevision?: number;
+	name: string;
+	displayName?: string;
+	description?: string;
+	insert?: SkillInsert;
+	arguments?: SkillArgument[];
+	tags?: string[];
+	enabled: boolean;
+	available: boolean;
+	runtimeAllowed: boolean;
+	catalogCurrent: boolean;
+	shadowed: boolean;
+	shadowedBy?: string;
+	definitionDigest?: string;
+	sourceID?: string;
+	locator?: string;
+	state?: string;
+	diagnostics?: SkillProviderDiagnostic[];
+}
+
+export interface RenderProvidedSkillResponse {
+	skill: ProvidedSkill;
+	available: boolean;
+	text?: string;
+	insert?: SkillInsert;
+	arguments?: SkillArgument[];
+	appliedArguments?: Record<string, string>;
+	diagnostics?: SkillProviderDiagnostic[];
 }
 
 export interface ListSkillsRequest {
@@ -194,7 +347,7 @@ export interface InvokeSkillToolResponse {
 export interface AssistantSkillOption {
 	key: string;
 	label: string;
-	sel: SkillSelection;
+	sel: InstalledSkillSelection;
 	skillDefinition: Skill;
 
 	bundleSlug: string;

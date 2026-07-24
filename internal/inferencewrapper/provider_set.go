@@ -25,6 +25,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
+	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
 const (
@@ -44,6 +45,7 @@ type ProviderSetAPI struct {
 	mpStore            *modelpresetStore.ModelPresetStore
 	skillRuntime       *skillruntime.SkillRuntime
 	mcpInferenceBridge *MCPInferenceBridge
+	workspaceBridge    *WorkspaceInferenceBridge
 
 	logger             *slog.Logger
 	debugger           *debugclient.HTTPCompletionDebugger
@@ -86,9 +88,10 @@ func NewProviderSetAPI(
 	mps *modelpresetStore.ModelPresetStore,
 	sr *skillruntime.SkillRuntime,
 	mcpBridge *MCPInferenceBridge,
+	workspaceBridge *WorkspaceInferenceBridge,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if ts == nil || mps == nil || sr == nil || mcpBridge == nil {
+	if ts == nil || mps == nil || sr == nil || mcpBridge == nil || workspaceBridge == nil {
 		return nil, errors.New("inferencewrapper: missing input")
 	}
 	ps := &ProviderSetAPI{
@@ -96,6 +99,7 @@ func NewProviderSetAPI(
 		mpStore:            mps,
 		skillRuntime:       sr,
 		mcpInferenceBridge: mcpBridge,
+		workspaceBridge:    workspaceBridge,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -272,6 +276,45 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	if len(inputs) == 0 {
 		return nil, errors.New("no usable inputs to send to inference-go")
 	}
+
+	inputs, currentInputs = stripGeneratedWorkspaceCurrentInputs(
+		inputs,
+		currentInputs,
+	)
+
+	var workspaceUsage *workspace.ConversationUsage
+	if body.Current.WorkspaceSelection != nil {
+		hydrated, workspaceErr := ps.workspaceBridge.HydrateCompletion(
+			ctx,
+			body.Current.WorkspaceSelection,
+		)
+		if hydrated != nil {
+			workspaceUsage = hydrated.Usage
+			if len(hydrated.CurrentInputs) > 0 {
+				inputs, currentInputs = prependCurrentInputs(
+					inputs,
+					currentInputs,
+					hydrated.CurrentInputs...,
+				)
+			}
+		}
+		if workspaceErr != nil {
+			//nolint:nilerr // Deliberate.
+			return &spec.CompletionResponse{
+				Body: &spec.CompletionResponseBody{
+					InferenceResponse: &inferenceSpec.FetchCompletionResponse{
+						Error: &inferenceSpec.Error{
+							Code:    "workspace_unavailable",
+							Message: workspaceErr.Error(),
+						},
+					},
+					HydratedCurrentInputs: currentInputs,
+					WorkspaceUsage:        workspaceUsage,
+				},
+			}, nil
+		}
+	}
+
 	if appCtxInput := buildMCPAppContextInput(body.Current.MCPAppContextUpdates); appCtxInput != nil {
 		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
 	}
@@ -285,11 +328,33 @@ func (ps *ProviderSetAPI) FetchCompletion(
 
 	skillSessionID := strings.TrimSpace(body.SkillSessionID)
 	if ps.skillRuntime != nil && len(enabledSkillRefs) > 0 {
+		var availableSkillItems []skillruntimeSpec.RuntimeSkillListItem
+		var activeSkillItems []skillruntimeSpec.RuntimeSkillListItem
 		if skillSessionID == "" {
 			return nil, errors.New("enabledSkillRefs provided but skillSessionID is missing")
 		}
 		// Active skills count in this session (restricted to allowlist).
 		activeResp, aerr := ps.skillRuntime.ListRuntimeSkills(ctx, &skillruntimeSpec.ListRuntimeSkillsRequest{
+			Body: &skillruntimeSpec.ListRuntimeSkillsRequestBody{
+				Filter: &skillruntimeSpec.RuntimeSkillFilter{
+					SessionID:      agentskillsSpec.SessionID(skillSessionID),
+					Activity:       agentskillsSpec.SkillActivityAny,
+					AllowSkillRefs: enabledSkillRefs,
+				},
+			},
+		})
+		if aerr != nil {
+			if errors.Is(aerr, agentskillsSpec.ErrSessionNotFound) {
+				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
+			}
+			ps.logger.Warn("listRuntimeSkills failed; Workspace Skill session availability is unknown", "err", aerr)
+			activeResp = nil
+		}
+		if activeResp != nil && activeResp.Body != nil {
+			availableSkillItems = activeResp.Body.Skills
+		}
+
+		activeResp, aerr = ps.skillRuntime.ListRuntimeSkills(ctx, &skillruntimeSpec.ListRuntimeSkillsRequest{
 			Body: &skillruntimeSpec.ListRuntimeSkillsRequestBody{
 				Filter: &skillruntimeSpec.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
@@ -308,6 +373,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}
 		if activeResp != nil && activeResp.Body != nil {
 			activeCount = len(activeResp.Body.Skills)
+			activeSkillItems = activeResp.Body.Skills
 		}
 
 		// Pick prompt activity:
@@ -355,6 +421,30 @@ func (ps *ProviderSetAPI) FetchCompletion(
 				return nil, fmt.Errorf("failed to build skill tool choices: %w", err)
 			}
 			toolChoices = append(toolChoices, skillToolChoices...)
+		}
+
+		markWorkspaceSkillSessionUsage(
+			workspaceUsage,
+			enabledSkillRefs,
+			availableSkillItems,
+			activeSkillItems,
+			skillsPrompt != "",
+		)
+
+		if workspaceUsage != nil &&
+			workspaceUsage.Status == workspace.ConversationSelectionUnavailable {
+			return &spec.CompletionResponse{
+				Body: &spec.CompletionResponseBody{
+					InferenceResponse: &inferenceSpec.FetchCompletionResponse{
+						Error: &inferenceSpec.Error{
+							Code:    "workspace_unavailable",
+							Message: "selected Workspace Skills could not enter the active Skill Runtime session",
+						},
+					},
+					HydratedCurrentInputs: currentInputs,
+					WorkspaceUsage:        workspaceUsage,
+				},
+			}, nil
 		}
 	}
 
@@ -410,6 +500,13 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	b, err := ps.inner.FetchCompletion(ctx, req.Provider, infReq, opts)
+	if b != nil && workspaceUsage != nil {
+		b.DebugDetails = mergeCompletionDebugDetails(
+			b.DebugDetails,
+			"workspace",
+			workspaceUsage,
+		)
+	}
 	if b != nil && mcpDebugDetails != nil {
 		b.DebugDetails = mergeCompletionDebugDetails(b.DebugDetails, "mcp", mcpDebugDetails)
 	}
@@ -417,6 +514,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	resp := &spec.CompletionResponse{Body: &spec.CompletionResponseBody{
 		InferenceResponse:     b,
 		HydratedCurrentInputs: currentInputs,
+		WorkspaceUsage:        workspaceUsage,
 	}}
 
 	return resp, err

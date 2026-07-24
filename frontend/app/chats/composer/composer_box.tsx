@@ -7,6 +7,7 @@ import type { UIToolCall } from '@/spec/inference';
 import type { MCPAppModelContextUpdate } from '@/spec/mcp';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
+import { SkillSessionSyncMode } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -34,6 +35,7 @@ import type {
 } from '@/chats/composer/editor/editor_types';
 import { useComposerSystemPrompt } from '@/chats/composer/skills/use_composer_system_prompt';
 import type { ChatWorkflowStarter, ChatWorkflowStarterAssistantPresetRef } from '@/chats/conversation/starter_intent';
+import { isWorkspaceSkillRef } from '@/skills/lib/skill_identity_utils';
 
 export interface ComposerBoxHandle {
 	getUIChatOptions: () => UIChatOption;
@@ -46,6 +48,7 @@ export interface ComposerBoxHandle {
 	openSystemPromptMenu: () => void;
 	openSkillsMenu: () => void;
 	openMCPMenu: () => void;
+	openWorkspaceMenu: () => void;
 	requestStopResponse: () => void;
 	loadWorkflowStarter: (starter: ChatWorkflowStarter) => Promise<boolean>;
 	loadExternalMessage: (msg: EditorExternalMessage) => void;
@@ -59,7 +62,7 @@ export interface ComposerBoxHandle {
 		enabledRefs: SkillRef[],
 		activeRefs: SkillRef[],
 		options?: {
-			syncSession?: 'none' | 'if-session-exists' | 'ensure-if-enabled';
+			syncSession?: SkillSessionSyncMode;
 			forceResetSession?: boolean;
 		}
 	) => void;
@@ -125,10 +128,9 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 			}
 
 			if (prepared.runtimeSelections.hasSkillsSelection) {
-				editorAreaRef.current?.setSkillStateFromMessage(
+				editorAreaRef.current?.setInstalledSkillStateFromPreset(
 					prepared.runtimeSelections.enabledSkillRefs,
-					prepared.runtimeSelections.activeSkillRefs,
-					{ syncSession: 'ensure-if-enabled' }
+					prepared.runtimeSelections.activeSkillRefs
 				);
 			}
 
@@ -144,8 +146,21 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 					? [...prepared.runtimeSelections.webSearchChoices]
 					: prev.webSearchChoices,
 				enabledSkillRefs: prepared.runtimeSelections.hasSkillsSelection
-					? [...prepared.runtimeSelections.enabledSkillRefs]
+					? [
+							...prepared.runtimeSelections.enabledSkillRefs,
+							...prev.enabledSkillRefs.filter(r => {
+								return isWorkspaceSkillRef(r);
+							}),
+						]
 					: prev.enabledSkillRefs,
+				activeSkillRefs: prepared.runtimeSelections.hasSkillsSelection
+					? [
+							...prepared.runtimeSelections.activeSkillRefs,
+							...(prev.activeSkillRefs ?? []).filter(r => {
+								return isWorkspaceSkillRef(r);
+							}),
+						]
+					: prev.activeSkillRefs,
 				mcpContext: prepared.runtimeSelections.hasMCPSelection
 					? prepared.runtimeSelections.mcpContext
 					: prev.mcpContext,
@@ -251,8 +266,12 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 		editorAreaRef.current?.setConversationToolsFromChoices([]);
 		editorAreaRef.current?.setWebSearchFromChoices([]);
 		editorAreaRef.current?.clearMCPContext();
+		editorAreaRef.current?.clearWorkspace();
 
-		editorAreaRef.current?.setSkillStateFromMessage([], [], { syncSession: 'none', forceResetSession: true });
+		editorAreaRef.current?.setSkillStateFromMessage([], [], {
+			syncSession: SkillSessionSyncMode.None,
+			forceResetSession: true,
+		});
 		replaceAssistantRuntimeSnapshot(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
 
 		const nextSelectedModel = assistantContext.resetForNewConversation();
@@ -296,6 +315,9 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 			},
 			openMCPMenu: () => {
 				editorAreaRef.current?.openMCPMenu();
+			},
+			openWorkspaceMenu: () => {
+				editorAreaRef.current?.openWorkspaceMenu();
 			},
 			requestStopResponse: () => {
 				editorAreaRef.current?.requestStopResponse();
@@ -353,6 +375,7 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 				updateAssistantRuntimeSnapshot(prev => ({
 					...prev,
 					enabledSkillRefs: [...enabledRefs],
+					activeSkillRefs: [...activeRefs],
 				}));
 			},
 			restoreConversationContext: context => {
@@ -364,13 +387,15 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 				editorAreaRef.current?.setMCPContextFromMessage(context.mcpContext);
 				editorAreaRef.current?.setMCPAppContextUpdatesFromMessage(context.mcpAppContextUpdates);
 				editorAreaRef.current?.setSkillStateFromMessage(context.enabledSkillRefs, context.activeSkillRefs, {
-					syncSession: 'none',
+					syncSession: SkillSessionSyncMode.None,
 					forceResetSession: true,
 				});
+				editorAreaRef.current?.setWorkspaceSelectionFromMessage(context.workspaceSelection, false);
 				replaceAssistantRuntimeSnapshot({
 					conversationToolChoices: [...context.toolChoices],
 					webSearchChoices: [...context.webSearchChoices],
 					enabledSkillRefs: [...context.enabledSkillRefs],
+					activeSkillRefs: [...context.activeSkillRefs],
 					mcpContext: context.mcpContext,
 				});
 				pendingPresetResolutionModeRef.current = 'track-default';

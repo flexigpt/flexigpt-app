@@ -44,6 +44,7 @@ import {
 	getSkillInstructionPromptEligibilityReason,
 	getSkillPreloadEligibilityReason,
 } from '@/skills/lib/skill_artifact_utils';
+import { isInstalledSkillRef } from '@/skills/lib/skill_identity_utils';
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {
@@ -475,6 +476,14 @@ function getAssistantPresetAvailability(
 	}
 
 	for (const sel of preset.startingSkillSelections ?? []) {
+		if (!isInstalledSkillRef(sel.skillRef)) {
+			return {
+				isSelectable: false,
+				availabilityReason:
+					'Assistant preset contains a malformed Skill reference. Installed bundleID, skillSlug, and skillID are required.',
+			};
+		}
+
 		const key = buildSkillRefKey(sel.skillRef);
 		const option = lookups.skillOptionsByKey.get(key);
 

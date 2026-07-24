@@ -393,6 +393,7 @@ export function useComposerToolRuntime({
 				type: output.type,
 				status: 'pending',
 				toolStoreChoice: output.toolStoreChoice,
+				errorMessage: undefined,
 			};
 
 			dispatchRuntime({

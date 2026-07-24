@@ -774,11 +774,12 @@ func workspaceViewOf(value engine.Workspace) (WorkspaceView, error) {
 		DisplayName:     value.Root.DisplayName,
 		Description:     value.Root.Description,
 		Enabled:         value.Root.Enabled,
-		Mode:            string(value.Data.Mode),
+		Mode:            value.Data.Mode,
 		PrimarySourceID: value.Data.PrimarySourceID,
 		Discovery:       workspaceDiscoveryOf(value.Data.Discovery),
 		Attachments:     make([]WorkspaceAttachmentView, 0, len(value.Attachments)),
 	}
+
 	for _, attachment := range value.Attachments {
 		settings, err := workspaceAttachmentSettingsOf(attachment.Data)
 		if err != nil {
@@ -893,7 +894,7 @@ func workspaceRecordViewOf(value record.Record) WorkspaceRecordView {
 		Name:               value.Name,
 		Kind:               value.Kind,
 		Enabled:            value.Enabled,
-		State:              string(value.State),
+		State:              value.State,
 		ResolvedDefinition: digest,
 		SourceID:           value.Occurrence.SourceID,
 		Locator:            value.Occurrence.Locator,
@@ -1086,7 +1087,7 @@ func contextLoadPlanViewOf(
 	for _, decision := range value.Decisions {
 		output.Decisions = append(output.Decisions, WorkspaceContextDecision{
 			RecordID:      decision.RecordID,
-			Status:        string(decision.Status),
+			Status:        decision.Status,
 			Code:          decision.Code,
 			OriginalBytes: decision.OriginalBytes,
 			IncludedBytes: decision.IncludedBytes,
@@ -1125,7 +1126,7 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 		Role:             value.Role,
 		MediaType:        value.MediaType,
 		Enabled:          value.Enabled,
-		State:            string(value.State),
+		State:            value.State,
 		CatalogCurrent:   value.CatalogCurrent,
 		RuntimeDisabled:  value.RuntimeDisabled,
 		Diagnostics:      artifactstore.CloneDiagnostics(value.Diagnostics),
@@ -1163,7 +1164,7 @@ func workspaceSkillViewOf(value skilladapter.WorkspaceSkill) WorkspaceSkillView 
 		Skill:            summary,
 		MarkdownBody:     value.MarkdownBody,
 		RecordRevision:   value.RecordRevision,
-		State:            string(value.State),
+		State:            value.State,
 		ProjectionValid:  value.ProjectionValid,
 		CatalogCurrent:   value.CatalogCurrent,
 		RuntimeDisabled:  value.RuntimeDisabled,

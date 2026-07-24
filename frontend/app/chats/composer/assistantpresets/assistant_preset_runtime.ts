@@ -14,7 +14,12 @@ import { areComparableValuesEqual } from '@/lib/obj_utils';
 
 import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
-import { areSkillRefListsEqual } from '@/skills/lib/skill_identity_utils';
+import {
+	areSkillRefListsEqual,
+	isInstalledSkillRef,
+	normalizeSkillRefs,
+	skillRefKey,
+} from '@/skills/lib/skill_identity_utils';
 import { areToolChoiceListsEqual } from '@/tools/lib/tool_choice_utils';
 
 export interface AssistantPresetOptionItem {
@@ -185,7 +190,17 @@ export function normalizeAssistantPresetToolChoices(
 }
 
 export function normalizeAssistantPresetSkillRefs(refs: SkillRef[]): string[] {
-	return [...new Set(refs.map(ref => `${ref.bundleID}/${ref.skillSlug}#${ref.skillID}`))].toSorted();
+	return [
+		...new Set(
+			normalizeSkillRefs(refs)
+				.filter(r => {
+					return isInstalledSkillRef(r);
+				})
+				.map(r => {
+					return skillRefKey(r);
+				})
+		),
+	].toSorted();
 }
 
 export function mapAssistantPresetWebSearchTemplatesToChoices(templates: WebSearchChoiceTemplate[]): ToolStoreChoice[] {

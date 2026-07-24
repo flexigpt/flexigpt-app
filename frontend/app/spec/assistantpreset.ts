@@ -1,6 +1,6 @@
 import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { SkillSelection } from '@/spec/skill';
+import type { InstalledSkillSelection } from '@/spec/skill';
 import type { ToolSelection } from '@/spec/tool';
 
 export const BASE_ASSISTANT_PRESET_SLUG = 'base';
@@ -20,7 +20,7 @@ export interface AssistantPreset {
 	startingModelPresetRef?: ModelPresetRef;
 	startingIncludeModelSystemPrompt?: boolean;
 	startingToolSelections?: ToolSelection[];
-	startingSkillSelections?: SkillSelection[];
+	startingSkillSelections?: InstalledSkillSelection[];
 	startingMCPContext?: MCPConversationContext;
 	createdAt: Date; // Go type: time
 	modifiedAt: Date; // Go type: time
@@ -63,6 +63,6 @@ export interface PutAssistantPresetPayload {
 	startingModelPresetRef?: ModelPresetRef;
 	startingIncludeModelSystemPrompt?: boolean;
 	startingToolSelections?: ToolSelection[];
-	startingSkillSelections?: SkillSelection[];
+	startingSkillSelections?: InstalledSkillSelection[];
 	startingMCPContext?: MCPConversationContext;
 }

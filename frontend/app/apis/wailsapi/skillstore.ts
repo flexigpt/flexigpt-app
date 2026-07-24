@@ -1,7 +1,9 @@
 import type {
 	InvokeSkillToolResponse,
 	ListSkillsRequest,
+	ProvidedSkill,
 	PutSkillArtifactPayload,
+	RenderProvidedSkillResponse,
 	RenderSkillResponse,
 	RuntimeSkillFilter,
 	RuntimeSkillListItem,
@@ -24,6 +26,7 @@ import {
 	GetSkill,
 	GetSkillsPrompt,
 	InvokeSkillTool,
+	ListProvidedSkills,
 	ListRuntimeSkills,
 	ListSkillBundles,
 	ListSkills,
@@ -32,6 +35,7 @@ import {
 	PutSkill,
 	PutSkillArtifact,
 	PutSkillBundle,
+	RenderProvidedSkill,
 	RenderSkill,
 } from '@/apis/wailsjs/go/main/SkillStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
@@ -241,5 +245,39 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		const resp = await RenderSkill(req);
 
 		return resp?.Body as RenderSkillResponse;
+	}
+
+	async listProvidedSkills(workspaceRootID?: string): Promise<ProvidedSkill[]> {
+		const request = {
+			WorkspaceRootID: workspaceRootID?.trim() ?? '',
+		} as Parameters<typeof ListProvidedSkills>[0];
+
+		const response = await ListProvidedSkills(request);
+		if (!response?.Body) {
+			throw new Error('ListProvidedSkills returned an empty response body.');
+		}
+
+		return (response.Body.skills ?? []) as ProvidedSkill[];
+	}
+
+	async renderProvidedSkill(
+		identity: string,
+		args?: Record<string, string>,
+		workspaceRootID?: string
+	): Promise<RenderProvidedSkillResponse> {
+		const request = {
+			Body: {
+				workspaceRootID: workspaceRootID?.trim() ?? '',
+				identity: identity.trim(),
+				arguments: args,
+			},
+		} as Parameters<typeof RenderProvidedSkill>[0];
+
+		const response = await RenderProvidedSkill(request);
+		if (!response?.Body) {
+			throw new Error('RenderProvidedSkill returned an empty response body.');
+		}
+
+		return response.Body as RenderProvidedSkillResponse;
 	}
 }

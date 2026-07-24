@@ -169,14 +169,7 @@ function mergeEditableTargetForModal(
 			resolvedPath: resolvedPath || undefined,
 			candidatePaths: isNewFile
 				? absolutePathStrings([...knownTargetPaths, targetPath])
-				: absolutePathStrings([
-						...knownTargetPaths,
-						...(target.candidatePaths ?? []),
-						targetPath,
-						resolvedPath,
-						target.newPath,
-						target.oldPath,
-					]),
+				: absolutePathStrings([...knownTargetPaths, ...(target.candidatePaths ?? []), targetPath, resolvedPath]),
 			knownTargetPaths,
 			sectionKeys: uniqueStrings([target.fileKey, ...(target.sectionKeys ?? [])]),
 		};
@@ -208,10 +201,6 @@ function mergeEditableTargetForModal(
 					targetPath,
 					existingResolvedPath,
 					resolvedPath,
-					existing.newPath,
-					target.newPath,
-					existing.oldPath,
-					target.oldPath,
 				]),
 		knownTargetPaths: mergedKnownTargetPaths,
 		diffText: target.diffText || existing.diffText,
@@ -466,14 +455,7 @@ function buildDisplayCandidatePathsForTarget(
 		: targetCandidatePaths;
 	const rawCandidates = isNewFile
 		? absolutePathStrings([target.targetPath, ...knownTargetPaths, ...safeTargetCandidatePaths])
-		: absolutePathStrings([
-				...knownTargetPaths,
-				target.resolvedPath,
-				target.targetPath,
-				...safeTargetCandidatePaths,
-				target.newPath,
-				target.oldPath,
-			]);
+		: absolutePathStrings([...knownTargetPaths, target.resolvedPath, target.targetPath, ...safeTargetCandidatePaths]);
 
 	const byKey = new Map<string, { path: string; score: number; firstIndex: number }>();
 
@@ -1064,7 +1046,7 @@ function DiffApplyModalContent({
 									{candidates.length > 0 ? (
 										<details className="group border-base-300 bg-base-100 mt-3 overflow-hidden rounded-lg border">
 											<summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold">
-												<span>{isNewFile ? 'Supported target paths' : 'Candidate paths'}</span>
+												<span>{isNewFile ? 'Supported target paths' : 'Evidence-backed candidate paths'}</span>
 												<span className="text-base-content/50 inline-flex items-center gap-1 font-normal">
 													<FiChevronRight size={11} className="transition group-open:rotate-90" />
 													{candidateDisplay.isLimited

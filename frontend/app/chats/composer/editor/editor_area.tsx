@@ -30,8 +30,10 @@ import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference
 import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/mcp';
 import { MCPExecutionMode } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
+import { SkillSessionSyncMode } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
+import type { WorkspaceConversationSelection } from '@/spec/workspace';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
@@ -77,6 +79,7 @@ import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { ToolArgsModalHost } from '@/chats/composer/tools/tool_user_args_host';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import { buildWebSearchChoicesForSubmit } from '@/chats/composer/tools/websearch_utils';
+import { useComposerWorkspace } from '@/chats/composer/workspaces/use_composer_workspace';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from '@/tools/lib/conversation_tool_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
@@ -84,7 +87,7 @@ import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/to
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 interface SkillStateApplyOptions {
-	syncSession?: 'none' | 'if-session-exists' | 'ensure-if-enabled';
+	syncSession?: SkillSessionSyncMode;
 	forceResetSession?: boolean;
 }
 
@@ -96,6 +99,8 @@ export interface EditorAreaHandle {
 	openSystemPromptMenu: () => void;
 	openSkillsMenu: () => void;
 	openMCPMenu: () => void;
+	openWorkspaceMenu: () => void;
+	clearWorkspace: () => void;
 	requestStopResponse: () => void;
 	loadExternalMessage: (msg: EditorExternalMessage) => void;
 	setDraftText: (text: string) => void;
@@ -110,6 +115,8 @@ export interface EditorAreaHandle {
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	setSkillStateFromMessage: (enabledRefs: SkillRef[], activeRefs: SkillRef[], options?: SkillStateApplyOptions) => void;
+	setInstalledSkillStateFromPreset: (enabledRefs: SkillRef[], activeRefs: SkillRef[]) => void;
+	setWorkspaceSelectionFromMessage: (selection?: WorkspaceConversationSelection, syncSkills?: boolean) => void;
 	finishAssistantTurn: (payload: AssistantTurnFinishedPayload) => void;
 }
 
@@ -314,6 +321,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const attachmentMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const skillsMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const mcpMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const workspaceMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const templateButtonRef = useRef<HTMLButtonElement | null>(null);
 	const toolButtonRef = useRef<HTMLButtonElement | null>(null);
 	const attachmentButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -331,6 +339,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachments: false,
 		skills: false,
 		mcp: false,
+		workspace: false,
 	});
 	const suppressNextAttachmentMenuFocusRestoreRef = useRef(false);
 
@@ -388,6 +397,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		enableAllSkills,
 		disableAllSkills,
 		refreshSkills,
+		applyInstalledSkillSelectionState,
 		applySkillSelectionState,
 		ensureSkillSession,
 		listActiveSkillRefs,
@@ -395,6 +405,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentEnabledSkillRefs,
 		getCurrentActiveSkillRefs,
 	} = useComposerSkills();
+
+	const workspace = useComposerWorkspace({
+		applySkillSelectionState,
+		getCurrentEnabledSkillRefs,
+		getCurrentActiveSkillRefs,
+	});
 
 	const [autoExecStopVisible, setAutoExecStopVisible] = useState(false);
 	const [autoExecStopRequested, setAutoExecStopRequested] = useState(false);
@@ -652,6 +668,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const preEditMCPContextRef = useRef<MCPConversationContext | undefined | null>(null);
 	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
 	const preEditActiveSkillRefsRef = useRef<SkillRef[] | null>(null);
+	const preEditWorkspaceSelectionRef = useRef<WorkspaceConversationSelection | undefined | null>(null);
 
 	// --- Fix: focus management for menus opened by shortcuts ---
 	const templateMenuOpen = useStoreState(templateMenu, 'open');
@@ -659,11 +676,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const attachmentMenuOpen = useStoreState(attachmentMenu, 'open');
 	const skillsMenuOpen = useStoreState(skillsMenu, 'open');
 	const mcpMenuOpen = useStoreState(mcpMenu, 'open');
+	const workspaceMenuOpen = useStoreState(workspaceMenu, 'open');
 	const templateMenuEl = useStoreState(templateMenu, 'contentElement');
 	const toolMenuEl = useStoreState(toolMenu, 'contentElement');
 	const attachmentMenuEl = useStoreState(attachmentMenu, 'contentElement');
 	const skillsMenuEl = useStoreState(skillsMenu, 'contentElement');
 	const mcpMenuEl = useStoreState(mcpMenu, 'contentElement');
+	const workspaceMenuEl = useStoreState(workspaceMenu, 'contentElement');
 
 	const clearPreEditSnapshot = useCallback(() => {
 		preEditConversationToolsRef.current = null;
@@ -671,6 +690,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		preEditMCPContextRef.current = null;
 		preEditEnabledSkillRefsRef.current = null;
 		preEditActiveSkillRefsRef.current = null;
+		preEditWorkspaceSelectionRef.current = null;
 	}, []);
 
 	const closeAllMenus = useCallback(() => {
@@ -679,7 +699,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachmentMenu.hide();
 		skillsMenu.hide();
 		mcpMenu.hide();
-	}, [attachmentMenu, mcpMenu, skillsMenu, templateMenu, toolMenu]);
+		workspaceMenu.hide();
+	}, [attachmentMenu, mcpMenu, skillsMenu, templateMenu, toolMenu, workspaceMenu]);
 
 	useEffect(() => {
 		if (!templateMenuOpen) {
@@ -781,6 +802,25 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		});
 	}, [focusEditorPreservingSelection, mcpMenuEl, mcpMenuOpen]);
 
+	useEffect(() => {
+		if (!workspaceMenuOpen) {
+			if (menuOpenedByShortcutRef.current.workspace) {
+				menuOpenedByShortcutRef.current.workspace = false;
+				requestAnimationFrame(() => {
+					focusEditorPreservingSelection();
+				});
+			}
+			return;
+		}
+		if (!menuOpenedByShortcutRef.current.workspace) {
+			return;
+		}
+
+		requestAnimationFrame(() => {
+			focusMenuSearchOrFirstItem(workspaceMenuEl);
+		});
+	}, [focusEditorPreservingSelection, workspaceMenuEl, workspaceMenuOpen]);
+
 	const openTemplatePicker = useCallback(() => {
 		if (isInputLocked) {
 			return;
@@ -835,12 +875,23 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		mcpMenu.show();
 	}, [closeAllMenus, isInputLocked, mcpMenu]);
 
+	const openWorkspacePicker = useCallback(() => {
+		if (isInputLocked) {
+			return;
+		}
+		menuOpenedByShortcutRef.current.workspace = true;
+
+		closeAllMenus();
+		workspaceMenu.show();
+	}, [closeAllMenus, isInputLocked, workspaceMenu]);
+
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
 		const prevWs = preEditWebSearchTemplatesRef.current;
 		const prevMCP = preEditMCPContextRef.current;
 		const prevSkills = preEditEnabledSkillRefsRef.current;
 		const prevActive = preEditActiveSkillRefsRef.current;
+		const prevWorkspace = preEditWorkspaceSelectionRef.current;
 
 		if (prevConv) {
 			setConversationToolsState(prevConv);
@@ -857,6 +908,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				prevActive ?? getCurrentActiveSkillRefs()
 			);
 		}
+		if (prevWorkspace !== null) {
+			void workspace.restoreSelection(prevWorkspace, false);
+		}
 		clearPreEditSnapshot();
 	}, [
 		applySkillSelectionState,
@@ -866,6 +920,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		mcp,
 		setConversationToolsState,
 		setWebSearchTemplates,
+		workspace,
 	]);
 
 	const isSendButtonEnabled = useMemo(() => {
@@ -1053,6 +1108,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				return;
 			}
 
+			if (workspace.blockingError) {
+				setSubmitError(workspace.blockingError);
+				return;
+			}
+
 			// The tool picker can remain mounted after attaching a tool.
 			// Close all menus before submit-driven state changes so no Ariakit menu
 			// subtree spans the attached-tool -> conversation-tool transition.
@@ -1188,6 +1248,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					enabledSkillRefs: effectiveEnabledSkillRefs,
 					activeSkillRefs: activeForMessage,
 					skillSessionID: effectiveSkillSessionID ?? undefined,
+					workspaceSelection: workspace.getSelectionSnapshot(),
 				};
 
 				lastSubmittedMCPContextRef.current = preparedMCPContext;
@@ -1248,6 +1309,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			systemPrompt.resolvedSystemPrompt,
 			toolCalls,
 			webSearchTemplates,
+			workspace,
 		]
 	);
 
@@ -1425,6 +1487,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				if (!preEditActiveSkillRefsRef.current) {
 					preEditActiveSkillRefsRef.current = getCurrentActiveSkillRefs();
 				}
+				if (preEditWorkspaceSelectionRef.current === null) {
+					preEditWorkspaceSelectionRef.current = workspace.getSelectionSnapshot();
+				}
 				clearComposerTransientState();
 
 				// 1) Reset document to plain text paragraphs.
@@ -1443,9 +1508,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				setMCPAppContextUpdates(incoming.mcpAppContextUpdates ?? []);
 				// 4) Restore enabled/active skills together so invariants hold immediately.
 				void applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? [], {
-					syncSession: 'none',
+					syncSession: SkillSessionSyncMode.None,
 					forceResetSession: true,
 				});
+				void workspace.restoreSelection(incoming.workspaceSelection, false);
 				// 5) Restore any tool outputs that were previously attached to this message.
 				setToolOutputs(incoming.toolOutputs ?? []);
 			} finally {
@@ -1468,6 +1534,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			replaceEditorDocument,
 			setToolOutputs,
 			webSearchTemplates,
+			workspace,
 		]
 	);
 
@@ -1617,6 +1684,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			openMCPMenu: () => {
 				openMCPPicker();
 			},
+			openWorkspaceMenu: () => {
+				openWorkspacePicker();
+			},
+			clearWorkspace: () => {
+				void workspace.detachWorkspace(false);
+			},
 			requestStopResponse: () => {
 				if (isGenerating) {
 					onRequestStop();
@@ -1645,6 +1718,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setSkillStateFromMessage: (enabledRefs, activeRefs, options) => {
 				void applySkillSelectionState(enabledRefs, activeRefs, options);
 			},
+			setInstalledSkillStateFromPreset: (enabledRefs, activeRefs) => {
+				void applyInstalledSkillSelectionState(enabledRefs, activeRefs, {
+					syncSession: SkillSessionSyncMode.EnsureIfEnabled,
+				});
+			},
+			setWorkspaceSelectionFromMessage: (selection, syncSkills = true) => {
+				void workspace.restoreSelection(selection, syncSkills);
+			},
 			finishAssistantTurn,
 		}),
 		[
@@ -1663,8 +1744,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			openAttachmentPicker,
 			openSkillsPicker,
 			openMCPPicker,
+			openWorkspacePicker,
+			workspace,
 			mcp,
 			applySkillSelectionState,
+			applyInstalledSkillSelectionState,
 			isGenerating,
 			onRequestStop,
 		]
@@ -1956,6 +2040,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						attachmentMenuState={attachmentMenu}
 						skillsMenuState={skillsMenu}
 						mcpMenuState={mcpMenu}
+						workspaceMenuState={workspaceMenu}
+						workspaceState={workspace}
 						templateButtonRef={templateButtonRef}
 						toolButtonRef={toolButtonRef}
 						attachmentButtonRef={attachmentButtonRef}
@@ -1988,6 +2074,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onDisableAllSkills={disableAllSkills}
 						onRefreshSkills={refreshSkills}
 						systemPrompt={systemPrompt}
+						workspaceActiveSkillRefs={activeSkillRefs}
+						setWorkspaceActiveSkillRefs={setActiveSkillRefs}
 						isInputLocked={isInputLocked || fastForwardPending}
 						mcpState={mcp}
 						skillsLoadError={skillsLoadError}

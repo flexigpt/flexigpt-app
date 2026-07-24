@@ -33,7 +33,7 @@ import {
 	supportsOutputVerbosity,
 } from '@/modelpresets/lib/capabilities_override';
 import { getChatInputOptions } from '@/modelpresets/lib/uichatoption_helper';
-import { normalizeSkillSelectionsToRefs } from '@/skills/lib/skill_identity_utils';
+import { isInstalledSkillRef, normalizeSkillSelectionsToRefs } from '@/skills/lib/skill_identity_utils';
 
 type ChatInputOptionsResult = Awaited<ReturnType<typeof getChatInputOptions>>;
 
@@ -673,6 +673,15 @@ export function useAssistantContextState(): AssistantContextController {
 			}
 
 			const requestedSkillSels = preset.startingSkillSelections ?? [];
+
+			for (const selection of requestedSkillSels) {
+				if (!isInstalledSkillRef(selection.skillRef)) {
+					throw new Error(
+						'Assistant preset contains a malformed Skill reference. Installed bundleID, skillSlug, and skillID are required.'
+					);
+				}
+			}
+
 			const sessionSkillSels = requestedSkillSels.filter(selection => !selection.useAsInstructions);
 
 			// Preset semantics: empty or missing means "no opinion", not "clear current skills".

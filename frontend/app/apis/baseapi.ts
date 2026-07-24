@@ -35,9 +35,6 @@ export let toolStoreAPI: IToolStoreAPI;
 export let toolRuntimeAPI: IToolRuntimeAPI;
 export let skillStoreAPI: ISkillStoreAPI;
 export let assistantPresetStoreAPI: IAssistantPresetStoreAPI;
-/**
- * @public
- */
 export let workspaceAPI: IWorkspaceAPI;
 
 // Conditional initialization

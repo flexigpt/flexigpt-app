@@ -339,6 +339,11 @@ type resolvedAllowSkillRefs struct {
 	AllowDefs []agentskillsSpec.SkillDef
 }
 
+type resolvedDefinitionRefs struct {
+	refs []spec.SkillRef
+	rank int
+}
+
 func (s *SkillRuntime) resolveAllowSkillRefs(
 	ctx context.Context,
 	refs []spec.SkillRef,
@@ -347,8 +352,10 @@ func (s *SkillRuntime) resolveAllowSkillRefs(
 		DefToRefs: map[agentskillsSpec.SkillDef][]spec.SkillRef{},
 		RefToDef:  map[string]agentskillsSpec.SkillDef{},
 	}
+
 	seenRefs := map[string]struct{}{}
-	seenDefs := map[agentskillsSpec.SkillDef]struct{}{}
+	definitions := map[agentskillsSpec.SkillDef]*resolvedDefinitionRefs{}
+
 	for _, ref := range refs {
 		key := refKey(ref)
 		if key == "||" {
@@ -362,13 +369,61 @@ func (s *SkillRuntime) resolveAllowSkillRefs(
 		if !ok {
 			continue
 		}
-		output.DefToRefs[definition] = append(output.DefToRefs[definition], ref)
-		output.RefToDef[key] = definition
-		if _, found := seenDefs[definition]; !found {
-			seenDefs[definition] = struct{}{}
-			output.AllowDefs = append(output.AllowDefs, definition)
+
+		entry := definitions[definition]
+		if entry == nil {
+			entry = &resolvedDefinitionRefs{
+				rank: 1,
+			}
+			definitions[definition] = entry
+		}
+		entry.refs = append(entry.refs, ref)
+		if strings.HasPrefix(ref.Identity, workspaceIdentityPrefix) {
+			entry.rank = 2
 		}
 	}
+
+	byName := map[string][]agentskillsSpec.SkillDef{}
+	for definition := range definitions {
+		byName[definition.Name] = append(byName[definition.Name], definition)
+	}
+
+	allowedDefinitions := map[agentskillsSpec.SkillDef]struct{}{}
+	for _, definitionsForName := range byName {
+		highestRank := -1
+		var highest []agentskillsSpec.SkillDef
+
+		for _, definition := range definitionsForName {
+			rank := definitions[definition].rank
+			if rank > highestRank {
+				highestRank = rank
+				highest = []agentskillsSpec.SkillDef{definition}
+				continue
+			}
+			if rank == highestRank {
+				highest = append(highest, definition)
+			}
+		}
+
+		// Equal-precedence collisions must not be silently chosen. The
+		// aggregate provider exposes a diagnostic; the runtime excludes them.
+		if len(highest) == 1 {
+			allowedDefinitions[highest[0]] = struct{}{}
+		}
+	}
+
+	for definition, entry := range definitions {
+		if _, allowed := allowedDefinitions[definition]; !allowed {
+			continue
+		}
+
+		output.DefToRefs[definition] = append([]spec.SkillRef(nil), entry.refs...)
+		output.AllowDefs = append(output.AllowDefs, definition)
+		for _, ref := range entry.refs {
+			output.RefToDef[refKey(ref)] = definition
+		}
+	}
+
 	sortSkillDefs(output.AllowDefs)
 	return output
 }
