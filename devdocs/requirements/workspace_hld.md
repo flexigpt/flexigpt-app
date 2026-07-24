@@ -253,28 +253,31 @@ Resources intended to supplement other Workspace sources.
 
 ## 10. Supported artifact kinds
 
-The initial Workspace may support:
+Workspace support is explicit. A kind is not supported merely because a source
+file can be discovered or parsed.
 
-- Workspace definition
-- Agent definition
-- Skill definition
-- Tool definition
-- MCP server definition
-- Model definition
-- Instruction document
-- Context document
+The current implemented set is:
 
-Each artifact kind must define:
+- Workspace definition, used to load bounded discovery preferences.
+- Workspace Context documents.
+- Workspace Skills.
 
-- Portable schema identity
-- Native source formats
-- Validation rules
-- Local record defaults
-- Projection target
-- Runtime consumption boundary
-- Whether dependencies are allowed
+Agent, Tool, MCP, Model, Assistant, and other future kinds remain planned.
+They must not be presented as current Workspace capability until their
+end-to-end consumer path exists.
 
-Adding a kind without a projection or runtime consumer should not be considered complete support.
+Every supported kind requires:
+
+- Portable schema identity.
+- Native source conventions or another discovery path.
+- Semantic validation and stable diagnostics.
+- Local record derivation rules.
+- A management projection.
+- A runtime or product consumer where runtime use is part of the kind.
+- Explicit dependency support or an explicit prohibition on dependencies.
+
+Adding a decoder without these responsibilities is incomplete implementation,
+not supported Workspace capability.
 
 ## 11. Native source conventions
 
@@ -289,33 +292,44 @@ Workspace may recognize conventions such as:
 - Structured model definitions
 - Structured tool definitions
 
-### 11.1 Repository resource MVP conventions
+### 11.1 Implemented repository conventions
 
-The initial repository-resource MVP must support source-linked discovery and loading of the following primary-source conventions:
+The current source-linked implementation recognizes the following conventions:
 
-| Repository convention           | Intended artifact behavior                                                                                            |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `AGENTS.md`                     | A project instruction or context document.                                                                            |
-| `CLAUDE.md`                     | A project instruction or context document.                                                                            |
-| `.skills/<skill-name>/SKILL.md` | A Skill definition. The containing Skill directory remains the source-relative location for declared Skill resources. |
-| `.mcps.json`                    | An MCP configuration document. One document may emit one or more MCP server definition occurrences.                   |
+| Repository convention                 | Current artifact behavior                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `.flexigpt/workspace.json`            | Workspace-definition discovery preferences. It is a bootstrap document, not a general runtime artifact.           |
+| `AGENTS.md`                           | A Context document with the `agent-instructions` role.                                                            |
+| `CLAUDE.md`                           | A Context document with the `assistant-instructions` role.                                                        |
+| `README.md`                           | A Context document only when README discovery is enabled.                                                         |
+| `<configured-skill-root>/**/SKILL.md` | A Workspace Skill. The default configured root is `.skills`; skill roots are configurable at Workspace open time. |
+| Explicit additional Markdown locators | A Context document with the `project-context` role when explicitly targeted by discovery preferences.             |
 
-`README.md` may be included only when enabled by Workspace discovery preferences. It is not a required repository-context convention.
+Context filenames are currently a static code-level convention registry.
+Skill roots use a dedicated convention registry and are configuration-driven.
+Both registries should remain the extension points for adding conventions
+rather than adding path tests throughout discovery code.
 
-The MVP must provide, for each convention:
+### 11.2 Deferred repository conventions
 
-- Discovery scope that includes the convention by default for a filesystem Workspace.
-- A native decoder and portable canonical definition.
+The following convention is a requirement for a future MCP increment, but is
+not implemented and must not be described as part of the current MVP:
+
+- `.mcps.json` or `.flexigpt/mcp.json`, with one canonical occurrence
+  subresource per declared server.
+
+Every future convention must provide:
+
+- Default or explicitly configured discovery scope.
+- A native decoder and canonical definition.
 - Semantic validation and structured diagnostics.
-- Workspace record derivation and catalog visibility.
-- A management projection or context contributor.
+- Record derivation and catalog visibility.
+- A management projection.
 - A runtime or product consumer appropriate to the artifact kind.
 
-These resources remain source-linked for the MVP. Discovering a repository resource must not copy it into an installed-resource store. Import, capture, and fork remain optional transfer workflows under `WS-F15`.
-
-These are Workspace conventions. they should be maintained and supported that a new file or pattern or convention semantic can be added very easily later. Eg we should be able to add context file names or skill dir names to scan or mcp json to scan very easily.
-
-Artifact Store only provides candidate traversal and format-adapter invocation.
+Repository resources remain source-linked. Discovery must not copy them into an
+installed-resource store. Import, capture, and fork remain optional transfer
+workflows under `WS-F15`.
 
 ## 12. Core use cases
 
@@ -328,8 +342,8 @@ Workspace:
 - Creates a source registration.
 - Creates a Workspace root.
 - Attaches the source as primary.
-- Performs discovery when requested.
-- Returns the Workspace even if optional immediate discovery fails, together with the failure.
+- Does not perform implicit discovery during creation.
+- Performs discovery only through an explicit refresh request.
 
 Selecting a directory is not an execution approval.
 
@@ -706,17 +720,22 @@ Skill Store record are separate concepts.
 
 Portable definitions use selectors rather than local references.
 
-Workspace resolves selectors against its current catalog.
+Workspace currently resolves selectors against available, recorded resources in
+the current catalog. It does not apply attachment-role precedence.
 
-Resolution rules are:
+Current resolution rules are:
 
 1. Filter by artifact kind.
 2. Apply logical name when present.
-3. Apply version constraint when present.
+3. Apply the currently supported exact version comparison when present.
 4. Apply label requirements.
-5. Remove disabled or unavailable source candidates.
-6. Select only when exactly one candidate has highest precedence.
-7. Return ambiguity otherwise.
+5. Remove disabled, unavailable, stale, unresolved, and projection-invalid
+   records.
+6. Select only when exactly one candidate remains.
+7. Return an unresolved or ambiguous error otherwise.
+
+If role-based precedence is introduced later, its ordered rules, tie behavior,
+and diagnostic projection must be defined before it is used for selection.
 
 Dependency graph construction is needed only for artifact kinds that declare dependencies and for product flows that consume the graph.
 
@@ -874,79 +893,116 @@ This mapping assesses the attached implementation, rather than planned architect
 - `Not implemented` means no implementation currently provides the requirement.
 
 The current implementation provides Workspace discovery, canonical definitions,
-record reconciliation, cataloging, Context composition, and Workspace-specific
-Skill list and load projections.
+record reconciliation, cataloging, Context composition, Workspace-specific
+Skill views, stable Workspace Skill identities, and a private filesystem
+handoff path for eligible Skill records.
 
-It does not yet complete the required normal runtime integration. In
-particular, selected Workspace Skills do not enter the existing Skill Store
-session/runtime APIs, do not participate in normal runtime prompt generation,
-and do not support normal Skill resource or script operations. The current
-Workspace Skill load projection is not equivalent to a normal runtime Skill.
+Normal Workspace Skill runtime participation remains partial. The runtime has
+identity-resolution and reconciliation code, but its current synchronization
+selection is inverted: it selects runtime-disabled records and the runtime
+policy rejects those same records. Consequently, no Workspace Skill reaches
+the desired runtime set through normal synchronization.
 
 ### 25.1 Mandatory prerequisite mapping
 
-| HLD prerequisite                    | Status            | Current state and notes                                                                                                                                                                        |
-| ----------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Logical roots                       | `Implemented`     | Workspace uses typed Artifact Store roots with stable UUIDv7 identities and logical deletion.                                                                                                  |
-| Source registrations                | `Implemented`     | Filesystem and embedded source registrations are managed through Artifact Store source services.                                                                                               |
-| Root-to-source attachments          | `Implemented`     | Workspace creates and manages primary and additional source attachments with root-local roles, enablement, and data.                                                                           |
-| Safe bounded discovery              | `Implemented`     | Workspace plans use bounded Artifact Store discovery with candidate, entry, depth, and byte limits.                                                                                            |
-| Native format adapters              | `Partial`         | Workspace has concrete JSON Workspace-definition, Markdown Context-document, and restricted-YAML `SKILL.md` decoders. MCP, Tool, Model, and Agent decoders remain unimplemented.               |
-| Canonical definitions               | `Implemented`     | Workspace definitions and any configured decoder output are normalized into Artifact Store canonical definitions.                                                                              |
-| Current root catalog publication    | `Implemented`     | Workspace refresh delegates to the atomic Artifact Store current-catalog publisher.                                                                                                            |
-| Stable local records                | `Implemented`     | Workspace record policy derives stable local records and refresh reconciliation preserves local record fields.                                                                                 |
-| Structured diagnostics              | `Implemented`     | Workspace catalog, Context, Skill, load, and record projections expose catalog, occurrence, record, semantic-projection, policy, exclusion, and truncation diagnostics.                        |
-| Projection boundary                 | `Partial`         | Context projects into a Workspace composition plan. Skills project into Workspace-specific summaries and Markdown load views, but not into the normal Skill runtime provider/session contract. |
-| Workspace runtime provider contract | `Partial`         | Context has a composition API, but no application-level instruction insertion boundary is shown. Workspace Skills have a load projection but no session, runtime, resource, or script handoff. |
-| Aggregate resource services         | `Not implemented` | Installed and Workspace Skills are not yet combined into one normal conversation-scoped Skill runtime. A read-only list or render adapter is not sufficient runtime aggregation.               |
-| Runtime policy boundary             | `Partial`         | `RecordRuntimePolicy` enforces Workspace and record enablement plus record-local runtime disablement. It does not yet represent a broader approval or execution-policy service.                |
-| Secret resolution boundary          | `Not implemented` | No local secret-reference resolution service or runtime setup model is implemented. Current Workspace JSON does not model secret values.                                                       |
-| User-visible diagnostics            | `Implemented`     | API-safe Wails projections expose resource, occurrence, record, policy, unavailable, truncation, exclusion, and catalog diagnostics. Frontend presentation remains a UI concern.               |
+| HLD prerequisite                    | Status            | Current state and notes                                                                                                                                                                                                                          |
+| ----------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Logical roots                       | `Implemented`     | Workspace uses typed Artifact Store roots with stable UUIDv7 identities and logical deletion.                                                                                                                                                    |
+| Source registrations                | `Implemented`     | Filesystem and embedded source registrations are managed through Artifact Store source services.                                                                                                                                                 |
+| Root-to-source attachments          | `Implemented`     | Workspace creates and manages primary and additional source attachments with root-local roles, enablement, and data.                                                                                                                             |
+| Safe bounded discovery              | `Implemented`     | Workspace plans use bounded Artifact Store discovery with candidate, entry, depth, and byte limits.                                                                                                                                              |
+| Native format adapters              | `Partial`         | Workspace has concrete Workspace-definition JSON, Context Markdown, and `SKILL.md` decoders. MCP, Tool, Model, Agent, and Assistant decoders are not implemented.                                                                                |
+| Canonical definitions               | `Implemented`     | Workspace definitions and any configured decoder output are normalized into Artifact Store canonical definitions.                                                                                                                                |
+| Current root catalog publication    | `Implemented`     | Workspace refresh delegates to the atomic Artifact Store current-catalog publisher.                                                                                                                                                              |
+| Stable local records                | `Implemented`     | Workspace record policy derives stable local records and refresh reconciliation preserves local record fields.                                                                                                                                   |
+| Structured diagnostics              | `Implemented`     | Workspace catalog, Context, Skill, load, and record projections expose catalog, occurrence, record, semantic-projection, policy, exclusion, and truncation diagnostics.                                                                          |
+| Projection boundary                 | `Partial`         | Context projects into a composition plan. Skills project into Workspace-specific views and can produce a private filesystem runtime location, but no completed general domain projection exists.                                                 |
+| Workspace runtime provider contract | `Partial`         | Context composition exists but is not wired into inference instruction assembly. Skill identity and handoff infrastructure exists, but the current synchronization gate prevents normal Workspace Skill registration.                            |
+| Aggregate resource services         | `Partial`         | Installed and Workspace Skill providers can be aggregated for management listing and rendering. Normal runtime APIs accept stable Workspace identities, but the current Workspace synchronization defect prevents completed session integration. |
+| Runtime policy boundary             | `Partial`         | `RecordRuntimePolicy` enforces Workspace and record enablement plus record-local runtime disablement. It does not yet represent a broader approval or execution-policy service.                                                                  |
+| Secret resolution boundary          | `Not implemented` | No local secret-reference resolution service or runtime setup model is implemented. Current Workspace JSON does not model secret values.                                                                                                         |
+| User-visible diagnostics            | `Implemented`     | API-safe Wails projections expose resource, occurrence, record, policy, unavailable, truncation, exclusion, and catalog diagnostics. Frontend presentation remains a UI concern.                                                                 |
 
 ### 25.2 Functional requirement mapping
 
-| ID       | Requirement                                                                           | Status                                  | Current state and notes                                                                                                                                                                                                                                       |
-| -------- | ------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WS-F01` | Create filesystem and empty Workspaces.                                               | `Implemented`                           | `Service.CreateFilesystem`, `Service.CreateEmpty`, and the filesystem provisioner create the required root and source relationships.                                                                                                                          |
-| `WS-F02` | Maintain exactly one primary source for filesystem Workspaces.                        | `Implemented`                           | Filesystem Workspace validation requires one enabled primary filesystem attachment matching `PrimarySourceID`. Primary attachments cannot be attached, detached, or replaced through Workspace attachment operations.                                         |
-| `WS-F03` | Attach built-in, library, package, and overlay sources.                               | `Implemented`                           | Workspace validates and persists the `built-in`, `library`, `attached-package`, and `overlay` roles. Package transport and package distribution itself remain unimplemented.                                                                                  |
-| `WS-F04` | Discover supported artifacts using Workspace conventions.                             | `Partial`                               | `AGENTS.md`, `CLAUDE.md`, optional `README.md`, and `.skills/**/SKILL.md` have concrete decoders and records. Context and Skill convention matching still needs centralized declarative configuration, and MCP plus the remaining artifact kinds are pending. |
-| `WS-F05` | Allow Workspace configuration to extend discovery scope safely.                       | `Implemented`                           | `.flexigpt/workspace.json` can add locators, roots, patterns, and README inclusion. Preferences are validated, merged deterministically, and passed through bounded discovery. Workspace YAML is not supported.                                               |
-| `WS-F06` | Publish one coherent catalog per user-visible refresh.                                | `Implemented`                           | The preliminary Workspace-definition read does not publish a catalog. The subsequent Artifact Store refresh produces one final publication.                                                                                                                   |
-| `WS-F07` | Create and preserve stable local records.                                             | `Implemented`                           | Record reconciliation creates one local record per supported typed occurrence and preserves local state across source-derived updates.                                                                                                                        |
-| `WS-F08` | Group resources by supported artifact kind for management views.                      | `Implemented`                           | Public catalog responses expose artifact-kind groups, recorded resources, and detailed unrecorded occurrences.                                                                                                                                                |
-| `WS-F09` | Project definitions into existing domain-facing models.                               | `Partial`                               | Context projects into Workspace contributions. Skills project into Workspace-specific summaries and Markdown load views, but not into the normal Skill provider and session runtime model.                                                                    |
-| `WS-F10` | Resolve explicit and selector-based references deterministically.                     | `Partial`                               | Explicit record resolution, logical-name matching, labels, and ambiguity errors exist. Version constraints only support exact equality and there is no detailed resolution explanation.                                                                       |
-| `WS-F11` | Compose validated load plans.                                                         | `Partial`                               | Context and Skill load views validate Workspace records and definitions, but selected Context is not yet shown entering the normal model instruction flow and selected Skills do not enter the normal Skill runtime/session flow.                             |
-| `WS-F12` | Expose invalid, missing, stale, and ambiguous states.                                 | `Implemented`                           | Public catalog APIs expose valid, invalid, missing, unrecorded, unresolved, stale, projection-invalid, denied, unavailable, and precedence-ambiguous states with diagnostics.                                                                                 |
-| `WS-F13` | Keep local setup, approval, and secrets outside portable definitions.                 | `Implemented` for Context and Skill MVP | Context and Skill portable definitions contain no credentials, secret values, local paths, approval state, or runtime state.                                                                                                                                  |
-| `WS-F14` | Integrate with existing installed-resource providers without duplicating persistence. | `Implemented` for Skills                | Installed and filesystem-backed Workspace Skills share one Agent Skills runtime while retaining distinct installed and Workspace persistence ownership.                                                                                                       |
-| `WS-F16` | Materialize source trees for path-only runtime libraries.                             | `Not implemented`                       | Workspace can provide source metadata in a load plan but cannot materialize a safe source tree or resource closure.                                                                                                                                           |
-| `WS-F17` | Persist dependency resolution history.                                                | `Not implemented`                       | No dependency graph, resolution history, or historical catalog integration exists.                                                                                                                                                                            |
-| `WS-F18` | Insert selected Workspace Context through the normal model instruction flow.          | `Partial`                               | `ComposeWorkspaceContext` can return a Workspace prompt contribution, but the backend does not yet show a normal conversation instruction assembly integration boundary.                                                                                      |
-| `WS-F19` | Include selected Workspace Skills in the normal Skill runtime and session flow.       | `Not implemented`                       | `CreateSkillSession`, `GetSkillsPrompt`, `ListRuntimeSkills`, `RenderSkill`, and `InvokeSkillTool` currently operate through the installed Skill Store only.                                                                                                  |
-| `WS-F19` | Include selected Workspace Skills in the normal Skill runtime and session flow.       | `Implemented` for filesystem sources    | Stable Workspace identities resolve to approved filesystem Skill directories and enter the ordinary Agent Skills runtime as `fs` definitions.                                                                                                                 |
-| `WS-F20` | Provide selected Workspace Skill resource and script capability parity.               | `Implemented` for filesystem sources    | The shared `fsskillprovider` indexes resources and handles `skills-readresource` and `skills-runscript` under the same policy as installed filesystem Skills.                                                                                                 |
+| ID       | Requirement                                                                           | Status            | Current state and notes                                                                                                                                                                                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WS-F01` | Create filesystem and empty Workspaces.                                               | `Implemented`     | `Service.CreateFilesystem`, `Service.CreateEmpty`, and the filesystem provisioner create the required root and source relationships.                                                                                                                                                         |
+| `WS-F02` | Maintain exactly one primary source for filesystem Workspaces.                        | `Implemented`     | Filesystem Workspace validation requires one enabled primary filesystem attachment matching `PrimarySourceID`. Primary attachments cannot be attached, detached, or replaced through Workspace attachment operations.                                                                        |
+| `WS-F03` | Attach built-in, library, package, and overlay sources.                               | `Partial`         | Role validation and attachment persistence are implemented. The public Workspace API can attach an existing source, but it does not yet provide source provisioning for built-in, library, package, or overlay content. Package transport and distribution are absent.                       |
+| `WS-F04` | Discover supported artifacts using Workspace conventions.                             | `Partial`         | Workspace definition JSON, `AGENTS.md`, `CLAUDE.md`, optional `README.md`, configured Skill roots, and explicitly targeted Markdown Context files are implemented. MCP and all other planned artifact kinds are absent.                                                                      |
+| `WS-F05` | Allow Workspace configuration to extend discovery scope safely.                       | `Implemented`     | `.flexigpt/workspace.json` can add locators, roots, patterns, and README inclusion. Preferences are validated, merged deterministically, and passed through bounded discovery. Workspace YAML is not supported.                                                                              |
+| `WS-F06` | Publish one coherent catalog per user-visible refresh.                                | `Implemented`     | The preliminary Workspace-definition read does not publish a catalog. The subsequent Artifact Store refresh produces one final publication.                                                                                                                                                  |
+| `WS-F07` | Create and preserve stable local records.                                             | `Implemented`     | Record reconciliation creates one local record per supported typed occurrence and preserves local state across source-derived updates.                                                                                                                                                       |
+| `WS-F08` | Group resources by supported artifact kind for management views.                      | `Implemented`     | Public catalog responses expose artifact-kind groups, recorded resources, and detailed unrecorded occurrences.                                                                                                                                                                               |
+| `WS-F09` | Project definitions into existing domain-facing models.                               | `Partial`         | Context projects into Workspace contributions. Skills project into Workspace-specific summaries and load views. The remaining planned kinds have no projections.                                                                                                                             |
+| `WS-F10` | Resolve explicit and selector-based references deterministically.                     | `Partial`         | Explicit record resolution, logical-name matching, labels, and ambiguity errors exist. Version constraints only support exact equality, resolution considers recorded resources only, and there is no explainable candidate result.                                                          |
+| `WS-F11` | Compose validated load plans.                                                         | `Partial`         | Context and Skill load views validate Workspace records and definitions, but selected Context is not yet shown entering the normal model instruction flow and selected Skills do not enter the normal Skill runtime/session flow.                                                            |
+| `WS-F12` | Expose invalid, missing, stale, and ambiguous states.                                 | `Partial`         | Catalog and record views expose occurrence state, record state, diagnostics, catalog currentness, unrecorded occurrences, and unresolved records. Selector ambiguity is returned as an engine error, not an explainable public resolution result.                                            |
+| `WS-F13` | Keep local setup, approval, and secrets outside portable definitions.                 | `Partial`         | Record-local runtime disablement is separate from definitions, and implemented Context and Skill schemas define no credential fields. There is no general secret-reference service, approval model, or enforcement that arbitrary Markdown and frontmatter cannot contain sensitive content. |
+| `WS-F14` | Integrate with existing installed-resource providers without duplicating persistence. | `Partial`         | Installed and Workspace Skills retain separate persistence ownership and have stable aggregate-provider identities. The runtime registration defect means the normal shared session path is not complete.                                                                                    |
+| `WS-F15` | Import, capture, or fork Workspace resources.                                         | `Not implemented` | No import, capture, fork, source-copy, package, or transfer-provenance workflow exists.                                                                                                                                                                                                      |
+| `WS-F16` | Materialize source trees for path-only runtime libraries.                             | `Not implemented` | Workspace can provide source metadata in a load plan but cannot materialize a safe source tree or resource closure.                                                                                                                                                                          |
+| `WS-F17` | Persist dependency resolution history.                                                | `Not implemented` | No dependency graph, resolution history, or historical catalog integration exists.                                                                                                                                                                                                           |
+| `WS-F18` | Insert selected Workspace Context through the normal model instruction flow.          | `Partial`         | `ComposeWorkspaceContext` can return a Workspace prompt contribution, but the backend does not yet show a normal conversation instruction assembly integration boundary.                                                                                                                     |
+| `WS-F19` | Include selected Workspace Skills in the normal Skill runtime and session flow.       | `Partial`         | Stable Workspace identities, runtime lookup, and filesystem handoff infrastructure exist. The current synchronization path selects `RuntimeDisabled` records, and the runtime policy rejects those records, leaving the desired Workspace runtime set empty.                                 |
+| `WS-F20` | Provide selected Workspace Skill resource and script capability parity.               | `Partial`         | A valid selected filesystem Skill can be projected to the shared filesystem provider path, which is the intended parity mechanism. Because `WS-F19` registration is currently blocked, normal session resource and script parity is not complete.                                            |
 
 ### 25.3 Quality requirement mapping
 
-| HLD section | Requirement              | Status        | Current state and notes                                                                                                                                                                                                                                                       |
-| ----------- | ------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `14.1`      | Refresh coherence        | `Implemented` | Artifact Store publishes one atomic final catalog. Bootstrap Workspace-definition preferences are bound to the expected primary-source generation used by final discovery.                                                                                                    |
-| `14.2`      | Local-state preservation | `Implemented` | Refresh reconciliation preserves enablement, local data, pins, names, and local record identity while updating only source-derived state.                                                                                                                                     |
-| `14.3`      | Source transparency      | `Partial`     | Internal resources retain record, source, occurrence, current-catalog status, definition, and diagnostics. Public Workspace catalog responses need detailed occurrence and diagnostic projections, plus explainable selector winner, loser, unavailable, and tied candidates. |
-| `14.4`      | Safe degradation         | `Implemented` | Candidate-specific decode and definition failures produce invalid occurrences while unrelated valid candidates continue. Structural failures still prevent publication, as required.                                                                                          |
-| `14.5`      | Runtime isolation        | `Implemented` | Current Workspace loading only composes data. It does not connect to MCP servers, start processes, invoke tools, load credentials, execute Skills, or modify installed stores.                                                                                                |
+| HLD section | Requirement              | Status        | Current state and notes                                                                                                                                                                                                                                                                                    |
+| ----------- | ------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `14.1`      | Predictable precedence   | `Partial`     | Selector resolution is deterministic because multiple matching resources are ambiguous. There is no attachment-role precedence policy, complete version matching, or explainable winner and loser projection.                                                                                              |
+| `14.2`      | Refresh coherence        | `Implemented` | Artifact Store publishes one atomic final catalog. Bootstrap Workspace-definition preferences are bound to the primary-source generation expected by final discovery.                                                                                                                                      |
+| `14.3`      | Local-state preservation | `Implemented` | Refresh reconciliation preserves enablement, local data, pins, names, and local record identity while updating only source-derived state.                                                                                                                                                                  |
+| `14.4`      | Source transparency      | `Partial`     | Catalog views expose source IDs, locators, occurrences, record state, currentness, and diagnostics. They do not expose selector candidate evaluation, precedence, or rejection explanations.                                                                                                               |
+| `14.5`      | Safe degradation         | `Implemented` | Candidate-specific decode and definition failures produce invalid occurrences while unrelated valid candidates continue. Structural failures prevent publication and preserve the prior catalog.                                                                                                           |
+| `14.6`      | Runtime isolation        | `Implemented` | Discovery, catalog reads, and Context composition do not execute content, connect external services, load credentials, or modify installed persistence. Lifecycle-triggered runtime synchronization may inspect and register selected runtime definitions, but does not create sessions or execute Skills. |
 
-## 26. Next steps
+## 26. Code guide
 
-- Complete frontend Workspace Skill orchestration.
-  - Refresh a Workspace before selecting discovered Skills.
-  - Persist stable installed or Workspace identities, never runtime locations.
-  - Recreate or update a Skill session after Workspace refresh, record enablement changes, runtime-policy changes, source attachment changes, or Workspace deletion.
-  - Render `insert=user-message` Skills through `RenderProvidedSkill`.
-  - Use selected instruction Skills through normal session prompt generation.
-  - Keep resource paths in `SKILL.md` body documentation rather than injecting resource inventories into prompts.
+This guide describes module-level responsibilities for code analysis. It is not
+an API contract and intentionally avoids describing individual structs.
+
+- `internal/workspace`
+  - Public Workspace feature boundary, API-safe request and response
+    projections, configuration, and feature composition.
+  - This is the boundary used by HTTP, CLI, and Wails callers.
+- `internal/workspace/engine`
+  - Workspace root semantics, attachment-role policy, discovery planning,
+    bootstrap definition loading, record policy, query resolution, catalog
+    projection, and runtime-policy decisions.
+  - Owns Workspace meaning; it does not own generic storage or source access.
+- `internal/workspace/contextadapter`
+  - Context conventions, Markdown decoding, semantic validation, inspection,
+    policy-aware prompt composition, ordering, and prompt-budget handling.
+- `internal/workspace/skilladapter`
+  - Skill conventions, `SKILL.md` decoding, semantic validation, management
+    projection, selected Skill loading, and private filesystem handoff.
+  - It does not own Agent Skills runtime registration, sessions, or execution.
+- `internal/workspace/provision`
+  - Filesystem Workspace provisioning and compensation when root creation
+    fails after source creation.
+- `internal/artifactstore`
+  - Upstream generic dependency providing roots, sources, discovery,
+    definitions, catalogs, records, and refresh publication.
+- `internal/skillruntime`
+  - Downstream runtime consumer for installed and Workspace Skill identities,
+    runtime reconciliation, sessions, prompts, rendering, and tool calls.
+- `cmd/agentgo`
+  - Application composition and Wails wrappers.
+  - `wrapper_workspace.go` invokes Workspace lifecycle APIs and synchronizes
+    Workspace runtime state. `wrapper_skill.go` exposes installed, aggregate,
+    and normal runtime APIs.
+
+Dependency direction is intentional:
+
+- `workspace` depends on `artifactstore`.
+- `skilladapter` is the Workspace-owned bridge to selected source-linked
+  Skills.
+- `skillruntime` consumes the Workspace Skill adapter through application
+  composition.
+- Artifact Store must not import Workspace or Skill runtime packages.
 
 - Complete selected Workspace Context integration.
   - Define the application instruction assembly boundary that accepts selected
@@ -955,7 +1011,25 @@ Workspace Skill load projection is not equivalent to a normal runtime Skill.
   - Preserve Context ordering, provenance, budgets, truncation, exclusion, and
     runtime-policy diagnostics through the conversation request.
 
-- Implement MCP only after Context and full Skill runtime parity are complete.
+- Repair and verify Workspace Skill runtime integration before expanding Skill
+  capability.
+  - Correct runtime synchronization to select enabled, available,
+    catalog-current records whose `RuntimeDisabled` value is `false`.
+  - Add tests proving that a stable Workspace identity appears in
+    `CreateSkillSession`, `GetSkillsPrompt`, `ListRuntimeSkills`,
+    `RenderSkill`, and `InvokeSkillTool`.
+  - Verify that refreshes, record enablement changes, pin and follow changes,
+    attachment changes, and Workspace deletion reconcile the normal runtime
+    deterministically.
+  - Keep runtime locations private. Wails and frontend code must persist only
+    stable installed or Workspace identities.
+
+- Complete attached-source provisioning.
+  - Add an application-level way to register or select sources intended for
+    built-in, library, package, and overlay attachment roles.
+  - Keep source transport ownership outside Workspace role validation.
+
+- Implement MCP only after Context integration and full Skill runtime parity.
   - Add decoders for `.flexigpt/mcp.json` and `.mcps.json`.
   - Emit one canonical definition and occurrence subresource per server.
   - Add semantic validation that excludes secret values and machine-local credential IDs from portable definitions.
