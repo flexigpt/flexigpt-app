@@ -2548,6 +2548,8 @@ export namespace spec {
 	    toolStoreChoices?: ToolStoreChoice[];
 	    mcpContext?: MCPConversationContext;
 	    mcpAppContextUpdates?: MCPAppModelContextUpdate[];
+	    workspaceSelection?: workspace.ConversationSelection;
+	    workspaceUsage?: workspace.ConversationUsage;
 	    attachments?: attachment.Attachment[];
 	    enabledSkillRefs?: SkillRef[];
 	    activeSkillRefs?: SkillRef[];
@@ -2574,6 +2576,8 @@ export namespace spec {
 	        this.toolStoreChoices = this.convertValues(source["toolStoreChoices"], ToolStoreChoice);
 	        this.mcpContext = this.convertValues(source["mcpContext"], MCPConversationContext);
 	        this.mcpAppContextUpdates = this.convertValues(source["mcpAppContextUpdates"], MCPAppModelContextUpdate);
+	        this.workspaceSelection = this.convertValues(source["workspaceSelection"], workspace.ConversationSelection);
+	        this.workspaceUsage = this.convertValues(source["workspaceUsage"], workspace.ConversationUsage);
 	        this.attachments = this.convertValues(source["attachments"], attachment.Attachment);
 	        this.enabledSkillRefs = this.convertValues(source["enabledSkillRefs"], SkillRef);
 	        this.activeSkillRefs = this.convertValues(source["activeSkillRefs"], SkillRef);
@@ -2848,6 +2852,7 @@ export namespace spec {
 	export class CompletionResponseBody {
 	    inferenceResponse?: FetchCompletionResponse;
 	    hydratedCurrentInputs?: InputUnion[];
+	    workspaceUsage?: workspace.ConversationUsage;
 	
 	    static createFrom(source: any = {}) {
 	        return new CompletionResponseBody(source);
@@ -2857,6 +2862,7 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.inferenceResponse = this.convertValues(source["inferenceResponse"], FetchCompletionResponse);
 	        this.hydratedCurrentInputs = this.convertValues(source["hydratedCurrentInputs"], InputUnion);
+	        this.workspaceUsage = this.convertValues(source["workspaceUsage"], workspace.ConversationUsage);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -11763,6 +11769,241 @@ export namespace workspace {
 		    return a;
 		}
 	}
+	export class ConversationContextUsage {
+	    recordID: string;
+	    name?: string;
+	    locator?: string;
+	    selectedDefinitionDigest?: string;
+	    usedDefinitionDigest?: string;
+	    status: string;
+	    code?: string;
+	    originalBytes?: number;
+	    includedBytes?: number;
+	    changed?: boolean;
+	    diagnostics?: artifactstore.Diagnostic[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ConversationContextUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recordID = source["recordID"];
+	        this.name = source["name"];
+	        this.locator = source["locator"];
+	        this.selectedDefinitionDigest = source["selectedDefinitionDigest"];
+	        this.usedDefinitionDigest = source["usedDefinitionDigest"];
+	        this.status = source["status"];
+	        this.code = source["code"];
+	        this.originalBytes = source["originalBytes"];
+	        this.includedBytes = source["includedBytes"];
+	        this.changed = source["changed"];
+	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ConversationResourceSelectionRef {
+	    recordID: string;
+	    name?: string;
+	    locator?: string;
+	    definitionDigest?: string;
+	    recordRevision?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConversationResourceSelectionRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recordID = source["recordID"];
+	        this.name = source["name"];
+	        this.locator = source["locator"];
+	        this.definitionDigest = source["definitionDigest"];
+	        this.recordRevision = source["recordRevision"];
+	    }
+	}
+	export class ConversationSkillSelectionRef {
+	    recordID: string;
+	    name?: string;
+	    locator?: string;
+	    definitionDigest?: string;
+	    recordRevision?: number;
+	    identity: string;
+	    displayName?: string;
+	    insert?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConversationSkillSelectionRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recordID = source["recordID"];
+	        this.name = source["name"];
+	        this.locator = source["locator"];
+	        this.definitionDigest = source["definitionDigest"];
+	        this.recordRevision = source["recordRevision"];
+	        this.identity = source["identity"];
+	        this.displayName = source["displayName"];
+	        this.insert = source["insert"];
+	    }
+	}
+	export class ConversationSelection {
+	    rootID: string;
+	    displayName?: string;
+	    workspaceRevision?: number;
+	    catalogRevision?: number;
+	    contextRefs?: ConversationResourceSelectionRef[];
+	    skillRefs?: ConversationSkillSelectionRef[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ConversationSelection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rootID = source["rootID"];
+	        this.displayName = source["displayName"];
+	        this.workspaceRevision = source["workspaceRevision"];
+	        this.catalogRevision = source["catalogRevision"];
+	        this.contextRefs = this.convertValues(source["contextRefs"], ConversationResourceSelectionRef);
+	        this.skillRefs = this.convertValues(source["skillRefs"], ConversationSkillSelectionRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ConversationSkillUsage {
+	    recordID: string;
+	    identity: string;
+	    name?: string;
+	    displayName?: string;
+	    locator?: string;
+	    selectedDefinitionDigest?: string;
+	    usedDefinitionDigest?: string;
+	    status: string;
+	    changed?: boolean;
+	    sessionAvailable?: boolean;
+	    active?: boolean;
+	    advertised?: boolean;
+	    diagnostics?: artifactstore.Diagnostic[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ConversationSkillUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.recordID = source["recordID"];
+	        this.identity = source["identity"];
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.locator = source["locator"];
+	        this.selectedDefinitionDigest = source["selectedDefinitionDigest"];
+	        this.usedDefinitionDigest = source["usedDefinitionDigest"];
+	        this.status = source["status"];
+	        this.changed = source["changed"];
+	        this.sessionAvailable = source["sessionAvailable"];
+	        this.active = source["active"];
+	        this.advertised = source["advertised"];
+	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ConversationUsage {
+	    rootID: string;
+	    displayName?: string;
+	    workspaceRevision?: number;
+	    catalogRevision?: number;
+	    status: string;
+	    contexts?: ConversationContextUsage[];
+	    skills?: ConversationSkillUsage[];
+	    diagnostics?: artifactstore.Diagnostic[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ConversationUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rootID = source["rootID"];
+	        this.displayName = source["displayName"];
+	        this.workspaceRevision = source["workspaceRevision"];
+	        this.catalogRevision = source["catalogRevision"];
+	        this.status = source["status"];
+	        this.contexts = this.convertValues(source["contexts"], ConversationContextUsage);
+	        this.skills = this.convertValues(source["skills"], ConversationSkillUsage);
+	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CreateEmptyWorkspaceRequestBody {
 	    displayName: string;
 	    description?: string;
@@ -12509,6 +12750,7 @@ export namespace workspace {
 	    enabled: boolean;
 	    state: string;
 	    catalogCurrent: boolean;
+	    projectionValid: boolean;
 	    runtimeDisabled: boolean;
 	    diagnostics?: artifactstore.Diagnostic[];
 	
@@ -12529,6 +12771,7 @@ export namespace workspace {
 	        this.enabled = source["enabled"];
 	        this.state = source["state"];
 	        this.catalogCurrent = source["catalogCurrent"];
+	        this.projectionValid = source["projectionValid"];
 	        this.runtimeDisabled = source["runtimeDisabled"];
 	        this.diagnostics = this.convertValues(source["diagnostics"], artifactstore.Diagnostic);
 	    }

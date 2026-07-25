@@ -367,11 +367,21 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		update => {
 			const prevActive = activeSkillRefsRef.current;
 			const nextActive = resolveStateUpdate(update, prevActive);
-			void applySkillSelectionState(enabledSkillRefsRef.current, nextActive, {
-				syncSession: SkillSessionSyncMode.None,
-			});
+
+			// A skills lifecycle tool has already changed the active set in the
+			// current runtime session. Routing this through
+			// applySkillSelectionState(..., None) treats the change as a local
+			// selection replacement, clears the session ID, and closes the very
+			// session that reported the new active set.
+			updateActiveSkillRefsState(nextActive);
+
+			if (skillSessionIDRef.current) {
+				sessionStateKeyRef.current = buildSkillSessionStateKey(enabledSkillRefsRef.current, activeSkillRefsRef.current);
+			} else {
+				sessionStateKeyRef.current = '';
+			}
 		},
-		[applySkillSelectionState]
+		[updateActiveSkillRefsState]
 	);
 
 	useEffect(() => {

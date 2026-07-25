@@ -279,7 +279,6 @@ func (a *API) ResolveConversationSelection(
 	skillUsageByID := make(map[artifactstore.RecordID]int, len(selection.SkillRefs))
 	skillRecordIDs := make([]artifactstore.RecordID, 0, len(selection.SkillRefs))
 
-	invalidSessionSkillSelection := false
 	for _, ref := range selection.SkillRefs {
 		if err := artifactstore.ValidateRecordID(ref.RecordID); err != nil {
 			return ConversationResolution{
@@ -364,7 +363,10 @@ func (a *API) ResolveConversationSelection(
 							"only Workspace Skills with insert=\"instructions\" can enter a conversation Skill session",
 						),
 					)
-					invalidSessionSkillSelection = true
+					// A persisted selection can become ineligible after a
+					// Workspace refresh. Keep it in usage as unavailable, but
+					// allow any other valid selected Context or Skills to make
+					// this a partial completion.
 					continue
 				}
 
@@ -378,13 +380,6 @@ func (a *API) ResolveConversationSelection(
 	}
 
 	ResolveConversationUsageStatus(&usage)
-	if invalidSessionSkillSelection {
-		return ConversationResolution{
-				Usage: usage,
-			}, errors.New(
-				"selected Workspace includes a Skill that cannot enter a conversation Skill session",
-			)
-	}
 	if usage.Status == ConversationSelectionUnavailable &&
 		len(usage.Contexts)+len(usage.Skills) > 0 {
 		return ConversationResolution{

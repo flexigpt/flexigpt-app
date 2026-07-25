@@ -80,6 +80,7 @@ function contextIsEligible(context: WorkspaceContextView): boolean {
 		context.enabled &&
 		context.state === WorkspaceRecordState.Available &&
 		context.catalogCurrent &&
+		!context.projectionValid &&
 		!context.runtimeDisabled
 	);
 }

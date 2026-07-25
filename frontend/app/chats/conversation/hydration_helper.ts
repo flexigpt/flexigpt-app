@@ -12,7 +12,7 @@ import type {
 	UIToolOutput,
 } from '@/spec/inference';
 import { ContentItemKind, InputKind, RoleEnum, Status, ToolType } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
+import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
@@ -60,17 +60,6 @@ function deriveMCPContextFromMessages(messages: ConversationMessage[]): MCPConve
 		return message.mcpContext;
 	}
 	return undefined;
-}
-
-function deriveMCPAppContextUpdatesFromMessages(messages: ConversationMessage[]): MCPAppModelContextUpdate[] {
-	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const message = messages[i];
-		if (message.role !== RoleEnum.User) {
-			continue;
-		}
-		return message.mcpAppContextUpdates ?? [];
-	}
-	return [];
 }
 
 function deriveConversationToolsFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
@@ -203,7 +192,6 @@ export function deriveRestorableConversationContextFromMessages(
 		toolChoices: deriveConversationToolsFromMessages(messages),
 		webSearchChoices: deriveWebSearchChoiceFromMessages(messages),
 		mcpContext: deriveMCPContextFromMessages(messages),
-		mcpAppContextUpdates: deriveMCPAppContextUpdatesFromMessages(messages),
 		enabledSkillRefs,
 		activeSkillRefs,
 		workspaceSelection: deriveWorkspaceSelectionFromMessages(messages),

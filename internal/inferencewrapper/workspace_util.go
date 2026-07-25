@@ -156,7 +156,7 @@ func buildWorkspaceContextInput(
 	}
 }
 
-func stripGeneratedWorkspaceCurrentInputs(
+func stripGeneratedCurrentContextInputs(
 	all []inferenceSpec.InputUnion,
 	current []inferenceSpec.InputUnion,
 ) (
@@ -169,7 +169,7 @@ func stripGeneratedWorkspaceCurrentInputs(
 
 	filteredCurrent := make([]inferenceSpec.InputUnion, 0, len(current))
 	for _, input := range current {
-		if isGeneratedWorkspaceInput(input) {
+		if isGeneratedCurrentContextInput(input) {
 			continue
 		}
 		filteredCurrent = append(filteredCurrent, input)
@@ -179,7 +179,7 @@ func stripGeneratedWorkspaceCurrentInputs(
 	if historyLength < 0 || historyLength > len(all) {
 		filteredAll := make([]inferenceSpec.InputUnion, 0, len(all))
 		for _, input := range all {
-			if isGeneratedWorkspaceInput(input) {
+			if isGeneratedCurrentContextInput(input) {
 				continue
 			}
 			filteredAll = append(filteredAll, input)
@@ -198,15 +198,16 @@ func stripGeneratedWorkspaceCurrentInputs(
 	return filteredAll, filteredCurrent
 }
 
-func isGeneratedWorkspaceInput(input inferenceSpec.InputUnion) bool {
+func isGeneratedCurrentContextInput(input inferenceSpec.InputUnion) bool {
 	if input.Kind != inferenceSpec.InputKindInputMessage ||
 		input.InputMessage == nil {
 		return false
 	}
-	return strings.HasPrefix(
-		input.InputMessage.ID,
-		workspaceContextInputIDPrefix,
-	)
+	return input.InputMessage.ID == mcpContextInputID ||
+		strings.HasPrefix(
+			input.InputMessage.ID,
+			workspaceContextInputIDPrefix,
+		)
 }
 
 func markWorkspaceSkillSessionUsage(

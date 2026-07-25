@@ -17,6 +17,8 @@ import (
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
+const mcpContextInputID = "mcp-context"
+
 var simpleMCPURITemplateVariableRE = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_.-]*)\}`)
 
 type MCPRuntime interface {
@@ -765,7 +767,7 @@ func buildMCPContextInputWithIntro(intro, text string) inferenceSpec.InputUnion 
 	return inferenceSpec.InputUnion{
 		Kind: inferenceSpec.InputKindInputMessage,
 		InputMessage: &inferenceSpec.InputOutputContent{
-			ID:     "mcp-context",
+			ID:     mcpContextInputID,
 			Role:   inferenceSpec.RoleUser,
 			Status: inferenceSpec.StatusNone,
 			Contents: []inferenceSpec.InputOutputContentItemUnion{

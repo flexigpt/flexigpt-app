@@ -968,11 +968,11 @@ func workspaceCatalogViewOf(
 		)
 		output.Occurrences = append(output.Occurrences, projected)
 		switch occurrence.State {
-		case "valid":
+		case catalog.OccurrenceValid:
 			output.ValidOccurrences = append(output.ValidOccurrences, projected)
-		case "invalid":
+		case catalog.OccurrenceInvalid:
 			output.InvalidOccurrences = append(output.InvalidOccurrences, projected)
-		case "missing":
+		case catalog.OccurrenceMissing:
 			output.MissingOccurrences = append(output.MissingOccurrences, projected)
 		default:
 		}
@@ -1128,6 +1128,7 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 		Enabled:          value.Enabled,
 		State:            value.State,
 		CatalogCurrent:   value.CatalogCurrent,
+		ProjectionValid:  value.ProjectionValid,
 		RuntimeDisabled:  value.RuntimeDisabled,
 		Diagnostics:      artifactstore.CloneDiagnostics(value.Diagnostics),
 	}

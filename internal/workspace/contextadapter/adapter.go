@@ -47,6 +47,7 @@ type ContextDocument struct {
 	Enabled          bool                       `json:"enabled"`
 	State            record.State               `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
+	ProjectionValid  bool                       `json:"projectionValid"`
 	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
 	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
 }
@@ -323,6 +324,7 @@ func projectContextDocument(
 	output.Name = body.Name
 	output.Role = body.Role
 	output.MediaType = body.MediaType
+	output.ProjectionValid = true
 	return output, nil
 }
 

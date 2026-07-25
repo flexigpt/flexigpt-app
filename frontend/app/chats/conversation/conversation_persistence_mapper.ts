@@ -143,7 +143,7 @@ function hydrateConversationMessage(
 				? derived.uiToolOutputs
 				: deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap, mcpToolSelectionMap);
 	} else if (role === RoleEnum.User) {
-		uiContent = deriveUIContentFromInputUnion(inputs);
+		uiContent = deriveUIContentFromInputUnion(inputs, message.id);
 		uiToolOutputs = deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap, mcpToolSelectionMap);
 	}
 
@@ -218,27 +218,56 @@ export async function hydrateConversationAsync(
 	} as Conversation;
 }
 
-function deriveUIContentFromInputUnion(inputs?: InputUnion[]): string {
+function getUserInputMessageText(input: InputUnion): string {
+	for (const content of input.inputMessage?.contents ?? []) {
+		if (content.kind !== ContentItemKind.Text || !content.textItem?.text) {
+			continue;
+		}
+
+		const text = content.textItem.text.trim();
+		if (text) {
+			return text;
+		}
+	}
+
+	return '';
+}
+
+function isGeneratedCurrentContextInput(input: InputUnion): boolean {
+	const inputMessageID = input.inputMessage?.id;
+	return inputMessageID === 'mcp-context' || inputMessageID?.startsWith('workspace-context:') === true;
+}
+
+function deriveUIContentFromInputUnion(inputs?: InputUnion[], expectedInputMessageID?: string): string {
 	if (!inputs || inputs.length === 0) {
 		return '';
 	}
 
-	for (const input of inputs) {
-		if (
-			input.kind !== InputKind.InputMessage ||
-			input.inputMessage?.role !== RoleEnum.User ||
-			!input.inputMessage.contents
-		) {
+	const userInputs = inputs.filter(
+		input => input.kind === InputKind.InputMessage && input.inputMessage?.role === RoleEnum.User
+	);
+
+	// The editor-created user InputMessage has the same ID as the persisted
+	// ConversationMessage. Prefer it because inference hydration prepends
+	// synthetic Workspace and MCP context InputMessages ahead of it.
+	if (expectedInputMessageID) {
+		const originalUserInput = userInputs.find(input => input.inputMessage?.id === expectedInputMessageID);
+		if (originalUserInput) {
+			return getUserInputMessageText(originalUserInput);
+		}
+	}
+
+	// Older persisted conversations may not have matching InputMessage IDs.
+	// Generated context is prepended, so the last non-generated user input is
+	// the safest fallback for legacy data.
+	for (const input of userInputs.toReversed()) {
+		if (isGeneratedCurrentContextInput(input)) {
 			continue;
 		}
 
-		for (const content of input.inputMessage.contents) {
-			if (content.kind === ContentItemKind.Text && content.textItem?.text) {
-				const text = content.textItem.text.trim();
-				if (text) {
-					return text;
-				}
-			}
+		const text = getUserInputMessageText(input);
+		if (text) {
+			return text;
 		}
 	}
 

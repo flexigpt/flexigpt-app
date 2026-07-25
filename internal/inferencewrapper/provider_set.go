@@ -277,7 +277,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		return nil, errors.New("no usable inputs to send to inference-go")
 	}
 
-	inputs, currentInputs = stripGeneratedWorkspaceCurrentInputs(
+	inputs, currentInputs = stripGeneratedCurrentContextInputs(
 		inputs,
 		currentInputs,
 	)

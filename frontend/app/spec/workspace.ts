@@ -245,6 +245,7 @@ export interface WorkspaceContextView {
 	enabled: boolean;
 	state: WorkspaceRecordState;
 	catalogCurrent: boolean;
+	projectionValid: boolean;
 	runtimeDisabled: boolean;
 	diagnostics?: WorkspaceDiagnostic[];
 }
