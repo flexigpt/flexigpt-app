@@ -198,6 +198,19 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
+function workspaceListsHaveSameRevision(previous: readonly WorkspaceView[], next: readonly WorkspaceView[]): boolean {
+	if (previous.length !== next.length) {
+		return false;
+	}
+
+	return previous.every((workspace, index) => {
+		const candidate = next[index];
+		return (
+			candidate !== undefined && candidate.rootID === workspace.rootID && candidate.revision === workspace.revision
+		);
+	});
+}
+
 export function useComposerWorkspace({
 	applySkillSelectionState,
 	getCurrentEnabledSkillRefs,
@@ -244,9 +257,12 @@ export function useComposerWorkspace({
 		setWorkspacesLoading(true);
 		setWorkspacesLoadError(null);
 		try {
-			const next = sortWorkspaces(await workspaceAPI.listWorkspaces());
+			const loaded = await workspaceAPI.listWorkspaces();
+			const next = sortWorkspaces([...loaded]);
 			if (mountedRef.current) {
-				setWorkspaces(next);
+				setWorkspaces(previous => {
+					return workspaceListsHaveSameRevision(previous, next) ? previous : next;
+				});
 			}
 		} catch (error) {
 			if (mountedRef.current) {
