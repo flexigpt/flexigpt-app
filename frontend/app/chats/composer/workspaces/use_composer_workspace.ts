@@ -326,25 +326,43 @@ export function useComposerWorkspace({
 			setSelectionLoading(true);
 			setSelectionError(null);
 
-			const loaded = await loadWorkspaceSelectionCatalog(nextSelection.rootID);
-			if (!mountedRef.current || loadVersionRef.current !== version) {
-				return;
+			try {
+				const loaded = await loadWorkspaceSelectionCatalog(nextSelection.rootID);
+				if (!mountedRef.current || loadVersionRef.current !== version) {
+					return;
+				}
+
+				setWorkspace(loaded.workspace);
+				setContexts(loaded.contexts);
+				setSkills(loaded.skills);
+				setProvidedSkills(loaded.providedSkills);
+				setCatalogKnown(loaded.catalogKnown);
+				setCatalogRevision(loaded.catalogRevision ?? nextSelection.catalogRevision);
+
+				await replaceWorkspaceSkillRefs(nextSelection, syncSession, loaded, forceResetSession);
+				if (!mountedRef.current || loadVersionRef.current !== version) {
+					return;
+				}
+
+				setSelectionError(loaded.errors.length > 0 ? loaded.errors.join(' ') : null);
+			} catch (error) {
+				if (!mountedRef.current || loadVersionRef.current !== version) {
+					return;
+				}
+
+				// Do not leave Workspace refs from a failed selection in the
+				// current Skill Runtime state.
+				await replaceWorkspaceSkillRefs(undefined, syncSession, undefined, forceResetSession);
+				if (!mountedRef.current || loadVersionRef.current !== version) {
+					return;
+				}
+
+				setSelectionError(getErrorMessage(error, 'The selected Workspace could not be loaded.'));
+			} finally {
+				if (mountedRef.current && loadVersionRef.current === version) {
+					setSelectionLoading(false);
+				}
 			}
-
-			setWorkspace(loaded.workspace);
-			setContexts(loaded.contexts);
-			setSkills(loaded.skills);
-			setProvidedSkills(loaded.providedSkills);
-			setCatalogKnown(loaded.catalogKnown);
-			setCatalogRevision(loaded.catalogRevision ?? nextSelection.catalogRevision);
-
-			await replaceWorkspaceSkillRefs(nextSelection, syncSession, loaded, forceResetSession);
-			if (!mountedRef.current || loadVersionRef.current !== version) {
-				return;
-			}
-
-			setSelectionError(loaded.errors.length > 0 ? loaded.errors.join(' ') : null);
-			setSelectionLoading(false);
 		},
 		[replaceSelection, replaceWorkspaceSkillRefs]
 	);
@@ -421,10 +439,10 @@ export function useComposerWorkspace({
 	const restoreSelection = useCallback(
 		async (nextSelection?: WorkspaceConversationSelection, syncSkills = true) => {
 			if (!nextSelection) {
-				await replaceWorkspaceSkillRefs(
-					undefined,
-					syncSkills ? SkillSessionSyncMode.IfSessionExists : SkillSessionSyncMode.None
-				);
+				// Invalidate an attach/restore request that is still loading.
+				// Without this, its completion can reattach a Workspace after a
+				// no-Workspace conversation or edited message has been restored.
+				loadVersionRef.current += 1;
 				replaceSelection(undefined);
 				setWorkspace(undefined);
 				setContexts([]);
@@ -432,7 +450,13 @@ export function useComposerWorkspace({
 				setProvidedSkills([]);
 				setCatalogKnown(false);
 				setCatalogRevision(undefined);
+				setSelectionLoading(false);
 				setSelectionError(null);
+
+				await replaceWorkspaceSkillRefs(
+					undefined,
+					syncSkills ? SkillSessionSyncMode.IfSessionExists : SkillSessionSyncMode.None
+				);
 				return;
 			}
 
@@ -597,18 +621,34 @@ export function useComposerWorkspace({
 			return;
 		}
 
+		const refreshVersion = loadVersionRef.current + 1;
+		loadVersionRef.current = refreshVersion;
 		setSelectionLoading(true);
 		setSelectionError(null);
 		try {
 			await workspaceAPI.refreshWorkspace(current.rootID);
-			if (selectionRef.current?.rootID === current.rootID) {
-				await loadSelection(current, SkillSessionSyncMode.IfSessionExists, (current.skillRefs?.length ?? 0) > 0);
+			if (
+				!mountedRef.current ||
+				loadVersionRef.current !== refreshVersion ||
+				selectionRef.current?.rootID !== current.rootID
+			) {
+				return;
 			}
+
+			await loadSelection(current, SkillSessionSyncMode.IfSessionExists, (current.skillRefs?.length ?? 0) > 0);
+			if (!mountedRef.current || selectionRef.current?.rootID !== current.rootID) {
+				return;
+			}
+
 			await refreshWorkspaces();
 		} catch (error) {
-			setSelectionError(getErrorMessage(error, 'The selected Workspace could not be refreshed.'));
+			if (mountedRef.current && loadVersionRef.current === refreshVersion) {
+				setSelectionError(getErrorMessage(error, 'The selected Workspace could not be refreshed.'));
+			}
 		} finally {
-			setSelectionLoading(false);
+			if (mountedRef.current && loadVersionRef.current === refreshVersion) {
+				setSelectionLoading(false);
+			}
 		}
 	}, [loadSelection, refreshWorkspaces]);
 

@@ -550,33 +550,60 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		}
 		const syncVersion = advanceSkillSessionSyncVersion();
 
-		const sess = await skillStoreAPI.createSkillSession(
-			existing ?? undefined, // closeSessionID (best-effort)
-			undefined, // maxActivePerSession
-			currentEnabled, // allowSkillRefs (REQUIRED)
-			currentActive // initial active from conversation
-		);
+		// `createSkillSession(closeSessionID, ...)` is a replacement operation.
+		// Do not retain a local ID that the backend may have already closed if
+		// creating its replacement fails.
+		updateSkillSessionIDState(null);
+		sessionStateKeyRef.current = '';
 
-		if (skillSessionSyncVersionRef.current !== syncVersion) {
-			closeSkillSessionBestEffort(sess.sessionID);
-			return null;
+		try {
+			const sess = await skillStoreAPI.createSkillSession(
+				existing ?? undefined, // closeSessionID (best-effort)
+				undefined, // maxActivePerSession
+				currentEnabled, // allowSkillRefs (REQUIRED)
+				currentActive // initial active from conversation
+			);
+
+			if (!sess.sessionID) {
+				throw new Error('Skill runtime did not return a session ID.');
+			}
+
+			if (skillSessionSyncVersionRef.current !== syncVersion) {
+				closeSkillSessionBestEffort(sess.sessionID);
+				return null;
+			}
+
+			const latestEnabled = enabledSkillRefsRef.current;
+			const latestActive = activeSkillRefsRef.current;
+			const latestStateKey = buildSkillSessionStateKey(latestEnabled, latestActive);
+
+			if (latestStateKey !== currentStateKey) {
+				closeSkillSessionBestEffort(sess.sessionID);
+				return null;
+			}
+
+			const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeSkillRefs ?? latestActive);
+			updateSkillSessionIDState(sess.sessionID);
+			updateActiveSkillRefsState(resolvedActive);
+			sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive);
+
+			return sess.sessionID;
+		} catch (error) {
+			if (skillSessionSyncVersionRef.current === syncVersion) {
+				updateSkillSessionIDState(null);
+				sessionStateKeyRef.current = '';
+				if (existing) {
+					closeSkillSessionBestEffort(existing);
+				}
+			}
+			throw error;
 		}
-
-		const latestEnabled = enabledSkillRefsRef.current;
-		const latestActive = activeSkillRefsRef.current;
-		const latestStateKey = buildSkillSessionStateKey(latestEnabled, latestActive);
-
-		if (latestStateKey !== currentStateKey) {
-			closeSkillSessionBestEffort(sess.sessionID);
-			return null;
-		}
-
-		const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeSkillRefs ?? latestActive);
-		sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive);
-		updateSkillSessionIDState(sess.sessionID);
-
-		return sess.sessionID;
-	}, [advanceSkillSessionSyncVersion, closeSkillSessionBestEffort, updateSkillSessionIDState]);
+	}, [
+		advanceSkillSessionSyncVersion,
+		closeSkillSessionBestEffort,
+		updateActiveSkillRefsState,
+		updateSkillSessionIDState,
+	]);
 
 	return {
 		allSkills,

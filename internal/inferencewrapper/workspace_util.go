@@ -210,6 +210,45 @@ func isGeneratedCurrentContextInput(input inferenceSpec.InputUnion) bool {
 		)
 }
 
+// filterWorkspaceSkillRefsToResolvedSelection prevents a Workspace Skill that
+// was selected in persisted or externally supplied client state from reaching
+// inference unless the authoritative Workspace resolver marked it available
+// for this turn. Installed Skill refs are intentionally left untouched.
+func filterWorkspaceSkillRefsToResolvedSelection(
+	refs []skillruntimeSpec.SkillRef,
+	usage *workspace.ConversationUsage,
+) []skillruntimeSpec.SkillRef {
+	if usage == nil || len(refs) == 0 {
+		return refs
+	}
+
+	available := make(map[string]struct{}, len(usage.Skills))
+	for _, skill := range usage.Skills {
+		if skill.Status != workspace.ConversationSkillUsageAvailable {
+			continue
+		}
+
+		identity := strings.TrimSpace(skill.Identity)
+		if identity != "" {
+			available[identity] = struct{}{}
+		}
+	}
+
+	filtered := make([]skillruntimeSpec.SkillRef, 0, len(refs))
+	for _, ref := range refs {
+		identity := strings.TrimSpace(ref.Identity)
+		if !strings.HasPrefix(identity, workspace.WorkspaceSkillIdentityPrefix) {
+			filtered = append(filtered, ref)
+			continue
+		}
+
+		if _, ok := available[identity]; ok {
+			filtered = append(filtered, ref)
+		}
+	}
+	return filtered
+}
+
 func markWorkspaceSkillSessionUsage(
 	usage *workspace.ConversationUsage,
 	enabledSkillRefs []skillruntimeSpec.SkillRef,

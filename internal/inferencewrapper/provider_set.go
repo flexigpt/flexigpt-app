@@ -343,6 +343,12 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	enabledSkillRefs := body.Current.EnabledSkillRefs
+	if workspaceUsage != nil {
+		enabledSkillRefs = filterWorkspaceSkillRefsToResolvedSelection(
+			enabledSkillRefs,
+			workspaceUsage,
+		)
+	}
 	skillSessionID := strings.TrimSpace(body.SkillSessionID)
 
 	// A Workspace selection is authoritative for which Workspace Skills may
