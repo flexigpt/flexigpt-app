@@ -493,7 +493,7 @@ function WorkspaceSetupModalContent({
 
 				<details
 					open={presentation === 'management'}
-					className={presentation === 'composer' ? 'border-base-content/10 bg-base-100 rounded-2xl border' : ''}
+					className={presentation === 'composer' ? 'border-base-content/10 bg-base-100 mb-8 rounded-2xl border' : ''}
 				>
 					{presentation === 'composer' ? (
 						<summary className="cursor-pointer list-none p-4 text-sm font-semibold">
@@ -503,7 +503,7 @@ function WorkspaceSetupModalContent({
 							</div>
 						</summary>
 					) : null}
-					<div className={presentation === 'composer' ? 'px-4 pb-4' : ''}>
+					<div>
 						<ModalSection
 							title="Discovery"
 							description="Use the defaults for normal projects. Add paths only when a project keeps Context or Skills in non-standard locations."

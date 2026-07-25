@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { FiCheck, FiEye, FiRefreshCcw, FiTrash2 } from 'react-icons/fi';
+import { FiCheck, FiEye, FiLayers, FiRefreshCcw, FiTrash2 } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
@@ -343,6 +343,7 @@ export function AssistantPresetDropdown({
 				<HoverTip content={triggerTitle} placement="top" wrapperElement="div" wrapperClassName="w-full">
 					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
 						<ActionTriggerChipContent
+							icon={<FiLayers size={14} />}
 							label={triggerLabel}
 							open={open}
 							suffix={selectedPreset ? <FiCheck size={14} className="shrink-0" /> : undefined}

@@ -150,16 +150,19 @@ export function WorkspaceBottomBarChip({
 								) : undefined
 							}
 							suffix={
-								<span className="flex items-center gap-1">
-									{selectedSkillCount > 0 ? (
-										<span className="badge badge-info badge-xs">Skills {selectedSkillCount}</span>
-									) : null}
-									{state.attentionCount > 0 ? (
-										<FiAlertCircle size={13} className="text-warning" />
-									) : selected && selectedSkillCount === 0 ? (
-										<FiCheck size={13} />
-									) : null}
-								</span>
+								selectedSkillCount > 0 || state.attentionCount > 0 || (selected && selectedSkillCount === 0) ? (
+									<span className="flex items-center gap-1">
+										{selectedSkillCount > 0 ? (
+											<span className="badge badge-info badge-xs">Skills {selectedSkillCount}</span>
+										) : null}
+
+										{state.attentionCount > 0 ? (
+											<FiAlertCircle size={14} className="text-warning" />
+										) : selected && selectedSkillCount === 0 ? (
+											<FiCheck size={14} className="shrink-0" />
+										) : null}
+									</span>
+								) : null
 							}
 							open={open}
 						/>
