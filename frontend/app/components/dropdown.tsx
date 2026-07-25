@@ -40,7 +40,7 @@ export interface DropdownProps<K extends string> {
 }
 
 // A single reusable dropdown that can be used by passing the appropriate config.
-export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
+export function Dropdown<K extends string>(props: DropdownProps<K>) {
 	const {
 		dropdownItems,
 		selectedKey,
@@ -266,4 +266,4 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 			{!inlineMenu && isOpen && floatingStyle && portalTarget ? createPortal(menu, portalTarget) : null}
 		</details>
 	);
-};
+}

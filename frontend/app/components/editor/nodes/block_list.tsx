@@ -38,14 +38,15 @@ function List(props: PlateElementProps) {
 	);
 }
 
-// oxlint-disable-next-line react/display-name
 export const BlockList: RenderNodeWrapper = props => {
 	if (!props.element.listStyleType) {
 		return;
 	}
 
 	// oxlint-disable-next-line no-shadow
-	return props => <List {...props} />;
+	return function p(props) {
+		return <List {...props} />;
+	};
 };
 
 function TodoMarker(props: PlateElementProps) {

@@ -97,7 +97,7 @@ function WorkspaceSelectionModalContent({
 								context.enabled &&
 								context.state === WorkspaceRecordState.Available &&
 								context.catalogCurrent &&
-								!context.projectionValid &&
+								context.projectionValid &&
 								!context.runtimeDisabled;
 
 							return (
@@ -134,7 +134,7 @@ function WorkspaceSelectionModalContent({
 										<span className={`badge badge-xs ${usable ? 'badge-success' : 'badge-warning'}`}>
 											{usable
 												? 'Available'
-												: context.projectionValid
+												: !context.projectionValid
 													? 'Invalid'
 													: context.runtimeDisabled
 														? 'Runtime disabled'

@@ -343,12 +343,53 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	enabledSkillRefs := body.Current.EnabledSkillRefs
-
 	skillSessionID := strings.TrimSpace(body.SkillSessionID)
+
+	// A Workspace selection is authoritative for which Workspace Skills may
+	// participate in this turn. If no runtime allow-list reaches the Skill
+	// Runtime, do not report selected Workspace Skills as silently available.
+	//
+	// This covers stale persisted conversations and frontend catalog races
+	// where Workspace selection survives but its corresponding runtime ref was
+	// omitted. A usable Context may still make the turn partial rather than
+	// completely unavailable.
+	if workspaceUsage != nil &&
+		len(workspaceUsage.Skills) > 0 &&
+		(ps.skillRuntime == nil || len(enabledSkillRefs) == 0) {
+		markWorkspaceSkillSessionUsage(
+			workspaceUsage,
+			enabledSkillRefs,
+			nil,
+			nil,
+			false,
+		)
+		if workspaceUsage.Status == workspace.ConversationSelectionUnavailable {
+			return workspaceUnavailableCompletionResponse(
+				currentInputs,
+				workspaceUsage,
+				"selected Workspace Skills were not included in the Skill Runtime session allow-list",
+			), nil
+		}
+	}
+
 	if ps.skillRuntime != nil && len(enabledSkillRefs) > 0 {
 		var availableSkillItems []skillruntimeSpec.RuntimeSkillListItem
 		var activeSkillItems []skillruntimeSpec.RuntimeSkillListItem
 		if skillSessionID == "" {
+			if workspaceUsage != nil && len(workspaceUsage.Skills) > 0 {
+				markWorkspaceSkillSessionUsage(
+					workspaceUsage,
+					enabledSkillRefs,
+					nil,
+					nil,
+					false,
+				)
+				return workspaceUnavailableCompletionResponse(
+					currentInputs,
+					workspaceUsage,
+					"selected Workspace Skills require a current Skill Runtime session",
+				), nil
+			}
 			return nil, errors.New("enabledSkillRefs provided but skillSessionID is missing")
 		}
 		// Active skills count in this session (restricted to allowlist).
@@ -451,18 +492,11 @@ func (ps *ProviderSetAPI) FetchCompletion(
 
 		if workspaceUsage != nil &&
 			workspaceUsage.Status == workspace.ConversationSelectionUnavailable {
-			return &spec.CompletionResponse{
-				Body: &spec.CompletionResponseBody{
-					InferenceResponse: &inferenceSpec.FetchCompletionResponse{
-						Error: &inferenceSpec.Error{
-							Code:    "workspace_unavailable",
-							Message: "selected Workspace Skills could not enter the active Skill Runtime session",
-						},
-					},
-					HydratedCurrentInputs: currentInputs,
-					WorkspaceUsage:        workspaceUsage,
-				},
-			}, nil
+			return workspaceUnavailableCompletionResponse(
+				currentInputs,
+				workspaceUsage,
+				"selected Workspace Skills could not enter the active Skill Runtime session",
+			), nil
 		}
 	}
 
@@ -536,6 +570,25 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}}
 
 	return resp, err
+}
+
+func workspaceUnavailableCompletionResponse(
+	currentInputs []inferenceSpec.InputUnion,
+	workspaceUsage *workspace.ConversationUsage,
+	message string,
+) *spec.CompletionResponse {
+	return &spec.CompletionResponse{
+		Body: &spec.CompletionResponseBody{
+			InferenceResponse: &inferenceSpec.FetchCompletionResponse{
+				Error: &inferenceSpec.Error{
+					Code:    "workspace_unavailable",
+					Message: message,
+				},
+			},
+			HydratedCurrentInputs: currentInputs,
+			WorkspaceUsage:        workspaceUsage,
+		},
+	}
 }
 
 func (ps *ProviderSetAPI) newPresetCapabilityResolver(

@@ -412,6 +412,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentActiveSkillRefs,
 	});
 
+	const workspaceSelectionPending = workspace.selectionLoading;
+	const workspaceExecutionBlocked = workspaceSelectionPending || workspace.blockingError !== null;
+	const workspaceControlsLocked = isInputLocked || isSubmitting || fastForwardPending || workspaceSelectionPending;
+
 	const [autoExecStopVisible, setAutoExecStopVisible] = useState(false);
 	const [autoExecStopRequested, setAutoExecStopRequested] = useState(false);
 	const [autoExecBlockedByUser, setAutoExecBlockedByUser] = useState(false);
@@ -467,7 +471,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setActiveSkillRefsFromSession,
 		getCurrentSkillSessionID,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
-		externalExecutionBlocked: fastForwardPending || autoExecBlockedByUser,
+		externalExecutionBlocked: fastForwardPending || autoExecBlockedByUser || workspaceExecutionBlocked,
 		requestMCPApproval: mcpApproval.requestMCPApproval,
 	});
 
@@ -876,14 +880,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [closeAllMenus, isInputLocked, mcpMenu]);
 
 	const openWorkspacePicker = useCallback(() => {
-		if (isInputLocked) {
+		if (workspaceControlsLocked) {
 			return;
 		}
 		menuOpenedByShortcutRef.current.workspace = true;
 
 		closeAllMenus();
 		workspaceMenu.show();
-	}, [closeAllMenus, isInputLocked, workspaceMenu]);
+	}, [closeAllMenus, workspaceControlsLocked, workspaceMenu]);
 
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
@@ -931,6 +935,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (isSubmitting) {
 			return false;
 		}
+		if (workspaceExecutionBlocked) {
+			return false;
+		}
 		if (hasBlockingToolArgs) {
 			return false;
 		}
@@ -943,15 +950,26 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		const hasOutputs = toolOutputs.length > 0;
 
 		return hasAttachments || hasOutputs;
-	}, [isInputLocked, isSubmitting, hasBlockingToolArgs, hasText, attachments.length, toolOutputs.length]);
+	}, [
+		isInputLocked,
+		isSubmitting,
+		hasBlockingToolArgs,
+		hasText,
+		attachments.length,
+		toolOutputs.length,
+		workspaceExecutionBlocked,
+	]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
-		isBusy: isGenerating || isSubmitting || fastForwardPending,
+		isBusy: isGenerating || isSubmitting || fastForwardPending || workspaceExecutionBlocked,
 		canSubmit: () => {
 			if (isInputLocked) {
 				return false;
 			}
 			if (isSubmitting) {
+				return false;
+			}
+			if (workspaceExecutionBlocked) {
 				return false;
 			}
 			if (hasBlockingToolArgs) {
@@ -1108,8 +1126,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				return;
 			}
 
-			if (workspace.blockingError) {
-				setSubmitError(workspace.blockingError);
+			if (workspaceExecutionBlocked) {
+				setSubmitError(
+					workspace.blockingError ?? 'Workspace selection is still resolving. Wait for it to finish before sending.'
+				);
 				return;
 			}
 
@@ -1310,6 +1330,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			toolCalls,
 			webSearchTemplates,
 			workspace,
+			workspaceExecutionBlocked,
 		]
 	);
 
@@ -1763,6 +1784,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const stopResponseShortcut = formatShortcut(shortcutConfig.stopResponse);
 
 	const handleRunToolsOnlyClick = useCallback(async () => {
+		if (workspaceExecutionBlocked) {
+			setSubmitError(
+				workspace.blockingError ?? 'Workspace selection is still resolving. Wait for it to finish before running tools.'
+			);
+			return;
+		}
+
 		if (!hasPendingToolCalls || isInputLocked || isSubmitting || fastForwardPending || hasRunningToolCalls) {
 			return;
 		}
@@ -1774,6 +1802,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		isInputLocked,
 		isSubmitting,
 		runAllPendingToolCalls,
+		workspace.blockingError,
+		workspaceExecutionBlocked,
 	]);
 
 	// Button-state helpers:
@@ -1783,13 +1813,19 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// - Send: send only (enabled when send is allowed and there are no pending tools).
 	const canSendOnly = !hasPendingToolCalls && isSendButtonEnabled && !hasRunningToolCalls && !fastForwardPending;
 	const canRunToolsOnly =
-		hasPendingToolCalls && !hasRunningToolCalls && !isInputLocked && !isSubmitting && !fastForwardPending;
+		hasPendingToolCalls &&
+		!hasRunningToolCalls &&
+		!isInputLocked &&
+		!isSubmitting &&
+		!fastForwardPending &&
+		!workspaceExecutionBlocked;
 	const canRunToolsAndSend =
 		hasPendingToolCalls &&
 		!hasRunningToolCalls &&
 		!isInputLocked &&
 		!isSubmitting &&
 		!fastForwardPending &&
+		!workspaceExecutionBlocked &&
 		!hasBlockingToolArgs;
 
 	const activeAutoExecBatchCount = useMemo(
@@ -1895,7 +1931,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									directoryGroups={directoryGroups}
 									toolCalls={toolCalls}
 									toolOutputs={toolOutputs}
-									isBusy={isGenerating || isSubmitting || isInputLocked || fastForwardPending}
+									isBusy={
+										isGenerating || isSubmitting || isInputLocked || fastForwardPending || workspaceExecutionBlocked
+									}
 									onRunToolCall={handleRunSingleToolCall}
 									onDiscardToolCall={handleDiscardToolCall}
 									onOpenOutput={handleOpenToolOutput}
@@ -2076,7 +2114,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						systemPrompt={systemPrompt}
 						workspaceActiveSkillRefs={activeSkillRefs}
 						setWorkspaceActiveSkillRefs={setActiveSkillRefs}
-						isInputLocked={isInputLocked || fastForwardPending}
+						isInputLocked={workspaceControlsLocked}
 						mcpState={mcp}
 						skillsLoadError={skillsLoadError}
 						mcpAppContextUpdateCount={mcpAppContextUpdates.length}

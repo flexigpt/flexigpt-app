@@ -80,7 +80,7 @@ function contextIsEligible(context: WorkspaceContextView): boolean {
 		context.enabled &&
 		context.state === WorkspaceRecordState.Available &&
 		context.catalogCurrent &&
-		!context.projectionValid &&
+		context.projectionValid &&
 		!context.runtimeDisabled
 	);
 }
@@ -268,7 +268,8 @@ export function useComposerWorkspace({
 		async (
 			nextSelection: WorkspaceConversationSelection | undefined,
 			syncSession: SkillSelectionApplyOptions['syncSession'],
-			loadedCatalog?: Pick<LoadedWorkspaceSelectionCatalog, 'skills' | 'providedSkills'>
+			loadedCatalog?: Pick<LoadedWorkspaceSelectionCatalog, 'skills' | 'providedSkills'>,
+			forceResetSession = false
 		) => {
 			const installedEnabled = getCurrentEnabledSkillRefs().filter(ref => !isWorkspaceSkillRef(ref));
 			const installedActive = getCurrentActiveSkillRefs().filter(ref => !isWorkspaceSkillRef(ref));
@@ -293,6 +294,7 @@ export function useComposerWorkspace({
 				[...installedActive, ...retainedWorkspaceActive],
 				{
 					syncSession,
+					forceResetSession,
 				}
 			);
 		},
@@ -306,7 +308,11 @@ export function useComposerWorkspace({
 	);
 
 	const loadSelection = useCallback(
-		async (nextSelection: WorkspaceConversationSelection, syncSkills: boolean) => {
+		async (
+			nextSelection: WorkspaceConversationSelection,
+			syncSession: SkillSessionSyncMode,
+			forceResetSession = false
+		) => {
 			const version = loadVersionRef.current + 1;
 			loadVersionRef.current = version;
 
@@ -332,11 +338,7 @@ export function useComposerWorkspace({
 			setCatalogKnown(loaded.catalogKnown);
 			setCatalogRevision(loaded.catalogRevision ?? nextSelection.catalogRevision);
 
-			await replaceWorkspaceSkillRefs(
-				nextSelection,
-				syncSkills ? SkillSessionSyncMode.EnsureIfEnabled : SkillSessionSyncMode.None,
-				loaded
-			);
+			await replaceWorkspaceSkillRefs(nextSelection, syncSession, loaded, forceResetSession);
 			if (!mountedRef.current || loadVersionRef.current !== version) {
 				return;
 			}
@@ -434,7 +436,7 @@ export function useComposerWorkspace({
 				return;
 			}
 
-			await loadSelection(nextSelection, syncSkills);
+			await loadSelection(nextSelection, syncSkills ? SkillSessionSyncMode.EnsureIfEnabled : SkillSessionSyncMode.None);
 		},
 		[loadSelection, replaceSelection, replaceWorkspaceSkillRefs]
 	);
@@ -487,7 +489,14 @@ export function useComposerWorkspace({
 		};
 
 		replaceSelection(nextSelection);
-		await replaceWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.IfSessionExists);
+		const shouldResetExistingSession =
+			(current?.skillRefs?.length ?? 0) > 0 || (nextSelection.skillRefs && nextSelection.skillRefs.length > 0);
+		await replaceWorkspaceSkillRefs(
+			nextSelection,
+			SkillSessionSyncMode.IfSessionExists,
+			undefined,
+			shouldResetExistingSession
+		);
 	}, [
 		catalogRevision,
 		contexts,
@@ -593,7 +602,7 @@ export function useComposerWorkspace({
 		try {
 			await workspaceAPI.refreshWorkspace(current.rootID);
 			if (selectionRef.current?.rootID === current.rootID) {
-				await loadSelection(current, false);
+				await loadSelection(current, SkillSessionSyncMode.IfSessionExists, (current.skillRefs?.length ?? 0) > 0);
 			}
 			await refreshWorkspaces();
 		} catch (error) {
@@ -732,10 +741,10 @@ export function useComposerWorkspace({
 	const selectedCount = (selection?.contextRefs?.length ?? 0) + (selection?.skillRefs?.length ?? 0);
 	const usableSelectedCount = Math.max(0, selectedCount - unusableSelectedCount);
 
-	const blockingError = !selection
-		? null
-		: selectionLoading
-			? 'Workspace selection is still resolving. Wait for it to finish before sending.'
+	const blockingError = selectionLoading
+		? 'Workspace selection is still resolving. Wait for it to finish before sending.'
+		: !selection
+			? null
 			: !workspace
 				? (selectionError ??
 					'The selected Workspace is unavailable. Detach it or choose another Workspace before sending.')
