@@ -9,7 +9,7 @@
 
 ## M-3
 
-- [ ] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
+- [x] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
 
 - [ ] Workflow sharing: easier add via some files/schemas etc. Assistant presets, Model presets, Skills, Tools, MCPs, Prompt templates etc.
   - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
