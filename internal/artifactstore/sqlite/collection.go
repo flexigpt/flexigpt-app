@@ -132,6 +132,50 @@ func (s *Store) getCollection(
 	return value.Clone(), nil
 }
 
+func (s *Store) getRetiredCollection(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+) (collection.Collection, error) {
+	if err := ref.Validate(); err != nil {
+		return collection.Collection{}, err
+	}
+
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return collection.Collection{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := getActiveRootTx(ctx, tx, ref.RootID); err != nil {
+		return collection.Collection{}, err
+	}
+	value, err := scanCollection(tx.QueryRowContext(
+		ctx,
+		`SELECT `+collectionColumns+`
+		 FROM artifact_collections
+		 WHERE id = ?
+		   AND root_id = ?
+		   AND retired_at IS NOT NULL`,
+		string(ref.CollectionID),
+		string(ref.RootID),
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return collection.Collection{}, fmt.Errorf(
+			"%w: retired collection %q in root %q",
+			artifactstore.ErrCollectionNotFound,
+			ref.CollectionID,
+			ref.RootID,
+		)
+	}
+	if err != nil {
+		return collection.Collection{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return collection.Collection{}, err
+	}
+	return value.Clone(), nil
+}
+
 func (s *Store) listCollectionsByRoot(
 	ctx context.Context,
 	rootID artifactstore.RootID,

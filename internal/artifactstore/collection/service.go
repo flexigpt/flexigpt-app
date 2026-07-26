@@ -144,6 +144,19 @@ func (s *Service) Get(
 	return s.repository.Get(ctx, ref)
 }
 
+// GetRetired is a privileged lifecycle read. It is intentionally not exposed
+// by public consumer APIs because a retired Collection cannot be used as an
+// active aggregate.
+func (s *Service) GetRetired(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+) (Collection, error) {
+	if err := ref.Validate(); err != nil {
+		return Collection{}, err
+	}
+	return s.repository.GetRetired(ctx, ref)
+}
+
 func (s *Service) ListByRoot(
 	ctx context.Context,
 	rootID artifactstore.RootID,

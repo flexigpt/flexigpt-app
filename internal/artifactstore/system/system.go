@@ -321,6 +321,7 @@ func (c *Components) PublishManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
+
 	beforeGeneration, err := sourceSnapshotGeneration(
 		ctx,
 		c.SourceRuntime,
@@ -329,6 +330,20 @@ func (c *Components) PublishManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
+	if repaired, err := c.reconcileManagedContentGeneration(
+		ctx,
+		value,
+		expectedSourceRevision,
+		beforeGeneration,
+	); err != nil {
+		return ManagedPackageResult{}, err
+	} else if repaired {
+		return ManagedPackageResult{}, fmt.Errorf(
+			"%w: managed Source metadata was repaired; reload and retry publication",
+			artifactstore.ErrConflict,
+		)
+	}
+
 	generation, err := c.managedSources.PublishPackage(
 		ctx,
 		value,
@@ -342,14 +357,16 @@ func (c *Components) PublishManagedPackage(
 		Source:     value.Summary(),
 		Generation: generation,
 	}
-	if generation == beforeGeneration {
+	if generation == value.ContentGeneration {
 		return result, nil
 	}
+
 	updated, err := c.Sources.MarkContentChanged(
 		ctx,
 		rootID,
 		sourceID,
 		expectedSourceRevision,
+		generation,
 	)
 	if err != nil {
 		return ManagedPackageResult{}, err
@@ -377,6 +394,51 @@ func (c *Components) RemoveManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
+	if err := source.ValidateManagedPackageDirectory(directory); err != nil {
+		return ManagedPackageResult{}, err
+	}
+
+	beforeGeneration, err := sourceSnapshotGeneration(
+		ctx,
+		c.SourceRuntime,
+		value,
+	)
+	if err != nil {
+		return ManagedPackageResult{}, err
+	}
+	if value.ContentGeneration != "" &&
+		beforeGeneration != value.ContentGeneration {
+		exists, err := managedPackageExists(
+			ctx,
+			c.SourceRuntime,
+			value,
+			directory,
+		)
+		if err != nil {
+			return ManagedPackageResult{}, err
+		}
+		updated, err := c.Sources.MarkContentChanged(
+			ctx,
+			rootID,
+			sourceID,
+			expectedSourceRevision,
+			beforeGeneration,
+		)
+		if err != nil {
+			return ManagedPackageResult{}, err
+		}
+		if !exists {
+			return ManagedPackageResult{
+				Source:     updated,
+				Generation: beforeGeneration,
+			}, nil
+		}
+		return ManagedPackageResult{}, fmt.Errorf(
+			"%w: managed Source content changed before package removal; reload and retry",
+			artifactstore.ErrConflict,
+		)
+	}
+
 	if err := c.managedSources.RemovePackage(
 		ctx,
 		value,
@@ -385,19 +447,22 @@ func (c *Components) RemoveManagedPackage(
 	); err != nil {
 		return ManagedPackageResult{}, err
 	}
+
+	generation, err := sourceSnapshotGeneration(ctx, c.SourceRuntime, value)
+	if err != nil {
+		return ManagedPackageResult{}, err
+	}
 	updated, err := c.Sources.MarkContentChanged(
 		ctx,
 		rootID,
 		sourceID,
 		expectedSourceRevision,
+		generation,
 	)
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
-	generation, err := sourceSnapshotGeneration(ctx, c.SourceRuntime, value)
-	if err != nil {
-		return ManagedPackageResult{}, err
-	}
+
 	return ManagedPackageResult{
 		Source:     updated,
 		Generation: generation,
@@ -420,6 +485,66 @@ func (c *Components) Close() error {
 		}
 	}
 	return errors.Join(closeErrors...)
+}
+
+// reconcileManagedContentGeneration repairs metadata after a successful
+// source-side publication was not acknowledged before a process crash,
+// cancellation, or transient database failure. It never silently continues a
+// second mutation against an unacknowledged source generation.
+func (c *Components) reconcileManagedContentGeneration(
+	ctx context.Context,
+	value source.Source,
+	expectedSourceRevision uint64,
+	observedGeneration string,
+) (bool, error) {
+	if value.ContentGeneration == "" ||
+		value.ContentGeneration == observedGeneration {
+		return false, nil
+	}
+
+	if _, err := c.Sources.MarkContentChanged(
+		ctx,
+		value.RootID,
+		value.ID,
+		expectedSourceRevision,
+		observedGeneration,
+	); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func managedPackageExists(
+	ctx context.Context,
+	runtime source.Runtime,
+	value source.Source,
+	directory artifactstore.Locator,
+) (bool, error) {
+	snapshot, err := runtime.Open(ctx, value)
+	if err != nil {
+		return false, err
+	}
+
+	entry, statErr := snapshot.Stat(ctx, directory)
+	confirmErr := snapshot.Confirm(ctx)
+	closeErr := snapshot.Close()
+	if confirmErr != nil || closeErr != nil {
+		return false, errors.Join(confirmErr, closeErr)
+	}
+	if errors.Is(statErr, artifactstore.ErrNotFound) {
+		return false, nil
+	}
+	if statErr != nil {
+		return false, statErr
+	}
+	if !entry.IsDirectory {
+		return false, fmt.Errorf(
+			"%w: managed package %q is not a directory",
+			artifactstore.ErrInvalid,
+			directory,
+		)
+	}
+	return true, nil
 }
 
 func (c *Components) managedSource(

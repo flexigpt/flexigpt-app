@@ -165,6 +165,13 @@ func (r *CollectionRepository) Get(
 	return r.store.getCollection(ctx, ref)
 }
 
+func (r *CollectionRepository) GetRetired(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+) (collection.Collection, error) {
+	return r.store.getRetiredCollection(ctx, ref)
+}
+
 func (r *CollectionRepository) ListByRoot(
 	ctx context.Context,
 	rootID artifactstore.RootID,

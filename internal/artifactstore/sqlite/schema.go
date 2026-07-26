@@ -363,4 +363,60 @@ BEGIN
 	SELECT RAISE(ABORT, 'artifact occurrence requires attached source');
 END;
 `,
+}, {
+	version:     4,
+	fingerprint: "artifactstore.source-content-generation.v1",
+	sql: `
+ALTER TABLE artifact_sources
+	ADD COLUMN content_generation TEXT NOT NULL DEFAULT '';
+`,
+}, {
+	version:     5,
+	fingerprint: "artifactstore.retirement-relationship-invariants.v1",
+	sql: `
+CREATE TRIGGER artifact_source_retirement_requires_no_active_attachments
+BEFORE UPDATE OF retired_at ON artifact_sources
+FOR EACH ROW
+WHEN OLD.retired_at IS NULL
+ AND NEW.retired_at IS NOT NULL
+ AND EXISTS (
+	SELECT 1
+	FROM artifact_collection_attachments a
+	JOIN artifact_collections c
+	  ON c.root_id = a.root_id
+	 AND c.id = a.collection_id
+	WHERE a.root_id = OLD.root_id
+	  AND a.source_id = OLD.id
+	  AND c.retired_at IS NULL
+)
+BEGIN
+	SELECT RAISE(
+		ABORT,
+		'artifact source retirement requires no active attachments'
+	);
+END;
+
+CREATE TRIGGER artifact_root_retirement_requires_no_active_children
+BEFORE UPDATE OF retired_at ON artifact_roots
+FOR EACH ROW
+WHEN OLD.retired_at IS NULL
+ AND NEW.retired_at IS NOT NULL
+ AND EXISTS (
+	SELECT 1
+	FROM artifact_sources
+	WHERE root_id = OLD.id
+	  AND retired_at IS NULL
+	UNION ALL
+	SELECT 1
+	FROM artifact_collections
+	WHERE root_id = OLD.id
+	  AND retired_at IS NULL
+)
+BEGIN
+	SELECT RAISE(
+		ABORT,
+		'artifact root retirement requires no active children'
+	);
+END;
+`,
 }}

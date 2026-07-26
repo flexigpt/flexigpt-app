@@ -30,8 +30,19 @@ type Reader interface {
 	) ([]Attachment, error)
 }
 
+// RetiredReader is intentionally separate from Reader. Ordinary consumers
+// must not treat retired Collections as active aggregates, while typed domain
+// lifecycle services need to verify Collection kind before destructive purge.
+type RetiredReader interface {
+	GetRetired(
+		ctx context.Context,
+		ref artifactstore.CollectionRef,
+	) (Collection, error)
+}
+
 type Repository interface {
 	Reader
+	RetiredReader
 
 	Create(
 		ctx context.Context,

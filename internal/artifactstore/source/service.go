@@ -288,18 +288,19 @@ func (s *Service) Purge(
 	return s.repository.Purge(ctx, rootID, id, expectedRevision)
 }
 
-// MarkContentChanged advances Source metadata after an application-managed
-// Source publication changes snapshot-visible content.
+// MarkContentChanged acknowledges a snapshot generation after an
+// application-managed Source publication or removal changes visible content.
 //
 // It is intentionally a trusted internal operation. It does not expose Source
-// configuration and is used by system composition after a successful managed
-// package publication or removal. Advancing the Source revision invalidates
-// catalogs that were published against the prior snapshot generation.
+// configuration. Persisting the acknowledged generation makes a source-side
+// mutation recoverable when the source write succeeded but the subsequent
+// metadata update was interrupted.
 func (s *Service) MarkContentChanged(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 	id artifactstore.SourceID,
 	expectedRevision uint64,
+	generation string,
 ) (Summary, error) {
 	if ctx == nil {
 		return Summary{}, fmt.Errorf(
@@ -322,6 +323,9 @@ func (s *Service) MarkContentChanged(
 			artifactstore.ErrInvalid,
 		)
 	}
+	if err := artifactstore.ValidateSourceGeneration(generation); err != nil {
+		return Summary{}, err
+	}
 
 	current, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
@@ -330,11 +334,15 @@ func (s *Service) MarkContentChanged(
 	if current.Revision != expectedRevision {
 		return Summary{}, artifactstore.ErrConflict
 	}
+	if current.ContentGeneration == generation {
+		return current.Summary(), nil
+	}
 	if current.Revision == ^uint64(0) {
 		return Summary{}, fmt.Errorf("%w: source revision is exhausted", artifactstore.ErrInvalid)
 	}
 
 	next := current.Clone()
+	next.ContentGeneration = generation
 	next.Revision++
 	next.ModifiedAt = s.nextModifiedAt(current.ModifiedAt)
 	if err := next.Validate(); err != nil {

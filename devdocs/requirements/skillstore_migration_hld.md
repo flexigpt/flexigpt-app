@@ -17,6 +17,13 @@ It specifies:
 - Ordered work needed to replace the standalone Skill Store.
 
 This document remains a migration target. The current Artifact Store and
+Workspace core boundary is complete independently of this migration. The
+completion does not authorize a dual write, implicit import, or deletion of
+the standalone Skill Store. The standalone package writer, embedded hydration,
+bundle metadata, and overlay implementation remain active legacy behavior
+until a dedicated one-way migration changes dependent assistant preset and
+conversation references in the same release.
+
 Workspace completion does not claim that installed Skills, built-in Skill
 bundles, assistant preset Skill selections, or legacy Skill persistence have
 already migrated. Until that dedicated migration begins, the standalone Skill
@@ -494,12 +501,16 @@ The Artifact Store and Workspace completion does not change standalone Skill
 Store durable ownership. Its direct package implementation remains active
 legacy behavior, not dead code and not an Artifact Store managed Source.
 
-### 10.1 Complete Artifact Store prerequisites
+### 10.1 Satisfied Artifact Store prerequisites
 
 - Implement Collections, Portable Collection Definitions, Artifact refs,
   managed Sources, adoption, pinning, and suppression.
 - Establish one application-owned Artifact Store.
 - Keep direct movement deferred unless a committed workflow requires it.
+
+These prerequisites are now available. This migration HLD intentionally retains
+the list as a boundary contract, not as an instruction to reopen Artifact Store
+or Workspace persistence during the standalone Skill migration.
 
 ### 10.2 Extract the common Skill artifact package
 

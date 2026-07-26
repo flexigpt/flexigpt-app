@@ -333,6 +333,30 @@ func (a *API) RetireWorkspace(
 	}, nil
 }
 
+func (a *API) PurgeWorkspace(
+	ctx context.Context,
+	request *PurgeWorkspaceRequest,
+) (*PurgeWorkspaceResponse, error) {
+	if err := a.ready(); err != nil {
+		return nil, err
+	}
+	if request == nil {
+		return nil, invalidAPIRequest("workspace purge request is required")
+	}
+	if err := a.workspace.service.Purge(
+		ctx,
+		request.Workspace,
+		request.ExpectedRevision,
+	); err != nil {
+		return nil, err
+	}
+	return &PurgeWorkspaceResponse{
+		Body: &PurgeWorkspaceResponseBody{
+			Workspace: request.Workspace,
+		},
+	}, nil
+}
+
 func (a *API) AttachWorkspaceSource(
 	ctx context.Context,
 	request *AttachWorkspaceSourceRequest,

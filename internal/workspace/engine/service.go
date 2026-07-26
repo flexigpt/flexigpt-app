@@ -552,6 +552,37 @@ func (s *Service) Retire(
 	return s.collections.Retire(ctx, ref, expectedRevision)
 }
 
+// Purge destructively removes a retired Workspace Collection and its
+// Collection-scoped metadata. It deliberately verifies the persisted kind
+// before delegating to generic Collection persistence, so Workspace APIs
+// cannot purge another domain's retired Collection.
+func (s *Service) Purge(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+	expectedRevision uint64,
+) error {
+	if err := ref.Validate(); err != nil {
+		return err
+	}
+	if expectedRevision == 0 {
+		return fmt.Errorf(
+			"%w: expected Workspace revision is required",
+			ErrInvalidWorkspace,
+		)
+	}
+	value, err := s.collections.GetRetired(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if value.Kind != CollectionKind {
+		return fmt.Errorf("%w: collection %q", ErrNotWorkspace, ref.CollectionID)
+	}
+	if value.Revision != expectedRevision {
+		return artifactstore.ErrConflict
+	}
+	return s.collections.Purge(ctx, ref, expectedRevision)
+}
+
 // PrepareRefresh converges the local policy revision before planning a
 // publication. A policy revision is local metadata, so a user-triggered
 // refresh is the appropriate point to persist an implementation upgrade.

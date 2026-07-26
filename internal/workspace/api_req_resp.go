@@ -426,6 +426,19 @@ type RetireWorkspaceResponse struct {
 	Body *RetireWorkspaceResponseBody
 }
 
+type PurgeWorkspaceRequest struct {
+	Workspace        WorkspaceRef `json:"workspace"        required:"true"`
+	ExpectedRevision uint64       `json:"expectedRevision" required:"true"`
+}
+
+type PurgeWorkspaceResponseBody struct {
+	Workspace WorkspaceRef `json:"workspace"`
+}
+
+type PurgeWorkspaceResponse struct {
+	Body *PurgeWorkspaceResponseBody
+}
+
 type AttachWorkspaceSourceRequestBody struct {
 	ExpectedCollectionRevision uint64                       `json:"expectedCollectionRevision" required:"true"`
 	SourceID                   artifactstore.SourceID       `json:"sourceID"                   required:"true"`

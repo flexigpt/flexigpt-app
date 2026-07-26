@@ -311,6 +311,14 @@ func validateWorkspaceState(
 				attachment.SourceID,
 			)
 		}
+		if attachment.Enabled && !sourceValue.Enabled {
+			return "", "", fmt.Errorf(
+				"%w: enabled Workspace attachment %q uses a disabled Source",
+				ErrInvalidWorkspace,
+				attachment.SourceID,
+			)
+		}
+
 		if operation.isPrimary {
 			primaryCount++
 			primarySourceID = attachment.SourceID

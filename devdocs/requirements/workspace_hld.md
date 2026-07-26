@@ -424,6 +424,7 @@ Workspace operations include:
     ListWorkspaces(rootID)
     UpdateWorkspace(workspaceRef, request)
     RetireWorkspace(workspaceRef)
+    PurgeWorkspace(workspaceRef)
     ReplaceWorkspacePrimarySource(workspaceRef, request)
     SetWorkspacePrimarySource(workspaceRef, request)
 
@@ -482,6 +483,7 @@ No API infers durable identity from an encoded runtime string.
 | Workspace Artifact purge                | Present                   | Workspace exposes membership-checked destructive Artifact purge and schedules derived runtime reconciliation.                    |
 | Primary Source lifecycle                | Present                   | Empty Workspaces can gain, replace, or explicitly clear one primary filesystem Source through a dedicated operation.            |
 | Attached Source provisioning            | Present for current scope | Artifact Store exposes Source lifecycle APIs and Workspace attaches existing Sources through typed attachment roles.            |
+| Workspace retirement and purge          | Present                   | Retirement is reversible only through retained metadata; typed purge verifies retired `workspace.collection` kind before delete. |
 | Future artifact kinds                   | Not present               | MCP, Tool, Model, Agent, and Assistant paths are absent.                                                                        |
 
 ## 13. Next steps
@@ -498,7 +500,10 @@ records selected and actually used definition and Artifact revisions.
 Transfer formats, URI acquisition, archive handling, portable closure export,
 and additional Artifact kinds remain deliberate omissions. Workspace does not
 perform generic Collection validation through raw Artifact Store APIs; typed
-Workspace APIs remain the public mutation boundary for Workspace state.
+Workspace APIs remain the public mutation boundary for Workspace state. The
+historical implementation items in sections 13.1 through 13.8 are complete for
+the current Workspace scope. Only transfer, portable closure work, and future
+artifact domains remain deferred.
 
 ### 13.1 Complete Artifact Store prerequisites
 
@@ -585,3 +590,5 @@ Workspace satisfies this document when:
 - Native member formats are preserved through domain codecs.
 - Workspace and installed resources retain separate persistence owners.
 - No root-as-Workspace, `RecordID`, or encoded Workspace Skill identity is required by new persistence.
+- A retired Workspace can be purged through a typed Workspace lifecycle API
+  without allowing that API to purge another Collection kind.

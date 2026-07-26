@@ -16,10 +16,17 @@ type Source struct {
 	DisplayName string                   `json:"displayName"`
 	Enabled     bool                     `json:"enabled"`
 	Config      json.RawMessage          `json:"-"`
-	Revision    uint64                   `json:"revision"`
-	CreatedAt   time.Time                `json:"createdAt"`
-	ModifiedAt  time.Time                `json:"modifiedAt"`
-	RetiredAt   *time.Time               `json:"retiredAt,omitempty"`
+
+	// ContentGeneration is the last snapshot generation acknowledged after an
+	// application-managed content mutation. It is internal metadata only:
+	// summaries, public APIs, portable definitions, and source configuration
+	// deliberately do not expose it.
+	ContentGeneration string `json:"-"`
+
+	Revision   uint64     `json:"revision"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	ModifiedAt time.Time  `json:"modifiedAt"`
+	RetiredAt  *time.Time `json:"retiredAt,omitempty"`
 }
 
 type Summary struct {
@@ -99,6 +106,14 @@ func (s Source) Validate() error {
 		artifactstore.MaxConfigBytes,
 	); err != nil {
 		return fmt.Errorf("%w: source config: %w", artifactstore.ErrInvalid, err)
+	}
+
+	if s.ContentGeneration != "" {
+		if err := artifactstore.ValidateSourceGeneration(
+			s.ContentGeneration,
+		); err != nil {
+			return fmt.Errorf("source content generation: %w", err)
+		}
 	}
 
 	return nil

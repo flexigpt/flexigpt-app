@@ -143,7 +143,6 @@ func (w *ArtifactStoreWrapper) UpdateArtifactRoot(
 		if err != nil {
 			return nil, err
 		}
-		w.notifyRootMutation(request.RootID)
 		return &UpdateArtifactRootResponse{Body: &value}, nil
 	})
 }

@@ -649,8 +649,10 @@ Consumer APIs wrap these operations with typed feature semantics.
 | Pinning and suppression                     | Present               | Typed source bindings support pinning, suppression, and source-derived reconciliation.                                                     |
 | Future movement-compatible identity         | Present               | Artifact identity is independent of Collection identity; move remains explicitly unsupported.                                              |
 | Managed writable Source                     | Present               | Managed Sources stage complete native packages, write payload files through MapStore, and publish by atomic directory rename.              |
-| Managed Source catalog invalidation         | Present               | Successful content-changing managed package publication or removal advances the Source revision, making older catalogs stale.               |
+| Managed Source catalog invalidation         | Present               | A managed mutation records its acknowledged snapshot generation privately and advances Source revision when that generation changes.       |
 | Managed Source optimistic API contract      | Present               | Public managed package mutation requires expected Source revision and expected generation where removal is requested.                       |
+| Managed Source recovery                     | Present               | Interrupted metadata acknowledgement is detected on the next mutation; metadata is repaired before another mutation can continue.          |
+| Retirement relationship invariants          | Present               | A Source may retire after all active Collection attachments are gone; retired attachment history remains until Collection purge.          |
 | Portable Collection Definition              | Present foundation    | A canonical generic envelope and safe relative locator resolver exist; persistence and transfer remain pending.                            |
 | Multi-output source documents               | Present               | One decoder candidate can emit multiple subresource occurrences.                                                                           |
 | Multi-file portable content closure         | Not present           | Definitions do not enumerate package assets or export closure.                                                                             |
@@ -674,11 +676,24 @@ behavior. Root, Source, Collection, attachment, catalog, Artifact, and
 managed-package mutations use optimistic revisions. Managed Source content
 changes advance Source revision so existing catalog snapshots become stale.
 
+An application-managed Source also records the last snapshot generation
+acknowledged by metadata. This internal value is not exported through
+`source.Summary`, persisted in portable data, or exposed through Source
+configuration. It closes the failure window in which a package filesystem
+mutation succeeds but the SQLite revision update is interrupted. The next
+managed mutation repairs the Source metadata and requires the caller to reload
+before continuing, rather than silently treating an old catalog as current.
+
 Import, export, archive handling, URI acquisition, portable content closure
 assembly, and direct Artifact movement remain deliberate omissions rather than
 partially implemented features. Generic Collection persistence remains behind
 consumer services; public domain APIs must not bypass consumer validation of
 Collection kind, attachment role, and opaque local data.
+
+## 11. Completion record and deferred work
+
+Sections 11.1 through 11.7 are completed implementation history. They are not
+remaining work items for the current Artifact Store boundary.
 
 ### 11.1 Resolve model invariants
 
@@ -726,7 +741,7 @@ Collection kind, attachment role, and opaque local data.
 - Inject Collection-oriented services into Workspace and Skill consumers.
 - Keep store lifecycle ownership in the application.
 
-### 11.8 Add transfer after the core model is stable
+### 11.8 Deliberate future transfer work
 
 - Implement Artifact import and export using the portable contracts defined
   before persistence work.
@@ -749,6 +764,11 @@ Artifact Store satisfies this document when:
 - Collection occurrences are coherent and independently diagnosable.
 - Automatic adoption respects explicit suppression.
 - Managed content follows the same Source, occurrence, definition, and Artifact lifecycle as external content.
+- A managed source-side mutation cannot silently leave an older catalog
+  current after its metadata acknowledgement is interrupted.
+- Retiring a Collection does not prevent its no-longer-active Sources from
+  retiring; destructive independent Source purge remains ordered after
+  purging retired Collection attachment history.
 - Collections and Artifacts both have portable, schema-versioned representations.
 - A Collection may contain one or many Artifact kinds according to domain policy.
 - Artifacts can originate from one file, a subresource array, or a multi-file package.

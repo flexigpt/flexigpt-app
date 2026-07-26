@@ -211,6 +211,22 @@ func (w *WorkspaceWrapper) RetireWorkspace(
 	})
 }
 
+func (w *WorkspaceWrapper) PurgeWorkspace(
+	request *workspace.PurgeWorkspaceRequest,
+) (*workspace.PurgeWorkspaceResponse, error) {
+	return middleware.WithRecoveryResp(func() (*workspace.PurgeWorkspaceResponse, error) {
+		ctx := context.Background()
+		response, err := w.api.PurgeWorkspace(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if request != nil {
+			w.removeWorkspaceSkills(request.Workspace)
+		}
+		return response, nil
+	})
+}
+
 func (w *WorkspaceWrapper) AttachWorkspaceSource(
 	request *workspace.AttachWorkspaceSourceRequest,
 ) (*workspace.AttachWorkspaceSourceResponse, error) {

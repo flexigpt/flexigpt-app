@@ -52,6 +52,11 @@ type workspaceCollectionStore interface {
 		ref artifactstore.CollectionRef,
 	) (collection.Collection, error)
 
+	GetRetired(
+		ctx context.Context,
+		ref artifactstore.CollectionRef,
+	) (collection.Collection, error)
+
 	ListByRoot(
 		ctx context.Context,
 		rootID artifactstore.RootID,
@@ -68,6 +73,12 @@ type workspaceCollectionStore interface {
 		ref artifactstore.CollectionRef,
 		expectedRevision uint64,
 	) (collection.Collection, error)
+
+	Purge(
+		ctx context.Context,
+		ref artifactstore.CollectionRef,
+		expectedRevision uint64,
+	) error
 
 	Attach(
 		ctx context.Context,

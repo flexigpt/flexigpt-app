@@ -1,6 +1,7 @@
 package workspace_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -212,5 +213,43 @@ func TestFilesystemWorkspaceRefreshContextSkillAndCurrentCatalogPin(
 	if pinned.State != artifact.StateAvailable ||
 		pinned.ResolvedDefinition == nil {
 		t.Fatalf("pinned Artifact=%#v, want available current Artifact", pinned)
+	}
+
+	currentWorkspace, err := api.GetWorkspace(
+		ctx,
+		&workspace.GetWorkspaceRequest{
+			Workspace: created.Body.Workspace,
+		},
+	)
+	if err != nil {
+		t.Fatalf("get Workspace before retirement: %v", err)
+	}
+	retired, err := api.RetireWorkspace(
+		ctx,
+		&workspace.RetireWorkspaceRequest{
+			Workspace:        created.Body.Workspace,
+			ExpectedRevision: currentWorkspace.Body.Revision,
+		},
+	)
+	if err != nil {
+		t.Fatalf("retire Workspace: %v", err)
+	}
+	if retired.Body == nil || retired.Body.Revision == 0 {
+		t.Fatal("retire Workspace returned an invalid response")
+	}
+	if _, err := api.PurgeWorkspace(
+		ctx,
+		&workspace.PurgeWorkspaceRequest{
+			Workspace:        created.Body.Workspace,
+			ExpectedRevision: retired.Body.Revision,
+		},
+	); err != nil {
+		t.Fatalf("purge retired Workspace: %v", err)
+	}
+	_, err = api.GetWorkspace(ctx, &workspace.GetWorkspaceRequest{
+		Workspace: created.Body.Workspace,
+	})
+	if !errors.Is(err, artifactstore.ErrCollectionNotFound) {
+		t.Fatalf("get purged Workspace error=%v, want collection not found", err)
 	}
 }
