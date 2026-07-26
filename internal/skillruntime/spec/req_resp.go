@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
@@ -15,10 +16,10 @@ var (
 
 // SkillRef is a stable runtime-facing identity.
 //
-// Installed references retain their original fields for compatibility.
-// External sources use Identity, for example workspace/<rootID>/<recordID>.
+// Installed references retain their existing bundle and Skill fields until the
+// standalone Skill Store is migrated. Workspace Skills use ArtifactRef only.
 type SkillRef struct {
-	Identity  string                       `json:"identity,omitempty"`
+	Artifact  *artifactstore.ArtifactRef   `json:"artifact,omitempty"`
 	BundleID  skillstoreSpec.SkillBundleID `json:"bundleID,omitempty"`
 	SkillSlug skillstoreSpec.SkillSlug     `json:"skillSlug,omitempty"`
 	SkillID   skillstoreSpec.SkillID       `json:"skillID,omitempty"`
@@ -32,6 +33,10 @@ type RuntimeSkillFilter struct {
 	Inserts        []agentskillsSpec.SkillInsert `json:"inserts,omitempty"`
 	LocationPrefix string                        `json:"locationPrefix,omitempty"`
 	AllowSkillRefs []SkillRef                    `json:"allowSkillRefs,omitempty"`
+
+	// Workspace scopes Artifact-based Skill references. It is required when
+	// AllowSkillRefs contains one or more Workspace Artifact references.
+	Workspace *artifactstore.CollectionRef `json:"workspace,omitempty"`
 
 	SessionID agentskillsSpec.SessionID     `json:"sessionID,omitempty"`
 	Activity  agentskillsSpec.SkillActivity `json:"activity,omitempty"`
@@ -59,6 +64,10 @@ type CreateSkillSessionRequestBody struct {
 	MaxActivePerSession int        `json:"maxActivePerSession,omitempty"`
 	AllowSkillRefs      []SkillRef `json:"allowSkillRefs,omitempty"`
 	ActiveSkillRefs     []SkillRef `json:"activeSkillRefs,omitempty"`
+
+	// Workspace scopes Artifact-based Skill references in this session.
+	// Installed Skill references remain valid without this field.
+	Workspace *artifactstore.CollectionRef `json:"workspace,omitempty"`
 }
 
 // CreateSkillSessionRequest creates a session using stable source identities.
@@ -83,6 +92,10 @@ type CloseSkillSessionResponse struct{}
 type RenderSkillRequestBody struct {
 	SkillRef  SkillRef          `json:"skillRef"            required:"true"`
 	Arguments map[string]string `json:"arguments,omitempty"`
+
+	// Workspace is required when SkillRef.Artifact is present and prevents an
+	// ArtifactRef from being resolved outside its selected Workspace.
+	Workspace *artifactstore.CollectionRef `json:"workspace,omitempty"`
 }
 
 type RenderSkillRequest struct {

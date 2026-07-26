@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 )
 
 type RuntimeUse string
@@ -26,7 +26,7 @@ const (
 type RuntimePolicyRequest struct {
 	Use              RuntimeUse
 	Workspace        Workspace
-	Record           record.Record
+	Artifact         artifact.Artifact
 	DefinitionDigest artifactstore.Digest
 	SourceID         artifactstore.SourceID
 }
@@ -78,17 +78,17 @@ type SourceUsePolicy interface {
 	) RuntimeDecision
 }
 
-// RecordRuntimePolicy is the default local Workspace trust boundary.
+// ArtifactRuntimePolicy is the default local Workspace trust boundary.
 //
 // Discovery and management remain available. Runtime use is enabled by default
-// unless the record-local RuntimeDisabled flag explicitly disables it.
-type RecordRuntimePolicy struct{}
+// unless the Artifact-local RuntimeDisabled flag explicitly disables it.
+type ArtifactRuntimePolicy struct{}
 
-func NewRecordRuntimePolicy() *RecordRuntimePolicy {
-	return &RecordRuntimePolicy{}
+func NewArtifactRuntimePolicy() *ArtifactRuntimePolicy {
+	return &ArtifactRuntimePolicy{}
 }
 
-func (*RecordRuntimePolicy) Decide(
+func (*ArtifactRuntimePolicy) Decide(
 	ctx context.Context,
 	request RuntimePolicyRequest,
 ) RuntimeDecision {
@@ -99,34 +99,34 @@ func (*RecordRuntimePolicy) Decide(
 			Message:     "runtime policy evaluation was cancelled",
 		}
 	}
-	if !request.Workspace.Root.Enabled {
+	if !request.Workspace.Collection.Enabled {
 		return RuntimeDecision{
 			Disposition: RuntimeUnavailable,
 			Code:        DiagnosticCodeRuntimeUnavailable,
 			Message:     "the Workspace is disabled",
 		}
 	}
-	if !request.Record.Enabled ||
-		request.Record.State != record.StateAvailable {
+	if !request.Artifact.Enabled ||
+		request.Artifact.State != artifact.StateAvailable {
 		return RuntimeDecision{
 			Disposition: RuntimeUnavailable,
 			Code:        DiagnosticCodeRuntimeUnavailable,
-			Message:     "the Workspace record is not enabled and available",
+			Message:     "the Workspace Artifact is not enabled and available",
 		}
 	}
-	disabled, err := RecordRuntimeDisabled(request.Record)
+	disabled, err := ArtifactRuntimeDisabled(request.Artifact)
 	if err != nil {
 		return RuntimeDecision{
 			Disposition: RuntimeUnavailable,
 			Code:        DiagnosticCodeRuntimeUnavailable,
-			Message:     "the Workspace record has invalid local runtime policy data",
+			Message:     "the Workspace Artifact has invalid local runtime policy data",
 		}
 	}
 	if disabled {
 		return RuntimeDecision{
 			Disposition: RuntimeDenied,
 			Code:        DiagnosticCodeRuntimeDenied,
-			Message:     "runtime use is disabled for this Workspace record",
+			Message:     "runtime use is disabled for this Workspace Artifact",
 		}
 	}
 	return RuntimeDecision{Disposition: RuntimeAllowed}
@@ -134,7 +134,7 @@ func (*RecordRuntimePolicy) Decide(
 
 func RuntimeDecisionDiagnostic(
 	decision RuntimeDecision,
-	value record.Record,
+	value artifact.Artifact,
 ) artifactstore.Diagnostic {
 	severity := artifactstore.DiagnosticWarning
 	if decision.Disposition == RuntimeUnavailable {
@@ -145,8 +145,8 @@ func RuntimeDecisionDiagnostic(
 		Code:     decision.Code,
 		Message:  decision.Message,
 		Location: &artifactstore.DiagnosticLocation{
-			Locator:            value.Occurrence.Locator,
-			SubresourceLocator: value.Occurrence.SubresourceLocator,
+			Locator:            value.Binding.Locator,
+			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
 	}
 }

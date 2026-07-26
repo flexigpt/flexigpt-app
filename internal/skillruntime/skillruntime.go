@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"slices"
+	"sort"
 	"sync"
 	"time"
 
@@ -19,6 +20,9 @@ import (
 const (
 	runtimeResyncTimeout             = 30 * time.Second
 	runtimeForegroundValidateTimeout = 15 * time.Second
+	workspaceReconcileMaxAttempts    = 5
+	workspaceReconcileInitialDelay   = 250 * time.Millisecond
+	workspaceReconcileMaximumDelay   = 4 * time.Second
 )
 
 // SkillRuntime owns the in-memory Agent Skills catalog, provider lifecycle,
@@ -31,8 +35,21 @@ type SkillRuntime struct {
 
 	rtResyncMu sync.Mutex
 
+	lifecycleMu       sync.Mutex
+	closed            bool
+	backgroundContext context.Context
+	backgroundCancel  context.CancelFunc
+	backgroundWG      sync.WaitGroup
+
+	installedResyncMu         sync.Mutex
+	installedResyncPending    bool
+	installedResyncGeneration uint64
+
+	workspaceRequestMu sync.Mutex
+	workspaceRequests  map[artifactstore.CollectionRef]workspaceReconcileRequest
+
 	managedInstalled  runtimeDesiredView
-	managedWorkspaces map[artifactstore.RootID]runtimeDesiredView
+	managedWorkspaces map[artifactstore.CollectionRef]runtimeDesiredView
 	managedRuntime    map[agentskillsSpec.SkillDef]string
 }
 
@@ -129,6 +146,8 @@ func NewSkillRuntime(
 		options.runScriptsEnabled = false
 	}
 
+	backgroundContext, backgroundCancel := context.WithCancel(context.Background())
+
 	value := &SkillRuntime{
 		store:             store,
 		workspaceSkills:   options.workspaceSkills,
@@ -137,22 +156,25 @@ func NewSkillRuntime(
 		managedInstalled: runtimeDesiredView{
 			definitions: map[agentskillsSpec.SkillDef]string{},
 		},
-		managedWorkspaces: map[artifactstore.RootID]runtimeDesiredView{},
+		managedWorkspaces: map[artifactstore.CollectionRef]runtimeDesiredView{},
 		managedRuntime:    map[agentskillsSpec.SkillDef]string{},
+		backgroundContext: backgroundContext,
+		backgroundCancel:  backgroundCancel,
+		workspaceRequests: map[artifactstore.CollectionRef]workspaceReconcileRequest{},
 	}
 	value.bestEffortInstalledResync(context.Background(), "init")
 	return value, nil
 }
 
 func (s *SkillRuntime) Store() *skillstore.SkillStore {
-	if s == nil {
+	if s == nil || s.isClosed() {
 		return nil
 	}
 	return s.store
 }
 
 func (s *SkillRuntime) AgentSkillsRuntime() *agentskills.Runtime {
-	if s == nil {
+	if s == nil || s.isClosed() {
 		return nil
 	}
 	return s.runtime
@@ -162,15 +184,174 @@ func (s *SkillRuntime) AgentSkillsRuntime() *agentskills.Runtime {
 // Inference composition uses this value only to decide whether
 // skills-runscript is advertised to the model.
 func (s *SkillRuntime) RunScriptsEnabled() bool {
-	if s == nil {
+	if s == nil || s.isClosed() {
 		return false
 	}
 	return s.runScriptsEnabled
 }
 
+// ManagedWorkspaceRefs returns the process-local Workspace partitions that
+// currently have derived Agent Skills runtime state. Application composition
+// uses this to remove a partition after a Workspace was retired or purged
+// through a generic Artifact Store lifecycle operation.
+func (s *SkillRuntime) ManagedWorkspaceRefs() []artifactstore.CollectionRef {
+	if s == nil {
+		return nil
+	}
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
+
+	output := make([]artifactstore.CollectionRef, 0, len(s.managedWorkspaces))
+	for ref := range s.managedWorkspaces {
+		output = append(output, ref)
+	}
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].RootID != output[right].RootID {
+			return output[left].RootID < output[right].RootID
+		}
+		return output[left].CollectionID < output[right].CollectionID
+	})
+	return output
+}
+
+// RequestInstalledResync schedules one coalesced reconciliation of the legacy
+// standalone Skill Store partition. It intentionally does not make a durable
+// Skill Store mutation fail after persistence has committed.
+func (s *SkillRuntime) RequestInstalledResync() {
+	if s == nil {
+		return
+	}
+	parent, started := s.beginBackground()
+	if !started {
+		return
+	}
+
+	s.installedResyncMu.Lock()
+	s.installedResyncGeneration++
+	if s.installedResyncPending {
+		s.installedResyncMu.Unlock()
+		s.endBackground()
+		return
+	}
+	s.installedResyncPending = true
+	s.installedResyncMu.Unlock()
+
+	go func() {
+		defer s.endBackground()
+		defer func() {
+			s.installedResyncMu.Lock()
+			s.installedResyncPending = false
+			s.installedResyncMu.Unlock()
+		}()
+
+		for {
+			if parent.Err() != nil {
+				return
+			}
+			s.installedResyncMu.Lock()
+			generation := s.installedResyncGeneration
+			s.installedResyncMu.Unlock()
+
+			s.bestEffortInstalledResync(
+				parent,
+				"installed-store mutation",
+			)
+
+			s.installedResyncMu.Lock()
+			current := s.installedResyncGeneration
+			s.installedResyncMu.Unlock()
+			if current == generation {
+				return
+			}
+		}
+	}()
+}
+
+// Close stops derived-state reconciliation before the owning Skill Store is
+// closed. Runtime registration is process-local, so no durable mutation occurs
+// during shutdown.
+func (s *SkillRuntime) Close() {
+	if s == nil {
+		return
+	}
+
+	s.lifecycleMu.Lock()
+	if s.closed {
+		s.lifecycleMu.Unlock()
+		return
+	}
+	s.closed = true
+	cancel := s.backgroundCancel
+	s.lifecycleMu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	s.backgroundWG.Wait()
+
+	s.rtResyncMu.Lock()
+	if s.runtime != nil && len(s.managedRuntime) != 0 {
+		ctx, cancel := context.WithTimeout(
+			context.Background(),
+			runtimeResyncTimeout,
+		)
+		remaining, err := s.runtimeApplyDesired(
+			ctx,
+			s.managedRuntime,
+			newRuntimeDesiredView(),
+			runtimeApplyBestEffort,
+		)
+		cancel()
+		if err != nil || len(remaining) != 0 {
+			slog.Error(
+				"remove managed Skill runtime registrations during close",
+				"remaining",
+				len(remaining),
+				"error",
+				err,
+			)
+		}
+	}
+	s.managedInstalled = newRuntimeDesiredView()
+	s.managedWorkspaces = map[artifactstore.CollectionRef]runtimeDesiredView{}
+	s.managedRuntime = map[agentskillsSpec.SkillDef]string{}
+	s.rtResyncMu.Unlock()
+
+	s.workspaceRequestMu.Lock()
+	s.workspaceRequests = nil
+	s.workspaceRequestMu.Unlock()
+}
+
 func (s *SkillRuntime) ensureConfigured() error {
-	if s == nil || s.store == nil || s.runtime == nil {
+	if s == nil {
+		return errors.New("Skill runtime is not configured")
+	}
+	s.lifecycleMu.Lock()
+	closed := s.closed
+	configured := s.store != nil && s.runtime != nil
+	s.lifecycleMu.Unlock()
+	if closed || !configured {
 		return errors.New("Skill runtime is not configured")
 	}
 	return nil
+}
+
+func (s *SkillRuntime) beginBackground() (context.Context, bool) {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	if s.closed || s.backgroundContext == nil {
+		return nil, false
+	}
+	s.backgroundWG.Add(1)
+	return s.backgroundContext, true
+}
+
+func (s *SkillRuntime) endBackground() {
+	s.backgroundWG.Done()
+}
+
+func (s *SkillRuntime) isClosed() bool {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	return s.closed
 }

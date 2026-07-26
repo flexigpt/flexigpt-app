@@ -11,23 +11,27 @@ import (
 
 type Source struct {
 	ID          artifactstore.SourceID   `json:"id"`
+	RootID      artifactstore.RootID     `json:"rootID"`
 	Kind        artifactstore.SourceKind `json:"kind"`
 	DisplayName string                   `json:"displayName"`
 	Enabled     bool                     `json:"enabled"`
-	Config      json.RawMessage          `json:"config"`
+	Config      json.RawMessage          `json:"-"`
 	Revision    uint64                   `json:"revision"`
 	CreatedAt   time.Time                `json:"createdAt"`
 	ModifiedAt  time.Time                `json:"modifiedAt"`
+	RetiredAt   *time.Time               `json:"retiredAt,omitempty"`
 }
 
 type Summary struct {
 	ID          artifactstore.SourceID   `json:"id"`
+	RootID      artifactstore.RootID     `json:"rootID"`
 	Kind        artifactstore.SourceKind `json:"kind"`
 	DisplayName string                   `json:"displayName"`
 	Enabled     bool                     `json:"enabled"`
 	Revision    uint64                   `json:"revision"`
 	CreatedAt   time.Time                `json:"createdAt"`
 	ModifiedAt  time.Time                `json:"modifiedAt"`
+	RetiredAt   *time.Time               `json:"retiredAt,omitempty"`
 }
 
 func (s Source) Clone() Source {
@@ -36,8 +40,48 @@ func (s Source) Clone() Source {
 	return output
 }
 
-func (s Source) Validate() error {
+func (s Summary) Validate() error {
+	if err := artifactstore.ValidateRootID(s.RootID); err != nil {
+		return err
+	}
 	if err := artifactstore.ValidateSourceID(s.ID); err != nil {
+		return err
+	}
+
+	if err := artifactstore.ValidateSourceKind(s.Kind); err != nil {
+		return err
+	}
+	if err := artifactstore.ValidateRequiredText(
+		"source display name",
+		s.DisplayName,
+		artifactstore.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+	if s.Revision == 0 {
+		return fmt.Errorf("%w: source revision must be greater than zero", artifactstore.ErrInvalid)
+	}
+	if s.CreatedAt.IsZero() || s.ModifiedAt.IsZero() {
+		return fmt.Errorf("%w: source timestamps are required", artifactstore.ErrInvalid)
+	}
+	if s.ModifiedAt.Before(s.CreatedAt) {
+		return fmt.Errorf("%w: source modified time precedes creation", artifactstore.ErrInvalid)
+	}
+	if s.RetiredAt != nil {
+		if s.RetiredAt.IsZero() ||
+			s.RetiredAt.Before(s.CreatedAt) ||
+			s.RetiredAt.Before(s.ModifiedAt) {
+			return fmt.Errorf("%w: source retirement time is invalid", artifactstore.ErrInvalid)
+		}
+		if s.Enabled {
+			return fmt.Errorf("%w: retired source cannot be enabled", artifactstore.ErrInvalid)
+		}
+	}
+	return nil
+}
+
+func (s Source) Validate() error {
+	if err := s.Summary().Validate(); err != nil {
 		return err
 	}
 	if err := artifactstore.ValidateSourceKind(s.Kind); err != nil {
@@ -56,27 +100,21 @@ func (s Source) Validate() error {
 	); err != nil {
 		return fmt.Errorf("%w: source config: %w", artifactstore.ErrInvalid, err)
 	}
-	if s.Revision == 0 {
-		return fmt.Errorf("%w: source revision must be greater than zero", artifactstore.ErrInvalid)
-	}
-	if s.CreatedAt.IsZero() || s.ModifiedAt.IsZero() {
-		return fmt.Errorf("%w: source timestamps are required", artifactstore.ErrInvalid)
-	}
-	if s.ModifiedAt.Before(s.CreatedAt) {
-		return fmt.Errorf("%w: source modified time precedes creation", artifactstore.ErrInvalid)
-	}
+
 	return nil
 }
 
 func (s Source) Summary() Summary {
 	return Summary{
 		ID:          s.ID,
+		RootID:      s.RootID,
 		Kind:        s.Kind,
 		DisplayName: s.DisplayName,
 		Enabled:     s.Enabled,
 		Revision:    s.Revision,
 		CreatedAt:   s.CreatedAt,
 		ModifiedAt:  s.ModifiedAt,
+		RetiredAt:   cloneTime(s.RetiredAt),
 	}
 }
 
@@ -92,6 +130,14 @@ type Update struct {
 	DisplayName      string
 	Enabled          bool
 	Config           json.RawMessage
+}
+
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	copyValue := *value
+	return &copyValue
 }
 
 type Entry struct {

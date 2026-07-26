@@ -4,22 +4,23 @@ import (
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/portable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 var (
 	ErrInvalidWorkspace           = errors.New("workspace: invalid")
-	ErrNotWorkspace               = errors.New("workspace: root is not a Workspace")
+	ErrNotWorkspace               = errors.New("workspace: collection is not a Workspace")
 	ErrPrimarySourceRequired      = errors.New("workspace: primary source is required")
 	ErrPrimarySourceImmutable     = errors.New("workspace: primary source is immutable")
 	ErrReferenceUnresolved        = errors.New("workspace: reference unresolved")
 	ErrReferenceAmbiguous         = errors.New("workspace: reference ambiguous")
-	ErrWorkspaceDefinitionInvalid = errors.New("workspace: definition invalid")
+	ErrWorkspaceDefinitionInvalid = errors.New("workspace: descriptor invalid")
 )
 
 type Mode string
@@ -55,10 +56,15 @@ type DiscoveryPreferences struct {
 	IncludeReadme      bool                    `json:"includeReadme,omitempty"`
 }
 
-type RootData struct {
-	Mode            Mode                   `json:"mode"`
-	PrimarySourceID artifactstore.SourceID `json:"primarySourceID,omitempty"`
-	Discovery       DiscoveryPreferences   `json:"discovery"`
+// CollectionData contains local Workspace policy only. The Workspace mode and
+// primary Source are derived from the current collection attachments.
+//
+// DiscoveryPolicyRevision is deliberately local. It is not portable descriptor
+// content and it gives the running Workspace implementation an explicit way to
+// invalidate a catalog after planner behavior changes.
+type CollectionData struct {
+	DiscoveryPolicyRevision string               `json:"discoveryPolicyRevision"`
+	Discovery               DiscoveryPreferences `json:"discovery"`
 }
 
 type AttachmentData struct {
@@ -66,22 +72,26 @@ type AttachmentData struct {
 	Authoritative *bool `json:"authoritative,omitempty"`
 }
 
-type RecordData struct {
+type ArtifactData struct {
 	RuntimeDisabled bool `json:"runtimeDisabled,omitempty"`
 }
 
-// Workspace is an internal privileged aggregate. API packages must project it
-// into explicit view models instead of serializing source configuration, root
-// data, or attachment data.
+type WorkspaceRef = artifactstore.CollectionRef
+
+// Workspace is an internal privileged aggregate. API packages project it into
+// explicit view models and must not serialize collection local data, attachment
+// local data, or Source configuration.
 type Workspace struct {
-	Root        root.Root         `json:"-"`
-	Data        RootData          `json:"-"`
-	Attachments []root.Attachment `json:"-"`
-	Sources     []source.Summary  `json:"-"`
+	Collection      collection.Collection   `json:"-"`
+	Data            CollectionData          `json:"-"`
+	Mode            Mode                    `json:"-"`
+	PrimarySourceID artifactstore.SourceID  `json:"-"`
+	Attachments     []collection.Attachment `json:"-"`
+	Sources         []source.Summary        `json:"-"`
 }
 
 type Resource struct {
-	Record          record.Record              `json:"-"`
+	Artifact        artifact.Artifact          `json:"-"`
 	Definition      definition.Definition      `json:"-"`
 	Occurrence      *catalog.Occurrence        `json:"-"`
 	Source          source.Summary             `json:"-"`
@@ -97,12 +107,14 @@ type ResourceGroup struct {
 }
 
 type EmptyWorkspaceRequest struct {
+	RootID      artifactstore.RootID `json:"rootID"`
 	DisplayName string               `json:"displayName"`
 	Description string               `json:"description,omitempty"`
 	Discovery   DiscoveryPreferences `json:"discovery"`
 }
 
 type FilesystemWorkspaceRequest struct {
+	RootID          artifactstore.RootID   `json:"rootID"`
 	DisplayName     string                 `json:"displayName"`
 	Description     string                 `json:"description,omitempty"`
 	PrimarySourceID artifactstore.SourceID `json:"primarySourceID"`
@@ -110,7 +122,7 @@ type FilesystemWorkspaceRequest struct {
 }
 
 type UpdateRequest struct {
-	RootID           artifactstore.RootID `json:"rootID"`
+	Workspace        WorkspaceRef         `json:"workspace"`
 	ExpectedRevision uint64               `json:"expectedRevision"`
 	DisplayName      string               `json:"displayName"`
 	Description      string               `json:"description,omitempty"`
@@ -119,43 +131,61 @@ type UpdateRequest struct {
 }
 
 type AttachRequest struct {
-	RootID               artifactstore.RootID         `json:"rootID"`
-	ExpectedRootRevision uint64                       `json:"expectedRootRevision"`
-	SourceID             artifactstore.SourceID       `json:"sourceID"`
-	Role                 artifactstore.AttachmentRole `json:"role"`
-	Enabled              bool                         `json:"enabled"`
-	Data                 AttachmentData               `json:"data"`
+	Workspace                  WorkspaceRef                 `json:"workspace"`
+	ExpectedCollectionRevision uint64                       `json:"expectedCollectionRevision"`
+	SourceID                   artifactstore.SourceID       `json:"sourceID"`
+	Role                       artifactstore.AttachmentRole `json:"role"`
+	Enabled                    bool                         `json:"enabled"`
+	Data                       AttachmentData               `json:"data"`
 }
 
 type UpdateAttachmentRequest struct {
-	RootID                     artifactstore.RootID
+	Workspace                  WorkspaceRef
 	SourceID                   artifactstore.SourceID
-	ExpectedRootRevision       uint64
+	ExpectedCollectionRevision uint64
 	ExpectedAttachmentRevision uint64
 	Role                       artifactstore.AttachmentRole
 	Enabled                    bool
 	Data                       AttachmentData
 }
 
+type ReplacePrimaryRequest struct {
+	Workspace                  WorkspaceRef
+	ExpectedCollectionRevision uint64
+	PreviousSourceID           artifactstore.SourceID
+	PreviousAttachmentRevision uint64
+	SourceID                   artifactstore.SourceID
+}
+
+type SetPrimaryRequest struct {
+	Workspace                  WorkspaceRef
+	ExpectedCollectionRevision uint64
+	PreviousSourceID           artifactstore.SourceID
+	PreviousAttachmentRevision uint64
+	SourceID                   artifactstore.SourceID
+	Clear                      bool
+}
+
 type CatalogView struct {
-	Workspace         Workspace            `json:"-"`
-	Catalog           catalog.Snapshot     `json:"-"`
-	Resources         []Resource           `json:"-"`
-	Unrecorded        []catalog.Occurrence `json:"-"`
-	UnresolvedRecords []record.Record      `json:"-"`
-	Groups            []ResourceGroup      `json:"-"`
-	CatalogCurrent    bool                 `json:"-"`
+	Workspace            Workspace                  `json:"-"`
+	Catalog              catalog.Snapshot           `json:"-"`
+	Resources            []Resource                 `json:"-"`
+	Unrecorded           []catalog.Occurrence       `json:"-"`
+	UnresolvedArtifacts  []artifact.Artifact        `json:"-"`
+	Groups               []ResourceGroup            `json:"-"`
+	CatalogCurrent       bool                       `json:"-"`
+	FreshnessDiagnostics []artifactstore.Diagnostic `json:"-"`
 }
 
 type Reference struct {
-	RecordID *artifactstore.RecordID `json:"-"`
-	Selector *definition.Selector    `json:"-"`
+	Artifact *artifactstore.ArtifactRef `json:"-"`
+	Selector *definition.Selector       `json:"-"`
 }
 
 // LoadPlanItem contains privileged materialized source state. It must be
 // projected into an explicit adapter response before crossing an API boundary.
 type LoadPlanItem struct {
-	Record                     record.Record         `json:"-"`
+	Artifact                   artifact.Artifact     `json:"-"`
 	Definition                 definition.Definition `json:"-"`
 	Source                     source.Summary        `json:"-"`
 	CatalogCurrent             bool                  `json:"-"`
@@ -165,20 +195,23 @@ type LoadPlanItem struct {
 }
 
 type LoadPlan struct {
-	RootID          artifactstore.RootID       `json:"-"`
+	Workspace       WorkspaceRef               `json:"-"`
 	CatalogRevision uint64                     `json:"-"`
 	Items           []LoadPlanItem             `json:"-"`
 	Diagnostics     []artifactstore.Diagnostic `json:"-"`
 }
 
-type DefinitionDocument struct {
-	Discovery DiscoveryPreferences `json:"discovery"`
-}
+// Descriptor is the portable Collection Definition stored at
+// .flexigpt/workspace.json. Its domain body contains Workspace discovery
+// policy while its generic Members field contains relative or external member
+// references.
+type Descriptor = portable.CollectionDefinition
 
-type DefinitionObservation struct {
-	Preferences DiscoveryPreferences
-	SourceID    artifactstore.SourceID
-	Generation  string
+type DescriptorObservation struct {
+	Preferences            DiscoveryPreferences
+	SourceID               artifactstore.SourceID
+	Generation             string
+	ExpectedContentDigests map[artifactstore.Locator]artifactstore.Digest
 }
 
 type attachmentOperation struct {

@@ -5,8 +5,9 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
@@ -19,11 +20,15 @@ type RootRepository struct {
 	store *Store
 }
 
-type RecordRepository struct {
+type CollectionRepository struct {
 	store *Store
 }
 
 type CatalogRepository struct {
+	store *Store
+}
+
+type ArtifactRepository struct {
 	store *Store
 }
 
@@ -35,8 +40,12 @@ func (s *Store) Roots() *RootRepository {
 	return &RootRepository{store: s}
 }
 
-func (s *Store) Records() *RecordRepository {
-	return &RecordRepository{store: s}
+func (s *Store) Collections() *CollectionRepository {
+	return &CollectionRepository{store: s}
+}
+
+func (s *Store) Artifacts() *ArtifactRepository {
+	return &ArtifactRepository{store: s}
 }
 
 func (s *Store) Catalogs() *CatalogRepository {
@@ -52,15 +61,17 @@ func (r *SourceRepository) Create(
 
 func (r *SourceRepository) Get(
 	ctx context.Context,
+	rootID artifactstore.RootID,
 	id artifactstore.SourceID,
 ) (source.Source, error) {
-	return r.store.getSource(ctx, id)
+	return r.store.getSource(ctx, rootID, id)
 }
 
 func (r *SourceRepository) List(
 	ctx context.Context,
+	rootID artifactstore.RootID,
 ) ([]source.Source, error) {
-	return r.store.listSources(ctx)
+	return r.store.listSources(ctx, rootID)
 }
 
 func (r *SourceRepository) Update(
@@ -71,20 +82,37 @@ func (r *SourceRepository) Update(
 	return r.store.updateSource(ctx, value, expectedRevision)
 }
 
-func (r *SourceRepository) Delete(
+func (r *SourceRepository) Retire(
 	ctx context.Context,
+	value source.Source,
+	expectedRevision uint64,
+) error {
+	return r.store.retireSource(ctx, value, expectedRevision)
+}
+
+func (r *SourceRepository) Discard(
+	ctx context.Context,
+	rootID artifactstore.RootID,
 	id artifactstore.SourceID,
 	expectedRevision uint64,
 ) error {
-	return r.store.deleteSource(ctx, id, expectedRevision)
+	return r.store.discardSource(ctx, rootID, id, expectedRevision)
+}
+
+func (r *SourceRepository) Purge(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+	id artifactstore.SourceID,
+	expectedRevision uint64,
+) error {
+	return r.store.purgeSource(ctx, rootID, id, expectedRevision)
 }
 
 func (r *RootRepository) Create(
 	ctx context.Context,
 	value root.Root,
-	attachments []root.Attachment,
 ) error {
-	return r.store.createRoot(ctx, value, attachments)
+	return r.store.createRoot(ctx, value)
 }
 
 func (r *RootRepository) Get(
@@ -114,94 +142,249 @@ func (r *RootRepository) Retire(
 	return r.store.retireRoot(ctx, value, expectedRevision)
 }
 
-func (r *RootRepository) Attach(
+func (r *RootRepository) Purge(
 	ctx context.Context,
-	value root.Attachment,
-	expectedRootRevision uint64,
-) (root.Root, error) {
-	return r.store.attach(ctx, value, expectedRootRevision)
+	id artifactstore.RootID,
+	expectedRevision uint64,
+) error {
+	return r.store.purgeRoot(ctx, id, expectedRevision)
 }
 
-func (r *RootRepository) GetAttachment(
+func (r *CollectionRepository) Create(
+	ctx context.Context,
+	value collection.Collection,
+	attachments []collection.Attachment,
+) error {
+	return r.store.createCollection(ctx, value, attachments)
+}
+
+func (r *CollectionRepository) Get(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+) (collection.Collection, error) {
+	return r.store.getCollection(ctx, ref)
+}
+
+func (r *CollectionRepository) ListByRoot(
 	ctx context.Context,
 	rootID artifactstore.RootID,
-	sourceID artifactstore.SourceID,
-) (root.Attachment, error) {
-	return r.store.getAttachment(ctx, rootID, sourceID)
+) ([]collection.Collection, error) {
+	return r.store.listCollectionsByRoot(ctx, rootID)
 }
 
-func (r *RootRepository) ListAttachments(
+func (r *CollectionRepository) Update(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-) ([]root.Attachment, error) {
-	return r.store.listAttachments(ctx, rootID)
+	value collection.Collection,
+	expectedRevision uint64,
+) error {
+	return r.store.updateCollection(ctx, value, expectedRevision)
 }
 
-func (r *RootRepository) UpdateAttachment(
+func (r *CollectionRepository) Retire(
 	ctx context.Context,
-	value root.Attachment,
-	expectedRootRevision uint64,
-	expectedAttachmentRevision uint64,
-) (root.Root, error) {
-	return r.store.updateAttachment(
+	value collection.Collection,
+	expectedRevision uint64,
+) error {
+	return r.store.retireCollection(ctx, value, expectedRevision)
+}
+
+func (r *CollectionRepository) Purge(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+	expectedRevision uint64,
+) error {
+	return r.store.purgeCollection(ctx, ref, expectedRevision)
+}
+
+func (r *CollectionRepository) Attach(
+	ctx context.Context,
+	value collection.Attachment,
+	expectedCollectionRevision uint64,
+) (collection.Collection, error) {
+	return r.store.attachCollectionSource(
 		ctx,
 		value,
-		expectedRootRevision,
+		expectedCollectionRevision,
+	)
+}
+
+func (r *CollectionRepository) GetAttachment(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+	sourceID artifactstore.SourceID,
+) (collection.Attachment, error) {
+	return r.store.getCollectionAttachment(ctx, ref, sourceID)
+}
+
+func (r *CollectionRepository) ListAttachments(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+) ([]collection.Attachment, error) {
+	return r.store.listCollectionAttachments(ctx, ref)
+}
+
+func (r *CollectionRepository) UpdateAttachment(
+	ctx context.Context,
+	value collection.Attachment,
+	expectedCollectionRevision uint64,
+	expectedAttachmentRevision uint64,
+) (collection.Collection, error) {
+	return r.store.updateCollectionAttachment(
+		ctx,
+		value,
+		expectedCollectionRevision,
 		expectedAttachmentRevision,
 	)
 }
 
-func (r *RootRepository) Detach(
+func (r *CollectionRepository) Detach(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	ref artifactstore.CollectionRef,
 	sourceID artifactstore.SourceID,
-	expectedRootRevision uint64,
+	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
 	modifiedAt time.Time,
-) (root.Root, error) {
-	return r.store.detach(
+) (collection.Collection, error) {
+	return r.store.detachCollectionSource(
 		ctx,
-		rootID,
+		ref,
 		sourceID,
-		expectedRootRevision,
+		expectedCollectionRevision,
 		expectedAttachmentRevision,
 		modifiedAt,
 	)
 }
 
+func (r *CollectionRepository) ReplaceAttachment(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+	previousSourceID artifactstore.SourceID,
+	expectedPreviousRevision uint64,
+	replacement collection.Attachment,
+	expectedCollectionRevision uint64,
+) (collection.Collection, error) {
+	return r.store.replaceCollectionAttachment(
+		ctx,
+		ref,
+		previousSourceID,
+		expectedPreviousRevision,
+		replacement,
+		expectedCollectionRevision,
+	)
+}
+
 func (r *CatalogRepository) GetCurrent(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	ref artifactstore.CollectionRef,
 ) (catalog.Snapshot, error) {
-	return r.store.getCurrentCatalog(ctx, rootID)
+	return r.store.getCurrentCatalog(ctx, ref)
 }
 
-func (r *RecordRepository) Get(
+func (r *ArtifactRepository) Get(
 	ctx context.Context,
-	id artifactstore.RecordID,
-) (record.Record, error) {
-	return r.store.getRecord(ctx, id)
+	ref artifactstore.ArtifactRef,
+) (artifact.Artifact, error) {
+	return r.store.getArtifact(ctx, ref)
 }
 
-func (r *RecordRepository) ListByRoot(
+func (r *ArtifactRepository) ListByCollection(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-) ([]record.Record, error) {
-	return r.store.listRecordsByRoot(ctx, rootID)
+	ref artifactstore.CollectionRef,
+) ([]artifact.Artifact, error) {
+	return r.store.listArtifactsByCollection(ctx, ref)
 }
 
-func (r *RecordRepository) Update(
+func (r *ArtifactRepository) ListSuppressions(
 	ctx context.Context,
-	value record.Record,
+	ref artifactstore.CollectionRef,
+) ([]artifact.Suppression, error) {
+	return r.store.listSuppressions(ctx, ref)
+}
+
+func (r *ArtifactRepository) Update(
+	ctx context.Context,
+	value artifact.Artifact,
 	expectedRevision uint64,
 ) error {
-	return r.store.updateRecord(ctx, value, expectedRevision)
+	return r.store.updateArtifact(ctx, value, expectedRevision)
 }
 
-func (r *RecordRepository) Delete(
+func (r *ArtifactRepository) CreateAdopted(
 	ctx context.Context,
-	id artifactstore.RecordID,
+	value artifact.Artifact,
+	expectedCollectionRevision uint64,
+	expectedCatalogRevision uint64,
+) error {
+	return r.store.createAdoptedArtifact(
+		ctx,
+		value,
+		expectedCollectionRevision,
+		expectedCatalogRevision,
+	)
+}
+
+func (r *ArtifactRepository) CreatePinned(
+	ctx context.Context,
+	value artifact.Artifact,
+	expectedCollectionRevision uint64,
+	expectedCatalogRevision uint64,
+) error {
+	return r.store.createPinnedArtifact(
+		ctx,
+		value,
+		expectedCollectionRevision,
+		expectedCatalogRevision,
+	)
+}
+
+func (r *ArtifactRepository) Unadopt(
+	ctx context.Context,
+	ref artifactstore.ArtifactRef,
+	expectedRevision uint64,
+	suppression *artifact.Suppression,
+) error {
+	return r.store.unadoptArtifact(
+		ctx,
+		ref,
+		expectedRevision,
+		suppression,
+	)
+}
+
+func (r *ArtifactRepository) Suppress(
+	ctx context.Context,
+	value artifact.Suppression,
+	expectedCollectionRevision uint64,
+) error {
+	return r.store.createSuppression(
+		ctx,
+		value,
+		expectedCollectionRevision,
+	)
+}
+
+func (r *ArtifactRepository) Unsuppress(
+	ctx context.Context,
+	ref artifactstore.CollectionRef,
+	binding artifactstore.SourceBinding,
 	expectedRevision uint64,
 ) error {
-	return r.store.deleteRecord(ctx, id, expectedRevision)
+	return r.store.deleteSuppression(
+		ctx,
+		ref,
+		binding,
+		expectedRevision,
+	)
+}
+
+func (r *ArtifactRepository) Purge(
+	ctx context.Context,
+	ref artifactstore.ArtifactRef,
+	expectedRevision uint64,
+) error {
+	return r.store.purgeArtifact(
+		ctx,
+		ref,
+		expectedRevision,
+	)
 }

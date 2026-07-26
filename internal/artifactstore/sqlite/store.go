@@ -3,17 +3,19 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
 
 	_ "github.com/glebarez/go-sqlite"
 )
-
-const schemaFingerprint = "artifactstore.clean.v1"
 
 type Store struct {
 	db *sql.DB
@@ -23,9 +25,24 @@ func Open(
 	ctx context.Context,
 	path string,
 ) (*Store, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf(
+			"%w: SQLite context is nil",
+			artifactstore.ErrInvalid,
+		)
+	}
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf("%w: SQLite path is empty", artifactstore.ErrInvalid)
 	}
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	path = filepath.Clean(absolute)
+	if err := prepareDatabaseFile(path); err != nil {
+		return nil, err
+	}
+
 	db, err := sql.Open("sqlite", dataSourceName(path))
 	if err != nil {
 		return nil, fmt.Errorf("open artifact metadata database: %w", err)
@@ -36,11 +53,11 @@ func Open(
 		_ = db.Close()
 		return nil, fmt.Errorf("ping artifact metadata database: %w", err)
 	}
-	if _, err := db.ExecContext(ctx, initializeSchemaSQL); err != nil {
+	if err := applySchemaMigrations(ctx, db); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("initialize artifact metadata schema: %w", err)
+		return nil, err
 	}
-	if err := verifySchema(ctx, db); err != nil {
+	if err := secureDatabaseFiles(path); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -54,41 +71,152 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-func verifySchema(
+func applySchemaMigrations(
 	ctx context.Context,
 	db *sql.DB,
 ) error {
-	var fingerprint string
-	err := db.QueryRowContext(
-		ctx,
-		`SELECT fingerprint FROM artifact_schema WHERE version = ?`,
-		schemaVersion,
-	).Scan(&fingerprint)
+	if err := validateSchemaMigrations(schemaMigrations); err != nil {
+		return err
+	}
 
-	if err == sql.ErrNoRows {
-		if _, err := db.ExecContext(
+	if _, err := db.ExecContext(
+		ctx,
+		`CREATE TABLE IF NOT EXISTS artifact_schema_migrations (
+			version INTEGER PRIMARY KEY,
+			fingerprint TEXT NOT NULL,
+			applied_at INTEGER NOT NULL
+		)`,
+	); err != nil {
+		return fmt.Errorf("initialize artifact schema ledger: %w", err)
+	}
+	for _, migration := range schemaMigrations {
+		var fingerprint string
+		err := db.QueryRowContext(
 			ctx,
-			`INSERT OR IGNORE INTO artifact_schema(version, fingerprint) VALUES (?, ?)`,
-			schemaVersion,
-			schemaFingerprint,
-		); err != nil {
-			return fmt.Errorf("record artifact schema identity: %w", err)
-		}
-		err = db.QueryRowContext(
-			ctx,
-			`SELECT fingerprint FROM artifact_schema WHERE version = ?`,
-			schemaVersion,
+			`SELECT fingerprint
+			 FROM artifact_schema_migrations
+			 WHERE version = ?`,
+			migration.version,
 		).Scan(&fingerprint)
+		switch {
+		case err == nil:
+			if fingerprint != migration.fingerprint {
+				return fmt.Errorf(
+					"%w: artifact schema migration %d has fingerprint %q",
+					artifactstore.ErrUnsupported,
+					migration.version,
+					fingerprint,
+				)
+			}
+			continue
+		case !errors.Is(err, sql.ErrNoRows):
+			return fmt.Errorf("read artifact schema ledger: %w", err)
+		}
+
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, migration.sql); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf(
+				"apply artifact schema migration %d: %w",
+				migration.version,
+				err,
+			)
+		}
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO artifact_schema_migrations(
+				version, fingerprint, applied_at
+			) VALUES (?, ?, ?)`,
+			migration.version,
+			migration.fingerprint,
+			time.Now().UTC().UnixNano(),
+		); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf(
+				"record artifact schema migration %d: %w",
+				migration.version,
+				err,
+			)
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func validateSchemaMigrations(values []migration) error {
+	previousVersion := 0
+	for _, value := range values {
+		if value.version <= previousVersion {
+			return fmt.Errorf(
+				"%w: artifact schema migrations must have strictly increasing versions",
+				artifactstore.ErrInvalid,
+			)
+		}
+		if strings.TrimSpace(value.fingerprint) == "" {
+			return fmt.Errorf(
+				"%w: artifact schema migration %d has no fingerprint",
+				artifactstore.ErrInvalid,
+				value.version,
+			)
+		}
+		if strings.TrimSpace(value.sql) == "" {
+			return fmt.Errorf(
+				"%w: artifact schema migration %d has no SQL",
+				artifactstore.ErrInvalid,
+				value.version,
+			)
+		}
+		previousVersion = value.version
+	}
+	return nil
+}
+
+func prepareDatabaseFile(path string) error {
+	info, err := os.Lstat(path)
+	switch {
+	case err == nil:
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return fmt.Errorf(
+				"%w: SQLite path must identify a regular non-symlink file",
+				artifactstore.ErrInvalid,
+			)
+		}
+	case errors.Is(err, os.ErrNotExist):
+		if _, err := mapstoreio.PreparePrivateDirectory(
+			filepath.Dir(path),
+		); err != nil {
+			return err
+		}
+	default:
+		return err
+	}
+
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
-		return fmt.Errorf("read artifact schema identity: %w", err)
+		return fmt.Errorf("prepare artifact metadata database: %w", err)
 	}
-	if fingerprint != schemaFingerprint {
-		return fmt.Errorf(
-			"%w: artifact metadata schema fingerprint %q is unsupported",
-			artifactstore.ErrUnsupported,
-			fingerprint,
-		)
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
+}
+
+func secureDatabaseFiles(path string) error {
+	for _, candidate := range []string{
+		path,
+		path + "-wal",
+		path + "-shm",
+		path + "-journal",
+	} {
+		if err := os.Chmod(candidate, 0o600); err != nil &&
+			!errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("secure artifact metadata database: %w", err)
+		}
 	}
 	return nil
 }

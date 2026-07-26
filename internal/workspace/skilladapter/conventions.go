@@ -8,8 +8,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
+
+const DefaultWorkspaceSkillRoot artifactstore.Locator = ".flexigpt/skills"
 
 type SkillRootConvention struct {
 	Root      artifactstore.Locator
@@ -22,7 +25,7 @@ type ConventionRegistry struct {
 
 func DefaultSkillRoots() []artifactstore.Locator {
 	return []artifactstore.Locator{
-		artifactstore.Locator(workspaceSkillsDirectory),
+		DefaultWorkspaceSkillRoot,
 	}
 }
 
@@ -73,7 +76,7 @@ func (r *ConventionRegistry) DiscoveryProfile() engine.DiscoveryProfile {
 				Root:      root.Root,
 				Recursive: root.Recursive,
 				IncludePatterns: []string{
-					skillDefinitionFileName,
+					skillartifact.DefinitionFileName,
 				},
 			},
 		)
@@ -88,7 +91,7 @@ func (r *ConventionRegistry) Match(
 	locator artifactstore.Locator,
 ) (SkillRootConvention, bool) {
 	value := string(locator)
-	if path.Base(value) != skillDefinitionFileName {
+	if path.Base(value) != skillartifact.DefinitionFileName {
 		return SkillRootConvention{}, false
 	}
 	for _, root := range r.Roots() {
@@ -102,7 +105,7 @@ func (r *ConventionRegistry) Match(
 				continue
 			}
 		}
-		if relative == skillDefinitionFileName {
+		if relative == skillartifact.DefinitionFileName {
 			continue
 		}
 		parent := path.Dir(relative)

@@ -4,18 +4,14 @@ import (
 	"context"
 	"errors"
 	"maps"
-	"strings"
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
-
-	"github.com/flexigpt/flexigpt-app/internal/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
-
-const workspaceIdentityPrefix = workspace.WorkspaceSkillIdentityPrefix
 
 type Workspace struct {
 	runtime *SkillRuntime
@@ -34,18 +30,21 @@ func NewWorkspace(
 	}, nil
 }
 
-func (*Workspace) Owns(identity string) bool {
-	return strings.HasPrefix(identity, workspaceIdentityPrefix)
+func (*Workspace) Owns(ref skillruntimeSpec.SkillRef) bool {
+	return ref.Artifact != nil
 }
 
 func (p *Workspace) List(
 	ctx context.Context,
 	scope Scope,
 ) ([]Skill, error) {
-	if scope.WorkspaceRootID == "" {
+	if scope.Workspace == nil {
 		return []Skill{}, nil
 	}
-	values, err := p.adapter.List(ctx, scope.WorkspaceRootID)
+	if err := scope.Workspace.Validate(); err != nil {
+		return nil, err
+	}
+	values, err := p.adapter.List(ctx, *scope.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -67,43 +66,46 @@ func (p *Workspace) List(
 			})
 		}
 		diagnostics := artifactstore.CloneDiagnostics(value.Diagnostics)
-		runtimeAllowed := value.Skill.IsEnabled &&
-			value.State == record.StateAvailable &&
-			value.CatalogCurrent &&
-			!value.RuntimeDisabled &&
-			value.FilesystemBacked
-		if !value.FilesystemBacked {
+		if !value.WorkspaceEnabled {
 			diagnostics = artifactstore.AppendDiagnostics(
 				diagnostics,
 				unavailableDiagnostic(
-					"skill.provider.runtime-unavailable",
-					"the Workspace Skill source has no native filesystem runtime path",
+					"skill.provider.workspace-disabled",
+					"the Workspace containing this Skill is disabled",
 				),
 			)
 		}
+		runtimeAllowed := value.WorkspaceEnabled &&
+			value.Skill.IsEnabled &&
+			value.State == artifact.StateAvailable &&
+			value.CatalogCurrent &&
+			!value.RuntimeDisabled
+		artifactRef := value.Artifact
+		workspaceRef := value.Workspace
 		projected := Skill{
-			Identity:          workspaceIdentity(value.RootID, value.RecordID),
-			Origin:            OriginWorkspace,
-			WorkspaceRootID:   value.RootID,
-			WorkspaceRecordID: value.RecordID,
-			RecordRevision:    value.RecordRevision,
-			Name:              value.Skill.Name,
-			DisplayName:       value.Skill.DisplayName,
-			Description:       value.Skill.Description,
-			Insert:            agentskillsSpec.SkillInsert(value.Skill.Insert),
-			Arguments:         arguments,
-			Tags:              append([]string(nil), value.Skill.Tags...),
-			Enabled:           value.Skill.IsEnabled,
-			Available:         value.State == record.StateAvailable,
-			RuntimeAllowed:    runtimeAllowed,
-			CatalogCurrent:    value.CatalogCurrent,
-			State:             string(value.State),
-			DefinitionDigest:  string(value.DefinitionDigest),
-			SourceID:          value.SourceID,
-			Locator:           value.Locator,
-			Diagnostics:       diagnostics,
-			CreatedAt:         value.Skill.CreatedAt,
-			ModifiedAt:        value.Skill.ModifiedAt,
+			Ref: skillruntimeSpec.SkillRef{
+				Artifact: &artifactRef,
+			},
+			Origin:           OriginWorkspace,
+			Workspace:        &workspaceRef,
+			ArtifactRevision: value.ArtifactRevision,
+			Name:             value.Skill.Name,
+			DisplayName:      value.Skill.DisplayName,
+			Description:      value.Skill.Description,
+			Insert:           agentskillsSpec.SkillInsert(value.Skill.Insert),
+			Arguments:        arguments,
+			Tags:             append([]string(nil), value.Skill.Tags...),
+			Enabled:          value.Skill.IsEnabled,
+			Available:        value.WorkspaceEnabled && value.State == artifact.StateAvailable,
+			RuntimeAllowed:   runtimeAllowed,
+			CatalogCurrent:   value.CatalogCurrent,
+			State:            string(value.State),
+			DefinitionDigest: string(value.DefinitionDigest),
+			SourceID:         value.SourceID,
+			Locator:          value.Locator,
+			Diagnostics:      diagnostics,
+			CreatedAt:        value.Skill.CreatedAt,
+			ModifiedAt:       value.Skill.ModifiedAt,
 		}
 		if err := projected.Validate(); err != nil {
 			return nil, err
@@ -117,17 +119,22 @@ func (p *Workspace) Render(
 	ctx context.Context,
 	request RenderRequest,
 ) (RenderedSkill, error) {
-	rootID, _, err := parseWorkspaceIdentity(request.Identity)
-	if err != nil {
+	if request.Ref.Artifact == nil {
+		return RenderedSkill{}, errors.New(
+			"Workspace Skill render request has no ArtifactRef",
+		)
+	}
+	if err := request.Ref.Artifact.Validate(); err != nil {
 		return RenderedSkill{}, err
 	}
-	if request.Scope.WorkspaceRootID != "" &&
-		request.Scope.WorkspaceRootID != rootID {
-		return RenderedSkill{}, errors.New("Workspace Skill belongs to another scope")
+	if request.Scope.Workspace != nil {
+		if err := request.Scope.Workspace.Validate(); err != nil {
+			return RenderedSkill{}, err
+		}
 	}
-	definition, found := p.runtime.workspaceDefinitionForIdentity(
+	definition, workspaceRef, found := p.runtime.workspaceDefinitionForArtifact(
 		ctx,
-		request.Identity,
+		*request.Ref.Artifact,
 	)
 	if !found {
 		return RenderedSkill{
@@ -139,6 +146,12 @@ func (p *Workspace) Render(
 				),
 			},
 		}, nil
+	}
+	if request.Scope.Workspace != nil &&
+		*request.Scope.Workspace != workspaceRef {
+		return RenderedSkill{}, errors.New(
+			"Workspace Skill belongs to another Workspace scope",
+		)
 	}
 	rendered, err := p.runtime.runtime.RenderSkill(
 		ctx,
@@ -161,18 +174,19 @@ func (p *Workspace) Render(
 			},
 		}, nil
 	}
-	list, err := p.List(ctx, Scope{WorkspaceRootID: rootID})
+	list, err := p.List(ctx, Scope{Workspace: &workspaceRef})
 	if err != nil {
 		return RenderedSkill{}, err
 	}
 	var projected Skill
 	for _, item := range list {
-		if item.Identity == request.Identity {
+		if item.Ref.Artifact != nil &&
+			*item.Ref.Artifact == *request.Ref.Artifact {
 			projected = item
 			break
 		}
 	}
-	if projected.Identity == "" {
+	if projected.Ref.Artifact == nil {
 		return RenderedSkill{
 			Available: false,
 			Diagnostics: []artifactstore.Diagnostic{
@@ -192,19 +206,6 @@ func (p *Workspace) Render(
 		AppliedArguments: cloneStrings(rendered.AppliedArguments),
 		Diagnostics:      artifactstore.CloneDiagnostics(projected.Diagnostics),
 	}, nil
-}
-
-func workspaceIdentity(
-	rootID artifactstore.RootID,
-	recordID artifactstore.RecordID,
-) string {
-	return workspace.WorkspaceSkillIdentity(rootID, recordID)
-}
-
-func parseWorkspaceIdentity(
-	value string,
-) (artifactstore.RootID, artifactstore.RecordID, error) {
-	return workspace.ParseWorkspaceSkillIdentity(value)
 }
 
 func cloneStrings(value map[string]string) map[string]string {

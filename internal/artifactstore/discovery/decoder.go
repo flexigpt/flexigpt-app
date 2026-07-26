@@ -2,12 +2,14 @@ package discovery
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
 
 type Recognition int
@@ -39,6 +41,7 @@ type Decoded struct {
 
 type Decoder interface {
 	ID() artifactstore.DecoderID
+	Revision() string
 	Recognize(ctx context.Context, candidate Candidate) Recognition
 
 	// Decode returns candidate-level diagnostics as its second result.
@@ -68,6 +71,13 @@ func NewDecoderRegistry(
 		if err := artifactstore.ValidateDecoderID(id); err != nil {
 			return nil, err
 		}
+		if err := artifactstore.ValidateRequiredText(
+			"decoder revision",
+			decoder.Revision(),
+			artifactstore.MaxVersionBytes,
+		); err != nil {
+			return nil, err
+		}
 		if _, duplicate := byID[id]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate decoder %q",
@@ -85,6 +95,35 @@ func NewDecoderRegistry(
 		decoders: ordered,
 		byID:     byID,
 	}, nil
+}
+
+func (r *DecoderRegistry) Fingerprint() (artifactstore.Digest, error) {
+	if r == nil {
+		return "", fmt.Errorf(
+			"%w: decoder registry is nil",
+			artifactstore.ErrInvalid,
+		)
+	}
+	type descriptor struct {
+		ID       artifactstore.DecoderID `json:"id"`
+		Revision string                  `json:"revision"`
+	}
+	values := make([]descriptor, 0, len(r.decoders))
+	for _, decoder := range r.decoders {
+		values = append(values, descriptor{
+			ID:       decoder.ID(),
+			Revision: decoder.Revision(),
+		})
+	}
+	raw, err := json.Marshal(values)
+	if err != nil {
+		return "", err
+	}
+	canonical, err := jsoncanon.Canonicalize(raw)
+	if err != nil {
+		return "", err
+	}
+	return artifactstore.DigestBytes(canonical), nil
 }
 
 func (r *DecoderRegistry) find(

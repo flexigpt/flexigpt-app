@@ -91,11 +91,11 @@ const (
 )
 
 type CompositionDecision struct {
-	RecordID      artifactstore.RecordID `json:"recordID"`
-	Status        CompositionStatus      `json:"status"`
-	Code          string                 `json:"code,omitempty"`
-	OriginalBytes int                    `json:"originalBytes"`
-	IncludedBytes int                    `json:"includedBytes"`
+	Artifact      artifactstore.ArtifactRef `json:"artifact"`
+	Status        CompositionStatus         `json:"status"`
+	Code          string                    `json:"code,omitempty"`
+	OriginalBytes int                       `json:"originalBytes"`
+	IncludedBytes int                       `json:"includedBytes"`
 }
 
 func applyCompositionPolicy(
@@ -135,7 +135,7 @@ func applyCompositionPolicy(
 					),
 				)
 				decisions = append(decisions, CompositionDecision{
-					RecordID:      value.RecordID,
+					Artifact:      value.Artifact,
 					Status:        CompositionExcluded,
 					Code:          code,
 					OriginalBytes: originalBytes,
@@ -165,7 +165,7 @@ func applyCompositionPolicy(
 					),
 				)
 				decisions = append(decisions, CompositionDecision{
-					RecordID:      value.RecordID,
+					Artifact:      value.Artifact,
 					Status:        CompositionExcluded,
 					Code:          code,
 					OriginalBytes: originalBytes,
@@ -186,7 +186,7 @@ func applyCompositionPolicy(
 					),
 				)
 				decisions = append(decisions, CompositionDecision{
-					RecordID:      value.RecordID,
+					Artifact:      value.Artifact,
 					Status:        CompositionExcluded,
 					Code:          code,
 					OriginalBytes: originalBytes,
@@ -205,7 +205,7 @@ func applyCompositionPolicy(
 					),
 				)
 				decisions = append(decisions, CompositionDecision{
-					RecordID:      value.RecordID,
+					Artifact:      value.Artifact,
 					Status:        CompositionExcluded,
 					Code:          code,
 					OriginalBytes: originalBytes,
@@ -238,7 +238,7 @@ func applyCompositionPolicy(
 		value.Content = content
 		included = append(included, value)
 		decisions = append(decisions, CompositionDecision{
-			RecordID:      value.RecordID,
+			Artifact:      value.Artifact,
 			Status:        status,
 			Code:          code,
 			OriginalBytes: originalBytes,

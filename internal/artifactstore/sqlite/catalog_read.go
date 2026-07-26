@@ -12,75 +12,79 @@ import (
 )
 
 const occurrenceColumns = `
-	root_id, source_id, locator, subresource_locator,
+	root_id, collection_id, source_id, locator, subresource_locator,
 	kind, logical_name, logical_version,
 	definition_digest, source_content_digest, decoder_id,
 	state, diagnostics_json, observed_at`
 
 func (s *Store) getCurrentCatalog(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	ref artifactstore.CollectionRef,
 ) (catalog.Snapshot, error) {
+	if err := ref.Validate(); err != nil {
+		return catalog.Snapshot{}, err
+	}
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return catalog.Snapshot{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var currentRootRevision uint64
-	err = tx.QueryRowContext(
-		ctx,
-		`SELECT revision FROM artifact_roots
-		 WHERE id = ? AND deleted_at IS NULL`,
-		string(rootID),
-	).Scan(&currentRootRevision)
-	if errors.Is(err, sql.ErrNoRows) {
-		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: root %q",
-			artifactstore.ErrNotFound,
-			rootID,
-		)
-	}
+	currentCollection, err := getActiveCollectionTx(ctx, tx, ref)
 	if err != nil {
 		return catalog.Snapshot{}, err
 	}
 
 	var (
-		revision, rootRevision uint64
+		revision               uint64
+		collectionRevision     uint64
+		attachmentRevisionsRaw []byte
 		sourceRevisionsRaw     []byte
 		sourceGenerationsRaw   []byte
+		planFingerprint        string
+		decoderFingerprint     string
 		publishedAt            int64
 		diagnosticsRaw         []byte
 	)
 	err = tx.QueryRowContext(
 		ctx,
-		`SELECT revision, root_revision, source_revisions_json,
-		        source_generations_json, published_at, diagnostics_json
+		`SELECT revision, collection_revision,
+		        attachment_revisions_json, source_revisions_json,
+		        source_generations_json, plan_fingerprint,
+		        decoder_fingerprint, published_at, diagnostics_json
 		 FROM artifact_current_catalogs
-		 WHERE root_id = ?`,
-		string(rootID),
+		 WHERE root_id = ? AND collection_id = ?`,
+		string(ref.RootID),
+		string(ref.CollectionID),
 	).Scan(
 		&revision,
-		&rootRevision,
+		&collectionRevision,
+		&attachmentRevisionsRaw,
 		&sourceRevisionsRaw,
 		&sourceGenerationsRaw,
+		&planFingerprint,
+		&decoderFingerprint,
 		&publishedAt,
 		&diagnosticsRaw,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: root %q has no current catalog",
+			"%w: collection %q has no current catalog",
 			artifactstore.ErrCatalogUnavailable,
-			rootID,
+			ref.CollectionID,
 		)
 	}
 	if err != nil {
 		return catalog.Snapshot{}, err
 	}
 
+	attachmentRevisions := map[artifactstore.SourceID]uint64{}
 	sourceRevisions := map[artifactstore.SourceID]uint64{}
 	sourceGenerations := map[artifactstore.SourceID]string{}
 	diagnostics := []artifactstore.Diagnostic{}
+	if err := decodeJSON(attachmentRevisionsRaw, &attachmentRevisions); err != nil {
+		return catalog.Snapshot{}, err
+	}
 	if err := decodeJSON(sourceRevisionsRaw, &sourceRevisions); err != nil {
 		return catalog.Snapshot{}, err
 	}
@@ -95,15 +99,15 @@ func (s *Store) getCurrentCatalog(
 		ctx,
 		`SELECT `+occurrenceColumns+`
 		 FROM artifact_current_occurrences
-		 WHERE root_id = ?
+		 WHERE root_id = ? AND collection_id = ?
 		 ORDER BY source_id, locator, subresource_locator`,
-		string(rootID),
+		string(ref.RootID),
+		string(ref.CollectionID),
 	)
 	if err != nil {
 		return catalog.Snapshot{}, err
 	}
 	defer rows.Close()
-	defer func() { _ = rows.Close() }()
 
 	occurrences := make([]catalog.Occurrence, 0)
 	for rows.Next() {
@@ -121,14 +125,18 @@ func (s *Store) getCurrentCatalog(
 	}
 
 	value := catalog.Snapshot{
-		RootID:            rootID,
-		Revision:          revision,
-		RootRevision:      rootRevision,
-		SourceRevisions:   sourceRevisions,
-		SourceGenerations: sourceGenerations,
-		PublishedAt:       parseTime(publishedAt),
-		Diagnostics:       diagnostics,
-		Occurrences:       occurrences,
+		RootID:              ref.RootID,
+		CollectionID:        ref.CollectionID,
+		Revision:            revision,
+		CollectionRevision:  collectionRevision,
+		AttachmentRevisions: attachmentRevisions,
+		SourceRevisions:     sourceRevisions,
+		SourceGenerations:   sourceGenerations,
+		PlanFingerprint:     artifactstore.Digest(planFingerprint),
+		DecoderFingerprint:  artifactstore.Digest(decoderFingerprint),
+		PublishedAt:         parseTime(publishedAt),
+		Diagnostics:         diagnostics,
+		Occurrences:         occurrences,
 	}
 	if err := value.Validate(); err != nil {
 		return catalog.Snapshot{}, fmt.Errorf(
@@ -136,25 +144,27 @@ func (s *Store) getCurrentCatalog(
 			err,
 		)
 	}
-	currentSourceRevisions, err := currentAttachedSourceRevisions(
+
+	currentAttachments, currentSources, err := currentAttachmentSourceRevisionsTx(
 		ctx,
 		tx,
-		rootID,
+		ref,
 	)
 	if err != nil {
 		return catalog.Snapshot{}, err
 	}
-	stale := value.RootRevision != currentRootRevision ||
-		!maps.Equal(value.SourceRevisions, currentSourceRevisions)
+	stale := value.CollectionRevision != currentCollection.Revision ||
+		!maps.Equal(value.AttachmentRevisions, currentAttachments) ||
+		!maps.Equal(value.SourceRevisions, currentSources)
 
 	if err := tx.Commit(); err != nil {
 		return catalog.Snapshot{}, err
 	}
 	if stale {
 		return catalog.CloneSnapshot(value), fmt.Errorf(
-			"%w: catalog for root %q does not match current metadata",
+			"%w: catalog for collection %q does not match current metadata",
 			artifactstore.ErrCatalogStale,
-			rootID,
+			ref.CollectionID,
 		)
 	}
 	return catalog.CloneSnapshot(value), nil
@@ -162,15 +172,16 @@ func (s *Store) getCurrentCatalog(
 
 func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 	var (
-		rootID, sourceID, locator, subresource string
-		kind, logicalName, logicalVersion      string
-		definitionDigest, sourceDigest         sql.NullString
-		decoderID, state                       string
-		diagnosticsRaw                         []byte
-		observedAt                             int64
+		rootID, collectionID, sourceID, locator, subresource string
+		kind, logicalName, logicalVersion                    string
+		definitionDigest, sourceDigest                       sql.NullString
+		decoderID, state                                     string
+		diagnosticsRaw                                       []byte
+		observedAt                                           int64
 	)
 	if err := row.Scan(
 		&rootID,
+		&collectionID,
 		&sourceID,
 		&locator,
 		&subresource,
@@ -191,8 +202,10 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 		return catalog.Occurrence{}, err
 	}
 	value := catalog.Occurrence{
-		RootID: artifactstore.RootID(rootID),
+		RootID:       artifactstore.RootID(rootID),
+		CollectionID: artifactstore.CollectionID(collectionID),
 		Key: catalog.OccurrenceKey{
+			CollectionID:       artifactstore.CollectionID(collectionID),
 			SourceID:           artifactstore.SourceID(sourceID),
 			Locator:            artifactstore.Locator(locator),
 			SubresourceLocator: artifactstore.SubresourceLocator(subresource),
@@ -211,4 +224,52 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 		return catalog.Occurrence{}, err
 	}
 	return value, nil
+}
+
+func currentAttachmentSourceRevisionsTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	ref artifactstore.CollectionRef,
+) (
+	currentAttachments map[artifactstore.SourceID]uint64,
+	currentSources map[artifactstore.SourceID]uint64,
+	err error,
+) {
+	rows, err := tx.QueryContext(
+		ctx,
+		`SELECT a.source_id, a.revision, s.revision
+		 FROM artifact_collection_attachments a
+		 JOIN artifact_sources s
+		   ON s.root_id = a.root_id AND s.id = a.source_id
+		 WHERE a.root_id = ? AND a.collection_id = ?
+		   AND s.retired_at IS NULL
+		 ORDER BY a.source_id`,
+		string(ref.RootID),
+		string(ref.CollectionID),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	attachments := make(map[artifactstore.SourceID]uint64)
+	sources := make(map[artifactstore.SourceID]uint64)
+	for rows.Next() {
+		var sourceID string
+		var attachmentRevision, sourceRevision uint64
+		if err := rows.Scan(
+			&sourceID,
+			&attachmentRevision,
+			&sourceRevision,
+		); err != nil {
+			return nil, nil, err
+		}
+		id := artifactstore.SourceID(sourceID)
+		attachments[id] = attachmentRevision
+		sources[id] = sourceRevision
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+	return attachments, sources, nil
 }

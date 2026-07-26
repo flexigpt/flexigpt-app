@@ -16,10 +16,12 @@ const (
 	DigestSHA256Prefix = "sha256:"
 
 	MaxKindBytes              = 128
+	MaxFingerprintBytes       = 128
 	MaxSchemaIDBytes          = 256
 	MaxDisplayNameBytes       = 256
 	MaxDescriptionBytes       = 16 * 1024
 	MaxLogicalNameBytes       = 256
+	MaxURIBytes               = 16 * 1024
 	MaxVersionBytes           = 256
 	MaxSourceGenerationBytes  = 1024
 	MaxLocatorBytes           = 4096
@@ -31,6 +33,8 @@ const (
 	MaxConfigBytes            = 1 << 20
 	MaxLocalDataBytes         = 1 << 20
 	MaxDefinitionBodyBytes    = 4 << 20
+	MaxDefinitionBytes        = 16 << 20
+	MaxDefinitionDependencies = 4096
 	MaxCandidateBytes         = 4 << 20
 	MaxScanBytes              = int64(512 << 20)
 
@@ -49,15 +53,26 @@ var (
 	identifierPattern = regexp.MustCompile(
 		`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`,
 	)
-	digestPattern = regexp.MustCompile(`^` + DigestSHA256Prefix + `[0-9a-f]{64}$`)
+	digestPattern            = regexp.MustCompile(`^` + DigestSHA256Prefix + `[0-9a-f]{64}$`)
+	windowsReservedPathNames = map[string]struct{}{
+		"CON":  {},
+		"PRN":  {},
+		"AUX":  {},
+		"NUL":  {},
+		"COM1": {}, "COM2": {}, "COM3": {}, "COM4": {}, "COM5": {},
+		"COM6": {}, "COM7": {}, "COM8": {}, "COM9": {},
+		"LPT1": {}, "LPT2": {}, "LPT3": {}, "LPT4": {}, "LPT5": {},
+		"LPT6": {}, "LPT7": {}, "LPT8": {}, "LPT9": {},
+	}
 )
 
 type (
 	RootID             string
 	SourceID           string
-	RecordID           string
-	RootKind           string
+	CollectionID       string
+	ArtifactID         string
 	SourceKind         string
+	CollectionKind     string
 	ArtifactKind       string
 	SchemaID           string
 	AttachmentRole     string
@@ -68,6 +83,70 @@ type (
 	LogicalName        string
 	LogicalVersion     string
 )
+
+type CollectionRef struct {
+	RootID       RootID       `json:"rootID"`
+	CollectionID CollectionID `json:"collectionID"`
+}
+
+func (r CollectionRef) Validate() error {
+	if err := ValidateRootID(r.RootID); err != nil {
+		return err
+	}
+	return ValidateCollectionID(r.CollectionID)
+}
+
+type ArtifactRef struct {
+	RootID     RootID     `json:"rootID"`
+	ArtifactID ArtifactID `json:"artifactID"`
+}
+
+func (r ArtifactRef) Validate() error {
+	if err := ValidateRootID(r.RootID); err != nil {
+		return err
+	}
+	return ValidateArtifactID(r.ArtifactID)
+}
+
+type ArtifactAddress struct {
+	RootID       RootID       `json:"rootID"`
+	CollectionID CollectionID `json:"collectionID"`
+	ArtifactID   ArtifactID   `json:"artifactID"`
+	Kind         ArtifactKind `json:"kind"`
+}
+
+func (a ArtifactAddress) Validate() error {
+	if err := ValidateRootID(a.RootID); err != nil {
+		return err
+	}
+	if err := ValidateCollectionID(a.CollectionID); err != nil {
+		return err
+	}
+	if err := ValidateArtifactID(a.ArtifactID); err != nil {
+		return err
+	}
+	return ValidateArtifactKind(a.Kind)
+}
+
+type SourceBinding struct {
+	SourceID           SourceID           `json:"sourceID"`
+	Locator            Locator            `json:"locator"`
+	SubresourceLocator SubresourceLocator `json:"subresourceLocator,omitempty"`
+	ExpectedKind       ArtifactKind       `json:"expectedKind"`
+}
+
+func (b SourceBinding) Validate() error {
+	if err := ValidateSourceID(b.SourceID); err != nil {
+		return err
+	}
+	if err := ValidateLocator(b.Locator, true); err != nil {
+		return err
+	}
+	if err := ValidateSubresourceLocator(b.SubresourceLocator); err != nil {
+		return err
+	}
+	return ValidateArtifactKind(b.ExpectedKind)
+}
 
 type Clock interface {
 	Now() time.Time
@@ -104,8 +183,12 @@ func ValidateSourceID(value SourceID) error {
 	return ValidateUUIDv7("source ID", string(value))
 }
 
-func ValidateRecordID(value RecordID) error {
-	return ValidateUUIDv7("record ID", string(value))
+func ValidateCollectionID(value CollectionID) error {
+	return ValidateUUIDv7("collection ID", string(value))
+}
+
+func ValidateArtifactID(value ArtifactID) error {
+	return ValidateUUIDv7("artifact ID", string(value))
 }
 
 func ValidateUUIDv7(label, value string) error {
@@ -115,12 +198,12 @@ func ValidateUUIDv7(label, value string) error {
 	return nil
 }
 
-func ValidateRootKind(value RootKind) error {
-	return ValidateIdentifier("root kind", string(value), MaxKindBytes)
-}
-
 func ValidateSourceKind(value SourceKind) error {
 	return ValidateIdentifier("source kind", string(value), MaxKindBytes)
+}
+
+func ValidateCollectionKind(value CollectionKind) error {
+	return ValidateIdentifier("collection kind", string(value), MaxKindBytes)
 }
 
 func ValidateArtifactKind(value ArtifactKind) error {
@@ -235,6 +318,51 @@ func ValidateSubresourceLocator(value SubresourceLocator) error {
 		return nil
 	}
 	return validateRelativePath("subresource locator", string(value), false)
+}
+
+// ValidatePortableLocator applies the platform-independent locator rules used
+// for managed content and portable packages.
+//
+// Generic Source locators can describe an existing platform-specific Source.
+// Portable locators are stricter because the same package must not acquire a
+// different meaning after being moved between Unix and Windows.
+func ValidatePortableLocator(value Locator, allowRoot bool) error {
+	if err := ValidateLocator(value, allowRoot); err != nil {
+		return err
+	}
+	if value == "." {
+		return nil
+	}
+
+	for segment := range strings.SplitSeq(string(value), "/") {
+		if strings.TrimRight(segment, " .") != segment {
+			return fmt.Errorf(
+				"%w: portable locator segment %q ends in a space or dot",
+				ErrInvalid,
+				segment,
+			)
+		}
+
+		base := segment
+		if before, _, found := strings.Cut(segment, "."); found {
+			base = before
+		}
+		if _, reserved := windowsReservedPathNames[strings.ToUpper(base)]; reserved {
+			return fmt.Errorf(
+				"%w: portable locator segment %q is a reserved platform name",
+				ErrInvalid,
+				segment,
+			)
+		}
+	}
+	return nil
+}
+
+func ValidatePortableSubresourceLocator(value SubresourceLocator) error {
+	if value == "" {
+		return nil
+	}
+	return ValidatePortableLocator(Locator(value), false)
 }
 
 func validateRelativePath(label, value string, allowRoot bool) error {

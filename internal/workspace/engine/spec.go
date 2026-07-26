@@ -3,7 +3,9 @@ package engine
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore"
 
 const (
-	RootKind artifactstore.RootKind = "workspace.root"
+	CollectionKind                   artifactstore.CollectionKind = "workspace.collection"
+	WorkspaceDescriptorSchemaID      artifactstore.SchemaID       = "workspace.collection.v1"
+	WorkspaceDescriptorSchemaVersion                              = "v1"
 
 	RolePrimary         artifactstore.AttachmentRole = "primary"
 	RoleBuiltIn         artifactstore.AttachmentRole = "built-in"
@@ -11,29 +13,16 @@ const (
 	RoleAttachedPackage artifactstore.AttachmentRole = "attached-package"
 	RoleOverlay         artifactstore.AttachmentRole = "overlay"
 
-	DefinitionKind      artifactstore.ArtifactKind = "workspace.definition"
-	DefinitionSchemaID  artifactstore.SchemaID     = "workspace.definition.v1"
-	DefinitionDecoderID artifactstore.DecoderID    = "workspace.definition-json"
+	WorkspaceMetadataDirectory                       = ".flexigpt"
+	WorkspaceMetadataLocator   artifactstore.Locator = WorkspaceMetadataDirectory
+	RepositoryRootLocator      artifactstore.Locator = "."
 
-	workspaceSchemaVersionV1 = "1"
+	WorkspaceDescriptorFileName                       = "workspace.json"
+	DescriptorLocator           artifactstore.Locator = WorkspaceMetadataDirectory + "/" + WorkspaceDescriptorFileName
+	markdownFilePattern                               = "*.md"
 
-	WorkspaceMetadataDirectory = ".flexigpt"
-
-	WorkspaceMetadataLocator artifactstore.Locator = WorkspaceMetadataDirectory
-	RepositoryRootLocator    artifactstore.Locator = "."
-
-	WorkspaceDefinitionFileName                          = "workspace.json"
-	DefinitionLocator              artifactstore.Locator = WorkspaceMetadataDirectory + "/" + WorkspaceDefinitionFileName
-	workspaceDefinitionLogicalName                       = "workspace"
-	workspaceDefinitionDisplayName                       = "Workspace"
-
-	jsonFilePattern      = "*.json"
-	yamlFilePattern      = "*.yaml"
-	yamlShortFilePattern = "*.yml"
-	markdownFilePattern  = "*.md"
-
-	defaultRecordName        = "artifact"
-	recordNameSeparator      = "-"
-	recordNameDigestLength   = 12
+	defaultArtifactName      = "artifact"
+	artifactNameSeparator    = "-"
+	artifactNameDigestLength = 12
 	exactVersionConstraintOp = "="
 )

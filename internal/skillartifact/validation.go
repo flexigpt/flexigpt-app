@@ -1,93 +1,110 @@
-package skilladapter
+package skillartifact
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
-func ValidateSkillDefinition(
-	value definition.Definition,
-) error {
-	if value.Kind != skillKind {
+func ValidateDefinition(value definition.Definition) error {
+	if value.Kind != Kind {
 		return fmt.Errorf(
 			"%w: Skill definition kind must be %q",
-			engine.ErrInvalidWorkspace,
-			skillKind,
+			artifactstore.ErrInvalid,
+			Kind,
 		)
 	}
-	if value.SchemaID != skillSchemaID {
+	if value.SchemaID != SchemaID {
 		return fmt.Errorf(
 			"%w: Skill definition schema must be %q",
-			engine.ErrInvalidWorkspace,
-			skillSchemaID,
+			artifactstore.ErrInvalid,
+			SchemaID,
 		)
 	}
-	if value.SchemaVersion != workspaceSkillsSchemaVersionV1 {
+	if value.SchemaVersion != SchemaVersion {
 		return fmt.Errorf(
 			"%w: Skill definition schema version must be %q",
-			engine.ErrInvalidWorkspace,
-			workspaceSkillsSchemaVersionV1,
+			artifactstore.ErrInvalid,
+			SchemaVersion,
 		)
 	}
 	if len(value.Dependencies) != 0 {
 		return fmt.Errorf(
-			"%w: Workspace Skills cannot declare portable dependencies",
-			engine.ErrInvalidWorkspace,
+			"%w: Agent Skills cannot declare generic portable dependencies",
+			artifactstore.ErrInvalid,
 		)
 	}
-	body, err := engine.DecodeDefinitionBody[skillDefinition](value.Body)
+	body, err := DecodeBody(value.Body)
 	if err != nil {
 		return err
 	}
-	if err := validateSkillBody(body); err != nil {
-		return err
+	if err := agentskills.ValidateSkillDocument(toDocument(body)); err != nil {
+		return fmt.Errorf(
+			"%w: invalid Agent Skill document: %w",
+			artifactstore.ErrInvalid,
+			err,
+		)
 	}
 	if string(value.LogicalName) != body.Name {
 		return fmt.Errorf(
 			"%w: Skill logical name does not match body.name",
-			engine.ErrInvalidWorkspace,
+			artifactstore.ErrInvalid,
 		)
 	}
 	if value.DisplayName != body.DisplayName {
 		return fmt.Errorf(
 			"%w: Skill display name does not match body.displayName",
-			engine.ErrInvalidWorkspace,
+			artifactstore.ErrInvalid,
 		)
 	}
 	if value.Description != body.Description {
 		return fmt.Errorf(
 			"%w: Skill description does not match body.description",
-			engine.ErrInvalidWorkspace,
+			artifactstore.ErrInvalid,
 		)
 	}
-	if value.Labels[skillInsertLabelKey] != body.Insert {
+	if value.Labels[InsertLabelKey] != body.Insert {
 		return fmt.Errorf(
 			"%w: Skill insert label does not match body.insert",
-			engine.ErrInvalidWorkspace,
+			artifactstore.ErrInvalid,
 		)
 	}
 	return nil
 }
 
-func validateSkillBody(value skillDefinition) error {
-	document := agentSkillDocument(value)
-	if err := agentskills.ValidateSkillDocument(document); err != nil {
-		return fmt.Errorf(
-			"%w: invalid Workspace Skill document: %w",
-			engine.ErrInvalidWorkspace,
+func DecodeBody(raw json.RawMessage) (Body, error) {
+	var output Body
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&output); err != nil {
+		return output, fmt.Errorf(
+			"%w: decode Agent Skill definition: %w",
+			artifactstore.ErrInvalid,
 			err,
 		)
 	}
-	return nil
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("definition contains trailing JSON")
+		}
+		return output, fmt.Errorf(
+			"%w: decode Agent Skill definition: %w",
+			artifactstore.ErrInvalid,
+			err,
+		)
+	}
+	return output, nil
 }
 
-func agentSkillDocument(
-	value skillDefinition,
-) agentskillsSpec.SkillDocument {
+func toDocument(value Body) agentskillsSpec.SkillDocument {
 	arguments := make(
 		[]agentskillsSpec.SkillArgument,
 		0,

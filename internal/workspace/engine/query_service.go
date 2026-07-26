@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -29,28 +29,40 @@ func occurrenceKindIdentity(
 }
 
 type QueryService struct {
-	workspaces  *Service
-	catalogs    catalogSnapshotReader
-	records     recordLister
-	definitions definitionLookup
-	validators  map[artifactstore.ArtifactKind]DefinitionValidator
+	workspaces              *Service
+	catalogs                catalogSnapshotReader
+	artifacts               artifactLookup
+	definitions             definitionLookup
+	decoderFingerprint      func() (artifactstore.Digest, error)
+	discoveryPolicyRevision string
+	validators              map[artifactstore.ArtifactKind]DefinitionValidator
 }
 
 func NewQueryService(
 	workspaces *Service,
 	catalogs catalogSnapshotReader,
-	records recordLister,
+	artifacts artifactLookup,
 	definitions definitionLookup,
+	decoderFingerprint func() (artifactstore.Digest, error),
+	discoveryPolicyRevision string,
 	supports ...ArtifactSupport,
 ) (*QueryService, error) {
 	if workspaces == nil ||
 		catalogs == nil ||
-		records == nil ||
-		definitions == nil {
+		artifacts == nil ||
+		definitions == nil ||
+		decoderFingerprint == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace query dependencies are incomplete",
 			ErrInvalidWorkspace,
 		)
+	}
+	if err := artifactstore.ValidateRequiredText(
+		"workspace discovery policy revision",
+		discoveryPolicyRevision,
+		artifactstore.MaxVersionBytes,
+	); err != nil {
+		return nil, err
 	}
 	validators := make(
 		map[artifactstore.ArtifactKind]DefinitionValidator,
@@ -70,56 +82,74 @@ func NewQueryService(
 		validators[support.Kind] = support.Validator
 	}
 	return &QueryService{
-		workspaces:  workspaces,
-		catalogs:    catalogs,
-		records:     records,
-		definitions: definitions,
-		validators:  validators,
+		workspaces:              workspaces,
+		catalogs:                catalogs,
+		artifacts:               artifacts,
+		definitions:             definitions,
+		decoderFingerprint:      decoderFingerprint,
+		discoveryPolicyRevision: discoveryPolicyRevision,
+		validators:              validators,
 	}, nil
 }
 
 func (q *QueryService) GetWorkspace(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	workspace artifactstore.CollectionRef,
 ) (Workspace, error) {
-	return q.workspaces.Get(ctx, rootID)
+	return q.workspaces.Get(ctx, workspace)
 }
 
 func (q *QueryService) Resolve(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	workspace artifactstore.CollectionRef,
 	reference Reference,
 ) (Resource, error) {
-	if (reference.RecordID == nil) == (reference.Selector == nil) {
+	if (reference.Artifact == nil) == (reference.Selector == nil) {
 		return Resource{}, fmt.Errorf(
-			"%w: exactly one record ID or selector is required",
+			"%w: exactly one ArtifactRef or selector is required",
 			ErrReferenceUnresolved,
 		)
 	}
-	view, err := q.Catalog(ctx, rootID)
+	view, err := q.Catalog(ctx, workspace)
 	if err != nil {
 		return Resource{}, err
+	}
+	if !view.Workspace.Collection.Enabled {
+		return Resource{}, fmt.Errorf("%w: Workspace is disabled", ErrReferenceUnresolved)
 	}
 	if !view.CatalogCurrent {
 		return Resource{}, artifactstore.ErrCatalogStale
 	}
 
-	if reference.RecordID != nil {
+	if reference.Artifact != nil {
+		if reference.Artifact.RootID != workspace.RootID {
+			return Resource{}, ErrReferenceUnresolved
+		}
 		for _, resourceValue := range view.Resources {
-			if resourceValue.Record.ID == *reference.RecordID {
+			if resourceValue.Artifact.ID == reference.Artifact.ArtifactID {
+				if !resourceValue.Artifact.Enabled ||
+					resourceValue.Artifact.State != artifact.StateAvailable ||
+					!resourceValue.CatalogCurrent ||
+					!resourceValue.ProjectionValid {
+					return Resource{}, fmt.Errorf(
+						"%w: Artifact %q is not currently eligible",
+						ErrReferenceUnresolved,
+						reference.Artifact.ArtifactID,
+					)
+				}
 				return resourceValue, nil
 			}
 		}
 		return Resource{}, fmt.Errorf(
-			"%w: record %q does not belong to Workspace %q",
+			"%w: Artifact %q does not belong to Workspace %q",
 			ErrReferenceUnresolved,
-			*reference.RecordID,
-			rootID,
+			reference.Artifact.ArtifactID,
+			workspace.CollectionID,
 		)
 	}
 
 	selector := *reference.Selector
-	if err := selector.Validate(); err != nil {
+	if err := validateWorkspaceSelector(selector); err != nil {
 		return Resource{}, err
 	}
 
@@ -127,8 +157,8 @@ func (q *QueryService) Resolve(
 
 	for index := range view.Resources {
 		resourceValue := &view.Resources[index]
-		if !resourceValue.Record.Enabled ||
-			resourceValue.Record.State != record.StateAvailable ||
+		if !resourceValue.Artifact.Enabled ||
+			resourceValue.Artifact.State != artifact.StateAvailable ||
 			!resourceValue.CatalogCurrent ||
 			!resourceValue.ProjectionValid ||
 			!matchesSelector(resourceValue.Definition, selector) {
@@ -146,53 +176,101 @@ func (q *QueryService) Resolve(
 	return *selected, nil
 }
 
+func (q *QueryService) ResolveArtifact(
+	ctx context.Context,
+	ref artifactstore.ArtifactRef,
+) (Workspace, Resource, error) {
+	if err := ref.Validate(); err != nil {
+		return Workspace{}, Resource{}, err
+	}
+	value, err := q.artifacts.Get(ctx, ref)
+	if err != nil {
+		return Workspace{}, Resource{}, err
+	}
+	workspaceRef := artifactstore.CollectionRef{
+		RootID:       value.RootID,
+		CollectionID: value.CollectionID,
+	}
+	workspace, err := q.workspaces.Get(ctx, workspaceRef)
+	if err != nil {
+		return Workspace{}, Resource{}, err
+	}
+	view, err := q.Catalog(ctx, workspaceRef)
+	if err != nil {
+		return Workspace{}, Resource{}, err
+	}
+	for _, resourceValue := range view.Resources {
+		if resourceValue.Artifact.ID == value.ID {
+			return workspace, resourceValue, nil
+		}
+	}
+	return workspace, Resource{}, fmt.Errorf(
+		"%w: Artifact %q is not a current Workspace resource",
+		ErrReferenceUnresolved,
+		ref.ArtifactID,
+	)
+}
+
 func (q *QueryService) ComposeLoadPlan(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	recordIDs []artifactstore.RecordID,
+	workspace artifactstore.CollectionRef,
+	artifactRefs []artifactstore.ArtifactRef,
 ) (LoadPlan, error) {
-	view, err := q.Catalog(ctx, rootID)
+	view, err := q.Catalog(ctx, workspace)
 	if err != nil {
 		return LoadPlan{}, err
 	}
-	requested := make(map[artifactstore.RecordID]struct{}, len(recordIDs))
-	for _, recordID := range recordIDs {
-		if err := artifactstore.ValidateRecordID(recordID); err != nil {
+	requested := make(map[artifactstore.ArtifactID]struct{}, len(artifactRefs))
+	for _, ref := range artifactRefs {
+		if err := ref.Validate(); err != nil {
 			return LoadPlan{}, err
 		}
-		if _, duplicate := requested[recordID]; duplicate {
+		if ref.RootID != workspace.RootID {
 			return LoadPlan{}, fmt.Errorf(
-				"%w: duplicate load-plan record %q",
-				ErrInvalidWorkspace,
-				recordID,
+				"%w: ArtifactRef belongs to another Root",
+				ErrReferenceUnresolved,
 			)
 		}
-		requested[recordID] = struct{}{}
+		if _, duplicate := requested[ref.ArtifactID]; duplicate {
+			return LoadPlan{}, fmt.Errorf(
+				"%w: duplicate load-plan Artifact %q",
+				ErrInvalidWorkspace,
+				ref.ArtifactID,
+			)
+		}
+		requested[ref.ArtifactID] = struct{}{}
 	}
 
 	plan := LoadPlan{
-		RootID:          rootID,
+		Workspace:       workspace,
 		CatalogRevision: view.Catalog.Revision,
+		Diagnostics: artifactstore.AppendDiagnostics(
+			view.Catalog.Diagnostics,
+			view.FreshnessDiagnostics...,
+		),
 	}
-	resources := make(map[artifactstore.RecordID]Resource, len(view.Resources))
+	resources := make(map[artifactstore.ArtifactID]Resource, len(view.Resources))
 	for _, value := range view.Resources {
-		resources[value.Record.ID] = value
+		resources[value.Artifact.ID] = value
 	}
-	unresolved := make(map[artifactstore.RecordID]record.Record, len(view.UnresolvedRecords))
-	for _, value := range view.UnresolvedRecords {
+	unresolved := make(
+		map[artifactstore.ArtifactID]artifact.Artifact,
+		len(view.UnresolvedArtifacts),
+	)
+	for _, value := range view.UnresolvedArtifacts {
 		unresolved[value.ID] = value
 	}
 
-	ordered := make([]artifactstore.RecordID, 0, len(requested))
-	for recordID := range requested {
-		ordered = append(ordered, recordID)
+	ordered := make([]artifactstore.ArtifactID, 0, len(requested))
+	for artifactID := range requested {
+		ordered = append(ordered, artifactID)
 	}
 	slices.Sort(ordered)
 
-	for _, recordID := range ordered {
-		resourceValue, found := resources[recordID]
+	for _, artifactID := range ordered {
+		resourceValue, found := resources[artifactID]
 		if !found {
-			if unresolvedValue, exists := unresolved[recordID]; exists {
+			if unresolvedValue, exists := unresolved[artifactID]; exists {
 				plan.Diagnostics = artifactstore.AppendDiagnostics(
 					plan.Diagnostics,
 					unresolvedValue.Diagnostics...,
@@ -201,8 +279,8 @@ func (q *QueryService) ComposeLoadPlan(
 					plan.Diagnostics,
 					recordAvailabilityDiagnostic(
 						unresolvedValue,
-						DiagnosticCodeRecordUnresolved,
-						"the Workspace record is unavailable for loading",
+						DiagnosticCodeArtifactUnresolved,
+						"the Workspace Artifact is unavailable for loading",
 					),
 				)
 			} else {
@@ -210,8 +288,8 @@ func (q *QueryService) ComposeLoadPlan(
 					plan.Diagnostics,
 					artifactstore.Diagnostic{
 						Severity: artifactstore.DiagnosticError,
-						Code:     DiagnosticCodeRecordUnresolved,
-						Message:  "the requested Workspace record was not found",
+						Code:     DiagnosticCodeArtifactUnresolved,
+						Message:  "the requested Workspace Artifact was not found",
 					},
 				)
 			}
@@ -223,31 +301,31 @@ func (q *QueryService) ComposeLoadPlan(
 			plan.Diagnostics = artifactstore.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
-					resourceValue.Record,
-					DiagnosticCodeRecordUnavailable,
+					resourceValue.Artifact,
+					DiagnosticCodeArtifactUnavailable,
 					"the Workspace catalog is stale and must be refreshed",
 				),
 			)
 			continue
 
-		case !resourceValue.Record.Enabled:
+		case !resourceValue.Artifact.Enabled:
 			plan.Diagnostics = artifactstore.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
-					resourceValue.Record,
-					DiagnosticCodeRecordUnavailable,
-					"the Workspace record is disabled",
+					resourceValue.Artifact,
+					DiagnosticCodeArtifactUnavailable,
+					"the Workspace Artifact is disabled",
 				),
 			)
 			continue
 
-		case resourceValue.Record.State != record.StateAvailable:
+		case resourceValue.Artifact.State != artifact.StateAvailable:
 			plan.Diagnostics = artifactstore.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
-					resourceValue.Record,
-					DiagnosticCodeRecordUnavailable,
-					"the Workspace record is not available",
+					resourceValue.Artifact,
+					DiagnosticCodeArtifactUnavailable,
+					"the Workspace Artifact is not available",
 				),
 			)
 			continue
@@ -256,9 +334,9 @@ func (q *QueryService) ComposeLoadPlan(
 			plan.Diagnostics = artifactstore.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
-					resourceValue.Record,
-					DiagnosticCodeRecordUnavailable,
-					"the linked Workspace record is not catalog-current",
+					resourceValue.Artifact,
+					DiagnosticCodeArtifactUnavailable,
+					"the linked Workspace Artifact is not catalog-current",
 				),
 			)
 			continue
@@ -282,7 +360,7 @@ func (q *QueryService) ComposeLoadPlan(
 			}
 		}
 		plan.Items = append(plan.Items, LoadPlanItem{
-			Record:                     resourceValue.Record,
+			Artifact:                   resourceValue.Artifact,
 			Definition:                 resourceValue.Definition,
 			Source:                     resourceValue.Source,
 			CatalogCurrent:             resourceValue.CatalogCurrent,
@@ -292,45 +370,76 @@ func (q *QueryService) ComposeLoadPlan(
 		})
 		plan.Diagnostics = artifactstore.AppendDiagnostics(
 			plan.Diagnostics,
-			resourceValue.Record.Diagnostics...,
+			resourceValue.Artifact.Diagnostics...,
 		)
 	}
 	sort.Slice(plan.Items, func(left, right int) bool {
-		return plan.Items[left].Record.ID < plan.Items[right].Record.ID
+		return plan.Items[left].Artifact.ID < plan.Items[right].Artifact.ID
 	})
 	return plan, nil
 }
 
 func (q *QueryService) Catalog(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	workspace artifactstore.CollectionRef,
 ) (CatalogView, error) {
-	workspaceValue, err := q.workspaces.Get(ctx, rootID)
+	if err := workspace.Validate(); err != nil {
+		return CatalogView{}, err
+	}
+	workspaceValue, err := q.workspaces.Get(ctx, workspace)
 	if err != nil {
 		return CatalogView{}, err
 	}
-	snapshot, catalogErr := q.catalogs.GetCurrent(ctx, rootID)
+	snapshot, catalogErr := catalog.ReadCurrent(ctx, q.catalogs, workspace)
 	if catalogErr != nil &&
 		!errors.Is(catalogErr, artifactstore.ErrCatalogStale) {
 		return CatalogView{}, catalogErr
 	}
-	if snapshot.RootID != rootID {
-		return CatalogView{}, fmt.Errorf(
-			"%w: catalog belongs to another Workspace",
-			ErrInvalidWorkspace,
-		)
-	}
-	if err := snapshot.Validate(); err != nil {
-		return CatalogView{}, fmt.Errorf(
-			"%w: catalog reader returned an invalid catalog: %w",
-			ErrInvalidWorkspace,
-			err,
-		)
+
+	currentDecoderFingerprint, err := q.decoderFingerprint()
+	if err != nil {
+		return CatalogView{}, err
 	}
 	catalogCurrent := catalogErr == nil &&
-		q.catalogIsCurrent(workspaceValue, snapshot)
+		q.catalogIsCurrent(
+			workspaceValue,
+			snapshot,
+			currentDecoderFingerprint,
+		)
 
-	records, err := q.records.ListByRoot(ctx, rootID)
+	freshnessDiagnostics := make([]artifactstore.Diagnostic, 0)
+	if catalogErr != nil {
+		freshnessDiagnostics = artifactstore.AppendDiagnostics(
+			freshnessDiagnostics,
+			artifactstore.Diagnostic{
+				Severity: artifactstore.DiagnosticWarning,
+				Code:     DiagnosticCodeCatalogStale,
+				Message:  "the Workspace catalog no longer matches current collection metadata",
+			},
+		)
+	}
+	if snapshot.DecoderFingerprint != currentDecoderFingerprint {
+		freshnessDiagnostics = artifactstore.AppendDiagnostics(
+			freshnessDiagnostics,
+			artifactstore.Diagnostic{
+				Severity: artifactstore.DiagnosticWarning,
+				Code:     DiagnosticCodeCatalogDecoderStale,
+				Message:  "the Workspace decoder capability set changed after this catalog was published",
+			},
+		)
+	}
+	if workspaceValue.Data.DiscoveryPolicyRevision != q.discoveryPolicyRevision {
+		freshnessDiagnostics = artifactstore.AppendDiagnostics(
+			freshnessDiagnostics,
+			artifactstore.Diagnostic{
+				Severity: artifactstore.DiagnosticWarning,
+				Code:     DiagnosticCodeCatalogPolicyStale,
+				Message:  "the Workspace discovery policy changed after this catalog was published",
+			},
+		)
+	}
+
+	artifacts, err := q.artifacts.ListByCollection(ctx, workspace)
 	if err != nil {
 		return CatalogView{}, err
 	}
@@ -351,80 +460,96 @@ func (q *QueryService) Catalog(
 		sourcesByID[value.ID] = value
 	}
 
-	recorded := make(map[occurrenceKindKey]struct{}, len(records))
+	recorded := make(map[occurrenceKindKey]struct{}, len(artifacts))
 	view := CatalogView{
-		Workspace:      workspaceValue,
-		Catalog:        snapshot,
-		CatalogCurrent: catalogCurrent,
+		Workspace:            workspaceValue,
+		Catalog:              snapshot,
+		CatalogCurrent:       catalogCurrent,
+		FreshnessDiagnostics: freshnessDiagnostics,
 	}
-	for _, localRecord := range records {
+	for _, localArtifact := range artifacts {
 		key := occurrenceKindIdentity(
-			localRecord.Occurrence,
-			localRecord.Kind,
+			catalog.OccurrenceKey{
+				CollectionID:       localArtifact.CollectionID,
+				SourceID:           localArtifact.Binding.SourceID,
+				Locator:            localArtifact.Binding.Locator,
+				SubresourceLocator: localArtifact.Binding.SubresourceLocator,
+			},
+			localArtifact.Kind,
 		)
 		recorded[key] = struct{}{}
 
-		sourceValue, exists := sourcesByID[localRecord.Occurrence.SourceID]
+		sourceValue, exists := sourcesByID[localArtifact.Binding.SourceID]
 		if !exists {
-			view.UnresolvedRecords = append(
-				view.UnresolvedRecords,
+			view.UnresolvedArtifacts = append(
+				view.UnresolvedArtifacts,
 				recordWithDiagnostic(
-					localRecord,
-					recordSourceUnavailableDiagnostic(localRecord),
+					localArtifact,
+					recordSourceUnavailableDiagnostic(localArtifact),
 				),
 			)
 			continue
 		}
 
-		if localRecord.ResolvedDefinition == nil {
-			view.UnresolvedRecords = append(
-				view.UnresolvedRecords,
-				localRecord,
+		if localArtifact.ResolvedDefinition == nil {
+			view.UnresolvedArtifacts = append(
+				view.UnresolvedArtifacts,
+				localArtifact,
 			)
 			continue
 		}
 		definitionValue, err := definition.ReadCanonical(
 			ctx,
 			q.definitions,
-			*localRecord.ResolvedDefinition,
+			workspace.RootID,
+			*localArtifact.ResolvedDefinition,
 		)
 		if err != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return CatalogView{}, ctxErr
 			}
-			view.UnresolvedRecords = append(
-				view.UnresolvedRecords,
+			view.UnresolvedArtifacts = append(
+				view.UnresolvedArtifacts,
 				recordWithDiagnostic(
-					localRecord,
-					recordDefinitionUnavailableDiagnostic(localRecord, err),
+					localArtifact,
+					recordDefinitionUnavailableDiagnostic(localArtifact, err),
 				),
 			)
 			continue
 		}
 		projectionValid := true
-		var projectionDiagnostics []artifactstore.Diagnostic
-		if definitionValue.Kind != localRecord.Kind {
+		projectionDiagnostics := make([]artifactstore.Diagnostic, 0)
+		if _, dataErr := DecodeArtifactData(localArtifact.Data); dataErr != nil {
+			projectionValid = false
+			projectionDiagnostics = append(
+				projectionDiagnostics,
+				projectionDiagnostic(localArtifact, dataErr),
+			)
+		}
+
+		if definitionValue.Kind != localArtifact.Kind {
 			projectionValid = false
 			projectionDiagnostics = append(
 				projectionDiagnostics,
 				projectionDiagnostic(
-					localRecord,
+					localArtifact,
 					fmt.Errorf(
-						"record kind %q does not match resolved definition kind %q",
-						localRecord.Kind,
+						"artifact kind %q does not match resolved definition kind %q",
+						localArtifact.Kind,
 						definitionValue.Kind,
 					),
 				),
 			)
-		} else if validator, supported := q.validators[localRecord.Kind]; !supported {
+
+		} else if validator, supported := q.validators[localArtifact.Kind]; !supported {
 			projectionValid = false
 			projectionDiagnostics = append(
 				projectionDiagnostics,
 				projectionDiagnostic(
-					localRecord,
+					localArtifact,
 					fmt.Errorf(
 						"artifact kind %q has no Workspace validator",
-						localRecord.Kind,
+						localArtifact.Kind,
 					),
 				),
 			)
@@ -432,7 +557,7 @@ func (q *QueryService) Catalog(
 			projectionValid = false
 			projectionDiagnostics = append(
 				projectionDiagnostics,
-				projectionDiagnostic(localRecord, err),
+				projectionDiagnostic(localArtifact, err),
 			)
 		}
 		var occurrencePointer *catalog.Occurrence
@@ -446,10 +571,10 @@ func (q *QueryService) Catalog(
 			occurrencePointer.State == catalog.OccurrenceValid &&
 			occurrencePointer.DefinitionDigest != nil &&
 			*occurrencePointer.DefinitionDigest ==
-				*localRecord.ResolvedDefinition
+				*localArtifact.ResolvedDefinition
 
 		view.Resources = append(view.Resources, Resource{
-			Record:          localRecord,
+			Artifact:        localArtifact,
 			Definition:      definitionValue,
 			Occurrence:      occurrencePointer,
 			Source:          sourceValue,
@@ -472,18 +597,18 @@ func (q *QueryService) Catalog(
 		}
 	}
 	sort.Slice(view.Resources, func(left, right int) bool {
-		if view.Resources[left].Record.Kind !=
-			view.Resources[right].Record.Kind {
-			return view.Resources[left].Record.Kind <
-				view.Resources[right].Record.Kind
+		if view.Resources[left].Artifact.Kind !=
+			view.Resources[right].Artifact.Kind {
+			return view.Resources[left].Artifact.Kind <
+				view.Resources[right].Artifact.Kind
 		}
-		if view.Resources[left].Record.Name !=
-			view.Resources[right].Record.Name {
-			return view.Resources[left].Record.Name <
-				view.Resources[right].Record.Name
+		if view.Resources[left].Artifact.Name !=
+			view.Resources[right].Artifact.Name {
+			return view.Resources[left].Artifact.Name <
+				view.Resources[right].Artifact.Name
 		}
-		return view.Resources[left].Record.ID <
-			view.Resources[right].Record.ID
+		return view.Resources[left].Artifact.ID <
+			view.Resources[right].Artifact.ID
 	})
 	view.Groups = groupCatalogResources(view.Resources, view.Unrecorded)
 	return view, nil
@@ -492,19 +617,31 @@ func (q *QueryService) Catalog(
 func (q *QueryService) catalogIsCurrent(
 	workspaceValue Workspace,
 	snapshot catalog.Snapshot,
+	currentDecoderFingerprint artifactstore.Digest,
 ) bool {
-	if snapshot.RootRevision != workspaceValue.Root.Revision {
+	if snapshot.CollectionRevision != workspaceValue.Collection.Revision {
+		return false
+	}
+	if snapshot.DecoderFingerprint != currentDecoderFingerprint {
+		return false
+	}
+	if workspaceValue.Data.DiscoveryPolicyRevision != q.discoveryPolicyRevision {
 		return false
 	}
 	currentRevisions := make(map[artifactstore.SourceID]uint64)
+	currentAttachmentRevisions := make(map[artifactstore.SourceID]uint64)
 	for _, sourceValue := range workspaceValue.Sources {
 		currentRevisions[sourceValue.ID] = sourceValue.Revision
 	}
-	return maps.Equal(currentRevisions, snapshot.SourceRevisions)
+	for _, attachment := range workspaceValue.Attachments {
+		currentAttachmentRevisions[attachment.SourceID] = attachment.Revision
+	}
+	return maps.Equal(currentRevisions, snapshot.SourceRevisions) &&
+		maps.Equal(currentAttachmentRevisions, snapshot.AttachmentRevisions)
 }
 
 func recordAvailabilityDiagnostic(
-	value record.Record,
+	value artifact.Artifact,
 	code string,
 	message string,
 ) artifactstore.Diagnostic {
@@ -513,14 +650,14 @@ func recordAvailabilityDiagnostic(
 		Code:     code,
 		Message:  message,
 		Location: &artifactstore.DiagnosticLocation{
-			Locator:            value.Occurrence.Locator,
-			SubresourceLocator: value.Occurrence.SubresourceLocator,
+			Locator:            value.Binding.Locator,
+			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
 	}
 }
 
 func projectionDiagnostic(
-	value record.Record,
+	value artifact.Artifact,
 	err error,
 ) artifactstore.Diagnostic {
 	return artifactstore.Diagnostic{
@@ -528,16 +665,16 @@ func projectionDiagnostic(
 		Code:     DiagnosticCodeProjectionInvalid,
 		Message:  diagnosticMessage(err.Error()),
 		Location: &artifactstore.DiagnosticLocation{
-			Locator:            value.Occurrence.Locator,
-			SubresourceLocator: value.Occurrence.SubresourceLocator,
+			Locator:            value.Binding.Locator,
+			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
 	}
 }
 
 func recordWithDiagnostic(
-	value record.Record,
+	value artifact.Artifact,
 	diagnostic artifactstore.Diagnostic,
-) record.Record {
+) artifact.Artifact {
 	output := value
 	output.Diagnostics = artifactstore.AppendDiagnostics(
 		[]artifactstore.Diagnostic{diagnostic},
@@ -547,35 +684,35 @@ func recordWithDiagnostic(
 }
 
 func recordSourceUnavailableDiagnostic(
-	value record.Record,
+	value artifact.Artifact,
 ) artifactstore.Diagnostic {
 	return artifactstore.Diagnostic{
 		Severity: artifactstore.DiagnosticError,
-		Code:     DiagnosticCodeRecordUnavailable,
-		Message:  "the record source is no longer attached to this Workspace",
+		Code:     DiagnosticCodeArtifactUnavailable,
+		Message:  "the Artifact Source is no longer attached to this Workspace",
 		Location: &artifactstore.DiagnosticLocation{
-			Locator:            value.Occurrence.Locator,
-			SubresourceLocator: value.Occurrence.SubresourceLocator,
+			Locator:            value.Binding.Locator,
+			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
 	}
 }
 
 func recordDefinitionUnavailableDiagnostic(
-	value record.Record,
+	value artifact.Artifact,
 	cause error,
 ) artifactstore.Diagnostic {
 	return artifactstore.Diagnostic{
 		Severity: artifactstore.DiagnosticError,
-		Code:     DiagnosticCodeRecordUnavailable,
+		Code:     DiagnosticCodeArtifactUnavailable,
 		Message: artifactstore.BoundedDiagnosticMessage(
 			fmt.Sprintf(
-				"the resolved Workspace definition could not be read: %v",
+				"the resolved Workspace Artifact definition could not be read: %v",
 				cause,
 			),
 		),
 		Location: &artifactstore.DiagnosticLocation{
-			Locator:            value.Occurrence.Locator,
-			SubresourceLocator: value.Occurrence.SubresourceLocator,
+			Locator:            value.Binding.Locator,
+			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
 	}
 }
@@ -607,13 +744,41 @@ func matchesSelector(
 	return constraint == string(value.LogicalVersion)
 }
 
+func validateWorkspaceSelector(selector definition.Selector) error {
+	if err := selector.Validate(); err != nil {
+		return err
+	}
+	constraint := strings.TrimSpace(selector.VersionConstraint)
+	if constraint == "" {
+		return nil
+	}
+	if after, ok := strings.CutPrefix(constraint, exactVersionConstraintOp); ok {
+		constraint = after
+	}
+	if constraint == "" ||
+		strings.HasPrefix(constraint, exactVersionConstraintOp) ||
+		strings.ContainsAny(constraint, "<>~^*|") {
+		return fmt.Errorf(
+			"%w: Workspace supports only exact logical-version selectors",
+			ErrReferenceUnresolved,
+		)
+	}
+	if err := artifactstore.ValidateLogicalVersion(
+		artifactstore.LogicalVersion(constraint),
+		false,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
 func groupCatalogResources(
 	resources []Resource,
 	unrecorded []catalog.Occurrence,
 ) []ResourceGroup {
 	values := make(map[artifactstore.ArtifactKind]*ResourceGroup)
 	for _, resourceValue := range resources {
-		kind := resourceValue.Record.Kind
+		kind := resourceValue.Artifact.Kind
 		group := values[kind]
 		if group == nil {
 			group = &ResourceGroup{Kind: kind}

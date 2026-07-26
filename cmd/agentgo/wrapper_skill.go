@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
@@ -47,6 +46,7 @@ func InitSkillStoreWrapper(
 	}
 	installed, err := skillruntime.NewInstalled(st, rt)
 	if err != nil {
+		rt.Close()
 		st.Close()
 		return err
 	}
@@ -91,9 +91,12 @@ func mutateInstalledSkill[T any](
 	if err != nil {
 		return zero, err
 	}
-	if err := wrapper.runtime.ResyncInstalled(ctx); err != nil {
-		return zero, fmt.Errorf("sync installed Skills: %w", err)
-	}
+
+	// Runtime state is derived. The durable Skill Store mutation has already
+	// committed and must not be reported as failed because reconciliation is
+	// temporarily unavailable.
+	//nolint:contextcheck // Explicit.
+	wrapper.runtime.RequestInstalledResync()
 	return response, nil
 }
 
@@ -245,7 +248,7 @@ func (s *SkillStoreWrapper) ListProvidedSkills(
 		}
 		scope := skillruntime.Scope{}
 		if req != nil {
-			scope.WorkspaceRootID = req.WorkspaceRootID
+			scope.Workspace = req.Workspace
 		}
 		values, err := s.provider.List(context.Background(), scope)
 		if err != nil {
@@ -270,10 +273,8 @@ func (s *SkillStoreWrapper) RenderProvidedSkill(
 		value, err := s.provider.Render(
 			context.Background(),
 			skillruntime.RenderRequest{
-				Scope: skillruntime.Scope{
-					WorkspaceRootID: req.Body.WorkspaceRootID,
-				},
-				Identity:  req.Body.Identity,
+				Scope:     skillruntime.Scope{Workspace: req.Body.Workspace},
+				Ref:       req.Body.Ref,
 				Arguments: req.Body.Arguments,
 			},
 		)
@@ -285,10 +286,17 @@ func (s *SkillStoreWrapper) RenderProvidedSkill(
 }
 
 func (s *SkillStoreWrapper) close() {
-	if s == nil || s.store == nil {
+	if s == nil {
 		return
 	}
-	s.store.Close()
+	if s.runtime != nil {
+		s.runtime.Close()
+	}
+	if s.store != nil {
+		s.store.Close()
+	}
+	s.provider = nil
+	s.installedProvider = nil
 	s.runtime = nil
 	s.store = nil
 }

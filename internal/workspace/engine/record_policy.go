@@ -7,19 +7,19 @@ import (
 	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 )
 
-type RecordPolicy struct {
+type ArtifactPolicy struct {
 	supports map[artifactstore.ArtifactKind]ArtifactSupport
 }
 
-func NewRecordPolicy(
+func NewArtifactPolicy(
 	supports ...ArtifactSupport,
-) (*RecordPolicy, error) {
+) (*ArtifactPolicy, error) {
 	if len(supports) == 0 {
 		return nil, fmt.Errorf(
 			"%w: workspace artifact support is required",
@@ -40,23 +40,33 @@ func NewRecordPolicy(
 		}
 		values[support.Kind] = support
 	}
-	return &RecordPolicy{supports: values}, nil
+	return &ArtifactPolicy{supports: values}, nil
 }
 
-func (p *RecordPolicy) Derive(
+func (p *ArtifactPolicy) Supports(
+	kind artifactstore.ArtifactKind,
+) bool {
+	if p == nil {
+		return false
+	}
+	_, supported := p.supports[kind]
+	return supported
+}
+
+func (p *ArtifactPolicy) Derive(
 	_ context.Context,
-	_ root.Root,
+	_ collection.Collection,
 	occurrence catalog.Occurrence,
 	value definition.Definition,
-) (record.Draft, bool, []artifactstore.Diagnostic) {
+) (artifact.Draft, bool, []artifactstore.Diagnostic) {
 	support, supported := p.supports[occurrence.Kind]
 	if !supported {
-		return record.Draft{}, false, nil
+		return artifact.Draft{}, false, nil
 	}
 	if value.Kind != occurrence.Kind {
-		return record.Draft{}, false, []artifactstore.Diagnostic{{
+		return artifact.Draft{}, false, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,
-			Code:     DiagnosticCodeRecordKindMismatch,
+			Code:     DiagnosticCodeArtifactKindMismatch,
 			Message: fmt.Sprintf(
 				"definition kind %q does not match occurrence kind %q",
 				value.Kind,
@@ -69,9 +79,9 @@ func (p *RecordPolicy) Derive(
 		}}
 	}
 	if value.SchemaID != support.SchemaID {
-		return record.Draft{}, false, []artifactstore.Diagnostic{{
+		return artifact.Draft{}, false, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,
-			Code:     DiagnosticCodeRecordSchemaUnsupported,
+			Code:     DiagnosticCodeArtifactSchemaUnsupported,
 			Message: fmt.Sprintf(
 				"definition schema %q is not supported for kind %q",
 				value.SchemaID,
@@ -84,7 +94,7 @@ func (p *RecordPolicy) Derive(
 		}}
 	}
 	if err := support.Validator(value); err != nil {
-		return record.Draft{}, false, []artifactstore.Diagnostic{{
+		return artifact.Draft{}, false, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,
 			Code:     DiagnosticCodeProjectionInvalid,
 			Message:  diagnosticMessage(err.Error()),
@@ -95,44 +105,44 @@ func (p *RecordPolicy) Derive(
 		}}
 	}
 
-	// An empty RecordData means runtime use is enabled by default.
-	data, err := EncodeRecordData(RecordData{})
+	// An empty ArtifactData means runtime use is enabled by default.
+	data, err := EncodeArtifactData(ArtifactData{})
 	if err != nil {
-		return record.Draft{}, false, []artifactstore.Diagnostic{{
+		return artifact.Draft{}, false, []artifactstore.Diagnostic{{
 			Severity: artifactstore.DiagnosticError,
 			Code:     DiagnosticCodeProjectionInvalid,
 			Message:  diagnosticMessage(err.Error()),
 		}}
 	}
 
-	name := recordName(value.LogicalName, occurrence.Key)
-	return record.Draft{
+	name := artifactName(value.LogicalName, occurrence.Key)
+	return artifact.Draft{
 		Name:    name,
 		Enabled: true,
 		Data:    data,
 	}, true, nil
 }
 
-func recordName(
+func artifactName(
 	logicalName artifactstore.LogicalName,
 	key catalog.OccurrenceKey,
 ) string {
 	base := strings.TrimSpace(string(logicalName))
 	if base == "" {
-		base = defaultRecordName
+		base = defaultArtifactName
 	}
 	digest := artifactstore.DigestBytes([]byte(occurrenceKeyDigestInput(key)))
 	suffix := strings.TrimPrefix(
 		string(digest),
 		artifactstore.DigestSHA256Prefix,
 	)
-	suffix = suffix[:recordNameDigestLength]
-	maximum := artifactstore.MaxDisplayNameBytes - len(suffix) - len(recordNameSeparator)
+	suffix = suffix[:artifactNameDigestLength]
+	maximum := artifactstore.MaxDisplayNameBytes - len(suffix) - len(artifactNameSeparator)
 	for len(base) > maximum {
 		_, size := utf8.DecodeLastRuneInString(base)
 		base = base[:len(base)-size]
 	}
-	return base + recordNameSeparator + suffix
+	return base + artifactNameSeparator + suffix
 }
 
 func diagnosticMessage(value string) string {

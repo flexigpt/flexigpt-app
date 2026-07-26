@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"fmt"
+	"maps"
 	"path"
 	"slices"
 	"sort"
@@ -11,25 +12,30 @@ import (
 )
 
 type DecoderHint struct {
-	Locator    artifactstore.Locator
-	Recursive  bool
-	DecoderIDs []artifactstore.DecoderID
+	Locator    artifactstore.Locator     `json:"locator"`
+	Recursive  bool                      `json:"recursive"`
+	DecoderIDs []artifactstore.DecoderID `json:"decoderIDs"`
+}
+
+type decoderHintScope struct {
+	Locator   artifactstore.Locator
+	Recursive bool
 }
 
 type SourcePlan struct {
-	SourceID         artifactstore.SourceID
-	ExplicitLocators []artifactstore.Locator
-	DirectoryRoots   []DirectoryRoot
-	DecoderHints     []DecoderHint
-
-	ExpectedGeneration string
-	AllowedDecoderIDs  []artifactstore.DecoderID
-	Authoritative      bool
-	MaxCandidateBytes  int64
-	MaxTotalBytes      int64
-	MaxCandidates      int
-	MaxEntries         int
-	MaxDepth           int
+	SourceID               artifactstore.SourceID                         `json:"sourceID"`
+	ExplicitLocators       []artifactstore.Locator                        `json:"explicitLocators,omitempty"`
+	DirectoryRoots         []DirectoryRoot                                `json:"directoryRoots,omitempty"`
+	DecoderHints           []DecoderHint                                  `json:"decoderHints,omitempty"`
+	ExpectedContentDigests map[artifactstore.Locator]artifactstore.Digest `json:"expectedContentDigests,omitempty"`
+	ExpectedGeneration     string                                         `json:"expectedGeneration,omitempty"`
+	AllowedDecoderIDs      []artifactstore.DecoderID                      `json:"allowedDecoderIDs,omitempty"`
+	Authoritative          bool                                           `json:"authoritative"`
+	MaxCandidateBytes      int64                                          `json:"maxCandidateBytes"`
+	MaxTotalBytes          int64                                          `json:"maxTotalBytes"`
+	MaxCandidates          int                                            `json:"maxCandidates"`
+	MaxEntries             int                                            `json:"maxEntries"`
+	MaxDepth               int                                            `json:"maxDepth"`
 }
 
 func (p SourcePlan) Validate() error {
@@ -101,11 +107,8 @@ func (p SourcePlan) Validate() error {
 
 		seenPatterns := make(map[string]struct{}, len(root.IncludePatterns))
 		for _, pattern := range root.IncludePatterns {
-			if strings.TrimSpace(pattern) != pattern || pattern == "" {
-				return fmt.Errorf(
-					"%w: discovery pattern must be non-empty and trimmed",
-					artifactstore.ErrInvalid,
-				)
+			if err := ValidateIncludePattern(pattern); err != nil {
+				return err
 			}
 			if _, duplicate := seenPatterns[pattern]; duplicate {
 				return fmt.Errorf(
@@ -115,17 +118,35 @@ func (p SourcePlan) Validate() error {
 				)
 			}
 			seenPatterns[pattern] = struct{}{}
-			if _, err := path.Match(pattern, "candidate"); err != nil {
-				return fmt.Errorf(
-					"%w: invalid discovery pattern %q: %w",
-					artifactstore.ErrInvalid,
-					pattern,
-					err,
-				)
-			}
 		}
 	}
+
+	if len(p.ExpectedContentDigests) > artifactstore.MaxDiscoveryCandidates {
+		return fmt.Errorf(
+			"%w: expected content digests exceed %d entries",
+			artifactstore.ErrInvalid,
+			artifactstore.MaxDiscoveryCandidates,
+		)
+	}
+	for locator, digest := range p.ExpectedContentDigests {
+		if err := artifactstore.ValidateLocator(locator, false); err != nil {
+			return err
+		}
+		if err := artifactstore.ValidateDigest(digest); err != nil {
+			return err
+		}
+		if !locatorInScope(locator, p) {
+			return fmt.Errorf(
+				"%w: expected content digest locator %q is outside discovery scope",
+				artifactstore.ErrInvalid,
+				locator,
+			)
+		}
+	}
+
+	seenHints := make(map[decoderHintScope]struct{}, len(p.DecoderHints))
 	for index, hint := range p.DecoderHints {
+		scope := decoderHintScope{Locator: hint.Locator, Recursive: hint.Recursive}
 		if err := artifactstore.ValidateLocator(hint.Locator, true); err != nil {
 			return fmt.Errorf("decoder hint %d: %w", index, err)
 		}
@@ -136,6 +157,16 @@ func (p SourcePlan) Validate() error {
 				index,
 			)
 		}
+		if _, duplicate := seenHints[scope]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate decoder hint scope %q recursive=%t",
+				artifactstore.ErrInvalid,
+				hint.Locator,
+				hint.Recursive,
+			)
+		}
+		seenHints[scope] = struct{}{}
+
 		seenHintDecoders := make(map[artifactstore.DecoderID]struct{}, len(hint.DecoderIDs))
 		for _, decoderID := range hint.DecoderIDs {
 			if err := artifactstore.ValidateDecoderID(decoderID); err != nil {
@@ -151,6 +182,7 @@ func (p SourcePlan) Validate() error {
 			seenHintDecoders[decoderID] = struct{}{}
 		}
 	}
+
 	seenDecoders := make(map[artifactstore.DecoderID]struct{}, len(p.AllowedDecoderIDs))
 	for _, decoderID := range p.AllowedDecoderIDs {
 		if err := artifactstore.ValidateDecoderID(decoderID); err != nil {
@@ -177,6 +209,7 @@ func (p SourcePlan) Normalized() SourcePlan {
 		[]artifactstore.Locator(nil),
 		p.ExplicitLocators...,
 	)
+	output.ExpectedContentDigests = maps.Clone(p.ExpectedContentDigests)
 	output.AllowedDecoderIDs = append(
 		[]artifactstore.DecoderID(nil),
 		p.AllowedDecoderIDs...,
@@ -196,6 +229,7 @@ func (p SourcePlan) Normalized() SourcePlan {
 			[]string(nil),
 			root.IncludePatterns...,
 		)
+		sort.Strings(output.DirectoryRoots[index].IncludePatterns)
 	}
 
 	if output.MaxCandidateBytes == 0 {
@@ -218,6 +252,7 @@ func (p SourcePlan) Normalized() SourcePlan {
 		return output.DirectoryRoots[left].Root < output.DirectoryRoots[right].Root
 	})
 	slices.Sort(output.AllowedDecoderIDs)
+
 	for index := range output.DecoderHints {
 		slices.Sort(output.DecoderHints[index].DecoderIDs)
 	}
@@ -234,6 +269,43 @@ func (p SourcePlan) Normalized() SourcePlan {
 		) < 0
 	})
 	return output
+}
+
+// ValidateIncludePattern validates a source-relative glob. It deliberately
+// rejects path traversal and host-path syntax before passing the pattern to
+// path.Match.
+func ValidateIncludePattern(pattern string) error {
+	if err := artifactstore.ValidateRequiredText(
+		"discovery pattern",
+		pattern,
+		artifactstore.MaxLocatorBytes,
+	); err != nil {
+		return err
+	}
+	if strings.HasPrefix(pattern, "/") ||
+		strings.ContainsAny(pattern, `\:`) {
+		return fmt.Errorf(
+			"%w: discovery pattern contains a disallowed path character",
+			artifactstore.ErrInvalid,
+		)
+	}
+	for segment := range strings.SplitSeq(pattern, "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return fmt.Errorf(
+				"%w: discovery pattern contains an invalid path segment",
+				artifactstore.ErrInvalid,
+			)
+		}
+	}
+	if _, err := path.Match(pattern, "candidate"); err != nil {
+		return fmt.Errorf(
+			"%w: invalid discovery pattern %q: %w",
+			artifactstore.ErrInvalid,
+			pattern,
+			err,
+		)
+	}
+	return nil
 }
 
 func (p SourcePlan) RequestedDecoderIDs(locator artifactstore.Locator) []artifactstore.DecoderID {

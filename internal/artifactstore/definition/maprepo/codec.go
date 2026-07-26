@@ -1,12 +1,12 @@
-package fsrepo
+package maprepo
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/flexigpt/mapstore-go/jsonencdec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
 
 const fileFormatV1 = "artifact-definition/v1"
@@ -27,32 +27,41 @@ func (f file) validate() error {
 	return f.Definition.Validate()
 }
 
-func encodeFile(value definition.Definition) ([]byte, error) {
+func encodeFile(
+	value definition.Definition,
+) (map[string]any, error) {
 	canonical, err := definition.Canonicalize(value)
 	if err != nil {
 		return nil, err
 	}
-	raw, err := json.Marshal(file{
+	return jsonencdec.StructWithJSONTagsToMap(file{
 		Format:     fileFormatV1,
 		Definition: canonical,
 	})
-	if err != nil {
-		return nil, fmt.Errorf("marshal definition file: %w", err)
-	}
-	return jsoncanon.Canonicalize(raw)
 }
 
-func decodeFile(raw []byte) (definition.Definition, error) {
-	canonicalFile, err := jsoncanon.Canonicalize(raw)
-	if err != nil {
-		return definition.Definition{}, err
-	}
+func decodeFile(
+	raw map[string]any,
+) (definition.Definition, error) {
 	var value file
-	if err := json.Unmarshal(canonicalFile, &value); err != nil {
-		return definition.Definition{}, fmt.Errorf("decode definition file: %w", err)
+	if err := jsonencdec.MapToStructWithJSONTags(raw, &value); err != nil {
+		return definition.Definition{}, fmt.Errorf(
+			"decode definition MapStore file: %w",
+			err,
+		)
 	}
 	if err := value.validate(); err != nil {
 		return definition.Definition{}, err
 	}
-	return definition.Canonicalize(value.Definition)
+	canonical, err := definition.Canonicalize(value.Definition)
+	if err != nil {
+		return definition.Definition{}, err
+	}
+	if canonical.Digest != value.Definition.Digest {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: definition file digest changed during canonicalization",
+			artifactstore.ErrDigestMismatch,
+		)
+	}
+	return canonical, nil
 }

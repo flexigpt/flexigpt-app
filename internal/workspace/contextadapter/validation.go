@@ -100,10 +100,7 @@ func ValidateContextDefinition(
 			engine.ErrInvalidWorkspace,
 		)
 	}
-	logicalName := strings.ToLower(
-		strings.TrimSuffix(body.Name, path.Ext(body.Name)),
-	)
-	if string(value.LogicalName) != logicalName {
+	if value.LogicalName != contextLogicalName(body.Name) {
 		return fmt.Errorf(
 			"%w: Context logical name does not match body.name",
 			engine.ErrInvalidWorkspace,
@@ -116,4 +113,28 @@ func ValidateContextDefinition(
 		)
 	}
 	return nil
+}
+
+func contextLogicalName(name string) artifactstore.LogicalName {
+	base := strings.ToLower(strings.TrimSuffix(name, path.Ext(name)))
+	parts := strings.FieldsFunc(base, func(character rune) bool {
+		return (character < 'a' || character > 'z') &&
+			(character < '0' || character > '9')
+	})
+
+	value := strings.Join(parts, "-")
+	if value == "" {
+		value = "context"
+	}
+	if value[0] >= '0' && value[0] <= '9' {
+		value = "context-" + value
+	}
+	if len(value) > artifactstore.MaxLogicalNameBytes {
+		value = value[:artifactstore.MaxLogicalNameBytes]
+		value = strings.Trim(value, ".-")
+	}
+	if value == "" {
+		value = "context"
+	}
+	return artifactstore.LogicalName(value)
 }

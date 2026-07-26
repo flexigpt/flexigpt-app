@@ -5,6 +5,11 @@ import "errors"
 var (
 	ErrClosed              = errors.New("artifact store: closed")
 	ErrNotFound            = errors.New("artifact store: not found")
+	ErrRootNotFound        = errors.New("artifact store: root not found")
+	ErrSourceNotFound      = errors.New("artifact store: source not found")
+	ErrAttachmentNotFound  = errors.New("artifact store: attachment not found")
+	ErrCollectionNotFound  = errors.New("artifact store: collection not found")
+	ErrArtifactNotFound    = errors.New("artifact store: artifact not found")
 	ErrConflict            = errors.New("artifact store: conflict")
 	ErrInvalid             = errors.New("artifact store: invalid")
 	ErrUnsupported         = errors.New("artifact store: unsupported")
@@ -16,4 +21,6 @@ var (
 	ErrDecoderUnavailable  = errors.New("artifact store: decoder unavailable")
 	ErrAmbiguousDecoder    = errors.New("artifact store: ambiguous decoder")
 	ErrReferenceUnresolved = errors.New("artifact store: reference unresolved")
+	ErrSuppressed          = errors.New("artifact store: source binding suppressed")
+	ErrRetired             = errors.New("artifact store: retired")
 )

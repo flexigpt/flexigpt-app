@@ -4,99 +4,114 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 type sourceSummaryLookup interface {
 	Get(
 		ctx context.Context,
+		rootID artifactstore.RootID,
 		id artifactstore.SourceID,
 	) (source.Summary, error)
 }
 
-type recordLister interface {
-	ListByRoot(
+type artifactLookup interface {
+	Get(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-	) ([]record.Record, error)
+		ref artifactstore.ArtifactRef,
+	) (artifact.Artifact, error)
+
+	ListByCollection(
+		ctx context.Context,
+		ref artifactstore.CollectionRef,
+	) ([]artifact.Artifact, error)
 }
 
 type definitionLookup interface {
 	Get(
 		ctx context.Context,
+		rootID artifactstore.RootID,
 		digest artifactstore.Digest,
 	) (definition.Definition, error)
 }
 
-type workspaceRootStore interface {
+type workspaceCollectionStore interface {
 	Create(
 		ctx context.Context,
-		draft root.RootDraft,
-		attachments []root.AttachmentDraft,
-	) (root.Root, []root.Attachment, error)
+		rootID artifactstore.RootID,
+		draft collection.Draft,
+		attachments []collection.AttachmentDraft,
+	) (collection.Collection, []collection.Attachment, error)
 
 	Get(
 		ctx context.Context,
-		id artifactstore.RootID,
-	) (root.Root, error)
+		ref artifactstore.CollectionRef,
+	) (collection.Collection, error)
 
-	List(
+	ListByRoot(
 		ctx context.Context,
-	) ([]root.Root, error)
+		rootID artifactstore.RootID,
+	) ([]collection.Collection, error)
 
 	Update(
 		ctx context.Context,
-		id artifactstore.RootID,
-		update root.RootUpdate,
-	) (root.Root, error)
+		ref artifactstore.CollectionRef,
+		update collection.Update,
+	) (collection.Collection, error)
 
-	Delete(
+	Retire(
 		ctx context.Context,
-		id artifactstore.RootID,
+		ref artifactstore.CollectionRef,
 		expectedRevision uint64,
-	) (root.Root, error)
+	) (collection.Collection, error)
 
 	Attach(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-		expectedRootRevision uint64,
-		draft root.AttachmentDraft,
-	) (root.Root, root.Attachment, error)
+		ref artifactstore.CollectionRef,
+		expectedCollectionRevision uint64,
+		draft collection.AttachmentDraft,
+	) (collection.Collection, collection.Attachment, error)
 
 	GetAttachment(
 		ctx context.Context,
-		rootID artifactstore.RootID,
+		ref artifactstore.CollectionRef,
 		sourceID artifactstore.SourceID,
-	) (root.Attachment, error)
+	) (collection.Attachment, error)
 
 	ListAttachments(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-	) ([]root.Attachment, error)
+		ref artifactstore.CollectionRef,
+	) ([]collection.Attachment, error)
 
 	UpdateAttachment(
 		ctx context.Context,
-		rootID artifactstore.RootID,
+		ref artifactstore.CollectionRef,
 		sourceID artifactstore.SourceID,
-		update root.AttachmentUpdate,
-	) (root.Root, root.Attachment, error)
+		update collection.AttachmentUpdate,
+	) (collection.Collection, collection.Attachment, error)
 
 	Detach(
 		ctx context.Context,
-		rootID artifactstore.RootID,
+		ref artifactstore.CollectionRef,
 		sourceID artifactstore.SourceID,
-		expectedRootRevision uint64,
+		expectedCollectionRevision uint64,
 		expectedAttachmentRevision uint64,
-	) (root.Root, error)
+	) (collection.Collection, error)
+
+	ReplaceAttachment(
+		ctx context.Context,
+		ref artifactstore.CollectionRef,
+		replacement collection.AttachmentReplacement,
+	) (collection.Collection, collection.Attachment, error)
 }
 
 type catalogSnapshotReader interface {
 	GetCurrent(
 		ctx context.Context,
-		rootID artifactstore.RootID,
+		ref artifactstore.CollectionRef,
 	) (catalog.Snapshot, error)
 }

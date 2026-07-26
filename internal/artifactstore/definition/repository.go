@@ -10,6 +10,7 @@ import (
 type Reader interface {
 	Get(
 		ctx context.Context,
+		rootID artifactstore.RootID,
 		digest artifactstore.Digest,
 	) (Definition, error)
 }
@@ -17,6 +18,7 @@ type Reader interface {
 type Writer interface {
 	Put(
 		ctx context.Context,
+		rootID artifactstore.RootID,
 		value Definition,
 	) (Definition, error)
 }
@@ -34,18 +36,32 @@ type Repository interface {
 func ReadCanonical(
 	ctx context.Context,
 	reader Reader,
+	rootID artifactstore.RootID,
 	digest artifactstore.Digest,
 ) (Definition, error) {
+	if ctx == nil {
+		return Definition{}, fmt.Errorf(
+			"%w: definition read context is nil",
+			artifactstore.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return Definition{}, err
+	}
 	if reader == nil {
 		return Definition{}, fmt.Errorf(
 			"%w: definition reader is nil",
 			artifactstore.ErrInvalid,
 		)
 	}
+	if err := artifactstore.ValidateRootID(rootID); err != nil {
+		return Definition{}, err
+	}
 	if err := artifactstore.ValidateDigest(digest); err != nil {
 		return Definition{}, err
 	}
-	value, err := reader.Get(ctx, digest)
+
+	value, err := reader.Get(ctx, rootID, digest)
 	if err != nil {
 		return Definition{}, err
 	}

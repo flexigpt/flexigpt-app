@@ -81,6 +81,25 @@ func sqliteError(err error) error {
 	switch {
 	case strings.Contains(message, "unique constraint failed"):
 		return fmt.Errorf("%w: metadata already exists", artifactstore.ErrConflict)
+	case strings.Contains(
+		message,
+		"artifact attachment requires active source and collection",
+	):
+		return fmt.Errorf("%w: source or collection is no longer active", artifactstore.ErrConflict)
+	case strings.Contains(
+		message,
+		"artifact enabled attachment requires enabled source",
+	):
+		return fmt.Errorf("%w: enabled attachment requires an enabled source", artifactstore.ErrConflict)
+	case strings.Contains(
+		message,
+		"artifact source disable requires disabled attachments",
+	):
+		return fmt.Errorf("%w: source still has enabled attachments", artifactstore.ErrConflict)
+	case strings.Contains(message, "artifact record requires attached source"),
+		strings.Contains(message, "artifact suppression requires attached source"),
+		strings.Contains(message, "artifact occurrence requires attached source"):
+		return fmt.Errorf("%w: source is no longer attached to the collection", artifactstore.ErrConflict)
 	case strings.Contains(message, "foreign key constraint failed"):
 		return fmt.Errorf("%w: related metadata is missing or still referenced", artifactstore.ErrConflict)
 	case strings.Contains(message, "database is locked"),

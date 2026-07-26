@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 )
@@ -15,6 +16,7 @@ import (
 type Runtime interface {
 	Get(
 		ctx context.Context,
+		rootID artifactstore.RootID,
 		id artifactstore.SourceID,
 	) (Source, error)
 
@@ -35,12 +37,17 @@ type LocalPathRuntime interface {
 		value Source,
 		locator artifactstore.Locator,
 	) (string, error)
+
+	SupportsLocalPath(
+		kind artifactstore.SourceKind,
+	) bool
 }
 
 type runtime struct {
 	reader     Reader
 	opener     Opener
 	localPaths LocalPathResolver
+	localKinds LocalPathCapability
 }
 
 func NewRuntime(
@@ -60,17 +67,24 @@ func NewRuntime(
 	if resolver, supported := opener.(LocalPathResolver); supported {
 		value.localPaths = resolver
 	}
+	if capabilities, supported := opener.(LocalPathCapability); supported {
+		value.localKinds = capabilities
+	}
 	return value, nil
 }
 
 func (r *runtime) Get(
 	ctx context.Context,
+	rootID artifactstore.RootID,
 	id artifactstore.SourceID,
 ) (Source, error) {
+	if err := artifactstore.ValidateRootID(rootID); err != nil {
+		return Source{}, err
+	}
 	if err := artifactstore.ValidateSourceID(id); err != nil {
 		return Source{}, err
 	}
-	value, err := r.reader.Get(ctx, id)
+	value, err := r.reader.Get(ctx, rootID, id)
 	if err != nil {
 		return Source{}, err
 	}
@@ -80,6 +94,14 @@ func (r *runtime) Get(
 			artifactstore.ErrInvalid,
 			value.ID,
 			id,
+		)
+	}
+	if value.RootID != rootID {
+		return Source{}, fmt.Errorf(
+			"%w: source reader returned root %q for requested root %q",
+			artifactstore.ErrInvalid,
+			value.RootID,
+			rootID,
 		)
 	}
 	if err := value.Validate(); err != nil {
@@ -106,6 +128,15 @@ func (r *runtime) Open(
 	return snapshot, nil
 }
 
+func (r *runtime) SupportsLocalPath(
+	kind artifactstore.SourceKind,
+) bool {
+	if r == nil || r.localKinds == nil {
+		return false
+	}
+	return r.localKinds.SupportsLocalPath(kind)
+}
+
 // ResolveLocalPath delegates only to adapters that explicitly support native
 // filesystem paths. Non-filesystem sources remain source-backed but do not
 // become path-backed implicitly.
@@ -114,6 +145,9 @@ func (r *runtime) ResolveLocalPath(
 	value Source,
 	locator artifactstore.Locator,
 ) (string, error) {
+	if ctx == nil {
+		return "", fmt.Errorf("%w: source local-path context is nil", artifactstore.ErrInvalid)
+	}
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -123,13 +157,29 @@ func (r *runtime) ResolveLocalPath(
 	if err := artifactstore.ValidateLocator(locator, true); err != nil {
 		return "", err
 	}
-	if r.localPaths == nil {
+	if r.localPaths == nil ||
+		!r.SupportsLocalPath(value.Kind) {
 		return "", fmt.Errorf(
 			"%w: source runtime has no native path resolver",
 			artifactstore.ErrUnsupported,
 		)
 	}
-	return r.localPaths.ResolveLocalPath(ctx, value.Clone(), locator)
+	location, err := r.localPaths.ResolveLocalPath(
+		ctx,
+		value.Clone(),
+		locator,
+	)
+	if err != nil {
+		return "", err
+	}
+	location = filepath.Clean(location)
+	if !filepath.IsAbs(location) {
+		return "", fmt.Errorf(
+			"%w: source runtime returned a non-absolute local path",
+			artifactstore.ErrInvalid,
+		)
+	}
+	return location, nil
 }
 
 func validateSnapshot(snapshot Snapshot) error {

@@ -26,6 +26,10 @@ func (*ContextDecoder) ID() artifactstore.DecoderID {
 	return contextDecoderID
 }
 
+func (*ContextDecoder) Revision() string {
+	return workspaceContextSchemaVersionV1
+}
+
 func DiscoveryProfile() engine.DiscoveryProfile {
 	var profile engine.DiscoveryProfile
 	for _, convention := range contextConventionRegistry {
@@ -118,10 +122,8 @@ func (*ContextDecoder) Decode(
 		Kind:          contextKind,
 		SchemaID:      contextSchemaID,
 		SchemaVersion: workspaceContextSchemaVersionV1,
-		LogicalName: artifactstore.LogicalName(
-			strings.ToLower(strings.TrimSuffix(name, path.Ext(name))),
-		),
-		DisplayName: name,
+		LogicalName:   contextLogicalName(name),
+		DisplayName:   name,
 		Labels: map[string]string{
 			contextRoleLabelKey: convention.Role,
 		},

@@ -36,23 +36,22 @@ const (
 )
 
 type ConversationResourceSelectionRef struct {
-	RecordID         artifactstore.RecordID `json:"recordID"`
-	Name             string                 `json:"name,omitempty"`
-	Locator          artifactstore.Locator  `json:"locator,omitempty"`
-	DefinitionDigest artifactstore.Digest   `json:"definitionDigest,omitempty"`
-	RecordRevision   uint64                 `json:"recordRevision,omitempty"`
+	Artifact         artifactstore.ArtifactRef `json:"artifact"`
+	Name             string                    `json:"name,omitempty"`
+	Locator          artifactstore.Locator     `json:"locator,omitempty"`
+	DefinitionDigest artifactstore.Digest      `json:"definitionDigest,omitempty"`
+	ArtifactRevision uint64                    `json:"artifactRevision,omitempty"`
 }
 
 type ConversationSkillSelectionRef struct {
 	ConversationResourceSelectionRef
 
-	Identity    string               `json:"identity"`
 	DisplayName string               `json:"displayName,omitempty"`
 	Insert      WorkspaceSkillInsert `json:"insert,omitempty"`
 }
 
 type ConversationSelection struct {
-	RootID            artifactstore.RootID               `json:"rootID"`
+	Workspace         WorkspaceRef                       `json:"workspace"`
 	DisplayName       string                             `json:"displayName,omitempty"`
 	WorkspaceRevision uint64                             `json:"workspaceRevision,omitempty"`
 	CatalogRevision   uint64                             `json:"catalogRevision,omitempty"`
@@ -61,11 +60,12 @@ type ConversationSelection struct {
 }
 
 type ConversationContextUsage struct {
-	RecordID                 artifactstore.RecordID         `json:"recordID"`
+	Artifact                 artifactstore.ArtifactRef      `json:"artifact"`
 	Name                     string                         `json:"name,omitempty"`
 	Locator                  artifactstore.Locator          `json:"locator,omitempty"`
 	SelectedDefinitionDigest artifactstore.Digest           `json:"selectedDefinitionDigest,omitempty"`
 	UsedDefinitionDigest     artifactstore.Digest           `json:"usedDefinitionDigest,omitempty"`
+	UsedArtifactRevision     uint64                         `json:"usedArtifactRevision,omitempty"`
 	Status                   ConversationContextUsageStatus `json:"status"`
 	Code                     string                         `json:"code,omitempty"`
 	OriginalBytes            int                            `json:"originalBytes,omitempty"`
@@ -75,13 +75,13 @@ type ConversationContextUsage struct {
 }
 
 type ConversationSkillUsage struct {
-	RecordID                 artifactstore.RecordID       `json:"recordID"`
-	Identity                 string                       `json:"identity"`
+	Artifact                 artifactstore.ArtifactRef    `json:"artifact"`
 	Name                     string                       `json:"name,omitempty"`
 	DisplayName              string                       `json:"displayName,omitempty"`
 	Locator                  artifactstore.Locator        `json:"locator,omitempty"`
 	SelectedDefinitionDigest artifactstore.Digest         `json:"selectedDefinitionDigest,omitempty"`
 	UsedDefinitionDigest     artifactstore.Digest         `json:"usedDefinitionDigest,omitempty"`
+	UsedArtifactRevision     uint64                       `json:"usedArtifactRevision,omitempty"`
 	Status                   ConversationSkillUsageStatus `json:"status"`
 	Changed                  bool                         `json:"changed,omitempty"`
 	SessionAvailable         bool                         `json:"sessionAvailable,omitempty"`
@@ -91,7 +91,7 @@ type ConversationSkillUsage struct {
 }
 
 type ConversationUsage struct {
-	RootID            artifactstore.RootID        `json:"rootID"`
+	Workspace         WorkspaceRef                `json:"workspace"`
 	DisplayName       string                      `json:"displayName,omitempty"`
 	WorkspaceRevision uint64                      `json:"workspaceRevision,omitempty"`
 	CatalogRevision   uint64                      `json:"catalogRevision,omitempty"`
@@ -106,44 +106,6 @@ type ConversationResolution struct {
 	Prompt string
 }
 
-const WorkspaceSkillIdentityPrefix = "workspace/"
-
-func WorkspaceSkillIdentity(
-	rootID artifactstore.RootID,
-	recordID artifactstore.RecordID,
-) string {
-	return WorkspaceSkillIdentityPrefix + string(rootID) + "/" + string(recordID)
-}
-
-func ParseWorkspaceSkillIdentity(
-	identity string,
-) (artifactstore.RootID, artifactstore.RecordID, error) {
-	value := strings.TrimSpace(identity)
-	if value == "" || value != identity {
-		return "", "", errors.New("workspace Skill identity must be non-empty and trimmed")
-	}
-
-	relative, found := strings.CutPrefix(value, WorkspaceSkillIdentityPrefix)
-	if !found {
-		return "", "", fmt.Errorf("identity %q is not a Workspace Skill", identity)
-	}
-
-	parts := strings.Split(relative, "/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return "", "", fmt.Errorf("workspace Skill identity %q is invalid", identity)
-	}
-
-	rootID := artifactstore.RootID(parts[0])
-	recordID := artifactstore.RecordID(parts[1])
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
-		return "", "", err
-	}
-	if err := artifactstore.ValidateRecordID(recordID); err != nil {
-		return "", "", err
-	}
-	return rootID, recordID, nil
-}
-
 func (a *API) ResolveConversationSelection(
 	ctx context.Context,
 	selection ConversationSelection,
@@ -151,12 +113,12 @@ func (a *API) ResolveConversationSelection(
 	if err := a.ready(); err != nil {
 		return ConversationResolution{}, err
 	}
-	if err := artifactstore.ValidateRootID(selection.RootID); err != nil {
+	if err := selection.Workspace.Validate(); err != nil {
 		return ConversationResolution{}, err
 	}
 
 	workspaceValue, err := a.GetWorkspace(ctx, &GetWorkspaceRequest{
-		RootID: selection.RootID,
+		Workspace: selection.Workspace,
 	})
 	if err != nil {
 		return ConversationResolution{
@@ -167,7 +129,7 @@ func (a *API) ResolveConversationSelection(
 		err := fmt.Errorf(
 			"%w: Workspace %q returned an empty view",
 			artifactstore.ErrNotFound,
-			selection.RootID,
+			selection.Workspace.CollectionID,
 		)
 		return ConversationResolution{
 			Usage: unresolvedConversationUsage(selection, err),
@@ -175,14 +137,14 @@ func (a *API) ResolveConversationSelection(
 	}
 
 	if !workspaceValue.Body.Enabled {
-		err := fmt.Errorf("selected Workspace %q is disabled", selection.RootID)
+		err := fmt.Errorf("selected Workspace %q is disabled", selection.Workspace.CollectionID)
 		return ConversationResolution{
 			Usage: unresolvedConversationUsage(selection, err),
 		}, err
 	}
 
 	usage := ConversationUsage{
-		RootID:            selection.RootID,
+		Workspace:         selection.Workspace,
 		DisplayName:       workspaceValue.Body.DisplayName,
 		WorkspaceRevision: workspaceValue.Body.Revision,
 		CatalogRevision:   selection.CatalogRevision,
@@ -193,20 +155,35 @@ func (a *API) ResolveConversationSelection(
 		usage.DisplayName = selection.DisplayName
 	}
 
-	contextUsageByID := make(map[artifactstore.RecordID]int, len(selection.ContextRefs))
-	contextRecordIDs := make([]artifactstore.RecordID, 0, len(selection.ContextRefs))
+	contextUsageByID := make(map[artifactstore.ArtifactID]int, len(selection.ContextRefs))
+	contextArtifactRefs := make([]artifactstore.ArtifactRef, 0, len(selection.ContextRefs))
 
 	for _, ref := range selection.ContextRefs {
-		if err := artifactstore.ValidateRecordID(ref.RecordID); err != nil {
+		if err := ref.Artifact.Validate(); err != nil {
+			return ConversationResolution{
+				Usage: unresolvedConversationUsage(selection, err),
+			}, err
+		}
+		if ref.Artifact.RootID != selection.Workspace.RootID {
+			err := fmt.Errorf(
+				"%w: selected Context Artifact belongs to another Root",
+				artifactstore.ErrInvalid,
+			)
+			return ConversationResolution{
+				Usage: unresolvedConversationUsage(selection, err),
+			}, err
+		}
+		if _, duplicate := contextUsageByID[ref.Artifact.ArtifactID]; duplicate {
+			err := fmt.Errorf("%w: duplicate selected Context Artifact", artifactstore.ErrInvalid)
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
 		}
 
-		contextUsageByID[ref.RecordID] = len(usage.Contexts)
-		contextRecordIDs = append(contextRecordIDs, ref.RecordID)
+		contextUsageByID[ref.Artifact.ArtifactID] = len(usage.Contexts)
+		contextArtifactRefs = append(contextArtifactRefs, ref.Artifact)
 		usage.Contexts = append(usage.Contexts, ConversationContextUsage{
-			RecordID:                 ref.RecordID,
+			Artifact:                 ref.Artifact,
 			Name:                     ref.Name,
 			Locator:                  ref.Locator,
 			SelectedDefinitionDigest: ref.DefinitionDigest,
@@ -215,13 +192,13 @@ func (a *API) ResolveConversationSelection(
 	}
 
 	prompt := ""
-	if len(contextRecordIDs) > 0 {
+	if len(contextArtifactRefs) > 0 {
 		contextPlan, composeErr := a.ComposeWorkspaceContext(
 			ctx,
 			&ComposeWorkspaceContextRequest{
-				RootID: selection.RootID,
+				Workspace: selection.Workspace,
 				Body: &ComposeWorkspaceContextRequestBody{
-					RecordIDs: contextRecordIDs,
+					Artifacts: contextArtifactRefs,
 				},
 			},
 		)
@@ -234,21 +211,17 @@ func (a *API) ResolveConversationSelection(
 					composeErr.Error(),
 				),
 			)
-			return ConversationResolution{
-				Usage: usage,
-			}, composeErr
-		}
-
-		if contextPlan != nil && contextPlan.Body != nil {
+		} else if contextPlan != nil && contextPlan.Body != nil {
 			usage.CatalogRevision = contextPlan.Body.CatalogRevision
 			usage.Diagnostics = artifactstore.AppendDiagnostics(
 				usage.Diagnostics,
 				contextPlan.Body.Diagnostics...,
 			)
+
 			prompt = contextPlan.Body.Prompt
 
 			for _, contribution := range contextPlan.Body.Contributions {
-				index, found := contextUsageByID[contribution.RecordID]
+				index, found := contextUsageByID[contribution.Artifact.ArtifactID]
 				if !found {
 					continue
 				}
@@ -257,12 +230,19 @@ func (a *API) ResolveConversationSelection(
 				current.Name = contribution.Name
 				current.Locator = contribution.Locator
 				current.UsedDefinitionDigest = contribution.DefinitionDigest
-				current.Changed = current.SelectedDefinitionDigest != "" &&
-					current.SelectedDefinitionDigest != contribution.DefinitionDigest
+				current.UsedArtifactRevision = contribution.RecordRevision
+				current.Changed = conversationResourceChanged(
+					current.SelectedDefinitionDigest,
+					current.UsedDefinitionDigest,
+					selection.ContextRefs[index].ArtifactRevision,
+					current.UsedArtifactRevision,
+					selection.ContextRefs[index].Locator,
+					current.Locator,
+				)
 			}
 
 			for _, decision := range contextPlan.Body.Decisions {
-				index, found := contextUsageByID[decision.RecordID]
+				index, found := contextUsageByID[decision.Artifact.ArtifactID]
 				if !found {
 					continue
 				}
@@ -276,35 +256,34 @@ func (a *API) ResolveConversationSelection(
 		}
 	}
 
-	skillUsageByID := make(map[artifactstore.RecordID]int, len(selection.SkillRefs))
-	skillRecordIDs := make([]artifactstore.RecordID, 0, len(selection.SkillRefs))
+	skillUsageByID := make(map[artifactstore.ArtifactID]int, len(selection.SkillRefs))
+	skillArtifactRefs := make([]artifactstore.ArtifactRef, 0, len(selection.SkillRefs))
 
 	for _, ref := range selection.SkillRefs {
-		if err := artifactstore.ValidateRecordID(ref.RecordID); err != nil {
+		if err := ref.Artifact.Validate(); err != nil {
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
 		}
-
-		expectedIdentity := WorkspaceSkillIdentity(selection.RootID, ref.RecordID)
-		if strings.TrimSpace(ref.Identity) != expectedIdentity {
+		if ref.Artifact.RootID != selection.Workspace.RootID {
 			err := fmt.Errorf(
-				"%w: Workspace Skill identity %q does not match Workspace %q record %q",
+				"%w: selected Workspace Skill belongs to another Root",
 				artifactstore.ErrInvalid,
-				ref.Identity,
-				selection.RootID,
-				ref.RecordID,
 			)
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
 		}
-
-		skillUsageByID[ref.RecordID] = len(usage.Skills)
-		skillRecordIDs = append(skillRecordIDs, ref.RecordID)
+		if _, duplicate := skillUsageByID[ref.Artifact.ArtifactID]; duplicate {
+			err := fmt.Errorf("%w: duplicate selected Workspace Skill Artifact", artifactstore.ErrInvalid)
+			return ConversationResolution{
+				Usage: unresolvedConversationUsage(selection, err),
+			}, err
+		}
+		skillUsageByID[ref.Artifact.ArtifactID] = len(usage.Skills)
+		skillArtifactRefs = append(skillArtifactRefs, ref.Artifact)
 		usage.Skills = append(usage.Skills, ConversationSkillUsage{
-			RecordID:                 ref.RecordID,
-			Identity:                 ref.Identity,
+			Artifact:                 ref.Artifact,
 			Name:                     ref.Name,
 			DisplayName:              ref.DisplayName,
 			Locator:                  ref.Locator,
@@ -313,13 +292,13 @@ func (a *API) ResolveConversationSelection(
 		})
 	}
 
-	if len(skillRecordIDs) > 0 {
+	if len(skillArtifactRefs) > 0 {
 		skillPlan, loadErr := a.LoadWorkspaceSkills(
 			ctx,
 			&LoadWorkspaceSkillsRequest{
-				RootID: selection.RootID,
+				Workspace: selection.Workspace,
 				Body: &LoadWorkspaceSkillsRequestBody{
-					RecordIDs: skillRecordIDs,
+					Artifacts: skillArtifactRefs,
 				},
 			},
 		)
@@ -341,7 +320,7 @@ func (a *API) ResolveConversationSelection(
 			)
 
 			for _, skill := range skillPlan.Body.Skills {
-				index, found := skillUsageByID[skill.RecordID]
+				index, found := skillUsageByID[skill.Artifact.ArtifactID]
 				if !found {
 					continue
 				}
@@ -351,8 +330,15 @@ func (a *API) ResolveConversationSelection(
 				current.DisplayName = skill.Skill.DisplayName
 				current.Locator = skill.Locator
 				current.UsedDefinitionDigest = skill.DefinitionDigest
-				current.Changed = current.SelectedDefinitionDigest != "" &&
-					current.SelectedDefinitionDigest != skill.DefinitionDigest
+				current.UsedArtifactRevision = skill.RecordRevision
+				current.Changed = conversationResourceChanged(
+					current.SelectedDefinitionDigest,
+					current.UsedDefinitionDigest,
+					selection.SkillRefs[index].ArtifactRevision,
+					current.UsedArtifactRevision,
+					selection.SkillRefs[index].Locator,
+					current.Locator,
+				)
 
 				if skill.Skill.Insert != WorkspaceSkillInsertInstructions {
 					current.Status = ConversationSkillUsageUnavailable
@@ -382,11 +368,12 @@ func (a *API) ResolveConversationSelection(
 	ResolveConversationUsageStatus(&usage)
 	if usage.Status == ConversationSelectionUnavailable &&
 		len(usage.Contexts)+len(usage.Skills) > 0 {
+		cause := errors.New(
+			"selected Workspace has no currently usable Context or Skills",
+		)
 		return ConversationResolution{
-				Usage: usage,
-			}, errors.New(
-				"selected Workspace has no currently usable Context or Skills",
-			)
+			Usage: usage,
+		}, cause
 	}
 
 	return ConversationResolution{
@@ -405,7 +392,7 @@ func unresolvedConversationUsage(
 	}
 
 	usage := ConversationUsage{
-		RootID:            selection.RootID,
+		Workspace:         selection.Workspace,
 		DisplayName:       selection.DisplayName,
 		WorkspaceRevision: selection.WorkspaceRevision,
 		CatalogRevision:   selection.CatalogRevision,
@@ -420,7 +407,7 @@ func unresolvedConversationUsage(
 
 	for _, ref := range selection.ContextRefs {
 		usage.Contexts = append(usage.Contexts, ConversationContextUsage{
-			RecordID:                 ref.RecordID,
+			Artifact:                 ref.Artifact,
 			Name:                     ref.Name,
 			Locator:                  ref.Locator,
 			SelectedDefinitionDigest: ref.DefinitionDigest,
@@ -430,8 +417,7 @@ func unresolvedConversationUsage(
 
 	for _, ref := range selection.SkillRefs {
 		usage.Skills = append(usage.Skills, ConversationSkillUsage{
-			RecordID:                 ref.RecordID,
-			Identity:                 ref.Identity,
+			Artifact:                 ref.Artifact,
 			Name:                     ref.Name,
 			DisplayName:              ref.DisplayName,
 			Locator:                  ref.Locator,
@@ -460,6 +446,26 @@ func conversationContextUsageStatusOf(
 	default:
 		return ConversationContextUsageUnavailable
 	}
+}
+
+func conversationResourceChanged(
+	selectedDigest artifactstore.Digest,
+	usedDigest artifactstore.Digest,
+	selectedRevision uint64,
+	usedRevision uint64,
+	selectedLocator artifactstore.Locator,
+	usedLocator artifactstore.Locator,
+) bool {
+	if selectedDigest != "" && selectedDigest != usedDigest {
+		return true
+	}
+	if selectedRevision != 0 && selectedRevision != usedRevision {
+		return true
+	}
+	if selectedLocator != "" && selectedLocator != usedLocator {
+		return true
+	}
+	return false
 }
 
 // ResolveConversationUsageStatus recomputes the aggregate status after an

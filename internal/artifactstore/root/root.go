@@ -1,32 +1,24 @@
 package root
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 )
 
 type Root struct {
-	ID          artifactstore.RootID   `json:"id"`
-	Kind        artifactstore.RootKind `json:"kind"`
-	DisplayName string                 `json:"displayName"`
-	Description string                 `json:"description,omitempty"`
-	Enabled     bool                   `json:"enabled"`
-	Data        json.RawMessage        `json:"data"`
-	Revision    uint64                 `json:"revision"`
-	CreatedAt   time.Time              `json:"createdAt"`
-	ModifiedAt  time.Time              `json:"modifiedAt"`
-	DeletedAt   *time.Time             `json:"deletedAt,omitempty"`
+	ID          artifactstore.RootID `json:"id"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description,omitempty"`
+	Revision    uint64               `json:"revision"`
+	CreatedAt   time.Time            `json:"createdAt"`
+	ModifiedAt  time.Time            `json:"modifiedAt"`
+	RetiredAt   *time.Time           `json:"retiredAt,omitempty"`
 }
 
 func (r Root) Validate() error {
 	if err := artifactstore.ValidateRootID(r.ID); err != nil {
-		return err
-	}
-	if err := artifactstore.ValidateRootKind(r.Kind); err != nil {
 		return err
 	}
 	if err := artifactstore.ValidateRequiredText(
@@ -43,12 +35,6 @@ func (r Root) Validate() error {
 	); err != nil {
 		return err
 	}
-	if _, err := jsoncanon.CanonicalizeObject(
-		r.Data,
-		artifactstore.MaxLocalDataBytes,
-	); err != nil {
-		return fmt.Errorf("%w: root data: %w", artifactstore.ErrInvalid, err)
-	}
 	if r.Revision == 0 {
 		return fmt.Errorf("%w: root revision must be positive", artifactstore.ErrInvalid)
 	}
@@ -58,17 +44,14 @@ func (r Root) Validate() error {
 	if r.ModifiedAt.Before(r.CreatedAt) {
 		return fmt.Errorf("%w: root modified time precedes creation", artifactstore.ErrInvalid)
 	}
-	if r.DeletedAt != nil {
-		if r.DeletedAt.IsZero() ||
-			r.DeletedAt.Before(r.CreatedAt) ||
-			r.DeletedAt.Before(r.ModifiedAt) {
+	if r.RetiredAt != nil {
+		if r.RetiredAt.IsZero() ||
+			r.RetiredAt.Before(r.CreatedAt) ||
+			r.RetiredAt.Before(r.ModifiedAt) {
 			return fmt.Errorf(
-				"%w: root deletion time is invalid",
+				"%w: root retirement time is invalid",
 				artifactstore.ErrInvalid,
 			)
-		}
-		if r.Enabled {
-			return fmt.Errorf("%w: deleted root cannot be enabled", artifactstore.ErrInvalid)
 		}
 	}
 	return nil

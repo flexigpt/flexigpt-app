@@ -3,18 +3,21 @@ package engine
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore"
 
 const (
-	DiagnosticCodeArtifactInvalid         = "workspace.artifact.invalid"
-	DiagnosticCodeContextInvalidContent   = "workspace.context.invalid-content"
-	DiagnosticCodeContextInvalidUTF8      = "workspace.context.invalid-utf8"
-	DiagnosticCodeDefinitionInvalid       = "workspace.definition.invalid"
-	DiagnosticCodeRecordSchemaUnsupported = "workspace.record.schema-unsupported"
-	DiagnosticCodeRecordKindMismatch      = "workspace.record.kind-mismatch"
-	DiagnosticCodeProjectionInvalid       = "workspace.projection.invalid"
-	DiagnosticCodeRecordUnavailable       = "workspace.record.unavailable"
-	DiagnosticCodeRecordUnresolved        = "workspace.record.unresolved"
-	DiagnosticCodeRuntimeDenied           = "workspace.runtime.denied"
-	DiagnosticCodeRuntimeUnavailable      = "workspace.runtime.unavailable"
-	DiagnosticCodeSkillInvalid            = "workspace.skill.invalid"
+	DiagnosticCodeArtifactInvalid           = "workspace.artifact.invalid"
+	DiagnosticCodeContextInvalidContent     = "workspace.context.invalid-content"
+	DiagnosticCodeContextInvalidUTF8        = "workspace.context.invalid-utf8"
+	DiagnosticCodeDefinitionInvalid         = "workspace.definition.invalid"
+	DiagnosticCodeArtifactSchemaUnsupported = "workspace.artifact.schema-unsupported"
+	DiagnosticCodeArtifactKindMismatch      = "workspace.artifact.kind-mismatch"
+	DiagnosticCodeProjectionInvalid         = "workspace.projection.invalid"
+	DiagnosticCodeArtifactUnavailable       = "workspace.artifact.unavailable"
+	DiagnosticCodeArtifactUnresolved        = "workspace.artifact.unresolved"
+	DiagnosticCodeRuntimeDenied             = "workspace.runtime.denied"
+	DiagnosticCodeRuntimeUnavailable        = "workspace.runtime.unavailable"
+	DiagnosticCodeCatalogStale              = "workspace.catalog.stale"
+	DiagnosticCodeCatalogDecoderStale       = "workspace.catalog.decoder-stale"
+	DiagnosticCodeCatalogPolicyStale        = "workspace.catalog.policy-stale"
+	DiagnosticCodeSkillInvalid              = "workspace.skill.invalid"
 )
 
 func WorkspaceArtifactErrorDiagnostics(

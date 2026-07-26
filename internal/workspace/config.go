@@ -5,17 +5,21 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
+const defaultDiscoveryPolicyRevision = "workspace.discovery.v1"
+
 type Config struct {
-	Supports           []engine.ArtifactSupport
-	DiscoveryProfiles  engine.DiscoveryProfiles
-	SkillRoots         []artifactstore.Locator
-	ContextComposition contextadapter.CompositionPolicy
-	SourceUsePolicy    engine.SourceUsePolicy
+	Supports                []engine.ArtifactSupport
+	DiscoveryProfiles       engine.DiscoveryProfiles
+	DiscoveryPolicyRevision string
+	SkillRoots              []artifactstore.Locator
+	ContextComposition      contextadapter.CompositionPolicy
+	SourceUsePolicy         engine.SourceUsePolicy
 }
 
 type builtinArtifactSupport struct {
@@ -27,28 +31,37 @@ type builtinArtifactSupport struct {
 // DefaultConfig and decoder construction both derive from this matrix.
 var builtinArtifactSupportMatrix = []builtinArtifactSupport{
 	{
-		support: engine.ArtifactSupport{
-			Kind:      engine.DefinitionKind,
-			SchemaID:  engine.DefinitionSchemaID,
-			DecoderID: engine.DefinitionDecoderID,
-			Validator: engine.ValidateWorkspaceDefinition,
-		},
-	},
-	{
 		support: contextadapter.ArtifactSupport(),
 	},
 	{
-		support: skilladapter.ArtifactSupport(),
+		support: engine.ArtifactSupport{
+			Kind:      skillartifact.Kind,
+			SchemaID:  skillartifact.SchemaID,
+			DecoderID: skillartifact.DecoderID,
+			Validator: skillartifact.ValidateDefinition,
+		},
 	},
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Supports:           BuiltinArtifactSupports(),
-		SkillRoots:         skilladapter.DefaultSkillRoots(),
-		ContextComposition: contextadapter.DefaultCompositionPolicy(),
-		SourceUsePolicy:    engine.NewRecordRuntimePolicy(),
+		Supports:                BuiltinArtifactSupports(),
+		DiscoveryPolicyRevision: defaultDiscoveryPolicyRevision,
+		SkillRoots:              skilladapter.DefaultSkillRoots(),
+		ContextComposition:      contextadapter.DefaultCompositionPolicy(),
+		SourceUsePolicy:         engine.NewArtifactRuntimePolicy(),
 	}
+}
+
+func (c Config) normalized() Config {
+	output := c
+	if len(output.Supports) == 0 {
+		output.Supports = BuiltinArtifactSupports()
+	}
+	if output.DiscoveryPolicyRevision == "" {
+		output.DiscoveryPolicyRevision = defaultDiscoveryPolicyRevision
+	}
+	return output
 }
 
 func (c Config) normalizedDiscoveryProfiles(
@@ -64,17 +77,18 @@ func (c Config) normalizedDiscoveryProfiles(
 		profiles = c.DiscoveryProfiles
 	}
 	contextProfile := contextadapter.DiscoveryProfile()
-	profiles.Primary.ExplicitLocators = append(
-		profiles.Primary.ExplicitLocators,
-		contextProfile.ExplicitLocators...,
+	profiles.Primary = engine.MergeDiscoveryProfile(
+		profiles.Primary,
+		contextProfile,
 	)
-	profiles.Primary.ReadmeLocator = contextProfile.ReadmeLocator
-	skillProfile := skilladapter.DiscoveryProfileWithConventions(
-		skillConventions,
+	skillProfile := skillConventions.DiscoveryProfile()
+	profiles.Primary = engine.MergeDiscoveryProfile(
+		profiles.Primary,
+		skillProfile,
 	)
-	profiles.Primary.DirectoryRoots = append(
-		profiles.Primary.DirectoryRoots,
-		skillProfile.DirectoryRoots...,
+	profiles.Attached = engine.MergeDiscoveryProfile(
+		profiles.Attached,
+		skillProfile,
 	)
 	return profiles
 }
@@ -89,7 +103,6 @@ func (c Config) normalizedSupports() ([]engine.ArtifactSupport, error) {
 
 	output := make([]engine.ArtifactSupport, 0, len(c.Supports))
 	seenKinds := make(map[artifactstore.ArtifactKind]struct{}, len(c.Supports))
-	definitionSupported := false
 
 	for _, support := range c.Supports {
 		if err := support.Validate(); err != nil {
@@ -103,25 +116,7 @@ func (c Config) normalizedSupports() ([]engine.ArtifactSupport, error) {
 			)
 		}
 		seenKinds[support.Kind] = struct{}{}
-
-		if support.Kind == engine.DefinitionKind {
-			if support.SchemaID != engine.DefinitionSchemaID ||
-				support.DecoderID != engine.DefinitionDecoderID {
-				return nil, fmt.Errorf(
-					"%w: workspace definition support is fixed",
-					engine.ErrInvalidWorkspace,
-				)
-			}
-			definitionSupported = true
-		}
 		output = append(output, support)
-	}
-
-	if !definitionSupported {
-		return nil, fmt.Errorf(
-			"%w: workspace definition support is required",
-			engine.ErrInvalidWorkspace,
-		)
 	}
 	return output, nil
 }
@@ -144,12 +139,11 @@ func BuiltinDecoders() []discovery.Decoder {
 	if err != nil {
 		panic(err)
 	}
-	decoder, err := skilladapter.NewSkillDecoderWithConventions(registry)
+	decoder, err := skillartifact.NewDecoder(registry)
 	if err != nil {
 		panic(err)
 	}
 	return []discovery.Decoder{
-		engine.NewDefinitionDecoder(),
 		contextadapter.NewContextDecoder(),
 		decoder,
 	}
@@ -168,11 +162,30 @@ func (c Config) skillConventions() (*skilladapter.ConventionRegistry, error) {
 	return skilladapter.NewConventionRegistry(c.SkillRoots...)
 }
 
+func (c Config) discoveryPolicyRevision() (string, error) {
+	value := c.DiscoveryPolicyRevision
+	if value == "" {
+		value = defaultDiscoveryPolicyRevision
+	}
+	if err := artifactstore.ValidateRequiredText(
+		"workspace discovery policy revision",
+		value,
+		artifactstore.MaxVersionBytes,
+	); err != nil {
+		return "", fmt.Errorf(
+			"%w: %w",
+			engine.ErrInvalidWorkspace,
+			err,
+		)
+	}
+	return value, nil
+}
+
 func (c Config) runtimePolicy() engine.SourceUsePolicy {
 	if c.SourceUsePolicy != nil {
 		return c.SourceUsePolicy
 	}
-	return engine.NewRecordRuntimePolicy()
+	return engine.NewArtifactRuntimePolicy()
 }
 
 func (c Config) contextCompositionPolicy() contextadapter.CompositionPolicy {

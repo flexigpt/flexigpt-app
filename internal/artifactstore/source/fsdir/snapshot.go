@@ -67,7 +67,7 @@ func (s *snapshot) ReadDir(
 	if s.traversalPolicy.excludesLocator(string(locator)) {
 		return []source.Entry{}, nil
 	}
-	path, err := s.resolve(locator)
+	path, err := s.resolveDirectory(locator)
 	if err != nil {
 		return nil, err
 	}
@@ -187,27 +187,13 @@ func (s *snapshot) ensureOpen(ctx context.Context) error {
 func (s *snapshot) resolve(
 	locator artifactstore.Locator,
 ) (string, error) {
-	if err := artifactstore.ValidateLocator(locator, true); err != nil {
-		return "", err
-	}
-	if locator == "." {
-		return s.root, nil
-	}
-	candidate := filepath.Join(s.root, filepath.FromSlash(string(locator)))
-	relative, err := filepath.Rel(s.root, candidate)
-	if err != nil {
-		return "", err
-	}
-	if relative == ".." ||
-		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
-		filepath.IsAbs(relative) {
-		return "", fmt.Errorf(
-			"%w: locator %q escapes source root",
-			artifactstore.ErrInvalid,
-			locator,
-		)
-	}
-	return candidate, nil
+	return resolveWithinRoot(s.root, locator, true)
+}
+
+func (s *snapshot) resolveDirectory(
+	locator artifactstore.Locator,
+) (string, error) {
+	return resolveWithinRoot(s.root, locator, false)
 }
 
 // resolveNativePath resolves an existing locator beneath a configured source
@@ -240,35 +226,52 @@ func resolveNativePath(
 			artifactstore.ErrInvalid,
 		)
 	}
+	path, err := resolveWithinRoot(resolvedRoot, locator, false)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf(
+			"%w: source locator %q",
+			artifactstore.ErrNotFound,
+			locator,
+		)
+	}
+	return path, err
+}
 
-	current := resolvedRoot
+func resolveWithinRoot(
+	root string,
+	locator artifactstore.Locator,
+	allowFinalSymlink bool,
+) (string, error) {
+	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+		return "", err
+	}
+	root = filepath.Clean(root)
 	if locator == "." {
-		return current, nil
+		return root, nil
 	}
 
-	for part := range strings.SplitSeq(string(locator), "/") {
+	current := root
+	parts := strings.Split(string(locator), "/")
+	for index, part := range parts {
 		current = filepath.Join(current, part)
-		info, err := os.Lstat(current)
-		if errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf(
-				"%w: source locator %q",
-				artifactstore.ErrNotFound,
-				locator,
-			)
+		if allowFinalSymlink && index == len(parts)-1 {
+			continue
 		}
+
+		info, err := os.Lstat(current)
 		if err != nil {
 			return "", err
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
 			return "", fmt.Errorf(
-				"%w: symbolic link %q is not allowed",
+				"%w: symbolic link in locator %q is not allowed",
 				artifactstore.ErrInvalid,
 				locator,
 			)
 		}
 	}
 
-	relative, err := filepath.Rel(resolvedRoot, current)
+	relative, err := filepath.Rel(root, current)
 	if err != nil {
 		return "", err
 	}
@@ -281,6 +284,7 @@ func resolveNativePath(
 			locator,
 		)
 	}
+
 	return current, nil
 }
 

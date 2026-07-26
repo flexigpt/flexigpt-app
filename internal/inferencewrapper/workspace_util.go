@@ -38,6 +38,16 @@ func NewWorkspaceInferenceBridge(
 	return &WorkspaceInferenceBridge{resolver: resolver}
 }
 
+func workspaceScopeForSelection(
+	selection *workspace.ConversationSelection,
+) *artifactstore.CollectionRef {
+	if selection == nil {
+		return nil
+	}
+	value := selection.Workspace
+	return &value
+}
+
 // validateWorkspaceSkillRefsForSelection binds runtime-facing Workspace Skill
 // identities to the Workspace selection carried by the same user turn.
 //
@@ -50,42 +60,71 @@ func validateWorkspaceSkillRefsForSelection(
 ) error {
 	selected := make(map[string]struct{})
 	if selection != nil {
-		for _, ref := range selection.SkillRefs {
-			if ref.RecordID == "" {
-				continue
+		if err := selection.Workspace.Validate(); err != nil {
+			return fmt.Errorf("invalid Workspace selection: %w", err)
+		}
+		for index, selectedSkill := range selection.SkillRefs {
+			artifactRef := selectedSkill.Artifact
+			if err := artifactRef.Validate(); err != nil {
+				return fmt.Errorf(
+					"invalid workspace selection skillRefs[%d]: %w",
+					index,
+					err,
+				)
 			}
-			selected[workspace.WorkspaceSkillIdentity(selection.RootID, ref.RecordID)] = struct{}{}
+			if artifactRef.RootID != selection.Workspace.RootID {
+				return fmt.Errorf(
+					"workspace selection skillRefs[%d] belongs to another Root",
+					index,
+				)
+			}
+			key := workspaceArtifactRefKey(artifactRef)
+			if _, duplicate := selected[key]; duplicate {
+				return fmt.Errorf(
+					"workspace selection contains duplicate Skill Artifact %q",
+					artifactRef.ArtifactID,
+				)
+			}
+			selected[key] = struct{}{}
 		}
 	}
 
+	seenRuntimeArtifacts := make(map[string]struct{})
 	for _, ref := range refs {
-		identity := strings.TrimSpace(ref.Identity)
-		if !strings.HasPrefix(identity, workspace.WorkspaceSkillIdentityPrefix) {
+		if ref.Artifact == nil {
 			continue
 		}
 		if ref.BundleID != "" || ref.SkillSlug != "" || ref.SkillID != "" {
-			return fmt.Errorf("workspace Skill ref %q mixes identity and installed fields", identity)
+			return errors.New("workspace skill artifactRef mixes Artifact and installed Skill fields")
 		}
 		if selection == nil {
-			return fmt.Errorf("workspace Skill ref %q was supplied without a Workspace selection", identity)
+			return errors.New(
+				"workspace skill artifactRef was supplied without a Workspace selection",
+			)
 		}
-
-		rootID, recordID, err := workspace.ParseWorkspaceSkillIdentity(identity)
-		if err != nil {
-			return fmt.Errorf("invalid Workspace Skill ref %q: %w", identity, err)
+		if err := ref.Artifact.Validate(); err != nil {
+			return fmt.Errorf("invalid workspace skill artifactRef: %w", err)
 		}
-		if rootID != selection.RootID {
+		if ref.Artifact.RootID != selection.Workspace.RootID {
 			return fmt.Errorf(
-				"workspace Skill ref %q belongs to Workspace %q, not selected Workspace %q",
-				identity,
-				rootID,
-				selection.RootID,
+				"workspace Skill Artifact %q belongs to another Root",
+				ref.Artifact.ArtifactID,
 			)
 		}
 
-		canonical := workspace.WorkspaceSkillIdentity(rootID, recordID)
-		if _, found := selected[canonical]; !found {
-			return fmt.Errorf("workspace Skill ref %q is not selected for this conversation", identity)
+		key := workspaceArtifactRefKey(*ref.Artifact)
+		if _, duplicate := seenRuntimeArtifacts[key]; duplicate {
+			return fmt.Errorf(
+				"duplicate workspace skill artifactRef %q in runtime allow-list",
+				ref.Artifact.ArtifactID,
+			)
+		}
+		seenRuntimeArtifacts[key] = struct{}{}
+		if _, found := selected[key]; !found {
+			return fmt.Errorf(
+				"workspace Skill Artifact %q is not selected for this conversation",
+				ref.Artifact.ArtifactID,
+			)
 		}
 	}
 
@@ -101,6 +140,9 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 	if selection == nil {
 		return output, nil
 	}
+	if err := selection.Workspace.Validate(); err != nil {
+		return output, fmt.Errorf("invalid Workspace selection: %w", err)
+	}
 	if b == nil || b.resolver == nil {
 		return output, errors.New(
 			"workspace inference bridge is not configured",
@@ -111,7 +153,8 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 	usage := resolution.Usage
 	output.Usage = &usage
 	output.DebugDetails = map[string]any{
-		"rootID":            usage.RootID,
+		"workspace":         selection.Workspace,
+		"resolvedWorkspace": usage.Workspace,
 		"workspaceRevision": usage.WorkspaceRevision,
 		"catalogRevision":   usage.CatalogRevision,
 		"status":            usage.Status,
@@ -123,7 +166,7 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 	if prompt := strings.TrimSpace(resolution.Prompt); prompt != "" {
 		output.CurrentInputs = append(
 			output.CurrentInputs,
-			buildWorkspaceContextInput(selection.RootID, prompt),
+			buildWorkspaceContextInput(selection.Workspace, prompt),
 		)
 	}
 
@@ -131,13 +174,13 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 }
 
 func buildWorkspaceContextInput(
-	rootID artifactstore.RootID,
+	workspaceRef artifactstore.CollectionRef,
 	prompt string,
 ) inferenceSpec.InputUnion {
 	return inferenceSpec.InputUnion{
 		Kind: inferenceSpec.InputKindInputMessage,
 		InputMessage: &inferenceSpec.InputOutputContent{
-			ID:     workspaceContextInputIDPrefix + string(rootID),
+			ID:     workspaceContextInputID(workspaceRef),
 			Role:   inferenceSpec.RoleUser,
 			Status: inferenceSpec.StatusNone,
 			Contents: []inferenceSpec.InputOutputContentItemUnion{
@@ -154,6 +197,18 @@ func buildWorkspaceContextInput(
 			},
 		},
 	}
+}
+
+func workspaceContextInputID(
+	workspaceRef artifactstore.CollectionRef,
+) string {
+	return workspaceContextInputIDPrefix +
+		string(workspaceRef.RootID) + ":" +
+		string(workspaceRef.CollectionID)
+}
+
+func workspaceArtifactRefKey(ref artifactstore.ArtifactRef) string {
+	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
 }
 
 func stripGeneratedCurrentContextInputs(
@@ -227,22 +282,17 @@ func filterWorkspaceSkillRefsToResolvedSelection(
 		if skill.Status != workspace.ConversationSkillUsageAvailable {
 			continue
 		}
-
-		identity := strings.TrimSpace(skill.Identity)
-		if identity != "" {
-			available[identity] = struct{}{}
-		}
+		available[workspaceArtifactRefKey(skill.Artifact)] = struct{}{}
 	}
 
 	filtered := make([]skillruntimeSpec.SkillRef, 0, len(refs))
 	for _, ref := range refs {
-		identity := strings.TrimSpace(ref.Identity)
-		if !strings.HasPrefix(identity, workspace.WorkspaceSkillIdentityPrefix) {
+		if ref.Artifact == nil {
 			filtered = append(filtered, ref)
 			continue
 		}
 
-		if _, ok := available[identity]; ok {
+		if _, ok := available[workspaceArtifactRefKey(*ref.Artifact)]; ok {
 			filtered = append(filtered, ref)
 		}
 	}
@@ -262,22 +312,22 @@ func markWorkspaceSkillSessionUsage(
 
 	enabled := make(map[string]struct{}, len(enabledSkillRefs))
 	for _, ref := range enabledSkillRefs {
-		if ref.Identity != "" {
-			enabled[ref.Identity] = struct{}{}
+		if ref.Artifact != nil {
+			enabled[workspaceArtifactRefKey(*ref.Artifact)] = struct{}{}
 		}
 	}
 
 	available := make(map[string]struct{}, len(availableItems))
 	for _, item := range availableItems {
-		if item.SkillRef.Identity != "" {
-			available[item.SkillRef.Identity] = struct{}{}
+		if item.SkillRef.Artifact != nil {
+			available[workspaceArtifactRefKey(*item.SkillRef.Artifact)] = struct{}{}
 		}
 	}
 
 	active := make(map[string]struct{}, len(activeItems))
 	for _, item := range activeItems {
-		if item.SkillRef.Identity != "" {
-			active[item.SkillRef.Identity] = struct{}{}
+		if item.SkillRef.Artifact != nil {
+			active[workspaceArtifactRefKey(*item.SkillRef.Artifact)] = struct{}{}
 		}
 	}
 
@@ -287,7 +337,21 @@ func markWorkspaceSkillSessionUsage(
 			continue
 		}
 
-		if _, selectedForSession := enabled[current.Identity]; !selectedForSession {
+		if !advertised {
+			current.Status = workspace.ConversationSkillUsageUnavailable
+			current.Diagnostics = artifactstore.AppendDiagnostics(
+				current.Diagnostics,
+				artifactstore.Diagnostic{
+					Severity: artifactstore.DiagnosticWarning,
+					Code:     "workspace.conversation.skill-not-advertised",
+					Message:  "the selected Workspace Skill was not advertised to the model for this turn",
+				},
+			)
+			continue
+		}
+
+		key := workspaceArtifactRefKey(current.Artifact)
+		if _, selectedForSession := enabled[key]; !selectedForSession {
 			current.Status = workspace.ConversationSkillUsageUnavailable
 			current.Diagnostics = artifactstore.AppendDiagnostics(
 				current.Diagnostics,
@@ -300,7 +364,7 @@ func markWorkspaceSkillSessionUsage(
 			continue
 		}
 
-		if _, resolved := available[current.Identity]; !resolved {
+		if _, resolved := available[key]; !resolved {
 			current.Status = workspace.ConversationSkillUsageUnavailable
 			current.Diagnostics = artifactstore.AppendDiagnostics(
 				current.Diagnostics,
@@ -314,7 +378,7 @@ func markWorkspaceSkillSessionUsage(
 		}
 
 		current.SessionAvailable = true
-		_, current.Active = active[current.Identity]
+		_, current.Active = active[key]
 		current.Advertised = advertised
 	}
 

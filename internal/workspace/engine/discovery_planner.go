@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 
@@ -10,12 +11,14 @@ import (
 )
 
 type Planner struct {
-	decoderIDs []artifactstore.DecoderID
-	profiles   DiscoveryProfiles
+	decoderIDs              []artifactstore.DecoderID
+	profiles                DiscoveryProfiles
+	discoveryPolicyRevision string
 }
 
 func NewPlanner(
 	profiles DiscoveryProfiles,
+	discoveryPolicyRevision string,
 	decoderIDs ...artifactstore.DecoderID,
 ) (*Planner, error) {
 	if err := validateDiscoveryProfiles(profiles); err != nil {
@@ -24,6 +27,13 @@ func NewPlanner(
 			ErrInvalidWorkspace,
 			err,
 		)
+	}
+	if err := artifactstore.ValidateRequiredText(
+		"workspace discovery policy revision",
+		discoveryPolicyRevision,
+		artifactstore.MaxVersionBytes,
+	); err != nil {
+		return nil, err
 	}
 	if len(profiles.Primary.ExplicitLocators) == 0 &&
 		len(profiles.Primary.DirectoryRoots) == 0 {
@@ -34,10 +44,7 @@ func NewPlanner(
 	}
 
 	seen := make(map[artifactstore.DecoderID]struct{}, len(decoderIDs))
-	values := make([]artifactstore.DecoderID, 0, len(decoderIDs)+1)
-
-	values = append(values, DefinitionDecoderID)
-	seen[DefinitionDecoderID] = struct{}{}
+	values := make([]artifactstore.DecoderID, 0, len(decoderIDs))
 
 	for _, decoderID := range decoderIDs {
 		if err := artifactstore.ValidateDecoderID(decoderID); err != nil {
@@ -49,20 +56,27 @@ func NewPlanner(
 		seen[decoderID] = struct{}{}
 		values = append(values, decoderID)
 	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf(
+			"%w: Workspace discovery requires at least one decoder",
+			ErrInvalidWorkspace,
+		)
+	}
 	slices.Sort(values)
 	return &Planner{
-		decoderIDs: values,
-		profiles:   cloneDiscoveryProfiles(profiles),
+		decoderIDs:              values,
+		profiles:                cloneDiscoveryProfiles(profiles),
+		discoveryPolicyRevision: discoveryPolicyRevision,
 	}, nil
 }
 
 func (p *Planner) Build(
 	value Workspace,
-	definitionPreferences DiscoveryPreferences,
+	observation DescriptorObservation,
 ) (discovery.Plan, error) {
 	preferences, err := mergeDiscoveryPreferences(
 		value.Data.Discovery,
-		definitionPreferences,
+		observation.Preferences,
 	)
 	if err != nil {
 		return discovery.Plan{}, err
@@ -74,8 +88,16 @@ func (p *Planner) Build(
 		len(value.Sources),
 	)
 	for _, sourceValue := range value.Sources {
+		if _, duplicate := sourcesByID[sourceValue.ID]; duplicate {
+			return discovery.Plan{}, fmt.Errorf(
+				"%w: duplicate Workspace source %q",
+				ErrInvalidWorkspace,
+				sourceValue.ID,
+			)
+		}
 		sourcesByID[sourceValue.ID] = sourceValue.Enabled
 	}
+
 	for _, attachment := range value.Attachments {
 		if !attachment.Enabled {
 			continue
@@ -105,6 +127,9 @@ func (p *Planner) Build(
 		}
 		attachmentData, err := decodeAttachmentData(attachment.Data)
 		if err != nil {
+			return discovery.Plan{}, err
+		}
+		if err := validateAttachmentDataForRole(attachment.Role, attachmentData); err != nil {
 			return discovery.Plan{}, err
 		}
 		sourcePlan := discovery.SourcePlan{
@@ -148,6 +173,11 @@ func (p *Planner) Build(
 				preferences,
 				p.decoderIDs,
 			)
+			if attachment.SourceID == observation.SourceID {
+				sourcePlan.ExpectedContentDigests = maps.Clone(
+					observation.ExpectedContentDigests,
+				)
+			}
 		}
 		if operation.allowsAttachmentDiscoveryOverrides {
 			if attachmentData.Recursive != nil {
@@ -170,7 +200,10 @@ func (p *Planner) Build(
 	sort.Slice(plans, func(left, right int) bool {
 		return plans[left].SourceID < plans[right].SourceID
 	})
-	valuePlan := discovery.Plan{Sources: plans}
+	valuePlan := discovery.Plan{
+		Revision: p.discoveryPolicyRevision,
+		Sources:  plans,
+	}
 	if err := valuePlan.Validate(); err != nil {
 		return discovery.Plan{}, err
 	}
@@ -181,20 +214,55 @@ func appendDiscoveryPreferenceDecoderHints(
 	preferences DiscoveryPreferences,
 	decoderIDs []artifactstore.DecoderID,
 ) []discovery.DecoderHint {
-	output := make([]discovery.DecoderHint, 0, len(preferences.AdditionalLocators)+len(preferences.AdditionalRoots))
-	for _, locator := range preferences.AdditionalLocators {
+	type scope struct {
+		locator   artifactstore.Locator
+		recursive bool
+	}
+
+	output := make(
+		[]discovery.DecoderHint,
+		0,
+		len(preferences.AdditionalLocators)+len(preferences.AdditionalRoots),
+	)
+	byScope := make(map[scope]int, cap(output))
+
+	appendHint := func(locator artifactstore.Locator, recursive bool) {
+		key := scope{locator: locator, recursive: recursive}
+		if index, found := byScope[key]; found {
+			seen := make(map[artifactstore.DecoderID]struct{}, len(output[index].DecoderIDs))
+			for _, decoderID := range output[index].DecoderIDs {
+				seen[decoderID] = struct{}{}
+			}
+			for _, decoderID := range decoderIDs {
+				if _, exists := seen[decoderID]; exists {
+					continue
+				}
+				seen[decoderID] = struct{}{}
+				output[index].DecoderIDs = append(output[index].DecoderIDs, decoderID)
+			}
+			return
+		}
+		byScope[key] = len(output)
 		output = append(output, discovery.DecoderHint{
 			Locator:    locator,
+			Recursive:  recursive,
 			DecoderIDs: append([]artifactstore.DecoderID(nil), decoderIDs...),
 		})
+	}
+
+	for _, locator := range preferences.AdditionalLocators {
+		appendHint(locator, false)
 	}
 	for _, root := range preferences.AdditionalRoots {
-		output = append(output, discovery.DecoderHint{
-			Locator:    root.Root,
-			Recursive:  root.Recursive,
-			DecoderIDs: append([]artifactstore.DecoderID(nil), decoderIDs...),
-		})
+		appendHint(root.Root, root.Recursive)
 	}
+
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].Locator != output[right].Locator {
+			return output[left].Locator < output[right].Locator
+		}
+		return !output[left].Recursive && output[right].Recursive
+	})
 	return output
 }
 
@@ -227,12 +295,42 @@ func cloneDirectoryRoots(
 	return output
 }
 
+// MergeDiscoveryProfile merges feature-contributed conventions into a profile
+// without creating duplicate locators or directory roots. An empty pattern
+// list means all files and therefore dominates narrower include patterns.
+func MergeDiscoveryProfile(
+	base DiscoveryProfile,
+	additions DiscoveryProfile,
+) DiscoveryProfile {
+	output := DiscoveryProfile{
+		ExplicitLocators: appendUniqueLocators(
+			nil,
+			base.ExplicitLocators...,
+		),
+		ReadmeLocator:  base.ReadmeLocator,
+		DirectoryRoots: appendDirectoryRoots(nil, base.DirectoryRoots...),
+	}
+	output.ExplicitLocators = appendUniqueLocators(
+		output.ExplicitLocators,
+		additions.ExplicitLocators...,
+	)
+	output.DirectoryRoots = appendDirectoryRoots(
+		output.DirectoryRoots,
+		additions.DirectoryRoots...,
+	)
+	if additions.ReadmeLocator != "" {
+		output.ReadmeLocator = additions.ReadmeLocator
+	}
+	return output
+}
+
 func appendUniqueLocators(
 	values []artifactstore.Locator,
 	additions ...artifactstore.Locator,
 ) []artifactstore.Locator {
-	seen := make(map[artifactstore.Locator]struct{}, len(values)+len(additions))
-	for _, value := range values {
+	output := append([]artifactstore.Locator(nil), values...)
+	seen := make(map[artifactstore.Locator]struct{}, len(output)+len(additions))
+	for _, value := range output {
 		seen[value] = struct{}{}
 	}
 	for _, value := range additions {
@@ -240,33 +338,18 @@ func appendUniqueLocators(
 			continue
 		}
 		seen[value] = struct{}{}
-		values = append(values, value)
+		output = append(output, value)
 	}
-	return values
+	return output
 }
 
 func appendDiscoveryRoots(
 	values []discovery.DirectoryRoot,
 	additions []DiscoveryRoot,
 ) []discovery.DirectoryRoot {
+	converted := make([]discovery.DirectoryRoot, 0, len(additions))
 	for _, addition := range additions {
-		merged := false
-		for index := range values {
-			if values[index].Root != addition.Root {
-				continue
-			}
-			values[index].Recursive = values[index].Recursive || addition.Recursive
-			values[index].IncludePatterns = mergePatterns(
-				values[index].IncludePatterns,
-				addition.IncludePatterns,
-			)
-			merged = true
-			break
-		}
-		if merged {
-			continue
-		}
-		values = append(values, discovery.DirectoryRoot{
+		converted = append(converted, discovery.DirectoryRoot{
 			Root:      addition.Root,
 			Recursive: addition.Recursive,
 			IncludePatterns: append(
@@ -275,7 +358,38 @@ func appendDiscoveryRoots(
 			),
 		})
 	}
-	return values
+	return appendDirectoryRoots(values, converted...)
+}
+
+func appendDirectoryRoots(
+	values []discovery.DirectoryRoot,
+	additions ...discovery.DirectoryRoot,
+) []discovery.DirectoryRoot {
+	output := cloneDirectoryRoots(values)
+	for _, addition := range additions {
+		addition.IncludePatterns = append(
+			[]string(nil),
+			addition.IncludePatterns...,
+		)
+		merged := false
+		for index := range output {
+			if output[index].Root != addition.Root {
+				continue
+			}
+			output[index].Recursive = output[index].Recursive || addition.Recursive
+			output[index].IncludePatterns = mergePatterns(
+				output[index].IncludePatterns,
+				addition.IncludePatterns,
+			)
+			merged = true
+			break
+		}
+		if merged {
+			continue
+		}
+		output = append(output, addition)
+	}
+	return output
 }
 
 func mergeDiscoveryPreferences(

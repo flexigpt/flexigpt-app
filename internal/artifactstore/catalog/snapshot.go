@@ -8,22 +8,51 @@ import (
 )
 
 type Snapshot struct {
-	RootID            artifactstore.RootID              `json:"rootID"`
-	Revision          uint64                            `json:"revision"`
-	RootRevision      uint64                            `json:"rootRevision"`
-	SourceRevisions   map[artifactstore.SourceID]uint64 `json:"sourceRevisions"`
-	SourceGenerations map[artifactstore.SourceID]string `json:"sourceGenerations"`
-	PublishedAt       time.Time                         `json:"publishedAt"`
-	Diagnostics       []artifactstore.Diagnostic        `json:"diagnostics,omitempty"`
-	Occurrences       []Occurrence                      `json:"occurrences"`
+	RootID              artifactstore.RootID              `json:"rootID"`
+	CollectionID        artifactstore.CollectionID        `json:"collectionID"`
+	Revision            uint64                            `json:"revision"`
+	CollectionRevision  uint64                            `json:"collectionRevision"`
+	AttachmentRevisions map[artifactstore.SourceID]uint64 `json:"attachmentRevisions"`
+	SourceRevisions     map[artifactstore.SourceID]uint64 `json:"sourceRevisions"`
+	SourceGenerations   map[artifactstore.SourceID]string `json:"sourceGenerations"`
+	PlanFingerprint     artifactstore.Digest              `json:"planFingerprint"`
+	DecoderFingerprint  artifactstore.Digest              `json:"decoderFingerprint"`
+	PublishedAt         time.Time                         `json:"publishedAt"`
+	Diagnostics         []artifactstore.Diagnostic        `json:"diagnostics,omitempty"`
+	Occurrences         []Occurrence                      `json:"occurrences"`
 }
 
 func (s Snapshot) Validate() error {
 	if err := artifactstore.ValidateRootID(s.RootID); err != nil {
 		return err
 	}
-	if s.Revision == 0 || s.RootRevision == 0 {
+	if err := artifactstore.ValidateCollectionID(s.CollectionID); err != nil {
+		return err
+	}
+	if s.Revision == 0 || s.CollectionRevision == 0 {
 		return fmt.Errorf("%w: catalog revisions must be positive", artifactstore.ErrInvalid)
+	}
+	if err := artifactstore.ValidateDigest(s.PlanFingerprint); err != nil {
+		return fmt.Errorf("catalog plan fingerprint: %w", err)
+	}
+	if err := artifactstore.ValidateDigest(s.DecoderFingerprint); err != nil {
+		return fmt.Errorf("catalog decoder fingerprint: %w", err)
+	}
+	for sourceID, revision := range s.AttachmentRevisions {
+		if err := artifactstore.ValidateSourceID(sourceID); err != nil {
+			return err
+		}
+		if revision == 0 {
+			return fmt.Errorf("%w: attachment revision must be positive", artifactstore.ErrInvalid)
+		}
+	}
+	for sourceID := range s.AttachmentRevisions {
+		if _, exists := s.SourceRevisions[sourceID]; !exists {
+			return fmt.Errorf(
+				"%w: collection attachment has no corresponding source revision",
+				artifactstore.ErrInvalid,
+			)
+		}
 	}
 	for sourceID, revision := range s.SourceRevisions {
 		if err := artifactstore.ValidateSourceID(sourceID); err != nil {
@@ -31,6 +60,12 @@ func (s Snapshot) Validate() error {
 		}
 		if revision == 0 {
 			return fmt.Errorf("%w: source revision must be positive", artifactstore.ErrInvalid)
+		}
+		if _, attached := s.AttachmentRevisions[sourceID]; !attached {
+			return fmt.Errorf(
+				"%w: source revision has no collection attachment",
+				artifactstore.ErrInvalid,
+			)
 		}
 	}
 	for sourceID, generation := range s.SourceGenerations {
@@ -66,6 +101,14 @@ func (s Snapshot) Validate() error {
 		if occurrence.RootID != s.RootID {
 			return fmt.Errorf(
 				"%w: occurrence %d belongs to another root",
+				artifactstore.ErrInvalid,
+				index,
+			)
+		}
+		if occurrence.CollectionID != s.CollectionID ||
+			occurrence.Key.CollectionID != s.CollectionID {
+			return fmt.Errorf(
+				"%w: occurrence %d belongs to another collection",
 				artifactstore.ErrInvalid,
 				index,
 			)

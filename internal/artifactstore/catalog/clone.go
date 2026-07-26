@@ -9,6 +9,11 @@ import (
 // CloneSnapshot returns an owned copy of a snapshot and all mutable members.
 func CloneSnapshot(input Snapshot) Snapshot {
 	output := input
+	output.AttachmentRevisions = make(
+		map[artifactstore.SourceID]uint64,
+		len(input.AttachmentRevisions),
+	)
+	maps.Copy(output.AttachmentRevisions, input.AttachmentRevisions)
 	output.SourceRevisions = make(
 		map[artifactstore.SourceID]uint64,
 		len(input.SourceRevisions),

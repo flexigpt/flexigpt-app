@@ -425,6 +425,7 @@ Workspace operations include:
     UpdateWorkspace(workspaceRef, request)
     RetireWorkspace(workspaceRef)
     ReplaceWorkspacePrimarySource(workspaceRef, request)
+    SetWorkspacePrimarySource(workspaceRef, request)
 
 Attachment and catalog operations include:
 
@@ -438,6 +439,11 @@ Artifact and projection operations include:
 
     GetWorkspaceArtifact(workspaceRef, artifactRef)
     ListWorkspaceArtifacts(workspaceRef)
+    AdoptWorkspaceOccurrence(workspaceRef, occurrenceRef)
+    PinWorkspaceArtifact(workspaceRef, sourceBinding)
+    ListWorkspaceSuppressions(workspaceRef)
+    SuppressWorkspaceBinding(workspaceRef, sourceBinding)
+    UnsuppressWorkspaceBinding(workspaceRef, sourceBinding)
     SetWorkspaceArtifactEnabled(workspaceRef, artifactRef, request)
     SetWorkspaceArtifactRuntimeDisabled(workspaceRef, artifactRef, request)
     ComposeWorkspaceLoadPlan(workspaceRef, artifactRefs)
@@ -454,28 +460,45 @@ No API infers durable identity from an encoded runtime string.
 
 ## 12. Current implementation status
 
-| Capability                              | Status                            | Current implementation                                                                                                          |
-| --------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Filesystem and empty Workspace creation | Present                           | Provisioning creates Sources and typed roots with compensation.                                                                 |
-| Workspace Collection identity           | Not present                       | A Workspace is currently an Artifact Root.                                                                                      |
-| Shared application Artifact Store       | Not present                       | `workspace.Open` creates and owns a private store.                                                                              |
-| Attachment role policy                  | Present as reusable logic         | Primary, built-in, library, package, and overlay roles exist for root attachments.                                              |
-| Workspace discovery planning            | Present                           | Defaults, preferences, bootstrap definition, hints, and bounds are implemented.                                                 |
-| Portable Workspace descriptor           | Partial foundation                | `.flexigpt/workspace.json` exists but is decoded as a normal `workspace.definition` Artifact.                                   |
-| Context decoding and composition        | Present                           | Context validation, ordering, budgets, truncation, and diagnostics exist.                                                       |
-| Context inference integration           | Verification required             | Application composition injects a Workspace inference bridge, but the supplied code does not prove end-to-end request behavior. |
-| Skill Markdown parsing                  | Present                           | `SKILL.md` parsing and validation are implemented in the Workspace Skill adapter.                                               |
-| Shared `agent.skill` definition         | Not present                       | Current kind and schema are Workspace-specific.                                                                                 |
-| Skill filesystem runtime handoff        | Present as reusable logic         | Source, definition, local path, and `SKILL.md` checks exist.                                                                    |
-| Full package freshness                  | Partial                           | `SKILL.md` is verified, but resource and script content can remain live after refresh.                                          |
-| Heterogeneous Collection support        | Partial foundation                | Workspace supports several kinds conceptually, but current persistence is root-scoped.                                          |
-| Workspace import and export             | Not present                       | There is no portable Collection codec, URI resolver, closure builder, or archive workflow.                                      |
-| Typed Workspace and Artifact refs       | Not present                       | APIs use `RootID`, `RecordID`, and encoded Skill identities.                                                                    |
-| Runtime reconciliation                  | Present but operationally coupled | Wails wrappers perform runtime synchronization after durable Workspace mutations.                                               |
-| Attached Source provisioning            | Partial                           | Existing Sources can be attached, but role-specific Source creation and selection flows are incomplete.                         |
-| Future artifact kinds                   | Not present                       | MCP, Tool, Model, Agent, and Assistant paths are absent.                                                                        |
+| Capability                              | Status                    | Current implementation                                                                                                          |
+| --------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Filesystem and empty Workspace creation | Present                   | Provisioning creates Sources and typed Collections with compensation.                                                           |
+| Workspace Collection identity           | Present                   | A Workspace is a `workspace.collection` addressed by `WorkspaceRef`.                                                            |
+| Shared application Artifact Store       | Present                   | Application startup opens one Artifact Store and injects its services into Workspace.                                           |
+| Attachment role policy                  | Present as reusable logic | Primary, built-in, library, package, and overlay roles exist for root attachments.                                              |
+| Workspace discovery planning            | Present                   | Defaults, preferences, bootstrap definition, hints, and bounds are implemented.                                                 |
+| Portable Workspace descriptor           | Present foundation        | `.flexigpt/workspace.json` is read as a portable Collection descriptor and remains outside Workspace Artifact Records.          |
+| Context decoding and composition        | Present                   | Context validation, ordering, budgets, truncation, and diagnostics exist.                                                       |
+| Context inference integration           | Present                   | The Workspace inference bridge resolves Context, injects bounded current-turn input, and returns usage provenance.              |
+| Skill Markdown parsing                  | Present                   | `SKILL.md` parsing and validation are implemented in the Workspace Skill adapter.                                               |
+| Shared `agent.skill` definition         | Present                   | Workspace uses the shared `agent.skill` definition and decoder.                                                                 |
+| Skill filesystem runtime handoff        | Present                   | Any Source adapter explicitly advertising trusted local paths can perform the verified `SKILL.md` runtime handoff.              |
+| Full package freshness                  | Point-in-time verified    | Source generation is verified before and after trusted package handoff; portable closure export remains planned.                |
+| Heterogeneous Collection support        | Present foundation        | Workspace uses one collection-scoped catalog and Artifact lifecycle for all registered supported kinds.                         |
+| Workspace import and export             | Not present               | There is no portable Collection codec, URI resolver, closure builder, or archive workflow.                                      |
+| Typed Workspace and Artifact refs       | Present                   | Workspace uses `WorkspaceRef` and `ArtifactRef`; runtime handles remain process-local.                                          |
+| Runtime reconciliation                  | Present and derived       | Wails wrappers enqueue coalesced runtime reconciliation after durable Workspace mutations; metadata commits do not wait for it. |
+| Generic Source mutation reconciliation  | Present and derived       | Artifact Store wrapper mutations schedule root-scoped Workspace runtime reconciliation without coupling Artifact Store to runtime. |
+| Workspace Artifact purge                | Present                   | Workspace exposes membership-checked destructive Artifact purge and schedules derived runtime reconciliation.                    |
+| Primary Source lifecycle                | Present                   | Empty Workspaces can gain, replace, or explicitly clear one primary filesystem Source through a dedicated operation.            |
+| Attached Source provisioning            | Present for current scope | Artifact Store exposes Source lifecycle APIs and Workspace attaches existing Sources through typed attachment roles.            |
+| Future artifact kinds                   | Not present               | MCP, Tool, Model, Agent, and Assistant paths are absent.                                                                        |
 
 ## 13. Next steps
+
+### 13.0 Current core completion boundary
+
+The current Workspace scope is filesystem and empty Workspace lifecycle,
+existing-Source attachment, Context, shared Agent Skills, catalog inspection,
+runtime handoff, inference hydration, and derived Skill Runtime reconciliation.
+Current-catalog pins immediately reflect valid, invalid, missing, or
+incompatible observations when a current catalog exists. Conversation usage
+records selected and actually used definition and Artifact revisions.
+
+Transfer formats, URI acquisition, archive handling, portable closure export,
+and additional Artifact kinds remain deliberate omissions. Workspace does not
+perform generic Collection validation through raw Artifact Store APIs; typed
+Workspace APIs remain the public mutation boundary for Workspace state.
 
 ### 13.1 Complete Artifact Store prerequisites
 

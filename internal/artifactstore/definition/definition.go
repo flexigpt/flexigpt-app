@@ -82,6 +82,13 @@ func (d Definition) Validate() error {
 			return err
 		}
 	}
+	if len(d.Dependencies) > artifactstore.MaxDefinitionDependencies {
+		return fmt.Errorf(
+			"%w: definition dependencies exceed %d entries",
+			artifactstore.ErrInvalid,
+			artifactstore.MaxDefinitionDependencies,
+		)
+	}
 	if _, err := jsoncanon.CanonicalizeObject(
 		d.Body,
 		artifactstore.MaxDefinitionBodyBytes,

@@ -8,8 +8,8 @@ import (
 	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 )
 
@@ -29,58 +29,59 @@ func (p *Publisher) Publish(
 		return catalog.Snapshot{}, err
 	}
 
+	occurrencesByKey := make(
+		map[catalog.OccurrenceKey]catalog.Occurrence,
+		len(publication.Occurrences),
+	)
+	for _, occurrence := range publication.Occurrences {
+		occurrencesByKey[occurrence.Key] = occurrence
+	}
+
 	tx, err := p.store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return catalog.Snapshot{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var currentRootRevision uint64
-	var enabled int
-	var deletedAt sql.NullInt64
-	err = tx.QueryRowContext(
-		ctx,
-		`SELECT revision, enabled, deleted_at
-		 FROM artifact_roots WHERE id = ?`,
-		string(publication.RootID),
-	).Scan(&currentRootRevision, &enabled, &deletedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: root %q",
-			artifactstore.ErrNotFound,
-			publication.RootID,
-		)
-	}
+	currentCollection, err := getActiveCollectionTx(ctx, tx, publication.Ref)
 	if err != nil {
 		return catalog.Snapshot{}, err
 	}
-	if currentRootRevision != publication.ExpectedRootRevision ||
-		enabled == 0 ||
-		deletedAt.Valid {
+	if !currentCollection.Enabled ||
+		currentCollection.Revision != publication.ExpectedCollectionRevision {
 		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: root changed during refresh",
+			"%w: collection changed or was disabled during refresh",
 			artifactstore.ErrConflict,
 		)
 	}
 
-	currentSourceRevisions, err := currentAttachedSourceRevisions(
+	currentAttachments, currentSources, err := currentAttachmentSourceRevisionsTx(
 		ctx,
 		tx,
-		publication.RootID,
+		publication.Ref,
 	)
 	if err != nil {
 		return catalog.Snapshot{}, err
 	}
 	if !maps.Equal(
-		currentSourceRevisions,
+		currentAttachments,
+		publication.ExpectedAttachmentRevisions,
+	) || !maps.Equal(
+		currentSources,
 		publication.ExpectedSourceRevisions,
 	) {
 		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: attached sources changed during refresh",
+			"%w: collection attachments or sources changed during refresh",
 			artifactstore.ErrConflict,
 		)
 	}
 
+	attachmentRevisionsRaw, err := encodeJSON(
+		publication.ExpectedAttachmentRevisions,
+	)
+	if err != nil {
+		return catalog.Snapshot{}, err
+	}
 	sourceRevisionsRaw, err := encodeJSON(publication.ExpectedSourceRevisions)
 	if err != nil {
 		return catalog.Snapshot{}, err
@@ -97,8 +98,11 @@ func (p *Publisher) Publish(
 	var currentCatalogRevision uint64
 	err = tx.QueryRowContext(
 		ctx,
-		`SELECT revision FROM artifact_current_catalogs WHERE root_id = ?`,
-		string(publication.RootID),
+		`SELECT revision
+		 FROM artifact_current_catalogs
+		 WHERE root_id = ? AND collection_id = ?`,
+		string(publication.Ref.RootID),
+		string(publication.Ref.CollectionID),
 	).Scan(&currentCatalogRevision)
 	if errors.Is(err, sql.ErrNoRows) {
 		currentCatalogRevision = 0
@@ -122,21 +126,30 @@ func (p *Publisher) Publish(
 	_, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO artifact_current_catalogs (
-			root_id, revision, root_revision, source_revisions_json,
-			source_generations_json, published_at, diagnostics_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(root_id) DO UPDATE SET
+			root_id, collection_id, revision, collection_revision,
+			attachment_revisions_json, source_revisions_json,
+			source_generations_json, plan_fingerprint, decoder_fingerprint,
+			published_at, diagnostics_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(root_id, collection_id) DO UPDATE SET
 			revision = excluded.revision,
-			root_revision = excluded.root_revision,
+			collection_revision = excluded.collection_revision,
+			attachment_revisions_json = excluded.attachment_revisions_json,
 			source_revisions_json = excluded.source_revisions_json,
 			source_generations_json = excluded.source_generations_json,
+			plan_fingerprint = excluded.plan_fingerprint,
+			decoder_fingerprint = excluded.decoder_fingerprint,
 			published_at = excluded.published_at,
 			diagnostics_json = excluded.diagnostics_json`,
-		string(publication.RootID),
+		string(publication.Ref.RootID),
+		string(publication.Ref.CollectionID),
 		nextCatalogRevision,
-		publication.ExpectedRootRevision,
+		publication.ExpectedCollectionRevision,
+		attachmentRevisionsRaw,
 		sourceRevisionsRaw,
 		sourceGenerationsRaw,
+		string(publication.PlanFingerprint),
+		string(publication.DecoderFingerprint),
 		timeValue(publication.PublishedAt),
 		diagnosticsRaw,
 	)
@@ -146,8 +159,10 @@ func (p *Publisher) Publish(
 
 	if _, err := tx.ExecContext(
 		ctx,
-		`DELETE FROM artifact_current_occurrences WHERE root_id = ?`,
-		string(publication.RootID),
+		`DELETE FROM artifact_current_occurrences
+		 WHERE root_id = ? AND collection_id = ?`,
+		string(publication.Ref.RootID),
+		string(publication.Ref.CollectionID),
 	); err != nil {
 		return catalog.Snapshot{}, err
 	}
@@ -160,12 +175,13 @@ func (p *Publisher) Publish(
 		if _, err := tx.ExecContext(
 			ctx,
 			`INSERT INTO artifact_current_occurrences (
-				root_id, source_id, locator, subresource_locator,
+				root_id, collection_id, source_id, locator, subresource_locator,
 				kind, logical_name, logical_version,
 				definition_digest, source_content_digest, decoder_id,
 				state, diagnostics_json, observed_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			string(publication.RootID),
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			string(publication.Ref.RootID),
+			string(publication.Ref.CollectionID),
 			string(occurrence.Key.SourceID),
 			string(occurrence.Key.Locator),
 			string(occurrence.Key.SubresourceLocator),
@@ -183,13 +199,29 @@ func (p *Publisher) Publish(
 		}
 	}
 
-	for _, value := range publication.RecordCreates {
-		if err := insertRecordTx(ctx, tx, value); err != nil {
+	for _, value := range publication.ArtifactCreates {
+		if err := requireAttachedSourceTx(
+			ctx,
+			tx,
+			publication.Ref,
+			value.Binding.SourceID,
+		); err != nil {
+			return catalog.Snapshot{}, err
+		}
+		if err := insertArtifactTx(ctx, tx, value); err != nil {
 			return catalog.Snapshot{}, err
 		}
 	}
-	for _, update := range publication.RecordUpdates {
-		if err := updateRecordTx(ctx, tx, update); err != nil {
+	// Artifact updates are source-derived state transitions. Validate them
+	// against both the persisted Artifact binding and this publication's
+	// occurrences before mutating metadata.
+	for _, update := range publication.ArtifactUpdates {
+		if err := updateArtifactSourceStateTx(
+			ctx,
+			tx,
+			update,
+			occurrencesByKey,
+		); err != nil {
 			return catalog.Snapshot{}, err
 		}
 	}
@@ -198,15 +230,24 @@ func (p *Publisher) Publish(
 		return catalog.Snapshot{}, err
 	}
 
+	occurrences := make([]catalog.Occurrence, len(publication.Occurrences))
+	for index, occurrence := range publication.Occurrences {
+		occurrences[index] = catalog.CloneOccurrence(occurrence)
+	}
+
 	snapshot := catalog.Snapshot{
-		RootID:            publication.RootID,
-		Revision:          nextCatalogRevision,
-		RootRevision:      publication.ExpectedRootRevision,
-		SourceRevisions:   publication.ExpectedSourceRevisions,
-		SourceGenerations: publication.SourceGenerations,
-		PublishedAt:       publication.PublishedAt,
-		Diagnostics:       publication.Diagnostics,
-		Occurrences:       publication.Occurrences,
+		RootID:              publication.Ref.RootID,
+		CollectionID:        publication.Ref.CollectionID,
+		Revision:            nextCatalogRevision,
+		CollectionRevision:  publication.ExpectedCollectionRevision,
+		AttachmentRevisions: maps.Clone(publication.ExpectedAttachmentRevisions),
+		SourceRevisions:     maps.Clone(publication.ExpectedSourceRevisions),
+		SourceGenerations:   maps.Clone(publication.SourceGenerations),
+		PlanFingerprint:     publication.PlanFingerprint,
+		DecoderFingerprint:  publication.DecoderFingerprint,
+		PublishedAt:         publication.PublishedAt,
+		Diagnostics:         artifactstore.CloneDiagnostics(publication.Diagnostics),
+		Occurrences:         occurrences,
 	}
 	if err := snapshot.Validate(); err != nil {
 		return catalog.Snapshot{}, err
@@ -214,97 +255,91 @@ func (p *Publisher) Publish(
 	return catalog.CloneSnapshot(snapshot), nil
 }
 
-func currentAttachedSourceRevisions(
+func updateArtifactSourceStateTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID artifactstore.RootID,
-) (map[artifactstore.SourceID]uint64, error) {
-	rows, err := tx.QueryContext(
-		ctx,
-		`SELECT s.id, s.revision
-		 FROM artifact_attachments a
-		 JOIN artifact_sources s ON s.id = a.source_id
-		 WHERE a.root_id = ?
-		 ORDER BY s.id`,
-		string(rootID),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	output := make(map[artifactstore.SourceID]uint64)
-	for rows.Next() {
-		var id string
-		var revision uint64
-		if err := rows.Scan(&id, &revision); err != nil {
-			return nil, err
-		}
-		output[artifactstore.SourceID(id)] = revision
-	}
-	return output, rows.Err()
-}
-
-func insertRecordTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	value record.Record,
+	value artifact.SourceStateUpdate,
+	occurrences map[catalog.OccurrenceKey]catalog.Occurrence,
 ) error {
-	diagnostics, err := encodeJSON(value.Diagnostics)
+	current, err := getArtifactTx(ctx, tx, artifactstore.ArtifactRef{
+		RootID:     value.RootID,
+		ArtifactID: value.ArtifactID,
+	})
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(
-		ctx,
-		`INSERT INTO artifact_records (
-			id, root_id, source_id, locator, subresource_locator,
-			kind, name, enabled, resolved_definition_digest, data_json, state,
-			diagnostics_json, revision, created_at, modified_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		string(value.ID),
-		string(value.RootID),
-		string(value.Occurrence.SourceID),
-		string(value.Occurrence.Locator),
-		string(value.Occurrence.SubresourceLocator),
-		string(value.Kind),
-		value.Name,
-		boolInt(value.Enabled),
-		nullableDigest(value.ResolvedDefinition),
-		[]byte(value.Data),
-		string(value.State),
-		diagnostics,
-		value.Revision,
-		timeValue(value.CreatedAt),
-		timeValue(value.ModifiedAt),
-	)
-	return sqliteError(err)
-}
+	if current.CollectionID != value.CollectionID {
+		return fmt.Errorf(
+			"%w: source-derived artifact update belongs to another collection",
+			artifactstore.ErrInvalid,
+		)
+	}
+	if current.Revision != value.ExpectedRevision {
+		return fmt.Errorf(
+			"%w: artifact %q changed during refresh",
+			artifactstore.ErrConflict,
+			value.ArtifactID,
+		)
+	}
+	if value.Revision != current.Revision+1 {
+		return fmt.Errorf(
+			"%w: source-derived artifact update revision does not advance current state",
+			artifactstore.ErrInvalid,
+		)
+	}
+	if !value.ModifiedAt.After(current.ModifiedAt) {
+		return fmt.Errorf(
+			"%w: source-derived artifact update time must advance current state",
+			artifactstore.ErrInvalid,
+		)
+	}
 
-func updateRecordTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	value record.SourceStateUpdate,
-) error {
+	key := catalog.OccurrenceKey{
+		CollectionID:       current.CollectionID,
+		SourceID:           current.Binding.SourceID,
+		Locator:            current.Binding.Locator,
+		SubresourceLocator: current.Binding.SubresourceLocator,
+	}
+	observed, found := occurrences[key]
+	var occurrence *catalog.Occurrence
+	if found {
+		occurrence = &observed
+	}
+
+	expectedDigest, expectedState, expectedDiagnostics, err := artifact.DeriveSourceState(current, occurrence)
+	if err != nil {
+		return err
+	}
+	if value.State != expectedState ||
+		!digestPointersEqual(value.ResolvedDefinition, expectedDigest) ||
+		!artifactstore.EqualDiagnostics(value.Diagnostics, expectedDiagnostics) {
+		return fmt.Errorf(
+			"%w: source-derived artifact update does not match current occurrence",
+			artifactstore.ErrInvalid,
+		)
+	}
+
 	diagnostics, err := encodeJSON(value.Diagnostics)
 	if err != nil {
 		return err
 	}
 	result, err := tx.ExecContext(
 		ctx,
-		`UPDATE artifact_records
+		`UPDATE artifact_artifacts
 		 SET resolved_definition_digest = ?,
 		     state = ?,
 		     diagnostics_json = ?,
 		     revision = ?,
 		     modified_at = ?
-		 WHERE id = ? AND root_id = ? AND revision = ?`,
+		 WHERE id = ? AND root_id = ? AND collection_id = ? AND revision = ?`,
 		nullableDigest(value.ResolvedDefinition),
 		string(value.State),
 		diagnostics,
 		value.Revision,
 		timeValue(value.ModifiedAt),
-		string(value.RecordID),
+		string(value.ArtifactID),
 		string(value.RootID),
+		string(value.CollectionID),
 		value.ExpectedRevision,
 	)
 	if err != nil {
@@ -316,9 +351,9 @@ func updateRecordTx(
 	}
 	if changed != 1 {
 		return fmt.Errorf(
-			"%w: record %q changed during refresh",
+			"%w: artifact %q changed during refresh",
 			artifactstore.ErrConflict,
-			value.RecordID,
+			value.ArtifactID,
 		)
 	}
 	return nil

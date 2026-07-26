@@ -15,11 +15,13 @@ import (
 type sourceManager interface {
 	Create(
 		ctx context.Context,
+		rootID artifactstore.RootID,
 		draft source.Draft,
 	) (source.Summary, error)
 
-	Delete(
+	Discard(
 		ctx context.Context,
+		rootID artifactstore.RootID,
 		id artifactstore.SourceID,
 		expectedRevision uint64,
 	) error
@@ -54,6 +56,7 @@ func NewService(
 }
 
 type Request struct {
+	RootID      artifactstore.RootID
 	DisplayName string
 	Description string
 	RootPath    string
@@ -72,6 +75,7 @@ func (s *Service) CreateFilesystem(
 	}
 	sourceValue, err := s.sources.Create(
 		ctx,
+		request.RootID,
 		source.Draft{
 			Kind:        fsdir.Kind,
 			DisplayName: request.DisplayName,
@@ -86,6 +90,7 @@ func (s *Service) CreateFilesystem(
 	value, createErr := s.workspaces.CreateFilesystem(
 		ctx,
 		engine.FilesystemWorkspaceRequest{
+			RootID:          request.RootID,
 			DisplayName:     request.DisplayName,
 			Description:     request.Description,
 			PrimarySourceID: sourceValue.ID,
@@ -96,10 +101,11 @@ func (s *Service) CreateFilesystem(
 		return value, nil
 	}
 
-	deleteErr := s.sources.Delete(
+	discardErr := s.sources.Discard(
 		context.WithoutCancel(ctx),
+		request.RootID,
 		sourceValue.ID,
 		sourceValue.Revision,
 	)
-	return engine.Workspace{}, errors.Join(createErr, deleteErr)
+	return engine.Workspace{}, errors.Join(createErr, discardErr)
 }

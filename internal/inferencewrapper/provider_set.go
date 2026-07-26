@@ -349,6 +349,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			workspaceUsage,
 		)
 	}
+	workspaceScope := workspaceScopeForSelection(body.Current.WorkspaceSelection)
 	skillSessionID := strings.TrimSpace(body.SkillSessionID)
 
 	// A Workspace selection is authoritative for which Workspace Skills may
@@ -403,6 +404,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			Body: &skillruntimeSpec.ListRuntimeSkillsRequestBody{
 				Filter: &skillruntimeSpec.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
+					Workspace:      workspaceScope,
 					Activity:       agentskillsSpec.SkillActivityAny,
 					AllowSkillRefs: enabledSkillRefs,
 				},
@@ -423,6 +425,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			Body: &skillruntimeSpec.ListRuntimeSkillsRequestBody{
 				Filter: &skillruntimeSpec.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
+					Workspace:      workspaceScope,
 					Activity:       agentskillsSpec.SkillActivityActive,
 					AllowSkillRefs: enabledSkillRefs,
 				},
@@ -453,6 +456,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			Body: &skillruntimeSpec.GetSkillsPromptRequestBody{
 				Filter: &skillruntimeSpec.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
+					Workspace:      workspaceScope,
 					Activity:       promptActivity,
 					AllowSkillRefs: enabledSkillRefs,
 				},

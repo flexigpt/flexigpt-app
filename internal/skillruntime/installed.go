@@ -12,8 +12,6 @@ import (
 	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
-const installedIdentityPrefix = "installed/"
-
 type Installed struct {
 	store   *skillstore.SkillStore
 	runtime *SkillRuntime
@@ -29,8 +27,11 @@ func NewInstalled(value *skillstore.SkillStore, runtime *SkillRuntime) (*Install
 	return &Installed{store: value, runtime: runtime}, nil
 }
 
-func (*Installed) Owns(identity string) bool {
-	return strings.HasPrefix(identity, installedIdentityPrefix)
+func (*Installed) Owns(ref spec.SkillRef) bool {
+	return ref.Artifact == nil &&
+		ref.BundleID != "" &&
+		ref.SkillSlug != "" &&
+		ref.SkillID != ""
 }
 
 func (p *Installed) List(ctx context.Context, _ Scope) ([]Skill, error) {
@@ -98,7 +99,11 @@ func (p *Installed) List(ctx context.Context, _ Scope) ([]Skill, error) {
 			available := value.Presence == nil || value.Presence.Status == skillstoreSpec.SkillPresenceUnknown ||
 				value.Presence.Status == skillstoreSpec.SkillPresencePresent
 			projected := Skill{
-				Identity:         installedIdentity(ref),
+				Ref: spec.SkillRef{
+					BundleID:  ref.BundleID,
+					SkillSlug: ref.SkillSlug,
+					SkillID:   ref.SkillID,
+				},
 				Origin:           OriginInstalled,
 				InstalledRef:     &ref,
 				Name:             value.Name,
@@ -132,9 +137,15 @@ func (p *Installed) List(ctx context.Context, _ Scope) ([]Skill, error) {
 }
 
 func (p *Installed) Render(ctx context.Context, request RenderRequest) (RenderedSkill, error) {
-	ref, err := parseInstalledIdentity(request.Identity)
-	if err != nil {
-		return RenderedSkill{}, err
+	if !p.Owns(request.Ref) {
+		return RenderedSkill{}, errors.New(
+			"reference does not identify an installed Skill",
+		)
+	}
+	ref := skillstoreSpec.SkillRef{
+		BundleID:  request.Ref.BundleID,
+		SkillSlug: request.Ref.SkillSlug,
+		SkillID:   request.Ref.SkillID,
 	}
 	response, err := p.store.GetSkill(ctx, &skillstoreSpec.GetSkillRequest{
 		BundleID:        ref.BundleID,
@@ -164,7 +175,7 @@ func (p *Installed) Render(ctx context.Context, request RenderRequest) (Rendered
 	}
 	var projected Skill
 	for _, item := range list {
-		if item.Identity == request.Identity {
+		if refKey(item.Ref) == refKey(request.Ref) {
 			projected = item
 			break
 		}
@@ -205,26 +216,6 @@ func (p *Installed) Render(ctx context.Context, request RenderRequest) (Rendered
 		Arguments:        append([]agentskillsSpec.SkillArgument(nil), rendered.Body.Arguments...),
 		AppliedArguments: cloneStrings(rendered.Body.AppliedArguments),
 		Diagnostics:      append([]artifactstore.Diagnostic(nil), projected.Diagnostics...),
-	}, nil
-}
-
-func installedIdentity(ref skillstoreSpec.SkillRef) string {
-	return installedIdentityPrefix + string(ref.BundleID) + "/" + string(ref.SkillSlug) + "/" + string(ref.SkillID)
-}
-
-func parseInstalledIdentity(value string) (skillstoreSpec.SkillRef, error) {
-	relative, found := strings.CutPrefix(value, installedIdentityPrefix)
-	if !found {
-		return skillstoreSpec.SkillRef{}, errors.New("identity is not an installed Skill")
-	}
-	parts := strings.Split(relative, "/")
-	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
-		return skillstoreSpec.SkillRef{}, errors.New("installed Skill identity is invalid")
-	}
-	return skillstoreSpec.SkillRef{
-		BundleID:  skillstoreSpec.SkillBundleID(parts[0]),
-		SkillSlug: skillstoreSpec.SkillSlug(parts[1]),
-		SkillID:   skillstoreSpec.SkillID(parts[2]),
 	}, nil
 }
 

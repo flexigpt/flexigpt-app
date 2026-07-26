@@ -67,21 +67,11 @@ func (a *Adapter) NormalizeConfig(
 	if err := decoder.Decode(&config); err != nil {
 		return nil, fmt.Errorf("%w: decode filesystem source config: %w", artifactstore.ErrInvalid, err)
 	}
-	if strings.TrimSpace(config.RootPath) == "" {
-		return nil, fmt.Errorf("%w: filesystem root path is required", artifactstore.ErrInvalid)
-	}
-	if !filepath.IsAbs(config.RootPath) {
-		return nil, fmt.Errorf("%w: filesystem root path must be absolute", artifactstore.ErrInvalid)
-	}
-	config.RootPath = filepath.Clean(config.RootPath)
-
-	info, err := os.Stat(config.RootPath)
+	root, err := normalizeFilesystemRoot(config.RootPath)
 	if err != nil {
-		return nil, fmt.Errorf("stat filesystem source root: %w", err)
+		return nil, err
 	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("%w: filesystem source root is not a directory", artifactstore.ErrInvalid)
-	}
+	config.RootPath = root
 
 	encoded, err := json.Marshal(config)
 	if err != nil {
@@ -141,6 +131,17 @@ func (a *Adapter) ResolveLocalPath(
 			value.Kind,
 		)
 	}
+	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+		return "", err
+	}
+
+	if a.traversalPolicy.excludesLocator(string(locator)) {
+		return "", fmt.Errorf(
+			"%w: source locator %q is excluded by traversal policy",
+			artifactstore.ErrNotFound,
+			locator,
+		)
+	}
 	config, err := decodeConfig(value.Config)
 	if err != nil {
 		return "", err
@@ -166,22 +167,86 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 			artifactstore.ErrInvalid,
 		)
 	}
+	if err := validateStoredFilesystemRoot(config.RootPath); err != nil {
+		return Config{}, err
+	}
 	return config, nil
 }
 
-func RootPath(value source.Source) (string, error) {
-	if value.Kind != Kind {
+func normalizeFilesystemRoot(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
 		return "", fmt.Errorf(
-			"%w: filesystem adapter received source kind %q",
+			"%w: filesystem root path is required",
 			artifactstore.ErrInvalid,
-			value.Kind,
 		)
 	}
-	config, err := decodeConfig(value.Config)
-	if err != nil {
-		return "", err
+	if !filepath.IsAbs(raw) {
+		return "", fmt.Errorf(
+			"%w: filesystem root path must be absolute",
+			artifactstore.ErrInvalid,
+		)
 	}
-	return config.RootPath, nil
+
+	resolved, err := filepath.EvalSymlinks(filepath.Clean(raw))
+	if err != nil {
+		return "", fmt.Errorf("resolve filesystem source root: %w", err)
+	}
+	resolved = filepath.Clean(resolved)
+	if !filepath.IsAbs(resolved) {
+		return "", fmt.Errorf(
+			"%w: resolved filesystem root path must be absolute",
+			artifactstore.ErrInvalid,
+		)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", fmt.Errorf("stat filesystem source root: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf(
+			"%w: filesystem source root is not a directory",
+			artifactstore.ErrInvalid,
+		)
+	}
+	return resolved, nil
+}
+
+func validateStoredFilesystemRoot(root string) error {
+	info, err := os.Lstat(root)
+	if err != nil {
+		return fmt.Errorf(
+			"%w: filesystem source root is unavailable: %w",
+			artifactstore.ErrSourceUnavailable,
+			err,
+		)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf(
+			"%w: filesystem source root changed into a symbolic link",
+			artifactstore.ErrSourceUnavailable,
+		)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf(
+			"%w: filesystem source root is no longer a directory",
+			artifactstore.ErrSourceUnavailable,
+		)
+	}
+	resolved, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf(
+			"%w: resolve filesystem source root: %w",
+			artifactstore.ErrSourceUnavailable,
+			err,
+		)
+	}
+	if filepath.Clean(resolved) != root {
+		return fmt.Errorf(
+			"%w: filesystem source root changed after registration",
+			artifactstore.ErrSourceUnavailable,
+		)
+	}
+	return nil
 }
 
 func fingerprint(ctx context.Context, root string, policy normalizedTraversalPolicy) (string, error) {

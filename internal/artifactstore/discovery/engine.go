@@ -26,8 +26,10 @@ type Result struct {
 
 const (
 	DiagnosticCodeCandidateTooLarge         = "artifact.discovery.candidate-too-large"
+	DiagnosticCodeContentDigestMismatch     = "artifact.discovery.content-digest-mismatch"
 	DiagnosticCodeDecoderAmbiguous          = "artifact.discovery.decoder-ambiguous"
 	DiagnosticCodeDecoderInvalidRecognition = "artifact.discovery.decoder-invalid-recognition"
+	DiagnosticCodeDecoderNoLongerRecognizes = "artifact.discovery.decoder-no-longer-recognizes"
 	DiagnosticCodeDefinitionInvalid         = "artifact.discovery.definition-invalid"
 	DiagnosticCodeResourceMissing           = "artifact.discovery.resource-missing"
 	DiagnosticCodeSubresourceMissing        = "artifact.discovery.subresource-missing"
@@ -60,9 +62,14 @@ func NewEngine(
 	}, nil
 }
 
+func (e *Engine) DecoderFingerprint() (artifactstore.Digest, error) {
+	return e.decoders.Fingerprint()
+}
+
 func (e *Engine) Discover(
 	ctx context.Context,
 	rootID artifactstore.RootID,
+	collectionID artifactstore.CollectionID,
 	sourceID artifactstore.SourceID,
 	sourceKind artifactstore.SourceKind,
 	snapshot source.Snapshot,
@@ -76,6 +83,9 @@ func (e *Engine) Discover(
 		return Result{}, err
 	}
 	if err := artifactstore.ValidateRootID(rootID); err != nil {
+		return Result{}, err
+	}
+	if err := artifactstore.ValidateCollectionID(collectionID); err != nil {
 		return Result{}, err
 	}
 	if err := artifactstore.ValidateSourceID(sourceID); err != nil {
@@ -121,6 +131,26 @@ func (e *Engine) Discover(
 		}
 		allowed[decoderID] = struct{}{}
 	}
+	for _, hint := range plan.DecoderHints {
+		for _, decoderID := range hint.DecoderIDs {
+			if _, exists := e.decoders.find(decoderID); !exists {
+				return Result{}, fmt.Errorf(
+					"%w: decoder %q",
+					artifactstore.ErrDecoderUnavailable,
+					decoderID,
+				)
+			}
+			if len(allowed) != 0 {
+				if _, permitted := allowed[decoderID]; !permitted {
+					return Result{}, fmt.Errorf(
+						"%w: hinted decoder %q is not allowed by its source plan",
+						artifactstore.ErrInvalid,
+						decoderID,
+					)
+				}
+			}
+		}
+	}
 
 	entries, err := collectCandidates(ctx, snapshot, plan)
 	if err != nil {
@@ -138,6 +168,14 @@ func (e *Engine) Discover(
 				artifactstore.ErrInvalid,
 				index,
 				err,
+			)
+		}
+		if value.CollectionID != collectionID ||
+			value.Key.CollectionID != collectionID {
+			return Result{}, fmt.Errorf(
+				"%w: previous occurrence %d belongs to another collection",
+				artifactstore.ErrInvalid,
+				index,
 			)
 		}
 		if value.RootID != rootID {
@@ -180,6 +218,7 @@ func (e *Engine) Discover(
 			applyInvalidForLocator(
 				occurrences,
 				rootID,
+				collectionID,
 				sourceID,
 				entry.Locator,
 				nil,
@@ -223,6 +262,39 @@ func (e *Engine) Discover(
 			)
 		}
 		sourceDigest := artifactstore.DigestBytes(content)
+		if expectedDigest, expected := plan.ExpectedContentDigests[entry.Locator]; expected &&
+			sourceDigest != expectedDigest {
+			diagnostics := []artifactstore.Diagnostic{{
+				Severity: artifactstore.DiagnosticError,
+				Code:     DiagnosticCodeContentDigestMismatch,
+				Message:  "candidate content does not match its expected portable digest",
+				Location: &artifactstore.DiagnosticLocation{
+					Locator: entry.Locator,
+				},
+			}}
+			applyInvalidForLocator(
+				occurrences,
+				rootID,
+				collectionID,
+				sourceID,
+				entry.Locator,
+				&sourceDigest,
+				"",
+				diagnostics,
+				now,
+			)
+			markObservedKeysForLocator(
+				seenKeys,
+				occurrences,
+				sourceID,
+				entry.Locator,
+			)
+			result.Diagnostics = artifactstore.AppendDiagnostics(
+				result.Diagnostics,
+				diagnostics...,
+			)
+			continue
+		}
 		candidate := Candidate{
 			SourceID:            sourceID,
 			SourceKind:          sourceKind,
@@ -237,6 +309,7 @@ func (e *Engine) Discover(
 			applyInvalidForLocator(
 				occurrences,
 				rootID,
+				collectionID,
 				sourceID,
 				entry.Locator,
 				&sourceDigest,
@@ -257,6 +330,24 @@ func (e *Engine) Discover(
 			continue
 		}
 		if decoder == nil {
+			diagnostics := markUnrecognizedForLocator(
+				occurrences,
+				sourceID,
+				entry.Locator,
+				now,
+			)
+			if len(diagnostics) != 0 {
+				result.Diagnostics = artifactstore.AppendDiagnostics(
+					result.Diagnostics,
+					diagnostics...,
+				)
+			}
+			markObservedKeysForLocator(
+				seenKeys,
+				occurrences,
+				sourceID,
+				entry.Locator,
+			)
 			continue
 		}
 
@@ -278,6 +369,7 @@ func (e *Engine) Discover(
 			applyInvalidForLocator(
 				occurrences,
 				rootID,
+				collectionID,
 				sourceID,
 				entry.Locator,
 				&sourceDigest,
@@ -307,6 +399,7 @@ func (e *Engine) Discover(
 				)
 			}
 			key := catalog.OccurrenceKey{
+				CollectionID:       collectionID,
 				SourceID:           sourceID,
 				Locator:            entry.Locator,
 				SubresourceLocator: item.SubresourceLocator,
@@ -343,8 +436,21 @@ func (e *Engine) Discover(
 				item.Diagnostics...,
 			)
 			if artifactstore.ContainsErrorDiagnostic(item.Diagnostics) {
+				previous, found := occurrences[key]
+				if found {
+					previous.DefinitionDigest = nil
+					previous.SourceContentDigest = &sourceDigest
+					previous.DecoderID = decoder.ID()
+					previous.State = catalog.OccurrenceInvalid
+					previous.Diagnostics = artifactstore.CloneDiagnostics(itemDiagnostics)
+					previous.ObservedAt = now
+					occurrences[key] = previous
+					continue
+				}
+
 				occurrences[key] = catalog.Occurrence{
 					RootID:              rootID,
+					CollectionID:        collectionID,
 					Key:                 key,
 					SourceContentDigest: &sourceDigest,
 					DecoderID:           decoder.ID(),
@@ -370,8 +476,24 @@ func (e *Engine) Discover(
 					itemDiagnostics,
 					definitionDiagnostics...,
 				)
+				if previous, found := occurrences[key]; found {
+					previous.DefinitionDigest = nil
+					previous.SourceContentDigest = &sourceDigest
+					previous.DecoderID = decoder.ID()
+					previous.State = catalog.OccurrenceInvalid
+					previous.Diagnostics = artifactstore.CloneDiagnostics(itemDiagnostics)
+					previous.ObservedAt = now
+					occurrences[key] = previous
+					result.Diagnostics = artifactstore.AppendDiagnostics(
+						result.Diagnostics,
+						definitionDiagnostics...,
+					)
+					continue
+				}
+
 				occurrences[key] = catalog.Occurrence{
 					RootID:              rootID,
+					CollectionID:        collectionID,
 					Key:                 key,
 					SourceContentDigest: &sourceDigest,
 					DecoderID:           decoder.ID(),
@@ -390,6 +512,7 @@ func (e *Engine) Discover(
 			occurrences[key] = catalog.Occurrence{
 				RootID:              rootID,
 				Key:                 key,
+				CollectionID:        collectionID,
 				Kind:                canonical.Kind,
 				LogicalName:         canonical.LogicalName,
 				LogicalVersion:      canonical.LogicalVersion,
@@ -411,6 +534,7 @@ func (e *Engine) Discover(
 			if _, stillPresent := emittedForLocator[key]; stillPresent {
 				continue
 			}
+			seenKeys[key] = struct{}{}
 			previousValue.State = catalog.OccurrenceMissing
 			previousValue.Diagnostics = []artifactstore.Diagnostic{{
 				Severity: artifactstore.DiagnosticWarning,
@@ -852,6 +976,7 @@ func readEntry(
 func applyInvalidForLocator(
 	values map[catalog.OccurrenceKey]catalog.Occurrence,
 	rootID artifactstore.RootID,
+	collectionID artifactstore.CollectionID,
 	sourceID artifactstore.SourceID,
 	locator artifactstore.Locator,
 	sourceDigest *artifactstore.Digest,
@@ -867,6 +992,7 @@ func applyInvalidForLocator(
 		}
 		matched = true
 		previous.SourceContentDigest = cloneDigest(sourceDigest)
+		previous.DefinitionDigest = nil
 		previous.DecoderID = decoderID
 		previous.State = catalog.OccurrenceInvalid
 		previous.Diagnostics = artifactstore.CloneDiagnostics(diagnostics)
@@ -877,11 +1003,13 @@ func applyInvalidForLocator(
 		return
 	}
 	key := catalog.OccurrenceKey{
-		SourceID: sourceID,
-		Locator:  locator,
+		CollectionID: collectionID,
+		SourceID:     sourceID,
+		Locator:      locator,
 	}
 	values[key] = catalog.Occurrence{
 		RootID:              rootID,
+		CollectionID:        collectionID,
 		Key:                 key,
 		SourceContentDigest: cloneDigest(sourceDigest),
 		DecoderID:           decoderID,
@@ -904,6 +1032,52 @@ func markObservedKeysForLocator(
 		}
 		seenKeys[key] = struct{}{}
 	}
+}
+
+// markUnrecognizedForLocator reconciles a source candidate which still exists
+// but is no longer recognized by any configured decoder. This is distinct
+// from an out-of-scope candidate: the candidate was explicitly observed during
+// this refresh and must not leave a previous Artifact falsely available.
+func markUnrecognizedForLocator(
+	values map[catalog.OccurrenceKey]catalog.Occurrence,
+	sourceID artifactstore.SourceID,
+	locator artifactstore.Locator,
+	now time.Time,
+) []artifactstore.Diagnostic {
+	keys := make([]catalog.OccurrenceKey, 0)
+	for key, value := range values {
+		if value.Key.SourceID != sourceID ||
+			value.Key.Locator != locator {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(left, right int) bool {
+		if keys[left].CollectionID != keys[right].CollectionID {
+			return keys[left].CollectionID < keys[right].CollectionID
+		}
+		return keys[left].SubresourceLocator < keys[right].SubresourceLocator
+	})
+
+	diagnostics := make([]artifactstore.Diagnostic, 0, len(keys))
+	for _, key := range keys {
+		previous := values[key]
+		diagnostic := artifactstore.Diagnostic{
+			Severity: artifactstore.DiagnosticWarning,
+			Code:     DiagnosticCodeDecoderNoLongerRecognizes,
+			Message:  "the source candidate no longer matches any configured decoder",
+			Location: &artifactstore.DiagnosticLocation{
+				Locator:            previous.Key.Locator,
+				SubresourceLocator: previous.Key.SubresourceLocator,
+			},
+		}
+		previous.State = catalog.OccurrenceMissing
+		previous.Diagnostics = []artifactstore.Diagnostic{diagnostic}
+		previous.ObservedAt = now
+		values[key] = previous
+		diagnostics = artifactstore.AppendDiagnostics(diagnostics, diagnostic)
+	}
+	return diagnostics
 }
 
 func cloneDigest(value *artifactstore.Digest) *artifactstore.Digest {

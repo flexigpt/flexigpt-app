@@ -69,6 +69,17 @@ func (r *Registry) Open(
 	return snapshot, nil
 }
 
+func (r *Registry) SupportsLocalPath(
+	kind artifactstore.SourceKind,
+) bool {
+	adapter, exists := r.adapter(kind)
+	if !exists {
+		return false
+	}
+	_, supported := adapter.(LocalPathResolver)
+	return supported
+}
+
 // ResolveLocalPath resolves a source-relative locator to a native absolute
 // filesystem path when, and only when, the selected source adapter explicitly
 // supports that capability.
@@ -120,6 +131,113 @@ func (r *Registry) ResolveLocalPath(
 		)
 	}
 	return location, nil
+}
+
+func (r *Registry) PublishPackage(
+	ctx context.Context,
+	value Source,
+	publication ManagedPackagePublication,
+) (string, error) {
+	if ctx == nil {
+		return "", fmt.Errorf(
+			"%w: managed Source publication context is nil",
+			artifactstore.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if err := value.Validate(); err != nil {
+		return "", err
+	}
+	normalized, err := NormalizeManagedPackagePublication(publication)
+	if err != nil {
+		return "", err
+	}
+
+	adapter, exists := r.adapter(value.Kind)
+	if !exists {
+		return "", fmt.Errorf(
+			"%w: source adapter %q",
+			artifactstore.ErrSourceUnavailable,
+			value.Kind,
+		)
+	}
+	writer, supported := adapter.(ManagedPackageWriter)
+	if !supported {
+		return "", fmt.Errorf(
+			"%w: source kind %q is not writable",
+			artifactstore.ErrUnsupported,
+			value.Kind,
+		)
+	}
+	generation, err := writer.PublishPackage(
+		ctx,
+		value.Clone(),
+		normalized,
+	)
+	if err != nil {
+		return "", err
+	}
+	if err := artifactstore.ValidateSourceGeneration(generation); err != nil {
+		return "", fmt.Errorf(
+			"%w: managed Source writer returned an invalid generation: %w",
+			artifactstore.ErrInvalid,
+			err,
+		)
+	}
+	return generation, nil
+}
+
+func (r *Registry) RemovePackage(
+	ctx context.Context,
+	value Source,
+	directory artifactstore.Locator,
+	expectedGeneration string,
+) error {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: managed Source removal context is nil",
+			artifactstore.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := value.Validate(); err != nil {
+		return err
+	}
+	if err := ValidateManagedPackageDirectory(directory); err != nil {
+		return err
+	}
+	if err := artifactstore.ValidateSourceGeneration(
+		expectedGeneration,
+	); err != nil {
+		return err
+	}
+
+	adapter, exists := r.adapter(value.Kind)
+	if !exists {
+		return fmt.Errorf(
+			"%w: source adapter %q",
+			artifactstore.ErrSourceUnavailable,
+			value.Kind,
+		)
+	}
+	writer, supported := adapter.(ManagedPackageWriter)
+	if !supported {
+		return fmt.Errorf(
+			"%w: source kind %q is not writable",
+			artifactstore.ErrUnsupported,
+			value.Kind,
+		)
+	}
+	return writer.RemovePackage(
+		ctx,
+		value.Clone(),
+		directory,
+		expectedGeneration,
+	)
 }
 
 func (r *Registry) Kinds() []artifactstore.SourceKind {

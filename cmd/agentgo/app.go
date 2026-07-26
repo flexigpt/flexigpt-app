@@ -15,15 +15,20 @@ import (
 const (
 	AppTitle = "FlexiGPT"
 
-	settingsDirectoryName           = "settings"
-	conversationsDirectoryName      = "conversationsv1"
-	modelPresetsDirectoryName       = "modelpresetsv1"
-	toolsDirectoryName              = "toolsv1"
-	skillsDirectoryName             = "skillsv1"
-	mcpDirectoryName                = "mcpserversv1"
-	assistantPresetsDirectoryName   = "assistantpresetsv1"
-	workspaceArtifactsDirectoryName = "workspace-artifacts"
-	appDirectoryMode                = 0o770
+	settingsDirectoryName         = "settings"
+	conversationsDirectoryName    = "conversationsv1"
+	modelPresetsDirectoryName     = "modelpresetsv1"
+	toolsDirectoryName            = "toolsv1"
+	skillsDirectoryName           = "skillsv1"
+	mcpDirectoryName              = "mcpserversv1"
+	assistantPresetsDirectoryName = "assistantpresetsv1"
+	// Workspace Collections are stored by the shared artifact store. Do not
+	// add a second Workspace-owned persistence directory. This is deliberately
+	// a clean namespace: startup must not locate, import, copy, or migrate any
+	// legacy Workspace or Artifact Store directory into it.
+	artifactStoreDirectoryName = "artifactsv1"
+	artifactStoreDirectoryMode = 0o700
+	appDirectoryMode           = 0o770
 )
 
 type App struct {
@@ -38,18 +43,19 @@ type App struct {
 	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
+	artifactStoreAPI        *ArtifactStoreWrapper
 	workspaceAPI            *WorkspaceWrapper
 
 	dataBasePath string
 
-	settingsDirPath           string
-	conversationsDirPath      string
-	modelPresetsDirPath       string
-	toolsDirPath              string
-	skillsDirPath             string
-	mcpsDirPath               string
-	assistantPresetsDirPath   string
-	workspaceArtifactsDirPath string
+	settingsDirPath         string
+	conversationsDirPath    string
+	modelPresetsDirPath     string
+	toolsDirPath            string
+	skillsDirPath           string
+	mcpsDirPath             string
+	assistantPresetsDirPath string
+	artifactStoreDirPath    string
 }
 
 func NewApp() *App {
@@ -71,16 +77,16 @@ func NewApp() *App {
 	app.skillsDirPath = filepath.Join(app.dataBasePath, skillsDirectoryName)
 	app.mcpsDirPath = filepath.Join(app.dataBasePath, mcpDirectoryName)
 	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, assistantPresetsDirectoryName)
-	app.workspaceArtifactsDirPath = filepath.Join(app.dataBasePath, workspaceArtifactsDirectoryName)
+	app.artifactStoreDirPath = filepath.Join(app.dataBasePath, artifactStoreDirectoryName)
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
 		app.modelPresetsDirPath == "" ||
 		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" ||
 		app.skillsDirPath == "" || app.mcpsDirPath == "" ||
-		app.workspaceArtifactsDirPath == "" {
+		app.artifactStoreDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
-			"workspaceArtifactsDirPath", app.workspaceArtifactsDirPath,
+			"artifactStoreDirPath", app.artifactStoreDirPath,
 			"settingsDirPath", app.settingsDirPath,
 			"conversationsDirPath", app.conversationsDirPath,
 			"modelPresetsDirPath", app.modelPresetsDirPath,
@@ -102,6 +108,7 @@ func NewApp() *App {
 	app.mcpAPI = &MCPWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
+	app.artifactStoreAPI = &ArtifactStoreWrapper{}
 	app.workspaceAPI = &WorkspaceWrapper{}
 
 	app.assistantPresetStoreAPI = &AssistantPresetStoreWrapper{}
@@ -164,13 +171,24 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create assistant presets directory")
 	}
-	if err := os.MkdirAll(app.workspaceArtifactsDirPath, os.FileMode(appDirectoryMode)); err != nil {
+	if err := os.MkdirAll(app.artifactStoreDirPath, os.FileMode(artifactStoreDirectoryMode)); err != nil {
 		slog.Error(
-			"failed to create Workspace artifact directory",
-			"workspaceArtifactsDirPath", app.workspaceArtifactsDirPath,
+			"failed to create artifact store directory",
+			"artifactStoreDirPath", app.artifactStoreDirPath,
 			"error", err,
 		)
-		panic("failed to initialize app: could not create Workspace artifact directory")
+		panic("failed to initialize app: could not create artifact store directory")
+	}
+	if err := os.Chmod(
+		app.artifactStoreDirPath,
+		os.FileMode(artifactStoreDirectoryMode),
+	); err != nil {
+		slog.Error(
+			"failed to secure artifact store directory",
+			"artifactStoreDirPath", app.artifactStoreDirPath,
+			"error", err,
+		)
+		panic("failed to initialize app: could not secure artifact store directory")
 	}
 
 	slog.Info(
@@ -183,7 +201,7 @@ func NewApp() *App {
 		"skillsDirPath", app.skillsDirPath,
 		"mcpsDirPath", app.mcpsDirPath,
 		"assistantPresetsDirPath", app.assistantPresetsDirPath,
-		"workspaceArtifactsDirPath", app.workspaceArtifactsDirPath,
+		"artifactStoreDirPath", app.artifactStoreDirPath,
 	)
 	return app
 }
@@ -227,19 +245,33 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: tool runtime initialization failed\n" + err.Error())
 	}
 
+	err = InitArtifactStoreWrapper(
+		a.artifactStoreAPI,
+		a.artifactStoreDirPath,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize artifact store",
+			"directory", a.artifactStoreDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: artifact store initialization failed\n" + err.Error())
+	}
+	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
+
 	err = InitWorkspaceWrapper(
 		a.workspaceAPI,
-		a.workspaceArtifactsDirPath,
+		a.artifactStoreAPI.components,
 	)
 	if err != nil {
 		slog.Error(
 			"couldn't initialize Workspace",
-			"directory", a.workspaceArtifactsDirPath,
+			"directory", a.artifactStoreDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: Workspace initialization failed\n" + err.Error())
+		panic("failed to initialize managers: workspace initialization failed\n" + err.Error())
 	}
-	slog.Info("workspace initialized", "directory", a.workspaceArtifactsDirPath)
+	slog.Info("workspace initialized")
 
 	err = InitSkillStoreWrapper(
 		a.skillStoreAPI,
@@ -252,7 +284,7 @@ func (a *App) initManagers() {
 			"directory", a.skillsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: Skill initialization failed\n" + err.Error())
+		panic("failed to initialize managers: skill initialization failed\n" + err.Error())
 	}
 	slog.Info("skill services initialized", "directory", a.skillsDirPath)
 
@@ -262,10 +294,19 @@ func (a *App) initManagers() {
 	)
 	if err != nil {
 		slog.Error(
-			"couldn't bind Workspace Skill runtime",
+			"couldn't bind workspace skill runtime",
 			"error", err,
 		)
-		panic("failed to initialize managers: Workspace Skill runtime binding failed\n" + err.Error())
+		panic("failed to initialize managers: workspace skill runtime binding failed\n" + err.Error())
+	}
+
+	err = BindArtifactStoreWorkspaceSynchronization(
+		a.artifactStoreAPI,
+		a.workspaceAPI,
+	)
+	if err != nil {
+		slog.Error("couldn't bind artifact store Workspace synchronization", "error", err)
+		panic("failed to initialize managers: artifact store Workspace synchronization failed\n" + err.Error())
 	}
 
 	err = InitAggregateSkillProvider(a.skillStoreAPI)
@@ -402,10 +443,14 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 		a.settingStoreAPI.close()
 	}
 	if a.skillStoreAPI != nil {
+		//nolint:contextcheck // Need separate context in shutdown.
 		a.skillStoreAPI.close()
 	}
 	if a.workspaceAPI != nil {
 		a.workspaceAPI.close()
+	}
+	if a.artifactStoreAPI != nil {
+		a.artifactStoreAPI.close()
 	}
 	if a.toolStoreAPI != nil {
 		a.toolStoreAPI.close()

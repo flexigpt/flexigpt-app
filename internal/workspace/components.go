@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
@@ -14,29 +13,25 @@ type components struct {
 	service   *engine.Service
 	refresher *engine.Refresher
 	query     *engine.QueryService
+	policy    *engine.ArtifactPolicy
 
 	contextAdapter *contextadapter.Adapter
 	skillAdapter   *skilladapter.Adapter
 }
 
 func newComponents(
-	artifacts *system.Components,
+	dependencies Dependencies,
 	config Config,
 ) (*components, error) {
-	if artifacts == nil {
-		return nil, fmt.Errorf(
-			"%w: Artifact Store components are nil",
-			engine.ErrInvalidWorkspace,
-		)
-	}
-	if artifacts.SourceRuntime == nil {
-		return nil, fmt.Errorf(
-			"%w: artifact store source runtime is nil",
-			engine.ErrInvalidWorkspace,
-		)
+	if err := dependencies.Validate(); err != nil {
+		return nil, err
 	}
 
 	supports, err := config.normalizedSupports()
+	if err != nil {
+		return nil, err
+	}
+	discoveryPolicyRevision, err := config.discoveryPolicyRevision()
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +42,7 @@ func newComponents(
 	profiles := config.normalizedDiscoveryProfiles(skillConventions)
 	decoderIDs := make([]artifactstore.DecoderID, 0, len(supports))
 	for _, support := range supports {
-		if !artifacts.HasDecoder(support.DecoderID) {
+		if !dependencies.HasDecoder(support.DecoderID) {
 			return nil, fmt.Errorf(
 				"%w: workspace decoder %q is not registered with artifact store",
 				engine.ErrInvalidWorkspace,
@@ -58,26 +53,28 @@ func newComponents(
 	}
 
 	service, err := engine.NewService(
-		artifacts.Roots,
-		artifacts.Sources,
+		dependencies.Collections,
+		dependencies.Sources,
+		discoveryPolicyRevision,
 	)
 	if err != nil {
 		return nil, err
 	}
 	planner, err := engine.NewPlanner(
 		profiles,
+		discoveryPolicyRevision,
 		decoderIDs...,
 	)
 	if err != nil {
 		return nil, err
 	}
-	loader, err := engine.NewDefinitionLoader(
-		artifacts.SourceRuntime,
+	loader, err := engine.NewDescriptorLoader(
+		dependencies.SourceRuntime,
 	)
 	if err != nil {
 		return nil, err
 	}
-	policy, err := engine.NewRecordPolicy(supports...)
+	policy, err := engine.NewArtifactPolicy(supports...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +82,7 @@ func newComponents(
 		service,
 		loader,
 		planner,
-		artifacts.Refresh,
+		dependencies.Refresh,
 		policy,
 	)
 	if err != nil {
@@ -93,9 +90,11 @@ func newComponents(
 	}
 	query, err := engine.NewQueryService(
 		service,
-		artifacts.Catalogs,
-		artifacts.Records,
-		artifacts.Definitions,
+		dependencies.Catalogs,
+		dependencies.Artifacts,
+		dependencies.Definitions,
+		dependencies.DecoderFingerprint,
+		discoveryPolicyRevision,
 		supports...,
 	)
 	if err != nil {
@@ -113,7 +112,7 @@ func newComponents(
 	skillAdapter, err := skilladapter.NewAdapter(
 		query,
 		runtimePolicy,
-		artifacts.SourceRuntime,
+		dependencies.SourceRuntime,
 	)
 	if err != nil {
 		return nil, err
@@ -122,6 +121,7 @@ func newComponents(
 		service:        service,
 		refresher:      refresher,
 		query:          query,
+		policy:         policy,
 		contextAdapter: contextAdapter,
 		skillAdapter:   skillAdapter,
 	}, nil

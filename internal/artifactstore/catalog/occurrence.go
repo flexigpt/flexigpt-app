@@ -17,6 +17,7 @@ const (
 )
 
 type OccurrenceKey struct {
+	CollectionID       artifactstore.CollectionID       `json:"collectionID"`
 	SourceID           artifactstore.SourceID           `json:"sourceID"`
 	Locator            artifactstore.Locator            `json:"locator"`
 	SubresourceLocator artifactstore.SubresourceLocator `json:"subresourceLocator,omitempty"`
@@ -24,6 +25,7 @@ type OccurrenceKey struct {
 
 type Occurrence struct {
 	RootID              artifactstore.RootID         `json:"rootID"`
+	CollectionID        artifactstore.CollectionID   `json:"collectionID"`
 	Key                 OccurrenceKey                `json:"key"`
 	Kind                artifactstore.ArtifactKind   `json:"kind,omitempty"`
 	LogicalName         artifactstore.LogicalName    `json:"logicalName,omitempty"`
@@ -39,6 +41,12 @@ type Occurrence struct {
 func (o Occurrence) Validate() error {
 	if err := artifactstore.ValidateRootID(o.RootID); err != nil {
 		return err
+	}
+	if err := artifactstore.ValidateCollectionID(o.CollectionID); err != nil {
+		return err
+	}
+	if o.Key.CollectionID != o.CollectionID {
+		return fmt.Errorf("%w: occurrence key collection mismatch", artifactstore.ErrInvalid)
 	}
 	if err := o.Key.Validate(); err != nil {
 		return err
@@ -116,6 +124,9 @@ func (o Occurrence) Validate() error {
 }
 
 func (k OccurrenceKey) Validate() error {
+	if err := artifactstore.ValidateCollectionID(k.CollectionID); err != nil {
+		return err
+	}
 	if err := artifactstore.ValidateSourceID(k.SourceID); err != nil {
 		return err
 	}
@@ -127,6 +138,9 @@ func (k OccurrenceKey) Validate() error {
 
 func SortOccurrences(values []Occurrence) {
 	sort.Slice(values, func(left, right int) bool {
+		if values[left].Key.CollectionID != values[right].Key.CollectionID {
+			return values[left].Key.CollectionID < values[right].Key.CollectionID
+		}
 		if values[left].Key.SourceID != values[right].Key.SourceID {
 			return values[left].Key.SourceID < values[right].Key.SourceID
 		}

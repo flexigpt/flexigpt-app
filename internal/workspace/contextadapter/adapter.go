@@ -6,38 +6,39 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 type ContextContribution struct {
-	RecordID         artifactstore.RecordID `json:"recordID"`
-	DefinitionDigest artifactstore.Digest   `json:"definitionDigest"`
-	SourceID         artifactstore.SourceID `json:"sourceID"`
-	Locator          artifactstore.Locator  `json:"locator"`
-	Name             string                 `json:"name"`
-	Role             string                 `json:"role"`
-	MediaType        string                 `json:"mediaType"`
-	Content          string                 `json:"content"`
-	ConventionOrder  int                    `json:"conventionOrder"`
-	OriginalBytes    int                    `json:"originalBytes"`
-	IncludedBytes    int                    `json:"includedBytes"`
-	Truncated        bool                   `json:"truncated"`
+	Artifact         artifactstore.ArtifactRef `json:"artifact"`
+	ArtifactRevision uint64                    `json:"artifactRevision"`
+	DefinitionDigest artifactstore.Digest      `json:"definitionDigest"`
+	SourceID         artifactstore.SourceID    `json:"sourceID"`
+	Locator          artifactstore.Locator     `json:"locator"`
+	Name             string                    `json:"name"`
+	Role             string                    `json:"role"`
+	MediaType        string                    `json:"mediaType"`
+	Content          string                    `json:"content"`
+	ConventionOrder  int                       `json:"conventionOrder"`
+	OriginalBytes    int                       `json:"originalBytes"`
+	IncludedBytes    int                       `json:"includedBytes"`
+	Truncated        bool                      `json:"truncated"`
 }
 
 type ContextLoadPlan struct {
-	RootID          artifactstore.RootID       `json:"rootID"`
-	CatalogRevision uint64                     `json:"catalogRevision"`
-	Contributions   []ContextContribution      `json:"contributions"`
-	Prompt          string                     `json:"prompt"`
-	Diagnostics     []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
-	Decisions       []CompositionDecision      `json:"decisions"`
-	PromptBytes     int                        `json:"promptBytes"`
+	Workspace       artifactstore.CollectionRef `json:"workspace"`
+	CatalogRevision uint64                      `json:"catalogRevision"`
+	Contributions   []ContextContribution       `json:"contributions"`
+	Prompt          string                      `json:"prompt"`
+	Diagnostics     []artifactstore.Diagnostic  `json:"diagnostics,omitempty"`
+	Decisions       []CompositionDecision       `json:"decisions"`
+	PromptBytes     int                         `json:"promptBytes"`
 }
 
 type ContextDocument struct {
-	RecordID         artifactstore.RecordID     `json:"recordID"`
-	RecordRevision   uint64                     `json:"recordRevision"`
+	Artifact         artifactstore.ArtifactRef  `json:"artifact"`
+	ArtifactRevision uint64                     `json:"artifactRevision"`
 	DefinitionDigest artifactstore.Digest       `json:"definitionDigest"`
 	SourceID         artifactstore.SourceID     `json:"sourceID"`
 	Locator          artifactstore.Locator      `json:"locator"`
@@ -45,7 +46,7 @@ type ContextDocument struct {
 	Role             string                     `json:"role"`
 	MediaType        string                     `json:"mediaType"`
 	Enabled          bool                       `json:"enabled"`
-	State            record.State               `json:"state"`
+	State            artifact.State             `json:"state"`
 	CatalogCurrent   bool                       `json:"catalogCurrent"`
 	ProjectionValid  bool                       `json:"projectionValid"`
 	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
@@ -53,10 +54,10 @@ type ContextDocument struct {
 }
 
 type ContextInspection struct {
-	RootID          artifactstore.RootID       `json:"rootID"`
-	CatalogRevision uint64                     `json:"catalogRevision"`
-	Contributions   []ContextContribution      `json:"contributions"`
-	Diagnostics     []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
+	Workspace       artifactstore.CollectionRef `json:"workspace"`
+	CatalogRevision uint64                      `json:"catalogRevision"`
+	Contributions   []ContextContribution       `json:"contributions"`
+	Diagnostics     []artifactstore.Diagnostic  `json:"diagnostics,omitempty"`
 }
 
 type Adapter struct {
@@ -89,47 +90,57 @@ func NewAdapter(
 
 func (p *Adapter) Compose(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	recordIDs []artifactstore.RecordID,
+	workspace artifactstore.CollectionRef,
+	artifactRefs []artifactstore.ArtifactRef,
 ) (ContextLoadPlan, error) {
-	if len(recordIDs) == 0 {
-		values, err := p.List(ctx, rootID)
+	if err := workspace.Validate(); err != nil {
+		return ContextLoadPlan{}, err
+	}
+	if len(artifactRefs) == 0 {
+		values, err := p.List(ctx, workspace)
 		if err != nil {
 			return ContextLoadPlan{}, err
 		}
 		for _, value := range values {
-			if value.Enabled && value.State == record.StateAvailable {
-				recordIDs = append(recordIDs, value.RecordID)
+			if value.Enabled && value.State == artifact.StateAvailable {
+				artifactRefs = append(artifactRefs, value.Artifact)
 			}
 		}
 	}
 
-	loadPlan, err := p.query.ComposeLoadPlan(ctx, rootID, recordIDs)
+	loadPlan, err := p.query.ComposeLoadPlan(ctx, workspace, artifactRefs)
 	if err != nil {
 		return ContextLoadPlan{}, err
 	}
 
-	workspaceValue, err := p.query.GetWorkspace(ctx, rootID)
+	workspaceValue, err := p.query.GetWorkspace(ctx, workspace)
 	if err != nil {
 		return ContextLoadPlan{}, err
 	}
 	output := ContextLoadPlan{
-		RootID:          rootID,
+		Workspace:       workspace,
 		CatalogRevision: loadPlan.CatalogRevision,
 		Diagnostics:     artifactstore.CloneDiagnostics(loadPlan.Diagnostics),
 	}
+	handled := make(map[artifactstore.ArtifactID]struct{}, len(loadPlan.Items))
 	for _, item := range loadPlan.Items {
+		handled[item.Artifact.ID] = struct{}{}
 		if err := ValidateContextDefinition(item.Definition); err != nil {
 			output.Diagnostics = artifactstore.AppendDiagnostics(
 				output.Diagnostics,
-				contextProjectionDiagnostic(item.Record, err),
+				contextProjectionDiagnostic(item.Artifact, err),
 			)
+			output.Decisions = append(output.Decisions, CompositionDecision{
+				Artifact: item.Artifact.Ref(),
+				Status:   CompositionUnavailable,
+				Code:     engine.DiagnosticCodeProjectionInvalid,
+			})
 			continue
 		}
 		decision := p.runtimePolicy.Decide(ctx, engine.RuntimePolicyRequest{
 			Use:              engine.RuntimeUseContextPrompt,
 			Workspace:        workspaceValue,
-			Record:           item.Record,
+			Artifact:         item.Artifact,
 			DefinitionDigest: item.Definition.Digest,
 			SourceID:         item.Source.ID,
 		})
@@ -139,14 +150,14 @@ func (p *Adapter) Compose(
 		if decision.Disposition != engine.RuntimeAllowed {
 			output.Diagnostics = artifactstore.AppendDiagnostics(
 				output.Diagnostics,
-				engine.RuntimeDecisionDiagnostic(decision, item.Record),
+				engine.RuntimeDecisionDiagnostic(decision, item.Artifact),
 			)
 			status := CompositionDenied
 			if decision.Disposition == engine.RuntimeUnavailable {
 				status = CompositionUnavailable
 			}
 			output.Decisions = append(output.Decisions, CompositionDecision{
-				RecordID: item.Record.ID,
+				Artifact: item.Artifact.Ref(),
 				Status:   status,
 				Code:     decision.Code,
 			})
@@ -156,18 +167,29 @@ func (p *Adapter) Compose(
 			item.Definition.Body,
 		)
 		if err != nil {
-			return ContextLoadPlan{}, err
+			handled[item.Artifact.ID] = struct{}{}
+			output.Diagnostics = artifactstore.AppendDiagnostics(
+				output.Diagnostics,
+				contextProjectionDiagnostic(item.Artifact, err),
+			)
+			output.Decisions = append(output.Decisions, CompositionDecision{
+				Artifact: item.Artifact.Ref(),
+				Status:   CompositionUnavailable,
+				Code:     engine.DiagnosticCodeProjectionInvalid,
+			})
+			continue
 		}
 		output.Contributions = append(
 			output.Contributions,
 			ContextContribution{
 				ConventionOrder: contextRuntimeOrder(
-					item.Record.Occurrence.Locator,
+					item.Artifact.Binding.Locator,
 				),
-				RecordID:         item.Record.ID,
+				ArtifactRevision: item.Artifact.Revision,
+				Artifact:         item.Artifact.Ref(),
 				DefinitionDigest: item.Definition.Digest,
 				SourceID:         item.Source.ID,
-				Locator:          item.Record.Occurrence.Locator,
+				Locator:          item.Artifact.Binding.Locator,
 				Name:             body.Name,
 				Role:             body.Role,
 				MediaType:        body.MediaType,
@@ -175,6 +197,17 @@ func (p *Adapter) Compose(
 			},
 		)
 	}
+	for _, ref := range artifactRefs {
+		if _, found := handled[ref.ArtifactID]; found {
+			continue
+		}
+		output.Decisions = append(output.Decisions, CompositionDecision{
+			Artifact: ref,
+			Status:   CompositionUnavailable,
+			Code:     engine.DiagnosticCodeArtifactUnresolved,
+		})
+	}
+
 	sortContextContributions(output.Contributions)
 	output.Contributions,
 		output.Prompt,
@@ -191,9 +224,9 @@ func (p *Adapter) Compose(
 
 func (p *Adapter) List(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	workspace artifactstore.CollectionRef,
 ) ([]ContextDocument, error) {
-	view, err := p.query.Catalog(ctx, rootID)
+	view, err := p.query.Catalog(ctx, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +240,7 @@ func (p *Adapter) List(
 		if err != nil {
 			value.Diagnostics = artifactstore.AppendDiagnostics(
 				value.Diagnostics,
-				contextProjectionDiagnostic(resourceValue.Record, err),
+				contextProjectionDiagnostic(resourceValue.Artifact, err),
 			)
 		}
 		output = append(output, value)
@@ -218,36 +251,45 @@ func (p *Adapter) List(
 		if leftOrder != rightOrder {
 			return leftOrder < rightOrder
 		}
-		return output[left].RecordID < output[right].RecordID
+		return output[left].Artifact.ArtifactID < output[right].Artifact.ArtifactID
 	})
 	return output, nil
 }
 
 func (p *Adapter) Load(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	recordIDs []artifactstore.RecordID,
+	workspace artifactstore.CollectionRef,
+	artifactRefs []artifactstore.ArtifactRef,
 ) (ContextInspection, error) {
-	view, err := p.query.Catalog(ctx, rootID)
+	view, err := p.query.Catalog(ctx, workspace)
 	if err != nil {
 		return ContextInspection{}, err
 	}
-	requested := make(map[artifactstore.RecordID]struct{}, len(recordIDs))
-	for _, recordID := range recordIDs {
-		if err := artifactstore.ValidateRecordID(recordID); err != nil {
+	requested := make(
+		map[artifactstore.ArtifactID]struct{},
+		len(artifactRefs),
+	)
+	for _, ref := range artifactRefs {
+		if err := ref.Validate(); err != nil {
 			return ContextInspection{}, err
 		}
-		if _, duplicate := requested[recordID]; duplicate {
+		if ref.RootID != workspace.RootID {
 			return ContextInspection{}, fmt.Errorf(
-				"%w: duplicate Context record %q",
+				"%w: Context Artifact belongs to another Root",
 				engine.ErrInvalidWorkspace,
-				recordID,
 			)
 		}
-		requested[recordID] = struct{}{}
+		if _, duplicate := requested[ref.ArtifactID]; duplicate {
+			return ContextInspection{}, fmt.Errorf(
+				"%w: duplicate Context Artifact %q",
+				engine.ErrInvalidWorkspace,
+				ref.ArtifactID,
+			)
+		}
+		requested[ref.ArtifactID] = struct{}{}
 	}
 	output := ContextInspection{
-		RootID:          rootID,
+		Workspace:       workspace,
 		CatalogRevision: view.Catalog.Revision,
 	}
 	for _, resourceValue := range view.Resources {
@@ -256,7 +298,7 @@ func (p *Adapter) Load(
 			continue
 		}
 		if len(requested) != 0 {
-			if _, selected := requested[resourceValue.Record.ID]; !selected {
+			if _, selected := requested[resourceValue.Artifact.ID]; !selected {
 				continue
 			}
 		}
@@ -264,14 +306,14 @@ func (p *Adapter) Load(
 		if err != nil {
 			output.Diagnostics = artifactstore.AppendDiagnostics(
 				output.Diagnostics,
-				contextProjectionDiagnostic(resourceValue.Record, err),
+				contextProjectionDiagnostic(resourceValue.Artifact, err),
 			)
 			continue
 		}
 		output.Contributions = append(output.Contributions, contribution)
 		output.Diagnostics = artifactstore.AppendDiagnostics(
 			output.Diagnostics,
-			resourceValue.Record.Diagnostics...,
+			resourceValue.Artifact.Diagnostics...,
 		)
 	}
 	sortContextContributions(output.Contributions)
@@ -281,8 +323,8 @@ func (p *Adapter) Load(
 			output.Diagnostics,
 			artifactstore.Diagnostic{
 				Severity: artifactstore.DiagnosticError,
-				Code:     engine.DiagnosticCodeRecordUnresolved,
-				Message:  "one or more requested Context records were not available for inspection",
+				Code:     engine.DiagnosticCodeArtifactUnresolved,
+				Message:  "one or more requested Context Artifacts were not available for inspection",
 			},
 		)
 	}
@@ -292,20 +334,20 @@ func (p *Adapter) Load(
 func projectContextDocument(
 	value engine.Resource,
 ) (ContextDocument, error) {
-	runtimeDisabled, dataErr := engine.RecordRuntimeDisabled(value.Record)
+	runtimeDisabled, dataErr := engine.ArtifactRuntimeDisabled(value.Artifact)
 	output := ContextDocument{
-		RecordID:         value.Record.ID,
-		RecordRevision:   value.Record.Revision,
+		Artifact:         value.Artifact.Ref(),
+		ArtifactRevision: value.Artifact.Revision,
 		DefinitionDigest: value.Definition.Digest,
 		SourceID:         value.Source.ID,
-		Locator:          value.Record.Occurrence.Locator,
-		Name:             value.Record.Name,
-		Enabled:          value.Record.Enabled,
-		State:            value.Record.State,
+		Locator:          value.Artifact.Binding.Locator,
+		Name:             value.Artifact.Name,
+		Enabled:          value.Artifact.Enabled,
+		State:            value.Artifact.State,
 		CatalogCurrent:   value.CatalogCurrent,
 		RuntimeDisabled:  runtimeDisabled,
 		Diagnostics: artifactstore.AppendDiagnostics(
-			value.Record.Diagnostics,
+			value.Artifact.Diagnostics,
 			value.Diagnostics...,
 		),
 	}
@@ -339,11 +381,12 @@ func projectContext(
 		return ContextContribution{}, err
 	}
 	return ContextContribution{
-		RecordID:         value.Record.ID,
+		Artifact:         value.Artifact.Ref(),
+		ArtifactRevision: value.Artifact.Revision,
 		DefinitionDigest: value.Definition.Digest,
 		SourceID:         value.Source.ID,
-		Locator:          value.Record.Occurrence.Locator,
-		ConventionOrder:  contextRuntimeOrder(value.Record.Occurrence.Locator),
+		Locator:          value.Artifact.Binding.Locator,
+		ConventionOrder:  contextRuntimeOrder(value.Artifact.Binding.Locator),
 		Name:             body.Name,
 		Role:             body.Role,
 		MediaType:        body.MediaType,
@@ -372,7 +415,7 @@ func contextRuntimeOrder(locator artifactstore.Locator) int {
 }
 
 func contextProjectionDiagnostic(
-	value record.Record,
+	value artifact.Artifact,
 	err error,
 ) artifactstore.Diagnostic {
 	return artifactstore.Diagnostic{
@@ -380,8 +423,8 @@ func contextProjectionDiagnostic(
 		Code:     engine.DiagnosticCodeProjectionInvalid,
 		Message:  artifactstore.BoundedDiagnosticMessage(err.Error()),
 		Location: &artifactstore.DiagnosticLocation{
-			Locator:            value.Occurrence.Locator,
-			SubresourceLocator: value.Occurrence.SubresourceLocator,
+			Locator:            value.Binding.Locator,
+			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
 	}
 }

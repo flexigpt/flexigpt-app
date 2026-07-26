@@ -7,6 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
+	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 )
 
 type aggregateSkillProvider struct {
@@ -29,9 +30,9 @@ func newAggregateSkillProvider(
 	return &aggregateSkillProvider{providers: values}, nil
 }
 
-func (a *aggregateSkillProvider) Owns(identity string) bool {
+func (a *aggregateSkillProvider) Owns(ref skillruntimeSpec.SkillRef) bool {
 	for _, provider := range a.providers {
-		if provider.Owns(identity) {
+		if provider.Owns(ref) {
 			return true
 		}
 	}
@@ -52,16 +53,10 @@ func (a *aggregateSkillProvider) List(
 	}
 	applyPrecedence(output)
 	sort.Slice(output, func(left, right int) bool {
-		if output[left].Shadowed != output[right].Shadowed {
-			return !output[left].Shadowed
-		}
 		if output[left].Name != output[right].Name {
 			return output[left].Name < output[right].Name
 		}
-		if originRank(output[left]) != originRank(output[right]) {
-			return originRank(output[left]) > originRank(output[right])
-		}
-		return output[left].Identity < output[right].Identity
+		return skillRefKey(output[left].Ref) < skillRefKey(output[right].Ref)
 	})
 	return output, nil
 }
@@ -71,7 +66,7 @@ func (a *aggregateSkillProvider) Render(
 	request skillruntime.RenderRequest,
 ) (skillruntime.RenderedSkill, error) {
 	for _, provider := range a.providers {
-		if provider.Owns(request.Identity) {
+		if provider.Owns(request.Ref) {
 			return provider.Render(ctx, request)
 		}
 	}
@@ -105,49 +100,29 @@ func applyPrecedence(values []skillruntime.Skill) {
 		if len(indexes) < 2 {
 			continue
 		}
-		bestRank := -1
-		best := make([]int, 0, len(indexes))
 		for _, index := range indexes {
-			rank := originRank(values[index])
-			if len(best) == 0 ||
-				rank > bestRank {
-				bestRank = rank
-				best = []int{index}
-				continue
-			}
-			if rank == bestRank {
-				best = append(best, index)
-			}
-		}
-		if len(best) > 1 {
-			for _, index := range best {
-				values[index].Diagnostics = artifactstore.AppendDiagnostics(
-					values[index].Diagnostics,
-					artifactstore.Diagnostic{
-						Severity: artifactstore.DiagnosticError,
-						Code:     "skill.provider.precedence-ambiguous",
-						Message:  "multiple Skills have the same highest origin precedence",
-					},
-				)
-				values[index].Available = false
-				values[index].RuntimeAllowed = false
-			}
-			continue
-		}
-		winner := values[best[0]].Identity
-		for _, index := range indexes {
-			if index == best[0] {
-				continue
-			}
-			values[index].Shadowed = true
-			values[index].ShadowedBy = winner
+			values[index].Diagnostics = artifactstore.AppendDiagnostics(
+				values[index].Diagnostics,
+				artifactstore.Diagnostic{
+					Severity: artifactstore.DiagnosticError,
+					Code:     "skill.provider.name-ambiguous",
+					Message:  "multiple eligible Skills have the same name",
+				},
+			)
+			values[index].Available = false
+			values[index].RuntimeAllowed = false
 		}
 	}
 }
 
-func originRank(value skillruntime.Skill) int {
-	if value.Origin == skillruntime.OriginWorkspace {
-		return 2
+func skillRefKey(ref skillruntimeSpec.SkillRef) string {
+	if ref.Artifact != nil {
+		return "artifact|" +
+			string(ref.Artifact.RootID) + "|" +
+			string(ref.Artifact.ArtifactID)
 	}
-	return 1
+	return "installed|" +
+		string(ref.BundleID) + "|" +
+		string(ref.SkillSlug) + "|" +
+		string(ref.SkillID)
 }

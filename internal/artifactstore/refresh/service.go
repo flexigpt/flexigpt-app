@@ -9,40 +9,40 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/record"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 type Service struct {
-	roots       RootReader
+	collections CollectionReader
 	catalogs    catalog.Reader
 	sources     source.Runtime
-	records     RecordReader
+	artifacts   ArtifactReader
 	discovery   *discovery.Engine
 	definitions definition.Repository
-	reconciler  *record.Reconciler
+	reconciler  *artifact.Reconciler
 	publisher   Publisher
 	clock       artifactstore.Clock
 }
 
 func NewService(
-	roots RootReader,
+	collections CollectionReader,
 	catalogs catalog.Reader,
 	sources source.Runtime,
-	records RecordReader,
+	artifacts ArtifactReader,
 	discoveryEngine *discovery.Engine,
 	definitions definition.Repository,
-	reconciler *record.Reconciler,
+	reconciler *artifact.Reconciler,
 	publisher Publisher,
 	clock artifactstore.Clock,
 ) (*Service, error) {
-	if roots == nil ||
+	if collections == nil ||
 		catalogs == nil ||
 		sources == nil ||
-		records == nil ||
+		artifacts == nil ||
 		discoveryEngine == nil ||
 		definitions == nil ||
 		reconciler == nil ||
@@ -54,10 +54,10 @@ func NewService(
 		)
 	}
 	return &Service{
-		roots:       roots,
+		collections: collections,
 		catalogs:    catalogs,
 		sources:     sources,
-		records:     records,
+		artifacts:   artifacts,
 		discovery:   discoveryEngine,
 		definitions: definitions,
 		reconciler:  reconciler,
@@ -68,57 +68,66 @@ func NewService(
 
 func (s *Service) Refresh(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	ref artifactstore.CollectionRef,
 	plan discovery.Plan,
-	policy record.Policy,
+	policy artifact.Policy,
 ) (Result, error) {
+	if ctx == nil {
+		return Result{}, fmt.Errorf("%w: refresh context is nil", artifactstore.ErrInvalid)
+	}
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
 	if policy == nil {
 		return Result{}, fmt.Errorf(
-			"%w: record policy is required",
+			"%w: artifact adoption policy is required",
 			artifactstore.ErrInvalid,
 		)
+	}
+	if err := ref.Validate(); err != nil {
+		return Result{}, err
 	}
 	if err := plan.Validate(); err != nil {
 		return Result{}, err
 	}
 
-	root, err := s.roots.Get(ctx, rootID)
+	collectionValue, err := s.collections.Get(ctx, ref)
 	if err != nil {
 		return Result{}, err
 	}
-	if !root.Enabled {
+	if err := collectionValue.Validate(); err != nil {
 		return Result{}, fmt.Errorf(
-			"%w: root %q is disabled",
+			"%w: collection reader returned an invalid collection: %w",
+			artifactstore.ErrInvalid,
+			err,
+		)
+	}
+	if collectionValue.Ref() != ref {
+		return Result{}, fmt.Errorf("%w: collection reader returned another collection", artifactstore.ErrInvalid)
+	}
+	if !collectionValue.Enabled {
+		return Result{}, fmt.Errorf(
+			"%w: collection %q is disabled",
 			artifactstore.ErrConflict,
-			rootID,
+			ref.CollectionID,
 		)
 	}
 
-	attachments, err := s.roots.ListAttachments(ctx, rootID)
+	attachments, err := s.collections.ListAttachments(ctx, ref)
 	if err != nil {
 		return Result{}, err
 	}
+
 	plansBySource := plan.BySource()
 
 	var previous catalog.Snapshot
-	previous, err = s.catalogs.GetCurrent(ctx, rootID)
+	previous, err = catalog.ReadCurrent(ctx, s.catalogs, ref)
 	hasPrevious := err == nil || errors.Is(err, artifactstore.ErrCatalogStale)
 	if !hasPrevious &&
 		!errors.Is(err, artifactstore.ErrCatalogUnavailable) {
 		return Result{}, err
 	}
-	if hasPrevious {
-		if err := previous.Validate(); err != nil {
-			return Result{}, fmt.Errorf(
-				"%w: catalog reader returned an invalid catalog: %w",
-				artifactstore.ErrInvalid,
-				err,
-			)
-		}
-		if previous.RootID != rootID {
-			return Result{}, fmt.Errorf("%w: catalog belongs to another root", artifactstore.ErrInvalid)
-		}
-	}
+
 	previousBySource := make(
 		map[artifactstore.SourceID][]catalog.Occurrence,
 	)
@@ -129,11 +138,13 @@ func (s *Service) Refresh(
 		)
 	}
 
+	expectedAttachmentRevisions := make(map[artifactstore.SourceID]uint64)
 	expectedSourceRevisions := make(map[artifactstore.SourceID]uint64)
 	sourceGenerations := make(map[artifactstore.SourceID]string)
 	finalOccurrences := make([]catalog.Occurrence, 0)
 	allDiagnostics := make([]artifactstore.Diagnostic, 0)
-	definitions := make(map[artifactstore.Digest]definition.Definition)
+	discoveredDefinitions := make(map[artifactstore.Digest]definition.Definition)
+
 	snapshots := make([]source.Snapshot, 0)
 	candidates := 0
 
@@ -148,12 +159,48 @@ func (s *Service) Refresh(
 	})
 
 	for _, attachment := range attachments {
+		if err := attachment.Validate(); err != nil {
+			return Result{}, fmt.Errorf(
+				"%w: collection reader returned an invalid attachment: %w",
+				artifactstore.ErrInvalid,
+				err,
+			)
+		}
+		if attachment.RootID != ref.RootID ||
+			attachment.CollectionID != ref.CollectionID {
+			return Result{}, fmt.Errorf("%w: attachment belongs to another collection", artifactstore.ErrInvalid)
+		}
 
-		sourceValue, err := s.sources.Get(ctx, attachment.SourceID)
+		if _, duplicate := expectedAttachmentRevisions[attachment.SourceID]; duplicate {
+			return Result{}, fmt.Errorf(
+				"%w: collection reader returned duplicate attachment source %q",
+				artifactstore.ErrInvalid,
+				attachment.SourceID,
+			)
+		}
+		expectedAttachmentRevisions[attachment.SourceID] = attachment.Revision
+
+		sourceValue, err := s.sources.Get(ctx, ref.RootID, attachment.SourceID)
 		if err != nil {
 			return Result{}, err
 		}
+		if sourceValue.ID != attachment.SourceID ||
+			sourceValue.RootID != ref.RootID {
+			return Result{}, fmt.Errorf(
+				"%w: source runtime returned a source that does not match attachment %q",
+				artifactstore.ErrInvalid,
+				attachment.SourceID,
+			)
+		}
+		if err := sourceValue.Validate(); err != nil {
+			return Result{}, fmt.Errorf(
+				"%w: source runtime returned an invalid source: %w",
+				artifactstore.ErrInvalid,
+				err,
+			)
+		}
 		if _, planned := plansBySource[sourceValue.ID]; planned &&
+
 			(!attachment.Enabled || !sourceValue.Enabled) {
 			return Result{}, fmt.Errorf(
 				"%w: discovery plan includes disabled source %q",
@@ -161,6 +208,7 @@ func (s *Service) Refresh(
 				sourceValue.ID,
 			)
 		}
+
 		expectedSourceRevisions[sourceValue.ID] = sourceValue.Revision
 
 		if !attachment.Enabled || !sourceValue.Enabled {
@@ -184,7 +232,8 @@ func (s *Service) Refresh(
 
 		discovered, err := s.discovery.Discover(
 			ctx,
-			rootID,
+			ref.RootID,
+			ref.CollectionID,
 			sourceValue.ID,
 			sourceValue.Kind,
 			snapshot,
@@ -194,6 +243,7 @@ func (s *Service) Refresh(
 		if err != nil {
 			return Result{}, err
 		}
+
 		finalOccurrences = append(
 			finalOccurrences,
 			discovered.Occurrences...,
@@ -203,7 +253,7 @@ func (s *Service) Refresh(
 			discovered.Diagnostics...,
 		)
 		candidates += discovered.Candidates
-		maps.Copy(definitions, discovered.Definitions)
+		maps.Copy(discoveredDefinitions, discovered.Definitions)
 	}
 
 	for sourceID := range plansBySource {
@@ -215,32 +265,58 @@ func (s *Service) Refresh(
 			)
 		}
 	}
-	digests := make([]artifactstore.Digest, 0, len(definitions))
-	for digest := range definitions {
+
+	catalog.SortOccurrences(finalOccurrences)
+
+	digests := make([]artifactstore.Digest, 0, len(discoveredDefinitions))
+	for digest := range discoveredDefinitions {
 		digests = append(digests, digest)
 	}
 	slices.Sort(digests)
 	for _, digest := range digests {
-		if _, err := s.definitions.Put(ctx, definitions[digest]); err != nil {
+		stored, err := s.definitions.Put(
+			ctx,
+			ref.RootID,
+			discoveredDefinitions[digest],
+		)
+		if err != nil {
 			return Result{}, err
+		}
+		canonicalStored, err := definition.Canonicalize(stored)
+		if err != nil {
+			return Result{}, fmt.Errorf(
+				"%w: definition repository returned an invalid definition: %w",
+				artifactstore.ErrInvalid,
+				err,
+			)
+		}
+		if canonicalStored.Digest != digest {
+			return Result{}, fmt.Errorf("%w: definition repository changed digest", artifactstore.ErrDigestMismatch)
 		}
 	}
 
-	existingRecords, err := s.records.ListByRoot(ctx, rootID)
+	existingArtifacts, err := s.artifacts.ListByCollection(ctx, ref)
 	if err != nil {
 		return Result{}, err
 	}
+	suppressions, err := s.artifacts.ListSuppressions(ctx, ref)
+	if err != nil {
+		return Result{}, err
+	}
+
 	reconciliation, err := s.reconciler.Reconcile(
 		ctx,
-		root,
+		collectionValue,
 		finalOccurrences,
-		existingRecords,
+		existingArtifacts,
+		suppressions,
 		s.definitions,
 		policy,
 	)
 	if err != nil {
 		return Result{}, err
 	}
+
 	allDiagnostics = artifactstore.AppendDiagnostics(
 		allDiagnostics,
 		reconciliation.Diagnostics...,
@@ -255,33 +331,83 @@ func (s *Service) Refresh(
 		}
 	}
 
+	planFingerprint, err := plan.Fingerprint()
+	if err != nil {
+		return Result{}, err
+	}
+	decoderFingerprint, err := s.discovery.DecoderFingerprint()
+	if err != nil {
+		return Result{}, err
+	}
+
 	publication := Publication{
-		RootID:                  rootID,
-		ExpectedCatalogRevision: previous.Revision,
-		ExpectedRootRevision:    root.Revision,
-		ExpectedSourceRevisions: expectedSourceRevisions,
-		SourceGenerations:       sourceGenerations,
-		Occurrences:             finalOccurrences,
-		RecordCreates:           reconciliation.Creates,
-		RecordUpdates:           reconciliation.Updates,
-		Diagnostics:             allDiagnostics,
-		PublishedAt:             s.clock.Now().UTC(),
+		Ref:                         ref,
+		ExpectedCatalogRevision:     previous.Revision,
+		ExpectedCollectionRevision:  collectionValue.Revision,
+		ExpectedAttachmentRevisions: expectedAttachmentRevisions,
+		ExpectedSourceRevisions:     expectedSourceRevisions,
+		SourceGenerations:           sourceGenerations,
+		PlanFingerprint:             planFingerprint,
+		DecoderFingerprint:          decoderFingerprint,
+		Occurrences:                 finalOccurrences,
+		ArtifactCreates:             reconciliation.Creates,
+		ArtifactUpdates:             reconciliation.Updates,
+		Diagnostics:                 allDiagnostics,
+		PublishedAt:                 s.clock.Now().UTC(),
 	}
 	published, err := s.publisher.Publish(ctx, publication)
 	if err != nil {
 		return Result{}, err
 	}
+	if err := published.Validate(); err != nil {
+		return Result{}, fmt.Errorf(
+			"%w: publisher returned an invalid catalog: %w",
+			artifactstore.ErrInvalid,
+			err,
+		)
+	}
+
+	expected := catalog.Snapshot{
+		RootID:              ref.RootID,
+		CollectionID:        ref.CollectionID,
+		Revision:            previous.Revision + 1,
+		CollectionRevision:  collectionValue.Revision,
+		AttachmentRevisions: maps.Clone(expectedAttachmentRevisions),
+		SourceRevisions:     maps.Clone(expectedSourceRevisions),
+		SourceGenerations:   maps.Clone(sourceGenerations),
+		PlanFingerprint:     planFingerprint,
+		DecoderFingerprint:  decoderFingerprint,
+		PublishedAt:         publication.PublishedAt,
+		Diagnostics:         artifactstore.CloneDiagnostics(allDiagnostics),
+		Occurrences:         make([]catalog.Occurrence, len(finalOccurrences)),
+	}
+	for index, occurrence := range finalOccurrences {
+		expected.Occurrences[index] = catalog.CloneOccurrence(occurrence)
+	}
+	if err := expected.Validate(); err != nil {
+		return Result{}, fmt.Errorf(
+			"%w: refresh service produced an invalid expected catalog: %w",
+			artifactstore.ErrInvalid,
+			err,
+		)
+	}
+	if !catalog.EqualSnapshot(published, expected) {
+		return Result{}, fmt.Errorf(
+			"%w: publisher returned a catalog that does not exactly match the publication",
+			artifactstore.ErrInvalid,
+		)
+	}
 
 	result := Result{
-		Catalog:     published,
-		Diagnostics: allDiagnostics,
+		Catalog:     catalog.CloneSnapshot(published),
+		Diagnostics: artifactstore.CloneDiagnostics(allDiagnostics),
 		Candidates:  candidates,
 	}
 	for _, value := range reconciliation.Creates {
-		result.CreatedRecords = append(result.CreatedRecords, value.ID)
+		result.CreatedArtifacts = append(result.CreatedArtifacts, value.ID)
 	}
 	for _, value := range reconciliation.Updates {
-		result.UpdatedRecords = append(result.UpdatedRecords, value.RecordID)
+		result.UpdatedArtifacts = append(result.UpdatedArtifacts, value.ArtifactID)
 	}
 	return result, nil
 }

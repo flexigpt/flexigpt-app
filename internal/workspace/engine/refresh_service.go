@@ -10,18 +10,18 @@ import (
 
 type Refresher struct {
 	workspaces *Service
-	loader     *DefinitionLoader
+	loader     *DescriptorLoader
 	planner    *Planner
 	runner     refresh.Runner
-	policy     *RecordPolicy
+	policy     *ArtifactPolicy
 }
 
 func NewRefresher(
 	workspaces *Service,
-	loader *DefinitionLoader,
+	loader *DescriptorLoader,
 	planner *Planner,
 	runner refresh.Runner,
-	policy *RecordPolicy,
+	policy *ArtifactPolicy,
 ) (*Refresher, error) {
 	if workspaces == nil ||
 		loader == nil ||
@@ -44,9 +44,12 @@ func NewRefresher(
 
 func (r *Refresher) Refresh(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	workspace artifactstore.CollectionRef,
 ) (refresh.Result, error) {
-	value, err := r.workspaces.Get(ctx, rootID)
+	if err := workspace.Validate(); err != nil {
+		return refresh.Result{}, err
+	}
+	value, err := r.workspaces.PrepareRefresh(ctx, workspace)
 	if err != nil {
 		return refresh.Result{}, err
 	}
@@ -54,18 +57,27 @@ func (r *Refresher) Refresh(
 	if err != nil {
 		return refresh.Result{}, err
 	}
-	plan, err := r.planner.Build(value, observation.Preferences)
+	plan, err := r.planner.Build(value, observation)
 	if err != nil {
 		return refresh.Result{}, err
 	}
 	if observation.SourceID != "" {
+		found := false
 		for index := range plan.Sources {
 			if plan.Sources[index].SourceID != observation.SourceID {
 				continue
 			}
 			plan.Sources[index].ExpectedGeneration = observation.Generation
+			found = true
 			break
 		}
+		if !found {
+			return refresh.Result{}, fmt.Errorf(
+				"%w: descriptor source %q is not part of the Workspace discovery plan",
+				ErrInvalidWorkspace,
+				observation.SourceID,
+			)
+		}
 	}
-	return r.runner.Refresh(ctx, rootID, plan, r.policy)
+	return r.runner.Refresh(ctx, workspace, plan, r.policy)
 }

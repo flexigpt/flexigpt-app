@@ -1,39 +1,19 @@
 package engine
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 )
 
 func DefaultDiscoveryProfiles() DiscoveryProfiles {
 	return DiscoveryProfiles{
-		Primary: DiscoveryProfile{
-			ExplicitLocators: []artifactstore.Locator{
-				DefinitionLocator,
-			},
-			DirectoryRoots: []discovery.DirectoryRoot{
-				{
-					Root:      WorkspaceMetadataLocator,
-					Recursive: true,
-					IncludePatterns: []string{
-						jsonFilePattern,
-						yamlFilePattern,
-						yamlShortFilePattern,
-						markdownFilePattern,
-					},
-				},
-			},
-		},
+		Primary: DiscoveryProfile{},
 		Attached: DiscoveryProfile{
 			DirectoryRoots: []discovery.DirectoryRoot{
 				{
 					Root:      RepositoryRootLocator,
 					Recursive: true,
 					IncludePatterns: []string{
-						jsonFilePattern,
-						yamlFilePattern,
-						yamlShortFilePattern,
 						markdownFilePattern,
 					},
 				},
