@@ -3,6 +3,7 @@ package workspace_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
@@ -15,6 +16,9 @@ import (
 func TestFilesystemWorkspaceRefreshContextSkillAndCurrentCatalogPin(
 	t *testing.T,
 ) {
+	if runtime.GOOS == "windows" {
+		t.Skip("non-win test")
+	}
 	t.Parallel()
 
 	ctx := t.Context()
