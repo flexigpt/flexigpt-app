@@ -461,30 +461,31 @@ No API infers durable identity from an encoded runtime string.
 
 ## 12. Current implementation status
 
-| Capability                              | Status                    | Current implementation                                                                                                          |
-| --------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Filesystem and empty Workspace creation | Present                   | Provisioning creates Sources and typed Collections with compensation.                                                           |
-| Workspace Collection identity           | Present                   | A Workspace is a `workspace.collection` addressed by `WorkspaceRef`.                                                            |
-| Shared application Artifact Store       | Present                   | Application startup opens one Artifact Store and injects its services into Workspace.                                           |
-| Attachment role policy                  | Present as reusable logic | Primary, built-in, library, package, and overlay roles exist for Collection attachments.                                        |
-| Workspace discovery planning            | Present                   | Defaults, profile scopes, explicit decoder hints, preferences, bootstrap definition, and bounds are implemented.                |
-| Portable Workspace descriptor           | Present foundation        | `.flexigpt/workspace.json` is read as a portable Collection descriptor and remains outside Workspace Artifact Records.          |
-| Context decoding and composition        | Present                   | Context validation, ordering, budgets, truncation, and diagnostics exist.                                                       |
-| Context inference integration           | Present                   | The Workspace inference bridge resolves Context, injects bounded current-turn input, and returns usage provenance.              |
-| Skill Markdown parsing                  | Present                   | `SKILL.md` parsing and validation are implemented in the Workspace Skill adapter.                                               |
-| Shared `agent.skill` definition         | Present                   | Workspace uses the shared `agent.skill` definition and decoder.                                                                 |
-| Skill filesystem runtime handoff        | Present                   | Any Source adapter explicitly advertising trusted local paths can perform the verified `SKILL.md` runtime handoff.              |
-| Full package freshness                  | Point-in-time verified    | Source generation is verified before and after trusted package handoff; portable closure export remains planned.                |
-| Heterogeneous Collection support        | Present foundation        | Workspace uses one collection-scoped catalog and Artifact lifecycle for all registered supported kinds.                         |
-| Workspace import and export             | Not present               | There is no portable Collection codec, URI resolver, closure builder, or archive workflow.                                      |
-| Typed Workspace and Artifact refs       | Present                   | Workspace uses `WorkspaceRef` and `ArtifactRef`; runtime handles remain process-local.                                          |
-| Runtime reconciliation                  | Present and derived       | Wails wrappers enqueue coalesced runtime reconciliation after durable Workspace mutations; metadata commits do not wait for it. |
-| Generic Source mutation reconciliation  | Present and derived       | Artifact Store wrapper mutations schedule root-scoped Workspace runtime reconciliation without coupling Artifact Store to runtime. |
-| Workspace Artifact purge                | Present                   | Workspace exposes membership-checked destructive Artifact purge and schedules derived runtime reconciliation.                    |
-| Primary Source lifecycle                | Present                   | Empty Workspaces can gain, replace, or explicitly clear one primary filesystem Source through a dedicated operation.            |
-| Attached Source provisioning            | Present for current scope | Artifact Store exposes Source lifecycle APIs and Workspace attaches existing Sources through typed attachment roles.            |
-| Workspace retirement and purge          | Present                   | Retirement is reversible only through retained metadata; typed purge verifies retired `workspace.collection` kind before delete. |
-| Future artifact kinds                   | Not present               | MCP, Tool, Model, Agent, and Assistant paths are absent.                                                                        |
+| Capability                              | Status                    | Current implementation                                                                                                                                                               |
+| --------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Filesystem and empty Workspace creation | Present                   | Provisioning creates Sources and typed Collections with compensation.                                                                                                                |
+| Workspace Collection identity           | Present                   | A Workspace is a `workspace.collection` addressed by `WorkspaceRef`.                                                                                                                 |
+| Shared application Artifact Store       | Present                   | Application startup opens one Artifact Store and injects its services into Workspace.                                                                                                |
+| Attachment role policy                  | Present as reusable logic | Primary, built-in, library, package, and overlay roles exist for Collection attachments.                                                                                             |
+| Workspace discovery planning            | Present                   | Defaults, profile scopes, explicit decoder hints, preferences, bootstrap definition, and bounds are implemented.                                                                     |
+| Portable Workspace descriptor           | Present foundation        | `.flexigpt/workspace.json` is read as a portable Collection descriptor and remains outside Workspace Artifact Records.                                                               |
+| Context decoding and composition        | Present                   | Context validation, ordering, budgets, truncation, and diagnostics exist.                                                                                                            |
+| Context inference integration           | Present                   | The Workspace inference bridge resolves Context, injects bounded current-turn input, and returns usage provenance.                                                                   |
+| Skill Markdown parsing                  | Present                   | `SKILL.md` parsing and validation are implemented in the Workspace Skill adapter.                                                                                                    |
+| Shared `agent.skill` definition         | Present                   | Workspace uses the shared `agent.skill` definition and decoder.                                                                                                                      |
+| Skill filesystem runtime handoff        | Present                   | Any Source adapter explicitly advertising trusted local paths can perform the verified `SKILL.md` runtime handoff.                                                                   |
+| Full package freshness                  | Point-in-time verified    | Source generation is verified before and after trusted package handoff; portable closure export remains planned.                                                                     |
+| Heterogeneous Collection support        | Present foundation        | Workspace uses one collection-scoped catalog and Artifact lifecycle for all registered supported kinds.                                                                              |
+| Workspace import and export             | Not present               | There is no portable Collection codec, URI resolver, closure builder, or archive workflow.                                                                                           |
+| Typed Workspace and Artifact refs       | Present                   | Workspace uses `WorkspaceRef` and `ArtifactRef`; runtime handles remain process-local.                                                                                               |
+| Runtime reconciliation                  | Present and derived       | Wails wrappers enqueue coalesced runtime reconciliation after durable Workspace mutations; metadata commits do not wait for it.                                                      |
+| Generic Source mutation reconciliation  | Present and derived       | Artifact Store wrapper mutations schedule root-scoped Workspace runtime reconciliation without coupling Artifact Store to runtime.                                                   |
+| Workspace Artifact purge                | Present                   | Workspace exposes membership-checked destructive Artifact purge and schedules derived runtime reconciliation.                                                                        |
+| Primary Source lifecycle                | Present                   | Empty Workspaces can gain, replace, or explicitly clear one primary filesystem Source through a dedicated operation.                                                                 |
+| Attached Source provisioning            | Present for current scope | Artifact Store exposes Source lifecycle APIs and Workspace attaches existing Sources through typed attachment roles.                                                                 |
+| Workspace retirement and purge          | Present                   | Retirement is reversible only through retained metadata; typed purge verifies retired `workspace.collection` kind before delete.                                                     |
+| Core end-to-end verification            | Present                   | Tests cover filesystem Workspace refresh, Context and Skill projection, current-catalog pinning, attached arbitrary Markdown, suppression, unsuppression, and automatic re-adoption. |
+| Future artifact kinds                   | Not present               | MCP, Tool, Model, Agent, and Assistant paths are absent.                                                                                                                             |
 
 ## 13. Next steps
 
@@ -509,6 +510,12 @@ Workspace APIs remain the public mutation boundary for Workspace state. The
 historical implementation items in sections 13.1 through 13.8 are complete for
 the current Workspace scope. Only transfer, portable closure work, and future
 artifact domains remain deferred.
+
+No raw generic Collection mutation endpoint is exposed as a Workspace API.
+Workspace mutations remain typed so Collection kind, attachment role, and
+opaque local data are validated by Workspace policy. Generic Artifact Store
+public APIs intentionally stop at Root, Source, managed-package, and scoped
+destructive Artifact operations.
 
 ### 13.1 Complete Artifact Store prerequisites
 
@@ -586,6 +593,12 @@ The Workspace verification suite must cover:
 - Context prompt composition and inference hydration provenance.
 - Skill Source generation and `SKILL.md` digest verification.
 - Retirement and typed Workspace purge.
+
+The implemented suite also verifies that an empty Workspace can attach a
+filesystem library Source, discover arbitrary Markdown through explicit
+decoder hints, suppress an automatically adopted occurrence, and re-adopt it
+only after explicit unsuppression and refresh. Transfer, archive, URI, and
+future-domain verification remain deferred with their corresponding features.
 
 ## 14. Acceptance outcomes
 

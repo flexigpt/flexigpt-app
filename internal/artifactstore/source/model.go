@@ -3,6 +3,7 @@ package source
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
@@ -176,6 +177,13 @@ func (e Entry) Validate() error {
 	}
 	if e.Name == "" {
 		return fmt.Errorf("%w: source entry name is empty", artifactstore.ErrInvalid)
+	}
+	if e.Locator != "." &&
+		e.Name != path.Base(string(e.Locator)) {
+		return fmt.Errorf(
+			"%w: source entry name does not match locator",
+			artifactstore.ErrInvalid,
+		)
 	}
 	if e.SizeBytes < 0 {
 		return fmt.Errorf("%w: source entry size is negative", artifactstore.ErrInvalid)

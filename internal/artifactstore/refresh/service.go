@@ -149,9 +149,8 @@ func (s *Service) Refresh(
 	candidates := 0
 
 	defer func() {
-		for _, snapshot := range snapshots {
-			_ = snapshot.Close()
-		}
+		// Early-return cleanup must not obscure the operation failure.
+		_ = closeRefreshSnapshots(snapshots)
 	}()
 
 	sort.Slice(attachments, func(left, right int) bool {
@@ -331,6 +330,12 @@ func (s *Service) Refresh(
 		}
 	}
 
+	closeErr := closeRefreshSnapshots(snapshots)
+	snapshots = nil
+	if closeErr != nil {
+		return Result{}, closeErr
+	}
+
 	planFingerprint, err := plan.Fingerprint()
 	if err != nil {
 		return Result{}, err
@@ -410,4 +415,15 @@ func (s *Service) Refresh(
 		result.UpdatedArtifacts = append(result.UpdatedArtifacts, value.ArtifactID)
 	}
 	return result, nil
+}
+
+func closeRefreshSnapshots(values []source.Snapshot) error {
+	var closeErr error
+	for _, snapshot := range values {
+		if snapshot == nil {
+			continue
+		}
+		closeErr = errors.Join(closeErr, snapshot.Close())
+	}
+	return closeErr
 }

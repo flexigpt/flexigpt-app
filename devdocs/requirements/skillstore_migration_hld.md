@@ -475,31 +475,37 @@ transport values only where explicitly required. They are not durable identity.
 
 ## 9. Current implementation status
 
-| Capability                          | Status                        | Current implementation                                                                                         |
-| ----------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `SKILL.md` parsing and validation   | Present                       | `agentskills-go` is used by managed creation and Workspace discovery.                                          |
-| Managed Skill document creation     | Present as reusable behavior  | `PutSkillArtifact` marshals, parses, and writes a valid package.                                               |
-| Managed Artifact Source             | Present at platform layer     | Artifact Store has a MapStore-backed staged writable Source; standalone Skill Store adoption remains deferred. |
-| Skill bundle Collection             | Not present                   | Bundles are MapFileStore records.                                                                              |
-| Portable Skill Bundle Definition    | Not present                   | Current `skills.json` is application metadata rather than a portable Collection schema.                        |
-| Shared `agent.skill` definition     | Present for Workspace         | Workspace emits and validates the shared `agent.skill` definition; installed Skills remain deferred.           |
-| External Source linkage             | Incompatible                  | Absolute location is persisted in `Skill.Location`.                                                            |
-| Built-in hydration                  | Present as reusable mechanism | Embedded content is copied to a filesystem directory with a digest marker.                                     |
-| Built-in normal Collection state    | Not present                   | Enablement uses bundle and Skill overlay flags.                                                                |
-| Agent Skills runtime                | Present                       | Registration, sessions, prompts, rendering, resources, and scripts are implemented.                            |
-| Workspace Skill digest verification | Present at handoff            | Definition, Source generation, `SKILL.md`, and package symlink checks occur before runtime registration.       |
-| Typed Artifact Skill refs           | Present for Workspace         | Workspace runtime selection uses `ArtifactRef`; installed legacy references remain intentionally.              |
+| Capability                          | Status                        | Current implementation                                                                                                                                                                                         |
+| ----------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SKILL.md` parsing and validation   | Present                       | `agentskills-go` is used by managed creation and Workspace discovery.                                                                                                                                          |
+| Managed Skill document creation     | Present as reusable behavior  | `PutSkillArtifact` marshals, parses, and writes a valid package.                                                                                                                                               |
+| Managed Artifact Source             | Present at platform layer     | Artifact Store has a MapStore-backed staged writable Source with contained private files and full package-generation coverage; standalone Skill Store adoption remains deferred.                               |
+| Skill bundle Collection             | Not present                   | Bundles are MapFileStore records.                                                                                                                                                                              |
+| Portable Skill Bundle Definition    | Not present                   | Current `skills.json` is application metadata rather than a portable Collection schema.                                                                                                                        |
+| Shared `agent.skill` definition     | Present for Workspace         | Workspace emits and validates the shared `agent.skill` definition; installed Skills remain deferred.                                                                                                           |
+| External Source linkage             | Incompatible                  | Absolute location is persisted in `Skill.Location`.                                                                                                                                                            |
+| Built-in hydration                  | Present as reusable mechanism | Embedded content is copied to a filesystem directory with a digest marker.                                                                                                                                     |
+| Built-in normal Collection state    | Not present                   | Enablement uses bundle and Skill overlay flags.                                                                                                                                                                |
+| Agent Skills runtime                | Present                       | Registration, sessions, prompts, rendering, resources, and scripts are implemented.                                                                                                                            |
+| Workspace Skill digest verification | Present at handoff            | Definition, Source generation, `SKILL.md`, and package symlink checks occur before runtime registration.                                                                                                       |
+| Typed Artifact Skill refs           | Present for Workspace         | Workspace runtime selection uses `ArtifactRef`; installed legacy references remain intentionally.                                                                                                              |
 | Same-name policy                    | Partial                       | Aggregate listing marks simultaneously eligible same-name Skills unavailable, and runtime resolution withholds ambiguous durable references. A unified migrated-Collection precedence policy remains deferred. |
-| Assistant preset integration        | Incompatible                  | Assistant presets persist the current Skill Store reference type.                                              |
-| Individual Skill import and export  | Not present                   | There is no native Skill transfer service or package closure builder.                                          |
-| Skill bundle import and export      | Not present                   | There is no portable bundle manifest, relative member resolver, or deterministic archive workflow.             |
-| Ordered metadata migrations         | Not present                   | User Skills use a single map-file schema and built-ins use a separate overlay database.                        |
+| Assistant preset integration        | Incompatible                  | Assistant presets persist the current Skill Store reference type.                                                                                                                                              |
+| Individual Skill import and export  | Not present                   | There is no native Skill transfer service or package closure builder.                                                                                                                                          |
+| Skill bundle import and export      | Not present                   | There is no portable bundle manifest, relative member resolver, or deterministic archive workflow.                                                                                                             |
+| Ordered metadata migrations         | Not present                   | User Skills use a single map-file schema and built-ins use a separate overlay database.                                                                                                                        |
 
 ## 10. Next steps
 
 The Artifact Store and Workspace completion does not change standalone Skill
 Store durable ownership. Its direct package implementation remains active
 legacy behavior, not dead code and not an Artifact Store managed Source.
+
+Accordingly, this completion pass intentionally performs no deletion or
+dual-write conversion in `internal/skillstore`. Its direct package creation,
+embedded hydration, MapFileStore metadata, and built-in overlay files are not
+dead code. They remain required until the dedicated one-way migration updates
+assistant preset and conversation references in the same release.
 
 Accordingly, `internal/skillstore` filesystem package creation, embedded
 hydration, MapFileStore metadata, built-in overlays, and installed Skill

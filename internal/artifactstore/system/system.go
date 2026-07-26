@@ -360,6 +360,13 @@ func (c *Components) PublishManagedPackage(
 	expectedSourceRevision uint64,
 	publication source.ManagedPackagePublication,
 ) (ManagedPackageResult, error) {
+	normalizedPublication, err := source.NormalizeManagedPackagePublication(
+		publication,
+	)
+	if err != nil {
+		return ManagedPackageResult{}, err
+	}
+
 	value, err := c.managedSource(
 		ctx,
 		rootID,
@@ -369,6 +376,7 @@ func (c *Components) PublishManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
+	publication = normalizedPublication
 
 	beforeGeneration, err := sourceSnapshotGeneration(
 		ctx,
@@ -433,6 +441,13 @@ func (c *Components) RemoveManagedPackage(
 	directory artifactstore.Locator,
 	expectedGeneration string,
 ) (ManagedPackageResult, error) {
+	if err := source.ValidateManagedPackageDirectory(directory); err != nil {
+		return ManagedPackageResult{}, err
+	}
+	if err := artifactstore.ValidateSourceGeneration(expectedGeneration); err != nil {
+		return ManagedPackageResult{}, err
+	}
+
 	value, err := c.managedSource(
 		ctx,
 		rootID,
@@ -440,9 +455,6 @@ func (c *Components) RemoveManagedPackage(
 		expectedSourceRevision,
 	)
 	if err != nil {
-		return ManagedPackageResult{}, err
-	}
-	if err := source.ValidateManagedPackageDirectory(directory); err != nil {
 		return ManagedPackageResult{}, err
 	}
 

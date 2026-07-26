@@ -2,6 +2,7 @@ package skilladapter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -507,17 +508,17 @@ func verifySourceGeneration(
 	if err != nil {
 		return err
 	}
-	defer snapshot.Close()
 	if snapshot.Generation() != expected {
-		return fmt.Errorf(
+		mismatchErr := fmt.Errorf(
 			"%w: Workspace Skill source changed since catalog publication",
 			artifactstore.ErrCatalogStale,
 		)
+		return errors.Join(mismatchErr, snapshot.Close())
 	}
-	if err := snapshot.Confirm(ctx); err != nil {
-		return err
-	}
-	return nil
+
+	confirmErr := snapshot.Confirm(ctx)
+	closeErr := snapshot.Close()
+	return errors.Join(confirmErr, closeErr)
 }
 
 func (f *Adapter) supportsRuntimePath(

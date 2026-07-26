@@ -160,11 +160,6 @@ func validateAppliedSchemaMigrations(
 	db *sql.DB,
 	values []migration,
 ) error {
-	known := make(map[int]string, len(values))
-	for _, value := range values {
-		known[value.version] = value.fingerprint
-	}
-
 	rows, err := db.QueryContext(
 		ctx,
 		`SELECT version, fingerprint
@@ -176,21 +171,30 @@ func validateAppliedSchemaMigrations(
 	}
 	defer rows.Close()
 
+	expectedIndex := 0
 	for rows.Next() {
 		var version int
 		var fingerprint string
 		if err := rows.Scan(&version, &fingerprint); err != nil {
 			return fmt.Errorf("read artifact schema ledger entry: %w", err)
 		}
-		expected, supported := known[version]
-		if !supported {
+		if expectedIndex >= len(values) {
 			return fmt.Errorf(
 				"%w: artifact metadata database contains unknown migration %d",
 				artifactstore.ErrUnsupported,
 				version,
 			)
 		}
-		if fingerprint != expected {
+		expected := values[expectedIndex]
+		if version != expected.version {
+			return fmt.Errorf(
+				"%w: artifact metadata migration ledger is not an ordered prefix; expected migration %d before %d",
+				artifactstore.ErrUnsupported,
+				expected.version,
+				version,
+			)
+		}
+		if fingerprint != expected.fingerprint {
 			return fmt.Errorf(
 				"%w: artifact schema migration %d has fingerprint %q",
 				artifactstore.ErrUnsupported,
@@ -198,6 +202,7 @@ func validateAppliedSchemaMigrations(
 				fingerprint,
 			)
 		}
+		expectedIndex++
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("read artifact schema ledger: %w", err)

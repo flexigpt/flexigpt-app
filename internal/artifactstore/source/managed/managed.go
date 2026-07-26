@@ -61,11 +61,17 @@ func New(base string) (*Adapter, error) {
 		)
 	}
 
-	policy := fsdir.DefaultTraversalPolicy()
-	policy.ExcludedDirectoryNames = append(
-		policy.ExcludedDirectoryNames,
-		stagingDirectoryName,
-	)
+	// Managed packages are application-owned immutable payloads. Their source
+	// generation must cover every published package file, including ordinary
+	// directories such as vendor, node_modules, resources, and scripts.
+	//
+	// The external-filesystem traversal defaults intentionally omit expensive
+	// project directories. Those defaults are not appropriate here. Only the
+	// adapter's private staging directory is excluded.
+	policy := fsdir.TraversalPolicy{
+		ExcludedDirectoryNames: []string{stagingDirectoryName},
+		SkipGitSubmodules:      true,
+	}
 	filesystem, err := fsdir.NewWithTraversalPolicy(&policy)
 	if err != nil {
 		return nil, err
@@ -525,14 +531,14 @@ func validatePublication(
 		return nil, err
 	}
 
-	if firstSegment(normalized.Directory) == stagingDirectoryName {
+	if containsReservedSegment(normalized.Directory) {
 		return nil, fmt.Errorf(
 			"%w: managed package uses a reserved directory",
 			artifactstore.ErrInvalid,
 		)
 	}
 	for index, file := range normalized.Files {
-		if firstSegment(file.Locator) == stagingDirectoryName {
+		if containsReservedSegment(file.Locator) {
 			return nil, fmt.Errorf(
 				"%w: managed package files[%d] use a reserved directory",
 				artifactstore.ErrInvalid,
@@ -550,15 +556,22 @@ func validatePackageDirectory(directory artifactstore.Locator) error {
 	); err != nil {
 		return err
 	}
+	if containsReservedSegment(directory) {
+		return fmt.Errorf(
+			"%w: managed package uses a reserved directory",
+			artifactstore.ErrInvalid,
+		)
+	}
 	return source.ValidateManagedPackageDirectory(directory)
 }
 
-func firstSegment(locator artifactstore.Locator) string {
-	value := string(locator)
-	if before, _, found := strings.Cut(value, "/"); found {
-		return before
+func containsReservedSegment(locator artifactstore.Locator) bool {
+	for segment := range strings.SplitSeq(string(locator), "/") {
+		if strings.EqualFold(segment, stagingDirectoryName) {
+			return true
+		}
 	}
-	return value
+	return false
 }
 
 func managedPackagePath(
@@ -832,7 +845,12 @@ func writeManagedPackageFiles(
 	if err != nil {
 		return err
 	}
-	defer func() { _ = directoryStore.CloseAll() }()
+	storesClosed := false
+	defer func() {
+		if !storesClosed {
+			_ = directoryStore.CloseAll()
+		}
+	}()
 
 	for _, file := range files {
 		parent := path.Dir(string(file.Locator))
@@ -889,6 +907,7 @@ func writeManagedPackageFiles(
 	if err := directoryStore.CloseAll(); err != nil {
 		return err
 	}
+	storesClosed = true
 	return secureAndSyncManagedPackage(root)
 }
 

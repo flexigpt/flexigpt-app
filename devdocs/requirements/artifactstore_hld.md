@@ -661,10 +661,11 @@ Consumer APIs wrap these operations with typed feature semantics.
 | Ordered schema migrations                   | Present               | SQLite uses an ordered migration ledger with immutable migration fingerprints and rejects unknown future migrations.                                                                                                                                               |
 | Shared application composition              | Present for Workspace | Application startup opens one Artifact Store and injects it into Workspace; legacy Skill Store persistence remains intentionally separate.                                                                                                                         |
 | Trusted local-path handoff                  | Present               | Filesystem Sources optionally implement `LocalPathResolver`.                                                                                                                                                                                                       |
-| MapStore-backed content files               | Present               | Root-scoped immutable definitions and application-managed package payload files are written through bounded, contained MapDirectoryStore and MapFileStore layouts.                                                                                                 |
+| MapStore-backed content files               | Present and hardened  | Root-scoped immutable definitions and application-managed package payload files use bounded MapDirectoryStore and MapFileStore layouts, reject escaping partition paths, and create private `0600` files.                                                          |
 | Public Root and Source lifecycle API        | Present               | Root retirement and purge plus Source create, read, list, update, retire, purge, kind discovery, and managed-generation inspection are exposed without returning config. Source metadata updates preserve hidden configuration when replacement config is omitted. |
 | Workspace runtime invalidation integration  | Present               | App composition schedules derived Workspace Skill reconciliation after Source, managed-package, and generic Artifact mutations.                                                                                                                                    |
 | Database relationship invariants            | Present               | SQLite triggers reject enabled attachments without enabled Sources and reject new records, suppressions, or occurrences without attachments.                                                                                                                       |
+| Core persistence verification               | Present               | Migration ledgers reject non-prefix histories; tests cover SQLite migration validation, managed package revision and generation advancement, and attached Workspace suppression reconciliation.                                                                    |
 | Legacy filesystem definition repository     | Removed               | `definition/maprepo` is the sole active definition repository implementation.                                                                                                                                                                                      |
 
 ## 11. Next steps
@@ -690,6 +691,16 @@ before their metadata row is published. A failed metadata creation compensates
 that empty bootstrap directory. Existing Sources from an earlier schema with
 an empty acknowledgement perform a one-time metadata repair before accepting
 another package mutation.
+
+Managed package generations cover every published payload directory. The
+managed adapter excludes only its private staging directory, rather than
+inheriting the broad project traversal exclusions used by external filesystem
+Sources. This preserves generation-based runtime freshness for normal package
+resources and scripts.
+
+MapStore remains the sole Artifact Store implementation for immutable
+definition files and application-managed package payload files. External
+filesystem Sources remain direct filesystem adapters by design.
 
 Public Source updates treat omitted configuration as "preserve current private
 configuration". Callers can therefore change display name or enablement without
