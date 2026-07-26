@@ -18,6 +18,20 @@ type PurgeArtifactResponse struct {
 	Artifact artifactstore.ArtifactRef `json:"artifact"`
 }
 
+type GetManagedSourceStateRequest struct {
+	RootID   artifactstore.RootID   `json:"rootID"   required:"true"`
+	SourceID artifactstore.SourceID `json:"sourceID" required:"true"`
+}
+
+type GetManagedSourceStateResponseBody struct {
+	Generation string         `json:"generation"`
+	Source     source.Summary `json:"source"`
+}
+
+type GetManagedSourceStateResponse struct {
+	Body *GetManagedSourceStateResponseBody
+}
+
 type PublishManagedSourcePackageRequestBody struct {
 	ExpectedSourceRevision uint64                      `json:"expectedSourceRevision"       required:"true"`
 	Directory              artifactstore.Locator       `json:"directory"                    required:"true"`
@@ -55,6 +69,30 @@ type RemoveManagedSourcePackageResponseBody struct {
 
 type RemoveManagedSourcePackageResponse struct {
 	Body *RemoveManagedSourcePackageResponseBody
+}
+
+func (w *ArtifactStoreWrapper) GetManagedSourceState(
+	request *GetManagedSourceStateRequest,
+) (*GetManagedSourceStateResponse, error) {
+	return middleware.WithRecoveryResp(func() (*GetManagedSourceStateResponse, error) {
+		if w == nil || w.components == nil || request == nil {
+			return nil, errors.New("artifact store wrapper is not initialized")
+		}
+		result, err := w.components.GetManagedSourceState(
+			context.Background(),
+			request.RootID,
+			request.SourceID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return &GetManagedSourceStateResponse{
+			Body: &GetManagedSourceStateResponseBody{
+				Generation: result.Generation,
+				Source:     result.Source,
+			},
+		}, nil
+	})
 }
 
 func (w *ArtifactStoreWrapper) PurgeArtifact(

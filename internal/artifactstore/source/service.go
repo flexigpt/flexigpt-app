@@ -2,6 +2,8 @@ package source
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -41,6 +43,15 @@ func (s *Service) Create(
 	rootID artifactstore.RootID,
 	draft Draft,
 ) (Summary, error) {
+	if ctx == nil {
+		return Summary{}, fmt.Errorf(
+			"%w: source creation context is nil",
+			artifactstore.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return Summary{}, err
+	}
 	if err := artifactstore.ValidateRootID(rootID); err != nil {
 		return Summary{}, err
 	}
@@ -90,11 +101,45 @@ func (s *Service) Create(
 		CreatedAt:   now,
 		ModifiedAt:  now,
 	}
+
+	var bootstrapper ManagedSourceBootstrapper
+	if candidate, supported := adapter.(ManagedSourceBootstrapper); supported {
+		bootstrapper = candidate
+	}
+	cleanupBootstrap := func(cause error) error {
+		if bootstrapper == nil {
+			return cause
+		}
+		cleanupErr := bootstrapper.DiscardBootstrappedManagedSource(
+			context.WithoutCancel(ctx),
+			value.Clone(),
+		)
+		return errors.Join(cause, cleanupErr)
+	}
+
+	if bootstrapper != nil {
+		generation, err := bootstrapper.BootstrapManagedSource(
+			ctx,
+			value.Clone(),
+		)
+		if err != nil {
+			return Summary{}, cleanupBootstrap(err)
+		}
+		if err := artifactstore.ValidateSourceGeneration(generation); err != nil {
+			return Summary{}, cleanupBootstrap(fmt.Errorf(
+				"%w: managed Source bootstrap returned an invalid generation: %w",
+				artifactstore.ErrInvalid,
+				err,
+			))
+		}
+		value.ContentGeneration = generation
+	}
+
 	if err := value.Validate(); err != nil {
-		return Summary{}, err
+		return Summary{}, cleanupBootstrap(err)
 	}
 	if err := s.repository.Create(ctx, value); err != nil {
-		return Summary{}, err
+		return Summary{}, cleanupBootstrap(err)
 	}
 	return value.Summary(), nil
 }
@@ -121,6 +166,9 @@ func (s *Service) List(
 	ctx context.Context,
 	rootID artifactstore.RootID,
 ) ([]Summary, error) {
+	if err := artifactstore.ValidateRootID(rootID); err != nil {
+		return nil, err
+	}
 	values, err := s.repository.List(ctx, rootID)
 	if err != nil {
 		return nil, err
@@ -138,6 +186,12 @@ func (s *Service) Update(
 	id artifactstore.SourceID,
 	update Update,
 ) (Summary, error) {
+	if err := artifactstore.ValidateRootID(rootID); err != nil {
+		return Summary{}, err
+	}
+	if err := artifactstore.ValidateSourceID(id); err != nil {
+		return Summary{}, err
+	}
 	if update.ExpectedRevision == 0 {
 		return Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
@@ -164,16 +218,24 @@ func (s *Service) Update(
 			current.Kind,
 		)
 	}
-	config, err := adapter.NormalizeConfig(ctx, update.Config)
-	if err != nil {
-		return Summary{}, err
-	}
-	config, err = jsoncanon.CanonicalizeObject(
-		config,
-		artifactstore.MaxConfigBytes,
-	)
-	if err != nil {
-		return Summary{}, err
+
+	config := append(json.RawMessage(nil), current.Config...)
+	if update.Config != nil {
+		normalized, err := adapter.NormalizeConfig(
+			ctx,
+			append(json.RawMessage(nil), update.Config...),
+		)
+		if err != nil {
+			return Summary{}, err
+		}
+		normalized, err = jsoncanon.CanonicalizeObject(
+			normalized,
+			artifactstore.MaxConfigBytes,
+		)
+		if err != nil {
+			return Summary{}, err
+		}
+		config = normalized
 	}
 
 	next := current
@@ -208,6 +270,12 @@ func (s *Service) Retire(
 	id artifactstore.SourceID,
 	expectedRevision uint64,
 ) (Summary, error) {
+	if err := artifactstore.ValidateRootID(rootID); err != nil {
+		return Summary{}, err
+	}
+	if err := artifactstore.ValidateSourceID(id); err != nil {
+		return Summary{}, err
+	}
 	if expectedRevision == 0 {
 		return Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",

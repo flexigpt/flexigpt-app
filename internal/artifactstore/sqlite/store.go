@@ -89,6 +89,13 @@ func applySchemaMigrations(
 	); err != nil {
 		return fmt.Errorf("initialize artifact schema ledger: %w", err)
 	}
+	if err := validateAppliedSchemaMigrations(
+		ctx,
+		db,
+		schemaMigrations,
+	); err != nil {
+		return err
+	}
 	for _, migration := range schemaMigrations {
 		var fingerprint string
 		err := db.QueryRowContext(
@@ -144,6 +151,56 @@ func applySchemaMigrations(
 		if err := tx.Commit(); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateAppliedSchemaMigrations(
+	ctx context.Context,
+	db *sql.DB,
+	values []migration,
+) error {
+	known := make(map[int]string, len(values))
+	for _, value := range values {
+		known[value.version] = value.fingerprint
+	}
+
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT version, fingerprint
+		 FROM artifact_schema_migrations
+		 ORDER BY version`,
+	)
+	if err != nil {
+		return fmt.Errorf("read artifact schema ledger: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var version int
+		var fingerprint string
+		if err := rows.Scan(&version, &fingerprint); err != nil {
+			return fmt.Errorf("read artifact schema ledger entry: %w", err)
+		}
+		expected, supported := known[version]
+		if !supported {
+			return fmt.Errorf(
+				"%w: artifact metadata database contains unknown migration %d",
+				artifactstore.ErrUnsupported,
+				version,
+			)
+		}
+		if fingerprint != expected {
+			return fmt.Errorf(
+				"%w: artifact schema migration %d has fingerprint %q",
+				artifactstore.ErrUnsupported,
+				version,
+				fingerprint,
+			)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read artifact schema ledger: %w", err)
 	}
 	return nil
 }

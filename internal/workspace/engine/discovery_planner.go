@@ -152,6 +152,27 @@ func (p *Planner) Build(
 				profile.DirectoryRoots,
 			),
 		}
+		profilePreferences := DiscoveryPreferences{
+			AdditionalLocators: append(
+				[]artifactstore.Locator(nil),
+				profile.ExplicitLocators...,
+			),
+		}
+		for _, root := range profile.DirectoryRoots {
+			profilePreferences.AdditionalRoots = append(
+				profilePreferences.AdditionalRoots,
+				DiscoveryRoot{
+					Root:            root.Root,
+					Recursive:       root.Recursive,
+					IncludePatterns: append([]string(nil), root.IncludePatterns...),
+				},
+			)
+		}
+		sourcePlan.DecoderHints = appendDiscoveryPreferenceDecoderHints(
+			nil,
+			profilePreferences,
+			p.decoderIDs,
+		)
 
 		if operation.includeReadmeWhenRequested &&
 			preferences.IncludeReadme && profile.ReadmeLocator != "" {
@@ -170,6 +191,7 @@ func (p *Planner) Build(
 				preferences.AdditionalRoots,
 			)
 			sourcePlan.DecoderHints = appendDiscoveryPreferenceDecoderHints(
+				sourcePlan.DecoderHints,
 				preferences,
 				p.decoderIDs,
 			)
@@ -211,6 +233,7 @@ func (p *Planner) Build(
 }
 
 func appendDiscoveryPreferenceDecoderHints(
+	current []discovery.DecoderHint,
 	preferences DiscoveryPreferences,
 	decoderIDs []artifactstore.DecoderID,
 ) []discovery.DecoderHint {
@@ -221,10 +244,23 @@ func appendDiscoveryPreferenceDecoderHints(
 
 	output := make(
 		[]discovery.DecoderHint,
-		0,
-		len(preferences.AdditionalLocators)+len(preferences.AdditionalRoots),
+		len(current),
+		len(current)+len(preferences.AdditionalLocators)+len(preferences.AdditionalRoots),
 	)
+	for index, value := range current {
+		output[index] = value
+		output[index].DecoderIDs = append(
+			[]artifactstore.DecoderID(nil),
+			value.DecoderIDs...,
+		)
+	}
 	byScope := make(map[scope]int, cap(output))
+	for index, hint := range output {
+		byScope[scope{
+			locator:   hint.Locator,
+			recursive: hint.Recursive,
+		}] = index
+	}
 
 	appendHint := func(locator artifactstore.Locator, recursive bool) {
 		key := scope{locator: locator, recursive: recursive}
@@ -257,6 +293,9 @@ func appendDiscoveryPreferenceDecoderHints(
 		appendHint(root.Root, root.Recursive)
 	}
 
+	for index := range output {
+		slices.Sort(output[index].DecoderIDs)
+	}
 	sort.Slice(output, func(left, right int) bool {
 		if output[left].Locator != output[right].Locator {
 			return output[left].Locator < output[right].Locator

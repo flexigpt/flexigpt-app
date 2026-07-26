@@ -155,6 +155,85 @@ func (a *Adapter) ResolveLocalPath(
 	return a.filesystem.ResolveLocalPath(ctx, filesystemValue, locator)
 }
 
+func (a *Adapter) BootstrapManagedSource(
+	ctx context.Context,
+	value source.Source,
+) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if err := a.validateSource(ctx, value); err != nil {
+		return "", err
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if _, err := a.sourceRootPath(value, true); err != nil {
+		return "", err
+	}
+	return a.confirmedGeneration(ctx, value)
+}
+
+func (a *Adapter) DiscardBootstrappedManagedSource(
+	ctx context.Context,
+	value source.Source,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := a.validateSource(ctx, value); err != nil {
+		return err
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	root, err := a.sourceRootPath(value, false)
+	if err != nil {
+		return err
+	}
+	info, err := os.Lstat(root)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return fmt.Errorf(
+			"%w: bootstrapped managed Source path is not a regular directory",
+			artifactstore.ErrInvalid,
+		)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return err
+	}
+	if len(entries) != 0 {
+		return fmt.Errorf(
+			"%w: refusing to discard a non-empty bootstrapped managed Source",
+			artifactstore.ErrConflict,
+		)
+	}
+	if err := os.Remove(root); err != nil {
+		return err
+	}
+
+	parent := filepath.Dir(root)
+	parentEntries, err := os.ReadDir(parent)
+	if err != nil {
+		return err
+	}
+	if len(parentEntries) == 0 {
+		if err := os.Remove(parent); err != nil {
+			return err
+		}
+		return mapstoreio.SyncDirectory(a.base)
+	}
+	return mapstoreio.SyncDirectory(parent)
+}
+
 func (a *Adapter) PublishPackage(
 	ctx context.Context,
 	value source.Source,
@@ -355,7 +434,13 @@ func (a *Adapter) RemovePackage(
 		_ = os.Rename(tombstone, target)
 		return err
 	}
-	return mapstoreio.SyncDirectory(filepath.Dir(target))
+	if err := pruneEmptyManagedParents(
+		root,
+		filepath.Dir(target),
+	); err != nil {
+		return err
+	}
+	return mapstoreio.SyncDirectory(root)
 }
 
 func (a *Adapter) validateSource(ctx context.Context, value source.Source) error {
@@ -518,6 +603,46 @@ func managedPackagePath(
 		return "", fmt.Errorf("%w: managed package escapes source root", artifactstore.ErrInvalid)
 	}
 	return target, nil
+}
+
+func pruneEmptyManagedParents(root, start string) error {
+	root = filepath.Clean(root)
+	current := filepath.Clean(start)
+	relative, err := filepath.Rel(root, current)
+	if err != nil {
+		return err
+	}
+	if relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
+		filepath.IsAbs(relative) {
+		return fmt.Errorf(
+			"%w: managed package parent escapes source root",
+			artifactstore.ErrInvalid,
+		)
+	}
+
+	for current != root {
+		entries, err := os.ReadDir(current)
+		if errors.Is(err, os.ErrNotExist) {
+			current = filepath.Dir(current)
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if len(entries) != 0 {
+			return nil
+		}
+		parent := filepath.Dir(current)
+		if err := os.Remove(current); err != nil {
+			return err
+		}
+		if err := mapstoreio.SyncDirectory(parent); err != nil {
+			return err
+		}
+		current = parent
+	}
+	return nil
 }
 
 func equivalentPackage(
@@ -822,7 +947,8 @@ func secureAndSyncManagedPackage(root string) error {
 }
 
 var (
-	_ source.Adapter              = (*Adapter)(nil)
-	_ source.LocalPathResolver    = (*Adapter)(nil)
-	_ source.ManagedPackageWriter = (*Adapter)(nil)
+	_ source.Adapter                   = (*Adapter)(nil)
+	_ source.LocalPathResolver         = (*Adapter)(nil)
+	_ source.ManagedPackageWriter      = (*Adapter)(nil)
+	_ source.ManagedSourceBootstrapper = (*Adapter)(nil)
 )

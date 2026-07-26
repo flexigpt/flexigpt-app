@@ -258,6 +258,7 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 	}
 
 	values := make([]entry, 0)
+	visited := 0
 	err := filepath.WalkDir(root, func(path string, dirEntry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -268,17 +269,18 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 		if path == root {
 			return nil
 		}
-		if dirEntry.Type()&os.ModeSymlink != 0 {
-			return nil
-		}
-
-		if len(values) >= artifactstore.DefaultMaxEntries {
+		visited++
+		if visited > artifactstore.DefaultMaxEntries {
 			return fmt.Errorf(
 				"%w: source exceeds %d entries",
 				artifactstore.ErrInvalid,
 				artifactstore.DefaultMaxEntries,
 			)
 		}
+		if dirEntry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+
 		relative, err := filepath.Rel(root, path)
 		if err != nil {
 			return err

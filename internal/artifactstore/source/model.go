@@ -144,7 +144,11 @@ type Update struct {
 	ExpectedRevision uint64
 	DisplayName      string
 	Enabled          bool
-	Config           json.RawMessage
+
+	// Config is write-only replacement configuration. A nil value preserves
+	// the current normalized configuration so public callers can update Source
+	// metadata without reading or resending private Source configuration.
+	Config json.RawMessage
 }
 
 func cloneTime(value *time.Time) *time.Time {

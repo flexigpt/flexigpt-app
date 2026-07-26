@@ -66,6 +66,13 @@ func Canonicalize(input Definition) (Definition, error) {
 	if err != nil {
 		return Definition{}, fmt.Errorf("canonicalize definition payload: %w", err)
 	}
+	if len(canonicalPayload) > artifactstore.MaxDefinitionBytes {
+		return Definition{}, fmt.Errorf(
+			"%w: canonical definition exceeds %d bytes",
+			artifactstore.ErrInvalid,
+			artifactstore.MaxDefinitionBytes,
+		)
+	}
 
 	calculated := artifactstore.DigestBytes(canonicalPayload)
 	if suppliedDigest != "" && suppliedDigest != calculated {

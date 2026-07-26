@@ -80,6 +80,17 @@ func (r *Registry) SupportsLocalPath(
 	return supported
 }
 
+func (r *Registry) SupportsManagedPackages(
+	kind artifactstore.SourceKind,
+) bool {
+	adapter, exists := r.adapter(kind)
+	if !exists {
+		return false
+	}
+	_, supported := adapter.(ManagedPackageWriter)
+	return supported
+}
+
 // ResolveLocalPath resolves a source-relative locator to a native absolute
 // filesystem path when, and only when, the selected source adapter explicitly
 // supports that capability.

@@ -466,8 +466,8 @@ No API infers durable identity from an encoded runtime string.
 | Filesystem and empty Workspace creation | Present                   | Provisioning creates Sources and typed Collections with compensation.                                                           |
 | Workspace Collection identity           | Present                   | A Workspace is a `workspace.collection` addressed by `WorkspaceRef`.                                                            |
 | Shared application Artifact Store       | Present                   | Application startup opens one Artifact Store and injects its services into Workspace.                                           |
-| Attachment role policy                  | Present as reusable logic | Primary, built-in, library, package, and overlay roles exist for root attachments.                                              |
-| Workspace discovery planning            | Present                   | Defaults, preferences, bootstrap definition, hints, and bounds are implemented.                                                 |
+| Attachment role policy                  | Present as reusable logic | Primary, built-in, library, package, and overlay roles exist for Collection attachments.                                        |
+| Workspace discovery planning            | Present                   | Defaults, profile scopes, explicit decoder hints, preferences, bootstrap definition, and bounds are implemented.                |
 | Portable Workspace descriptor           | Present foundation        | `.flexigpt/workspace.json` is read as a portable Collection descriptor and remains outside Workspace Artifact Records.          |
 | Context decoding and composition        | Present                   | Context validation, ordering, budgets, truncation, and diagnostics exist.                                                       |
 | Context inference integration           | Present                   | The Workspace inference bridge resolves Context, injects bounded current-turn input, and returns usage provenance.              |
@@ -496,6 +496,11 @@ runtime handoff, inference hydration, and derived Skill Runtime reconciliation.
 Current-catalog pins immediately reflect valid, invalid, missing, or
 incompatible observations when a current catalog exists. Conversation usage
 records selected and actually used definition and Artifact revisions.
+
+Discovery profiles now request registered Workspace decoders for their own
+explicit locators and directory roots. This is required for attached-library
+Markdown: scanning a candidate is not sufficient when a decoder intentionally
+recognizes non-conventional files only after an explicit hint.
 
 Transfer formats, URI acquisition, archive handling, portable closure export,
 and additional Artifact kinds remain deliberate omissions. Workspace does not
@@ -567,6 +572,20 @@ artifact domains remain deferred.
 - Add MCP only after defining credential references and connection policy.
 - Add Tool, Model, Agent, Assistant, and conversation-related kinds only with
   complete domain codecs, projectors, and product consumers.
+
+### 13.10 Core verification suite
+
+The Workspace verification suite must cover:
+
+- Filesystem and empty Workspace creation.
+- Existing Source attachment for each currently supported role.
+- Attached arbitrary Markdown Context through profile decoder hints.
+- Context and Skill discovery, automatic adoption, catalog inspection, and load.
+- Current and stale catalog behavior after Collection, attachment, and Source revisions.
+- Explicit adoption, pinning, suppression, unsuppression, unadoption, and purge.
+- Context prompt composition and inference hydration provenance.
+- Skill Source generation and `SKILL.md` digest verification.
+- Retirement and typed Workspace purge.
 
 ## 14. Acceptance outcomes
 

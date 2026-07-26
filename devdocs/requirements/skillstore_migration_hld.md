@@ -489,7 +489,7 @@ transport values only where explicitly required. They are not durable identity.
 | Agent Skills runtime                | Present                       | Registration, sessions, prompts, rendering, resources, and scripts are implemented.                            |
 | Workspace Skill digest verification | Present at handoff            | Definition, Source generation, `SKILL.md`, and package symlink checks occur before runtime registration.       |
 | Typed Artifact Skill refs           | Present for Workspace         | Workspace runtime selection uses `ArtifactRef`; installed legacy references remain intentionally.              |
-| Same-name policy                    | Partial                       | Aggregate listing has origin precedence, while runtime resolution excludes some equal-rank collisions.         |
+| Same-name policy                    | Partial                       | Aggregate listing marks simultaneously eligible same-name Skills unavailable, and runtime resolution withholds ambiguous durable references. A unified migrated-Collection precedence policy remains deferred. |
 | Assistant preset integration        | Incompatible                  | Assistant presets persist the current Skill Store reference type.                                              |
 | Individual Skill import and export  | Not present                   | There is no native Skill transfer service or package closure builder.                                          |
 | Skill bundle import and export      | Not present                   | There is no portable bundle manifest, relative member resolver, or deterministic archive workflow.             |
@@ -500,6 +500,12 @@ transport values only where explicitly required. They are not durable identity.
 The Artifact Store and Workspace completion does not change standalone Skill
 Store durable ownership. Its direct package implementation remains active
 legacy behavior, not dead code and not an Artifact Store managed Source.
+
+Accordingly, `internal/skillstore` filesystem package creation, embedded
+hydration, MapFileStore metadata, built-in overlays, and installed Skill
+runtime references must remain until the one-way migration updates assistant
+preset and conversation references in the same release. They must not be
+dual-written or deleted as cleanup in the Artifact Store and Workspace pass.
 
 ### 10.1 Satisfied Artifact Store prerequisites
 

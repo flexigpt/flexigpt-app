@@ -118,7 +118,7 @@ type UpdateArtifactSourceRequestBody struct {
 	ExpectedRevision uint64          `json:"expectedRevision" required:"true"`
 	DisplayName      string          `json:"displayName"      required:"true"`
 	Enabled          bool            `json:"enabled"`
-	Config           json.RawMessage `json:"config"`
+	Config           json.RawMessage `json:"config,omitempty"`
 }
 
 type UpdateArtifactSourceRequest struct {

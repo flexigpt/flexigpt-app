@@ -298,6 +298,54 @@ func (c *Components) DecoderFingerprint() (artifactstore.Digest, error) {
 	return c.discovery.DecoderFingerprint()
 }
 
+// GetManagedSourceState returns the current confirmed snapshot generation used
+// as the optimistic token for managed package publication and removal. It does
+// not expose Source configuration or the private acknowledged-generation
+// metadata field.
+func (c *Components) GetManagedSourceState(
+	ctx context.Context,
+	rootID artifactstore.RootID,
+	sourceID artifactstore.SourceID,
+) (ManagedPackageResult, error) {
+	if c == nil ||
+		c.SourceRuntime == nil ||
+		c.managedSources == nil {
+		return ManagedPackageResult{}, artifactstore.ErrClosed
+	}
+	if ctx == nil {
+		return ManagedPackageResult{}, fmt.Errorf(
+			"%w: managed Source state context is nil",
+			artifactstore.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return ManagedPackageResult{}, err
+	}
+	value, err := c.SourceRuntime.Get(ctx, rootID, sourceID)
+	if err != nil {
+		return ManagedPackageResult{}, err
+	}
+	if !c.managedSources.SupportsManagedPackages(value.Kind) {
+		return ManagedPackageResult{}, fmt.Errorf(
+			"%w: source kind %q is not writable",
+			artifactstore.ErrUnsupported,
+			value.Kind,
+		)
+	}
+	generation, err := sourceSnapshotGeneration(
+		ctx,
+		c.SourceRuntime,
+		value,
+	)
+	if err != nil {
+		return ManagedPackageResult{}, err
+	}
+	return ManagedPackageResult{
+		Source:     value.Summary(),
+		Generation: generation,
+	}, nil
+}
+
 // PublishManagedPackage publishes a package and advances the Source revision
 // only when the resulting snapshot generation changed. The revision advance
 // invalidates catalogs that observed the prior generation.
@@ -406,8 +454,7 @@ func (c *Components) RemoveManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
-	if value.ContentGeneration != "" &&
-		beforeGeneration != value.ContentGeneration {
+	if beforeGeneration != value.ContentGeneration {
 		exists, err := managedPackageExists(
 			ctx,
 			c.SourceRuntime,
@@ -497,8 +544,7 @@ func (c *Components) reconcileManagedContentGeneration(
 	expectedSourceRevision uint64,
 	observedGeneration string,
 ) (bool, error) {
-	if value.ContentGeneration == "" ||
-		value.ContentGeneration == observedGeneration {
+	if value.ContentGeneration == observedGeneration {
 		return false, nil
 	}
 
@@ -580,6 +626,13 @@ func (c *Components) managedSource(
 	}
 	if value.Revision != expectedSourceRevision {
 		return source.Source{}, artifactstore.ErrConflict
+	}
+	if !c.managedSources.SupportsManagedPackages(value.Kind) {
+		return source.Source{}, fmt.Errorf(
+			"%w: source kind %q is not writable",
+			artifactstore.ErrUnsupported,
+			value.Kind,
+		)
 	}
 	return value, nil
 }

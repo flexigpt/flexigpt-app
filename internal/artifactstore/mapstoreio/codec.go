@@ -29,7 +29,6 @@ func (c BoundedJSONEncoderDecoder) Encode(
 
 	var encoded bytes.Buffer
 	encoder := json.NewEncoder(&encoded)
-	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(value); err != nil {
 		return fmt.Errorf("encode mapstore JSON: %w", err)
 	}

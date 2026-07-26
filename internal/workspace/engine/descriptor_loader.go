@@ -31,7 +31,16 @@ func NewDescriptorLoader(runtime source.Runtime) (*DescriptorLoader, error) {
 func (l *DescriptorLoader) Load(
 	ctx context.Context,
 	value Workspace,
-) (DescriptorObservation, error) {
+) (observation DescriptorObservation, returnErr error) {
+	if ctx == nil {
+		return DescriptorObservation{}, fmt.Errorf(
+			"%w: Workspace descriptor context is nil",
+			ErrInvalidWorkspace,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return DescriptorObservation{}, err
+	}
 	if value.PrimarySourceID == "" {
 		return DescriptorObservation{}, nil
 	}
@@ -47,9 +56,11 @@ func (l *DescriptorLoader) Load(
 	if err != nil {
 		return DescriptorObservation{}, err
 	}
-	defer snapshot.Close()
+	defer func() {
+		returnErr = errors.Join(returnErr, snapshot.Close())
+	}()
 
-	observation := DescriptorObservation{
+	observation = DescriptorObservation{
 		SourceID:   sourceValue.ID,
 		Generation: snapshot.Generation(),
 	}
@@ -66,6 +77,21 @@ func (l *DescriptorLoader) Load(
 	}
 	if err != nil {
 		return DescriptorObservation{}, err
+	}
+	if err := entry.Validate(); err != nil {
+		return DescriptorObservation{}, fmt.Errorf(
+			"%w: Source returned an invalid Workspace descriptor entry: %w",
+			ErrWorkspaceDefinitionInvalid,
+			err,
+		)
+	}
+	if entry.Locator != DescriptorLocator {
+		return DescriptorObservation{}, fmt.Errorf(
+			"%w: Source returned %q for Workspace descriptor %q",
+			ErrWorkspaceDefinitionInvalid,
+			entry.Locator,
+			DescriptorLocator,
+		)
 	}
 	if !entry.IsRegular ||
 		entry.SizeBytes > artifactstore.MaxDefinitionBodyBytes {
