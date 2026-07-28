@@ -45,6 +45,7 @@ type Summary struct {
 func (s Source) Clone() Source {
 	output := s
 	output.Config = append(json.RawMessage(nil), s.Config...)
+	output.RetiredAt = cloneTime(s.RetiredAt)
 	return output
 }
 

@@ -116,6 +116,7 @@ func ValidateContextDefinition(
 }
 
 func contextLogicalName(name string) artifactstore.LogicalName {
+	contextVal := "context"
 	base := strings.ToLower(strings.TrimSuffix(name, path.Ext(name)))
 	parts := strings.FieldsFunc(base, func(character rune) bool {
 		return (character < 'a' || character > 'z') &&
@@ -124,7 +125,7 @@ func contextLogicalName(name string) artifactstore.LogicalName {
 
 	value := strings.Join(parts, "-")
 	if value == "" {
-		value = "context"
+		value = contextVal
 	}
 	if value[0] >= '0' && value[0] <= '9' {
 		value = "context-" + value
@@ -134,7 +135,7 @@ func contextLogicalName(name string) artifactstore.LogicalName {
 		value = strings.Trim(value, ".-")
 	}
 	if value == "" {
-		value = "context"
+		value = contextVal
 	}
 	return artifactstore.LogicalName(value)
 }

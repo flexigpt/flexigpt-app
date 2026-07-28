@@ -19,4 +19,4 @@ threshold:
 
   # (optional; default 0)
   # Minimum overall project coverage percentage required.
-  total: 0
+  total: 50

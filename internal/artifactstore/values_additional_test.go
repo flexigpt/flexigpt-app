@@ -1,0 +1,125 @@
+package artifactstore
+
+import (
+	"errors"
+	"strings"
+	"sync"
+	"testing"
+)
+
+func TestValueValidationBoundariesAndPlatformSafety(t *testing.T) {
+	t.Parallel()
+
+	validID := "019d3150-6a12-7a6b-a34e-d9032342bc31"
+	if err := ValidateRootID(RootID(validID)); err != nil {
+		t.Fatalf("ValidateRootID(valid): %v", err)
+	}
+
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "upper-case UUID", err: ValidateRootID(RootID(strings.ToUpper(validID)))},
+		{name: "trimmed text", err: ValidateRequiredText("text", " value", 16)},
+		{name: "control text", err: ValidateRequiredText("text", "value\n", 16)},
+		{name: "invalid UTF-8", err: ValidateRequiredText("text", string([]byte{0xff}), 16)},
+		{name: "overlong text", err: ValidateRequiredText("text", strings.Repeat("a", 17), 16)},
+		{name: "portable reserved basename", err: ValidatePortableLocator("CON.txt", false)},
+		{name: "portable trailing dot", err: ValidatePortableLocator("package/name.", false)},
+		{name: "portable trailing space", err: ValidatePortableLocator("package/name ", false)},
+		{name: "portable invalid separator", err: ValidatePortableLocator(`package\\name`, false)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if !errors.Is(test.err, ErrInvalid) {
+				t.Fatalf("error=%v, want wrapping ErrInvalid", test.err)
+			}
+		})
+	}
+
+	if err := ValidateRequiredText("text", strings.Repeat("a", 16), 16); err != nil {
+		t.Fatalf("ValidateRequiredText at limit: %v", err)
+	}
+	if err := ValidatePortableLocator("packages/example/SKILL.md", false); err != nil {
+		t.Fatalf("ValidatePortableLocator(valid): %v", err)
+	}
+	if err := ValidatePortableLocator(".", true); err != nil {
+		t.Fatalf("ValidatePortableLocator(root): %v", err)
+	}
+	if err := ValidatePortableLocator(".", false); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("ValidatePortableLocator(file root) error=%v, want ErrInvalid", err)
+	}
+}
+
+func TestDiagnosticsAreBoundedOwnedAndErrorPreserving(t *testing.T) {
+	t.Parallel()
+
+	message := BoundedDiagnosticMessage("\x00  hello\t" + strings.Repeat("é", MaxDiagnosticMessageBytes))
+	if err := ValidateRequiredText("diagnostic message", message, MaxDiagnosticMessageBytes); err != nil {
+		t.Fatalf("bounded message is invalid: %v; message=%q", err, message)
+	}
+	if len(message) > MaxDiagnosticMessageBytes {
+		t.Fatalf("bounded message length=%d, maximum=%d", len(message), MaxDiagnosticMessageBytes)
+	}
+	if !strings.HasSuffix(message, "...") {
+		t.Fatalf("bounded long message=%q, want ellipsis", message)
+	}
+
+	location := &DiagnosticLocation{Locator: "file.json", Line: 3, Column: 7}
+	original := []Diagnostic{{
+		Severity: DiagnosticError,
+		Code:     "test.error",
+		Message:  "failure",
+		Location: location,
+	}}
+	cloned := CloneDiagnostics(original)
+	location.Line = 99
+	if cloned[0].Location == nil || cloned[0].Location.Line != 3 {
+		t.Fatalf("CloneDiagnostics did not clone location: %#v", cloned)
+	}
+
+	errorsOnly := make([]Diagnostic, 0, MaxDiagnostics)
+	for range MaxDiagnostics {
+		errorsOnly = append(errorsOnly, Diagnostic{
+			Severity: DiagnosticError,
+			Code:     "test.error",
+			Message:  "must remain",
+		})
+	}
+	trimmed := AppendDiagnostics(errorsOnly,
+		Diagnostic{Severity: DiagnosticWarning, Code: "test.warning", Message: "drop first"},
+		Diagnostic{Severity: DiagnosticInfo, Code: "test.info", Message: "drop second"},
+	)
+	if len(trimmed) != MaxDiagnostics {
+		t.Fatalf("trimmed diagnostics=%d, want %d", len(trimmed), MaxDiagnostics)
+	}
+	for index, diagnostic := range trimmed {
+		if diagnostic.Severity != DiagnosticError {
+			t.Fatalf("diagnostic %d=%#v, errors must be preserved", index, diagnostic)
+		}
+	}
+}
+
+func TestValueValidationIsSafeForConcurrentCallers(t *testing.T) {
+	t.Parallel()
+
+	const workers = 32
+	var group sync.WaitGroup
+	errorsSeen := make(chan error, workers)
+	for range workers {
+		group.Go(func() {
+			if err := ValidatePortableLocator("portable/path.json", false); err != nil {
+				errorsSeen <- err
+			}
+			if err := ValidateDigest(DigestBytes([]byte("stable content"))); err != nil {
+				errorsSeen <- err
+			}
+		})
+	}
+	group.Wait()
+	close(errorsSeen)
+	for err := range errorsSeen {
+		t.Fatalf("concurrent validation failed: %v", err)
+	}
+}

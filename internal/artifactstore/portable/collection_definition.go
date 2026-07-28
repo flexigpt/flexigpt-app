@@ -114,6 +114,15 @@ func validateURI(value string) error {
 	); err != nil {
 		return err
 	}
+	// ParseRequestURI deliberately treats fragments as irrelevant to an HTTP
+	// request target, so reject a raw fragment before parsing. A percent-encoded
+	// hash remains valid path data and does not trigger this guard.
+	if strings.Contains(value, "#") {
+		return fmt.Errorf(
+			"%w: portable content URI must use subresourceLocator instead of a fragment",
+			artifactstore.ErrInvalid,
+		)
+	}
 
 	parsed, err := url.ParseRequestURI(value)
 	if err != nil {
