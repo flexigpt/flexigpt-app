@@ -43,7 +43,7 @@ func (s *snapshot) Stat(
 	if err != nil {
 		return source.Entry{}, err
 	}
-	info, err := os.Lstat(path)
+	info, err := os.Stat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return source.Entry{}, fmt.Errorf(
 			"%w: source locator %q",
@@ -75,7 +75,7 @@ func (s *snapshot) ReadDir(
 		return []source.Entry{}, nil
 	}
 
-	values, err := os.ReadDir(path)
+	values, err := readDirectoryEntries(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source directory %q",
@@ -96,7 +96,7 @@ func (s *snapshot) ReadDir(
 		if err != nil {
 			return nil, err
 		}
-		info, err := os.Lstat(filepath.Join(path, value.Name()))
+		info, err := os.Stat(filepath.Join(path, value.Name()))
 		if err != nil {
 			return nil, err
 		}
@@ -105,15 +105,48 @@ func (s *snapshot) ReadDir(
 				s.traversalPolicy.isGitSubmoduleDirectory(filepath.Join(path, value.Name()))) {
 			continue
 		}
-
-		// Symlinks remain visible as entries so generic discovery can safely
-		// skip them without treating the source as invalid.
 		output = append(output, entryFromInfo(child, info))
 	}
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].Locator < output[right].Locator
 	})
 	return output, nil
+}
+
+func readDirectoryEntries(location string) ([]os.DirEntry, error) {
+	directory, err := os.Open(location)
+	if err != nil {
+		return nil, err
+	}
+
+	values := make([]os.DirEntry, 0)
+	for {
+		batch, readErr := directory.ReadDir(directoryReadBatchSize)
+		if len(batch) > artifactstore.MaxDiscoveryEntries-len(values) {
+			closeErr := directory.Close()
+			return nil, errors.Join(
+				fmt.Errorf(
+					"%w: source directory %q exceeds %d entries",
+					artifactstore.ErrInvalid,
+					location,
+					artifactstore.MaxDiscoveryEntries,
+				),
+				closeErr,
+			)
+		}
+		values = append(values, batch...)
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			closeErr := directory.Close()
+			return nil, errors.Join(readErr, closeErr)
+		}
+	}
+	if err := directory.Close(); err != nil {
+		return nil, err
+	}
+	return values, nil
 }
 
 func (s *snapshot) Open(
@@ -134,7 +167,7 @@ func (s *snapshot) Open(
 	if err != nil {
 		return nil, err
 	}
-	info, err := os.Lstat(path)
+	file, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source file %q",
@@ -145,14 +178,18 @@ func (s *snapshot) Open(
 	if err != nil {
 		return nil, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+	info, statErr := file.Stat()
+	if statErr != nil {
+		return nil, errors.Join(statErr, file.Close())
+	}
+	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf(
 			"%w: source locator %q is not a regular file",
 			artifactstore.ErrInvalid,
 			locator,
 		)
 	}
-	return os.Open(path)
+	return file, nil
 }
 
 func (s *snapshot) Confirm(ctx context.Context) error {
@@ -187,19 +224,17 @@ func (s *snapshot) ensureOpen(ctx context.Context) error {
 func (s *snapshot) resolve(
 	locator artifactstore.Locator,
 ) (string, error) {
-	return resolveWithinRoot(s.root, locator, true)
+	return resolveWithinRoot(s.root, locator)
 }
 
 func (s *snapshot) resolveDirectory(
 	locator artifactstore.Locator,
 ) (string, error) {
-	return resolveWithinRoot(s.root, locator, false)
+	return resolveWithinRoot(s.root, locator)
 }
 
 // resolveNativePath resolves an existing locator beneath a configured source
-// root while refusing symlinks below that root. The configured root itself may
-// be a symlink, but it is canonicalized first so containment is evaluated
-// against its actual directory.
+// root using normal native filesystem path semantics.
 func resolveNativePath(
 	root string,
 	locator artifactstore.Locator,
@@ -207,16 +242,8 @@ func resolveNativePath(
 	if err := artifactstore.ValidateLocator(locator, true); err != nil {
 		return "", err
 	}
-
-	resolvedRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return "", fmt.Errorf(
-			"%w: resolve filesystem source root: %w",
-			artifactstore.ErrSourceUnavailable,
-			err,
-		)
-	}
-	rootInfo, err := os.Stat(resolvedRoot)
+	root = filepath.Clean(root)
+	rootInfo, err := os.Stat(root)
 	if err != nil {
 		return "", err
 	}
@@ -226,7 +253,7 @@ func resolveNativePath(
 			artifactstore.ErrInvalid,
 		)
 	}
-	path, err := resolveWithinRoot(resolvedRoot, locator, false)
+	path, err := resolveWithinRoot(root, locator)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf(
 			"%w: source locator %q",
@@ -234,41 +261,32 @@ func resolveNativePath(
 			locator,
 		)
 	}
-	return path, err
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf(
+			"%w: source locator %q",
+			artifactstore.ErrNotFound,
+			locator,
+		)
+	} else if err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func resolveWithinRoot(
 	root string,
 	locator artifactstore.Locator,
-	allowFinalSymlink bool,
 ) (string, error) {
 	if err := artifactstore.ValidateLocator(locator, true); err != nil {
 		return "", err
 	}
 	root = filepath.Clean(root)
-	if locator == "." {
-		return root, nil
-	}
-
 	current := root
-	parts := strings.Split(string(locator), "/")
-	for index, part := range parts {
-		current = filepath.Join(current, part)
-		if allowFinalSymlink && index == len(parts)-1 {
-			continue
-		}
-
-		info, err := os.Lstat(current)
-		if err != nil {
-			return "", err
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return "", fmt.Errorf(
-				"%w: symbolic link in locator %q is not allowed",
-				artifactstore.ErrInvalid,
-				locator,
-			)
-		}
+	if locator != "." {
+		current = filepath.Join(root, filepath.FromSlash(string(locator)))
 	}
 
 	relative, err := filepath.Rel(root, current)
@@ -300,7 +318,6 @@ func entryFromInfo(
 		ModifiedAt:  info.ModTime().UTC(),
 		IsDirectory: info.IsDir(),
 		IsRegular:   info.Mode().IsRegular(),
-		IsSymlink:   info.Mode()&os.ModeSymlink != 0,
 	}
 }
 

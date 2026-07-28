@@ -39,6 +39,12 @@ func Open(
 		return nil, err
 	}
 	path = filepath.Clean(absolute)
+	if strings.HasPrefix(filepath.VolumeName(path), `\\`) {
+		return nil, fmt.Errorf(
+			"%w: SQLite database paths on UNC or device shares are unsupported",
+			artifactstore.ErrUnsupported,
+		)
+	}
 	if err := prepareDatabaseFile(path); err != nil {
 		return nil, err
 	}
@@ -239,12 +245,12 @@ func validateSchemaMigrations(values []migration) error {
 }
 
 func prepareDatabaseFile(path string) error {
-	info, err := os.Lstat(path)
+	info, err := os.Stat(path)
 	switch {
 	case err == nil:
-		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		if !info.Mode().IsRegular() {
 			return fmt.Errorf(
-				"%w: SQLite path must identify a regular non-symlink file",
+				"%w: SQLite path must identify a regular file",
 				artifactstore.ErrInvalid,
 			)
 		}
@@ -265,7 +271,7 @@ func prepareDatabaseFile(path string) error {
 	if err := file.Close(); err != nil {
 		return err
 	}
-	return os.Chmod(path, 0o600)
+	return mapstoreio.ApplyPrivateFileMode(path)
 }
 
 func secureDatabaseFiles(path string) error {
@@ -275,7 +281,7 @@ func secureDatabaseFiles(path string) error {
 		path + "-shm",
 		path + "-journal",
 	} {
-		if err := os.Chmod(candidate, 0o600); err != nil &&
+		if err := mapstoreio.ApplyPrivateFileMode(candidate); err != nil &&
 			!errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("secure artifact metadata database: %w", err)
 		}

@@ -161,7 +161,7 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 	entries := 0
 	var totalBytes int64
 
-	err := fs.WalkDir(provider, ".", func(name string, entry fs.DirEntry, walkErr error) error {
+	err := fs.WalkDir(provider, ".", func(name string, _ fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -186,17 +186,11 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 				artifactstore.DefaultMaxDepth,
 			)
 		}
-		if entry.Type()&fs.ModeSymlink != 0 {
-			return nil
-		}
-		info, err := entry.Info()
+		info, err := fs.Stat(provider, name)
 		if err != nil {
 			return err
 		}
-		if info.Mode()&fs.ModeSymlink != 0 {
-			return nil
-		}
-		if entry.IsDir() {
+		if info.IsDir() {
 			_, _ = io.WriteString(hash, "d\x00"+name+"\x00")
 			return nil
 		}

@@ -27,7 +27,6 @@ const (
 	Kind artifactstore.SourceKind = "managed-directory"
 
 	directoryMode        = 0o700
-	fileMode             = 0o600
 	stagingDirectoryName = ".artifactstore-staging"
 )
 
@@ -199,24 +198,24 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	if err != nil {
 		return err
 	}
-	info, err := os.Lstat(root)
+	info, err := os.Stat(root)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+	if !info.IsDir() {
 		return fmt.Errorf(
-			"%w: bootstrapped managed Source path is not a regular directory",
+			"%w: bootstrapped managed Source path is not a directory",
 			artifactstore.ErrInvalid,
 		)
 	}
-	entries, err := os.ReadDir(root)
+	empty, err := managedDirectoryEmpty(root)
 	if err != nil {
 		return err
 	}
-	if len(entries) != 0 {
+	if !empty {
 		return fmt.Errorf(
 			"%w: refusing to discard a non-empty bootstrapped managed Source",
 			artifactstore.ErrConflict,
@@ -227,11 +226,11 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	}
 
 	parent := filepath.Dir(root)
-	parentEntries, err := os.ReadDir(parent)
+	empty, err = managedDirectoryEmpty(parent)
 	if err != nil {
 		return err
 	}
-	if len(parentEntries) == 0 {
+	if empty {
 		if err := os.Remove(parent); err != nil {
 			return err
 		}
@@ -401,7 +400,7 @@ func (a *Adapter) RemovePackage(
 	if err != nil {
 		return err
 	}
-	info, err := os.Lstat(target)
+	info, err := os.Stat(target)
 	if errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf(
 			"%w: managed package %q",
@@ -412,9 +411,9 @@ func (a *Adapter) RemovePackage(
 	if err != nil {
 		return err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+	if !info.IsDir() {
 		return fmt.Errorf(
-			"%w: managed package is not a regular directory",
+			"%w: managed package is not a directory",
 			artifactstore.ErrInvalid,
 		)
 	}
@@ -437,8 +436,7 @@ func (a *Adapter) RemovePackage(
 		return err
 	}
 	if err := os.RemoveAll(tombstone); err != nil {
-		_ = os.Rename(tombstone, target)
-		return err
+		return errors.Join(err, os.Rename(tombstone, target))
 	}
 	if err := pruneEmptyManagedParents(
 		root,
@@ -662,14 +660,14 @@ func equivalentPackage(
 	root string,
 	expected []source.ManagedPackageFile,
 ) (exists, equivalent bool, err error) {
-	info, err := os.Lstat(root)
+	info, err := os.Stat(root)
 	if errors.Is(err, os.ErrNotExist) {
 		return false, false, nil
 	}
 	if err != nil {
 		return false, false, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+	if !info.IsDir() {
 		return true, false, nil
 	}
 
@@ -684,7 +682,7 @@ func equivalentPackage(
 	}
 	err = filepath.WalkDir(root, func(
 		location string,
-		entry os.DirEntry,
+		_ os.DirEntry,
 		walkErr error,
 	) error {
 		if walkErr != nil {
@@ -711,13 +709,7 @@ func equivalentPackage(
 				artifactstore.ErrInvalid,
 			)
 		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf(
-				"%w: managed package contains a symbolic link",
-				artifactstore.ErrInvalid,
-			)
-		}
-		info, err := entry.Info()
+		info, err := os.Stat(location)
 		if err != nil {
 			return err
 		}
@@ -749,8 +741,10 @@ func equivalentPackage(
 			return errPackageDifferent
 		}
 
-		//nolint:gosec // No Root race path.
-		content, err := os.ReadFile(location)
+		content, err := readManagedPackageFile(
+			location,
+			int64(len(expectedContent)),
+		)
 		if err != nil {
 			return err
 		}
@@ -767,6 +761,28 @@ func equivalentPackage(
 		return true, false, err
 	}
 	return true, len(remaining) == 0, nil
+}
+
+func readManagedPackageFile(
+	location string,
+	maximum int64,
+) ([]byte, error) {
+	file, err := os.Open(location)
+	if err != nil {
+		return nil, err
+	}
+	content, readErr := io.ReadAll(io.LimitReader(file, maximum+1))
+	closeErr := file.Close()
+	if readErr != nil {
+		return nil, readErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	if int64(len(content)) > maximum {
+		return nil, errPackageDifferent
+	}
+	return content, nil
 }
 
 var errPackageDifferent = errors.New("managed package content differs")
@@ -915,25 +931,19 @@ func secureAndSyncManagedPackage(root string) error {
 	directories := make([]string, 0)
 	err := filepath.WalkDir(root, func(
 		location string,
-		entry os.DirEntry,
+		_ os.DirEntry,
 		walkErr error,
 	) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		info, err := os.Lstat(location)
+		info, err := os.Stat(location)
 		if err != nil {
 			return err
 		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf(
-				"%w: managed package contains a symbolic link",
-				artifactstore.ErrInvalid,
-			)
-		}
+
 		if info.IsDir() {
-			//nolint:gosec // No Root APIs.
-			if err := os.Chmod(location, directoryMode); err != nil {
+			if err := mapstoreio.ApplyPrivateDirectoryMode(location); err != nil {
 				return err
 			}
 			directories = append(directories, location)
@@ -945,8 +955,7 @@ func secureAndSyncManagedPackage(root string) error {
 				artifactstore.ErrInvalid,
 			)
 		}
-		//nolint:gosec // No Root APIs.
-		if err := os.Chmod(location, fileMode); err != nil {
+		if err := mapstoreio.ApplyPrivateFileMode(location); err != nil {
 			return err
 		}
 		return mapstoreio.SyncRegularFile(location)
@@ -963,6 +972,25 @@ func secureAndSyncManagedPackage(root string) error {
 		}
 	}
 	return nil
+}
+
+func managedDirectoryEmpty(location string) (bool, error) {
+	directory, err := os.Open(location)
+	if err != nil {
+		return false, err
+	}
+	entries, readErr := directory.ReadDir(1)
+	closeErr := directory.Close()
+	if readErr == io.EOF {
+		return true, closeErr
+	}
+	if readErr != nil {
+		return false, errors.Join(readErr, closeErr)
+	}
+	if closeErr != nil {
+		return false, closeErr
+	}
+	return len(entries) == 0, nil
 }
 
 var (

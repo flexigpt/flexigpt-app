@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,7 +20,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-const Kind artifactstore.SourceKind = "fs-directory"
+const (
+	directoryReadBatchSize                          = 256
+	Kind                   artifactstore.SourceKind = "fs-directory"
+)
 
 type Config struct {
 	RootPath string `json:"rootPath"`
@@ -167,7 +171,7 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 			artifactstore.ErrInvalid,
 		)
 	}
-	if err := validateStoredFilesystemRoot(config.RootPath); err != nil {
+	if err := validateFilesystemRoot(config.RootPath); err != nil {
 		return Config{}, err
 	}
 	return config, nil
@@ -187,18 +191,8 @@ func normalizeFilesystemRoot(raw string) (string, error) {
 		)
 	}
 
-	resolved, err := filepath.EvalSymlinks(filepath.Clean(raw))
-	if err != nil {
-		return "", fmt.Errorf("resolve filesystem source root: %w", err)
-	}
-	resolved = filepath.Clean(resolved)
-	if !filepath.IsAbs(resolved) {
-		return "", fmt.Errorf(
-			"%w: resolved filesystem root path must be absolute",
-			artifactstore.ErrInvalid,
-		)
-	}
-	info, err := os.Stat(resolved)
+	root := filepath.Clean(raw)
+	info, err := os.Stat(root)
 	if err != nil {
 		return "", fmt.Errorf("stat filesystem source root: %w", err)
 	}
@@ -208,11 +202,11 @@ func normalizeFilesystemRoot(raw string) (string, error) {
 			artifactstore.ErrInvalid,
 		)
 	}
-	return resolved, nil
+	return root, nil
 }
 
-func validateStoredFilesystemRoot(root string) error {
-	info, err := os.Lstat(root)
+func validateFilesystemRoot(root string) error {
+	info, err := os.Stat(root)
 	if err != nil {
 		return fmt.Errorf(
 			"%w: filesystem source root is unavailable: %w",
@@ -220,29 +214,9 @@ func validateStoredFilesystemRoot(root string) error {
 			err,
 		)
 	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf(
-			"%w: filesystem source root changed into a symbolic link",
-			artifactstore.ErrSourceUnavailable,
-		)
-	}
 	if !info.IsDir() {
 		return fmt.Errorf(
 			"%w: filesystem source root is no longer a directory",
-			artifactstore.ErrSourceUnavailable,
-		)
-	}
-	resolved, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return fmt.Errorf(
-			"%w: resolve filesystem source root: %w",
-			artifactstore.ErrSourceUnavailable,
-			err,
-		)
-	}
-	if filepath.Clean(resolved) != root {
-		return fmt.Errorf(
-			"%w: filesystem source root changed after registration",
 			artifactstore.ErrSourceUnavailable,
 		)
 	}
@@ -259,65 +233,90 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 
 	values := make([]entry, 0)
 	visited := 0
-	err := filepath.WalkDir(root, func(path string, dirEntry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
+
+	var walk func(location string, depth int) error
+	walk = func(location string, depth int) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if path == root {
-			return nil
-		}
-		visited++
-		if visited > artifactstore.DefaultMaxEntries {
-			return fmt.Errorf(
-				"%w: source exceeds %d entries",
-				artifactstore.ErrInvalid,
-				artifactstore.DefaultMaxEntries,
-			)
-		}
-		if dirEntry.Type()&os.ModeSymlink != 0 {
-			return nil
-		}
-
-		relative, err := filepath.Rel(root, path)
+		info, err := os.Stat(location)
 		if err != nil {
 			return err
 		}
-		if strings.Count(filepath.ToSlash(relative), "/")+1 >
-			artifactstore.DefaultMaxDepth {
+		if location == root && !info.IsDir() {
 			return fmt.Errorf(
-				"%w: source exceeds traversal depth %d",
-				artifactstore.ErrInvalid,
-				artifactstore.DefaultMaxDepth,
+				"%w: filesystem source root is no longer a directory",
+				artifactstore.ErrSourceUnavailable,
 			)
 		}
 
-		info, err := os.Lstat(path)
+		if location != root {
+			visited++
+			if visited > artifactstore.DefaultMaxEntries {
+				return fmt.Errorf(
+					"%w: source exceeds %d entries",
+					artifactstore.ErrInvalid,
+					artifactstore.DefaultMaxEntries,
+				)
+			}
+			relative, err := filepath.Rel(root, location)
+			if err != nil {
+				return err
+			}
+			if depth > artifactstore.DefaultMaxDepth {
+				return fmt.Errorf(
+					"%w: source exceeds traversal depth %d",
+					artifactstore.ErrInvalid,
+					artifactstore.DefaultMaxDepth,
+				)
+			}
+			if info.IsDir() &&
+				(policy.shouldSkipDirectory(info.Name()) ||
+					policy.isGitSubmoduleDirectory(location)) {
+				return nil
+			}
+			if !info.IsDir() && !info.Mode().IsRegular() {
+				return nil
+			}
+			values = append(values, entry{
+				relative: filepath.ToSlash(relative),
+				mode:     info.Mode(),
+				size:     info.Size(),
+				modified: info.ModTime().UTC(),
+			})
+		}
+
+		if !info.IsDir() {
+			return nil
+		}
+
+		directory, err := os.Open(location)
 		if err != nil {
 			return err
 		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return nil
+		for {
+			children, readErr := directory.ReadDir(directoryReadBatchSize)
+			for _, child := range children {
+				if err := walk(
+					filepath.Join(location, child.Name()),
+					depth+1,
+				); err != nil {
+					closeErr := directory.Close()
+					return errors.Join(err, closeErr)
+				}
+			}
+			if readErr == io.EOF {
+				break
+			}
+			if readErr != nil {
+				closeErr := directory.Close()
+				return errors.Join(readErr, closeErr)
+			}
 		}
-		if info.IsDir() &&
-			(policy.shouldSkipDirectory(info.Name()) ||
-				policy.isGitSubmoduleDirectory(path)) {
-			return filepath.SkipDir
-		}
-		if !info.IsDir() && !info.Mode().IsRegular() {
-			return nil
-		}
-		values = append(values, entry{
-			relative: filepath.ToSlash(relative),
-			mode:     info.Mode(),
-			size:     info.Size(),
-			modified: info.ModTime().UTC(),
-		})
-		return nil
-	})
-	if err != nil {
+		return directory.Close()
+	}
+
+	if err := walk(root, 0); err != nil {
 		return "", err
 	}
 	sort.Slice(values, func(left, right int) bool {

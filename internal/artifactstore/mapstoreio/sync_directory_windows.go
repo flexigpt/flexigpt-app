@@ -2,9 +2,9 @@
 
 package mapstoreio
 
-// Windows does not provide the same portable directory fsync operation as
-// Unix. MapStore's Windows replacement path uses MoveFileEx with
-// MOVEFILE_WRITE_THROUGH for file publication.
+// Windows does not expose a portable directory fsync through os.File.
+// Publication is still atomic at the writer boundary, but directory metadata
+// durability is best-effort after a sudden power loss.
 func SyncDirectory(_ string) error {
 	return nil
 }

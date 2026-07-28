@@ -115,7 +115,7 @@ func (r *Repository) Put(
 		return definition.Definition{}, artifactstore.ErrClosed
 	}
 
-	_, statErr := os.Lstat(path)
+	_, statErr := os.Stat(path)
 	existed := statErr == nil
 	if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
 		return definition.Definition{}, statErr
@@ -194,7 +194,7 @@ func (r *Repository) Get(
 		return definition.Definition{}, artifactstore.ErrClosed
 	}
 
-	info, err := os.Lstat(path)
+	info, err := os.Stat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: definition %q",
@@ -205,9 +205,9 @@ func (r *Repository) Get(
 	if err != nil {
 		return definition.Definition{}, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+	if !info.Mode().IsRegular() {
 		return definition.Definition{}, fmt.Errorf(
-			"%w: definition path is not a regular non-symlink file",
+			"%w: definition path is not a regular file",
 			artifactstore.ErrInvalid,
 		)
 	}

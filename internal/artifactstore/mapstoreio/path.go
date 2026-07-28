@@ -26,20 +26,17 @@ func PreparePrivateDirectory(raw string) (string, error) {
 	if err := os.MkdirAll(absolute, PrivateDirectoryMode); err != nil {
 		return "", err
 	}
-	info, err := os.Lstat(absolute)
+	info, err := os.Stat(absolute)
 	if err != nil {
 		return "", err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+	if !info.IsDir() {
 		return "", fmt.Errorf(
-			"private path %q is not a non-symlink directory",
+			"private path %q is not a directory",
 			absolute,
 		)
 	}
-	if err := os.Chmod(absolute, PrivateDirectoryMode); err != nil {
-		return "", err
-	}
-	return absolute, nil
+	return absolute, ApplyPrivateDirectoryMode(absolute)
 }
 
 func EnsurePrivateSubdirectory(
@@ -50,8 +47,7 @@ func EnsurePrivateSubdirectory(
 }
 
 // PrivateSubdirectoryPath returns a validated path beneath a private base
-// without creating missing child directories. Existing components are checked
-// with Lstat so a symlink cannot redirect managed content outside its root.
+// without creating missing child directories.
 func PrivateSubdirectoryPath(
 	base string,
 	relative string,
@@ -79,12 +75,12 @@ func privateSubdirectory(
 	current := base
 	for segment := range strings.SplitSeq(clean, string(filepath.Separator)) {
 		current = filepath.Join(current, segment)
-		info, statErr := os.Lstat(current)
+		info, statErr := os.Stat(current)
 		switch {
 		case statErr == nil:
-			if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			if !info.IsDir() {
 				return "", fmt.Errorf(
-					"private path component %q is not a non-symlink directory",
+					"private path component %q is not a directory",
 					current,
 				)
 			}
@@ -96,20 +92,20 @@ func privateSubdirectory(
 				!errors.Is(err, os.ErrExist) {
 				return "", err
 			}
-			info, statErr = os.Lstat(current)
+			info, statErr = os.Stat(current)
 			if statErr != nil {
 				return "", statErr
 			}
-			if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			if !info.IsDir() {
 				return "", fmt.Errorf(
-					"private path component %q is not a non-symlink directory",
+					"private path component %q is not a directory",
 					current,
 				)
 			}
 		default:
 			return "", statErr
 		}
-		if err := os.Chmod(current, PrivateDirectoryMode); err != nil {
+		if err := ApplyPrivateDirectoryMode(current); err != nil {
 			return "", err
 		}
 	}
@@ -187,17 +183,17 @@ func PrivateFilePath(
 }
 
 func SecureRegularFile(location string) error {
-	info, err := os.Lstat(location)
+	info, err := os.Stat(location)
 	if err != nil {
 		return err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+	if !info.Mode().IsRegular() {
 		return fmt.Errorf(
-			"private file %q is not a regular non-symlink file",
+			"private file %q is not a regular file",
 			location,
 		)
 	}
-	return os.Chmod(location, PrivateFileMode)
+	return ApplyPrivateFileMode(location)
 }
 
 func SyncRegularFile(location string) error {

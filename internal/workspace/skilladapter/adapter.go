@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
@@ -475,9 +473,6 @@ func (f *Adapter) resolveRuntimeLocation(
 			skillartifact.DefinitionFileName,
 		)
 	}
-	if err := verifySkillPackage(skillMDPath); err != nil {
-		return "", err
-	}
 	if err := verifySkillMDContent(
 		skillMDPath,
 		item.SourceContentDigest,
@@ -531,101 +526,6 @@ func (f *Adapter) supportsRuntimePath(
 	return localPaths.SupportsLocalPath(kind)
 }
 
-// verifySkillPackage rejects runtime-visible links and special files before
-// handing a package to the ordinary Agent Skills filesystem provider.
-//
-// Source generation confirmation binds regular package files to the catalog
-// observation. This check prevents a package from using a symlink to escape a
-// source root after the trusted local-path handoff.
-func verifySkillPackage(skillMDPath string) error {
-	root := filepath.Dir(skillMDPath)
-	rootInfo, err := os.Lstat(root)
-	if err != nil {
-		return err
-	}
-	if rootInfo.Mode()&os.ModeSymlink != 0 || !rootInfo.IsDir() {
-		return fmt.Errorf(
-			"%w: Workspace Skill package is not a regular directory",
-			artifactstore.ErrInvalid,
-		)
-	}
-
-	var (
-		entries int
-		bytes   int64
-	)
-
-	return filepath.WalkDir(root, func(
-		location string,
-		entry fs.DirEntry,
-		walkErr error,
-	) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if location == root {
-			return nil
-		}
-		entries++
-		if entries > artifactstore.MaxDiscoveryEntries {
-			return fmt.Errorf(
-				"%w: Workspace Skill package exceeds entry limit",
-				artifactstore.ErrInvalid,
-			)
-		}
-		relative, err := filepath.Rel(root, location)
-		if err != nil {
-			return err
-		}
-
-		if filepath.IsAbs(relative) ||
-			relative == ".." ||
-			strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			return fmt.Errorf(
-				"%w: Workspace Skill package entry escapes package root",
-				artifactstore.ErrInvalid,
-			)
-		}
-
-		if strings.Count(filepath.ToSlash(relative), "/")+1 > artifactstore.MaxDiscoveryDepth {
-			return fmt.Errorf("%w: Workspace Skill package exceeds depth limit", artifactstore.ErrInvalid)
-		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf(
-				"%w: Workspace Skill package contains a symbolic link",
-				artifactstore.ErrInvalid,
-			)
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf(
-				"%w: Workspace Skill package contains a symbolic link",
-				artifactstore.ErrInvalid,
-			)
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf(
-				"%w: Workspace Skill package contains a non-regular file",
-				artifactstore.ErrInvalid,
-			)
-		}
-		if info.Size() < 0 || info.Size() > artifactstore.MaxScanBytes-bytes {
-			return fmt.Errorf(
-				"%w: Workspace Skill package exceeds byte limit",
-				artifactstore.ErrInvalid,
-			)
-		}
-		bytes += info.Size()
-		return nil
-	})
-}
-
 // verifySkillMDContent prevents a selected Workspace record from silently
 // becoming a runtime handle for different SKILL.md content after refresh.
 // Resource and script contents remain normal live filesystem-provider inputs,
@@ -637,19 +537,19 @@ func verifySkillMDContent(
 	if err := artifactstore.ValidateDigest(expected); err != nil {
 		return err
 	}
-	info, err := os.Lstat(location)
-	if err != nil {
-		return err
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return fmt.Errorf(
-			"%w: Workspace SKILL.md is not a regular non-symlink file",
-			artifactstore.ErrInvalid,
-		)
-	}
 	file, err := os.Open(location)
 	if err != nil {
 		return err
+	}
+	info, statErr := file.Stat()
+	if statErr != nil {
+		return errors.Join(statErr, file.Close())
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf(
+			"%w: Workspace SKILL.md is not a regular file",
+			artifactstore.ErrInvalid,
+		)
 	}
 	content, readErr := io.ReadAll(
 		io.LimitReader(file, int64(artifactstore.MaxCandidateBytes)+1),

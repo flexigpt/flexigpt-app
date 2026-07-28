@@ -81,7 +81,7 @@ func (s *snapshot) ReadDir(
 		if err != nil {
 			return nil, err
 		}
-		info, err := value.Info()
+		info, err := fs.Stat(s.provider, string(child))
 		if err != nil {
 			return nil, err
 		}
@@ -197,6 +197,5 @@ func entryFromInfo(
 		ModifiedAt:  info.ModTime().UTC(),
 		IsDirectory: info.IsDir(),
 		IsRegular:   info.Mode().IsRegular(),
-		IsSymlink:   info.Mode()&fs.ModeSymlink != 0,
 	}
 }

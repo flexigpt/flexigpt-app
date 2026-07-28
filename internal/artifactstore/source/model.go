@@ -161,14 +161,14 @@ func cloneTime(value *time.Time) *time.Time {
 }
 
 type Entry struct {
-	Locator     artifactstore.Locator
-	Name        string
-	SizeBytes   int64
-	Mode        uint32
-	ModifiedAt  time.Time
+	Locator    artifactstore.Locator
+	Name       string
+	SizeBytes  int64
+	Mode       uint32
+	ModifiedAt time.Time
+
 	IsDirectory bool
 	IsRegular   bool
-	IsSymlink   bool
 }
 
 func (e Entry) Validate() error {
@@ -188,17 +188,7 @@ func (e Entry) Validate() error {
 	if e.SizeBytes < 0 {
 		return fmt.Errorf("%w: source entry size is negative", artifactstore.ErrInvalid)
 	}
-	modes := 0
-	if e.IsDirectory {
-		modes++
-	}
-	if e.IsRegular {
-		modes++
-	}
-	if e.IsSymlink {
-		modes++
-	}
-	if modes != 1 {
+	if e.IsDirectory == e.IsRegular {
 		return fmt.Errorf(
 			"%w: source entry must identify exactly one entry type",
 			artifactstore.ErrInvalid,

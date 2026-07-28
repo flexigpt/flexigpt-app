@@ -740,11 +740,6 @@ func collectCandidates(
 				err,
 			)
 		}
-		if entry.IsSymlink {
-			// A symlink is not a discoverable candidate. It is deliberately
-			// ignored rather than making an otherwise valid Workspace fail.
-			return nil
-		}
 		if !entry.IsRegular {
 			return nil
 		}
@@ -817,9 +812,6 @@ func collectCandidates(
 					)
 				}
 
-				if entry.IsSymlink {
-					continue
-				}
 				if entry.IsDirectory {
 					if root.Recursive {
 						if err := visit(entry.Locator, nextDepth); err != nil {

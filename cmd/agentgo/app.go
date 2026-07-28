@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -27,7 +28,6 @@ const (
 	// a clean namespace: startup must not locate, import, copy, or migrate any
 	// legacy Workspace or Artifact Store directory into it.
 	artifactStoreDirectoryName = "artifactsv1"
-	artifactStoreDirectoryMode = 0o700
 	appDirectoryMode           = 0o770
 )
 
@@ -97,6 +97,14 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: invalid path configuration")
 	}
+	if err := ensureAppPrivateDirectory(app.dataBasePath); err != nil {
+		slog.Error(
+			"failed to create application data directory",
+			"path", app.dataBasePath,
+			"error", err,
+		)
+		panic("failed to initialize app: could not create application data directory")
+	}
 
 	// Wails needs some instance of a struct to create bindings from its methods.
 	// Therefore, the pattern followed is to create a hollow struct in new and then init in startup.
@@ -113,7 +121,7 @@ func NewApp() *App {
 
 	app.assistantPresetStoreAPI = &AssistantPresetStoreWrapper{}
 
-	if err := os.MkdirAll(app.settingsDirPath, os.FileMode(appDirectoryMode)); err != nil {
+	if err := ensureAppPrivateDirectory(app.settingsDirPath); err != nil {
 		slog.Error(
 			"failed to create settings directory",
 			"settings path", app.settingsDirPath,
@@ -121,7 +129,7 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create settings directory")
 	}
-	if err := os.MkdirAll(app.conversationsDirPath, os.FileMode(appDirectoryMode)); err != nil {
+	if err := ensureAppPrivateDirectory(app.conversationsDirPath); err != nil {
 		slog.Error(
 			"failed to create conversations directory",
 			"conversations path", app.conversationsDirPath,
@@ -129,7 +137,8 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create conversations directory")
 	}
-	if err := os.MkdirAll(app.modelPresetsDirPath, os.FileMode(appDirectoryMode)); err != nil {
+	if err := ensureAppPrivateDirectory(app.modelPresetsDirPath); err != nil {
+
 		slog.Error(
 			"failed to create model presets directory",
 			"model presets path", app.modelPresetsDirPath,
@@ -138,7 +147,8 @@ func NewApp() *App {
 		panic("failed to initialize app: could not create model presets directory")
 	}
 
-	if err := os.MkdirAll(app.toolsDirPath, os.FileMode(appDirectoryMode)); err != nil {
+	if err := ensureAppPrivateDirectory(app.toolsDirPath); err != nil {
+
 		slog.Error(
 			"failed to create tools directory",
 			"tools path", app.toolsDirPath,
@@ -146,7 +156,8 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create tools directory")
 	}
-	if err := os.MkdirAll(app.skillsDirPath, os.FileMode(appDirectoryMode)); err != nil {
+	if err := ensureAppPrivateDirectory(app.skillsDirPath); err != nil {
+
 		slog.Error(
 			"failed to create skills directory",
 			"skills path", app.skillsDirPath,
@@ -154,7 +165,8 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create skills directory")
 	}
-	if err := os.MkdirAll(app.mcpsDirPath, os.FileMode(appDirectoryMode)); err != nil {
+	if err := ensureAppPrivateDirectory(app.mcpsDirPath); err != nil {
+
 		slog.Error(
 			"failed to create mcp directory",
 			"mcps path", app.mcpsDirPath,
@@ -163,7 +175,8 @@ func NewApp() *App {
 		panic("failed to initialize app: could not create mcp server directory")
 
 	}
-	if err := os.MkdirAll(app.assistantPresetsDirPath, os.FileMode(appDirectoryMode)); err != nil {
+	if err := ensureAppPrivateDirectory(app.assistantPresetsDirPath); err != nil {
+
 		slog.Error(
 			"failed to create assistant presets directory",
 			"assistant presets path", app.assistantPresetsDirPath,
@@ -171,24 +184,14 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create assistant presets directory")
 	}
-	if err := os.MkdirAll(app.artifactStoreDirPath, os.FileMode(artifactStoreDirectoryMode)); err != nil {
+	if err := ensureAppPrivateDirectory(app.artifactStoreDirPath); err != nil {
+
 		slog.Error(
 			"failed to create artifact store directory",
 			"artifactStoreDirPath", app.artifactStoreDirPath,
 			"error", err,
 		)
 		panic("failed to initialize app: could not create artifact store directory")
-	}
-	if err := os.Chmod(
-		app.artifactStoreDirPath,
-		os.FileMode(artifactStoreDirectoryMode),
-	); err != nil {
-		slog.Error(
-			"failed to secure artifact store directory",
-			"artifactStoreDirPath", app.artifactStoreDirPath,
-			"error", err,
-		)
-		panic("failed to initialize app: could not secure artifact store directory")
 	}
 
 	slog.Info(
@@ -212,6 +215,13 @@ func (a *App) Ping() string {
 
 func (a *App) GetAppVersion() string {
 	return Version
+}
+
+func ensureAppPrivateDirectory(location string) error {
+	if err := os.MkdirAll(location, os.FileMode(appDirectoryMode)); err != nil {
+		return err
+	}
+	return mapstoreio.ApplyPrivateDirectoryMode(location)
 }
 
 func (a *App) initManagers() {

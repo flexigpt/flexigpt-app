@@ -44,6 +44,8 @@ const (
 	MaxDiscoveryCandidates = 100_000
 	MaxDiscoveryEntries    = 1_000_000
 	MaxDiscoveryDepth      = 256
+
+	maxPortablePathSegmentBytes = 255
 )
 
 var (
@@ -335,6 +337,21 @@ func ValidatePortableLocator(value Locator, allowRoot bool) error {
 	}
 
 	for segment := range strings.SplitSeq(string(value), "/") {
+		if len(segment) > maxPortablePathSegmentBytes {
+			return fmt.Errorf(
+				"%w: portable locator segment %q exceeds %d bytes",
+				ErrInvalid,
+				segment,
+				maxPortablePathSegmentBytes,
+			)
+		}
+		if strings.ContainsAny(segment, `<>:"|?*`) {
+			return fmt.Errorf(
+				"%w: portable locator segment %q contains a platform-disallowed filename character",
+				ErrInvalid,
+				segment,
+			)
+		}
 		if strings.TrimRight(segment, " .") != segment {
 			return fmt.Errorf(
 				"%w: portable locator segment %q ends in a space or dot",

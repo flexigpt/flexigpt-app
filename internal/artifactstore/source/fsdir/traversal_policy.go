@@ -86,7 +86,7 @@ func (p normalizedTraversalPolicy) isGitSubmoduleDirectory(directory string) boo
 	}
 
 	gitFile := filepath.Join(directory, ".git")
-	info, err := os.Lstat(gitFile)
+	info, err := os.Stat(gitFile)
 	if err != nil || !info.Mode().IsRegular() {
 		return false
 	}
