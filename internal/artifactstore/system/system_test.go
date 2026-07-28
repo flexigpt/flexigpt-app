@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 	"errors"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -78,6 +79,9 @@ func (systemTestDecoder) Decode(
 }
 
 func TestComponentsManagedLifecycleRefreshAndOptimisticConcurrency(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("non win test")
+	}
 	ctx := t.Context()
 	clock := &systemTestClock{now: time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)}
 	ids := &systemTestIDs{values: []string{

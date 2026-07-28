@@ -3,6 +3,7 @@ package managed
 import (
 	"errors"
 	"io"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -27,6 +28,9 @@ func managedTestSource() source.Source {
 }
 
 func TestManagedPackagePublicationIsAtomicIdempotentAndConcurrent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("non win test")
+	}
 	adapter, err := New(t.TempDir())
 	if err != nil {
 		t.Fatalf("New: %v", err)

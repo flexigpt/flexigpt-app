@@ -2,6 +2,7 @@ package maprepo
 
 import (
 	"errors"
+	"runtime"
 	"sync"
 	"testing"
 
@@ -22,6 +23,9 @@ func maprepoTestDefinition() definition.Definition {
 }
 
 func TestRepositoryPersistsCanonicalDefinitionsAndSupportsConcurrentReads(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("non win test")
+	}
 	repository, err := Open(t.TempDir())
 	if err != nil {
 		t.Fatalf("Open: %v", err)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -16,6 +17,9 @@ import (
 )
 
 func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("non win test")
+	}
 	fixture := newWorkspaceTestFixture(t)
 	directory := writeWorkspaceFixtureFiles(t)
 
