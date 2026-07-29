@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -199,7 +200,7 @@ func (l *DescriptorLoader) Load(
 		)
 	}
 
-	descriptorDirectory, err := DocumentBaseLocator(
+	descriptorDirectory, err := documentBaseLocator(
 		spec.DescriptorLocator,
 	)
 	if err != nil {
@@ -227,9 +228,10 @@ func (l *DescriptorLoader) Load(
 	for index, member := range descriptor.Members {
 		switch {
 		case member.Locator != "":
-			resolvedLocator, err := ResolveRelativeLocator(
+			resolvedLocator, err := resolveRelativeLocator(
 				descriptorDirectory,
 				member.Locator,
+				false,
 			)
 			if err != nil {
 				return DescriptorObservation{}, fmt.Errorf(
@@ -323,7 +325,7 @@ func resolveDescriptorDiscoveryPreferences(
 		IncludeReadme: input.IncludeReadme,
 	}
 	for index, locator := range input.AdditionalLocators {
-		resolved, err := ResolveRelativeLocator(base, locator)
+		resolved, err := resolveRelativeLocator(base, locator, false)
 		if err != nil {
 			return spec.DiscoveryPreferences{}, fmt.Errorf(
 				"additionalLocators[%d]: %w",
@@ -334,9 +336,10 @@ func resolveDescriptorDiscoveryPreferences(
 		output.AdditionalLocators = append(output.AdditionalLocators, resolved)
 	}
 	for index, root := range input.AdditionalRoots {
-		resolved, err := ResolveRelativeDirectoryLocator(
+		resolved, err := resolveRelativeLocator(
 			base,
 			root.Root,
+			true,
 		)
 		if err != nil {
 			return spec.DiscoveryPreferences{}, fmt.Errorf(
@@ -352,4 +355,50 @@ func resolveDescriptorDiscoveryPreferences(
 		})
 	}
 	return output, nil
+}
+
+// documentBaseLocator returns the source-relative directory containing a
+// portable document. A document in the source root has "." as its base.
+func documentBaseLocator(
+	document basespec.Locator,
+) (basespec.Locator, error) {
+	if err := basespec.ValidateLocator(document, false); err != nil {
+		return "", fmt.Errorf("portable document locator: %w", err)
+	}
+
+	base := basespec.Locator(path.Dir(string(document)))
+	if err := basespec.ValidateLocator(base, true); err != nil {
+		return "", fmt.Errorf("portable document base locator: %w", err)
+	}
+	return base, nil
+}
+
+func resolveRelativeLocator(
+	base basespec.Locator,
+	relative basespec.Locator,
+	allowRelativeRoot bool,
+) (basespec.Locator, error) {
+	if err := basespec.ValidatePortableLocator(base, true); err != nil {
+		return "", fmt.Errorf("portable base locator: %w", err)
+	}
+	if err := basespec.ValidatePortableLocator(relative, allowRelativeRoot); err != nil {
+		return "", fmt.Errorf("portable relative locator: %w", err)
+	}
+
+	var resolved basespec.Locator
+	switch {
+	case base == ".":
+		resolved = relative
+	case relative == ".":
+		resolved = base
+	default:
+		resolved = basespec.Locator(
+			path.Join(string(base), string(relative)),
+		)
+	}
+
+	if err := basespec.ValidatePortableLocator(resolved, allowRelativeRoot); err != nil {
+		return "", fmt.Errorf("resolved portable locator: %w", err)
+	}
+	return resolved, nil
 }

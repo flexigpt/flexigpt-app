@@ -82,21 +82,21 @@ func TestPortableReferencesAndRelativeResolutionRejectAmbiguity(t *testing.T) {
 		t.Fatalf("percent-encoded hash URI error=%v", err)
 	}
 
-	resolved, err := ResolveRelativeLocator("packages/example", "member.txt")
+	resolved, err := resolveRelativeLocator("packages/example", "member.txt", false)
 	if err != nil {
-		t.Fatalf("ResolveRelativeLocator: %v", err)
+		t.Fatalf("resolveRelativeLocator: %v", err)
 	}
 	if resolved != "packages/example/member.txt" {
 		t.Fatalf("resolved=%q", resolved)
 	}
-	root, err := ResolveRelativeDirectoryLocator("packages/example", ".")
+	root, err := resolveRelativeLocator("packages/example", ".", true)
 	if err != nil {
-		t.Fatalf("ResolveRelativeDirectoryLocator: %v", err)
+		t.Fatalf("resolveRelativeLocator: %v", err)
 	}
 	if root != "packages/example" {
 		t.Fatalf("directory root=%q", root)
 	}
-	if _, err := ResolveRelativeLocator("packages/example", "."); !errors.Is(err, basespec.ErrInvalid) {
+	if _, err := resolveRelativeLocator("packages/example", ".", false); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("file relative root error=%v", err)
 	}
 
