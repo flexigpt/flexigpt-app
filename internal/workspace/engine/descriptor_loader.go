@@ -9,10 +9,10 @@ import (
 	"io"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/portable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/engine/portable"
 )
 
 type DescriptorLoader struct {
