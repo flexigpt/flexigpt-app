@@ -17,8 +17,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/provision"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -1018,12 +1018,12 @@ func (a *API) SetWorkspaceArtifactRuntimeDisabled(
 	if err != nil {
 		return nil, err
 	}
-	artifactData, err := engine.DecodeArtifactData(current.Data)
+	artifactData, err := artifactadapter.DecodeArtifactData(current.Data)
 	if err != nil {
 		return nil, err
 	}
 	artifactData.RuntimeDisabled = request.Body.RuntimeDisabled
-	data, err := engine.EncodeArtifactData(artifactData)
+	data, err := artifactadapter.EncodeArtifactData(artifactData)
 	if err != nil {
 		return nil, err
 	}
@@ -1370,7 +1370,7 @@ func attachmentDataOf(value WorkspaceAttachmentSettings) spec.AttachmentData {
 func workspaceArtifactDataOf(
 	value WorkspaceArtifactSettings,
 ) (json.RawMessage, error) {
-	return engine.EncodeArtifactData(spec.ArtifactData{
+	return artifactadapter.EncodeArtifactData(spec.ArtifactData{
 		RuntimeDisabled: value.RuntimeDisabled,
 	})
 }
@@ -1390,13 +1390,13 @@ func workspaceArtifactViewOf(value artifact.Artifact) WorkspaceArtifactView {
 		digest = &copyValue
 	}
 	diagnostics := diagnostic.CloneDiagnostics(value.Diagnostics)
-	runtimeDisabled, dataErr := engine.ArtifactRuntimeDisabled(value)
+	runtimeDisabled, dataErr := artifactadapter.ArtifactRuntimeDisabled(value)
 	if dataErr != nil {
 		diagnostics = diagnostic.AppendDiagnostics(
 			diagnostics,
 			diagnostic.Diagnostic{
 				Severity: diagnostic.DiagnosticError,
-				Code:     engine.DiagnosticCodeProjectionInvalid,
+				Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
 				Message:  "the Workspace Artifact has invalid local runtime settings",
 				Location: &diagnostic.DiagnosticLocation{
 					Locator:            value.Binding.Locator,

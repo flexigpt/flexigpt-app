@@ -4,18 +4,18 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type components struct {
-	service   *engine.Service
-	refresher *engine.Refresher
-	query     *engine.QueryService
-	policy    *engine.ArtifactPolicy
+	service   *artifactadapter.Service
+	refresher *artifactadapter.Refresher
+	query     *artifactadapter.QueryService
+	policy    *artifactadapter.ArtifactPolicy
 
 	contextAdapter *contextadapter.Adapter
 	skillAdapter   *skilladapter.Adapter
@@ -54,7 +54,7 @@ func newComponents(
 		decoderIDs = append(decoderIDs, support.DecoderID)
 	}
 
-	service, err := engine.NewService(
+	service, err := artifactadapter.NewService(
 		dependencies.Collections,
 		dependencies.Sources,
 		discoveryPolicyRevision,
@@ -76,11 +76,11 @@ func newComponents(
 	if err != nil {
 		return nil, err
 	}
-	policy, err := engine.NewArtifactPolicy(supports...)
+	policy, err := artifactadapter.NewArtifactPolicy(supports...)
 	if err != nil {
 		return nil, err
 	}
-	refresher, err := engine.NewRefresher(
+	refresher, err := artifactadapter.NewRefresher(
 		service,
 		loader,
 		planner,
@@ -90,7 +90,7 @@ func newComponents(
 	if err != nil {
 		return nil, err
 	}
-	query, err := engine.NewQueryService(
+	query, err := artifactadapter.NewQueryService(
 		service,
 		dependencies.Catalogs,
 		dependencies.Artifacts,

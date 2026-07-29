@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -72,16 +72,16 @@ func (*ContextDecoder) Decode(
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	if !utf8.Valid(candidate.Content) {
-		return nil, engine.WorkspaceArtifactDiagnostics(
+		return nil, artifactadapter.WorkspaceArtifactDiagnostics(
 			candidate.Locator,
-			engine.DiagnosticCodeContextInvalidUTF8,
+			artifactadapter.DiagnosticCodeContextInvalidUTF8,
 			"context file must contain valid UTF-8",
 		)
 	}
 	if bytes.ContainsRune(candidate.Content, 0) {
-		return nil, engine.WorkspaceArtifactDiagnostics(
+		return nil, artifactadapter.WorkspaceArtifactDiagnostics(
 			candidate.Locator,
-			engine.DiagnosticCodeContextInvalidContent,
+			artifactadapter.DiagnosticCodeContextInvalidContent,
 			"context file contains a NUL byte",
 		)
 	}
@@ -110,14 +110,14 @@ func (*ContextDecoder) Decode(
 	}
 	raw, err := json.Marshal(document)
 	if err != nil {
-		return nil, engine.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
+		return nil, artifactadapter.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
 	}
 	raw, err = jsonutil.CanonicalizeObject(
 		raw,
 		basespec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
-		return nil, engine.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
+		return nil, artifactadapter.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
 	}
 
 	value := definition.Definition{
@@ -132,9 +132,9 @@ func (*ContextDecoder) Decode(
 		Body: raw,
 	}
 	if err := ValidateContextDefinition(value); err != nil {
-		return nil, engine.WorkspaceArtifactDiagnostics(
+		return nil, artifactadapter.WorkspaceArtifactDiagnostics(
 			candidate.Locator,
-			engine.DiagnosticCodeContextInvalidContent,
+			artifactadapter.DiagnosticCodeContextInvalidContent,
 			err.Error(),
 		)
 	}

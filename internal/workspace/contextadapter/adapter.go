@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -65,14 +65,14 @@ type ContextInspection struct {
 }
 
 type Adapter struct {
-	query             *engine.QueryService
-	runtimePolicy     engine.SourceUsePolicy
+	query             *artifactadapter.QueryService
+	runtimePolicy     artifactadapter.SourceUsePolicy
 	compositionPolicy CompositionPolicy
 }
 
 func NewAdapter(
-	query *engine.QueryService,
-	runtimePolicy engine.SourceUsePolicy,
+	query *artifactadapter.QueryService,
+	runtimePolicy artifactadapter.SourceUsePolicy,
 	compositionPolicy CompositionPolicy,
 ) (*Adapter, error) {
 	if query == nil || runtimePolicy == nil {
@@ -137,12 +137,12 @@ func (p *Adapter) Compose(
 			output.Decisions = append(output.Decisions, CompositionDecision{
 				Artifact: item.Artifact.Ref(),
 				Status:   CompositionUnavailable,
-				Code:     engine.DiagnosticCodeProjectionInvalid,
+				Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
 			})
 			continue
 		}
-		decision := p.runtimePolicy.Decide(ctx, engine.RuntimePolicyRequest{
-			Use:              engine.RuntimeUseContextPrompt,
+		decision := p.runtimePolicy.Decide(ctx, artifactadapter.RuntimePolicyRequest{
+			Use:              artifactadapter.RuntimeUseContextPrompt,
 			Workspace:        workspaceValue,
 			Artifact:         item.Artifact,
 			DefinitionDigest: item.Definition.Digest,
@@ -151,13 +151,13 @@ func (p *Adapter) Compose(
 		if err := decision.Validate(); err != nil {
 			return ContextLoadPlan{}, err
 		}
-		if decision.Disposition != engine.RuntimeAllowed {
+		if decision.Disposition != artifactadapter.RuntimeAllowed {
 			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
-				engine.RuntimeDecisionDiagnostic(decision, item.Artifact),
+				artifactadapter.RuntimeDecisionDiagnostic(decision, item.Artifact),
 			)
 			status := CompositionDenied
-			if decision.Disposition == engine.RuntimeUnavailable {
+			if decision.Disposition == artifactadapter.RuntimeUnavailable {
 				status = CompositionUnavailable
 			}
 			output.Decisions = append(output.Decisions, CompositionDecision{
@@ -179,7 +179,7 @@ func (p *Adapter) Compose(
 			output.Decisions = append(output.Decisions, CompositionDecision{
 				Artifact: item.Artifact.Ref(),
 				Status:   CompositionUnavailable,
-				Code:     engine.DiagnosticCodeProjectionInvalid,
+				Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
 			})
 			continue
 		}
@@ -208,7 +208,7 @@ func (p *Adapter) Compose(
 		output.Decisions = append(output.Decisions, CompositionDecision{
 			Artifact: ref,
 			Status:   CompositionUnavailable,
-			Code:     engine.DiagnosticCodeArtifactUnresolved,
+			Code:     artifactadapter.DiagnosticCodeArtifactUnresolved,
 		})
 	}
 
@@ -327,7 +327,7 @@ func (p *Adapter) Load(
 			output.Diagnostics,
 			diagnostic.Diagnostic{
 				Severity: diagnostic.DiagnosticError,
-				Code:     engine.DiagnosticCodeArtifactUnresolved,
+				Code:     artifactadapter.DiagnosticCodeArtifactUnresolved,
 				Message:  "one or more requested Context Artifacts were not available for inspection",
 			},
 		)
@@ -338,7 +338,7 @@ func (p *Adapter) Load(
 func projectContextDocument(
 	value spec.Resource,
 ) (ContextDocument, error) {
-	runtimeDisabled, dataErr := engine.ArtifactRuntimeDisabled(value.Artifact)
+	runtimeDisabled, dataErr := artifactadapter.ArtifactRuntimeDisabled(value.Artifact)
 	output := ContextDocument{
 		Artifact:         value.Artifact.Ref(),
 		ArtifactRevision: value.Artifact.Revision,
@@ -424,7 +424,7 @@ func contextProjectionDiagnostic(
 ) diagnostic.Diagnostic {
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.DiagnosticError,
-		Code:     engine.DiagnosticCodeProjectionInvalid,
+		Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
 		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
 		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,

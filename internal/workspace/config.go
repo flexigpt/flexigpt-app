@@ -6,9 +6,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -41,7 +41,7 @@ type Config struct {
 	DiscoveryPolicyRevision string
 	SkillRoots              []basespec.Locator
 	ContextComposition      contextadapter.CompositionPolicy
-	SourceUsePolicy         engine.SourceUsePolicy
+	SourceUsePolicy         artifactadapter.SourceUsePolicy
 }
 
 type builtinArtifactSupport struct {
@@ -71,7 +71,7 @@ func DefaultConfig() Config {
 		DiscoveryPolicyRevision: defaultDiscoveryPolicyRevision,
 		SkillRoots:              skilladapter.DefaultSkillRoots(),
 		ContextComposition:      contextadapter.DefaultCompositionPolicy(),
-		SourceUsePolicy:         engine.NewArtifactRuntimePolicy(),
+		SourceUsePolicy:         artifactadapter.NewArtifactRuntimePolicy(),
 	}
 }
 
@@ -203,11 +203,11 @@ func (c Config) discoveryPolicyRevision() (string, error) {
 	return value, nil
 }
 
-func (c Config) runtimePolicy() engine.SourceUsePolicy {
+func (c Config) runtimePolicy() artifactadapter.SourceUsePolicy {
 	if c.SourceUsePolicy != nil {
 		return c.SourceUsePolicy
 	}
-	return engine.NewArtifactRuntimePolicy()
+	return artifactadapter.NewArtifactRuntimePolicy()
 }
 
 func (c Config) contextCompositionPolicy() contextadapter.CompositionPolicy {

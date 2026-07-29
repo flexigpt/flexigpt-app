@@ -1,4 +1,4 @@
-package engine
+package artifactadapter
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"

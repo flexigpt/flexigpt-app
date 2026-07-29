@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -72,14 +72,14 @@ type SkillLoadPlan struct {
 }
 
 type Adapter struct {
-	query         *engine.QueryService
-	runtimePolicy engine.SourceUsePolicy
+	query         *artifactadapter.QueryService
+	runtimePolicy artifactadapter.SourceUsePolicy
 	sourceRuntime source.Runtime
 }
 
 func NewAdapter(
-	query *engine.QueryService,
-	runtimePolicy engine.SourceUsePolicy,
+	query *artifactadapter.QueryService,
+	runtimePolicy artifactadapter.SourceUsePolicy,
 	sourceRuntime source.Runtime,
 ) (*Adapter, error) {
 	if query == nil || runtimePolicy == nil || sourceRuntime == nil {
@@ -171,8 +171,8 @@ func (f *Adapter) Load(
 			)
 			continue
 		}
-		decision := f.runtimePolicy.Decide(ctx, engine.RuntimePolicyRequest{
-			Use:              engine.RuntimeUseSkill,
+		decision := f.runtimePolicy.Decide(ctx, artifactadapter.RuntimePolicyRequest{
+			Use:              artifactadapter.RuntimeUseSkill,
 			Workspace:        workspaceValue,
 			Artifact:         item.Artifact,
 			DefinitionDigest: item.Definition.Digest,
@@ -181,10 +181,10 @@ func (f *Adapter) Load(
 		if err := decision.Validate(); err != nil {
 			return SkillLoadPlan{}, err
 		}
-		if decision.Disposition != engine.RuntimeAllowed {
+		if decision.Disposition != artifactadapter.RuntimeAllowed {
 			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
-				engine.RuntimeDecisionDiagnostic(decision, item.Artifact),
+				artifactadapter.RuntimeDecisionDiagnostic(decision, item.Artifact),
 			)
 			continue
 		}
@@ -282,7 +282,7 @@ func projectWorkspaceSkill(
 	includeMarkdown bool,
 	runtimePathBacked bool,
 ) (WorkspaceSkill, error) {
-	runtimeDisabled, dataErr := engine.ArtifactRuntimeDisabled(
+	runtimeDisabled, dataErr := artifactadapter.ArtifactRuntimeDisabled(
 		resourceValue.Artifact,
 	)
 	output := WorkspaceSkill{
@@ -586,7 +586,7 @@ func runtimeLocationDiagnostic(
 ) diagnostic.Diagnostic {
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.DiagnosticError,
-		Code:     engine.DiagnosticCodeRuntimeUnavailable,
+		Code:     artifactadapter.DiagnosticCodeRuntimeUnavailable,
 		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
 		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
@@ -601,7 +601,7 @@ func skillProjectionDiagnostic(
 ) diagnostic.Diagnostic {
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.DiagnosticError,
-		Code:     engine.DiagnosticCodeProjectionInvalid,
+		Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
 		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
 		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,

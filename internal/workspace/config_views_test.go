@@ -13,8 +13,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -201,7 +201,7 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 	}
 	artifactView := workspaceArtifactViewOf(artifactValue)
 	if artifactView.ResolvedDefinition == nil || len(artifactView.Diagnostics) != 1 ||
-		artifactView.Diagnostics[0].Code != engine.DiagnosticCodeProjectionInvalid {
+		artifactView.Diagnostics[0].Code != artifactadapter.DiagnosticCodeProjectionInvalid {
 		t.Fatalf("workspaceArtifactViewOf=%#v", artifactView)
 	}
 	*artifactView.ResolvedDefinition = cryptoutil.DigestBytes([]byte("changed"))
