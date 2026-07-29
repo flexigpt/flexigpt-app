@@ -1,4 +1,4 @@
-package discovery
+package collectiondata
 
 import (
 	"bytes"
@@ -49,7 +49,7 @@ func DecodeCollectionData(raw json.RawMessage) (spec.CollectionData, error) {
 }
 
 func ValidateCollectionData(value spec.CollectionData) error {
-	if err := validateDiscoveryPreferences(value.Discovery); err != nil {
+	if err := spec.ValidateDiscoveryPreferences(value.Discovery); err != nil {
 		return fmt.Errorf("%w: %w", spec.ErrInvalidWorkspace, err)
 	}
 	if err := basespec.ValidateRequiredText(

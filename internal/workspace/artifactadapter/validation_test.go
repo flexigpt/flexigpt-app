@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/collectiondata"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -32,7 +32,7 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 			IncludeReadme: true,
 		},
 	}
-	raw, err := discovery.EncodeCollectionData(input)
+	raw, err := collectiondata.EncodeCollectionData(input)
 	if err != nil {
 		t.Fatalf("encodeCollectionData: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 	) != `{"discovery":{"additionalLocators":["docs/guide.md"],"additionalRoots":[{"includePatterns":["*.md"],"recursive":true,"root":"docs"}],"includeReadme":true},"discoveryPolicyRevision":"policy.v1"}` {
 		t.Fatalf("encoded collection data=%s", raw)
 	}
-	decoded, err := discovery.DecodeCollectionData(raw)
+	decoded, err := collectiondata.DecodeCollectionData(raw)
 	if err != nil {
 		t.Fatalf("decodeCollectionData: %v", err)
 	}
@@ -49,12 +49,12 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 	if input.Discovery.AdditionalLocators[0] != "docs/guide.md" {
 		t.Fatalf("decodeCollectionData reused input storage: %#v", input)
 	}
-	if _, err := discovery.DecodeCollectionData(
+	if _, err := collectiondata.DecodeCollectionData(
 		[]byte(`{"discoveryPolicyRevision":"policy.v1","extra":true}`),
 	); err == nil {
 		t.Fatal("unknown collection data field was accepted")
 	}
-	if _, err := discovery.EncodeCollectionData(
+	if _, err := collectiondata.EncodeCollectionData(
 		spec.CollectionData{DiscoveryPolicyRevision: " "},
 	); !errors.Is(
 		err,
@@ -62,7 +62,7 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 	) {
 		t.Fatalf("invalid policy revision error=%v", err)
 	}
-	if _, err := discovery.EncodeCollectionData(
+	if _, err := collectiondata.EncodeCollectionData(
 		spec.CollectionData{
 			DiscoveryPolicyRevision: "policy.v1",
 			Discovery: spec.DiscoveryPreferences{
@@ -213,7 +213,7 @@ func TestDecodeDefinitionBodyAndWorkspaceStateBoundaries(t *testing.T) {
 func validationTestCollection(t *testing.T) collection.Collection {
 	t.Helper()
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	raw, err := discovery.EncodeCollectionData(spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"})
+	raw, err := collectiondata.EncodeCollectionData(spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"})
 	if err != nil {
 		t.Fatalf("encode test collection data: %v", err)
 	}

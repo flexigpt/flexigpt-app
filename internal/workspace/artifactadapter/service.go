@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/collectiondata"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -56,7 +56,7 @@ func (s *Service) CreateEmpty(
 		DiscoveryPolicyRevision: s.discoveryPolicyRevision,
 		Discovery:               request.Discovery,
 	}
-	raw, err := discovery.EncodeCollectionData(data)
+	raw, err := collectiondata.EncodeCollectionData(data)
 	if err != nil {
 		return spec.Workspace{}, err
 	}
@@ -114,7 +114,7 @@ func (s *Service) CreateFilesystem(
 		DiscoveryPolicyRevision: s.discoveryPolicyRevision,
 		Discovery:               request.Discovery,
 	}
-	raw, err := discovery.EncodeCollectionData(data)
+	raw, err := collectiondata.EncodeCollectionData(data)
 	if err != nil {
 		return spec.Workspace{}, err
 	}
@@ -186,7 +186,7 @@ func (s *Service) Update(
 	data.DiscoveryPolicyRevision = s.discoveryPolicyRevision
 	data.Discovery = request.Discovery
 
-	raw, err := discovery.EncodeCollectionData(data)
+	raw, err := collectiondata.EncodeCollectionData(data)
 	if err != nil {
 		return spec.Workspace{}, err
 	}
@@ -604,7 +604,7 @@ func (s *Service) PrepareRefresh(
 
 	data := current.Data
 	data.DiscoveryPolicyRevision = s.discoveryPolicyRevision
-	raw, err := discovery.EncodeCollectionData(data)
+	raw, err := collectiondata.EncodeCollectionData(data)
 	if err != nil {
 		return spec.Workspace{}, err
 	}
@@ -656,7 +656,7 @@ func (s *Service) Get(
 			value.Kind,
 		)
 	}
-	data, err := discovery.DecodeCollectionData(value.Data)
+	data, err := collectiondata.DecodeCollectionData(value.Data)
 	if err != nil {
 		return spec.Workspace{}, fmt.Errorf("%w: %w", spec.ErrInvalidWorkspace, err)
 	}

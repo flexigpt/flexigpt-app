@@ -1,31 +1,39 @@
-package artifactadapter
+package discovery
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
+type CollectionRefresher interface {
+	PrepareRefresh(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) (spec.Workspace, error)
+}
+
 type Refresher struct {
-	workspaces *Service
-	loader     *discovery.DescriptorLoader
-	planner    *discovery.Planner
-	runner     refresh.Runner
-	policy     *ArtifactPolicy
+	colRefresher CollectionRefresher
+	loader       *DescriptorLoader
+	planner      *Planner
+	runner       refresh.Runner
+	policy       artifact.Policy
 }
 
 func NewRefresher(
-	workspaces *Service,
-	loader *discovery.DescriptorLoader,
-	planner *discovery.Planner,
+	colRefresher CollectionRefresher,
+	loader *DescriptorLoader,
+	planner *Planner,
 	runner refresh.Runner,
-	policy *ArtifactPolicy,
+	policy artifact.Policy,
 ) (*Refresher, error) {
-	if workspaces == nil ||
+	if colRefresher == nil ||
 		loader == nil ||
 		planner == nil ||
 		runner == nil ||
@@ -36,11 +44,11 @@ func NewRefresher(
 		)
 	}
 	return &Refresher{
-		workspaces: workspaces,
-		loader:     loader,
-		planner:    planner,
-		runner:     runner,
-		policy:     policy,
+		colRefresher: colRefresher,
+		loader:       loader,
+		planner:      planner,
+		runner:       runner,
+		policy:       policy,
 	}, nil
 }
 
@@ -51,7 +59,7 @@ func (r *Refresher) Refresh(
 	if err := workspace.Validate(); err != nil {
 		return refresh.Result{}, err
 	}
-	value, err := r.workspaces.PrepareRefresh(ctx, workspace)
+	value, err := r.colRefresher.PrepareRefresh(ctx, workspace)
 	if err != nil {
 		return refresh.Result{}, err
 	}

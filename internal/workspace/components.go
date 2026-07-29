@@ -13,7 +13,7 @@ import (
 
 type components struct {
 	service   *artifactadapter.Service
-	refresher *artifactadapter.Refresher
+	refresher *discovery.Refresher
 	query     *artifactadapter.QueryService
 	policy    *artifactadapter.ArtifactPolicy
 
@@ -80,7 +80,7 @@ func newComponents(
 	if err != nil {
 		return nil, err
 	}
-	refresher, err := artifactadapter.NewRefresher(
+	refresher, err := discovery.NewRefresher(
 		service,
 		loader,
 		planner,

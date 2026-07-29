@@ -281,7 +281,7 @@ func (l *DescriptorLoader) Load(
 			)
 		}
 	}
-	if err := validateDiscoveryPreferences(preferences); err != nil {
+	if err := spec.ValidateDiscoveryPreferences(preferences); err != nil {
 		return DescriptorObservation{}, fmt.Errorf(
 			"%w: %w",
 			spec.ErrWorkspaceDefinitionInvalid,

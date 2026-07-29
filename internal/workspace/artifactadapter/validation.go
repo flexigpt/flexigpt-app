@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/collectiondata"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -80,7 +80,7 @@ func validateWorkspaceState(
 			value.Kind,
 		)
 	}
-	if err := discovery.ValidateCollectionData(data); err != nil {
+	if err := collectiondata.ValidateCollectionData(data); err != nil {
 		return "", "", err
 	}
 	sourcesByID := make(map[basespec.SourceID]source.Summary, len(sources))

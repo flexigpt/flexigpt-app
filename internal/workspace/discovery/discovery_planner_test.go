@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/collectiondata"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -191,7 +192,7 @@ func TestPlannerAndDiscoveryMergesRejectInvalidInputAndAreDeterministic(t *testi
 func plannerTestWorkspace(t *testing.T) spec.Workspace {
 	t.Helper()
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	collectionData, err := EncodeCollectionData(spec.CollectionData{
+	collectionData, err := collectiondata.EncodeCollectionData(spec.CollectionData{
 		DiscoveryPolicyRevision: "policy.v1",
 		Discovery:               spec.DiscoveryPreferences{IncludeReadme: true},
 	})

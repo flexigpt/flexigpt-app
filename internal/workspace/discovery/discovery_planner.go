@@ -437,10 +437,10 @@ func MergeDiscoveryPreferences(
 	left,
 	right spec.DiscoveryPreferences,
 ) (spec.DiscoveryPreferences, error) {
-	if err := validateDiscoveryPreferences(left); err != nil {
+	if err := spec.ValidateDiscoveryPreferences(left); err != nil {
 		return spec.DiscoveryPreferences{}, err
 	}
-	if err := validateDiscoveryPreferences(right); err != nil {
+	if err := spec.ValidateDiscoveryPreferences(right); err != nil {
 		return spec.DiscoveryPreferences{}, err
 	}
 
@@ -495,7 +495,7 @@ func MergeDiscoveryPreferences(
 		return output.AdditionalRoots[left].Root <
 			output.AdditionalRoots[right].Root
 	})
-	return output, validateDiscoveryPreferences(output)
+	return output, spec.ValidateDiscoveryPreferences(output)
 }
 
 func MergePatterns(left, right []string) []string {
@@ -533,7 +533,7 @@ func validateDiscoveryProfile(value spec.DiscoveryProfile) error {
 			IncludePatterns: append([]string(nil), root.IncludePatterns...),
 		})
 	}
-	if err := validateDiscoveryPreferences(spec.DiscoveryPreferences{
+	if err := spec.ValidateDiscoveryPreferences(spec.DiscoveryPreferences{
 		AdditionalLocators: append(
 			[]basespec.Locator(nil),
 			value.ExplicitLocators...,
@@ -546,49 +546,4 @@ func validateDiscoveryProfile(value spec.DiscoveryProfile) error {
 		return nil
 	}
 	return basespec.ValidateLocator(value.ReadmeLocator, false)
-}
-
-func validateDiscoveryPreferences(
-	value spec.DiscoveryPreferences,
-) error {
-	seenLocators := make(map[basespec.Locator]struct{})
-	for _, locator := range value.AdditionalLocators {
-		if err := basespec.ValidateLocator(locator, false); err != nil {
-			return err
-		}
-		if _, duplicate := seenLocators[locator]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate discovery locator %q",
-				basespec.ErrInvalid,
-				locator,
-			)
-		}
-		seenLocators[locator] = struct{}{}
-	}
-
-	seenRoots := make(map[basespec.Locator]struct{})
-	for _, root := range value.AdditionalRoots {
-		if err := basespec.ValidateLocator(root.Root, true); err != nil {
-			return err
-		}
-		if _, duplicate := seenRoots[root.Root]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate discovery root %q",
-				basespec.ErrInvalid,
-				root.Root,
-			)
-		}
-		seenRoots[root.Root] = struct{}{}
-		seenPatterns := make(map[string]struct{}, len(root.IncludePatterns))
-		for _, pattern := range root.IncludePatterns {
-			if err := discovery.ValidateIncludePattern(pattern); err != nil {
-				return err
-			}
-			if _, duplicate := seenPatterns[pattern]; duplicate {
-				return fmt.Errorf("%w: duplicate include pattern %q", basespec.ErrInvalid, pattern)
-			}
-			seenPatterns[pattern] = struct{}{}
-		}
-	}
-	return nil
 }
