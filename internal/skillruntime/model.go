@@ -8,7 +8,8 @@ import (
 	"time"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
@@ -21,16 +22,16 @@ const (
 )
 
 type Scope struct {
-	Workspace *artifactstore.CollectionRef `json:"workspace,omitempty"`
+	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
 }
 
 type Skill struct {
 	Ref    skillruntimeSpec.SkillRef `json:"ref"`
 	Origin Origin                    `json:"origin"`
 
-	InstalledRef     *skillstoreSpec.SkillRef     `json:"installedRef,omitempty"`
-	Workspace        *artifactstore.CollectionRef `json:"workspace,omitempty"`
-	ArtifactRevision uint64                       `json:"artifactRevision,omitempty"`
+	InstalledRef     *skillstoreSpec.SkillRef `json:"installedRef,omitempty"`
+	Workspace        *basespec.CollectionRef  `json:"workspace,omitempty"`
+	ArtifactRevision uint64                   `json:"artifactRevision,omitempty"`
 
 	Name        string                          `json:"name"`
 	DisplayName string                          `json:"displayName"`
@@ -47,10 +48,10 @@ type Skill struct {
 	CatalogCurrent bool   `json:"catalogCurrent"`
 	State          string `json:"state,omitempty"`
 
-	DefinitionDigest string                     `json:"definitionDigest,omitempty"`
-	SourceID         artifactstore.SourceID     `json:"sourceID,omitempty"`
-	Locator          artifactstore.Locator      `json:"locator,omitempty"`
-	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
+	DefinitionDigest string                  `json:"definitionDigest,omitempty"`
+	SourceID         basespec.SourceID       `json:"sourceID,omitempty"`
+	Locator          basespec.Locator        `json:"locator,omitempty"`
+	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`
@@ -104,7 +105,7 @@ func (s Skill) Validate() error {
 	if s.ModifiedAt.Before(s.CreatedAt) {
 		return errors.New("Skill modified time precedes creation")
 	}
-	return artifactstore.ValidateDiagnostics(s.Diagnostics)
+	return diagnostic.ValidateDiagnostics(s.Diagnostics)
 }
 
 type RenderRequest struct {
@@ -120,7 +121,7 @@ type RenderedSkill struct {
 	Insert           agentskillsSpec.SkillInsert     `json:"insert,omitempty"`
 	Arguments        []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
 	AppliedArguments map[string]string               `json:"appliedArguments,omitempty"`
-	Diagnostics      []artifactstore.Diagnostic      `json:"diagnostics,omitempty"`
+	Diagnostics      []diagnostic.Diagnostic         `json:"diagnostics,omitempty"`
 }
 
 type Provider interface {
@@ -130,7 +131,7 @@ type Provider interface {
 }
 
 type ListProvidedSkillsRequest struct {
-	Workspace *artifactstore.CollectionRef `json:"workspace,omitempty"`
+	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
 }
 
 type ListProvidedSkillsResponseBody struct {
@@ -142,9 +143,9 @@ type ListProvidedSkillsResponse struct {
 }
 
 type RenderProvidedSkillRequestBody struct {
-	Workspace *artifactstore.CollectionRef `json:"workspace,omitempty"`
-	Ref       skillruntimeSpec.SkillRef    `json:"ref"                 required:"true"`
-	Arguments map[string]string            `json:"arguments,omitempty"`
+	Workspace *basespec.CollectionRef   `json:"workspace,omitempty"`
+	Ref       skillruntimeSpec.SkillRef `json:"ref"                 required:"true"`
+	Arguments map[string]string         `json:"arguments,omitempty"`
 }
 
 type RenderProvidedSkillRequest struct {
@@ -155,9 +156,9 @@ type RenderProvidedSkillResponse struct {
 	Body *RenderedSkill
 }
 
-func unavailableDiagnostic(code, message string) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticWarning,
+func unavailableDiagnostic(code, message string) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticWarning,
 		Code:     code,
 		Message:  message,
 	}

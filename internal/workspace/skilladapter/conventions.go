@@ -6,16 +6,16 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
-const DefaultWorkspaceSkillRoot artifactstore.Locator = ".flexigpt/skills"
+const DefaultWorkspaceSkillRoot basespec.Locator = ".flexigpt/skills"
 
 type SkillRootConvention struct {
-	Root      artifactstore.Locator
+	Root      basespec.Locator
 	Recursive bool
 }
 
@@ -23,22 +23,22 @@ type ConventionRegistry struct {
 	roots []SkillRootConvention
 }
 
-func DefaultSkillRoots() []artifactstore.Locator {
-	return []artifactstore.Locator{
+func DefaultSkillRoots() []basespec.Locator {
+	return []basespec.Locator{
 		DefaultWorkspaceSkillRoot,
 	}
 }
 
 func NewConventionRegistry(
-	roots ...artifactstore.Locator,
+	roots ...basespec.Locator,
 ) (*ConventionRegistry, error) {
 	if len(roots) == 0 {
 		roots = DefaultSkillRoots()
 	}
-	seen := make(map[artifactstore.Locator]struct{}, len(roots))
+	seen := make(map[basespec.Locator]struct{}, len(roots))
 	values := make([]SkillRootConvention, 0, len(roots))
 	for _, root := range roots {
-		if err := artifactstore.ValidateLocator(root, true); err != nil {
+		if err := basespec.ValidateLocator(root, true); err != nil {
 			return nil, err
 		}
 		if _, duplicate := seen[root]; duplicate {
@@ -88,7 +88,7 @@ func (r *ConventionRegistry) DiscoveryProfile() engine.DiscoveryProfile {
 // nested at any depth, but SKILL.md must belong to a containing Skill
 // directory and cannot sit directly at the configured root.
 func (r *ConventionRegistry) Match(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (SkillRootConvention, bool) {
 	value := string(locator)
 	if path.Base(value) != skillartifact.DefinitionFileName {
@@ -121,7 +121,7 @@ func (r *ConventionRegistry) Match(
 }
 
 func (r *ConventionRegistry) ExpectedName(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (string, bool) {
 	if _, found := r.Match(locator); !found {
 		return "", false

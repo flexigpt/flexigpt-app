@@ -5,7 +5,7 @@ import (
 
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 )
 
@@ -20,7 +20,7 @@ func (f file) validate() error {
 	if f.Format != fileFormatV1 {
 		return fmt.Errorf(
 			"%w: unsupported definition file format %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			f.Format,
 		)
 	}
@@ -60,7 +60,7 @@ func decodeFile(
 	if canonical.Digest != value.Definition.Digest {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: definition file digest changed during canonicalization",
-			artifactstore.ErrDigestMismatch,
+			basespec.ErrDigestMismatch,
 		)
 	}
 	return canonical, nil

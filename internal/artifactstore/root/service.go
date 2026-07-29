@@ -5,24 +5,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 type Service struct {
 	repository Repository
-	ids        artifactstore.IDGenerator
-	clock      artifactstore.Clock
+	ids        basespec.IDGenerator
+	clock      basespec.Clock
 }
 
 func NewService(
 	repository Repository,
-	ids artifactstore.IDGenerator,
-	clock artifactstore.Clock,
+	ids basespec.IDGenerator,
+	clock basespec.Clock,
 ) (*Service, error) {
 	if repository == nil || ids == nil || clock == nil {
 		return nil, fmt.Errorf(
 			"%w: root service dependencies are incomplete",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -42,7 +42,7 @@ func (s *Service) Create(
 	}
 	now := s.clock.Now().UTC()
 	value := Root{
-		ID:          artifactstore.RootID(id),
+		ID:          basespec.RootID(id),
 		DisplayName: draft.DisplayName,
 		Description: draft.Description,
 		Revision:    1,
@@ -60,9 +60,9 @@ func (s *Service) Create(
 
 func (s *Service) Get(
 	ctx context.Context,
-	id artifactstore.RootID,
+	id basespec.RootID,
 ) (Root, error) {
-	if err := artifactstore.ValidateRootID(id); err != nil {
+	if err := basespec.ValidateRootID(id); err != nil {
 		return Root{}, err
 	}
 	return s.repository.Get(ctx, id)
@@ -74,13 +74,13 @@ func (s *Service) List(ctx context.Context) ([]Root, error) {
 
 func (s *Service) Update(
 	ctx context.Context,
-	id artifactstore.RootID,
+	id basespec.RootID,
 	update RootUpdate,
 ) (Root, error) {
 	if update.ExpectedRevision == 0 {
 		return Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, id)
@@ -90,7 +90,7 @@ func (s *Service) Update(
 	if current.Revision != update.ExpectedRevision {
 		return Root{}, fmt.Errorf(
 			"%w: root %q changed since it was read",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			id,
 		)
 	}
@@ -115,13 +115,13 @@ func (s *Service) Update(
 
 func (s *Service) Retire(
 	ctx context.Context,
-	id artifactstore.RootID,
+	id basespec.RootID,
 	expectedRevision uint64,
 ) (Root, error) {
 	if expectedRevision == 0 {
 		return Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, id)
@@ -131,7 +131,7 @@ func (s *Service) Retire(
 	if current.Revision != expectedRevision {
 		return Root{}, fmt.Errorf(
 			"%w: root %q changed since it was read",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			id,
 		)
 	}
@@ -151,13 +151,13 @@ func (s *Service) Retire(
 
 func (s *Service) Purge(
 	ctx context.Context,
-	id artifactstore.RootID,
+	id basespec.RootID,
 	expectedRevision uint64,
 ) error {
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected root revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return s.repository.Purge(ctx, id, expectedRevision)

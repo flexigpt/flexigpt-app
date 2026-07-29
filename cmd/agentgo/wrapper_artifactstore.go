@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
@@ -17,7 +17,7 @@ type ArtifactStoreWrapper struct {
 	components *system.Components
 
 	mutationMu     sync.RWMutex
-	onRootMutation func(artifactstore.RootID)
+	onRootMutation func(basespec.RootID)
 }
 
 func InitArtifactStoreWrapper(
@@ -66,7 +66,7 @@ func (w *ArtifactStoreWrapper) CreateArtifactRoot(
 }
 
 type GetArtifactRootRequest struct {
-	RootID artifactstore.RootID `path:"rootID" required:"true"`
+	RootID basespec.RootID `path:"rootID" required:"true"`
 }
 
 type GetArtifactRootResponse struct {
@@ -119,7 +119,7 @@ func (w *ArtifactStoreWrapper) ListArtifactRoots(
 }
 
 type UpdateArtifactRootRequest struct {
-	RootID artifactstore.RootID `path:"rootID" required:"true"`
+	RootID basespec.RootID `path:"rootID" required:"true"`
 	Body   *root.RootUpdate
 }
 
@@ -148,8 +148,8 @@ func (w *ArtifactStoreWrapper) UpdateArtifactRoot(
 }
 
 type RetireArtifactRootRequest struct {
-	RootID           artifactstore.RootID `path:"rootID" required:"true"`
-	ExpectedRevision uint64               `              required:"true" json:"expectedRevision"`
+	RootID           basespec.RootID `path:"rootID" required:"true"`
+	ExpectedRevision uint64          `              required:"true" json:"expectedRevision"`
 }
 
 type RetireArtifactRootResponse struct {
@@ -177,12 +177,12 @@ func (w *ArtifactStoreWrapper) RetireArtifactRoot(
 }
 
 type PurgeArtifactRootRequest struct {
-	RootID           artifactstore.RootID `path:"rootID" required:"true"`
-	ExpectedRevision uint64               `              required:"true" json:"expectedRevision"`
+	RootID           basespec.RootID `path:"rootID" required:"true"`
+	ExpectedRevision uint64          `              required:"true" json:"expectedRevision"`
 }
 
 type PurgeArtifactRootResponse struct {
-	RootID artifactstore.RootID `json:"rootID"`
+	RootID basespec.RootID `json:"rootID"`
 }
 
 func (w *ArtifactStoreWrapper) PurgeArtifactRoot(
@@ -218,7 +218,7 @@ func (w *ArtifactStoreWrapper) close() {
 }
 
 func (w *ArtifactStoreWrapper) setRootMutationObserver(
-	observer func(artifactstore.RootID),
+	observer func(basespec.RootID),
 ) {
 	if w == nil {
 		return
@@ -229,7 +229,7 @@ func (w *ArtifactStoreWrapper) setRootMutationObserver(
 }
 
 func (w *ArtifactStoreWrapper) notifyRootMutation(
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) {
 	if w == nil {
 		return

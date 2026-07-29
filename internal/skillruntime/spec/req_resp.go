@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
@@ -19,7 +19,7 @@ var (
 // Installed references retain their existing bundle and Skill fields until the
 // standalone Skill Store is migrated. Workspace Skills use ArtifactRef only.
 type SkillRef struct {
-	Artifact  *artifactstore.ArtifactRef   `json:"artifact,omitempty"`
+	Artifact  *basespec.ArtifactRef        `json:"artifact,omitempty"`
 	BundleID  skillstoreSpec.SkillBundleID `json:"bundleID,omitempty"`
 	SkillSlug skillstoreSpec.SkillSlug     `json:"skillSlug,omitempty"`
 	SkillID   skillstoreSpec.SkillID       `json:"skillID,omitempty"`
@@ -36,7 +36,7 @@ type RuntimeSkillFilter struct {
 
 	// Workspace scopes Artifact-based Skill references. It is required when
 	// AllowSkillRefs contains one or more Workspace Artifact references.
-	Workspace *artifactstore.CollectionRef `json:"workspace,omitempty"`
+	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
 
 	SessionID agentskillsSpec.SessionID     `json:"sessionID,omitempty"`
 	Activity  agentskillsSpec.SkillActivity `json:"activity,omitempty"`
@@ -67,7 +67,7 @@ type CreateSkillSessionRequestBody struct {
 
 	// Workspace scopes Artifact-based Skill references in this session.
 	// Installed Skill references remain valid without this field.
-	Workspace *artifactstore.CollectionRef `json:"workspace,omitempty"`
+	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
 }
 
 // CreateSkillSessionRequest creates a session using stable source identities.
@@ -95,7 +95,7 @@ type RenderSkillRequestBody struct {
 
 	// Workspace is required when SkillRef.Artifact is present and prevents an
 	// ArtifactRef from being resolved outside its selected Workspace.
-	Workspace *artifactstore.CollectionRef `json:"workspace,omitempty"`
+	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
 }
 
 type RenderSkillRequest struct {

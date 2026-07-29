@@ -8,12 +8,14 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/provision"
@@ -462,14 +464,14 @@ func (a *API) RefreshWorkspace(
 		Workspace:       request.Workspace,
 		CatalogRevision: value.Catalog.Revision,
 		CreatedArtifacts: append(
-			make([]artifactstore.ArtifactRef, 0, len(value.CreatedArtifacts)),
+			make([]basespec.ArtifactRef, 0, len(value.CreatedArtifacts)),
 			artifactRefsOf(request.Workspace.RootID, value.CreatedArtifacts)...,
 		),
 		UpdatedArtifacts: append(
-			make([]artifactstore.ArtifactRef, 0, len(value.UpdatedArtifacts)),
+			make([]basespec.ArtifactRef, 0, len(value.UpdatedArtifacts)),
 			artifactRefsOf(request.Workspace.RootID, value.UpdatedArtifacts)...,
 		),
-		Diagnostics: artifactstore.CloneDiagnostics(value.Diagnostics),
+		Diagnostics: diagnostic.CloneDiagnostics(value.Diagnostics),
 		Candidates:  value.Candidates,
 	}
 	return &RefreshWorkspaceResponse{Body: &output}, nil
@@ -832,7 +834,7 @@ func (a *API) LoadWorkspaceContexts(
 	output := WorkspaceContextInspectionView{
 		Workspace:       value.Workspace,
 		CatalogRevision: value.CatalogRevision,
-		Diagnostics:     artifactstore.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
 		Contributions: make(
 			[]WorkspaceContextContribution,
 			0,
@@ -1038,8 +1040,8 @@ func (a *API) SetWorkspaceArtifactRuntimeDisabled(
 
 func (a *API) workspaceArtifact(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
-	ref artifactstore.ArtifactRef,
+	workspace basespec.CollectionRef,
+	ref basespec.ArtifactRef,
 ) (artifact.Artifact, error) {
 	if _, err := a.workspace.service.Get(ctx, workspace); err != nil {
 		return artifact.Artifact{}, err
@@ -1062,7 +1064,7 @@ func (a *API) workspaceArtifact(
 
 func (a *API) workspaceOccurrence(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 	key catalog.OccurrenceKey,
 ) (catalog.Occurrence, error) {
 	view, err := a.workspace.query.Catalog(ctx, workspace)
@@ -1072,7 +1074,7 @@ func (a *API) workspaceOccurrence(
 	if !view.CatalogCurrent {
 		return catalog.Occurrence{}, fmt.Errorf(
 			"%w: Workspace catalog must be refreshed before an occurrence can be adopted",
-			artifactstore.ErrCatalogStale,
+			basespec.ErrCatalogStale,
 		)
 	}
 	for _, occurrence := range view.Catalog.Occurrences {
@@ -1090,9 +1092,9 @@ func (a *API) workspaceOccurrence(
 }
 
 func (a *API) requireWorkspaceArtifactKind(
-	kind artifactstore.ArtifactKind,
+	kind basespec.ArtifactKind,
 ) error {
-	if err := artifactstore.ValidateArtifactKind(kind); err != nil {
+	if err := basespec.ValidateArtifactKind(kind); err != nil {
 		return err
 	}
 	if a.workspace == nil ||
@@ -1108,12 +1110,12 @@ func (a *API) requireWorkspaceArtifactKind(
 }
 
 func artifactRefsOf(
-	rootID artifactstore.RootID,
-	ids []artifactstore.ArtifactID,
-) []artifactstore.ArtifactRef {
-	output := make([]artifactstore.ArtifactRef, 0, len(ids))
+	rootID basespec.RootID,
+	ids []basespec.ArtifactID,
+) []basespec.ArtifactRef {
+	output := make([]basespec.ArtifactRef, 0, len(ids))
 	for _, id := range ids {
-		output = append(output, artifactstore.ArtifactRef{
+		output = append(output, basespec.ArtifactRef{
 			RootID:     rootID,
 			ArtifactID: id,
 		})
@@ -1205,7 +1207,7 @@ func (a *API) enrichWorkspaceSourcePresentation(
 			attachment.SourceID,
 		)
 		if err != nil {
-			attachment.Diagnostics = artifactstore.AppendDiagnostics(
+			attachment.Diagnostics = diagnostic.AppendDiagnostics(
 				attachment.Diagnostics,
 				workspaceSourcePresentationDiagnostic(
 					"workspace.source.path-unavailable",
@@ -1217,7 +1219,7 @@ func (a *API) enrichWorkspaceSourcePresentation(
 		if sourceValue.ID != attachment.SourceID ||
 			sourceValue.RootID != value.Collection.RootID ||
 			sourceValue.Kind != fsdir.Kind {
-			attachment.Diagnostics = artifactstore.AppendDiagnostics(
+			attachment.Diagnostics = diagnostic.AppendDiagnostics(
 				attachment.Diagnostics,
 				workspaceSourcePresentationDiagnostic(
 					"workspace.source.presentation-invalid",
@@ -1229,7 +1231,7 @@ func (a *API) enrichWorkspaceSourcePresentation(
 
 		localPaths, supported := a.dependencies.SourceRuntime.(source.LocalPathRuntime)
 		if !supported {
-			attachment.Diagnostics = artifactstore.AppendDiagnostics(
+			attachment.Diagnostics = diagnostic.AppendDiagnostics(
 				attachment.Diagnostics,
 				workspaceSourcePresentationDiagnostic(
 					"workspace.source.path-unavailable",
@@ -1247,7 +1249,7 @@ func (a *API) enrichWorkspaceSourcePresentation(
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return ctxErr
 			}
-			attachment.Diagnostics = artifactstore.AppendDiagnostics(
+			attachment.Diagnostics = diagnostic.AppendDiagnostics(
 				attachment.Diagnostics,
 				workspaceSourcePresentationDiagnostic(
 					"workspace.source.path-unavailable",
@@ -1266,9 +1268,9 @@ func (a *API) enrichWorkspaceSourcePresentation(
 func workspaceSourcePresentationDiagnostic(
 	code string,
 	message string,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticWarning,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticWarning,
 		Code:     code,
 		Message:  message,
 	}
@@ -1306,7 +1308,7 @@ func workspaceViewOf(value engine.Workspace) (WorkspaceView, error) {
 func workspaceDiscoveryOf(value engine.DiscoveryPreferences) WorkspaceDiscovery {
 	output := WorkspaceDiscovery{
 		AdditionalLocators: append(
-			[]artifactstore.Locator(nil),
+			[]basespec.Locator(nil),
 			value.AdditionalLocators...,
 		),
 		IncludeReadme: value.IncludeReadme,
@@ -1324,7 +1326,7 @@ func workspaceDiscoveryOf(value engine.DiscoveryPreferences) WorkspaceDiscovery 
 func discoveryPreferencesOf(value WorkspaceDiscovery) engine.DiscoveryPreferences {
 	output := engine.DiscoveryPreferences{
 		AdditionalLocators: append(
-			[]artifactstore.Locator(nil),
+			[]basespec.Locator(nil),
 			value.AdditionalLocators...,
 		),
 		IncludeReadme: value.IncludeReadme,
@@ -1380,21 +1382,21 @@ func cloneBool(value *bool) *bool {
 }
 
 func workspaceArtifactViewOf(value artifact.Artifact) WorkspaceArtifactView {
-	var digest *artifactstore.Digest
+	var digest *cryptoutil.Digest
 	if value.ResolvedDefinition != nil {
 		copyValue := *value.ResolvedDefinition
 		digest = &copyValue
 	}
-	diagnostics := artifactstore.CloneDiagnostics(value.Diagnostics)
+	diagnostics := diagnostic.CloneDiagnostics(value.Diagnostics)
 	runtimeDisabled, dataErr := engine.ArtifactRuntimeDisabled(value)
 	if dataErr != nil {
-		diagnostics = artifactstore.AppendDiagnostics(
+		diagnostics = diagnostic.AppendDiagnostics(
 			diagnostics,
-			artifactstore.Diagnostic{
-				Severity: artifactstore.DiagnosticError,
+			diagnostic.Diagnostic{
+				Severity: diagnostic.DiagnosticError,
 				Code:     engine.DiagnosticCodeProjectionInvalid,
 				Message:  "the Workspace Artifact has invalid local runtime settings",
-				Location: &artifactstore.DiagnosticLocation{
+				Location: &diagnostic.DiagnosticLocation{
 					Locator:            value.Binding.Locator,
 					SubresourceLocator: value.Binding.SubresourceLocator,
 				},
@@ -1422,7 +1424,7 @@ func workspaceSuppressionViewOf(
 	value artifact.Suppression,
 ) WorkspaceSuppressionView {
 	return WorkspaceSuppressionView{
-		Workspace:  artifactstore.CollectionRef{RootID: value.RootID, CollectionID: value.CollectionID},
+		Workspace:  basespec.CollectionRef{RootID: value.RootID, CollectionID: value.CollectionID},
 		Binding:    value.Binding,
 		Revision:   value.Revision,
 		CreatedAt:  value.CreatedAt,
@@ -1441,7 +1443,7 @@ func workspaceCatalogViewOf(
 		Workspace:       workspaceValue,
 		CatalogRevision: value.Catalog.Revision,
 		CatalogCurrent:  value.CatalogCurrent,
-		Diagnostics: artifactstore.AppendDiagnostics(
+		Diagnostics: diagnostic.AppendDiagnostics(
 			value.Catalog.Diagnostics,
 			value.FreshnessDiagnostics...,
 		),
@@ -1467,7 +1469,7 @@ func workspaceCatalogViewOf(
 			Locator:          resourceValue.Artifact.Binding.Locator,
 			CatalogCurrent:   resourceValue.CatalogCurrent,
 			ProjectionValid:  resourceValue.ProjectionValid,
-			Diagnostics: artifactstore.AppendDiagnostics(
+			Diagnostics: diagnostic.AppendDiagnostics(
 				artifactView.Diagnostics,
 				resourceValue.Diagnostics...,
 			),
@@ -1531,7 +1533,7 @@ func workspaceCatalogViewOf(
 					Locator:          resourceValue.Artifact.Binding.Locator,
 					CatalogCurrent:   resourceValue.CatalogCurrent,
 					ProjectionValid:  resourceValue.ProjectionValid,
-					Diagnostics: artifactstore.AppendDiagnostics(
+					Diagnostics: diagnostic.AppendDiagnostics(
 						artifactView.Diagnostics,
 						resourceValue.Diagnostics...,
 					),
@@ -1550,10 +1552,10 @@ func workspaceCatalogViewOf(
 }
 
 func occurrenceViewKey(
-	sourceID artifactstore.SourceID,
-	locator artifactstore.Locator,
-	subresource artifactstore.SubresourceLocator,
-	kind artifactstore.ArtifactKind,
+	sourceID basespec.SourceID,
+	locator basespec.Locator,
+	subresource basespec.SubresourceLocator,
+	kind basespec.ArtifactKind,
 ) string {
 	return string(sourceID) + "\x00" +
 		string(locator) + "\x00" +
@@ -1572,10 +1574,10 @@ func workspaceOccurrenceViewOf(
 		Kind:                value.Kind,
 		LogicalName:         value.LogicalName,
 		LogicalVersion:      value.LogicalVersion,
-		DefinitionDigest:    cloneDigest(value.DefinitionDigest),
-		SourceContentDigest: cloneDigest(value.SourceContentDigest),
+		DefinitionDigest:    cryptoutil.CloneDigest(value.DefinitionDigest),
+		SourceContentDigest: cryptoutil.CloneDigest(value.SourceContentDigest),
 		State:               string(value.State),
-		Diagnostics:         artifactstore.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:         diagnostic.CloneDiagnostics(value.Diagnostics),
 	}
 	if localArtifact, found := artifacts[occurrenceViewKey(
 		value.Key.SourceID,
@@ -1588,14 +1590,6 @@ func workspaceOccurrenceViewOf(
 		output.Artifact = &artifactRef
 	}
 	return output
-}
-
-func cloneDigest(value *artifactstore.Digest) *artifactstore.Digest {
-	if value == nil {
-		return nil
-	}
-	copyValue := *value
-	return &copyValue
 }
 
 func workspaceDefinitionViewOf(
@@ -1635,7 +1629,7 @@ func workspaceResourceViewOf(
 		Locator:          value.Artifact.Binding.Locator,
 		CatalogCurrent:   value.CatalogCurrent,
 		ProjectionValid:  value.ProjectionValid,
-		Diagnostics: artifactstore.AppendDiagnostics(
+		Diagnostics: diagnostic.AppendDiagnostics(
 			artifactView.Diagnostics,
 			value.Diagnostics...,
 		),
@@ -1648,7 +1642,7 @@ func workspaceLoadPlanViewOf(
 	output := WorkspaceLoadPlanView{
 		Workspace:       value.Workspace,
 		CatalogRevision: value.CatalogRevision,
-		Diagnostics:     artifactstore.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
 		Items: make(
 			[]WorkspaceLoadPlanItemView,
 			0,
@@ -1679,7 +1673,7 @@ func contextLoadPlanViewOf(
 		Workspace:       value.Workspace,
 		CatalogRevision: value.CatalogRevision,
 		Prompt:          value.Prompt,
-		Diagnostics:     artifactstore.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
 		Contributions:   make([]WorkspaceContextContribution, 0, len(value.Contributions)),
 		Decisions:       make([]WorkspaceContextDecision, 0, len(value.Decisions)),
 		PromptBytes:     value.PromptBytes,
@@ -1737,7 +1731,7 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 		CatalogCurrent:   value.CatalogCurrent,
 		ProjectionValid:  value.ProjectionValid,
 		RuntimeDisabled:  value.RuntimeDisabled,
-		Diagnostics:      artifactstore.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:      diagnostic.CloneDiagnostics(value.Diagnostics),
 	}
 }
 
@@ -1776,7 +1770,7 @@ func workspaceSkillViewOf(value skilladapter.WorkspaceSkill) WorkspaceSkillView 
 		ProjectionValid:  value.ProjectionValid,
 		CatalogCurrent:   value.CatalogCurrent,
 		RuntimeDisabled:  value.RuntimeDisabled,
-		Diagnostics:      artifactstore.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:      diagnostic.CloneDiagnostics(value.Diagnostics),
 	}
 }
 
@@ -1786,7 +1780,7 @@ func workspaceSkillLoadViewOf(
 	output := WorkspaceSkillLoadView{
 		Workspace:       value.Workspace,
 		CatalogRevision: value.CatalogRevision,
-		Diagnostics:     artifactstore.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
 		Skills:          make([]WorkspaceSkillView, 0, len(value.Skills)),
 	}
 	for _, skill := range value.Skills {

@@ -7,27 +7,27 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Service struct {
 	repository Repository
 	registry   *Registry
-	ids        artifactstore.IDGenerator
-	clock      artifactstore.Clock
+	ids        basespec.IDGenerator
+	clock      basespec.Clock
 }
 
 func NewService(
 	repository Repository,
 	registry *Registry,
-	ids artifactstore.IDGenerator,
-	clock artifactstore.Clock,
+	ids basespec.IDGenerator,
+	clock basespec.Clock,
 ) (*Service, error) {
 	if repository == nil || registry == nil || ids == nil || clock == nil {
 		return nil, fmt.Errorf(
 			"%w: source service dependencies are incomplete",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -40,28 +40,28 @@ func NewService(
 
 func (s *Service) Create(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 	draft Draft,
 ) (Summary, error) {
 	if ctx == nil {
 		return Summary{}, fmt.Errorf(
 			"%w: source creation context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
 		return Summary{}, err
 	}
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Summary{}, err
 	}
-	if err := artifactstore.ValidateSourceKind(draft.Kind); err != nil {
+	if err := basespec.ValidateSourceKind(draft.Kind); err != nil {
 		return Summary{}, err
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"source display name",
 		draft.DisplayName,
-		artifactstore.MaxDisplayNameBytes,
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
 		return Summary{}, err
 	}
@@ -69,7 +69,7 @@ func (s *Service) Create(
 	if !exists {
 		return Summary{}, fmt.Errorf(
 			"%w: source adapter %q",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 			draft.Kind,
 		)
 	}
@@ -77,12 +77,12 @@ func (s *Service) Create(
 	if err != nil {
 		return Summary{}, err
 	}
-	config, err = jsoncanon.CanonicalizeObject(
+	config, err = jsonutil.CanonicalizeObject(
 		config,
-		artifactstore.MaxConfigBytes,
+		basespec.MaxConfigBytes,
 	)
 	if err != nil {
-		return Summary{}, fmt.Errorf("%w: source config: %w", artifactstore.ErrInvalid, err)
+		return Summary{}, fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
 	}
 
 	id, err := s.ids.NewID(ctx)
@@ -91,7 +91,7 @@ func (s *Service) Create(
 	}
 	now := s.clock.Now().UTC()
 	value := Source{
-		ID:          artifactstore.SourceID(id),
+		ID:          basespec.SourceID(id),
 		RootID:      rootID,
 		Kind:        draft.Kind,
 		DisplayName: draft.DisplayName,
@@ -125,10 +125,10 @@ func (s *Service) Create(
 		if err != nil {
 			return Summary{}, cleanupBootstrap(err)
 		}
-		if err := artifactstore.ValidateSourceGeneration(generation); err != nil {
+		if err := basespec.ValidateSourceGeneration(generation); err != nil {
 			return Summary{}, cleanupBootstrap(fmt.Errorf(
 				"%w: managed Source bootstrap returned an invalid generation: %w",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				err,
 			))
 		}
@@ -146,13 +146,13 @@ func (s *Service) Create(
 
 func (s *Service) Get(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 ) (Summary, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Summary{}, err
 	}
-	if err := artifactstore.ValidateSourceID(id); err != nil {
+	if err := basespec.ValidateSourceID(id); err != nil {
 		return Summary{}, err
 	}
 	value, err := s.repository.Get(ctx, rootID, id)
@@ -164,9 +164,9 @@ func (s *Service) Get(
 
 func (s *Service) List(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) ([]Summary, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return nil, err
 	}
 	values, err := s.repository.List(ctx, rootID)
@@ -182,20 +182,20 @@ func (s *Service) List(
 
 func (s *Service) Update(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	update Update,
 ) (Summary, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Summary{}, err
 	}
-	if err := artifactstore.ValidateSourceID(id); err != nil {
+	if err := basespec.ValidateSourceID(id); err != nil {
 		return Summary{}, err
 	}
 	if update.ExpectedRevision == 0 {
 		return Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
@@ -205,7 +205,7 @@ func (s *Service) Update(
 	if current.Revision != update.ExpectedRevision {
 		return Summary{}, fmt.Errorf(
 			"%w: source %q changed since it was read",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			id,
 		)
 	}
@@ -214,7 +214,7 @@ func (s *Service) Update(
 	if !exists {
 		return Summary{}, fmt.Errorf(
 			"%w: source adapter %q",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 			current.Kind,
 		)
 	}
@@ -228,9 +228,9 @@ func (s *Service) Update(
 		if err != nil {
 			return Summary{}, err
 		}
-		normalized, err = jsoncanon.CanonicalizeObject(
+		normalized, err = jsonutil.CanonicalizeObject(
 			normalized,
-			artifactstore.MaxConfigBytes,
+			basespec.MaxConfigBytes,
 		)
 		if err != nil {
 			return Summary{}, err
@@ -245,13 +245,13 @@ func (s *Service) Update(
 
 	unchanged := current.DisplayName == next.DisplayName &&
 		current.Enabled == next.Enabled &&
-		jsoncanon.Equal(current.Config, next.Config)
+		jsonutil.Equal(current.Config, next.Config)
 	if unchanged {
 		return current.Summary(), nil
 	}
 
 	if current.Revision == ^uint64(0) {
-		return Summary{}, fmt.Errorf("%w: source revision is exhausted", artifactstore.ErrInvalid)
+		return Summary{}, fmt.Errorf("%w: source revision is exhausted", basespec.ErrInvalid)
 	}
 	next.Revision++
 	next.ModifiedAt = s.nextModifiedAt(current.ModifiedAt)
@@ -266,20 +266,20 @@ func (s *Service) Update(
 
 func (s *Service) Retire(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	expectedRevision uint64,
 ) (Summary, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Summary{}, err
 	}
-	if err := artifactstore.ValidateSourceID(id); err != nil {
+	if err := basespec.ValidateSourceID(id); err != nil {
 		return Summary{}, err
 	}
 	if expectedRevision == 0 {
 		return Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
@@ -289,12 +289,12 @@ func (s *Service) Retire(
 	if current.Revision != expectedRevision {
 		return Summary{}, fmt.Errorf(
 			"%w: source %q changed since it was read",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			id,
 		)
 	}
 	if current.Revision == ^uint64(0) {
-		return Summary{}, fmt.Errorf("%w: source revision is exhausted", artifactstore.ErrInvalid)
+		return Summary{}, fmt.Errorf("%w: source revision is exhausted", basespec.ErrInvalid)
 	}
 	now := s.nextModifiedAt(current.ModifiedAt)
 	next := current
@@ -316,20 +316,20 @@ func (s *Service) Retire(
 // Purge, it is intentionally limited to active Sources with no attachments.
 func (s *Service) Discard(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateSourceID(id); err != nil {
+	if err := basespec.ValidateSourceID(id); err != nil {
 		return err
 	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected source revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return s.repository.Discard(ctx, rootID, id, expectedRevision)
@@ -337,20 +337,20 @@ func (s *Service) Discard(
 
 func (s *Service) Purge(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected source revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateSourceID(id); err != nil {
+	if err := basespec.ValidateSourceID(id); err != nil {
 		return err
 	}
 	return s.repository.Purge(ctx, rootID, id, expectedRevision)
@@ -365,33 +365,33 @@ func (s *Service) Purge(
 // metadata update was interrupted.
 func (s *Service) MarkContentChanged(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	expectedRevision uint64,
 	generation string,
 ) (Summary, error) {
 	if ctx == nil {
 		return Summary{}, fmt.Errorf(
 			"%w: source content-change context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
 		return Summary{}, err
 	}
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Summary{}, err
 	}
-	if err := artifactstore.ValidateSourceID(id); err != nil {
+	if err := basespec.ValidateSourceID(id); err != nil {
 		return Summary{}, err
 	}
 	if expectedRevision == 0 {
 		return Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
-	if err := artifactstore.ValidateSourceGeneration(generation); err != nil {
+	if err := basespec.ValidateSourceGeneration(generation); err != nil {
 		return Summary{}, err
 	}
 
@@ -400,13 +400,13 @@ func (s *Service) MarkContentChanged(
 		return Summary{}, err
 	}
 	if current.Revision != expectedRevision {
-		return Summary{}, artifactstore.ErrConflict
+		return Summary{}, basespec.ErrConflict
 	}
 	if current.ContentGeneration == generation {
 		return current.Summary(), nil
 	}
 	if current.Revision == ^uint64(0) {
-		return Summary{}, fmt.Errorf("%w: source revision is exhausted", artifactstore.ErrInvalid)
+		return Summary{}, fmt.Errorf("%w: source revision is exhausted", basespec.ErrInvalid)
 	}
 
 	next := current.Clone()
@@ -422,7 +422,7 @@ func (s *Service) MarkContentChanged(
 	return next.Summary(), nil
 }
 
-func (s *Service) Kinds() []artifactstore.SourceKind {
+func (s *Service) Kinds() []basespec.SourceKind {
 	return s.registry.Kinds()
 }
 

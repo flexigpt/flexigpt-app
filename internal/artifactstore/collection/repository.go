@@ -4,29 +4,29 @@ import (
 	"context"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 type Reader interface {
 	Get(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
+		ref basespec.CollectionRef,
 	) (Collection, error)
 
 	ListByRoot(
 		ctx context.Context,
-		rootID artifactstore.RootID,
+		rootID basespec.RootID,
 	) ([]Collection, error)
 
 	GetAttachment(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
-		sourceID artifactstore.SourceID,
+		ref basespec.CollectionRef,
+		sourceID basespec.SourceID,
 	) (Attachment, error)
 
 	ListAttachments(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
+		ref basespec.CollectionRef,
 	) ([]Attachment, error)
 }
 
@@ -36,7 +36,7 @@ type Reader interface {
 type RetiredReader interface {
 	GetRetired(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
+		ref basespec.CollectionRef,
 	) (Collection, error)
 }
 
@@ -64,7 +64,7 @@ type Repository interface {
 
 	Purge(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
+		ref basespec.CollectionRef,
 		expectedRevision uint64,
 	) error
 
@@ -83,8 +83,8 @@ type Repository interface {
 
 	Detach(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
-		sourceID artifactstore.SourceID,
+		ref basespec.CollectionRef,
+		sourceID basespec.SourceID,
 		expectedCollectionRevision uint64,
 		expectedAttachmentRevision uint64,
 		modifiedAt time.Time,
@@ -92,8 +92,8 @@ type Repository interface {
 
 	ReplaceAttachment(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
-		previousSourceID artifactstore.SourceID,
+		ref basespec.CollectionRef,
+		previousSourceID basespec.SourceID,
 		expectedPreviousRevision uint64,
 		replacement Attachment,
 		expectedCollectionRevision uint64,

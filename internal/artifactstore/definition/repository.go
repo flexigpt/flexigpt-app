@@ -4,21 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Reader interface {
 	Get(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-		digest artifactstore.Digest,
+		rootID basespec.RootID,
+		digest cryptoutil.Digest,
 	) (Definition, error)
 }
 
 type Writer interface {
 	Put(
 		ctx context.Context,
-		rootID artifactstore.RootID,
+		rootID basespec.RootID,
 		value Definition,
 	) (Definition, error)
 }
@@ -36,13 +37,13 @@ type Repository interface {
 func ReadCanonical(
 	ctx context.Context,
 	reader Reader,
-	rootID artifactstore.RootID,
-	digest artifactstore.Digest,
+	rootID basespec.RootID,
+	digest cryptoutil.Digest,
 ) (Definition, error) {
 	if ctx == nil {
 		return Definition{}, fmt.Errorf(
 			"%w: definition read context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -51,13 +52,13 @@ func ReadCanonical(
 	if reader == nil {
 		return Definition{}, fmt.Errorf(
 			"%w: definition reader is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Definition{}, err
 	}
-	if err := artifactstore.ValidateDigest(digest); err != nil {
+	if err := cryptoutil.ValidateDigest(digest); err != nil {
 		return Definition{}, err
 	}
 
@@ -72,7 +73,7 @@ func ReadCanonical(
 	if canonical.Digest != digest {
 		return Definition{}, fmt.Errorf(
 			"%w: requested definition %q, reader returned %q",
-			artifactstore.ErrDigestMismatch,
+			basespec.ErrDigestMismatch,
 			digest,
 			canonical.Digest,
 		)

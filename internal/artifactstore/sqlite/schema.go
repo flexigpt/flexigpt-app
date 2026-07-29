@@ -8,7 +8,7 @@ type migration struct {
 
 var schemaMigrations = []migration{{
 	version:     1,
-	fingerprint: "artifactstore.collections.clean.v1",
+	fingerprint: "basespec.collections.clean.v1",
 	sql: `
 CREATE TABLE artifact_roots (
 	id TEXT PRIMARY KEY,
@@ -176,7 +176,7 @@ CREATE INDEX idx_artifact_artifacts_collection
 `,
 }, {
 	version:     2,
-	fingerprint: "artifactstore.active-attachment-source.v1",
+	fingerprint: "basespec.active-attachment-source.v1",
 	sql: `
 CREATE TRIGGER artifact_attachment_requires_active_source_insert
 BEFORE INSERT ON artifact_collection_attachments
@@ -227,7 +227,7 @@ END;
 `,
 }, {
 	version:     3,
-	fingerprint: "artifactstore.relationship-invariants.v1",
+	fingerprint: "basespec.relationship-invariants.v1",
 	sql: `
 CREATE TRIGGER artifact_enabled_attachment_requires_enabled_source_insert
 BEFORE INSERT ON artifact_collection_attachments
@@ -365,14 +365,14 @@ END;
 `,
 }, {
 	version:     4,
-	fingerprint: "artifactstore.source-content-generation.v1",
+	fingerprint: "basespec.source-content-generation.v1",
 	sql: `
 ALTER TABLE artifact_sources
 	ADD COLUMN content_generation TEXT NOT NULL DEFAULT '';
 `,
 }, {
 	version:     5,
-	fingerprint: "artifactstore.retirement-relationship-invariants.v1",
+	fingerprint: "basespec.retirement-relationship-invariants.v1",
 	sql: `
 CREATE TRIGGER artifact_source_retirement_requires_no_active_attachments
 BEFORE UPDATE OF retired_at ON artifact_sources

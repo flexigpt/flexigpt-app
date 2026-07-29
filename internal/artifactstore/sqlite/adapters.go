@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
@@ -61,15 +61,15 @@ func (r *SourceRepository) Create(
 
 func (r *SourceRepository) Get(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 ) (source.Source, error) {
 	return r.store.getSource(ctx, rootID, id)
 }
 
 func (r *SourceRepository) List(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) ([]source.Source, error) {
 	return r.store.listSources(ctx, rootID)
 }
@@ -92,8 +92,8 @@ func (r *SourceRepository) Retire(
 
 func (r *SourceRepository) Discard(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
 	return r.store.discardSource(ctx, rootID, id, expectedRevision)
@@ -101,8 +101,8 @@ func (r *SourceRepository) Discard(
 
 func (r *SourceRepository) Purge(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
 	return r.store.purgeSource(ctx, rootID, id, expectedRevision)
@@ -117,7 +117,7 @@ func (r *RootRepository) Create(
 
 func (r *RootRepository) Get(
 	ctx context.Context,
-	id artifactstore.RootID,
+	id basespec.RootID,
 ) (root.Root, error) {
 	return r.store.getRoot(ctx, id)
 }
@@ -144,7 +144,7 @@ func (r *RootRepository) Retire(
 
 func (r *RootRepository) Purge(
 	ctx context.Context,
-	id artifactstore.RootID,
+	id basespec.RootID,
 	expectedRevision uint64,
 ) error {
 	return r.store.purgeRoot(ctx, id, expectedRevision)
@@ -160,21 +160,21 @@ func (r *CollectionRepository) Create(
 
 func (r *CollectionRepository) Get(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (collection.Collection, error) {
 	return r.store.getCollection(ctx, ref)
 }
 
 func (r *CollectionRepository) GetRetired(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (collection.Collection, error) {
 	return r.store.getRetiredCollection(ctx, ref)
 }
 
 func (r *CollectionRepository) ListByRoot(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) ([]collection.Collection, error) {
 	return r.store.listCollectionsByRoot(ctx, rootID)
 }
@@ -197,7 +197,7 @@ func (r *CollectionRepository) Retire(
 
 func (r *CollectionRepository) Purge(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	return r.store.purgeCollection(ctx, ref, expectedRevision)
@@ -217,15 +217,15 @@ func (r *CollectionRepository) Attach(
 
 func (r *CollectionRepository) GetAttachment(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 ) (collection.Attachment, error) {
 	return r.store.getCollectionAttachment(ctx, ref, sourceID)
 }
 
 func (r *CollectionRepository) ListAttachments(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) ([]collection.Attachment, error) {
 	return r.store.listCollectionAttachments(ctx, ref)
 }
@@ -246,8 +246,8 @@ func (r *CollectionRepository) UpdateAttachment(
 
 func (r *CollectionRepository) Detach(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
 	modifiedAt time.Time,
@@ -264,8 +264,8 @@ func (r *CollectionRepository) Detach(
 
 func (r *CollectionRepository) ReplaceAttachment(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	previousSourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	previousSourceID basespec.SourceID,
 	expectedPreviousRevision uint64,
 	replacement collection.Attachment,
 	expectedCollectionRevision uint64,
@@ -282,28 +282,28 @@ func (r *CollectionRepository) ReplaceAttachment(
 
 func (r *CatalogRepository) GetCurrent(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (catalog.Snapshot, error) {
 	return r.store.getCurrentCatalog(ctx, ref)
 }
 
 func (r *ArtifactRepository) Get(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 ) (artifact.Artifact, error) {
 	return r.store.getArtifact(ctx, ref)
 }
 
 func (r *ArtifactRepository) ListByCollection(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) ([]artifact.Artifact, error) {
 	return r.store.listArtifactsByCollection(ctx, ref)
 }
 
 func (r *ArtifactRepository) ListSuppressions(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) ([]artifact.Suppression, error) {
 	return r.store.listSuppressions(ctx, ref)
 }
@@ -346,7 +346,7 @@ func (r *ArtifactRepository) CreatePinned(
 
 func (r *ArtifactRepository) Unadopt(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 	expectedRevision uint64,
 	suppression *artifact.Suppression,
 ) error {
@@ -372,8 +372,8 @@ func (r *ArtifactRepository) Suppress(
 
 func (r *ArtifactRepository) Unsuppress(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	binding artifactstore.SourceBinding,
+	ref basespec.CollectionRef,
+	binding basespec.SourceBinding,
 	expectedRevision uint64,
 ) error {
 	return r.store.deleteSuppression(
@@ -386,7 +386,7 @@ func (r *ArtifactRepository) Unsuppress(
 
 func (r *ArtifactRepository) Purge(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return r.store.purgeArtifact(

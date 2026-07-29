@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 func TestCollectionAndAttachmentValidationCloneAndBoundaries(t *testing.T) {
@@ -38,12 +38,12 @@ func TestCollectionAndAttachmentValidationCloneAndBoundaries(t *testing.T) {
 	}
 	invalid := value
 	invalid.Enabled = true
-	if err := invalid.Validate(); !errors.Is(err, artifactstore.ErrInvalid) {
+	if err := invalid.Validate(); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("enabled retired collection error=%v", err)
 	}
 	invalid = cloned
 	invalid.Data = []byte(`[]`)
-	if err := invalid.Validate(); !errors.Is(err, artifactstore.ErrInvalid) {
+	if err := invalid.Validate(); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("array collection data error=%v", err)
 	}
 
@@ -67,7 +67,7 @@ func TestCollectionAndAttachmentValidationCloneAndBoundaries(t *testing.T) {
 		t.Fatalf("Attachment.Clone=%#v", attachmentClone)
 	}
 	attachment.Data = []byte(`null`)
-	if err := attachment.Validate(); !errors.Is(err, artifactstore.ErrInvalid) {
+	if err := attachment.Validate(); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("non-object attachment data error=%v", err)
 	}
 }

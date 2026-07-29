@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 )
@@ -27,13 +27,13 @@ func TestContextDecoderRecognitionAndDecode(t *testing.T) {
 	}
 	if got := decoder.Recognize(t.Context(), discovery.Candidate{
 		Locator:             "docs/notes.md",
-		RequestedDecoderIDs: []artifactstore.DecoderID{contextDecoderID},
+		RequestedDecoderIDs: []basespec.DecoderID{contextDecoderID},
 	}); got != discovery.RecognitionPossible {
 		t.Fatalf("requested markdown recognition=%v", got)
 	}
 	if got := decoder.Recognize(t.Context(), discovery.Candidate{
 		Locator:             "docs/notes.txt",
-		RequestedDecoderIDs: []artifactstore.DecoderID{contextDecoderID},
+		RequestedDecoderIDs: []basespec.DecoderID{contextDecoderID},
 	}); got != discovery.RecognitionNone {
 		t.Fatalf("requested text recognition=%v", got)
 	}
@@ -66,7 +66,7 @@ func TestContextDecoderRecognitionAndDecode(t *testing.T) {
 
 	decoded, diagnostics = decoder.Decode(t.Context(), discovery.Candidate{
 		Locator:             "docs/notes.md",
-		RequestedDecoderIDs: []artifactstore.DecoderID{contextDecoderID},
+		RequestedDecoderIDs: []basespec.DecoderID{contextDecoderID},
 		Content:             []byte("project notes"),
 	})
 	if len(diagnostics) != 0 || len(decoded) != 1 {
@@ -183,12 +183,12 @@ func TestValidateContextDefinitionAndLogicalNames(t *testing.T) {
 
 	for _, test := range []struct {
 		input string
-		want  artifactstore.LogicalName
+		want  basespec.LogicalName
 	}{
 		{input: "AGENTS.md", want: "agents"},
 		{input: "123 My Thing.md", want: "context-123-my-thing"},
 		{input: "---.md", want: "context"},
-		{input: strings.Repeat("a", artifactstore.MaxLogicalNameBytes+32) + ".md", want: artifactstore.LogicalName(strings.Repeat("a", artifactstore.MaxLogicalNameBytes))},
+		{input: strings.Repeat("a", basespec.MaxLogicalNameBytes+32) + ".md", want: basespec.LogicalName(strings.Repeat("a", basespec.MaxLogicalNameBytes))},
 	} {
 		if got := contextLogicalName(test.input); got != test.want {
 			t.Errorf("contextLogicalName(%q)=%q, want %q", test.input, got, test.want)

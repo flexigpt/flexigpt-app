@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 )
 
@@ -36,11 +38,11 @@ const (
 )
 
 type ConversationResourceSelectionRef struct {
-	Artifact         artifactstore.ArtifactRef `json:"artifact"`
-	Name             string                    `json:"name,omitempty"`
-	Locator          artifactstore.Locator     `json:"locator,omitempty"`
-	DefinitionDigest artifactstore.Digest      `json:"definitionDigest,omitempty"`
-	ArtifactRevision uint64                    `json:"artifactRevision,omitempty"`
+	Artifact         basespec.ArtifactRef `json:"artifact"`
+	Name             string               `json:"name,omitempty"`
+	Locator          basespec.Locator     `json:"locator,omitempty"`
+	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest,omitempty"`
+	ArtifactRevision uint64               `json:"artifactRevision,omitempty"`
 }
 
 type ConversationSkillSelectionRef struct {
@@ -60,34 +62,34 @@ type ConversationSelection struct {
 }
 
 type ConversationContextUsage struct {
-	Artifact                 artifactstore.ArtifactRef      `json:"artifact"`
+	Artifact                 basespec.ArtifactRef           `json:"artifact"`
 	Name                     string                         `json:"name,omitempty"`
-	Locator                  artifactstore.Locator          `json:"locator,omitempty"`
-	SelectedDefinitionDigest artifactstore.Digest           `json:"selectedDefinitionDigest,omitempty"`
-	UsedDefinitionDigest     artifactstore.Digest           `json:"usedDefinitionDigest,omitempty"`
+	Locator                  basespec.Locator               `json:"locator,omitempty"`
+	SelectedDefinitionDigest cryptoutil.Digest              `json:"selectedDefinitionDigest,omitempty"`
+	UsedDefinitionDigest     cryptoutil.Digest              `json:"usedDefinitionDigest,omitempty"`
 	UsedArtifactRevision     uint64                         `json:"usedArtifactRevision,omitempty"`
 	Status                   ConversationContextUsageStatus `json:"status"`
 	Code                     string                         `json:"code,omitempty"`
 	OriginalBytes            int                            `json:"originalBytes,omitempty"`
 	IncludedBytes            int                            `json:"includedBytes,omitempty"`
 	Changed                  bool                           `json:"changed,omitempty"`
-	Diagnostics              []artifactstore.Diagnostic     `json:"diagnostics,omitempty"`
+	Diagnostics              []diagnostic.Diagnostic        `json:"diagnostics,omitempty"`
 }
 
 type ConversationSkillUsage struct {
-	Artifact                 artifactstore.ArtifactRef    `json:"artifact"`
+	Artifact                 basespec.ArtifactRef         `json:"artifact"`
 	Name                     string                       `json:"name,omitempty"`
 	DisplayName              string                       `json:"displayName,omitempty"`
-	Locator                  artifactstore.Locator        `json:"locator,omitempty"`
-	SelectedDefinitionDigest artifactstore.Digest         `json:"selectedDefinitionDigest,omitempty"`
-	UsedDefinitionDigest     artifactstore.Digest         `json:"usedDefinitionDigest,omitempty"`
+	Locator                  basespec.Locator             `json:"locator,omitempty"`
+	SelectedDefinitionDigest cryptoutil.Digest            `json:"selectedDefinitionDigest,omitempty"`
+	UsedDefinitionDigest     cryptoutil.Digest            `json:"usedDefinitionDigest,omitempty"`
 	UsedArtifactRevision     uint64                       `json:"usedArtifactRevision,omitempty"`
 	Status                   ConversationSkillUsageStatus `json:"status"`
 	Changed                  bool                         `json:"changed,omitempty"`
 	SessionAvailable         bool                         `json:"sessionAvailable,omitempty"`
 	Active                   bool                         `json:"active,omitempty"`
 	Advertised               bool                         `json:"advertised,omitempty"`
-	Diagnostics              []artifactstore.Diagnostic   `json:"diagnostics,omitempty"`
+	Diagnostics              []diagnostic.Diagnostic      `json:"diagnostics,omitempty"`
 }
 
 type ConversationUsage struct {
@@ -98,7 +100,7 @@ type ConversationUsage struct {
 	Status            ConversationSelectionStatus `json:"status"`
 	Contexts          []ConversationContextUsage  `json:"contexts,omitempty"`
 	Skills            []ConversationSkillUsage    `json:"skills,omitempty"`
-	Diagnostics       []artifactstore.Diagnostic  `json:"diagnostics,omitempty"`
+	Diagnostics       []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
 }
 
 type ConversationResolution struct {
@@ -128,7 +130,7 @@ func (a *API) ResolveConversationSelection(
 	if workspaceValue == nil || workspaceValue.Body == nil {
 		err := fmt.Errorf(
 			"%w: Workspace %q returned an empty view",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			selection.Workspace.CollectionID,
 		)
 		return ConversationResolution{
@@ -155,8 +157,8 @@ func (a *API) ResolveConversationSelection(
 		usage.DisplayName = selection.DisplayName
 	}
 
-	contextUsageByID := make(map[artifactstore.ArtifactID]int, len(selection.ContextRefs))
-	contextArtifactRefs := make([]artifactstore.ArtifactRef, 0, len(selection.ContextRefs))
+	contextUsageByID := make(map[basespec.ArtifactID]int, len(selection.ContextRefs))
+	contextArtifactRefs := make([]basespec.ArtifactRef, 0, len(selection.ContextRefs))
 
 	for _, ref := range selection.ContextRefs {
 		if err := ref.Artifact.Validate(); err != nil {
@@ -167,14 +169,14 @@ func (a *API) ResolveConversationSelection(
 		if ref.Artifact.RootID != selection.Workspace.RootID {
 			err := fmt.Errorf(
 				"%w: selected Context Artifact belongs to another Root",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
 		}
 		if _, duplicate := contextUsageByID[ref.Artifact.ArtifactID]; duplicate {
-			err := fmt.Errorf("%w: duplicate selected Context Artifact", artifactstore.ErrInvalid)
+			err := fmt.Errorf("%w: duplicate selected Context Artifact", basespec.ErrInvalid)
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
@@ -204,7 +206,7 @@ func (a *API) ResolveConversationSelection(
 		)
 		if composeErr != nil {
 			usage.Status = ConversationSelectionUnavailable
-			usage.Diagnostics = artifactstore.AppendDiagnostics(
+			usage.Diagnostics = diagnostic.AppendDiagnostics(
 				usage.Diagnostics,
 				conversationSelectionDiagnostic(
 					"workspace.conversation.context-unavailable",
@@ -213,7 +215,7 @@ func (a *API) ResolveConversationSelection(
 			)
 		} else if contextPlan != nil && contextPlan.Body != nil {
 			usage.CatalogRevision = contextPlan.Body.CatalogRevision
-			usage.Diagnostics = artifactstore.AppendDiagnostics(
+			usage.Diagnostics = diagnostic.AppendDiagnostics(
 				usage.Diagnostics,
 				contextPlan.Body.Diagnostics...,
 			)
@@ -256,8 +258,8 @@ func (a *API) ResolveConversationSelection(
 		}
 	}
 
-	skillUsageByID := make(map[artifactstore.ArtifactID]int, len(selection.SkillRefs))
-	skillArtifactRefs := make([]artifactstore.ArtifactRef, 0, len(selection.SkillRefs))
+	skillUsageByID := make(map[basespec.ArtifactID]int, len(selection.SkillRefs))
+	skillArtifactRefs := make([]basespec.ArtifactRef, 0, len(selection.SkillRefs))
 
 	for _, ref := range selection.SkillRefs {
 		if err := ref.Artifact.Validate(); err != nil {
@@ -268,14 +270,14 @@ func (a *API) ResolveConversationSelection(
 		if ref.Artifact.RootID != selection.Workspace.RootID {
 			err := fmt.Errorf(
 				"%w: selected Workspace Skill belongs to another Root",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
 		}
 		if _, duplicate := skillUsageByID[ref.Artifact.ArtifactID]; duplicate {
-			err := fmt.Errorf("%w: duplicate selected Workspace Skill Artifact", artifactstore.ErrInvalid)
+			err := fmt.Errorf("%w: duplicate selected Workspace Skill Artifact", basespec.ErrInvalid)
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
@@ -303,7 +305,7 @@ func (a *API) ResolveConversationSelection(
 			},
 		)
 		if loadErr != nil {
-			usage.Diagnostics = artifactstore.AppendDiagnostics(
+			usage.Diagnostics = diagnostic.AppendDiagnostics(
 				usage.Diagnostics,
 				conversationSelectionDiagnostic(
 					"workspace.conversation.skills-unavailable",
@@ -314,7 +316,7 @@ func (a *API) ResolveConversationSelection(
 			if skillPlan.Body.CatalogRevision > usage.CatalogRevision {
 				usage.CatalogRevision = skillPlan.Body.CatalogRevision
 			}
-			usage.Diagnostics = artifactstore.AppendDiagnostics(
+			usage.Diagnostics = diagnostic.AppendDiagnostics(
 				usage.Diagnostics,
 				skillPlan.Body.Diagnostics...,
 			)
@@ -342,7 +344,7 @@ func (a *API) ResolveConversationSelection(
 
 				if skill.Skill.Insert != WorkspaceSkillInsertInstructions {
 					current.Status = ConversationSkillUsageUnavailable
-					current.Diagnostics = artifactstore.AppendDiagnostics(
+					current.Diagnostics = diagnostic.AppendDiagnostics(
 						current.Diagnostics,
 						conversationSelectionDiagnostic(
 							"workspace.conversation.skill-ineligible",
@@ -357,7 +359,7 @@ func (a *API) ResolveConversationSelection(
 				}
 
 				current.Status = ConversationSkillUsageAvailable
-				current.Diagnostics = artifactstore.AppendDiagnostics(
+				current.Diagnostics = diagnostic.AppendDiagnostics(
 					current.Diagnostics,
 					skill.Diagnostics...,
 				)
@@ -397,7 +399,7 @@ func unresolvedConversationUsage(
 		WorkspaceRevision: selection.WorkspaceRevision,
 		CatalogRevision:   selection.CatalogRevision,
 		Status:            ConversationSelectionUnavailable,
-		Diagnostics: []artifactstore.Diagnostic{
+		Diagnostics: []diagnostic.Diagnostic{
 			conversationSelectionDiagnostic(
 				"workspace.conversation.unavailable",
 				message,
@@ -449,12 +451,12 @@ func conversationContextUsageStatusOf(
 }
 
 func conversationResourceChanged(
-	selectedDigest artifactstore.Digest,
-	usedDigest artifactstore.Digest,
+	selectedDigest cryptoutil.Digest,
+	usedDigest cryptoutil.Digest,
 	selectedRevision uint64,
 	usedRevision uint64,
-	selectedLocator artifactstore.Locator,
-	usedLocator artifactstore.Locator,
+	selectedLocator basespec.Locator,
+	usedLocator basespec.Locator,
 ) bool {
 	if selectedDigest != "" && selectedDigest != usedDigest {
 		return true
@@ -507,10 +509,10 @@ func ResolveConversationUsageStatus(usage *ConversationUsage) {
 func conversationSelectionDiagnostic(
 	code string,
 	message string,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticError,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticError,
 		Code:     code,
-		Message:  artifactstore.BoundedDiagnosticMessage(message),
+		Message:  diagnostic.BoundedDiagnosticMessage(message),
 	}
 }

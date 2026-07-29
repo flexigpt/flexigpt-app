@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
@@ -26,7 +26,7 @@ func TestCompositionPolicyNormalizationAndValidation(t *testing.T) {
 
 	cases := []CompositionPolicy{
 		{MaxPromptBytes: -1},
-		{MaxPromptBytes: artifactstore.MaxDefinitionBodyBytes + 1},
+		{MaxPromptBytes: basespec.MaxDefinitionBodyBytes + 1},
 		{MaxPromptBytes: 8, MaxDocumentBytes: 9},
 		{MaxPromptBytes: 8, MaxDocumentBytes: -1},
 		{MaxPromptBytes: 8, MaxDocumentBytes: 8, Overflow: "discard"},
@@ -162,9 +162,9 @@ func TestApplyCompositionPolicyEnforcesAggregateBudgetAndExclusion(t *testing.T)
 	}
 }
 
-func testContribution(locator artifactstore.Locator, role, content string) ContextContribution {
+func testContribution(locator basespec.Locator, role, content string) ContextContribution {
 	return ContextContribution{
-		Artifact: artifactstore.ArtifactRef{
+		Artifact: basespec.ArtifactRef{
 			RootID:     "019d3150-6c01-7a6b-a34e-d9032342bc31",
 			ArtifactID: "019d3150-6c02-7a6b-a34e-d9032342bc31",
 		},

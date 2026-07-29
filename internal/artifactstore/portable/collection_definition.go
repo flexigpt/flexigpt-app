@@ -10,8 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -19,7 +20,7 @@ const (
 	MaxPortableMediaTypeBytes = 256
 )
 
-const placeholderDigest artifactstore.Digest = artifactstore.DigestSHA256Prefix +
+const placeholderDigest cryptoutil.Digest = cryptoutil.DigestSHA256Prefix +
 	"0000000000000000000000000000000000000000000000000000000000000000"
 
 // ContentRef identifies portable member content. Locator is relative to the
@@ -29,12 +30,12 @@ const placeholderDigest artifactstore.Digest = artifactstore.DigestSHA256Prefix 
 // When Locator and URI are empty, SubresourceLocator identifies embedded
 // content in the containing document.
 type ContentRef struct {
-	Locator            artifactstore.Locator            `json:"locator,omitempty"`
-	URI                string                           `json:"uri,omitempty"`
-	SubresourceLocator artifactstore.SubresourceLocator `json:"subresourceLocator,omitempty"`
-	Digest             *artifactstore.Digest            `json:"digest,omitempty"`
-	MediaType          string                           `json:"mediaType,omitempty"`
-	Role               string                           `json:"role,omitempty"`
+	Locator            basespec.Locator            `json:"locator,omitempty"`
+	URI                string                      `json:"uri,omitempty"`
+	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
+	Digest             *cryptoutil.Digest          `json:"digest,omitempty"`
+	MediaType          string                      `json:"mediaType,omitempty"`
+	Role               string                      `json:"role,omitempty"`
 }
 
 func (r ContentRef) Validate() error {
@@ -42,11 +43,11 @@ func (r ContentRef) Validate() error {
 	case r.Locator != "" && r.URI != "":
 		return fmt.Errorf(
 			"%w: portable content reference cannot contain both locator and URI",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 
 	case r.Locator != "":
-		if err := artifactstore.ValidatePortableLocator(r.Locator, false); err != nil {
+		if err := basespec.ValidatePortableLocator(r.Locator, false); err != nil {
 			return err
 		}
 
@@ -58,21 +59,21 @@ func (r ContentRef) Validate() error {
 	case r.SubresourceLocator == "":
 		return fmt.Errorf(
 			"%w: portable content reference requires a locator, URI, or embedded subresource",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
-	if err := artifactstore.ValidatePortableSubresourceLocator(
+	if err := basespec.ValidatePortableSubresourceLocator(
 		r.SubresourceLocator,
 	); err != nil {
 		return err
 	}
 	if r.Digest != nil {
-		if err := artifactstore.ValidateDigest(*r.Digest); err != nil {
+		if err := cryptoutil.ValidateDigest(*r.Digest); err != nil {
 			return err
 		}
 	}
-	if err := artifactstore.ValidateOptionalText(
+	if err := basespec.ValidateOptionalText(
 		"portable content media type",
 		r.MediaType,
 		MaxPortableMediaTypeBytes,
@@ -80,10 +81,10 @@ func (r ContentRef) Validate() error {
 		return err
 	}
 	if r.Role != "" {
-		if err := artifactstore.ValidateIdentifier(
+		if err := basespec.ValidateIdentifier(
 			"portable content role",
 			r.Role,
-			artifactstore.MaxKindBytes,
+			basespec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
@@ -107,10 +108,10 @@ func (r ContentRef) identity() string {
 }
 
 func validateURI(value string) error {
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"portable content URI",
 		value,
-		artifactstore.MaxURIBytes,
+		basespec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -120,7 +121,7 @@ func validateURI(value string) error {
 	if strings.Contains(value, "#") {
 		return fmt.Errorf(
 			"%w: portable content URI must use subresourceLocator instead of a fragment",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -128,32 +129,32 @@ func validateURI(value string) error {
 	if err != nil {
 		return fmt.Errorf(
 			"%w: portable content URI is invalid: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
 	if !parsed.IsAbs() || parsed.Scheme == "" {
 		return fmt.Errorf(
 			"%w: portable content URI must be absolute",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if parsed.User != nil {
 		return fmt.Errorf(
 			"%w: portable content URI cannot contain user information",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if parsed.Fragment != "" {
 		return fmt.Errorf(
 			"%w: portable content URI must use subresourceLocator instead of a fragment",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if strings.EqualFold(parsed.Scheme, "file") {
 		return fmt.Errorf(
 			"%w: portable content URI cannot use the file scheme",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return nil
@@ -163,93 +164,93 @@ func validateURI(value string) error {
 // Collection. Its Body remains domain-owned, while Members remain visible to
 // generic transfer and integrity code.
 type CollectionDefinition struct {
-	Digest         artifactstore.Digest         `json:"digest,omitempty"`
-	Kind           artifactstore.CollectionKind `json:"kind"`
-	SchemaID       artifactstore.SchemaID       `json:"schemaID"`
-	SchemaVersion  string                       `json:"schemaVersion"`
-	LogicalName    artifactstore.LogicalName    `json:"logicalName"`
-	LogicalVersion artifactstore.LogicalVersion `json:"logicalVersion,omitempty"`
-	DisplayName    string                       `json:"displayName,omitempty"`
-	Description    string                       `json:"description,omitempty"`
-	Labels         map[string]string            `json:"labels,omitempty"`
-	Body           json.RawMessage              `json:"body"`
-	Members        []ContentRef                 `json:"members,omitempty"`
+	Digest         cryptoutil.Digest       `json:"digest,omitempty"`
+	Kind           basespec.CollectionKind `json:"kind"`
+	SchemaID       basespec.SchemaID       `json:"schemaID"`
+	SchemaVersion  string                  `json:"schemaVersion"`
+	LogicalName    basespec.LogicalName    `json:"logicalName"`
+	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
+	DisplayName    string                  `json:"displayName,omitempty"`
+	Description    string                  `json:"description,omitempty"`
+	Labels         map[string]string       `json:"labels,omitempty"`
+	Body           json.RawMessage         `json:"body"`
+	Members        []ContentRef            `json:"members,omitempty"`
 }
 
 func (d CollectionDefinition) Validate() error {
-	if err := artifactstore.ValidateDigest(d.Digest); err != nil {
+	if err := cryptoutil.ValidateDigest(d.Digest); err != nil {
 		return fmt.Errorf("portable collection definition: %w", err)
 	}
-	if err := artifactstore.ValidateCollectionKind(d.Kind); err != nil {
+	if err := basespec.ValidateCollectionKind(d.Kind); err != nil {
 		return fmt.Errorf("portable collection definition: %w", err)
 	}
-	if err := artifactstore.ValidateSchemaID(d.SchemaID); err != nil {
+	if err := basespec.ValidateSchemaID(d.SchemaID); err != nil {
 		return fmt.Errorf("portable collection definition: %w", err)
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"portable collection schema version",
 		d.SchemaVersion,
-		artifactstore.MaxVersionBytes,
+		basespec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateLogicalName(d.LogicalName); err != nil {
+	if err := basespec.ValidateLogicalName(d.LogicalName); err != nil {
 		return fmt.Errorf("portable collection definition: %w", err)
 	}
-	if err := artifactstore.ValidateLogicalVersion(d.LogicalVersion, true); err != nil {
+	if err := basespec.ValidateLogicalVersion(d.LogicalVersion, true); err != nil {
 		return fmt.Errorf("portable collection definition: %w", err)
 	}
-	if err := artifactstore.ValidateOptionalText(
+	if err := basespec.ValidateOptionalText(
 		"portable collection display name",
 		d.DisplayName,
-		artifactstore.MaxDisplayNameBytes,
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateOptionalText(
+	if err := basespec.ValidateOptionalText(
 		"portable collection description",
 		d.Description,
-		artifactstore.MaxDescriptionBytes,
+		basespec.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
-	if len(d.Labels) > artifactstore.MaxLabels {
+	if len(d.Labels) > basespec.MaxLabels {
 		return fmt.Errorf(
 			"%w: portable collection labels exceed %d entries",
-			artifactstore.ErrInvalid,
-			artifactstore.MaxLabels,
+			basespec.ErrInvalid,
+			basespec.MaxLabels,
 		)
 	}
 	for key, value := range d.Labels {
-		if err := artifactstore.ValidateIdentifier(
+		if err := basespec.ValidateIdentifier(
 			"portable collection label key",
 			key,
-			artifactstore.MaxKindBytes,
+			basespec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
-		if err := artifactstore.ValidateRequiredText(
+		if err := basespec.ValidateRequiredText(
 			"portable collection label value",
 			value,
-			artifactstore.MaxLabelValueBytes,
+			basespec.MaxLabelValueBytes,
 		); err != nil {
 			return err
 		}
 	}
-	if _, err := jsoncanon.CanonicalizeObject(
+	if _, err := jsonutil.CanonicalizeObject(
 		d.Body,
-		artifactstore.MaxDefinitionBodyBytes,
+		basespec.MaxDefinitionBodyBytes,
 	); err != nil {
 		return fmt.Errorf(
 			"%w: portable collection body: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
 	if len(d.Members) > MaxCollectionMembers {
 		return fmt.Errorf(
 			"%w: portable collection members exceed %d entries",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			MaxCollectionMembers,
 		)
 	}
@@ -264,7 +265,7 @@ func (d CollectionDefinition) Validate() error {
 		if _, duplicate := seen[identity]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate portable collection member %d",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				index,
 			)
 		}
@@ -276,7 +277,7 @@ func (d CollectionDefinition) Validate() error {
 			if _, duplicate := seenPortablePaths[portablePath]; duplicate {
 				return fmt.Errorf(
 					"%w: portable collection members contain a case-ambiguous locator at index %d",
-					artifactstore.ErrInvalid,
+					basespec.ErrInvalid,
 					index,
 				)
 			}
@@ -311,9 +312,9 @@ func CanonicalizeCollectionDefinition(
 		return output.Members[left].identity() < output.Members[right].identity()
 	})
 
-	body, err := jsoncanon.CanonicalizeObject(
+	body, err := jsonutil.CanonicalizeObject(
 		output.Body,
-		artifactstore.MaxDefinitionBodyBytes,
+		basespec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return CollectionDefinition{}, fmt.Errorf(
@@ -332,16 +333,16 @@ func CanonicalizeCollectionDefinition(
 	}
 
 	payload := struct {
-		Kind           artifactstore.CollectionKind `json:"kind"`
-		SchemaID       artifactstore.SchemaID       `json:"schemaID"`
-		SchemaVersion  string                       `json:"schemaVersion"`
-		LogicalName    artifactstore.LogicalName    `json:"logicalName"`
-		LogicalVersion artifactstore.LogicalVersion `json:"logicalVersion,omitempty"`
-		DisplayName    string                       `json:"displayName,omitempty"`
-		Description    string                       `json:"description,omitempty"`
-		Labels         map[string]string            `json:"labels,omitempty"`
-		Body           json.RawMessage              `json:"body"`
-		Members        []ContentRef                 `json:"members,omitempty"`
+		Kind           basespec.CollectionKind `json:"kind"`
+		SchemaID       basespec.SchemaID       `json:"schemaID"`
+		SchemaVersion  string                  `json:"schemaVersion"`
+		LogicalName    basespec.LogicalName    `json:"logicalName"`
+		LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
+		DisplayName    string                  `json:"displayName,omitempty"`
+		Description    string                  `json:"description,omitempty"`
+		Labels         map[string]string       `json:"labels,omitempty"`
+		Body           json.RawMessage         `json:"body"`
+		Members        []ContentRef            `json:"members,omitempty"`
 	}{
 		Kind:           output.Kind,
 		SchemaID:       output.SchemaID,
@@ -361,7 +362,7 @@ func CanonicalizeCollectionDefinition(
 			err,
 		)
 	}
-	canonical, err := jsoncanon.Canonicalize(raw)
+	canonical, err := jsonutil.Canonicalize(raw)
 	if err != nil {
 		return CollectionDefinition{}, fmt.Errorf(
 			"canonicalize portable collection definition: %w",
@@ -369,11 +370,11 @@ func CanonicalizeCollectionDefinition(
 		)
 	}
 
-	calculated := artifactstore.DigestBytes(canonical)
+	calculated := cryptoutil.DigestBytes(canonical)
 	if suppliedDigest != "" && suppliedDigest != calculated {
 		return CollectionDefinition{}, fmt.Errorf(
 			"%w: supplied portable collection digest %q, calculated %q",
-			artifactstore.ErrDigestMismatch,
+			basespec.ErrDigestMismatch,
 			suppliedDigest,
 			calculated,
 		)

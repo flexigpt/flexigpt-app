@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const occurrenceColumns = `
@@ -19,7 +21,7 @@ const occurrenceColumns = `
 
 func (s *Store) getCurrentCatalog(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (catalog.Snapshot, error) {
 	if err := ref.Validate(); err != nil {
 		return catalog.Snapshot{}, err
@@ -70,7 +72,7 @@ func (s *Store) getCurrentCatalog(
 	if errors.Is(err, sql.ErrNoRows) {
 		return catalog.Snapshot{}, fmt.Errorf(
 			"%w: collection %q has no current catalog",
-			artifactstore.ErrCatalogUnavailable,
+			basespec.ErrCatalogUnavailable,
 			ref.CollectionID,
 		)
 	}
@@ -78,10 +80,10 @@ func (s *Store) getCurrentCatalog(
 		return catalog.Snapshot{}, err
 	}
 
-	attachmentRevisions := map[artifactstore.SourceID]uint64{}
-	sourceRevisions := map[artifactstore.SourceID]uint64{}
-	sourceGenerations := map[artifactstore.SourceID]string{}
-	diagnostics := []artifactstore.Diagnostic{}
+	attachmentRevisions := map[basespec.SourceID]uint64{}
+	sourceRevisions := map[basespec.SourceID]uint64{}
+	sourceGenerations := map[basespec.SourceID]string{}
+	diagnostics := []diagnostic.Diagnostic{}
 	if err := decodeJSON(attachmentRevisionsRaw, &attachmentRevisions); err != nil {
 		return catalog.Snapshot{}, err
 	}
@@ -132,8 +134,8 @@ func (s *Store) getCurrentCatalog(
 		AttachmentRevisions: attachmentRevisions,
 		SourceRevisions:     sourceRevisions,
 		SourceGenerations:   sourceGenerations,
-		PlanFingerprint:     artifactstore.Digest(planFingerprint),
-		DecoderFingerprint:  artifactstore.Digest(decoderFingerprint),
+		PlanFingerprint:     cryptoutil.Digest(planFingerprint),
+		DecoderFingerprint:  cryptoutil.Digest(decoderFingerprint),
 		PublishedAt:         parseTime(publishedAt),
 		Diagnostics:         diagnostics,
 		Occurrences:         occurrences,
@@ -163,7 +165,7 @@ func (s *Store) getCurrentCatalog(
 	if stale {
 		return catalog.CloneSnapshot(value), fmt.Errorf(
 			"%w: catalog for collection %q does not match current metadata",
-			artifactstore.ErrCatalogStale,
+			basespec.ErrCatalogStale,
 			ref.CollectionID,
 		)
 	}
@@ -197,25 +199,25 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 	); err != nil {
 		return catalog.Occurrence{}, err
 	}
-	diagnostics := []artifactstore.Diagnostic{}
+	diagnostics := []diagnostic.Diagnostic{}
 	if err := decodeJSON(diagnosticsRaw, &diagnostics); err != nil {
 		return catalog.Occurrence{}, err
 	}
 	value := catalog.Occurrence{
-		RootID:       artifactstore.RootID(rootID),
-		CollectionID: artifactstore.CollectionID(collectionID),
+		RootID:       basespec.RootID(rootID),
+		CollectionID: basespec.CollectionID(collectionID),
 		Key: catalog.OccurrenceKey{
-			CollectionID:       artifactstore.CollectionID(collectionID),
-			SourceID:           artifactstore.SourceID(sourceID),
-			Locator:            artifactstore.Locator(locator),
-			SubresourceLocator: artifactstore.SubresourceLocator(subresource),
+			CollectionID:       basespec.CollectionID(collectionID),
+			SourceID:           basespec.SourceID(sourceID),
+			Locator:            basespec.Locator(locator),
+			SubresourceLocator: basespec.SubresourceLocator(subresource),
 		},
-		Kind:                artifactstore.ArtifactKind(kind),
-		LogicalName:         artifactstore.LogicalName(logicalName),
-		LogicalVersion:      artifactstore.LogicalVersion(logicalVersion),
+		Kind:                basespec.ArtifactKind(kind),
+		LogicalName:         basespec.LogicalName(logicalName),
+		LogicalVersion:      basespec.LogicalVersion(logicalVersion),
 		DefinitionDigest:    parseDigest(definitionDigest),
 		SourceContentDigest: parseDigest(sourceDigest),
-		DecoderID:           artifactstore.DecoderID(decoderID),
+		DecoderID:           basespec.DecoderID(decoderID),
 		State:               catalog.OccurrenceState(state),
 		Diagnostics:         diagnostics,
 		ObservedAt:          parseTime(observedAt),
@@ -229,10 +231,10 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 func currentAttachmentSourceRevisionsTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (
-	currentAttachments map[artifactstore.SourceID]uint64,
-	currentSources map[artifactstore.SourceID]uint64,
+	currentAttachments map[basespec.SourceID]uint64,
+	currentSources map[basespec.SourceID]uint64,
 	err error,
 ) {
 	rows, err := tx.QueryContext(
@@ -252,8 +254,8 @@ func currentAttachmentSourceRevisionsTx(
 	}
 	defer rows.Close()
 
-	attachments := make(map[artifactstore.SourceID]uint64)
-	sources := make(map[artifactstore.SourceID]uint64)
+	attachments := make(map[basespec.SourceID]uint64)
+	sources := make(map[basespec.SourceID]uint64)
 	for rows.Next() {
 		var sourceID string
 		var attachmentRevision, sourceRevision uint64
@@ -264,7 +266,7 @@ func currentAttachmentSourceRevisionsTx(
 		); err != nil {
 			return nil, nil, err
 		}
-		id := artifactstore.SourceID(sourceID)
+		id := basespec.SourceID(sourceID)
 		attachments[id] = attachmentRevision
 		sources[id] = sourceRevision
 	}

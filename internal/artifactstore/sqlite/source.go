@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -56,8 +56,8 @@ func (s *Store) createSource(
 
 func (s *Store) getSource(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 ) (source.Source, error) {
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return source.Source{}, err
@@ -74,7 +74,7 @@ func (s *Store) getSource(
 	if errors.Is(err, sql.ErrNoRows) {
 		return source.Source{}, fmt.Errorf(
 			"%w: source %q in root %q",
-			artifactstore.ErrSourceNotFound,
+			basespec.ErrSourceNotFound,
 			id,
 			rootID,
 		)
@@ -84,7 +84,7 @@ func (s *Store) getSource(
 
 func (s *Store) listSources(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) ([]source.Source, error) {
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
@@ -128,7 +128,7 @@ func (s *Store) updateSource(
 	if expectedRevision == 0 ||
 		value.Revision != expectedRevision+1 ||
 		value.RetiredAt != nil {
-		return fmt.Errorf("%w: invalid source update", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid source update", basespec.ErrInvalid)
 	}
 	result, err := s.db.ExecContext(
 		ctx,
@@ -191,7 +191,7 @@ func (s *Store) retireSource(
 	if value.RetiredAt == nil ||
 		value.Enabled ||
 		value.Revision != expectedRevision+1 {
-		return fmt.Errorf("%w: invalid source retirement", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid source retirement", basespec.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -219,7 +219,7 @@ func (s *Store) retireSource(
 		return err
 	}
 	if attached != 0 {
-		return fmt.Errorf("%w: source is still attached to a collection", artifactstore.ErrConflict)
+		return fmt.Errorf("%w: source is still attached to a collection", basespec.ErrConflict)
 	}
 
 	result, err := tx.ExecContext(
@@ -248,8 +248,8 @@ func (s *Store) retireSource(
 
 func (s *Store) discardSource(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
 	result, err := s.db.ExecContext(
@@ -281,8 +281,8 @@ func (s *Store) discardSource(
 
 func (s *Store) purgeSource(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
 	result, err := s.db.ExecContext(
@@ -328,9 +328,9 @@ func scanSource(row scanner) (source.Source, error) {
 		return source.Source{}, err
 	}
 	value := source.Source{
-		ID:                artifactstore.SourceID(id),
-		RootID:            artifactstore.RootID(rootID),
-		Kind:              artifactstore.SourceKind(kind),
+		ID:                basespec.SourceID(id),
+		RootID:            basespec.RootID(rootID),
+		Kind:              basespec.SourceKind(kind),
 		DisplayName:       displayName,
 		Enabled:           enabled != 0,
 		Config:            append([]byte(nil), config...),

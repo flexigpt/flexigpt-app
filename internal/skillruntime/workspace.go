@@ -7,8 +7,8 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
@@ -65,9 +65,9 @@ func (p *Workspace) List(
 				Default:     argument.Default,
 			})
 		}
-		diagnostics := artifactstore.CloneDiagnostics(value.Diagnostics)
+		diagnostics := diagnostic.CloneDiagnostics(value.Diagnostics)
 		if !value.WorkspaceEnabled {
-			diagnostics = artifactstore.AppendDiagnostics(
+			diagnostics = diagnostic.AppendDiagnostics(
 				diagnostics,
 				unavailableDiagnostic(
 					"skill.provider.workspace-disabled",
@@ -139,7 +139,7 @@ func (p *Workspace) Render(
 	if !found {
 		return RenderedSkill{
 			Available: false,
-			Diagnostics: []artifactstore.Diagnostic{
+			Diagnostics: []diagnostic.Diagnostic{
 				unavailableDiagnostic(
 					"skill.provider.workspace-unavailable",
 					"the Workspace Skill is unavailable or no longer current",
@@ -166,7 +166,7 @@ func (p *Workspace) Render(
 		}
 		return RenderedSkill{
 			Available: false,
-			Diagnostics: []artifactstore.Diagnostic{
+			Diagnostics: []diagnostic.Diagnostic{
 				unavailableDiagnostic(
 					"skill.provider.render-unavailable",
 					"the Workspace Skill could not be rendered",
@@ -189,7 +189,7 @@ func (p *Workspace) Render(
 	if projected.Ref.Artifact == nil {
 		return RenderedSkill{
 			Available: false,
-			Diagnostics: []artifactstore.Diagnostic{
+			Diagnostics: []diagnostic.Diagnostic{
 				unavailableDiagnostic(
 					"skill.provider.workspace-unavailable",
 					"the Workspace Skill became unavailable while it was rendered",
@@ -204,7 +204,7 @@ func (p *Workspace) Render(
 		Insert:           rendered.Insert,
 		Arguments:        append([]agentskillsSpec.SkillArgument(nil), rendered.Arguments...),
 		AppliedArguments: cloneStrings(rendered.AppliedArguments),
-		Diagnostics:      artifactstore.CloneDiagnostics(projected.Diagnostics),
+		Diagnostics:      diagnostic.CloneDiagnostics(projected.Diagnostics),
 	}, nil
 }
 

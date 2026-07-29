@@ -7,38 +7,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const (
-	refreshTestRootID       artifactstore.RootID       = "019d3150-6a44-7a6b-a34e-d9032342bc31"
-	refreshTestCollectionID artifactstore.CollectionID = "019d3150-6a45-7a6b-a34e-d9032342bc31"
-	refreshTestSourceID     artifactstore.SourceID     = "019d3150-6a46-7a6b-a34e-d9032342bc31"
+	refreshTestRootID       basespec.RootID       = "019d3150-6a44-7a6b-a34e-d9032342bc31"
+	refreshTestCollectionID basespec.CollectionID = "019d3150-6a45-7a6b-a34e-d9032342bc31"
+	refreshTestSourceID     basespec.SourceID     = "019d3150-6a46-7a6b-a34e-d9032342bc31"
 )
 
 func refreshTestPublication() Publication {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	definitionDigest := artifactstore.DigestBytes([]byte("definition"))
-	contentDigest := artifactstore.DigestBytes([]byte("content"))
+	definitionDigest := cryptoutil.DigestBytes([]byte("definition"))
+	contentDigest := cryptoutil.DigestBytes([]byte("content"))
 	return Publication{
-		Ref: artifactstore.CollectionRef{
+		Ref: basespec.CollectionRef{
 			RootID:       refreshTestRootID,
 			CollectionID: refreshTestCollectionID,
 		},
 		ExpectedCollectionRevision: 1,
-		ExpectedAttachmentRevisions: map[artifactstore.SourceID]uint64{
+		ExpectedAttachmentRevisions: map[basespec.SourceID]uint64{
 			refreshTestSourceID: 1,
 		},
-		ExpectedSourceRevisions: map[artifactstore.SourceID]uint64{
+		ExpectedSourceRevisions: map[basespec.SourceID]uint64{
 			refreshTestSourceID: 1,
 		},
-		SourceGenerations: map[artifactstore.SourceID]string{
+		SourceGenerations: map[basespec.SourceID]string{
 			refreshTestSourceID: "generation-1",
 		},
-		PlanFingerprint:    artifactstore.DigestBytes([]byte("plan")),
-		DecoderFingerprint: artifactstore.DigestBytes([]byte("decoder")),
+		PlanFingerprint:    cryptoutil.DigestBytes([]byte("plan")),
+		DecoderFingerprint: cryptoutil.DigestBytes([]byte("decoder")),
 		Occurrences: []catalog.Occurrence{{
 			RootID:       refreshTestRootID,
 			CollectionID: refreshTestCollectionID,
@@ -68,17 +69,17 @@ func TestPublicationValidationRejectsBrokenConcurrencyAndOwnership(t *testing.T)
 	}
 	missingGeneration := refreshTestPublication()
 	missingGeneration.SourceGenerations = nil
-	if err := missingGeneration.Validate(); !errors.Is(err, artifactstore.ErrInvalid) {
+	if err := missingGeneration.Validate(); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("missing generation error=%v, want ErrInvalid", err)
 	}
 	unattached := refreshTestPublication()
 	unattached.Occurrences[0].Key.SourceID = "019d3150-6a47-7a6b-a34e-d9032342bc31"
-	if err := unattached.Validate(); !errors.Is(err, artifactstore.ErrInvalid) {
+	if err := unattached.Validate(); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("unattached occurrence error=%v, want ErrInvalid", err)
 	}
 	duplicate := refreshTestPublication()
 	duplicate.Occurrences = append(duplicate.Occurrences, duplicate.Occurrences[0])
-	if err := duplicate.Validate(); !errors.Is(err, artifactstore.ErrInvalid) {
+	if err := duplicate.Validate(); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("duplicate occurrence error=%v, want ErrInvalid", err)
 	}
 }
@@ -89,16 +90,16 @@ type refreshTestSnapshot struct {
 }
 
 func (s *refreshTestSnapshot) Generation() string { return "generation-1" }
-func (s *refreshTestSnapshot) Stat(context.Context, artifactstore.Locator) (source.Entry, error) {
-	return source.Entry{}, artifactstore.ErrNotFound
+func (s *refreshTestSnapshot) Stat(context.Context, basespec.Locator) (source.Entry, error) {
+	return source.Entry{}, basespec.ErrNotFound
 }
 
-func (s *refreshTestSnapshot) ReadDir(context.Context, artifactstore.Locator) ([]source.Entry, error) {
-	return nil, artifactstore.ErrNotFound
+func (s *refreshTestSnapshot) ReadDir(context.Context, basespec.Locator) ([]source.Entry, error) {
+	return nil, basespec.ErrNotFound
 }
 
-func (s *refreshTestSnapshot) Open(context.Context, artifactstore.Locator) (io.ReadCloser, error) {
-	return nil, artifactstore.ErrNotFound
+func (s *refreshTestSnapshot) Open(context.Context, basespec.Locator) (io.ReadCloser, error) {
+	return nil, basespec.ErrNotFound
 }
 func (s *refreshTestSnapshot) Confirm(context.Context) error { return nil }
 func (s *refreshTestSnapshot) Close() error {

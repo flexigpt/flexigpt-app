@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -110,7 +110,7 @@ func TestManagedPackagePublicationIsAtomicIdempotentAndConcurrent(t *testing.T) 
 		different,
 	); !errors.Is(
 		err,
-		artifactstore.ErrConflict,
+		basespec.ErrConflict,
 	) {
 		t.Fatalf("different package error=%v, want ErrConflict", err)
 	}
@@ -121,7 +121,7 @@ func TestManagedPackagePublicationIsAtomicIdempotentAndConcurrent(t *testing.T) 
 		"other-generation",
 	); !errors.Is(
 		err,
-		artifactstore.ErrConflict,
+		basespec.ErrConflict,
 	) {
 		t.Fatalf("wrong generation removal error=%v, want ErrConflict", err)
 	}
@@ -133,7 +133,7 @@ func TestManagedPackagePublicationIsAtomicIdempotentAndConcurrent(t *testing.T) 
 		t.Fatalf("Open after removal: %v", err)
 	}
 	defer removed.Close()
-	if _, err := removed.Stat(t.Context(), publication.Directory); !errors.Is(err, artifactstore.ErrNotFound) {
+	if _, err := removed.Stat(t.Context(), publication.Directory); !errors.Is(err, basespec.ErrNotFound) {
 		t.Fatalf("removed package Stat error=%v, want ErrNotFound", err)
 	}
 }
@@ -149,7 +149,7 @@ func TestManagedPackagePublicationRejectsReservedDirectory(t *testing.T) {
 		Directory: ".artifactstore-staging/private",
 		Files:     []source.ManagedPackageFile{{Locator: "file.txt", Content: []byte("x")}},
 	})
-	if !errors.Is(err, artifactstore.ErrInvalid) {
+	if !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("reserved directory error=%v, want ErrInvalid", err)
 	}
 }

@@ -1,6 +1,9 @@
 package engine
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactstore"
+import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+)
 
 const (
 	DiagnosticCodeArtifactInvalid           = "workspace.artifact.invalid"
@@ -21,9 +24,9 @@ const (
 )
 
 func WorkspaceArtifactErrorDiagnostics(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 	err error,
-) []artifactstore.Diagnostic {
+) []diagnostic.Diagnostic {
 	return WorkspaceArtifactDiagnostics(
 		locator,
 		DiagnosticCodeArtifactInvalid,
@@ -32,15 +35,15 @@ func WorkspaceArtifactErrorDiagnostics(
 }
 
 func WorkspaceArtifactDiagnostics(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 	code string,
 	message string,
-) []artifactstore.Diagnostic {
-	return []artifactstore.Diagnostic{{
-		Severity: artifactstore.DiagnosticError,
+) []diagnostic.Diagnostic {
+	return []diagnostic.Diagnostic{{
+		Severity: diagnostic.DiagnosticError,
 		Code:     code,
-		Message:  artifactstore.BoundedDiagnosticMessage(message),
-		Location: &artifactstore.DiagnosticLocation{
+		Message:  diagnostic.BoundedDiagnosticMessage(message),
+		Location: &diagnostic.DiagnosticLocation{
 			Locator: locator,
 		},
 	}}

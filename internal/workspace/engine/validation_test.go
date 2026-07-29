@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
@@ -20,7 +20,7 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 	input := CollectionData{
 		DiscoveryPolicyRevision: "policy.v1",
 		Discovery: DiscoveryPreferences{
-			AdditionalLocators: []artifactstore.Locator{"docs/guide.md"},
+			AdditionalLocators: []basespec.Locator{"docs/guide.md"},
 			AdditionalRoots: []DiscoveryRoot{{
 				Root:            "docs",
 				Recursive:       true,
@@ -53,7 +53,7 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 		CollectionData{DiscoveryPolicyRevision: " "},
 	); !errors.Is(
 		err,
-		artifactstore.ErrInvalid,
+		basespec.ErrInvalid,
 	) {
 		t.Fatalf("invalid policy revision error=%v", err)
 	}
@@ -61,12 +61,12 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 		CollectionData{
 			DiscoveryPolicyRevision: "policy.v1",
 			Discovery: DiscoveryPreferences{
-				AdditionalLocators: []artifactstore.Locator{"same.md", "same.md"},
+				AdditionalLocators: []basespec.Locator{"same.md", "same.md"},
 			},
 		},
 	); !errors.Is(
 		err,
-		artifactstore.ErrInvalid,
+		basespec.ErrInvalid,
 	) {
 		t.Fatalf("duplicate locator error=%v", err)
 	}
@@ -222,7 +222,7 @@ func validationTestCollection(t *testing.T) collection.Collection {
 	}
 }
 
-func validationTestSource(enabled bool, kind artifactstore.SourceKind) source.Summary {
+func validationTestSource(enabled bool, kind basespec.SourceKind) source.Summary {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
 	return source.Summary{
 		ID:          "019d3150-6f03-7a6b-a34e-d9032342bc31",

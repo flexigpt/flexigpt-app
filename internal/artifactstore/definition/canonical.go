@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-const placeholderDigest artifactstore.Digest = artifactstore.DigestSHA256Prefix +
+const placeholderDigest cryptoutil.Digest = cryptoutil.DigestSHA256Prefix +
 	"0000000000000000000000000000000000000000000000000000000000000000"
 
 func Canonicalize(input Definition) (Definition, error) {
@@ -17,9 +18,9 @@ func Canonicalize(input Definition) (Definition, error) {
 	output.Dependencies = cloneSelectors(input.Dependencies)
 	output.Body = append(json.RawMessage(nil), input.Body...)
 
-	body, err := jsoncanon.CanonicalizeObject(
+	body, err := jsonutil.CanonicalizeObject(
 		output.Body,
-		artifactstore.MaxDefinitionBodyBytes,
+		basespec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return Definition{}, fmt.Errorf("canonicalize definition body: %w", err)
@@ -35,16 +36,16 @@ func Canonicalize(input Definition) (Definition, error) {
 	}
 
 	payload := struct {
-		Kind           artifactstore.ArtifactKind   `json:"kind"`
-		SchemaID       artifactstore.SchemaID       `json:"schemaID"`
-		SchemaVersion  string                       `json:"schemaVersion"`
-		LogicalName    artifactstore.LogicalName    `json:"logicalName"`
-		LogicalVersion artifactstore.LogicalVersion `json:"logicalVersion,omitempty"`
-		DisplayName    string                       `json:"displayName,omitempty"`
-		Description    string                       `json:"description,omitempty"`
-		Labels         map[string]string            `json:"labels,omitempty"`
-		Body           json.RawMessage              `json:"body"`
-		Dependencies   []Selector                   `json:"dependencies,omitempty"`
+		Kind           basespec.ArtifactKind   `json:"kind"`
+		SchemaID       basespec.SchemaID       `json:"schemaID"`
+		SchemaVersion  string                  `json:"schemaVersion"`
+		LogicalName    basespec.LogicalName    `json:"logicalName"`
+		LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
+		DisplayName    string                  `json:"displayName,omitempty"`
+		Description    string                  `json:"description,omitempty"`
+		Labels         map[string]string       `json:"labels,omitempty"`
+		Body           json.RawMessage         `json:"body"`
+		Dependencies   []Selector              `json:"dependencies,omitempty"`
 	}{
 		Kind:           output.Kind,
 		SchemaID:       output.SchemaID,
@@ -62,23 +63,23 @@ func Canonicalize(input Definition) (Definition, error) {
 	if err != nil {
 		return Definition{}, fmt.Errorf("marshal definition payload: %w", err)
 	}
-	canonicalPayload, err := jsoncanon.Canonicalize(raw)
+	canonicalPayload, err := jsonutil.Canonicalize(raw)
 	if err != nil {
 		return Definition{}, fmt.Errorf("canonicalize definition payload: %w", err)
 	}
-	if len(canonicalPayload) > artifactstore.MaxDefinitionBytes {
+	if len(canonicalPayload) > basespec.MaxDefinitionBytes {
 		return Definition{}, fmt.Errorf(
 			"%w: canonical definition exceeds %d bytes",
-			artifactstore.ErrInvalid,
-			artifactstore.MaxDefinitionBytes,
+			basespec.ErrInvalid,
+			basespec.MaxDefinitionBytes,
 		)
 	}
 
-	calculated := artifactstore.DigestBytes(canonicalPayload)
+	calculated := cryptoutil.DigestBytes(canonicalPayload)
 	if suppliedDigest != "" && suppliedDigest != calculated {
 		return Definition{}, fmt.Errorf(
 			"%w: supplied definition digest %q, calculated %q",
-			artifactstore.ErrDigestMismatch,
+			basespec.ErrDigestMismatch,
 			suppliedDigest,
 			calculated,
 		)

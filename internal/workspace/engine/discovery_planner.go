@@ -6,12 +6,12 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 )
 
 type Planner struct {
-	decoderIDs              []artifactstore.DecoderID
+	decoderIDs              []basespec.DecoderID
 	profiles                DiscoveryProfiles
 	discoveryPolicyRevision string
 }
@@ -19,7 +19,7 @@ type Planner struct {
 func NewPlanner(
 	profiles DiscoveryProfiles,
 	discoveryPolicyRevision string,
-	decoderIDs ...artifactstore.DecoderID,
+	decoderIDs ...basespec.DecoderID,
 ) (*Planner, error) {
 	if err := validateDiscoveryProfiles(profiles); err != nil {
 		return nil, fmt.Errorf(
@@ -28,10 +28,10 @@ func NewPlanner(
 			err,
 		)
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"workspace discovery policy revision",
 		discoveryPolicyRevision,
-		artifactstore.MaxVersionBytes,
+		basespec.MaxVersionBytes,
 	); err != nil {
 		return nil, err
 	}
@@ -43,11 +43,11 @@ func NewPlanner(
 		)
 	}
 
-	seen := make(map[artifactstore.DecoderID]struct{}, len(decoderIDs))
-	values := make([]artifactstore.DecoderID, 0, len(decoderIDs))
+	seen := make(map[basespec.DecoderID]struct{}, len(decoderIDs))
+	values := make([]basespec.DecoderID, 0, len(decoderIDs))
 
 	for _, decoderID := range decoderIDs {
-		if err := artifactstore.ValidateDecoderID(decoderID); err != nil {
+		if err := basespec.ValidateDecoderID(decoderID); err != nil {
 			return nil, err
 		}
 		if _, duplicate := seen[decoderID]; duplicate {
@@ -84,7 +84,7 @@ func (p *Planner) Build(
 
 	plans := make([]discovery.SourcePlan, 0, len(value.Attachments))
 	sourcesByID := make(
-		map[artifactstore.SourceID]bool,
+		map[basespec.SourceID]bool,
 		len(value.Sources),
 	)
 	for _, sourceValue := range value.Sources {
@@ -135,17 +135,17 @@ func (p *Planner) Build(
 		sourcePlan := discovery.SourcePlan{
 			SourceID: attachment.SourceID,
 			AllowedDecoderIDs: append(
-				[]artifactstore.DecoderID(nil),
+				[]basespec.DecoderID(nil),
 				p.decoderIDs...,
 			),
 			Authoritative:     operation.defaultAuthoritative,
-			MaxCandidateBytes: artifactstore.MaxCandidateBytes,
-			MaxTotalBytes:     artifactstore.MaxScanBytes,
-			MaxCandidates:     artifactstore.DefaultMaxCandidates,
-			MaxEntries:        artifactstore.DefaultMaxEntries,
-			MaxDepth:          artifactstore.DefaultMaxDepth,
+			MaxCandidateBytes: basespec.MaxCandidateBytes,
+			MaxTotalBytes:     basespec.MaxScanBytes,
+			MaxCandidates:     basespec.DefaultMaxCandidates,
+			MaxEntries:        basespec.DefaultMaxEntries,
+			MaxDepth:          basespec.DefaultMaxDepth,
 			ExplicitLocators: append(
-				[]artifactstore.Locator(nil),
+				[]basespec.Locator(nil),
 				profile.ExplicitLocators...,
 			),
 			DirectoryRoots: cloneDirectoryRoots(
@@ -154,7 +154,7 @@ func (p *Planner) Build(
 		}
 		profilePreferences := DiscoveryPreferences{
 			AdditionalLocators: append(
-				[]artifactstore.Locator(nil),
+				[]basespec.Locator(nil),
 				profile.ExplicitLocators...,
 			),
 		}
@@ -235,10 +235,10 @@ func (p *Planner) Build(
 func appendDiscoveryPreferenceDecoderHints(
 	current []discovery.DecoderHint,
 	preferences DiscoveryPreferences,
-	decoderIDs []artifactstore.DecoderID,
+	decoderIDs []basespec.DecoderID,
 ) []discovery.DecoderHint {
 	type scope struct {
-		locator   artifactstore.Locator
+		locator   basespec.Locator
 		recursive bool
 	}
 
@@ -250,7 +250,7 @@ func appendDiscoveryPreferenceDecoderHints(
 	for index, value := range current {
 		output[index] = value
 		output[index].DecoderIDs = append(
-			[]artifactstore.DecoderID(nil),
+			[]basespec.DecoderID(nil),
 			value.DecoderIDs...,
 		)
 	}
@@ -262,10 +262,10 @@ func appendDiscoveryPreferenceDecoderHints(
 		}] = index
 	}
 
-	appendHint := func(locator artifactstore.Locator, recursive bool) {
+	appendHint := func(locator basespec.Locator, recursive bool) {
 		key := scope{locator: locator, recursive: recursive}
 		if index, found := byScope[key]; found {
-			seen := make(map[artifactstore.DecoderID]struct{}, len(output[index].DecoderIDs))
+			seen := make(map[basespec.DecoderID]struct{}, len(output[index].DecoderIDs))
 			for _, decoderID := range output[index].DecoderIDs {
 				seen[decoderID] = struct{}{}
 			}
@@ -282,7 +282,7 @@ func appendDiscoveryPreferenceDecoderHints(
 		output = append(output, discovery.DecoderHint{
 			Locator:    locator,
 			Recursive:  recursive,
-			DecoderIDs: append([]artifactstore.DecoderID(nil), decoderIDs...),
+			DecoderIDs: append([]basespec.DecoderID(nil), decoderIDs...),
 		})
 	}
 
@@ -308,12 +308,12 @@ func appendDiscoveryPreferenceDecoderHints(
 func cloneDiscoveryProfiles(value DiscoveryProfiles) DiscoveryProfiles {
 	return DiscoveryProfiles{
 		Primary: DiscoveryProfile{
-			ExplicitLocators: append([]artifactstore.Locator(nil), value.Primary.ExplicitLocators...),
+			ExplicitLocators: append([]basespec.Locator(nil), value.Primary.ExplicitLocators...),
 			ReadmeLocator:    value.Primary.ReadmeLocator,
 			DirectoryRoots:   cloneDirectoryRoots(value.Primary.DirectoryRoots),
 		},
 		Attached: DiscoveryProfile{
-			ExplicitLocators: append([]artifactstore.Locator(nil), value.Attached.ExplicitLocators...),
+			ExplicitLocators: append([]basespec.Locator(nil), value.Attached.ExplicitLocators...),
 			ReadmeLocator:    value.Attached.ReadmeLocator,
 			DirectoryRoots:   cloneDirectoryRoots(value.Attached.DirectoryRoots),
 		},
@@ -364,11 +364,11 @@ func MergeDiscoveryProfile(
 }
 
 func appendUniqueLocators(
-	values []artifactstore.Locator,
-	additions ...artifactstore.Locator,
-) []artifactstore.Locator {
-	output := append([]artifactstore.Locator(nil), values...)
-	seen := make(map[artifactstore.Locator]struct{}, len(output)+len(additions))
+	values []basespec.Locator,
+	additions ...basespec.Locator,
+) []basespec.Locator {
+	output := append([]basespec.Locator(nil), values...)
+	seen := make(map[basespec.Locator]struct{}, len(output)+len(additions))
 	for _, value := range output {
 		seen[value] = struct{}{}
 	}
@@ -445,8 +445,8 @@ func mergeDiscoveryPreferences(
 	output := DiscoveryPreferences{
 		IncludeReadme: left.IncludeReadme || right.IncludeReadme,
 	}
-	locators := make(map[artifactstore.Locator]struct{})
-	for _, values := range [][]artifactstore.Locator{
+	locators := make(map[basespec.Locator]struct{})
+	for _, values := range [][]basespec.Locator{
 		left.AdditionalLocators,
 		right.AdditionalLocators,
 	} {
@@ -462,7 +462,7 @@ func mergeDiscoveryPreferences(
 		}
 	}
 
-	roots := make(map[artifactstore.Locator]DiscoveryRoot)
+	roots := make(map[basespec.Locator]DiscoveryRoot)
 	for _, values := range [][]DiscoveryRoot{
 		left.AdditionalRoots,
 		right.AdditionalRoots,

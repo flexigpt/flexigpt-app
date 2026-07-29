@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
@@ -494,7 +494,7 @@ func (w *WorkspaceWrapper) SetWorkspaceArtifactRuntimeDisabled(
 }
 
 func (w *WorkspaceWrapper) syncWorkspaceSkills(
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) {
 	if w == nil {
 		return
@@ -513,9 +513,9 @@ func (w *WorkspaceWrapper) syncWorkspaceSkills(
 }
 
 func (w *WorkspaceWrapper) syncWorkspaceSkillsForRoot(
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return
 	}
 	w.scheduleWorkspaceSkillSynchronization(rootID, true)
@@ -526,7 +526,7 @@ func (w *WorkspaceWrapper) syncKnownWorkspaceSkills() {
 }
 
 func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 	filterRoot bool,
 ) {
 	if w == nil {
@@ -563,7 +563,7 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 			return
 		}
 
-		active := make(map[artifactstore.CollectionRef]struct{}, len(refs))
+		active := make(map[basespec.CollectionRef]struct{}, len(refs))
 		for _, ref := range refs {
 			if filterRoot && ref.RootID != rootID {
 				continue
@@ -587,7 +587,7 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 }
 
 func (w *WorkspaceWrapper) removeWorkspaceSkills(
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) {
 	if w == nil {
 		return

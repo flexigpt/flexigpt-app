@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 )
@@ -72,9 +72,9 @@ func (a *aggregateSkillProvider) Render(
 	}
 	return skillruntime.RenderedSkill{
 		Available: false,
-		Diagnostics: []artifactstore.Diagnostic{
+		Diagnostics: []diagnostic.Diagnostic{
 			{
-				Severity: artifactstore.DiagnosticWarning,
+				Severity: diagnostic.DiagnosticWarning,
 				Code:     "skill.provider.identity-unresolved",
 				Message:  "the requested Skill provider identity is unresolved",
 			},
@@ -101,10 +101,10 @@ func applyPrecedence(values []skillruntime.Skill) {
 			continue
 		}
 		for _, index := range indexes {
-			values[index].Diagnostics = artifactstore.AppendDiagnostics(
+			values[index].Diagnostics = diagnostic.AppendDiagnostics(
 				values[index].Diagnostics,
-				artifactstore.Diagnostic{
-					Severity: artifactstore.DiagnosticError,
+				diagnostic.Diagnostic{
+					Severity: diagnostic.DiagnosticError,
 					Code:     "skill.provider.name-ambiguous",
 					Message:  "multiple eligible Skills have the same name",
 				},

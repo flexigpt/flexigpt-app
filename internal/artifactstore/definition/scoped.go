@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 // RootValidator establishes whether a Root remains reachable for definition
@@ -12,7 +13,7 @@ import (
 // coupling the definition package to one metadata implementation.
 type RootValidator func(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) error
 
 // RootScopedRepository enforces Root reachability before delegating immutable
@@ -32,7 +33,7 @@ func NewRootScopedRepository(
 	if repository == nil || validateRoot == nil {
 		return nil, fmt.Errorf(
 			"%w: root-scoped definition repository dependencies are incomplete",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return &RootScopedRepository{
@@ -43,13 +44,13 @@ func NewRootScopedRepository(
 
 func (r *RootScopedRepository) Get(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	digest artifactstore.Digest,
+	rootID basespec.RootID,
+	digest cryptoutil.Digest,
 ) (Definition, error) {
 	if err := r.validateRequest(ctx, rootID); err != nil {
 		return Definition{}, err
 	}
-	if err := artifactstore.ValidateDigest(digest); err != nil {
+	if err := cryptoutil.ValidateDigest(digest); err != nil {
 		return Definition{}, err
 	}
 
@@ -67,7 +68,7 @@ func (r *RootScopedRepository) Get(
 	if canonical.Digest != digest {
 		return Definition{}, fmt.Errorf(
 			"%w: requested definition %q, repository returned %q",
-			artifactstore.ErrDigestMismatch,
+			basespec.ErrDigestMismatch,
 			digest,
 			canonical.Digest,
 		)
@@ -77,7 +78,7 @@ func (r *RootScopedRepository) Get(
 
 func (r *RootScopedRepository) Put(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 	value Definition,
 ) (Definition, error) {
 	if err := r.validateRequest(ctx, rootID); err != nil {
@@ -102,7 +103,7 @@ func (r *RootScopedRepository) Put(
 	if canonicalStored.Digest != canonicalInput.Digest {
 		return Definition{}, fmt.Errorf(
 			"%w: requested definition %q, repository stored %q",
-			artifactstore.ErrDigestMismatch,
+			basespec.ErrDigestMismatch,
 			canonicalInput.Digest,
 			canonicalStored.Digest,
 		)
@@ -112,18 +113,18 @@ func (r *RootScopedRepository) Put(
 
 func (r *RootScopedRepository) validateRequest(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) error {
 	if r == nil || r.repository == nil || r.validateRoot == nil {
-		return fmt.Errorf("%w: definition repository is unavailable", artifactstore.ErrClosed)
+		return fmt.Errorf("%w: definition repository is unavailable", basespec.ErrClosed)
 	}
 	if ctx == nil {
-		return fmt.Errorf("%w: definition repository context is nil", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: definition repository context is nil", basespec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return err
 	}
 	return r.validateRoot(ctx, rootID)

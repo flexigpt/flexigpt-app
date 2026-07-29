@@ -4,14 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
@@ -33,8 +34,8 @@ type Dependencies struct {
 	Catalogs           catalog.Reader
 	Definitions        definition.Reader
 	SourceRuntime      source.Runtime
-	HasDecoder         func(artifactstore.DecoderID) bool
-	DecoderFingerprint func() (artifactstore.Digest, error)
+	HasDecoder         func(basespec.DecoderID) bool
+	DecoderFingerprint func() (cryptoutil.Digest, error)
 }
 
 func (d Dependencies) Validate() error {

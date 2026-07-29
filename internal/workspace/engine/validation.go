@@ -5,22 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func (s ArtifactSupport) Validate() error {
-	if err := artifactstore.ValidateArtifactKind(s.Kind); err != nil {
+	if err := basespec.ValidateArtifactKind(s.Kind); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateSchemaID(s.SchemaID); err != nil {
+	if err := basespec.ValidateSchemaID(s.SchemaID); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateDecoderID(s.DecoderID); err != nil {
+	if err := basespec.ValidateDecoderID(s.DecoderID); err != nil {
 		return err
 	}
 	if s.Validator == nil {
@@ -51,7 +51,7 @@ func validateDiscoveryProfile(value DiscoveryProfile) error {
 	}
 	if err := validateDiscoveryPreferences(DiscoveryPreferences{
 		AdditionalLocators: append(
-			[]artifactstore.Locator(nil),
+			[]basespec.Locator(nil),
 			value.ExplicitLocators...,
 		),
 		AdditionalRoots: roots,
@@ -61,7 +61,7 @@ func validateDiscoveryProfile(value DiscoveryProfile) error {
 	if value.ReadmeLocator == "" {
 		return nil
 	}
-	return artifactstore.ValidateLocator(value.ReadmeLocator, false)
+	return basespec.ValidateLocator(value.ReadmeLocator, false)
 }
 
 func encodeCollectionData(value CollectionData) (json.RawMessage, error) {
@@ -72,9 +72,9 @@ func encodeCollectionData(value CollectionData) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	canonical, err := jsoncanon.CanonicalizeObject(
+	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxLocalDataBytes,
+		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -83,9 +83,9 @@ func encodeCollectionData(value CollectionData) (json.RawMessage, error) {
 }
 
 func decodeCollectionData(raw json.RawMessage) (CollectionData, error) {
-	canonical, err := jsoncanon.CanonicalizeObject(
+	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxLocalDataBytes,
+		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return CollectionData{}, err
@@ -109,9 +109,9 @@ func encodeAttachmentData(
 	if err != nil {
 		return nil, err
 	}
-	canonical, err := jsoncanon.CanonicalizeObject(
+	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxLocalDataBytes,
+		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -122,9 +122,9 @@ func encodeAttachmentData(
 func decodeAttachmentData(
 	raw json.RawMessage,
 ) (AttachmentData, error) {
-	canonical, err := jsoncanon.CanonicalizeObject(
+	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxLocalDataBytes,
+		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return AttachmentData{}, err
@@ -145,9 +145,9 @@ func EncodeArtifactData(
 	if err != nil {
 		return nil, err
 	}
-	canonical, err := jsoncanon.CanonicalizeObject(
+	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxLocalDataBytes,
+		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -158,9 +158,9 @@ func EncodeArtifactData(
 func DecodeArtifactData(
 	raw json.RawMessage,
 ) (ArtifactData, error) {
-	canonical, err := jsoncanon.CanonicalizeObject(
+	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxLocalDataBytes,
+		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return ArtifactData{}, err
@@ -187,7 +187,7 @@ func ArtifactRuntimeDisabled(value artifact.Artifact) (bool, error) {
 }
 
 func validateAttachmentDataForRole(
-	role artifactstore.AttachmentRole,
+	role basespec.AttachmentRole,
 	value AttachmentData,
 ) error {
 	operation, supported := attachmentOperationFor(role)
@@ -214,7 +214,7 @@ func validateWorkspaceState(
 	data CollectionData,
 	attachments []collection.Attachment,
 	sources []source.Summary,
-) (Mode, artifactstore.SourceID, error) {
+) (Mode, basespec.SourceID, error) {
 	if err := value.Validate(); err != nil {
 		return "", "", fmt.Errorf("%w: invalid Workspace collection: %w", ErrInvalidWorkspace, err)
 	}
@@ -229,7 +229,7 @@ func validateWorkspaceState(
 	if err := validateCollectionData(data); err != nil {
 		return "", "", err
 	}
-	sourcesByID := make(map[artifactstore.SourceID]source.Summary, len(sources))
+	sourcesByID := make(map[basespec.SourceID]source.Summary, len(sources))
 
 	for _, sourceValue := range sources {
 		if err := sourceValue.Validate(); err != nil {
@@ -257,8 +257,8 @@ func validateWorkspaceState(
 	}
 
 	primaryCount := 0
-	var primarySourceID artifactstore.SourceID
-	seenAttachments := make(map[artifactstore.SourceID]struct{}, len(attachments))
+	var primarySourceID basespec.SourceID
+	seenAttachments := make(map[basespec.SourceID]struct{}, len(attachments))
 	for _, attachment := range attachments {
 		if err := attachment.Validate(); err != nil {
 			return "", "", fmt.Errorf(
@@ -354,10 +354,10 @@ func validateCollectionData(value CollectionData) error {
 	if err := validateDiscoveryPreferences(value.Discovery); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"workspace discovery policy revision",
 		value.DiscoveryPolicyRevision,
-		artifactstore.MaxVersionBytes,
+		basespec.MaxVersionBytes,
 	); err != nil {
 		return fmt.Errorf(
 			"%w: %w",
@@ -371,30 +371,30 @@ func validateCollectionData(value CollectionData) error {
 func validateDiscoveryPreferences(
 	value DiscoveryPreferences,
 ) error {
-	seenLocators := make(map[artifactstore.Locator]struct{})
+	seenLocators := make(map[basespec.Locator]struct{})
 	for _, locator := range value.AdditionalLocators {
-		if err := artifactstore.ValidateLocator(locator, false); err != nil {
+		if err := basespec.ValidateLocator(locator, false); err != nil {
 			return err
 		}
 		if _, duplicate := seenLocators[locator]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate discovery locator %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				locator,
 			)
 		}
 		seenLocators[locator] = struct{}{}
 	}
 
-	seenRoots := make(map[artifactstore.Locator]struct{})
+	seenRoots := make(map[basespec.Locator]struct{})
 	for _, root := range value.AdditionalRoots {
-		if err := artifactstore.ValidateLocator(root.Root, true); err != nil {
+		if err := basespec.ValidateLocator(root.Root, true); err != nil {
 			return err
 		}
 		if _, duplicate := seenRoots[root.Root]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate discovery root %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				root.Root,
 			)
 		}
@@ -405,7 +405,7 @@ func validateDiscoveryPreferences(
 				return err
 			}
 			if _, duplicate := seenPatterns[pattern]; duplicate {
-				return fmt.Errorf("%w: duplicate include pattern %q", artifactstore.ErrInvalid, pattern)
+				return fmt.Errorf("%w: duplicate include pattern %q", basespec.ErrInvalid, pattern)
 			}
 			seenPatterns[pattern] = struct{}{}
 		}
@@ -413,7 +413,7 @@ func validateDiscoveryPreferences(
 	return nil
 }
 
-func validateRole(role artifactstore.AttachmentRole) error {
+func validateRole(role basespec.AttachmentRole) error {
 	if _, supported := attachmentOperationFor(role); supported {
 		return nil
 	}

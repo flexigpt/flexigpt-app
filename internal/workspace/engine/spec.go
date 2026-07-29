@@ -1,25 +1,25 @@
 package engine
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactstore"
+import "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 
 const (
-	CollectionKind                   artifactstore.CollectionKind = "workspace.collection"
-	WorkspaceDescriptorSchemaID      artifactstore.SchemaID       = "workspace.collection.v1"
-	WorkspaceDescriptorSchemaVersion                              = "v1"
+	CollectionKind                   basespec.CollectionKind = "workspace.collection"
+	WorkspaceDescriptorSchemaID      basespec.SchemaID       = "workspace.collection.v1"
+	WorkspaceDescriptorSchemaVersion                         = "v1"
 
-	RolePrimary         artifactstore.AttachmentRole = "primary"
-	RoleBuiltIn         artifactstore.AttachmentRole = "built-in"
-	RoleLibrary         artifactstore.AttachmentRole = "library"
-	RoleAttachedPackage artifactstore.AttachmentRole = "attached-package"
-	RoleOverlay         artifactstore.AttachmentRole = "overlay"
+	RolePrimary         basespec.AttachmentRole = "primary"
+	RoleBuiltIn         basespec.AttachmentRole = "built-in"
+	RoleLibrary         basespec.AttachmentRole = "library"
+	RoleAttachedPackage basespec.AttachmentRole = "attached-package"
+	RoleOverlay         basespec.AttachmentRole = "overlay"
 
-	WorkspaceMetadataDirectory                       = ".flexigpt"
-	WorkspaceMetadataLocator   artifactstore.Locator = WorkspaceMetadataDirectory
-	RepositoryRootLocator      artifactstore.Locator = "."
+	WorkspaceMetadataDirectory                  = ".flexigpt"
+	WorkspaceMetadataLocator   basespec.Locator = WorkspaceMetadataDirectory
+	RepositoryRootLocator      basespec.Locator = "."
 
-	WorkspaceDescriptorFileName                       = "workspace.json"
-	DescriptorLocator           artifactstore.Locator = WorkspaceMetadataDirectory + "/" + WorkspaceDescriptorFileName
-	markdownFilePattern                               = "*.md"
+	WorkspaceDescriptorFileName                  = "workspace.json"
+	DescriptorLocator           basespec.Locator = WorkspaceMetadataDirectory + "/" + WorkspaceDescriptorFileName
+	markdownFilePattern                          = "*.md"
 
 	defaultArtifactName      = "artifact"
 	artifactNameSeparator    = "-"

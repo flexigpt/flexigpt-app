@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 type Reader interface {
 	Get(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-		id artifactstore.SourceID,
+		rootID basespec.RootID,
+		id basespec.SourceID,
 	) (Source, error)
 }
 
@@ -26,7 +26,7 @@ type Repository interface {
 
 	List(
 		ctx context.Context,
-		rootID artifactstore.RootID,
+		rootID basespec.RootID,
 	) ([]Source, error)
 
 	Update(
@@ -43,15 +43,15 @@ type Repository interface {
 
 	Discard(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-		id artifactstore.SourceID,
+		rootID basespec.RootID,
+		id basespec.SourceID,
 		expectedRevision uint64,
 	) error
 
 	Purge(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-		id artifactstore.SourceID,
+		rootID basespec.RootID,
+		id basespec.SourceID,
 		expectedRevision uint64,
 	) error
 }
@@ -68,17 +68,17 @@ type Snapshot interface {
 
 	Stat(
 		ctx context.Context,
-		locator artifactstore.Locator,
+		locator basespec.Locator,
 	) (Entry, error)
 
 	ReadDir(
 		ctx context.Context,
-		locator artifactstore.Locator,
+		locator basespec.Locator,
 	) ([]Entry, error)
 
 	Open(
 		ctx context.Context,
-		locator artifactstore.Locator,
+		locator basespec.Locator,
 	) (io.ReadCloser, error)
 
 	Confirm(ctx context.Context) error
@@ -96,7 +96,7 @@ type LocalPathResolver interface {
 	ResolveLocalPath(
 		ctx context.Context,
 		value Source,
-		locator artifactstore.Locator,
+		locator basespec.Locator,
 	) (string, error)
 }
 
@@ -104,7 +104,7 @@ type LocalPathResolver interface {
 // native paths. It avoids consumer hard-coding of concrete adapter kinds.
 type LocalPathCapability interface {
 	SupportsLocalPath(
-		kind artifactstore.SourceKind,
+		kind basespec.SourceKind,
 	) bool
 }
 
@@ -112,8 +112,8 @@ type LocalPathCapability interface {
 // directory. Empty directories are deliberately not part of the managed
 // package contract.
 type ManagedPackageFile struct {
-	Locator artifactstore.Locator `json:"locator"`
-	Content []byte                `json:"content"`
+	Locator basespec.Locator `json:"locator"`
+	Content []byte           `json:"content"`
 }
 
 // ManagedPackagePublication atomically publishes one new package directory
@@ -124,9 +124,9 @@ type ManagedPackageFile struct {
 // Repeating an already completed, byte-identical publication is idempotent
 // even when ExpectedGeneration names the generation before that publication.
 type ManagedPackagePublication struct {
-	Directory          artifactstore.Locator `json:"directory"`
-	ExpectedGeneration string                `json:"expectedGeneration,omitempty"`
-	Files              []ManagedPackageFile  `json:"files"`
+	Directory          basespec.Locator     `json:"directory"`
+	ExpectedGeneration string               `json:"expectedGeneration,omitempty"`
+	Files              []ManagedPackageFile `json:"files"`
 }
 
 // ManagedPackageWriter is the optional writable capability for an
@@ -146,7 +146,7 @@ type ManagedPackageWriter interface {
 	RemovePackage(
 		ctx context.Context,
 		value Source,
-		directory artifactstore.Locator,
+		directory basespec.Locator,
 		expectedGeneration string,
 	) error
 }
@@ -171,7 +171,7 @@ type ManagedSourceBootstrapper interface {
 }
 
 type Adapter interface {
-	Kind() artifactstore.SourceKind
+	Kind() basespec.SourceKind
 
 	NormalizeConfig(
 		ctx context.Context,

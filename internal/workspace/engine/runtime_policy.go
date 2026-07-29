@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type RuntimeUse string
@@ -27,8 +29,8 @@ type RuntimePolicyRequest struct {
 	Use              RuntimeUse
 	Workspace        Workspace
 	Artifact         artifact.Artifact
-	DefinitionDigest artifactstore.Digest
-	SourceID         artifactstore.SourceID
+	DefinitionDigest cryptoutil.Digest
+	SourceID         basespec.SourceID
 }
 
 type RuntimeDecision struct {
@@ -49,17 +51,17 @@ func (d RuntimeDecision) Validate() error {
 		return nil
 
 	case RuntimeDenied, RuntimeUnavailable:
-		if err := artifactstore.ValidateIdentifier(
+		if err := basespec.ValidateIdentifier(
 			"runtime policy diagnostic code",
 			d.Code,
-			artifactstore.MaxDiagnosticCodeBytes,
+			diagnostic.MaxDiagnosticCodeBytes,
 		); err != nil {
 			return err
 		}
-		return artifactstore.ValidateRequiredText(
+		return basespec.ValidateRequiredText(
 			"runtime policy diagnostic message",
 			d.Message,
-			artifactstore.MaxDiagnosticMessageBytes,
+			diagnostic.MaxDiagnosticMessageBytes,
 		)
 
 	default:
@@ -135,16 +137,16 @@ func (*ArtifactRuntimePolicy) Decide(
 func RuntimeDecisionDiagnostic(
 	decision RuntimeDecision,
 	value artifact.Artifact,
-) artifactstore.Diagnostic {
-	severity := artifactstore.DiagnosticWarning
+) diagnostic.Diagnostic {
+	severity := diagnostic.DiagnosticWarning
 	if decision.Disposition == RuntimeUnavailable {
-		severity = artifactstore.DiagnosticError
+		severity = diagnostic.DiagnosticError
 	}
-	return artifactstore.Diagnostic{
+	return diagnostic.Diagnostic{
 		Severity: severity,
 		Code:     decision.Code,
 		Message:  decision.Message,
-		Location: &artifactstore.DiagnosticLocation{
+		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},

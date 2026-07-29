@@ -4,14 +4,16 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
-type WorkspaceRef = artifactstore.CollectionRef
+type WorkspaceRef = basespec.CollectionRef
 
 type WorkspaceContextRole string
 
@@ -36,15 +38,15 @@ const (
 )
 
 type WorkspaceDiscovery struct {
-	AdditionalLocators []artifactstore.Locator  `json:"additionalLocators,omitempty"`
+	AdditionalLocators []basespec.Locator       `json:"additionalLocators,omitempty"`
 	AdditionalRoots    []WorkspaceDiscoveryRoot `json:"additionalRoots,omitempty"`
 	IncludeReadme      bool                     `json:"includeReadme,omitempty"`
 }
 
 type WorkspaceDiscoveryRoot struct {
-	Root            artifactstore.Locator `json:"root"`
-	Recursive       bool                  `json:"recursive"`
-	IncludePatterns []string              `json:"includePatterns,omitempty"`
+	Root            basespec.Locator `json:"root"`
+	Recursive       bool             `json:"recursive"`
+	IncludePatterns []string         `json:"includePatterns,omitempty"`
 }
 
 type WorkspaceAttachmentSettings struct {
@@ -57,9 +59,9 @@ type WorkspaceArtifactSettings struct {
 }
 
 type WorkspaceOccurrenceRef struct {
-	SourceID           artifactstore.SourceID           `json:"sourceID"`
-	Locator            artifactstore.Locator            `json:"locator"`
-	SubresourceLocator artifactstore.SubresourceLocator `json:"subresourceLocator,omitempty"`
+	SourceID           basespec.SourceID           `json:"sourceID"`
+	Locator            basespec.Locator            `json:"locator"`
+	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
 }
 
 // WorkspaceView is the API-safe representation of a workspace.
@@ -74,108 +76,108 @@ type WorkspaceView struct {
 	Description     string                    `json:"description,omitempty"`
 	Enabled         bool                      `json:"enabled"`
 	Mode            engine.Mode               `json:"mode"`
-	PrimarySourceID artifactstore.SourceID    `json:"primarySourceID,omitempty"`
+	PrimarySourceID basespec.SourceID         `json:"primarySourceID,omitempty"`
 	PrimaryPath     string                    `json:"primaryPath,omitempty"`
 	Discovery       WorkspaceDiscovery        `json:"discovery"`
 	Attachments     []WorkspaceAttachmentView `json:"attachments"`
 }
 
 type WorkspaceAttachmentView struct {
-	SourceID          artifactstore.SourceID       `json:"sourceID"`
-	Revision          uint64                       `json:"revision"`
-	Role              artifactstore.AttachmentRole `json:"role"`
-	Enabled           bool                         `json:"enabled"`
-	SourceDisplayName string                       `json:"sourceDisplayName,omitempty"`
-	SourceKind        string                       `json:"sourceKind,omitempty"`
-	Path              string                       `json:"path,omitempty"`
-	Settings          WorkspaceAttachmentSettings  `json:"settings"`
-	Diagnostics       []artifactstore.Diagnostic   `json:"diagnostics,omitempty"`
+	SourceID          basespec.SourceID           `json:"sourceID"`
+	Revision          uint64                      `json:"revision"`
+	Role              basespec.AttachmentRole     `json:"role"`
+	Enabled           bool                        `json:"enabled"`
+	SourceDisplayName string                      `json:"sourceDisplayName,omitempty"`
+	SourceKind        string                      `json:"sourceKind,omitempty"`
+	Path              string                      `json:"path,omitempty"`
+	Settings          WorkspaceAttachmentSettings `json:"settings"`
+	Diagnostics       []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceArtifactView struct {
-	Artifact           artifactstore.ArtifactRef        `json:"artifact"`
-	Revision           uint64                           `json:"revision"`
-	Name               string                           `json:"name"`
-	Kind               artifactstore.ArtifactKind       `json:"kind"`
-	Enabled            bool                             `json:"enabled"`
-	State              artifact.State                   `json:"state"`
-	Adoption           artifact.AdoptionMode            `json:"adoption"`
-	ResolvedDefinition *artifactstore.Digest            `json:"resolvedDefinition,omitempty"`
-	SourceID           artifactstore.SourceID           `json:"sourceID"`
-	Locator            artifactstore.Locator            `json:"locator"`
-	SubresourceLocator artifactstore.SubresourceLocator `json:"subresourceLocator,omitempty"`
-	RuntimeDisabled    bool                             `json:"runtimeDisabled"`
-	Diagnostics        []artifactstore.Diagnostic       `json:"diagnostics,omitempty"`
+	Artifact           basespec.ArtifactRef        `json:"artifact"`
+	Revision           uint64                      `json:"revision"`
+	Name               string                      `json:"name"`
+	Kind               basespec.ArtifactKind       `json:"kind"`
+	Enabled            bool                        `json:"enabled"`
+	State              artifact.State              `json:"state"`
+	Adoption           artifact.AdoptionMode       `json:"adoption"`
+	ResolvedDefinition *cryptoutil.Digest          `json:"resolvedDefinition,omitempty"`
+	SourceID           basespec.SourceID           `json:"sourceID"`
+	Locator            basespec.Locator            `json:"locator"`
+	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
+	RuntimeDisabled    bool                        `json:"runtimeDisabled"`
+	Diagnostics        []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceSuppressionView struct {
-	Workspace  WorkspaceRef                `json:"workspace"`
-	Binding    artifactstore.SourceBinding `json:"binding"`
-	Revision   uint64                      `json:"revision"`
-	CreatedAt  time.Time                   `json:"createdAt"`
-	ModifiedAt time.Time                   `json:"modifiedAt"`
+	Workspace  WorkspaceRef           `json:"workspace"`
+	Binding    basespec.SourceBinding `json:"binding"`
+	Revision   uint64                 `json:"revision"`
+	CreatedAt  time.Time              `json:"createdAt"`
+	ModifiedAt time.Time              `json:"modifiedAt"`
 }
 
 type WorkspaceResourceView struct {
-	Artifact         WorkspaceArtifactView      `json:"artifact"`
-	DefinitionDigest artifactstore.Digest       `json:"definitionDigest"`
-	SourceID         artifactstore.SourceID     `json:"sourceID"`
-	Locator          artifactstore.Locator      `json:"locator"`
-	CatalogCurrent   bool                       `json:"catalogCurrent"`
-	ProjectionValid  bool                       `json:"projectionValid"`
-	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
+	Artifact         WorkspaceArtifactView   `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
+	SourceID         basespec.SourceID       `json:"sourceID"`
+	Locator          basespec.Locator        `json:"locator"`
+	CatalogCurrent   bool                    `json:"catalogCurrent"`
+	ProjectionValid  bool                    `json:"projectionValid"`
+	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceOccurrenceView struct {
-	SourceID            artifactstore.SourceID           `json:"sourceID"`
-	Locator             artifactstore.Locator            `json:"locator"`
-	SubresourceLocator  artifactstore.SubresourceLocator `json:"subresourceLocator,omitempty"`
-	Kind                artifactstore.ArtifactKind       `json:"kind,omitempty"`
-	LogicalName         artifactstore.LogicalName        `json:"logicalName,omitempty"`
-	LogicalVersion      artifactstore.LogicalVersion     `json:"logicalVersion,omitempty"`
-	DefinitionDigest    *artifactstore.Digest            `json:"definitionDigest,omitempty"`
-	SourceContentDigest *artifactstore.Digest            `json:"sourceContentDigest,omitempty"`
-	State               string                           `json:"state"`
-	Recorded            bool                             `json:"recorded"`
-	Artifact            *artifactstore.ArtifactRef       `json:"artifact,omitempty"`
-	Diagnostics         []artifactstore.Diagnostic       `json:"diagnostics,omitempty"`
+	SourceID            basespec.SourceID           `json:"sourceID"`
+	Locator             basespec.Locator            `json:"locator"`
+	SubresourceLocator  basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
+	Kind                basespec.ArtifactKind       `json:"kind,omitempty"`
+	LogicalName         basespec.LogicalName        `json:"logicalName,omitempty"`
+	LogicalVersion      basespec.LogicalVersion     `json:"logicalVersion,omitempty"`
+	DefinitionDigest    *cryptoutil.Digest          `json:"definitionDigest,omitempty"`
+	SourceContentDigest *cryptoutil.Digest          `json:"sourceContentDigest,omitempty"`
+	State               string                      `json:"state"`
+	Recorded            bool                        `json:"recorded"`
+	Artifact            *basespec.ArtifactRef       `json:"artifact,omitempty"`
+	Diagnostics         []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceResourceGroupView struct {
-	Kind       artifactstore.ArtifactKind `json:"kind"`
-	Resources  []WorkspaceResourceView    `json:"resources"`
-	Unrecorded []WorkspaceOccurrenceView  `json:"unrecorded"`
+	Kind       basespec.ArtifactKind     `json:"kind"`
+	Resources  []WorkspaceResourceView   `json:"resources"`
+	Unrecorded []WorkspaceOccurrenceView `json:"unrecorded"`
 }
 
 type WorkspaceDefinitionView struct {
-	Digest         artifactstore.Digest         `json:"digest"`
-	Kind           artifactstore.ArtifactKind   `json:"kind"`
-	SchemaID       artifactstore.SchemaID       `json:"schemaID"`
-	SchemaVersion  string                       `json:"schemaVersion"`
-	LogicalName    artifactstore.LogicalName    `json:"logicalName"`
-	LogicalVersion artifactstore.LogicalVersion `json:"logicalVersion,omitempty"`
-	DisplayName    string                       `json:"displayName,omitempty"`
-	Description    string                       `json:"description,omitempty"`
-	Labels         map[string]string            `json:"labels,omitempty"`
-	Body           json.RawMessage              `json:"body"`
-	Dependencies   []definition.Selector        `json:"dependencies,omitempty"`
+	Digest         cryptoutil.Digest       `json:"digest"`
+	Kind           basespec.ArtifactKind   `json:"kind"`
+	SchemaID       basespec.SchemaID       `json:"schemaID"`
+	SchemaVersion  string                  `json:"schemaVersion"`
+	LogicalName    basespec.LogicalName    `json:"logicalName"`
+	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
+	DisplayName    string                  `json:"displayName,omitempty"`
+	Description    string                  `json:"description,omitempty"`
+	Labels         map[string]string       `json:"labels,omitempty"`
+	Body           json.RawMessage         `json:"body"`
+	Dependencies   []definition.Selector   `json:"dependencies,omitempty"`
 }
 
 type WorkspaceLoadPlanItemView struct {
-	Artifact         WorkspaceArtifactView    `json:"artifact"`
-	Definition       WorkspaceDefinitionView  `json:"definition"`
-	DefinitionDigest artifactstore.Digest     `json:"definitionDigest"`
-	SourceID         artifactstore.SourceID   `json:"sourceID"`
-	SourceKind       artifactstore.SourceKind `json:"sourceKind"`
-	Locator          artifactstore.Locator    `json:"locator"`
-	CatalogCurrent   bool                     `json:"catalogCurrent"`
+	Artifact         WorkspaceArtifactView   `json:"artifact"`
+	Definition       WorkspaceDefinitionView `json:"definition"`
+	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
+	SourceID         basespec.SourceID       `json:"sourceID"`
+	SourceKind       basespec.SourceKind     `json:"sourceKind"`
+	Locator          basespec.Locator        `json:"locator"`
+	CatalogCurrent   bool                    `json:"catalogCurrent"`
 }
 
 type WorkspaceLoadPlanView struct {
 	Workspace       WorkspaceRef                `json:"workspace"`
 	CatalogRevision uint64                      `json:"catalogRevision"`
 	Items           []WorkspaceLoadPlanItemView `json:"items"`
-	Diagnostics     []artifactstore.Diagnostic  `json:"diagnostics,omitempty"`
+	Diagnostics     []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
 }
 
 type ResolveWorkspaceResourceResponseBody struct {
@@ -187,7 +189,7 @@ type WorkspaceCatalogView struct {
 	Workspace               WorkspaceView                `json:"workspace"`
 	CatalogRevision         uint64                       `json:"catalogRevision"`
 	CatalogCurrent          bool                         `json:"catalogCurrent"`
-	Diagnostics             []artifactstore.Diagnostic   `json:"diagnostics,omitempty"`
+	Diagnostics             []diagnostic.Diagnostic      `json:"diagnostics,omitempty"`
 	Resources               []WorkspaceResourceView      `json:"resources"`
 	Groups                  []WorkspaceResourceGroupView `json:"groups"`
 	Occurrences             []WorkspaceOccurrenceView    `json:"occurrences"`
@@ -201,20 +203,20 @@ type WorkspaceCatalogView struct {
 }
 
 type WorkspaceRefreshResult struct {
-	Workspace        WorkspaceRef                `json:"workspace"`
-	CatalogRevision  uint64                      `json:"catalogRevision"`
-	CreatedArtifacts []artifactstore.ArtifactRef `json:"createdArtifacts"`
-	UpdatedArtifacts []artifactstore.ArtifactRef `json:"updatedArtifacts"`
-	Diagnostics      []artifactstore.Diagnostic  `json:"diagnostics,omitempty"`
-	Candidates       int                         `json:"candidates"`
+	Workspace        WorkspaceRef            `json:"workspace"`
+	CatalogRevision  uint64                  `json:"catalogRevision"`
+	CreatedArtifacts []basespec.ArtifactRef  `json:"createdArtifacts"`
+	UpdatedArtifacts []basespec.ArtifactRef  `json:"updatedArtifacts"`
+	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Candidates       int                     `json:"candidates"`
 }
 
 type WorkspaceContextContribution struct {
-	Artifact         artifactstore.ArtifactRef `json:"artifact"`
+	Artifact         basespec.ArtifactRef      `json:"artifact"`
 	RecordRevision   uint64                    `json:"recordRevision"`
-	DefinitionDigest artifactstore.Digest      `json:"definitionDigest"`
-	SourceID         artifactstore.SourceID    `json:"sourceID"`
-	Locator          artifactstore.Locator     `json:"locator"`
+	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
+	SourceID         basespec.SourceID         `json:"sourceID"`
+	Locator          basespec.Locator          `json:"locator"`
 	Name             string                    `json:"name"`
 	Role             WorkspaceContextRole      `json:"role"`
 	MediaType        WorkspaceContextMediaType `json:"mediaType"`
@@ -226,7 +228,7 @@ type WorkspaceContextContribution struct {
 }
 
 type WorkspaceContextDecision struct {
-	Artifact      artifactstore.ArtifactRef        `json:"artifact"`
+	Artifact      basespec.ArtifactRef             `json:"artifact"`
 	Status        contextadapter.CompositionStatus `json:"status"`
 	Code          string                           `json:"code,omitempty"`
 	OriginalBytes int                              `json:"originalBytes"`
@@ -238,33 +240,33 @@ type WorkspaceContextLoadPlan struct {
 	CatalogRevision uint64                         `json:"catalogRevision"`
 	Contributions   []WorkspaceContextContribution `json:"contributions"`
 	Prompt          string                         `json:"prompt"`
-	Diagnostics     []artifactstore.Diagnostic     `json:"diagnostics,omitempty"`
+	Diagnostics     []diagnostic.Diagnostic        `json:"diagnostics,omitempty"`
 	Decisions       []WorkspaceContextDecision     `json:"decisions"`
 	PromptBytes     int                            `json:"promptBytes"`
 }
 
 type WorkspaceContextView struct {
-	Artifact         artifactstore.ArtifactRef  `json:"artifact"`
-	RecordRevision   uint64                     `json:"recordRevision"`
-	DefinitionDigest artifactstore.Digest       `json:"definitionDigest"`
-	SourceID         artifactstore.SourceID     `json:"sourceID"`
-	Locator          artifactstore.Locator      `json:"locator"`
-	Name             string                     `json:"name"`
-	Role             WorkspaceContextRole       `json:"role"`
-	MediaType        WorkspaceContextMediaType  `json:"mediaType"`
-	Enabled          bool                       `json:"enabled"`
-	State            artifact.State             `json:"state"`
-	CatalogCurrent   bool                       `json:"catalogCurrent"`
-	ProjectionValid  bool                       `json:"projectionValid"`
-	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
-	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
+	Artifact         basespec.ArtifactRef      `json:"artifact"`
+	RecordRevision   uint64                    `json:"recordRevision"`
+	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
+	SourceID         basespec.SourceID         `json:"sourceID"`
+	Locator          basespec.Locator          `json:"locator"`
+	Name             string                    `json:"name"`
+	Role             WorkspaceContextRole      `json:"role"`
+	MediaType        WorkspaceContextMediaType `json:"mediaType"`
+	Enabled          bool                      `json:"enabled"`
+	State            artifact.State            `json:"state"`
+	CatalogCurrent   bool                      `json:"catalogCurrent"`
+	ProjectionValid  bool                      `json:"projectionValid"`
+	RuntimeDisabled  bool                      `json:"runtimeDisabled"`
+	Diagnostics      []diagnostic.Diagnostic   `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceContextInspectionView struct {
 	Workspace       WorkspaceRef                   `json:"workspace"`
 	CatalogRevision uint64                         `json:"catalogRevision"`
 	Contributions   []WorkspaceContextContribution `json:"contributions"`
-	Diagnostics     []artifactstore.Diagnostic     `json:"diagnostics,omitempty"`
+	Diagnostics     []diagnostic.Diagnostic        `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceSkillArgument struct {
@@ -275,7 +277,7 @@ type WorkspaceSkillArgument struct {
 
 type WorkspaceSkillSummary struct {
 	SchemaVersion string                   `json:"schemaVersion"`
-	ID            artifactstore.ArtifactID `json:"id"`
+	ID            basespec.ArtifactID      `json:"id"`
 	Slug          string                   `json:"slug"`
 	Name          string                   `json:"name"`
 	DisplayName   string                   `json:"displayName"`
@@ -289,26 +291,26 @@ type WorkspaceSkillSummary struct {
 }
 
 type WorkspaceSkillView struct {
-	Workspace        WorkspaceRef               `json:"workspace"`
-	Artifact         artifactstore.ArtifactRef  `json:"artifact"`
-	DefinitionDigest artifactstore.Digest       `json:"definitionDigest"`
-	SourceID         artifactstore.SourceID     `json:"sourceID"`
-	Locator          artifactstore.Locator      `json:"locator"`
-	Skill            WorkspaceSkillSummary      `json:"skill"`
-	MarkdownBody     string                     `json:"markdownBody,omitempty"`
-	RecordRevision   uint64                     `json:"recordRevision"`
-	State            artifact.State             `json:"state"`
-	ProjectionValid  bool                       `json:"projectionValid"`
-	CatalogCurrent   bool                       `json:"catalogCurrent"`
-	RuntimeDisabled  bool                       `json:"runtimeDisabled"`
-	Diagnostics      []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
+	Workspace        WorkspaceRef            `json:"workspace"`
+	Artifact         basespec.ArtifactRef    `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
+	SourceID         basespec.SourceID       `json:"sourceID"`
+	Locator          basespec.Locator        `json:"locator"`
+	Skill            WorkspaceSkillSummary   `json:"skill"`
+	MarkdownBody     string                  `json:"markdownBody,omitempty"`
+	RecordRevision   uint64                  `json:"recordRevision"`
+	State            artifact.State          `json:"state"`
+	ProjectionValid  bool                    `json:"projectionValid"`
+	CatalogCurrent   bool                    `json:"catalogCurrent"`
+	RuntimeDisabled  bool                    `json:"runtimeDisabled"`
+	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceSkillLoadView struct {
-	Workspace       WorkspaceRef               `json:"workspace"`
-	CatalogRevision uint64                     `json:"catalogRevision"`
-	Skills          []WorkspaceSkillView       `json:"skills"`
-	Diagnostics     []artifactstore.Diagnostic `json:"diagnostics,omitempty"`
+	Workspace       WorkspaceRef            `json:"workspace"`
+	CatalogRevision uint64                  `json:"catalogRevision"`
+	Skills          []WorkspaceSkillView    `json:"skills"`
+	Diagnostics     []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type CreateFilesystemWorkspaceRequestBody struct {
@@ -319,7 +321,7 @@ type CreateFilesystemWorkspaceRequestBody struct {
 }
 
 type CreateFilesystemWorkspaceRequest struct {
-	RootID artifactstore.RootID `json:"rootID" required:"true"`
+	RootID basespec.RootID `json:"rootID" required:"true"`
 	Body   *CreateFilesystemWorkspaceRequestBody
 }
 
@@ -334,7 +336,7 @@ type CreateEmptyWorkspaceRequestBody struct {
 }
 
 type CreateEmptyWorkspaceRequest struct {
-	RootID artifactstore.RootID `json:"rootID" required:"true"`
+	RootID basespec.RootID `json:"rootID" required:"true"`
 	Body   *CreateEmptyWorkspaceRequestBody
 }
 
@@ -351,7 +353,7 @@ type GetWorkspaceResponse struct {
 }
 
 type ListWorkspacesRequest struct {
-	RootID artifactstore.RootID `json:"rootID" required:"true"`
+	RootID basespec.RootID `json:"rootID" required:"true"`
 }
 
 type ListWorkspacesResponseBody struct {
@@ -380,10 +382,10 @@ type UpdateWorkspaceResponse struct {
 }
 
 type ReplaceWorkspacePrimarySourceRequestBody struct {
-	ExpectedCollectionRevision         uint64                 `json:"expectedCollectionRevision"         required:"true"`
-	PreviousSourceID                   artifactstore.SourceID `json:"previousSourceID"                   required:"true"`
-	ExpectedPreviousAttachmentRevision uint64                 `json:"expectedPreviousAttachmentRevision" required:"true"`
-	SourceID                           artifactstore.SourceID `json:"sourceID"                           required:"true"`
+	ExpectedCollectionRevision         uint64            `json:"expectedCollectionRevision"         required:"true"`
+	PreviousSourceID                   basespec.SourceID `json:"previousSourceID"                   required:"true"`
+	ExpectedPreviousAttachmentRevision uint64            `json:"expectedPreviousAttachmentRevision" required:"true"`
+	SourceID                           basespec.SourceID `json:"sourceID"                           required:"true"`
 }
 
 type ReplaceWorkspacePrimarySourceRequest struct {
@@ -396,11 +398,11 @@ type ReplaceWorkspacePrimarySourceResponse struct {
 }
 
 type SetWorkspacePrimarySourceRequestBody struct {
-	ExpectedCollectionRevision         uint64                 `json:"expectedCollectionRevision"                   required:"true"`
-	PreviousSourceID                   artifactstore.SourceID `json:"previousSourceID,omitempty"`
-	ExpectedPreviousAttachmentRevision uint64                 `json:"expectedPreviousAttachmentRevision,omitempty"`
-	SourceID                           artifactstore.SourceID `json:"sourceID,omitempty"`
-	Clear                              bool                   `json:"clear,omitempty"`
+	ExpectedCollectionRevision         uint64            `json:"expectedCollectionRevision"                   required:"true"`
+	PreviousSourceID                   basespec.SourceID `json:"previousSourceID,omitempty"`
+	ExpectedPreviousAttachmentRevision uint64            `json:"expectedPreviousAttachmentRevision,omitempty"`
+	SourceID                           basespec.SourceID `json:"sourceID,omitempty"`
+	Clear                              bool              `json:"clear,omitempty"`
 }
 
 type SetWorkspacePrimarySourceRequest struct {
@@ -440,11 +442,11 @@ type PurgeWorkspaceResponse struct {
 }
 
 type AttachWorkspaceSourceRequestBody struct {
-	ExpectedCollectionRevision uint64                       `json:"expectedCollectionRevision" required:"true"`
-	SourceID                   artifactstore.SourceID       `json:"sourceID"                   required:"true"`
-	Role                       artifactstore.AttachmentRole `json:"role"                       required:"true"`
-	Enabled                    bool                         `json:"enabled"                    required:"true"`
-	Settings                   WorkspaceAttachmentSettings  `json:"settings"`
+	ExpectedCollectionRevision uint64                      `json:"expectedCollectionRevision" required:"true"`
+	SourceID                   basespec.SourceID           `json:"sourceID"                   required:"true"`
+	Role                       basespec.AttachmentRole     `json:"role"                       required:"true"`
+	Enabled                    bool                        `json:"enabled"                    required:"true"`
+	Settings                   WorkspaceAttachmentSettings `json:"settings"`
 }
 
 type AttachWorkspaceSourceRequest struct {
@@ -457,16 +459,16 @@ type AttachWorkspaceSourceResponse struct {
 }
 
 type UpdateWorkspaceAttachmentRequestBody struct {
-	ExpectedCollectionRevision uint64                       `json:"expectedCollectionRevision" required:"true"`
-	ExpectedAttachmentRevision uint64                       `json:"expectedAttachmentRevision" required:"true"`
-	Role                       artifactstore.AttachmentRole `json:"role"                       required:"true"`
-	Enabled                    bool                         `json:"enabled"                    required:"true"`
-	Settings                   WorkspaceAttachmentSettings  `json:"settings"`
+	ExpectedCollectionRevision uint64                      `json:"expectedCollectionRevision" required:"true"`
+	ExpectedAttachmentRevision uint64                      `json:"expectedAttachmentRevision" required:"true"`
+	Role                       basespec.AttachmentRole     `json:"role"                       required:"true"`
+	Enabled                    bool                        `json:"enabled"                    required:"true"`
+	Settings                   WorkspaceAttachmentSettings `json:"settings"`
 }
 
 type UpdateWorkspaceAttachmentRequest struct {
-	Workspace WorkspaceRef           `json:"workspace" required:"true"`
-	SourceID  artifactstore.SourceID `json:"sourceID"  required:"true"`
+	Workspace WorkspaceRef      `json:"workspace" required:"true"`
+	SourceID  basespec.SourceID `json:"sourceID"  required:"true"`
 	Body      *UpdateWorkspaceAttachmentRequestBody
 }
 
@@ -475,10 +477,10 @@ type UpdateWorkspaceAttachmentResponse struct {
 }
 
 type DetachWorkspaceSourceRequest struct {
-	Workspace                  WorkspaceRef           `json:"workspace"                  required:"true"`
-	SourceID                   artifactstore.SourceID `json:"sourceID"                   required:"true"`
-	ExpectedCollectionRevision uint64                 `json:"expectedCollectionRevision" required:"true"`
-	ExpectedAttachmentRevision uint64                 `json:"expectedAttachmentRevision" required:"true"`
+	Workspace                  WorkspaceRef      `json:"workspace"                  required:"true"`
+	SourceID                   basespec.SourceID `json:"sourceID"                   required:"true"`
+	ExpectedCollectionRevision uint64            `json:"expectedCollectionRevision" required:"true"`
+	ExpectedAttachmentRevision uint64            `json:"expectedAttachmentRevision" required:"true"`
 }
 
 type DetachWorkspaceSourceResponse struct {
@@ -502,7 +504,7 @@ type GetWorkspaceCatalogResponse struct {
 }
 
 type ComposeWorkspaceLoadPlanRequestBody struct {
-	Artifacts []artifactstore.ArtifactRef `json:"artifacts"`
+	Artifacts []basespec.ArtifactRef `json:"artifacts"`
 }
 
 type ComposeWorkspaceLoadPlanRequest struct {
@@ -515,8 +517,8 @@ type ComposeWorkspaceLoadPlanResponse struct {
 }
 
 type ResolveWorkspaceResourceRequestBody struct {
-	Artifact *artifactstore.ArtifactRef `json:"artifact,omitempty"`
-	Selector *definition.Selector       `json:"selector,omitempty"`
+	Artifact *basespec.ArtifactRef `json:"artifact,omitempty"`
+	Selector *definition.Selector  `json:"selector,omitempty"`
 }
 
 type ResolveWorkspaceResourceRequest struct {
@@ -529,8 +531,8 @@ type ResolveWorkspaceResourceResponse struct {
 }
 
 type GetWorkspaceArtifactRequest struct {
-	Workspace WorkspaceRef              `json:"workspace" required:"true"`
-	Artifact  artifactstore.ArtifactRef `json:"artifact"  required:"true"`
+	Workspace WorkspaceRef         `json:"workspace" required:"true"`
+	Artifact  basespec.ArtifactRef `json:"artifact"  required:"true"`
 }
 
 type GetWorkspaceArtifactResponse struct {
@@ -567,11 +569,11 @@ type AdoptWorkspaceOccurrenceResponse struct {
 }
 
 type PinWorkspaceArtifactRequestBody struct {
-	ExpectedCollectionRevision uint64                      `json:"expectedCollectionRevision" required:"true"`
-	Binding                    artifactstore.SourceBinding `json:"binding"                    required:"true"`
-	Name                       string                      `json:"name"                       required:"true"`
-	Enabled                    bool                        `json:"enabled"                    required:"true"`
-	Settings                   WorkspaceArtifactSettings   `json:"settings"`
+	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision" required:"true"`
+	Binding                    basespec.SourceBinding    `json:"binding"                    required:"true"`
+	Name                       string                    `json:"name"                       required:"true"`
+	Enabled                    bool                      `json:"enabled"                    required:"true"`
+	Settings                   WorkspaceArtifactSettings `json:"settings"`
 }
 
 type PinWorkspaceArtifactRequest struct {
@@ -596,8 +598,8 @@ type ListWorkspaceSuppressionsResponse struct {
 }
 
 type SuppressWorkspaceBindingRequestBody struct {
-	ExpectedCollectionRevision uint64                      `json:"expectedCollectionRevision" required:"true"`
-	Binding                    artifactstore.SourceBinding `json:"binding"                    required:"true"`
+	ExpectedCollectionRevision uint64                 `json:"expectedCollectionRevision" required:"true"`
+	Binding                    basespec.SourceBinding `json:"binding"                    required:"true"`
 }
 
 type SuppressWorkspaceBindingRequest struct {
@@ -622,7 +624,7 @@ type ListWorkspaceContextsResponse struct {
 }
 
 type LoadWorkspaceContextsRequestBody struct {
-	Artifacts []artifactstore.ArtifactRef `json:"artifacts,omitempty"`
+	Artifacts []basespec.ArtifactRef `json:"artifacts,omitempty"`
 }
 
 type LoadWorkspaceContextsRequest struct {
@@ -635,7 +637,7 @@ type LoadWorkspaceContextsResponse struct {
 }
 
 type ComposeWorkspaceContextRequestBody struct {
-	Artifacts []artifactstore.ArtifactRef `json:"artifacts,omitempty"`
+	Artifacts []basespec.ArtifactRef `json:"artifacts,omitempty"`
 }
 
 type ComposeWorkspaceContextRequest struct {
@@ -660,7 +662,7 @@ type ListWorkspaceSkillsResponse struct {
 }
 
 type LoadWorkspaceSkillsRequestBody struct {
-	Artifacts []artifactstore.ArtifactRef `json:"artifacts"`
+	Artifacts []basespec.ArtifactRef `json:"artifacts"`
 }
 
 type LoadWorkspaceSkillsRequest struct {
@@ -678,8 +680,8 @@ type SetWorkspaceArtifactEnabledRequestBody struct {
 }
 
 type SetWorkspaceArtifactEnabledRequest struct {
-	Workspace WorkspaceRef              `json:"workspace" required:"true"`
-	Artifact  artifactstore.ArtifactRef `json:"artifact"  required:"true"`
+	Workspace WorkspaceRef         `json:"workspace" required:"true"`
+	Artifact  basespec.ArtifactRef `json:"artifact"  required:"true"`
 	Body      *SetWorkspaceArtifactEnabledRequestBody
 }
 
@@ -688,14 +690,14 @@ type SetWorkspaceArtifactEnabledResponse struct {
 }
 
 type UnadoptWorkspaceArtifactRequest struct {
-	Workspace        WorkspaceRef              `json:"workspace"        required:"true"`
-	Artifact         artifactstore.ArtifactRef `json:"artifact"         required:"true"`
-	ExpectedRevision uint64                    `json:"expectedRevision" required:"true"`
-	Suppress         bool                      `json:"suppress"`
+	Workspace        WorkspaceRef         `json:"workspace"        required:"true"`
+	Artifact         basespec.ArtifactRef `json:"artifact"         required:"true"`
+	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
+	Suppress         bool                 `json:"suppress"`
 }
 
 type UnadoptWorkspaceArtifactResponseBody struct {
-	Artifact artifactstore.ArtifactRef `json:"artifact"`
+	Artifact basespec.ArtifactRef `json:"artifact"`
 }
 
 type UnadoptWorkspaceArtifactResponse struct {
@@ -703,13 +705,13 @@ type UnadoptWorkspaceArtifactResponse struct {
 }
 
 type PurgeWorkspaceArtifactRequest struct {
-	Workspace        WorkspaceRef              `json:"workspace"        required:"true"`
-	Artifact         artifactstore.ArtifactRef `json:"artifact"         required:"true"`
-	ExpectedRevision uint64                    `json:"expectedRevision" required:"true"`
+	Workspace        WorkspaceRef         `json:"workspace"        required:"true"`
+	Artifact         basespec.ArtifactRef `json:"artifact"         required:"true"`
+	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
 }
 
 type PurgeWorkspaceArtifactResponseBody struct {
-	Artifact artifactstore.ArtifactRef `json:"artifact"`
+	Artifact basespec.ArtifactRef `json:"artifact"`
 }
 
 type PurgeWorkspaceArtifactResponse struct {
@@ -717,14 +719,14 @@ type PurgeWorkspaceArtifactResponse struct {
 }
 
 type UnsuppressWorkspaceBindingRequest struct {
-	Workspace        WorkspaceRef                `json:"workspace"        required:"true"`
-	Binding          artifactstore.SourceBinding `json:"binding"          required:"true"`
-	ExpectedRevision uint64                      `json:"expectedRevision" required:"true"`
+	Workspace        WorkspaceRef           `json:"workspace"        required:"true"`
+	Binding          basespec.SourceBinding `json:"binding"          required:"true"`
+	ExpectedRevision uint64                 `json:"expectedRevision" required:"true"`
 }
 
 type UnsuppressWorkspaceBindingResponseBody struct {
-	Workspace WorkspaceRef                `json:"workspace"`
-	Binding   artifactstore.SourceBinding `json:"binding"`
+	Workspace WorkspaceRef           `json:"workspace"`
+	Binding   basespec.SourceBinding `json:"binding"`
 }
 
 type UnsuppressWorkspaceBindingResponse struct {
@@ -737,8 +739,8 @@ type SetWorkspaceArtifactRuntimeDisabledRequestBody struct {
 }
 
 type SetWorkspaceArtifactRuntimeDisabledRequest struct {
-	Workspace WorkspaceRef              `json:"workspace" required:"true"`
-	Artifact  artifactstore.ArtifactRef `json:"artifact"  required:"true"`
+	Workspace WorkspaceRef         `json:"workspace" required:"true"`
+	Artifact  basespec.ArtifactRef `json:"artifact"  required:"true"`
 	Body      *SetWorkspaceArtifactRuntimeDisabledRequestBody
 }
 

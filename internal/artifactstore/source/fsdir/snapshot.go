@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -27,7 +27,7 @@ func (s *snapshot) Generation() string {
 
 func (s *snapshot) Stat(
 	ctx context.Context,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (source.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return source.Entry{}, err
@@ -35,7 +35,7 @@ func (s *snapshot) Stat(
 	if s.traversalPolicy.excludesLocator(string(locator)) {
 		return source.Entry{}, fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			locator,
 		)
 	}
@@ -47,7 +47,7 @@ func (s *snapshot) Stat(
 	if errors.Is(err, os.ErrNotExist) {
 		return source.Entry{}, fmt.Errorf(
 			"%w: source locator %q",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			locator,
 		)
 	}
@@ -59,7 +59,7 @@ func (s *snapshot) Stat(
 
 func (s *snapshot) ReadDir(
 	ctx context.Context,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) ([]source.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (s *snapshot) ReadDir(
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source directory %q",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			locator,
 		)
 	}
@@ -122,14 +122,14 @@ func readDirectoryEntries(location string) ([]os.DirEntry, error) {
 	values := make([]os.DirEntry, 0)
 	for {
 		batch, readErr := directory.ReadDir(directoryReadBatchSize)
-		if len(batch) > artifactstore.MaxDiscoveryEntries-len(values) {
+		if len(batch) > basespec.MaxDiscoveryEntries-len(values) {
 			closeErr := directory.Close()
 			return nil, errors.Join(
 				fmt.Errorf(
 					"%w: source directory %q exceeds %d entries",
-					artifactstore.ErrInvalid,
+					basespec.ErrInvalid,
 					location,
-					artifactstore.MaxDiscoveryEntries,
+					basespec.MaxDiscoveryEntries,
 				),
 				closeErr,
 			)
@@ -151,7 +151,7 @@ func readDirectoryEntries(location string) ([]os.DirEntry, error) {
 
 func (s *snapshot) Open(
 	ctx context.Context,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (io.ReadCloser, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (s *snapshot) Open(
 	if s.traversalPolicy.excludesLocator(string(locator)) {
 		return nil, fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			locator,
 		)
 	}
@@ -171,7 +171,7 @@ func (s *snapshot) Open(
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source file %q",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			locator,
 		)
 	}
@@ -185,7 +185,7 @@ func (s *snapshot) Open(
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf(
 			"%w: source locator %q is not a regular file",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			locator,
 		)
 	}
@@ -203,7 +203,7 @@ func (s *snapshot) Confirm(ctx context.Context) error {
 	if current != s.generation {
 		return fmt.Errorf(
 			"%w: filesystem source changed during discovery",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	return nil
@@ -216,19 +216,19 @@ func (s *snapshot) Close() error {
 
 func (s *snapshot) ensureOpen(ctx context.Context) error {
 	if s == nil || s.closed {
-		return artifactstore.ErrClosed
+		return basespec.ErrClosed
 	}
 	return ctx.Err()
 }
 
 func (s *snapshot) resolve(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (string, error) {
 	return resolveWithinRoot(s.root, locator)
 }
 
 func (s *snapshot) resolveDirectory(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (string, error) {
 	return resolveWithinRoot(s.root, locator)
 }
@@ -237,9 +237,9 @@ func (s *snapshot) resolveDirectory(
 // root using normal native filesystem path semantics.
 func resolveNativePath(
 	root string,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (string, error) {
-	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+	if err := basespec.ValidateLocator(locator, true); err != nil {
 		return "", err
 	}
 	root = filepath.Clean(root)
@@ -250,14 +250,14 @@ func resolveNativePath(
 	if !rootInfo.IsDir() {
 		return "", fmt.Errorf(
 			"%w: filesystem source root is not a directory",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	path, err := resolveWithinRoot(root, locator)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf(
 			"%w: source locator %q",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			locator,
 		)
 	}
@@ -267,7 +267,7 @@ func resolveNativePath(
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf(
 			"%w: source locator %q",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			locator,
 		)
 	} else if err != nil {
@@ -278,9 +278,9 @@ func resolveNativePath(
 
 func resolveWithinRoot(
 	root string,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (string, error) {
-	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+	if err := basespec.ValidateLocator(locator, true); err != nil {
 		return "", err
 	}
 	root = filepath.Clean(root)
@@ -298,7 +298,7 @@ func resolveWithinRoot(
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: locator %q escapes source root",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			locator,
 		)
 	}
@@ -307,7 +307,7 @@ func resolveWithinRoot(
 }
 
 func entryFromInfo(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 	info os.FileInfo,
 ) source.Entry {
 	return source.Entry{
@@ -322,18 +322,18 @@ func entryFromInfo(
 }
 
 func joinLocator(
-	parent artifactstore.Locator,
+	parent basespec.Locator,
 	name string,
-) (artifactstore.Locator, error) {
+) (basespec.Locator, error) {
 	if name == "" || strings.ContainsAny(name, `/\:`) {
 		return "", fmt.Errorf(
 			"%w: invalid source entry name %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			name,
 		)
 	}
 	if parent == "." {
-		return artifactstore.Locator(name), nil
+		return basespec.Locator(name), nil
 	}
-	return artifactstore.Locator(string(parent) + "/" + name), nil
+	return basespec.Locator(string(parent) + "/" + name), nil
 }

@@ -5,7 +5,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type OccurrenceState string
@@ -17,92 +19,92 @@ const (
 )
 
 type OccurrenceKey struct {
-	CollectionID       artifactstore.CollectionID       `json:"collectionID"`
-	SourceID           artifactstore.SourceID           `json:"sourceID"`
-	Locator            artifactstore.Locator            `json:"locator"`
-	SubresourceLocator artifactstore.SubresourceLocator `json:"subresourceLocator,omitempty"`
+	CollectionID       basespec.CollectionID       `json:"collectionID"`
+	SourceID           basespec.SourceID           `json:"sourceID"`
+	Locator            basespec.Locator            `json:"locator"`
+	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
 }
 
 type Occurrence struct {
-	RootID              artifactstore.RootID         `json:"rootID"`
-	CollectionID        artifactstore.CollectionID   `json:"collectionID"`
-	Key                 OccurrenceKey                `json:"key"`
-	Kind                artifactstore.ArtifactKind   `json:"kind,omitempty"`
-	LogicalName         artifactstore.LogicalName    `json:"logicalName,omitempty"`
-	LogicalVersion      artifactstore.LogicalVersion `json:"logicalVersion,omitempty"`
-	DefinitionDigest    *artifactstore.Digest        `json:"definitionDigest,omitempty"`
-	SourceContentDigest *artifactstore.Digest        `json:"sourceContentDigest,omitempty"`
-	DecoderID           artifactstore.DecoderID      `json:"decoderID,omitempty"`
-	State               OccurrenceState              `json:"state"`
-	Diagnostics         []artifactstore.Diagnostic   `json:"diagnostics,omitempty"`
-	ObservedAt          time.Time                    `json:"observedAt"`
+	RootID              basespec.RootID         `json:"rootID"`
+	CollectionID        basespec.CollectionID   `json:"collectionID"`
+	Key                 OccurrenceKey           `json:"key"`
+	Kind                basespec.ArtifactKind   `json:"kind,omitempty"`
+	LogicalName         basespec.LogicalName    `json:"logicalName,omitempty"`
+	LogicalVersion      basespec.LogicalVersion `json:"logicalVersion,omitempty"`
+	DefinitionDigest    *cryptoutil.Digest      `json:"definitionDigest,omitempty"`
+	SourceContentDigest *cryptoutil.Digest      `json:"sourceContentDigest,omitempty"`
+	DecoderID           basespec.DecoderID      `json:"decoderID,omitempty"`
+	State               OccurrenceState         `json:"state"`
+	Diagnostics         []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	ObservedAt          time.Time               `json:"observedAt"`
 }
 
 func (o Occurrence) Validate() error {
-	if err := artifactstore.ValidateRootID(o.RootID); err != nil {
+	if err := basespec.ValidateRootID(o.RootID); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateCollectionID(o.CollectionID); err != nil {
+	if err := basespec.ValidateCollectionID(o.CollectionID); err != nil {
 		return err
 	}
 	if o.Key.CollectionID != o.CollectionID {
-		return fmt.Errorf("%w: occurrence key collection mismatch", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: occurrence key collection mismatch", basespec.ErrInvalid)
 	}
 	if err := o.Key.Validate(); err != nil {
 		return err
 	}
 	if o.Kind != "" {
-		if err := artifactstore.ValidateArtifactKind(o.Kind); err != nil {
+		if err := basespec.ValidateArtifactKind(o.Kind); err != nil {
 			return err
 		}
 	}
 	if o.LogicalName != "" {
-		if err := artifactstore.ValidateLogicalName(o.LogicalName); err != nil {
+		if err := basespec.ValidateLogicalName(o.LogicalName); err != nil {
 			return err
 		}
 	}
-	if err := artifactstore.ValidateLogicalVersion(o.LogicalVersion, true); err != nil {
+	if err := basespec.ValidateLogicalVersion(o.LogicalVersion, true); err != nil {
 		return err
 	}
 	if o.DefinitionDigest != nil {
-		if err := artifactstore.ValidateDigest(*o.DefinitionDigest); err != nil {
+		if err := cryptoutil.ValidateDigest(*o.DefinitionDigest); err != nil {
 			return err
 		}
 	}
 	if o.SourceContentDigest != nil {
-		if err := artifactstore.ValidateDigest(*o.SourceContentDigest); err != nil {
+		if err := cryptoutil.ValidateDigest(*o.SourceContentDigest); err != nil {
 			return err
 		}
 	}
 	if o.DecoderID != "" {
-		if err := artifactstore.ValidateDecoderID(o.DecoderID); err != nil {
+		if err := basespec.ValidateDecoderID(o.DecoderID); err != nil {
 			return err
 		}
 	}
 	switch o.State {
 	case OccurrenceValid:
-		if err := artifactstore.ValidateArtifactKind(o.Kind); err != nil {
+		if err := basespec.ValidateArtifactKind(o.Kind); err != nil {
 			return err
 		}
-		if err := artifactstore.ValidateLogicalName(o.LogicalName); err != nil {
+		if err := basespec.ValidateLogicalName(o.LogicalName); err != nil {
 			return err
 		}
-		if err := artifactstore.ValidateLogicalVersion(o.LogicalVersion, true); err != nil {
+		if err := basespec.ValidateLogicalVersion(o.LogicalVersion, true); err != nil {
 			return err
 		}
 		if o.DefinitionDigest == nil || o.SourceContentDigest == nil {
 			return fmt.Errorf(
 				"%w: valid occurrence requires definition and source content digests",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
-		if err := artifactstore.ValidateDigest(*o.DefinitionDigest); err != nil {
+		if err := cryptoutil.ValidateDigest(*o.DefinitionDigest); err != nil {
 			return err
 		}
-		if err := artifactstore.ValidateDigest(*o.SourceContentDigest); err != nil {
+		if err := cryptoutil.ValidateDigest(*o.SourceContentDigest); err != nil {
 			return err
 		}
-		if err := artifactstore.ValidateDecoderID(o.DecoderID); err != nil {
+		if err := basespec.ValidateDecoderID(o.DecoderID); err != nil {
 			return err
 		}
 
@@ -110,30 +112,30 @@ func (o Occurrence) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: invalid occurrence state %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			o.State,
 		)
 	}
-	if err := artifactstore.ValidateDiagnostics(o.Diagnostics); err != nil {
+	if err := diagnostic.ValidateDiagnostics(o.Diagnostics); err != nil {
 		return err
 	}
 	if o.ObservedAt.IsZero() {
-		return fmt.Errorf("%w: occurrence observed time is required", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: occurrence observed time is required", basespec.ErrInvalid)
 	}
 	return nil
 }
 
 func (k OccurrenceKey) Validate() error {
-	if err := artifactstore.ValidateCollectionID(k.CollectionID); err != nil {
+	if err := basespec.ValidateCollectionID(k.CollectionID); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateSourceID(k.SourceID); err != nil {
+	if err := basespec.ValidateSourceID(k.SourceID); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateLocator(k.Locator, false); err != nil {
+	if err := basespec.ValidateLocator(k.Locator, false); err != nil {
 		return err
 	}
-	return artifactstore.ValidateSubresourceLocator(k.SubresourceLocator)
+	return basespec.ValidateSubresourceLocator(k.SubresourceLocator)
 }
 
 func SortOccurrences(values []Occurrence) {

@@ -9,7 +9,7 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -72,13 +72,13 @@ func TestEmbeddedAdapterNormalizesAndReadsImmutableProvider(t *testing.T) {
 	if err := snapshot.Confirm(t.Context()); err != nil {
 		t.Fatalf("Confirm: %v", err)
 	}
-	if _, err := snapshot.Stat(t.Context(), "missing.txt"); !errors.Is(err, artifactstore.ErrNotFound) {
+	if _, err := snapshot.Stat(t.Context(), "missing.txt"); !errors.Is(err, basespec.ErrNotFound) {
 		t.Fatalf("missing Stat error=%v", err)
 	}
 	if err := snapshot.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if _, err := snapshot.Open(t.Context(), "one.txt"); !errors.Is(err, artifactstore.ErrClosed) {
+	if _, err := snapshot.Open(t.Context(), "one.txt"); !errors.Is(err, basespec.ErrClosed) {
 		t.Fatalf("Open after Close error=%v", err)
 	}
 }
@@ -86,7 +86,7 @@ func TestEmbeddedAdapterNormalizesAndReadsImmutableProvider(t *testing.T) {
 func TestEmbeddedAdapterRejectsUnavailableProviders(t *testing.T) {
 	t.Parallel()
 
-	if _, err := New(map[string]fs.FS{"missing": nil}); !errors.Is(err, artifactstore.ErrInvalid) {
+	if _, err := New(map[string]fs.FS{"missing": nil}); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("nil provider error=%v, want ErrInvalid", err)
 	}
 	adapter, err := New(nil)
@@ -98,7 +98,7 @@ func TestEmbeddedAdapterRejectsUnavailableProviders(t *testing.T) {
 		[]byte(`{"providerKey":"missing"}`),
 	); !errors.Is(
 		err,
-		artifactstore.ErrSourceUnavailable,
+		basespec.ErrSourceUnavailable,
 	) {
 		t.Fatalf("unavailable config error=%v", err)
 	}

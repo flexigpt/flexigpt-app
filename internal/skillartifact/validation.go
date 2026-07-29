@@ -9,7 +9,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 )
 
@@ -17,28 +17,28 @@ func ValidateDefinition(value definition.Definition) error {
 	if value.Kind != Kind {
 		return fmt.Errorf(
 			"%w: Skill definition kind must be %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			Kind,
 		)
 	}
 	if value.SchemaID != SchemaID {
 		return fmt.Errorf(
 			"%w: Skill definition schema must be %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			SchemaID,
 		)
 	}
 	if value.SchemaVersion != SchemaVersion {
 		return fmt.Errorf(
 			"%w: Skill definition schema version must be %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			SchemaVersion,
 		)
 	}
 	if len(value.Dependencies) != 0 {
 		return fmt.Errorf(
 			"%w: Agent Skills cannot declare generic portable dependencies",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	body, err := DecodeBody(value.Body)
@@ -48,32 +48,32 @@ func ValidateDefinition(value definition.Definition) error {
 	if err := agentskills.ValidateSkillDocument(toDocument(body)); err != nil {
 		return fmt.Errorf(
 			"%w: invalid Agent Skill document: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
 	if string(value.LogicalName) != body.Name {
 		return fmt.Errorf(
 			"%w: Skill logical name does not match body.name",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if value.DisplayName != body.DisplayName {
 		return fmt.Errorf(
 			"%w: Skill display name does not match body.displayName",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if value.Description != body.Description {
 		return fmt.Errorf(
 			"%w: Skill description does not match body.description",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if value.Labels[InsertLabelKey] != body.Insert {
 		return fmt.Errorf(
 			"%w: Skill insert label does not match body.insert",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return nil
@@ -86,7 +86,7 @@ func DecodeBody(raw json.RawMessage) (Body, error) {
 	if err := decoder.Decode(&output); err != nil {
 		return output, fmt.Errorf(
 			"%w: decode Agent Skill definition: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
@@ -97,7 +97,7 @@ func DecodeBody(raw json.RawMessage) (Body, error) {
 		}
 		return output, fmt.Errorf(
 			"%w: decode Agent Skill definition: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}

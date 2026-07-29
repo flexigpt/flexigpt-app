@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 // Runtime is a trusted internal capability for consumers that need an
@@ -16,8 +16,8 @@ import (
 type Runtime interface {
 	Get(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-		id artifactstore.SourceID,
+		rootID basespec.RootID,
+		id basespec.SourceID,
 	) (Source, error)
 
 	Open(
@@ -35,11 +35,11 @@ type LocalPathRuntime interface {
 	ResolveLocalPath(
 		ctx context.Context,
 		value Source,
-		locator artifactstore.Locator,
+		locator basespec.Locator,
 	) (string, error)
 
 	SupportsLocalPath(
-		kind artifactstore.SourceKind,
+		kind basespec.SourceKind,
 	) bool
 }
 
@@ -57,7 +57,7 @@ func NewRuntime(
 	if reader == nil || opener == nil {
 		return nil, fmt.Errorf(
 			"%w: source runtime dependencies are incomplete",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	value := &runtime{
@@ -75,13 +75,13 @@ func NewRuntime(
 
 func (r *runtime) Get(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 ) (Source, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Source{}, err
 	}
-	if err := artifactstore.ValidateSourceID(id); err != nil {
+	if err := basespec.ValidateSourceID(id); err != nil {
 		return Source{}, err
 	}
 	value, err := r.reader.Get(ctx, rootID, id)
@@ -91,7 +91,7 @@ func (r *runtime) Get(
 	if value.ID != id {
 		return Source{}, fmt.Errorf(
 			"%w: source reader returned %q for requested source %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			value.ID,
 			id,
 		)
@@ -99,7 +99,7 @@ func (r *runtime) Get(
 	if value.RootID != rootID {
 		return Source{}, fmt.Errorf(
 			"%w: source reader returned root %q for requested root %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			value.RootID,
 			rootID,
 		)
@@ -129,7 +129,7 @@ func (r *runtime) Open(
 }
 
 func (r *runtime) SupportsLocalPath(
-	kind artifactstore.SourceKind,
+	kind basespec.SourceKind,
 ) bool {
 	if r == nil || r.localKinds == nil {
 		return false
@@ -143,10 +143,10 @@ func (r *runtime) SupportsLocalPath(
 func (r *runtime) ResolveLocalPath(
 	ctx context.Context,
 	value Source,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (string, error) {
 	if ctx == nil {
-		return "", fmt.Errorf("%w: source local-path context is nil", artifactstore.ErrInvalid)
+		return "", fmt.Errorf("%w: source local-path context is nil", basespec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -154,14 +154,14 @@ func (r *runtime) ResolveLocalPath(
 	if err := value.Validate(); err != nil {
 		return "", err
 	}
-	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+	if err := basespec.ValidateLocator(locator, true); err != nil {
 		return "", err
 	}
 	if r.localPaths == nil ||
 		!r.SupportsLocalPath(value.Kind) {
 		return "", fmt.Errorf(
 			"%w: source runtime has no native path resolver",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 		)
 	}
 	location, err := r.localPaths.ResolveLocalPath(
@@ -176,7 +176,7 @@ func (r *runtime) ResolveLocalPath(
 	if !filepath.IsAbs(location) {
 		return "", fmt.Errorf(
 			"%w: source runtime returned a non-absolute local path",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return location, nil
@@ -184,12 +184,12 @@ func (r *runtime) ResolveLocalPath(
 
 func validateSnapshot(snapshot Snapshot) error {
 	if snapshot == nil {
-		return fmt.Errorf("%w: source opener returned a nil snapshot", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: source opener returned a nil snapshot", basespec.ErrInvalid)
 	}
-	if err := artifactstore.ValidateSourceGeneration(snapshot.Generation()); err != nil {
+	if err := basespec.ValidateSourceGeneration(snapshot.Generation()); err != nil {
 		return fmt.Errorf(
 			"%w: source snapshot returned an invalid generation: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}

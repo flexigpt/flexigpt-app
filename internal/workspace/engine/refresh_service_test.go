@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
@@ -19,13 +19,13 @@ func TestRefresherBuildsPlanAndDelegatesToRunner(t *testing.T) {
 
 	workspace := refresherTestWorkspace(t)
 	store := &engineTestCollectionStore{
-		getFn: func(_ context.Context, ref artifactstore.CollectionRef) (collection.Collection, error) {
+		getFn: func(_ context.Context, ref basespec.CollectionRef) (collection.Collection, error) {
 			if ref != workspace.Collection.Ref() {
-				return collection.Collection{}, artifactstore.ErrCollectionNotFound
+				return collection.Collection{}, basespec.ErrCollectionNotFound
 			}
 			return workspace.Collection, nil
 		},
-		listAttachmentsFn: func(context.Context, artifactstore.CollectionRef) ([]collection.Attachment, error) {
+		listAttachmentsFn: func(context.Context, basespec.CollectionRef) ([]collection.Attachment, error) {
 			return nil, nil
 		},
 	}
@@ -38,7 +38,7 @@ func TestRefresherBuildsPlanAndDelegatesToRunner(t *testing.T) {
 		t.Fatalf("NewDescriptorLoader: %v", err)
 	}
 	planner, err := NewPlanner(
-		DiscoveryProfiles{Primary: DiscoveryProfile{ExplicitLocators: []artifactstore.Locator{"AGENTS.md"}}},
+		DiscoveryProfiles{Primary: DiscoveryProfile{ExplicitLocators: []basespec.Locator{"AGENTS.md"}}},
 		"policy.v1",
 		"test.decoder",
 	)
@@ -58,7 +58,7 @@ func TestRefresherBuildsPlanAndDelegatesToRunner(t *testing.T) {
 	}
 	var received discovery.Plan
 	runner := refresherTestRunner{
-		refreshFn: func(_ context.Context, ref artifactstore.CollectionRef, plan discovery.Plan, receivedPolicy artifact.Policy) (refresh.Result, error) {
+		refreshFn: func(_ context.Context, ref basespec.CollectionRef, plan discovery.Plan, receivedPolicy artifact.Policy) (refresh.Result, error) {
 			if ref != workspace.Collection.Ref() || receivedPolicy != policy {
 				t.Fatalf("runner ref=%#v policy=%#v", ref, receivedPolicy)
 			}
@@ -74,7 +74,7 @@ func TestRefresherBuildsPlanAndDelegatesToRunner(t *testing.T) {
 	if err != nil || result.Candidates != 2 || received.Revision != "policy.v1" || len(received.Sources) != 0 {
 		t.Fatalf("Refresh result=%#v plan=%#v err=%v", result, received, err)
 	}
-	if _, err := refresher.Refresh(t.Context(), artifactstore.CollectionRef{}); err == nil {
+	if _, err := refresher.Refresh(t.Context(), basespec.CollectionRef{}); err == nil {
 		t.Fatal("Refresh accepted an invalid workspace reference")
 	}
 }
@@ -88,12 +88,12 @@ func TestRefresherConstructorRejectsMissingDependencies(t *testing.T) {
 }
 
 type refresherTestRunner struct {
-	refreshFn func(context.Context, artifactstore.CollectionRef, discovery.Plan, artifact.Policy) (refresh.Result, error)
+	refreshFn func(context.Context, basespec.CollectionRef, discovery.Plan, artifact.Policy) (refresh.Result, error)
 }
 
 func (r refresherTestRunner) Refresh(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	plan discovery.Plan,
 	policy artifact.Policy,
 ) (refresh.Result, error) {

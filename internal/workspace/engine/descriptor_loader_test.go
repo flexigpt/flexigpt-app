@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 func TestDescriptorLoaderMissingAndValidDescriptor(t *testing.T) {
@@ -20,7 +21,7 @@ func TestDescriptorLoaderMissingAndValidDescriptor(t *testing.T) {
 
 	missing := &engineTestSnapshot{generation: "generation-missing"}
 	loader, err := NewDescriptorLoader(engineTestRuntime{
-		getFn: func(context.Context, artifactstore.RootID, artifactstore.SourceID) (source.Source, error) {
+		getFn: func(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error) {
 			return sourceValue, nil
 		},
 		openFn: func(context.Context, source.Source) (source.Snapshot, error) {
@@ -42,7 +43,7 @@ func TestDescriptorLoaderMissingAndValidDescriptor(t *testing.T) {
 	content := descriptorTestDocument(t)
 	valid := &engineTestSnapshot{
 		generation: "generation-valid",
-		entries: map[artifactstore.Locator]source.Entry{
+		entries: map[basespec.Locator]source.Entry{
 			DescriptorLocator: {
 				Locator:   DescriptorLocator,
 				Name:      WorkspaceDescriptorFileName,
@@ -50,10 +51,10 @@ func TestDescriptorLoaderMissingAndValidDescriptor(t *testing.T) {
 				IsRegular: true,
 			},
 		},
-		contents: map[artifactstore.Locator][]byte{DescriptorLocator: content},
+		contents: map[basespec.Locator][]byte{DescriptorLocator: content},
 	}
 	loader, err = NewDescriptorLoader(engineTestRuntime{
-		getFn: func(context.Context, artifactstore.RootID, artifactstore.SourceID) (source.Source, error) {
+		getFn: func(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error) {
 			return sourceValue, nil
 		},
 		openFn: func(context.Context, source.Source) (source.Snapshot, error) {
@@ -91,7 +92,7 @@ func TestDescriptorLoaderRejectsBadObservationsAndClosesSnapshots(t *testing.T) 
 	content := []byte(`[]`)
 	snapshot := &engineTestSnapshot{
 		generation: "generation-invalid",
-		entries: map[artifactstore.Locator]source.Entry{
+		entries: map[basespec.Locator]source.Entry{
 			DescriptorLocator: {
 				Locator:   DescriptorLocator,
 				Name:      WorkspaceDescriptorFileName,
@@ -99,10 +100,10 @@ func TestDescriptorLoaderRejectsBadObservationsAndClosesSnapshots(t *testing.T) 
 				IsRegular: true,
 			},
 		},
-		contents: map[artifactstore.Locator][]byte{DescriptorLocator: content},
+		contents: map[basespec.Locator][]byte{DescriptorLocator: content},
 	}
 	loader, err := NewDescriptorLoader(engineTestRuntime{
-		getFn: func(context.Context, artifactstore.RootID, artifactstore.SourceID) (source.Source, error) {
+		getFn: func(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error) {
 			return sourceValue, nil
 		},
 		openFn: func(context.Context, source.Source) (source.Snapshot, error) { return snapshot, nil },
@@ -120,7 +121,7 @@ func TestDescriptorLoaderRejectsBadObservationsAndClosesSnapshots(t *testing.T) 
 	confirmation := errors.New("confirmation failed")
 	missing := &engineTestSnapshot{generation: "generation-confirm", confirmErr: confirmation}
 	loader, err = NewDescriptorLoader(engineTestRuntime{
-		getFn: func(context.Context, artifactstore.RootID, artifactstore.SourceID) (source.Source, error) {
+		getFn: func(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error) {
 			return sourceValue, nil
 		},
 		openFn: func(context.Context, source.Source) (source.Snapshot, error) { return missing, nil },
@@ -153,7 +154,7 @@ func descriptorTestSource(workspace Workspace) source.Source {
 
 func descriptorTestDocument(t *testing.T) []byte {
 	t.Helper()
-	digest := artifactstore.DigestBytes([]byte("member"))
+	digest := cryptoutil.DigestBytes([]byte("member"))
 	return fmt.Appendf(nil, `{
 		"kind":"workspace.collection",
 		"schemaID":"workspace.collection.v1",

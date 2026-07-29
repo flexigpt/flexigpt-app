@@ -6,15 +6,17 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type ArtifactPolicy struct {
-	supports map[artifactstore.ArtifactKind]ArtifactSupport
+	supports map[basespec.ArtifactKind]ArtifactSupport
 }
 
 func NewArtifactPolicy(
@@ -26,7 +28,7 @@ func NewArtifactPolicy(
 			ErrInvalidWorkspace,
 		)
 	}
-	values := make(map[artifactstore.ArtifactKind]ArtifactSupport, len(supports))
+	values := make(map[basespec.ArtifactKind]ArtifactSupport, len(supports))
 	for _, support := range supports {
 		if err := support.Validate(); err != nil {
 			return nil, err
@@ -44,7 +46,7 @@ func NewArtifactPolicy(
 }
 
 func (p *ArtifactPolicy) Supports(
-	kind artifactstore.ArtifactKind,
+	kind basespec.ArtifactKind,
 ) bool {
 	if p == nil {
 		return false
@@ -58,47 +60,47 @@ func (p *ArtifactPolicy) Derive(
 	_ collection.Collection,
 	occurrence catalog.Occurrence,
 	value definition.Definition,
-) (artifact.Draft, bool, []artifactstore.Diagnostic) {
+) (artifact.Draft, bool, []diagnostic.Diagnostic) {
 	support, supported := p.supports[occurrence.Kind]
 	if !supported {
 		return artifact.Draft{}, false, nil
 	}
 	if value.Kind != occurrence.Kind {
-		return artifact.Draft{}, false, []artifactstore.Diagnostic{{
-			Severity: artifactstore.DiagnosticError,
+		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
+			Severity: diagnostic.DiagnosticError,
 			Code:     DiagnosticCodeArtifactKindMismatch,
 			Message: fmt.Sprintf(
 				"definition kind %q does not match occurrence kind %q",
 				value.Kind,
 				occurrence.Kind,
 			),
-			Location: &artifactstore.DiagnosticLocation{
+			Location: &diagnostic.DiagnosticLocation{
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,
 			},
 		}}
 	}
 	if value.SchemaID != support.SchemaID {
-		return artifact.Draft{}, false, []artifactstore.Diagnostic{{
-			Severity: artifactstore.DiagnosticError,
+		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
+			Severity: diagnostic.DiagnosticError,
 			Code:     DiagnosticCodeArtifactSchemaUnsupported,
 			Message: fmt.Sprintf(
 				"definition schema %q is not supported for kind %q",
 				value.SchemaID,
 				value.Kind,
 			),
-			Location: &artifactstore.DiagnosticLocation{
+			Location: &diagnostic.DiagnosticLocation{
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,
 			},
 		}}
 	}
 	if err := support.Validator(value); err != nil {
-		return artifact.Draft{}, false, []artifactstore.Diagnostic{{
-			Severity: artifactstore.DiagnosticError,
+		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
+			Severity: diagnostic.DiagnosticError,
 			Code:     DiagnosticCodeProjectionInvalid,
 			Message:  diagnosticMessage(err.Error()),
-			Location: &artifactstore.DiagnosticLocation{
+			Location: &diagnostic.DiagnosticLocation{
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,
 			},
@@ -108,8 +110,8 @@ func (p *ArtifactPolicy) Derive(
 	// An empty ArtifactData means runtime use is enabled by default.
 	data, err := EncodeArtifactData(ArtifactData{})
 	if err != nil {
-		return artifact.Draft{}, false, []artifactstore.Diagnostic{{
-			Severity: artifactstore.DiagnosticError,
+		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
+			Severity: diagnostic.DiagnosticError,
 			Code:     DiagnosticCodeProjectionInvalid,
 			Message:  diagnosticMessage(err.Error()),
 		}}
@@ -124,20 +126,20 @@ func (p *ArtifactPolicy) Derive(
 }
 
 func artifactName(
-	logicalName artifactstore.LogicalName,
+	logicalName basespec.LogicalName,
 	key catalog.OccurrenceKey,
 ) string {
 	base := strings.TrimSpace(string(logicalName))
 	if base == "" {
 		base = defaultArtifactName
 	}
-	digest := artifactstore.DigestBytes([]byte(occurrenceKeyDigestInput(key)))
+	digest := cryptoutil.DigestBytes([]byte(occurrenceKeyDigestInput(key)))
 	suffix := strings.TrimPrefix(
 		string(digest),
-		artifactstore.DigestSHA256Prefix,
+		cryptoutil.DigestSHA256Prefix,
 	)
 	suffix = suffix[:artifactNameDigestLength]
-	maximum := artifactstore.MaxDisplayNameBytes - len(suffix) - len(artifactNameSeparator)
+	maximum := basespec.MaxDisplayNameBytes - len(suffix) - len(artifactNameSeparator)
 	for len(base) > maximum {
 		_, size := utf8.DecodeLastRuneInString(base)
 		base = base[:len(base)-size]
@@ -146,7 +148,7 @@ func artifactName(
 }
 
 func diagnosticMessage(value string) string {
-	return artifactstore.BoundedDiagnosticMessage(value)
+	return diagnostic.BoundedDiagnosticMessage(value)
 }
 
 func occurrenceKeyDigestInput(key catalog.OccurrenceKey) string {

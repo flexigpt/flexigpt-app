@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
@@ -15,14 +15,14 @@ import (
 type sourceManager interface {
 	Create(
 		ctx context.Context,
-		rootID artifactstore.RootID,
+		rootID basespec.RootID,
 		draft source.Draft,
 	) (source.Summary, error)
 
 	Discard(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-		id artifactstore.SourceID,
+		rootID basespec.RootID,
+		id basespec.SourceID,
 		expectedRevision uint64,
 	) error
 }
@@ -56,7 +56,7 @@ func NewService(
 }
 
 type Request struct {
-	RootID      artifactstore.RootID
+	RootID      basespec.RootID
 	DisplayName string
 	Description string
 	RootPath    string

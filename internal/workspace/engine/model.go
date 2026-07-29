@@ -3,14 +3,16 @@ package engine
 import (
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/portable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 var (
@@ -34,8 +36,8 @@ const (
 //
 // Artifact adapters contribute their own conventions through this type.
 type DiscoveryProfile struct {
-	ExplicitLocators []artifactstore.Locator
-	ReadmeLocator    artifactstore.Locator
+	ExplicitLocators []basespec.Locator
+	ReadmeLocator    basespec.Locator
 	DirectoryRoots   []discovery.DirectoryRoot
 }
 
@@ -45,15 +47,15 @@ type DiscoveryProfiles struct {
 }
 
 type DiscoveryRoot struct {
-	Root            artifactstore.Locator `json:"root"`
-	Recursive       bool                  `json:"recursive"`
-	IncludePatterns []string              `json:"includePatterns,omitempty"`
+	Root            basespec.Locator `json:"root"`
+	Recursive       bool             `json:"recursive"`
+	IncludePatterns []string         `json:"includePatterns,omitempty"`
 }
 
 type DiscoveryPreferences struct {
-	AdditionalLocators []artifactstore.Locator `json:"additionalLocators,omitempty"`
-	AdditionalRoots    []DiscoveryRoot         `json:"additionalRoots,omitempty"`
-	IncludeReadme      bool                    `json:"includeReadme,omitempty"`
+	AdditionalLocators []basespec.Locator `json:"additionalLocators,omitempty"`
+	AdditionalRoots    []DiscoveryRoot    `json:"additionalRoots,omitempty"`
+	IncludeReadme      bool               `json:"includeReadme,omitempty"`
 }
 
 // CollectionData contains local Workspace policy only. The Workspace mode and
@@ -76,7 +78,7 @@ type ArtifactData struct {
 	RuntimeDisabled bool `json:"runtimeDisabled,omitempty"`
 }
 
-type WorkspaceRef = artifactstore.CollectionRef
+type WorkspaceRef = basespec.CollectionRef
 
 // Workspace is an internal privileged aggregate. API packages project it into
 // explicit view models and must not serialize collection local data, attachment
@@ -85,40 +87,40 @@ type Workspace struct {
 	Collection      collection.Collection   `json:"-"`
 	Data            CollectionData          `json:"-"`
 	Mode            Mode                    `json:"-"`
-	PrimarySourceID artifactstore.SourceID  `json:"-"`
+	PrimarySourceID basespec.SourceID       `json:"-"`
 	Attachments     []collection.Attachment `json:"-"`
 	Sources         []source.Summary        `json:"-"`
 }
 
 type Resource struct {
-	Artifact        artifact.Artifact          `json:"-"`
-	Definition      definition.Definition      `json:"-"`
-	Occurrence      *catalog.Occurrence        `json:"-"`
-	Source          source.Summary             `json:"-"`
-	CatalogCurrent  bool                       `json:"-"`
-	ProjectionValid bool                       `json:"-"`
-	Diagnostics     []artifactstore.Diagnostic `json:"-"`
+	Artifact        artifact.Artifact       `json:"-"`
+	Definition      definition.Definition   `json:"-"`
+	Occurrence      *catalog.Occurrence     `json:"-"`
+	Source          source.Summary          `json:"-"`
+	CatalogCurrent  bool                    `json:"-"`
+	ProjectionValid bool                    `json:"-"`
+	Diagnostics     []diagnostic.Diagnostic `json:"-"`
 }
 
 type ResourceGroup struct {
-	Kind       artifactstore.ArtifactKind `json:"-"`
-	Resources  []Resource                 `json:"-"`
-	Unrecorded []catalog.Occurrence       `json:"-"`
+	Kind       basespec.ArtifactKind `json:"-"`
+	Resources  []Resource            `json:"-"`
+	Unrecorded []catalog.Occurrence  `json:"-"`
 }
 
 type EmptyWorkspaceRequest struct {
-	RootID      artifactstore.RootID `json:"rootID"`
+	RootID      basespec.RootID      `json:"rootID"`
 	DisplayName string               `json:"displayName"`
 	Description string               `json:"description,omitempty"`
 	Discovery   DiscoveryPreferences `json:"discovery"`
 }
 
 type FilesystemWorkspaceRequest struct {
-	RootID          artifactstore.RootID   `json:"rootID"`
-	DisplayName     string                 `json:"displayName"`
-	Description     string                 `json:"description,omitempty"`
-	PrimarySourceID artifactstore.SourceID `json:"primarySourceID"`
-	Discovery       DiscoveryPreferences   `json:"discovery"`
+	RootID          basespec.RootID      `json:"rootID"`
+	DisplayName     string               `json:"displayName"`
+	Description     string               `json:"description,omitempty"`
+	PrimarySourceID basespec.SourceID    `json:"primarySourceID"`
+	Discovery       DiscoveryPreferences `json:"discovery"`
 }
 
 type UpdateRequest struct {
@@ -131,20 +133,20 @@ type UpdateRequest struct {
 }
 
 type AttachRequest struct {
-	Workspace                  WorkspaceRef                 `json:"workspace"`
-	ExpectedCollectionRevision uint64                       `json:"expectedCollectionRevision"`
-	SourceID                   artifactstore.SourceID       `json:"sourceID"`
-	Role                       artifactstore.AttachmentRole `json:"role"`
-	Enabled                    bool                         `json:"enabled"`
-	Data                       AttachmentData               `json:"data"`
+	Workspace                  WorkspaceRef            `json:"workspace"`
+	ExpectedCollectionRevision uint64                  `json:"expectedCollectionRevision"`
+	SourceID                   basespec.SourceID       `json:"sourceID"`
+	Role                       basespec.AttachmentRole `json:"role"`
+	Enabled                    bool                    `json:"enabled"`
+	Data                       AttachmentData          `json:"data"`
 }
 
 type UpdateAttachmentRequest struct {
 	Workspace                  WorkspaceRef
-	SourceID                   artifactstore.SourceID
+	SourceID                   basespec.SourceID
 	ExpectedCollectionRevision uint64
 	ExpectedAttachmentRevision uint64
-	Role                       artifactstore.AttachmentRole
+	Role                       basespec.AttachmentRole
 	Enabled                    bool
 	Data                       AttachmentData
 }
@@ -152,34 +154,34 @@ type UpdateAttachmentRequest struct {
 type ReplacePrimaryRequest struct {
 	Workspace                  WorkspaceRef
 	ExpectedCollectionRevision uint64
-	PreviousSourceID           artifactstore.SourceID
+	PreviousSourceID           basespec.SourceID
 	PreviousAttachmentRevision uint64
-	SourceID                   artifactstore.SourceID
+	SourceID                   basespec.SourceID
 }
 
 type SetPrimaryRequest struct {
 	Workspace                  WorkspaceRef
 	ExpectedCollectionRevision uint64
-	PreviousSourceID           artifactstore.SourceID
+	PreviousSourceID           basespec.SourceID
 	PreviousAttachmentRevision uint64
-	SourceID                   artifactstore.SourceID
+	SourceID                   basespec.SourceID
 	Clear                      bool
 }
 
 type CatalogView struct {
-	Workspace            Workspace                  `json:"-"`
-	Catalog              catalog.Snapshot           `json:"-"`
-	Resources            []Resource                 `json:"-"`
-	Unrecorded           []catalog.Occurrence       `json:"-"`
-	UnresolvedArtifacts  []artifact.Artifact        `json:"-"`
-	Groups               []ResourceGroup            `json:"-"`
-	CatalogCurrent       bool                       `json:"-"`
-	FreshnessDiagnostics []artifactstore.Diagnostic `json:"-"`
+	Workspace            Workspace               `json:"-"`
+	Catalog              catalog.Snapshot        `json:"-"`
+	Resources            []Resource              `json:"-"`
+	Unrecorded           []catalog.Occurrence    `json:"-"`
+	UnresolvedArtifacts  []artifact.Artifact     `json:"-"`
+	Groups               []ResourceGroup         `json:"-"`
+	CatalogCurrent       bool                    `json:"-"`
+	FreshnessDiagnostics []diagnostic.Diagnostic `json:"-"`
 }
 
 type Reference struct {
-	Artifact *artifactstore.ArtifactRef `json:"-"`
-	Selector *definition.Selector       `json:"-"`
+	Artifact *basespec.ArtifactRef `json:"-"`
+	Selector *definition.Selector  `json:"-"`
 }
 
 // LoadPlanItem contains privileged materialized source state. It must be
@@ -189,16 +191,16 @@ type LoadPlanItem struct {
 	Definition                 definition.Definition `json:"-"`
 	Source                     source.Summary        `json:"-"`
 	CatalogCurrent             bool                  `json:"-"`
-	OccurrenceDefinitionDigest artifactstore.Digest  `json:"-"`
-	SourceContentDigest        artifactstore.Digest  `json:"-"`
+	OccurrenceDefinitionDigest cryptoutil.Digest     `json:"-"`
+	SourceContentDigest        cryptoutil.Digest     `json:"-"`
 	SourceGeneration           string                `json:"-"`
 }
 
 type LoadPlan struct {
-	Workspace       WorkspaceRef               `json:"-"`
-	CatalogRevision uint64                     `json:"-"`
-	Items           []LoadPlanItem             `json:"-"`
-	Diagnostics     []artifactstore.Diagnostic `json:"-"`
+	Workspace       WorkspaceRef            `json:"-"`
+	CatalogRevision uint64                  `json:"-"`
+	Items           []LoadPlanItem          `json:"-"`
+	Diagnostics     []diagnostic.Diagnostic `json:"-"`
 }
 
 // Descriptor is the portable Collection Definition stored at
@@ -209,16 +211,16 @@ type Descriptor = portable.CollectionDefinition
 
 type DescriptorObservation struct {
 	Preferences            DiscoveryPreferences
-	SourceID               artifactstore.SourceID
+	SourceID               basespec.SourceID
 	Generation             string
-	ExpectedContentDigests map[artifactstore.Locator]artifactstore.Digest
+	ExpectedContentDigests map[basespec.Locator]cryptoutil.Digest
 }
 
 type attachmentOperation struct {
-	role                                 artifactstore.AttachmentRole
+	role                                 basespec.AttachmentRole
 	canAttach                            bool
 	isPrimary                            bool
-	requiredSourceKind                   artifactstore.SourceKind
+	requiredSourceKind                   basespec.SourceKind
 	defaultAuthoritative                 bool
 	includeReadmeWhenRequested           bool
 	appliesWorkspaceDiscoveryPreferences bool
@@ -228,8 +230,8 @@ type attachmentOperation struct {
 type DefinitionValidator func(definition.Definition) error
 
 type ArtifactSupport struct {
-	Kind      artifactstore.ArtifactKind
-	SchemaID  artifactstore.SchemaID
-	DecoderID artifactstore.DecoderID
+	Kind      basespec.ArtifactKind
+	SchemaID  basespec.SchemaID
+	DecoderID basespec.DecoderID
 	Validator DefinitionValidator
 }

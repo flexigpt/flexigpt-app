@@ -11,7 +11,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 )
 
@@ -397,7 +397,7 @@ type resolvedDefinitionRefs struct {
 
 func (s *SkillRuntime) resolveAllowSkillRefs(
 	ctx context.Context,
-	workspaceScope *artifactstore.CollectionRef,
+	workspaceScope *basespec.CollectionRef,
 	refs []spec.SkillRef,
 ) resolvedAllowSkillRefs {
 	output := resolvedAllowSkillRefs{
@@ -550,7 +550,7 @@ func validateSkillRef(ref spec.SkillRef) error {
 }
 
 func validateWorkspaceScopeForRefs(
-	workspace *artifactstore.CollectionRef,
+	workspace *basespec.CollectionRef,
 	refs []spec.SkillRef,
 ) error {
 	if workspace != nil {

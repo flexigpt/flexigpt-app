@@ -6,12 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
@@ -24,57 +25,57 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	catalogErr := error(nil)
 
 	store := &engineTestCollectionStore{
-		getFn: func(_ context.Context, ref artifactstore.CollectionRef) (collectionValue collection.Collection, err error) {
+		getFn: func(_ context.Context, ref basespec.CollectionRef) (collectionValue collection.Collection, err error) {
 			if ref != workspace.Collection.Ref() {
-				return collection.Collection{}, artifactstore.ErrCollectionNotFound
+				return collection.Collection{}, basespec.ErrCollectionNotFound
 			}
 			return workspace.Collection, nil
 		},
-		listAttachmentsFn: func(_ context.Context, ref artifactstore.CollectionRef) ([]collection.Attachment, error) {
+		listAttachmentsFn: func(_ context.Context, ref basespec.CollectionRef) ([]collection.Attachment, error) {
 			if ref != workspace.Collection.Ref() {
-				return nil, artifactstore.ErrCollectionNotFound
+				return nil, basespec.ErrCollectionNotFound
 			}
 			return append([]collection.Attachment(nil), workspace.Attachments...), nil
 		},
 	}
 	sources := engineTestSources{
-		getFn: func(_ context.Context, rootID artifactstore.RootID, sourceID artifactstore.SourceID) (source.Summary, error) {
+		getFn: func(_ context.Context, rootID basespec.RootID, sourceID basespec.SourceID) (source.Summary, error) {
 			if rootID != workspace.Collection.RootID {
-				return source.Summary{}, artifactstore.ErrSourceNotFound
+				return source.Summary{}, basespec.ErrSourceNotFound
 			}
 			for _, item := range workspace.Sources {
 				if item.ID == sourceID {
 					return item, nil
 				}
 			}
-			return source.Summary{}, artifactstore.ErrSourceNotFound
+			return source.Summary{}, basespec.ErrSourceNotFound
 		},
 	}
 	workspaces, err := NewService(store, sources, "policy.v1")
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
-	catalogs := engineTestCatalogs{getFn: func(context.Context, artifactstore.CollectionRef) (catalog.Snapshot, error) {
+	catalogs := engineTestCatalogs{getFn: func(context.Context, basespec.CollectionRef) (catalog.Snapshot, error) {
 		return snapshot, catalogErr
 	}}
 	artifacts := engineTestArtifacts{
-		getFn: func(_ context.Context, ref artifactstore.ArtifactRef) (artifact.Artifact, error) {
+		getFn: func(_ context.Context, ref basespec.ArtifactRef) (artifact.Artifact, error) {
 			if ref == record.Ref() {
 				return record, nil
 			}
-			return artifact.Artifact{}, artifactstore.ErrArtifactNotFound
+			return artifact.Artifact{}, basespec.ErrArtifactNotFound
 		},
-		listFn: func(_ context.Context, ref artifactstore.CollectionRef) ([]artifact.Artifact, error) {
+		listFn: func(_ context.Context, ref basespec.CollectionRef) ([]artifact.Artifact, error) {
 			if ref != workspace.Collection.Ref() {
-				return nil, artifactstore.ErrCollectionNotFound
+				return nil, basespec.ErrCollectionNotFound
 			}
 			return []artifact.Artifact{record}, nil
 		},
 	}
 	definitions := engineTestDefinitions{
-		getFn: func(_ context.Context, rootID artifactstore.RootID, digest artifactstore.Digest) (definition.Definition, error) {
+		getFn: func(_ context.Context, rootID basespec.RootID, digest cryptoutil.Digest) (definition.Definition, error) {
 			if rootID != workspace.Collection.RootID || digest != definitionValue.Digest {
-				return definition.Definition{}, artifactstore.ErrDefinitionNotFound
+				return definition.Definition{}, basespec.ErrDefinitionNotFound
 			}
 			return definitionValue, nil
 		},
@@ -84,7 +85,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 		catalogs,
 		artifacts,
 		definitions,
-		func() (artifactstore.Digest, error) { return snapshot.DecoderFingerprint, nil },
+		func() (cryptoutil.Digest, error) { return snapshot.DecoderFingerprint, nil },
 		"policy.v1",
 		ArtifactSupport{
 			Kind:      "test.kind",
@@ -158,7 +159,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	plan, err := query.ComposeLoadPlan(
 		t.Context(),
 		workspace.Collection.Ref(),
-		[]artifactstore.ArtifactRef{record.Ref()},
+		[]basespec.ArtifactRef{record.Ref()},
 	)
 	if err != nil || len(plan.Items) != 1 || plan.Items[0].Definition.Digest != definitionValue.Digest ||
 		plan.Items[0].SourceGeneration != snapshot.SourceGenerations[record.Binding.SourceID] {
@@ -167,7 +168,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	if _, err := query.ComposeLoadPlan(
 		t.Context(),
 		workspace.Collection.Ref(),
-		[]artifactstore.ArtifactRef{record.Ref(), record.Ref()},
+		[]basespec.ArtifactRef{record.Ref(), record.Ref()},
 	); !errors.Is(
 		err,
 		ErrInvalidWorkspace,
@@ -175,7 +176,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 		t.Fatalf("duplicate load-plan artifact error=%v", err)
 	}
 
-	catalogErr = artifactstore.ErrCatalogStale
+	catalogErr = basespec.ErrCatalogStale
 	view, err = query.Catalog(t.Context(), workspace.Collection.Ref())
 	if err != nil || view.CatalogCurrent || len(view.FreshnessDiagnostics) == 0 ||
 		view.FreshnessDiagnostics[0].Code != DiagnosticCodeCatalogStale {
@@ -187,7 +188,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 		Reference{Artifact: new(record.Ref())},
 	); !errors.Is(
 		err,
-		artifactstore.ErrCatalogStale,
+		basespec.ErrCatalogStale,
 	) {
 		t.Fatalf("stale Resolve error=%v, want ErrCatalogStale", err)
 	}
@@ -236,7 +237,7 @@ func queryTestDefinition(t *testing.T) definition.Definition {
 	return value
 }
 
-func queryTestArtifact(t *testing.T, workspace Workspace, digest artifactstore.Digest) artifact.Artifact {
+func queryTestArtifact(t *testing.T, workspace Workspace, digest cryptoutil.Digest) artifact.Artifact {
 	t.Helper()
 	raw, err := EncodeArtifactData(ArtifactData{})
 	if err != nil {
@@ -247,7 +248,7 @@ func queryTestArtifact(t *testing.T, workspace Workspace, digest artifactstore.D
 		ID:           "019d3150-7205-7a6b-a34e-d9032342bc31",
 		RootID:       workspace.Collection.RootID,
 		CollectionID: workspace.Collection.ID,
-		Binding: artifactstore.SourceBinding{
+		Binding: basespec.SourceBinding{
 			SourceID:     workspace.PrimarySourceID,
 			Locator:      "docs/first.md",
 			ExpectedKind: "test.kind",
@@ -267,30 +268,30 @@ func queryTestArtifact(t *testing.T, workspace Workspace, digest artifactstore.D
 
 func queryTestSnapshot(
 	workspace Workspace,
-	digest artifactstore.Digest,
-	binding artifactstore.SourceBinding,
+	digest cryptoutil.Digest,
+	binding basespec.SourceBinding,
 ) catalog.Snapshot {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	sourceContent := artifactstore.DigestBytes([]byte("source"))
+	sourceContent := cryptoutil.DigestBytes([]byte("source"))
 	return catalog.Snapshot{
 		RootID:             workspace.Collection.RootID,
 		CollectionID:       workspace.Collection.ID,
 		Revision:           1,
 		CollectionRevision: workspace.Collection.Revision,
-		AttachmentRevisions: map[artifactstore.SourceID]uint64{
+		AttachmentRevisions: map[basespec.SourceID]uint64{
 			workspace.Attachments[0].SourceID: workspace.Attachments[0].Revision,
 			workspace.Attachments[1].SourceID: workspace.Attachments[1].Revision,
 		},
-		SourceRevisions: map[artifactstore.SourceID]uint64{
+		SourceRevisions: map[basespec.SourceID]uint64{
 			workspace.Sources[0].ID: workspace.Sources[0].Revision,
 			workspace.Sources[1].ID: workspace.Sources[1].Revision,
 		},
-		SourceGenerations: map[artifactstore.SourceID]string{
+		SourceGenerations: map[basespec.SourceID]string{
 			workspace.Sources[0].ID: "generation-primary",
 			workspace.Sources[1].ID: "generation-attached",
 		},
-		PlanFingerprint:    artifactstore.DigestBytes([]byte("plan")),
-		DecoderFingerprint: artifactstore.DigestBytes([]byte("decoders")),
+		PlanFingerprint:    cryptoutil.DigestBytes([]byte("plan")),
+		DecoderFingerprint: cryptoutil.DigestBytes([]byte("decoders")),
 		PublishedAt:        now,
 		Occurrences: []catalog.Occurrence{{
 			RootID:       workspace.Collection.RootID,

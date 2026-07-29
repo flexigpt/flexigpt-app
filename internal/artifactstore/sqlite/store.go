@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
 
 	_ "github.com/glebarez/go-sqlite"
@@ -28,11 +28,11 @@ func Open(
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: SQLite context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if strings.TrimSpace(path) == "" {
-		return nil, fmt.Errorf("%w: SQLite path is empty", artifactstore.ErrInvalid)
+		return nil, fmt.Errorf("%w: SQLite path is empty", basespec.ErrInvalid)
 	}
 	absolute, err := filepath.Abs(path)
 	if err != nil {
@@ -42,7 +42,7 @@ func Open(
 	if strings.HasPrefix(filepath.VolumeName(path), `\\`) {
 		return nil, fmt.Errorf(
 			"%w: SQLite database paths on UNC or device shares are unsupported",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 		)
 	}
 	if err := prepareDatabaseFile(path); err != nil {
@@ -116,7 +116,7 @@ func applySchemaMigrations(
 			if fingerprint != migration.fingerprint {
 				return fmt.Errorf(
 					"%w: artifact schema migration %d has fingerprint %q",
-					artifactstore.ErrUnsupported,
+					basespec.ErrUnsupported,
 					migration.version,
 					fingerprint,
 				)
@@ -187,7 +187,7 @@ func validateAppliedSchemaMigrations(
 		if expectedIndex >= len(values) {
 			return fmt.Errorf(
 				"%w: artifact metadata database contains unknown migration %d",
-				artifactstore.ErrUnsupported,
+				basespec.ErrUnsupported,
 				version,
 			)
 		}
@@ -195,7 +195,7 @@ func validateAppliedSchemaMigrations(
 		if version != expected.version {
 			return fmt.Errorf(
 				"%w: artifact metadata migration ledger is not an ordered prefix; expected migration %d before %d",
-				artifactstore.ErrUnsupported,
+				basespec.ErrUnsupported,
 				expected.version,
 				version,
 			)
@@ -203,7 +203,7 @@ func validateAppliedSchemaMigrations(
 		if fingerprint != expected.fingerprint {
 			return fmt.Errorf(
 				"%w: artifact schema migration %d has fingerprint %q",
-				artifactstore.ErrUnsupported,
+				basespec.ErrUnsupported,
 				version,
 				fingerprint,
 			)
@@ -222,20 +222,20 @@ func validateSchemaMigrations(values []migration) error {
 		if value.version <= previousVersion {
 			return fmt.Errorf(
 				"%w: artifact schema migrations must have strictly increasing versions",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		if strings.TrimSpace(value.fingerprint) == "" {
 			return fmt.Errorf(
 				"%w: artifact schema migration %d has no fingerprint",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				value.version,
 			)
 		}
 		if strings.TrimSpace(value.sql) == "" {
 			return fmt.Errorf(
 				"%w: artifact schema migration %d has no SQL",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				value.version,
 			)
 		}
@@ -251,7 +251,7 @@ func prepareDatabaseFile(path string) error {
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf(
 				"%w: SQLite path must identify a regular file",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 	case errors.Is(err, os.ErrNotExist):

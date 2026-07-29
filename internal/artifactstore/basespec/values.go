@@ -1,4 +1,4 @@
-package artifactstore
+package basespec
 
 import (
 	"context"
@@ -13,21 +13,17 @@ import (
 )
 
 const (
-	DigestSHA256Prefix = "sha256:"
+	MaxKindBytes             = 128
+	MaxFingerprintBytes      = 128
+	MaxSchemaIDBytes         = 256
+	MaxDisplayNameBytes      = 256
+	MaxDescriptionBytes      = 16 * 1024
+	MaxLogicalNameBytes      = 256
+	MaxURIBytes              = 16 * 1024
+	MaxVersionBytes          = 256
+	MaxSourceGenerationBytes = 1024
+	MaxLocatorBytes          = 4096
 
-	MaxKindBytes              = 128
-	MaxFingerprintBytes       = 128
-	MaxSchemaIDBytes          = 256
-	MaxDisplayNameBytes       = 256
-	MaxDescriptionBytes       = 16 * 1024
-	MaxLogicalNameBytes       = 256
-	MaxURIBytes               = 16 * 1024
-	MaxVersionBytes           = 256
-	MaxSourceGenerationBytes  = 1024
-	MaxLocatorBytes           = 4096
-	MaxDiagnosticCodeBytes    = 128
-	MaxDiagnosticMessageBytes = 4096
-	MaxDiagnostics            = 128
 	MaxLabels                 = 64
 	MaxLabelValueBytes        = 256
 	MaxConfigBytes            = 1 << 20
@@ -55,7 +51,7 @@ var (
 	identifierPattern = regexp.MustCompile(
 		`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`,
 	)
-	digestPattern            = regexp.MustCompile(`^` + DigestSHA256Prefix + `[0-9a-f]{64}$`)
+
 	windowsReservedPathNames = map[string]struct{}{
 		"CON":  {},
 		"PRN":  {},
@@ -81,9 +77,9 @@ type (
 	DecoderID          string
 	Locator            string
 	SubresourceLocator string
-	Digest             string
-	LogicalName        string
-	LogicalVersion     string
+
+	LogicalName    string
+	LogicalVersion string
 )
 
 type CollectionRef struct {
@@ -230,16 +226,6 @@ func ValidateSourceGeneration(value string) error {
 		value,
 		MaxSourceGenerationBytes,
 	)
-}
-
-func ValidateDigest(value Digest) error {
-	if !digestPattern.MatchString(string(value)) {
-		return fmt.Errorf(
-			"%w: digest must be sha256:<64 lowercase hexadecimal characters>",
-			ErrInvalid,
-		)
-	}
-	return nil
 }
 
 func ValidateLogicalName(value LogicalName) error {

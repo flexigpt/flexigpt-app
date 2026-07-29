@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 const (
-	sourceTestRootID artifactstore.RootID   = "019d3150-6a1a-7a6b-a34e-d9032342bc31"
-	sourceTestID     artifactstore.SourceID = "019d3150-6a1b-7a6b-a34e-d9032342bc31"
+	sourceTestRootID basespec.RootID   = "019d3150-6a1a-7a6b-a34e-d9032342bc31"
+	sourceTestID     basespec.SourceID = "019d3150-6a1b-7a6b-a34e-d9032342bc31"
 )
 
 func sourceTestValue() Source {
@@ -77,7 +77,7 @@ func TestSourceCloneAndManagedPublicationNormalizationOwnMutableData(t *testing.
 		{Locator: "Readme.md", Content: []byte("one")},
 		{Locator: "README.md", Content: []byte("two")},
 	}
-	if _, err := NormalizeManagedPackagePublication(collision); !errors.Is(err, artifactstore.ErrInvalid) {
+	if _, err := NormalizeManagedPackagePublication(collision); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("case collision error=%v, want ErrInvalid", err)
 	}
 }
@@ -90,21 +90,21 @@ type sourceTestSnapshot struct {
 
 func (s *sourceTestSnapshot) Generation() string { return s.generation }
 
-func (s *sourceTestSnapshot) Stat(ctx context.Context, _ artifactstore.Locator) (Entry, error) {
+func (s *sourceTestSnapshot) Stat(ctx context.Context, _ basespec.Locator) (Entry, error) {
 	if err := ctx.Err(); err != nil {
 		return Entry{}, err
 	}
-	return Entry{}, artifactstore.ErrNotFound
+	return Entry{}, basespec.ErrNotFound
 }
 
-func (s *sourceTestSnapshot) ReadDir(ctx context.Context, _ artifactstore.Locator) ([]Entry, error) {
+func (s *sourceTestSnapshot) ReadDir(ctx context.Context, _ basespec.Locator) ([]Entry, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return nil, artifactstore.ErrNotFound
+	return nil, basespec.ErrNotFound
 }
 
-func (s *sourceTestSnapshot) Open(ctx context.Context, _ artifactstore.Locator) (io.ReadCloser, error) {
+func (s *sourceTestSnapshot) Open(ctx context.Context, _ basespec.Locator) (io.ReadCloser, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (s *sourceTestSnapshot) Close() error {
 }
 
 type sourceTestAdapter struct {
-	kind       artifactstore.SourceKind
+	kind       basespec.SourceKind
 	generation string
 	localPath  string
 
@@ -131,7 +131,7 @@ type sourceTestAdapter struct {
 	removals     int
 }
 
-func (a *sourceTestAdapter) Kind() artifactstore.SourceKind { return a.kind }
+func (a *sourceTestAdapter) Kind() basespec.SourceKind { return a.kind }
 
 func (a *sourceTestAdapter) NormalizeConfig(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
 	if err := ctx.Err(); err != nil {
@@ -156,7 +156,7 @@ func (a *sourceTestAdapter) Open(ctx context.Context, value Source) (Snapshot, e
 func (a *sourceTestAdapter) ResolveLocalPath(
 	ctx context.Context,
 	_ Source,
-	_ artifactstore.Locator,
+	_ basespec.Locator,
 ) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -181,7 +181,7 @@ func (a *sourceTestAdapter) PublishPackage(
 func (a *sourceTestAdapter) RemovePackage(
 	ctx context.Context,
 	_ Source,
-	_ artifactstore.Locator,
+	_ basespec.Locator,
 	_ string,
 ) error {
 	if err := ctx.Err(); err != nil {
@@ -197,8 +197,8 @@ type sourceTestReader struct{ value Source }
 
 func (r sourceTestReader) Get(
 	context.Context,
-	artifactstore.RootID,
-	artifactstore.SourceID,
+	basespec.RootID,
+	basespec.SourceID,
 ) (Source, error) {
 	return r.value, nil
 }

@@ -3,7 +3,7 @@ package workspace
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
@@ -40,7 +40,7 @@ func newComponents(
 		return nil, err
 	}
 	profiles := config.normalizedDiscoveryProfiles(skillConventions)
-	decoderIDs := make([]artifactstore.DecoderID, 0, len(supports))
+	decoderIDs := make([]basespec.DecoderID, 0, len(supports))
 	for _, support := range supports {
 		if !dependencies.HasDecoder(support.DecoderID) {
 			return nil, fmt.Errorf(

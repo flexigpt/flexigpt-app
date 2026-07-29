@@ -1,11 +1,43 @@
-package artifactstore
+package basespec
 
 import (
 	"errors"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
+
+func TestValidatePortableLocatorRejectsPlatformSpecificNames(t *testing.T) {
+	t.Parallel()
+
+	invalid := []Locator{
+		"package/name<invalid",
+		"package/name>invalid",
+		`package/name"invalid`,
+		"package/name|invalid",
+		"package/name?invalid",
+		"package/name*invalid",
+		Locator(strings.Repeat("a", maxPortablePathSegmentBytes+1)),
+	}
+
+	for _, locator := range invalid {
+		t.Run(string(locator), func(t *testing.T) {
+			t.Parallel()
+			if err := ValidatePortableLocator(locator, false); err == nil {
+				t.Fatalf("ValidatePortableLocator(%q) succeeded", locator)
+			}
+		})
+	}
+
+	if err := ValidatePortableLocator(
+		"packages/example/SKILL.md",
+		false,
+	); err != nil {
+		t.Fatalf("ValidatePortableLocator(valid): %v", err)
+	}
+}
 
 func TestValueValidationBoundariesAndPlatformSafety(t *testing.T) {
 	t.Parallel()
@@ -52,55 +84,6 @@ func TestValueValidationBoundariesAndPlatformSafety(t *testing.T) {
 	}
 }
 
-func TestDiagnosticsAreBoundedOwnedAndErrorPreserving(t *testing.T) {
-	t.Parallel()
-
-	message := BoundedDiagnosticMessage("\x00  hello\t" + strings.Repeat("é", MaxDiagnosticMessageBytes))
-	if err := ValidateRequiredText("diagnostic message", message, MaxDiagnosticMessageBytes); err != nil {
-		t.Fatalf("bounded message is invalid: %v; message=%q", err, message)
-	}
-	if len(message) > MaxDiagnosticMessageBytes {
-		t.Fatalf("bounded message length=%d, maximum=%d", len(message), MaxDiagnosticMessageBytes)
-	}
-	if !strings.HasSuffix(message, "...") {
-		t.Fatalf("bounded long message=%q, want ellipsis", message)
-	}
-
-	location := &DiagnosticLocation{Locator: "file.json", Line: 3, Column: 7}
-	original := []Diagnostic{{
-		Severity: DiagnosticError,
-		Code:     "test.error",
-		Message:  "failure",
-		Location: location,
-	}}
-	cloned := CloneDiagnostics(original)
-	location.Line = 99
-	if cloned[0].Location == nil || cloned[0].Location.Line != 3 {
-		t.Fatalf("CloneDiagnostics did not clone location: %#v", cloned)
-	}
-
-	errorsOnly := make([]Diagnostic, 0, MaxDiagnostics)
-	for range MaxDiagnostics {
-		errorsOnly = append(errorsOnly, Diagnostic{
-			Severity: DiagnosticError,
-			Code:     "test.error",
-			Message:  "must remain",
-		})
-	}
-	trimmed := AppendDiagnostics(errorsOnly,
-		Diagnostic{Severity: DiagnosticWarning, Code: "test.warning", Message: "drop first"},
-		Diagnostic{Severity: DiagnosticInfo, Code: "test.info", Message: "drop second"},
-	)
-	if len(trimmed) != MaxDiagnostics {
-		t.Fatalf("trimmed diagnostics=%d, want %d", len(trimmed), MaxDiagnostics)
-	}
-	for index, diagnostic := range trimmed {
-		if diagnostic.Severity != DiagnosticError {
-			t.Fatalf("diagnostic %d=%#v, errors must be preserved", index, diagnostic)
-		}
-	}
-}
-
 func TestValueValidationIsSafeForConcurrentCallers(t *testing.T) {
 	t.Parallel()
 
@@ -112,7 +95,7 @@ func TestValueValidationIsSafeForConcurrentCallers(t *testing.T) {
 			if err := ValidatePortableLocator("portable/path.json", false); err != nil {
 				errorsSeen <- err
 			}
-			if err := ValidateDigest(DigestBytes([]byte("stable content"))); err != nil {
+			if err := cryptoutil.ValidateDigest(cryptoutil.DigestBytes([]byte("stable content"))); err != nil {
 				errorsSeen <- err
 			}
 		})

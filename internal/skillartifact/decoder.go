@@ -9,10 +9,11 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Decoder struct {
@@ -23,13 +24,13 @@ func NewDecoder(policy LocatorPolicy) (*Decoder, error) {
 	if policy == nil {
 		return nil, fmt.Errorf(
 			"%w: agent Skill locator policy is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return &Decoder{policy: policy}, nil
 }
 
-func (*Decoder) ID() artifactstore.DecoderID {
+func (*Decoder) ID() basespec.DecoderID {
 	return DecoderID
 }
 
@@ -57,7 +58,7 @@ func (d *Decoder) Recognize(
 func (d *Decoder) Decode(
 	_ context.Context,
 	candidate discovery.Candidate,
-) ([]discovery.Decoded, []artifactstore.Diagnostic) {
+) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	expectedName, supported := d.policy.ExpectedName(candidate.Locator)
 	if !supported {
 		if !candidate.RequestsDecoder(DecoderID) ||
@@ -114,9 +115,9 @@ func (d *Decoder) Decode(
 	if err != nil {
 		return nil, errorDiagnostics(candidate.Locator, err)
 	}
-	raw, err = jsoncanon.CanonicalizeObject(
+	raw, err = jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxDefinitionBodyBytes,
+		basespec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return nil, errorDiagnostics(candidate.Locator, err)
@@ -125,7 +126,7 @@ func (d *Decoder) Decode(
 		Kind:          Kind,
 		SchemaID:      SchemaID,
 		SchemaVersion: SchemaVersion,
-		LogicalName:   artifactstore.LogicalName(document.Name),
+		LogicalName:   basespec.LogicalName(document.Name),
 		DisplayName:   document.DisplayName,
 		Description:   document.Description,
 		Labels: map[string]string{
@@ -141,37 +142,37 @@ func (d *Decoder) Decode(
 }
 
 func errorDiagnostics(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 	err error,
-) []artifactstore.Diagnostic {
-	return []artifactstore.Diagnostic{{
-		Severity: artifactstore.DiagnosticError,
+) []diagnostic.Diagnostic {
+	return []diagnostic.Diagnostic{{
+		Severity: diagnostic.DiagnosticError,
 		Code:     "agent.skill.invalid",
-		Message:  artifactstore.BoundedDiagnosticMessage(err.Error()),
-		Location: &artifactstore.DiagnosticLocation{
+		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
+		Location: &diagnostic.DiagnosticLocation{
 			Locator: locator,
 		},
 	}}
 }
 
 func warningDiagnostics(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 	warnings []string,
-) []artifactstore.Diagnostic {
-	output := make([]artifactstore.Diagnostic, 0, len(warnings))
+) []diagnostic.Diagnostic {
+	output := make([]diagnostic.Diagnostic, 0, len(warnings))
 	for _, warning := range warnings {
-		if len(output) == artifactstore.MaxDiagnostics {
+		if len(output) == diagnostic.MaxDiagnostics {
 			break
 		}
 		warning = strings.TrimSpace(warning)
 		if warning == "" {
 			continue
 		}
-		output = append(output, artifactstore.Diagnostic{
-			Severity: artifactstore.DiagnosticWarning,
+		output = append(output, diagnostic.Diagnostic{
+			Severity: diagnostic.DiagnosticWarning,
 			Code:     "agent.skill.parse-warning",
-			Message:  artifactstore.BoundedDiagnosticMessage(warning),
-			Location: &artifactstore.DiagnosticLocation{
+			Message:  diagnostic.BoundedDiagnosticMessage(warning),
+			Location: &diagnostic.DiagnosticLocation{
 				Locator: locator,
 			},
 		})

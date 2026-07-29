@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Plan struct {
@@ -21,14 +22,14 @@ type Plan struct {
 }
 
 func (p Plan) Validate() error {
-	if err := artifactstore.ValidateOptionalText(
+	if err := basespec.ValidateOptionalText(
 		"discovery plan revision",
 		p.Revision,
-		artifactstore.MaxVersionBytes,
+		basespec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
-	seen := make(map[artifactstore.SourceID]struct{}, len(p.Sources))
+	seen := make(map[basespec.SourceID]struct{}, len(p.Sources))
 	for index, sourcePlan := range p.Sources {
 		if err := sourcePlan.Validate(); err != nil {
 			return fmt.Errorf("source plan %d: %w", index, err)
@@ -36,7 +37,7 @@ func (p Plan) Validate() error {
 		if _, duplicate := seen[sourcePlan.SourceID]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate source plan for %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				sourcePlan.SourceID,
 			)
 		}
@@ -45,8 +46,8 @@ func (p Plan) Validate() error {
 	return nil
 }
 
-func (p Plan) BySource() map[artifactstore.SourceID]SourcePlan {
-	output := make(map[artifactstore.SourceID]SourcePlan, len(p.Sources))
+func (p Plan) BySource() map[basespec.SourceID]SourcePlan {
+	output := make(map[basespec.SourceID]SourcePlan, len(p.Sources))
 	for _, value := range p.Sources {
 		value = value.Normalized()
 		output[value.SourceID] = value
@@ -59,7 +60,7 @@ type fp struct {
 	Sources  []SourcePlan `json:"sources"`
 }
 
-func (p Plan) Fingerprint() (artifactstore.Digest, error) {
+func (p Plan) Fingerprint() (cryptoutil.Digest, error) {
 	if err := p.Validate(); err != nil {
 		return "", err
 	}
@@ -82,9 +83,9 @@ func (p Plan) Fingerprint() (artifactstore.Digest, error) {
 	if err != nil {
 		return "", err
 	}
-	canonical, err := jsoncanon.Canonicalize(raw)
+	canonical, err := jsonutil.Canonicalize(raw)
 	if err != nil {
 		return "", err
 	}
-	return artifactstore.DigestBytes(canonical), nil
+	return cryptoutil.DigestBytes(canonical), nil
 }

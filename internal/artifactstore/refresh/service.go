@@ -8,12 +8,14 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Service struct {
@@ -25,7 +27,7 @@ type Service struct {
 	definitions definition.Repository
 	reconciler  *artifact.Reconciler
 	publisher   Publisher
-	clock       artifactstore.Clock
+	clock       basespec.Clock
 }
 
 func NewService(
@@ -37,7 +39,7 @@ func NewService(
 	definitions definition.Repository,
 	reconciler *artifact.Reconciler,
 	publisher Publisher,
-	clock artifactstore.Clock,
+	clock basespec.Clock,
 ) (*Service, error) {
 	if collections == nil ||
 		catalogs == nil ||
@@ -50,7 +52,7 @@ func NewService(
 		clock == nil {
 		return nil, fmt.Errorf(
 			"%w: refresh service dependencies are incomplete",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -68,12 +70,12 @@ func NewService(
 
 func (s *Service) Refresh(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	plan discovery.Plan,
 	policy artifact.Policy,
 ) (Result, error) {
 	if ctx == nil {
-		return Result{}, fmt.Errorf("%w: refresh context is nil", artifactstore.ErrInvalid)
+		return Result{}, fmt.Errorf("%w: refresh context is nil", basespec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return Result{}, err
@@ -81,7 +83,7 @@ func (s *Service) Refresh(
 	if policy == nil {
 		return Result{}, fmt.Errorf(
 			"%w: artifact adoption policy is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ref.Validate(); err != nil {
@@ -98,17 +100,17 @@ func (s *Service) Refresh(
 	if err := collectionValue.Validate(); err != nil {
 		return Result{}, fmt.Errorf(
 			"%w: collection reader returned an invalid collection: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
 	if collectionValue.Ref() != ref {
-		return Result{}, fmt.Errorf("%w: collection reader returned another collection", artifactstore.ErrInvalid)
+		return Result{}, fmt.Errorf("%w: collection reader returned another collection", basespec.ErrInvalid)
 	}
 	if !collectionValue.Enabled {
 		return Result{}, fmt.Errorf(
 			"%w: collection %q is disabled",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			ref.CollectionID,
 		)
 	}
@@ -122,14 +124,14 @@ func (s *Service) Refresh(
 
 	var previous catalog.Snapshot
 	previous, err = catalog.ReadCurrent(ctx, s.catalogs, ref)
-	hasPrevious := err == nil || errors.Is(err, artifactstore.ErrCatalogStale)
+	hasPrevious := err == nil || errors.Is(err, basespec.ErrCatalogStale)
 	if !hasPrevious &&
-		!errors.Is(err, artifactstore.ErrCatalogUnavailable) {
+		!errors.Is(err, basespec.ErrCatalogUnavailable) {
 		return Result{}, err
 	}
 
 	previousBySource := make(
-		map[artifactstore.SourceID][]catalog.Occurrence,
+		map[basespec.SourceID][]catalog.Occurrence,
 	)
 	for _, occurrence := range previous.Occurrences {
 		previousBySource[occurrence.Key.SourceID] = append(
@@ -138,12 +140,12 @@ func (s *Service) Refresh(
 		)
 	}
 
-	expectedAttachmentRevisions := make(map[artifactstore.SourceID]uint64)
-	expectedSourceRevisions := make(map[artifactstore.SourceID]uint64)
-	sourceGenerations := make(map[artifactstore.SourceID]string)
+	expectedAttachmentRevisions := make(map[basespec.SourceID]uint64)
+	expectedSourceRevisions := make(map[basespec.SourceID]uint64)
+	sourceGenerations := make(map[basespec.SourceID]string)
 	finalOccurrences := make([]catalog.Occurrence, 0)
-	allDiagnostics := make([]artifactstore.Diagnostic, 0)
-	discoveredDefinitions := make(map[artifactstore.Digest]definition.Definition)
+	allDiagnostics := make([]diagnostic.Diagnostic, 0)
+	discoveredDefinitions := make(map[cryptoutil.Digest]definition.Definition)
 
 	snapshots := make([]source.Snapshot, 0)
 	candidates := 0
@@ -161,19 +163,19 @@ func (s *Service) Refresh(
 		if err := attachment.Validate(); err != nil {
 			return Result{}, fmt.Errorf(
 				"%w: collection reader returned an invalid attachment: %w",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				err,
 			)
 		}
 		if attachment.RootID != ref.RootID ||
 			attachment.CollectionID != ref.CollectionID {
-			return Result{}, fmt.Errorf("%w: attachment belongs to another collection", artifactstore.ErrInvalid)
+			return Result{}, fmt.Errorf("%w: attachment belongs to another collection", basespec.ErrInvalid)
 		}
 
 		if _, duplicate := expectedAttachmentRevisions[attachment.SourceID]; duplicate {
 			return Result{}, fmt.Errorf(
 				"%w: collection reader returned duplicate attachment source %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				attachment.SourceID,
 			)
 		}
@@ -187,14 +189,14 @@ func (s *Service) Refresh(
 			sourceValue.RootID != ref.RootID {
 			return Result{}, fmt.Errorf(
 				"%w: source runtime returned a source that does not match attachment %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				attachment.SourceID,
 			)
 		}
 		if err := sourceValue.Validate(); err != nil {
 			return Result{}, fmt.Errorf(
 				"%w: source runtime returned an invalid source: %w",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				err,
 			)
 		}
@@ -203,7 +205,7 @@ func (s *Service) Refresh(
 			(!attachment.Enabled || !sourceValue.Enabled) {
 			return Result{}, fmt.Errorf(
 				"%w: discovery plan includes disabled source %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				sourceValue.ID,
 			)
 		}
@@ -217,7 +219,7 @@ func (s *Service) Refresh(
 		if !exists {
 			return Result{}, fmt.Errorf(
 				"%w: enabled source %q has no discovery plan",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				sourceValue.ID,
 			)
 		}
@@ -247,7 +249,7 @@ func (s *Service) Refresh(
 			finalOccurrences,
 			discovered.Occurrences...,
 		)
-		allDiagnostics = artifactstore.AppendDiagnostics(
+		allDiagnostics = diagnostic.AppendDiagnostics(
 			allDiagnostics,
 			discovered.Diagnostics...,
 		)
@@ -259,7 +261,7 @@ func (s *Service) Refresh(
 		if _, exists := expectedSourceRevisions[sourceID]; !exists {
 			return Result{}, fmt.Errorf(
 				"%w: discovery plan includes unattached source %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				sourceID,
 			)
 		}
@@ -267,7 +269,7 @@ func (s *Service) Refresh(
 
 	catalog.SortOccurrences(finalOccurrences)
 
-	digests := make([]artifactstore.Digest, 0, len(discoveredDefinitions))
+	digests := make([]cryptoutil.Digest, 0, len(discoveredDefinitions))
 	for digest := range discoveredDefinitions {
 		digests = append(digests, digest)
 	}
@@ -285,12 +287,12 @@ func (s *Service) Refresh(
 		if err != nil {
 			return Result{}, fmt.Errorf(
 				"%w: definition repository returned an invalid definition: %w",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				err,
 			)
 		}
 		if canonicalStored.Digest != digest {
-			return Result{}, fmt.Errorf("%w: definition repository changed digest", artifactstore.ErrDigestMismatch)
+			return Result{}, fmt.Errorf("%w: definition repository changed digest", basespec.ErrDigestMismatch)
 		}
 	}
 
@@ -316,7 +318,7 @@ func (s *Service) Refresh(
 		return Result{}, err
 	}
 
-	allDiagnostics = artifactstore.AppendDiagnostics(
+	allDiagnostics = diagnostic.AppendDiagnostics(
 		allDiagnostics,
 		reconciliation.Diagnostics...,
 	)
@@ -367,7 +369,7 @@ func (s *Service) Refresh(
 	if err := published.Validate(); err != nil {
 		return Result{}, fmt.Errorf(
 			"%w: publisher returned an invalid catalog: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
@@ -383,7 +385,7 @@ func (s *Service) Refresh(
 		PlanFingerprint:     planFingerprint,
 		DecoderFingerprint:  decoderFingerprint,
 		PublishedAt:         publication.PublishedAt,
-		Diagnostics:         artifactstore.CloneDiagnostics(allDiagnostics),
+		Diagnostics:         diagnostic.CloneDiagnostics(allDiagnostics),
 		Occurrences:         make([]catalog.Occurrence, len(finalOccurrences)),
 	}
 	for index, occurrence := range finalOccurrences {
@@ -392,20 +394,20 @@ func (s *Service) Refresh(
 	if err := expected.Validate(); err != nil {
 		return Result{}, fmt.Errorf(
 			"%w: refresh service produced an invalid expected catalog: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
 	if !catalog.EqualSnapshot(published, expected) {
 		return Result{}, fmt.Errorf(
 			"%w: publisher returned a catalog that does not exactly match the publication",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
 	result := Result{
 		Catalog:     catalog.CloneSnapshot(published),
-		Diagnostics: artifactstore.CloneDiagnostics(allDiagnostics),
+		Diagnostics: diagnostic.CloneDiagnostics(allDiagnostics),
 		Candidates:  candidates,
 	}
 	for _, value := range reconciliation.Creates {

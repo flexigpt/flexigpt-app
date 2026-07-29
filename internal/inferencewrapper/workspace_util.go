@@ -8,7 +8,8 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
@@ -40,7 +41,7 @@ func NewWorkspaceInferenceBridge(
 
 func workspaceScopeForSelection(
 	selection *workspace.ConversationSelection,
-) *artifactstore.CollectionRef {
+) *basespec.CollectionRef {
 	if selection == nil {
 		return nil
 	}
@@ -174,7 +175,7 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 }
 
 func buildWorkspaceContextInput(
-	workspaceRef artifactstore.CollectionRef,
+	workspaceRef basespec.CollectionRef,
 	prompt string,
 ) inferenceSpec.InputUnion {
 	return inferenceSpec.InputUnion{
@@ -200,14 +201,14 @@ func buildWorkspaceContextInput(
 }
 
 func workspaceContextInputID(
-	workspaceRef artifactstore.CollectionRef,
+	workspaceRef basespec.CollectionRef,
 ) string {
 	return workspaceContextInputIDPrefix +
 		string(workspaceRef.RootID) + ":" +
 		string(workspaceRef.CollectionID)
 }
 
-func workspaceArtifactRefKey(ref artifactstore.ArtifactRef) string {
+func workspaceArtifactRefKey(ref basespec.ArtifactRef) string {
 	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
 }
 
@@ -339,10 +340,10 @@ func markWorkspaceSkillSessionUsage(
 
 		if !advertised {
 			current.Status = workspace.ConversationSkillUsageUnavailable
-			current.Diagnostics = artifactstore.AppendDiagnostics(
+			current.Diagnostics = diagnostic.AppendDiagnostics(
 				current.Diagnostics,
-				artifactstore.Diagnostic{
-					Severity: artifactstore.DiagnosticWarning,
+				diagnostic.Diagnostic{
+					Severity: diagnostic.DiagnosticWarning,
 					Code:     "workspace.conversation.skill-not-advertised",
 					Message:  "the selected Workspace Skill was not advertised to the model for this turn",
 				},
@@ -353,10 +354,10 @@ func markWorkspaceSkillSessionUsage(
 		key := workspaceArtifactRefKey(current.Artifact)
 		if _, selectedForSession := enabled[key]; !selectedForSession {
 			current.Status = workspace.ConversationSkillUsageUnavailable
-			current.Diagnostics = artifactstore.AppendDiagnostics(
+			current.Diagnostics = diagnostic.AppendDiagnostics(
 				current.Diagnostics,
-				artifactstore.Diagnostic{
-					Severity: artifactstore.DiagnosticWarning,
+				diagnostic.Diagnostic{
+					Severity: diagnostic.DiagnosticWarning,
 					Code:     "workspace.conversation.skill-not-in-session",
 					Message:  "the selected Workspace Skill was not present in the Skill session allow-list",
 				},
@@ -366,10 +367,10 @@ func markWorkspaceSkillSessionUsage(
 
 		if _, resolved := available[key]; !resolved {
 			current.Status = workspace.ConversationSkillUsageUnavailable
-			current.Diagnostics = artifactstore.AppendDiagnostics(
+			current.Diagnostics = diagnostic.AppendDiagnostics(
 				current.Diagnostics,
-				artifactstore.Diagnostic{
-					Severity: artifactstore.DiagnosticWarning,
+				diagnostic.Diagnostic{
+					Severity: diagnostic.DiagnosticWarning,
 					Code:     "workspace.conversation.skill-session-unavailable",
 					Message:  "the selected Workspace Skill did not resolve into the normal Skill Runtime session",
 				},

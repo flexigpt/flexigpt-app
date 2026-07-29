@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -86,13 +86,13 @@ func TestFilesystemAdapterUsesPortableLocatorsAndDetectsChanges(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "document.txt"), []byte("second"), 0o600); err != nil {
 		t.Fatalf("rewrite document: %v", err)
 	}
-	if err := snapshot.Confirm(t.Context()); !errors.Is(err, artifactstore.ErrConflict) {
+	if err := snapshot.Confirm(t.Context()); !errors.Is(err, basespec.ErrConflict) {
 		t.Fatalf("Confirm after mutation error=%v, want ErrConflict", err)
 	}
 	if err := snapshot.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if _, err := snapshot.Stat(t.Context(), "document.txt"); !errors.Is(err, artifactstore.ErrClosed) {
+	if _, err := snapshot.Stat(t.Context(), "document.txt"); !errors.Is(err, basespec.ErrClosed) {
 		t.Fatalf("Stat after Close error=%v, want ErrClosed", err)
 	}
 }
@@ -106,7 +106,7 @@ func TestFilesystemAdapterRejectsUnportableConfigurationAndPolicy(t *testing.T) 
 		[]byte(`{"rootPath":"relative"}`),
 	); !errors.Is(
 		err,
-		artifactstore.ErrInvalid,
+		basespec.ErrInvalid,
 	) {
 		t.Fatalf("relative config error=%v, want ErrInvalid", err)
 	}

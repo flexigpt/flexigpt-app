@@ -9,14 +9,15 @@ import (
 
 	"github.com/flexigpt/agentskills-go/fsskillprovider"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
 func (s *SkillRuntime) ResyncWorkspace(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 ) error {
 	if err := s.ensureConfigured(); err != nil {
 		return err
@@ -33,10 +34,10 @@ func (s *SkillRuntime) ResyncWorkspace(
 	values, err := s.workspaceSkills.List(ctx, workspace)
 	if err != nil {
 		//nolint:gocritic // Dont want switch.
-		if errors.Is(err, artifactstore.ErrCatalogUnavailable) {
+		if errors.Is(err, basespec.ErrCatalogUnavailable) {
 			values = nil
-		} else if errors.Is(err, artifactstore.ErrCollectionNotFound) ||
-			errors.Is(err, artifactstore.ErrRootNotFound) {
+		} else if errors.Is(err, basespec.ErrCollectionNotFound) ||
+			errors.Is(err, basespec.ErrRootNotFound) {
 			workspaces := cloneWorkspaceDesiredViews(s.managedWorkspaces)
 			delete(workspaces, workspace)
 			return s.reconcilePartitionsLocked(
@@ -55,7 +56,7 @@ func (s *SkillRuntime) ResyncWorkspace(
 	}
 
 	desired := newRuntimeDesiredView()
-	artifactRefs := make([]artifactstore.ArtifactRef, 0, len(values))
+	artifactRefs := make([]basespec.ArtifactRef, 0, len(values))
 	for _, value := range values {
 		if !value.ProjectionValid ||
 			!value.RuntimePathBacked ||
@@ -87,7 +88,7 @@ func (s *SkillRuntime) ResyncWorkspace(
 			if value.Workspace != workspace {
 				return fmt.Errorf(
 					"%w: Workspace Skill load plan returned a Skill from another Workspace",
-					artifactstore.ErrInvalid,
+					basespec.ErrInvalid,
 				)
 			}
 
@@ -118,7 +119,7 @@ func (s *SkillRuntime) ResyncWorkspace(
 
 func (s *SkillRuntime) failClosedWorkspaceLocked(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 	cause error,
 ) error {
 	workspaces := cloneWorkspaceDesiredViews(s.managedWorkspaces)
@@ -149,7 +150,7 @@ func (s *SkillRuntime) failClosedWorkspaceLocked(
 
 func (s *SkillRuntime) RemoveWorkspace(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 ) error {
 	if err := s.ensureConfigured(); err != nil {
 		return err
@@ -172,25 +173,25 @@ func (s *SkillRuntime) RemoveWorkspace(
 
 func (s *SkillRuntime) workspaceDefinitionForArtifact(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
-) (agentskillsSpec.SkillDef, artifactstore.CollectionRef, bool) {
+	ref basespec.ArtifactRef,
+) (agentskillsSpec.SkillDef, basespec.CollectionRef, bool) {
 	if s.workspaceSkills == nil {
-		return agentskillsSpec.SkillDef{}, artifactstore.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
 	}
 	value, err := s.workspaceSkills.LoadArtifact(ctx, ref)
 	if err != nil {
-		return agentskillsSpec.SkillDef{}, artifactstore.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
 	}
 	if err := s.ResyncWorkspace(ctx, value.Workspace); err != nil {
-		return agentskillsSpec.SkillDef{}, artifactstore.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
 	}
 	value, err = s.workspaceSkills.LoadArtifact(ctx, ref)
 	if err != nil {
-		return agentskillsSpec.SkillDef{}, artifactstore.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
 	}
 	definition, err := workspaceRuntimeDefinition(value)
 	if err != nil {
-		return agentskillsSpec.SkillDef{}, artifactstore.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
 	}
 	return definition, value.Workspace, true
 }
@@ -204,7 +205,7 @@ func workspaceRuntimeVersion(value skilladapter.WorkspaceSkill) string {
 		string(value.SourceContentDigest) + "\x00" +
 		value.SourceGeneration
 	return "workspace:" + string(
-		artifactstore.DigestBytes([]byte(input)),
+		cryptoutil.DigestBytes([]byte(input)),
 	)
 }
 
@@ -220,7 +221,7 @@ func workspaceRuntimeDefinition(
 		value.State != artifact.StateAvailable {
 		return agentskillsSpec.SkillDef{}, fmt.Errorf(
 			"%w: Workspace Skill is not eligible for runtime registration",
-			artifactstore.ErrCatalogStale,
+			basespec.ErrCatalogStale,
 		)
 	}
 
@@ -228,7 +229,7 @@ func workspaceRuntimeDefinition(
 	if location == "" || !filepath.IsAbs(location) {
 		return agentskillsSpec.SkillDef{}, fmt.Errorf(
 			"%w: Workspace Skill runtime location is not an absolute filesystem path",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return agentskillsSpec.SkillDef{

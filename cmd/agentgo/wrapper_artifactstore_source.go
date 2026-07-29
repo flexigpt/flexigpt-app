@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
@@ -14,14 +14,14 @@ import (
 // include local filesystem paths or provider credentials and is never returned
 // from a public Artifact Store API.
 type ArtifactSourceDraft struct {
-	Kind        artifactstore.SourceKind `json:"kind"        required:"true"`
-	DisplayName string                   `json:"displayName" required:"true"`
-	Enabled     bool                     `json:"enabled"`
-	Config      json.RawMessage          `json:"config"`
+	Kind        basespec.SourceKind `json:"kind"        required:"true"`
+	DisplayName string              `json:"displayName" required:"true"`
+	Enabled     bool                `json:"enabled"`
+	Config      json.RawMessage     `json:"config"`
 }
 
 type CreateArtifactSourceRequest struct {
-	RootID artifactstore.RootID `path:"rootID" required:"true"`
+	RootID basespec.RootID `path:"rootID" required:"true"`
 	Body   *ArtifactSourceDraft
 }
 
@@ -55,8 +55,8 @@ func (w *ArtifactStoreWrapper) CreateArtifactSource(
 }
 
 type GetArtifactSourceRequest struct {
-	RootID   artifactstore.RootID   `path:"rootID"   required:"true"`
-	SourceID artifactstore.SourceID `path:"sourceID" required:"true"`
+	RootID   basespec.RootID   `path:"rootID"   required:"true"`
+	SourceID basespec.SourceID `path:"sourceID" required:"true"`
 }
 
 type GetArtifactSourceResponse struct {
@@ -83,7 +83,7 @@ func (w *ArtifactStoreWrapper) GetArtifactSource(
 }
 
 type ListArtifactSourcesRequest struct {
-	RootID artifactstore.RootID `path:"rootID" required:"true"`
+	RootID basespec.RootID `path:"rootID" required:"true"`
 }
 
 type ListArtifactSourcesResponseBody struct {
@@ -122,8 +122,8 @@ type UpdateArtifactSourceRequestBody struct {
 }
 
 type UpdateArtifactSourceRequest struct {
-	RootID   artifactstore.RootID   `path:"rootID"   required:"true"`
-	SourceID artifactstore.SourceID `path:"sourceID" required:"true"`
+	RootID   basespec.RootID   `path:"rootID"   required:"true"`
+	SourceID basespec.SourceID `path:"sourceID" required:"true"`
 	Body     *UpdateArtifactSourceRequestBody
 }
 
@@ -159,9 +159,9 @@ func (w *ArtifactStoreWrapper) UpdateArtifactSource(
 }
 
 type RetireArtifactSourceRequest struct {
-	RootID           artifactstore.RootID   `path:"rootID"   required:"true"`
-	SourceID         artifactstore.SourceID `path:"sourceID" required:"true"`
-	ExpectedRevision uint64                 `                required:"true" json:"expectedRevision"`
+	RootID           basespec.RootID   `path:"rootID"   required:"true"`
+	SourceID         basespec.SourceID `path:"sourceID" required:"true"`
+	ExpectedRevision uint64            `                required:"true" json:"expectedRevision"`
 }
 
 type RetireArtifactSourceResponse struct {
@@ -190,14 +190,14 @@ func (w *ArtifactStoreWrapper) RetireArtifactSource(
 }
 
 type PurgeArtifactSourceRequest struct {
-	RootID           artifactstore.RootID   `path:"rootID"   required:"true"`
-	SourceID         artifactstore.SourceID `path:"sourceID" required:"true"`
-	ExpectedRevision uint64                 `                required:"true" json:"expectedRevision"`
+	RootID           basespec.RootID   `path:"rootID"   required:"true"`
+	SourceID         basespec.SourceID `path:"sourceID" required:"true"`
+	ExpectedRevision uint64            `                required:"true" json:"expectedRevision"`
 }
 
 type PurgeArtifactSourceResponse struct {
-	RootID   artifactstore.RootID   `json:"rootID"`
-	SourceID artifactstore.SourceID `json:"sourceID"`
+	RootID   basespec.RootID   `json:"rootID"`
+	SourceID basespec.SourceID `json:"sourceID"`
 }
 
 func (w *ArtifactStoreWrapper) PurgeArtifactSource(
@@ -226,7 +226,7 @@ func (w *ArtifactStoreWrapper) PurgeArtifactSource(
 type ListArtifactSourceKindsRequest struct{}
 
 type ListArtifactSourceKindsResponseBody struct {
-	Kinds []artifactstore.SourceKind `json:"kinds"`
+	Kinds []basespec.SourceKind `json:"kinds"`
 }
 
 type ListArtifactSourceKindsResponse struct {

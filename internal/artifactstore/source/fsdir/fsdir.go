@@ -15,14 +15,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
-	directoryReadBatchSize                          = 256
-	Kind                   artifactstore.SourceKind = "fs-directory"
+	directoryReadBatchSize                     = 256
+	Kind                   basespec.SourceKind = "fs-directory"
 )
 
 type Config struct {
@@ -49,7 +49,7 @@ func NewWithTraversalPolicy(policy *TraversalPolicy) (*Adapter, error) {
 	return &Adapter{traversalPolicy: normalized}, nil
 }
 
-func (a *Adapter) Kind() artifactstore.SourceKind {
+func (a *Adapter) Kind() basespec.SourceKind {
 	return Kind
 }
 
@@ -60,16 +60,16 @@ func (a *Adapter) NormalizeConfig(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	canonical, err := jsoncanon.CanonicalizeObject(raw, artifactstore.MaxConfigBytes)
+	canonical, err := jsonutil.CanonicalizeObject(raw, basespec.MaxConfigBytes)
 	if err != nil {
-		return nil, fmt.Errorf("%w: filesystem source config: %w", artifactstore.ErrInvalid, err)
+		return nil, fmt.Errorf("%w: filesystem source config: %w", basespec.ErrInvalid, err)
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(canonical))
 	decoder.DisallowUnknownFields()
 	var config Config
 	if err := decoder.Decode(&config); err != nil {
-		return nil, fmt.Errorf("%w: decode filesystem source config: %w", artifactstore.ErrInvalid, err)
+		return nil, fmt.Errorf("%w: decode filesystem source config: %w", basespec.ErrInvalid, err)
 	}
 	root, err := normalizeFilesystemRoot(config.RootPath)
 	if err != nil {
@@ -81,7 +81,7 @@ func (a *Adapter) NormalizeConfig(
 	if err != nil {
 		return nil, err
 	}
-	encoded, err = jsoncanon.CanonicalizeObject(encoded, artifactstore.MaxConfigBytes)
+	encoded, err = jsonutil.CanonicalizeObject(encoded, basespec.MaxConfigBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (a *Adapter) Open(
 	if value.Kind != Kind {
 		return nil, fmt.Errorf(
 			"%w: filesystem adapter received source kind %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			value.Kind,
 		)
 	}
@@ -123,7 +123,7 @@ func (a *Adapter) Open(
 func (a *Adapter) ResolveLocalPath(
 	ctx context.Context,
 	value source.Source,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -131,18 +131,18 @@ func (a *Adapter) ResolveLocalPath(
 	if value.Kind != Kind {
 		return "", fmt.Errorf(
 			"%w: filesystem adapter received source kind %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			value.Kind,
 		)
 	}
-	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+	if err := basespec.ValidateLocator(locator, true); err != nil {
 		return "", err
 	}
 
 	if a.traversalPolicy.excludesLocator(string(locator)) {
 		return "", fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			locator,
 		)
 	}
@@ -154,7 +154,7 @@ func (a *Adapter) ResolveLocalPath(
 }
 
 func decodeConfig(raw json.RawMessage) (Config, error) {
-	canonical, err := jsoncanon.CanonicalizeObject(raw, artifactstore.MaxConfigBytes)
+	canonical, err := jsonutil.CanonicalizeObject(raw, basespec.MaxConfigBytes)
 	if err != nil {
 		return Config{}, err
 	}
@@ -168,7 +168,7 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 		filepath.Clean(config.RootPath) != config.RootPath {
 		return Config{}, fmt.Errorf(
 			"%w: invalid normalized filesystem root",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := validateFilesystemRoot(config.RootPath); err != nil {
@@ -181,13 +181,13 @@ func normalizeFilesystemRoot(raw string) (string, error) {
 	if strings.TrimSpace(raw) == "" {
 		return "", fmt.Errorf(
 			"%w: filesystem root path is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if !filepath.IsAbs(raw) {
 		return "", fmt.Errorf(
 			"%w: filesystem root path must be absolute",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -199,7 +199,7 @@ func normalizeFilesystemRoot(raw string) (string, error) {
 	if !info.IsDir() {
 		return "", fmt.Errorf(
 			"%w: filesystem source root is not a directory",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return root, nil
@@ -210,14 +210,14 @@ func validateFilesystemRoot(root string) error {
 	if err != nil {
 		return fmt.Errorf(
 			"%w: filesystem source root is unavailable: %w",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 			err,
 		)
 	}
 	if !info.IsDir() {
 		return fmt.Errorf(
 			"%w: filesystem source root is no longer a directory",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 		)
 	}
 	return nil
@@ -246,28 +246,28 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 		if location == root && !info.IsDir() {
 			return fmt.Errorf(
 				"%w: filesystem source root is no longer a directory",
-				artifactstore.ErrSourceUnavailable,
+				basespec.ErrSourceUnavailable,
 			)
 		}
 
 		if location != root {
 			visited++
-			if visited > artifactstore.DefaultMaxEntries {
+			if visited > basespec.DefaultMaxEntries {
 				return fmt.Errorf(
 					"%w: source exceeds %d entries",
-					artifactstore.ErrInvalid,
-					artifactstore.DefaultMaxEntries,
+					basespec.ErrInvalid,
+					basespec.DefaultMaxEntries,
 				)
 			}
 			relative, err := filepath.Rel(root, location)
 			if err != nil {
 				return err
 			}
-			if depth > artifactstore.DefaultMaxDepth {
+			if depth > basespec.DefaultMaxDepth {
 				return fmt.Errorf(
 					"%w: source exceeds traversal depth %d",
-					artifactstore.ErrInvalid,
-					artifactstore.DefaultMaxDepth,
+					basespec.ErrInvalid,
+					basespec.DefaultMaxDepth,
 				)
 			}
 			if info.IsDir() &&
@@ -339,10 +339,10 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 			continue
 		}
 		if value.size < 0 ||
-			value.size > artifactstore.MaxScanBytes-totalBytes {
+			value.size > basespec.MaxScanBytes-totalBytes {
 			return "", fmt.Errorf(
 				"%w: source exceeds byte limit",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 
@@ -360,7 +360,7 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 			_ = file.Close()
 			return "", fmt.Errorf(
 				"%w: source entry %q changed during fingerprinting",
-				artifactstore.ErrConflict,
+				basespec.ErrConflict,
 				value.relative,
 			)
 		}
@@ -380,7 +380,7 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 		if written != value.size {
 			return "", fmt.Errorf(
 				"%w: source entry %q changed during fingerprinting",
-				artifactstore.ErrConflict,
+				basespec.ErrConflict,
 				value.relative,
 			)
 		}

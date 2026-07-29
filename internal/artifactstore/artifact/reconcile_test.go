@@ -6,18 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const (
-	artifactTestRootID       artifactstore.RootID       = "019d3150-6a25-7a6b-a34e-d9032342bc31"
-	artifactTestCollectionID artifactstore.CollectionID = "019d3150-6a26-7a6b-a34e-d9032342bc31"
-	artifactTestSourceID     artifactstore.SourceID     = "019d3150-6a27-7a6b-a34e-d9032342bc31"
-	artifactTestExistingID   artifactstore.ArtifactID   = "019d3150-6a28-7a6b-a34e-d9032342bc31"
-	artifactTestCreatedID    string                     = "019d3150-6a29-7a6b-a34e-d9032342bc31"
+	artifactTestRootID       basespec.RootID       = "019d3150-6a25-7a6b-a34e-d9032342bc31"
+	artifactTestCollectionID basespec.CollectionID = "019d3150-6a26-7a6b-a34e-d9032342bc31"
+	artifactTestSourceID     basespec.SourceID     = "019d3150-6a27-7a6b-a34e-d9032342bc31"
+	artifactTestExistingID   basespec.ArtifactID   = "019d3150-6a28-7a6b-a34e-d9032342bc31"
+	artifactTestCreatedID    string                = "019d3150-6a29-7a6b-a34e-d9032342bc31"
 )
 
 type artifactTestClock struct{ now time.Time }
@@ -36,17 +38,17 @@ func (g *artifactTestIDs) NewID(context.Context) (string, error) {
 }
 
 type artifactTestDefinitions struct {
-	values map[artifactstore.Digest]definition.Definition
+	values map[cryptoutil.Digest]definition.Definition
 }
 
 func (r artifactTestDefinitions) Get(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	digest artifactstore.Digest,
+	rootID basespec.RootID,
+	digest cryptoutil.Digest,
 ) (definition.Definition, error) {
 	value, found := r.values[digest]
 	if !found {
-		return definition.Definition{}, artifactstore.ErrDefinitionNotFound
+		return definition.Definition{}, basespec.ErrDefinitionNotFound
 	}
 	return value, nil
 }
@@ -54,7 +56,7 @@ func (r artifactTestDefinitions) Get(
 type artifactTestPolicy struct {
 	draft       Draft
 	create      bool
-	diagnostics []artifactstore.Diagnostic
+	diagnostics []diagnostic.Diagnostic
 }
 
 func (p artifactTestPolicy) Derive(
@@ -62,7 +64,7 @@ func (p artifactTestPolicy) Derive(
 	collection.Collection,
 	catalog.Occurrence,
 	definition.Definition,
-) (Draft, bool, []artifactstore.Diagnostic) {
+) (Draft, bool, []diagnostic.Diagnostic) {
 	return p.draft, p.create, p.diagnostics
 }
 
@@ -96,12 +98,12 @@ func artifactTestCollection(now time.Time) collection.Collection {
 }
 
 func artifactTestOccurrence(
-	locator artifactstore.Locator,
-	kind artifactstore.ArtifactKind,
-	digest artifactstore.Digest,
+	locator basespec.Locator,
+	kind basespec.ArtifactKind,
+	digest cryptoutil.Digest,
 	now time.Time,
 ) catalog.Occurrence {
-	contentDigest := artifactstore.DigestBytes([]byte("content:" + string(locator)))
+	contentDigest := cryptoutil.DigestBytes([]byte("content:" + string(locator)))
 	return catalog.Occurrence{
 		RootID:       artifactTestRootID,
 		CollectionID: artifactTestCollectionID,
@@ -133,7 +135,7 @@ func TestReconcilerUpdatesKindChangesAndCreatesNewObservedArtifacts(t *testing.T
 		t.Fatalf("NewReconciler: %v", err)
 	}
 	collectionValue := artifactTestCollection(now)
-	binding := artifactstore.SourceBinding{
+	binding := basespec.SourceBinding{
 		SourceID:     artifactTestSourceID,
 		Locator:      "changed.json",
 		ExpectedKind: "test.artifact",
@@ -164,7 +166,7 @@ func TestReconcilerUpdatesKindChangesAndCreatesNewObservedArtifacts(t *testing.T
 		[]Artifact{existing},
 		nil,
 		artifactTestDefinitions{
-			values: map[artifactstore.Digest]definition.Definition{definitionValue.Digest: definitionValue},
+			values: map[cryptoutil.Digest]definition.Definition{definitionValue.Digest: definitionValue},
 		},
 		artifactTestPolicy{
 			draft:  Draft{Name: "New artifact", Enabled: true, Data: []byte(`{"z":2,"a":1}`)},
@@ -188,7 +190,7 @@ func TestReconcilerUpdatesKindChangesAndCreatesNewObservedArtifacts(t *testing.T
 		t.Fatalf("creates=%#v", result.Creates)
 	}
 	created := result.Creates[0]
-	if created.ID != artifactstore.ArtifactID(artifactTestCreatedID) || created.Adoption != AdoptionObserved ||
+	if created.ID != basespec.ArtifactID(artifactTestCreatedID) || created.Adoption != AdoptionObserved ||
 		created.State != StateAvailable ||
 		string(created.Data) != `{"a":1,"z":2}` {
 		t.Fatalf("created artifact=%#v", created)
@@ -211,7 +213,7 @@ func TestReconcilerHonorsSuppressionsAndRejectsDuplicatePhysicalOccurrences(t *t
 	suppression := Suppression{
 		RootID:       artifactTestRootID,
 		CollectionID: artifactTestCollectionID,
-		Binding: artifactstore.SourceBinding{
+		Binding: basespec.SourceBinding{
 			SourceID:     artifactTestSourceID,
 			Locator:      "new.json",
 			ExpectedKind: "test.artifact",
@@ -227,7 +229,7 @@ func TestReconcilerHonorsSuppressionsAndRejectsDuplicatePhysicalOccurrences(t *t
 		nil,
 		[]Suppression{suppression},
 		artifactTestDefinitions{
-			values: map[artifactstore.Digest]definition.Definition{definitionValue.Digest: definitionValue},
+			values: map[cryptoutil.Digest]definition.Definition{definitionValue.Digest: definitionValue},
 		},
 		artifactTestPolicy{draft: Draft{Name: "ignored", Data: []byte(`{}`)}, create: true},
 	)
@@ -247,12 +249,12 @@ func TestReconcilerHonorsSuppressionsAndRejectsDuplicatePhysicalOccurrences(t *t
 		nil,
 		nil,
 		artifactTestDefinitions{
-			values: map[artifactstore.Digest]definition.Definition{definitionValue.Digest: definitionValue},
+			values: map[cryptoutil.Digest]definition.Definition{definitionValue.Digest: definitionValue},
 		},
 		artifactTestPolicy{},
 	); !errors.Is(
 		err,
-		artifactstore.ErrInvalid,
+		basespec.ErrInvalid,
 	) {
 		t.Fatalf("duplicate physical occurrence error=%v, want ErrInvalid", err)
 	}

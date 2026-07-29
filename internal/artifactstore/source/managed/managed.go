@@ -16,15 +16,15 @@ import (
 
 	"github.com/flexigpt/mapstore-go"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
-	Kind artifactstore.SourceKind = "managed-directory"
+	Kind basespec.SourceKind = "managed-directory"
 
 	directoryMode        = 0o700
 	stagingDirectoryName = ".artifactstore-staging"
@@ -49,7 +49,7 @@ func New(base string) (*Adapter, error) {
 	if strings.TrimSpace(base) == "" {
 		return nil, fmt.Errorf(
 			"%w: managed Source base directory is empty",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	absolute, err := mapstoreio.PreparePrivateDirectory(base)
@@ -81,7 +81,7 @@ func New(base string) (*Adapter, error) {
 	}, nil
 }
 
-func (*Adapter) Kind() artifactstore.SourceKind {
+func (*Adapter) Kind() basespec.SourceKind {
 	return Kind
 }
 
@@ -92,14 +92,14 @@ func (*Adapter) NormalizeConfig(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	canonical, err := jsoncanon.CanonicalizeObject(
+	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxConfigBytes,
+		basespec.MaxConfigBytes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: managed Source config: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
@@ -109,7 +109,7 @@ func (*Adapter) NormalizeConfig(
 	if err := decoder.Decode(&value); err != nil {
 		return nil, fmt.Errorf(
 			"%w: managed Source config must be an empty object: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
@@ -118,9 +118,9 @@ func (*Adapter) NormalizeConfig(
 		if err == nil {
 			err = errors.New("managed Source config has trailing JSON")
 		}
-		return nil, fmt.Errorf("%w: %w", artifactstore.ErrInvalid, err)
+		return nil, fmt.Errorf("%w: %w", basespec.ErrInvalid, err)
 	}
-	return json.RawMessage(jsoncanon.EmptyObject), nil
+	return json.RawMessage(jsonutil.EmptyObject), nil
 }
 
 func (a *Adapter) Open(
@@ -144,7 +144,7 @@ func (a *Adapter) Open(
 func (a *Adapter) ResolveLocalPath(
 	ctx context.Context,
 	value source.Source,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (string, error) {
 	if err := a.validateSource(ctx, value); err != nil {
 		return "", err
@@ -208,7 +208,7 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	if !info.IsDir() {
 		return fmt.Errorf(
 			"%w: bootstrapped managed Source path is not a directory",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	empty, err := managedDirectoryEmpty(root)
@@ -218,7 +218,7 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	if !empty {
 		return fmt.Errorf(
 			"%w: refusing to discard a non-empty bootstrapped managed Source",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	if err := os.Remove(root); err != nil {
@@ -278,7 +278,7 @@ func (a *Adapter) PublishPackage(
 		if !equivalent {
 			return "", fmt.Errorf(
 				"%w: managed package %q already exists with different content",
-				artifactstore.ErrConflict,
+				basespec.ErrConflict,
 				publication.Directory,
 			)
 		}
@@ -286,7 +286,7 @@ func (a *Adapter) PublishPackage(
 	}
 
 	if publication.ExpectedGeneration != "" {
-		if err := artifactstore.ValidateSourceGeneration(
+		if err := basespec.ValidateSourceGeneration(
 			publication.ExpectedGeneration,
 		); err != nil {
 			return "", err
@@ -298,7 +298,7 @@ func (a *Adapter) PublishPackage(
 		if current != publication.ExpectedGeneration {
 			return "", fmt.Errorf(
 				"%w: managed Source changed before package publication",
-				artifactstore.ErrConflict,
+				basespec.ErrConflict,
 			)
 		}
 	}
@@ -363,7 +363,7 @@ func (a *Adapter) PublishPackage(
 func (a *Adapter) RemovePackage(
 	ctx context.Context,
 	value source.Source,
-	directory artifactstore.Locator,
+	directory basespec.Locator,
 	expectedGeneration string,
 ) error {
 	if err := ctx.Err(); err != nil {
@@ -375,7 +375,7 @@ func (a *Adapter) RemovePackage(
 	if err := validatePackageDirectory(directory); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateSourceGeneration(expectedGeneration); err != nil {
+	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
 		return err
 	}
 
@@ -389,7 +389,7 @@ func (a *Adapter) RemovePackage(
 	if current != expectedGeneration {
 		return fmt.Errorf(
 			"%w: managed Source changed before package removal",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	root, err := a.sourceRootPath(value, false)
@@ -404,7 +404,7 @@ func (a *Adapter) RemovePackage(
 	if errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf(
 			"%w: managed package %q",
-			artifactstore.ErrNotFound,
+			basespec.ErrNotFound,
 			directory,
 		)
 	}
@@ -414,7 +414,7 @@ func (a *Adapter) RemovePackage(
 	if !info.IsDir() {
 		return fmt.Errorf(
 			"%w: managed package is not a directory",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -449,7 +449,7 @@ func (a *Adapter) RemovePackage(
 
 func (a *Adapter) validateSource(ctx context.Context, value source.Source) error {
 	if a == nil || a.filesystem == nil {
-		return artifactstore.ErrClosed
+		return basespec.ErrClosed
 	}
 	if err := value.Validate(); err != nil {
 		return err
@@ -457,7 +457,7 @@ func (a *Adapter) validateSource(ctx context.Context, value source.Source) error
 	if value.Kind != Kind {
 		return fmt.Errorf(
 			"%w: managed adapter received source kind %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			value.Kind,
 		)
 	}
@@ -465,10 +465,10 @@ func (a *Adapter) validateSource(ctx context.Context, value source.Source) error
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(normalized, []byte(jsoncanon.EmptyObject)) {
+	if !bytes.Equal(normalized, []byte(jsonutil.EmptyObject)) {
 		return fmt.Errorf(
 			"%w: invalid normalized managed Source config",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return nil
@@ -532,14 +532,14 @@ func validatePublication(
 	if containsReservedSegment(normalized.Directory) {
 		return nil, fmt.Errorf(
 			"%w: managed package uses a reserved directory",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	for index, file := range normalized.Files {
 		if containsReservedSegment(file.Locator) {
 			return nil, fmt.Errorf(
 				"%w: managed package files[%d] use a reserved directory",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				index,
 			)
 		}
@@ -547,8 +547,8 @@ func validatePublication(
 	return normalized.Files, nil
 }
 
-func validatePackageDirectory(directory artifactstore.Locator) error {
-	if err := artifactstore.ValidatePortableLocator(
+func validatePackageDirectory(directory basespec.Locator) error {
+	if err := basespec.ValidatePortableLocator(
 		directory,
 		false,
 	); err != nil {
@@ -557,13 +557,13 @@ func validatePackageDirectory(directory artifactstore.Locator) error {
 	if containsReservedSegment(directory) {
 		return fmt.Errorf(
 			"%w: managed package uses a reserved directory",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return source.ValidateManagedPackageDirectory(directory)
 }
 
-func containsReservedSegment(locator artifactstore.Locator) bool {
+func containsReservedSegment(locator basespec.Locator) bool {
 	for segment := range strings.SplitSeq(string(locator), "/") {
 		if strings.EqualFold(segment, stagingDirectoryName) {
 			return true
@@ -574,7 +574,7 @@ func containsReservedSegment(locator artifactstore.Locator) bool {
 
 func managedPackagePath(
 	root string,
-	directory artifactstore.Locator,
+	directory basespec.Locator,
 	createParent bool,
 ) (string, error) {
 	if err := validatePackageDirectory(directory); err != nil {
@@ -611,7 +611,7 @@ func managedPackagePath(
 	if relative == ".." ||
 		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
 		filepath.IsAbs(relative) {
-		return "", fmt.Errorf("%w: managed package escapes source root", artifactstore.ErrInvalid)
+		return "", fmt.Errorf("%w: managed package escapes source root", basespec.ErrInvalid)
 	}
 	return target, nil
 }
@@ -628,7 +628,7 @@ func pruneEmptyManagedParents(root, start string) error {
 		filepath.IsAbs(relative) {
 		return fmt.Errorf(
 			"%w: managed package parent escapes source root",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -692,10 +692,10 @@ func equivalentPackage(
 			return nil
 		}
 		entries++
-		if entries > artifactstore.MaxDiscoveryEntries {
+		if entries > basespec.MaxDiscoveryEntries {
 			return fmt.Errorf(
 				"%w: managed package exceeds entry limit",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		relative, err := filepath.Rel(root, location)
@@ -703,10 +703,10 @@ func equivalentPackage(
 			return err
 		}
 		if strings.Count(filepath.ToSlash(relative), "/")+1 >
-			artifactstore.MaxDiscoveryDepth {
+			basespec.MaxDiscoveryDepth {
 			return fmt.Errorf(
 				"%w: managed package exceeds depth limit",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		info, err := os.Stat(location)
@@ -719,19 +719,19 @@ func equivalentPackage(
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf(
 				"%w: managed package contains a non-regular file",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
-		if info.Size() < 0 || info.Size() > artifactstore.MaxScanBytes-total {
+		if info.Size() < 0 || info.Size() > basespec.MaxScanBytes-total {
 			return fmt.Errorf(
 				"%w: managed package exceeds byte limit",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		total += info.Size()
 		relative = path.Clean(filepath.ToSlash(relative))
-		if err := artifactstore.ValidatePortableLocator(
-			artifactstore.Locator(relative),
+		if err := basespec.ValidatePortableLocator(
+			basespec.Locator(relative),
 			false,
 		); err != nil {
 			return err
@@ -788,7 +788,7 @@ func readManagedPackageFile(
 var errPackageDifferent = errors.New("managed package content differs")
 
 type packageFileKeyAttributes struct {
-	Locator artifactstore.Locator
+	Locator basespec.Locator
 }
 
 type packagePartitionProvider struct{}
@@ -800,10 +800,10 @@ func (*packagePartitionProvider) GetPartitionDir(
 	if !ok {
 		return "", fmt.Errorf(
 			"%w: invalid managed package MapStore key",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
-	if err := artifactstore.ValidatePortableLocator(
+	if err := basespec.ValidatePortableLocator(
 		attributes.Locator,
 		false,
 	); err != nil {
@@ -812,7 +812,7 @@ func (*packagePartitionProvider) GetPartitionDir(
 	if key.FileName != path.Base(string(attributes.Locator)) {
 		return "", fmt.Errorf(
 			"%w: managed package filename does not match its locator",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	parent := path.Dir(string(attributes.Locator))
@@ -828,13 +828,13 @@ func (*packagePartitionProvider) ListPartitions(
 	_ string,
 	_ int,
 ) (dirs []string, nextPageToken string, err error) {
-	return nil, "", artifactstore.ErrUnsupported
+	return nil, "", basespec.ErrUnsupported
 }
 
 func managedPackageFileKey(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (mapstore.FileKey, error) {
-	if err := artifactstore.ValidatePortableLocator(locator, false); err != nil {
+	if err := basespec.ValidatePortableLocator(locator, false); err != nil {
 		return mapstore.FileKey{}, err
 	}
 	return mapstore.FileKey{
@@ -855,7 +855,7 @@ func writeManagedPackageFiles(
 		true,
 		&packagePartitionProvider{},
 		mapstoreio.RawEncoderDecoder{
-			MaximumBytes: artifactstore.MaxScanBytes,
+			MaximumBytes: basespec.MaxScanBytes,
 		},
 	)
 	if err != nil {
@@ -907,7 +907,7 @@ func writeManagedPackageFiles(
 		}
 		content, err := mapstoreio.RawBytes(
 			stored,
-			artifactstore.MaxScanBytes,
+			basespec.MaxScanBytes,
 		)
 		if err != nil {
 			return err
@@ -915,7 +915,7 @@ func writeManagedPackageFiles(
 		if !bytes.Equal(content, file.Content) {
 			return fmt.Errorf(
 				"%w: MapStore changed managed package file %q",
-				artifactstore.ErrDigestMismatch,
+				basespec.ErrDigestMismatch,
 				file.Locator,
 			)
 		}
@@ -952,7 +952,7 @@ func secureAndSyncManagedPackage(root string) error {
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf(
 				"%w: managed package contains a non-regular file",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		if err := mapstoreio.ApplyPrivateFileMode(location); err != nil {
@@ -992,10 +992,3 @@ func managedDirectoryEmpty(location string) (bool, error) {
 	}
 	return len(entries) == 0, nil
 }
-
-var (
-	_ source.Adapter                   = (*Adapter)(nil)
-	_ source.LocalPathResolver         = (*Adapter)(nil)
-	_ source.ManagedPackageWriter      = (*Adapter)(nil)
-	_ source.ManagedSourceBootstrapper = (*Adapter)(nil)
-)

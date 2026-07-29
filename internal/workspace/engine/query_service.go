@@ -9,21 +9,23 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type occurrenceKindKey struct {
 	Occurrence catalog.OccurrenceKey
-	Kind       artifactstore.ArtifactKind
+	Kind       basespec.ArtifactKind
 }
 
 func occurrenceKindIdentity(
 	key catalog.OccurrenceKey,
-	kind artifactstore.ArtifactKind,
+	kind basespec.ArtifactKind,
 ) occurrenceKindKey {
 	return occurrenceKindKey{Occurrence: key, Kind: kind}
 }
@@ -33,9 +35,9 @@ type QueryService struct {
 	catalogs                catalogSnapshotReader
 	artifacts               artifactLookup
 	definitions             definitionLookup
-	decoderFingerprint      func() (artifactstore.Digest, error)
+	decoderFingerprint      func() (cryptoutil.Digest, error)
 	discoveryPolicyRevision string
-	validators              map[artifactstore.ArtifactKind]DefinitionValidator
+	validators              map[basespec.ArtifactKind]DefinitionValidator
 }
 
 func NewQueryService(
@@ -43,7 +45,7 @@ func NewQueryService(
 	catalogs catalogSnapshotReader,
 	artifacts artifactLookup,
 	definitions definitionLookup,
-	decoderFingerprint func() (artifactstore.Digest, error),
+	decoderFingerprint func() (cryptoutil.Digest, error),
 	discoveryPolicyRevision string,
 	supports ...ArtifactSupport,
 ) (*QueryService, error) {
@@ -57,15 +59,15 @@ func NewQueryService(
 			ErrInvalidWorkspace,
 		)
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"workspace discovery policy revision",
 		discoveryPolicyRevision,
-		artifactstore.MaxVersionBytes,
+		basespec.MaxVersionBytes,
 	); err != nil {
 		return nil, err
 	}
 	validators := make(
-		map[artifactstore.ArtifactKind]DefinitionValidator,
+		map[basespec.ArtifactKind]DefinitionValidator,
 		len(supports),
 	)
 	for _, support := range supports {
@@ -94,14 +96,14 @@ func NewQueryService(
 
 func (q *QueryService) GetWorkspace(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 ) (Workspace, error) {
 	return q.workspaces.Get(ctx, workspace)
 }
 
 func (q *QueryService) Resolve(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 	reference Reference,
 ) (Resource, error) {
 	if (reference.Artifact == nil) == (reference.Selector == nil) {
@@ -118,7 +120,7 @@ func (q *QueryService) Resolve(
 		return Resource{}, fmt.Errorf("%w: Workspace is disabled", ErrReferenceUnresolved)
 	}
 	if !view.CatalogCurrent {
-		return Resource{}, artifactstore.ErrCatalogStale
+		return Resource{}, basespec.ErrCatalogStale
 	}
 
 	if reference.Artifact != nil {
@@ -178,7 +180,7 @@ func (q *QueryService) Resolve(
 
 func (q *QueryService) ResolveArtifact(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 ) (Workspace, Resource, error) {
 	if err := ref.Validate(); err != nil {
 		return Workspace{}, Resource{}, err
@@ -187,7 +189,7 @@ func (q *QueryService) ResolveArtifact(
 	if err != nil {
 		return Workspace{}, Resource{}, err
 	}
-	workspaceRef := artifactstore.CollectionRef{
+	workspaceRef := basespec.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -213,14 +215,14 @@ func (q *QueryService) ResolveArtifact(
 
 func (q *QueryService) ComposeLoadPlan(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
-	artifactRefs []artifactstore.ArtifactRef,
+	workspace basespec.CollectionRef,
+	artifactRefs []basespec.ArtifactRef,
 ) (LoadPlan, error) {
 	view, err := q.Catalog(ctx, workspace)
 	if err != nil {
 		return LoadPlan{}, err
 	}
-	requested := make(map[artifactstore.ArtifactID]struct{}, len(artifactRefs))
+	requested := make(map[basespec.ArtifactID]struct{}, len(artifactRefs))
 	for _, ref := range artifactRefs {
 		if err := ref.Validate(); err != nil {
 			return LoadPlan{}, err
@@ -244,24 +246,24 @@ func (q *QueryService) ComposeLoadPlan(
 	plan := LoadPlan{
 		Workspace:       workspace,
 		CatalogRevision: view.Catalog.Revision,
-		Diagnostics: artifactstore.AppendDiagnostics(
+		Diagnostics: diagnostic.AppendDiagnostics(
 			view.Catalog.Diagnostics,
 			view.FreshnessDiagnostics...,
 		),
 	}
-	resources := make(map[artifactstore.ArtifactID]Resource, len(view.Resources))
+	resources := make(map[basespec.ArtifactID]Resource, len(view.Resources))
 	for _, value := range view.Resources {
 		resources[value.Artifact.ID] = value
 	}
 	unresolved := make(
-		map[artifactstore.ArtifactID]artifact.Artifact,
+		map[basespec.ArtifactID]artifact.Artifact,
 		len(view.UnresolvedArtifacts),
 	)
 	for _, value := range view.UnresolvedArtifacts {
 		unresolved[value.ID] = value
 	}
 
-	ordered := make([]artifactstore.ArtifactID, 0, len(requested))
+	ordered := make([]basespec.ArtifactID, 0, len(requested))
 	for artifactID := range requested {
 		ordered = append(ordered, artifactID)
 	}
@@ -271,11 +273,11 @@ func (q *QueryService) ComposeLoadPlan(
 		resourceValue, found := resources[artifactID]
 		if !found {
 			if unresolvedValue, exists := unresolved[artifactID]; exists {
-				plan.Diagnostics = artifactstore.AppendDiagnostics(
+				plan.Diagnostics = diagnostic.AppendDiagnostics(
 					plan.Diagnostics,
 					unresolvedValue.Diagnostics...,
 				)
-				plan.Diagnostics = artifactstore.AppendDiagnostics(
+				plan.Diagnostics = diagnostic.AppendDiagnostics(
 					plan.Diagnostics,
 					recordAvailabilityDiagnostic(
 						unresolvedValue,
@@ -284,10 +286,10 @@ func (q *QueryService) ComposeLoadPlan(
 					),
 				)
 			} else {
-				plan.Diagnostics = artifactstore.AppendDiagnostics(
+				plan.Diagnostics = diagnostic.AppendDiagnostics(
 					plan.Diagnostics,
-					artifactstore.Diagnostic{
-						Severity: artifactstore.DiagnosticError,
+					diagnostic.Diagnostic{
+						Severity: diagnostic.DiagnosticError,
 						Code:     DiagnosticCodeArtifactUnresolved,
 						Message:  "the requested Workspace Artifact was not found",
 					},
@@ -298,7 +300,7 @@ func (q *QueryService) ComposeLoadPlan(
 
 		switch {
 		case !view.CatalogCurrent:
-			plan.Diagnostics = artifactstore.AppendDiagnostics(
+			plan.Diagnostics = diagnostic.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
 					resourceValue.Artifact,
@@ -309,7 +311,7 @@ func (q *QueryService) ComposeLoadPlan(
 			continue
 
 		case !resourceValue.Artifact.Enabled:
-			plan.Diagnostics = artifactstore.AppendDiagnostics(
+			plan.Diagnostics = diagnostic.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
 					resourceValue.Artifact,
@@ -320,7 +322,7 @@ func (q *QueryService) ComposeLoadPlan(
 			continue
 
 		case resourceValue.Artifact.State != artifact.StateAvailable:
-			plan.Diagnostics = artifactstore.AppendDiagnostics(
+			plan.Diagnostics = diagnostic.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
 					resourceValue.Artifact,
@@ -331,7 +333,7 @@ func (q *QueryService) ComposeLoadPlan(
 			continue
 
 		case !resourceValue.CatalogCurrent:
-			plan.Diagnostics = artifactstore.AppendDiagnostics(
+			plan.Diagnostics = diagnostic.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
 					resourceValue.Artifact,
@@ -342,15 +344,15 @@ func (q *QueryService) ComposeLoadPlan(
 			continue
 
 		case !resourceValue.ProjectionValid:
-			plan.Diagnostics = artifactstore.AppendDiagnostics(
+			plan.Diagnostics = diagnostic.AppendDiagnostics(
 				plan.Diagnostics,
 				resourceValue.Diagnostics...,
 			)
 			continue
 		}
 
-		occurrenceDefinitionDigest := artifactstore.Digest("")
-		sourceContentDigest := artifactstore.Digest("")
+		occurrenceDefinitionDigest := cryptoutil.Digest("")
+		sourceContentDigest := cryptoutil.Digest("")
 		if resourceValue.Occurrence != nil {
 			if resourceValue.Occurrence.DefinitionDigest != nil {
 				occurrenceDefinitionDigest = *resourceValue.Occurrence.DefinitionDigest
@@ -368,7 +370,7 @@ func (q *QueryService) ComposeLoadPlan(
 			SourceContentDigest:        sourceContentDigest,
 			SourceGeneration:           view.Catalog.SourceGenerations[resourceValue.Source.ID],
 		})
-		plan.Diagnostics = artifactstore.AppendDiagnostics(
+		plan.Diagnostics = diagnostic.AppendDiagnostics(
 			plan.Diagnostics,
 			resourceValue.Artifact.Diagnostics...,
 		)
@@ -381,7 +383,7 @@ func (q *QueryService) ComposeLoadPlan(
 
 func (q *QueryService) Catalog(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 ) (CatalogView, error) {
 	if err := workspace.Validate(); err != nil {
 		return CatalogView{}, err
@@ -392,7 +394,7 @@ func (q *QueryService) Catalog(
 	}
 	snapshot, catalogErr := catalog.ReadCurrent(ctx, q.catalogs, workspace)
 	if catalogErr != nil &&
-		!errors.Is(catalogErr, artifactstore.ErrCatalogStale) {
+		!errors.Is(catalogErr, basespec.ErrCatalogStale) {
 		return CatalogView{}, catalogErr
 	}
 
@@ -407,32 +409,32 @@ func (q *QueryService) Catalog(
 			currentDecoderFingerprint,
 		)
 
-	freshnessDiagnostics := make([]artifactstore.Diagnostic, 0)
+	freshnessDiagnostics := make([]diagnostic.Diagnostic, 0)
 	if catalogErr != nil {
-		freshnessDiagnostics = artifactstore.AppendDiagnostics(
+		freshnessDiagnostics = diagnostic.AppendDiagnostics(
 			freshnessDiagnostics,
-			artifactstore.Diagnostic{
-				Severity: artifactstore.DiagnosticWarning,
+			diagnostic.Diagnostic{
+				Severity: diagnostic.DiagnosticWarning,
 				Code:     DiagnosticCodeCatalogStale,
 				Message:  "the Workspace catalog no longer matches current collection metadata",
 			},
 		)
 	}
 	if snapshot.DecoderFingerprint != currentDecoderFingerprint {
-		freshnessDiagnostics = artifactstore.AppendDiagnostics(
+		freshnessDiagnostics = diagnostic.AppendDiagnostics(
 			freshnessDiagnostics,
-			artifactstore.Diagnostic{
-				Severity: artifactstore.DiagnosticWarning,
+			diagnostic.Diagnostic{
+				Severity: diagnostic.DiagnosticWarning,
 				Code:     DiagnosticCodeCatalogDecoderStale,
 				Message:  "the Workspace decoder capability set changed after this catalog was published",
 			},
 		)
 	}
 	if workspaceValue.Data.DiscoveryPolicyRevision != q.discoveryPolicyRevision {
-		freshnessDiagnostics = artifactstore.AppendDiagnostics(
+		freshnessDiagnostics = diagnostic.AppendDiagnostics(
 			freshnessDiagnostics,
-			artifactstore.Diagnostic{
-				Severity: artifactstore.DiagnosticWarning,
+			diagnostic.Diagnostic{
+				Severity: diagnostic.DiagnosticWarning,
 				Code:     DiagnosticCodeCatalogPolicyStale,
 				Message:  "the Workspace discovery policy changed after this catalog was published",
 			},
@@ -455,7 +457,7 @@ func (q *QueryService) Catalog(
 		occurrencesByKey[key] = occurrence
 	}
 
-	sourcesByID := make(map[artifactstore.SourceID]source.Summary)
+	sourcesByID := make(map[basespec.SourceID]source.Summary)
 	for _, value := range workspaceValue.Sources {
 		sourcesByID[value.ID] = value
 	}
@@ -518,7 +520,7 @@ func (q *QueryService) Catalog(
 			continue
 		}
 		projectionValid := true
-		projectionDiagnostics := make([]artifactstore.Diagnostic, 0)
+		projectionDiagnostics := make([]diagnostic.Diagnostic, 0)
 		if _, dataErr := DecodeArtifactData(localArtifact.Data); dataErr != nil {
 			projectionValid = false
 			projectionDiagnostics = append(
@@ -617,7 +619,7 @@ func (q *QueryService) Catalog(
 func (q *QueryService) catalogIsCurrent(
 	workspaceValue Workspace,
 	snapshot catalog.Snapshot,
-	currentDecoderFingerprint artifactstore.Digest,
+	currentDecoderFingerprint cryptoutil.Digest,
 ) bool {
 	if snapshot.CollectionRevision != workspaceValue.Collection.Revision {
 		return false
@@ -628,8 +630,8 @@ func (q *QueryService) catalogIsCurrent(
 	if workspaceValue.Data.DiscoveryPolicyRevision != q.discoveryPolicyRevision {
 		return false
 	}
-	currentRevisions := make(map[artifactstore.SourceID]uint64)
-	currentAttachmentRevisions := make(map[artifactstore.SourceID]uint64)
+	currentRevisions := make(map[basespec.SourceID]uint64)
+	currentAttachmentRevisions := make(map[basespec.SourceID]uint64)
 	for _, sourceValue := range workspaceValue.Sources {
 		currentRevisions[sourceValue.ID] = sourceValue.Revision
 	}
@@ -644,12 +646,12 @@ func recordAvailabilityDiagnostic(
 	value artifact.Artifact,
 	code string,
 	message string,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticError,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticError,
 		Code:     code,
 		Message:  message,
-		Location: &artifactstore.DiagnosticLocation{
+		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
@@ -659,12 +661,12 @@ func recordAvailabilityDiagnostic(
 func projectionDiagnostic(
 	value artifact.Artifact,
 	err error,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticError,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticError,
 		Code:     DiagnosticCodeProjectionInvalid,
 		Message:  diagnosticMessage(err.Error()),
-		Location: &artifactstore.DiagnosticLocation{
+		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
@@ -673,11 +675,11 @@ func projectionDiagnostic(
 
 func recordWithDiagnostic(
 	value artifact.Artifact,
-	diagnostic artifactstore.Diagnostic,
+	d diagnostic.Diagnostic,
 ) artifact.Artifact {
 	output := value
-	output.Diagnostics = artifactstore.AppendDiagnostics(
-		[]artifactstore.Diagnostic{diagnostic},
+	output.Diagnostics = diagnostic.AppendDiagnostics(
+		[]diagnostic.Diagnostic{d},
 		value.Diagnostics...,
 	)
 	return output
@@ -685,12 +687,12 @@ func recordWithDiagnostic(
 
 func recordSourceUnavailableDiagnostic(
 	value artifact.Artifact,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticError,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticError,
 		Code:     DiagnosticCodeArtifactUnavailable,
 		Message:  "the Artifact Source is no longer attached to this Workspace",
-		Location: &artifactstore.DiagnosticLocation{
+		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
@@ -700,17 +702,17 @@ func recordSourceUnavailableDiagnostic(
 func recordDefinitionUnavailableDiagnostic(
 	value artifact.Artifact,
 	cause error,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticError,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticError,
 		Code:     DiagnosticCodeArtifactUnavailable,
-		Message: artifactstore.BoundedDiagnosticMessage(
+		Message: diagnostic.BoundedDiagnosticMessage(
 			fmt.Sprintf(
 				"the resolved Workspace Artifact definition could not be read: %v",
 				cause,
 			),
 		),
-		Location: &artifactstore.DiagnosticLocation{
+		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
@@ -763,8 +765,8 @@ func validateWorkspaceSelector(selector definition.Selector) error {
 			ErrReferenceUnresolved,
 		)
 	}
-	if err := artifactstore.ValidateLogicalVersion(
-		artifactstore.LogicalVersion(constraint),
+	if err := basespec.ValidateLogicalVersion(
+		basespec.LogicalVersion(constraint),
 		false,
 	); err != nil {
 		return err
@@ -776,7 +778,7 @@ func groupCatalogResources(
 	resources []Resource,
 	unrecorded []catalog.Occurrence,
 ) []ResourceGroup {
-	values := make(map[artifactstore.ArtifactKind]*ResourceGroup)
+	values := make(map[basespec.ArtifactKind]*ResourceGroup)
 	for _, resourceValue := range resources {
 		kind := resourceValue.Artifact.Kind
 		group := values[kind]

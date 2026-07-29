@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
@@ -19,30 +19,30 @@ func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 
 	workspace := plannerTestWorkspace(t)
 	store := &engineTestCollectionStore{
-		getFn: func(_ context.Context, ref artifactstore.CollectionRef) (collection.Collection, error) {
+		getFn: func(_ context.Context, ref basespec.CollectionRef) (collection.Collection, error) {
 			if ref != workspace.Collection.Ref() {
-				return collection.Collection{}, artifactstore.ErrCollectionNotFound
+				return collection.Collection{}, basespec.ErrCollectionNotFound
 			}
 			return workspace.Collection, nil
 		},
-		listAttachmentsFn: func(_ context.Context, ref artifactstore.CollectionRef) ([]collection.Attachment, error) {
+		listAttachmentsFn: func(_ context.Context, ref basespec.CollectionRef) ([]collection.Attachment, error) {
 			if ref != workspace.Collection.Ref() {
-				return nil, artifactstore.ErrCollectionNotFound
+				return nil, basespec.ErrCollectionNotFound
 			}
 			return []collection.Attachment{workspace.Attachments[1], workspace.Attachments[0]}, nil
 		},
 	}
 	sources := engineTestSources{
-		getFn: func(_ context.Context, rootID artifactstore.RootID, sourceID artifactstore.SourceID) (source.Summary, error) {
+		getFn: func(_ context.Context, rootID basespec.RootID, sourceID basespec.SourceID) (source.Summary, error) {
 			if rootID != workspace.Collection.RootID {
-				return source.Summary{}, artifactstore.ErrSourceNotFound
+				return source.Summary{}, basespec.ErrSourceNotFound
 			}
 			for _, value := range workspace.Sources {
 				if value.ID == sourceID {
 					return value, nil
 				}
 			}
-			return source.Summary{}, artifactstore.ErrSourceNotFound
+			return source.Summary{}, basespec.ErrSourceNotFound
 		},
 	}
 	service, err := NewService(store, sources, "policy.v1")
@@ -95,7 +95,7 @@ func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 	disabledService, err := NewService(
 		store,
 		engineTestSources{
-			getFn: func(context.Context, artifactstore.RootID, artifactstore.SourceID) (source.Summary, error) {
+			getFn: func(context.Context, basespec.RootID, basespec.SourceID) (source.Summary, error) {
 				return disabledSource, nil
 			},
 		},
@@ -125,7 +125,7 @@ func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 	kindService, err := NewService(
 		store,
 		engineTestSources{
-			getFn: func(context.Context, artifactstore.RootID, artifactstore.SourceID) (source.Summary, error) {
+			getFn: func(context.Context, basespec.RootID, basespec.SourceID) (source.Summary, error) {
 				return wrongKind, nil
 			},
 		},
@@ -153,8 +153,8 @@ func TestServicePurgeChecksRetiredWorkspaceIdentity(t *testing.T) {
 	retired.Enabled = false
 	retired.Revision = 3
 	store := &engineTestCollectionStore{
-		getRetiredFn: func(context.Context, artifactstore.CollectionRef) (collection.Collection, error) { return retired, nil },
-		purgeFn:      func(context.Context, artifactstore.CollectionRef, uint64) error { return nil },
+		getRetiredFn: func(context.Context, basespec.CollectionRef) (collection.Collection, error) { return retired, nil },
+		purgeFn:      func(context.Context, basespec.CollectionRef, uint64) error { return nil },
 	}
 	service, err := NewService(store, engineTestSources{}, "policy.v1")
 	if err != nil {
@@ -165,7 +165,7 @@ func TestServicePurgeChecksRetiredWorkspaceIdentity(t *testing.T) {
 	}
 	wrongKind := retired
 	wrongKind.Kind = "other.collection"
-	store.getRetiredFn = func(context.Context, artifactstore.CollectionRef) (collection.Collection, error) {
+	store.getRetiredFn = func(context.Context, basespec.CollectionRef) (collection.Collection, error) {
 		return wrongKind, nil
 	}
 	if err := service.Purge(
@@ -178,14 +178,14 @@ func TestServicePurgeChecksRetiredWorkspaceIdentity(t *testing.T) {
 	) {
 		t.Fatalf("Purge wrong kind error=%v", err)
 	}
-	store.getRetiredFn = func(context.Context, artifactstore.CollectionRef) (collection.Collection, error) { return retired, nil }
+	store.getRetiredFn = func(context.Context, basespec.CollectionRef) (collection.Collection, error) { return retired, nil }
 	if err := service.Purge(
 		t.Context(),
 		workspace.Collection.Ref(),
 		retired.Revision-1,
 	); !errors.Is(
 		err,
-		artifactstore.ErrConflict,
+		basespec.ErrConflict,
 	) {
 		t.Fatalf("Purge stale revision error=%v", err)
 	}

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
@@ -103,7 +103,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	loadPlan, err := fixture.api.ComposeWorkspaceLoadPlan(t.Context(), &ComposeWorkspaceLoadPlanRequest{
 		Workspace: workspaceView.Workspace,
 		Body: &ComposeWorkspaceLoadPlanRequestBody{
-			Artifacts: []artifactstore.ArtifactRef{contextArtifact.Artifact, skillArtifact.Artifact},
+			Artifacts: []basespec.ArtifactRef{contextArtifact.Artifact, skillArtifact.Artifact},
 		},
 	})
 	if err != nil || loadPlan == nil || loadPlan.Body == nil || len(loadPlan.Body.Items) != 2 {
@@ -159,7 +159,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		Workspace: workspaceView.Workspace,
 		Body: &PinWorkspaceArtifactRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
-			Binding: artifactstore.SourceBinding{
+			Binding: basespec.SourceBinding{
 				SourceID:     workspaceView.PrimarySourceID,
 				Locator:      "manual.md",
 				ExpectedKind: "workspace.context",
@@ -176,7 +176,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		Workspace: workspaceView.Workspace,
 		Body: &SuppressWorkspaceBindingRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
-			Binding: artifactstore.SourceBinding{
+			Binding: basespec.SourceBinding{
 				SourceID:     workspaceView.PrimarySourceID,
 				Locator:      "suppressed.md",
 				ExpectedKind: "workspace.context",
@@ -219,7 +219,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	}
 	inspection, err := fixture.api.LoadWorkspaceContexts(t.Context(), &LoadWorkspaceContextsRequest{
 		Workspace: workspaceView.Workspace,
-		Body:      &LoadWorkspaceContextsRequestBody{Artifacts: []artifactstore.ArtifactRef{contextArtifact.Artifact}},
+		Body:      &LoadWorkspaceContextsRequestBody{Artifacts: []basespec.ArtifactRef{contextArtifact.Artifact}},
 	})
 	if err != nil || inspection == nil || inspection.Body == nil || len(inspection.Body.Contributions) != 1 ||
 		inspection.Body.Contributions[0].Artifact != contextArtifact.Artifact {
@@ -247,7 +247,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	}
 	loadedSkills, err := fixture.api.LoadWorkspaceSkills(t.Context(), &LoadWorkspaceSkillsRequest{
 		Workspace: workspaceView.Workspace,
-		Body:      &LoadWorkspaceSkillsRequestBody{Artifacts: []artifactstore.ArtifactRef{skillArtifact.Artifact}},
+		Body:      &LoadWorkspaceSkillsRequestBody{Artifacts: []basespec.ArtifactRef{skillArtifact.Artifact}},
 	})
 	if err != nil || loadedSkills == nil || loadedSkills.Body == nil || len(loadedSkills.Body.Skills) != 1 ||
 		!strings.Contains(loadedSkills.Body.Skills[0].MarkdownBody, "Use the weather Skill.") {
@@ -295,7 +295,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	composed, err = fixture.api.ComposeWorkspaceContext(t.Context(), &ComposeWorkspaceContextRequest{
 		Workspace: workspaceView.Workspace,
 		Body: &ComposeWorkspaceContextRequestBody{
-			Artifacts: []artifactstore.ArtifactRef{contextArtifact.Artifact},
+			Artifacts: []basespec.ArtifactRef{contextArtifact.Artifact},
 		},
 	})
 	if err != nil || len(composed.Body.Contributions) != 0 || len(composed.Body.Decisions) != 1 ||
@@ -488,7 +488,7 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 		&GetWorkspaceRequest{Workspace: workspaceView.Workspace},
 	); !errors.Is(
 		err,
-		artifactstore.ErrCollectionNotFound,
+		basespec.ErrCollectionNotFound,
 	) {
 		t.Fatalf("GetWorkspace after purge error=%v, want ErrCollectionNotFound", err)
 	}
@@ -551,7 +551,7 @@ func sourceDraftForWorkspaceTest(config json.RawMessage) source.Draft {
 func findWorkspaceAttachment(
 	t *testing.T,
 	workspaceView WorkspaceView,
-	sourceID artifactstore.SourceID,
+	sourceID basespec.SourceID,
 ) WorkspaceAttachmentView {
 	t.Helper()
 	for _, value := range workspaceView.Attachments {
@@ -594,7 +594,7 @@ func concurrentWorkspaceUpdate(t *testing.T, api *API, workspaceView WorkspaceVi
 		switch {
 		case err == nil:
 			successes++
-		case errors.Is(err, artifactstore.ErrConflict):
+		case errors.Is(err, basespec.ErrConflict):
 			conflicts++
 		default:
 			t.Fatalf("concurrent UpdateWorkspace error=%v", err)

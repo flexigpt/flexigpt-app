@@ -5,15 +5,15 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 // ValidateManagedPackageDirectory validates one managed package directory
 // relative to its managed Source root.
 func ValidateManagedPackageDirectory(
-	directory artifactstore.Locator,
+	directory basespec.Locator,
 ) error {
-	return artifactstore.ValidatePortableLocator(directory, false)
+	return basespec.ValidatePortableLocator(directory, false)
 }
 
 // NormalizeManagedPackagePublication validates and returns an independently
@@ -28,7 +28,7 @@ func NormalizeManagedPackagePublication(
 		return ManagedPackagePublication{}, err
 	}
 	if input.ExpectedGeneration != "" {
-		if err := artifactstore.ValidateSourceGeneration(
+		if err := basespec.ValidateSourceGeneration(
 			input.ExpectedGeneration,
 		); err != nil {
 			return ManagedPackagePublication{}, err
@@ -37,27 +37,27 @@ func NormalizeManagedPackagePublication(
 	if len(input.Files) == 0 {
 		return ManagedPackagePublication{}, fmt.Errorf(
 			"%w: managed package must contain at least one file",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
-	if len(input.Files) > artifactstore.MaxDiscoveryEntries {
+	if len(input.Files) > basespec.MaxDiscoveryEntries {
 		return ManagedPackagePublication{}, fmt.Errorf(
 			"%w: managed package exceeds the file count limit",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
 	output := input
 	output.Files = make([]ManagedPackageFile, len(input.Files))
-	seen := make(map[artifactstore.Locator]struct{}, len(input.Files))
+	seen := make(map[basespec.Locator]struct{}, len(input.Files))
 	seenCaseFolded := make(
-		map[string]artifactstore.Locator,
+		map[string]basespec.Locator,
 		len(input.Files),
 	)
 	var total int64
 
 	for index, file := range input.Files {
-		if err := artifactstore.ValidatePortableLocator(
+		if err := basespec.ValidatePortableLocator(
 			file.Locator,
 			false,
 		); err != nil {
@@ -70,7 +70,7 @@ func NormalizeManagedPackagePublication(
 		if _, duplicate := seen[file.Locator]; duplicate {
 			return ManagedPackagePublication{}, fmt.Errorf(
 				"%w: duplicate managed package file %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				file.Locator,
 			)
 		}
@@ -80,17 +80,17 @@ func NormalizeManagedPackagePublication(
 		if previous, duplicate := seenCaseFolded[caseFolded]; duplicate {
 			return ManagedPackagePublication{}, fmt.Errorf(
 				"%w: managed package files %q and %q collide on case-insensitive filesystems",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				previous,
 				file.Locator,
 			)
 		}
 		seenCaseFolded[caseFolded] = file.Locator
 
-		if int64(len(file.Content)) > artifactstore.MaxScanBytes-total {
+		if int64(len(file.Content)) > basespec.MaxScanBytes-total {
 			return ManagedPackagePublication{}, fmt.Errorf(
 				"%w: managed package exceeds the byte limit",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		total += int64(len(file.Content))

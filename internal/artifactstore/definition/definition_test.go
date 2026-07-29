@@ -5,10 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-const definitionTestRootID artifactstore.RootID = "019d3150-6a15-7a6b-a34e-d9032342bc31"
+const definitionTestRootID basespec.RootID = "019d3150-6a15-7a6b-a34e-d9032342bc31"
 
 func definitionTestValue() Definition {
 	return Definition{
@@ -67,8 +68,8 @@ func TestCanonicalizeIsDeterministicAndOwnsMutableFields(t *testing.T) {
 	}
 
 	wrong := definitionTestValue()
-	wrong.Digest = artifactstore.DigestBytes([]byte("not this definition"))
-	if _, err := Canonicalize(wrong); !errors.Is(err, artifactstore.ErrDigestMismatch) {
+	wrong.Digest = cryptoutil.DigestBytes([]byte("not this definition"))
+	if _, err := Canonicalize(wrong); !errors.Is(err, basespec.ErrDigestMismatch) {
 		t.Fatalf("mismatched supplied digest error=%v, want ErrDigestMismatch", err)
 	}
 }
@@ -81,8 +82,8 @@ type definitionTestReader struct {
 
 func (r *definitionTestReader) Get(
 	context.Context,
-	artifactstore.RootID,
-	artifactstore.Digest,
+	basespec.RootID,
+	cryptoutil.Digest,
 ) (Definition, error) {
 	r.calls++
 	return r.value, r.err
@@ -98,7 +99,7 @@ type definitionTestRepository struct {
 
 func (r *definitionTestRepository) Put(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 	value Definition,
 ) (Definition, error) {
 	r.putCalls++
@@ -137,14 +138,14 @@ func TestReadCanonicalAndRootScopedRepositoryEnforceIntegrity(t *testing.T) {
 		stored.Digest,
 	); !errors.Is(
 		err,
-		artifactstore.ErrDigestMismatch,
+		basespec.ErrDigestMismatch,
 	) {
 		t.Fatalf("wrong reader result error=%v, want ErrDigestMismatch", err)
 	}
 
 	repository := &definitionTestRepository{definitionTestReader: definitionTestReader{value: stored}}
 	validated := 0
-	scoped, err := NewRootScopedRepository(repository, func(_ context.Context, rootID artifactstore.RootID) error {
+	scoped, err := NewRootScopedRepository(repository, func(_ context.Context, rootID basespec.RootID) error {
 		validated++
 		if rootID != definitionTestRootID {
 			t.Fatalf("validator root=%q", rootID)
@@ -171,8 +172,8 @@ func TestReadCanonicalAndRootScopedRepositoryEnforceIntegrity(t *testing.T) {
 	}
 
 	deniedRepository := &definitionTestRepository{}
-	denied, err := NewRootScopedRepository(deniedRepository, func(context.Context, artifactstore.RootID) error {
-		return artifactstore.ErrRootNotFound
+	denied, err := NewRootScopedRepository(deniedRepository, func(context.Context, basespec.RootID) error {
+		return basespec.ErrRootNotFound
 	})
 	if err != nil {
 		t.Fatalf("NewRootScopedRepository denied: %v", err)
@@ -183,7 +184,7 @@ func TestReadCanonicalAndRootScopedRepositoryEnforceIntegrity(t *testing.T) {
 		stored.Digest,
 	); !errors.Is(
 		err,
-		artifactstore.ErrRootNotFound,
+		basespec.ErrRootNotFound,
 	) {
 		t.Fatalf("denied Get error=%v", err)
 	}

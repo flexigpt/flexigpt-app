@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/agentskills-go"
 	"github.com/flexigpt/agentskills-go/fsskillprovider"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/skillstore"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
@@ -46,10 +46,10 @@ type SkillRuntime struct {
 	installedResyncGeneration uint64
 
 	workspaceRequestMu sync.Mutex
-	workspaceRequests  map[artifactstore.CollectionRef]workspaceReconcileRequest
+	workspaceRequests  map[basespec.CollectionRef]workspaceReconcileRequest
 
 	managedInstalled  runtimeDesiredView
-	managedWorkspaces map[artifactstore.CollectionRef]runtimeDesiredView
+	managedWorkspaces map[basespec.CollectionRef]runtimeDesiredView
 	managedRuntime    map[agentskillsSpec.SkillDef]string
 }
 
@@ -156,11 +156,11 @@ func NewSkillRuntime(
 		managedInstalled: runtimeDesiredView{
 			definitions: map[agentskillsSpec.SkillDef]string{},
 		},
-		managedWorkspaces: map[artifactstore.CollectionRef]runtimeDesiredView{},
+		managedWorkspaces: map[basespec.CollectionRef]runtimeDesiredView{},
 		managedRuntime:    map[agentskillsSpec.SkillDef]string{},
 		backgroundContext: backgroundContext,
 		backgroundCancel:  backgroundCancel,
-		workspaceRequests: map[artifactstore.CollectionRef]workspaceReconcileRequest{},
+		workspaceRequests: map[basespec.CollectionRef]workspaceReconcileRequest{},
 	}
 	value.bestEffortInstalledResync(context.Background(), "init")
 	return value, nil
@@ -194,14 +194,14 @@ func (s *SkillRuntime) RunScriptsEnabled() bool {
 // currently have derived Agent Skills runtime state. Application composition
 // uses this to remove a partition after a Workspace was retired or purged
 // through a generic Artifact Store lifecycle operation.
-func (s *SkillRuntime) ManagedWorkspaceRefs() []artifactstore.CollectionRef {
+func (s *SkillRuntime) ManagedWorkspaceRefs() []basespec.CollectionRef {
 	if s == nil {
 		return nil
 	}
 	s.rtResyncMu.Lock()
 	defer s.rtResyncMu.Unlock()
 
-	output := make([]artifactstore.CollectionRef, 0, len(s.managedWorkspaces))
+	output := make([]basespec.CollectionRef, 0, len(s.managedWorkspaces))
 	for ref := range s.managedWorkspaces {
 		output = append(output, ref)
 	}
@@ -313,7 +313,7 @@ func (s *SkillRuntime) Close() {
 		}
 	}
 	s.managedInstalled = newRuntimeDesiredView()
-	s.managedWorkspaces = map[artifactstore.CollectionRef]runtimeDesiredView{}
+	s.managedWorkspaces = map[basespec.CollectionRef]runtimeDesiredView{}
 	s.managedRuntime = map[agentskillsSpec.SkillDef]string{}
 	s.rtResyncMu.Unlock()
 

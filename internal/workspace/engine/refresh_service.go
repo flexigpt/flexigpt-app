@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 )
 
@@ -44,7 +44,7 @@ func NewRefresher(
 
 func (r *Refresher) Refresh(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 ) (refresh.Result, error) {
 	if err := workspace.Validate(); err != nil {
 		return refresh.Result{}, err

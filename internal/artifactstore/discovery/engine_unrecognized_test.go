@@ -8,20 +8,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const (
-	unrecognizedTestRootID       artifactstore.RootID       = "019d3150-6a12-7a6b-a34e-d9032342bc31"
-	unrecognizedTestCollectionID artifactstore.CollectionID = "019d3150-6a13-7a6b-a34e-d9032342bc31"
-	unrecognizedTestSourceID     artifactstore.SourceID     = "019d3150-6a14-7a6b-a34e-d9032342bc31"
+	unrecognizedTestRootID       basespec.RootID       = "019d3150-6a12-7a6b-a34e-d9032342bc31"
+	unrecognizedTestCollectionID basespec.CollectionID = "019d3150-6a13-7a6b-a34e-d9032342bc31"
+	unrecognizedTestSourceID     basespec.SourceID     = "019d3150-6a14-7a6b-a34e-d9032342bc31"
 )
 
 type unrecognizedTestDecoder struct{}
 
-func (unrecognizedTestDecoder) ID() artifactstore.DecoderID {
+func (unrecognizedTestDecoder) ID() basespec.DecoderID {
 	return "test.decoder"
 }
 
@@ -39,7 +41,7 @@ func (unrecognizedTestDecoder) Recognize(
 func (unrecognizedTestDecoder) Decode(
 	context.Context,
 	Candidate,
-) ([]Decoded, []artifactstore.Diagnostic) {
+) ([]Decoded, []diagnostic.Diagnostic) {
 	return nil, nil
 }
 
@@ -61,13 +63,13 @@ func (s unrecognizedTestSnapshot) Generation() string {
 
 func (s unrecognizedTestSnapshot) Stat(
 	ctx context.Context,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (source.Entry, error) {
 	if err := ctx.Err(); err != nil {
 		return source.Entry{}, err
 	}
 	if locator != "candidate.md" {
-		return source.Entry{}, artifactstore.ErrNotFound
+		return source.Entry{}, basespec.ErrNotFound
 	}
 	return source.Entry{
 		Locator:   locator,
@@ -79,23 +81,23 @@ func (s unrecognizedTestSnapshot) Stat(
 
 func (s unrecognizedTestSnapshot) ReadDir(
 	ctx context.Context,
-	_ artifactstore.Locator,
+	_ basespec.Locator,
 ) ([]source.Entry, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return nil, artifactstore.ErrNotFound
+	return nil, basespec.ErrNotFound
 }
 
 func (s unrecognizedTestSnapshot) Open(
 	ctx context.Context,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (io.ReadCloser, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if locator != "candidate.md" {
-		return nil, artifactstore.ErrNotFound
+		return nil, basespec.ErrNotFound
 	}
 	return io.NopCloser(bytes.NewReader(s.content)), nil
 }
@@ -123,8 +125,8 @@ func TestDiscoverMarksPreviouslyObservedCandidateMissingWhenUnrecognized(
 		t.Fatalf("create engine: %v", err)
 	}
 
-	definitionDigest := artifactstore.DigestBytes([]byte("definition"))
-	contentDigest := artifactstore.DigestBytes([]byte("previous content"))
+	definitionDigest := cryptoutil.DigestBytes([]byte("definition"))
+	contentDigest := cryptoutil.DigestBytes([]byte("previous content"))
 	previous := catalog.Occurrence{
 		RootID:       unrecognizedTestRootID,
 		CollectionID: unrecognizedTestCollectionID,
@@ -151,7 +153,7 @@ func TestDiscoverMarksPreviouslyObservedCandidateMissingWhenUnrecognized(
 		unrecognizedTestSnapshot{content: []byte("not a supported artifact")},
 		SourcePlan{
 			SourceID:         unrecognizedTestSourceID,
-			ExplicitLocators: []artifactstore.Locator{"candidate.md"},
+			ExplicitLocators: []basespec.Locator{"candidate.md"},
 			Authoritative:    false,
 		},
 		[]catalog.Occurrence{previous},

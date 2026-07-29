@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
@@ -57,7 +57,7 @@ func TestConventionRegistryMatchAndExpectedNameBoundaries(t *testing.T) {
 		t.Fatalf("NewConventionRegistry: %v", err)
 	}
 	for _, test := range []struct {
-		locator artifactstore.Locator
+		locator basespec.Locator
 		want    bool
 		name    string
 	}{

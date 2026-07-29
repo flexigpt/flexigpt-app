@@ -8,11 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -59,8 +60,8 @@ func (g *systemTestIDs) NewID(ctx context.Context) (string, error) {
 
 type systemTestDecoder struct{}
 
-func (systemTestDecoder) ID() artifactstore.DecoderID { return "test.decoder" }
-func (systemTestDecoder) Revision() string            { return "v1" }
+func (systemTestDecoder) ID() basespec.DecoderID { return "test.decoder" }
+func (systemTestDecoder) Revision() string       { return "v1" }
 func (systemTestDecoder) Recognize(context.Context, discovery.Candidate) discovery.Recognition {
 	return discovery.RecognitionPreferred
 }
@@ -68,7 +69,7 @@ func (systemTestDecoder) Recognize(context.Context, discovery.Candidate) discove
 func (systemTestDecoder) Decode(
 	context.Context,
 	discovery.Candidate,
-) ([]discovery.Decoded, []artifactstore.Diagnostic) {
+) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	return []discovery.Decoded{{Definition: definition.Definition{
 		Kind:          "test.artifact",
 		SchemaID:      "test.schema",
@@ -147,7 +148,7 @@ func TestComponentsManagedLifecycleRefreshAndOptimisticConcurrency(t *testing.T)
 		rootValue.Revision,
 	); !errors.Is(
 		err,
-		artifactstore.ErrConflict,
+		basespec.ErrConflict,
 	) {
 		t.Fatalf("retire root with children error=%v, want ErrConflict", err)
 	}
@@ -198,7 +199,7 @@ func TestComponentsManagedLifecycleRefreshAndOptimisticConcurrency(t *testing.T)
 		publication,
 	); !errors.Is(
 		err,
-		artifactstore.ErrConflict,
+		basespec.ErrConflict,
 	) {
 		t.Fatalf("stale source revision publication error=%v, want ErrConflict", err)
 	}
@@ -207,7 +208,7 @@ func TestComponentsManagedLifecycleRefreshAndOptimisticConcurrency(t *testing.T)
 		Revision: "test-refresh-v1",
 		Sources: []discovery.SourcePlan{{
 			SourceID:         sourceValue.ID,
-			ExplicitLocators: []artifactstore.Locator{"packages/one/artifact.json"},
+			ExplicitLocators: []basespec.Locator{"packages/one/artifact.json"},
 		}},
 	}, artifactPolicyAdapter{})
 	if err != nil {
@@ -221,7 +222,7 @@ func TestComponentsManagedLifecycleRefreshAndOptimisticConcurrency(t *testing.T)
 	if err != nil {
 		t.Fatalf("ListByCollection: %v", err)
 	}
-	if len(artifacts) != 1 || artifacts[0].ID != artifactstore.ArtifactID(systemTestArtifactID) ||
+	if len(artifacts) != 1 || artifacts[0].ID != basespec.ArtifactID(systemTestArtifactID) ||
 		string(artifacts[0].Data) != `{"a":1,"z":2}` {
 		t.Fatalf("artifacts=%#v", artifacts)
 	}
@@ -234,7 +235,7 @@ func TestComponentsManagedLifecycleRefreshAndOptimisticConcurrency(t *testing.T)
 		published.Source.Revision,
 	); !errors.Is(
 		err,
-		artifactstore.ErrConflict,
+		basespec.ErrConflict,
 	) {
 		t.Fatalf("retire attached source error=%v, want ErrConflict", err)
 	}
@@ -279,7 +280,7 @@ func TestComponentsManagedLifecycleRefreshAndOptimisticConcurrency(t *testing.T)
 			currentArtifact = result.value
 			continue
 		}
-		if !errors.Is(result.err, artifactstore.ErrConflict) {
+		if !errors.Is(result.err, basespec.ErrConflict) {
 			t.Fatalf("concurrent SetEnabled error=%v", result.err)
 		}
 	}
@@ -305,7 +306,7 @@ func TestComponentsManagedLifecycleRefreshAndOptimisticConcurrency(t *testing.T)
 	if changedSource.Source.Revision != published.Source.Revision+1 {
 		t.Fatalf("changed source=%#v", changedSource)
 	}
-	if _, err := components.Catalogs.GetCurrent(ctx, collectionRef); !errors.Is(err, artifactstore.ErrCatalogStale) {
+	if _, err := components.Catalogs.GetCurrent(ctx, collectionRef); !errors.Is(err, basespec.ErrCatalogStale) {
 		t.Fatalf("catalog after source mutation error=%v, want ErrCatalogStale", err)
 	}
 
@@ -343,7 +344,7 @@ func TestComponentsManagedLifecycleRefreshAndOptimisticConcurrency(t *testing.T)
 	if err := components.Roots.Purge(ctx, rootValue.ID, retiredRoot.Revision); err != nil {
 		t.Fatalf("Purge root: %v", err)
 	}
-	if _, err := components.Roots.Get(ctx, rootValue.ID); !errors.Is(err, artifactstore.ErrRootNotFound) {
+	if _, err := components.Roots.Get(ctx, rootValue.ID); !errors.Is(err, basespec.ErrRootNotFound) {
 		t.Fatalf("Get purged root error=%v", err)
 	}
 }
@@ -356,6 +357,6 @@ func (artifactPolicyAdapter) Derive(
 	collection.Collection,
 	catalog.Occurrence,
 	definition.Definition,
-) (artifact.Draft, bool, []artifactstore.Diagnostic) {
+) (artifact.Draft, bool, []diagnostic.Diagnostic) {
 	return artifact.Draft{Name: "Generated artifact", Enabled: true, Data: []byte(`{"z":2,"a":1}`)}, true, nil
 }

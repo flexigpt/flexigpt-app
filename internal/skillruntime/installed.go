@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	"github.com/flexigpt/flexigpt-app/internal/skillstore"
 	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
@@ -156,7 +156,7 @@ func (p *Installed) Render(ctx context.Context, request RenderRequest) (Rendered
 		//nolint:nilerr // Explicit rendered skill return.
 		return RenderedSkill{
 			Available: false,
-			Diagnostics: []artifactstore.Diagnostic{
+			Diagnostics: []diagnostic.Diagnostic{
 				unavailableDiagnostic("skill.provider.unavailable", "the installed Skill is unavailable"),
 			},
 		}, nil
@@ -164,7 +164,7 @@ func (p *Installed) Render(ctx context.Context, request RenderRequest) (Rendered
 	if response.Body.ID != ref.SkillID {
 		return RenderedSkill{
 			Available: false,
-			Diagnostics: []artifactstore.Diagnostic{
+			Diagnostics: []diagnostic.Diagnostic{
 				unavailableDiagnostic("skill.provider.stale-identity", "the installed Skill identity is stale"),
 			},
 		}, nil
@@ -184,7 +184,7 @@ func (p *Installed) Render(ctx context.Context, request RenderRequest) (Rendered
 		return RenderedSkill{
 			Skill:       projected,
 			Available:   false,
-			Diagnostics: append([]artifactstore.Diagnostic(nil), projected.Diagnostics...),
+			Diagnostics: append([]diagnostic.Diagnostic(nil), projected.Diagnostics...),
 		}, nil
 	}
 	rendered, err := p.runtime.RenderSkill(
@@ -203,7 +203,7 @@ func (p *Installed) Render(ctx context.Context, request RenderRequest) (Rendered
 		return RenderedSkill{
 			Skill:     projected,
 			Available: false,
-			Diagnostics: []artifactstore.Diagnostic{
+			Diagnostics: []diagnostic.Diagnostic{
 				unavailableDiagnostic("skill.provider.render-unavailable", "the installed Skill could not be rendered"),
 			},
 		}, nil
@@ -215,7 +215,7 @@ func (p *Installed) Render(ctx context.Context, request RenderRequest) (Rendered
 		Insert:           rendered.Body.Insert,
 		Arguments:        append([]agentskillsSpec.SkillArgument(nil), rendered.Body.Arguments...),
 		AppliedArguments: cloneStrings(rendered.Body.AppliedArguments),
-		Diagnostics:      append([]artifactstore.Diagnostic(nil), projected.Diagnostics...),
+		Diagnostics:      append([]diagnostic.Diagnostic(nil), projected.Diagnostics...),
 	}, nil
 }
 
@@ -226,14 +226,14 @@ func installedState(value skillstoreSpec.Skill) string {
 	return string(value.Presence.Status)
 }
 
-func installedDiagnostics(value skillstoreSpec.Skill) []artifactstore.Diagnostic {
-	var output []artifactstore.Diagnostic
+func installedDiagnostics(value skillstoreSpec.Skill) []diagnostic.Diagnostic {
+	var output []diagnostic.Diagnostic
 	for _, warning := range value.RuntimeWarnings {
 		if strings.TrimSpace(warning) != "" {
-			output = artifactstore.AppendDiagnostics(
+			output = diagnostic.AppendDiagnostics(
 				output,
-				artifactstore.Diagnostic{
-					Severity: artifactstore.DiagnosticWarning,
+				diagnostic.Diagnostic{
+					Severity: diagnostic.DiagnosticWarning,
 					Code:     "skill.provider.runtime-warning",
 					Message:  warning,
 				},
@@ -242,10 +242,10 @@ func installedDiagnostics(value skillstoreSpec.Skill) []artifactstore.Diagnostic
 	}
 	if value.Presence != nil && value.Presence.Status != skillstoreSpec.SkillPresencePresent &&
 		value.Presence.Status != skillstoreSpec.SkillPresenceUnknown {
-		output = artifactstore.AppendDiagnostics(
+		output = diagnostic.AppendDiagnostics(
 			output,
-			artifactstore.Diagnostic{
-				Severity: artifactstore.DiagnosticWarning,
+			diagnostic.Diagnostic{
+				Severity: diagnostic.DiagnosticWarning,
 				Code:     "skill.provider.source-unavailable",
 				Message:  "the installed Skill source is not currently available",
 			},

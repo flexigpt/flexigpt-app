@@ -4,96 +4,97 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Definition struct {
-	Digest         artifactstore.Digest         `json:"digest"`
-	Kind           artifactstore.ArtifactKind   `json:"kind"`
-	SchemaID       artifactstore.SchemaID       `json:"schemaID"`
-	SchemaVersion  string                       `json:"schemaVersion"`
-	LogicalName    artifactstore.LogicalName    `json:"logicalName"`
-	LogicalVersion artifactstore.LogicalVersion `json:"logicalVersion,omitempty"`
-	DisplayName    string                       `json:"displayName,omitempty"`
-	Description    string                       `json:"description,omitempty"`
-	Labels         map[string]string            `json:"labels,omitempty"`
-	Body           json.RawMessage              `json:"body"`
-	Dependencies   []Selector                   `json:"dependencies,omitempty"`
+	Digest         cryptoutil.Digest       `json:"digest"`
+	Kind           basespec.ArtifactKind   `json:"kind"`
+	SchemaID       basespec.SchemaID       `json:"schemaID"`
+	SchemaVersion  string                  `json:"schemaVersion"`
+	LogicalName    basespec.LogicalName    `json:"logicalName"`
+	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
+	DisplayName    string                  `json:"displayName,omitempty"`
+	Description    string                  `json:"description,omitempty"`
+	Labels         map[string]string       `json:"labels,omitempty"`
+	Body           json.RawMessage         `json:"body"`
+	Dependencies   []Selector              `json:"dependencies,omitempty"`
 }
 
 func (d Definition) Validate() error {
-	if err := artifactstore.ValidateDigest(d.Digest); err != nil {
+	if err := cryptoutil.ValidateDigest(d.Digest); err != nil {
 		return fmt.Errorf("definition: %w", err)
 	}
-	if err := artifactstore.ValidateArtifactKind(d.Kind); err != nil {
+	if err := basespec.ValidateArtifactKind(d.Kind); err != nil {
 		return fmt.Errorf("definition: %w", err)
 	}
-	if err := artifactstore.ValidateSchemaID(d.SchemaID); err != nil {
+	if err := basespec.ValidateSchemaID(d.SchemaID); err != nil {
 		return fmt.Errorf("definition: %w", err)
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"definition schema version",
 		d.SchemaVersion,
-		artifactstore.MaxVersionBytes,
+		basespec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateLogicalName(d.LogicalName); err != nil {
+	if err := basespec.ValidateLogicalName(d.LogicalName); err != nil {
 		return fmt.Errorf("definition: %w", err)
 	}
-	if err := artifactstore.ValidateLogicalVersion(d.LogicalVersion, true); err != nil {
+	if err := basespec.ValidateLogicalVersion(d.LogicalVersion, true); err != nil {
 		return fmt.Errorf("definition: %w", err)
 	}
-	if err := artifactstore.ValidateOptionalText(
+	if err := basespec.ValidateOptionalText(
 		"definition display name",
 		d.DisplayName,
-		artifactstore.MaxDisplayNameBytes,
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateOptionalText(
+	if err := basespec.ValidateOptionalText(
 		"definition description",
 		d.Description,
-		artifactstore.MaxDescriptionBytes,
+		basespec.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
-	if len(d.Labels) > artifactstore.MaxLabels {
+	if len(d.Labels) > basespec.MaxLabels {
 		return fmt.Errorf(
 			"%w: definition labels exceed %d entries",
-			artifactstore.ErrInvalid,
-			artifactstore.MaxLabels,
+			basespec.ErrInvalid,
+			basespec.MaxLabels,
 		)
 	}
 	for key, value := range d.Labels {
-		if err := artifactstore.ValidateIdentifier(
+		if err := basespec.ValidateIdentifier(
 			"definition label key",
 			key,
-			artifactstore.MaxKindBytes,
+			basespec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
-		if err := artifactstore.ValidateRequiredText(
+		if err := basespec.ValidateRequiredText(
 			"definition label value",
 			value,
-			artifactstore.MaxLabelValueBytes,
+			basespec.MaxLabelValueBytes,
 		); err != nil {
 			return err
 		}
 	}
-	if len(d.Dependencies) > artifactstore.MaxDefinitionDependencies {
+	if len(d.Dependencies) > basespec.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: definition dependencies exceed %d entries",
-			artifactstore.ErrInvalid,
-			artifactstore.MaxDefinitionDependencies,
+			basespec.ErrInvalid,
+			basespec.MaxDefinitionDependencies,
 		)
 	}
-	if _, err := jsoncanon.CanonicalizeObject(
+	if _, err := jsonutil.CanonicalizeObject(
 		d.Body,
-		artifactstore.MaxDefinitionBodyBytes,
+		basespec.MaxDefinitionBodyBytes,
 	); err != nil {
-		return fmt.Errorf("%w: definition body: %w", artifactstore.ErrInvalid, err)
+		return fmt.Errorf("%w: definition body: %w", basespec.ErrInvalid, err)
 	}
 	for index, selector := range d.Dependencies {
 		if err := selector.Validate(); err != nil {

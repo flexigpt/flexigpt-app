@@ -3,16 +3,16 @@ package contextadapter
 import (
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
 const workspaceContextSchemaVersionV1 = "v1"
 
 const (
-	contextKind      artifactstore.ArtifactKind = "workspace.context"
-	contextSchemaID  artifactstore.SchemaID     = "workspace.context.v1"
-	contextDecoderID artifactstore.DecoderID    = "workspace.context-markdown"
+	contextKind      basespec.ArtifactKind = "workspace.context"
+	contextSchemaID  basespec.SchemaID     = "workspace.context.v1"
+	contextDecoderID basespec.DecoderID    = "workspace.context-markdown"
 )
 
 const (
@@ -67,7 +67,7 @@ var contextConventionRegistry = []contextFileSupport{
 }
 
 func contextConventionFor(
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (contextFileSupport, bool) {
 	value := string(locator)
 	for _, convention := range contextConventionRegistry {

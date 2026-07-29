@@ -6,17 +6,17 @@ import (
 	"path"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Source struct {
-	ID          artifactstore.SourceID   `json:"id"`
-	RootID      artifactstore.RootID     `json:"rootID"`
-	Kind        artifactstore.SourceKind `json:"kind"`
-	DisplayName string                   `json:"displayName"`
-	Enabled     bool                     `json:"enabled"`
-	Config      json.RawMessage          `json:"-"`
+	ID          basespec.SourceID   `json:"id"`
+	RootID      basespec.RootID     `json:"rootID"`
+	Kind        basespec.SourceKind `json:"kind"`
+	DisplayName string              `json:"displayName"`
+	Enabled     bool                `json:"enabled"`
+	Config      json.RawMessage     `json:"-"`
 
 	// ContentGeneration is the last snapshot generation acknowledged after an
 	// application-managed content mutation. It is internal metadata only:
@@ -31,15 +31,15 @@ type Source struct {
 }
 
 type Summary struct {
-	ID          artifactstore.SourceID   `json:"id"`
-	RootID      artifactstore.RootID     `json:"rootID"`
-	Kind        artifactstore.SourceKind `json:"kind"`
-	DisplayName string                   `json:"displayName"`
-	Enabled     bool                     `json:"enabled"`
-	Revision    uint64                   `json:"revision"`
-	CreatedAt   time.Time                `json:"createdAt"`
-	ModifiedAt  time.Time                `json:"modifiedAt"`
-	RetiredAt   *time.Time               `json:"retiredAt,omitempty"`
+	ID          basespec.SourceID   `json:"id"`
+	RootID      basespec.RootID     `json:"rootID"`
+	Kind        basespec.SourceKind `json:"kind"`
+	DisplayName string              `json:"displayName"`
+	Enabled     bool                `json:"enabled"`
+	Revision    uint64              `json:"revision"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	ModifiedAt  time.Time           `json:"modifiedAt"`
+	RetiredAt   *time.Time          `json:"retiredAt,omitempty"`
 }
 
 func (s Source) Clone() Source {
@@ -50,40 +50,40 @@ func (s Source) Clone() Source {
 }
 
 func (s Summary) Validate() error {
-	if err := artifactstore.ValidateRootID(s.RootID); err != nil {
+	if err := basespec.ValidateRootID(s.RootID); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateSourceID(s.ID); err != nil {
+	if err := basespec.ValidateSourceID(s.ID); err != nil {
 		return err
 	}
 
-	if err := artifactstore.ValidateSourceKind(s.Kind); err != nil {
+	if err := basespec.ValidateSourceKind(s.Kind); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"source display name",
 		s.DisplayName,
-		artifactstore.MaxDisplayNameBytes,
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
 	if s.Revision == 0 {
-		return fmt.Errorf("%w: source revision must be greater than zero", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: source revision must be greater than zero", basespec.ErrInvalid)
 	}
 	if s.CreatedAt.IsZero() || s.ModifiedAt.IsZero() {
-		return fmt.Errorf("%w: source timestamps are required", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: source timestamps are required", basespec.ErrInvalid)
 	}
 	if s.ModifiedAt.Before(s.CreatedAt) {
-		return fmt.Errorf("%w: source modified time precedes creation", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: source modified time precedes creation", basespec.ErrInvalid)
 	}
 	if s.RetiredAt != nil {
 		if s.RetiredAt.IsZero() ||
 			s.RetiredAt.Before(s.CreatedAt) ||
 			s.RetiredAt.Before(s.ModifiedAt) {
-			return fmt.Errorf("%w: source retirement time is invalid", artifactstore.ErrInvalid)
+			return fmt.Errorf("%w: source retirement time is invalid", basespec.ErrInvalid)
 		}
 		if s.Enabled {
-			return fmt.Errorf("%w: retired source cannot be enabled", artifactstore.ErrInvalid)
+			return fmt.Errorf("%w: retired source cannot be enabled", basespec.ErrInvalid)
 		}
 	}
 	return nil
@@ -93,25 +93,25 @@ func (s Source) Validate() error {
 	if err := s.Summary().Validate(); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateSourceKind(s.Kind); err != nil {
+	if err := basespec.ValidateSourceKind(s.Kind); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"source display name",
 		s.DisplayName,
-		artifactstore.MaxDisplayNameBytes,
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if _, err := jsoncanon.CanonicalizeObject(
+	if _, err := jsonutil.CanonicalizeObject(
 		s.Config,
-		artifactstore.MaxConfigBytes,
+		basespec.MaxConfigBytes,
 	); err != nil {
-		return fmt.Errorf("%w: source config: %w", artifactstore.ErrInvalid, err)
+		return fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
 	}
 
 	if s.ContentGeneration != "" {
-		if err := artifactstore.ValidateSourceGeneration(
+		if err := basespec.ValidateSourceGeneration(
 			s.ContentGeneration,
 		); err != nil {
 			return fmt.Errorf("source content generation: %w", err)
@@ -136,7 +136,7 @@ func (s Source) Summary() Summary {
 }
 
 type Draft struct {
-	Kind        artifactstore.SourceKind
+	Kind        basespec.SourceKind
 	DisplayName string
 	Enabled     bool
 	Config      json.RawMessage
@@ -162,7 +162,7 @@ func cloneTime(value *time.Time) *time.Time {
 }
 
 type Entry struct {
-	Locator    artifactstore.Locator
+	Locator    basespec.Locator
 	Name       string
 	SizeBytes  int64
 	Mode       uint32
@@ -173,26 +173,26 @@ type Entry struct {
 }
 
 func (e Entry) Validate() error {
-	if err := artifactstore.ValidateLocator(e.Locator, true); err != nil {
+	if err := basespec.ValidateLocator(e.Locator, true); err != nil {
 		return err
 	}
 	if e.Name == "" {
-		return fmt.Errorf("%w: source entry name is empty", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: source entry name is empty", basespec.ErrInvalid)
 	}
 	if e.Locator != "." &&
 		e.Name != path.Base(string(e.Locator)) {
 		return fmt.Errorf(
 			"%w: source entry name does not match locator",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if e.SizeBytes < 0 {
-		return fmt.Errorf("%w: source entry size is negative", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: source entry size is negative", basespec.ErrInvalid)
 	}
 	if e.IsDirectory == e.IsRegular {
 		return fmt.Errorf(
 			"%w: source entry must identify exactly one entry type",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return nil

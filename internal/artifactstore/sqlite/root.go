@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 )
 
@@ -40,7 +40,7 @@ func (s *Store) createRoot(
 
 func (s *Store) getRoot(
 	ctx context.Context,
-	id artifactstore.RootID,
+	id basespec.RootID,
 ) (root.Root, error) {
 	value, err := scanRoot(s.db.QueryRowContext(
 		ctx,
@@ -52,7 +52,7 @@ func (s *Store) getRoot(
 	if errors.Is(err, sql.ErrNoRows) {
 		return root.Root{}, fmt.Errorf(
 			"%w: root %q",
-			artifactstore.ErrRootNotFound,
+			basespec.ErrRootNotFound,
 			id,
 		)
 	}
@@ -96,7 +96,7 @@ func (s *Store) updateRoot(
 	if expectedRevision == 0 ||
 		value.Revision != expectedRevision+1 ||
 		value.RetiredAt != nil {
-		return fmt.Errorf("%w: invalid root update", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid root update", basespec.ErrInvalid)
 	}
 	result, err := s.db.ExecContext(
 		ctx,
@@ -129,7 +129,7 @@ func (s *Store) retireRoot(
 	}
 	if value.RetiredAt == nil ||
 		value.Revision != expectedRevision+1 {
-		return fmt.Errorf("%w: invalid root retirement", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid root retirement", basespec.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -145,7 +145,7 @@ func (s *Store) retireRoot(
 	if activeChildren {
 		return fmt.Errorf(
 			"%w: root %q still owns active sources or collections",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			value.ID,
 		)
 	}
@@ -172,11 +172,11 @@ func (s *Store) retireRoot(
 
 func (s *Store) purgeRoot(
 	ctx context.Context,
-	id artifactstore.RootID,
+	id basespec.RootID,
 	expectedRevision uint64,
 ) error {
 	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected root revision is required", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: expected root revision is required", basespec.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -192,7 +192,7 @@ func (s *Store) purgeRoot(
 	if activeChildren {
 		return fmt.Errorf(
 			"%w: root %q still owns active sources or collections",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			id,
 		)
 	}
@@ -215,7 +215,7 @@ func (s *Store) purgeRoot(
 
 func (s *Store) requireActiveRoot(
 	ctx context.Context,
-	id artifactstore.RootID,
+	id basespec.RootID,
 ) error {
 	var marker int
 	err := s.db.QueryRowContext(
@@ -225,7 +225,7 @@ func (s *Store) requireActiveRoot(
 		string(id),
 	).Scan(&marker)
 	if errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("%w: root %q", artifactstore.ErrRootNotFound, id)
+		return fmt.Errorf("%w: root %q", basespec.ErrRootNotFound, id)
 	}
 	return err
 }
@@ -233,7 +233,7 @@ func (s *Store) requireActiveRoot(
 func getActiveRootTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	id artifactstore.RootID,
+	id basespec.RootID,
 ) (root.Root, error) {
 	value, err := scanRoot(tx.QueryRowContext(
 		ctx,
@@ -245,7 +245,7 @@ func getActiveRootTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return root.Root{}, fmt.Errorf(
 			"%w: root %q",
-			artifactstore.ErrRootNotFound,
+			basespec.ErrRootNotFound,
 			id,
 		)
 	}
@@ -255,7 +255,7 @@ func getActiveRootTx(
 func rootHasActiveChildrenTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	id artifactstore.RootID,
+	id basespec.RootID,
 ) (bool, error) {
 	var exists int
 	err := tx.QueryRowContext(
@@ -297,7 +297,7 @@ func scanRoot(row scanner) (root.Root, error) {
 		return root.Root{}, err
 	}
 	value := root.Root{
-		ID:          artifactstore.RootID(id),
+		ID:          basespec.RootID(id),
 		DisplayName: displayName,
 		Description: description,
 		Revision:    revision,
@@ -320,7 +320,7 @@ func requireOneChanged(
 		return err
 	}
 	if changed != 1 {
-		return fmt.Errorf("%w: %s", artifactstore.ErrConflict, message)
+		return fmt.Errorf("%w: %s", basespec.ErrConflict, message)
 	}
 	return nil
 }

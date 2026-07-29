@@ -6,36 +6,36 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type sourceReader interface {
 	Get(
 		ctx context.Context,
-		rootID artifactstore.RootID,
-		id artifactstore.SourceID,
+		rootID basespec.RootID,
+		id basespec.SourceID,
 	) (source.Summary, error)
 }
 
 type Service struct {
 	repository Repository
 	sources    sourceReader
-	ids        artifactstore.IDGenerator
-	clock      artifactstore.Clock
+	ids        basespec.IDGenerator
+	clock      basespec.Clock
 }
 
 func NewService(
 	repository Repository,
 	sources sourceReader,
-	ids artifactstore.IDGenerator,
-	clock artifactstore.Clock,
+	ids basespec.IDGenerator,
+	clock basespec.Clock,
 ) (*Service, error) {
 	if repository == nil || sources == nil || ids == nil || clock == nil {
 		return nil, fmt.Errorf(
 			"%w: collection service dependencies are incomplete",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -48,14 +48,14 @@ func NewService(
 
 func (s *Service) Create(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 	draft Draft,
 	attachmentDrafts []AttachmentDraft,
 ) (Collection, []Attachment, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Collection{}, nil, err
 	}
-	if err := artifactstore.ValidateCollectionKind(draft.Kind); err != nil {
+	if err := basespec.ValidateCollectionKind(draft.Kind); err != nil {
 		return Collection{}, nil, err
 	}
 	data, err := canonicalData(draft.Data)
@@ -68,7 +68,7 @@ func (s *Service) Create(
 	}
 	now := s.clock.Now().UTC()
 	value := Collection{
-		ID:          artifactstore.CollectionID(id),
+		ID:          basespec.CollectionID(id),
 		RootID:      rootID,
 		Kind:        draft.Kind,
 		DisplayName: draft.DisplayName,
@@ -84,7 +84,7 @@ func (s *Service) Create(
 	}
 
 	seenSources := make(
-		map[artifactstore.SourceID]struct{},
+		map[basespec.SourceID]struct{},
 		len(attachmentDrafts),
 	)
 	attachments := make([]Attachment, 0, len(attachmentDrafts))
@@ -92,7 +92,7 @@ func (s *Service) Create(
 		if _, duplicate := seenSources[draft.SourceID]; duplicate {
 			return Collection{}, nil, fmt.Errorf(
 				"%w: duplicate collection attachment for source %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				draft.SourceID,
 			)
 		}
@@ -104,7 +104,7 @@ func (s *Service) Create(
 		if draft.Enabled && !sourceValue.Enabled {
 			return Collection{}, nil, fmt.Errorf(
 				"%w: enabled attachment cannot use disabled source %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				draft.SourceID,
 			)
 		}
@@ -136,7 +136,7 @@ func (s *Service) Create(
 
 func (s *Service) Get(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return Collection{}, err
@@ -149,7 +149,7 @@ func (s *Service) Get(
 // active aggregate.
 func (s *Service) GetRetired(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return Collection{}, err
@@ -159,9 +159,9 @@ func (s *Service) GetRetired(
 
 func (s *Service) ListByRoot(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) ([]Collection, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return nil, err
 	}
 	return s.repository.ListByRoot(ctx, rootID)
@@ -169,13 +169,13 @@ func (s *Service) ListByRoot(
 
 func (s *Service) Update(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	update Update,
 ) (Collection, error) {
 	if update.ExpectedRevision == 0 {
 		return Collection{}, fmt.Errorf(
 			"%w: expected collection revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, ref)
@@ -185,7 +185,7 @@ func (s *Service) Update(
 	if current.Revision != update.ExpectedRevision {
 		return Collection{}, fmt.Errorf(
 			"%w: collection changed since it was read",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	data, err := canonicalData(update.Data)
@@ -200,7 +200,7 @@ func (s *Service) Update(
 	if current.DisplayName == next.DisplayName &&
 		current.Description == next.Description &&
 		current.Enabled == next.Enabled &&
-		jsoncanon.Equal(current.Data, next.Data) {
+		jsonutil.Equal(current.Data, next.Data) {
 		return current, nil
 	}
 	next.Revision++
@@ -216,7 +216,7 @@ func (s *Service) Update(
 
 func (s *Service) Retire(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	expectedRevision uint64,
 ) (Collection, error) {
 	current, err := s.repository.Get(ctx, ref)
@@ -226,7 +226,7 @@ func (s *Service) Retire(
 	if expectedRevision == 0 || current.Revision != expectedRevision {
 		return Collection{}, fmt.Errorf(
 			"%w: collection changed since it was read",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	now := s.nextTime(current.ModifiedAt)
@@ -246,13 +246,13 @@ func (s *Service) Retire(
 
 func (s *Service) Purge(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected collection revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return s.repository.Purge(ctx, ref, expectedRevision)
@@ -260,7 +260,7 @@ func (s *Service) Purge(
 
 func (s *Service) ListAttachments(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) ([]Attachment, error) {
 	if _, err := s.repository.Get(ctx, ref); err != nil {
 		return nil, err
@@ -270,8 +270,8 @@ func (s *Service) ListAttachments(
 
 func (s *Service) GetAttachment(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 ) (Attachment, error) {
 	if _, err := s.repository.Get(ctx, ref); err != nil {
 		return Attachment{}, err
@@ -281,7 +281,7 @@ func (s *Service) GetAttachment(
 
 func (s *Service) Attach(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	expectedCollectionRevision uint64,
 	draft AttachmentDraft,
 ) (Collection, Attachment, error) {
@@ -291,7 +291,7 @@ func (s *Service) Attach(
 	}
 	if expectedCollectionRevision == 0 ||
 		current.Revision != expectedCollectionRevision {
-		return Collection{}, Attachment{}, artifactstore.ErrConflict
+		return Collection{}, Attachment{}, basespec.ErrConflict
 	}
 	sourceValue, err := s.sources.Get(ctx, ref.RootID, draft.SourceID)
 	if err != nil {
@@ -300,7 +300,7 @@ func (s *Service) Attach(
 	if draft.Enabled && !sourceValue.Enabled {
 		return Collection{}, Attachment{}, fmt.Errorf(
 			"%w: enabled attachment cannot use a disabled source",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	data, err := canonicalData(draft.Data)
@@ -335,8 +335,8 @@ func (s *Service) Attach(
 
 func (s *Service) UpdateAttachment(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 	update AttachmentUpdate,
 ) (Collection, Attachment, error) {
 	currentCollection, err := s.repository.Get(ctx, ref)
@@ -349,7 +349,7 @@ func (s *Service) UpdateAttachment(
 	}
 	if currentCollection.Revision != update.ExpectedCollectionRevision ||
 		current.Revision != update.ExpectedAttachmentRevision {
-		return Collection{}, Attachment{}, artifactstore.ErrConflict
+		return Collection{}, Attachment{}, basespec.ErrConflict
 	}
 	sourceValue, err := s.sources.Get(ctx, ref.RootID, sourceID)
 	if err != nil {
@@ -358,7 +358,7 @@ func (s *Service) UpdateAttachment(
 	if update.Enabled && !sourceValue.Enabled {
 		return Collection{}, Attachment{}, fmt.Errorf(
 			"%w: enabled attachment cannot use disabled source",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	data, err := canonicalData(update.Data)
@@ -371,7 +371,7 @@ func (s *Service) UpdateAttachment(
 	next.Data = data
 	if current.Role == next.Role &&
 		current.Enabled == next.Enabled &&
-		jsoncanon.Equal(current.Data, next.Data) {
+		jsonutil.Equal(current.Data, next.Data) {
 		return currentCollection, current, nil
 	}
 	next.Revision++
@@ -397,8 +397,8 @@ func (s *Service) UpdateAttachment(
 
 func (s *Service) Detach(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
 ) (Collection, error) {
@@ -407,7 +407,7 @@ func (s *Service) Detach(
 		return Collection{}, err
 	}
 	if current.Revision != expectedCollectionRevision {
-		return Collection{}, artifactstore.ErrConflict
+		return Collection{}, basespec.ErrConflict
 	}
 	return s.repository.Detach(
 		ctx,
@@ -421,7 +421,7 @@ func (s *Service) Detach(
 
 func (s *Service) ReplaceAttachment(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	replacement AttachmentReplacement,
 ) (Collection, Attachment, error) {
 	current, err := s.repository.Get(ctx, ref)
@@ -430,7 +430,7 @@ func (s *Service) ReplaceAttachment(
 	}
 	if replacement.ExpectedCollectionRevision == 0 ||
 		current.Revision != replacement.ExpectedCollectionRevision {
-		return Collection{}, Attachment{}, artifactstore.ErrConflict
+		return Collection{}, Attachment{}, basespec.ErrConflict
 	}
 	sourceValue, err := s.sources.Get(
 		ctx,
@@ -443,7 +443,7 @@ func (s *Service) ReplaceAttachment(
 	if replacement.Replacement.Enabled && !sourceValue.Enabled {
 		return Collection{}, Attachment{}, fmt.Errorf(
 			"%w: enabled replacement cannot use disabled source",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	data, err := canonicalData(replacement.Replacement.Data)
@@ -480,9 +480,9 @@ func (s *Service) ReplaceAttachment(
 }
 
 func canonicalData(raw json.RawMessage) (json.RawMessage, error) {
-	value, err := jsoncanon.CanonicalizeObject(
+	value, err := jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxLocalDataBytes,
+		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err

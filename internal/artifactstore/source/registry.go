@@ -6,30 +6,30 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 type Registry struct {
-	adapters map[artifactstore.SourceKind]Adapter
-	kinds    []artifactstore.SourceKind
+	adapters map[basespec.SourceKind]Adapter
+	kinds    []basespec.SourceKind
 }
 
 func NewRegistry(adapters ...Adapter) (*Registry, error) {
-	values := make(map[artifactstore.SourceKind]Adapter, len(adapters))
-	kinds := make([]artifactstore.SourceKind, 0, len(adapters))
+	values := make(map[basespec.SourceKind]Adapter, len(adapters))
+	kinds := make([]basespec.SourceKind, 0, len(adapters))
 
 	for _, adapter := range adapters {
 		if adapter == nil {
-			return nil, fmt.Errorf("%w: source adapter is nil", artifactstore.ErrInvalid)
+			return nil, fmt.Errorf("%w: source adapter is nil", basespec.ErrInvalid)
 		}
 		kind := adapter.Kind()
-		if err := artifactstore.ValidateSourceKind(kind); err != nil {
+		if err := basespec.ValidateSourceKind(kind); err != nil {
 			return nil, err
 		}
 		if _, exists := values[kind]; exists {
 			return nil, fmt.Errorf(
 				"%w: duplicate source adapter %q",
-				artifactstore.ErrConflict,
+				basespec.ErrConflict,
 				kind,
 			)
 		}
@@ -45,7 +45,7 @@ func (r *Registry) Open(
 	value Source,
 ) (Snapshot, error) {
 	if ctx == nil {
-		return nil, artifactstore.ErrInvalid
+		return nil, basespec.ErrInvalid
 	}
 	if err := value.Validate(); err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (r *Registry) Open(
 	if !exists {
 		return nil, fmt.Errorf(
 			"%w: source adapter %q",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -70,7 +70,7 @@ func (r *Registry) Open(
 }
 
 func (r *Registry) SupportsLocalPath(
-	kind artifactstore.SourceKind,
+	kind basespec.SourceKind,
 ) bool {
 	adapter, exists := r.adapter(kind)
 	if !exists {
@@ -81,7 +81,7 @@ func (r *Registry) SupportsLocalPath(
 }
 
 func (r *Registry) SupportsManagedPackages(
-	kind artifactstore.SourceKind,
+	kind basespec.SourceKind,
 ) bool {
 	adapter, exists := r.adapter(kind)
 	if !exists {
@@ -100,10 +100,10 @@ func (r *Registry) SupportsManagedPackages(
 func (r *Registry) ResolveLocalPath(
 	ctx context.Context,
 	value Source,
-	locator artifactstore.Locator,
+	locator basespec.Locator,
 ) (string, error) {
 	if ctx == nil {
-		return "", artifactstore.ErrInvalid
+		return "", basespec.ErrInvalid
 	}
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -111,14 +111,14 @@ func (r *Registry) ResolveLocalPath(
 	if err := value.Validate(); err != nil {
 		return "", err
 	}
-	if err := artifactstore.ValidateLocator(locator, true); err != nil {
+	if err := basespec.ValidateLocator(locator, true); err != nil {
 		return "", err
 	}
 	adapter, exists := r.adapter(value.Kind)
 	if !exists {
 		return "", fmt.Errorf(
 			"%w: source adapter %q",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -126,7 +126,7 @@ func (r *Registry) ResolveLocalPath(
 	if !supported {
 		return "", fmt.Errorf(
 			"%w: source kind %q has no native filesystem path",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -138,7 +138,7 @@ func (r *Registry) ResolveLocalPath(
 	if !filepath.IsAbs(location) {
 		return "", fmt.Errorf(
 			"%w: source adapter returned a non-absolute local path",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return location, nil
@@ -152,7 +152,7 @@ func (r *Registry) PublishPackage(
 	if ctx == nil {
 		return "", fmt.Errorf(
 			"%w: managed Source publication context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -170,7 +170,7 @@ func (r *Registry) PublishPackage(
 	if !exists {
 		return "", fmt.Errorf(
 			"%w: source adapter %q",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -178,7 +178,7 @@ func (r *Registry) PublishPackage(
 	if !supported {
 		return "", fmt.Errorf(
 			"%w: source kind %q is not writable",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -190,10 +190,10 @@ func (r *Registry) PublishPackage(
 	if err != nil {
 		return "", err
 	}
-	if err := artifactstore.ValidateSourceGeneration(generation); err != nil {
+	if err := basespec.ValidateSourceGeneration(generation); err != nil {
 		return "", fmt.Errorf(
 			"%w: managed Source writer returned an invalid generation: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
@@ -203,13 +203,13 @@ func (r *Registry) PublishPackage(
 func (r *Registry) RemovePackage(
 	ctx context.Context,
 	value Source,
-	directory artifactstore.Locator,
+	directory basespec.Locator,
 	expectedGeneration string,
 ) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: managed Source removal context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -221,7 +221,7 @@ func (r *Registry) RemovePackage(
 	if err := ValidateManagedPackageDirectory(directory); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateSourceGeneration(
+	if err := basespec.ValidateSourceGeneration(
 		expectedGeneration,
 	); err != nil {
 		return err
@@ -231,7 +231,7 @@ func (r *Registry) RemovePackage(
 	if !exists {
 		return fmt.Errorf(
 			"%w: source adapter %q",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -239,7 +239,7 @@ func (r *Registry) RemovePackage(
 	if !supported {
 		return fmt.Errorf(
 			"%w: source kind %q is not writable",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -251,15 +251,15 @@ func (r *Registry) RemovePackage(
 	)
 }
 
-func (r *Registry) Kinds() []artifactstore.SourceKind {
+func (r *Registry) Kinds() []basespec.SourceKind {
 	if r == nil {
 		return nil
 	}
-	return append([]artifactstore.SourceKind(nil), r.kinds...)
+	return append([]basespec.SourceKind(nil), r.kinds...)
 }
 
 func (r *Registry) adapter(
-	kind artifactstore.SourceKind,
+	kind basespec.SourceKind,
 ) (Adapter, bool) {
 	if r == nil {
 		return nil, false

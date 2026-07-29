@@ -5,16 +5,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 type Reader interface {
 	// GetCurrent returns the latest published snapshot. It may return a valid
-	// snapshot together with an error wrapping artifactstore.ErrCatalogStale
+	// snapshot together with an error wrapping basespec.ErrCatalogStale
 	// when Collection, attachment, or Source metadata has changed.
 	GetCurrent(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
+		ref basespec.CollectionRef,
 	) (Snapshot, error)
 }
 
@@ -24,18 +24,18 @@ type Reader interface {
 func ReadCurrent(
 	ctx context.Context,
 	reader Reader,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (Snapshot, error) {
 	if reader == nil {
 		return Snapshot{}, fmt.Errorf(
 			"%w: catalog reader is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if ctx == nil {
 		return Snapshot{}, fmt.Errorf(
 			"%w: catalog read context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -46,19 +46,19 @@ func ReadCurrent(
 	}
 
 	value, err := reader.GetCurrent(ctx, ref)
-	if err != nil && !errors.Is(err, artifactstore.ErrCatalogStale) {
+	if err != nil && !errors.Is(err, basespec.ErrCatalogStale) {
 		return Snapshot{}, err
 	}
 	if value.RootID != ref.RootID || value.CollectionID != ref.CollectionID {
 		return Snapshot{}, fmt.Errorf(
 			"%w: catalog reader returned a catalog for another collection",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if validateErr := value.Validate(); validateErr != nil {
 		return Snapshot{}, fmt.Errorf(
 			"%w: catalog reader returned an invalid catalog: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			validateErr,
 		)
 	}

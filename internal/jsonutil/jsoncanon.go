@@ -1,4 +1,4 @@
-package jsoncanon
+package jsonutil
 
 import (
 	"bytes"

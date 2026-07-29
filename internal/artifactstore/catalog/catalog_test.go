@@ -6,18 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const (
-	catalogTestRootID       artifactstore.RootID       = "019d3150-6a16-7a6b-a34e-d9032342bc31"
-	catalogTestCollectionID artifactstore.CollectionID = "019d3150-6a17-7a6b-a34e-d9032342bc31"
-	catalogTestSourceID     artifactstore.SourceID     = "019d3150-6a18-7a6b-a34e-d9032342bc31"
+	catalogTestRootID       basespec.RootID       = "019d3150-6a16-7a6b-a34e-d9032342bc31"
+	catalogTestCollectionID basespec.CollectionID = "019d3150-6a17-7a6b-a34e-d9032342bc31"
+	catalogTestSourceID     basespec.SourceID     = "019d3150-6a18-7a6b-a34e-d9032342bc31"
 )
 
-func catalogTestOccurrence(locator artifactstore.Locator) Occurrence {
-	definitionDigest := artifactstore.DigestBytes([]byte("definition:" + string(locator)))
-	contentDigest := artifactstore.DigestBytes([]byte("content:" + string(locator)))
+func catalogTestOccurrence(locator basespec.Locator) Occurrence {
+	definitionDigest := cryptoutil.DigestBytes([]byte("definition:" + string(locator)))
+	contentDigest := cryptoutil.DigestBytes([]byte("content:" + string(locator)))
 	return Occurrence{
 		RootID:       catalogTestRootID,
 		CollectionID: catalogTestCollectionID,
@@ -42,11 +44,11 @@ func catalogTestSnapshot() Snapshot {
 		CollectionID:        catalogTestCollectionID,
 		Revision:            1,
 		CollectionRevision:  1,
-		AttachmentRevisions: map[artifactstore.SourceID]uint64{catalogTestSourceID: 1},
-		SourceRevisions:     map[artifactstore.SourceID]uint64{catalogTestSourceID: 1},
-		SourceGenerations:   map[artifactstore.SourceID]string{catalogTestSourceID: "generation-1"},
-		PlanFingerprint:     artifactstore.DigestBytes([]byte("plan")),
-		DecoderFingerprint:  artifactstore.DigestBytes([]byte("decoder")),
+		AttachmentRevisions: map[basespec.SourceID]uint64{catalogTestSourceID: 1},
+		SourceRevisions:     map[basespec.SourceID]uint64{catalogTestSourceID: 1},
+		SourceGenerations:   map[basespec.SourceID]string{catalogTestSourceID: "generation-1"},
+		PlanFingerprint:     cryptoutil.DigestBytes([]byte("plan")),
+		DecoderFingerprint:  cryptoutil.DigestBytes([]byte("decoder")),
 		PublishedAt:         time.Date(2026, 3, 25, 12, 1, 0, 0, time.UTC),
 		Occurrences:         []Occurrence{catalogTestOccurrence("one.json")},
 	}
@@ -63,8 +65,8 @@ func TestSnapshotCloneAndEqualityIgnoreOccurrenceOrder(t *testing.T) {
 	}
 	cloned := CloneSnapshot(original)
 	original.AttachmentRevisions[catalogTestSourceID] = 9
-	original.Occurrences[0].Diagnostics = []artifactstore.Diagnostic{{
-		Severity: artifactstore.DiagnosticWarning,
+	original.Occurrences[0].Diagnostics = []diagnostic.Diagnostic{{
+		Severity: diagnostic.DiagnosticWarning,
 		Code:     "test.warning",
 		Message:  "changed",
 	}}
@@ -88,21 +90,21 @@ type catalogTestReader struct {
 	err   error
 }
 
-func (r catalogTestReader) GetCurrent(context.Context, artifactstore.CollectionRef) (Snapshot, error) {
+func (r catalogTestReader) GetCurrent(context.Context, basespec.CollectionRef) (Snapshot, error) {
 	return r.value, r.err
 }
 
 func TestReadCurrentValidatesOwnershipAndPreservesStaleCatalogs(t *testing.T) {
 	t.Parallel()
 
-	ref := artifactstore.CollectionRef{RootID: catalogTestRootID, CollectionID: catalogTestCollectionID}
+	ref := basespec.CollectionRef{RootID: catalogTestRootID, CollectionID: catalogTestCollectionID}
 	value := catalogTestSnapshot()
 	read, err := ReadCurrent(
 		t.Context(),
-		catalogTestReader{value: value, err: artifactstore.ErrCatalogStale},
+		catalogTestReader{value: value, err: basespec.ErrCatalogStale},
 		ref,
 	)
-	if !errors.Is(err, artifactstore.ErrCatalogStale) {
+	if !errors.Is(err, basespec.ErrCatalogStale) {
 		t.Fatalf("stale read error=%v", err)
 	}
 	value.AttachmentRevisions[catalogTestSourceID] = 7
@@ -118,11 +120,11 @@ func TestReadCurrentValidatesOwnershipAndPreservesStaleCatalogs(t *testing.T) {
 		ref,
 	); !errors.Is(
 		err,
-		artifactstore.ErrInvalid,
+		basespec.ErrInvalid,
 	) {
 		t.Fatalf("wrong ownership error=%v, want ErrInvalid", err)
 	}
-	if _, err := ReadCurrent(t.Context(), nil, ref); !errors.Is(err, artifactstore.ErrInvalid) {
+	if _, err := ReadCurrent(t.Context(), nil, ref); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("nil reader error=%v, want ErrInvalid", err)
 	}
 	cancelled, cancel := context.WithCancel(t.Context())

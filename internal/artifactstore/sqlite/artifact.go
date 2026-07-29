@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const artifactColumns = `
@@ -30,7 +32,7 @@ const suppressionColumns = `
 
 func (s *Store) getArtifact(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 ) (artifact.Artifact, error) {
 	if err := ref.Validate(); err != nil {
 		return artifact.Artifact{}, err
@@ -48,7 +50,7 @@ func (s *Store) getArtifact(
 
 func (s *Store) listArtifactsByCollection(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) ([]artifact.Artifact, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -99,7 +101,7 @@ func (s *Store) listArtifactsByCollection(
 
 func (s *Store) listSuppressions(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) ([]artifact.Suppression, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -158,7 +160,7 @@ func (s *Store) updateArtifact(
 	}
 	if expectedRevision == 0 ||
 		value.Revision != expectedRevision+1 {
-		return fmt.Errorf("%w: invalid artifact update", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid artifact update", basespec.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -167,7 +169,7 @@ func (s *Store) updateArtifact(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := artifactstore.CollectionRef{
+	ref := basespec.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -179,12 +181,12 @@ func (s *Store) updateArtifact(
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 	if !sameArtifactManagedFields(current, value) {
 		return fmt.Errorf(
 			"%w: artifact update attempted to change source-derived fields",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -231,7 +233,7 @@ func (s *Store) createAdoptedArtifact(
 		value.Adoption != artifact.AdoptionObserved ||
 		value.State != artifact.StateAvailable ||
 		value.ResolvedDefinition == nil {
-		return fmt.Errorf("%w: invalid observed artifact creation", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid observed artifact creation", basespec.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -240,7 +242,7 @@ func (s *Store) createAdoptedArtifact(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := artifactstore.CollectionRef{
+	ref := basespec.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -250,7 +252,7 @@ func (s *Store) createAdoptedArtifact(
 	}
 	if !currentCollection.Enabled ||
 		currentCollection.Revision != expectedCollectionRevision {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 	if err := requireCurrentCatalogTx(
 		ctx,
@@ -286,7 +288,7 @@ func (s *Store) createPinnedArtifact(
 		(expectedCatalogRevision == 0 &&
 			(value.State != artifact.StateMissing ||
 				value.ResolvedDefinition != nil)) {
-		return fmt.Errorf("%w: invalid pinned artifact creation", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid pinned artifact creation", basespec.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -295,7 +297,7 @@ func (s *Store) createPinnedArtifact(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := artifactstore.CollectionRef{
+	ref := basespec.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -305,7 +307,7 @@ func (s *Store) createPinnedArtifact(
 	}
 	if !currentCollection.Enabled ||
 		currentCollection.Revision != expectedCollectionRevision {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 	if err := requireAttachedSourceTx(ctx, tx, ref, value.Binding.SourceID); err != nil {
 		return err
@@ -331,7 +333,7 @@ func (s *Store) createPinnedArtifact(
 
 func (s *Store) unadoptArtifact(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 	expectedRevision uint64,
 	suppression *artifact.Suppression,
 ) error {
@@ -341,7 +343,7 @@ func (s *Store) unadoptArtifact(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected artifact revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -359,10 +361,10 @@ func (s *Store) unadoptArtifact(
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 
-	collectionRef := artifactstore.CollectionRef{
+	collectionRef := basespec.CollectionRef{
 		RootID:       current.RootID,
 		CollectionID: current.CollectionID,
 	}
@@ -378,7 +380,7 @@ func (s *Store) unadoptArtifact(
 			suppression.Binding != current.Binding {
 			return fmt.Errorf(
 				"%w: suppression does not match artifact binding",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		if err := requireAttachedSourceTx(
@@ -420,7 +422,7 @@ func (s *Store) createSuppression(
 		return err
 	}
 	if expectedCollectionRevision == 0 || value.Revision != 1 {
-		return fmt.Errorf("%w: invalid suppression creation", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid suppression creation", basespec.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -429,7 +431,7 @@ func (s *Store) createSuppression(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := artifactstore.CollectionRef{
+	ref := basespec.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -439,7 +441,7 @@ func (s *Store) createSuppression(
 	}
 	if !currentCollection.Enabled ||
 		currentCollection.Revision != expectedCollectionRevision {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 	if err := requireAttachedSourceTx(ctx, tx, ref, value.Binding.SourceID); err != nil {
 		return err
@@ -452,8 +454,8 @@ func (s *Store) createSuppression(
 
 func (s *Store) deleteSuppression(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	binding artifactstore.SourceBinding,
+	ref basespec.CollectionRef,
+	binding basespec.SourceBinding,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -465,7 +467,7 @@ func (s *Store) deleteSuppression(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected suppression revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -507,7 +509,7 @@ func (s *Store) deleteSuppression(
 
 func (s *Store) purgeArtifact(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -516,7 +518,7 @@ func (s *Store) purgeArtifact(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected artifact revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -534,9 +536,9 @@ func (s *Store) purgeArtifact(
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
-	collectionRef := artifactstore.CollectionRef{
+	collectionRef := basespec.CollectionRef{
 		RootID:       current.RootID,
 		CollectionID: current.CollectionID,
 	}
@@ -675,9 +677,9 @@ func insertSuppressionTx(
 func requireNoSuppressionTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID artifactstore.RootID,
-	collectionID artifactstore.CollectionID,
-	binding artifactstore.SourceBinding,
+	rootID basespec.RootID,
+	collectionID basespec.CollectionID,
+	binding basespec.SourceBinding,
 ) error {
 	var exists int
 	err := tx.QueryRowContext(
@@ -705,7 +707,7 @@ func requireNoSuppressionTx(
 	if exists != 0 {
 		return fmt.Errorf(
 			"%w: source binding is explicitly suppressed",
-			artifactstore.ErrSuppressed,
+			basespec.ErrSuppressed,
 		)
 	}
 	return nil
@@ -714,9 +716,9 @@ func requireNoSuppressionTx(
 func requireNoArtifactForBindingTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID artifactstore.RootID,
-	collectionID artifactstore.CollectionID,
-	binding artifactstore.SourceBinding,
+	rootID basespec.RootID,
+	collectionID basespec.CollectionID,
+	binding basespec.SourceBinding,
 ) error {
 	var exists int
 	err := tx.QueryRowContext(
@@ -744,7 +746,7 @@ func requireNoArtifactForBindingTx(
 	if exists != 0 {
 		return fmt.Errorf(
 			"%w: source binding is already represented by an Artifact",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	return nil
@@ -753,7 +755,7 @@ func requireNoArtifactForBindingTx(
 func requireCurrentCatalogTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	var (
@@ -776,7 +778,7 @@ func requireCurrentCatalogTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf(
 			"%w: collection %q has no current catalog",
-			artifactstore.ErrCatalogUnavailable,
+			basespec.ErrCatalogUnavailable,
 			ref.CollectionID,
 		)
 	}
@@ -786,12 +788,12 @@ func requireCurrentCatalogTx(
 	if revision != expectedRevision {
 		return fmt.Errorf(
 			"%w: catalog changed during artifact adoption",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 
-	catalogAttachmentRevisions := map[artifactstore.SourceID]uint64{}
-	catalogSourceRevisions := map[artifactstore.SourceID]uint64{}
+	catalogAttachmentRevisions := map[basespec.SourceID]uint64{}
+	catalogSourceRevisions := map[basespec.SourceID]uint64{}
 	if err := decodeJSON(
 		attachmentRevisionsRaw,
 		&catalogAttachmentRevisions,
@@ -814,7 +816,7 @@ func requireCurrentCatalogTx(
 		!maps.Equal(catalogSourceRevisions, currentSources) {
 		return fmt.Errorf(
 			"%w: catalog metadata changed during artifact adoption",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	return nil
@@ -828,7 +830,7 @@ func requireAdoptableOccurrenceTx(
 	if value.ResolvedDefinition == nil {
 		return fmt.Errorf(
 			"%w: adopted artifact has no resolved definition",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -862,7 +864,7 @@ func requireAdoptableOccurrenceTx(
 	if exists == 0 {
 		return fmt.Errorf(
 			"%w: source occurrence is not currently adoptable",
-			artifactstore.ErrReferenceUnresolved,
+			basespec.ErrReferenceUnresolved,
 		)
 	}
 	return nil
@@ -884,11 +886,11 @@ func requirePinnedSourceStateTx(
 		return err
 	}
 	if value.State != expectedState ||
-		!digestPointersEqual(value.ResolvedDefinition, expectedDigest) ||
-		!artifactstore.EqualDiagnostics(value.Diagnostics, expectedDiagnostics) {
+		!cryptoutil.IsDigestEqual(value.ResolvedDefinition, expectedDigest) ||
+		!diagnostic.EqualDiagnostics(value.Diagnostics, expectedDiagnostics) {
 		return fmt.Errorf(
 			"%w: pinned artifact does not match the current source occurrence",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	return nil
@@ -935,7 +937,7 @@ type rowQueryer interface {
 func getArtifactTx(
 	ctx context.Context,
 	queryer rowQueryer,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 ) (artifact.Artifact, error) {
 	value, err := scanArtifact(queryer.QueryRowContext(
 		ctx,
@@ -955,7 +957,7 @@ func getArtifactTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: artifact %q in root %q",
-			artifactstore.ErrArtifactNotFound,
+			basespec.ErrArtifactNotFound,
 			ref.ArtifactID,
 			ref.RootID,
 		)
@@ -974,23 +976,13 @@ func sameArtifactManagedFields(
 		current.Kind == next.Kind &&
 		current.Name == next.Name &&
 		current.Adoption == next.Adoption &&
-		digestPointersEqual(
+		cryptoutil.IsDigestEqual(
 			current.ResolvedDefinition,
 			next.ResolvedDefinition,
 		) &&
 		current.State == next.State &&
-		artifactstore.EqualDiagnostics(current.Diagnostics, next.Diagnostics) &&
+		diagnostic.EqualDiagnostics(current.Diagnostics, next.Diagnostics) &&
 		current.CreatedAt.Equal(next.CreatedAt)
-}
-
-func digestPointersEqual(
-	left *artifactstore.Digest,
-	right *artifactstore.Digest,
-) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
-	}
-	return *left == *right
 }
 
 func scanArtifact(row scanner) (artifact.Artifact, error) {
@@ -1026,21 +1018,21 @@ func scanArtifact(row scanner) (artifact.Artifact, error) {
 		return artifact.Artifact{}, err
 	}
 
-	diagnostics := []artifactstore.Diagnostic{}
+	diagnostics := []diagnostic.Diagnostic{}
 	if err := decodeJSON(diagnosticsRaw, &diagnostics); err != nil {
 		return artifact.Artifact{}, err
 	}
 	value := artifact.Artifact{
-		ID:           artifactstore.ArtifactID(id),
-		RootID:       artifactstore.RootID(rootID),
-		CollectionID: artifactstore.CollectionID(collectionID),
-		Binding: artifactstore.SourceBinding{
-			SourceID:           artifactstore.SourceID(sourceID),
-			Locator:            artifactstore.Locator(locator),
-			SubresourceLocator: artifactstore.SubresourceLocator(subresource),
-			ExpectedKind:       artifactstore.ArtifactKind(kind),
+		ID:           basespec.ArtifactID(id),
+		RootID:       basespec.RootID(rootID),
+		CollectionID: basespec.CollectionID(collectionID),
+		Binding: basespec.SourceBinding{
+			SourceID:           basespec.SourceID(sourceID),
+			Locator:            basespec.Locator(locator),
+			SubresourceLocator: basespec.SubresourceLocator(subresource),
+			ExpectedKind:       basespec.ArtifactKind(kind),
 		},
-		Kind:               artifactstore.ArtifactKind(kind),
+		Kind:               basespec.ArtifactKind(kind),
 		Name:               name,
 		Enabled:            enabled != 0,
 		Adoption:           artifact.AdoptionMode(adoption),
@@ -1084,13 +1076,13 @@ func scanSuppression(row scanner) (artifact.Suppression, error) {
 	}
 
 	value := artifact.Suppression{
-		RootID:       artifactstore.RootID(rootID),
-		CollectionID: artifactstore.CollectionID(collectionID),
-		Binding: artifactstore.SourceBinding{
-			SourceID:           artifactstore.SourceID(sourceID),
-			Locator:            artifactstore.Locator(locator),
-			SubresourceLocator: artifactstore.SubresourceLocator(subresource),
-			ExpectedKind:       artifactstore.ArtifactKind(kind),
+		RootID:       basespec.RootID(rootID),
+		CollectionID: basespec.CollectionID(collectionID),
+		Binding: basespec.SourceBinding{
+			SourceID:           basespec.SourceID(sourceID),
+			Locator:            basespec.Locator(locator),
+			SubresourceLocator: basespec.SubresourceLocator(subresource),
+			ExpectedKind:       basespec.ArtifactKind(kind),
 		},
 		Revision:   revision,
 		CreatedAt:  parseTime(createdAt),

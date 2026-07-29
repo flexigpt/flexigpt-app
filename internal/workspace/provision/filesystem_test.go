@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
@@ -29,7 +29,7 @@ func TestCreateFilesystemCreatesSourceAndWorkspace(t *testing.T) {
 	var createdDraft source.Draft
 	var workspaceRequest engine.FilesystemWorkspaceRequest
 	sources := provisionTestSources{
-		create: func(_ context.Context, rootID artifactstore.RootID, draft source.Draft) (source.Summary, error) {
+		create: func(_ context.Context, rootID basespec.RootID, draft source.Draft) (source.Summary, error) {
 			if rootID != provisionTestRootID {
 				t.Fatalf("source root=%q", rootID)
 			}
@@ -83,10 +83,10 @@ func TestCreateFilesystemCompensatesWorkspaceFailure(t *testing.T) {
 	discardErr := errors.New("source discard failed")
 	var discardCalled bool
 	sources := provisionTestSources{
-		create: func(context.Context, artifactstore.RootID, source.Draft) (source.Summary, error) {
+		create: func(context.Context, basespec.RootID, source.Draft) (source.Summary, error) {
 			return source.Summary{ID: provisionTestSourceID, Revision: 3}, nil
 		},
-		discard: func(ctx context.Context, rootID artifactstore.RootID, id artifactstore.SourceID, revision uint64) error {
+		discard: func(ctx context.Context, rootID basespec.RootID, id basespec.SourceID, revision uint64) error {
 			discardCalled = true
 			if ctx.Err() != nil || rootID != provisionTestRootID || id != provisionTestSourceID || revision != 3 {
 				t.Fatalf(
@@ -121,7 +121,7 @@ func TestCreateFilesystemCompensatesWorkspaceFailure(t *testing.T) {
 
 	sourceErr := errors.New("source create failed")
 	service, err = NewService(provisionTestSources{
-		create: func(context.Context, artifactstore.RootID, source.Draft) (source.Summary, error) {
+		create: func(context.Context, basespec.RootID, source.Draft) (source.Summary, error) {
 			return source.Summary{}, sourceErr
 		},
 	}, workspaces)
@@ -140,18 +140,18 @@ func TestCreateFilesystemCompensatesWorkspaceFailure(t *testing.T) {
 }
 
 const (
-	provisionTestRootID   artifactstore.RootID   = "019d3150-6e01-7a6b-a34e-d9032342bc31"
-	provisionTestSourceID artifactstore.SourceID = "019d3150-6e02-7a6b-a34e-d9032342bc31"
+	provisionTestRootID   basespec.RootID   = "019d3150-6e01-7a6b-a34e-d9032342bc31"
+	provisionTestSourceID basespec.SourceID = "019d3150-6e02-7a6b-a34e-d9032342bc31"
 )
 
 type provisionTestSources struct {
-	create  func(context.Context, artifactstore.RootID, source.Draft) (source.Summary, error)
-	discard func(context.Context, artifactstore.RootID, artifactstore.SourceID, uint64) error
+	create  func(context.Context, basespec.RootID, source.Draft) (source.Summary, error)
+	discard func(context.Context, basespec.RootID, basespec.SourceID, uint64) error
 }
 
 func (s provisionTestSources) Create(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 	draft source.Draft,
 ) (source.Summary, error) {
 	if s.create == nil {
@@ -162,8 +162,8 @@ func (s provisionTestSources) Create(
 
 func (s provisionTestSources) Discard(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	id artifactstore.SourceID,
+	rootID basespec.RootID,
+	id basespec.SourceID,
 	revision uint64,
 ) error {
 	if s.discard == nil {

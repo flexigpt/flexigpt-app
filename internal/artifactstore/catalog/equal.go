@@ -3,7 +3,8 @@ package catalog
 import (
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 // EqualSnapshot compares the semantic contents of two catalog snapshots.
@@ -20,7 +21,7 @@ func EqualSnapshot(left, right Snapshot) bool {
 		!maps.Equal(left.AttachmentRevisions, right.AttachmentRevisions) ||
 		!maps.Equal(left.SourceRevisions, right.SourceRevisions) ||
 		!maps.Equal(left.SourceGenerations, right.SourceGenerations) ||
-		!artifactstore.EqualDiagnostics(left.Diagnostics, right.Diagnostics) {
+		!diagnostic.EqualDiagnostics(left.Diagnostics, right.Diagnostics) {
 		return false
 	}
 
@@ -57,20 +58,10 @@ func equalOccurrence(left, right Occurrence) bool {
 		left.Kind == right.Kind &&
 		left.LogicalName == right.LogicalName &&
 		left.LogicalVersion == right.LogicalVersion &&
-		equalDigest(left.DefinitionDigest, right.DefinitionDigest) &&
-		equalDigest(left.SourceContentDigest, right.SourceContentDigest) &&
+		cryptoutil.IsDigestEqual(left.DefinitionDigest, right.DefinitionDigest) &&
+		cryptoutil.IsDigestEqual(left.SourceContentDigest, right.SourceContentDigest) &&
 		left.DecoderID == right.DecoderID &&
 		left.State == right.State &&
 		left.ObservedAt.Equal(right.ObservedAt) &&
-		artifactstore.EqualDiagnostics(left.Diagnostics, right.Diagnostics)
-}
-
-func equalDigest(
-	left *artifactstore.Digest,
-	right *artifactstore.Digest,
-) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
-	}
-	return *left == *right
+		diagnostic.EqualDiagnostics(left.Diagnostics, right.Diagnostics)
 }

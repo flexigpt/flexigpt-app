@@ -6,11 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
@@ -95,7 +97,7 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 	t.Parallel()
 
 	discovery := engine.DiscoveryPreferences{
-		AdditionalLocators: []artifactstore.Locator{"docs/guide.md"},
+		AdditionalLocators: []basespec.Locator{"docs/guide.md"},
 		AdditionalRoots:    []engine.DiscoveryRoot{{Root: "docs", Recursive: true, IncludePatterns: []string{"*.md"}}},
 		IncludeReadme:      true,
 	}
@@ -157,7 +159,7 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 	}
 
 	definitionValue := definition.Definition{
-		Digest:        artifactstore.DigestBytes([]byte("definition")),
+		Digest:        cryptoutil.DigestBytes([]byte("definition")),
 		Kind:          "test.kind",
 		SchemaID:      "test.schema",
 		SchemaVersion: "v1",
@@ -175,12 +177,12 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 		t.Fatalf("workspaceDefinitionViewOf leaked storage: %#v", definitionValue)
 	}
 
-	digest := artifactstore.DigestBytes([]byte("resolved"))
+	digest := cryptoutil.DigestBytes([]byte("resolved"))
 	artifactValue := artifact.Artifact{
 		ID:           "019d3150-7304-7a6b-a34e-d9032342bc31",
 		RootID:       workspaceValue.Collection.RootID,
 		CollectionID: workspaceValue.Collection.ID,
-		Binding: artifactstore.SourceBinding{
+		Binding: basespec.SourceBinding{
 			SourceID:     workspaceValue.PrimarySourceID,
 			Locator:      "AGENTS.md",
 			ExpectedKind: "test.kind",
@@ -201,12 +203,12 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 		artifactView.Diagnostics[0].Code != engine.DiagnosticCodeProjectionInvalid {
 		t.Fatalf("workspaceArtifactViewOf=%#v", artifactView)
 	}
-	*artifactView.ResolvedDefinition = artifactstore.DigestBytes([]byte("changed"))
+	*artifactView.ResolvedDefinition = cryptoutil.DigestBytes([]byte("changed"))
 	if *artifactValue.ResolvedDefinition != digest {
 		t.Fatal("workspaceArtifactViewOf reused digest pointer")
 	}
 
-	occurrenceDigest := artifactstore.DigestBytes([]byte("occurrence"))
+	occurrenceDigest := cryptoutil.DigestBytes([]byte("occurrence"))
 	occurrence := catalog.Occurrence{
 		Key: catalog.OccurrenceKey{
 			CollectionID: workspaceValue.Collection.ID,
@@ -230,8 +232,8 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 func TestContextAndSkillViewConversionsOwnSlices(t *testing.T) {
 	t.Parallel()
 
-	diagnostic := artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticWarning,
+	d := diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticWarning,
 		Code:     "test.warning",
 		Message:  "warning",
 	}
@@ -241,10 +243,10 @@ func TestContextAndSkillViewConversionsOwnSlices(t *testing.T) {
 			CollectionID: "019d3150-7306-7a6b-a34e-d9032342bc31",
 		},
 		CatalogRevision: 4,
-		Diagnostics:     []artifactstore.Diagnostic{diagnostic},
+		Diagnostics:     []diagnostic.Diagnostic{d},
 		Contributions: []contextadapter.ContextContribution{
 			{
-				Artifact: artifactstore.ArtifactRef{
+				Artifact: basespec.ArtifactRef{
 					RootID:     "019d3150-7305-7a6b-a34e-d9032342bc31",
 					ArtifactID: "019d3150-7307-7a6b-a34e-d9032342bc31",
 				},
@@ -269,7 +271,7 @@ func TestContextAndSkillViewConversionsOwnSlices(t *testing.T) {
 			Tags:      []string{"one"},
 			Arguments: []skilladapter.SkillArgument{{Name: "argument"}},
 		},
-		Diagnostics: []artifactstore.Diagnostic{diagnostic},
+		Diagnostics: []diagnostic.Diagnostic{d},
 	}
 	skillView := workspaceSkillViewOf(skill)
 	skillView.Skill.Tags[0] = "changed"

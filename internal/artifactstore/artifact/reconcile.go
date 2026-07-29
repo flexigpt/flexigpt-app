@@ -6,16 +6,18 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type bindingIdentity struct {
-	CollectionID artifactstore.CollectionID
-	Binding      artifactstore.SourceBinding
+	CollectionID basespec.CollectionID
+	Binding      basespec.SourceBinding
 }
 
 // occurrenceIdentity intentionally excludes ExpectedKind. A source can stop
@@ -23,13 +25,13 @@ type bindingIdentity struct {
 // location. Existing Artifacts must become incompatible rather than silently
 // becoming missing while a second automatically adopted Artifact is created.
 type occurrenceIdentity struct {
-	SourceID           artifactstore.SourceID
-	Locator            artifactstore.Locator
-	SubresourceLocator artifactstore.SubresourceLocator
+	SourceID           basespec.SourceID
+	Locator            basespec.Locator
+	SubresourceLocator basespec.SubresourceLocator
 }
 
 func occurrenceIdentityForBinding(
-	binding artifactstore.SourceBinding,
+	binding basespec.SourceBinding,
 ) occurrenceIdentity {
 	return occurrenceIdentity{
 		SourceID:           binding.SourceID,
@@ -47,18 +49,18 @@ func occurrenceIdentityForKey(key catalog.OccurrenceKey) occurrenceIdentity {
 }
 
 type Reconciler struct {
-	ids   artifactstore.IDGenerator
-	clock artifactstore.Clock
+	ids   basespec.IDGenerator
+	clock basespec.Clock
 }
 
 func NewReconciler(
-	ids artifactstore.IDGenerator,
-	clock artifactstore.Clock,
+	ids basespec.IDGenerator,
+	clock basespec.Clock,
 ) (*Reconciler, error) {
 	if ids == nil || clock == nil {
 		return nil, fmt.Errorf(
 			"%w: artifact reconciler dependencies are incomplete",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return &Reconciler{ids: ids, clock: clock}, nil
@@ -74,14 +76,14 @@ func DeriveSourceState(
 	current Artifact,
 	occurrence *catalog.Occurrence,
 ) (
-	*artifactstore.Digest,
+	*cryptoutil.Digest,
 	State,
-	[]artifactstore.Diagnostic,
+	[]diagnostic.Diagnostic,
 	error,
 ) {
 	if occurrence == nil || occurrence.State == catalog.OccurrenceMissing {
-		return nil, StateMissing, []artifactstore.Diagnostic{{
-			Severity: artifactstore.DiagnosticWarning,
+		return nil, StateMissing, []diagnostic.Diagnostic{{
+			Severity: diagnostic.DiagnosticWarning,
 			Code:     "artifact.source-missing",
 			Message:  "the artifact source binding is missing",
 		}}, nil
@@ -91,32 +93,32 @@ func DeriveSourceState(
 	case catalog.OccurrenceInvalid:
 		return nil,
 			StateInvalid,
-			artifactstore.CloneDiagnostics(occurrence.Diagnostics),
+			diagnostic.CloneDiagnostics(occurrence.Diagnostics),
 			nil
 
 	case catalog.OccurrenceValid:
 		if occurrence.DefinitionDigest == nil {
 			return nil, "", nil, fmt.Errorf(
 				"%w: valid source occurrence has no definition digest",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 
-		resolved := cloneDigest(occurrence.DefinitionDigest)
+		resolved := cryptoutil.CloneDigest(occurrence.DefinitionDigest)
 		if occurrence.Kind == current.Kind {
 			return resolved,
 				StateAvailable,
-				artifactstore.CloneDiagnostics(occurrence.Diagnostics),
+				diagnostic.CloneDiagnostics(occurrence.Diagnostics),
 				nil
 		}
 
-		diagnostics := artifactstore.AppendDiagnostics(
+		diagnostics := diagnostic.AppendDiagnostics(
 			occurrence.Diagnostics,
-			artifactstore.Diagnostic{
-				Severity: artifactstore.DiagnosticError,
+			diagnostic.Diagnostic{
+				Severity: diagnostic.DiagnosticError,
 				Code:     "artifact.kind-incompatible",
 				Message:  "the source occurrence changed artifact kind",
-				Location: &artifactstore.DiagnosticLocation{
+				Location: &diagnostic.DiagnosticLocation{
 					Locator:            current.Binding.Locator,
 					SubresourceLocator: current.Binding.SubresourceLocator,
 				},
@@ -127,7 +129,7 @@ func DeriveSourceState(
 	default:
 		return nil, "", nil, fmt.Errorf(
 			"%w: unsupported occurrence state %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			occurrence.State,
 		)
 	}
@@ -145,7 +147,7 @@ func (r *Reconciler) Reconcile(
 	if definitions == nil || policy == nil {
 		return Reconciliation{}, fmt.Errorf(
 			"%w: artifact reconciliation dependencies are incomplete",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := collectionValue.Validate(); err != nil {
@@ -178,7 +180,7 @@ func (r *Reconciler) Reconcile(
 			occurrence.CollectionID != collectionValue.ID {
 			return Reconciliation{}, fmt.Errorf(
 				"%w: occurrence belongs to another collection",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 
@@ -186,7 +188,7 @@ func (r *Reconciler) Reconcile(
 		if _, duplicate := occurrencesBySource[sourceIdentity]; duplicate {
 			return Reconciliation{}, fmt.Errorf(
 				"%w: duplicate source occurrence",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		occurrencesBySource[sourceIdentity] = occurrence
@@ -197,7 +199,7 @@ func (r *Reconciler) Reconcile(
 
 		identity := bindingIdentity{
 			CollectionID: collectionValue.ID,
-			Binding: artifactstore.SourceBinding{
+			Binding: basespec.SourceBinding{
 				SourceID:           occurrence.Key.SourceID,
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,
@@ -207,7 +209,7 @@ func (r *Reconciler) Reconcile(
 		if _, duplicate := occurrencesByBinding[identity]; duplicate {
 			return Reconciliation{}, fmt.Errorf(
 				"%w: duplicate typed occurrence",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 
@@ -236,7 +238,7 @@ func (r *Reconciler) Reconcile(
 			value.CollectionID != collectionValue.ID {
 			return Reconciliation{}, fmt.Errorf(
 				"%w: artifact belongs to another collection",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 
@@ -247,7 +249,7 @@ func (r *Reconciler) Reconcile(
 		if _, duplicate := existingByBinding[identity]; duplicate {
 			return Reconciliation{}, fmt.Errorf(
 				"%w: duplicate artifact source binding",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 
@@ -269,7 +271,7 @@ func (r *Reconciler) Reconcile(
 			value.CollectionID != collectionValue.ID {
 			return Reconciliation{}, fmt.Errorf(
 				"%w: suppression belongs to another collection",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 
@@ -318,13 +320,14 @@ func (r *Reconciler) Reconcile(
 		if err := next.Validate(); err != nil {
 			return Reconciliation{}, err
 		}
+
 		result.Updates = append(result.Updates, SourceStateUpdate{
 			ArtifactID:         next.ID,
 			RootID:             next.RootID,
 			CollectionID:       next.CollectionID,
-			ResolvedDefinition: cloneDigest(next.ResolvedDefinition),
+			ResolvedDefinition: cryptoutil.CloneDigest(next.ResolvedDefinition),
 			State:              next.State,
-			Diagnostics:        artifactstore.CloneDiagnostics(next.Diagnostics),
+			Diagnostics:        diagnostic.CloneDiagnostics(next.Diagnostics),
 			Revision:           next.Revision,
 			ModifiedAt:         next.ModifiedAt,
 			ExpectedRevision:   current.Revision,
@@ -381,21 +384,21 @@ func (r *Reconciler) Reconcile(
 			occurrence,
 			value,
 		)
-		if err := artifactstore.ValidateDiagnostics(diagnostics); err != nil {
+		if err := diagnostic.ValidateDiagnostics(diagnostics); err != nil {
 			return Reconciliation{}, err
 		}
 
-		result.Diagnostics = artifactstore.AppendDiagnostics(
+		result.Diagnostics = diagnostic.AppendDiagnostics(
 			result.Diagnostics,
 			diagnostics...,
 		)
-		if !create || artifactstore.ContainsErrorDiagnostic(diagnostics) {
+		if !create || diagnostic.ContainsErrorDiagnostic(diagnostics) {
 			continue
 		}
 
-		data, err := jsoncanon.CanonicalizeObject(
+		data, err := jsonutil.CanonicalizeObject(
 			draft.Data,
-			artifactstore.MaxLocalDataBytes,
+			basespec.MaxLocalDataBytes,
 		)
 		if err != nil {
 			return Reconciliation{}, err
@@ -408,7 +411,7 @@ func (r *Reconciler) Reconcile(
 
 		resolved := *occurrence.DefinitionDigest
 		created := Artifact{
-			ID:                 artifactstore.ArtifactID(id),
+			ID:                 basespec.ArtifactID(id),
 			RootID:             collectionValue.RootID,
 			CollectionID:       collectionValue.ID,
 			Binding:            identity.Binding,
@@ -419,7 +422,7 @@ func (r *Reconciler) Reconcile(
 			ResolvedDefinition: &resolved,
 			Data:               json.RawMessage(data),
 			State:              StateAvailable,
-			Diagnostics: artifactstore.AppendDiagnostics(
+			Diagnostics: diagnostic.AppendDiagnostics(
 				occurrence.Diagnostics,
 				diagnostics...,
 			),
@@ -440,18 +443,10 @@ func (r *Reconciler) Reconcile(
 func equivalentSourceState(left, right Artifact) bool {
 	return left.State == right.State &&
 		digestPointersEqual(left.ResolvedDefinition, right.ResolvedDefinition) &&
-		artifactstore.EqualDiagnostics(left.Diagnostics, right.Diagnostics)
+		diagnostic.EqualDiagnostics(left.Diagnostics, right.Diagnostics)
 }
 
-func cloneDigest(value *artifactstore.Digest) *artifactstore.Digest {
-	if value == nil {
-		return nil
-	}
-	copyValue := *value
-	return &copyValue
-}
-
-func digestPointersEqual(left, right *artifactstore.Digest) bool {
+func digestPointersEqual(left, right *cryptoutil.Digest) bool {
 	if left == nil || right == nil {
 		return left == nil && right == nil
 	}

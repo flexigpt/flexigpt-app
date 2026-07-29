@@ -7,9 +7,11 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Recognition int
@@ -21,26 +23,26 @@ const (
 )
 
 type Candidate struct {
-	SourceID            artifactstore.SourceID
-	SourceKind          artifactstore.SourceKind
-	Locator             artifactstore.Locator
-	SourceContentDigest artifactstore.Digest
+	SourceID            basespec.SourceID
+	SourceKind          basespec.SourceKind
+	Locator             basespec.Locator
+	SourceContentDigest cryptoutil.Digest
 	Content             []byte
-	RequestedDecoderIDs []artifactstore.DecoderID
+	RequestedDecoderIDs []basespec.DecoderID
 }
 
-func (c Candidate) RequestsDecoder(id artifactstore.DecoderID) bool {
+func (c Candidate) RequestsDecoder(id basespec.DecoderID) bool {
 	return slices.Contains(c.RequestedDecoderIDs, id)
 }
 
 type Decoded struct {
-	SubresourceLocator artifactstore.SubresourceLocator
+	SubresourceLocator basespec.SubresourceLocator
 	Definition         definition.Definition
-	Diagnostics        []artifactstore.Diagnostic
+	Diagnostics        []diagnostic.Diagnostic
 }
 
 type Decoder interface {
-	ID() artifactstore.DecoderID
+	ID() basespec.DecoderID
 	Revision() string
 	Recognize(ctx context.Context, candidate Candidate) Recognition
 
@@ -50,38 +52,38 @@ type Decoder interface {
 	Decode(
 		ctx context.Context,
 		candidate Candidate,
-	) ([]Decoded, []artifactstore.Diagnostic)
+	) ([]Decoded, []diagnostic.Diagnostic)
 }
 
 type DecoderRegistry struct {
 	decoders []Decoder
-	byID     map[artifactstore.DecoderID]Decoder
+	byID     map[basespec.DecoderID]Decoder
 }
 
 func NewDecoderRegistry(
 	decoders ...Decoder,
 ) (*DecoderRegistry, error) {
-	byID := make(map[artifactstore.DecoderID]Decoder, len(decoders))
+	byID := make(map[basespec.DecoderID]Decoder, len(decoders))
 	ordered := make([]Decoder, 0, len(decoders))
 	for _, decoder := range decoders {
 		if decoder == nil {
-			return nil, fmt.Errorf("%w: decoder is nil", artifactstore.ErrInvalid)
+			return nil, fmt.Errorf("%w: decoder is nil", basespec.ErrInvalid)
 		}
 		id := decoder.ID()
-		if err := artifactstore.ValidateDecoderID(id); err != nil {
+		if err := basespec.ValidateDecoderID(id); err != nil {
 			return nil, err
 		}
-		if err := artifactstore.ValidateRequiredText(
+		if err := basespec.ValidateRequiredText(
 			"decoder revision",
 			decoder.Revision(),
-			artifactstore.MaxVersionBytes,
+			basespec.MaxVersionBytes,
 		); err != nil {
 			return nil, err
 		}
 		if _, duplicate := byID[id]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate decoder %q",
-				artifactstore.ErrConflict,
+				basespec.ErrConflict,
 				id,
 			)
 		}
@@ -97,16 +99,16 @@ func NewDecoderRegistry(
 	}, nil
 }
 
-func (r *DecoderRegistry) Fingerprint() (artifactstore.Digest, error) {
+func (r *DecoderRegistry) Fingerprint() (cryptoutil.Digest, error) {
 	if r == nil {
 		return "", fmt.Errorf(
 			"%w: decoder registry is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	type descriptor struct {
-		ID       artifactstore.DecoderID `json:"id"`
-		Revision string                  `json:"revision"`
+		ID       basespec.DecoderID `json:"id"`
+		Revision string             `json:"revision"`
 	}
 	values := make([]descriptor, 0, len(r.decoders))
 	for _, decoder := range r.decoders {
@@ -119,15 +121,15 @@ func (r *DecoderRegistry) Fingerprint() (artifactstore.Digest, error) {
 	if err != nil {
 		return "", err
 	}
-	canonical, err := jsoncanon.Canonicalize(raw)
+	canonical, err := jsonutil.Canonicalize(raw)
 	if err != nil {
 		return "", err
 	}
-	return artifactstore.DigestBytes(canonical), nil
+	return cryptoutil.DigestBytes(canonical), nil
 }
 
 func (r *DecoderRegistry) find(
-	id artifactstore.DecoderID,
+	id basespec.DecoderID,
 ) (Decoder, bool) {
 	if r == nil {
 		return nil, false

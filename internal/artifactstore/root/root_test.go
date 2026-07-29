@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
-const rootTestID artifactstore.RootID = "019d3150-6a40-7a6b-a34e-d9032342bc31"
+const rootTestID basespec.RootID = "019d3150-6a40-7a6b-a34e-d9032342bc31"
 
 type rootTestClock struct{ now time.Time }
 
@@ -27,7 +27,7 @@ func (g rootTestIDs) NewID(ctx context.Context) (string, error) {
 
 type rootTestRepository struct {
 	mu      sync.Mutex
-	values  map[artifactstore.RootID]Root
+	values  map[basespec.RootID]Root
 	updates int
 }
 
@@ -44,18 +44,18 @@ func (r *rootTestRepository) Create(_ context.Context, value Root) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, found := r.values[value.ID]; found {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 	r.values[value.ID] = cloneRoot(value)
 	return nil
 }
 
-func (r *rootTestRepository) Get(_ context.Context, id artifactstore.RootID) (Root, error) {
+func (r *rootTestRepository) Get(_ context.Context, id basespec.RootID) (Root, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	value, found := r.values[id]
 	if !found {
-		return Root{}, artifactstore.ErrRootNotFound
+		return Root{}, basespec.ErrRootNotFound
 	}
 	return cloneRoot(value), nil
 }
@@ -75,10 +75,10 @@ func (r *rootTestRepository) Update(_ context.Context, value Root, expected uint
 	defer r.mu.Unlock()
 	current, found := r.values[value.ID]
 	if !found {
-		return artifactstore.ErrRootNotFound
+		return basespec.ErrRootNotFound
 	}
 	if current.Revision != expected {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 	r.values[value.ID] = cloneRoot(value)
 	r.updates++
@@ -90,24 +90,24 @@ func (r *rootTestRepository) Retire(_ context.Context, value Root, expected uint
 	defer r.mu.Unlock()
 	current, found := r.values[value.ID]
 	if !found {
-		return artifactstore.ErrRootNotFound
+		return basespec.ErrRootNotFound
 	}
 	if current.Revision != expected {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 	r.values[value.ID] = cloneRoot(value)
 	return nil
 }
 
-func (r *rootTestRepository) Purge(_ context.Context, id artifactstore.RootID, expected uint64) error {
+func (r *rootTestRepository) Purge(_ context.Context, id basespec.RootID, expected uint64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	current, found := r.values[id]
 	if !found {
-		return artifactstore.ErrRootNotFound
+		return basespec.ErrRootNotFound
 	}
 	if current.Revision != expected {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 	delete(r.values, id)
 	return nil
@@ -117,7 +117,7 @@ func TestServiceLifecycleNoOpsAndConcurrentRevisionConflicts(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	repository := &rootTestRepository{values: make(map[artifactstore.RootID]Root)}
+	repository := &rootTestRepository{values: make(map[basespec.RootID]Root)}
 	service, err := NewService(repository, rootTestIDs{value: string(rootTestID)}, rootTestClock{now: now})
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
@@ -158,7 +158,7 @@ func TestServiceLifecycleNoOpsAndConcurrentRevisionConflicts(t *testing.T) {
 		RootUpdate{ExpectedRevision: 1, DisplayName: "stale"},
 	); !errors.Is(
 		err,
-		artifactstore.ErrConflict,
+		basespec.ErrConflict,
 	) {
 		t.Fatalf("stale Update error=%v, want ErrConflict", err)
 	}
@@ -186,7 +186,7 @@ func TestServiceLifecycleNoOpsAndConcurrentRevisionConflicts(t *testing.T) {
 			successes++
 			continue
 		}
-		if !errors.Is(err, artifactstore.ErrConflict) {
+		if !errors.Is(err, basespec.ErrConflict) {
 			t.Fatalf("concurrent Update error=%v", err)
 		}
 	}
@@ -208,7 +208,7 @@ func TestServiceLifecycleNoOpsAndConcurrentRevisionConflicts(t *testing.T) {
 	if err := service.Purge(t.Context(), created.ID, retired.Revision); err != nil {
 		t.Fatalf("Purge: %v", err)
 	}
-	if _, err := service.Get(t.Context(), created.ID); !errors.Is(err, artifactstore.ErrRootNotFound) {
+	if _, err := service.Get(t.Context(), created.ID); !errors.Is(err, basespec.ErrRootNotFound) {
 		t.Fatalf("Get purged root error=%v", err)
 	}
 }
@@ -216,12 +216,12 @@ func TestServiceLifecycleNoOpsAndConcurrentRevisionConflicts(t *testing.T) {
 func TestServiceRejectsMissingExpectedRevisions(t *testing.T) {
 	t.Parallel()
 
-	repository := &rootTestRepository{values: make(map[artifactstore.RootID]Root)}
+	repository := &rootTestRepository{values: make(map[basespec.RootID]Root)}
 	service, err := NewService(repository, rootTestIDs{value: string(rootTestID)}, rootTestClock{now: time.Now().UTC()})
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
-	if err := service.Purge(t.Context(), rootTestID, 0); !errors.Is(err, artifactstore.ErrInvalid) {
+	if err := service.Purge(t.Context(), rootTestID, 0); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("Purge missing revision error=%v", err)
 	}
 	if _, err := service.Update(
@@ -230,11 +230,11 @@ func TestServiceRejectsMissingExpectedRevisions(t *testing.T) {
 		RootUpdate{},
 	); !errors.Is(
 		err,
-		artifactstore.ErrInvalid,
+		basespec.ErrInvalid,
 	) {
 		t.Fatalf("Update missing revision error=%v", err)
 	}
-	if _, err := NewService(nil, rootTestIDs{}, rootTestClock{}); !errors.Is(err, artifactstore.ErrInvalid) {
+	if _, err := NewService(nil, rootTestIDs{}, rootTestClock{}); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("NewService missing dependency error=%v", err)
 	}
 }

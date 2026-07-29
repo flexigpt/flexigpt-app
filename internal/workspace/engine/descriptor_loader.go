@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/portable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type DescriptorLoader struct {
@@ -69,7 +70,7 @@ func (l *DescriptorLoader) Load(
 	// A missing descriptor is valid. Its source generation remains a refresh
 	// precondition so a descriptor cannot appear or disappear between bootstrap
 	// observation and final catalog publication.
-	if errors.Is(err, artifactstore.ErrNotFound) {
+	if errors.Is(err, basespec.ErrNotFound) {
 		if err := snapshot.Confirm(ctx); err != nil {
 			return DescriptorObservation{}, err
 		}
@@ -94,7 +95,7 @@ func (l *DescriptorLoader) Load(
 		)
 	}
 	if !entry.IsRegular ||
-		entry.SizeBytes > artifactstore.MaxDefinitionBodyBytes {
+		entry.SizeBytes > basespec.MaxDefinitionBodyBytes {
 		return DescriptorObservation{}, ErrWorkspaceDefinitionInvalid
 	}
 	reader, err := snapshot.Open(ctx, DescriptorLocator)
@@ -103,7 +104,7 @@ func (l *DescriptorLoader) Load(
 	}
 	content, readErr := io.ReadAll(io.LimitReader(
 		reader,
-		artifactstore.MaxDefinitionBodyBytes+1,
+		basespec.MaxDefinitionBodyBytes+1,
 	))
 	closeErr := reader.Close()
 	if readErr != nil {
@@ -112,20 +113,20 @@ func (l *DescriptorLoader) Load(
 	if closeErr != nil {
 		return DescriptorObservation{}, closeErr
 	}
-	if len(content) > artifactstore.MaxDefinitionBodyBytes ||
+	if len(content) > basespec.MaxDefinitionBodyBytes ||
 		int64(len(content)) != entry.SizeBytes {
 		return DescriptorObservation{}, fmt.Errorf(
 			"%w: Workspace descriptor changed or exceeds its limit",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	if err := snapshot.Confirm(ctx); err != nil {
 		return DescriptorObservation{}, err
 	}
 
-	canonical, err := jsoncanon.CanonicalizeObject(
+	canonical, err := jsonutil.CanonicalizeObject(
 		content,
-		artifactstore.MaxDefinitionBodyBytes,
+		basespec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return DescriptorObservation{}, fmt.Errorf(
@@ -205,7 +206,7 @@ func (l *DescriptorLoader) Load(
 		)
 	}
 	expectedContentDigests := make(
-		map[artifactstore.Locator]artifactstore.Digest,
+		map[basespec.Locator]cryptoutil.Digest,
 		len(descriptor.Members),
 	)
 	for index, member := range descriptor.Members {
@@ -251,7 +252,7 @@ func (l *DescriptorLoader) Load(
 				"%w: descriptor member %d requires an external URI resolver: %w",
 				ErrWorkspaceDefinitionInvalid,
 				index,
-				artifactstore.ErrUnsupported,
+				basespec.ErrUnsupported,
 			)
 
 		default:
@@ -259,7 +260,7 @@ func (l *DescriptorLoader) Load(
 				"%w: descriptor member %d requires unsupported embedded content handling: %w",
 				ErrWorkspaceDefinitionInvalid,
 				index,
-				artifactstore.ErrUnsupported,
+				basespec.ErrUnsupported,
 			)
 		}
 	}
@@ -301,7 +302,7 @@ func decodeDescriptor(raw []byte) (Descriptor, error) {
 
 func resolveDescriptorDiscoveryPreferences(
 	input DiscoveryPreferences,
-	base artifactstore.Locator,
+	base basespec.Locator,
 ) (DiscoveryPreferences, error) {
 	output := DiscoveryPreferences{
 		IncludeReadme: input.IncludeReadme,

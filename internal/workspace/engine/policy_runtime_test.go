@@ -8,11 +8,13 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 func TestArtifactPolicyDerivationAndNames(t *testing.T) {
@@ -126,8 +128,8 @@ func TestArtifactPolicyDerivationAndNames(t *testing.T) {
 		t.Fatalf("validator failure adopt=%t diagnostics=%#v", adopt, diagnostics)
 	}
 
-	name := artifactName(artifactstore.LogicalName(strings.Repeat("界", artifactstore.MaxDisplayNameBytes)), key)
-	if len(name) > artifactstore.MaxDisplayNameBytes || !utf8.ValidString(name) ||
+	name := artifactName(basespec.LogicalName(strings.Repeat("界", basespec.MaxDisplayNameBytes)), key)
+	if len(name) > basespec.MaxDisplayNameBytes || !utf8.ValidString(name) ||
 		!strings.Contains(name, artifactNameSeparator) {
 		t.Fatalf("bounded artifact name=%q", name)
 	}
@@ -160,7 +162,7 @@ func TestRuntimePolicyDecisionsAndValidation(t *testing.T) {
 		{Disposition: "other"},
 	} {
 		if err := decision.Validate(); !errors.Is(err, ErrInvalidWorkspace) &&
-			!errors.Is(err, artifactstore.ErrInvalid) {
+			!errors.Is(err, basespec.ErrInvalid) {
 			t.Errorf("invalid decision %#v error=%v", decision, err)
 		}
 	}
@@ -216,13 +218,13 @@ func TestRuntimePolicyDecisionsAndValidation(t *testing.T) {
 		t.Fatalf("invalid data decision=%#v", decision)
 	}
 
-	diagnostic := RuntimeDecisionDiagnostic(
+	d := RuntimeDecisionDiagnostic(
 		RuntimeDecision{Disposition: RuntimeUnavailable, Code: "runtime.unavailable", Message: "failure"},
 		available,
 	)
-	if diagnostic.Severity != artifactstore.DiagnosticError || diagnostic.Location == nil ||
-		diagnostic.Location.Locator != available.Binding.Locator {
-		t.Fatalf("runtime diagnostic=%#v", diagnostic)
+	if d.Severity != diagnostic.DiagnosticError || d.Location == nil ||
+		d.Location.Locator != available.Binding.Locator {
+		t.Fatalf("runtime diagnostic=%#v", d)
 	}
 }
 
@@ -232,13 +234,13 @@ func runtimeTestArtifact(t *testing.T, enabled bool, state artifact.State, runti
 	if err != nil {
 		t.Fatalf("EncodeArtifactData: %v", err)
 	}
-	digest := artifactstore.DigestBytes([]byte("definition"))
+	digest := cryptoutil.DigestBytes([]byte("definition"))
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
 	return artifact.Artifact{
 		ID:           "019d3150-7103-7a6b-a34e-d9032342bc31",
 		RootID:       "019d3150-7104-7a6b-a34e-d9032342bc31",
 		CollectionID: "019d3150-7105-7a6b-a34e-d9032342bc31",
-		Binding: artifactstore.SourceBinding{
+		Binding: basespec.SourceBinding{
 			SourceID:     "019d3150-7106-7a6b-a34e-d9032342bc31",
 			Locator:      "AGENTS.md",
 			ExpectedKind: "test.kind",

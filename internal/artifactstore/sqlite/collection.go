@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 )
 
@@ -29,7 +29,7 @@ func (s *Store) createCollection(
 		return err
 	}
 
-	seenSources := make(map[artifactstore.SourceID]struct{}, len(attachments))
+	seenSources := make(map[basespec.SourceID]struct{}, len(attachments))
 	for index, attachment := range attachments {
 		if err := attachment.Validate(); err != nil {
 			return fmt.Errorf("attachment %d: %w", index, err)
@@ -38,20 +38,20 @@ func (s *Store) createCollection(
 			attachment.CollectionID != value.ID {
 			return fmt.Errorf(
 				"%w: attachment %d belongs to another collection",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				index,
 			)
 		}
 		if attachment.Revision != 1 {
 			return fmt.Errorf(
 				"%w: initial attachment revision must be one",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		if _, duplicate := seenSources[attachment.SourceID]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate collection attachment source %q",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				attachment.SourceID,
 			)
 		}
@@ -110,7 +110,7 @@ func (s *Store) createCollection(
 
 func (s *Store) getCollection(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
@@ -134,7 +134,7 @@ func (s *Store) getCollection(
 
 func (s *Store) getRetiredCollection(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
@@ -162,7 +162,7 @@ func (s *Store) getRetiredCollection(
 	if errors.Is(err, sql.ErrNoRows) {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: retired collection %q in root %q",
-			artifactstore.ErrCollectionNotFound,
+			basespec.ErrCollectionNotFound,
 			ref.CollectionID,
 			ref.RootID,
 		)
@@ -178,9 +178,9 @@ func (s *Store) getRetiredCollection(
 
 func (s *Store) listCollectionsByRoot(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) ([]collection.Collection, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return nil, err
 	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
@@ -228,7 +228,7 @@ func (s *Store) updateCollection(
 	if expectedRevision == 0 ||
 		value.Revision != expectedRevision+1 ||
 		value.RetiredAt != nil {
-		return fmt.Errorf("%w: invalid collection update", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid collection update", basespec.ErrInvalid)
 	}
 	if err := s.requireActiveRoot(ctx, value.RootID); err != nil {
 		return err
@@ -275,7 +275,7 @@ func (s *Store) retireCollection(
 		value.RetiredAt == nil ||
 		value.Enabled ||
 		value.Revision != expectedRevision+1 {
-		return fmt.Errorf("%w: invalid collection retirement", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid collection retirement", basespec.ErrInvalid)
 	}
 	if err := s.requireActiveRoot(ctx, value.RootID); err != nil {
 		return err
@@ -307,7 +307,7 @@ func (s *Store) retireCollection(
 
 func (s *Store) purgeCollection(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -316,7 +316,7 @@ func (s *Store) purgeCollection(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected collection revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -351,7 +351,7 @@ func (s *Store) attachCollectionSource(
 	if expectedCollectionRevision == 0 || value.Revision != 1 {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: invalid collection attachment creation",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -361,7 +361,7 @@ func (s *Store) attachCollectionSource(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := artifactstore.CollectionRef{
+	ref := basespec.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -370,7 +370,7 @@ func (s *Store) attachCollectionSource(
 		return collection.Collection{}, err
 	}
 	if current.Revision != expectedCollectionRevision {
-		return collection.Collection{}, artifactstore.ErrConflict
+		return collection.Collection{}, basespec.ErrConflict
 	}
 	if err := requireAttachableSourceTx(
 		ctx,
@@ -403,13 +403,13 @@ func (s *Store) attachCollectionSource(
 
 func (s *Store) getCollectionAttachment(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 ) (collection.Attachment, error) {
 	if err := ref.Validate(); err != nil {
 		return collection.Attachment{}, err
 	}
-	if err := artifactstore.ValidateSourceID(sourceID); err != nil {
+	if err := basespec.ValidateSourceID(sourceID); err != nil {
 		return collection.Attachment{}, err
 	}
 
@@ -434,7 +434,7 @@ func (s *Store) getCollectionAttachment(
 
 func (s *Store) listCollectionAttachments(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) ([]collection.Attachment, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -497,7 +497,7 @@ func (s *Store) updateCollectionAttachment(
 		value.Revision != expectedAttachmentRevision+1 {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: invalid collection attachment update",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -507,7 +507,7 @@ func (s *Store) updateCollectionAttachment(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := artifactstore.CollectionRef{
+	ref := basespec.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -516,7 +516,7 @@ func (s *Store) updateCollectionAttachment(
 		return collection.Collection{}, err
 	}
 	if currentCollection.Revision != expectedCollectionRevision {
-		return collection.Collection{}, artifactstore.ErrConflict
+		return collection.Collection{}, basespec.ErrConflict
 	}
 	currentAttachment, err := getCollectionAttachmentTx(
 		ctx,
@@ -528,7 +528,7 @@ func (s *Store) updateCollectionAttachment(
 		return collection.Collection{}, err
 	}
 	if currentAttachment.Revision != expectedAttachmentRevision {
-		return collection.Collection{}, artifactstore.ErrConflict
+		return collection.Collection{}, basespec.ErrConflict
 	}
 	if value.RootID != currentAttachment.RootID ||
 		value.CollectionID != currentAttachment.CollectionID ||
@@ -537,7 +537,7 @@ func (s *Store) updateCollectionAttachment(
 		!value.ModifiedAt.After(currentAttachment.ModifiedAt) {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: collection attachment immutable fields changed",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := requireAttachableSourceTx(
@@ -600,8 +600,8 @@ func (s *Store) updateCollectionAttachment(
 
 func (s *Store) detachCollectionSource(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
 	modifiedAt time.Time,
@@ -609,7 +609,7 @@ func (s *Store) detachCollectionSource(
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
 	}
-	if err := artifactstore.ValidateSourceID(sourceID); err != nil {
+	if err := basespec.ValidateSourceID(sourceID); err != nil {
 		return collection.Collection{}, err
 	}
 	if expectedCollectionRevision == 0 ||
@@ -617,7 +617,7 @@ func (s *Store) detachCollectionSource(
 		modifiedAt.IsZero() {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: invalid collection attachment detach",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -632,14 +632,14 @@ func (s *Store) detachCollectionSource(
 		return collection.Collection{}, err
 	}
 	if current.Revision != expectedCollectionRevision {
-		return collection.Collection{}, artifactstore.ErrConflict
+		return collection.Collection{}, basespec.ErrConflict
 	}
 	attachment, err := getCollectionAttachmentTx(ctx, tx, ref, sourceID)
 	if err != nil {
 		return collection.Collection{}, err
 	}
 	if attachment.Revision != expectedAttachmentRevision {
-		return collection.Collection{}, artifactstore.ErrConflict
+		return collection.Collection{}, basespec.ErrConflict
 	}
 
 	result, err := tx.ExecContext(
@@ -682,8 +682,8 @@ func (s *Store) detachCollectionSource(
 
 func (s *Store) replaceCollectionAttachment(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	previousSourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	previousSourceID basespec.SourceID,
 	expectedPreviousRevision uint64,
 	replacement collection.Attachment,
 	expectedCollectionRevision uint64,
@@ -691,7 +691,7 @@ func (s *Store) replaceCollectionAttachment(
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
 	}
-	if err := artifactstore.ValidateSourceID(previousSourceID); err != nil {
+	if err := basespec.ValidateSourceID(previousSourceID); err != nil {
 		return collection.Collection{}, err
 	}
 	if err := replacement.Validate(); err != nil {
@@ -704,7 +704,7 @@ func (s *Store) replaceCollectionAttachment(
 		replacement.CollectionID != ref.CollectionID {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: invalid collection attachment replacement",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -719,7 +719,7 @@ func (s *Store) replaceCollectionAttachment(
 		return collection.Collection{}, err
 	}
 	if current.Revision != expectedCollectionRevision {
-		return collection.Collection{}, artifactstore.ErrConflict
+		return collection.Collection{}, basespec.ErrConflict
 	}
 	previous, err := getCollectionAttachmentTx(
 		ctx,
@@ -731,7 +731,7 @@ func (s *Store) replaceCollectionAttachment(
 		return collection.Collection{}, err
 	}
 	if previous.Revision != expectedPreviousRevision {
-		return collection.Collection{}, artifactstore.ErrConflict
+		return collection.Collection{}, basespec.ErrConflict
 	}
 	if err := requireAttachableSourceTx(
 		ctx,
@@ -787,7 +787,7 @@ func (s *Store) replaceCollectionAttachment(
 func getActiveCollectionTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
@@ -807,7 +807,7 @@ func getActiveCollectionTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: collection %q in root %q",
-			artifactstore.ErrCollectionNotFound,
+			basespec.ErrCollectionNotFound,
 			ref.CollectionID,
 			ref.RootID,
 		)
@@ -822,10 +822,10 @@ func getActiveCollectionTx(
 func requireAttachedSourceTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 ) error {
-	if err := artifactstore.ValidateSourceID(sourceID); err != nil {
+	if err := basespec.ValidateSourceID(sourceID); err != nil {
 		return err
 	}
 	if _, err := getActiveCollectionTx(ctx, tx, ref); err != nil {
@@ -855,7 +855,7 @@ func requireAttachedSourceTx(
 	if attached == 0 {
 		return fmt.Errorf(
 			"%w: source %q is not attached to collection %q",
-			artifactstore.ErrAttachmentNotFound,
+			basespec.ErrAttachmentNotFound,
 			sourceID,
 			ref.CollectionID,
 		)
@@ -866,8 +866,8 @@ func requireAttachedSourceTx(
 func requireAttachableSourceTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID artifactstore.RootID,
-	sourceID artifactstore.SourceID,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
 	attachmentEnabled bool,
 ) error {
 	var enabled int
@@ -882,7 +882,7 @@ func requireAttachableSourceTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf(
 			"%w: source %q in root %q",
-			artifactstore.ErrSourceNotFound,
+			basespec.ErrSourceNotFound,
 			sourceID,
 			rootID,
 		)
@@ -893,7 +893,7 @@ func requireAttachableSourceTx(
 	if attachmentEnabled && enabled == 0 {
 		return fmt.Errorf(
 			"%w: enabled attachment cannot use disabled source %q",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			sourceID,
 		)
 	}
@@ -930,8 +930,8 @@ func insertCollectionAttachmentTx(
 func getCollectionAttachmentTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 ) (collection.Attachment, error) {
 	value, err := scanCollectionAttachment(tx.QueryRowContext(
 		ctx,
@@ -945,7 +945,7 @@ func getCollectionAttachmentTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return collection.Attachment{}, fmt.Errorf(
 			"%w: source %q in collection %q",
-			artifactstore.ErrAttachmentNotFound,
+			basespec.ErrAttachmentNotFound,
 			sourceID,
 			ref.CollectionID,
 		)
@@ -961,19 +961,19 @@ func advanceCollectionRevisionTx(
 	modifiedAt time.Time,
 ) (collection.Collection, error) {
 	if current.Revision != expectedRevision {
-		return collection.Collection{}, artifactstore.ErrConflict
+		return collection.Collection{}, basespec.ErrConflict
 	}
 	if current.Revision == ^uint64(0) {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: collection revision is exhausted",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	modifiedAt = modifiedAt.UTC()
 	if !modifiedAt.After(current.ModifiedAt) {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: collection membership mutation time must advance",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -1036,9 +1036,9 @@ func scanCollection(row scanner) (collection.Collection, error) {
 	}
 
 	value := collection.Collection{
-		ID:          artifactstore.CollectionID(id),
-		RootID:      artifactstore.RootID(rootID),
-		Kind:        artifactstore.CollectionKind(kind),
+		ID:          basespec.CollectionID(id),
+		RootID:      basespec.RootID(rootID),
+		Kind:        basespec.CollectionKind(kind),
 		DisplayName: displayName,
 		Description: description,
 		Enabled:     enabled != 0,
@@ -1081,10 +1081,10 @@ func scanCollectionAttachment(row scanner) (collection.Attachment, error) {
 	}
 
 	value := collection.Attachment{
-		RootID:       artifactstore.RootID(rootID),
-		CollectionID: artifactstore.CollectionID(collectionID),
-		SourceID:     artifactstore.SourceID(sourceID),
-		Role:         artifactstore.AttachmentRole(role),
+		RootID:       basespec.RootID(rootID),
+		CollectionID: basespec.CollectionID(collectionID),
+		SourceID:     basespec.SourceID(sourceID),
+		Role:         basespec.AttachmentRole(role),
 		Enabled:      enabled != 0,
 		Data:         append(json.RawMessage(nil), data...),
 		Revision:     revision,

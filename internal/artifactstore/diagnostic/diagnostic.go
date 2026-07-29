@@ -1,10 +1,18 @@
-package artifactstore
+package diagnostic
 
 import (
 	"fmt"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+)
+
+const (
+	MaxDiagnosticCodeBytes    = 128
+	MaxDiagnosticMessageBytes = 4096
+	MaxDiagnostics            = 128
 )
 
 type DiagnosticSeverity string
@@ -16,10 +24,10 @@ const (
 )
 
 type DiagnosticLocation struct {
-	Locator            Locator            `json:"locator,omitempty"`
-	SubresourceLocator SubresourceLocator `json:"subresourceLocator,omitempty"`
-	Line               int                `json:"line,omitempty"`
-	Column             int                `json:"column,omitempty"`
+	Locator            basespec.Locator            `json:"locator,omitempty"`
+	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
+	Line               int                         `json:"line,omitempty"`
+	Column             int                         `json:"column,omitempty"`
 }
 
 type Diagnostic struct {
@@ -33,7 +41,7 @@ func ValidateDiagnostics(values []Diagnostic) error {
 	if len(values) > MaxDiagnostics {
 		return fmt.Errorf(
 			"%w: diagnostics exceed %d entries",
-			ErrInvalid,
+			basespec.ErrInvalid,
 			MaxDiagnostics,
 		)
 	}
@@ -49,12 +57,12 @@ func (d Diagnostic) Validate() error {
 	switch d.Severity {
 	case DiagnosticError, DiagnosticWarning, DiagnosticInfo:
 	default:
-		return fmt.Errorf("%w: invalid diagnostic severity %q", ErrInvalid, d.Severity)
+		return fmt.Errorf("%w: invalid diagnostic severity %q", basespec.ErrInvalid, d.Severity)
 	}
-	if err := ValidateIdentifier("diagnostic code", d.Code, MaxDiagnosticCodeBytes); err != nil {
+	if err := basespec.ValidateIdentifier("diagnostic code", d.Code, MaxDiagnosticCodeBytes); err != nil {
 		return err
 	}
-	if err := ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"diagnostic message",
 		d.Message,
 		MaxDiagnosticMessageBytes,
@@ -65,7 +73,7 @@ func (d Diagnostic) Validate() error {
 		return nil
 	}
 	if d.Location.Locator != "" {
-		if err := ValidateLocator(d.Location.Locator, true); err != nil {
+		if err := basespec.ValidateLocator(d.Location.Locator, true); err != nil {
 			return fmt.Errorf("diagnostic location: %w", err)
 		}
 	}
@@ -73,15 +81,15 @@ func (d Diagnostic) Validate() error {
 		if d.Location.Locator == "" {
 			return fmt.Errorf(
 				"%w: diagnostic subresource location requires a locator",
-				ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
-		if err := ValidateSubresourceLocator(d.Location.SubresourceLocator); err != nil {
+		if err := basespec.ValidateSubresourceLocator(d.Location.SubresourceLocator); err != nil {
 			return fmt.Errorf("diagnostic subresource location: %w", err)
 		}
 	}
 	if d.Location.Line < 0 || d.Location.Column < 0 {
-		return fmt.Errorf("%w: diagnostic line and column cannot be negative", ErrInvalid)
+		return fmt.Errorf("%w: diagnostic line and column cannot be negative", basespec.ErrInvalid)
 	}
 	return nil
 }

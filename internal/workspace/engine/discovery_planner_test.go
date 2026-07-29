@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 func TestPlannerBuildsIndependentRoleAwarePlans(t *testing.T) {
@@ -17,7 +18,7 @@ func TestPlannerBuildsIndependentRoleAwarePlans(t *testing.T) {
 
 	profiles := DiscoveryProfiles{
 		Primary: DiscoveryProfile{
-			ExplicitLocators: []artifactstore.Locator{"BASE.md"},
+			ExplicitLocators: []basespec.Locator{"BASE.md"},
 			ReadmeLocator:    "README.md",
 			DirectoryRoots: []discovery.DirectoryRoot{{
 				Root:            "workspace",
@@ -39,12 +40,12 @@ func TestPlannerBuildsIndependentRoleAwarePlans(t *testing.T) {
 	profiles.Attached.DirectoryRoots[0].IncludePatterns[0] = "*.json"
 
 	workspace := plannerTestWorkspace(t)
-	expected := artifactstore.DigestBytes([]byte("member"))
+	expected := cryptoutil.DigestBytes([]byte("member"))
 	plan, err := planner.Build(workspace, DescriptorObservation{
 		SourceID:   workspace.PrimarySourceID,
 		Generation: "generation-1",
 		Preferences: DiscoveryPreferences{
-			AdditionalLocators: []artifactstore.Locator{"extra.md"},
+			AdditionalLocators: []basespec.Locator{"extra.md"},
 			AdditionalRoots: []DiscoveryRoot{{
 				Root:            "docs",
 				Recursive:       false,
@@ -52,7 +53,7 @@ func TestPlannerBuildsIndependentRoleAwarePlans(t *testing.T) {
 			}},
 			IncludeReadme: true,
 		},
-		ExpectedContentDigests: map[artifactstore.Locator]artifactstore.Digest{"extra.md": expected},
+		ExpectedContentDigests: map[basespec.Locator]cryptoutil.Digest{"extra.md": expected},
 	})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
@@ -102,7 +103,7 @@ func TestPlannerAndDiscoveryMergesRejectInvalidInputAndAreDeterministic(t *testi
 		t.Fatalf("empty primary profile error=%v, want ErrInvalidWorkspace", err)
 	}
 	if _, err := NewPlanner(
-		DiscoveryProfiles{Primary: DiscoveryProfile{ExplicitLocators: []artifactstore.Locator{"AGENTS.md"}}},
+		DiscoveryProfiles{Primary: DiscoveryProfile{ExplicitLocators: []basespec.Locator{"AGENTS.md"}}},
 		" ",
 		"decoder.a",
 	); err == nil {
@@ -111,11 +112,11 @@ func TestPlannerAndDiscoveryMergesRejectInvalidInputAndAreDeterministic(t *testi
 
 	merged, err := mergeDiscoveryPreferences(
 		DiscoveryPreferences{
-			AdditionalLocators: []artifactstore.Locator{"b.md", "a.md"},
+			AdditionalLocators: []basespec.Locator{"b.md", "a.md"},
 			AdditionalRoots:    []DiscoveryRoot{{Root: "docs", Recursive: false, IncludePatterns: []string{"*.md"}}},
 		},
 		DiscoveryPreferences{
-			AdditionalLocators: []artifactstore.Locator{"a.md", "c.md"},
+			AdditionalLocators: []basespec.Locator{"a.md", "c.md"},
 			AdditionalRoots: []DiscoveryRoot{
 				{Root: "docs", Recursive: true, IncludePatterns: []string{"*.txt", "*.md"}},
 			},
@@ -137,13 +138,13 @@ func TestPlannerAndDiscoveryMergesRejectInvalidInputAndAreDeterministic(t *testi
 
 	profile := MergeDiscoveryProfile(
 		DiscoveryProfile{
-			ExplicitLocators: []artifactstore.Locator{"AGENTS.md"},
+			ExplicitLocators: []basespec.Locator{"AGENTS.md"},
 			DirectoryRoots: []discovery.DirectoryRoot{
 				{Root: "docs", Recursive: false, IncludePatterns: []string{"*.md"}},
 			},
 		},
 		DiscoveryProfile{
-			ExplicitLocators: []artifactstore.Locator{"AGENTS.md", "README.md"},
+			ExplicitLocators: []basespec.Locator{"AGENTS.md", "README.md"},
 			ReadmeLocator:    "README.md",
 			DirectoryRoots:   []discovery.DirectoryRoot{{Root: "docs", Recursive: true, IncludePatterns: nil}},
 		},
@@ -158,7 +159,7 @@ func TestPlannerAndDiscoveryMergesRejectInvalidInputAndAreDeterministic(t *testi
 	workspace := plannerTestWorkspace(t)
 	workspace.Sources = workspace.Sources[:1]
 	planner, err := NewPlanner(
-		DiscoveryProfiles{Primary: DiscoveryProfile{ExplicitLocators: []artifactstore.Locator{"AGENTS.md"}}},
+		DiscoveryProfiles{Primary: DiscoveryProfile{ExplicitLocators: []basespec.Locator{"AGENTS.md"}}},
 		"policy.v1",
 		"decoder.a",
 	)
@@ -189,10 +190,10 @@ func plannerTestWorkspace(t *testing.T) Workspace {
 	if err != nil {
 		t.Fatalf("encode attached data: %v", err)
 	}
-	rootID := artifactstore.RootID("019d3150-7001-7a6b-a34e-d9032342bc31")
-	collectionID := artifactstore.CollectionID("019d3150-7002-7a6b-a34e-d9032342bc31")
-	primaryID := artifactstore.SourceID("019d3150-7003-7a6b-a34e-d9032342bc31")
-	attachedID := artifactstore.SourceID("019d3150-7004-7a6b-a34e-d9032342bc31")
+	rootID := basespec.RootID("019d3150-7001-7a6b-a34e-d9032342bc31")
+	collectionID := basespec.CollectionID("019d3150-7002-7a6b-a34e-d9032342bc31")
+	primaryID := basespec.SourceID("019d3150-7003-7a6b-a34e-d9032342bc31")
+	attachedID := basespec.SourceID("019d3150-7004-7a6b-a34e-d9032342bc31")
 	return Workspace{
 		Collection: collection.Collection{
 			ID:          collectionID,

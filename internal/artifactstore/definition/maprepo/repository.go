@@ -11,13 +11,14 @@ import (
 
 	"github.com/flexigpt/mapstore-go"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const maximumDefinitionFileBytes = int64(
-	artifactstore.MaxDefinitionBytes + 64<<10,
+	basespec.MaxDefinitionBytes + 64<<10,
 )
 
 type Repository struct {
@@ -29,8 +30,8 @@ type Repository struct {
 }
 
 type definitionKeyAttributes struct {
-	RootID artifactstore.RootID
-	Digest artifactstore.Digest
+	RootID basespec.RootID
+	Digest cryptoutil.Digest
 }
 
 type definitionPartitionProvider struct{}
@@ -81,19 +82,19 @@ func (r *Repository) Close() error {
 
 func (r *Repository) Put(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 	value definition.Definition,
 ) (definition.Definition, error) {
 	if ctx == nil {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: definition write context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
 		return definition.Definition{}, err
 	}
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return definition.Definition{}, err
 	}
 	canonical, err := definition.Canonicalize(value)
@@ -112,7 +113,7 @@ func (r *Repository) Put(
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if r.closed || r.files == nil {
-		return definition.Definition{}, artifactstore.ErrClosed
+		return definition.Definition{}, basespec.ErrClosed
 	}
 
 	_, statErr := os.Stat(path)
@@ -151,7 +152,7 @@ func (r *Repository) Put(
 	if stored.Digest != canonical.Digest {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: requested definition %q, stored %q",
-			artifactstore.ErrDigestMismatch,
+			basespec.ErrDigestMismatch,
 			canonical.Digest,
 			stored.Digest,
 		)
@@ -171,13 +172,13 @@ func (r *Repository) Put(
 
 func (r *Repository) Get(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	digest artifactstore.Digest,
+	rootID basespec.RootID,
+	digest cryptoutil.Digest,
 ) (definition.Definition, error) {
 	if ctx == nil {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: definition read context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -191,14 +192,14 @@ func (r *Repository) Get(
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if r.closed || r.files == nil {
-		return definition.Definition{}, artifactstore.ErrClosed
+		return definition.Definition{}, basespec.ErrClosed
 	}
 
 	info, err := os.Stat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: definition %q",
-			artifactstore.ErrDefinitionNotFound,
+			basespec.ErrDefinitionNotFound,
 			digest,
 		)
 	}
@@ -208,7 +209,7 @@ func (r *Repository) Get(
 	if !info.Mode().IsRegular() {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: definition path is not a regular file",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := mapstoreio.SecureRegularFile(path); err != nil {
@@ -220,7 +221,7 @@ func (r *Repository) Get(
 		if _, statErr := os.Lstat(path); errors.Is(statErr, os.ErrNotExist) {
 			return definition.Definition{}, fmt.Errorf(
 				"%w: definition %q",
-				artifactstore.ErrDefinitionNotFound,
+				basespec.ErrDefinitionNotFound,
 				digest,
 			)
 		}
@@ -237,7 +238,7 @@ func (r *Repository) Get(
 	if value.Digest != digest {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: requested %q, read %q",
-			artifactstore.ErrDigestMismatch,
+			basespec.ErrDigestMismatch,
 			digest,
 			value.Digest,
 		)
@@ -246,8 +247,8 @@ func (r *Repository) Get(
 }
 
 func (r *Repository) location(
-	rootID artifactstore.RootID,
-	digest artifactstore.Digest,
+	rootID basespec.RootID,
+	digest cryptoutil.Digest,
 	createParent bool,
 ) (key mapstore.FileKey, partition, path string, err error) {
 	key, err = definitionFileKey(rootID, digest)
@@ -272,18 +273,18 @@ func (r *Repository) location(
 }
 
 func definitionFileKey(
-	rootID artifactstore.RootID,
-	digest artifactstore.Digest,
+	rootID basespec.RootID,
+	digest cryptoutil.Digest,
 ) (mapstore.FileKey, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return mapstore.FileKey{}, err
 	}
-	if err := artifactstore.ValidateDigest(digest); err != nil {
+	if err := cryptoutil.ValidateDigest(digest); err != nil {
 		return mapstore.FileKey{}, err
 	}
 	hexDigest := strings.TrimPrefix(
 		string(digest),
-		artifactstore.DigestSHA256Prefix,
+		cryptoutil.DigestSHA256Prefix,
 	)
 	return mapstore.FileKey{
 		FileName: hexDigest + ".json",
@@ -301,23 +302,23 @@ func (*definitionPartitionProvider) GetPartitionDir(
 	if !ok {
 		return "", fmt.Errorf(
 			"%w: invalid definition MapStore key attributes",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
-	if err := artifactstore.ValidateRootID(attributes.RootID); err != nil {
+	if err := basespec.ValidateRootID(attributes.RootID); err != nil {
 		return "", err
 	}
-	if err := artifactstore.ValidateDigest(attributes.Digest); err != nil {
+	if err := cryptoutil.ValidateDigest(attributes.Digest); err != nil {
 		return "", err
 	}
 	hexDigest := strings.TrimPrefix(
 		string(attributes.Digest),
-		artifactstore.DigestSHA256Prefix,
+		cryptoutil.DigestSHA256Prefix,
 	)
 	if key.FileName != hexDigest+".json" {
 		return "", fmt.Errorf(
 			"%w: definition MapStore filename does not match its digest",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return filepath.Join(
@@ -333,5 +334,5 @@ func (*definitionPartitionProvider) ListPartitions(
 	_ string,
 	_ int,
 ) (dirs []string, nextPageToken string, err error) {
-	return nil, "", artifactstore.ErrUnsupported
+	return nil, "", basespec.ErrUnsupported
 }

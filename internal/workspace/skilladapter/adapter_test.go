@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 )
 
@@ -25,38 +26,38 @@ func TestVerifySkillMDContentHappyErrorsAndBoundary(t *testing.T) {
 	if err := os.WriteFile(location, content, 0o600); err != nil {
 		t.Fatalf("write skill: %v", err)
 	}
-	if err := verifySkillMDContent(location, artifactstore.DigestBytes(content)); err != nil {
+	if err := verifySkillMDContent(location, cryptoutil.DigestBytes(content)); err != nil {
 		t.Fatalf("verify valid content: %v", err)
 	}
 	if err := verifySkillMDContent(
 		location,
-		artifactstore.DigestBytes([]byte("other")),
+		cryptoutil.DigestBytes([]byte("other")),
 	); !errors.Is(
 		err,
-		artifactstore.ErrCatalogStale,
+		basespec.ErrCatalogStale,
 	) {
 		t.Fatalf("mismatched digest error=%v, want ErrCatalogStale", err)
 	}
 	if err := verifySkillMDContent(
 		directory,
-		artifactstore.DigestBytes(content),
+		cryptoutil.DigestBytes(content),
 	); !errors.Is(
 		err,
-		artifactstore.ErrInvalid,
+		basespec.ErrInvalid,
 	) {
 		t.Fatalf("directory error=%v, want ErrInvalid", err)
 	}
 
 	large := filepath.Join(directory, "large.md")
-	if err := os.WriteFile(large, bytes.Repeat([]byte("x"), artifactstore.MaxCandidateBytes+1), 0o600); err != nil {
+	if err := os.WriteFile(large, bytes.Repeat([]byte("x"), basespec.MaxCandidateBytes+1), 0o600); err != nil {
 		t.Fatalf("write oversized skill: %v", err)
 	}
 	if err := verifySkillMDContent(
 		large,
-		artifactstore.DigestBytes([]byte("x")),
+		cryptoutil.DigestBytes([]byte("x")),
 	); !errors.Is(
 		err,
-		artifactstore.ErrInvalid,
+		basespec.ErrInvalid,
 	) {
 		t.Fatalf("oversized skill error=%v, want ErrInvalid", err)
 	}
@@ -95,7 +96,7 @@ func TestVerifySourceGenerationClosesSnapshotsAndDetectsChanges(t *testing.T) {
 		"generation-1",
 	); !errors.Is(
 		err,
-		artifactstore.ErrCatalogStale,
+		basespec.ErrCatalogStale,
 	) {
 		t.Fatalf("changed generation error=%v, want ErrCatalogStale", err)
 	}
@@ -151,15 +152,15 @@ func TestSkillSummarySortingAndDiagnostics(t *testing.T) {
 
 	values := []WorkspaceSkill{
 		{
-			Artifact: artifactstore.ArtifactRef{ArtifactID: "019d3150-6d05-7a6b-a34e-d9032342bc31"},
+			Artifact: basespec.ArtifactRef{ArtifactID: "019d3150-6d05-7a6b-a34e-d9032342bc31"},
 			Skill:    SkillSummary{Name: "z"},
 		},
 		{
-			Artifact: artifactstore.ArtifactRef{ArtifactID: "019d3150-6d04-7a6b-a34e-d9032342bc31"},
+			Artifact: basespec.ArtifactRef{ArtifactID: "019d3150-6d04-7a6b-a34e-d9032342bc31"},
 			Skill:    SkillSummary{Name: "a"},
 		},
 		{
-			Artifact: artifactstore.ArtifactRef{ArtifactID: "019d3150-6d03-7a6b-a34e-d9032342bc31"},
+			Artifact: basespec.ArtifactRef{ArtifactID: "019d3150-6d03-7a6b-a34e-d9032342bc31"},
 			Skill:    SkillSummary{Name: "z"},
 		},
 	}
@@ -169,7 +170,7 @@ func TestSkillSummarySortingAndDiagnostics(t *testing.T) {
 	}
 
 	diagnostic := runtimeLocationDiagnostic(
-		artifact.Artifact{Binding: artifactstore.SourceBinding{Locator: "skills/weather/SKILL.md"}},
+		artifact.Artifact{Binding: basespec.SourceBinding{Locator: "skills/weather/SKILL.md"}},
 		errors.New("unavailable"),
 	)
 	if diagnostic.Code == "" || diagnostic.Location == nil || diagnostic.Location.Locator != "skills/weather/SKILL.md" {
@@ -181,7 +182,7 @@ type skillTestRuntime struct {
 	snapshot source.Snapshot
 }
 
-func (r skillTestRuntime) Get(context.Context, artifactstore.RootID, artifactstore.SourceID) (source.Source, error) {
+func (r skillTestRuntime) Get(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error) {
 	return source.Source{}, errors.New("not implemented")
 }
 
@@ -199,16 +200,16 @@ type skillTestSnapshot struct {
 
 func (s *skillTestSnapshot) Generation() string { return s.generation }
 
-func (*skillTestSnapshot) Stat(context.Context, artifactstore.Locator) (source.Entry, error) {
-	return source.Entry{}, artifactstore.ErrNotFound
+func (*skillTestSnapshot) Stat(context.Context, basespec.Locator) (source.Entry, error) {
+	return source.Entry{}, basespec.ErrNotFound
 }
 
-func (*skillTestSnapshot) ReadDir(context.Context, artifactstore.Locator) ([]source.Entry, error) {
-	return nil, artifactstore.ErrNotFound
+func (*skillTestSnapshot) ReadDir(context.Context, basespec.Locator) ([]source.Entry, error) {
+	return nil, basespec.ErrNotFound
 }
 
-func (*skillTestSnapshot) Open(context.Context, artifactstore.Locator) (io.ReadCloser, error) {
-	return nil, artifactstore.ErrNotFound
+func (*skillTestSnapshot) Open(context.Context, basespec.Locator) (io.ReadCloser, error) {
+	return nil, basespec.ErrNotFound
 }
 
 func (s *skillTestSnapshot) Confirm(context.Context) error {

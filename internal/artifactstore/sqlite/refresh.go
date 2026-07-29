@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Publisher struct {
@@ -51,7 +53,7 @@ func (p *Publisher) Publish(
 		currentCollection.Revision != publication.ExpectedCollectionRevision {
 		return catalog.Snapshot{}, fmt.Errorf(
 			"%w: collection changed or was disabled during refresh",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 
@@ -72,7 +74,7 @@ func (p *Publisher) Publish(
 	) {
 		return catalog.Snapshot{}, fmt.Errorf(
 			"%w: collection attachments or sources changed during refresh",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 
@@ -112,13 +114,13 @@ func (p *Publisher) Publish(
 	if currentCatalogRevision != publication.ExpectedCatalogRevision {
 		return catalog.Snapshot{}, fmt.Errorf(
 			"%w: catalog changed during refresh",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 	if currentCatalogRevision == ^uint64(0) {
 		return catalog.Snapshot{}, fmt.Errorf(
 			"%w: catalog revision is exhausted",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	nextCatalogRevision := currentCatalogRevision + 1
@@ -246,7 +248,7 @@ func (p *Publisher) Publish(
 		PlanFingerprint:     publication.PlanFingerprint,
 		DecoderFingerprint:  publication.DecoderFingerprint,
 		PublishedAt:         publication.PublishedAt,
-		Diagnostics:         artifactstore.CloneDiagnostics(publication.Diagnostics),
+		Diagnostics:         diagnostic.CloneDiagnostics(publication.Diagnostics),
 		Occurrences:         occurrences,
 	}
 	if err := snapshot.Validate(); err != nil {
@@ -261,7 +263,7 @@ func updateArtifactSourceStateTx(
 	value artifact.SourceStateUpdate,
 	occurrences map[catalog.OccurrenceKey]catalog.Occurrence,
 ) error {
-	current, err := getArtifactTx(ctx, tx, artifactstore.ArtifactRef{
+	current, err := getArtifactTx(ctx, tx, basespec.ArtifactRef{
 		RootID:     value.RootID,
 		ArtifactID: value.ArtifactID,
 	})
@@ -271,26 +273,26 @@ func updateArtifactSourceStateTx(
 	if current.CollectionID != value.CollectionID {
 		return fmt.Errorf(
 			"%w: source-derived artifact update belongs to another collection",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if current.Revision != value.ExpectedRevision {
 		return fmt.Errorf(
 			"%w: artifact %q changed during refresh",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			value.ArtifactID,
 		)
 	}
 	if value.Revision != current.Revision+1 {
 		return fmt.Errorf(
 			"%w: source-derived artifact update revision does not advance current state",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if !value.ModifiedAt.After(current.ModifiedAt) {
 		return fmt.Errorf(
 			"%w: source-derived artifact update time must advance current state",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -311,11 +313,11 @@ func updateArtifactSourceStateTx(
 		return err
 	}
 	if value.State != expectedState ||
-		!digestPointersEqual(value.ResolvedDefinition, expectedDigest) ||
-		!artifactstore.EqualDiagnostics(value.Diagnostics, expectedDiagnostics) {
+		!cryptoutil.IsDigestEqual(value.ResolvedDefinition, expectedDigest) ||
+		!diagnostic.EqualDiagnostics(value.Diagnostics, expectedDiagnostics) {
 		return fmt.Errorf(
 			"%w: source-derived artifact update does not match current occurrence",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -352,7 +354,7 @@ func updateArtifactSourceStateTx(
 	if changed != 1 {
 		return fmt.Errorf(
 			"%w: artifact %q changed during refresh",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			value.ArtifactID,
 		)
 	}

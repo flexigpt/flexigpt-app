@@ -5,7 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
@@ -55,7 +56,7 @@ func (p CompositionPolicy) Normalized() CompositionPolicy {
 func (p CompositionPolicy) Validate() error {
 	p = p.Normalized()
 	if p.MaxPromptBytes <= 0 ||
-		p.MaxPromptBytes > artifactstore.MaxDefinitionBodyBytes {
+		p.MaxPromptBytes > basespec.MaxDefinitionBodyBytes {
 		return fmt.Errorf(
 			"%w: Context prompt byte budget is invalid",
 			engine.ErrInvalidWorkspace,
@@ -91,22 +92,22 @@ const (
 )
 
 type CompositionDecision struct {
-	Artifact      artifactstore.ArtifactRef `json:"artifact"`
-	Status        CompositionStatus         `json:"status"`
-	Code          string                    `json:"code,omitempty"`
-	OriginalBytes int                       `json:"originalBytes"`
-	IncludedBytes int                       `json:"includedBytes"`
+	Artifact      basespec.ArtifactRef `json:"artifact"`
+	Status        CompositionStatus    `json:"status"`
+	Code          string               `json:"code,omitempty"`
+	OriginalBytes int                  `json:"originalBytes"`
+	IncludedBytes int                  `json:"includedBytes"`
 }
 
 func applyCompositionPolicy(
 	policy CompositionPolicy,
 	values []ContextContribution,
-	diagnostics []artifactstore.Diagnostic,
+	diagnostics []diagnostic.Diagnostic,
 	decisions []CompositionDecision,
 ) (
 	[]ContextContribution,
 	string,
-	[]artifactstore.Diagnostic,
+	[]diagnostic.Diagnostic,
 	[]CompositionDecision,
 ) {
 	policy = policy.Normalized()
@@ -123,7 +124,7 @@ func applyCompositionPolicy(
 		if len(content) > policy.MaxDocumentBytes {
 			if policy.Overflow == OverflowExclude {
 				code = DiagnosticCodeContextDocumentExcluded
-				diagnostics = artifactstore.AppendDiagnostics(
+				diagnostics = diagnostic.AppendDiagnostics(
 					diagnostics,
 					compositionDiagnostic(
 						value,
@@ -156,7 +157,7 @@ func applyCompositionPolicy(
 		if len(rendered) > remaining {
 			if policy.Overflow == OverflowExclude {
 				code = DiagnosticCodeContextBudgetExceeded
-				diagnostics = artifactstore.AppendDiagnostics(
+				diagnostics = diagnostic.AppendDiagnostics(
 					diagnostics,
 					compositionDiagnostic(
 						value,
@@ -177,7 +178,7 @@ func applyCompositionPolicy(
 			contentBudget := remaining - len(emptyRendered)
 			if contentBudget <= 0 {
 				code = DiagnosticCodeContextBudgetExceeded
-				diagnostics = artifactstore.AppendDiagnostics(
+				diagnostics = diagnostic.AppendDiagnostics(
 					diagnostics,
 					compositionDiagnostic(
 						value,
@@ -196,7 +197,7 @@ func applyCompositionPolicy(
 			content = truncateUTF8(content, contentBudget)
 			if strings.TrimSpace(content) == "" {
 				code = DiagnosticCodeContextBudgetExceeded
-				diagnostics = artifactstore.AppendDiagnostics(
+				diagnostics = diagnostic.AppendDiagnostics(
 					diagnostics,
 					compositionDiagnostic(
 						value,
@@ -218,7 +219,7 @@ func applyCompositionPolicy(
 		}
 
 		if status == CompositionTruncated {
-			diagnostics = artifactstore.AppendDiagnostics(
+			diagnostics = diagnostic.AppendDiagnostics(
 				diagnostics,
 				compositionDiagnostic(
 					value,
@@ -266,12 +267,12 @@ func compositionDiagnostic(
 	value ContextContribution,
 	code string,
 	message string,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticWarning,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticWarning,
 		Code:     code,
 		Message:  message,
-		Location: &artifactstore.DiagnosticLocation{
+		Location: &diagnostic.DiagnosticLocation{
 			Locator: value.Locator,
 		},
 	}

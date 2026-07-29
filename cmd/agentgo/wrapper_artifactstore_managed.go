@@ -4,23 +4,23 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 type PurgeArtifactRequest struct {
-	Artifact         artifactstore.ArtifactRef `json:"artifact"         required:"true"`
-	ExpectedRevision uint64                    `json:"expectedRevision" required:"true"`
+	Artifact         basespec.ArtifactRef `json:"artifact"         required:"true"`
+	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
 }
 
 type PurgeArtifactResponse struct {
-	Artifact artifactstore.ArtifactRef `json:"artifact"`
+	Artifact basespec.ArtifactRef `json:"artifact"`
 }
 
 type GetManagedSourceStateRequest struct {
-	RootID   artifactstore.RootID   `json:"rootID"   required:"true"`
-	SourceID artifactstore.SourceID `json:"sourceID" required:"true"`
+	RootID   basespec.RootID   `json:"rootID"   required:"true"`
+	SourceID basespec.SourceID `json:"sourceID" required:"true"`
 }
 
 type GetManagedSourceStateResponseBody struct {
@@ -34,14 +34,14 @@ type GetManagedSourceStateResponse struct {
 
 type PublishManagedSourcePackageRequestBody struct {
 	ExpectedSourceRevision uint64                      `json:"expectedSourceRevision"       required:"true"`
-	Directory              artifactstore.Locator       `json:"directory"                    required:"true"`
+	Directory              basespec.Locator            `json:"directory"                    required:"true"`
 	ExpectedGeneration     string                      `json:"expectedGeneration,omitempty"`
 	Files                  []source.ManagedPackageFile `json:"files"                        required:"true"`
 }
 
 type PublishManagedSourcePackageRequest struct {
-	RootID   artifactstore.RootID   `json:"rootID"   required:"true"`
-	SourceID artifactstore.SourceID `json:"sourceID" required:"true"`
+	RootID   basespec.RootID   `json:"rootID"   required:"true"`
+	SourceID basespec.SourceID `json:"sourceID" required:"true"`
 	Body     *PublishManagedSourcePackageRequestBody
 }
 
@@ -55,11 +55,11 @@ type PublishManagedSourcePackageResponse struct {
 }
 
 type RemoveManagedSourcePackageRequest struct {
-	RootID                 artifactstore.RootID   `json:"rootID"                 required:"true"`
-	SourceID               artifactstore.SourceID `json:"sourceID"               required:"true"`
-	ExpectedSourceRevision uint64                 `json:"expectedSourceRevision" required:"true"`
-	Directory              artifactstore.Locator  `json:"directory"              required:"true"`
-	ExpectedGeneration     string                 `json:"expectedGeneration"     required:"true"`
+	RootID                 basespec.RootID   `json:"rootID"                 required:"true"`
+	SourceID               basespec.SourceID `json:"sourceID"               required:"true"`
+	ExpectedSourceRevision uint64            `json:"expectedSourceRevision" required:"true"`
+	Directory              basespec.Locator  `json:"directory"              required:"true"`
+	ExpectedGeneration     string            `json:"expectedGeneration"     required:"true"`
 }
 
 type RemoveManagedSourcePackageResponseBody struct {

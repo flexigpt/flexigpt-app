@@ -1,11 +1,11 @@
 package skillartifact
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactstore"
+import "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 
 const (
-	Kind      artifactstore.ArtifactKind = "agent.skill"
-	SchemaID  artifactstore.SchemaID     = "agent.skill.v1"
-	DecoderID artifactstore.DecoderID    = "agent.skill-markdown"
+	Kind      basespec.ArtifactKind = "agent.skill"
+	SchemaID  basespec.SchemaID     = "agent.skill.v1"
+	DecoderID basespec.DecoderID    = "agent.skill-markdown"
 
 	SchemaVersion      = "v1"
 	DefinitionFileName = "SKILL.md"
@@ -31,6 +31,6 @@ type Body struct {
 
 type LocatorPolicy interface {
 	ExpectedName(
-		locator artifactstore.Locator,
+		locator basespec.Locator,
 	) (string, bool)
 }

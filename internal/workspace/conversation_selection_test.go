@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 )
 
@@ -76,12 +78,12 @@ func TestConversationSelectionHelpersTrackChangesAndUnavailableReferences(t *tes
 		t.Fatal("empty selection was reported changed")
 	}
 	for _, test := range []struct {
-		selectedDigest artifactstore.Digest
-		usedDigest     artifactstore.Digest
+		selectedDigest cryptoutil.Digest
+		usedDigest     cryptoutil.Digest
 		selectedRev    uint64
 		usedRev        uint64
-		selectedLoc    artifactstore.Locator
-		usedLoc        artifactstore.Locator
+		selectedLoc    basespec.Locator
+		usedLoc        basespec.Locator
 	}{
 		{selectedDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", usedDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
 		{selectedRev: 1, usedRev: 2},
@@ -109,7 +111,7 @@ func TestConversationSelectionHelpersTrackChangesAndUnavailableReferences(t *tes
 		CatalogRevision:   4,
 		ContextRefs: []ConversationResourceSelectionRef{
 			{
-				Artifact: artifactstore.ArtifactRef{
+				Artifact: basespec.ArtifactRef{
 					RootID:     "019d3150-7401-7a6b-a34e-d9032342bc31",
 					ArtifactID: "019d3150-7403-7a6b-a34e-d9032342bc31",
 				},
@@ -119,7 +121,7 @@ func TestConversationSelectionHelpersTrackChangesAndUnavailableReferences(t *tes
 		SkillRefs: []ConversationSkillSelectionRef{
 			{
 				ConversationResourceSelectionRef: ConversationResourceSelectionRef{
-					Artifact: artifactstore.ArtifactRef{
+					Artifact: basespec.ArtifactRef{
 						RootID:     "019d3150-7401-7a6b-a34e-d9032342bc31",
 						ArtifactID: "019d3150-7404-7a6b-a34e-d9032342bc31",
 					},
@@ -135,10 +137,10 @@ func TestConversationSelectionHelpersTrackChangesAndUnavailableReferences(t *tes
 		len(usage.Diagnostics) != 1 || usage.Diagnostics[0].Code != "workspace.conversation.unavailable" {
 		t.Fatalf("unresolved usage=%#v", usage)
 	}
-	message := strings.Repeat("x", artifactstore.MaxDiagnosticMessageBytes+100)
-	diagnostic := conversationSelectionDiagnostic("workspace.conversation.test", message)
-	if len(diagnostic.Message) > artifactstore.MaxDiagnosticMessageBytes ||
-		diagnostic.Code != "workspace.conversation.test" {
-		t.Fatalf("bounded diagnostic=%#v", diagnostic)
+	message := strings.Repeat("x", diagnostic.MaxDiagnosticMessageBytes+100)
+	d := conversationSelectionDiagnostic("workspace.conversation.test", message)
+	if len(d.Message) > diagnostic.MaxDiagnosticMessageBytes ||
+		d.Code != "workspace.conversation.test" {
+		t.Fatalf("bounded diagnostic=%#v", d)
 	}
 }

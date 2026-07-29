@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
@@ -28,10 +28,10 @@ func NewService(
 			ErrInvalidWorkspace,
 		)
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"workspace discovery policy revision",
 		discoveryPolicyRevision,
-		artifactstore.MaxVersionBytes,
+		basespec.MaxVersionBytes,
 	); err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (s *Service) CreateEmpty(
 	ctx context.Context,
 	request EmptyWorkspaceRequest,
 ) (Workspace, error) {
-	if err := artifactstore.ValidateRootID(request.RootID); err != nil {
+	if err := basespec.ValidateRootID(request.RootID); err != nil {
 		return Workspace{}, err
 	}
 	data := CollectionData{
@@ -79,10 +79,10 @@ func (s *Service) CreateFilesystem(
 	ctx context.Context,
 	request FilesystemWorkspaceRequest,
 ) (Workspace, error) {
-	if err := artifactstore.ValidateRootID(request.RootID); err != nil {
+	if err := basespec.ValidateRootID(request.RootID); err != nil {
 		return Workspace{}, err
 	}
-	if err := artifactstore.ValidateSourceID(request.PrimarySourceID); err != nil {
+	if err := basespec.ValidateSourceID(request.PrimarySourceID); err != nil {
 		return Workspace{}, err
 	}
 	sourceValue, err := s.sources.Get(
@@ -144,9 +144,9 @@ func (s *Service) CreateFilesystem(
 
 func (s *Service) List(
 	ctx context.Context,
-	rootID artifactstore.RootID,
+	rootID basespec.RootID,
 ) ([]Workspace, error) {
-	if err := artifactstore.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateRootID(rootID); err != nil {
 		return nil, err
 	}
 	collections, err := s.collections.ListByRoot(ctx, rootID)
@@ -349,12 +349,12 @@ func (s *Service) SetPrimary(
 		)
 	}
 	if request.SourceID != "" {
-		if err := artifactstore.ValidateSourceID(request.SourceID); err != nil {
+		if err := basespec.ValidateSourceID(request.SourceID); err != nil {
 			return Workspace{}, err
 		}
 	}
 	if request.PreviousSourceID != "" {
-		if err := artifactstore.ValidateSourceID(request.PreviousSourceID); err != nil {
+		if err := basespec.ValidateSourceID(request.PreviousSourceID); err != nil {
 			return Workspace{}, err
 		}
 	}
@@ -364,13 +364,13 @@ func (s *Service) SetPrimary(
 		return Workspace{}, err
 	}
 	if current.Collection.Revision != request.ExpectedCollectionRevision {
-		return Workspace{}, artifactstore.ErrConflict
+		return Workspace{}, basespec.ErrConflict
 	}
 
 	if current.PrimarySourceID == "" {
 		if request.PreviousSourceID != "" ||
 			request.PreviousAttachmentRevision != 0 {
-			return Workspace{}, artifactstore.ErrConflict
+			return Workspace{}, basespec.ErrConflict
 		}
 		if request.Clear {
 			return Workspace{}, fmt.Errorf(
@@ -408,7 +408,7 @@ func (s *Service) SetPrimary(
 
 	if request.PreviousSourceID == "" ||
 		request.PreviousSourceID != current.PrimarySourceID {
-		return Workspace{}, artifactstore.ErrConflict
+		return Workspace{}, basespec.ErrConflict
 	}
 	if request.PreviousAttachmentRevision == 0 {
 		return Workspace{}, fmt.Errorf(
@@ -426,7 +426,7 @@ func (s *Service) SetPrimary(
 		return Workspace{}, err
 	}
 	if previous.Revision != request.PreviousAttachmentRevision {
-		return Workspace{}, artifactstore.ErrConflict
+		return Workspace{}, basespec.ErrConflict
 	}
 
 	if request.Clear {
@@ -461,9 +461,9 @@ func (s *Service) SetPrimary(
 	); err == nil {
 		return Workspace{}, fmt.Errorf(
 			"%w: replacement primary source is already attached to the Workspace",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
-	} else if !errors.Is(err, artifactstore.ErrAttachmentNotFound) {
+	} else if !errors.Is(err, basespec.ErrAttachmentNotFound) {
 		return Workspace{}, err
 	}
 
@@ -507,8 +507,8 @@ func (s *Service) ReplacePrimary(
 
 func (s *Service) Detach(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	sourceID artifactstore.SourceID,
+	ref basespec.CollectionRef,
+	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
 ) (Workspace, error) {
@@ -543,7 +543,7 @@ func (s *Service) Detach(
 
 func (s *Service) Retire(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	expectedRevision uint64,
 ) (collection.Collection, error) {
 	if _, err := s.Get(ctx, ref); err != nil {
@@ -558,7 +558,7 @@ func (s *Service) Retire(
 // cannot purge another domain's retired Collection.
 func (s *Service) Purge(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -578,7 +578,7 @@ func (s *Service) Purge(
 		return fmt.Errorf("%w: collection %q", ErrNotWorkspace, ref.CollectionID)
 	}
 	if value.Revision != expectedRevision {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 	return s.collections.Purge(ctx, ref, expectedRevision)
 }
@@ -588,7 +588,7 @@ func (s *Service) Purge(
 // refresh is the appropriate point to persist an implementation upgrade.
 func (s *Service) PrepareRefresh(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (Workspace, error) {
 	current, err := s.Get(ctx, ref)
 	if err != nil {
@@ -623,7 +623,7 @@ func (s *Service) PrepareRefresh(
 
 func (s *Service) Get(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (Workspace, error) {
 	if err := ref.Validate(); err != nil {
 		return Workspace{}, err
@@ -699,8 +699,8 @@ func (s *Service) Get(
 
 func (s *Service) requirePrimarySource(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	sourceID artifactstore.SourceID,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
 ) error {
 	sourceValue, err := s.sources.Get(ctx, rootID, sourceID)
 	if err != nil {
@@ -724,7 +724,7 @@ func (s *Service) requirePrimarySource(
 }
 
 func attachmentOperationFor(
-	role artifactstore.AttachmentRole,
+	role basespec.AttachmentRole,
 ) (attachmentOperation, bool) {
 	for _, operation := range attachmentOperationMatrix {
 		if operation.role == role {

@@ -6,26 +6,28 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Reader interface {
 	Get(
 		ctx context.Context,
-		ref artifactstore.ArtifactRef,
+		ref basespec.ArtifactRef,
 	) (Artifact, error)
 
 	ListByCollection(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
+		ref basespec.CollectionRef,
 	) ([]Artifact, error)
 
 	ListSuppressions(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
+		ref basespec.CollectionRef,
 	) ([]Suppression, error)
 }
 
@@ -54,7 +56,7 @@ type Repository interface {
 
 	Unadopt(
 		ctx context.Context,
-		ref artifactstore.ArtifactRef,
+		ref basespec.ArtifactRef,
 		expectedRevision uint64,
 		suppression *Suppression,
 	) error
@@ -67,14 +69,14 @@ type Repository interface {
 
 	Unsuppress(
 		ctx context.Context,
-		ref artifactstore.CollectionRef,
-		binding artifactstore.SourceBinding,
+		ref basespec.CollectionRef,
+		binding basespec.SourceBinding,
 		expectedRevision uint64,
 	) error
 
 	Purge(
 		ctx context.Context,
-		ref artifactstore.ArtifactRef,
+		ref basespec.ArtifactRef,
 		expectedRevision uint64,
 	) error
 }
@@ -91,33 +93,33 @@ type Policy interface {
 		value collection.Collection,
 		occurrence catalog.Occurrence,
 		def definition.Definition,
-	) (Draft, bool, []artifactstore.Diagnostic)
+	) (Draft, bool, []diagnostic.Diagnostic)
 }
 
 type SourceStateUpdate struct {
-	ArtifactID         artifactstore.ArtifactID
-	RootID             artifactstore.RootID
-	CollectionID       artifactstore.CollectionID
-	ResolvedDefinition *artifactstore.Digest
+	ArtifactID         basespec.ArtifactID
+	RootID             basespec.RootID
+	CollectionID       basespec.CollectionID
+	ResolvedDefinition *cryptoutil.Digest
 	State              State
-	Diagnostics        []artifactstore.Diagnostic
+	Diagnostics        []diagnostic.Diagnostic
 	Revision           uint64
 	ModifiedAt         time.Time
 	ExpectedRevision   uint64
 }
 
 func (u SourceStateUpdate) Validate() error {
-	if err := artifactstore.ValidateArtifactID(u.ArtifactID); err != nil {
+	if err := basespec.ValidateArtifactID(u.ArtifactID); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateRootID(u.RootID); err != nil {
+	if err := basespec.ValidateRootID(u.RootID); err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateCollectionID(u.CollectionID); err != nil {
+	if err := basespec.ValidateCollectionID(u.CollectionID); err != nil {
 		return err
 	}
 	if u.ResolvedDefinition != nil {
-		if err := artifactstore.ValidateDigest(*u.ResolvedDefinition); err != nil {
+		if err := cryptoutil.ValidateDigest(*u.ResolvedDefinition); err != nil {
 			return err
 		}
 	}
@@ -126,7 +128,7 @@ func (u SourceStateUpdate) Validate() error {
 		if u.ResolvedDefinition == nil {
 			return fmt.Errorf(
 				"%w: artifact update state requires a definition",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 
@@ -134,14 +136,14 @@ func (u SourceStateUpdate) Validate() error {
 		if u.ResolvedDefinition != nil {
 			return fmt.Errorf(
 				"%w: missing or invalid artifact state cannot retain a definition",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 
 	default:
-		return fmt.Errorf("%w: invalid artifact update state", artifactstore.ErrInvalid)
+		return fmt.Errorf("%w: invalid artifact update state", basespec.ErrInvalid)
 	}
-	if err := artifactstore.ValidateDiagnostics(u.Diagnostics); err != nil {
+	if err := diagnostic.ValidateDiagnostics(u.Diagnostics); err != nil {
 		return err
 	}
 	if u.ExpectedRevision == 0 ||
@@ -149,7 +151,7 @@ func (u SourceStateUpdate) Validate() error {
 		u.ModifiedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: invalid source-derived artifact update",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return nil
@@ -158,5 +160,5 @@ func (u SourceStateUpdate) Validate() error {
 type Reconciliation struct {
 	Creates     []Artifact
 	Updates     []SourceStateUpdate
-	Diagnostics []artifactstore.Diagnostic
+	Diagnostics []diagnostic.Diagnostic
 }

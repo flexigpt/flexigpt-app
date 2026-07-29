@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
@@ -48,10 +48,10 @@ func ValidateContextDefinition(
 	if err != nil {
 		return err
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"Context name",
 		body.Name,
-		artifactstore.MaxDisplayNameBytes,
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func ValidateContextDefinition(
 	return nil
 }
 
-func contextLogicalName(name string) artifactstore.LogicalName {
+func contextLogicalName(name string) basespec.LogicalName {
 	contextVal := "context"
 	base := strings.ToLower(strings.TrimSuffix(name, path.Ext(name)))
 	parts := strings.FieldsFunc(base, func(character rune) bool {
@@ -130,12 +130,12 @@ func contextLogicalName(name string) artifactstore.LogicalName {
 	if value[0] >= '0' && value[0] <= '9' {
 		value = "context-" + value
 	}
-	if len(value) > artifactstore.MaxLogicalNameBytes {
-		value = value[:artifactstore.MaxLogicalNameBytes]
+	if len(value) > basespec.MaxLogicalNameBytes {
+		value = value[:basespec.MaxLogicalNameBytes]
 		value = strings.Trim(value, ".-")
 	}
 	if value == "" {
 		value = contextVal
 	}
-	return artifactstore.LogicalName(value)
+	return basespec.LogicalName(value)
 }

@@ -7,26 +7,28 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Service struct {
 	repository  Repository
 	collections collection.Reader
 	catalogs    catalog.Reader
-	ids         artifactstore.IDGenerator
-	clock       artifactstore.Clock
+	ids         basespec.IDGenerator
+	clock       basespec.Clock
 }
 
 func NewService(
 	repository Repository,
 	collections collection.Reader,
 	catalogs catalog.Reader,
-	ids artifactstore.IDGenerator,
-	clock artifactstore.Clock,
+	ids basespec.IDGenerator,
+	clock basespec.Clock,
 ) (*Service, error) {
 	if repository == nil ||
 		collections == nil ||
@@ -35,7 +37,7 @@ func NewService(
 		clock == nil {
 		return nil, fmt.Errorf(
 			"%w: artifact service dependencies are incomplete",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -49,7 +51,7 @@ func NewService(
 
 func (s *Service) Get(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 ) (Artifact, error) {
 	if err := ref.Validate(); err != nil {
 		return Artifact{}, err
@@ -59,7 +61,7 @@ func (s *Service) Get(
 
 func (s *Service) ListByCollection(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) ([]Artifact, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -72,7 +74,7 @@ func (s *Service) ListByCollection(
 
 func (s *Service) ListSuppressions(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) ([]Suppression, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -88,7 +90,7 @@ func (s *Service) ListSuppressions(
 }
 
 type AdoptRequest struct {
-	Collection              artifactstore.CollectionRef
+	Collection              basespec.CollectionRef
 	Occurrence              catalog.OccurrenceKey
 	ExpectedCatalogRevision uint64
 	Name                    string
@@ -109,7 +111,7 @@ func (s *Service) Adopt(
 	if request.Occurrence.CollectionID != request.Collection.CollectionID {
 		return Artifact{}, fmt.Errorf(
 			"%w: occurrence belongs to another collection",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	collectionValue, err := s.activeCollection(ctx, request.Collection)
@@ -129,7 +131,7 @@ func (s *Service) Adopt(
 	}
 	if request.ExpectedCatalogRevision == 0 ||
 		snapshot.Revision != request.ExpectedCatalogRevision {
-		return Artifact{}, artifactstore.ErrConflict
+		return Artifact{}, basespec.ErrConflict
 	}
 
 	var occurrence *catalog.Occurrence
@@ -146,7 +148,7 @@ func (s *Service) Adopt(
 		occurrence.DefinitionDigest == nil {
 		return Artifact{}, fmt.Errorf(
 			"%w: occurrence is not currently adoptable",
-			artifactstore.ErrReferenceUnresolved,
+			basespec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -167,10 +169,10 @@ func (s *Service) Adopt(
 	resolved := *occurrence.DefinitionDigest
 	now := s.clock.Now().UTC()
 	value := Artifact{
-		ID:           artifactstore.ArtifactID(id),
+		ID:           basespec.ArtifactID(id),
 		RootID:       request.Collection.RootID,
 		CollectionID: request.Collection.CollectionID,
-		Binding: artifactstore.SourceBinding{
+		Binding: basespec.SourceBinding{
 			SourceID:           occurrence.Key.SourceID,
 			Locator:            occurrence.Key.Locator,
 			SubresourceLocator: occurrence.Key.SubresourceLocator,
@@ -183,7 +185,7 @@ func (s *Service) Adopt(
 		ResolvedDefinition: &resolved,
 		Data:               data,
 		State:              StateAvailable,
-		Diagnostics:        artifactstore.CloneDiagnostics(occurrence.Diagnostics),
+		Diagnostics:        diagnostic.CloneDiagnostics(occurrence.Diagnostics),
 		Revision:           1,
 		CreatedAt:          now,
 		ModifiedAt:         now,
@@ -203,9 +205,9 @@ func (s *Service) Adopt(
 }
 
 type PinRequest struct {
-	Collection                 artifactstore.CollectionRef
+	Collection                 basespec.CollectionRef
 	ExpectedCollectionRevision uint64
-	Binding                    artifactstore.SourceBinding
+	Binding                    basespec.SourceBinding
 	Name                       string
 	Enabled                    bool
 	Data                       json.RawMessage
@@ -223,20 +225,20 @@ func (s *Service) Pin(
 	if request.ExpectedCollectionRevision == 0 {
 		return Artifact{}, fmt.Errorf(
 			"%w: expected collection revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if collectionValue.Revision != request.ExpectedCollectionRevision {
-		return Artifact{}, artifactstore.ErrConflict
+		return Artifact{}, basespec.ErrConflict
 	}
 
 	if err := s.requireAttachedBinding(ctx, request.Collection, request.Binding); err != nil {
 		return Artifact{}, err
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"pinned artifact name",
 		request.Name,
-		artifactstore.MaxDisplayNameBytes,
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
 		return Artifact{}, err
 	}
@@ -247,10 +249,10 @@ func (s *Service) Pin(
 	}
 
 	var (
-		resolvedDefinition *artifactstore.Digest
+		resolvedDefinition *cryptoutil.Digest
 		state              = StateMissing
-		diagnostics        = []artifactstore.Diagnostic{{
-			Severity: artifactstore.DiagnosticInfo,
+		diagnostics        = []diagnostic.Diagnostic{{
+			Severity: diagnostic.DiagnosticInfo,
 			Code:     "artifact.pinned.awaiting-catalog",
 			Message:  "the pinned source binding has no current catalog observation",
 		}}
@@ -285,12 +287,12 @@ func (s *Service) Pin(
 			return Artifact{}, err
 		}
 
-	case errors.Is(snapshotErr, artifactstore.ErrCatalogUnavailable):
-	case errors.Is(snapshotErr, artifactstore.ErrCatalogStale):
-		diagnostics = artifactstore.AppendDiagnostics(
+	case errors.Is(snapshotErr, basespec.ErrCatalogUnavailable):
+	case errors.Is(snapshotErr, basespec.ErrCatalogStale):
+		diagnostics = diagnostic.AppendDiagnostics(
 			diagnostics,
-			artifactstore.Diagnostic{
-				Severity: artifactstore.DiagnosticWarning,
+			diagnostic.Diagnostic{
+				Severity: diagnostic.DiagnosticWarning,
 				Code:     "artifact.pinned.catalog-stale",
 				Message:  "the pinned source binding will be reconciled after the collection catalog is refreshed",
 			},
@@ -305,7 +307,7 @@ func (s *Service) Pin(
 	}
 	now := s.clock.Now().UTC()
 	value := Artifact{
-		ID:                 artifactstore.ArtifactID(id),
+		ID:                 basespec.ArtifactID(id),
 		RootID:             request.Collection.RootID,
 		CollectionID:       request.Collection.CollectionID,
 		Binding:            request.Binding,
@@ -337,7 +339,7 @@ func (s *Service) Pin(
 
 func (s *Service) SetEnabled(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (Artifact, error) {
@@ -349,7 +351,7 @@ func (s *Service) SetEnabled(
 		return Artifact{}, err
 	}
 	if expectedRevision == 0 || current.Revision != expectedRevision {
-		return Artifact{}, artifactstore.ErrConflict
+		return Artifact{}, basespec.ErrConflict
 	}
 	if current.Enabled == enabled {
 		return current, nil
@@ -369,7 +371,7 @@ func (s *Service) SetEnabled(
 
 func (s *Service) UpdateData(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 	expectedRevision uint64,
 	data json.RawMessage,
 ) (Artifact, error) {
@@ -385,9 +387,9 @@ func (s *Service) UpdateData(
 		return Artifact{}, err
 	}
 	if expectedRevision == 0 || current.Revision != expectedRevision {
-		return Artifact{}, artifactstore.ErrConflict
+		return Artifact{}, basespec.ErrConflict
 	}
-	if jsoncanon.Equal(current.Data, canonical) {
+	if jsonutil.Equal(current.Data, canonical) {
 		return current, nil
 	}
 	next := current
@@ -405,7 +407,7 @@ func (s *Service) UpdateData(
 
 func (s *Service) Unadopt(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 	expectedRevision uint64,
 	suppress bool,
 ) error {
@@ -417,12 +419,12 @@ func (s *Service) Unadopt(
 		return err
 	}
 	if expectedRevision == 0 || current.Revision != expectedRevision {
-		return artifactstore.ErrConflict
+		return basespec.ErrConflict
 	}
 
 	var suppression *Suppression
 	if suppress {
-		ref := artifactstore.CollectionRef{
+		ref := basespec.CollectionRef{
 			RootID:       current.RootID,
 			CollectionID: current.CollectionID,
 		}
@@ -448,9 +450,9 @@ func (s *Service) Unadopt(
 }
 
 type SuppressRequest struct {
-	Collection                 artifactstore.CollectionRef
+	Collection                 basespec.CollectionRef
 	ExpectedCollectionRevision uint64
-	Binding                    artifactstore.SourceBinding
+	Binding                    basespec.SourceBinding
 }
 
 func (s *Service) Suppress(
@@ -463,7 +465,7 @@ func (s *Service) Suppress(
 	if request.ExpectedCollectionRevision == 0 {
 		return Suppression{}, fmt.Errorf(
 			"%w: expected collection revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 
@@ -472,7 +474,7 @@ func (s *Service) Suppress(
 		return Suppression{}, err
 	}
 	if current.Revision != request.ExpectedCollectionRevision {
-		return Suppression{}, artifactstore.ErrConflict
+		return Suppression{}, basespec.ErrConflict
 	}
 
 	if err := s.requireAttachedBinding(ctx, request.Collection, request.Binding); err != nil {
@@ -504,8 +506,8 @@ func (s *Service) Suppress(
 
 func (s *Service) Unsuppress(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	binding artifactstore.SourceBinding,
+	ref basespec.CollectionRef,
+	binding basespec.SourceBinding,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -518,7 +520,7 @@ func (s *Service) Unsuppress(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected suppression revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if _, err := s.collections.Get(ctx, ref); err != nil {
@@ -535,10 +537,10 @@ func (s *Service) Unsuppress(
 
 func (s *Service) Move(
 	context.Context,
-	artifactstore.ArtifactRef,
-	artifactstore.CollectionRef,
+	basespec.ArtifactRef,
+	basespec.CollectionRef,
 ) error {
-	return artifactstore.ErrUnsupported
+	return basespec.ErrUnsupported
 }
 
 // Purge destructively removes one local Artifact Record.
@@ -547,7 +549,7 @@ func (s *Service) Move(
 // externally owned Source content or immutable definitions.
 func (s *Service) Purge(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -556,7 +558,7 @@ func (s *Service) Purge(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected artifact revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return s.repository.Purge(ctx, ref, expectedRevision)
@@ -564,7 +566,7 @@ func (s *Service) Purge(
 
 func (s *Service) activeCollection(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
+	ref basespec.CollectionRef,
 ) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
@@ -576,7 +578,7 @@ func (s *Service) activeCollection(
 	if !value.Enabled {
 		return collection.Collection{}, fmt.Errorf(
 			"%w: collection %q is disabled",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 			ref.CollectionID,
 		)
 	}
@@ -585,8 +587,8 @@ func (s *Service) activeCollection(
 
 func (s *Service) requireAttachedBinding(
 	ctx context.Context,
-	ref artifactstore.CollectionRef,
-	binding artifactstore.SourceBinding,
+	ref basespec.CollectionRef,
+	binding basespec.SourceBinding,
 ) error {
 	if err := binding.Validate(); err != nil {
 		return err
@@ -599,7 +601,7 @@ func (s *Service) ensureArtifactCollection(
 	ctx context.Context,
 	value Artifact,
 ) error {
-	ref := artifactstore.CollectionRef{
+	ref := basespec.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -611,16 +613,16 @@ func (s *Service) ensureArtifactCollection(
 		collectionValue.ID != value.CollectionID {
 		return fmt.Errorf(
 			"%w: artifact belongs to an unavailable collection",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	return nil
 }
 
 func canonicalArtifactData(raw json.RawMessage) (json.RawMessage, error) {
-	value, err := jsoncanon.CanonicalizeObject(
+	value, err := jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxLocalDataBytes,
+		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err

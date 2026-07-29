@@ -11,16 +11,16 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-const Kind artifactstore.SourceKind = "embedded-directory"
+const Kind basespec.SourceKind = "embedded-directory"
 
 type Config struct {
-	ProviderKey string                `json:"providerKey"`
-	Root        artifactstore.Locator `json:"root"`
+	ProviderKey string           `json:"providerKey"`
+	Root        basespec.Locator `json:"root"`
 }
 
 type Adapter struct {
@@ -30,17 +30,17 @@ type Adapter struct {
 func New(providers map[string]fs.FS) (*Adapter, error) {
 	output := make(map[string]fs.FS, len(providers))
 	for key, provider := range providers {
-		if err := artifactstore.ValidateIdentifier(
+		if err := basespec.ValidateIdentifier(
 			"embedded provider key",
 			key,
-			artifactstore.MaxKindBytes,
+			basespec.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
 		if provider == nil {
 			return nil, fmt.Errorf(
 				"%w: embedded provider %q is nil",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 				key,
 			)
 		}
@@ -49,7 +49,7 @@ func New(providers map[string]fs.FS) (*Adapter, error) {
 	return &Adapter{providers: output}, nil
 }
 
-func (*Adapter) Kind() artifactstore.SourceKind {
+func (*Adapter) Kind() basespec.SourceKind {
 	return Kind
 }
 
@@ -67,7 +67,7 @@ func (a *Adapter) NormalizeConfig(
 	if _, exists := a.providers[config.ProviderKey]; !exists {
 		return nil, fmt.Errorf(
 			"%w: embedded provider %q",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 			config.ProviderKey,
 		)
 	}
@@ -75,9 +75,9 @@ func (a *Adapter) NormalizeConfig(
 	if err != nil {
 		return nil, err
 	}
-	canonical, err := jsoncanon.CanonicalizeObject(
+	canonical, err := jsonutil.CanonicalizeObject(
 		encoded,
-		artifactstore.MaxConfigBytes,
+		basespec.MaxConfigBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func (a *Adapter) Open(
 	if value.Kind != Kind {
 		return nil, fmt.Errorf(
 			"%w: embedded adapter received source kind %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			value.Kind,
 		)
 	}
@@ -104,7 +104,7 @@ func (a *Adapter) Open(
 	if !exists {
 		return nil, fmt.Errorf(
 			"%w: embedded provider %q",
-			artifactstore.ErrSourceUnavailable,
+			basespec.ErrSourceUnavailable,
 			config.ProviderKey,
 		)
 	}
@@ -125,7 +125,7 @@ func (a *Adapter) Open(
 }
 
 func decodeConfig(raw json.RawMessage) (Config, error) {
-	canonical, err := jsoncanon.CanonicalizeObject(raw, artifactstore.MaxConfigBytes)
+	canonical, err := jsonutil.CanonicalizeObject(raw, basespec.MaxConfigBytes)
 	if err != nil {
 		return Config{}, err
 	}
@@ -136,21 +136,21 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 	if err := decoder.Decode(&config); err != nil {
 		return Config{}, fmt.Errorf(
 			"%w: decode embedded source config: %w",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			err,
 		)
 	}
-	if err := artifactstore.ValidateIdentifier(
+	if err := basespec.ValidateIdentifier(
 		"embedded provider key",
 		config.ProviderKey,
-		artifactstore.MaxKindBytes,
+		basespec.MaxKindBytes,
 	); err != nil {
 		return Config{}, err
 	}
 	if config.Root == "" {
 		config.Root = "."
 	}
-	if err := artifactstore.ValidateLocator(config.Root, true); err != nil {
+	if err := basespec.ValidateLocator(config.Root, true); err != nil {
 		return Config{}, err
 	}
 	return config, nil
@@ -172,18 +172,18 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 			return nil
 		}
 		entries++
-		if entries > artifactstore.DefaultMaxEntries {
+		if entries > basespec.DefaultMaxEntries {
 			return fmt.Errorf(
 				"%w: embedded source exceeds %d entries",
-				artifactstore.ErrInvalid,
-				artifactstore.DefaultMaxEntries,
+				basespec.ErrInvalid,
+				basespec.DefaultMaxEntries,
 			)
 		}
-		if strings.Count(name, "/")+1 > artifactstore.DefaultMaxDepth {
+		if strings.Count(name, "/")+1 > basespec.DefaultMaxDepth {
 			return fmt.Errorf(
 				"%w: embedded source exceeds depth %d",
-				artifactstore.ErrInvalid,
-				artifactstore.DefaultMaxDepth,
+				basespec.ErrInvalid,
+				basespec.DefaultMaxDepth,
 			)
 		}
 		info, err := fs.Stat(provider, name)
@@ -197,10 +197,10 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 		if !info.Mode().IsRegular() {
 			return nil
 		}
-		if info.Size() < 0 || info.Size() > artifactstore.MaxScanBytes-totalBytes {
+		if info.Size() < 0 || info.Size() > basespec.MaxScanBytes-totalBytes {
 			return fmt.Errorf(
 				"%w: embedded source exceeds byte limit",
-				artifactstore.ErrInvalid,
+				basespec.ErrInvalid,
 			)
 		}
 		totalBytes += info.Size()
@@ -221,7 +221,7 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 		if written != info.Size() {
 			return fmt.Errorf(
 				"%w: embedded source entry %q changed during fingerprinting",
-				artifactstore.ErrConflict,
+				basespec.ErrConflict,
 				name,
 			)
 		}

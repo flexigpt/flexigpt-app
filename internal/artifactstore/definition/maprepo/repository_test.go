@@ -6,11 +6,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-const maprepoTestRootID artifactstore.RootID = "019d3150-6a48-7a6b-a34e-d9032342bc31"
+const maprepoTestRootID basespec.RootID = "019d3150-6a48-7a6b-a34e-d9032342bc31"
 
 func maprepoTestDefinition() definition.Definition {
 	return definition.Definition{
@@ -49,10 +50,10 @@ func TestRepositoryPersistsCanonicalDefinitionsAndSupportsConcurrentReads(t *tes
 	if _, err := repository.Get(
 		t.Context(),
 		maprepoTestRootID,
-		artifactstore.DigestBytes([]byte("missing")),
+		cryptoutil.DigestBytes([]byte("missing")),
 	); !errors.Is(
 		err,
-		artifactstore.ErrDefinitionNotFound,
+		basespec.ErrDefinitionNotFound,
 	) {
 		t.Fatalf("missing definition error=%v", err)
 	}
@@ -62,7 +63,7 @@ func TestRepositoryPersistsCanonicalDefinitionsAndSupportsConcurrentReads(t *tes
 		stored.Digest,
 	); !errors.Is(
 		err,
-		artifactstore.ErrDefinitionNotFound,
+		basespec.ErrDefinitionNotFound,
 	) {
 		t.Fatalf("other root error=%v", err)
 	}
@@ -97,7 +98,7 @@ func TestRepositoryPersistsCanonicalDefinitionsAndSupportsConcurrentReads(t *tes
 		stored.Digest,
 	); !errors.Is(
 		err,
-		artifactstore.ErrClosed,
+		basespec.ErrClosed,
 	) {
 		t.Fatalf("Get after Close error=%v, want ErrClosed", err)
 	}
@@ -106,7 +107,7 @@ func TestRepositoryPersistsCanonicalDefinitionsAndSupportsConcurrentReads(t *tes
 func TestDefinitionFileKeyRejectsInvalidValues(t *testing.T) {
 	t.Parallel()
 
-	digest := artifactstore.DigestBytes([]byte("content"))
+	digest := cryptoutil.DigestBytes([]byte("content"))
 	key, err := definitionFileKey(maprepoTestRootID, digest)
 	if err != nil {
 		t.Fatalf("definitionFileKey: %v", err)
@@ -116,7 +117,7 @@ func TestDefinitionFileKeyRejectsInvalidValues(t *testing.T) {
 	if err != nil || partition == "" {
 		t.Fatalf("GetPartitionDir partition=%q err=%v", partition, err)
 	}
-	if _, err := definitionFileKey("not-a-uuid", digest); !errors.Is(err, artifactstore.ErrInvalid) {
+	if _, err := definitionFileKey("not-a-uuid", digest); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("invalid root error=%v", err)
 	}
 }

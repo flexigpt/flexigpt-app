@@ -10,16 +10,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const (
-	discoveryTestRootID       artifactstore.RootID       = "019d3150-6a22-7a6b-a34e-d9032342bc31"
-	discoveryTestCollectionID artifactstore.CollectionID = "019d3150-6a23-7a6b-a34e-d9032342bc31"
-	discoveryTestSourceID     artifactstore.SourceID     = "019d3150-6a24-7a6b-a34e-d9032342bc31"
+	discoveryTestRootID       basespec.RootID       = "019d3150-6a22-7a6b-a34e-d9032342bc31"
+	discoveryTestCollectionID basespec.CollectionID = "019d3150-6a23-7a6b-a34e-d9032342bc31"
+	discoveryTestSourceID     basespec.SourceID     = "019d3150-6a24-7a6b-a34e-d9032342bc31"
 )
 
 type discoveryTestClock struct{ now time.Time }
@@ -27,37 +29,37 @@ type discoveryTestClock struct{ now time.Time }
 func (c discoveryTestClock) Now() time.Time { return c.now }
 
 type discoveryTestDecoder struct {
-	id          artifactstore.DecoderID
+	id          basespec.DecoderID
 	revision    string
 	recognition Recognition
 	decoded     []Decoded
-	diagnostics []artifactstore.Diagnostic
+	diagnostics []diagnostic.Diagnostic
 }
 
-func (d discoveryTestDecoder) ID() artifactstore.DecoderID { return d.id }
-func (d discoveryTestDecoder) Revision() string            { return d.revision }
+func (d discoveryTestDecoder) ID() basespec.DecoderID { return d.id }
+func (d discoveryTestDecoder) Revision() string       { return d.revision }
 func (d discoveryTestDecoder) Recognize(context.Context, Candidate) Recognition {
 	return d.recognition
 }
 
-func (d discoveryTestDecoder) Decode(context.Context, Candidate) ([]Decoded, []artifactstore.Diagnostic) {
+func (d discoveryTestDecoder) Decode(context.Context, Candidate) ([]Decoded, []diagnostic.Diagnostic) {
 	return d.decoded, d.diagnostics
 }
 
 type discoveryTestSnapshot struct {
 	generation string
-	content    map[artifactstore.Locator][]byte
+	content    map[basespec.Locator][]byte
 }
 
 func (s discoveryTestSnapshot) Generation() string { return s.generation }
 
-func (s discoveryTestSnapshot) Stat(ctx context.Context, locator artifactstore.Locator) (source.Entry, error) {
+func (s discoveryTestSnapshot) Stat(ctx context.Context, locator basespec.Locator) (source.Entry, error) {
 	if err := ctx.Err(); err != nil {
 		return source.Entry{}, err
 	}
 	content, found := s.content[locator]
 	if !found {
-		return source.Entry{}, artifactstore.ErrNotFound
+		return source.Entry{}, basespec.ErrNotFound
 	}
 	return source.Entry{
 		Locator:   locator,
@@ -67,20 +69,20 @@ func (s discoveryTestSnapshot) Stat(ctx context.Context, locator artifactstore.L
 	}, nil
 }
 
-func (s discoveryTestSnapshot) ReadDir(ctx context.Context, _ artifactstore.Locator) ([]source.Entry, error) {
+func (s discoveryTestSnapshot) ReadDir(ctx context.Context, _ basespec.Locator) ([]source.Entry, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return nil, artifactstore.ErrNotFound
+	return nil, basespec.ErrNotFound
 }
 
-func (s discoveryTestSnapshot) Open(ctx context.Context, locator artifactstore.Locator) (io.ReadCloser, error) {
+func (s discoveryTestSnapshot) Open(ctx context.Context, locator basespec.Locator) (io.ReadCloser, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	content, found := s.content[locator]
 	if !found {
-		return nil, artifactstore.ErrNotFound
+		return nil, basespec.ErrNotFound
 	}
 	return io.NopCloser(bytes.NewReader(content)), nil
 }
@@ -101,7 +103,7 @@ func discoveryTestDefinition() definition.Definition {
 func discoveryTestPlan() SourcePlan {
 	return SourcePlan{
 		SourceID:         discoveryTestSourceID,
-		ExplicitLocators: []artifactstore.Locator{"example.json"},
+		ExplicitLocators: []basespec.Locator{"example.json"},
 	}
 }
 
@@ -124,7 +126,7 @@ func TestDiscoverCreatesCanonicalOccurrenceAndDefinition(t *testing.T) {
 		t.Fatalf("NewEngine: %v", err)
 	}
 	plan := discoveryTestPlan()
-	plan.DecoderHints = []DecoderHint{{Locator: "example.json", DecoderIDs: []artifactstore.DecoderID{"test.decoder"}}}
+	plan.DecoderHints = []DecoderHint{{Locator: "example.json", DecoderIDs: []basespec.DecoderID{"test.decoder"}}}
 	result, err := engine.Discover(
 		t.Context(),
 		discoveryTestRootID,
@@ -133,7 +135,7 @@ func TestDiscoverCreatesCanonicalOccurrenceAndDefinition(t *testing.T) {
 		"test.source",
 		discoveryTestSnapshot{
 			generation: "generation-1",
-			content:    map[artifactstore.Locator][]byte{"example.json": []byte(`{"payload":1}`)},
+			content:    map[basespec.Locator][]byte{"example.json": []byte(`{"payload":1}`)},
 		},
 		plan,
 		nil,
@@ -173,7 +175,7 @@ func TestDiscoverReportsAmbiguityDigestMismatchAndInvalidPlans(t *testing.T) {
 	}
 	snapshot := discoveryTestSnapshot{
 		generation: "generation-1",
-		content:    map[artifactstore.Locator][]byte{"example.json": []byte("content")},
+		content:    map[basespec.Locator][]byte{"example.json": []byte("content")},
 	}
 	result, err := engine.Discover(
 		t.Context(),
@@ -195,8 +197,8 @@ func TestDiscoverReportsAmbiguityDigestMismatchAndInvalidPlans(t *testing.T) {
 	}
 
 	plan := discoveryTestPlan()
-	plan.ExpectedContentDigests = map[artifactstore.Locator]artifactstore.Digest{
-		"example.json": artifactstore.DigestBytes([]byte("other")),
+	plan.ExpectedContentDigests = map[basespec.Locator]cryptoutil.Digest{
+		"example.json": cryptoutil.DigestBytes([]byte("other")),
 	}
 	mismatch, err := engine.Discover(
 		t.Context(),
@@ -216,7 +218,7 @@ func TestDiscoverReportsAmbiguityDigestMismatchAndInvalidPlans(t *testing.T) {
 	}
 
 	unavailable := discoveryTestPlan()
-	unavailable.AllowedDecoderIDs = []artifactstore.DecoderID{"missing.decoder"}
+	unavailable.AllowedDecoderIDs = []basespec.DecoderID{"missing.decoder"}
 	if _, err := engine.Discover(
 		t.Context(),
 		discoveryTestRootID,
@@ -228,7 +230,7 @@ func TestDiscoverReportsAmbiguityDigestMismatchAndInvalidPlans(t *testing.T) {
 		nil,
 	); !errors.Is(
 		err,
-		artifactstore.ErrDecoderUnavailable,
+		basespec.ErrDecoderUnavailable,
 	) {
 		t.Fatalf("unavailable decoder error=%v", err)
 	}
@@ -270,7 +272,7 @@ func TestDiscoverIsSafeForConcurrentReadOnlySnapshots(t *testing.T) {
 	}
 	snapshot := discoveryTestSnapshot{
 		generation: "generation-1",
-		content:    map[artifactstore.Locator][]byte{"example.json": []byte(`{"payload":1}`)},
+		content:    map[basespec.Locator][]byte{"example.json": []byte(`{"payload":1}`)},
 	}
 	const workers = 24
 	var group sync.WaitGroup

@@ -3,7 +3,7 @@ package workspace
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
@@ -17,7 +17,7 @@ type Config struct {
 	Supports                []engine.ArtifactSupport
 	DiscoveryProfiles       engine.DiscoveryProfiles
 	DiscoveryPolicyRevision string
-	SkillRoots              []artifactstore.Locator
+	SkillRoots              []basespec.Locator
 	ContextComposition      contextadapter.CompositionPolicy
 	SourceUsePolicy         engine.SourceUsePolicy
 }
@@ -102,7 +102,7 @@ func (c Config) normalizedSupports() ([]engine.ArtifactSupport, error) {
 	}
 
 	output := make([]engine.ArtifactSupport, 0, len(c.Supports))
-	seenKinds := make(map[artifactstore.ArtifactKind]struct{}, len(c.Supports))
+	seenKinds := make(map[basespec.ArtifactKind]struct{}, len(c.Supports))
 
 	for _, support := range c.Supports {
 		if err := support.Validate(); err != nil {
@@ -167,10 +167,10 @@ func (c Config) discoveryPolicyRevision() (string, error) {
 	if value == "" {
 		value = defaultDiscoveryPolicyRevision
 	}
-	if err := artifactstore.ValidateRequiredText(
+	if err := basespec.ValidateRequiredText(
 		"workspace discovery policy revision",
 		value,
-		artifactstore.MaxVersionBytes,
+		basespec.MaxVersionBytes,
 	); err != nil {
 		return "", fmt.Errorf(
 			"%w: %w",

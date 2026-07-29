@@ -1,4 +1,4 @@
-package artifactstore
+package basespec
 
 import "errors"
 

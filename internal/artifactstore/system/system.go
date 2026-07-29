@@ -7,8 +7,8 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
@@ -22,6 +22,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/sqlite"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Config struct {
@@ -29,8 +30,8 @@ type Config struct {
 	EmbeddedProviders         map[string]fs.FS
 	AdditionalSources         []source.Adapter
 	Decoders                  []discovery.Decoder
-	Clock                     artifactstore.Clock
-	IDGenerator               artifactstore.IDGenerator
+	Clock                     basespec.Clock
+	IDGenerator               basespec.IDGenerator
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 }
 
@@ -56,7 +57,7 @@ type Components struct {
 	metadata       *sqlite.Store
 	content        *maprepo.Repository
 	managedSources *source.Registry
-	decoderIDs     map[artifactstore.DecoderID]struct{}
+	decoderIDs     map[basespec.DecoderID]struct{}
 }
 
 func Open(
@@ -66,14 +67,14 @@ func Open(
 	if config.BaseDirectory == "" {
 		return nil, fmt.Errorf(
 			"%w: artifact system base directory is empty",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if config.Clock == nil {
-		config.Clock = artifactstore.SystemClock{}
+		config.Clock = basespec.SystemClock{}
 	}
 	if config.IDGenerator == nil {
-		config.IDGenerator = artifactstore.UUIDv7Generator{}
+		config.IDGenerator = basespec.UUIDv7Generator{}
 	}
 
 	base, err := mapstoreio.PreparePrivateDirectory(
@@ -153,7 +154,7 @@ func Open(
 	artifactRepository := metadata.Artifacts()
 	definitions, err := definition.NewRootScopedRepository(
 		content,
-		func(ctx context.Context, rootID artifactstore.RootID) error {
+		func(ctx context.Context, rootID basespec.RootID) error {
 			_, err := rootRepository.Get(ctx, rootID)
 			return err
 		},
@@ -236,7 +237,7 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	decoderIDs := make(map[artifactstore.DecoderID]struct{}, len(config.Decoders))
+	decoderIDs := make(map[basespec.DecoderID]struct{}, len(config.Decoders))
 	for _, decoder := range config.Decoders {
 		decoderIDs[decoder.ID()] = struct{}{}
 	}
@@ -277,7 +278,7 @@ func Open(
 	}, nil
 }
 
-func (c *Components) HasDecoder(id artifactstore.DecoderID) bool {
+func (c *Components) HasDecoder(id basespec.DecoderID) bool {
 	if c == nil {
 		return false
 	}
@@ -288,11 +289,11 @@ func (c *Components) HasDecoder(id artifactstore.DecoderID) bool {
 // DecoderFingerprint returns the exact decoder capability fingerprint used by
 // newly published catalogs. Consumers use it to mark old catalogs stale after
 // a decoder implementation or revision changes.
-func (c *Components) DecoderFingerprint() (artifactstore.Digest, error) {
+func (c *Components) DecoderFingerprint() (cryptoutil.Digest, error) {
 	if c == nil || c.discovery == nil {
 		return "", fmt.Errorf(
 			"%w: artifact decoder registry is unavailable",
-			artifactstore.ErrClosed,
+			basespec.ErrClosed,
 		)
 	}
 	return c.discovery.DecoderFingerprint()
@@ -304,18 +305,18 @@ func (c *Components) DecoderFingerprint() (artifactstore.Digest, error) {
 // metadata field.
 func (c *Components) GetManagedSourceState(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	sourceID artifactstore.SourceID,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
 ) (ManagedPackageResult, error) {
 	if c == nil ||
 		c.SourceRuntime == nil ||
 		c.managedSources == nil {
-		return ManagedPackageResult{}, artifactstore.ErrClosed
+		return ManagedPackageResult{}, basespec.ErrClosed
 	}
 	if ctx == nil {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: managed Source state context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -328,7 +329,7 @@ func (c *Components) GetManagedSourceState(
 	if !c.managedSources.SupportsManagedPackages(value.Kind) {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -355,8 +356,8 @@ func (c *Components) GetManagedSourceState(
 // conflicts, the caller receives the conflict and must reload before retrying.
 func (c *Components) PublishManagedPackage(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	sourceID artifactstore.SourceID,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
 	expectedSourceRevision uint64,
 	publication source.ManagedPackagePublication,
 ) (ManagedPackageResult, error) {
@@ -396,7 +397,7 @@ func (c *Components) PublishManagedPackage(
 	} else if repaired {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: managed Source metadata was repaired; reload and retry publication",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 
@@ -435,16 +436,16 @@ func (c *Components) PublishManagedPackage(
 // revision after successful source-side removal.
 func (c *Components) RemoveManagedPackage(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	sourceID artifactstore.SourceID,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
 	expectedSourceRevision uint64,
-	directory artifactstore.Locator,
+	directory basespec.Locator,
 	expectedGeneration string,
 ) (ManagedPackageResult, error) {
 	if err := source.ValidateManagedPackageDirectory(directory); err != nil {
 		return ManagedPackageResult{}, err
 	}
-	if err := artifactstore.ValidateSourceGeneration(expectedGeneration); err != nil {
+	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
 		return ManagedPackageResult{}, err
 	}
 
@@ -494,7 +495,7 @@ func (c *Components) RemoveManagedPackage(
 		}
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: managed Source content changed before package removal; reload and retry",
-			artifactstore.ErrConflict,
+			basespec.ErrConflict,
 		)
 	}
 
@@ -576,7 +577,7 @@ func managedPackageExists(
 	ctx context.Context,
 	runtime source.Runtime,
 	value source.Source,
-	directory artifactstore.Locator,
+	directory basespec.Locator,
 ) (bool, error) {
 	snapshot, err := runtime.Open(ctx, value)
 	if err != nil {
@@ -589,7 +590,7 @@ func managedPackageExists(
 	if confirmErr != nil || closeErr != nil {
 		return false, errors.Join(confirmErr, closeErr)
 	}
-	if errors.Is(statErr, artifactstore.ErrNotFound) {
+	if errors.Is(statErr, basespec.ErrNotFound) {
 		return false, nil
 	}
 	if statErr != nil {
@@ -598,7 +599,7 @@ func managedPackageExists(
 	if !entry.IsDirectory {
 		return false, fmt.Errorf(
 			"%w: managed package %q is not a directory",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			directory,
 		)
 	}
@@ -607,20 +608,20 @@ func managedPackageExists(
 
 func (c *Components) managedSource(
 	ctx context.Context,
-	rootID artifactstore.RootID,
-	sourceID artifactstore.SourceID,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
 	expectedSourceRevision uint64,
 ) (source.Source, error) {
 	if c == nil ||
 		c.Sources == nil ||
 		c.SourceRuntime == nil ||
 		c.managedSources == nil {
-		return source.Source{}, artifactstore.ErrClosed
+		return source.Source{}, basespec.ErrClosed
 	}
 	if ctx == nil {
 		return source.Source{}, fmt.Errorf(
 			"%w: managed Source context is nil",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -629,7 +630,7 @@ func (c *Components) managedSource(
 	if expectedSourceRevision == 0 {
 		return source.Source{}, fmt.Errorf(
 			"%w: expected source revision is required",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	value, err := c.SourceRuntime.Get(ctx, rootID, sourceID)
@@ -637,12 +638,12 @@ func (c *Components) managedSource(
 		return source.Source{}, err
 	}
 	if value.Revision != expectedSourceRevision {
-		return source.Source{}, artifactstore.ErrConflict
+		return source.Source{}, basespec.ErrConflict
 	}
 	if !c.managedSources.SupportsManagedPackages(value.Kind) {
 		return source.Source{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 			value.Kind,
 		)
 	}

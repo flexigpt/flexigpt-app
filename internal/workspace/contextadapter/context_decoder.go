@@ -8,10 +8,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/jsoncanon"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
@@ -22,7 +23,7 @@ func NewContextDecoder() *ContextDecoder {
 	return &ContextDecoder{}
 }
 
-func (*ContextDecoder) ID() artifactstore.DecoderID {
+func (*ContextDecoder) ID() basespec.DecoderID {
 	return contextDecoderID
 }
 
@@ -33,7 +34,7 @@ func (*ContextDecoder) Revision() string {
 func DiscoveryProfile() engine.DiscoveryProfile {
 	var profile engine.DiscoveryProfile
 	for _, convention := range contextConventionRegistry {
-		locator := artifactstore.Locator(convention.FileName)
+		locator := basespec.Locator(convention.FileName)
 		switch {
 		case convention.DefaultDiscovery:
 			profile.ExplicitLocators = append(
@@ -68,7 +69,7 @@ func (*ContextDecoder) Recognize(
 func (*ContextDecoder) Decode(
 	_ context.Context,
 	candidate discovery.Candidate,
-) ([]discovery.Decoded, []artifactstore.Diagnostic) {
+) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	if !utf8.Valid(candidate.Content) {
 		return nil, engine.WorkspaceArtifactDiagnostics(
 			candidate.Locator,
@@ -110,9 +111,9 @@ func (*ContextDecoder) Decode(
 	if err != nil {
 		return nil, engine.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
 	}
-	raw, err = jsoncanon.CanonicalizeObject(
+	raw, err = jsonutil.CanonicalizeObject(
 		raw,
-		artifactstore.MaxDefinitionBodyBytes,
+		basespec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return nil, engine.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)

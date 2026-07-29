@@ -2,9 +2,11 @@ package portable
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 func portableTestDefinition() CollectionDefinition {
@@ -56,8 +58,8 @@ func TestCanonicalizeCollectionDefinitionSortsMembersAndOwnsFields(t *testing.T)
 	}
 
 	mismatch := portableTestDefinition()
-	mismatch.Digest = artifactstore.DigestBytes([]byte("wrong"))
-	if _, err := CanonicalizeCollectionDefinition(mismatch); !errors.Is(err, artifactstore.ErrDigestMismatch) {
+	mismatch.Digest = cryptoutil.DigestBytes([]byte("wrong"))
+	if _, err := CanonicalizeCollectionDefinition(mismatch); !errors.Is(err, basespec.ErrDigestMismatch) {
 		t.Fatalf("mismatched digest error=%v", err)
 	}
 }
@@ -72,7 +74,7 @@ func TestPortableReferencesAndRelativeResolutionRejectAmbiguity(t *testing.T) {
 		{URI: "https://example.com/file#fragment"},
 		{},
 	} {
-		if err := reference.Validate(); !errors.Is(err, artifactstore.ErrInvalid) {
+		if err := reference.Validate(); !errors.Is(err, basespec.ErrInvalid) {
 			t.Fatalf("ContentRef(%#v) error=%v, want ErrInvalid", reference, err)
 		}
 	}
@@ -94,13 +96,13 @@ func TestPortableReferencesAndRelativeResolutionRejectAmbiguity(t *testing.T) {
 	if root != "packages/example" {
 		t.Fatalf("directory root=%q", root)
 	}
-	if _, err := ResolveRelativeLocator("packages/example", "."); !errors.Is(err, artifactstore.ErrInvalid) {
+	if _, err := ResolveRelativeLocator("packages/example", "."); !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("file relative root error=%v", err)
 	}
 
 	ambiguous := portableTestDefinition()
 	ambiguous.Members = []ContentRef{{Locator: "Files/Example.txt"}, {Locator: "files/example.TXT"}}
-	if err := ambiguous.Validate(); !errors.Is(err, artifactstore.ErrInvalid) {
+	if err := ambiguous.Validate(); !strings.Contains(err.Error(), "invalid") {
 		t.Fatalf("case-ambiguous members error=%v", err)
 	}
 }

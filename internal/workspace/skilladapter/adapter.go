@@ -10,9 +10,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
@@ -24,47 +26,47 @@ type SkillArgument struct {
 }
 
 type SkillSummary struct {
-	SchemaVersion string                   `json:"schemaVersion"`
-	ID            artifactstore.ArtifactID `json:"id"`
-	Slug          string                   `json:"slug"`
-	Name          string                   `json:"name"`
-	DisplayName   string                   `json:"displayName"`
-	Description   string                   `json:"description"`
-	Tags          []string                 `json:"tags,omitempty"`
-	Insert        string                   `json:"insert"`
-	Arguments     []SkillArgument          `json:"arguments,omitempty"`
-	IsEnabled     bool                     `json:"isEnabled"`
-	CreatedAt     time.Time                `json:"createdAt"`
-	ModifiedAt    time.Time                `json:"modifiedAt"`
+	SchemaVersion string              `json:"schemaVersion"`
+	ID            basespec.ArtifactID `json:"id"`
+	Slug          string              `json:"slug"`
+	Name          string              `json:"name"`
+	DisplayName   string              `json:"displayName"`
+	Description   string              `json:"description"`
+	Tags          []string            `json:"tags,omitempty"`
+	Insert        string              `json:"insert"`
+	Arguments     []SkillArgument     `json:"arguments,omitempty"`
+	IsEnabled     bool                `json:"isEnabled"`
+	CreatedAt     time.Time           `json:"createdAt"`
+	ModifiedAt    time.Time           `json:"modifiedAt"`
 }
 
 type WorkspaceSkill struct {
-	Workspace        artifactstore.CollectionRef `json:"workspace"`
-	Artifact         artifactstore.ArtifactRef   `json:"artifact"`
-	DefinitionDigest artifactstore.Digest        `json:"definitionDigest"`
-	SourceID         artifactstore.SourceID      `json:"sourceID"`
-	Locator          artifactstore.Locator       `json:"locator"`
-	Skill            SkillSummary                `json:"skill"`
-	MarkdownBody     string                      `json:"markdownBody,omitempty"`
-	ArtifactRevision uint64                      `json:"artifactRevision"`
-	State            artifact.State              `json:"state"`
-	CatalogCurrent   bool                        `json:"catalogCurrent"`
-	WorkspaceEnabled bool                        `json:"-"`
-	RuntimeDisabled  bool                        `json:"runtimeDisabled"`
-	Diagnostics      []artifactstore.Diagnostic  `json:"diagnostics,omitempty"`
+	Workspace        basespec.CollectionRef  `json:"workspace"`
+	Artifact         basespec.ArtifactRef    `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
+	SourceID         basespec.SourceID       `json:"sourceID"`
+	Locator          basespec.Locator        `json:"locator"`
+	Skill            SkillSummary            `json:"skill"`
+	MarkdownBody     string                  `json:"markdownBody,omitempty"`
+	ArtifactRevision uint64                  `json:"artifactRevision"`
+	State            artifact.State          `json:"state"`
+	CatalogCurrent   bool                    `json:"catalogCurrent"`
+	WorkspaceEnabled bool                    `json:"-"`
+	RuntimeDisabled  bool                    `json:"runtimeDisabled"`
+	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 
-	ProjectionValid     bool                 `json:"-"`
-	RuntimePathBacked   bool                 `json:"-"`
-	SourceContentDigest artifactstore.Digest `json:"-"`
-	SourceGeneration    string               `json:"-"`
-	RuntimeLocation     string               `json:"-"`
+	ProjectionValid     bool              `json:"-"`
+	RuntimePathBacked   bool              `json:"-"`
+	SourceContentDigest cryptoutil.Digest `json:"-"`
+	SourceGeneration    string            `json:"-"`
+	RuntimeLocation     string            `json:"-"`
 }
 
 type SkillLoadPlan struct {
-	Workspace       artifactstore.CollectionRef `json:"workspace"`
-	CatalogRevision uint64                      `json:"catalogRevision"`
-	Skills          []WorkspaceSkill            `json:"skills"`
-	Diagnostics     []artifactstore.Diagnostic  `json:"diagnostics,omitempty"`
+	Workspace       basespec.CollectionRef  `json:"workspace"`
+	CatalogRevision uint64                  `json:"catalogRevision"`
+	Skills          []WorkspaceSkill        `json:"skills"`
+	Diagnostics     []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type Adapter struct {
@@ -93,7 +95,7 @@ func NewAdapter(
 
 func (f *Adapter) List(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 ) ([]WorkspaceSkill, error) {
 	if err := workspace.Validate(); err != nil {
 		return nil, err
@@ -116,7 +118,7 @@ func (f *Adapter) List(
 			f.supportsRuntimePath(resourceValue.Source.Kind),
 		)
 		if err != nil {
-			value.Diagnostics = artifactstore.AppendDiagnostics(
+			value.Diagnostics = diagnostic.AppendDiagnostics(
 				value.Diagnostics,
 				skillProjectionDiagnostic(resourceValue.Artifact, err),
 			)
@@ -129,8 +131,8 @@ func (f *Adapter) List(
 
 func (f *Adapter) Load(
 	ctx context.Context,
-	workspace artifactstore.CollectionRef,
-	artifactRefs []artifactstore.ArtifactRef,
+	workspace basespec.CollectionRef,
+	artifactRefs []basespec.ArtifactRef,
 ) (SkillLoadPlan, error) {
 	if err := workspace.Validate(); err != nil {
 		return SkillLoadPlan{}, err
@@ -151,17 +153,17 @@ func (f *Adapter) Load(
 	output := SkillLoadPlan{
 		Workspace:       workspace,
 		CatalogRevision: loadPlan.CatalogRevision,
-		Diagnostics:     artifactstore.CloneDiagnostics(loadPlan.Diagnostics),
+		Diagnostics:     diagnostic.CloneDiagnostics(loadPlan.Diagnostics),
 	}
 	verifiedSources := make(
-		map[artifactstore.SourceID]source.Source,
+		map[basespec.SourceID]source.Source,
 		len(loadPlan.Items),
 	)
-	sourceFailures := make(map[artifactstore.SourceID]error)
+	sourceFailures := make(map[basespec.SourceID]error)
 
 	for _, item := range loadPlan.Items {
 		if err := skillartifact.ValidateDefinition(item.Definition); err != nil {
-			output.Diagnostics = artifactstore.AppendDiagnostics(
+			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
 				skillProjectionDiagnostic(item.Artifact, err),
 			)
@@ -178,7 +180,7 @@ func (f *Adapter) Load(
 			return SkillLoadPlan{}, err
 		}
 		if decision.Disposition != engine.RuntimeAllowed {
-			output.Diagnostics = artifactstore.AppendDiagnostics(
+			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
 				engine.RuntimeDecisionDiagnostic(decision, item.Artifact),
 			)
@@ -200,7 +202,7 @@ func (f *Adapter) Load(
 			f.supportsRuntimePath(item.Source.Kind),
 		)
 		if err != nil {
-			output.Diagnostics = artifactstore.AppendDiagnostics(
+			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
 				skillProjectionDiagnostic(item.Artifact, err),
 			)
@@ -215,7 +217,7 @@ func (f *Adapter) Load(
 			sourceFailures,
 		)
 		if err != nil {
-			output.Diagnostics = artifactstore.AppendDiagnostics(
+			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
 				runtimeLocationDiagnostic(item.Artifact, err),
 			)
@@ -227,7 +229,7 @@ func (f *Adapter) Load(
 			sourceValue,
 		)
 		if err != nil {
-			output.Diagnostics = artifactstore.AppendDiagnostics(
+			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
 				runtimeLocationDiagnostic(item.Artifact, err),
 			)
@@ -242,7 +244,7 @@ func (f *Adapter) Load(
 
 func (f *Adapter) LoadArtifact(
 	ctx context.Context,
-	ref artifactstore.ArtifactRef,
+	ref basespec.ArtifactRef,
 ) (WorkspaceSkill, error) {
 	workspaceValue, resourceValue, err := f.query.ResolveArtifact(ctx, ref)
 	if err != nil {
@@ -257,7 +259,7 @@ func (f *Adapter) LoadArtifact(
 			ref.ArtifactID,
 		)
 	}
-	plan, err := f.Load(ctx, workspace, []artifactstore.ArtifactRef{ref})
+	plan, err := f.Load(ctx, workspace, []basespec.ArtifactRef{ref})
 	if err != nil {
 		return WorkspaceSkill{}, err
 	}
@@ -272,7 +274,7 @@ func (f *Adapter) LoadArtifact(
 }
 
 func projectWorkspaceSkill(
-	workspace artifactstore.CollectionRef,
+	workspace basespec.CollectionRef,
 	resourceValue engine.Resource,
 	workspaceEnabled bool,
 	includeMarkdown bool,
@@ -292,7 +294,7 @@ func projectWorkspaceSkill(
 		CatalogCurrent:   resourceValue.CatalogCurrent,
 		RuntimeDisabled:  runtimeDisabled,
 		WorkspaceEnabled: workspaceEnabled,
-		Diagnostics: artifactstore.AppendDiagnostics(
+		Diagnostics: diagnostic.AppendDiagnostics(
 			resourceValue.Artifact.Diagnostics,
 			resourceValue.Diagnostics...,
 		),
@@ -371,8 +373,8 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 func (f *Adapter) runtimeSource(
 	ctx context.Context,
 	item engine.LoadPlanItem,
-	verified map[artifactstore.SourceID]source.Source,
-	failures map[artifactstore.SourceID]error,
+	verified map[basespec.SourceID]source.Source,
+	failures map[basespec.SourceID]error,
 ) (source.Source, error) {
 	if value, found := verified[item.Source.ID]; found {
 		return value, nil
@@ -394,7 +396,7 @@ func (f *Adapter) runtimeSource(
 		sourceValue.Kind != item.Source.Kind {
 		err := fmt.Errorf(
 			"%w: Workspace Skill source changed after load-plan composition",
-			artifactstore.ErrCatalogStale,
+			basespec.ErrCatalogStale,
 		)
 		failures[item.Source.ID] = err
 		return source.Source{}, err
@@ -404,7 +406,7 @@ func (f *Adapter) runtimeSource(
 		!localPaths.SupportsLocalPath(sourceValue.Kind) {
 		err := fmt.Errorf(
 			"%w: Workspace Skill source kind %q has no trusted native path",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 			sourceValue.Kind,
 		)
 		failures[item.Source.ID] = err
@@ -434,27 +436,27 @@ func (f *Adapter) resolveRuntimeLocation(
 		!localPaths.SupportsLocalPath(item.Source.Kind) {
 		return "", fmt.Errorf(
 			"%w: Workspace Skill source kind %q has no native filesystem package",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 			item.Source.Kind,
 		)
 	}
 	if item.Artifact.Binding.SubresourceLocator != "" {
 		return "", fmt.Errorf(
 			"%w: Workspace Skill cannot use a subresource binding",
-			artifactstore.ErrUnsupported,
+			basespec.ErrUnsupported,
 		)
 	}
 	if item.SourceContentDigest == "" ||
 		item.OccurrenceDefinitionDigest == "" {
 		return "", fmt.Errorf(
 			"%w: Workspace Skill has no current source occurrence",
-			artifactstore.ErrCatalogStale,
+			basespec.ErrCatalogStale,
 		)
 	}
 	if item.OccurrenceDefinitionDigest != item.Definition.Digest {
 		return "", fmt.Errorf(
 			"%w: selected Workspace Skill definition does not match its current source occurrence",
-			artifactstore.ErrCatalogStale,
+			basespec.ErrCatalogStale,
 		)
 	}
 	skillMDPath, err := localPaths.ResolveLocalPath(
@@ -468,7 +470,7 @@ func (f *Adapter) resolveRuntimeLocation(
 	if filepath.Base(skillMDPath) != skillartifact.DefinitionFileName {
 		return "", fmt.Errorf(
 			"%w: Workspace Skill locator %q is not %q",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 			item.Artifact.Binding.Locator,
 			skillartifact.DefinitionFileName,
 		)
@@ -496,7 +498,7 @@ func verifySourceGeneration(
 	value source.Source,
 	expected string,
 ) error {
-	if err := artifactstore.ValidateSourceGeneration(expected); err != nil {
+	if err := basespec.ValidateSourceGeneration(expected); err != nil {
 		return err
 	}
 	snapshot, err := runtime.Open(ctx, value)
@@ -506,7 +508,7 @@ func verifySourceGeneration(
 	if snapshot.Generation() != expected {
 		mismatchErr := fmt.Errorf(
 			"%w: Workspace Skill source changed since catalog publication",
-			artifactstore.ErrCatalogStale,
+			basespec.ErrCatalogStale,
 		)
 		return errors.Join(mismatchErr, snapshot.Close())
 	}
@@ -517,7 +519,7 @@ func verifySourceGeneration(
 }
 
 func (f *Adapter) supportsRuntimePath(
-	kind artifactstore.SourceKind,
+	kind basespec.SourceKind,
 ) bool {
 	localPaths, supported := f.sourceRuntime.(source.LocalPathRuntime)
 	if !supported {
@@ -532,9 +534,9 @@ func (f *Adapter) supportsRuntimePath(
 // just as they are for installed filesystem skills.
 func verifySkillMDContent(
 	location string,
-	expected artifactstore.Digest,
+	expected cryptoutil.Digest,
 ) error {
-	if err := artifactstore.ValidateDigest(expected); err != nil {
+	if err := cryptoutil.ValidateDigest(expected); err != nil {
 		return err
 	}
 	file, err := os.Open(location)
@@ -548,11 +550,11 @@ func verifySkillMDContent(
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf(
 			"%w: Workspace SKILL.md is not a regular file",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
 	content, readErr := io.ReadAll(
-		io.LimitReader(file, int64(artifactstore.MaxCandidateBytes)+1),
+		io.LimitReader(file, int64(basespec.MaxCandidateBytes)+1),
 	)
 	closeErr := file.Close()
 	if readErr != nil {
@@ -561,16 +563,16 @@ func verifySkillMDContent(
 	if closeErr != nil {
 		return closeErr
 	}
-	if len(content) > artifactstore.MaxCandidateBytes {
+	if len(content) > basespec.MaxCandidateBytes {
 		return fmt.Errorf(
 			"%w: Workspace SKILL.md exceeds runtime verification limit",
-			artifactstore.ErrInvalid,
+			basespec.ErrInvalid,
 		)
 	}
-	if artifactstore.DigestBytes(content) != expected {
+	if cryptoutil.DigestBytes(content) != expected {
 		return fmt.Errorf(
 			"%w: Workspace SKILL.md changed since the current catalog refresh",
-			artifactstore.ErrCatalogStale,
+			basespec.ErrCatalogStale,
 		)
 	}
 	return nil
@@ -579,12 +581,12 @@ func verifySkillMDContent(
 func runtimeLocationDiagnostic(
 	value artifact.Artifact,
 	err error,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticError,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticError,
 		Code:     engine.DiagnosticCodeRuntimeUnavailable,
-		Message:  artifactstore.BoundedDiagnosticMessage(err.Error()),
-		Location: &artifactstore.DiagnosticLocation{
+		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
+		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
@@ -594,12 +596,12 @@ func runtimeLocationDiagnostic(
 func skillProjectionDiagnostic(
 	value artifact.Artifact,
 	err error,
-) artifactstore.Diagnostic {
-	return artifactstore.Diagnostic{
-		Severity: artifactstore.DiagnosticError,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.DiagnosticError,
 		Code:     engine.DiagnosticCodeProjectionInvalid,
-		Message:  artifactstore.BoundedDiagnosticMessage(err.Error()),
-		Location: &artifactstore.DiagnosticLocation{
+		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
+		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
