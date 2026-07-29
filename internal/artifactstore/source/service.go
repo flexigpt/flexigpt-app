@@ -5,26 +5,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type Service struct {
 	repository Repository
 	registry   *Registry
-	ids        basespec.IDGenerator
-	clock      basespec.Clock
+	ids        uuidutil.Generator
+	clock      clockutil.Clock
 }
 
 func NewService(
 	repository Repository,
 	registry *Registry,
-	ids basespec.IDGenerator,
-	clock basespec.Clock,
+	ids uuidutil.Generator,
+	timeClock clockutil.Clock,
 ) (*Service, error) {
-	if repository == nil || registry == nil || ids == nil || clock == nil {
+	if repository == nil || registry == nil || ids == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: source service dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -34,7 +35,7 @@ func NewService(
 		repository: repository,
 		registry:   registry,
 		ids:        ids,
-		clock:      clock,
+		clock:      timeClock,
 	}, nil
 }
 
@@ -89,7 +90,7 @@ func (s *Service) Create(
 	if err != nil {
 		return Summary{}, err
 	}
-	now := s.clock.Now().UTC()
+	now := clockutil.NowUTC(s.clock)
 	value := Source{
 		ID:          basespec.SourceID(id),
 		RootID:      rootID,
@@ -254,7 +255,7 @@ func (s *Service) Update(
 		return Summary{}, fmt.Errorf("%w: source revision is exhausted", basespec.ErrInvalid)
 	}
 	next.Revision++
-	next.ModifiedAt = s.nextModifiedAt(current.ModifiedAt)
+	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
 		return Summary{}, err
 	}
@@ -296,7 +297,7 @@ func (s *Service) Retire(
 	if current.Revision == ^uint64(0) {
 		return Summary{}, fmt.Errorf("%w: source revision is exhausted", basespec.ErrInvalid)
 	}
-	now := s.nextModifiedAt(current.ModifiedAt)
+	now := clockutil.Next(s.clock, current.ModifiedAt)
 	next := current
 	next.Enabled = false
 	next.RetiredAt = &now
@@ -412,7 +413,7 @@ func (s *Service) MarkContentChanged(
 	next := current.Clone()
 	next.ContentGeneration = generation
 	next.Revision++
-	next.ModifiedAt = s.nextModifiedAt(current.ModifiedAt)
+	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
 		return Summary{}, err
 	}
@@ -424,12 +425,4 @@ func (s *Service) MarkContentChanged(
 
 func (s *Service) Kinds() []basespec.SourceKind {
 	return s.registry.Kinds()
-}
-
-func (s *Service) nextModifiedAt(previous time.Time) time.Time {
-	next := s.clock.Now().UTC()
-	if !next.After(previous) {
-		return previous.Add(time.Nanosecond)
-	}
-	return next
 }

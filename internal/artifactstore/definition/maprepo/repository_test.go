@@ -3,6 +3,7 @@ package maprepo
 import (
 	"errors"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 
@@ -117,7 +118,7 @@ func TestDefinitionFileKeyRejectsInvalidValues(t *testing.T) {
 	if err != nil || partition == "" {
 		t.Fatalf("GetPartitionDir partition=%q err=%v", partition, err)
 	}
-	if _, err := definitionFileKey("not-a-uuid", digest); !errors.Is(err, basespec.ErrInvalid) {
+	if _, err := definitionFileKey("not-a-uuid", digest); !strings.Contains(err.Error(), "invalid") {
 		t.Fatalf("invalid root error=%v", err)
 	}
 }

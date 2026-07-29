@@ -1,15 +1,13 @@
 package basespec
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/google/uuid"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 const (
@@ -45,9 +43,6 @@ const (
 )
 
 var (
-	uuidV7Pattern = regexp.MustCompile(
-		`^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
-	)
 	identifierPattern = regexp.MustCompile(
 		`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`,
 	)
@@ -146,54 +141,20 @@ func (b SourceBinding) Validate() error {
 	return ValidateArtifactKind(b.ExpectedKind)
 }
 
-type Clock interface {
-	Now() time.Time
-}
-
-type SystemClock struct{}
-
-func (SystemClock) Now() time.Time {
-	return time.Now().UTC()
-}
-
-type IDGenerator interface {
-	NewID(ctx context.Context) (string, error)
-}
-
-type UUIDv7Generator struct{}
-
-func (UUIDv7Generator) NewID(ctx context.Context) (string, error) {
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-	value, err := uuid.NewV7()
-	if err != nil {
-		return "", fmt.Errorf("generate UUIDv7: %w", err)
-	}
-	return value.String(), nil
-}
-
 func ValidateRootID(value RootID) error {
-	return ValidateUUIDv7("root ID", string(value))
+	return uuidutil.ValidateUUIDv7("root ID", string(value))
 }
 
 func ValidateSourceID(value SourceID) error {
-	return ValidateUUIDv7("source ID", string(value))
+	return uuidutil.ValidateUUIDv7("source ID", string(value))
 }
 
 func ValidateCollectionID(value CollectionID) error {
-	return ValidateUUIDv7("collection ID", string(value))
+	return uuidutil.ValidateUUIDv7("collection ID", string(value))
 }
 
 func ValidateArtifactID(value ArtifactID) error {
-	return ValidateUUIDv7("artifact ID", string(value))
-}
-
-func ValidateUUIDv7(label, value string) error {
-	if !uuidV7Pattern.MatchString(value) {
-		return fmt.Errorf("%w: %s must be a canonical UUIDv7", ErrInvalid, label)
-	}
-	return nil
+	return uuidutil.ValidateUUIDv7("artifact ID", string(value))
 }
 
 func ValidateSourceKind(value SourceKind) error {

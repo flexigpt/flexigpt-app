@@ -24,13 +24,11 @@ function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'sum
 export const MessageThinkingSection = memo(function MessageThinkingSection(props: {
 	/** Busy == request in flight */
 	isBusy: boolean;
-	/** Streaming thinking channel */
-	streamedThinking: string;
 	/** Final reasoning (if provider sends it at end) */
 	reasoningContents?: ReasoningContent[];
 	streamSource?: MessageStreamSource;
 }) {
-	const { isBusy, streamedThinking, reasoningContents, streamSource } = props;
+	const { isBusy, reasoningContents, streamSource } = props;
 
 	useSyncExternalStore(
 		streamSource?.subscribe ?? EMPTY_STREAM_SUBSCRIBE,
@@ -41,10 +39,8 @@ export const MessageThinkingSection = memo(function MessageThinkingSection(props
 	const finalSummary = useMemo(() => joinReasoningParts(reasoningContents, 'summary'), [reasoningContents]);
 	const finalThinking = useMemo(() => joinReasoningParts(reasoningContents, 'thinking'), [reasoningContents]);
 
-	const activeStreamedThinking = isBusy && streamSource ? streamSource.getThinking() : streamedThinking;
-
 	// Prefer streamed thinking while busy; otherwise show final thinking.
-	const thinkingText = isBusy ? activeStreamedThinking : finalThinking.trimEnd();
+	const thinkingText = isBusy ? (streamSource?.getThinking() ?? '') : finalThinking.trimEnd();
 
 	// Thinking is optional: only show when we actually have something to display.
 	const hasSummary = /\S/.test(finalSummary);

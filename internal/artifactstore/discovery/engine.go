@@ -16,6 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -45,14 +46,14 @@ type DirectoryRoot struct {
 
 type Engine struct {
 	decoders *DecoderRegistry
-	clock    basespec.Clock
+	clock    clockutil.Clock
 }
 
 func NewEngine(
 	decoders *DecoderRegistry,
-	clock basespec.Clock,
+	timeClock clockutil.Clock,
 ) (*Engine, error) {
-	if decoders == nil || clock == nil {
+	if decoders == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: discovery engine dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -60,7 +61,7 @@ func NewEngine(
 	}
 	return &Engine{
 		decoders: decoders,
-		clock:    clock,
+		clock:    timeClock,
 	}, nil
 }
 
@@ -198,7 +199,7 @@ func (e *Engine) Discover(
 	}
 	seenKeys := make(map[catalog.OccurrenceKey]struct{})
 	var consumed int64
-	now := e.clock.Now().UTC()
+	now := clockutil.NowUTC(e.clock)
 
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {

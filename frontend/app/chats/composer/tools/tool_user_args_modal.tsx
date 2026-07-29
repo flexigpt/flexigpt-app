@@ -274,8 +274,6 @@ function ToolUserArgsModalContent({
 							<MessageContentCard
 								messageID={`tool-args:example:${toolLabel}`}
 								content={exampleMarkdown}
-								streamedText=""
-								isStreaming={false}
 								isBusy={false}
 								align="items-start text-left"
 								renderAsMarkdown={true}
@@ -292,8 +290,6 @@ function ToolUserArgsModalContent({
 								<MessageContentCard
 									messageID={`tool-args:schema:${toolLabel}`}
 									content={schemaMarkdown}
-									streamedText=""
-									isStreaming={false}
 									isBusy={false}
 									align="items-start text-left"
 									renderAsMarkdown={true}

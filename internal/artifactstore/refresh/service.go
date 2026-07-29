@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -27,7 +28,7 @@ type Service struct {
 	definitions definition.Repository
 	reconciler  *artifact.Reconciler
 	publisher   Publisher
-	clock       basespec.Clock
+	clock       clockutil.Clock
 }
 
 func NewService(
@@ -39,7 +40,7 @@ func NewService(
 	definitions definition.Repository,
 	reconciler *artifact.Reconciler,
 	publisher Publisher,
-	clock basespec.Clock,
+	timeClock clockutil.Clock,
 ) (*Service, error) {
 	if collections == nil ||
 		catalogs == nil ||
@@ -49,7 +50,7 @@ func NewService(
 		definitions == nil ||
 		reconciler == nil ||
 		publisher == nil ||
-		clock == nil {
+		timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: refresh service dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -64,7 +65,7 @@ func NewService(
 		definitions: definitions,
 		reconciler:  reconciler,
 		publisher:   publisher,
-		clock:       clock,
+		clock:       timeClock,
 	}, nil
 }
 
@@ -360,7 +361,7 @@ func (s *Service) Refresh(
 		ArtifactCreates:             reconciliation.Creates,
 		ArtifactUpdates:             reconciliation.Updates,
 		Diagnostics:                 allDiagnostics,
-		PublishedAt:                 s.clock.Now().UTC(),
+		PublishedAt:                 clockutil.NowUTC(s.clock),
 	}
 	published, err := s.publisher.Publish(ctx, publication)
 	if err != nil {

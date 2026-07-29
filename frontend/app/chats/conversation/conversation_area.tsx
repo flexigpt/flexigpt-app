@@ -853,8 +853,6 @@ function ConversationAreaInner(
 				return (
 					<ChatMessage
 						message={message}
-						streamedText=""
-						streamedThinking=""
 						isBusy={true}
 						isEditing={activeEditingMessageId === message.id}
 						deferRichRendering={deferRichRendering}
@@ -870,8 +868,6 @@ function ConversationAreaInner(
 			return (
 				<ChatMessage
 					message={message}
-					streamedText=""
-					streamedThinking=""
 					isBusy={false}
 					isEditing={activeEditingMessageId === message.id}
 					deferRichRendering={deferRichRendering}

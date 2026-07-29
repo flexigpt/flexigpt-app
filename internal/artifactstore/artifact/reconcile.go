@@ -11,8 +11,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type bindingIdentity struct {
@@ -49,21 +51,21 @@ func occurrenceIdentityForKey(key catalog.OccurrenceKey) occurrenceIdentity {
 }
 
 type Reconciler struct {
-	ids   basespec.IDGenerator
-	clock basespec.Clock
+	ids   uuidutil.Generator
+	clock clockutil.Clock
 }
 
 func NewReconciler(
-	ids basespec.IDGenerator,
-	clock basespec.Clock,
+	ids uuidutil.Generator,
+	timeClock clockutil.Clock,
 ) (*Reconciler, error) {
-	if ids == nil || clock == nil {
+	if ids == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: artifact reconciler dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
-	return &Reconciler{ids: ids, clock: clock}, nil
+	return &Reconciler{ids: ids, clock: timeClock}, nil
 }
 
 // DeriveSourceState derives only the source-owned fields of an existing
@@ -282,7 +284,7 @@ func (r *Reconciler) Reconcile(
 	}
 
 	result := Reconciliation{}
-	now := r.clock.Now().UTC()
+	now := clockutil.NowUTC(r.clock)
 
 	orderedExisting := append([]Artifact(nil), existing...)
 	sort.Slice(orderedExisting, func(left, right int) bool {
@@ -312,10 +314,7 @@ func (r *Reconciler) Reconcile(
 			continue
 		}
 		next.Revision++
-		next.ModifiedAt = now
-		if !next.ModifiedAt.After(current.ModifiedAt) {
-			next.ModifiedAt = current.ModifiedAt.Add(1)
-		}
+		next.ModifiedAt = clockutil.Advance(now, current.ModifiedAt)
 
 		if err := next.Validate(); err != nil {
 			return Reconciliation{}, err

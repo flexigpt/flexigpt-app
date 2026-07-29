@@ -19,7 +19,6 @@ interface MessageDetailsModalProps {
 	content: string;
 	isBusy: boolean;
 	reasoningContents?: ReasoningContent[];
-	streamedThinking?: string;
 	showReasoningAtTop?: boolean;
 }
 
@@ -43,14 +42,13 @@ function MessageDetailsModalContent({
 	content,
 	isBusy,
 	reasoningContents,
-	streamedThinking = '',
 	showReasoningAtTop = false,
 }: MessageDetailsModalProps) {
 	const { requestClose } = useModalDialogController();
 
 	const summaryText = joinReasoningParts(reasoningContents, 'summary');
 	const finalThinkingText = joinReasoningParts(reasoningContents, 'thinking');
-	const thinkingText = (isBusy ? streamedThinking : finalThinkingText).trimEnd();
+	const thinkingText = finalThinkingText.trimEnd();
 
 	const hasSummary = summaryText.trim().length > 0;
 	const hasThinking = thinkingText.trim().length > 0;
@@ -82,8 +80,6 @@ function MessageDetailsModalContent({
 										<MessageContentCard
 											messageID={`${messageID}:details:reasoning-summary`}
 											content={summaryText}
-											streamedText=""
-											isStreaming={false}
 											isBusy={false}
 											align="items-start text-left"
 											renderAsMarkdown={false}
@@ -96,8 +92,6 @@ function MessageDetailsModalContent({
 										<MessageContentCard
 											messageID={`${messageID}:details:reasoning-thinking`}
 											content={thinkingText}
-											streamedText=""
-											isStreaming={false}
 											isBusy={false}
 											align="items-start text-left"
 											renderAsMarkdown={false}
@@ -111,8 +105,6 @@ function MessageDetailsModalContent({
 							<MessageContentCard
 								messageID={messageID}
 								content={content}
-								streamedText=""
-								isStreaming={false}
 								isBusy={isBusy}
 								align="items-start text-left"
 								renderAsMarkdown={true}

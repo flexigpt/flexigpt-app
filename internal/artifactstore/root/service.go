@@ -3,23 +3,24 @@ package root
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type Service struct {
 	repository Repository
-	ids        basespec.IDGenerator
-	clock      basespec.Clock
+	ids        uuidutil.Generator
+	clock      clockutil.Clock
 }
 
 func NewService(
 	repository Repository,
-	ids basespec.IDGenerator,
-	clock basespec.Clock,
+	ids uuidutil.Generator,
+	timeClock clockutil.Clock,
 ) (*Service, error) {
-	if repository == nil || ids == nil || clock == nil {
+	if repository == nil || ids == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: root service dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -28,7 +29,7 @@ func NewService(
 	return &Service{
 		repository: repository,
 		ids:        ids,
-		clock:      clock,
+		clock:      timeClock,
 	}, nil
 }
 
@@ -40,7 +41,7 @@ func (s *Service) Create(
 	if err != nil {
 		return Root{}, err
 	}
-	now := s.clock.Now().UTC()
+	now := clockutil.NowUTC(s.clock)
 	value := Root{
 		ID:          basespec.RootID(id),
 		DisplayName: draft.DisplayName,
@@ -103,7 +104,7 @@ func (s *Service) Update(
 		return current, nil
 	}
 	next.Revision++
-	next.ModifiedAt = s.nextModifiedAt(current.ModifiedAt)
+	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
 		return Root{}, err
 	}
@@ -135,7 +136,7 @@ func (s *Service) Retire(
 			id,
 		)
 	}
-	modifiedAt := s.nextModifiedAt(current.ModifiedAt)
+	modifiedAt := clockutil.Next(s.clock, current.ModifiedAt)
 	next := current
 	next.RetiredAt = &modifiedAt
 	next.ModifiedAt = modifiedAt
@@ -161,12 +162,4 @@ func (s *Service) Purge(
 		)
 	}
 	return s.repository.Purge(ctx, id, expectedRevision)
-}
-
-func (s *Service) nextModifiedAt(previous time.Time) time.Time {
-	next := s.clock.Now().UTC()
-	if !next.After(previous) {
-		return previous.Add(time.Nanosecond)
-	}
-	return next
 }

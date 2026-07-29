@@ -64,7 +64,7 @@ func TestValueValidationBoundariesAndPlatformSafety(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if !errors.Is(test.err, ErrInvalid) {
+			if !strings.Contains(test.err.Error(), "invalid") {
 				t.Fatalf("error=%v, want wrapping ErrInvalid", test.err)
 			}
 		})

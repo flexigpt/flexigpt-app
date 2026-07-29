@@ -18,8 +18,6 @@ interface MessageFooterAreaProps {
 	onEdit: () => void;
 	messageDetails: string;
 	reasoningContents?: ReasoningContent[];
-	streamedThinking?: string;
-	isStreaming: boolean;
 	isBusy: boolean;
 	bodyPresent: boolean;
 	disableMarkdown: boolean;
@@ -29,11 +27,7 @@ interface MessageFooterAreaProps {
 	errorDetails?: unknown;
 }
 
-function hasReasoningContent(reasoningContents?: ReasoningContent[], streamedThinking = ''): boolean {
-	if (/\S/.test(streamedThinking)) {
-		return true;
-	}
-
+function hasReasoningContent(reasoningContents?: ReasoningContent[]): boolean {
 	return (
 		reasoningContents?.some(rc => {
 			const hasSummary = (rc?.summary ?? []).some(s => /\S/.test(s ?? ''));
@@ -50,8 +44,6 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	onEdit,
 	messageDetails,
 	reasoningContents,
-	streamedThinking,
-	isStreaming,
 	isBusy,
 	bodyPresent,
 	disableMarkdown,
@@ -63,7 +55,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
 	const hasDebugDetails = /\S/.test(messageDetails) || debugDetails !== undefined || errorDetails !== undefined;
-	const hasInlineHiddenReasoning = !bodyPresent && hasReasoningContent(reasoningContents, streamedThinking);
+	const hasInlineHiddenReasoning = !bodyPresent && hasReasoningContent(reasoningContents);
 	const hasDetails = hasDebugDetails || hasInlineHiddenReasoning;
 	const hasContent = !!cardCopyContent;
 
@@ -110,7 +102,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 			<div
 				className={`flex items-center space-x-6 ${bodyPresent ? 'justify-between' : isUser ? 'justify-start' : 'justify-end'}`}
 			>
-				{usage && !isStreaming && (
+				{usage && !isBusy && (
 					<HoverTip content={usageTooltip} placement="top" wrapperElement="div">
 						<div className="flex items-center bg-transparent p-0 text-xs">
 							<div className="flex items-center">
@@ -122,7 +114,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 					</HoverTip>
 				)}
 
-				<div className={`flex items-center justify-end space-x-6 ${!isStreaming && !usage ? 'w-full' : ''}`}>
+				<div className={`flex items-center justify-end space-x-6 ${!isBusy && !usage ? 'w-full' : ''}`}>
 					{hasContent && !isBusy && (
 						<label className="ml-1 flex h-full items-center space-x-2 truncate p-1" title="Disable Markdown">
 							<input
@@ -187,7 +179,6 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 					content={renderedMessageDetails}
 					isBusy={isBusy}
 					reasoningContents={reasoningContents}
-					streamedThinking={streamedThinking}
 					showReasoningAtTop={!bodyPresent}
 				/>
 			) : null}

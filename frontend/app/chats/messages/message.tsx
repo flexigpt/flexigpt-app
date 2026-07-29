@@ -24,8 +24,6 @@ import { MessageThinkingSection } from '@/chats/messages/message_thinking_sectio
 
 interface ChatMessageProps {
 	message: ConversationMessage;
-	streamedText: string;
-	streamedThinking: string;
 	isBusy: boolean;
 	isEditing: boolean;
 	deferRichRendering: boolean;
@@ -114,13 +112,6 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 		return false;
 	}
 
-	if (prev.streamedText !== next.streamedText) {
-		return false;
-	}
-	if (prev.streamedThinking !== next.streamedThinking) {
-		return false;
-	}
-
 	// If the *object reference* for the ConversationMessage changes
 	// react must re-render (content edited, message appended).
 	if (prev.message !== next.message) {
@@ -133,8 +124,6 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 
 export const ChatMessage = memo(function ChatMessage({
 	message,
-	streamedText,
-	streamedThinking,
 	isBusy,
 	isEditing,
 	deferRichRendering,
@@ -163,25 +152,18 @@ export const ChatMessage = memo(function ChatMessage({
 		setToolDetailsState({ kind: 'output', output });
 	}, []);
 
-	const bubbleExtra = [
-		isBusy || streamedText || streamedThinking ? '' : 'shadow-lg',
-		isEditing ? 'ring-2 ring-primary/70' : '',
-	]
-		.filter(Boolean)
-		.join(' ');
+	const bubbleExtra = [isBusy ? '' : 'shadow-lg', isEditing ? 'ring-2 ring-primary/70' : ''].filter(Boolean).join(' ');
 
 	const baseContent = message.uiContent ?? '';
-	const hasAnyContent = /\S/.test(baseContent) || /\S/.test(streamedText);
+	const hasAnyContent = /\S/.test(baseContent);
 	const hasError = message.status === Status.Failed || !!message.error;
 
 	const hasAnyReasoning =
-		/\S/.test(streamedThinking) ||
-		(message.uiReasoningContents?.some(rc => {
+		message.uiReasoningContents?.some(rc => {
 			const sum = (rc?.summary ?? []).some(s => /\S/.test(s ?? ''));
 			const th = (rc?.thinking ?? []).some(s => /\S/.test(s ?? ''));
 			return sum || th;
-		}) ??
-			false);
+		}) ?? false;
 
 	const hasCitations = !isUser && !isBusy && (message.uiCitations?.length ?? 0) > 0;
 	const mcpContextItemCount =
@@ -248,7 +230,6 @@ export const ChatMessage = memo(function ChatMessage({
 						{!isUser && (hasAnyReasoning || (isBusy && streamSource)) && (
 							<MessageThinkingSection
 								isBusy={isBusy}
-								streamedThinking={streamedThinking}
 								reasoningContents={message.uiReasoningContents}
 								streamSource={streamSource}
 							/>
@@ -257,8 +238,6 @@ export const ChatMessage = memo(function ChatMessage({
 							<MessageContentCard
 								messageID={message.id}
 								content={baseContent}
-								streamedText={streamedText}
-								isStreaming={!!streamedText}
 								isBusy={isBusy}
 								align={align}
 								renderAsMarkdown={renderMarkdown && !deferRichRendering}
@@ -358,8 +337,6 @@ export const ChatMessage = memo(function ChatMessage({
 							onEdit={onEdit}
 							messageDetails={message.uiDebugDetails ?? ''}
 							reasoningContents={message.uiReasoningContents}
-							streamedThinking={streamedThinking}
-							isStreaming={isBusy || !!streamedText || !!streamedThinking}
 							isBusy={isBusy}
 							bodyPresent={showBody}
 							disableMarkdown={!renderMarkdown}

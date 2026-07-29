@@ -13,9 +13,6 @@ interface MessageContentCardProps {
 	messageID: string;
 	// Final text
 	content: string;
-	// Partial text while streaming.
-	streamedText?: string;
-	isStreaming?: boolean;
 	isBusy?: boolean;
 	align: string;
 	renderAsMarkdown?: boolean;
@@ -109,8 +106,6 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 	return (
 		prev.messageID === next.messageID &&
 		prev.content === next.content &&
-		prev.streamedText === next.streamedText &&
-		prev.isStreaming === next.isStreaming &&
 		prev.isBusy === next.isBusy &&
 		prev.align === next.align &&
 		prev.renderAsMarkdown === next.renderAsMarkdown &&
@@ -123,8 +118,6 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 export const MessageContentCard = memo(function MessageContentCard({
 	messageID,
 	content,
-	streamedText = '',
-	isStreaming = false,
 	isBusy = false,
 	align,
 	renderAsMarkdown = true,
@@ -132,11 +125,12 @@ export const MessageContentCard = memo(function MessageContentCard({
 	streamSource,
 	defaultCodeBlockExpanded = true,
 }: MessageContentCardProps) {
-	const liveText = isStreaming ? streamedText : content;
-	const textToRender = liveText;
+	const textToRender = content;
 	const renderBusy = isBusy;
 
-	if (isStreaming && streamSource) {
+	// The live source owns text rendering while this message has the
+	// in-flight request. Non-streaming requests keep showing the loader.
+	if (isBusy && streamSource) {
 		return <AppendOnlyStreamingText source={streamSource} align={align} />;
 	}
 
@@ -154,11 +148,9 @@ export const MessageContentCard = memo(function MessageContentCard({
 		);
 	}
 
-	// Parsing the complete accumulated response as Markdown for every token is
-	// the dominant streaming cost. Keep streaming and intentionally deferred
-	// transcript paints on one cheap text node, then render rich Markdown once
-	// the content has settled.
-	if (isStreaming || !renderAsMarkdown) {
+	// Deferred transcript paints use the inexpensive plain-text presentation.
+	// Live stream text has already returned through AppendOnlyStreamingText.
+	if (!renderAsMarkdown) {
 		return (
 			<div
 				className={`${align} wrap-break-word whitespace-pre-wrap`}

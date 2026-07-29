@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type sourceReader interface {
@@ -22,17 +23,17 @@ type sourceReader interface {
 type Service struct {
 	repository Repository
 	sources    sourceReader
-	ids        basespec.IDGenerator
-	clock      basespec.Clock
+	ids        uuidutil.Generator
+	clock      clockutil.Clock
 }
 
 func NewService(
 	repository Repository,
 	sources sourceReader,
-	ids basespec.IDGenerator,
-	clock basespec.Clock,
+	ids uuidutil.Generator,
+	timeClock clockutil.Clock,
 ) (*Service, error) {
-	if repository == nil || sources == nil || ids == nil || clock == nil {
+	if repository == nil || sources == nil || ids == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: collection service dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -42,7 +43,7 @@ func NewService(
 		repository: repository,
 		sources:    sources,
 		ids:        ids,
-		clock:      clock,
+		clock:      timeClock,
 	}, nil
 }
 
@@ -66,7 +67,7 @@ func (s *Service) Create(
 	if err != nil {
 		return Collection{}, nil, err
 	}
-	now := s.clock.Now().UTC()
+	now := clockutil.NowUTC(s.clock)
 	value := Collection{
 		ID:          basespec.CollectionID(id),
 		RootID:      rootID,
@@ -204,7 +205,7 @@ func (s *Service) Update(
 		return current, nil
 	}
 	next.Revision++
-	next.ModifiedAt = s.nextTime(current.ModifiedAt)
+	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
 		return Collection{}, err
 	}
@@ -229,7 +230,7 @@ func (s *Service) Retire(
 			basespec.ErrConflict,
 		)
 	}
-	now := s.nextTime(current.ModifiedAt)
+	now := clockutil.Next(s.clock, current.ModifiedAt)
 	next := current
 	next.Enabled = false
 	next.RetiredAt = &now
@@ -307,7 +308,7 @@ func (s *Service) Attach(
 	if err != nil {
 		return Collection{}, Attachment{}, err
 	}
-	now := s.nextTime(current.ModifiedAt)
+	now := clockutil.Next(s.clock, current.ModifiedAt)
 	value := Attachment{
 		RootID:       ref.RootID,
 		CollectionID: ref.CollectionID,
@@ -379,7 +380,7 @@ func (s *Service) UpdateAttachment(
 	if currentCollection.ModifiedAt.After(previous) {
 		previous = currentCollection.ModifiedAt
 	}
-	next.ModifiedAt = s.nextTime(previous)
+	next.ModifiedAt = clockutil.Next(s.clock, previous)
 	if err := next.Validate(); err != nil {
 		return Collection{}, Attachment{}, err
 	}
@@ -415,7 +416,7 @@ func (s *Service) Detach(
 		sourceID,
 		expectedCollectionRevision,
 		expectedAttachmentRevision,
-		s.nextTime(current.ModifiedAt),
+		clockutil.Next(s.clock, current.ModifiedAt),
 	)
 }
 
@@ -450,7 +451,7 @@ func (s *Service) ReplaceAttachment(
 	if err != nil {
 		return Collection{}, Attachment{}, err
 	}
-	now := s.nextTime(current.ModifiedAt)
+	now := clockutil.Next(s.clock, current.ModifiedAt)
 	value := Attachment{
 		RootID:       ref.RootID,
 		CollectionID: ref.CollectionID,
@@ -496,12 +497,4 @@ func cloneAttachments(values []Attachment) []Attachment {
 		output[index] = value.Clone()
 	}
 	return output
-}
-
-func (s *Service) nextTime(previous time.Time) time.Time {
-	now := s.clock.Now().UTC()
-	if !now.After(previous) {
-		return previous.Add(time.Nanosecond)
-	}
-	return now
 }

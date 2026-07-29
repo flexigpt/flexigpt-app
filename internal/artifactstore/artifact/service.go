@@ -5,36 +5,37 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type Service struct {
 	repository  Repository
 	collections collection.Reader
 	catalogs    catalog.Reader
-	ids         basespec.IDGenerator
-	clock       basespec.Clock
+	ids         uuidutil.Generator
+	clock       clockutil.Clock
 }
 
 func NewService(
 	repository Repository,
 	collections collection.Reader,
 	catalogs catalog.Reader,
-	ids basespec.IDGenerator,
-	clock basespec.Clock,
+	ids uuidutil.Generator,
+	timeClock clockutil.Clock,
 ) (*Service, error) {
 	if repository == nil ||
 		collections == nil ||
 		catalogs == nil ||
 		ids == nil ||
-		clock == nil {
+		timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: artifact service dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -45,7 +46,7 @@ func NewService(
 		collections: collections,
 		catalogs:    catalogs,
 		ids:         ids,
-		clock:       clock,
+		clock:       timeClock,
 	}, nil
 }
 
@@ -167,7 +168,7 @@ func (s *Service) Adopt(
 		name = string(occurrence.LogicalName)
 	}
 	resolved := *occurrence.DefinitionDigest
-	now := s.clock.Now().UTC()
+	now := clockutil.NowUTC(s.clock)
 	value := Artifact{
 		ID:           basespec.ArtifactID(id),
 		RootID:       request.Collection.RootID,
@@ -305,7 +306,7 @@ func (s *Service) Pin(
 	if err != nil {
 		return Artifact{}, err
 	}
-	now := s.clock.Now().UTC()
+	now := clockutil.NowUTC(s.clock)
 	value := Artifact{
 		ID:                 basespec.ArtifactID(id),
 		RootID:             request.Collection.RootID,
@@ -359,7 +360,7 @@ func (s *Service) SetEnabled(
 	next := current
 	next.Enabled = enabled
 	next.Revision++
-	next.ModifiedAt = s.nextTime(current.ModifiedAt)
+	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
 		return Artifact{}, err
 	}
@@ -395,7 +396,7 @@ func (s *Service) UpdateData(
 	next := current
 	next.Data = canonical
 	next.Revision++
-	next.ModifiedAt = s.nextTime(current.ModifiedAt)
+	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
 		return Artifact{}, err
 	}
@@ -431,7 +432,7 @@ func (s *Service) Unadopt(
 		if err := s.requireAttachedBinding(ctx, ref, current.Binding); err != nil {
 			return err
 		}
-		now := s.clock.Now().UTC()
+		now := clockutil.NowUTC(s.clock)
 		value := Suppression{
 			RootID:       current.RootID,
 			CollectionID: current.CollectionID,
@@ -481,7 +482,7 @@ func (s *Service) Suppress(
 		return Suppression{}, err
 	}
 
-	now := s.clock.Now().UTC()
+	now := clockutil.NowUTC(s.clock)
 	value := Suppression{
 		RootID:       request.Collection.RootID,
 		CollectionID: request.Collection.CollectionID,
@@ -628,12 +629,4 @@ func canonicalArtifactData(raw json.RawMessage) (json.RawMessage, error) {
 		return nil, err
 	}
 	return json.RawMessage(value), nil
-}
-
-func (s *Service) nextTime(previous time.Time) time.Time {
-	now := s.clock.Now().UTC()
-	if !now.After(previous) {
-		return previous.Add(time.Nanosecond)
-	}
-	return now
 }

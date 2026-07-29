@@ -22,7 +22,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/sqlite"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type Config struct {
@@ -30,8 +32,8 @@ type Config struct {
 	EmbeddedProviders         map[string]fs.FS
 	AdditionalSources         []source.Adapter
 	Decoders                  []discovery.Decoder
-	Clock                     basespec.Clock
-	IDGenerator               basespec.IDGenerator
+	Clock                     clockutil.Clock
+	IDGenerator               uuidutil.Generator
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 }
 
@@ -71,10 +73,10 @@ func Open(
 		)
 	}
 	if config.Clock == nil {
-		config.Clock = basespec.SystemClock{}
+		config.Clock = clockutil.System{}
 	}
 	if config.IDGenerator == nil {
-		config.IDGenerator = basespec.UUIDv7Generator{}
+		config.IDGenerator = uuidutil.UUIDv7Generator{}
 	}
 
 	base, err := mapstoreio.PreparePrivateDirectory(

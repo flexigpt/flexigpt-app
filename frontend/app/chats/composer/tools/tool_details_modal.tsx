@@ -268,8 +268,6 @@ function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
 							<MessageContentCard
 								messageID={`${baseMessageId}:primary`}
 								content={primaryContent}
-								streamedText=""
-								isStreaming={false}
 								isBusy={false}
 								align="items-start text-left"
 								renderAsMarkdown={true}
@@ -283,8 +281,6 @@ function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
 						<MessageContentCard
 							messageID={`${baseMessageId}:raw`}
 							content={rawPayloadMarkdown}
-							streamedText=""
-							isStreaming={false}
 							isBusy={false}
 							align="items-start text-left"
 							renderAsMarkdown={true}
