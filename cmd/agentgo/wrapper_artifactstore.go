@@ -4,20 +4,17 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"sync"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
 type ArtifactStoreWrapper struct {
+	api        *artifactstore.API
 	components *system.Components
-
-	mutationMu     sync.RWMutex
-	onRootMutation func(basespec.RootID)
 }
 
 func InitArtifactStoreWrapper(
@@ -25,219 +22,266 @@ func InitArtifactStoreWrapper(
 	baseDirectory string,
 ) error {
 	if wrapper == nil {
-		return errors.New("artifact store wrapper is nil")
+		return errors.New("artifact store wrapper is required")
 	}
-	components, err := system.Open(context.Background(), system.Config{
-		BaseDirectory: baseDirectory,
-		Decoders:      workspace.BuiltinDecoders(),
-	})
+
+	components, err := system.Open(
+		context.Background(),
+		system.Config{
+			BaseDirectory: baseDirectory,
+			Decoders:      workspace.BuiltinDecoders(),
+		},
+	)
 	if err != nil {
 		return err
 	}
+
+	api, err := artifactstore.New(components)
+	if err != nil {
+		_ = components.Close()
+		return err
+	}
+
 	wrapper.components = components
+	wrapper.api = api
+
 	return nil
 }
 
-type CreateArtifactRootRequest struct {
-	Body *root.RootDraft
-}
-
-type CreateArtifactRootResponse struct {
-	Body *root.Root
-}
-
 func (w *ArtifactStoreWrapper) CreateArtifactRoot(
-	request *CreateArtifactRootRequest,
-) (*CreateArtifactRootResponse, error) {
-	return middleware.WithRecoveryResp(func() (*CreateArtifactRootResponse, error) {
-		if w == nil || w.components == nil ||
-			request == nil || request.Body == nil {
-			return nil, errors.New("invalid Artifact Root request")
-		}
-		value, err := w.components.Roots.Create(
-			context.Background(),
-			*request.Body,
-		)
-		if err != nil {
-			return nil, err
-		}
-		return &CreateArtifactRootResponse{Body: &value}, nil
-	})
-}
-
-type GetArtifactRootRequest struct {
-	RootID basespec.RootID `path:"rootID" required:"true"`
-}
-
-type GetArtifactRootResponse struct {
-	Body *root.Root
+	request *artifactstore.CreateArtifactRootRequest,
+) (*artifactstore.CreateArtifactRootResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.CreateArtifactRootResponse, error) {
+			return w.api.CreateArtifactRoot(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *ArtifactStoreWrapper) GetArtifactRoot(
-	request *GetArtifactRootRequest,
-) (*GetArtifactRootResponse, error) {
-	return middleware.WithRecoveryResp(func() (*GetArtifactRootResponse, error) {
-		if w == nil || w.components == nil || request == nil {
-			return nil, errors.New("invalid Artifact Root request")
-		}
-		value, err := w.components.Roots.Get(
-			context.Background(),
-			request.RootID,
-		)
-		if err != nil {
-			return nil, err
-		}
-		return &GetArtifactRootResponse{Body: &value}, nil
-	})
-}
-
-type ListArtifactRootsRequest struct{}
-
-type ListArtifactRootsResponseBody struct {
-	Roots []root.Root `json:"roots"`
-}
-
-type ListArtifactRootsResponse struct {
-	Body *ListArtifactRootsResponseBody
+	request *artifactstore.GetArtifactRootRequest,
+) (*artifactstore.GetArtifactRootResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.GetArtifactRootResponse, error) {
+			return w.api.GetArtifactRoot(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *ArtifactStoreWrapper) ListArtifactRoots(
-	_ *ListArtifactRootsRequest,
-) (*ListArtifactRootsResponse, error) {
-	return middleware.WithRecoveryResp(func() (*ListArtifactRootsResponse, error) {
-		if w == nil || w.components == nil {
-			return nil, errors.New("artifact store is not initialized")
-		}
-		values, err := w.components.Roots.List(context.Background())
-		if err != nil {
-			return nil, err
-		}
-		return &ListArtifactRootsResponse{
-			Body: &ListArtifactRootsResponseBody{Roots: values},
-		}, nil
-	})
-}
-
-type UpdateArtifactRootRequest struct {
-	RootID basespec.RootID `path:"rootID" required:"true"`
-	Body   *root.RootUpdate
-}
-
-type UpdateArtifactRootResponse struct {
-	Body *root.Root
+	request *artifactstore.ListArtifactRootsRequest,
+) (*artifactstore.ListArtifactRootsResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.ListArtifactRootsResponse, error) {
+			return w.api.ListArtifactRoots(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *ArtifactStoreWrapper) UpdateArtifactRoot(
-	request *UpdateArtifactRootRequest,
-) (*UpdateArtifactRootResponse, error) {
-	return middleware.WithRecoveryResp(func() (*UpdateArtifactRootResponse, error) {
-		if w == nil || w.components == nil ||
-			request == nil || request.Body == nil {
-			return nil, errors.New("invalid Artifact Root request")
-		}
-		value, err := w.components.Roots.Update(
-			context.Background(),
-			request.RootID,
-			*request.Body,
-		)
-		if err != nil {
-			return nil, err
-		}
-		return &UpdateArtifactRootResponse{Body: &value}, nil
-	})
-}
-
-type RetireArtifactRootRequest struct {
-	RootID           basespec.RootID `path:"rootID" required:"true"`
-	ExpectedRevision uint64          `              required:"true" json:"expectedRevision"`
-}
-
-type RetireArtifactRootResponse struct {
-	Body *root.Root
+	request *artifactstore.UpdateArtifactRootRequest,
+) (*artifactstore.UpdateArtifactRootResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.UpdateArtifactRootResponse, error) {
+			return w.api.UpdateArtifactRoot(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *ArtifactStoreWrapper) RetireArtifactRoot(
-	request *RetireArtifactRootRequest,
-) (*RetireArtifactRootResponse, error) {
-	return middleware.WithRecoveryResp(func() (*RetireArtifactRootResponse, error) {
-		if w == nil || w.components == nil || request == nil {
-			return nil, errors.New("invalid Artifact Root request")
-		}
-		value, err := w.components.Roots.Retire(
-			context.Background(),
-			request.RootID,
-			request.ExpectedRevision,
-		)
-		if err != nil {
-			return nil, err
-		}
-		w.notifyRootMutation(request.RootID)
-		return &RetireArtifactRootResponse{Body: &value}, nil
-	})
-}
-
-type PurgeArtifactRootRequest struct {
-	RootID           basespec.RootID `path:"rootID" required:"true"`
-	ExpectedRevision uint64          `              required:"true" json:"expectedRevision"`
-}
-
-type PurgeArtifactRootResponse struct {
-	RootID basespec.RootID `json:"rootID"`
+	request *artifactstore.RetireArtifactRootRequest,
+) (*artifactstore.RetireArtifactRootResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.RetireArtifactRootResponse, error) {
+			return w.api.RetireArtifactRoot(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *ArtifactStoreWrapper) PurgeArtifactRoot(
-	request *PurgeArtifactRootRequest,
-) (*PurgeArtifactRootResponse, error) {
-	return middleware.WithRecoveryResp(func() (*PurgeArtifactRootResponse, error) {
-		if w == nil || w.components == nil || request == nil {
-			return nil, errors.New("invalid Artifact Root request")
-		}
-		if err := w.components.Roots.Purge(
-			context.Background(),
-			request.RootID,
-			request.ExpectedRevision,
-		); err != nil {
-			return nil, err
-		}
-		w.notifyRootMutation(request.RootID)
-		return &PurgeArtifactRootResponse{RootID: request.RootID}, nil
-	})
+	request *artifactstore.PurgeArtifactRootRequest,
+) (*artifactstore.PurgeArtifactRootResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.PurgeArtifactRootResponse, error) {
+			return w.api.PurgeArtifactRoot(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
-func (w *ArtifactStoreWrapper) close() {
-	if w == nil || w.components == nil {
-		return
-	}
-	w.mutationMu.Lock()
-	w.onRootMutation = nil
-	w.mutationMu.Unlock()
-	if err := w.components.Close(); err != nil {
-		slog.Error("close artifact store", "error", err)
-	}
-	w.components = nil
+func (w *ArtifactStoreWrapper) CreateArtifactSource(
+	request *artifactstore.CreateArtifactSourceRequest,
+) (*artifactstore.CreateArtifactSourceResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.CreateArtifactSourceResponse, error) {
+			return w.api.CreateArtifactSource(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) GetArtifactSource(
+	request *artifactstore.GetArtifactSourceRequest,
+) (*artifactstore.GetArtifactSourceResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.GetArtifactSourceResponse, error) {
+			return w.api.GetArtifactSource(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) ListArtifactSources(
+	request *artifactstore.ListArtifactSourcesRequest,
+) (*artifactstore.ListArtifactSourcesResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.ListArtifactSourcesResponse, error) {
+			return w.api.ListArtifactSources(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) UpdateArtifactSource(
+	request *artifactstore.UpdateArtifactSourceRequest,
+) (*artifactstore.UpdateArtifactSourceResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.UpdateArtifactSourceResponse, error) {
+			return w.api.UpdateArtifactSource(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) RetireArtifactSource(
+	request *artifactstore.RetireArtifactSourceRequest,
+) (*artifactstore.RetireArtifactSourceResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.RetireArtifactSourceResponse, error) {
+			return w.api.RetireArtifactSource(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) PurgeArtifactSource(
+	request *artifactstore.PurgeArtifactSourceRequest,
+) (*artifactstore.PurgeArtifactSourceResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.PurgeArtifactSourceResponse, error) {
+			return w.api.PurgeArtifactSource(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) ListArtifactSourceKinds(
+	request *artifactstore.ListArtifactSourceKindsRequest,
+) (*artifactstore.ListArtifactSourceKindsResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.ListArtifactSourceKindsResponse, error) {
+			return w.api.ListArtifactSourceKinds(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) PurgeArtifact(
+	request *artifactstore.PurgeArtifactRequest,
+) (*artifactstore.PurgeArtifactResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.PurgeArtifactResponse, error) {
+			return w.api.PurgeArtifact(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) GetManagedSourceState(
+	request *artifactstore.GetManagedSourceStateRequest,
+) (*artifactstore.GetManagedSourceStateResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.GetManagedSourceStateResponse, error) {
+			return w.api.GetManagedSourceState(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) PublishManagedSourcePackage(
+	request *artifactstore.PublishManagedSourcePackageRequest,
+) (*artifactstore.PublishManagedSourcePackageResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.PublishManagedSourcePackageResponse, error) {
+			return w.api.PublishManagedSourcePackage(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) RemoveManagedSourcePackage(
+	request *artifactstore.RemoveManagedSourcePackageRequest,
+) (*artifactstore.RemoveManagedSourcePackageResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.RemoveManagedSourcePackageResponse, error) {
+			return w.api.RemoveManagedSourcePackage(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *ArtifactStoreWrapper) setRootMutationObserver(
 	observer func(basespec.RootID),
 ) {
-	if w == nil {
-		return
-	}
-	w.mutationMu.Lock()
-	w.onRootMutation = observer
-	w.mutationMu.Unlock()
+	w.api.SetRootMutationObserver(observer)
 }
 
-func (w *ArtifactStoreWrapper) notifyRootMutation(
-	rootID basespec.RootID,
-) {
-	if w == nil {
-		return
+func (w *ArtifactStoreWrapper) close() {
+	w.api.SetRootMutationObserver(nil)
+
+	if err := w.components.Close(); err != nil {
+		slog.Error("close artifact store", "error", err)
 	}
-	w.mutationMu.RLock()
-	observer := w.onRootMutation
-	w.mutationMu.RUnlock()
-	if observer != nil {
-		observer(rootID)
-	}
+
+	w.api = nil
+	w.components = nil
 }

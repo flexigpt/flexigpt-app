@@ -62,9 +62,8 @@ type PurgeArtifactRootResponse struct {
 	RootID basespec.RootID `json:"rootID"`
 }
 
-// ArtifactSourceDraft is intentionally write-only. Source configuration may
-// include filesystem paths, provider credentials, or other sensitive values,
-// and is never returned by the public Artifact Store API.
+// ArtifactSourceDraft is write-only. Source configuration can contain local
+// filesystem paths or provider credentials and is not returned by the API.
 type ArtifactSourceDraft struct {
 	Kind        basespec.SourceKind `json:"kind"        required:"true"`
 	DisplayName string              `json:"displayName" required:"true"`
@@ -150,6 +149,15 @@ type ListArtifactSourceKindsResponse struct {
 	Body *ListArtifactSourceKindsResponseBody
 }
 
+type PurgeArtifactRequest struct {
+	Artifact         artifact.ArtifactRef `json:"artifact"         required:"true"`
+	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
+}
+
+type PurgeArtifactResponse struct {
+	Artifact artifact.ArtifactRef `json:"artifact"`
+}
+
 type GetManagedSourceStateRequest struct {
 	RootID   basespec.RootID   `json:"rootID"   required:"true"`
 	SourceID basespec.SourceID `json:"sourceID" required:"true"`
@@ -201,13 +209,4 @@ type RemoveManagedSourcePackageResponseBody struct {
 
 type RemoveManagedSourcePackageResponse struct {
 	Body *RemoveManagedSourcePackageResponseBody
-}
-
-type PurgeArtifactRequest struct {
-	Artifact         artifact.ArtifactRef `json:"artifact"         required:"true"`
-	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
-}
-
-type PurgeArtifactResponse struct {
-	Artifact artifact.ArtifactRef `json:"artifact"`
 }
