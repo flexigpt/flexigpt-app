@@ -1,4 +1,4 @@
-package workspace
+package integration
 
 import (
 	"encoding/json"
@@ -16,6 +16,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
+	"github.com/flexigpt/flexigpt-app/internal/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -26,13 +28,13 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	fixture := newWorkspaceTestFixture(t)
 	directory := writeWorkspaceFixtureFiles(t)
 
-	created, err := fixture.api.CreateFilesystemWorkspace(t.Context(), &CreateFilesystemWorkspaceRequest{
+	created, err := fixture.api.CreateFilesystemWorkspace(t.Context(), &workspace.CreateFilesystemWorkspaceRequest{
 		RootID: fixture.root.ID,
-		Body: &CreateFilesystemWorkspaceRequestBody{
+		Body: &workspace.CreateFilesystemWorkspaceRequestBody{
 			DisplayName: "Repository",
 			Description: "Workspace integration test",
 			RootPath:    directory,
-			Discovery:   WorkspaceDiscovery{IncludeReadme: true},
+			Discovery:   workspace.WorkspaceDiscovery{IncludeReadme: true},
 		},
 	})
 	if err != nil || created == nil || created.Body == nil {
@@ -46,7 +48,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		t.Fatalf("created workspace=%#v", workspaceView)
 	}
 
-	listed, err := fixture.api.ListWorkspaces(t.Context(), &ListWorkspacesRequest{RootID: fixture.root.ID})
+	listed, err := fixture.api.ListWorkspaces(t.Context(), &workspace.ListWorkspacesRequest{RootID: fixture.root.ID})
 	if err != nil || listed == nil || listed.Body == nil || len(listed.Body.Workspaces) != 1 ||
 		listed.Body.Workspaces[0].Workspace != workspaceView.Workspace {
 		t.Fatalf("ListWorkspaces response=%#v err=%v", listed, err)
@@ -58,7 +60,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 
 	refreshed, err := fixture.api.RefreshWorkspace(
 		t.Context(),
-		&RefreshWorkspaceRequest{Workspace: workspaceView.Workspace},
+		&workspace.RefreshWorkspaceRequest{Workspace: workspaceView.Workspace},
 	)
 	if err != nil || refreshed == nil || refreshed.Body == nil || refreshed.Body.CatalogRevision == 0 ||
 		refreshed.Body.Candidates < 3 || len(refreshed.Body.CreatedArtifacts) < 3 {
@@ -66,7 +68,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	}
 	catalogView, err := fixture.api.GetWorkspaceCatalog(
 		t.Context(),
-		&GetWorkspaceCatalogRequest{Workspace: workspaceView.Workspace},
+		&workspace.GetWorkspaceCatalogRequest{Workspace: workspaceView.Workspace},
 	)
 	if err != nil || catalogView == nil || catalogView.Body == nil || !catalogView.Body.CatalogCurrent ||
 		len(catalogView.Body.Resources) < 3 || len(catalogView.Body.ValidOccurrences) < 3 {
@@ -75,12 +77,12 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 
 	artifacts, err := fixture.api.ListWorkspaceArtifacts(
 		t.Context(),
-		&ListWorkspaceArtifactsRequest{Workspace: workspaceView.Workspace},
+		&workspace.ListWorkspaceArtifactsRequest{Workspace: workspaceView.Workspace},
 	)
 	if err != nil || artifacts == nil || artifacts.Body == nil || len(artifacts.Body.Artifacts) < 3 {
 		t.Fatalf("ListWorkspaceArtifacts response=%#v err=%v", artifacts, err)
 	}
-	var contextArtifact, skillArtifact WorkspaceArtifactView
+	var contextArtifact, skillArtifact workspace.WorkspaceArtifactView
 	for _, value := range artifacts.Body.Artifacts {
 		switch value.Kind {
 		case "workspace.context":
@@ -95,7 +97,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		t.Fatalf("expected Context and Skill Artifacts, got %#v", artifacts.Body.Artifacts)
 	}
 
-	gotArtifact, err := fixture.api.GetWorkspaceArtifact(t.Context(), &GetWorkspaceArtifactRequest{
+	gotArtifact, err := fixture.api.GetWorkspaceArtifact(t.Context(), &workspace.GetWorkspaceArtifactRequest{
 		Workspace: workspaceView.Workspace,
 		Artifact:  contextArtifact.Artifact,
 	})
@@ -103,9 +105,9 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		gotArtifact.Body.Artifact != contextArtifact.Artifact {
 		t.Fatalf("GetWorkspaceArtifact response=%#v err=%v", gotArtifact, err)
 	}
-	loadPlan, err := fixture.api.ComposeWorkspaceLoadPlan(t.Context(), &ComposeWorkspaceLoadPlanRequest{
+	loadPlan, err := fixture.api.ComposeWorkspaceLoadPlan(t.Context(), &workspace.ComposeWorkspaceLoadPlanRequest{
 		Workspace: workspaceView.Workspace,
-		Body: &ComposeWorkspaceLoadPlanRequestBody{
+		Body: &workspace.ComposeWorkspaceLoadPlanRequestBody{
 			Artifacts: []artifact.ArtifactRef{contextArtifact.Artifact, skillArtifact.Artifact},
 		},
 	})
@@ -113,7 +115,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		t.Fatalf("ComposeWorkspaceLoadPlan response=%#v err=%v", loadPlan, err)
 	}
 
-	removed, err := fixture.api.UnadoptWorkspaceArtifact(t.Context(), &UnadoptWorkspaceArtifactRequest{
+	removed, err := fixture.api.UnadoptWorkspaceArtifact(t.Context(), &workspace.UnadoptWorkspaceArtifactRequest{
 		Workspace:        workspaceView.Workspace,
 		Artifact:         contextArtifact.Artifact,
 		ExpectedRevision: contextArtifact.Revision,
@@ -121,11 +123,11 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	if err != nil || removed == nil || removed.Body == nil || removed.Body.Artifact != contextArtifact.Artifact {
 		t.Fatalf("UnadoptWorkspaceArtifact response=%#v err=%v", removed, err)
 	}
-	adopted, err := fixture.api.AdoptWorkspaceOccurrence(t.Context(), &AdoptWorkspaceOccurrenceRequest{
+	adopted, err := fixture.api.AdoptWorkspaceOccurrence(t.Context(), &workspace.AdoptWorkspaceOccurrenceRequest{
 		Workspace: workspaceView.Workspace,
-		Body: &AdoptWorkspaceOccurrenceRequestBody{
+		Body: &workspace.AdoptWorkspaceOccurrenceRequestBody{
 			ExpectedCatalogRevision: catalogView.Body.CatalogRevision,
-			Occurrence: WorkspaceOccurrenceRef{
+			Occurrence: workspace.WorkspaceOccurrenceRef{
 				SourceID:           contextArtifact.SourceID,
 				Locator:            contextArtifact.Locator,
 				SubresourceLocator: contextArtifact.SubresourceLocator,
@@ -139,28 +141,40 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	}
 	contextArtifact = *adopted.Body
 
-	disabledRecord, err := fixture.api.SetWorkspaceArtifactEnabled(t.Context(), &SetWorkspaceArtifactEnabledRequest{
-		Workspace: workspaceView.Workspace,
-		Artifact:  contextArtifact.Artifact,
-		Body:      &SetWorkspaceArtifactEnabledRequestBody{ExpectedRevision: contextArtifact.Revision, Enabled: false},
-	})
+	disabledRecord, err := fixture.api.SetWorkspaceArtifactEnabled(
+		t.Context(),
+		&workspace.SetWorkspaceArtifactEnabledRequest{
+			Workspace: workspaceView.Workspace,
+			Artifact:  contextArtifact.Artifact,
+			Body: &workspace.SetWorkspaceArtifactEnabledRequestBody{
+				ExpectedRevision: contextArtifact.Revision,
+				Enabled:          false,
+			},
+		},
+	)
 	if err != nil || disabledRecord == nil || disabledRecord.Body == nil || disabledRecord.Body.Enabled {
 		t.Fatalf("SetWorkspaceArtifactEnabled(false) response=%#v err=%v", disabledRecord, err)
 	}
 	contextArtifact = *disabledRecord.Body
-	enabledRecord, err := fixture.api.SetWorkspaceArtifactEnabled(t.Context(), &SetWorkspaceArtifactEnabledRequest{
-		Workspace: workspaceView.Workspace,
-		Artifact:  contextArtifact.Artifact,
-		Body:      &SetWorkspaceArtifactEnabledRequestBody{ExpectedRevision: contextArtifact.Revision, Enabled: true},
-	})
+	enabledRecord, err := fixture.api.SetWorkspaceArtifactEnabled(
+		t.Context(),
+		&workspace.SetWorkspaceArtifactEnabledRequest{
+			Workspace: workspaceView.Workspace,
+			Artifact:  contextArtifact.Artifact,
+			Body: &workspace.SetWorkspaceArtifactEnabledRequestBody{
+				ExpectedRevision: contextArtifact.Revision,
+				Enabled:          true,
+			},
+		},
+	)
 	if err != nil || enabledRecord == nil || enabledRecord.Body == nil || !enabledRecord.Body.Enabled {
 		t.Fatalf("SetWorkspaceArtifactEnabled(true) response=%#v err=%v", enabledRecord, err)
 	}
 	contextArtifact = *enabledRecord.Body
 
-	pinned, err := fixture.api.PinWorkspaceArtifact(t.Context(), &PinWorkspaceArtifactRequest{
+	pinned, err := fixture.api.PinWorkspaceArtifact(t.Context(), &workspace.PinWorkspaceArtifactRequest{
 		Workspace: workspaceView.Workspace,
-		Body: &PinWorkspaceArtifactRequestBody{
+		Body: &workspace.PinWorkspaceArtifactRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
 			Binding: artifact.SourceBinding{
 				SourceID:     workspaceView.PrimarySourceID,
@@ -175,9 +189,9 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		t.Fatalf("PinWorkspaceArtifact response=%#v err=%v", pinned, err)
 	}
 
-	suppressed, err := fixture.api.SuppressWorkspaceBinding(t.Context(), &SuppressWorkspaceBindingRequest{
+	suppressed, err := fixture.api.SuppressWorkspaceBinding(t.Context(), &workspace.SuppressWorkspaceBindingRequest{
 		Workspace: workspaceView.Workspace,
-		Body: &SuppressWorkspaceBindingRequestBody{
+		Body: &workspace.SuppressWorkspaceBindingRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
 			Binding: artifact.SourceBinding{
 				SourceID:     workspaceView.PrimarySourceID,
@@ -191,21 +205,24 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	}
 	suppressions, err := fixture.api.ListWorkspaceSuppressions(
 		t.Context(),
-		&ListWorkspaceSuppressionsRequest{Workspace: workspaceView.Workspace},
+		&workspace.ListWorkspaceSuppressionsRequest{Workspace: workspaceView.Workspace},
 	)
 	if err != nil || suppressions == nil || suppressions.Body == nil || len(suppressions.Body.Suppressions) != 1 {
 		t.Fatalf("ListWorkspaceSuppressions response=%#v err=%v", suppressions, err)
 	}
-	unsuppressed, err := fixture.api.UnsuppressWorkspaceBinding(t.Context(), &UnsuppressWorkspaceBindingRequest{
-		Workspace:        workspaceView.Workspace,
-		Binding:          suppressed.Body.Binding,
-		ExpectedRevision: suppressed.Body.Revision,
-	})
+	unsuppressed, err := fixture.api.UnsuppressWorkspaceBinding(
+		t.Context(),
+		&workspace.UnsuppressWorkspaceBindingRequest{
+			Workspace:        workspaceView.Workspace,
+			Binding:          suppressed.Body.Binding,
+			ExpectedRevision: suppressed.Body.Revision,
+		},
+	)
 	if err != nil || unsuppressed == nil || unsuppressed.Body == nil ||
 		unsuppressed.Body.Binding != suppressed.Body.Binding {
 		t.Fatalf("UnsuppressWorkspaceBinding response=%#v err=%v", unsuppressed, err)
 	}
-	if _, err := fixture.api.PurgeWorkspaceArtifact(t.Context(), &PurgeWorkspaceArtifactRequest{
+	if _, err := fixture.api.PurgeWorkspaceArtifact(t.Context(), &workspace.PurgeWorkspaceArtifactRequest{
 		Workspace:        workspaceView.Workspace,
 		Artifact:         pinned.Body.Artifact,
 		ExpectedRevision: pinned.Body.Revision,
@@ -215,22 +232,24 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 
 	contexts, err := fixture.api.ListWorkspaceContexts(
 		t.Context(),
-		&ListWorkspaceContextsRequest{Workspace: workspaceView.Workspace},
+		&workspace.ListWorkspaceContextsRequest{Workspace: workspaceView.Workspace},
 	)
 	if err != nil || contexts == nil || contexts.Body == nil || len(contexts.Body.Contexts) != 2 {
 		t.Fatalf("ListWorkspaceContexts response=%#v err=%v", contexts, err)
 	}
-	inspection, err := fixture.api.LoadWorkspaceContexts(t.Context(), &LoadWorkspaceContextsRequest{
+	inspection, err := fixture.api.LoadWorkspaceContexts(t.Context(), &workspace.LoadWorkspaceContextsRequest{
 		Workspace: workspaceView.Workspace,
-		Body:      &LoadWorkspaceContextsRequestBody{Artifacts: []artifact.ArtifactRef{contextArtifact.Artifact}},
+		Body: &workspace.LoadWorkspaceContextsRequestBody{
+			Artifacts: []artifact.ArtifactRef{contextArtifact.Artifact},
+		},
 	})
 	if err != nil || inspection == nil || inspection.Body == nil || len(inspection.Body.Contributions) != 1 ||
 		inspection.Body.Contributions[0].Artifact != contextArtifact.Artifact {
 		t.Fatalf("LoadWorkspaceContexts response=%#v err=%v", inspection, err)
 	}
-	composed, err := fixture.api.ComposeWorkspaceContext(t.Context(), &ComposeWorkspaceContextRequest{
+	composed, err := fixture.api.ComposeWorkspaceContext(t.Context(), &workspace.ComposeWorkspaceContextRequest{
 		Workspace: workspaceView.Workspace,
-		Body:      &ComposeWorkspaceContextRequestBody{},
+		Body:      &workspace.ComposeWorkspaceContextRequestBody{},
 	})
 	if err != nil || composed == nil || composed.Body == nil || len(composed.Body.Contributions) != 2 ||
 		!strings.Contains(
@@ -242,40 +261,48 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 
 	skills, err := fixture.api.ListWorkspaceSkills(
 		t.Context(),
-		&ListWorkspaceSkillsRequest{Workspace: workspaceView.Workspace},
+		&workspace.ListWorkspaceSkillsRequest{Workspace: workspaceView.Workspace},
 	)
 	if err != nil || skills == nil || skills.Body == nil || len(skills.Body.Skills) != 1 ||
 		skills.Body.Skills[0].Skill.Name != "weather" || skills.Body.Skills[0].MarkdownBody != "" {
 		t.Fatalf("ListWorkspaceSkills response=%#v err=%v", skills, err)
 	}
-	loadedSkills, err := fixture.api.LoadWorkspaceSkills(t.Context(), &LoadWorkspaceSkillsRequest{
+	loadedSkills, err := fixture.api.LoadWorkspaceSkills(t.Context(), &workspace.LoadWorkspaceSkillsRequest{
 		Workspace: workspaceView.Workspace,
-		Body:      &LoadWorkspaceSkillsRequestBody{Artifacts: []artifact.ArtifactRef{skillArtifact.Artifact}},
+		Body:      &workspace.LoadWorkspaceSkillsRequestBody{Artifacts: []artifact.ArtifactRef{skillArtifact.Artifact}},
 	})
 	if err != nil || loadedSkills == nil || loadedSkills.Body == nil || len(loadedSkills.Body.Skills) != 1 ||
 		!strings.Contains(loadedSkills.Body.Skills[0].MarkdownBody, "Use the weather Skill.") {
 		t.Fatalf("LoadWorkspaceSkills response=%#v err=%v", loadedSkills, err)
 	}
 
-	resolved, err := fixture.api.ResolveWorkspaceResource(t.Context(), &ResolveWorkspaceResourceRequest{
+	resolved, err := fixture.api.ResolveWorkspaceResource(t.Context(), &workspace.ResolveWorkspaceResourceRequest{
 		Workspace: workspaceView.Workspace,
-		Body:      &ResolveWorkspaceResourceRequestBody{Artifact: new(contextArtifact.Artifact)},
+		Body:      &workspace.ResolveWorkspaceResourceRequestBody{Artifact: new(contextArtifact.Artifact)},
 	})
 	if err != nil || resolved == nil || resolved.Body == nil ||
 		resolved.Body.Resource.Artifact.Artifact != contextArtifact.Artifact {
 		t.Fatalf("ResolveWorkspaceResource response=%#v err=%v", resolved, err)
 	}
 
-	conversation, err := fixture.api.ResolveConversationSelection(t.Context(), ConversationSelection{
+	cs, err := selection.NewConversationResolver(fixture.api)
+	if err != nil {
+		t.Fatalf("convo selection returned err %v", err)
+	}
+	conversation, err := cs.ResolveConversationSelection(t.Context(), selection.ConversationSelection{
 		Workspace: workspaceView.Workspace,
-		ContextRefs: []ConversationResourceSelectionRef{{
+		ContextRefs: []selection.ConversationResourceSelectionRef{{
 			Artifact: contextArtifact.Artifact,
 		}},
-		SkillRefs: []ConversationSkillSelectionRef{{
-			ConversationResourceSelectionRef: ConversationResourceSelectionRef{Artifact: skillArtifact.Artifact},
-		}},
+		SkillRefs: []selection.ConversationSkillSelectionRef{
+			{
+				ConversationResourceSelectionRef: selection.ConversationResourceSelectionRef{
+					Artifact: skillArtifact.Artifact,
+				},
+			},
+		},
 	})
-	if err != nil || conversation.Usage.Status != ConversationSelectionReady ||
+	if err != nil || conversation.Usage.Status != selection.ConversationSelectionReady ||
 		len(conversation.Usage.Contexts) != 1 || len(conversation.Usage.Skills) != 1 ||
 		!strings.Contains(conversation.Prompt, "Follow repository instructions.") {
 		t.Fatalf("ResolveConversationSelection resolution=%#v err=%v", conversation, err)
@@ -283,10 +310,10 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 
 	disabled, err := fixture.api.SetWorkspaceArtifactRuntimeDisabled(
 		t.Context(),
-		&SetWorkspaceArtifactRuntimeDisabledRequest{
+		&workspace.SetWorkspaceArtifactRuntimeDisabledRequest{
 			Workspace: workspaceView.Workspace,
 			Artifact:  contextArtifact.Artifact,
-			Body: &SetWorkspaceArtifactRuntimeDisabledRequestBody{
+			Body: &workspace.SetWorkspaceArtifactRuntimeDisabledRequestBody{
 				ExpectedRevision: contextArtifact.Revision,
 				RuntimeDisabled:  true,
 			},
@@ -295,9 +322,9 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	if err != nil || disabled == nil || disabled.Body == nil || !disabled.Body.RuntimeDisabled {
 		t.Fatalf("SetWorkspaceArtifactRuntimeDisabled response=%#v err=%v", disabled, err)
 	}
-	composed, err = fixture.api.ComposeWorkspaceContext(t.Context(), &ComposeWorkspaceContextRequest{
+	composed, err = fixture.api.ComposeWorkspaceContext(t.Context(), &workspace.ComposeWorkspaceContextRequest{
 		Workspace: workspaceView.Workspace,
-		Body: &ComposeWorkspaceContextRequestBody{
+		Body: &workspace.ComposeWorkspaceContextRequestBody{
 			Artifacts: []artifact.ArtifactRef{contextArtifact.Artifact},
 		},
 	})
@@ -306,13 +333,16 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		t.Fatalf("runtime-disabled composition=%#v err=%v", composed, err)
 	}
 
-	current, err := fixture.api.GetWorkspace(t.Context(), &GetWorkspaceRequest{Workspace: workspaceView.Workspace})
+	current, err := fixture.api.GetWorkspace(
+		t.Context(),
+		&workspace.GetWorkspaceRequest{Workspace: workspaceView.Workspace},
+	)
 	if err != nil || current == nil || current.Body == nil {
 		t.Fatalf("GetWorkspace response=%#v err=%v", current, err)
 	}
-	updated, err := fixture.api.UpdateWorkspace(t.Context(), &UpdateWorkspaceRequest{
+	updated, err := fixture.api.UpdateWorkspace(t.Context(), &workspace.UpdateWorkspaceRequest{
 		Workspace: workspaceView.Workspace,
-		Body: &UpdateWorkspaceRequestBody{
+		Body: &workspace.UpdateWorkspaceRequestBody{
 			ExpectedRevision: current.Body.Revision,
 			DisplayName:      "Repository updated",
 			Description:      "Updated description",
@@ -340,9 +370,9 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	if err != nil {
 		t.Fatalf("create attached source: %v", err)
 	}
-	attached, err := fixture.api.AttachWorkspaceSource(t.Context(), &AttachWorkspaceSourceRequest{
+	attached, err := fixture.api.AttachWorkspaceSource(t.Context(), &workspace.AttachWorkspaceSourceRequest{
 		Workspace: workspaceView.Workspace,
-		Body: &AttachWorkspaceSourceRequestBody{
+		Body: &workspace.AttachWorkspaceSourceRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
 			SourceID:                   attachedSource.ID,
 			Role:                       spec.RoleLibrary,
@@ -355,23 +385,26 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	workspaceView = *attached.Body
 	attachment := findWorkspaceAttachment(t, workspaceView, attachedSource.ID)
 	falseValue := false
-	changedAttachment, err := fixture.api.UpdateWorkspaceAttachment(t.Context(), &UpdateWorkspaceAttachmentRequest{
-		Workspace: workspaceView.Workspace,
-		SourceID:  attachedSource.ID,
-		Body: &UpdateWorkspaceAttachmentRequestBody{
-			ExpectedCollectionRevision: workspaceView.Revision,
-			ExpectedAttachmentRevision: attachment.Revision,
-			Role:                       spec.RoleLibrary,
-			Enabled:                    true,
-			Settings:                   WorkspaceAttachmentSettings{Recursive: &falseValue},
+	changedAttachment, err := fixture.api.UpdateWorkspaceAttachment(
+		t.Context(),
+		&workspace.UpdateWorkspaceAttachmentRequest{
+			Workspace: workspaceView.Workspace,
+			SourceID:  attachedSource.ID,
+			Body: &workspace.UpdateWorkspaceAttachmentRequestBody{
+				ExpectedCollectionRevision: workspaceView.Revision,
+				ExpectedAttachmentRevision: attachment.Revision,
+				Role:                       spec.RoleLibrary,
+				Enabled:                    true,
+				Settings:                   workspace.WorkspaceAttachmentSettings{Recursive: &falseValue},
+			},
 		},
-	})
+	)
 	if err != nil || changedAttachment == nil || changedAttachment.Body == nil {
 		t.Fatalf("UpdateWorkspaceAttachment response=%#v err=%v", changedAttachment, err)
 	}
 	workspaceView = *changedAttachment.Body
 	attachment = findWorkspaceAttachment(t, workspaceView, attachedSource.ID)
-	detached, err := fixture.api.DetachWorkspaceSource(t.Context(), &DetachWorkspaceSourceRequest{
+	detached, err := fixture.api.DetachWorkspaceSource(t.Context(), &workspace.DetachWorkspaceSourceRequest{
 		Workspace:                  workspaceView.Workspace,
 		SourceID:                   attachedSource.ID,
 		ExpectedCollectionRevision: workspaceView.Revision,
@@ -388,9 +421,9 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 	fixture := newWorkspaceTestFixture(t)
 
-	empty, err := fixture.api.CreateEmptyWorkspace(t.Context(), &CreateEmptyWorkspaceRequest{
+	empty, err := fixture.api.CreateEmptyWorkspace(t.Context(), &workspace.CreateEmptyWorkspaceRequest{
 		RootID: fixture.root.ID,
-		Body:   &CreateEmptyWorkspaceRequestBody{DisplayName: "Empty workspace"},
+		Body:   &workspace.CreateEmptyWorkspaceRequestBody{DisplayName: "Empty workspace"},
 	})
 	if err != nil || empty == nil || empty.Body == nil || empty.Body.Mode != spec.ModeEmpty {
 		t.Fatalf("CreateEmptyWorkspace response=%#v err=%v", empty, err)
@@ -410,9 +443,9 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create primary source: %v", err)
 	}
-	set, err := fixture.api.SetWorkspacePrimarySource(t.Context(), &SetWorkspacePrimarySourceRequest{
+	set, err := fixture.api.SetWorkspacePrimarySource(t.Context(), &workspace.SetWorkspacePrimarySourceRequest{
 		Workspace: workspaceView.Workspace,
-		Body: &SetWorkspacePrimarySourceRequestBody{
+		Body: &workspace.SetWorkspacePrimarySourceRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
 			SourceID:                   primarySource.ID,
 		},
@@ -430,23 +463,30 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create replacement primary source: %v", err)
 	}
-	replaced, err := fixture.api.ReplaceWorkspacePrimarySource(t.Context(), &ReplaceWorkspacePrimarySourceRequest{
-		Workspace: workspaceView.Workspace,
-		Body: &ReplaceWorkspacePrimarySourceRequestBody{
-			ExpectedCollectionRevision:         workspaceView.Revision,
-			PreviousSourceID:                   primarySource.ID,
-			ExpectedPreviousAttachmentRevision: findWorkspaceAttachment(t, workspaceView, primarySource.ID).Revision,
-			SourceID:                           replacementSource.ID,
+	replaced, err := fixture.api.ReplaceWorkspacePrimarySource(
+		t.Context(),
+		&workspace.ReplaceWorkspacePrimarySourceRequest{
+			Workspace: workspaceView.Workspace,
+			Body: &workspace.ReplaceWorkspacePrimarySourceRequestBody{
+				ExpectedCollectionRevision: workspaceView.Revision,
+				PreviousSourceID:           primarySource.ID,
+				ExpectedPreviousAttachmentRevision: findWorkspaceAttachment(
+					t,
+					workspaceView,
+					primarySource.ID,
+				).Revision,
+				SourceID: replacementSource.ID,
+			},
 		},
-	})
+	)
 	if err != nil || replaced == nil || replaced.Body == nil || replaced.Body.PrimarySourceID != replacementSource.ID {
 		t.Fatalf("ReplaceWorkspacePrimarySource response=%#v err=%v", replaced, err)
 	}
 	workspaceView = *replaced.Body
 	primaryAttachment := findWorkspaceAttachment(t, workspaceView, replacementSource.ID)
-	cleared, err := fixture.api.SetWorkspacePrimarySource(t.Context(), &SetWorkspacePrimarySourceRequest{
+	cleared, err := fixture.api.SetWorkspacePrimarySource(t.Context(), &workspace.SetWorkspacePrimarySourceRequest{
 		Workspace: workspaceView.Workspace,
-		Body: &SetWorkspacePrimarySourceRequestBody{
+		Body: &workspace.SetWorkspacePrimarySourceRequestBody{
 			ExpectedCollectionRevision:         workspaceView.Revision,
 			PreviousSourceID:                   replacementSource.ID,
 			ExpectedPreviousAttachmentRevision: primaryAttachment.Revision,
@@ -459,9 +499,9 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 	}
 	workspaceView = *cleared.Body
 
-	second, err := fixture.api.CreateEmptyWorkspace(t.Context(), &CreateEmptyWorkspaceRequest{
+	second, err := fixture.api.CreateEmptyWorkspace(t.Context(), &workspace.CreateEmptyWorkspaceRequest{
 		RootID: fixture.root.ID,
-		Body:   &CreateEmptyWorkspaceRequestBody{DisplayName: "Second workspace"},
+		Body:   &workspace.CreateEmptyWorkspaceRequestBody{DisplayName: "Second workspace"},
 	})
 	if err != nil || second == nil || second.Body == nil {
 		t.Fatalf("create second Workspace response=%#v err=%v", second, err)
@@ -472,14 +512,14 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 		t.Fatalf("WorkspaceRefs=%#v err=%v", refs, err)
 	}
 
-	retired, err := fixture.api.RetireWorkspace(t.Context(), &RetireWorkspaceRequest{
+	retired, err := fixture.api.RetireWorkspace(t.Context(), &workspace.RetireWorkspaceRequest{
 		Workspace:        workspaceView.Workspace,
 		ExpectedRevision: workspaceView.Revision,
 	})
 	if err != nil || retired == nil || retired.Body == nil || retired.Body.Revision != workspaceView.Revision+1 {
 		t.Fatalf("RetireWorkspace response=%#v err=%v", retired, err)
 	}
-	purged, err := fixture.api.PurgeWorkspace(t.Context(), &PurgeWorkspaceRequest{
+	purged, err := fixture.api.PurgeWorkspace(t.Context(), &workspace.PurgeWorkspaceRequest{
 		Workspace:        workspaceView.Workspace,
 		ExpectedRevision: retired.Body.Revision,
 	})
@@ -488,7 +528,7 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 	}
 	if _, err := fixture.api.GetWorkspace(
 		t.Context(),
-		&GetWorkspaceRequest{Workspace: workspaceView.Workspace},
+		&workspace.GetWorkspaceRequest{Workspace: workspaceView.Workspace},
 	); !errors.Is(
 		err,
 		basespec.ErrCollectionNotFound,
@@ -498,8 +538,14 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 }
 
 func TestAPIRejectsUninitializedClosedAndNilRequests(t *testing.T) {
-	var nilAPI *API
-	if _, err := nilAPI.GetWorkspace(t.Context(), &GetWorkspaceRequest{}); !errors.Is(err, spec.ErrInvalidWorkspace) {
+	var nilAPI *workspace.API
+	if _, err := nilAPI.GetWorkspace(
+		t.Context(),
+		&workspace.GetWorkspaceRequest{},
+	); !errors.Is(
+		err,
+		spec.ErrInvalidWorkspace,
+	) {
 		t.Fatalf("nil API GetWorkspace error=%v", err)
 	}
 
@@ -533,7 +579,7 @@ func TestAPIRejectsUninitializedClosedAndNilRequests(t *testing.T) {
 	}
 	if _, err := fixture.api.ListWorkspaces(
 		t.Context(),
-		&ListWorkspacesRequest{RootID: fixture.root.ID},
+		&workspace.ListWorkspacesRequest{RootID: fixture.root.ID},
 	); !errors.Is(
 		err,
 		spec.ErrInvalidWorkspace,
@@ -553,9 +599,9 @@ func sourceDraftForWorkspaceTest(config json.RawMessage) source.Draft {
 
 func findWorkspaceAttachment(
 	t *testing.T,
-	workspaceView WorkspaceView,
+	workspaceView workspace.WorkspaceView,
 	sourceID basespec.SourceID,
-) WorkspaceAttachmentView {
+) workspace.WorkspaceAttachmentView {
 	t.Helper()
 	for _, value := range workspaceView.Attachments {
 		if value.SourceID == sourceID {
@@ -563,10 +609,10 @@ func findWorkspaceAttachment(
 		}
 	}
 	t.Fatalf("attachment for source %q not found in %#v", sourceID, workspaceView.Attachments)
-	return WorkspaceAttachmentView{}
+	return workspace.WorkspaceAttachmentView{}
 }
 
-func concurrentWorkspaceUpdate(t *testing.T, api *API, workspaceView WorkspaceView) {
+func concurrentWorkspaceUpdate(t *testing.T, api *workspace.API, workspaceView workspace.WorkspaceView) {
 	t.Helper()
 	start := make(chan struct{})
 	results := make(chan error, 2)
@@ -574,9 +620,9 @@ func concurrentWorkspaceUpdate(t *testing.T, api *API, workspaceView WorkspaceVi
 	for range 2 {
 		group.Go(func() {
 			<-start
-			_, err := api.UpdateWorkspace(t.Context(), &UpdateWorkspaceRequest{
+			_, err := api.UpdateWorkspace(t.Context(), &workspace.UpdateWorkspaceRequest{
 				Workspace: workspaceView.Workspace,
-				Body: &UpdateWorkspaceRequestBody{
+				Body: &workspace.UpdateWorkspaceRequestBody{
 					ExpectedRevision: workspaceView.Revision,
 					DisplayName:      workspaceView.DisplayName + " concurrent",
 					Description:      workspaceView.Description,
@@ -610,7 +656,7 @@ func concurrentWorkspaceUpdate(t *testing.T, api *API, workspaceView WorkspaceVi
 
 type workspaceTestFixture struct {
 	components *system.Components
-	api        *API
+	api        *workspace.API
 	root       root.Root
 }
 
@@ -618,7 +664,7 @@ func newWorkspaceTestFixture(t *testing.T) *workspaceTestFixture {
 	t.Helper()
 	components, err := system.Open(t.Context(), system.Config{
 		BaseDirectory: t.TempDir(),
-		Decoders:      BuiltinDecoders(),
+		Decoders:      workspace.BuiltinDecoders(),
 	})
 	if err != nil {
 		t.Fatalf("open Artifact Store components: %v", err)
@@ -635,7 +681,7 @@ func newWorkspaceTestFixture(t *testing.T) *workspaceTestFixture {
 	if err != nil {
 		t.Fatalf("create root: %v", err)
 	}
-	api, err := New(Dependencies{
+	api, err := workspace.New(workspace.Dependencies{
 		Roots:              components.Roots,
 		Sources:            components.Sources,
 		Collections:        components.Collections,
@@ -646,7 +692,7 @@ func newWorkspaceTestFixture(t *testing.T) *workspaceTestFixture {
 		SourceRuntime:      components.SourceRuntime,
 		HasDecoder:         components.HasDecoder,
 		DecoderFingerprint: components.DecoderFingerprint,
-	}, DefaultConfig())
+	}, workspace.DefaultConfig())
 	if err != nil {
 		t.Fatalf("create workspace API: %v", err)
 	}

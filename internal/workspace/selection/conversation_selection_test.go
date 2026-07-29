@@ -1,4 +1,4 @@
-package workspace
+package selection
 
 import (
 	"strings"
@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 )
 
@@ -103,7 +104,7 @@ func TestConversationSelectionHelpersTrackChangesAndUnavailableReferences(t *tes
 	}
 
 	selection := ConversationSelection{
-		Workspace: WorkspaceRef{
+		Workspace: workspace.WorkspaceRef{
 			RootID:       "019d3150-7401-7a6b-a34e-d9032342bc31",
 			CollectionID: "019d3150-7402-7a6b-a34e-d9032342bc31",
 		},

@@ -83,7 +83,7 @@ func (a *API) CreateFilesystemWorkspace(
 	ctx context.Context,
 	request *CreateFilesystemWorkspaceRequest,
 ) (*CreateFilesystemWorkspaceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -110,7 +110,7 @@ func (a *API) CreateEmptyWorkspace(
 	ctx context.Context,
 	request *CreateEmptyWorkspaceRequest,
 ) (*CreateEmptyWorkspaceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -139,7 +139,7 @@ func (a *API) GetWorkspace(
 	ctx context.Context,
 	request *GetWorkspaceRequest,
 ) (*GetWorkspaceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -160,7 +160,7 @@ func (a *API) ListWorkspaces(
 	ctx context.Context,
 	request *ListWorkspacesRequest,
 ) (*ListWorkspacesResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -189,7 +189,7 @@ func (a *API) ListWorkspaces(
 func (a *API) WorkspaceRefs(
 	ctx context.Context,
 ) ([]WorkspaceRef, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	roots, err := a.dependencies.Roots.List(ctx)
@@ -226,7 +226,7 @@ func (a *API) UpdateWorkspace(
 	ctx context.Context,
 	request *UpdateWorkspaceRequest,
 ) (*UpdateWorkspaceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -254,7 +254,7 @@ func (a *API) ReplaceWorkspacePrimarySource(
 	ctx context.Context,
 	request *ReplaceWorkspacePrimarySourceRequest,
 ) (*ReplaceWorkspacePrimarySourceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -284,7 +284,7 @@ func (a *API) SetWorkspacePrimarySource(
 	ctx context.Context,
 	request *SetWorkspacePrimarySourceRequest,
 ) (*SetWorkspacePrimarySourceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -315,7 +315,7 @@ func (a *API) RetireWorkspace(
 	ctx context.Context,
 	request *RetireWorkspaceRequest,
 ) (*RetireWorkspaceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -341,7 +341,7 @@ func (a *API) PurgeWorkspace(
 	ctx context.Context,
 	request *PurgeWorkspaceRequest,
 ) (*PurgeWorkspaceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -365,7 +365,7 @@ func (a *API) AttachWorkspaceSource(
 	ctx context.Context,
 	request *AttachWorkspaceSourceRequest,
 ) (*AttachWorkspaceSourceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -393,7 +393,7 @@ func (a *API) UpdateWorkspaceAttachment(
 	ctx context.Context,
 	request *UpdateWorkspaceAttachmentRequest,
 ) (*UpdateWorkspaceAttachmentResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -425,7 +425,7 @@ func (a *API) DetachWorkspaceSource(
 	ctx context.Context,
 	request *DetachWorkspaceSourceRequest,
 ) (*DetachWorkspaceSourceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -452,7 +452,7 @@ func (a *API) RefreshWorkspace(
 	ctx context.Context,
 	request *RefreshWorkspaceRequest,
 ) (*RefreshWorkspaceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -483,7 +483,7 @@ func (a *API) GetWorkspaceCatalog(
 	ctx context.Context,
 	request *GetWorkspaceCatalogRequest,
 ) (*GetWorkspaceCatalogResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -504,7 +504,7 @@ func (a *API) ComposeWorkspaceLoadPlan(
 	ctx context.Context,
 	request *ComposeWorkspaceLoadPlanRequest,
 ) (*ComposeWorkspaceLoadPlanResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -528,7 +528,7 @@ func (a *API) ResolveWorkspaceResource(
 	ctx context.Context,
 	request *ResolveWorkspaceResourceRequest,
 ) (*ResolveWorkspaceResourceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -558,7 +558,7 @@ func (a *API) GetWorkspaceArtifact(
 	ctx context.Context,
 	request *GetWorkspaceArtifactRequest,
 ) (*GetWorkspaceArtifactResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -580,7 +580,7 @@ func (a *API) ListWorkspaceArtifacts(
 	ctx context.Context,
 	request *ListWorkspaceArtifactsRequest,
 ) (*ListWorkspaceArtifactsResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -615,7 +615,7 @@ func (a *API) AdoptWorkspaceOccurrence(
 	ctx context.Context,
 	request *AdoptWorkspaceOccurrenceRequest,
 ) (*AdoptWorkspaceOccurrenceResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -665,7 +665,7 @@ func (a *API) PinWorkspaceArtifact(
 	ctx context.Context,
 	request *PinWorkspaceArtifactRequest,
 ) (*PinWorkspaceArtifactResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -705,7 +705,7 @@ func (a *API) ListWorkspaceSuppressions(
 	ctx context.Context,
 	request *ListWorkspaceSuppressionsRequest,
 ) (*ListWorkspaceSuppressionsResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -734,7 +734,7 @@ func (a *API) SuppressWorkspaceBinding(
 	ctx context.Context,
 	request *SuppressWorkspaceBindingRequest,
 ) (*SuppressWorkspaceBindingResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -767,7 +767,7 @@ func (a *API) UnsuppressWorkspaceBinding(
 	ctx context.Context,
 	request *UnsuppressWorkspaceBindingRequest,
 ) (*UnsuppressWorkspaceBindingResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -796,7 +796,7 @@ func (a *API) ListWorkspaceContexts(
 	ctx context.Context,
 	request *ListWorkspaceContextsRequest,
 ) (*ListWorkspaceContextsResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -819,7 +819,7 @@ func (a *API) LoadWorkspaceContexts(
 	ctx context.Context,
 	request *LoadWorkspaceContextsRequest,
 ) (*LoadWorkspaceContextsResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -856,7 +856,7 @@ func (a *API) ComposeWorkspaceContext(
 	ctx context.Context,
 	request *ComposeWorkspaceContextRequest,
 ) (*ComposeWorkspaceContextResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -878,7 +878,7 @@ func (a *API) ListWorkspaceSkills(
 	ctx context.Context,
 	request *ListWorkspaceSkillsRequest,
 ) (*ListWorkspaceSkillsResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -901,7 +901,7 @@ func (a *API) LoadWorkspaceSkills(
 	ctx context.Context,
 	request *LoadWorkspaceSkillsRequest,
 ) (*LoadWorkspaceSkillsResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -923,7 +923,7 @@ func (a *API) SetWorkspaceArtifactEnabled(
 	ctx context.Context,
 	request *SetWorkspaceArtifactEnabledRequest,
 ) (*SetWorkspaceArtifactEnabledResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -949,7 +949,7 @@ func (a *API) UnadoptWorkspaceArtifact(
 	ctx context.Context,
 	request *UnadoptWorkspaceArtifactRequest,
 ) (*UnadoptWorkspaceArtifactResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -977,7 +977,7 @@ func (a *API) PurgeWorkspaceArtifact(
 	ctx context.Context,
 	request *PurgeWorkspaceArtifactRequest,
 ) (*PurgeWorkspaceArtifactResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil {
@@ -1008,7 +1008,7 @@ func (a *API) SetWorkspaceArtifactRuntimeDisabled(
 	ctx context.Context,
 	request *SetWorkspaceArtifactRuntimeDisabledRequest,
 ) (*SetWorkspaceArtifactRuntimeDisabledResponse, error) {
-	if err := a.ready(); err != nil {
+	if err := a.Ready(); err != nil {
 		return nil, err
 	}
 	if request == nil || request.Body == nil {
@@ -1038,6 +1038,16 @@ func (a *API) SetWorkspaceArtifactRuntimeDisabled(
 	}
 	output := workspaceArtifactViewOf(value)
 	return &SetWorkspaceArtifactRuntimeDisabledResponse{Body: &output}, nil
+}
+
+func (a *API) Ready() error {
+	if a == nil ||
+		a.closed.Load() ||
+		a.workspace == nil ||
+		a.provisioner == nil {
+		return invalidAPIRequest("workspace API is not initialized")
+	}
+	return a.dependencies.Validate()
 }
 
 func (a *API) workspaceArtifact(
@@ -1123,16 +1133,6 @@ func artifactRefsOf(
 		})
 	}
 	return output
-}
-
-func (a *API) ready() error {
-	if a == nil ||
-		a.closed.Load() ||
-		a.workspace == nil ||
-		a.provisioner == nil {
-		return invalidAPIRequest("workspace API is not initialized")
-	}
-	return a.dependencies.Validate()
 }
 
 func invalidAPIRequest(message string) error {

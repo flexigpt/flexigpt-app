@@ -1,4 +1,4 @@
-package workspace
+package selection
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 )
 
@@ -49,12 +50,12 @@ type ConversationResourceSelectionRef struct {
 type ConversationSkillSelectionRef struct {
 	ConversationResourceSelectionRef
 
-	DisplayName string               `json:"displayName,omitempty"`
-	Insert      WorkspaceSkillInsert `json:"insert,omitempty"`
+	DisplayName string                         `json:"displayName,omitempty"`
+	Insert      workspace.WorkspaceSkillInsert `json:"insert,omitempty"`
 }
 
 type ConversationSelection struct {
-	Workspace         WorkspaceRef                       `json:"workspace"`
+	Workspace         workspace.WorkspaceRef             `json:"workspace"`
 	DisplayName       string                             `json:"displayName,omitempty"`
 	WorkspaceRevision uint64                             `json:"workspaceRevision,omitempty"`
 	CatalogRevision   uint64                             `json:"catalogRevision,omitempty"`
@@ -94,7 +95,7 @@ type ConversationSkillUsage struct {
 }
 
 type ConversationUsage struct {
-	Workspace         WorkspaceRef                `json:"workspace"`
+	Workspace         workspace.WorkspaceRef      `json:"workspace"`
 	DisplayName       string                      `json:"displayName,omitempty"`
 	WorkspaceRevision uint64                      `json:"workspaceRevision,omitempty"`
 	CatalogRevision   uint64                      `json:"catalogRevision,omitempty"`
@@ -109,18 +110,32 @@ type ConversationResolution struct {
 	Prompt string
 }
 
-func (a *API) ResolveConversationSelection(
+type ConversationResolver struct {
+	workspaceAPI *workspace.API
+}
+
+func NewConversationResolver(workspaceAPI *workspace.API) (*ConversationResolver, error) {
+	if workspaceAPI == nil {
+		return nil, errors.New("nil workspaceAPI providerd")
+	}
+	return &ConversationResolver{workspaceAPI: workspaceAPI}, nil
+}
+
+func (cr *ConversationResolver) ResolveConversationSelection(
 	ctx context.Context,
 	selection ConversationSelection,
 ) (ConversationResolution, error) {
-	if err := a.ready(); err != nil {
+	if cr.workspaceAPI == nil {
+		return ConversationResolution{}, errors.New("invalid workspaceAPI")
+	}
+	if err := cr.workspaceAPI.Ready(); err != nil {
 		return ConversationResolution{}, err
 	}
 	if err := selection.Workspace.Validate(); err != nil {
 		return ConversationResolution{}, err
 	}
 
-	workspaceValue, err := a.GetWorkspace(ctx, &GetWorkspaceRequest{
+	workspaceValue, err := cr.workspaceAPI.GetWorkspace(ctx, &workspace.GetWorkspaceRequest{
 		Workspace: selection.Workspace,
 	})
 	if err != nil {
@@ -196,11 +211,11 @@ func (a *API) ResolveConversationSelection(
 
 	prompt := ""
 	if len(contextArtifactRefs) > 0 {
-		contextPlan, composeErr := a.ComposeWorkspaceContext(
+		contextPlan, composeErr := cr.workspaceAPI.ComposeWorkspaceContext(
 			ctx,
-			&ComposeWorkspaceContextRequest{
+			&workspace.ComposeWorkspaceContextRequest{
 				Workspace: selection.Workspace,
-				Body: &ComposeWorkspaceContextRequestBody{
+				Body: &workspace.ComposeWorkspaceContextRequestBody{
 					Artifacts: contextArtifactRefs,
 				},
 			},
@@ -296,11 +311,11 @@ func (a *API) ResolveConversationSelection(
 	}
 
 	if len(skillArtifactRefs) > 0 {
-		skillPlan, loadErr := a.LoadWorkspaceSkills(
+		skillPlan, loadErr := cr.workspaceAPI.LoadWorkspaceSkills(
 			ctx,
-			&LoadWorkspaceSkillsRequest{
+			&workspace.LoadWorkspaceSkillsRequest{
 				Workspace: selection.Workspace,
-				Body: &LoadWorkspaceSkillsRequestBody{
+				Body: &workspace.LoadWorkspaceSkillsRequestBody{
 					Artifacts: skillArtifactRefs,
 				},
 			},
@@ -343,7 +358,7 @@ func (a *API) ResolveConversationSelection(
 					current.Locator,
 				)
 
-				if skill.Skill.Insert != WorkspaceSkillInsertInstructions {
+				if skill.Skill.Insert != workspace.WorkspaceSkillInsertInstructions {
 					current.Status = ConversationSkillUsageUnavailable
 					current.Diagnostics = diagnostic.AppendDiagnostics(
 						current.Diagnostics,

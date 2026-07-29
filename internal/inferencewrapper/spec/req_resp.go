@@ -7,7 +7,7 @@ import (
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
-	"github.com/flexigpt/flexigpt-app/internal/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
 
 type AddProviderRequestBody struct {
@@ -83,7 +83,7 @@ type CompletionRequest struct {
 type CompletionResponseBody struct {
 	InferenceResponse     *inferenceSpec.FetchCompletionResponse `json:"inferenceResponse,omitempty"`
 	HydratedCurrentInputs []inferenceSpec.InputUnion             `json:"hydratedCurrentInputs,omitempty"`
-	WorkspaceUsage        *workspace.ConversationUsage           `json:"workspaceUsage,omitempty"`
+	WorkspaceUsage        *selection.ConversationUsage           `json:"workspaceUsage,omitempty"`
 }
 
 type CompletionResponse struct {

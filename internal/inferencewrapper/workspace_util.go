@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
-	"github.com/flexigpt/flexigpt-app/internal/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
 
 const workspaceContextInputIDPrefix = "workspace-context:"
@@ -20,8 +20,8 @@ const workspaceContextInputIDPrefix = "workspace-context:"
 type WorkspaceConversationResolver interface {
 	ResolveConversationSelection(
 		ctx context.Context,
-		selection workspace.ConversationSelection,
-	) (workspace.ConversationResolution, error)
+		selection selection.ConversationSelection,
+	) (selection.ConversationResolution, error)
 }
 
 type WorkspaceInferenceBridge struct {
@@ -30,7 +30,7 @@ type WorkspaceInferenceBridge struct {
 
 type WorkspaceCompletionHydrationResult struct {
 	CurrentInputs []inferenceSpec.InputUnion
-	Usage         *workspace.ConversationUsage
+	Usage         *selection.ConversationUsage
 	DebugDetails  map[string]any
 }
 
@@ -41,12 +41,12 @@ func NewWorkspaceInferenceBridge(
 }
 
 func workspaceScopeForSelection(
-	selection *workspace.ConversationSelection,
+	sel *selection.ConversationSelection,
 ) *collection.CollectionRef {
-	if selection == nil {
+	if sel == nil {
 		return nil
 	}
-	value := selection.Workspace
+	value := sel.Workspace
 	return &value
 }
 
@@ -57,15 +57,15 @@ func workspaceScopeForSelection(
 // callers are untrusted at this boundary. A Workspace Skill must not survive a
 // detach, root switch, or removal from selection.skillRefs.
 func validateWorkspaceSkillRefsForSelection(
-	selection *workspace.ConversationSelection,
+	sel *selection.ConversationSelection,
 	refs []skillruntimeSpec.SkillRef,
 ) error {
 	selected := make(map[string]struct{})
-	if selection != nil {
-		if err := selection.Workspace.Validate(); err != nil {
+	if sel != nil {
+		if err := sel.Workspace.Validate(); err != nil {
 			return fmt.Errorf("invalid Workspace selection: %w", err)
 		}
-		for index, selectedSkill := range selection.SkillRefs {
+		for index, selectedSkill := range sel.SkillRefs {
 			artifactRef := selectedSkill.Artifact
 			if err := artifactRef.Validate(); err != nil {
 				return fmt.Errorf(
@@ -74,7 +74,7 @@ func validateWorkspaceSkillRefsForSelection(
 					err,
 				)
 			}
-			if artifactRef.RootID != selection.Workspace.RootID {
+			if artifactRef.RootID != sel.Workspace.RootID {
 				return fmt.Errorf(
 					"workspace selection skillRefs[%d] belongs to another Root",
 					index,
@@ -99,7 +99,7 @@ func validateWorkspaceSkillRefsForSelection(
 		if ref.BundleID != "" || ref.SkillSlug != "" || ref.SkillID != "" {
 			return errors.New("workspace skill artifactRef mixes Artifact and installed Skill fields")
 		}
-		if selection == nil {
+		if sel == nil {
 			return errors.New(
 				"workspace skill artifactRef was supplied without a Workspace selection",
 			)
@@ -107,7 +107,7 @@ func validateWorkspaceSkillRefsForSelection(
 		if err := ref.Artifact.Validate(); err != nil {
 			return fmt.Errorf("invalid workspace skill artifactRef: %w", err)
 		}
-		if ref.Artifact.RootID != selection.Workspace.RootID {
+		if ref.Artifact.RootID != sel.Workspace.RootID {
 			return fmt.Errorf(
 				"workspace Skill Artifact %q belongs to another Root",
 				ref.Artifact.ArtifactID,
@@ -135,14 +135,14 @@ func validateWorkspaceSkillRefsForSelection(
 
 func (b *WorkspaceInferenceBridge) HydrateCompletion(
 	ctx context.Context,
-	selection *workspace.ConversationSelection,
+	sel *selection.ConversationSelection,
 ) (*WorkspaceCompletionHydrationResult, error) {
 	output := &WorkspaceCompletionHydrationResult{}
 
-	if selection == nil {
+	if sel == nil {
 		return output, nil
 	}
-	if err := selection.Workspace.Validate(); err != nil {
+	if err := sel.Workspace.Validate(); err != nil {
 		return output, fmt.Errorf("invalid Workspace selection: %w", err)
 	}
 	if b == nil || b.resolver == nil {
@@ -151,11 +151,11 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 		)
 	}
 
-	resolution, err := b.resolver.ResolveConversationSelection(ctx, *selection)
+	resolution, err := b.resolver.ResolveConversationSelection(ctx, *sel)
 	usage := resolution.Usage
 	output.Usage = &usage
 	output.DebugDetails = map[string]any{
-		"workspace":         selection.Workspace,
+		"workspace":         sel.Workspace,
 		"resolvedWorkspace": usage.Workspace,
 		"workspaceRevision": usage.WorkspaceRevision,
 		"catalogRevision":   usage.CatalogRevision,
@@ -168,7 +168,7 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 	if prompt := strings.TrimSpace(resolution.Prompt); prompt != "" {
 		output.CurrentInputs = append(
 			output.CurrentInputs,
-			buildWorkspaceContextInput(selection.Workspace, prompt),
+			buildWorkspaceContextInput(sel.Workspace, prompt),
 		)
 	}
 
@@ -273,7 +273,7 @@ func isGeneratedCurrentContextInput(input inferenceSpec.InputUnion) bool {
 // for this turn. Installed Skill refs are intentionally left untouched.
 func filterWorkspaceSkillRefsToResolvedSelection(
 	refs []skillruntimeSpec.SkillRef,
-	usage *workspace.ConversationUsage,
+	usage *selection.ConversationUsage,
 ) []skillruntimeSpec.SkillRef {
 	if usage == nil || len(refs) == 0 {
 		return refs
@@ -281,7 +281,7 @@ func filterWorkspaceSkillRefsToResolvedSelection(
 
 	available := make(map[string]struct{}, len(usage.Skills))
 	for _, skill := range usage.Skills {
-		if skill.Status != workspace.ConversationSkillUsageAvailable {
+		if skill.Status != selection.ConversationSkillUsageAvailable {
 			continue
 		}
 		available[workspaceArtifactRefKey(skill.Artifact)] = struct{}{}
@@ -302,7 +302,7 @@ func filterWorkspaceSkillRefsToResolvedSelection(
 }
 
 func markWorkspaceSkillSessionUsage(
-	usage *workspace.ConversationUsage,
+	usage *selection.ConversationUsage,
 	enabledSkillRefs []skillruntimeSpec.SkillRef,
 	availableItems []skillruntimeSpec.RuntimeSkillListItem,
 	activeItems []skillruntimeSpec.RuntimeSkillListItem,
@@ -335,12 +335,12 @@ func markWorkspaceSkillSessionUsage(
 
 	for index := range usage.Skills {
 		current := &usage.Skills[index]
-		if current.Status != workspace.ConversationSkillUsageAvailable {
+		if current.Status != selection.ConversationSkillUsageAvailable {
 			continue
 		}
 
 		if !advertised {
-			current.Status = workspace.ConversationSkillUsageUnavailable
+			current.Status = selection.ConversationSkillUsageUnavailable
 			current.Diagnostics = diagnostic.AppendDiagnostics(
 				current.Diagnostics,
 				diagnostic.Diagnostic{
@@ -354,7 +354,7 @@ func markWorkspaceSkillSessionUsage(
 
 		key := workspaceArtifactRefKey(current.Artifact)
 		if _, selectedForSession := enabled[key]; !selectedForSession {
-			current.Status = workspace.ConversationSkillUsageUnavailable
+			current.Status = selection.ConversationSkillUsageUnavailable
 			current.Diagnostics = diagnostic.AppendDiagnostics(
 				current.Diagnostics,
 				diagnostic.Diagnostic{
@@ -367,7 +367,7 @@ func markWorkspaceSkillSessionUsage(
 		}
 
 		if _, resolved := available[key]; !resolved {
-			current.Status = workspace.ConversationSkillUsageUnavailable
+			current.Status = selection.ConversationSkillUsageUnavailable
 			current.Diagnostics = diagnostic.AppendDiagnostics(
 				current.Diagnostics,
 				diagnostic.Diagnostic{
@@ -384,5 +384,5 @@ func markWorkspaceSkillSessionUsage(
 		current.Advertised = advertised
 	}
 
-	workspace.ResolveConversationUsageStatus(usage)
+	selection.ResolveConversationUsageStatus(usage)
 }

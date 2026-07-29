@@ -13,7 +13,27 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
-const defaultDiscoveryPolicyRevision = "workspace.discovery.v1"
+const (
+	defaultDiscoveryPolicyRevision = "workspace.discovery.v1"
+	markdownFilePattern            = "*.md"
+)
+
+func defaultDiscoveryProfiles() spec.DiscoveryProfiles {
+	return spec.DiscoveryProfiles{
+		Primary: spec.DiscoveryProfile{},
+		Attached: spec.DiscoveryProfile{
+			DirectoryRoots: []spec.DirectoryRoot{
+				{
+					Root:      spec.RepositoryRootLocator,
+					Recursive: true,
+					IncludePatterns: []string{
+						markdownFilePattern,
+					},
+				},
+			},
+		},
+	}
+}
 
 type Config struct {
 	Supports                []spec.ArtifactSupport
@@ -74,7 +94,7 @@ func (c Config) normalizedDiscoveryProfiles(
 		len(c.DiscoveryProfiles.Primary.DirectoryRoots) == 0 &&
 		len(c.DiscoveryProfiles.Attached.ExplicitLocators) == 0 &&
 		len(c.DiscoveryProfiles.Attached.DirectoryRoots) == 0 {
-		profiles = discovery.DefaultDiscoveryProfiles()
+		profiles = defaultDiscoveryProfiles()
 	} else {
 		profiles = c.DiscoveryProfiles
 	}

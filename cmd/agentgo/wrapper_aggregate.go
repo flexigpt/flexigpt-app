@@ -17,6 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
@@ -77,8 +78,12 @@ func InitAggregrateWrapper(
 		bridge = inferencewrapper.NewMCPInferenceBridge(mr)
 	}
 
+	cr, err := selection.NewConversationResolver(workspaceAPI)
+	if err != nil {
+		panic("no workspace api provided")
+	}
 	workspaceBridge := inferencewrapper.NewWorkspaceInferenceBridge(
-		workspaceAPI,
+		cr,
 	)
 
 	p, err := inferencewrapper.NewProviderSetAPI(
