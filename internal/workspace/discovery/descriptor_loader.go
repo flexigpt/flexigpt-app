@@ -10,6 +10,7 @@ import (
 	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -26,7 +27,7 @@ const descriptorLocator basespec.Locator = spec.WorkspaceMetadataDirectory + "/"
 // .flexigpt/workspace.json. Its domain body contains Workspace discovery
 // policy while its generic Members field contains relative or external member
 // references.
-type Descriptor = CollectionDefinition
+type Descriptor = definition.CollectionDefinition
 
 type DescriptorObservation struct {
 	Preferences            spec.DiscoveryPreferences
@@ -161,7 +162,7 @@ func (l *DescriptorLoader) Load(
 		)
 	}
 
-	descriptor, err := CanonicalizeCollectionDefinition(rawDescriptor)
+	descriptor, err := definition.CanonicalizeCollectionDefinition(rawDescriptor)
 	if err != nil {
 		return DescriptorObservation{}, fmt.Errorf(
 			"%w: %w",

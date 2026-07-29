@@ -29,28 +29,8 @@ func (s Selector) Validate() error {
 	); err != nil {
 		return err
 	}
-	if len(s.Labels) > basespec.MaxLabels {
-		return fmt.Errorf(
-			"%w: selector labels exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxLabels,
-		)
-	}
-	for key, value := range s.Labels {
-		if err := basespec.ValidateIdentifier(
-			"selector label key",
-			key,
-			basespec.MaxKindBytes,
-		); err != nil {
-			return err
-		}
-		if err := basespec.ValidateRequiredText(
-			"selector label value",
-			value,
-			basespec.MaxLabelValueBytes,
-		); err != nil {
-			return err
-		}
+	if err := validateLabels("selector", s.Labels); err != nil {
+		return err
 	}
 	return nil
 }

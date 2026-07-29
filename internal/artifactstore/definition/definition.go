@@ -9,6 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+// Definition is an immutable, content-addressed Artifact definition.
+// Portable collection descriptor documents use CollectionDefinition instead.
 type Definition struct {
 	Digest         cryptoutil.Digest       `json:"digest"`
 	Kind           basespec.ArtifactKind   `json:"kind"`
@@ -60,28 +62,8 @@ func (d Definition) Validate() error {
 	); err != nil {
 		return err
 	}
-	if len(d.Labels) > basespec.MaxLabels {
-		return fmt.Errorf(
-			"%w: definition labels exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxLabels,
-		)
-	}
-	for key, value := range d.Labels {
-		if err := basespec.ValidateIdentifier(
-			"definition label key",
-			key,
-			basespec.MaxKindBytes,
-		); err != nil {
-			return err
-		}
-		if err := basespec.ValidateRequiredText(
-			"definition label value",
-			value,
-			basespec.MaxLabelValueBytes,
-		); err != nil {
-			return err
-		}
+	if err := validateLabels("definition", d.Labels); err != nil {
+		return err
 	}
 	if len(d.Dependencies) > basespec.MaxDefinitionDependencies {
 		return fmt.Errorf(

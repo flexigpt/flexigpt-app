@@ -12,6 +12,33 @@ import (
 const placeholderDigest cryptoutil.Digest = cryptoutil.DigestSHA256Prefix +
 	"0000000000000000000000000000000000000000000000000000000000000000"
 
+func canonicalPayloadDigest(
+	subject string,
+	payload any,
+) (cryptoutil.Digest, error) {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal %s payload: %w", subject, err)
+	}
+	canonicalPayload, err := jsonutil.Canonicalize(raw)
+	if err != nil {
+		return "", fmt.Errorf(
+			"canonicalize %s payload: %w",
+			subject,
+			err,
+		)
+	}
+	if len(canonicalPayload) > basespec.MaxDefinitionBytes {
+		return "", fmt.Errorf(
+			"%w: canonical %s exceeds %d bytes",
+			basespec.ErrInvalid,
+			subject,
+			basespec.MaxDefinitionBytes,
+		)
+	}
+	return cryptoutil.DigestBytes(canonicalPayload), nil
+}
+
 func Canonicalize(input Definition) (Definition, error) {
 	output := input
 	output.Labels = cloneLabels(input.Labels)
@@ -59,23 +86,10 @@ func Canonicalize(input Definition) (Definition, error) {
 		Dependencies:   output.Dependencies,
 	}
 
-	raw, err := json.Marshal(payload)
+	calculated, err := canonicalPayloadDigest("definition", payload)
 	if err != nil {
-		return Definition{}, fmt.Errorf("marshal definition payload: %w", err)
+		return Definition{}, err
 	}
-	canonicalPayload, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return Definition{}, fmt.Errorf("canonicalize definition payload: %w", err)
-	}
-	if len(canonicalPayload) > basespec.MaxDefinitionBytes {
-		return Definition{}, fmt.Errorf(
-			"%w: canonical definition exceeds %d bytes",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionBytes,
-		)
-	}
-
-	calculated := cryptoutil.DigestBytes(canonicalPayload)
 	if suppliedDigest != "" && suppliedDigest != calculated {
 		return Definition{}, fmt.Errorf(
 			"%w: supplied definition digest %q, calculated %q",

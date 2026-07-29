@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -20,11 +21,8 @@ const (
 	ModeFilesystem Mode = "filesystem"
 )
 
-type DirectoryRoot struct {
-	Root            basespec.Locator
-	Recursive       bool
-	IncludePatterns []string
-}
+// DirectoryRoot is the generic source-discovery scope type.
+type DirectoryRoot = artifactstoreDiscovery.DirectoryRoot
 
 // DiscoveryProfile defines discovery rules for one attachment class.
 //
@@ -40,11 +38,8 @@ type DiscoveryProfiles struct {
 	Attached DiscoveryProfile
 }
 
-type DiscoveryRoot struct {
-	Root            basespec.Locator `json:"root"`
-	Recursive       bool             `json:"recursive"`
-	IncludePatterns []string         `json:"includePatterns,omitempty"`
-}
+// DiscoveryRoot is retained as the Workspace preference name.
+type DiscoveryRoot = artifactstoreDiscovery.DirectoryRoot
 
 type DiscoveryPreferences struct {
 	AdditionalLocators []basespec.Locator `json:"additionalLocators,omitempty"`

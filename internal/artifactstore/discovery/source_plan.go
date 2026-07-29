@@ -3,14 +3,80 @@ package discovery
 import (
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 	"sort"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
+
+// DirectoryRoot is generic source-discovery scope shared by planners,
+// preferences, and executable SourcePlans.
+type DirectoryRoot struct {
+	Root            basespec.Locator `json:"root"`
+	Recursive       bool             `json:"recursive"`
+	IncludePatterns []string         `json:"includePatterns,omitempty"`
+}
+
+func (r DirectoryRoot) Validate() error {
+	if err := basespec.ValidateLocator(r.Root, true); err != nil {
+		return err
+	}
+	seenPatterns := make(map[string]struct{}, len(r.IncludePatterns))
+	for _, pattern := range r.IncludePatterns {
+		if err := ValidateIncludePattern(pattern); err != nil {
+			return err
+		}
+		if _, duplicate := seenPatterns[pattern]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate discovery pattern %q",
+				basespec.ErrInvalid,
+				pattern,
+			)
+		}
+		seenPatterns[pattern] = struct{}{}
+	}
+	return nil
+}
+
+// ValidateIncludePattern validates a source-relative glob. It deliberately
+// rejects path traversal and host-path syntax before passing the pattern to
+// path.Match.
+func ValidateIncludePattern(pattern string) error {
+	if err := basespec.ValidateRequiredText(
+		"discovery pattern",
+		pattern,
+		basespec.MaxLocatorBytes,
+	); err != nil {
+		return err
+	}
+	if strings.HasPrefix(pattern, "/") ||
+		strings.ContainsAny(pattern, `\:`) {
+		return fmt.Errorf(
+			"%w: discovery pattern contains a disallowed path character",
+			basespec.ErrInvalid,
+		)
+	}
+	for segment := range strings.SplitSeq(pattern, "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return fmt.Errorf(
+				"%w: discovery pattern contains an invalid path segment",
+				basespec.ErrInvalid,
+			)
+		}
+	}
+	if _, err := path.Match(pattern, "candidate"); err != nil {
+		return fmt.Errorf(
+			"%w: invalid discovery pattern %q: %w",
+			basespec.ErrInvalid,
+			pattern,
+			err,
+		)
+	}
+	return nil
+}
 
 type DecoderHint struct {
 	Locator    basespec.Locator     `json:"locator"`
@@ -26,7 +92,7 @@ type decoderHintScope struct {
 type SourcePlan struct {
 	SourceID               basespec.SourceID                      `json:"sourceID"`
 	ExplicitLocators       []basespec.Locator                     `json:"explicitLocators,omitempty"`
-	DirectoryRoots         []spec.DirectoryRoot                   `json:"directoryRoots,omitempty"`
+	DirectoryRoots         []DirectoryRoot                        `json:"directoryRoots,omitempty"`
 	DecoderHints           []DecoderHint                          `json:"decoderHints,omitempty"`
 	ExpectedContentDigests map[basespec.Locator]cryptoutil.Digest `json:"expectedContentDigests,omitempty"`
 	ExpectedGeneration     string                                 `json:"expectedGeneration,omitempty"`
@@ -94,7 +160,7 @@ func (p SourcePlan) Validate() error {
 
 	seenRoots := make(map[basespec.Locator]struct{}, len(p.DirectoryRoots))
 	for _, root := range p.DirectoryRoots {
-		if err := basespec.ValidateLocator(root.Root, true); err != nil {
+		if err := root.Validate(); err != nil {
 			return err
 		}
 		if _, duplicate := seenRoots[root.Root]; duplicate {
@@ -105,21 +171,6 @@ func (p SourcePlan) Validate() error {
 			)
 		}
 		seenRoots[root.Root] = struct{}{}
-
-		seenPatterns := make(map[string]struct{}, len(root.IncludePatterns))
-		for _, pattern := range root.IncludePatterns {
-			if err := spec.ValidateIncludePattern(pattern); err != nil {
-				return err
-			}
-			if _, duplicate := seenPatterns[pattern]; duplicate {
-				return fmt.Errorf(
-					"%w: duplicate discovery pattern %q",
-					basespec.ErrInvalid,
-					pattern,
-				)
-			}
-			seenPatterns[pattern] = struct{}{}
-		}
 	}
 
 	if len(p.ExpectedContentDigests) > basespec.MaxDiscoveryCandidates {
@@ -223,7 +274,7 @@ func (p SourcePlan) Normalized() SourcePlan {
 			hint.DecoderIDs...,
 		)
 	}
-	output.DirectoryRoots = make([]spec.DirectoryRoot, len(p.DirectoryRoots))
+	output.DirectoryRoots = make([]DirectoryRoot, len(p.DirectoryRoots))
 	for index, root := range p.DirectoryRoots {
 		output.DirectoryRoots[index] = root
 		output.DirectoryRoots[index].IncludePatterns = append(

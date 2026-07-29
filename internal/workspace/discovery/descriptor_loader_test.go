@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -137,6 +139,66 @@ func TestDescriptorLoaderRejectsBadObservationsAndClosesSnapshots(t *testing.T) 
 	}
 	if missing.closed != 1 {
 		t.Fatalf("confirmation snapshot closed=%d", missing.closed)
+	}
+}
+
+func TestPortableReferencesAndRelativeResolutionRejectAmbiguity(t *testing.T) {
+	t.Parallel()
+
+	for _, reference := range []definition.ContentRef{
+		{Locator: "file.txt", URI: "https://example.com/file"},
+		{URI: "file:///private/file"},
+		{URI: "https://user@example.com/file"},
+		{URI: "https://example.com/file#fragment"},
+		{},
+	} {
+		if err := reference.Validate(); !errors.Is(err, basespec.ErrInvalid) {
+			t.Fatalf("ContentRef(%#v) error=%v, want ErrInvalid", reference, err)
+		}
+	}
+	if err := (definition.ContentRef{URI: "https://example.com/file%23literal"}).Validate(); err != nil {
+		t.Fatalf("percent-encoded hash URI error=%v", err)
+	}
+
+	resolved, err := resolveRelativeLocator("packages/example", "member.txt", false)
+	if err != nil {
+		t.Fatalf("resolveRelativeLocator: %v", err)
+	}
+	if resolved != "packages/example/member.txt" {
+		t.Fatalf("resolved=%q", resolved)
+	}
+	root, err := resolveRelativeLocator("packages/example", ".", true)
+	if err != nil {
+		t.Fatalf("resolveRelativeLocator: %v", err)
+	}
+	if root != "packages/example" {
+		t.Fatalf("directory root=%q", root)
+	}
+	if _, err := resolveRelativeLocator("packages/example", ".", false); !errors.Is(err, basespec.ErrInvalid) {
+		t.Fatalf("file relative root error=%v", err)
+	}
+
+	ambiguous := portableTestDefinition()
+	ambiguous.Members = []definition.ContentRef{{Locator: "Files/Example.txt"}, {Locator: "files/example.TXT"}}
+	if err := ambiguous.Validate(); !strings.Contains(err.Error(), "invalid") {
+		t.Fatalf("case-ambiguous members error=%v", err)
+	}
+}
+
+func portableTestDefinition() definition.CollectionDefinition {
+	return definition.CollectionDefinition{
+		Kind:           "test.collection",
+		SchemaID:       "test.schema",
+		SchemaVersion:  "v1",
+		LogicalName:    "portable-example",
+		LogicalVersion: "1",
+		DisplayName:    "Portable example",
+		Labels:         map[string]string{"scope": "test"},
+		Body:           []byte(`{"z":2,"a":1}`),
+		Members: []definition.ContentRef{
+			{Locator: "z/member.txt", MediaType: "text/plain", Role: "support"},
+			{URI: "https://example.com/member.json", MediaType: "application/json"},
+		},
 	}
 }
 

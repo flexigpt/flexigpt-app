@@ -118,30 +118,8 @@ func (u SourceStateUpdate) Validate() error {
 	if err := basespec.ValidateCollectionID(u.CollectionID); err != nil {
 		return err
 	}
-	if u.ResolvedDefinition != nil {
-		if err := cryptoutil.ValidateDigest(*u.ResolvedDefinition); err != nil {
-			return err
-		}
-	}
-	switch u.State {
-	case StateAvailable, StateIncompatible:
-		if u.ResolvedDefinition == nil {
-			return fmt.Errorf(
-				"%w: artifact update state requires a definition",
-				basespec.ErrInvalid,
-			)
-		}
-
-	case StateMissing, StateInvalid:
-		if u.ResolvedDefinition != nil {
-			return fmt.Errorf(
-				"%w: missing or invalid artifact state cannot retain a definition",
-				basespec.ErrInvalid,
-			)
-		}
-
-	default:
-		return fmt.Errorf("%w: invalid artifact update state", basespec.ErrInvalid)
+	if err := validateSourceState(u.State, u.ResolvedDefinition); err != nil {
+		return err
 	}
 	if err := diagnostic.ValidateDiagnostics(u.Diagnostics); err != nil {
 		return err

@@ -1,9 +1,8 @@
-package discovery
+package definition
 
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
 	"net/url"
 	"sort"
 	"strings"
@@ -17,9 +16,6 @@ const (
 	MaxCollectionMembers      = 100_000
 	MaxPortableMediaTypeBytes = 256
 )
-
-const placeholderDigest cryptoutil.Digest = cryptoutil.DigestSHA256Prefix +
-	"0000000000000000000000000000000000000000000000000000000000000000"
 
 // ContentRef identifies portable member content. Locator is relative to the
 // containing document or package root. URI is an external portable acquisition
@@ -92,10 +88,7 @@ func (r ContentRef) Validate() error {
 
 func (r ContentRef) Clone() ContentRef {
 	output := r
-	if r.Digest != nil {
-		value := *r.Digest
-		output.Digest = &value
-	}
+	output.Digest = cryptoutil.CloneDigest(r.Digest)
 	return output
 }
 
@@ -113,9 +106,6 @@ func validateURI(value string) error {
 	); err != nil {
 		return err
 	}
-	// ParseRequestURI deliberately treats fragments as irrelevant to an HTTP
-	// request target, so reject a raw fragment before parsing. A percent-encoded
-	// hash remains valid path data and does not trigger this guard.
 	if strings.Contains(value, "#") {
 		return fmt.Errorf(
 			"%w: portable content URI must use subresourceLocator instead of a fragment",
@@ -212,28 +202,8 @@ func (d CollectionDefinition) Validate() error {
 	); err != nil {
 		return err
 	}
-	if len(d.Labels) > basespec.MaxLabels {
-		return fmt.Errorf(
-			"%w: portable collection labels exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxLabels,
-		)
-	}
-	for key, value := range d.Labels {
-		if err := basespec.ValidateIdentifier(
-			"portable collection label key",
-			key,
-			basespec.MaxKindBytes,
-		); err != nil {
-			return err
-		}
-		if err := basespec.ValidateRequiredText(
-			"portable collection label value",
-			value,
-			basespec.MaxLabelValueBytes,
-		); err != nil {
-			return err
-		}
+	if err := validateLabels("portable collection", d.Labels); err != nil {
+		return err
 	}
 	if _, err := jsonutil.CanonicalizeObject(
 		d.Body,
@@ -269,29 +239,32 @@ func (d CollectionDefinition) Validate() error {
 		}
 		seen[identity] = struct{}{}
 
-		if member.Locator != "" {
-			portablePath := strings.ToLower(string(member.Locator)) + "\x00" +
-				strings.ToLower(string(member.SubresourceLocator))
-			if _, duplicate := seenPortablePaths[portablePath]; duplicate {
-				return fmt.Errorf(
-					"%w: portable collection members contain a case-ambiguous locator at index %d",
-					basespec.ErrInvalid,
-					index,
-				)
-			}
-			seenPortablePaths[portablePath] = struct{}{}
+		if member.Locator == "" {
+			continue
 		}
+		portablePath := strings.ToLower(string(member.Locator)) + "\x00" +
+			strings.ToLower(string(member.SubresourceLocator))
+		if _, duplicate := seenPortablePaths[portablePath]; duplicate {
+			return fmt.Errorf(
+				"%w: portable collection members contain a case-ambiguous locator at index %d",
+				basespec.ErrInvalid,
+				index,
+			)
+		}
+		seenPortablePaths[portablePath] = struct{}{}
 	}
 	return nil
 }
 
 func (d CollectionDefinition) Clone() CollectionDefinition {
 	output := d
-	output.Labels = maps.Clone(d.Labels)
+	output.Labels = cloneLabels(d.Labels)
 	output.Body = append(json.RawMessage(nil), d.Body...)
-	output.Members = make([]ContentRef, len(d.Members))
-	for index, member := range d.Members {
-		output.Members[index] = member.Clone()
+	if d.Members != nil {
+		output.Members = make([]ContentRef, len(d.Members))
+		for index, member := range d.Members {
+			output.Members[index] = member.Clone()
+		}
 	}
 	return output
 }
@@ -303,11 +276,9 @@ func CanonicalizeCollectionDefinition(
 ) (CollectionDefinition, error) {
 	output := input.Clone()
 
-	// Generic Members describe a content closure rather than domain display
-	// ordering. Domain-defined ordering belongs in Body. Sorting here makes
-	// equivalent portable closures produce the same digest.
 	sort.Slice(output.Members, func(left, right int) bool {
-		return output.Members[left].identity() < output.Members[right].identity()
+		return output.Members[left].identity() <
+			output.Members[right].identity()
 	})
 
 	body, err := jsonutil.CanonicalizeObject(
@@ -353,22 +324,13 @@ func CanonicalizeCollectionDefinition(
 		Body:           output.Body,
 		Members:        output.Members,
 	}
-	raw, err := json.Marshal(payload)
+	calculated, err := canonicalPayloadDigest(
+		"portable collection definition",
+		payload,
+	)
 	if err != nil {
-		return CollectionDefinition{}, fmt.Errorf(
-			"marshal portable collection definition: %w",
-			err,
-		)
+		return CollectionDefinition{}, err
 	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return CollectionDefinition{}, fmt.Errorf(
-			"canonicalize portable collection definition: %w",
-			err,
-		)
-	}
-
-	calculated := cryptoutil.DigestBytes(canonical)
 	if suppliedDigest != "" && suppliedDigest != calculated {
 		return CollectionDefinition{}, fmt.Errorf(
 			"%w: supplied portable collection digest %q, calculated %q",

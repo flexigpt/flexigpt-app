@@ -78,7 +78,7 @@ func (p Plan) Fingerprint() (cryptoutil.Digest, error) {
 		Revision: p.Revision,
 		Sources:  values,
 	}
-	//nolint:musttag // Rev.
+
 	raw, err := json.Marshal(rev)
 	if err != nil {
 		return "", err

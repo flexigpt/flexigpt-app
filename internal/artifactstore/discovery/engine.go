@@ -18,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type Result struct {
@@ -1086,7 +1085,7 @@ func locatorInScope(
 }
 
 func matchesDirectoryRoot(
-	root spec.DirectoryRoot,
+	root DirectoryRoot,
 	locator basespec.Locator,
 ) bool {
 	base := string(root.Root)

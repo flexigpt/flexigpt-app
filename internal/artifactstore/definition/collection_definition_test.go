@@ -1,8 +1,7 @@
-package discovery
+package definition
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -61,48 +60,5 @@ func TestCanonicalizeCollectionDefinitionSortsMembersAndOwnsFields(t *testing.T)
 	mismatch.Digest = cryptoutil.DigestBytes([]byte("wrong"))
 	if _, err := CanonicalizeCollectionDefinition(mismatch); !errors.Is(err, basespec.ErrDigestMismatch) {
 		t.Fatalf("mismatched digest error=%v", err)
-	}
-}
-
-func TestPortableReferencesAndRelativeResolutionRejectAmbiguity(t *testing.T) {
-	t.Parallel()
-
-	for _, reference := range []ContentRef{
-		{Locator: "file.txt", URI: "https://example.com/file"},
-		{URI: "file:///private/file"},
-		{URI: "https://user@example.com/file"},
-		{URI: "https://example.com/file#fragment"},
-		{},
-	} {
-		if err := reference.Validate(); !errors.Is(err, basespec.ErrInvalid) {
-			t.Fatalf("ContentRef(%#v) error=%v, want ErrInvalid", reference, err)
-		}
-	}
-	if err := (ContentRef{URI: "https://example.com/file%23literal"}).Validate(); err != nil {
-		t.Fatalf("percent-encoded hash URI error=%v", err)
-	}
-
-	resolved, err := resolveRelativeLocator("packages/example", "member.txt", false)
-	if err != nil {
-		t.Fatalf("resolveRelativeLocator: %v", err)
-	}
-	if resolved != "packages/example/member.txt" {
-		t.Fatalf("resolved=%q", resolved)
-	}
-	root, err := resolveRelativeLocator("packages/example", ".", true)
-	if err != nil {
-		t.Fatalf("resolveRelativeLocator: %v", err)
-	}
-	if root != "packages/example" {
-		t.Fatalf("directory root=%q", root)
-	}
-	if _, err := resolveRelativeLocator("packages/example", ".", false); !errors.Is(err, basespec.ErrInvalid) {
-		t.Fatalf("file relative root error=%v", err)
-	}
-
-	ambiguous := portableTestDefinition()
-	ambiguous.Members = []ContentRef{{Locator: "Files/Example.txt"}, {Locator: "files/example.TXT"}}
-	if err := ambiguous.Validate(); !strings.Contains(err.Error(), "invalid") {
-		t.Fatalf("case-ambiguous members error=%v", err)
 	}
 }

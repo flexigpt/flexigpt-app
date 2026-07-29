@@ -20,6 +20,45 @@ const (
 	StateIncompatible State = "incompatible"
 )
 
+func validateSourceState(
+	state State,
+	resolvedDefinition *cryptoutil.Digest,
+) error {
+	if resolvedDefinition != nil {
+		if err := cryptoutil.ValidateDigest(*resolvedDefinition); err != nil {
+			return err
+		}
+	}
+
+	switch state {
+	case StateAvailable, StateIncompatible:
+		if resolvedDefinition == nil {
+			return fmt.Errorf(
+				"%w: artifact state %q requires a resolved definition",
+				basespec.ErrInvalid,
+				state,
+			)
+		}
+
+	case StateMissing, StateInvalid:
+		if resolvedDefinition != nil {
+			return fmt.Errorf(
+				"%w: artifact state %q cannot retain a resolved definition",
+				basespec.ErrInvalid,
+				state,
+			)
+		}
+
+	default:
+		return fmt.Errorf(
+			"%w: invalid artifact state %q",
+			basespec.ErrInvalid,
+			state,
+		)
+	}
+	return nil
+}
+
 type AdoptionMode string
 
 const (
@@ -151,36 +190,8 @@ func (a Artifact) Validate() error {
 			a.Adoption,
 		)
 	}
-	if a.ResolvedDefinition != nil {
-		if err := cryptoutil.ValidateDigest(*a.ResolvedDefinition); err != nil {
-			return err
-		}
-	}
-	switch a.State {
-	case StateAvailable, StateIncompatible:
-		if a.ResolvedDefinition == nil {
-			return fmt.Errorf(
-				"%w: artifact state %q requires a resolved definition",
-				basespec.ErrInvalid,
-				a.State,
-			)
-		}
-
-	case StateMissing, StateInvalid:
-		if a.ResolvedDefinition != nil {
-			return fmt.Errorf(
-				"%w: artifact state %q cannot retain a resolved definition",
-				basespec.ErrInvalid,
-				a.State,
-			)
-		}
-
-	default:
-		return fmt.Errorf(
-			"%w: invalid artifact state %q",
-			basespec.ErrInvalid,
-			a.State,
-		)
+	if err := validateSourceState(a.State, a.ResolvedDefinition); err != nil {
+		return err
 	}
 	if _, err := jsonutil.CanonicalizeObject(
 		a.Data,
