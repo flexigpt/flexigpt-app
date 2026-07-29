@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -90,14 +91,14 @@ type catalogTestReader struct {
 	err   error
 }
 
-func (r catalogTestReader) GetCurrent(context.Context, basespec.CollectionRef) (Snapshot, error) {
+func (r catalogTestReader) GetCurrent(context.Context, collection.CollectionRef) (Snapshot, error) {
 	return r.value, r.err
 }
 
 func TestReadCurrentValidatesOwnershipAndPreservesStaleCatalogs(t *testing.T) {
 	t.Parallel()
 
-	ref := basespec.CollectionRef{RootID: catalogTestRootID, CollectionID: catalogTestCollectionID}
+	ref := collection.CollectionRef{RootID: catalogTestRootID, CollectionID: catalogTestCollectionID}
 	value := catalogTestSnapshot()
 	read, err := ReadCurrent(
 		t.Context(),

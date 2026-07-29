@@ -9,6 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -24,7 +25,7 @@ func refreshTestPublication() Publication {
 	definitionDigest := cryptoutil.DigestBytes([]byte("definition"))
 	contentDigest := cryptoutil.DigestBytes([]byte("content"))
 	return Publication{
-		Ref: basespec.CollectionRef{
+		Ref: collection.CollectionRef{
 			RootID:       refreshTestRootID,
 			CollectionID: refreshTestCollectionID,
 		},

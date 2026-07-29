@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -1040,7 +1041,7 @@ func (a *API) SetWorkspaceArtifactRuntimeDisabled(
 
 func (a *API) workspaceArtifact(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	ref basespec.ArtifactRef,
 ) (artifact.Artifact, error) {
 	if _, err := a.workspace.service.Get(ctx, workspace); err != nil {
@@ -1064,7 +1065,7 @@ func (a *API) workspaceArtifact(
 
 func (a *API) workspaceOccurrence(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	key catalog.OccurrenceKey,
 ) (catalog.Occurrence, error) {
 	view, err := a.workspace.query.Catalog(ctx, workspace)
@@ -1424,7 +1425,7 @@ func workspaceSuppressionViewOf(
 	value artifact.Suppression,
 ) WorkspaceSuppressionView {
 	return WorkspaceSuppressionView{
-		Workspace:  basespec.CollectionRef{RootID: value.RootID, CollectionID: value.CollectionID},
+		Workspace:  collection.CollectionRef{RootID: value.RootID, CollectionID: value.CollectionID},
 		Binding:    value.Binding,
 		Revision:   value.Revision,
 		CreatedAt:  value.CreatedAt,

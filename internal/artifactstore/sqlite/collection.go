@@ -110,7 +110,7 @@ func (s *Store) createCollection(
 
 func (s *Store) getCollection(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
@@ -134,7 +134,7 @@ func (s *Store) getCollection(
 
 func (s *Store) getRetiredCollection(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
@@ -307,7 +307,7 @@ func (s *Store) retireCollection(
 
 func (s *Store) purgeCollection(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -361,7 +361,7 @@ func (s *Store) attachCollectionSource(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := basespec.CollectionRef{
+	ref := collection.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -403,7 +403,7 @@ func (s *Store) attachCollectionSource(
 
 func (s *Store) getCollectionAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 ) (collection.Attachment, error) {
 	if err := ref.Validate(); err != nil {
@@ -434,7 +434,7 @@ func (s *Store) getCollectionAttachment(
 
 func (s *Store) listCollectionAttachments(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]collection.Attachment, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -507,7 +507,7 @@ func (s *Store) updateCollectionAttachment(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := basespec.CollectionRef{
+	ref := collection.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -600,7 +600,7 @@ func (s *Store) updateCollectionAttachment(
 
 func (s *Store) detachCollectionSource(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
@@ -682,7 +682,7 @@ func (s *Store) detachCollectionSource(
 
 func (s *Store) replaceCollectionAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	previousSourceID basespec.SourceID,
 	expectedPreviousRevision uint64,
 	replacement collection.Attachment,
@@ -787,7 +787,7 @@ func (s *Store) replaceCollectionAttachment(
 func getActiveCollectionTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
@@ -822,7 +822,7 @@ func getActiveCollectionTx(
 func requireAttachedSourceTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 ) error {
 	if err := basespec.ValidateSourceID(sourceID); err != nil {
@@ -930,7 +930,7 @@ func insertCollectionAttachmentTx(
 func getCollectionAttachmentTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 ) (collection.Attachment, error) {
 	value, err := scanCollectionAttachment(tx.QueryRowContext(

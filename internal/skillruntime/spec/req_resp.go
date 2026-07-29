@@ -5,6 +5,7 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
@@ -36,7 +37,7 @@ type RuntimeSkillFilter struct {
 
 	// Workspace scopes Artifact-based Skill references. It is required when
 	// AllowSkillRefs contains one or more Workspace Artifact references.
-	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
+	Workspace *collection.CollectionRef `json:"workspace,omitempty"`
 
 	SessionID agentskillsSpec.SessionID     `json:"sessionID,omitempty"`
 	Activity  agentskillsSpec.SkillActivity `json:"activity,omitempty"`
@@ -67,7 +68,7 @@ type CreateSkillSessionRequestBody struct {
 
 	// Workspace scopes Artifact-based Skill references in this session.
 	// Installed Skill references remain valid without this field.
-	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
+	Workspace *collection.CollectionRef `json:"workspace,omitempty"`
 }
 
 // CreateSkillSessionRequest creates a session using stable source identities.
@@ -95,7 +96,7 @@ type RenderSkillRequestBody struct {
 
 	// Workspace is required when SkillRef.Artifact is present and prevents an
 	// ArtifactRef from being resolved outside its selected Workspace.
-	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
+	Workspace *collection.CollectionRef `json:"workspace,omitempty"`
 }
 
 type RenderSkillRequest struct {

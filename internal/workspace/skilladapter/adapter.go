@@ -12,6 +12,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -41,19 +42,19 @@ type SkillSummary struct {
 }
 
 type WorkspaceSkill struct {
-	Workspace        basespec.CollectionRef  `json:"workspace"`
-	Artifact         basespec.ArtifactRef    `json:"artifact"`
-	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
-	SourceID         basespec.SourceID       `json:"sourceID"`
-	Locator          basespec.Locator        `json:"locator"`
-	Skill            SkillSummary            `json:"skill"`
-	MarkdownBody     string                  `json:"markdownBody,omitempty"`
-	ArtifactRevision uint64                  `json:"artifactRevision"`
-	State            artifact.State          `json:"state"`
-	CatalogCurrent   bool                    `json:"catalogCurrent"`
-	WorkspaceEnabled bool                    `json:"-"`
-	RuntimeDisabled  bool                    `json:"runtimeDisabled"`
-	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Workspace        collection.CollectionRef `json:"workspace"`
+	Artifact         basespec.ArtifactRef     `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
+	SourceID         basespec.SourceID        `json:"sourceID"`
+	Locator          basespec.Locator         `json:"locator"`
+	Skill            SkillSummary             `json:"skill"`
+	MarkdownBody     string                   `json:"markdownBody,omitempty"`
+	ArtifactRevision uint64                   `json:"artifactRevision"`
+	State            artifact.State           `json:"state"`
+	CatalogCurrent   bool                     `json:"catalogCurrent"`
+	WorkspaceEnabled bool                     `json:"-"`
+	RuntimeDisabled  bool                     `json:"runtimeDisabled"`
+	Diagnostics      []diagnostic.Diagnostic  `json:"diagnostics,omitempty"`
 
 	ProjectionValid     bool              `json:"-"`
 	RuntimePathBacked   bool              `json:"-"`
@@ -63,10 +64,10 @@ type WorkspaceSkill struct {
 }
 
 type SkillLoadPlan struct {
-	Workspace       basespec.CollectionRef  `json:"workspace"`
-	CatalogRevision uint64                  `json:"catalogRevision"`
-	Skills          []WorkspaceSkill        `json:"skills"`
-	Diagnostics     []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Workspace       collection.CollectionRef `json:"workspace"`
+	CatalogRevision uint64                   `json:"catalogRevision"`
+	Skills          []WorkspaceSkill         `json:"skills"`
+	Diagnostics     []diagnostic.Diagnostic  `json:"diagnostics,omitempty"`
 }
 
 type Adapter struct {
@@ -95,7 +96,7 @@ func NewAdapter(
 
 func (f *Adapter) List(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 ) ([]WorkspaceSkill, error) {
 	if err := workspace.Validate(); err != nil {
 		return nil, err
@@ -131,7 +132,7 @@ func (f *Adapter) List(
 
 func (f *Adapter) Load(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	artifactRefs []basespec.ArtifactRef,
 ) (SkillLoadPlan, error) {
 	if err := workspace.Validate(); err != nil {
@@ -274,7 +275,7 @@ func (f *Adapter) LoadArtifact(
 }
 
 func projectWorkspaceSkill(
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	resourceValue engine.Resource,
 	workspaceEnabled bool,
 	includeMarkdown bool,

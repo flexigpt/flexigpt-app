@@ -25,13 +25,13 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	catalogErr := error(nil)
 
 	store := &engineTestCollectionStore{
-		getFn: func(_ context.Context, ref basespec.CollectionRef) (collectionValue collection.Collection, err error) {
+		getFn: func(_ context.Context, ref collection.CollectionRef) (collectionValue collection.Collection, err error) {
 			if ref != workspace.Collection.Ref() {
 				return collection.Collection{}, basespec.ErrCollectionNotFound
 			}
 			return workspace.Collection, nil
 		},
-		listAttachmentsFn: func(_ context.Context, ref basespec.CollectionRef) ([]collection.Attachment, error) {
+		listAttachmentsFn: func(_ context.Context, ref collection.CollectionRef) ([]collection.Attachment, error) {
 			if ref != workspace.Collection.Ref() {
 				return nil, basespec.ErrCollectionNotFound
 			}
@@ -55,7 +55,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
-	catalogs := engineTestCatalogs{getFn: func(context.Context, basespec.CollectionRef) (catalog.Snapshot, error) {
+	catalogs := engineTestCatalogs{getFn: func(context.Context, collection.CollectionRef) (catalog.Snapshot, error) {
 		return snapshot, catalogErr
 	}}
 	artifacts := engineTestArtifacts{
@@ -65,7 +65,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 			}
 			return artifact.Artifact{}, basespec.ErrArtifactNotFound
 		},
-		listFn: func(_ context.Context, ref basespec.CollectionRef) ([]artifact.Artifact, error) {
+		listFn: func(_ context.Context, ref collection.CollectionRef) ([]artifact.Artifact, error) {
 			if ref != workspace.Collection.Ref() {
 				return nil, basespec.ErrCollectionNotFound
 			}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -21,7 +22,7 @@ const occurrenceColumns = `
 
 func (s *Store) getCurrentCatalog(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (catalog.Snapshot, error) {
 	if err := ref.Validate(); err != nil {
 		return catalog.Snapshot{}, err
@@ -231,7 +232,7 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 func currentAttachmentSourceRevisionsTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (
 	currentAttachments map[basespec.SourceID]uint64,
 	currentSources map[basespec.SourceID]uint64,

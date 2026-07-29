@@ -28,7 +28,7 @@ type artifactLookup interface {
 
 	ListByCollection(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) ([]artifact.Artifact, error)
 }
 
@@ -50,12 +50,12 @@ type workspaceCollectionStore interface {
 
 	Get(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) (collection.Collection, error)
 
 	GetRetired(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) (collection.Collection, error)
 
 	ListByRoot(
@@ -65,50 +65,50 @@ type workspaceCollectionStore interface {
 
 	Update(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		update collection.Update,
 	) (collection.Collection, error)
 
 	Retire(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		expectedRevision uint64,
 	) (collection.Collection, error)
 
 	Purge(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		expectedRevision uint64,
 	) error
 
 	Attach(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		expectedCollectionRevision uint64,
 		draft collection.AttachmentDraft,
 	) (collection.Collection, collection.Attachment, error)
 
 	GetAttachment(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		sourceID basespec.SourceID,
 	) (collection.Attachment, error)
 
 	ListAttachments(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) ([]collection.Attachment, error)
 
 	UpdateAttachment(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		sourceID basespec.SourceID,
 		update collection.AttachmentUpdate,
 	) (collection.Collection, collection.Attachment, error)
 
 	Detach(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		sourceID basespec.SourceID,
 		expectedCollectionRevision uint64,
 		expectedAttachmentRevision uint64,
@@ -116,7 +116,7 @@ type workspaceCollectionStore interface {
 
 	ReplaceAttachment(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		replacement collection.AttachmentReplacement,
 	) (collection.Collection, collection.Attachment, error)
 }
@@ -124,6 +124,6 @@ type workspaceCollectionStore interface {
 type catalogSnapshotReader interface {
 	GetCurrent(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) (catalog.Snapshot, error)
 }

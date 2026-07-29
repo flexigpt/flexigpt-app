@@ -19,13 +19,13 @@ func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 
 	workspace := plannerTestWorkspace(t)
 	store := &engineTestCollectionStore{
-		getFn: func(_ context.Context, ref basespec.CollectionRef) (collection.Collection, error) {
+		getFn: func(_ context.Context, ref collection.CollectionRef) (collection.Collection, error) {
 			if ref != workspace.Collection.Ref() {
 				return collection.Collection{}, basespec.ErrCollectionNotFound
 			}
 			return workspace.Collection, nil
 		},
-		listAttachmentsFn: func(_ context.Context, ref basespec.CollectionRef) ([]collection.Attachment, error) {
+		listAttachmentsFn: func(_ context.Context, ref collection.CollectionRef) ([]collection.Attachment, error) {
 			if ref != workspace.Collection.Ref() {
 				return nil, basespec.ErrCollectionNotFound
 			}
@@ -153,8 +153,8 @@ func TestServicePurgeChecksRetiredWorkspaceIdentity(t *testing.T) {
 	retired.Enabled = false
 	retired.Revision = 3
 	store := &engineTestCollectionStore{
-		getRetiredFn: func(context.Context, basespec.CollectionRef) (collection.Collection, error) { return retired, nil },
-		purgeFn:      func(context.Context, basespec.CollectionRef, uint64) error { return nil },
+		getRetiredFn: func(context.Context, collection.CollectionRef) (collection.Collection, error) { return retired, nil },
+		purgeFn:      func(context.Context, collection.CollectionRef, uint64) error { return nil },
 	}
 	service, err := NewService(store, engineTestSources{}, "policy.v1")
 	if err != nil {
@@ -165,7 +165,7 @@ func TestServicePurgeChecksRetiredWorkspaceIdentity(t *testing.T) {
 	}
 	wrongKind := retired
 	wrongKind.Kind = "other.collection"
-	store.getRetiredFn = func(context.Context, basespec.CollectionRef) (collection.Collection, error) {
+	store.getRetiredFn = func(context.Context, collection.CollectionRef) (collection.Collection, error) {
 		return wrongKind, nil
 	}
 	if err := service.Purge(
@@ -178,7 +178,7 @@ func TestServicePurgeChecksRetiredWorkspaceIdentity(t *testing.T) {
 	) {
 		t.Fatalf("Purge wrong kind error=%v", err)
 	}
-	store.getRetiredFn = func(context.Context, basespec.CollectionRef) (collection.Collection, error) { return retired, nil }
+	store.getRetiredFn = func(context.Context, collection.CollectionRef) (collection.Collection, error) { return retired, nil }
 	if err := service.Purge(
 		t.Context(),
 		workspace.Collection.Ref(),

@@ -9,6 +9,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+type CollectionRef struct {
+	RootID       basespec.RootID       `json:"rootID"`
+	CollectionID basespec.CollectionID `json:"collectionID"`
+}
+
+func (r CollectionRef) Validate() error {
+	if err := basespec.ValidateRootID(r.RootID); err != nil {
+		return err
+	}
+	return basespec.ValidateCollectionID(r.CollectionID)
+}
+
 type Collection struct {
 	ID          basespec.CollectionID   `json:"id"`
 	RootID      basespec.RootID         `json:"rootID"`
@@ -23,8 +35,8 @@ type Collection struct {
 	RetiredAt   *time.Time              `json:"retiredAt,omitempty"`
 }
 
-func (c Collection) Ref() basespec.CollectionRef {
-	return basespec.CollectionRef{
+func (c Collection) Ref() CollectionRef {
+	return CollectionRef{
 		RootID:       c.RootID,
 		CollectionID: c.ID,
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -50,7 +51,7 @@ func (s *Store) getArtifact(
 
 func (s *Store) listArtifactsByCollection(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]artifact.Artifact, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -101,7 +102,7 @@ func (s *Store) listArtifactsByCollection(
 
 func (s *Store) listSuppressions(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]artifact.Suppression, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -169,7 +170,7 @@ func (s *Store) updateArtifact(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := basespec.CollectionRef{
+	ref := collection.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -242,7 +243,7 @@ func (s *Store) createAdoptedArtifact(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := basespec.CollectionRef{
+	ref := collection.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -297,7 +298,7 @@ func (s *Store) createPinnedArtifact(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := basespec.CollectionRef{
+	ref := collection.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -364,7 +365,7 @@ func (s *Store) unadoptArtifact(
 		return basespec.ErrConflict
 	}
 
-	collectionRef := basespec.CollectionRef{
+	collectionRef := collection.CollectionRef{
 		RootID:       current.RootID,
 		CollectionID: current.CollectionID,
 	}
@@ -431,7 +432,7 @@ func (s *Store) createSuppression(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	ref := basespec.CollectionRef{
+	ref := collection.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -454,7 +455,7 @@ func (s *Store) createSuppression(
 
 func (s *Store) deleteSuppression(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	binding basespec.SourceBinding,
 	expectedRevision uint64,
 ) error {
@@ -538,7 +539,7 @@ func (s *Store) purgeArtifact(
 	if current.Revision != expectedRevision {
 		return basespec.ErrConflict
 	}
-	collectionRef := basespec.CollectionRef{
+	collectionRef := collection.CollectionRef{
 		RootID:       current.RootID,
 		CollectionID: current.CollectionID,
 	}
@@ -755,7 +756,7 @@ func requireNoArtifactForBindingTx(
 func requireCurrentCatalogTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	var (

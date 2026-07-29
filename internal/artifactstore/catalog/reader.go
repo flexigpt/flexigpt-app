@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 )
 
 type Reader interface {
@@ -14,7 +15,7 @@ type Reader interface {
 	// when Collection, attachment, or Source metadata has changed.
 	GetCurrent(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) (Snapshot, error)
 }
 
@@ -24,7 +25,7 @@ type Reader interface {
 func ReadCurrent(
 	ctx context.Context,
 	reader Reader,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (Snapshot, error) {
 	if reader == nil {
 		return Snapshot{}, fmt.Errorf(

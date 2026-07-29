@@ -160,14 +160,14 @@ func (r *CollectionRepository) Create(
 
 func (r *CollectionRepository) Get(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (collection.Collection, error) {
 	return r.store.getCollection(ctx, ref)
 }
 
 func (r *CollectionRepository) GetRetired(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (collection.Collection, error) {
 	return r.store.getRetiredCollection(ctx, ref)
 }
@@ -197,7 +197,7 @@ func (r *CollectionRepository) Retire(
 
 func (r *CollectionRepository) Purge(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	return r.store.purgeCollection(ctx, ref, expectedRevision)
@@ -217,7 +217,7 @@ func (r *CollectionRepository) Attach(
 
 func (r *CollectionRepository) GetAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 ) (collection.Attachment, error) {
 	return r.store.getCollectionAttachment(ctx, ref, sourceID)
@@ -225,7 +225,7 @@ func (r *CollectionRepository) GetAttachment(
 
 func (r *CollectionRepository) ListAttachments(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]collection.Attachment, error) {
 	return r.store.listCollectionAttachments(ctx, ref)
 }
@@ -246,7 +246,7 @@ func (r *CollectionRepository) UpdateAttachment(
 
 func (r *CollectionRepository) Detach(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
@@ -264,7 +264,7 @@ func (r *CollectionRepository) Detach(
 
 func (r *CollectionRepository) ReplaceAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	previousSourceID basespec.SourceID,
 	expectedPreviousRevision uint64,
 	replacement collection.Attachment,
@@ -282,7 +282,7 @@ func (r *CollectionRepository) ReplaceAttachment(
 
 func (r *CatalogRepository) GetCurrent(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (catalog.Snapshot, error) {
 	return r.store.getCurrentCatalog(ctx, ref)
 }
@@ -296,14 +296,14 @@ func (r *ArtifactRepository) Get(
 
 func (r *ArtifactRepository) ListByCollection(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]artifact.Artifact, error) {
 	return r.store.listArtifactsByCollection(ctx, ref)
 }
 
 func (r *ArtifactRepository) ListSuppressions(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]artifact.Suppression, error) {
 	return r.store.listSuppressions(ctx, ref)
 }
@@ -372,7 +372,7 @@ func (r *ArtifactRepository) Suppress(
 
 func (r *ArtifactRepository) Unsuppress(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	binding basespec.SourceBinding,
 	expectedRevision uint64,
 ) error {

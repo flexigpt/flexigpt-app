@@ -62,7 +62,7 @@ func (s *Service) Get(
 
 func (s *Service) ListByCollection(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]Artifact, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (s *Service) ListByCollection(
 
 func (s *Service) ListSuppressions(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]Suppression, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (s *Service) ListSuppressions(
 }
 
 type AdoptRequest struct {
-	Collection              basespec.CollectionRef
+	Collection              collection.CollectionRef
 	Occurrence              catalog.OccurrenceKey
 	ExpectedCatalogRevision uint64
 	Name                    string
@@ -206,7 +206,7 @@ func (s *Service) Adopt(
 }
 
 type PinRequest struct {
-	Collection                 basespec.CollectionRef
+	Collection                 collection.CollectionRef
 	ExpectedCollectionRevision uint64
 	Binding                    basespec.SourceBinding
 	Name                       string
@@ -425,7 +425,7 @@ func (s *Service) Unadopt(
 
 	var suppression *Suppression
 	if suppress {
-		ref := basespec.CollectionRef{
+		ref := collection.CollectionRef{
 			RootID:       current.RootID,
 			CollectionID: current.CollectionID,
 		}
@@ -451,7 +451,7 @@ func (s *Service) Unadopt(
 }
 
 type SuppressRequest struct {
-	Collection                 basespec.CollectionRef
+	Collection                 collection.CollectionRef
 	ExpectedCollectionRevision uint64
 	Binding                    basespec.SourceBinding
 }
@@ -507,7 +507,7 @@ func (s *Service) Suppress(
 
 func (s *Service) Unsuppress(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	binding basespec.SourceBinding,
 	expectedRevision uint64,
 ) error {
@@ -539,7 +539,7 @@ func (s *Service) Unsuppress(
 func (s *Service) Move(
 	context.Context,
 	basespec.ArtifactRef,
-	basespec.CollectionRef,
+	collection.CollectionRef,
 ) error {
 	return basespec.ErrUnsupported
 }
@@ -567,7 +567,7 @@ func (s *Service) Purge(
 
 func (s *Service) activeCollection(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return collection.Collection{}, err
@@ -588,7 +588,7 @@ func (s *Service) activeCollection(
 
 func (s *Service) requireAttachedBinding(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	binding basespec.SourceBinding,
 ) error {
 	if err := binding.Validate(); err != nil {
@@ -602,7 +602,7 @@ func (s *Service) ensureArtifactCollection(
 	ctx context.Context,
 	value Artifact,
 ) error {
-	ref := basespec.CollectionRef{
+	ref := collection.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}

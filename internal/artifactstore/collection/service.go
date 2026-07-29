@@ -137,7 +137,7 @@ func (s *Service) Create(
 
 func (s *Service) Get(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 ) (Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return Collection{}, err
@@ -150,7 +150,7 @@ func (s *Service) Get(
 // active aggregate.
 func (s *Service) GetRetired(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 ) (Collection, error) {
 	if err := ref.Validate(); err != nil {
 		return Collection{}, err
@@ -170,7 +170,7 @@ func (s *Service) ListByRoot(
 
 func (s *Service) Update(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 	update Update,
 ) (Collection, error) {
 	if update.ExpectedRevision == 0 {
@@ -217,7 +217,7 @@ func (s *Service) Update(
 
 func (s *Service) Retire(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 	expectedRevision uint64,
 ) (Collection, error) {
 	current, err := s.repository.Get(ctx, ref)
@@ -247,7 +247,7 @@ func (s *Service) Retire(
 
 func (s *Service) Purge(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 	expectedRevision uint64,
 ) error {
 	if expectedRevision == 0 {
@@ -261,7 +261,7 @@ func (s *Service) Purge(
 
 func (s *Service) ListAttachments(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 ) ([]Attachment, error) {
 	if _, err := s.repository.Get(ctx, ref); err != nil {
 		return nil, err
@@ -271,7 +271,7 @@ func (s *Service) ListAttachments(
 
 func (s *Service) GetAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 	sourceID basespec.SourceID,
 ) (Attachment, error) {
 	if _, err := s.repository.Get(ctx, ref); err != nil {
@@ -282,7 +282,7 @@ func (s *Service) GetAttachment(
 
 func (s *Service) Attach(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 	expectedCollectionRevision uint64,
 	draft AttachmentDraft,
 ) (Collection, Attachment, error) {
@@ -336,7 +336,7 @@ func (s *Service) Attach(
 
 func (s *Service) UpdateAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 	sourceID basespec.SourceID,
 	update AttachmentUpdate,
 ) (Collection, Attachment, error) {
@@ -398,7 +398,7 @@ func (s *Service) UpdateAttachment(
 
 func (s *Service) Detach(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
@@ -422,7 +422,7 @@ func (s *Service) Detach(
 
 func (s *Service) ReplaceAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref CollectionRef,
 	replacement AttachmentReplacement,
 ) (Collection, Attachment, error) {
 	current, err := s.repository.Get(ctx, ref)

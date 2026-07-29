@@ -10,7 +10,7 @@ import (
 type Reader interface {
 	Get(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref CollectionRef,
 	) (Collection, error)
 
 	ListByRoot(
@@ -20,13 +20,13 @@ type Reader interface {
 
 	GetAttachment(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref CollectionRef,
 		sourceID basespec.SourceID,
 	) (Attachment, error)
 
 	ListAttachments(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref CollectionRef,
 	) ([]Attachment, error)
 }
 
@@ -36,7 +36,7 @@ type Reader interface {
 type RetiredReader interface {
 	GetRetired(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref CollectionRef,
 	) (Collection, error)
 }
 
@@ -64,7 +64,7 @@ type Repository interface {
 
 	Purge(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref CollectionRef,
 		expectedRevision uint64,
 	) error
 
@@ -83,7 +83,7 @@ type Repository interface {
 
 	Detach(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref CollectionRef,
 		sourceID basespec.SourceID,
 		expectedCollectionRevision uint64,
 		expectedAttachmentRevision uint64,
@@ -92,7 +92,7 @@ type Repository interface {
 
 	ReplaceAttachment(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref CollectionRef,
 		previousSourceID basespec.SourceID,
 		expectedPreviousRevision uint64,
 		replacement Attachment,

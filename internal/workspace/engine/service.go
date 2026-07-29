@@ -507,7 +507,7 @@ func (s *Service) ReplacePrimary(
 
 func (s *Service) Detach(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
@@ -543,7 +543,7 @@ func (s *Service) Detach(
 
 func (s *Service) Retire(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	expectedRevision uint64,
 ) (collection.Collection, error) {
 	if _, err := s.Get(ctx, ref); err != nil {
@@ -558,7 +558,7 @@ func (s *Service) Retire(
 // cannot purge another domain's retired Collection.
 func (s *Service) Purge(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -588,7 +588,7 @@ func (s *Service) Purge(
 // refresh is the appropriate point to persist an implementation upgrade.
 func (s *Service) PrepareRefresh(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (Workspace, error) {
 	current, err := s.Get(ctx, ref)
 	if err != nil {
@@ -623,7 +623,7 @@ func (s *Service) PrepareRefresh(
 
 func (s *Service) Get(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (Workspace, error) {
 	if err := ref.Validate(); err != nil {
 		return Workspace{}, err

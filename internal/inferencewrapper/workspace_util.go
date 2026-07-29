@@ -9,6 +9,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
@@ -41,7 +42,7 @@ func NewWorkspaceInferenceBridge(
 
 func workspaceScopeForSelection(
 	selection *workspace.ConversationSelection,
-) *basespec.CollectionRef {
+) *collection.CollectionRef {
 	if selection == nil {
 		return nil
 	}
@@ -175,7 +176,7 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 }
 
 func buildWorkspaceContextInput(
-	workspaceRef basespec.CollectionRef,
+	workspaceRef collection.CollectionRef,
 	prompt string,
 ) inferenceSpec.InputUnion {
 	return inferenceSpec.InputUnion{
@@ -201,7 +202,7 @@ func buildWorkspaceContextInput(
 }
 
 func workspaceContextInputID(
-	workspaceRef basespec.CollectionRef,
+	workspaceRef collection.CollectionRef,
 ) string {
 	return workspaceContextInputIDPrefix +
 		string(workspaceRef.RootID) + ":" +

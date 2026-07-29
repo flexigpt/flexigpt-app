@@ -7,6 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
@@ -29,13 +30,13 @@ type ContextContribution struct {
 }
 
 type ContextLoadPlan struct {
-	Workspace       basespec.CollectionRef  `json:"workspace"`
-	CatalogRevision uint64                  `json:"catalogRevision"`
-	Contributions   []ContextContribution   `json:"contributions"`
-	Prompt          string                  `json:"prompt"`
-	Diagnostics     []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
-	Decisions       []CompositionDecision   `json:"decisions"`
-	PromptBytes     int                     `json:"promptBytes"`
+	Workspace       collection.CollectionRef `json:"workspace"`
+	CatalogRevision uint64                   `json:"catalogRevision"`
+	Contributions   []ContextContribution    `json:"contributions"`
+	Prompt          string                   `json:"prompt"`
+	Diagnostics     []diagnostic.Diagnostic  `json:"diagnostics,omitempty"`
+	Decisions       []CompositionDecision    `json:"decisions"`
+	PromptBytes     int                      `json:"promptBytes"`
 }
 
 type ContextDocument struct {
@@ -56,10 +57,10 @@ type ContextDocument struct {
 }
 
 type ContextInspection struct {
-	Workspace       basespec.CollectionRef  `json:"workspace"`
-	CatalogRevision uint64                  `json:"catalogRevision"`
-	Contributions   []ContextContribution   `json:"contributions"`
-	Diagnostics     []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Workspace       collection.CollectionRef `json:"workspace"`
+	CatalogRevision uint64                   `json:"catalogRevision"`
+	Contributions   []ContextContribution    `json:"contributions"`
+	Diagnostics     []diagnostic.Diagnostic  `json:"diagnostics,omitempty"`
 }
 
 type Adapter struct {
@@ -92,7 +93,7 @@ func NewAdapter(
 
 func (p *Adapter) Compose(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	artifactRefs []basespec.ArtifactRef,
 ) (ContextLoadPlan, error) {
 	if err := workspace.Validate(); err != nil {
@@ -226,7 +227,7 @@ func (p *Adapter) Compose(
 
 func (p *Adapter) List(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 ) ([]ContextDocument, error) {
 	view, err := p.query.Catalog(ctx, workspace)
 	if err != nil {
@@ -260,7 +261,7 @@ func (p *Adapter) List(
 
 func (p *Adapter) Load(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	artifactRefs []basespec.ArtifactRef,
 ) (ContextInspection, error) {
 	view, err := p.query.Catalog(ctx, workspace)

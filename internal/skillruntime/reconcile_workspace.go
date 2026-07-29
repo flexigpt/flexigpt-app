@@ -11,13 +11,14 @@ import (
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
 func (s *SkillRuntime) ResyncWorkspace(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 ) error {
 	if err := s.ensureConfigured(); err != nil {
 		return err
@@ -119,7 +120,7 @@ func (s *SkillRuntime) ResyncWorkspace(
 
 func (s *SkillRuntime) failClosedWorkspaceLocked(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	cause error,
 ) error {
 	workspaces := cloneWorkspaceDesiredViews(s.managedWorkspaces)
@@ -150,7 +151,7 @@ func (s *SkillRuntime) failClosedWorkspaceLocked(
 
 func (s *SkillRuntime) RemoveWorkspace(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 ) error {
 	if err := s.ensureConfigured(); err != nil {
 		return err
@@ -174,24 +175,24 @@ func (s *SkillRuntime) RemoveWorkspace(
 func (s *SkillRuntime) workspaceDefinitionForArtifact(
 	ctx context.Context,
 	ref basespec.ArtifactRef,
-) (agentskillsSpec.SkillDef, basespec.CollectionRef, bool) {
+) (agentskillsSpec.SkillDef, collection.CollectionRef, bool) {
 	if s.workspaceSkills == nil {
-		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, collection.CollectionRef{}, false
 	}
 	value, err := s.workspaceSkills.LoadArtifact(ctx, ref)
 	if err != nil {
-		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, collection.CollectionRef{}, false
 	}
 	if err := s.ResyncWorkspace(ctx, value.Workspace); err != nil {
-		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, collection.CollectionRef{}, false
 	}
 	value, err = s.workspaceSkills.LoadArtifact(ctx, ref)
 	if err != nil {
-		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, collection.CollectionRef{}, false
 	}
 	definition, err := workspaceRuntimeDefinition(value)
 	if err != nil {
-		return agentskillsSpec.SkillDef{}, basespec.CollectionRef{}, false
+		return agentskillsSpec.SkillDef{}, collection.CollectionRef{}, false
 	}
 	return definition, value.Workspace, true
 }

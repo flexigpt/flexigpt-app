@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
@@ -494,7 +495,7 @@ func (w *WorkspaceWrapper) SetWorkspaceArtifactRuntimeDisabled(
 }
 
 func (w *WorkspaceWrapper) syncWorkspaceSkills(
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) {
 	if w == nil {
 		return
@@ -563,7 +564,7 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 			return
 		}
 
-		active := make(map[basespec.CollectionRef]struct{}, len(refs))
+		active := make(map[collection.CollectionRef]struct{}, len(refs))
 		for _, ref := range refs {
 			if filterRoot && ref.RootID != rootID {
 				continue
@@ -587,7 +588,7 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 }
 
 func (w *WorkspaceWrapper) removeWorkspaceSkills(
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) {
 	if w == nil {
 		return

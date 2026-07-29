@@ -22,12 +22,12 @@ type Reader interface {
 
 	ListByCollection(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) ([]Artifact, error)
 
 	ListSuppressions(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) ([]Suppression, error)
 }
 
@@ -69,7 +69,7 @@ type Repository interface {
 
 	Unsuppress(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		binding basespec.SourceBinding,
 		expectedRevision uint64,
 	) error

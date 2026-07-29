@@ -17,29 +17,29 @@ import (
 type CollectionReader interface {
 	Get(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) (collection.Collection, error)
 
 	ListAttachments(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) ([]collection.Attachment, error)
 }
 
 type ArtifactReader interface {
 	ListByCollection(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) ([]artifact.Artifact, error)
 
 	ListSuppressions(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 	) ([]artifact.Suppression, error)
 }
 
 type Publication struct {
-	Ref basespec.CollectionRef
+	Ref collection.CollectionRef
 
 	// ExpectedCatalogRevision is zero when the root has no prior publication.
 	// It prevents a concurrent refresh from replacing a newer catalog with an
@@ -309,7 +309,7 @@ type Result struct {
 type Runner interface {
 	Refresh(
 		ctx context.Context,
-		ref basespec.CollectionRef,
+		ref collection.CollectionRef,
 		plan discovery.Plan,
 		policy artifact.Policy,
 	) (Result, error)

@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -96,14 +97,14 @@ func NewQueryService(
 
 func (q *QueryService) GetWorkspace(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 ) (Workspace, error) {
 	return q.workspaces.Get(ctx, workspace)
 }
 
 func (q *QueryService) Resolve(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	reference Reference,
 ) (Resource, error) {
 	if (reference.Artifact == nil) == (reference.Selector == nil) {
@@ -189,7 +190,7 @@ func (q *QueryService) ResolveArtifact(
 	if err != nil {
 		return Workspace{}, Resource{}, err
 	}
-	workspaceRef := basespec.CollectionRef{
+	workspaceRef := collection.CollectionRef{
 		RootID:       value.RootID,
 		CollectionID: value.CollectionID,
 	}
@@ -215,7 +216,7 @@ func (q *QueryService) ResolveArtifact(
 
 func (q *QueryService) ComposeLoadPlan(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	artifactRefs []basespec.ArtifactRef,
 ) (LoadPlan, error) {
 	view, err := q.Catalog(ctx, workspace)
@@ -383,7 +384,7 @@ func (q *QueryService) ComposeLoadPlan(
 
 func (q *QueryService) Catalog(
 	ctx context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 ) (CatalogView, error) {
 	if err := workspace.Validate(); err != nil {
 		return CatalogView{}, err

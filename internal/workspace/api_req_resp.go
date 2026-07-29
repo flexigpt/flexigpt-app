@@ -6,6 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -13,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
 
-type WorkspaceRef = basespec.CollectionRef
+type WorkspaceRef = collection.CollectionRef
 
 type WorkspaceContextRole string
 

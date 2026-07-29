@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 )
 
 type workspaceReconcileRequest struct {
@@ -17,7 +17,7 @@ type workspaceReconcileRequest struct {
 // derived Agent Skills runtime partition. Durable Workspace mutations must not
 // wait for this rebuild or report its transient failures as metadata failures.
 func (s *SkillRuntime) RequestWorkspaceResync(
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 ) {
 	s.requestWorkspaceReconciliation(workspace, false)
 }
@@ -25,13 +25,13 @@ func (s *SkillRuntime) RequestWorkspaceResync(
 // RequestWorkspaceRemoval schedules removal of one retired Workspace's
 // derived Agent Skills runtime partition.
 func (s *SkillRuntime) RequestWorkspaceRemoval(
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 ) {
 	s.requestWorkspaceReconciliation(workspace, true)
 }
 
 func (s *SkillRuntime) requestWorkspaceReconciliation(
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 	remove bool,
 ) {
 	if s == nil || workspace.Validate() != nil {
@@ -63,7 +63,7 @@ func (s *SkillRuntime) requestWorkspaceReconciliation(
 
 func (s *SkillRuntime) runWorkspaceReconciliation(
 	parent context.Context,
-	workspace basespec.CollectionRef,
+	workspace collection.CollectionRef,
 ) {
 	defer s.endBackground()
 

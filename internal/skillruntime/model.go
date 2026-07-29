@@ -9,6 +9,7 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
@@ -22,16 +23,16 @@ const (
 )
 
 type Scope struct {
-	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
+	Workspace *collection.CollectionRef `json:"workspace,omitempty"`
 }
 
 type Skill struct {
 	Ref    skillruntimeSpec.SkillRef `json:"ref"`
 	Origin Origin                    `json:"origin"`
 
-	InstalledRef     *skillstoreSpec.SkillRef `json:"installedRef,omitempty"`
-	Workspace        *basespec.CollectionRef  `json:"workspace,omitempty"`
-	ArtifactRevision uint64                   `json:"artifactRevision,omitempty"`
+	InstalledRef     *skillstoreSpec.SkillRef  `json:"installedRef,omitempty"`
+	Workspace        *collection.CollectionRef `json:"workspace,omitempty"`
+	ArtifactRevision uint64                    `json:"artifactRevision,omitempty"`
 
 	Name        string                          `json:"name"`
 	DisplayName string                          `json:"displayName"`
@@ -131,7 +132,7 @@ type Provider interface {
 }
 
 type ListProvidedSkillsRequest struct {
-	Workspace *basespec.CollectionRef `json:"workspace,omitempty"`
+	Workspace *collection.CollectionRef `json:"workspace,omitempty"`
 }
 
 type ListProvidedSkillsResponseBody struct {
@@ -143,7 +144,7 @@ type ListProvidedSkillsResponse struct {
 }
 
 type RenderProvidedSkillRequestBody struct {
-	Workspace *basespec.CollectionRef   `json:"workspace,omitempty"`
+	Workspace *collection.CollectionRef `json:"workspace,omitempty"`
 	Ref       skillruntimeSpec.SkillRef `json:"ref"                 required:"true"`
 	Arguments map[string]string         `json:"arguments,omitempty"`
 }

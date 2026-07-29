@@ -78,7 +78,7 @@ type ArtifactData struct {
 	RuntimeDisabled bool `json:"runtimeDisabled,omitempty"`
 }
 
-type WorkspaceRef = basespec.CollectionRef
+type WorkspaceRef = collection.CollectionRef
 
 // Workspace is an internal privileged aggregate. API packages project it into
 // explicit view models and must not serialize collection local data, attachment

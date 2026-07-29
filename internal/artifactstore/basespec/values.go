@@ -77,18 +77,6 @@ type (
 	LogicalVersion string
 )
 
-type CollectionRef struct {
-	RootID       RootID       `json:"rootID"`
-	CollectionID CollectionID `json:"collectionID"`
-}
-
-func (r CollectionRef) Validate() error {
-	if err := ValidateRootID(r.RootID); err != nil {
-		return err
-	}
-	return ValidateCollectionID(r.CollectionID)
-}
-
 type ArtifactRef struct {
 	RootID     RootID     `json:"rootID"`
 	ArtifactID ArtifactID `json:"artifactID"`

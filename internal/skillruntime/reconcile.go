@@ -11,7 +11,7 @@ import (
 	"time"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
@@ -215,10 +215,10 @@ func (s *SkillRuntime) installedDesiredView(
 }
 
 func cloneWorkspaceDesiredViews(
-	input map[basespec.CollectionRef]runtimeDesiredView,
-) map[basespec.CollectionRef]runtimeDesiredView {
+	input map[collection.CollectionRef]runtimeDesiredView,
+) map[collection.CollectionRef]runtimeDesiredView {
 	output := make(
-		map[basespec.CollectionRef]runtimeDesiredView,
+		map[collection.CollectionRef]runtimeDesiredView,
 		len(input),
 	)
 	for workspace, value := range input {
@@ -229,7 +229,7 @@ func cloneWorkspaceDesiredViews(
 
 func mergeDesiredPartitions(
 	installed runtimeDesiredView,
-	workspaces map[basespec.CollectionRef]runtimeDesiredView,
+	workspaces map[collection.CollectionRef]runtimeDesiredView,
 ) runtimeDesiredView {
 	output := cloneRuntimeDesiredView(installed)
 	for _, workspace := range workspaces {
@@ -243,7 +243,7 @@ func mergeDesiredPartitions(
 func (s *SkillRuntime) reconcilePartitionsLocked(
 	ctx context.Context,
 	installed runtimeDesiredView,
-	workspaces map[basespec.CollectionRef]runtimeDesiredView,
+	workspaces map[collection.CollectionRef]runtimeDesiredView,
 	mode runtimeApplyMode,
 ) error {
 	desired := mergeDesiredPartitions(installed, workspaces)
@@ -386,7 +386,7 @@ func (s *SkillRuntime) runtimeApplyDesired(
 func (s *SkillRuntime) definitionForSkillRef(
 	ctx context.Context,
 	ref spec.SkillRef,
-	workspaceScope *basespec.CollectionRef,
+	workspaceScope *collection.CollectionRef,
 ) (agentskillsSpec.SkillDef, bool) {
 	if ref.Artifact != nil {
 		definition, resolvedWorkspace, found := s.workspaceDefinitionForArtifact(

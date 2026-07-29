@@ -19,18 +19,18 @@ var errEngineTestUnexpected = errors.New("unexpected engine test dependency call
 
 type engineTestCollectionStore struct {
 	createFn            func(context.Context, basespec.RootID, collection.Draft, []collection.AttachmentDraft) (collection.Collection, []collection.Attachment, error)
-	getFn               func(context.Context, basespec.CollectionRef) (collection.Collection, error)
-	getRetiredFn        func(context.Context, basespec.CollectionRef) (collection.Collection, error)
+	getFn               func(context.Context, collection.CollectionRef) (collection.Collection, error)
+	getRetiredFn        func(context.Context, collection.CollectionRef) (collection.Collection, error)
 	listByRootFn        func(context.Context, basespec.RootID) ([]collection.Collection, error)
-	updateFn            func(context.Context, basespec.CollectionRef, collection.Update) (collection.Collection, error)
-	retireFn            func(context.Context, basespec.CollectionRef, uint64) (collection.Collection, error)
-	purgeFn             func(context.Context, basespec.CollectionRef, uint64) error
-	attachFn            func(context.Context, basespec.CollectionRef, uint64, collection.AttachmentDraft) (collection.Collection, collection.Attachment, error)
-	getAttachmentFn     func(context.Context, basespec.CollectionRef, basespec.SourceID) (collection.Attachment, error)
-	listAttachmentsFn   func(context.Context, basespec.CollectionRef) ([]collection.Attachment, error)
-	updateAttachmentFn  func(context.Context, basespec.CollectionRef, basespec.SourceID, collection.AttachmentUpdate) (collection.Collection, collection.Attachment, error)
-	detachFn            func(context.Context, basespec.CollectionRef, basespec.SourceID, uint64, uint64) (collection.Collection, error)
-	replaceAttachmentFn func(context.Context, basespec.CollectionRef, collection.AttachmentReplacement) (collection.Collection, collection.Attachment, error)
+	updateFn            func(context.Context, collection.CollectionRef, collection.Update) (collection.Collection, error)
+	retireFn            func(context.Context, collection.CollectionRef, uint64) (collection.Collection, error)
+	purgeFn             func(context.Context, collection.CollectionRef, uint64) error
+	attachFn            func(context.Context, collection.CollectionRef, uint64, collection.AttachmentDraft) (collection.Collection, collection.Attachment, error)
+	getAttachmentFn     func(context.Context, collection.CollectionRef, basespec.SourceID) (collection.Attachment, error)
+	listAttachmentsFn   func(context.Context, collection.CollectionRef) ([]collection.Attachment, error)
+	updateAttachmentFn  func(context.Context, collection.CollectionRef, basespec.SourceID, collection.AttachmentUpdate) (collection.Collection, collection.Attachment, error)
+	detachFn            func(context.Context, collection.CollectionRef, basespec.SourceID, uint64, uint64) (collection.Collection, error)
+	replaceAttachmentFn func(context.Context, collection.CollectionRef, collection.AttachmentReplacement) (collection.Collection, collection.Attachment, error)
 }
 
 func (s *engineTestCollectionStore) Create(
@@ -47,7 +47,7 @@ func (s *engineTestCollectionStore) Create(
 
 func (s *engineTestCollectionStore) Get(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (collection.Collection, error) {
 	if s.getFn == nil {
 		return collection.Collection{}, errEngineTestUnexpected
@@ -57,7 +57,7 @@ func (s *engineTestCollectionStore) Get(
 
 func (s *engineTestCollectionStore) GetRetired(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) (collection.Collection, error) {
 	if s.getRetiredFn == nil {
 		return collection.Collection{}, errEngineTestUnexpected
@@ -77,7 +77,7 @@ func (s *engineTestCollectionStore) ListByRoot(
 
 func (s *engineTestCollectionStore) Update(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	update collection.Update,
 ) (collection.Collection, error) {
 	if s.updateFn == nil {
@@ -88,7 +88,7 @@ func (s *engineTestCollectionStore) Update(
 
 func (s *engineTestCollectionStore) Retire(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	revision uint64,
 ) (collection.Collection, error) {
 	if s.retireFn == nil {
@@ -97,7 +97,7 @@ func (s *engineTestCollectionStore) Retire(
 	return s.retireFn(ctx, ref, revision)
 }
 
-func (s *engineTestCollectionStore) Purge(ctx context.Context, ref basespec.CollectionRef, revision uint64) error {
+func (s *engineTestCollectionStore) Purge(ctx context.Context, ref collection.CollectionRef, revision uint64) error {
 	if s.purgeFn == nil {
 		return errEngineTestUnexpected
 	}
@@ -106,7 +106,7 @@ func (s *engineTestCollectionStore) Purge(ctx context.Context, ref basespec.Coll
 
 func (s *engineTestCollectionStore) Attach(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	revision uint64,
 	draft collection.AttachmentDraft,
 ) (collection.Collection, collection.Attachment, error) {
@@ -118,7 +118,7 @@ func (s *engineTestCollectionStore) Attach(
 
 func (s *engineTestCollectionStore) GetAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 ) (collection.Attachment, error) {
 	if s.getAttachmentFn == nil {
@@ -129,7 +129,7 @@ func (s *engineTestCollectionStore) GetAttachment(
 
 func (s *engineTestCollectionStore) ListAttachments(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]collection.Attachment, error) {
 	if s.listAttachmentsFn == nil {
 		return nil, errEngineTestUnexpected
@@ -139,7 +139,7 @@ func (s *engineTestCollectionStore) ListAttachments(
 
 func (s *engineTestCollectionStore) UpdateAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 	update collection.AttachmentUpdate,
 ) (collection.Collection, collection.Attachment, error) {
@@ -151,7 +151,7 @@ func (s *engineTestCollectionStore) UpdateAttachment(
 
 func (s *engineTestCollectionStore) Detach(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 	collectionRevision, attachmentRevision uint64,
 ) (collection.Collection, error) {
@@ -163,7 +163,7 @@ func (s *engineTestCollectionStore) Detach(
 
 func (s *engineTestCollectionStore) ReplaceAttachment(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 	replacement collection.AttachmentReplacement,
 ) (collection.Collection, collection.Attachment, error) {
 	if s.replaceAttachmentFn == nil {
@@ -188,10 +188,10 @@ func (s engineTestSources) Get(
 }
 
 type engineTestCatalogs struct {
-	getFn func(context.Context, basespec.CollectionRef) (catalog.Snapshot, error)
+	getFn func(context.Context, collection.CollectionRef) (catalog.Snapshot, error)
 }
 
-func (c engineTestCatalogs) GetCurrent(ctx context.Context, ref basespec.CollectionRef) (catalog.Snapshot, error) {
+func (c engineTestCatalogs) GetCurrent(ctx context.Context, ref collection.CollectionRef) (catalog.Snapshot, error) {
 	if c.getFn == nil {
 		return catalog.Snapshot{}, errEngineTestUnexpected
 	}
@@ -200,7 +200,7 @@ func (c engineTestCatalogs) GetCurrent(ctx context.Context, ref basespec.Collect
 
 type engineTestArtifacts struct {
 	getFn  func(context.Context, basespec.ArtifactRef) (artifact.Artifact, error)
-	listFn func(context.Context, basespec.CollectionRef) ([]artifact.Artifact, error)
+	listFn func(context.Context, collection.CollectionRef) ([]artifact.Artifact, error)
 }
 
 func (a engineTestArtifacts) Get(ctx context.Context, ref basespec.ArtifactRef) (artifact.Artifact, error) {
@@ -212,7 +212,7 @@ func (a engineTestArtifacts) Get(ctx context.Context, ref basespec.ArtifactRef) 
 
 func (a engineTestArtifacts) ListByCollection(
 	ctx context.Context,
-	ref basespec.CollectionRef,
+	ref collection.CollectionRef,
 ) ([]artifact.Artifact, error) {
 	if a.listFn == nil {
 		return nil, errEngineTestUnexpected
