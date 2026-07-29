@@ -57,7 +57,7 @@ func (s *SkillRuntime) ResyncWorkspace(
 	}
 
 	desired := newRuntimeDesiredView()
-	artifactRefs := make([]basespec.ArtifactRef, 0, len(values))
+	artifactRefs := make([]artifact.ArtifactRef, 0, len(values))
 	for _, value := range values {
 		if !value.ProjectionValid ||
 			!value.RuntimePathBacked ||
@@ -174,7 +174,7 @@ func (s *SkillRuntime) RemoveWorkspace(
 
 func (s *SkillRuntime) workspaceDefinitionForArtifact(
 	ctx context.Context,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 ) (agentskillsSpec.SkillDef, collection.CollectionRef, bool) {
 	if s.workspaceSkills == nil {
 		return agentskillsSpec.SkillDef{}, collection.CollectionRef{}, false

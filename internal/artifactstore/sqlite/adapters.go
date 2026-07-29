@@ -289,7 +289,7 @@ func (r *CatalogRepository) GetCurrent(
 
 func (r *ArtifactRepository) Get(
 	ctx context.Context,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 ) (artifact.Artifact, error) {
 	return r.store.getArtifact(ctx, ref)
 }
@@ -346,7 +346,7 @@ func (r *ArtifactRepository) CreatePinned(
 
 func (r *ArtifactRepository) Unadopt(
 	ctx context.Context,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	suppression *artifact.Suppression,
 ) error {
@@ -373,7 +373,7 @@ func (r *ArtifactRepository) Suppress(
 func (r *ArtifactRepository) Unsuppress(
 	ctx context.Context,
 	ref collection.CollectionRef,
-	binding basespec.SourceBinding,
+	binding artifact.SourceBinding,
 	expectedRevision uint64,
 ) error {
 	return r.store.deleteSuppression(
@@ -386,7 +386,7 @@ func (r *ArtifactRepository) Unsuppress(
 
 func (r *ArtifactRepository) Purge(
 	ctx context.Context,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return r.store.purgeArtifact(

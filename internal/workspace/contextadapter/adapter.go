@@ -14,7 +14,7 @@ import (
 )
 
 type ContextContribution struct {
-	Artifact         basespec.ArtifactRef `json:"artifact"`
+	Artifact         artifact.ArtifactRef `json:"artifact"`
 	ArtifactRevision uint64               `json:"artifactRevision"`
 	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest"`
 	SourceID         basespec.SourceID    `json:"sourceID"`
@@ -40,7 +40,7 @@ type ContextLoadPlan struct {
 }
 
 type ContextDocument struct {
-	Artifact         basespec.ArtifactRef    `json:"artifact"`
+	Artifact         artifact.ArtifactRef    `json:"artifact"`
 	ArtifactRevision uint64                  `json:"artifactRevision"`
 	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
 	SourceID         basespec.SourceID       `json:"sourceID"`
@@ -94,7 +94,7 @@ func NewAdapter(
 func (p *Adapter) Compose(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-	artifactRefs []basespec.ArtifactRef,
+	artifactRefs []artifact.ArtifactRef,
 ) (ContextLoadPlan, error) {
 	if err := workspace.Validate(); err != nil {
 		return ContextLoadPlan{}, err
@@ -262,7 +262,7 @@ func (p *Adapter) List(
 func (p *Adapter) Load(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-	artifactRefs []basespec.ArtifactRef,
+	artifactRefs []artifact.ArtifactRef,
 ) (ContextInspection, error) {
 	view, err := p.query.Catalog(ctx, workspace)
 	if err != nil {

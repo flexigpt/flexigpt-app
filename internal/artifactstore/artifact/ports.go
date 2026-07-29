@@ -17,7 +17,7 @@ import (
 type Reader interface {
 	Get(
 		ctx context.Context,
-		ref basespec.ArtifactRef,
+		ref ArtifactRef,
 	) (Artifact, error)
 
 	ListByCollection(
@@ -56,7 +56,7 @@ type Repository interface {
 
 	Unadopt(
 		ctx context.Context,
-		ref basespec.ArtifactRef,
+		ref ArtifactRef,
 		expectedRevision uint64,
 		suppression *Suppression,
 	) error
@@ -70,13 +70,13 @@ type Repository interface {
 	Unsuppress(
 		ctx context.Context,
 		ref collection.CollectionRef,
-		binding basespec.SourceBinding,
+		binding SourceBinding,
 		expectedRevision uint64,
 	) error
 
 	Purge(
 		ctx context.Context,
-		ref basespec.ArtifactRef,
+		ref ArtifactRef,
 		expectedRevision uint64,
 	) error
 }

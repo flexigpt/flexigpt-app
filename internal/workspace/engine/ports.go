@@ -23,7 +23,7 @@ type sourceSummaryLookup interface {
 type artifactLookup interface {
 	Get(
 		ctx context.Context,
-		ref basespec.ArtifactRef,
+		ref artifact.ArtifactRef,
 	) (artifact.Artifact, error)
 
 	ListByCollection(

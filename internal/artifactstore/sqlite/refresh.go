@@ -263,7 +263,7 @@ func updateArtifactSourceStateTx(
 	value artifact.SourceStateUpdate,
 	occurrences map[catalog.OccurrenceKey]catalog.Occurrence,
 ) error {
-	current, err := getArtifactTx(ctx, tx, basespec.ArtifactRef{
+	current, err := getArtifactTx(ctx, tx, artifact.ArtifactRef{
 		RootID:     value.RootID,
 		ArtifactID: value.ArtifactID,
 	})

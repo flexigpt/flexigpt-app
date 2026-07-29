@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -111,7 +112,7 @@ func TestConversationSelectionHelpersTrackChangesAndUnavailableReferences(t *tes
 		CatalogRevision:   4,
 		ContextRefs: []ConversationResourceSelectionRef{
 			{
-				Artifact: basespec.ArtifactRef{
+				Artifact: artifact.ArtifactRef{
 					RootID:     "019d3150-7401-7a6b-a34e-d9032342bc31",
 					ArtifactID: "019d3150-7403-7a6b-a34e-d9032342bc31",
 				},
@@ -121,7 +122,7 @@ func TestConversationSelectionHelpersTrackChangesAndUnavailableReferences(t *tes
 		SkillRefs: []ConversationSkillSelectionRef{
 			{
 				ConversationResourceSelectionRef: ConversationResourceSelectionRef{
-					Artifact: basespec.ArtifactRef{
+					Artifact: artifact.ArtifactRef{
 						RootID:     "019d3150-7401-7a6b-a34e-d9032342bc31",
 						ArtifactID: "019d3150-7404-7a6b-a34e-d9032342bc31",
 					},

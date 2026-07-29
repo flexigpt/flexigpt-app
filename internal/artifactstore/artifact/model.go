@@ -27,11 +27,63 @@ const (
 	AdoptionPinned   AdoptionMode = "pinned"
 )
 
+type ArtifactRef struct {
+	RootID     basespec.RootID     `json:"rootID"`
+	ArtifactID basespec.ArtifactID `json:"artifactID"`
+}
+
+func (r ArtifactRef) Validate() error {
+	if err := basespec.ValidateRootID(r.RootID); err != nil {
+		return err
+	}
+	return basespec.ValidateArtifactID(r.ArtifactID)
+}
+
+type ArtifactAddress struct {
+	RootID       basespec.RootID       `json:"rootID"`
+	CollectionID basespec.CollectionID `json:"collectionID"`
+	ArtifactID   basespec.ArtifactID   `json:"artifactID"`
+	Kind         basespec.ArtifactKind `json:"kind"`
+}
+
+func (a ArtifactAddress) Validate() error {
+	if err := basespec.ValidateRootID(a.RootID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateCollectionID(a.CollectionID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateArtifactID(a.ArtifactID); err != nil {
+		return err
+	}
+	return basespec.ValidateArtifactKind(a.Kind)
+}
+
+type SourceBinding struct {
+	SourceID           basespec.SourceID           `json:"sourceID"`
+	Locator            basespec.Locator            `json:"locator"`
+	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
+	ExpectedKind       basespec.ArtifactKind       `json:"expectedKind"`
+}
+
+func (b SourceBinding) Validate() error {
+	if err := basespec.ValidateSourceID(b.SourceID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateLocator(b.Locator, true); err != nil {
+		return err
+	}
+	if err := basespec.ValidateSubresourceLocator(b.SubresourceLocator); err != nil {
+		return err
+	}
+	return basespec.ValidateArtifactKind(b.ExpectedKind)
+}
+
 type Artifact struct {
 	ID                 basespec.ArtifactID     `json:"id"`
 	RootID             basespec.RootID         `json:"rootID"`
 	CollectionID       basespec.CollectionID   `json:"collectionID"`
-	Binding            basespec.SourceBinding  `json:"binding"`
+	Binding            SourceBinding           `json:"binding"`
 	Kind               basespec.ArtifactKind   `json:"kind"`
 	Name               string                  `json:"name"`
 	Enabled            bool                    `json:"enabled"`
@@ -45,15 +97,15 @@ type Artifact struct {
 	ModifiedAt         time.Time               `json:"modifiedAt"`
 }
 
-func (a Artifact) Ref() basespec.ArtifactRef {
-	return basespec.ArtifactRef{
+func (a Artifact) Ref() ArtifactRef {
+	return ArtifactRef{
 		RootID:     a.RootID,
 		ArtifactID: a.ID,
 	}
 }
 
-func (a Artifact) Address() basespec.ArtifactAddress {
-	return basespec.ArtifactAddress{
+func (a Artifact) Address() ArtifactAddress {
+	return ArtifactAddress{
 		RootID:       a.RootID,
 		CollectionID: a.CollectionID,
 		ArtifactID:   a.ID,
@@ -172,12 +224,12 @@ func (a Artifact) Clone() Artifact {
 }
 
 type Suppression struct {
-	RootID       basespec.RootID        `json:"rootID"`
-	CollectionID basespec.CollectionID  `json:"collectionID"`
-	Binding      basespec.SourceBinding `json:"binding"`
-	Revision     uint64                 `json:"revision"`
-	CreatedAt    time.Time              `json:"createdAt"`
-	ModifiedAt   time.Time              `json:"modifiedAt"`
+	RootID       basespec.RootID       `json:"rootID"`
+	CollectionID basespec.CollectionID `json:"collectionID"`
+	Binding      SourceBinding         `json:"binding"`
+	Revision     uint64                `json:"revision"`
+	CreatedAt    time.Time             `json:"createdAt"`
+	ModifiedAt   time.Time             `json:"modifiedAt"`
 }
 
 func (s Suppression) Validate() error {

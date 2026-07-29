@@ -152,15 +152,15 @@ func TestSkillSummarySortingAndDiagnostics(t *testing.T) {
 
 	values := []WorkspaceSkill{
 		{
-			Artifact: basespec.ArtifactRef{ArtifactID: "019d3150-6d05-7a6b-a34e-d9032342bc31"},
+			Artifact: artifact.ArtifactRef{ArtifactID: "019d3150-6d05-7a6b-a34e-d9032342bc31"},
 			Skill:    SkillSummary{Name: "z"},
 		},
 		{
-			Artifact: basespec.ArtifactRef{ArtifactID: "019d3150-6d04-7a6b-a34e-d9032342bc31"},
+			Artifact: artifact.ArtifactRef{ArtifactID: "019d3150-6d04-7a6b-a34e-d9032342bc31"},
 			Skill:    SkillSummary{Name: "a"},
 		},
 		{
-			Artifact: basespec.ArtifactRef{ArtifactID: "019d3150-6d03-7a6b-a34e-d9032342bc31"},
+			Artifact: artifact.ArtifactRef{ArtifactID: "019d3150-6d03-7a6b-a34e-d9032342bc31"},
 			Skill:    SkillSummary{Name: "z"},
 		},
 	}
@@ -170,7 +170,7 @@ func TestSkillSummarySortingAndDiagnostics(t *testing.T) {
 	}
 
 	diagnostic := runtimeLocationDiagnostic(
-		artifact.Artifact{Binding: basespec.SourceBinding{Locator: "skills/weather/SKILL.md"}},
+		artifact.Artifact{Binding: artifact.SourceBinding{Locator: "skills/weather/SKILL.md"}},
 		errors.New("unavailable"),
 	)
 	if diagnostic.Code == "" || diagnostic.Location == nil || diagnostic.Location.Locator != "skills/weather/SKILL.md" {

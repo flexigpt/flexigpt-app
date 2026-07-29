@@ -181,7 +181,7 @@ func (q *QueryService) Resolve(
 
 func (q *QueryService) ResolveArtifact(
 	ctx context.Context,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 ) (Workspace, Resource, error) {
 	if err := ref.Validate(); err != nil {
 		return Workspace{}, Resource{}, err
@@ -217,7 +217,7 @@ func (q *QueryService) ResolveArtifact(
 func (q *QueryService) ComposeLoadPlan(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-	artifactRefs []basespec.ArtifactRef,
+	artifactRefs []artifact.ArtifactRef,
 ) (LoadPlan, error) {
 	view, err := q.Catalog(ctx, workspace)
 	if err != nil {

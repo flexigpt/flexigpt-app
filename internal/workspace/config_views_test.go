@@ -182,7 +182,7 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 		ID:           "019d3150-7304-7a6b-a34e-d9032342bc31",
 		RootID:       workspaceValue.Collection.RootID,
 		CollectionID: workspaceValue.Collection.ID,
-		Binding: basespec.SourceBinding{
+		Binding: artifact.SourceBinding{
 			SourceID:     workspaceValue.PrimarySourceID,
 			Locator:      "AGENTS.md",
 			ExpectedKind: "test.kind",
@@ -246,7 +246,7 @@ func TestContextAndSkillViewConversionsOwnSlices(t *testing.T) {
 		Diagnostics:     []diagnostic.Diagnostic{d},
 		Contributions: []contextadapter.ContextContribution{
 			{
-				Artifact: basespec.ArtifactRef{
+				Artifact: artifact.ArtifactRef{
 					RootID:     "019d3150-7305-7a6b-a34e-d9032342bc31",
 					ArtifactID: "019d3150-7307-7a6b-a34e-d9032342bc31",
 				},

@@ -77,58 +77,6 @@ type (
 	LogicalVersion string
 )
 
-type ArtifactRef struct {
-	RootID     RootID     `json:"rootID"`
-	ArtifactID ArtifactID `json:"artifactID"`
-}
-
-func (r ArtifactRef) Validate() error {
-	if err := ValidateRootID(r.RootID); err != nil {
-		return err
-	}
-	return ValidateArtifactID(r.ArtifactID)
-}
-
-type ArtifactAddress struct {
-	RootID       RootID       `json:"rootID"`
-	CollectionID CollectionID `json:"collectionID"`
-	ArtifactID   ArtifactID   `json:"artifactID"`
-	Kind         ArtifactKind `json:"kind"`
-}
-
-func (a ArtifactAddress) Validate() error {
-	if err := ValidateRootID(a.RootID); err != nil {
-		return err
-	}
-	if err := ValidateCollectionID(a.CollectionID); err != nil {
-		return err
-	}
-	if err := ValidateArtifactID(a.ArtifactID); err != nil {
-		return err
-	}
-	return ValidateArtifactKind(a.Kind)
-}
-
-type SourceBinding struct {
-	SourceID           SourceID           `json:"sourceID"`
-	Locator            Locator            `json:"locator"`
-	SubresourceLocator SubresourceLocator `json:"subresourceLocator,omitempty"`
-	ExpectedKind       ArtifactKind       `json:"expectedKind"`
-}
-
-func (b SourceBinding) Validate() error {
-	if err := ValidateSourceID(b.SourceID); err != nil {
-		return err
-	}
-	if err := ValidateLocator(b.Locator, true); err != nil {
-		return err
-	}
-	if err := ValidateSubresourceLocator(b.SubresourceLocator); err != nil {
-		return err
-	}
-	return ValidateArtifactKind(b.ExpectedKind)
-}
-
 func ValidateRootID(value RootID) error {
 	return uuidutil.ValidateUUIDv7("root ID", string(value))
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -38,7 +39,7 @@ const (
 )
 
 type ConversationResourceSelectionRef struct {
-	Artifact         basespec.ArtifactRef `json:"artifact"`
+	Artifact         artifact.ArtifactRef `json:"artifact"`
 	Name             string               `json:"name,omitempty"`
 	Locator          basespec.Locator     `json:"locator,omitempty"`
 	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest,omitempty"`
@@ -62,7 +63,7 @@ type ConversationSelection struct {
 }
 
 type ConversationContextUsage struct {
-	Artifact                 basespec.ArtifactRef           `json:"artifact"`
+	Artifact                 artifact.ArtifactRef           `json:"artifact"`
 	Name                     string                         `json:"name,omitempty"`
 	Locator                  basespec.Locator               `json:"locator,omitempty"`
 	SelectedDefinitionDigest cryptoutil.Digest              `json:"selectedDefinitionDigest,omitempty"`
@@ -77,7 +78,7 @@ type ConversationContextUsage struct {
 }
 
 type ConversationSkillUsage struct {
-	Artifact                 basespec.ArtifactRef         `json:"artifact"`
+	Artifact                 artifact.ArtifactRef         `json:"artifact"`
 	Name                     string                       `json:"name,omitempty"`
 	DisplayName              string                       `json:"displayName,omitempty"`
 	Locator                  basespec.Locator             `json:"locator,omitempty"`
@@ -158,7 +159,7 @@ func (a *API) ResolveConversationSelection(
 	}
 
 	contextUsageByID := make(map[basespec.ArtifactID]int, len(selection.ContextRefs))
-	contextArtifactRefs := make([]basespec.ArtifactRef, 0, len(selection.ContextRefs))
+	contextArtifactRefs := make([]artifact.ArtifactRef, 0, len(selection.ContextRefs))
 
 	for _, ref := range selection.ContextRefs {
 		if err := ref.Artifact.Validate(); err != nil {
@@ -259,7 +260,7 @@ func (a *API) ResolveConversationSelection(
 	}
 
 	skillUsageByID := make(map[basespec.ArtifactID]int, len(selection.SkillRefs))
-	skillArtifactRefs := make([]basespec.ArtifactRef, 0, len(selection.SkillRefs))
+	skillArtifactRefs := make([]artifact.ArtifactRef, 0, len(selection.SkillRefs))
 
 	for _, ref := range selection.SkillRefs {
 		if err := ref.Artifact.Validate(); err != nil {

@@ -135,7 +135,7 @@ func TestReconcilerUpdatesKindChangesAndCreatesNewObservedArtifacts(t *testing.T
 		t.Fatalf("NewReconciler: %v", err)
 	}
 	collectionValue := artifactTestCollection(now)
-	binding := basespec.SourceBinding{
+	binding := SourceBinding{
 		SourceID:     artifactTestSourceID,
 		Locator:      "changed.json",
 		ExpectedKind: "test.artifact",
@@ -213,7 +213,7 @@ func TestReconcilerHonorsSuppressionsAndRejectsDuplicatePhysicalOccurrences(t *t
 	suppression := Suppression{
 		RootID:       artifactTestRootID,
 		CollectionID: artifactTestCollectionID,
-		Binding: basespec.SourceBinding{
+		Binding: SourceBinding{
 			SourceID:     artifactTestSourceID,
 			Locator:      "new.json",
 			ExpectedKind: "test.artifact",

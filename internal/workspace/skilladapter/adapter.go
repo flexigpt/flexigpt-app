@@ -43,7 +43,7 @@ type SkillSummary struct {
 
 type WorkspaceSkill struct {
 	Workspace        collection.CollectionRef `json:"workspace"`
-	Artifact         basespec.ArtifactRef     `json:"artifact"`
+	Artifact         artifact.ArtifactRef     `json:"artifact"`
 	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
 	SourceID         basespec.SourceID        `json:"sourceID"`
 	Locator          basespec.Locator         `json:"locator"`
@@ -133,7 +133,7 @@ func (f *Adapter) List(
 func (f *Adapter) Load(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-	artifactRefs []basespec.ArtifactRef,
+	artifactRefs []artifact.ArtifactRef,
 ) (SkillLoadPlan, error) {
 	if err := workspace.Validate(); err != nil {
 		return SkillLoadPlan{}, err
@@ -245,7 +245,7 @@ func (f *Adapter) Load(
 
 func (f *Adapter) LoadArtifact(
 	ctx context.Context,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 ) (WorkspaceSkill, error) {
 	workspaceValue, resourceValue, err := f.query.ResolveArtifact(ctx, ref)
 	if err != nil {
@@ -260,7 +260,7 @@ func (f *Adapter) LoadArtifact(
 			ref.ArtifactID,
 		)
 	}
-	plan, err := f.Load(ctx, workspace, []basespec.ArtifactRef{ref})
+	plan, err := f.Load(ctx, workspace, []artifact.ArtifactRef{ref})
 	if err != nil {
 		return WorkspaceSkill{}, err
 	}

@@ -180,7 +180,7 @@ type CatalogView struct {
 }
 
 type Reference struct {
-	Artifact *basespec.ArtifactRef `json:"-"`
+	Artifact *artifact.ArtifactRef `json:"-"`
 	Selector *definition.Selector  `json:"-"`
 }
 

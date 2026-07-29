@@ -240,7 +240,7 @@ func runtimeTestArtifact(t *testing.T, enabled bool, state artifact.State, runti
 		ID:           "019d3150-7103-7a6b-a34e-d9032342bc31",
 		RootID:       "019d3150-7104-7a6b-a34e-d9032342bc31",
 		CollectionID: "019d3150-7105-7a6b-a34e-d9032342bc31",
-		Binding: basespec.SourceBinding{
+		Binding: artifact.SourceBinding{
 			SourceID:     "019d3150-7106-7a6b-a34e-d9032342bc31",
 			Locator:      "AGENTS.md",
 			ExpectedKind: "test.kind",

@@ -4,18 +4,19 @@ import (
 	"context"
 	"errors"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 type PurgeArtifactRequest struct {
-	Artifact         basespec.ArtifactRef `json:"artifact"         required:"true"`
+	Artifact         artifact.ArtifactRef `json:"artifact"         required:"true"`
 	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
 }
 
 type PurgeArtifactResponse struct {
-	Artifact basespec.ArtifactRef `json:"artifact"`
+	Artifact artifact.ArtifactRef `json:"artifact"`
 }
 
 type GetManagedSourceStateRequest struct {

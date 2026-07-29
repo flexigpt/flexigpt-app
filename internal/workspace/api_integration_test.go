@@ -103,7 +103,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	loadPlan, err := fixture.api.ComposeWorkspaceLoadPlan(t.Context(), &ComposeWorkspaceLoadPlanRequest{
 		Workspace: workspaceView.Workspace,
 		Body: &ComposeWorkspaceLoadPlanRequestBody{
-			Artifacts: []basespec.ArtifactRef{contextArtifact.Artifact, skillArtifact.Artifact},
+			Artifacts: []artifact.ArtifactRef{contextArtifact.Artifact, skillArtifact.Artifact},
 		},
 	})
 	if err != nil || loadPlan == nil || loadPlan.Body == nil || len(loadPlan.Body.Items) != 2 {
@@ -159,7 +159,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		Workspace: workspaceView.Workspace,
 		Body: &PinWorkspaceArtifactRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
-			Binding: basespec.SourceBinding{
+			Binding: artifact.SourceBinding{
 				SourceID:     workspaceView.PrimarySourceID,
 				Locator:      "manual.md",
 				ExpectedKind: "workspace.context",
@@ -176,7 +176,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		Workspace: workspaceView.Workspace,
 		Body: &SuppressWorkspaceBindingRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
-			Binding: basespec.SourceBinding{
+			Binding: artifact.SourceBinding{
 				SourceID:     workspaceView.PrimarySourceID,
 				Locator:      "suppressed.md",
 				ExpectedKind: "workspace.context",
@@ -219,7 +219,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	}
 	inspection, err := fixture.api.LoadWorkspaceContexts(t.Context(), &LoadWorkspaceContextsRequest{
 		Workspace: workspaceView.Workspace,
-		Body:      &LoadWorkspaceContextsRequestBody{Artifacts: []basespec.ArtifactRef{contextArtifact.Artifact}},
+		Body:      &LoadWorkspaceContextsRequestBody{Artifacts: []artifact.ArtifactRef{contextArtifact.Artifact}},
 	})
 	if err != nil || inspection == nil || inspection.Body == nil || len(inspection.Body.Contributions) != 1 ||
 		inspection.Body.Contributions[0].Artifact != contextArtifact.Artifact {
@@ -247,7 +247,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	}
 	loadedSkills, err := fixture.api.LoadWorkspaceSkills(t.Context(), &LoadWorkspaceSkillsRequest{
 		Workspace: workspaceView.Workspace,
-		Body:      &LoadWorkspaceSkillsRequestBody{Artifacts: []basespec.ArtifactRef{skillArtifact.Artifact}},
+		Body:      &LoadWorkspaceSkillsRequestBody{Artifacts: []artifact.ArtifactRef{skillArtifact.Artifact}},
 	})
 	if err != nil || loadedSkills == nil || loadedSkills.Body == nil || len(loadedSkills.Body.Skills) != 1 ||
 		!strings.Contains(loadedSkills.Body.Skills[0].MarkdownBody, "Use the weather Skill.") {
@@ -295,7 +295,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 	composed, err = fixture.api.ComposeWorkspaceContext(t.Context(), &ComposeWorkspaceContextRequest{
 		Workspace: workspaceView.Workspace,
 		Body: &ComposeWorkspaceContextRequestBody{
-			Artifacts: []basespec.ArtifactRef{contextArtifact.Artifact},
+			Artifacts: []artifact.ArtifactRef{contextArtifact.Artifact},
 		},
 	})
 	if err != nil || len(composed.Body.Contributions) != 0 || len(composed.Body.Decisions) != 1 ||

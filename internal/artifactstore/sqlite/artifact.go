@@ -33,7 +33,7 @@ const suppressionColumns = `
 
 func (s *Store) getArtifact(
 	ctx context.Context,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 ) (artifact.Artifact, error) {
 	if err := ref.Validate(); err != nil {
 		return artifact.Artifact{}, err
@@ -334,7 +334,7 @@ func (s *Store) createPinnedArtifact(
 
 func (s *Store) unadoptArtifact(
 	ctx context.Context,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	suppression *artifact.Suppression,
 ) error {
@@ -456,7 +456,7 @@ func (s *Store) createSuppression(
 func (s *Store) deleteSuppression(
 	ctx context.Context,
 	ref collection.CollectionRef,
-	binding basespec.SourceBinding,
+	binding artifact.SourceBinding,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -510,7 +510,7 @@ func (s *Store) deleteSuppression(
 
 func (s *Store) purgeArtifact(
 	ctx context.Context,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -680,7 +680,7 @@ func requireNoSuppressionTx(
 	tx *sql.Tx,
 	rootID basespec.RootID,
 	collectionID basespec.CollectionID,
-	binding basespec.SourceBinding,
+	binding artifact.SourceBinding,
 ) error {
 	var exists int
 	err := tx.QueryRowContext(
@@ -719,7 +719,7 @@ func requireNoArtifactForBindingTx(
 	tx *sql.Tx,
 	rootID basespec.RootID,
 	collectionID basespec.CollectionID,
-	binding basespec.SourceBinding,
+	binding artifact.SourceBinding,
 ) error {
 	var exists int
 	err := tx.QueryRowContext(
@@ -938,7 +938,7 @@ type rowQueryer interface {
 func getArtifactTx(
 	ctx context.Context,
 	queryer rowQueryer,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 ) (artifact.Artifact, error) {
 	value, err := scanArtifact(queryer.QueryRowContext(
 		ctx,
@@ -1027,7 +1027,7 @@ func scanArtifact(row scanner) (artifact.Artifact, error) {
 		ID:           basespec.ArtifactID(id),
 		RootID:       basespec.RootID(rootID),
 		CollectionID: basespec.CollectionID(collectionID),
-		Binding: basespec.SourceBinding{
+		Binding: artifact.SourceBinding{
 			SourceID:           basespec.SourceID(sourceID),
 			Locator:            basespec.Locator(locator),
 			SubresourceLocator: basespec.SubresourceLocator(subresource),
@@ -1079,7 +1079,7 @@ func scanSuppression(row scanner) (artifact.Suppression, error) {
 	value := artifact.Suppression{
 		RootID:       basespec.RootID(rootID),
 		CollectionID: basespec.CollectionID(collectionID),
-		Binding: basespec.SourceBinding{
+		Binding: artifact.SourceBinding{
 			SourceID:           basespec.SourceID(sourceID),
 			Locator:            basespec.Locator(locator),
 			SubresourceLocator: basespec.SubresourceLocator(subresource),

@@ -465,11 +465,11 @@ func (a *API) RefreshWorkspace(
 		Workspace:       request.Workspace,
 		CatalogRevision: value.Catalog.Revision,
 		CreatedArtifacts: append(
-			make([]basespec.ArtifactRef, 0, len(value.CreatedArtifacts)),
+			make([]artifact.ArtifactRef, 0, len(value.CreatedArtifacts)),
 			artifactRefsOf(request.Workspace.RootID, value.CreatedArtifacts)...,
 		),
 		UpdatedArtifacts: append(
-			make([]basespec.ArtifactRef, 0, len(value.UpdatedArtifacts)),
+			make([]artifact.ArtifactRef, 0, len(value.UpdatedArtifacts)),
 			artifactRefsOf(request.Workspace.RootID, value.UpdatedArtifacts)...,
 		),
 		Diagnostics: diagnostic.CloneDiagnostics(value.Diagnostics),
@@ -1042,7 +1042,7 @@ func (a *API) SetWorkspaceArtifactRuntimeDisabled(
 func (a *API) workspaceArtifact(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-	ref basespec.ArtifactRef,
+	ref artifact.ArtifactRef,
 ) (artifact.Artifact, error) {
 	if _, err := a.workspace.service.Get(ctx, workspace); err != nil {
 		return artifact.Artifact{}, err
@@ -1113,10 +1113,10 @@ func (a *API) requireWorkspaceArtifactKind(
 func artifactRefsOf(
 	rootID basespec.RootID,
 	ids []basespec.ArtifactID,
-) []basespec.ArtifactRef {
-	output := make([]basespec.ArtifactRef, 0, len(ids))
+) []artifact.ArtifactRef {
+	output := make([]artifact.ArtifactRef, 0, len(ids))
 	for _, id := range ids {
-		output = append(output, basespec.ArtifactRef{
+		output = append(output, artifact.ArtifactRef{
 			RootID:     rootID,
 			ArtifactID: id,
 		})

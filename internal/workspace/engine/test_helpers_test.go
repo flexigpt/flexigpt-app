@@ -199,11 +199,11 @@ func (c engineTestCatalogs) GetCurrent(ctx context.Context, ref collection.Colle
 }
 
 type engineTestArtifacts struct {
-	getFn  func(context.Context, basespec.ArtifactRef) (artifact.Artifact, error)
+	getFn  func(context.Context, artifact.ArtifactRef) (artifact.Artifact, error)
 	listFn func(context.Context, collection.CollectionRef) ([]artifact.Artifact, error)
 }
 
-func (a engineTestArtifacts) Get(ctx context.Context, ref basespec.ArtifactRef) (artifact.Artifact, error) {
+func (a engineTestArtifacts) Get(ctx context.Context, ref artifact.ArtifactRef) (artifact.Artifact, error) {
 	if a.getFn == nil {
 		return artifact.Artifact{}, errEngineTestUnexpected
 	}

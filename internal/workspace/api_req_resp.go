@@ -96,7 +96,7 @@ type WorkspaceAttachmentView struct {
 }
 
 type WorkspaceArtifactView struct {
-	Artifact           basespec.ArtifactRef        `json:"artifact"`
+	Artifact           artifact.ArtifactRef        `json:"artifact"`
 	Revision           uint64                      `json:"revision"`
 	Name               string                      `json:"name"`
 	Kind               basespec.ArtifactKind       `json:"kind"`
@@ -113,7 +113,7 @@ type WorkspaceArtifactView struct {
 
 type WorkspaceSuppressionView struct {
 	Workspace  WorkspaceRef           `json:"workspace"`
-	Binding    basespec.SourceBinding `json:"binding"`
+	Binding    artifact.SourceBinding `json:"binding"`
 	Revision   uint64                 `json:"revision"`
 	CreatedAt  time.Time              `json:"createdAt"`
 	ModifiedAt time.Time              `json:"modifiedAt"`
@@ -140,7 +140,7 @@ type WorkspaceOccurrenceView struct {
 	SourceContentDigest *cryptoutil.Digest          `json:"sourceContentDigest,omitempty"`
 	State               string                      `json:"state"`
 	Recorded            bool                        `json:"recorded"`
-	Artifact            *basespec.ArtifactRef       `json:"artifact,omitempty"`
+	Artifact            *artifact.ArtifactRef       `json:"artifact,omitempty"`
 	Diagnostics         []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
 }
 
@@ -206,14 +206,14 @@ type WorkspaceCatalogView struct {
 type WorkspaceRefreshResult struct {
 	Workspace        WorkspaceRef            `json:"workspace"`
 	CatalogRevision  uint64                  `json:"catalogRevision"`
-	CreatedArtifacts []basespec.ArtifactRef  `json:"createdArtifacts"`
-	UpdatedArtifacts []basespec.ArtifactRef  `json:"updatedArtifacts"`
+	CreatedArtifacts []artifact.ArtifactRef  `json:"createdArtifacts"`
+	UpdatedArtifacts []artifact.ArtifactRef  `json:"updatedArtifacts"`
 	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 	Candidates       int                     `json:"candidates"`
 }
 
 type WorkspaceContextContribution struct {
-	Artifact         basespec.ArtifactRef      `json:"artifact"`
+	Artifact         artifact.ArtifactRef      `json:"artifact"`
 	RecordRevision   uint64                    `json:"recordRevision"`
 	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
 	SourceID         basespec.SourceID         `json:"sourceID"`
@@ -229,7 +229,7 @@ type WorkspaceContextContribution struct {
 }
 
 type WorkspaceContextDecision struct {
-	Artifact      basespec.ArtifactRef             `json:"artifact"`
+	Artifact      artifact.ArtifactRef             `json:"artifact"`
 	Status        contextadapter.CompositionStatus `json:"status"`
 	Code          string                           `json:"code,omitempty"`
 	OriginalBytes int                              `json:"originalBytes"`
@@ -247,7 +247,7 @@ type WorkspaceContextLoadPlan struct {
 }
 
 type WorkspaceContextView struct {
-	Artifact         basespec.ArtifactRef      `json:"artifact"`
+	Artifact         artifact.ArtifactRef      `json:"artifact"`
 	RecordRevision   uint64                    `json:"recordRevision"`
 	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
 	SourceID         basespec.SourceID         `json:"sourceID"`
@@ -293,7 +293,7 @@ type WorkspaceSkillSummary struct {
 
 type WorkspaceSkillView struct {
 	Workspace        WorkspaceRef            `json:"workspace"`
-	Artifact         basespec.ArtifactRef    `json:"artifact"`
+	Artifact         artifact.ArtifactRef    `json:"artifact"`
 	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
 	SourceID         basespec.SourceID       `json:"sourceID"`
 	Locator          basespec.Locator        `json:"locator"`
@@ -505,7 +505,7 @@ type GetWorkspaceCatalogResponse struct {
 }
 
 type ComposeWorkspaceLoadPlanRequestBody struct {
-	Artifacts []basespec.ArtifactRef `json:"artifacts"`
+	Artifacts []artifact.ArtifactRef `json:"artifacts"`
 }
 
 type ComposeWorkspaceLoadPlanRequest struct {
@@ -518,7 +518,7 @@ type ComposeWorkspaceLoadPlanResponse struct {
 }
 
 type ResolveWorkspaceResourceRequestBody struct {
-	Artifact *basespec.ArtifactRef `json:"artifact,omitempty"`
+	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
 	Selector *definition.Selector  `json:"selector,omitempty"`
 }
 
@@ -533,7 +533,7 @@ type ResolveWorkspaceResourceResponse struct {
 
 type GetWorkspaceArtifactRequest struct {
 	Workspace WorkspaceRef         `json:"workspace" required:"true"`
-	Artifact  basespec.ArtifactRef `json:"artifact"  required:"true"`
+	Artifact  artifact.ArtifactRef `json:"artifact"  required:"true"`
 }
 
 type GetWorkspaceArtifactResponse struct {
@@ -571,7 +571,7 @@ type AdoptWorkspaceOccurrenceResponse struct {
 
 type PinWorkspaceArtifactRequestBody struct {
 	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision" required:"true"`
-	Binding                    basespec.SourceBinding    `json:"binding"                    required:"true"`
+	Binding                    artifact.SourceBinding    `json:"binding"                    required:"true"`
 	Name                       string                    `json:"name"                       required:"true"`
 	Enabled                    bool                      `json:"enabled"                    required:"true"`
 	Settings                   WorkspaceArtifactSettings `json:"settings"`
@@ -600,7 +600,7 @@ type ListWorkspaceSuppressionsResponse struct {
 
 type SuppressWorkspaceBindingRequestBody struct {
 	ExpectedCollectionRevision uint64                 `json:"expectedCollectionRevision" required:"true"`
-	Binding                    basespec.SourceBinding `json:"binding"                    required:"true"`
+	Binding                    artifact.SourceBinding `json:"binding"                    required:"true"`
 }
 
 type SuppressWorkspaceBindingRequest struct {
@@ -625,7 +625,7 @@ type ListWorkspaceContextsResponse struct {
 }
 
 type LoadWorkspaceContextsRequestBody struct {
-	Artifacts []basespec.ArtifactRef `json:"artifacts,omitempty"`
+	Artifacts []artifact.ArtifactRef `json:"artifacts,omitempty"`
 }
 
 type LoadWorkspaceContextsRequest struct {
@@ -638,7 +638,7 @@ type LoadWorkspaceContextsResponse struct {
 }
 
 type ComposeWorkspaceContextRequestBody struct {
-	Artifacts []basespec.ArtifactRef `json:"artifacts,omitempty"`
+	Artifacts []artifact.ArtifactRef `json:"artifacts,omitempty"`
 }
 
 type ComposeWorkspaceContextRequest struct {
@@ -663,7 +663,7 @@ type ListWorkspaceSkillsResponse struct {
 }
 
 type LoadWorkspaceSkillsRequestBody struct {
-	Artifacts []basespec.ArtifactRef `json:"artifacts"`
+	Artifacts []artifact.ArtifactRef `json:"artifacts"`
 }
 
 type LoadWorkspaceSkillsRequest struct {
@@ -682,7 +682,7 @@ type SetWorkspaceArtifactEnabledRequestBody struct {
 
 type SetWorkspaceArtifactEnabledRequest struct {
 	Workspace WorkspaceRef         `json:"workspace" required:"true"`
-	Artifact  basespec.ArtifactRef `json:"artifact"  required:"true"`
+	Artifact  artifact.ArtifactRef `json:"artifact"  required:"true"`
 	Body      *SetWorkspaceArtifactEnabledRequestBody
 }
 
@@ -692,13 +692,13 @@ type SetWorkspaceArtifactEnabledResponse struct {
 
 type UnadoptWorkspaceArtifactRequest struct {
 	Workspace        WorkspaceRef         `json:"workspace"        required:"true"`
-	Artifact         basespec.ArtifactRef `json:"artifact"         required:"true"`
+	Artifact         artifact.ArtifactRef `json:"artifact"         required:"true"`
 	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
 	Suppress         bool                 `json:"suppress"`
 }
 
 type UnadoptWorkspaceArtifactResponseBody struct {
-	Artifact basespec.ArtifactRef `json:"artifact"`
+	Artifact artifact.ArtifactRef `json:"artifact"`
 }
 
 type UnadoptWorkspaceArtifactResponse struct {
@@ -707,12 +707,12 @@ type UnadoptWorkspaceArtifactResponse struct {
 
 type PurgeWorkspaceArtifactRequest struct {
 	Workspace        WorkspaceRef         `json:"workspace"        required:"true"`
-	Artifact         basespec.ArtifactRef `json:"artifact"         required:"true"`
+	Artifact         artifact.ArtifactRef `json:"artifact"         required:"true"`
 	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
 }
 
 type PurgeWorkspaceArtifactResponseBody struct {
-	Artifact basespec.ArtifactRef `json:"artifact"`
+	Artifact artifact.ArtifactRef `json:"artifact"`
 }
 
 type PurgeWorkspaceArtifactResponse struct {
@@ -721,13 +721,13 @@ type PurgeWorkspaceArtifactResponse struct {
 
 type UnsuppressWorkspaceBindingRequest struct {
 	Workspace        WorkspaceRef           `json:"workspace"        required:"true"`
-	Binding          basespec.SourceBinding `json:"binding"          required:"true"`
+	Binding          artifact.SourceBinding `json:"binding"          required:"true"`
 	ExpectedRevision uint64                 `json:"expectedRevision" required:"true"`
 }
 
 type UnsuppressWorkspaceBindingResponseBody struct {
 	Workspace WorkspaceRef           `json:"workspace"`
-	Binding   basespec.SourceBinding `json:"binding"`
+	Binding   artifact.SourceBinding `json:"binding"`
 }
 
 type UnsuppressWorkspaceBindingResponse struct {
@@ -741,7 +741,7 @@ type SetWorkspaceArtifactRuntimeDisabledRequestBody struct {
 
 type SetWorkspaceArtifactRuntimeDisabledRequest struct {
 	Workspace WorkspaceRef         `json:"workspace" required:"true"`
-	Artifact  basespec.ArtifactRef `json:"artifact"  required:"true"`
+	Artifact  artifact.ArtifactRef `json:"artifact"  required:"true"`
 	Body      *SetWorkspaceArtifactRuntimeDisabledRequestBody
 }
 

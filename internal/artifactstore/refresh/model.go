@@ -126,7 +126,7 @@ func (p Publication) Validate() error {
 	}
 
 	validOccurrences := make(
-		map[basespec.SourceBinding]catalog.Occurrence,
+		map[artifact.SourceBinding]catalog.Occurrence,
 		len(p.Occurrences),
 	)
 	seenOccurrences := make(map[catalog.OccurrenceKey]struct{}, len(p.Occurrences))
@@ -171,7 +171,7 @@ func (p Publication) Validate() error {
 
 		if occurrence.State == catalog.OccurrenceValid &&
 			occurrence.DefinitionDigest != nil {
-			binding := basespec.SourceBinding{
+			binding := artifact.SourceBinding{
 				SourceID:           occurrence.Key.SourceID,
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,

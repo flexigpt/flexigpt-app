@@ -8,7 +8,7 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
@@ -209,7 +209,7 @@ func workspaceContextInputID(
 		string(workspaceRef.CollectionID)
 }
 
-func workspaceArtifactRefKey(ref basespec.ArtifactRef) string {
+func workspaceArtifactRefKey(ref artifact.ArtifactRef) string {
 	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
 }
 

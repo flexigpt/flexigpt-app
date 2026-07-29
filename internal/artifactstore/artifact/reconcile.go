@@ -19,7 +19,7 @@ import (
 
 type bindingIdentity struct {
 	CollectionID basespec.CollectionID
-	Binding      basespec.SourceBinding
+	Binding      SourceBinding
 }
 
 // occurrenceIdentity intentionally excludes ExpectedKind. A source can stop
@@ -33,7 +33,7 @@ type occurrenceIdentity struct {
 }
 
 func occurrenceIdentityForBinding(
-	binding basespec.SourceBinding,
+	binding SourceBinding,
 ) occurrenceIdentity {
 	return occurrenceIdentity{
 		SourceID:           binding.SourceID,
@@ -201,7 +201,7 @@ func (r *Reconciler) Reconcile(
 
 		identity := bindingIdentity{
 			CollectionID: collectionValue.ID,
-			Binding: basespec.SourceBinding{
+			Binding: SourceBinding{
 				SourceID:           occurrence.Key.SourceID,
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,

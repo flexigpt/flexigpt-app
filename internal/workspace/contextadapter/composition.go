@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
@@ -92,7 +93,7 @@ const (
 )
 
 type CompositionDecision struct {
-	Artifact      basespec.ArtifactRef `json:"artifact"`
+	Artifact      artifact.ArtifactRef `json:"artifact"`
 	Status        CompositionStatus    `json:"status"`
 	Code          string               `json:"code,omitempty"`
 	OriginalBytes int                  `json:"originalBytes"`

@@ -59,7 +59,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 		return snapshot, catalogErr
 	}}
 	artifacts := engineTestArtifacts{
-		getFn: func(_ context.Context, ref basespec.ArtifactRef) (artifact.Artifact, error) {
+		getFn: func(_ context.Context, ref artifact.ArtifactRef) (artifact.Artifact, error) {
 			if ref == record.Ref() {
 				return record, nil
 			}
@@ -159,7 +159,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	plan, err := query.ComposeLoadPlan(
 		t.Context(),
 		workspace.Collection.Ref(),
-		[]basespec.ArtifactRef{record.Ref()},
+		[]artifact.ArtifactRef{record.Ref()},
 	)
 	if err != nil || len(plan.Items) != 1 || plan.Items[0].Definition.Digest != definitionValue.Digest ||
 		plan.Items[0].SourceGeneration != snapshot.SourceGenerations[record.Binding.SourceID] {
@@ -168,7 +168,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	if _, err := query.ComposeLoadPlan(
 		t.Context(),
 		workspace.Collection.Ref(),
-		[]basespec.ArtifactRef{record.Ref(), record.Ref()},
+		[]artifact.ArtifactRef{record.Ref(), record.Ref()},
 	); !errors.Is(
 		err,
 		ErrInvalidWorkspace,
@@ -248,7 +248,7 @@ func queryTestArtifact(t *testing.T, workspace Workspace, digest cryptoutil.Dige
 		ID:           "019d3150-7205-7a6b-a34e-d9032342bc31",
 		RootID:       workspace.Collection.RootID,
 		CollectionID: workspace.Collection.ID,
-		Binding: basespec.SourceBinding{
+		Binding: artifact.SourceBinding{
 			SourceID:     workspace.PrimarySourceID,
 			Locator:      "docs/first.md",
 			ExpectedKind: "test.kind",
@@ -269,7 +269,7 @@ func queryTestArtifact(t *testing.T, workspace Workspace, digest cryptoutil.Dige
 func queryTestSnapshot(
 	workspace Workspace,
 	digest cryptoutil.Digest,
-	binding basespec.SourceBinding,
+	binding artifact.SourceBinding,
 ) catalog.Snapshot {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
 	sourceContent := cryptoutil.DigestBytes([]byte("source"))

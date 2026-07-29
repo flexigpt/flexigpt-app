@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
@@ -20,7 +20,7 @@ var (
 // Installed references retain their existing bundle and Skill fields until the
 // standalone Skill Store is migrated. Workspace Skills use ArtifactRef only.
 type SkillRef struct {
-	Artifact  *basespec.ArtifactRef        `json:"artifact,omitempty"`
+	Artifact  *artifact.ArtifactRef        `json:"artifact,omitempty"`
 	BundleID  skillstoreSpec.SkillBundleID `json:"bundleID,omitempty"`
 	SkillSlug skillstoreSpec.SkillSlug     `json:"skillSlug,omitempty"`
 	SkillID   skillstoreSpec.SkillID       `json:"skillID,omitempty"`

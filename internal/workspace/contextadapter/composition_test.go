@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 )
@@ -164,7 +165,7 @@ func TestApplyCompositionPolicyEnforcesAggregateBudgetAndExclusion(t *testing.T)
 
 func testContribution(locator basespec.Locator, role, content string) ContextContribution {
 	return ContextContribution{
-		Artifact: basespec.ArtifactRef{
+		Artifact: artifact.ArtifactRef{
 			RootID:     "019d3150-6c01-7a6b-a34e-d9032342bc31",
 			ArtifactID: "019d3150-6c02-7a6b-a34e-d9032342bc31",
 		},
