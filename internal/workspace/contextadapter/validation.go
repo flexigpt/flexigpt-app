@@ -8,7 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 const maxWorkspaceContextContentBytes = 2 << 20
@@ -19,32 +19,32 @@ func ValidateContextDefinition(
 	if value.Kind != contextKind {
 		return fmt.Errorf(
 			"%w: Context definition kind must be %q",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			contextKind,
 		)
 	}
 	if value.SchemaID != contextSchemaID {
 		return fmt.Errorf(
 			"%w: Context definition schema must be %q",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			contextSchemaID,
 		)
 	}
 	if value.SchemaVersion != workspaceContextSchemaVersionV1 {
 		return fmt.Errorf(
 			"%w: Context definition schema version must be %q",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			workspaceContextSchemaVersionV1,
 		)
 	}
 	if len(value.Dependencies) != 0 {
 		return fmt.Errorf(
 			"%w: Context definitions cannot declare dependencies",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 
-	body, err := engine.DecodeDefinitionBody[contextDefinition](value.Body)
+	body, err := spec.DecodeDefinitionBody[contextDefinition](value.Body)
 	if err != nil {
 		return err
 	}
@@ -58,58 +58,58 @@ func ValidateContextDefinition(
 	if !supportedContextRole(body.Role) {
 		return fmt.Errorf(
 			"%w: unsupported Context role %q",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			body.Role,
 		)
 	}
 	if body.MediaType != contextMarkdownMediaType {
 		return fmt.Errorf(
 			"%w: unsupported Context media type %q",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			body.MediaType,
 		)
 	}
 	if !utf8.ValidString(body.Content) {
 		return fmt.Errorf(
 			"%w: Context content must contain valid UTF-8",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if strings.ContainsRune(body.Content, 0) {
 		return fmt.Errorf(
 			"%w: Context content contains a NUL byte",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if strings.TrimSpace(body.Content) == "" {
 		return fmt.Errorf(
 			"%w: Context content is empty",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if len(body.Content) > maxWorkspaceContextContentBytes {
 		return fmt.Errorf(
 			"%w: Context content exceeds %d bytes",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			maxWorkspaceContextContentBytes,
 		)
 	}
 	if value.DisplayName != body.Name {
 		return fmt.Errorf(
 			"%w: Context display name does not match body.name",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if value.LogicalName != contextLogicalName(body.Name) {
 		return fmt.Errorf(
 			"%w: Context logical name does not match body.name",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if value.Labels[contextRoleLabelKey] != body.Role {
 		return fmt.Errorf(
 			"%w: Context role label does not match body.role",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	return nil

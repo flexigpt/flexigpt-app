@@ -8,138 +8,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
-func (s ArtifactSupport) Validate() error {
-	if err := basespec.ValidateArtifactKind(s.Kind); err != nil {
-		return err
-	}
-	if err := basespec.ValidateSchemaID(s.SchemaID); err != nil {
-		return err
-	}
-	if err := basespec.ValidateDecoderID(s.DecoderID); err != nil {
-		return err
-	}
-	if s.Validator == nil {
-		return fmt.Errorf(
-			"%w: Workspace artifact support %q has no semantic validator",
-			ErrInvalidWorkspace,
-			s.Kind,
-		)
-	}
-	return nil
-}
-
-func validateDiscoveryProfiles(value DiscoveryProfiles) error {
-	if err := validateDiscoveryProfile(value.Primary); err != nil {
-		return err
-	}
-	return validateDiscoveryProfile(value.Attached)
-}
-
-func validateDiscoveryProfile(value DiscoveryProfile) error {
-	roots := make([]DiscoveryRoot, 0, len(value.DirectoryRoots))
-	for _, root := range value.DirectoryRoots {
-		roots = append(roots, DiscoveryRoot{
-			Root:            root.Root,
-			Recursive:       root.Recursive,
-			IncludePatterns: append([]string(nil), root.IncludePatterns...),
-		})
-	}
-	if err := validateDiscoveryPreferences(DiscoveryPreferences{
-		AdditionalLocators: append(
-			[]basespec.Locator(nil),
-			value.ExplicitLocators...,
-		),
-		AdditionalRoots: roots,
-	}); err != nil {
-		return err
-	}
-	if value.ReadmeLocator == "" {
-		return nil
-	}
-	return basespec.ValidateLocator(value.ReadmeLocator, false)
-}
-
-func encodeCollectionData(value CollectionData) (json.RawMessage, error) {
-	if err := validateCollectionData(value); err != nil {
-		return nil, err
-	}
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return nil, err
-	}
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return json.RawMessage(canonical), nil
-}
-
-func decodeCollectionData(raw json.RawMessage) (CollectionData, error) {
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return CollectionData{}, err
-	}
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
-	var value CollectionData
-	if err := decoder.Decode(&value); err != nil {
-		return CollectionData{}, err
-	}
-	if err := validateCollectionData(value); err != nil {
-		return CollectionData{}, err
-	}
-	return value, nil
-}
-
-func encodeAttachmentData(
-	value AttachmentData,
-) (json.RawMessage, error) {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return nil, err
-	}
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return json.RawMessage(canonical), nil
-}
-
-func decodeAttachmentData(
-	raw json.RawMessage,
-) (AttachmentData, error) {
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return AttachmentData{}, err
-	}
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
-	var value AttachmentData
-	if err := decoder.Decode(&value); err != nil {
-		return AttachmentData{}, err
-	}
-	return value, nil
-}
-
 func EncodeArtifactData(
-	value ArtifactData,
+	value spec.ArtifactData,
 ) (json.RawMessage, error) {
 	raw, err := json.Marshal(value)
 	if err != nil {
@@ -157,21 +34,21 @@ func EncodeArtifactData(
 
 func DecodeArtifactData(
 	raw json.RawMessage,
-) (ArtifactData, error) {
+) (spec.ArtifactData, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
 		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
-		return ArtifactData{}, err
+		return spec.ArtifactData{}, err
 	}
 	decoder := json.NewDecoder(bytes.NewReader(canonical))
 	decoder.DisallowUnknownFields()
-	var value ArtifactData
+	var value spec.ArtifactData
 	if err := decoder.Decode(&value); err != nil {
-		return ArtifactData{}, fmt.Errorf(
+		return spec.ArtifactData{}, fmt.Errorf(
 			"%w: decode Workspace artifact data: %w",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			err,
 		)
 	}
@@ -186,47 +63,24 @@ func ArtifactRuntimeDisabled(value artifact.Artifact) (bool, error) {
 	return data.RuntimeDisabled, nil
 }
 
-func validateAttachmentDataForRole(
-	role basespec.AttachmentRole,
-	value AttachmentData,
-) error {
-	operation, supported := attachmentOperationFor(role)
-	if !supported {
-		return fmt.Errorf(
-			"%w: unsupported attachment role %q",
-			ErrInvalidWorkspace,
-			role,
-		)
-	}
-	if !operation.allowsAttachmentDiscoveryOverrides &&
-		(value.Recursive != nil || value.Authoritative != nil) {
-		return fmt.Errorf(
-			"%w: attachment role %q does not allow discovery overrides",
-			ErrInvalidWorkspace,
-			role,
-		)
-	}
-	return nil
-}
-
 func validateWorkspaceState(
 	value collection.Collection,
-	data CollectionData,
+	data spec.CollectionData,
 	attachments []collection.Attachment,
 	sources []source.Summary,
-) (Mode, basespec.SourceID, error) {
+) (spec.Mode, basespec.SourceID, error) {
 	if err := value.Validate(); err != nil {
-		return "", "", fmt.Errorf("%w: invalid Workspace collection: %w", ErrInvalidWorkspace, err)
+		return "", "", fmt.Errorf("%w: invalid Workspace collection: %w", spec.ErrInvalidWorkspace, err)
 	}
-	if value.Kind != CollectionKind {
+	if value.Kind != spec.CollectionKind {
 		return "", "", fmt.Errorf(
 			"%w: collection %q has kind %q",
-			ErrNotWorkspace,
+			spec.ErrNotWorkspace,
 			value.ID,
 			value.Kind,
 		)
 	}
-	if err := validateCollectionData(data); err != nil {
+	if err := discovery.ValidateCollectionData(data); err != nil {
 		return "", "", err
 	}
 	sourcesByID := make(map[basespec.SourceID]source.Summary, len(sources))
@@ -235,21 +89,21 @@ func validateWorkspaceState(
 		if err := sourceValue.Validate(); err != nil {
 			return "", "", fmt.Errorf(
 				"%w: invalid Workspace source summary: %w",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				err,
 			)
 		}
 		if _, duplicate := sourcesByID[sourceValue.ID]; duplicate {
 			return "", "", fmt.Errorf(
 				"%w: duplicate Workspace source summary %q",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				sourceValue.ID,
 			)
 		}
 		if sourceValue.RootID != value.RootID {
 			return "", "", fmt.Errorf(
 				"%w: Workspace source %q belongs to another Root",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				sourceValue.ID,
 			)
 		}
@@ -263,7 +117,7 @@ func validateWorkspaceState(
 		if err := attachment.Validate(); err != nil {
 			return "", "", fmt.Errorf(
 				"%w: invalid Workspace attachment: %w",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				err,
 			)
 		}
@@ -271,34 +125,34 @@ func validateWorkspaceState(
 		if _, duplicate := seenAttachments[attachment.SourceID]; duplicate {
 			return "", "", fmt.Errorf(
 				"%w: duplicate Workspace attachment source %q",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				attachment.SourceID,
 			)
 		}
 		seenAttachments[attachment.SourceID] = struct{}{}
 		if attachment.RootID != value.RootID || attachment.CollectionID != value.ID {
-			return "", "", fmt.Errorf("%w: attachment belongs to another collection", ErrInvalidWorkspace)
+			return "", "", fmt.Errorf("%w: attachment belongs to another collection", spec.ErrInvalidWorkspace)
 		}
-		operation, supported := attachmentOperationFor(attachment.Role)
+		operation, supported := attachmentdata.AttachmentOperationFor(attachment.Role)
 		if !supported {
 			return "", "", fmt.Errorf(
 
 				"%w: unsupported attachment role %q",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				attachment.Role,
 			)
 		}
 
-		attachmentData, err := decodeAttachmentData(attachment.Data)
+		att, err := attachmentdata.DecodeAttachmentData(attachment.Data)
 		if err != nil {
 			return "", "", fmt.Errorf(
 				"%w: invalid attachment data for source %q: %w",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				attachment.SourceID,
 				err,
 			)
 		}
-		if err := validateAttachmentDataForRole(attachment.Role, attachmentData); err != nil {
+		if err := attachmentdata.ValidateAttachmentDataForRole(attachment.Role, att); err != nil {
 			return "", "", err
 		}
 
@@ -307,119 +161,56 @@ func validateWorkspaceState(
 			return "", "", fmt.Errorf(
 
 				"%w: attachment source %q is unavailable",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				attachment.SourceID,
 			)
 		}
 		if attachment.Enabled && !sourceValue.Enabled {
 			return "", "", fmt.Errorf(
 				"%w: enabled Workspace attachment %q uses a disabled Source",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				attachment.SourceID,
 			)
 		}
 
-		if operation.isPrimary {
+		if operation.IsPrimary {
 			primaryCount++
 			primarySourceID = attachment.SourceID
 
 			if !attachment.Enabled || !sourceValue.Enabled {
 				return "", "", fmt.Errorf(
 					"%w: primary source and attachment must be enabled",
-					ErrInvalidWorkspace,
+					spec.ErrInvalidWorkspace,
 				)
 			}
-			if sourceValue.Kind != operation.requiredSourceKind {
+			if sourceValue.Kind != operation.RequiredSourceKind {
 				return "", "", fmt.Errorf(
 					"%w: primary source must be a filesystem source",
-					ErrInvalidWorkspace,
+					spec.ErrInvalidWorkspace,
 				)
 			}
 		}
 	}
 	switch primaryCount {
 	case 0:
-		return ModeEmpty, "", nil
+		return spec.ModeEmpty, "", nil
 	case 1:
-		return ModeFilesystem, primarySourceID, nil
+		return spec.ModeFilesystem, primarySourceID, nil
 	default:
 		return "", "", fmt.Errorf(
 			"%w: Workspace cannot have multiple primary attachments",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
-}
-
-func validateCollectionData(value CollectionData) error {
-	if err := validateDiscoveryPreferences(value.Discovery); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
-	}
-	if err := basespec.ValidateRequiredText(
-		"workspace discovery policy revision",
-		value.DiscoveryPolicyRevision,
-		basespec.MaxVersionBytes,
-	); err != nil {
-		return fmt.Errorf(
-			"%w: %w",
-			ErrInvalidWorkspace,
-			err,
-		)
-	}
-	return nil
-}
-
-func validateDiscoveryPreferences(
-	value DiscoveryPreferences,
-) error {
-	seenLocators := make(map[basespec.Locator]struct{})
-	for _, locator := range value.AdditionalLocators {
-		if err := basespec.ValidateLocator(locator, false); err != nil {
-			return err
-		}
-		if _, duplicate := seenLocators[locator]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate discovery locator %q",
-				basespec.ErrInvalid,
-				locator,
-			)
-		}
-		seenLocators[locator] = struct{}{}
-	}
-
-	seenRoots := make(map[basespec.Locator]struct{})
-	for _, root := range value.AdditionalRoots {
-		if err := basespec.ValidateLocator(root.Root, true); err != nil {
-			return err
-		}
-		if _, duplicate := seenRoots[root.Root]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate discovery root %q",
-				basespec.ErrInvalid,
-				root.Root,
-			)
-		}
-		seenRoots[root.Root] = struct{}{}
-		seenPatterns := make(map[string]struct{}, len(root.IncludePatterns))
-		for _, pattern := range root.IncludePatterns {
-			if err := discovery.ValidateIncludePattern(pattern); err != nil {
-				return err
-			}
-			if _, duplicate := seenPatterns[pattern]; duplicate {
-				return fmt.Errorf("%w: duplicate include pattern %q", basespec.ErrInvalid, pattern)
-			}
-			seenPatterns[pattern] = struct{}{}
-		}
-	}
-	return nil
 }
 
 func validateRole(role basespec.AttachmentRole) error {
-	if _, supported := attachmentOperationFor(role); supported {
+	if _, supported := attachmentdata.AttachmentOperationFor(role); supported {
 		return nil
 	}
 	return fmt.Errorf(
 		"%w: unsupported attachment role %q",
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 		role,
 	)
 }

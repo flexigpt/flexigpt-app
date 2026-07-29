@@ -1,9 +1,11 @@
-package engine
+package discovery
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestDescriptorLoaderMissingAndValidDescriptor(t *testing.T) {
@@ -44,14 +47,14 @@ func TestDescriptorLoaderMissingAndValidDescriptor(t *testing.T) {
 	valid := &engineTestSnapshot{
 		generation: "generation-valid",
 		entries: map[basespec.Locator]source.Entry{
-			DescriptorLocator: {
-				Locator:   DescriptorLocator,
-				Name:      WorkspaceDescriptorFileName,
+			spec.DescriptorLocator: {
+				Locator:   spec.DescriptorLocator,
+				Name:      spec.WorkspaceDescriptorFileName,
 				SizeBytes: int64(len(content)),
 				IsRegular: true,
 			},
 		},
-		contents: map[basespec.Locator][]byte{DescriptorLocator: content},
+		contents: map[basespec.Locator][]byte{spec.DescriptorLocator: content},
 	}
 	loader, err = NewDescriptorLoader(engineTestRuntime{
 		getFn: func(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error) {
@@ -85,7 +88,7 @@ func TestDescriptorLoaderRejectsBadObservationsAndClosesSnapshots(t *testing.T) 
 
 	workspace := plannerTestWorkspace(t)
 	sourceValue := descriptorTestSource(workspace)
-	if loader, err := NewDescriptorLoader(nil); !errors.Is(err, ErrInvalidWorkspace) || loader != nil {
+	if loader, err := NewDescriptorLoader(nil); !errors.Is(err, spec.ErrInvalidWorkspace) || loader != nil {
 		t.Fatalf("NewDescriptorLoader(nil) loader=%#v err=%v", loader, err)
 	}
 
@@ -93,14 +96,14 @@ func TestDescriptorLoaderRejectsBadObservationsAndClosesSnapshots(t *testing.T) 
 	snapshot := &engineTestSnapshot{
 		generation: "generation-invalid",
 		entries: map[basespec.Locator]source.Entry{
-			DescriptorLocator: {
-				Locator:   DescriptorLocator,
-				Name:      WorkspaceDescriptorFileName,
+			spec.DescriptorLocator: {
+				Locator:   spec.DescriptorLocator,
+				Name:      spec.WorkspaceDescriptorFileName,
 				SizeBytes: int64(len(content)),
 				IsRegular: true,
 			},
 		},
-		contents: map[basespec.Locator][]byte{DescriptorLocator: content},
+		contents: map[basespec.Locator][]byte{spec.DescriptorLocator: content},
 	}
 	loader, err := NewDescriptorLoader(engineTestRuntime{
 		getFn: func(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error) {
@@ -111,7 +114,7 @@ func TestDescriptorLoaderRejectsBadObservationsAndClosesSnapshots(t *testing.T) 
 	if err != nil {
 		t.Fatalf("NewDescriptorLoader: %v", err)
 	}
-	if _, err := loader.Load(t.Context(), workspace); !errors.Is(err, ErrWorkspaceDefinitionInvalid) {
+	if _, err := loader.Load(t.Context(), workspace); !errors.Is(err, spec.ErrWorkspaceDefinitionInvalid) {
 		t.Fatalf("invalid descriptor error=%v, want ErrWorkspaceDefinitionInvalid", err)
 	}
 	if snapshot.closed != 1 {
@@ -137,7 +140,7 @@ func TestDescriptorLoaderRejectsBadObservationsAndClosesSnapshots(t *testing.T) 
 	}
 }
 
-func descriptorTestSource(workspace Workspace) source.Source {
+func descriptorTestSource(workspace spec.Workspace) source.Source {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
 	return source.Source{
 		ID:          workspace.PrimarySourceID,
@@ -163,4 +166,79 @@ func descriptorTestDocument(t *testing.T) []byte {
 		"body":{"discovery":{"additionalLocators":["docs/guide.md"],"additionalRoots":[{"root":"docs","recursive":true,"includePatterns":["*.md"]}],"includeReadme":true}},
 		"members":[{"locator":"member.md","digest":%q}]
 	}`, digest)
+}
+
+type engineTestSnapshot struct {
+	generation string
+	entries    map[basespec.Locator]source.Entry
+	contents   map[basespec.Locator][]byte
+	statErrors map[basespec.Locator]error
+	openErrors map[basespec.Locator]error
+	confirmErr error
+	closeErr   error
+	confirmed  int
+	closed     int
+}
+
+func (s *engineTestSnapshot) Generation() string { return s.generation }
+
+func (s *engineTestSnapshot) Stat(_ context.Context, locator basespec.Locator) (source.Entry, error) {
+	if err := s.statErrors[locator]; err != nil {
+		return source.Entry{}, err
+	}
+	value, found := s.entries[locator]
+	if !found {
+		return source.Entry{}, basespec.ErrNotFound
+	}
+	return value, nil
+}
+
+func (*engineTestSnapshot) ReadDir(context.Context, basespec.Locator) ([]source.Entry, error) {
+	return nil, basespec.ErrNotFound
+}
+
+func (s *engineTestSnapshot) Open(_ context.Context, locator basespec.Locator) (io.ReadCloser, error) {
+	if err := s.openErrors[locator]; err != nil {
+		return nil, err
+	}
+	value, found := s.contents[locator]
+	if !found {
+		return nil, basespec.ErrNotFound
+	}
+	return io.NopCloser(bytes.NewReader(append([]byte(nil), value...))), nil
+}
+
+func (s *engineTestSnapshot) Confirm(context.Context) error {
+	s.confirmed++
+	return s.confirmErr
+}
+
+func (s *engineTestSnapshot) Close() error {
+	s.closed++
+	return s.closeErr
+}
+
+var errEngineTestUnexpected = errors.New("unexpected engine test dependency call")
+
+type engineTestRuntime struct {
+	getFn  func(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error)
+	openFn func(context.Context, source.Source) (source.Snapshot, error)
+}
+
+func (r engineTestRuntime) Get(
+	ctx context.Context,
+	rootID basespec.RootID,
+	id basespec.SourceID,
+) (source.Source, error) {
+	if r.getFn == nil {
+		return source.Source{}, errEngineTestUnexpected
+	}
+	return r.getFn(ctx, rootID, id)
+}
+
+func (r engineTestRuntime) Open(ctx context.Context, value source.Source) (source.Snapshot, error) {
+	if r.openFn == nil {
+		return nil, errEngineTestUnexpected
+	}
+	return r.openFn(ctx, value)
 }

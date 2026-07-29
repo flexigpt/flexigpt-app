@@ -1,4 +1,4 @@
-package engine
+package spec
 
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 
@@ -19,10 +19,4 @@ const (
 
 	WorkspaceDescriptorFileName                  = "workspace.json"
 	DescriptorLocator           basespec.Locator = WorkspaceMetadataDirectory + "/" + WorkspaceDescriptorFileName
-	markdownFilePattern                          = "*.md"
-
-	defaultArtifactName      = "artifact"
-	artifactNameSeparator    = "-"
-	artifactNameDigestLength = 12
-	exactVersionConstraintOp = "="
 )

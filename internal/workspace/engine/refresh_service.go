@@ -6,20 +6,22 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type Refresher struct {
 	workspaces *Service
-	loader     *DescriptorLoader
-	planner    *Planner
+	loader     *discovery.DescriptorLoader
+	planner    *discovery.Planner
 	runner     refresh.Runner
 	policy     *ArtifactPolicy
 }
 
 func NewRefresher(
 	workspaces *Service,
-	loader *DescriptorLoader,
-	planner *Planner,
+	loader *discovery.DescriptorLoader,
+	planner *discovery.Planner,
 	runner refresh.Runner,
 	policy *ArtifactPolicy,
 ) (*Refresher, error) {
@@ -30,7 +32,7 @@ func NewRefresher(
 		policy == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace refresher dependencies are incomplete",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	return &Refresher{
@@ -74,7 +76,7 @@ func (r *Refresher) Refresh(
 		if !found {
 			return refresh.Result{}, fmt.Errorf(
 				"%w: descriptor source %q is not part of the Workspace discovery plan",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				observation.SourceID,
 			)
 		}

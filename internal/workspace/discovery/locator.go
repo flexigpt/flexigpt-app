@@ -1,4 +1,4 @@
-package portable
+package discovery
 
 import (
 	"fmt"

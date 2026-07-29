@@ -9,9 +9,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestRefresherBuildsPlanAndDelegatesToRunner(t *testing.T) {
@@ -33,12 +35,14 @@ func TestRefresherBuildsPlanAndDelegatesToRunner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
-	loader, err := NewDescriptorLoader(engineTestRuntime{})
+	loader, err := discovery.NewDescriptorLoader(engineTestRuntime{})
 	if err != nil {
 		t.Fatalf("NewDescriptorLoader: %v", err)
 	}
-	planner, err := NewPlanner(
-		DiscoveryProfiles{Primary: DiscoveryProfile{ExplicitLocators: []basespec.Locator{"AGENTS.md"}}},
+	planner, err := discovery.NewPlanner(
+		spec.DiscoveryProfiles{
+			Primary: spec.DiscoveryProfile{ExplicitLocators: []basespec.Locator{"AGENTS.md"}},
+		},
 		"policy.v1",
 		"test.decoder",
 	)
@@ -46,7 +50,7 @@ func TestRefresherBuildsPlanAndDelegatesToRunner(t *testing.T) {
 		t.Fatalf("NewPlanner: %v", err)
 	}
 	policy, err := NewArtifactPolicy(
-		ArtifactSupport{
+		spec.ArtifactSupport{
 			Kind:      "test.kind",
 			SchemaID:  "test.schema",
 			DecoderID: "test.decoder",
@@ -56,9 +60,9 @@ func TestRefresherBuildsPlanAndDelegatesToRunner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewArtifactPolicy: %v", err)
 	}
-	var received discovery.Plan
+	var received artifactstoreDiscovery.Plan
 	runner := refresherTestRunner{
-		refreshFn: func(_ context.Context, ref collection.CollectionRef, plan discovery.Plan, receivedPolicy artifact.Policy) (refresh.Result, error) {
+		refreshFn: func(_ context.Context, ref collection.CollectionRef, plan artifactstoreDiscovery.Plan, receivedPolicy artifact.Policy) (refresh.Result, error) {
 			if ref != workspace.Collection.Ref() || receivedPolicy != policy {
 				t.Fatalf("runner ref=%#v policy=%#v", ref, receivedPolicy)
 			}
@@ -82,19 +86,19 @@ func TestRefresherBuildsPlanAndDelegatesToRunner(t *testing.T) {
 func TestRefresherConstructorRejectsMissingDependencies(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewRefresher(nil, nil, nil, nil, nil); !errors.Is(err, ErrInvalidWorkspace) {
+	if _, err := NewRefresher(nil, nil, nil, nil, nil); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("NewRefresher nil dependencies error=%v", err)
 	}
 }
 
 type refresherTestRunner struct {
-	refreshFn func(context.Context, collection.CollectionRef, discovery.Plan, artifact.Policy) (refresh.Result, error)
+	refreshFn func(context.Context, collection.CollectionRef, artifactstoreDiscovery.Plan, artifact.Policy) (refresh.Result, error)
 }
 
 func (r refresherTestRunner) Refresh(
 	ctx context.Context,
 	ref collection.CollectionRef,
-	plan discovery.Plan,
+	plan artifactstoreDiscovery.Plan,
 	policy artifact.Policy,
 ) (refresh.Result, error) {
 	if r.refreshFn == nil {
@@ -103,17 +107,35 @@ func (r refresherTestRunner) Refresh(
 	return r.refreshFn(ctx, ref, plan, policy)
 }
 
-func refresherTestWorkspace(t *testing.T) Workspace {
+func refresherTestWorkspace(t *testing.T) spec.Workspace {
 	t.Helper()
 	value := validationTestCollection(t)
-	return Workspace{
+	return spec.Workspace{
 		Collection: value,
-		Data:       CollectionData{DiscoveryPolicyRevision: "policy.v1"},
-		Mode:       ModeEmpty,
+		Data:       spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"},
+		Mode:       spec.ModeEmpty,
 	}
 }
 
-var (
-	_ source.Runtime = engineTestRuntime{}
-	_ refresh.Runner = refresherTestRunner{}
-)
+type engineTestRuntime struct {
+	getFn  func(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error)
+	openFn func(context.Context, source.Source) (source.Snapshot, error)
+}
+
+func (r engineTestRuntime) Get(
+	ctx context.Context,
+	rootID basespec.RootID,
+	id basespec.SourceID,
+) (source.Source, error) {
+	if r.getFn == nil {
+		return source.Source{}, errEngineTestUnexpected
+	}
+	return r.getFn(ctx, rootID, id)
+}
+
+func (r engineTestRuntime) Open(ctx context.Context, value source.Source) (source.Snapshot, error) {
+	if r.openFn == nil {
+		return nil, errEngineTestUnexpected
+	}
+	return r.openFn(ctx, value)
+}

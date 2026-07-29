@@ -10,6 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type DecoderHint struct {
@@ -26,7 +27,7 @@ type decoderHintScope struct {
 type SourcePlan struct {
 	SourceID               basespec.SourceID                      `json:"sourceID"`
 	ExplicitLocators       []basespec.Locator                     `json:"explicitLocators,omitempty"`
-	DirectoryRoots         []DirectoryRoot                        `json:"directoryRoots,omitempty"`
+	DirectoryRoots         []spec.DirectoryRoot                   `json:"directoryRoots,omitempty"`
 	DecoderHints           []DecoderHint                          `json:"decoderHints,omitempty"`
 	ExpectedContentDigests map[basespec.Locator]cryptoutil.Digest `json:"expectedContentDigests,omitempty"`
 	ExpectedGeneration     string                                 `json:"expectedGeneration,omitempty"`
@@ -223,7 +224,7 @@ func (p SourcePlan) Normalized() SourcePlan {
 			hint.DecoderIDs...,
 		)
 	}
-	output.DirectoryRoots = make([]DirectoryRoot, len(p.DirectoryRoots))
+	output.DirectoryRoots = make([]spec.DirectoryRoot, len(p.DirectoryRoots))
 	for index, root := range p.DirectoryRoots {
 		output.DirectoryRoots[index] = root
 		output.DirectoryRoots[index].IncludePatterns = append(

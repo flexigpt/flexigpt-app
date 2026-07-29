@@ -16,16 +16,17 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestDependenciesAndNewRejectIncompleteComposition(t *testing.T) {
 	t.Parallel()
 
-	if err := (Dependencies{}).Validate(); !errors.Is(err, engine.ErrInvalidWorkspace) {
+	if err := (Dependencies{}).Validate(); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("empty Dependencies.Validate error=%v", err)
 	}
 	api, err := New(Dependencies{}, DefaultConfig())
-	if api != nil || !errors.Is(err, engine.ErrInvalidWorkspace) {
+	if api != nil || !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("New with incomplete dependencies api=%#v err=%v", api, err)
 	}
 }
@@ -65,10 +66,10 @@ func TestConfigDefaultsProfilesAndValidation(t *testing.T) {
 		normalized.DiscoveryPolicyRevision != defaultDiscoveryPolicyRevision {
 		t.Fatalf("normalized zero Config=%#v", normalized)
 	}
-	if _, err := (Config{}).normalizedSupports(); !errors.Is(err, engine.ErrInvalidWorkspace) {
+	if _, err := (Config{}).normalizedSupports(); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("empty normalizedSupports error=%v", err)
 	}
-	duplicate := Config{Supports: []engine.ArtifactSupport{
+	duplicate := Config{Supports: []spec.ArtifactSupport{
 		{
 			Kind:      "test.kind",
 			SchemaID:  "test.schema",
@@ -82,12 +83,12 @@ func TestConfigDefaultsProfilesAndValidation(t *testing.T) {
 			Validator: func(definition.Definition) error { return nil },
 		},
 	}}
-	if _, err := duplicate.normalizedSupports(); !errors.Is(err, engine.ErrInvalidWorkspace) {
+	if _, err := duplicate.normalizedSupports(); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("duplicate support error=%v", err)
 	}
 	if _, err := (Config{DiscoveryPolicyRevision: " "}).discoveryPolicyRevision(); !errors.Is(
 		err,
-		engine.ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
 		t.Fatalf("invalid discovery policy revision error=%v", err)
 	}
@@ -96,9 +97,9 @@ func TestConfigDefaultsProfilesAndValidation(t *testing.T) {
 func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 	t.Parallel()
 
-	discovery := engine.DiscoveryPreferences{
+	discovery := spec.DiscoveryPreferences{
 		AdditionalLocators: []basespec.Locator{"docs/guide.md"},
-		AdditionalRoots:    []engine.DiscoveryRoot{{Root: "docs", Recursive: true, IncludePatterns: []string{"*.md"}}},
+		AdditionalRoots:    []spec.DiscoveryRoot{{Root: "docs", Recursive: true, IncludePatterns: []string{"*.md"}}},
 		IncludeReadme:      true,
 	}
 	viewDiscovery := workspaceDiscoveryOf(discovery)
@@ -115,11 +116,11 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
 	attachmentRaw := json.RawMessage(`{"recursive":true,"authoritative":false}`)
-	workspaceValue := engine.Workspace{
+	workspaceValue := spec.Workspace{
 		Collection: collection.Collection{
 			ID:          "019d3150-7301-7a6b-a34e-d9032342bc31",
 			RootID:      "019d3150-7302-7a6b-a34e-d9032342bc31",
-			Kind:        engine.CollectionKind,
+			Kind:        spec.CollectionKind,
 			DisplayName: "Workspace",
 			Description: "Description",
 			Enabled:     true,
@@ -127,13 +128,13 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 			CreatedAt:   now,
 			ModifiedAt:  now,
 		},
-		Data:            engine.CollectionData{DiscoveryPolicyRevision: "policy.v1", Discovery: discovery},
-		Mode:            engine.ModeFilesystem,
+		Data:            spec.CollectionData{DiscoveryPolicyRevision: "policy.v1", Discovery: discovery},
+		Mode:            spec.ModeFilesystem,
 		PrimarySourceID: "019d3150-7303-7a6b-a34e-d9032342bc31",
 		Attachments: []collection.Attachment{
 			{
 				SourceID: "019d3150-7303-7a6b-a34e-d9032342bc31",
-				Role:     engine.RolePrimary,
+				Role:     spec.RolePrimary,
 				Enabled:  true,
 				Data:     attachmentRaw,
 				Revision: 2,
@@ -149,7 +150,7 @@ func TestViewsProjectOnlyOwnedAPISafeData(t *testing.T) {
 		*workspaceView.Attachments[0].Settings.Authoritative {
 		t.Fatalf("workspaceView=%#v err=%v", workspaceView, err)
 	}
-	if _, err := workspaceAttachmentSettingsOf(json.RawMessage(`[]`)); !errors.Is(err, engine.ErrInvalidWorkspace) {
+	if _, err := workspaceAttachmentSettingsOf(json.RawMessage(`[]`)); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("invalid attachment settings error=%v", err)
 	}
 	settings := attachmentDataOf(workspaceView.Attachments[0].Settings)

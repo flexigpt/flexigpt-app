@@ -9,13 +9,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestNewServiceValidatesDependencies(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewService(nil, nil); !errors.Is(err, engine.ErrInvalidWorkspace) {
+	if _, err := NewService(nil, nil); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("NewService(nil,nil) error=%v, want ErrInvalidWorkspace", err)
 	}
 	if _, err := NewService(provisionTestSources{}, provisionTestWorkspaces{}); err != nil {
@@ -27,7 +27,7 @@ func TestCreateFilesystemCreatesSourceAndWorkspace(t *testing.T) {
 	t.Parallel()
 
 	var createdDraft source.Draft
-	var workspaceRequest engine.FilesystemWorkspaceRequest
+	var workspaceRequest spec.FilesystemWorkspaceRequest
 	sources := provisionTestSources{
 		create: func(_ context.Context, rootID basespec.RootID, draft source.Draft) (source.Summary, error) {
 			if rootID != provisionTestRootID {
@@ -38,9 +38,9 @@ func TestCreateFilesystemCreatesSourceAndWorkspace(t *testing.T) {
 		},
 	}
 	workspaces := provisionTestWorkspaces{
-		create: func(_ context.Context, request engine.FilesystemWorkspaceRequest) (engine.Workspace, error) {
+		create: func(_ context.Context, request spec.FilesystemWorkspaceRequest) (spec.Workspace, error) {
 			workspaceRequest = request
-			return engine.Workspace{}, nil
+			return spec.Workspace{}, nil
 		},
 	}
 	service, err := NewService(sources, workspaces)
@@ -52,7 +52,7 @@ func TestCreateFilesystemCreatesSourceAndWorkspace(t *testing.T) {
 		DisplayName: "Project",
 		Description: "Description",
 		RootPath:    "/portable-test-path",
-		Discovery: engine.DiscoveryPreferences{
+		Discovery: spec.DiscoveryPreferences{
 			IncludeReadme: true,
 		},
 	})
@@ -101,8 +101,8 @@ func TestCreateFilesystemCompensatesWorkspaceFailure(t *testing.T) {
 		},
 	}
 	workspaces := provisionTestWorkspaces{
-		create: func(context.Context, engine.FilesystemWorkspaceRequest) (engine.Workspace, error) {
-			return engine.Workspace{}, workspaceErr
+		create: func(context.Context, spec.FilesystemWorkspaceRequest) (spec.Workspace, error) {
+			return spec.Workspace{}, workspaceErr
 		},
 	}
 	service, err := NewService(sources, workspaces)
@@ -173,15 +173,15 @@ func (s provisionTestSources) Discard(
 }
 
 type provisionTestWorkspaces struct {
-	create func(context.Context, engine.FilesystemWorkspaceRequest) (engine.Workspace, error)
+	create func(context.Context, spec.FilesystemWorkspaceRequest) (spec.Workspace, error)
 }
 
 func (w provisionTestWorkspaces) CreateFilesystem(
 	ctx context.Context,
-	request engine.FilesystemWorkspaceRequest,
-) (engine.Workspace, error) {
+	request spec.FilesystemWorkspaceRequest,
+) (spec.Workspace, error) {
 	if w.create == nil {
-		return engine.Workspace{}, errors.New("unexpected workspace create")
+		return spec.Workspace{}, errors.New("unexpected workspace create")
 	}
 	return w.create(ctx, request)
 }

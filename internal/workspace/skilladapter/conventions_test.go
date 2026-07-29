@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestConventionRegistryNormalizesAndOwnsRoots(t *testing.T) {
@@ -41,7 +41,7 @@ func TestConventionRegistryNormalizesAndOwnsRoots(t *testing.T) {
 		t.Fatalf("default registry=%#v err=%v", defaults, err)
 	}
 
-	if _, err := NewConventionRegistry("same", "same"); !errors.Is(err, engine.ErrInvalidWorkspace) {
+	if _, err := NewConventionRegistry("same", "same"); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("duplicate roots error=%v, want ErrInvalidWorkspace", err)
 	}
 	if _, err := NewConventionRegistry("../unsafe"); err == nil {

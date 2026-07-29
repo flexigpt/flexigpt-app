@@ -15,13 +15,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestArtifactPolicyDerivationAndNames(t *testing.T) {
 	t.Parallel()
 
 	validatorCalls := 0
-	policy, err := NewArtifactPolicy(ArtifactSupport{
+	policy, err := NewArtifactPolicy(spec.ArtifactSupport{
 		Kind:      "test.kind",
 		SchemaID:  "test.schema",
 		DecoderID: "test.decoder",
@@ -39,23 +40,23 @@ func TestArtifactPolicyDerivationAndNames(t *testing.T) {
 	if !policy.Supports("test.kind") || policy.Supports("other.kind") {
 		t.Fatalf("Supports returned unexpected result")
 	}
-	if _, err := NewArtifactPolicy(); !errors.Is(err, ErrInvalidWorkspace) {
+	if _, err := NewArtifactPolicy(); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("empty policy error=%v, want ErrInvalidWorkspace", err)
 	}
 	if _, err := NewArtifactPolicy(
-		ArtifactSupport{
+		spec.ArtifactSupport{
 			Kind:      "test.kind",
 			SchemaID:  "test.schema",
 			DecoderID: "test.decoder",
 			Validator: func(definition.Definition) error { return nil },
 		},
-		ArtifactSupport{
+		spec.ArtifactSupport{
 			Kind:      "test.kind",
 			SchemaID:  "other.schema",
 			DecoderID: "other.decoder",
 			Validator: func(definition.Definition) error { return nil },
 		},
-	); !errors.Is(err, ErrInvalidWorkspace) {
+	); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("duplicate policy error=%v, want ErrInvalidWorkspace", err)
 	}
 
@@ -161,7 +162,7 @@ func TestRuntimePolicyDecisionsAndValidation(t *testing.T) {
 		{Disposition: RuntimeDenied},
 		{Disposition: "other"},
 	} {
-		if err := decision.Validate(); !errors.Is(err, ErrInvalidWorkspace) &&
+		if err := decision.Validate(); !errors.Is(err, spec.ErrInvalidWorkspace) &&
 			!errors.Is(err, basespec.ErrInvalid) {
 			t.Errorf("invalid decision %#v error=%v", decision, err)
 		}
@@ -169,7 +170,7 @@ func TestRuntimePolicyDecisionsAndValidation(t *testing.T) {
 
 	policy := NewArtifactRuntimePolicy()
 	available := runtimeTestArtifact(t, true, artifact.StateAvailable, false)
-	workspace := Workspace{Collection: collection.Collection{Enabled: true}}
+	workspace := spec.Workspace{Collection: collection.Collection{Enabled: true}}
 	if decision := policy.Decide(
 		t.Context(),
 		RuntimePolicyRequest{Workspace: workspace, Artifact: available},
@@ -230,7 +231,7 @@ func TestRuntimePolicyDecisionsAndValidation(t *testing.T) {
 
 func runtimeTestArtifact(t *testing.T, enabled bool, state artifact.State, runtimeDisabled bool) artifact.Artifact {
 	t.Helper()
-	raw, err := EncodeArtifactData(ArtifactData{RuntimeDisabled: runtimeDisabled})
+	raw, err := EncodeArtifactData(spec.ArtifactData{RuntimeDisabled: runtimeDisabled})
 	if err != nil {
 		t.Fatalf("EncodeArtifactData: %v", err)
 	}

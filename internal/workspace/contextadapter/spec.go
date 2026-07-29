@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 const workspaceContextSchemaVersionV1 = "v1"
@@ -90,7 +90,7 @@ func supportedContextRole(role string) bool {
 	}
 }
 
-var artifactSupport = engine.ArtifactSupport{
+var artifactSupport = spec.ArtifactSupport{
 	Kind:      contextKind,
 	SchemaID:  contextSchemaID,
 	DecoderID: contextDecoderID,

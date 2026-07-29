@@ -12,7 +12,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
@@ -87,7 +91,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 		definitions,
 		func() (cryptoutil.Digest, error) { return snapshot.DecoderFingerprint, nil },
 		"policy.v1",
-		ArtifactSupport{
+		spec.ArtifactSupport{
 			Kind:      "test.kind",
 			SchemaID:  "test.schema",
 			DecoderID: "test.decoder",
@@ -110,7 +114,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	resolved, err := query.Resolve(
 		t.Context(),
 		workspace.Collection.Ref(),
-		Reference{Artifact: new(record.Ref())},
+		spec.Reference{Artifact: new(record.Ref())},
 	)
 	if err != nil || resolved.Artifact.ID != record.ID {
 		t.Fatalf("Resolve artifact=%#v err=%v", resolved, err)
@@ -118,7 +122,9 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	resolved, err = query.Resolve(
 		t.Context(),
 		workspace.Collection.Ref(),
-		Reference{Selector: &definition.Selector{Kind: "test.kind", LogicalName: "first", VersionConstraint: "=v1"}},
+		spec.Reference{
+			Selector: &definition.Selector{Kind: "test.kind", LogicalName: "first", VersionConstraint: "=v1"},
+		},
 	)
 	if err != nil || resolved.Artifact.ID != record.ID {
 		t.Fatalf("Resolve selector=%#v err=%v", resolved, err)
@@ -126,20 +132,20 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	if _, err := query.Resolve(
 		t.Context(),
 		workspace.Collection.Ref(),
-		Reference{},
+		spec.Reference{},
 	); !errors.Is(
 		err,
-		ErrReferenceUnresolved,
+		spec.ErrReferenceUnresolved,
 	) {
 		t.Fatalf("empty reference error=%v", err)
 	}
 	if _, err := query.Resolve(
 		t.Context(),
 		workspace.Collection.Ref(),
-		Reference{Selector: &definition.Selector{Kind: "test.kind", VersionConstraint: ">=v1"}},
+		spec.Reference{Selector: &definition.Selector{Kind: "test.kind", VersionConstraint: ">=v1"}},
 	); !errors.Is(
 		err,
-		ErrReferenceUnresolved,
+		spec.ErrReferenceUnresolved,
 	) {
 		t.Fatalf("unsupported selector error=%v", err)
 	}
@@ -148,10 +154,10 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	if _, err := query.Resolve(
 		t.Context(),
 		workspace.Collection.Ref(),
-		Reference{Artifact: &wrongRoot},
+		spec.Reference{Artifact: &wrongRoot},
 	); !errors.Is(
 		err,
-		ErrReferenceUnresolved,
+		spec.ErrReferenceUnresolved,
 	) {
 		t.Fatalf("cross-root reference error=%v", err)
 	}
@@ -171,7 +177,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 		[]artifact.ArtifactRef{record.Ref(), record.Ref()},
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
 		t.Fatalf("duplicate load-plan artifact error=%v", err)
 	}
@@ -185,7 +191,7 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 	if _, err := query.Resolve(
 		t.Context(),
 		workspace.Collection.Ref(),
-		Reference{Artifact: new(record.Ref())},
+		spec.Reference{Artifact: new(record.Ref())},
 	); !errors.Is(
 		err,
 		basespec.ErrCatalogStale,
@@ -197,14 +203,14 @@ func TestQueryServiceCatalogResolveAndLoadPlan(t *testing.T) {
 func TestQueryServiceConstructorAndSelectorBoundaries(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewQueryService(nil, nil, nil, nil, nil, "policy.v1"); !errors.Is(err, ErrInvalidWorkspace) {
+	if _, err := NewQueryService(nil, nil, nil, nil, nil, "policy.v1"); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("NewQueryService nil dependencies error=%v", err)
 	}
 	if err := validateWorkspaceSelector(
 		definition.Selector{Kind: "test.kind", VersionConstraint: "="},
 	); !errors.Is(
 		err,
-		ErrReferenceUnresolved,
+		spec.ErrReferenceUnresolved,
 	) {
 		t.Fatalf("empty exact selector error=%v", err)
 	}
@@ -237,9 +243,9 @@ func queryTestDefinition(t *testing.T) definition.Definition {
 	return value
 }
 
-func queryTestArtifact(t *testing.T, workspace Workspace, digest cryptoutil.Digest) artifact.Artifact {
+func queryTestArtifact(t *testing.T, workspace spec.Workspace, digest cryptoutil.Digest) artifact.Artifact {
 	t.Helper()
-	raw, err := EncodeArtifactData(ArtifactData{})
+	raw, err := EncodeArtifactData(spec.ArtifactData{})
 	if err != nil {
 		t.Fatalf("EncodeArtifactData: %v", err)
 	}
@@ -267,7 +273,7 @@ func queryTestArtifact(t *testing.T, workspace Workspace, digest cryptoutil.Dige
 }
 
 func queryTestSnapshot(
-	workspace Workspace,
+	workspace spec.Workspace,
 	digest cryptoutil.Digest,
 	binding artifact.SourceBinding,
 ) catalog.Snapshot {
@@ -310,5 +316,97 @@ func queryTestSnapshot(
 			State:               catalog.OccurrenceValid,
 			ObservedAt:          now,
 		}},
+	}
+}
+
+func plannerTestWorkspace(t *testing.T) spec.Workspace {
+	t.Helper()
+	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
+	collectionData, err := discovery.EncodeCollectionData(spec.CollectionData{
+		DiscoveryPolicyRevision: "policy.v1",
+		Discovery:               spec.DiscoveryPreferences{IncludeReadme: true},
+	})
+	if err != nil {
+		t.Fatalf("encode collection data: %v", err)
+	}
+	primaryData, err := attachmentdata.EncodeAttachmentData(spec.AttachmentData{})
+	if err != nil {
+		t.Fatalf("encode primary data: %v", err)
+	}
+	falseValue := false
+	attachedData, err := attachmentdata.EncodeAttachmentData(
+		spec.AttachmentData{Recursive: &falseValue, Authoritative: &falseValue},
+	)
+	if err != nil {
+		t.Fatalf("encode attached data: %v", err)
+	}
+	rootID := basespec.RootID("019d3150-7001-7a6b-a34e-d9032342bc31")
+	collectionID := basespec.CollectionID("019d3150-7002-7a6b-a34e-d9032342bc31")
+	primaryID := basespec.SourceID("019d3150-7003-7a6b-a34e-d9032342bc31")
+	attachedID := basespec.SourceID("019d3150-7004-7a6b-a34e-d9032342bc31")
+	return spec.Workspace{
+		Collection: collection.Collection{
+			ID:          collectionID,
+			RootID:      rootID,
+			Kind:        spec.CollectionKind,
+			DisplayName: "Workspace",
+			Enabled:     true,
+			Data:        collectionData,
+			Revision:    1,
+			CreatedAt:   now,
+			ModifiedAt:  now,
+		},
+		Data: spec.CollectionData{
+			DiscoveryPolicyRevision: "policy.v1",
+			Discovery:               spec.DiscoveryPreferences{IncludeReadme: true},
+		},
+		Mode:            spec.ModeFilesystem,
+		PrimarySourceID: primaryID,
+		Attachments: []collection.Attachment{
+			{
+				RootID:       rootID,
+				CollectionID: collectionID,
+				SourceID:     primaryID,
+				Role:         spec.RolePrimary,
+				Enabled:      true,
+				Data:         primaryData,
+				Revision:     1,
+				CreatedAt:    now,
+				ModifiedAt:   now,
+			},
+			{
+				RootID:       rootID,
+				CollectionID: collectionID,
+				SourceID:     attachedID,
+				Role:         spec.RoleLibrary,
+				Enabled:      true,
+				Data:         attachedData,
+				Revision:     1,
+				CreatedAt:    now,
+				ModifiedAt:   now,
+			},
+		},
+		Sources: []source.Summary{
+			{
+				ID:          primaryID,
+				RootID:      rootID,
+				Kind:        fsdir.Kind,
+				DisplayName: "Primary",
+				Enabled:     true,
+				Revision:    1,
+				CreatedAt:   now,
+				ModifiedAt:  now,
+			},
+			{
+				ID:          attachedID,
+				RootID:      rootID,
+				Kind:        "test.source",
+				DisplayName: "Library",
+				Enabled:     true,
+				Revision:    1,
+				CreatedAt:   now,
+				ModifiedAt:  now,
+			},
+		},
 	}
 }

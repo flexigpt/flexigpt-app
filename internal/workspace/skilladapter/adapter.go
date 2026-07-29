@@ -18,6 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type SkillArgument struct {
@@ -84,7 +85,7 @@ func NewAdapter(
 	if query == nil || runtimePolicy == nil || sourceRuntime == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Skill adapter dependencies are incomplete",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	return &Adapter{
@@ -187,7 +188,7 @@ func (f *Adapter) Load(
 			)
 			continue
 		}
-		resourceValue := engine.Resource{
+		resourceValue := spec.Resource{
 			Artifact: item.Artifact,
 
 			Definition:      item.Definition,
@@ -256,7 +257,7 @@ func (f *Adapter) LoadArtifact(
 		resourceValue.Definition.SchemaID != skillartifact.SchemaID {
 		return WorkspaceSkill{}, fmt.Errorf(
 			"%w: Artifact %q is not an Agent Skill",
-			engine.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)
 	}
@@ -267,7 +268,7 @@ func (f *Adapter) LoadArtifact(
 	if len(plan.Skills) != 1 {
 		return WorkspaceSkill{}, fmt.Errorf(
 			"%w: Artifact %q is unavailable for runtime loading",
-			engine.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)
 	}
@@ -276,7 +277,7 @@ func (f *Adapter) LoadArtifact(
 
 func projectWorkspaceSkill(
 	workspace collection.CollectionRef,
-	resourceValue engine.Resource,
+	resourceValue spec.Resource,
 	workspaceEnabled bool,
 	includeMarkdown bool,
 	runtimePathBacked bool,
@@ -373,7 +374,7 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 // skillruntime.
 func (f *Adapter) runtimeSource(
 	ctx context.Context,
-	item engine.LoadPlanItem,
+	item spec.LoadPlanItem,
 	verified map[basespec.SourceID]source.Source,
 	failures map[basespec.SourceID]error,
 ) (source.Source, error) {
@@ -429,7 +430,7 @@ func (f *Adapter) runtimeSource(
 
 func (f *Adapter) resolveRuntimeLocation(
 	ctx context.Context,
-	item engine.LoadPlanItem,
+	item spec.LoadPlanItem,
 	sourceValue source.Source,
 ) (string, error) {
 	localPaths, supported := f.sourceRuntime.(source.LocalPathRuntime)

@@ -21,6 +21,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/provision"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 // API is the workspace aggregate boundary for HTTP, Wails, CLI, and other
@@ -117,7 +118,7 @@ func (a *API) CreateEmptyWorkspace(
 	}
 	value, err := a.workspace.service.CreateEmpty(
 		ctx,
-		engine.EmptyWorkspaceRequest{
+		spec.EmptyWorkspaceRequest{
 			RootID:      request.RootID,
 			DisplayName: request.Body.DisplayName,
 			Description: request.Body.Description,
@@ -206,7 +207,7 @@ func (a *API) WorkspaceRefs(
 			return nil, err
 		}
 		for _, value := range values {
-			if value.Kind != engine.CollectionKind {
+			if value.Kind != spec.CollectionKind {
 				continue
 			}
 			refs = append(refs, value.Ref())
@@ -231,7 +232,7 @@ func (a *API) UpdateWorkspace(
 	if request == nil || request.Body == nil {
 		return nil, invalidAPIRequest("workspace update body is required")
 	}
-	value, err := a.workspace.service.Update(ctx, engine.UpdateRequest{
+	value, err := a.workspace.service.Update(ctx, spec.UpdateRequest{
 		Workspace:        request.Workspace,
 		ExpectedRevision: request.Body.ExpectedRevision,
 		DisplayName:      request.Body.DisplayName,
@@ -261,7 +262,7 @@ func (a *API) ReplaceWorkspacePrimarySource(
 	}
 	value, err := a.workspace.service.ReplacePrimary(
 		ctx,
-		engine.ReplacePrimaryRequest{
+		spec.ReplacePrimaryRequest{
 			Workspace:                  request.Workspace,
 			ExpectedCollectionRevision: request.Body.ExpectedCollectionRevision,
 			PreviousSourceID:           request.Body.PreviousSourceID,
@@ -291,7 +292,7 @@ func (a *API) SetWorkspacePrimarySource(
 	}
 	value, err := a.workspace.service.SetPrimary(
 		ctx,
-		engine.SetPrimaryRequest{
+		spec.SetPrimaryRequest{
 			Workspace:                  request.Workspace,
 			ExpectedCollectionRevision: request.Body.ExpectedCollectionRevision,
 			PreviousSourceID:           request.Body.PreviousSourceID,
@@ -370,7 +371,7 @@ func (a *API) AttachWorkspaceSource(
 	if request == nil || request.Body == nil {
 		return nil, invalidAPIRequest("workspace attachment body is required")
 	}
-	value, err := a.workspace.service.Attach(ctx, engine.AttachRequest{
+	value, err := a.workspace.service.Attach(ctx, spec.AttachRequest{
 		Workspace:                  request.Workspace,
 		ExpectedCollectionRevision: request.Body.ExpectedCollectionRevision,
 		SourceID:                   request.Body.SourceID,
@@ -400,7 +401,7 @@ func (a *API) UpdateWorkspaceAttachment(
 	}
 	value, err := a.workspace.service.UpdateAttachment(
 		ctx,
-		engine.UpdateAttachmentRequest{
+		spec.UpdateAttachmentRequest{
 			Workspace:                  request.Workspace,
 			SourceID:                   request.SourceID,
 			ExpectedCollectionRevision: request.Body.ExpectedCollectionRevision,
@@ -538,7 +539,7 @@ func (a *API) ResolveWorkspaceResource(
 	value, err := a.workspace.query.Resolve(
 		ctx,
 		request.Workspace,
-		engine.Reference{
+		spec.Reference{
 			Artifact: request.Body.Artifact,
 			Selector: request.Body.Selector,
 		},
@@ -1055,7 +1056,7 @@ func (a *API) workspaceArtifact(
 		value.CollectionID != workspace.CollectionID {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q does not belong to Workspace %q",
-			engine.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			ref.ArtifactID,
 			workspace.CollectionID,
 		)
@@ -1086,7 +1087,7 @@ func (a *API) workspaceOccurrence(
 
 	return catalog.Occurrence{}, fmt.Errorf(
 		"%w: Workspace occurrence %q/%q is unavailable",
-		engine.ErrReferenceUnresolved,
+		spec.ErrReferenceUnresolved,
 		key.SourceID,
 		key.Locator,
 	)
@@ -1103,7 +1104,7 @@ func (a *API) requireWorkspaceArtifactKind(
 		!a.workspace.policy.Supports(kind) {
 		return fmt.Errorf(
 			"%w: Artifact kind %q is not supported by Workspace",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			kind,
 		)
 	}
@@ -1135,12 +1136,12 @@ func (a *API) ready() error {
 }
 
 func invalidAPIRequest(message string) error {
-	return fmt.Errorf("%w: %s", engine.ErrInvalidWorkspace, message)
+	return fmt.Errorf("%w: %s", spec.ErrInvalidWorkspace, message)
 }
 
 func (a *API) workspaceViewForAPI(
 	ctx context.Context,
-	value engine.Workspace,
+	value spec.Workspace,
 ) (WorkspaceView, error) {
 	output, err := workspaceViewOf(value)
 	if err != nil {
@@ -1154,7 +1155,7 @@ func (a *API) workspaceViewForAPI(
 
 func (a *API) workspaceCatalogViewForAPI(
 	ctx context.Context,
-	value engine.CatalogView,
+	value spec.CatalogView,
 ) (WorkspaceCatalogView, error) {
 	output, err := workspaceCatalogViewOf(value)
 	if err != nil {
@@ -1173,7 +1174,7 @@ func (a *API) workspaceCatalogViewForAPI(
 func (a *API) enrichWorkspaceSourcePresentation(
 	ctx context.Context,
 	output *WorkspaceView,
-	value engine.Workspace,
+	value spec.Workspace,
 ) error {
 	for index := range output.Attachments {
 		attachment := &output.Attachments[index]
@@ -1191,7 +1192,7 @@ func (a *API) enrichWorkspaceSourcePresentation(
 		if !summaryFound {
 			return fmt.Errorf(
 				"%w: Workspace attachment source %q is unavailable",
-				engine.ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				attachment.SourceID,
 			)
 		}
@@ -1277,7 +1278,7 @@ func workspaceSourcePresentationDiagnostic(
 	}
 }
 
-func workspaceViewOf(value engine.Workspace) (WorkspaceView, error) {
+func workspaceViewOf(value spec.Workspace) (WorkspaceView, error) {
 	output := WorkspaceView{
 		Workspace:       value.Collection.Ref(),
 		Revision:        value.Collection.Revision,
@@ -1306,7 +1307,7 @@ func workspaceViewOf(value engine.Workspace) (WorkspaceView, error) {
 	return output, nil
 }
 
-func workspaceDiscoveryOf(value engine.DiscoveryPreferences) WorkspaceDiscovery {
+func workspaceDiscoveryOf(value spec.DiscoveryPreferences) WorkspaceDiscovery {
 	output := WorkspaceDiscovery{
 		AdditionalLocators: append(
 			[]basespec.Locator(nil),
@@ -1324,8 +1325,8 @@ func workspaceDiscoveryOf(value engine.DiscoveryPreferences) WorkspaceDiscovery 
 	return output
 }
 
-func discoveryPreferencesOf(value WorkspaceDiscovery) engine.DiscoveryPreferences {
-	output := engine.DiscoveryPreferences{
+func discoveryPreferencesOf(value WorkspaceDiscovery) spec.DiscoveryPreferences {
+	output := spec.DiscoveryPreferences{
 		AdditionalLocators: append(
 			[]basespec.Locator(nil),
 			value.AdditionalLocators...,
@@ -1333,7 +1334,7 @@ func discoveryPreferencesOf(value WorkspaceDiscovery) engine.DiscoveryPreference
 		IncludeReadme: value.IncludeReadme,
 	}
 	for _, root := range value.AdditionalRoots {
-		output.AdditionalRoots = append(output.AdditionalRoots, engine.DiscoveryRoot{
+		output.AdditionalRoots = append(output.AdditionalRoots, spec.DiscoveryRoot{
 			Root:            root.Root,
 			Recursive:       root.Recursive,
 			IncludePatterns: append([]string(nil), root.IncludePatterns...),
@@ -1345,11 +1346,11 @@ func discoveryPreferencesOf(value WorkspaceDiscovery) engine.DiscoveryPreference
 func workspaceAttachmentSettingsOf(
 	raw json.RawMessage,
 ) (WorkspaceAttachmentSettings, error) {
-	var value engine.AttachmentData
+	var value spec.AttachmentData
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return WorkspaceAttachmentSettings{}, fmt.Errorf(
 			"%w: decode workspace attachment settings: %w",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			err,
 		)
 	}
@@ -1359,8 +1360,8 @@ func workspaceAttachmentSettingsOf(
 	}, nil
 }
 
-func attachmentDataOf(value WorkspaceAttachmentSettings) engine.AttachmentData {
-	return engine.AttachmentData{
+func attachmentDataOf(value WorkspaceAttachmentSettings) spec.AttachmentData {
+	return spec.AttachmentData{
 		Recursive:     cloneBool(value.Recursive),
 		Authoritative: cloneBool(value.Authoritative),
 	}
@@ -1369,7 +1370,7 @@ func attachmentDataOf(value WorkspaceAttachmentSettings) engine.AttachmentData {
 func workspaceArtifactDataOf(
 	value WorkspaceArtifactSettings,
 ) (json.RawMessage, error) {
-	return engine.EncodeArtifactData(engine.ArtifactData{
+	return engine.EncodeArtifactData(spec.ArtifactData{
 		RuntimeDisabled: value.RuntimeDisabled,
 	})
 }
@@ -1434,7 +1435,7 @@ func workspaceSuppressionViewOf(
 }
 
 func workspaceCatalogViewOf(
-	value engine.CatalogView,
+	value spec.CatalogView,
 ) (WorkspaceCatalogView, error) {
 	workspaceValue, err := workspaceViewOf(value.Workspace)
 	if err != nil {
@@ -1620,7 +1621,7 @@ func workspaceDefinitionViewOf(
 }
 
 func workspaceResourceViewOf(
-	value engine.Resource,
+	value spec.Resource,
 ) WorkspaceResourceView {
 	artifactView := workspaceArtifactViewOf(value.Artifact)
 	return WorkspaceResourceView{
@@ -1638,7 +1639,7 @@ func workspaceResourceViewOf(
 }
 
 func workspaceLoadPlanViewOf(
-	value engine.LoadPlan,
+	value spec.LoadPlan,
 ) WorkspaceLoadPlanView {
 	output := WorkspaceLoadPlanView{
 		Workspace:       value.Workspace,

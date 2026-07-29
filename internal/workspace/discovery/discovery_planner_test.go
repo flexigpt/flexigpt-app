@@ -1,4 +1,4 @@
-package engine
+package discovery
 
 import (
 	"errors"
@@ -11,22 +11,24 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestPlannerBuildsIndependentRoleAwarePlans(t *testing.T) {
 	t.Parallel()
 
-	profiles := DiscoveryProfiles{
-		Primary: DiscoveryProfile{
+	profiles := spec.DiscoveryProfiles{
+		Primary: spec.DiscoveryProfile{
 			ExplicitLocators: []basespec.Locator{"BASE.md"},
 			ReadmeLocator:    "README.md",
-			DirectoryRoots: []discovery.DirectoryRoot{{
+			DirectoryRoots: []spec.DirectoryRoot{{
 				Root:            "workspace",
 				Recursive:       true,
 				IncludePatterns: []string{"*.md"},
 			}},
 		},
-		Attached: DiscoveryProfile{DirectoryRoots: []discovery.DirectoryRoot{{
+		Attached: spec.DiscoveryProfile{DirectoryRoots: []spec.DirectoryRoot{{
 			Root:            ".",
 			Recursive:       true,
 			IncludePatterns: []string{"*.md"},
@@ -44,9 +46,9 @@ func TestPlannerBuildsIndependentRoleAwarePlans(t *testing.T) {
 	plan, err := planner.Build(workspace, DescriptorObservation{
 		SourceID:   workspace.PrimarySourceID,
 		Generation: "generation-1",
-		Preferences: DiscoveryPreferences{
+		Preferences: spec.DiscoveryPreferences{
 			AdditionalLocators: []basespec.Locator{"extra.md"},
-			AdditionalRoots: []DiscoveryRoot{{
+			AdditionalRoots: []spec.DiscoveryRoot{{
 				Root:            "docs",
 				Recursive:       false,
 				IncludePatterns: []string{"*.md"},
@@ -99,25 +101,34 @@ func TestPlannerBuildsIndependentRoleAwarePlans(t *testing.T) {
 func TestPlannerAndDiscoveryMergesRejectInvalidInputAndAreDeterministic(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewPlanner(DiscoveryProfiles{}, "policy.v1", "decoder.a"); !errors.Is(err, ErrInvalidWorkspace) {
+	if _, err := NewPlanner(
+		spec.DiscoveryProfiles{},
+		"policy.v1",
+		"decoder.a",
+	); !errors.Is(
+		err,
+		spec.ErrInvalidWorkspace,
+	) {
 		t.Fatalf("empty primary profile error=%v, want ErrInvalidWorkspace", err)
 	}
 	if _, err := NewPlanner(
-		DiscoveryProfiles{Primary: DiscoveryProfile{ExplicitLocators: []basespec.Locator{"AGENTS.md"}}},
+		spec.DiscoveryProfiles{Primary: spec.DiscoveryProfile{ExplicitLocators: []basespec.Locator{"AGENTS.md"}}},
 		" ",
 		"decoder.a",
 	); err == nil {
 		t.Fatal("blank policy revision was accepted")
 	}
 
-	merged, err := mergeDiscoveryPreferences(
-		DiscoveryPreferences{
+	merged, err := MergeDiscoveryPreferences(
+		spec.DiscoveryPreferences{
 			AdditionalLocators: []basespec.Locator{"b.md", "a.md"},
-			AdditionalRoots:    []DiscoveryRoot{{Root: "docs", Recursive: false, IncludePatterns: []string{"*.md"}}},
+			AdditionalRoots: []spec.DiscoveryRoot{
+				{Root: "docs", Recursive: false, IncludePatterns: []string{"*.md"}},
+			},
 		},
-		DiscoveryPreferences{
+		spec.DiscoveryPreferences{
 			AdditionalLocators: []basespec.Locator{"a.md", "c.md"},
-			AdditionalRoots: []DiscoveryRoot{
+			AdditionalRoots: []spec.DiscoveryRoot{
 				{Root: "docs", Recursive: true, IncludePatterns: []string{"*.txt", "*.md"}},
 			},
 			IncludeReadme: true,
@@ -132,21 +143,21 @@ func TestPlannerAndDiscoveryMergesRejectInvalidInputAndAreDeterministic(t *testi
 		len(merged.AdditionalRoots[0].IncludePatterns) != 2 || merged.AdditionalRoots[0].IncludePatterns[0] != "*.md" {
 		t.Fatalf("merged preferences=%#v", merged)
 	}
-	if got := mergePatterns([]string{"*.md"}, nil); got != nil {
+	if got := MergePatterns([]string{"*.md"}, nil); got != nil {
 		t.Fatalf("mergePatterns with unrestricted side=%#v, want nil", got)
 	}
 
 	profile := MergeDiscoveryProfile(
-		DiscoveryProfile{
+		spec.DiscoveryProfile{
 			ExplicitLocators: []basespec.Locator{"AGENTS.md"},
-			DirectoryRoots: []discovery.DirectoryRoot{
+			DirectoryRoots: []spec.DirectoryRoot{
 				{Root: "docs", Recursive: false, IncludePatterns: []string{"*.md"}},
 			},
 		},
-		DiscoveryProfile{
+		spec.DiscoveryProfile{
 			ExplicitLocators: []basespec.Locator{"AGENTS.md", "README.md"},
 			ReadmeLocator:    "README.md",
-			DirectoryRoots:   []discovery.DirectoryRoot{{Root: "docs", Recursive: true, IncludePatterns: nil}},
+			DirectoryRoots:   []spec.DirectoryRoot{{Root: "docs", Recursive: true, IncludePatterns: nil}},
 		},
 	)
 	if len(profile.ExplicitLocators) != 2 || profile.ReadmeLocator != "README.md" ||
@@ -159,34 +170,42 @@ func TestPlannerAndDiscoveryMergesRejectInvalidInputAndAreDeterministic(t *testi
 	workspace := plannerTestWorkspace(t)
 	workspace.Sources = workspace.Sources[:1]
 	planner, err := NewPlanner(
-		DiscoveryProfiles{Primary: DiscoveryProfile{ExplicitLocators: []basespec.Locator{"AGENTS.md"}}},
+		spec.DiscoveryProfiles{Primary: spec.DiscoveryProfile{ExplicitLocators: []basespec.Locator{"AGENTS.md"}}},
 		"policy.v1",
 		"decoder.a",
 	)
 	if err != nil {
 		t.Fatalf("NewPlanner valid: %v", err)
 	}
-	if _, err := planner.Build(workspace, DescriptorObservation{}); !errors.Is(err, ErrInvalidWorkspace) {
+	if _, err := planner.Build(
+		workspace,
+		DescriptorObservation{},
+	); !errors.Is(
+		err,
+		spec.ErrInvalidWorkspace,
+	) {
 		t.Fatalf("missing attachment source error=%v, want ErrInvalidWorkspace", err)
 	}
 }
 
-func plannerTestWorkspace(t *testing.T) Workspace {
+func plannerTestWorkspace(t *testing.T) spec.Workspace {
 	t.Helper()
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	collectionData, err := encodeCollectionData(CollectionData{
+	collectionData, err := EncodeCollectionData(spec.CollectionData{
 		DiscoveryPolicyRevision: "policy.v1",
-		Discovery:               DiscoveryPreferences{IncludeReadme: true},
+		Discovery:               spec.DiscoveryPreferences{IncludeReadme: true},
 	})
 	if err != nil {
 		t.Fatalf("encode collection data: %v", err)
 	}
-	primaryData, err := encodeAttachmentData(AttachmentData{})
+	primaryData, err := attachmentdata.EncodeAttachmentData(spec.AttachmentData{})
 	if err != nil {
 		t.Fatalf("encode primary data: %v", err)
 	}
 	falseValue := false
-	attachedData, err := encodeAttachmentData(AttachmentData{Recursive: &falseValue, Authoritative: &falseValue})
+	attachedData, err := attachmentdata.EncodeAttachmentData(
+		spec.AttachmentData{Recursive: &falseValue, Authoritative: &falseValue},
+	)
 	if err != nil {
 		t.Fatalf("encode attached data: %v", err)
 	}
@@ -194,11 +213,11 @@ func plannerTestWorkspace(t *testing.T) Workspace {
 	collectionID := basespec.CollectionID("019d3150-7002-7a6b-a34e-d9032342bc31")
 	primaryID := basespec.SourceID("019d3150-7003-7a6b-a34e-d9032342bc31")
 	attachedID := basespec.SourceID("019d3150-7004-7a6b-a34e-d9032342bc31")
-	return Workspace{
+	return spec.Workspace{
 		Collection: collection.Collection{
 			ID:          collectionID,
 			RootID:      rootID,
-			Kind:        CollectionKind,
+			Kind:        spec.CollectionKind,
 			DisplayName: "Workspace",
 			Enabled:     true,
 			Data:        collectionData,
@@ -206,18 +225,18 @@ func plannerTestWorkspace(t *testing.T) Workspace {
 			CreatedAt:   now,
 			ModifiedAt:  now,
 		},
-		Data: CollectionData{
+		Data: spec.CollectionData{
 			DiscoveryPolicyRevision: "policy.v1",
-			Discovery:               DiscoveryPreferences{IncludeReadme: true},
+			Discovery:               spec.DiscoveryPreferences{IncludeReadme: true},
 		},
-		Mode:            ModeFilesystem,
+		Mode:            spec.ModeFilesystem,
 		PrimarySourceID: primaryID,
 		Attachments: []collection.Attachment{
 			{
 				RootID:       rootID,
 				CollectionID: collectionID,
 				SourceID:     primaryID,
-				Role:         RolePrimary,
+				Role:         spec.RolePrimary,
 				Enabled:      true,
 				Data:         primaryData,
 				Revision:     1,
@@ -228,7 +247,7 @@ func plannerTestWorkspace(t *testing.T) Workspace {
 				RootID:       rootID,
 				CollectionID: collectionID,
 				SourceID:     attachedID,
-				Role:         RoleLibrary,
+				Role:         spec.RoleLibrary,
 				Enabled:      true,
 				Data:         attachedData,
 				Revision:     1,

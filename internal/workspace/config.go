@@ -4,18 +4,20 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 const defaultDiscoveryPolicyRevision = "workspace.discovery.v1"
 
 type Config struct {
-	Supports                []engine.ArtifactSupport
-	DiscoveryProfiles       engine.DiscoveryProfiles
+	Supports                []spec.ArtifactSupport
+	DiscoveryProfiles       spec.DiscoveryProfiles
 	DiscoveryPolicyRevision string
 	SkillRoots              []basespec.Locator
 	ContextComposition      contextadapter.CompositionPolicy
@@ -23,7 +25,7 @@ type Config struct {
 }
 
 type builtinArtifactSupport struct {
-	support engine.ArtifactSupport
+	support spec.ArtifactSupport
 }
 
 // builtinArtifactSupportMatrix is the workspace artifact support matrix.
@@ -34,7 +36,7 @@ var builtinArtifactSupportMatrix = []builtinArtifactSupport{
 		support: contextadapter.ArtifactSupport(),
 	},
 	{
-		support: engine.ArtifactSupport{
+		support: spec.ArtifactSupport{
 			Kind:      skillartifact.Kind,
 			SchemaID:  skillartifact.SchemaID,
 			DecoderID: skillartifact.DecoderID,
@@ -66,42 +68,42 @@ func (c Config) normalized() Config {
 
 func (c Config) normalizedDiscoveryProfiles(
 	skillConventions *skilladapter.ConventionRegistry,
-) engine.DiscoveryProfiles {
-	var profiles engine.DiscoveryProfiles
+) spec.DiscoveryProfiles {
+	var profiles spec.DiscoveryProfiles
 	if len(c.DiscoveryProfiles.Primary.ExplicitLocators) == 0 &&
 		len(c.DiscoveryProfiles.Primary.DirectoryRoots) == 0 &&
 		len(c.DiscoveryProfiles.Attached.ExplicitLocators) == 0 &&
 		len(c.DiscoveryProfiles.Attached.DirectoryRoots) == 0 {
-		profiles = engine.DefaultDiscoveryProfiles()
+		profiles = discovery.DefaultDiscoveryProfiles()
 	} else {
 		profiles = c.DiscoveryProfiles
 	}
 	contextProfile := contextadapter.DiscoveryProfile()
-	profiles.Primary = engine.MergeDiscoveryProfile(
+	profiles.Primary = discovery.MergeDiscoveryProfile(
 		profiles.Primary,
 		contextProfile,
 	)
 	skillProfile := skillConventions.DiscoveryProfile()
-	profiles.Primary = engine.MergeDiscoveryProfile(
+	profiles.Primary = discovery.MergeDiscoveryProfile(
 		profiles.Primary,
 		skillProfile,
 	)
-	profiles.Attached = engine.MergeDiscoveryProfile(
+	profiles.Attached = discovery.MergeDiscoveryProfile(
 		profiles.Attached,
 		skillProfile,
 	)
 	return profiles
 }
 
-func (c Config) normalizedSupports() ([]engine.ArtifactSupport, error) {
+func (c Config) normalizedSupports() ([]spec.ArtifactSupport, error) {
 	if len(c.Supports) == 0 {
 		return nil, fmt.Errorf(
 			"%w: workspace artifact support is required",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 
-	output := make([]engine.ArtifactSupport, 0, len(c.Supports))
+	output := make([]spec.ArtifactSupport, 0, len(c.Supports))
 	seenKinds := make(map[basespec.ArtifactKind]struct{}, len(c.Supports))
 
 	for _, support := range c.Supports {
@@ -111,7 +113,7 @@ func (c Config) normalizedSupports() ([]engine.ArtifactSupport, error) {
 		if _, duplicate := seenKinds[support.Kind]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate workspace artifact kind %q",
-				engine.ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				support.Kind,
 			)
 		}
@@ -121,9 +123,9 @@ func (c Config) normalizedSupports() ([]engine.ArtifactSupport, error) {
 	return output, nil
 }
 
-func BuiltinArtifactSupports() []engine.ArtifactSupport {
+func BuiltinArtifactSupports() []spec.ArtifactSupport {
 	output := make(
-		[]engine.ArtifactSupport,
+		[]spec.ArtifactSupport,
 		0,
 		len(builtinArtifactSupportMatrix),
 	)
@@ -133,7 +135,7 @@ func BuiltinArtifactSupports() []engine.ArtifactSupport {
 	return output
 }
 
-func BuiltinDecoders() []discovery.Decoder {
+func BuiltinDecoders() []artifactstoreDiscovery.Decoder {
 	config := DefaultConfig()
 	registry, err := config.skillConventions()
 	if err != nil {
@@ -143,13 +145,13 @@ func BuiltinDecoders() []discovery.Decoder {
 	if err != nil {
 		panic(err)
 	}
-	return []discovery.Decoder{
+	return []artifactstoreDiscovery.Decoder{
 		contextadapter.NewContextDecoder(),
 		decoder,
 	}
 }
 
-func BuiltinDiscoveryProfiles() engine.DiscoveryProfiles {
+func BuiltinDiscoveryProfiles() spec.DiscoveryProfiles {
 	config := DefaultConfig()
 	registry, err := config.skillConventions()
 	if err != nil {
@@ -174,7 +176,7 @@ func (c Config) discoveryPolicyRevision() (string, error) {
 	); err != nil {
 		return "", fmt.Errorf(
 			"%w: %w",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			err,
 		)
 	}

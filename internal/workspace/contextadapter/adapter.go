@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type ContextContribution struct {
@@ -77,7 +78,7 @@ func NewAdapter(
 	if query == nil || runtimePolicy == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace context adapter query is nil",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	compositionPolicy = compositionPolicy.Normalized()
@@ -166,7 +167,7 @@ func (p *Adapter) Compose(
 			})
 			continue
 		}
-		body, err := engine.DecodeDefinitionBody[contextDefinition](
+		body, err := spec.DecodeDefinitionBody[contextDefinition](
 			item.Definition.Body,
 		)
 		if err != nil {
@@ -279,13 +280,13 @@ func (p *Adapter) Load(
 		if ref.RootID != workspace.RootID {
 			return ContextInspection{}, fmt.Errorf(
 				"%w: Context Artifact belongs to another Root",
-				engine.ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 			)
 		}
 		if _, duplicate := requested[ref.ArtifactID]; duplicate {
 			return ContextInspection{}, fmt.Errorf(
 				"%w: duplicate Context Artifact %q",
-				engine.ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				ref.ArtifactID,
 			)
 		}
@@ -335,7 +336,7 @@ func (p *Adapter) Load(
 }
 
 func projectContextDocument(
-	value engine.Resource,
+	value spec.Resource,
 ) (ContextDocument, error) {
 	runtimeDisabled, dataErr := engine.ArtifactRuntimeDisabled(value.Artifact)
 	output := ContextDocument{
@@ -360,7 +361,7 @@ func projectContextDocument(
 	if err := ValidateContextDefinition(value.Definition); err != nil {
 		return output, err
 	}
-	body, err := engine.DecodeDefinitionBody[contextDefinition](
+	body, err := spec.DecodeDefinitionBody[contextDefinition](
 		value.Definition.Body,
 	)
 	if err != nil {
@@ -374,12 +375,12 @@ func projectContextDocument(
 }
 
 func projectContext(
-	value engine.Resource,
+	value spec.Resource,
 ) (ContextContribution, error) {
 	if err := ValidateContextDefinition(value.Definition); err != nil {
 		return ContextContribution{}, err
 	}
-	body, err := engine.DecodeDefinitionBody[contextDefinition](value.Definition.Body)
+	body, err := spec.DecodeDefinitionBody[contextDefinition](value.Definition.Body)
 	if err != nil {
 		return ContextContribution{}, err
 	}

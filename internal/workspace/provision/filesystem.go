@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type sourceManager interface {
@@ -30,8 +30,8 @@ type sourceManager interface {
 type workspaceManager interface {
 	CreateFilesystem(
 		ctx context.Context,
-		request engine.FilesystemWorkspaceRequest,
-	) (engine.Workspace, error)
+		request spec.FilesystemWorkspaceRequest,
+	) (spec.Workspace, error)
 }
 
 type Service struct {
@@ -46,7 +46,7 @@ func NewService(
 	if sources == nil || workspaces == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace provisioner dependencies are incomplete",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	return &Service{
@@ -60,18 +60,18 @@ type Request struct {
 	DisplayName string
 	Description string
 	RootPath    string
-	Discovery   engine.DiscoveryPreferences
+	Discovery   spec.DiscoveryPreferences
 }
 
 func (s *Service) CreateFilesystem(
 	ctx context.Context,
 	request Request,
-) (engine.Workspace, error) {
+) (spec.Workspace, error) {
 	config, err := json.Marshal(fsdir.Config{
 		RootPath: request.RootPath,
 	})
 	if err != nil {
-		return engine.Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	sourceValue, err := s.sources.Create(
 		ctx,
@@ -84,12 +84,12 @@ func (s *Service) CreateFilesystem(
 		},
 	)
 	if err != nil {
-		return engine.Workspace{}, err
+		return spec.Workspace{}, err
 	}
 
 	value, createErr := s.workspaces.CreateFilesystem(
 		ctx,
-		engine.FilesystemWorkspaceRequest{
+		spec.FilesystemWorkspaceRequest{
 			RootID:          request.RootID,
 			DisplayName:     request.DisplayName,
 			Description:     request.Description,
@@ -107,5 +107,5 @@ func (s *Service) CreateFilesystem(
 		sourceValue.ID,
 		sourceValue.Revision,
 	)
-	return engine.Workspace{}, errors.Join(createErr, discardErr)
+	return spec.Workspace{}, errors.Join(createErr, discardErr)
 }

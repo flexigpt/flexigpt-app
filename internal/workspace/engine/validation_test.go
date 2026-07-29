@@ -12,16 +12,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 	t.Parallel()
 
-	input := CollectionData{
+	input := spec.CollectionData{
 		DiscoveryPolicyRevision: "policy.v1",
-		Discovery: DiscoveryPreferences{
+		Discovery: spec.DiscoveryPreferences{
 			AdditionalLocators: []basespec.Locator{"docs/guide.md"},
-			AdditionalRoots: []DiscoveryRoot{{
+			AdditionalRoots: []spec.DiscoveryRoot{{
 				Root:            "docs",
 				Recursive:       true,
 				IncludePatterns: []string{"*.md"},
@@ -29,7 +32,7 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 			IncludeReadme: true,
 		},
 	}
-	raw, err := encodeCollectionData(input)
+	raw, err := discovery.EncodeCollectionData(input)
 	if err != nil {
 		t.Fatalf("encodeCollectionData: %v", err)
 	}
@@ -38,7 +41,7 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 	) != `{"discovery":{"additionalLocators":["docs/guide.md"],"additionalRoots":[{"includePatterns":["*.md"],"recursive":true,"root":"docs"}],"includeReadme":true},"discoveryPolicyRevision":"policy.v1"}` {
 		t.Fatalf("encoded collection data=%s", raw)
 	}
-	decoded, err := decodeCollectionData(raw)
+	decoded, err := discovery.DecodeCollectionData(raw)
 	if err != nil {
 		t.Fatalf("decodeCollectionData: %v", err)
 	}
@@ -46,21 +49,23 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 	if input.Discovery.AdditionalLocators[0] != "docs/guide.md" {
 		t.Fatalf("decodeCollectionData reused input storage: %#v", input)
 	}
-	if _, err := decodeCollectionData([]byte(`{"discoveryPolicyRevision":"policy.v1","extra":true}`)); err == nil {
+	if _, err := discovery.DecodeCollectionData(
+		[]byte(`{"discoveryPolicyRevision":"policy.v1","extra":true}`),
+	); err == nil {
 		t.Fatal("unknown collection data field was accepted")
 	}
-	if _, err := encodeCollectionData(
-		CollectionData{DiscoveryPolicyRevision: " "},
+	if _, err := discovery.EncodeCollectionData(
+		spec.CollectionData{DiscoveryPolicyRevision: " "},
 	); !errors.Is(
 		err,
 		basespec.ErrInvalid,
 	) {
 		t.Fatalf("invalid policy revision error=%v", err)
 	}
-	if _, err := encodeCollectionData(
-		CollectionData{
+	if _, err := discovery.EncodeCollectionData(
+		spec.CollectionData{
 			DiscoveryPolicyRevision: "policy.v1",
-			Discovery: DiscoveryPreferences{
+			Discovery: spec.DiscoveryPreferences{
 				AdditionalLocators: []basespec.Locator{"same.md", "same.md"},
 			},
 		},
@@ -71,28 +76,31 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 		t.Fatalf("duplicate locator error=%v", err)
 	}
 
-	attachmentRaw, err := encodeAttachmentData(AttachmentData{})
+	attachmentRaw, err := attachmentdata.EncodeAttachmentData(spec.AttachmentData{})
 	if err != nil || string(attachmentRaw) != `{}` {
 		t.Fatalf("encodeAttachmentData=%s err=%v", attachmentRaw, err)
 	}
-	if _, err := decodeAttachmentData([]byte(`{"recursive":true,"unknown":true}`)); err == nil {
+	if _, err := attachmentdata.DecodeAttachmentData([]byte(`{"recursive":true,"unknown":true}`)); err == nil {
 		t.Fatal("unknown attachment data field was accepted")
 	}
 	truth := true
-	if err := validateAttachmentDataForRole(
-		RolePrimary,
-		AttachmentData{Recursive: &truth},
+	if err := attachmentdata.ValidateAttachmentDataForRole(
+		spec.RolePrimary,
+		spec.AttachmentData{Recursive: &truth},
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
-		t.Fatalf("primary override error=%v, want ErrInvalidWorkspace", err)
+		t.Fatalf("primary override error=%v, want spec.ErrInvalidWorkspace", err)
 	}
-	if err := validateAttachmentDataForRole(RoleLibrary, AttachmentData{Recursive: &truth}); err != nil {
+	if err := attachmentdata.ValidateAttachmentDataForRole(
+		spec.RoleLibrary,
+		spec.AttachmentData{Recursive: &truth},
+	); err != nil {
 		t.Fatalf("library override error=%v", err)
 	}
 
-	artifactRaw, err := EncodeArtifactData(ArtifactData{RuntimeDisabled: true})
+	artifactRaw, err := EncodeArtifactData(spec.ArtifactData{RuntimeDisabled: true})
 	if err != nil || string(artifactRaw) != `{"runtimeDisabled":true}` {
 		t.Fatalf("EncodeArtifactData=%s err=%v", artifactRaw, err)
 	}
@@ -104,7 +112,7 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 		[]byte(`{"runtimeDisabled":false,"unknown":true}`),
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
 		t.Fatalf("unknown artifact data error=%v", err)
 	}
@@ -121,7 +129,7 @@ func TestDecodeDefinitionBodyAndWorkspaceStateBoundaries(t *testing.T) {
 	type body struct {
 		Name string `json:"name"`
 	}
-	decoded, err := DecodeDefinitionBody[body](json.RawMessage(`{"name":"ok"}`))
+	decoded, err := spec.DecodeDefinitionBody[body](json.RawMessage(`{"name":"ok"}`))
 	if err != nil || decoded.Name != "ok" {
 		t.Fatalf("DecodeDefinitionBody=%#v err=%v", decoded, err)
 	}
@@ -130,23 +138,23 @@ func TestDecodeDefinitionBodyAndWorkspaceStateBoundaries(t *testing.T) {
 		[]byte(`{"name":"ok"} {}`),
 		[]byte(`[]`),
 	} {
-		if _, err := DecodeDefinitionBody[body](raw); !errors.Is(err, ErrInvalidWorkspace) {
-			t.Errorf("DecodeDefinitionBody(%s) error=%v, want ErrInvalidWorkspace", raw, err)
+		if _, err := spec.DecodeDefinitionBody[body](raw); !errors.Is(err, spec.ErrInvalidWorkspace) {
+			t.Errorf("DecodeDefinitionBody(%s) error=%v, want spec.ErrInvalidWorkspace", raw, err)
 		}
 	}
 
 	workspace := validationTestCollection(t)
 	mode, primary, err := validateWorkspaceState(
 		workspace,
-		CollectionData{DiscoveryPolicyRevision: "policy.v1"},
+		spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"},
 		nil,
 		nil,
 	)
-	if err != nil || mode != ModeEmpty || primary != "" {
+	if err != nil || mode != spec.ModeEmpty || primary != "" {
 		t.Fatalf("empty workspace mode=%q primary=%q err=%v", mode, primary, err)
 	}
 
-	attachmentData, err := encodeAttachmentData(AttachmentData{})
+	attachmentData, err := attachmentdata.EncodeAttachmentData(spec.AttachmentData{})
 	if err != nil {
 		t.Fatalf("encode primary attachment: %v", err)
 	}
@@ -155,7 +163,7 @@ func TestDecodeDefinitionBodyAndWorkspaceStateBoundaries(t *testing.T) {
 		RootID:       workspace.RootID,
 		CollectionID: workspace.ID,
 		SourceID:     primarySource.ID,
-		Role:         RolePrimary,
+		Role:         spec.RolePrimary,
 		Enabled:      true,
 		Data:         attachmentData,
 		Revision:     1,
@@ -164,11 +172,11 @@ func TestDecodeDefinitionBodyAndWorkspaceStateBoundaries(t *testing.T) {
 	}
 	mode, primary, err = validateWorkspaceState(
 		workspace,
-		CollectionData{DiscoveryPolicyRevision: "policy.v1"},
+		spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"},
 		[]collection.Attachment{primaryAttachment},
 		[]source.Summary{primarySource},
 	)
-	if err != nil || mode != ModeFilesystem || primary != primarySource.ID {
+	if err != nil || mode != spec.ModeFilesystem || primary != primarySource.ID {
 		t.Fatalf("filesystem workspace mode=%q primary=%q err=%v", mode, primary, err)
 	}
 
@@ -176,14 +184,14 @@ func TestDecodeDefinitionBodyAndWorkspaceStateBoundaries(t *testing.T) {
 	disabledSource.Enabled = false
 	if _, _, err := validateWorkspaceState(
 		workspace,
-		CollectionData{DiscoveryPolicyRevision: "policy.v1"},
+		spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"},
 		[]collection.Attachment{primaryAttachment},
 		[]source.Summary{disabledSource},
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
-		t.Fatalf("disabled primary error=%v, want ErrInvalidWorkspace", err)
+		t.Fatalf("disabled primary error=%v, want spec.ErrInvalidWorkspace", err)
 	}
 	second := primaryAttachment
 	second.SourceID = "019d3150-6f04-7a6b-a34e-d9032342bc31"
@@ -191,28 +199,28 @@ func TestDecodeDefinitionBodyAndWorkspaceStateBoundaries(t *testing.T) {
 	secondSource.ID = second.SourceID
 	if _, _, err := validateWorkspaceState(
 		workspace,
-		CollectionData{DiscoveryPolicyRevision: "policy.v1"},
+		spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"},
 		[]collection.Attachment{primaryAttachment, second},
 		[]source.Summary{primarySource, secondSource},
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
-		t.Fatalf("multiple primary error=%v, want ErrInvalidWorkspace", err)
+		t.Fatalf("multiple primary error=%v, want spec.ErrInvalidWorkspace", err)
 	}
 }
 
 func validationTestCollection(t *testing.T) collection.Collection {
 	t.Helper()
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	raw, err := encodeCollectionData(CollectionData{DiscoveryPolicyRevision: "policy.v1"})
+	raw, err := discovery.EncodeCollectionData(spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"})
 	if err != nil {
 		t.Fatalf("encode test collection data: %v", err)
 	}
 	return collection.Collection{
 		ID:          "019d3150-6f01-7a6b-a34e-d9032342bc31",
 		RootID:      "019d3150-6f02-7a6b-a34e-d9032342bc31",
-		Kind:        CollectionKind,
+		Kind:        spec.CollectionKind,
 		DisplayName: "Workspace",
 		Enabled:     true,
 		Data:        raw,

@@ -18,6 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type Result struct {
@@ -37,12 +38,6 @@ const (
 	DiagnosticCodeResourceMissing           = "artifact.discovery.resource-missing"
 	DiagnosticCodeSubresourceMissing        = "artifact.discovery.subresource-missing"
 )
-
-type DirectoryRoot struct {
-	Root            basespec.Locator
-	Recursive       bool
-	IncludePatterns []string
-}
 
 type Engine struct {
 	decoders *DecoderRegistry
@@ -1091,7 +1086,7 @@ func locatorInScope(
 }
 
 func matchesDirectoryRoot(
-	root DirectoryRoot,
+	root spec.DirectoryRoot,
 	locator basespec.Locator,
 ) bool {
 	base := string(root.Root)

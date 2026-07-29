@@ -17,6 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type occurrenceKindKey struct {
@@ -38,7 +39,7 @@ type QueryService struct {
 	definitions             definitionLookup
 	decoderFingerprint      func() (cryptoutil.Digest, error)
 	discoveryPolicyRevision string
-	validators              map[basespec.ArtifactKind]DefinitionValidator
+	validators              map[basespec.ArtifactKind]spec.DefinitionValidator
 }
 
 func NewQueryService(
@@ -48,7 +49,7 @@ func NewQueryService(
 	definitions definitionLookup,
 	decoderFingerprint func() (cryptoutil.Digest, error),
 	discoveryPolicyRevision string,
-	supports ...ArtifactSupport,
+	supports ...spec.ArtifactSupport,
 ) (*QueryService, error) {
 	if workspaces == nil ||
 		catalogs == nil ||
@@ -57,7 +58,7 @@ func NewQueryService(
 		decoderFingerprint == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace query dependencies are incomplete",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if err := basespec.ValidateRequiredText(
@@ -68,7 +69,7 @@ func NewQueryService(
 		return nil, err
 	}
 	validators := make(
-		map[basespec.ArtifactKind]DefinitionValidator,
+		map[basespec.ArtifactKind]spec.DefinitionValidator,
 		len(supports),
 	)
 	for _, support := range supports {
@@ -78,7 +79,7 @@ func NewQueryService(
 		if _, duplicate := validators[support.Kind]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate query validator for %q",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				support.Kind,
 			)
 		}
@@ -98,35 +99,35 @@ func NewQueryService(
 func (q *QueryService) GetWorkspace(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-) (Workspace, error) {
+) (spec.Workspace, error) {
 	return q.workspaces.Get(ctx, workspace)
 }
 
 func (q *QueryService) Resolve(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-	reference Reference,
-) (Resource, error) {
+	reference spec.Reference,
+) (spec.Resource, error) {
 	if (reference.Artifact == nil) == (reference.Selector == nil) {
-		return Resource{}, fmt.Errorf(
+		return spec.Resource{}, fmt.Errorf(
 			"%w: exactly one ArtifactRef or selector is required",
-			ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	view, err := q.Catalog(ctx, workspace)
 	if err != nil {
-		return Resource{}, err
+		return spec.Resource{}, err
 	}
 	if !view.Workspace.Collection.Enabled {
-		return Resource{}, fmt.Errorf("%w: Workspace is disabled", ErrReferenceUnresolved)
+		return spec.Resource{}, fmt.Errorf("%w: Workspace is disabled", spec.ErrReferenceUnresolved)
 	}
 	if !view.CatalogCurrent {
-		return Resource{}, basespec.ErrCatalogStale
+		return spec.Resource{}, basespec.ErrCatalogStale
 	}
 
 	if reference.Artifact != nil {
 		if reference.Artifact.RootID != workspace.RootID {
-			return Resource{}, ErrReferenceUnresolved
+			return spec.Resource{}, spec.ErrReferenceUnresolved
 		}
 		for _, resourceValue := range view.Resources {
 			if resourceValue.Artifact.ID == reference.Artifact.ArtifactID {
@@ -134,18 +135,18 @@ func (q *QueryService) Resolve(
 					resourceValue.Artifact.State != artifact.StateAvailable ||
 					!resourceValue.CatalogCurrent ||
 					!resourceValue.ProjectionValid {
-					return Resource{}, fmt.Errorf(
+					return spec.Resource{}, fmt.Errorf(
 						"%w: Artifact %q is not currently eligible",
-						ErrReferenceUnresolved,
+						spec.ErrReferenceUnresolved,
 						reference.Artifact.ArtifactID,
 					)
 				}
 				return resourceValue, nil
 			}
 		}
-		return Resource{}, fmt.Errorf(
+		return spec.Resource{}, fmt.Errorf(
 			"%w: Artifact %q does not belong to Workspace %q",
-			ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			reference.Artifact.ArtifactID,
 			workspace.CollectionID,
 		)
@@ -153,10 +154,10 @@ func (q *QueryService) Resolve(
 
 	selector := *reference.Selector
 	if err := validateWorkspaceSelector(selector); err != nil {
-		return Resource{}, err
+		return spec.Resource{}, err
 	}
 
-	var selected *Resource
+	var selected *spec.Resource
 
 	for index := range view.Resources {
 		resourceValue := &view.Resources[index]
@@ -168,13 +169,13 @@ func (q *QueryService) Resolve(
 			continue
 		}
 		if selected != nil {
-			return Resource{}, ErrReferenceAmbiguous
+			return spec.Resource{}, spec.ErrReferenceAmbiguous
 		}
 		copyValue := *resourceValue
 		selected = &copyValue
 	}
 	if selected == nil {
-		return Resource{}, ErrReferenceUnresolved
+		return spec.Resource{}, spec.ErrReferenceUnresolved
 	}
 	return *selected, nil
 }
@@ -182,13 +183,13 @@ func (q *QueryService) Resolve(
 func (q *QueryService) ResolveArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (Workspace, Resource, error) {
+) (spec.Workspace, spec.Resource, error) {
 	if err := ref.Validate(); err != nil {
-		return Workspace{}, Resource{}, err
+		return spec.Workspace{}, spec.Resource{}, err
 	}
 	value, err := q.artifacts.Get(ctx, ref)
 	if err != nil {
-		return Workspace{}, Resource{}, err
+		return spec.Workspace{}, spec.Resource{}, err
 	}
 	workspaceRef := collection.CollectionRef{
 		RootID:       value.RootID,
@@ -196,20 +197,20 @@ func (q *QueryService) ResolveArtifact(
 	}
 	workspace, err := q.workspaces.Get(ctx, workspaceRef)
 	if err != nil {
-		return Workspace{}, Resource{}, err
+		return spec.Workspace{}, spec.Resource{}, err
 	}
 	view, err := q.Catalog(ctx, workspaceRef)
 	if err != nil {
-		return Workspace{}, Resource{}, err
+		return spec.Workspace{}, spec.Resource{}, err
 	}
 	for _, resourceValue := range view.Resources {
 		if resourceValue.Artifact.ID == value.ID {
 			return workspace, resourceValue, nil
 		}
 	}
-	return workspace, Resource{}, fmt.Errorf(
+	return workspace, spec.Resource{}, fmt.Errorf(
 		"%w: Artifact %q is not a current Workspace resource",
-		ErrReferenceUnresolved,
+		spec.ErrReferenceUnresolved,
 		ref.ArtifactID,
 	)
 }
@@ -218,33 +219,33 @@ func (q *QueryService) ComposeLoadPlan(
 	ctx context.Context,
 	workspace collection.CollectionRef,
 	artifactRefs []artifact.ArtifactRef,
-) (LoadPlan, error) {
+) (spec.LoadPlan, error) {
 	view, err := q.Catalog(ctx, workspace)
 	if err != nil {
-		return LoadPlan{}, err
+		return spec.LoadPlan{}, err
 	}
 	requested := make(map[basespec.ArtifactID]struct{}, len(artifactRefs))
 	for _, ref := range artifactRefs {
 		if err := ref.Validate(); err != nil {
-			return LoadPlan{}, err
+			return spec.LoadPlan{}, err
 		}
 		if ref.RootID != workspace.RootID {
-			return LoadPlan{}, fmt.Errorf(
+			return spec.LoadPlan{}, fmt.Errorf(
 				"%w: ArtifactRef belongs to another Root",
-				ErrReferenceUnresolved,
+				spec.ErrReferenceUnresolved,
 			)
 		}
 		if _, duplicate := requested[ref.ArtifactID]; duplicate {
-			return LoadPlan{}, fmt.Errorf(
+			return spec.LoadPlan{}, fmt.Errorf(
 				"%w: duplicate load-plan Artifact %q",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				ref.ArtifactID,
 			)
 		}
 		requested[ref.ArtifactID] = struct{}{}
 	}
 
-	plan := LoadPlan{
+	plan := spec.LoadPlan{
 		Workspace:       workspace,
 		CatalogRevision: view.Catalog.Revision,
 		Diagnostics: diagnostic.AppendDiagnostics(
@@ -252,7 +253,7 @@ func (q *QueryService) ComposeLoadPlan(
 			view.FreshnessDiagnostics...,
 		),
 	}
-	resources := make(map[basespec.ArtifactID]Resource, len(view.Resources))
+	resources := make(map[basespec.ArtifactID]spec.Resource, len(view.Resources))
 	for _, value := range view.Resources {
 		resources[value.Artifact.ID] = value
 	}
@@ -362,7 +363,7 @@ func (q *QueryService) ComposeLoadPlan(
 				sourceContentDigest = *resourceValue.Occurrence.SourceContentDigest
 			}
 		}
-		plan.Items = append(plan.Items, LoadPlanItem{
+		plan.Items = append(plan.Items, spec.LoadPlanItem{
 			Artifact:                   resourceValue.Artifact,
 			Definition:                 resourceValue.Definition,
 			Source:                     resourceValue.Source,
@@ -385,23 +386,23 @@ func (q *QueryService) ComposeLoadPlan(
 func (q *QueryService) Catalog(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-) (CatalogView, error) {
+) (spec.CatalogView, error) {
 	if err := workspace.Validate(); err != nil {
-		return CatalogView{}, err
+		return spec.CatalogView{}, err
 	}
 	workspaceValue, err := q.workspaces.Get(ctx, workspace)
 	if err != nil {
-		return CatalogView{}, err
+		return spec.CatalogView{}, err
 	}
 	snapshot, catalogErr := catalog.ReadCurrent(ctx, q.catalogs, workspace)
 	if catalogErr != nil &&
 		!errors.Is(catalogErr, basespec.ErrCatalogStale) {
-		return CatalogView{}, catalogErr
+		return spec.CatalogView{}, catalogErr
 	}
 
 	currentDecoderFingerprint, err := q.decoderFingerprint()
 	if err != nil {
-		return CatalogView{}, err
+		return spec.CatalogView{}, err
 	}
 	catalogCurrent := catalogErr == nil &&
 		q.catalogIsCurrent(
@@ -444,7 +445,7 @@ func (q *QueryService) Catalog(
 
 	artifacts, err := q.artifacts.ListByCollection(ctx, workspace)
 	if err != nil {
-		return CatalogView{}, err
+		return spec.CatalogView{}, err
 	}
 	occurrencesByKey := make(map[occurrenceKindKey]catalog.Occurrence)
 	for _, occurrence := range snapshot.Occurrences {
@@ -464,7 +465,7 @@ func (q *QueryService) Catalog(
 	}
 
 	recorded := make(map[occurrenceKindKey]struct{}, len(artifacts))
-	view := CatalogView{
+	view := spec.CatalogView{
 		Workspace:            workspaceValue,
 		Catalog:              snapshot,
 		CatalogCurrent:       catalogCurrent,
@@ -509,7 +510,7 @@ func (q *QueryService) Catalog(
 		)
 		if err != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return CatalogView{}, ctxErr
+				return spec.CatalogView{}, ctxErr
 			}
 			view.UnresolvedArtifacts = append(
 				view.UnresolvedArtifacts,
@@ -576,7 +577,7 @@ func (q *QueryService) Catalog(
 			*occurrencePointer.DefinitionDigest ==
 				*localArtifact.ResolvedDefinition
 
-		view.Resources = append(view.Resources, Resource{
+		view.Resources = append(view.Resources, spec.Resource{
 			Artifact:        localArtifact,
 			Definition:      definitionValue,
 			Occurrence:      occurrencePointer,
@@ -618,7 +619,7 @@ func (q *QueryService) Catalog(
 }
 
 func (q *QueryService) catalogIsCurrent(
-	workspaceValue Workspace,
+	workspaceValue spec.Workspace,
 	snapshot catalog.Snapshot,
 	currentDecoderFingerprint cryptoutil.Digest,
 ) bool {
@@ -763,7 +764,7 @@ func validateWorkspaceSelector(selector definition.Selector) error {
 		strings.ContainsAny(constraint, "<>~^*|") {
 		return fmt.Errorf(
 			"%w: Workspace supports only exact logical-version selectors",
-			ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	if err := basespec.ValidateLogicalVersion(
@@ -776,15 +777,15 @@ func validateWorkspaceSelector(selector definition.Selector) error {
 }
 
 func groupCatalogResources(
-	resources []Resource,
+	resources []spec.Resource,
 	unrecorded []catalog.Occurrence,
-) []ResourceGroup {
-	values := make(map[basespec.ArtifactKind]*ResourceGroup)
+) []spec.ResourceGroup {
+	values := make(map[basespec.ArtifactKind]*spec.ResourceGroup)
 	for _, resourceValue := range resources {
 		kind := resourceValue.Artifact.Kind
 		group := values[kind]
 		if group == nil {
-			group = &ResourceGroup{Kind: kind}
+			group = &spec.ResourceGroup{Kind: kind}
 			values[kind] = group
 		}
 		group.Resources = append(group.Resources, resourceValue)
@@ -795,13 +796,13 @@ func groupCatalogResources(
 		}
 		group := values[occurrence.Kind]
 		if group == nil {
-			group = &ResourceGroup{Kind: occurrence.Kind}
+			group = &spec.ResourceGroup{Kind: occurrence.Kind}
 			values[occurrence.Kind] = group
 		}
 		group.Unrecorded = append(group.Unrecorded, occurrence)
 	}
 
-	output := make([]ResourceGroup, 0, len(values))
+	output := make([]spec.ResourceGroup, 0, len(values))
 	for _, group := range values {
 		output = append(output, *group)
 	}

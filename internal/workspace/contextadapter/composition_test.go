@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestCompositionPolicyNormalizationAndValidation(t *testing.T) {
@@ -33,7 +33,7 @@ func TestCompositionPolicyNormalizationAndValidation(t *testing.T) {
 		{MaxPromptBytes: 8, MaxDocumentBytes: 8, Overflow: "discard"},
 	}
 	for _, value := range cases {
-		if err := value.Validate(); !errors.Is(err, engine.ErrInvalidWorkspace) {
+		if err := value.Validate(); !errors.Is(err, spec.ErrInvalidWorkspace) {
 			t.Errorf("CompositionPolicy(%#v).Validate() error=%v, want ErrInvalidWorkspace", value, err)
 		}
 	}

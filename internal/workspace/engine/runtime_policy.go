@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type RuntimeUse string
@@ -27,7 +28,7 @@ const (
 
 type RuntimePolicyRequest struct {
 	Use              RuntimeUse
-	Workspace        Workspace
+	Workspace        spec.Workspace
 	Artifact         artifact.Artifact
 	DefinitionDigest cryptoutil.Digest
 	SourceID         basespec.SourceID
@@ -45,7 +46,7 @@ func (d RuntimeDecision) Validate() error {
 		if d.Code != "" || d.Message != "" {
 			return fmt.Errorf(
 				"%w: allowed runtime decision cannot contain denial details",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 			)
 		}
 		return nil
@@ -67,7 +68,7 @@ func (d RuntimeDecision) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported runtime disposition %q",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			d.Disposition,
 		)
 	}

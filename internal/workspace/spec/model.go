@@ -1,7 +1,7 @@
-package engine
+package spec
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -9,20 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine/portable"
-)
-
-var (
-	ErrInvalidWorkspace           = errors.New("workspace: invalid")
-	ErrNotWorkspace               = errors.New("workspace: collection is not a Workspace")
-	ErrPrimarySourceRequired      = errors.New("workspace: primary source is required")
-	ErrPrimarySourceImmutable     = errors.New("workspace: primary source is immutable")
-	ErrReferenceUnresolved        = errors.New("workspace: reference unresolved")
-	ErrReferenceAmbiguous         = errors.New("workspace: reference ambiguous")
-	ErrWorkspaceDefinitionInvalid = errors.New("workspace: descriptor invalid")
 )
 
 type Mode string
@@ -32,13 +20,19 @@ const (
 	ModeFilesystem Mode = "filesystem"
 )
 
+type DirectoryRoot struct {
+	Root            basespec.Locator
+	Recursive       bool
+	IncludePatterns []string
+}
+
 // DiscoveryProfile defines discovery rules for one attachment class.
 //
 // Artifact adapters contribute their own conventions through this type.
 type DiscoveryProfile struct {
 	ExplicitLocators []basespec.Locator
 	ReadmeLocator    basespec.Locator
-	DirectoryRoots   []discovery.DirectoryRoot
+	DirectoryRoots   []DirectoryRoot
 }
 
 type DiscoveryProfiles struct {
@@ -203,30 +197,6 @@ type LoadPlan struct {
 	Diagnostics     []diagnostic.Diagnostic `json:"-"`
 }
 
-// Descriptor is the portable Collection Definition stored at
-// .flexigpt/workspace.json. Its domain body contains Workspace discovery
-// policy while its generic Members field contains relative or external member
-// references.
-type Descriptor = portable.CollectionDefinition
-
-type DescriptorObservation struct {
-	Preferences            DiscoveryPreferences
-	SourceID               basespec.SourceID
-	Generation             string
-	ExpectedContentDigests map[basespec.Locator]cryptoutil.Digest
-}
-
-type attachmentOperation struct {
-	role                                 basespec.AttachmentRole
-	canAttach                            bool
-	isPrimary                            bool
-	requiredSourceKind                   basespec.SourceKind
-	defaultAuthoritative                 bool
-	includeReadmeWhenRequested           bool
-	appliesWorkspaceDiscoveryPreferences bool
-	allowsAttachmentDiscoveryOverrides   bool
-}
-
 type DefinitionValidator func(definition.Definition) error
 
 type ArtifactSupport struct {
@@ -234,4 +204,24 @@ type ArtifactSupport struct {
 	SchemaID  basespec.SchemaID
 	DecoderID basespec.DecoderID
 	Validator DefinitionValidator
+}
+
+func (s ArtifactSupport) Validate() error {
+	if err := basespec.ValidateArtifactKind(s.Kind); err != nil {
+		return err
+	}
+	if err := basespec.ValidateSchemaID(s.SchemaID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateDecoderID(s.DecoderID); err != nil {
+		return err
+	}
+	if s.Validator == nil {
+		return fmt.Errorf(
+			"%w: Workspace artifact support %q has no semantic validator",
+			ErrInvalidWorkspace,
+			s.Kind,
+		)
+	}
+	return nil
 }

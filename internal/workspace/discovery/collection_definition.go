@@ -1,6 +1,4 @@
-// Package portable defines Artifact Store's portable, content-addressed
-// collection envelope and source-independent member references.
-package portable
+package discovery
 
 import (
 	"encoding/json"

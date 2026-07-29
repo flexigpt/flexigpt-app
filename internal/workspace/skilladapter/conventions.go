@@ -7,9 +7,8 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 const DefaultWorkspaceSkillRoot basespec.Locator = ".flexigpt/skills"
@@ -44,7 +43,7 @@ func NewConventionRegistry(
 		if _, duplicate := seen[root]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate Workspace Skill root %q",
-				engine.ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				root,
 			)
 		}
@@ -67,12 +66,12 @@ func (r *ConventionRegistry) Roots() []SkillRootConvention {
 	return append([]SkillRootConvention(nil), r.roots...)
 }
 
-func (r *ConventionRegistry) DiscoveryProfile() engine.DiscoveryProfile {
-	var output engine.DiscoveryProfile
+func (r *ConventionRegistry) DiscoveryProfile() spec.DiscoveryProfile {
+	var output spec.DiscoveryProfile
 	for _, root := range r.Roots() {
 		output.DirectoryRoots = append(
 			output.DirectoryRoots,
-			discovery.DirectoryRoot{
+			spec.DirectoryRoot{
 				Root:      root.Root,
 				Recursive: root.Recursive,
 				IncludePatterns: []string{

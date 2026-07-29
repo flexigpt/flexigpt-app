@@ -1,4 +1,4 @@
-package engine
+package discovery
 
 import (
 	"fmt"
@@ -8,23 +8,25 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type Planner struct {
 	decoderIDs              []basespec.DecoderID
-	profiles                DiscoveryProfiles
+	profiles                spec.DiscoveryProfiles
 	discoveryPolicyRevision string
 }
 
 func NewPlanner(
-	profiles DiscoveryProfiles,
+	profiles spec.DiscoveryProfiles,
 	discoveryPolicyRevision string,
 	decoderIDs ...basespec.DecoderID,
 ) (*Planner, error) {
 	if err := validateDiscoveryProfiles(profiles); err != nil {
 		return nil, fmt.Errorf(
 			"%w: %w",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			err,
 		)
 	}
@@ -39,7 +41,7 @@ func NewPlanner(
 		len(profiles.Primary.DirectoryRoots) == 0 {
 		return nil, fmt.Errorf(
 			"%w: primary discovery profile is required",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 
@@ -59,7 +61,7 @@ func NewPlanner(
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: Workspace discovery requires at least one decoder",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	slices.Sort(values)
@@ -71,10 +73,10 @@ func NewPlanner(
 }
 
 func (p *Planner) Build(
-	value Workspace,
+	value spec.Workspace,
 	observation DescriptorObservation,
 ) (discovery.Plan, error) {
-	preferences, err := mergeDiscoveryPreferences(
+	preferences, err := MergeDiscoveryPreferences(
 		value.Data.Discovery,
 		observation.Preferences,
 	)
@@ -91,54 +93,54 @@ func (p *Planner) Build(
 		if _, duplicate := sourcesByID[sourceValue.ID]; duplicate {
 			return discovery.Plan{}, fmt.Errorf(
 				"%w: duplicate Workspace source %q",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				sourceValue.ID,
 			)
 		}
 		sourcesByID[sourceValue.ID] = sourceValue.Enabled
 	}
 
-	for _, attachment := range value.Attachments {
-		if !attachment.Enabled {
+	for _, att := range value.Attachments {
+		if !att.Enabled {
 			continue
 		}
-		sourceEnabled, exists := sourcesByID[attachment.SourceID]
+		sourceEnabled, exists := sourcesByID[att.SourceID]
 		if !exists {
 			return discovery.Plan{}, fmt.Errorf(
 				"%w: attachment source %q is unavailable",
-				ErrInvalidWorkspace,
-				attachment.SourceID,
+				spec.ErrInvalidWorkspace,
+				att.SourceID,
 			)
 		}
 		if !sourceEnabled {
 			continue
 		}
-		operation, supported := attachmentOperationFor(attachment.Role)
+		operation, supported := attachmentdata.AttachmentOperationFor(att.Role)
 		if !supported {
 			return discovery.Plan{}, fmt.Errorf(
 				"%w: unsupported attachment role %q",
-				ErrInvalidWorkspace,
-				attachment.Role,
+				spec.ErrInvalidWorkspace,
+				att.Role,
 			)
 		}
 		profile := p.profiles.Attached
-		if operation.isPrimary {
+		if operation.IsPrimary {
 			profile = p.profiles.Primary
 		}
-		attachmentData, err := decodeAttachmentData(attachment.Data)
+		attachmentData, err := attachmentdata.DecodeAttachmentData(att.Data)
 		if err != nil {
 			return discovery.Plan{}, err
 		}
-		if err := validateAttachmentDataForRole(attachment.Role, attachmentData); err != nil {
+		if err := attachmentdata.ValidateAttachmentDataForRole(att.Role, attachmentData); err != nil {
 			return discovery.Plan{}, err
 		}
 		sourcePlan := discovery.SourcePlan{
-			SourceID: attachment.SourceID,
+			SourceID: att.SourceID,
 			AllowedDecoderIDs: append(
 				[]basespec.DecoderID(nil),
 				p.decoderIDs...,
 			),
-			Authoritative:     operation.defaultAuthoritative,
+			Authoritative:     operation.DefaultAuthoritative,
 			MaxCandidateBytes: basespec.MaxCandidateBytes,
 			MaxTotalBytes:     basespec.MaxScanBytes,
 			MaxCandidates:     basespec.DefaultMaxCandidates,
@@ -152,7 +154,7 @@ func (p *Planner) Build(
 				profile.DirectoryRoots,
 			),
 		}
-		profilePreferences := DiscoveryPreferences{
+		profilePreferences := spec.DiscoveryPreferences{
 			AdditionalLocators: append(
 				[]basespec.Locator(nil),
 				profile.ExplicitLocators...,
@@ -161,7 +163,7 @@ func (p *Planner) Build(
 		for _, root := range profile.DirectoryRoots {
 			profilePreferences.AdditionalRoots = append(
 				profilePreferences.AdditionalRoots,
-				DiscoveryRoot{
+				spec.DiscoveryRoot{
 					Root:            root.Root,
 					Recursive:       root.Recursive,
 					IncludePatterns: append([]string(nil), root.IncludePatterns...),
@@ -174,14 +176,14 @@ func (p *Planner) Build(
 			p.decoderIDs,
 		)
 
-		if operation.includeReadmeWhenRequested &&
+		if operation.IncludeReadmeWhenRequested &&
 			preferences.IncludeReadme && profile.ReadmeLocator != "" {
 			sourcePlan.ExplicitLocators = appendUniqueLocators(
 				sourcePlan.ExplicitLocators,
 				profile.ReadmeLocator,
 			)
 		}
-		if operation.appliesWorkspaceDiscoveryPreferences {
+		if operation.AppliesWorkspaceDiscoveryPreferences {
 			sourcePlan.ExplicitLocators = appendUniqueLocators(
 				sourcePlan.ExplicitLocators,
 				preferences.AdditionalLocators...,
@@ -195,19 +197,19 @@ func (p *Planner) Build(
 				preferences,
 				p.decoderIDs,
 			)
-			if attachment.SourceID == observation.SourceID {
+			if att.SourceID == observation.SourceID {
 				sourcePlan.ExpectedContentDigests = maps.Clone(
 					observation.ExpectedContentDigests,
 				)
 			}
 		}
-		if operation.allowsAttachmentDiscoveryOverrides {
+		if operation.AllowsAttachmentDiscoveryOverrides {
 			if attachmentData.Recursive != nil {
 				if len(sourcePlan.DirectoryRoots) == 0 {
 					return discovery.Plan{}, fmt.Errorf(
 						"%w: attachment role %q has no directory root to override",
-						ErrInvalidWorkspace,
-						attachment.Role,
+						spec.ErrInvalidWorkspace,
+						att.Role,
 					)
 				}
 				sourcePlan.DirectoryRoots[0].Recursive = *attachmentData.Recursive
@@ -234,7 +236,7 @@ func (p *Planner) Build(
 
 func appendDiscoveryPreferenceDecoderHints(
 	current []discovery.DecoderHint,
-	preferences DiscoveryPreferences,
+	preferences spec.DiscoveryPreferences,
 	decoderIDs []basespec.DecoderID,
 ) []discovery.DecoderHint {
 	type scope struct {
@@ -305,14 +307,14 @@ func appendDiscoveryPreferenceDecoderHints(
 	return output
 }
 
-func cloneDiscoveryProfiles(value DiscoveryProfiles) DiscoveryProfiles {
-	return DiscoveryProfiles{
-		Primary: DiscoveryProfile{
+func cloneDiscoveryProfiles(value spec.DiscoveryProfiles) spec.DiscoveryProfiles {
+	return spec.DiscoveryProfiles{
+		Primary: spec.DiscoveryProfile{
 			ExplicitLocators: append([]basespec.Locator(nil), value.Primary.ExplicitLocators...),
 			ReadmeLocator:    value.Primary.ReadmeLocator,
 			DirectoryRoots:   cloneDirectoryRoots(value.Primary.DirectoryRoots),
 		},
-		Attached: DiscoveryProfile{
+		Attached: spec.DiscoveryProfile{
 			ExplicitLocators: append([]basespec.Locator(nil), value.Attached.ExplicitLocators...),
 			ReadmeLocator:    value.Attached.ReadmeLocator,
 			DirectoryRoots:   cloneDirectoryRoots(value.Attached.DirectoryRoots),
@@ -321,9 +323,9 @@ func cloneDiscoveryProfiles(value DiscoveryProfiles) DiscoveryProfiles {
 }
 
 func cloneDirectoryRoots(
-	values []discovery.DirectoryRoot,
-) []discovery.DirectoryRoot {
-	output := make([]discovery.DirectoryRoot, len(values))
+	values []spec.DirectoryRoot,
+) []spec.DirectoryRoot {
+	output := make([]spec.DirectoryRoot, len(values))
 	for index, value := range values {
 		output[index] = value
 		output[index].IncludePatterns = append(
@@ -338,10 +340,10 @@ func cloneDirectoryRoots(
 // without creating duplicate locators or directory roots. An empty pattern
 // list means all files and therefore dominates narrower include patterns.
 func MergeDiscoveryProfile(
-	base DiscoveryProfile,
-	additions DiscoveryProfile,
-) DiscoveryProfile {
-	output := DiscoveryProfile{
+	base spec.DiscoveryProfile,
+	additions spec.DiscoveryProfile,
+) spec.DiscoveryProfile {
+	output := spec.DiscoveryProfile{
 		ExplicitLocators: appendUniqueLocators(
 			nil,
 			base.ExplicitLocators...,
@@ -383,12 +385,12 @@ func appendUniqueLocators(
 }
 
 func appendDiscoveryRoots(
-	values []discovery.DirectoryRoot,
-	additions []DiscoveryRoot,
-) []discovery.DirectoryRoot {
-	converted := make([]discovery.DirectoryRoot, 0, len(additions))
+	values []spec.DirectoryRoot,
+	additions []spec.DiscoveryRoot,
+) []spec.DirectoryRoot {
+	converted := make([]spec.DirectoryRoot, 0, len(additions))
 	for _, addition := range additions {
-		converted = append(converted, discovery.DirectoryRoot{
+		converted = append(converted, spec.DirectoryRoot{
 			Root:      addition.Root,
 			Recursive: addition.Recursive,
 			IncludePatterns: append(
@@ -401,9 +403,9 @@ func appendDiscoveryRoots(
 }
 
 func appendDirectoryRoots(
-	values []discovery.DirectoryRoot,
-	additions ...discovery.DirectoryRoot,
-) []discovery.DirectoryRoot {
+	values []spec.DirectoryRoot,
+	additions ...spec.DirectoryRoot,
+) []spec.DirectoryRoot {
 	output := cloneDirectoryRoots(values)
 	for _, addition := range additions {
 		addition.IncludePatterns = append(
@@ -416,7 +418,7 @@ func appendDirectoryRoots(
 				continue
 			}
 			output[index].Recursive = output[index].Recursive || addition.Recursive
-			output[index].IncludePatterns = mergePatterns(
+			output[index].IncludePatterns = MergePatterns(
 				output[index].IncludePatterns,
 				addition.IncludePatterns,
 			)
@@ -431,18 +433,18 @@ func appendDirectoryRoots(
 	return output
 }
 
-func mergeDiscoveryPreferences(
+func MergeDiscoveryPreferences(
 	left,
-	right DiscoveryPreferences,
-) (DiscoveryPreferences, error) {
+	right spec.DiscoveryPreferences,
+) (spec.DiscoveryPreferences, error) {
 	if err := validateDiscoveryPreferences(left); err != nil {
-		return DiscoveryPreferences{}, err
+		return spec.DiscoveryPreferences{}, err
 	}
 	if err := validateDiscoveryPreferences(right); err != nil {
-		return DiscoveryPreferences{}, err
+		return spec.DiscoveryPreferences{}, err
 	}
 
-	output := DiscoveryPreferences{
+	output := spec.DiscoveryPreferences{
 		IncludeReadme: left.IncludeReadme || right.IncludeReadme,
 	}
 	locators := make(map[basespec.Locator]struct{})
@@ -462,8 +464,8 @@ func mergeDiscoveryPreferences(
 		}
 	}
 
-	roots := make(map[basespec.Locator]DiscoveryRoot)
-	for _, values := range [][]DiscoveryRoot{
+	roots := make(map[basespec.Locator]spec.DiscoveryRoot)
+	for _, values := range [][]spec.DiscoveryRoot{
 		left.AdditionalRoots,
 		right.AdditionalRoots,
 	} {
@@ -477,7 +479,7 @@ func mergeDiscoveryPreferences(
 				)
 			} else {
 				current.Recursive = current.Recursive || root.Recursive
-				current.IncludePatterns = mergePatterns(
+				current.IncludePatterns = MergePatterns(
 					current.IncludePatterns,
 					root.IncludePatterns,
 				)
@@ -496,7 +498,7 @@ func mergeDiscoveryPreferences(
 	return output, validateDiscoveryPreferences(output)
 }
 
-func mergePatterns(left, right []string) []string {
+func MergePatterns(left, right []string) []string {
 	if len(left) == 0 || len(right) == 0 {
 		return nil
 	}
@@ -513,4 +515,80 @@ func mergePatterns(left, right []string) []string {
 	}
 	sort.Strings(output)
 	return output
+}
+
+func validateDiscoveryProfiles(value spec.DiscoveryProfiles) error {
+	if err := validateDiscoveryProfile(value.Primary); err != nil {
+		return err
+	}
+	return validateDiscoveryProfile(value.Attached)
+}
+
+func validateDiscoveryProfile(value spec.DiscoveryProfile) error {
+	roots := make([]spec.DiscoveryRoot, 0, len(value.DirectoryRoots))
+	for _, root := range value.DirectoryRoots {
+		roots = append(roots, spec.DiscoveryRoot{
+			Root:            root.Root,
+			Recursive:       root.Recursive,
+			IncludePatterns: append([]string(nil), root.IncludePatterns...),
+		})
+	}
+	if err := validateDiscoveryPreferences(spec.DiscoveryPreferences{
+		AdditionalLocators: append(
+			[]basespec.Locator(nil),
+			value.ExplicitLocators...,
+		),
+		AdditionalRoots: roots,
+	}); err != nil {
+		return err
+	}
+	if value.ReadmeLocator == "" {
+		return nil
+	}
+	return basespec.ValidateLocator(value.ReadmeLocator, false)
+}
+
+func validateDiscoveryPreferences(
+	value spec.DiscoveryPreferences,
+) error {
+	seenLocators := make(map[basespec.Locator]struct{})
+	for _, locator := range value.AdditionalLocators {
+		if err := basespec.ValidateLocator(locator, false); err != nil {
+			return err
+		}
+		if _, duplicate := seenLocators[locator]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate discovery locator %q",
+				basespec.ErrInvalid,
+				locator,
+			)
+		}
+		seenLocators[locator] = struct{}{}
+	}
+
+	seenRoots := make(map[basespec.Locator]struct{})
+	for _, root := range value.AdditionalRoots {
+		if err := basespec.ValidateLocator(root.Root, true); err != nil {
+			return err
+		}
+		if _, duplicate := seenRoots[root.Root]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate discovery root %q",
+				basespec.ErrInvalid,
+				root.Root,
+			)
+		}
+		seenRoots[root.Root] = struct{}{}
+		seenPatterns := make(map[string]struct{}, len(root.IncludePatterns))
+		for _, pattern := range root.IncludePatterns {
+			if err := discovery.ValidateIncludePattern(pattern); err != nil {
+				return err
+			}
+			if _, duplicate := seenPatterns[pattern]; duplicate {
+				return fmt.Errorf("%w: duplicate include pattern %q", basespec.ErrInvalid, pattern)
+			}
+			seenPatterns[pattern] = struct{}{}
+		}
+	}
+	return nil
 }

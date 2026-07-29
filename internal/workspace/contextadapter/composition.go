@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type OverflowBehavior string
@@ -60,14 +60,14 @@ func (p CompositionPolicy) Validate() error {
 		p.MaxPromptBytes > basespec.MaxDefinitionBodyBytes {
 		return fmt.Errorf(
 			"%w: Context prompt byte budget is invalid",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if p.MaxDocumentBytes <= 0 ||
 		p.MaxDocumentBytes > p.MaxPromptBytes {
 		return fmt.Errorf(
 			"%w: Context per-document byte budget is invalid",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	switch p.Overflow {
@@ -76,7 +76,7 @@ func (p CompositionPolicy) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Context overflow behavior %q",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			p.Overflow,
 		)
 	}

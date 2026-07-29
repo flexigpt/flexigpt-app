@@ -8,12 +8,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewService(nil, nil, "policy.v1"); !errors.Is(err, ErrInvalidWorkspace) {
+	if _, err := NewService(nil, nil, "policy.v1"); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("NewService(nil,nil) error=%v", err)
 	}
 
@@ -50,22 +51,22 @@ func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 		t.Fatalf("NewService: %v", err)
 	}
 	got, err := service.Get(t.Context(), workspace.Collection.Ref())
-	if err != nil || got.Mode != ModeFilesystem || got.PrimarySourceID != workspace.PrimarySourceID ||
+	if err != nil || got.Mode != spec.ModeFilesystem || got.PrimarySourceID != workspace.PrimarySourceID ||
 		got.Attachments[0].SourceID > got.Attachments[1].SourceID || got.Sources[0].ID > got.Sources[1].ID {
 		t.Fatalf("Get workspace=%#v err=%v", got, err)
 	}
 	if _, err := service.SetPrimary(
 		t.Context(),
-		SetPrimaryRequest{Workspace: workspace.Collection.Ref()},
+		spec.SetPrimaryRequest{Workspace: workspace.Collection.Ref()},
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
 		t.Fatalf("SetPrimary missing revision error=%v", err)
 	}
 	if _, err := service.SetPrimary(
 		t.Context(),
-		SetPrimaryRequest{
+		spec.SetPrimaryRequest{
 			Workspace:                  workspace.Collection.Ref(),
 			ExpectedCollectionRevision: 1,
 			Clear:                      true,
@@ -73,7 +74,7 @@ func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 		},
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
 		t.Fatalf("SetPrimary incompatible clear/source error=%v", err)
 	}
@@ -85,7 +86,7 @@ func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 		0,
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
 		t.Fatalf("Detach missing revisions error=%v", err)
 	}
@@ -106,10 +107,10 @@ func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 	}
 	if _, err := disabledService.CreateFilesystem(
 		t.Context(),
-		FilesystemWorkspaceRequest{RootID: workspace.Collection.RootID, PrimarySourceID: disabledSource.ID},
+		spec.FilesystemWorkspaceRequest{RootID: workspace.Collection.RootID, PrimarySourceID: disabledSource.ID},
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
 		t.Fatalf("CreateFilesystem disabled source error=%v", err)
 	}
@@ -136,10 +137,10 @@ func TestServiceGetAndLifecycleGuardrails(t *testing.T) {
 	}
 	if _, err := kindService.CreateFilesystem(
 		t.Context(),
-		FilesystemWorkspaceRequest{RootID: workspace.Collection.RootID, PrimarySourceID: wrongKind.ID},
+		spec.FilesystemWorkspaceRequest{RootID: workspace.Collection.RootID, PrimarySourceID: wrongKind.ID},
 	); !errors.Is(
 		err,
-		ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
 		t.Fatalf("CreateFilesystem wrong kind error=%v", err)
 	}
@@ -160,7 +161,7 @@ func TestServicePurgeChecksRetiredWorkspaceIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
-	if err := service.Purge(t.Context(), workspace.Collection.Ref(), 0); !errors.Is(err, ErrInvalidWorkspace) {
+	if err := service.Purge(t.Context(), workspace.Collection.Ref(), 0); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("Purge missing revision error=%v", err)
 	}
 	wrongKind := retired
@@ -174,7 +175,7 @@ func TestServicePurgeChecksRetiredWorkspaceIdentity(t *testing.T) {
 		retired.Revision,
 	); !errors.Is(
 		err,
-		ErrNotWorkspace,
+		spec.ErrNotWorkspace,
 	) {
 		t.Fatalf("Purge wrong kind error=%v", err)
 	}

@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T) {
@@ -36,7 +36,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		t.Fatalf("CreateFilesystemWorkspace response=%#v err=%v", created, err)
 	}
 	workspaceView := *created.Body
-	if workspaceView.Mode != engine.ModeFilesystem || workspaceView.PrimarySourceID == "" ||
+	if workspaceView.Mode != spec.ModeFilesystem || workspaceView.PrimarySourceID == "" ||
 		workspaceView.PrimaryPath != filepath.Clean(directory) || len(workspaceView.Attachments) != 1 ||
 		workspaceView.Attachments[0].SourceKind != string(fsdir.Kind) ||
 		workspaceView.Attachments[0].Path != filepath.Clean(directory) {
@@ -342,7 +342,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		Body: &AttachWorkspaceSourceRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
 			SourceID:                   attachedSource.ID,
-			Role:                       engine.RoleLibrary,
+			Role:                       spec.RoleLibrary,
 			Enabled:                    true,
 		},
 	})
@@ -358,7 +358,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		Body: &UpdateWorkspaceAttachmentRequestBody{
 			ExpectedCollectionRevision: workspaceView.Revision,
 			ExpectedAttachmentRevision: attachment.Revision,
-			Role:                       engine.RoleLibrary,
+			Role:                       spec.RoleLibrary,
 			Enabled:                    true,
 			Settings:                   WorkspaceAttachmentSettings{Recursive: &falseValue},
 		},
@@ -389,7 +389,7 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 		RootID: fixture.root.ID,
 		Body:   &CreateEmptyWorkspaceRequestBody{DisplayName: "Empty workspace"},
 	})
-	if err != nil || empty == nil || empty.Body == nil || empty.Body.Mode != engine.ModeEmpty {
+	if err != nil || empty == nil || empty.Body == nil || empty.Body.Mode != spec.ModeEmpty {
 		t.Fatalf("CreateEmptyWorkspace response=%#v err=%v", empty, err)
 	}
 	workspaceView := *empty.Body
@@ -414,7 +414,7 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 			SourceID:                   primarySource.ID,
 		},
 	})
-	if err != nil || set == nil || set.Body == nil || set.Body.Mode != engine.ModeFilesystem ||
+	if err != nil || set == nil || set.Body == nil || set.Body.Mode != spec.ModeFilesystem ||
 		set.Body.PrimarySourceID != primarySource.ID {
 		t.Fatalf("SetWorkspacePrimarySource response=%#v err=%v", set, err)
 	}
@@ -450,7 +450,7 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 			Clear:                              true,
 		},
 	})
-	if err != nil || cleared == nil || cleared.Body == nil || cleared.Body.Mode != engine.ModeEmpty ||
+	if err != nil || cleared == nil || cleared.Body == nil || cleared.Body.Mode != spec.ModeEmpty ||
 		cleared.Body.PrimarySourceID != "" {
 		t.Fatalf("clear primary response=%#v err=%v", cleared, err)
 	}
@@ -496,7 +496,7 @@ func TestAPIEmptyWorkspacePrimaryTransitionsReferencesAndPurge(t *testing.T) {
 
 func TestAPIRejectsUninitializedClosedAndNilRequests(t *testing.T) {
 	var nilAPI *API
-	if _, err := nilAPI.GetWorkspace(t.Context(), &GetWorkspaceRequest{}); !errors.Is(err, engine.ErrInvalidWorkspace) {
+	if _, err := nilAPI.GetWorkspace(t.Context(), &GetWorkspaceRequest{}); !errors.Is(err, spec.ErrInvalidWorkspace) {
 		t.Fatalf("nil API GetWorkspace error=%v", err)
 	}
 
@@ -514,7 +514,7 @@ func TestAPIRejectsUninitializedClosedAndNilRequests(t *testing.T) {
 		{name: "load skills", call: func() error { _, err := fixture.api.LoadWorkspaceSkills(t.Context(), nil); return err }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if err := test.call(); !errors.Is(err, engine.ErrInvalidWorkspace) {
+			if err := test.call(); !errors.Is(err, spec.ErrInvalidWorkspace) {
 				t.Fatalf("error=%v, want ErrInvalidWorkspace", err)
 			}
 		})
@@ -533,7 +533,7 @@ func TestAPIRejectsUninitializedClosedAndNilRequests(t *testing.T) {
 		&ListWorkspacesRequest{RootID: fixture.root.ID},
 	); !errors.Is(
 		err,
-		engine.ErrInvalidWorkspace,
+		spec.ErrInvalidWorkspace,
 	) {
 		t.Fatalf("closed API error=%v", err)
 	}

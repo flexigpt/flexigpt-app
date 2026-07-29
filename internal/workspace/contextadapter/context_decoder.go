@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type ContextDecoder struct{}
@@ -31,8 +32,8 @@ func (*ContextDecoder) Revision() string {
 	return workspaceContextSchemaVersionV1
 }
 
-func DiscoveryProfile() engine.DiscoveryProfile {
-	var profile engine.DiscoveryProfile
+func DiscoveryProfile() spec.DiscoveryProfile {
+	var profile spec.DiscoveryProfile
 	for _, convention := range contextConventionRegistry {
 		locator := basespec.Locator(convention.FileName)
 		switch {
@@ -48,7 +49,7 @@ func DiscoveryProfile() engine.DiscoveryProfile {
 	return profile
 }
 
-func ArtifactSupport() engine.ArtifactSupport {
+func ArtifactSupport() spec.ArtifactSupport {
 	return artifactSupport
 }
 

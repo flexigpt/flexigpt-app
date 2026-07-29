@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 // RootLister is the narrow Root capability required to rebuild Workspace
@@ -51,7 +51,7 @@ func (d Dependencies) Validate() error {
 		d.DecoderFingerprint == nil {
 		return fmt.Errorf(
 			"%w: Workspace Artifact Store dependencies are incomplete",
-			engine.ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	return nil

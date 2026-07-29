@@ -1,10 +1,8 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -233,77 +231,4 @@ func (d engineTestDefinitions) Get(
 		return definition.Definition{}, errEngineTestUnexpected
 	}
 	return d.getFn(ctx, rootID, digest)
-}
-
-type engineTestRuntime struct {
-	getFn  func(context.Context, basespec.RootID, basespec.SourceID) (source.Source, error)
-	openFn func(context.Context, source.Source) (source.Snapshot, error)
-}
-
-func (r engineTestRuntime) Get(
-	ctx context.Context,
-	rootID basespec.RootID,
-	id basespec.SourceID,
-) (source.Source, error) {
-	if r.getFn == nil {
-		return source.Source{}, errEngineTestUnexpected
-	}
-	return r.getFn(ctx, rootID, id)
-}
-
-func (r engineTestRuntime) Open(ctx context.Context, value source.Source) (source.Snapshot, error) {
-	if r.openFn == nil {
-		return nil, errEngineTestUnexpected
-	}
-	return r.openFn(ctx, value)
-}
-
-type engineTestSnapshot struct {
-	generation string
-	entries    map[basespec.Locator]source.Entry
-	contents   map[basespec.Locator][]byte
-	statErrors map[basespec.Locator]error
-	openErrors map[basespec.Locator]error
-	confirmErr error
-	closeErr   error
-	confirmed  int
-	closed     int
-}
-
-func (s *engineTestSnapshot) Generation() string { return s.generation }
-
-func (s *engineTestSnapshot) Stat(_ context.Context, locator basespec.Locator) (source.Entry, error) {
-	if err := s.statErrors[locator]; err != nil {
-		return source.Entry{}, err
-	}
-	value, found := s.entries[locator]
-	if !found {
-		return source.Entry{}, basespec.ErrNotFound
-	}
-	return value, nil
-}
-
-func (*engineTestSnapshot) ReadDir(context.Context, basespec.Locator) ([]source.Entry, error) {
-	return nil, basespec.ErrNotFound
-}
-
-func (s *engineTestSnapshot) Open(_ context.Context, locator basespec.Locator) (io.ReadCloser, error) {
-	if err := s.openErrors[locator]; err != nil {
-		return nil, err
-	}
-	value, found := s.contents[locator]
-	if !found {
-		return nil, basespec.ErrNotFound
-	}
-	return io.NopCloser(bytes.NewReader(append([]byte(nil), value...))), nil
-}
-
-func (s *engineTestSnapshot) Confirm(context.Context) error {
-	s.confirmed++
-	return s.confirmErr
-}
-
-func (s *engineTestSnapshot) Close() error {
-	s.closed++
-	return s.closeErr
 }

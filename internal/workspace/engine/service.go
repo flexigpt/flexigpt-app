@@ -9,6 +9,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type Service struct {
@@ -25,7 +28,7 @@ func NewService(
 	if collections == nil || sources == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace service dependencies are incomplete",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if err := basespec.ValidateRequiredText(
@@ -44,24 +47,24 @@ func NewService(
 
 func (s *Service) CreateEmpty(
 	ctx context.Context,
-	request EmptyWorkspaceRequest,
-) (Workspace, error) {
+	request spec.EmptyWorkspaceRequest,
+) (spec.Workspace, error) {
 	if err := basespec.ValidateRootID(request.RootID); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
-	data := CollectionData{
+	data := spec.CollectionData{
 		DiscoveryPolicyRevision: s.discoveryPolicyRevision,
 		Discovery:               request.Discovery,
 	}
-	raw, err := encodeCollectionData(data)
+	raw, err := discovery.EncodeCollectionData(data)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	created, _, err := s.collections.Create(
 		ctx,
 		request.RootID,
 		collection.Draft{
-			Kind:        CollectionKind,
+			Kind:        spec.CollectionKind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
 			Enabled:     true,
@@ -70,20 +73,20 @@ func (s *Service) CreateEmpty(
 		nil,
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, created.Ref())
 }
 
 func (s *Service) CreateFilesystem(
 	ctx context.Context,
-	request FilesystemWorkspaceRequest,
-) (Workspace, error) {
+	request spec.FilesystemWorkspaceRequest,
+) (spec.Workspace, error) {
 	if err := basespec.ValidateRootID(request.RootID); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	if err := basespec.ValidateSourceID(request.PrimarySourceID); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	sourceValue, err := s.sources.Get(
 		ctx,
@@ -91,39 +94,39 @@ func (s *Service) CreateFilesystem(
 		request.PrimarySourceID,
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
-	primaryOperation, _ := attachmentOperationFor(RolePrimary)
-	if sourceValue.Kind != primaryOperation.requiredSourceKind {
-		return Workspace{}, fmt.Errorf(
+	primaryOperation, _ := attachmentdata.AttachmentOperationFor(spec.RolePrimary)
+	if sourceValue.Kind != primaryOperation.RequiredSourceKind {
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: primary source must have kind %q",
-			ErrInvalidWorkspace,
-			primaryOperation.requiredSourceKind,
+			spec.ErrInvalidWorkspace,
+			primaryOperation.RequiredSourceKind,
 		)
 	}
 	if !sourceValue.Enabled {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: primary source must be enabled",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
-	data := CollectionData{
+	data := spec.CollectionData{
 		DiscoveryPolicyRevision: s.discoveryPolicyRevision,
 		Discovery:               request.Discovery,
 	}
-	raw, err := encodeCollectionData(data)
+	raw, err := discovery.EncodeCollectionData(data)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
-	attachmentData, err := encodeAttachmentData(AttachmentData{})
+	attachmentData, err := attachmentdata.EncodeAttachmentData(spec.AttachmentData{})
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	created, _, err := s.collections.Create(
 		ctx,
 		request.RootID,
 		collection.Draft{
-			Kind:        CollectionKind,
+			Kind:        spec.CollectionKind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
 			Enabled:     true,
@@ -131,13 +134,13 @@ func (s *Service) CreateFilesystem(
 		},
 		[]collection.AttachmentDraft{{
 			SourceID: sourceValue.ID,
-			Role:     RolePrimary,
+			Role:     spec.RolePrimary,
 			Enabled:  true,
 			Data:     attachmentData,
 		}},
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, created.Ref())
 }
@@ -145,7 +148,7 @@ func (s *Service) CreateFilesystem(
 func (s *Service) List(
 	ctx context.Context,
 	rootID basespec.RootID,
-) ([]Workspace, error) {
+) ([]spec.Workspace, error) {
 	if err := basespec.ValidateRootID(rootID); err != nil {
 		return nil, err
 	}
@@ -153,9 +156,9 @@ func (s *Service) List(
 	if err != nil {
 		return nil, err
 	}
-	output := make([]Workspace, 0)
+	output := make([]spec.Workspace, 0)
 	for _, value := range collections {
-		if value.Kind != CollectionKind {
+		if value.Kind != spec.CollectionKind {
 			continue
 		}
 		workspaceValue, err := s.Get(ctx, value.Ref())
@@ -170,22 +173,22 @@ func (s *Service) List(
 
 func (s *Service) Update(
 	ctx context.Context,
-	request UpdateRequest,
-) (Workspace, error) {
+	request spec.UpdateRequest,
+) (spec.Workspace, error) {
 	if err := request.Workspace.Validate(); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	current, err := s.Get(ctx, request.Workspace)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	data := current.Data
 	data.DiscoveryPolicyRevision = s.discoveryPolicyRevision
 	data.Discovery = request.Discovery
 
-	raw, err := encodeCollectionData(data)
+	raw, err := discovery.EncodeCollectionData(data)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	_, err = s.collections.Update(
 		ctx,
@@ -199,30 +202,30 @@ func (s *Service) Update(
 		},
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, request.Workspace)
 }
 
 func (s *Service) Attach(
 	ctx context.Context,
-	request AttachRequest,
-) (Workspace, error) {
+	request spec.AttachRequest,
+) (spec.Workspace, error) {
 	if err := validateRole(request.Role); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
-	operation, _ := attachmentOperationFor(request.Role)
-	if !operation.canAttach {
-		return Workspace{}, ErrPrimarySourceImmutable
+	operation, _ := attachmentdata.AttachmentOperationFor(request.Role)
+	if !operation.CanAttach {
+		return spec.Workspace{}, spec.ErrPrimarySourceImmutable
 	}
 	if request.ExpectedCollectionRevision == 0 {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: expected collection revision is required",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if _, err := s.Get(ctx, request.Workspace); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	sourceValue, err := s.sources.Get(
 		ctx,
@@ -230,20 +233,20 @@ func (s *Service) Attach(
 		request.SourceID,
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	if !sourceValue.Enabled && request.Enabled {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: enabled attachment cannot use disabled source",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
-	data, err := encodeAttachmentData(request.Data)
+	data, err := attachmentdata.EncodeAttachmentData(request.Data)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
-	if err := validateAttachmentDataForRole(request.Role, request.Data); err != nil {
-		return Workspace{}, err
+	if err := attachmentdata.ValidateAttachmentDataForRole(request.Role, request.Data); err != nil {
+		return spec.Workspace{}, err
 	}
 	if _, _, err := s.collections.Attach(
 
@@ -257,24 +260,24 @@ func (s *Service) Attach(
 			Data:     data,
 		},
 	); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, request.Workspace)
 }
 
 func (s *Service) UpdateAttachment(
 	ctx context.Context,
-	request UpdateAttachmentRequest,
-) (Workspace, error) {
+	request spec.UpdateAttachmentRequest,
+) (spec.Workspace, error) {
 	if err := validateRole(request.Role); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
-	targetOperation, _ := attachmentOperationFor(request.Role)
-	if !targetOperation.canAttach {
-		return Workspace{}, ErrPrimarySourceImmutable
+	targetOperation, _ := attachmentdata.AttachmentOperationFor(request.Role)
+	if !targetOperation.CanAttach {
+		return spec.Workspace{}, spec.ErrPrimarySourceImmutable
 	}
 	if _, err := s.Get(ctx, request.Workspace); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	current, err := s.collections.GetAttachment(
 		ctx,
@@ -282,11 +285,11 @@ func (s *Service) UpdateAttachment(
 		request.SourceID,
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
-	currentOperation, _ := attachmentOperationFor(current.Role)
-	if !currentOperation.canAttach {
-		return Workspace{}, ErrPrimarySourceImmutable
+	currentOperation, _ := attachmentdata.AttachmentOperationFor(current.Role)
+	if !currentOperation.CanAttach {
+		return spec.Workspace{}, spec.ErrPrimarySourceImmutable
 	}
 	sourceValue, err := s.sources.Get(
 		ctx,
@@ -294,20 +297,20 @@ func (s *Service) UpdateAttachment(
 		request.SourceID,
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	if request.Enabled && !sourceValue.Enabled {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: enabled attachment cannot use disabled source",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
-	data, err := encodeAttachmentData(request.Data)
+	data, err := attachmentdata.EncodeAttachmentData(request.Data)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
-	if err := validateAttachmentDataForRole(request.Role, request.Data); err != nil {
-		return Workspace{}, err
+	if err := attachmentdata.ValidateAttachmentDataForRole(request.Role, request.Data); err != nil {
+		return spec.Workspace{}, err
 	}
 	if _, _, err := s.collections.UpdateAttachment(
 		ctx,
@@ -321,7 +324,7 @@ func (s *Service) UpdateAttachment(
 			Data:                       data,
 		},
 	); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, request.Workspace)
 }
@@ -331,51 +334,51 @@ func (s *Service) UpdateAttachment(
 // intentionally cannot mutate the primary relationship.
 func (s *Service) SetPrimary(
 	ctx context.Context,
-	request SetPrimaryRequest,
-) (Workspace, error) {
+	request spec.SetPrimaryRequest,
+) (spec.Workspace, error) {
 	if err := request.Workspace.Validate(); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	if request.ExpectedCollectionRevision == 0 {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: expected collection revision is required",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if request.Clear == (request.SourceID != "") {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: exactly one of sourceID or clear is required",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if request.SourceID != "" {
 		if err := basespec.ValidateSourceID(request.SourceID); err != nil {
-			return Workspace{}, err
+			return spec.Workspace{}, err
 		}
 	}
 	if request.PreviousSourceID != "" {
 		if err := basespec.ValidateSourceID(request.PreviousSourceID); err != nil {
-			return Workspace{}, err
+			return spec.Workspace{}, err
 		}
 	}
 
 	current, err := s.Get(ctx, request.Workspace)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	if current.Collection.Revision != request.ExpectedCollectionRevision {
-		return Workspace{}, basespec.ErrConflict
+		return spec.Workspace{}, basespec.ErrConflict
 	}
 
 	if current.PrimarySourceID == "" {
 		if request.PreviousSourceID != "" ||
 			request.PreviousAttachmentRevision != 0 {
-			return Workspace{}, basespec.ErrConflict
+			return spec.Workspace{}, basespec.ErrConflict
 		}
 		if request.Clear {
-			return Workspace{}, fmt.Errorf(
+			return spec.Workspace{}, fmt.Errorf(
 				"%w: an empty Workspace has no primary Source to clear",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 			)
 		}
 		if err := s.requirePrimarySource(
@@ -383,12 +386,12 @@ func (s *Service) SetPrimary(
 			request.Workspace.RootID,
 			request.SourceID,
 		); err != nil {
-			return Workspace{}, err
+			return spec.Workspace{}, err
 		}
 
-		data, err := encodeAttachmentData(AttachmentData{})
+		data, err := attachmentdata.EncodeAttachmentData(spec.AttachmentData{})
 		if err != nil {
-			return Workspace{}, err
+			return spec.Workspace{}, err
 		}
 		if _, _, err := s.collections.Attach(
 			ctx,
@@ -396,24 +399,24 @@ func (s *Service) SetPrimary(
 			request.ExpectedCollectionRevision,
 			collection.AttachmentDraft{
 				SourceID: request.SourceID,
-				Role:     RolePrimary,
+				Role:     spec.RolePrimary,
 				Enabled:  true,
 				Data:     data,
 			},
 		); err != nil {
-			return Workspace{}, err
+			return spec.Workspace{}, err
 		}
 		return s.Get(ctx, request.Workspace)
 	}
 
 	if request.PreviousSourceID == "" ||
 		request.PreviousSourceID != current.PrimarySourceID {
-		return Workspace{}, basespec.ErrConflict
+		return spec.Workspace{}, basespec.ErrConflict
 	}
 	if request.PreviousAttachmentRevision == 0 {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: expected primary attachment revision is required",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 
@@ -423,10 +426,10 @@ func (s *Service) SetPrimary(
 		current.PrimarySourceID,
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	if previous.Revision != request.PreviousAttachmentRevision {
-		return Workspace{}, basespec.ErrConflict
+		return spec.Workspace{}, basespec.ErrConflict
 	}
 
 	if request.Clear {
@@ -437,7 +440,7 @@ func (s *Service) SetPrimary(
 			request.ExpectedCollectionRevision,
 			request.PreviousAttachmentRevision,
 		); err != nil {
-			return Workspace{}, err
+			return spec.Workspace{}, err
 		}
 		return s.Get(ctx, request.Workspace)
 	}
@@ -451,7 +454,7 @@ func (s *Service) SetPrimary(
 		request.Workspace.RootID,
 		request.SourceID,
 	); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 
 	if _, err := s.collections.GetAttachment(
@@ -459,17 +462,17 @@ func (s *Service) SetPrimary(
 		request.Workspace,
 		request.SourceID,
 	); err == nil {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: replacement primary source is already attached to the Workspace",
 			basespec.ErrConflict,
 		)
 	} else if !errors.Is(err, basespec.ErrAttachmentNotFound) {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 
-	data, err := encodeAttachmentData(AttachmentData{})
+	data, err := attachmentdata.EncodeAttachmentData(spec.AttachmentData{})
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	_, _, err = s.collections.ReplaceAttachment(
 		ctx,
@@ -480,23 +483,23 @@ func (s *Service) SetPrimary(
 			PreviousAttachmentRevision: request.PreviousAttachmentRevision,
 			Replacement: collection.AttachmentDraft{
 				SourceID: request.SourceID,
-				Role:     RolePrimary,
+				Role:     spec.RolePrimary,
 				Enabled:  true,
 				Data:     data,
 			},
 		},
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, request.Workspace)
 }
 
 func (s *Service) ReplacePrimary(
 	ctx context.Context,
-	request ReplacePrimaryRequest,
-) (Workspace, error) {
-	return s.SetPrimary(ctx, SetPrimaryRequest{
+	request spec.ReplacePrimaryRequest,
+) (spec.Workspace, error) {
+	return s.SetPrimary(ctx, spec.SetPrimaryRequest{
 		Workspace:                  request.Workspace,
 		ExpectedCollectionRevision: request.ExpectedCollectionRevision,
 		PreviousSourceID:           request.PreviousSourceID,
@@ -511,23 +514,23 @@ func (s *Service) Detach(
 	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
-) (Workspace, error) {
+) (spec.Workspace, error) {
 	if expectedCollectionRevision == 0 || expectedAttachmentRevision == 0 {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: expected collection and attachment revisions are required",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	if _, err := s.Get(ctx, ref); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	attachment, err := s.collections.GetAttachment(ctx, ref, sourceID)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
-	operation, _ := attachmentOperationFor(attachment.Role)
-	if !operation.canAttach {
-		return Workspace{}, ErrPrimarySourceImmutable
+	operation, _ := attachmentdata.AttachmentOperationFor(attachment.Role)
+	if !operation.CanAttach {
+		return spec.Workspace{}, spec.ErrPrimarySourceImmutable
 	}
 	if _, err := s.collections.Detach(
 		ctx,
@@ -536,7 +539,7 @@ func (s *Service) Detach(
 		expectedCollectionRevision,
 		expectedAttachmentRevision,
 	); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, ref)
 }
@@ -567,15 +570,15 @@ func (s *Service) Purge(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Workspace revision is required",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	value, err := s.collections.GetRetired(ctx, ref)
 	if err != nil {
 		return err
 	}
-	if value.Kind != CollectionKind {
-		return fmt.Errorf("%w: collection %q", ErrNotWorkspace, ref.CollectionID)
+	if value.Kind != spec.CollectionKind {
+		return fmt.Errorf("%w: collection %q", spec.ErrNotWorkspace, ref.CollectionID)
 	}
 	if value.Revision != expectedRevision {
 		return basespec.ErrConflict
@@ -589,10 +592,10 @@ func (s *Service) Purge(
 func (s *Service) PrepareRefresh(
 	ctx context.Context,
 	ref collection.CollectionRef,
-) (Workspace, error) {
+) (spec.Workspace, error) {
 	current, err := s.Get(ctx, ref)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	if !current.Collection.Enabled ||
 		current.Data.DiscoveryPolicyRevision == s.discoveryPolicyRevision {
@@ -601,9 +604,9 @@ func (s *Service) PrepareRefresh(
 
 	data := current.Data
 	data.DiscoveryPolicyRevision = s.discoveryPolicyRevision
-	raw, err := encodeCollectionData(data)
+	raw, err := discovery.EncodeCollectionData(data)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	if _, err := s.collections.Update(
 		ctx,
@@ -616,7 +619,7 @@ func (s *Service) PrepareRefresh(
 			Data:             raw,
 		},
 	); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, ref)
 }
@@ -624,39 +627,42 @@ func (s *Service) PrepareRefresh(
 func (s *Service) Get(
 	ctx context.Context,
 	ref collection.CollectionRef,
-) (Workspace, error) {
+) (spec.Workspace, error) {
 	if err := ref.Validate(); err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	value, err := s.collections.Get(ctx, ref)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	if err := value.Validate(); err != nil {
-		return Workspace{}, fmt.Errorf(
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: Collection reader returned an invalid Workspace Collection: %w",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 			err,
 		)
 	}
 	if value.Ref() != ref {
-		return Workspace{}, fmt.Errorf("%w: Collection reader returned another Workspace", ErrInvalidWorkspace)
+		return spec.Workspace{}, fmt.Errorf(
+			"%w: Collection reader returned another Workspace",
+			spec.ErrInvalidWorkspace,
+		)
 	}
-	if value.Kind != CollectionKind {
-		return Workspace{}, fmt.Errorf(
+	if value.Kind != spec.CollectionKind {
+		return spec.Workspace{}, fmt.Errorf(
 			"%w: collection %q has kind %q",
-			ErrNotWorkspace,
+			spec.ErrNotWorkspace,
 			ref.CollectionID,
 			value.Kind,
 		)
 	}
-	data, err := decodeCollectionData(value.Data)
+	data, err := discovery.DecodeCollectionData(value.Data)
 	if err != nil {
-		return Workspace{}, fmt.Errorf("%w: %w", ErrInvalidWorkspace, err)
+		return spec.Workspace{}, fmt.Errorf("%w: %w", spec.ErrInvalidWorkspace, err)
 	}
 	attachments, err := s.collections.ListAttachments(ctx, ref)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 
 	sort.Slice(attachments, func(left, right int) bool {
@@ -671,7 +677,7 @@ func (s *Service) Get(
 			attachment.SourceID,
 		)
 		if err != nil {
-			return Workspace{}, err
+			return spec.Workspace{}, err
 		}
 		sources = append(sources, sourceValue)
 	}
@@ -682,12 +688,12 @@ func (s *Service) Get(
 		sources,
 	)
 	if err != nil {
-		return Workspace{}, err
+		return spec.Workspace{}, err
 	}
 	sort.Slice(sources, func(left, right int) bool {
 		return sources[left].ID < sources[right].ID
 	})
-	return Workspace{
+	return spec.Workspace{
 		Collection:      value,
 		Data:            data,
 		Mode:            mode,
@@ -706,30 +712,19 @@ func (s *Service) requirePrimarySource(
 	if err != nil {
 		return err
 	}
-	operation, found := attachmentOperationFor(RolePrimary)
+	operation, found := attachmentdata.AttachmentOperationFor(spec.RolePrimary)
 	if !found {
 		return fmt.Errorf(
 			"%w: Workspace primary attachment policy is unavailable",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
-	if sourceValue.Kind != operation.requiredSourceKind ||
+	if sourceValue.Kind != operation.RequiredSourceKind ||
 		!sourceValue.Enabled {
 		return fmt.Errorf(
 			"%w: primary source must be an enabled filesystem source",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
 	return nil
-}
-
-func attachmentOperationFor(
-	role basespec.AttachmentRole,
-) (attachmentOperation, bool) {
-	for _, operation := range attachmentOperationMatrix {
-		if operation.role == role {
-			return operation, true
-		}
-	}
-	return attachmentOperation{}, false
 }

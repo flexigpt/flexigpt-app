@@ -432,6 +432,8 @@ linters:
           alias: ${1}Store
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime
           alias: ${1}Runtime
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/discovery
+          alias: ${1}Discovery
 
     nakedret:
       # No naked returns, ever.

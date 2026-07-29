@@ -5,8 +5,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type components struct {
@@ -45,7 +47,7 @@ func newComponents(
 		if !dependencies.HasDecoder(support.DecoderID) {
 			return nil, fmt.Errorf(
 				"%w: workspace decoder %q is not registered with artifact store",
-				engine.ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				support.DecoderID,
 			)
 		}
@@ -60,7 +62,7 @@ func newComponents(
 	if err != nil {
 		return nil, err
 	}
-	planner, err := engine.NewPlanner(
+	planner, err := discovery.NewPlanner(
 		profiles,
 		discoveryPolicyRevision,
 		decoderIDs...,
@@ -68,7 +70,7 @@ func newComponents(
 	if err != nil {
 		return nil, err
 	}
-	loader, err := engine.NewDescriptorLoader(
+	loader, err := discovery.NewDescriptorLoader(
 		dependencies.SourceRuntime,
 	)
 	if err != nil {

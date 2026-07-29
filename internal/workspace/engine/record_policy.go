@@ -13,22 +13,30 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
+)
+
+const (
+	defaultArtifactName      = "artifact"
+	artifactNameSeparator    = "-"
+	artifactNameDigestLength = 12
+	exactVersionConstraintOp = "="
 )
 
 type ArtifactPolicy struct {
-	supports map[basespec.ArtifactKind]ArtifactSupport
+	supports map[basespec.ArtifactKind]spec.ArtifactSupport
 }
 
 func NewArtifactPolicy(
-	supports ...ArtifactSupport,
+	supports ...spec.ArtifactSupport,
 ) (*ArtifactPolicy, error) {
 	if len(supports) == 0 {
 		return nil, fmt.Errorf(
 			"%w: workspace artifact support is required",
-			ErrInvalidWorkspace,
+			spec.ErrInvalidWorkspace,
 		)
 	}
-	values := make(map[basespec.ArtifactKind]ArtifactSupport, len(supports))
+	values := make(map[basespec.ArtifactKind]spec.ArtifactSupport, len(supports))
 	for _, support := range supports {
 		if err := support.Validate(); err != nil {
 			return nil, err
@@ -36,7 +44,7 @@ func NewArtifactPolicy(
 		if _, duplicate := values[support.Kind]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate workspace artifact kind %q",
-				ErrInvalidWorkspace,
+				spec.ErrInvalidWorkspace,
 				support.Kind,
 			)
 		}
@@ -108,7 +116,7 @@ func (p *ArtifactPolicy) Derive(
 	}
 
 	// An empty ArtifactData means runtime use is enabled by default.
-	data, err := EncodeArtifactData(ArtifactData{})
+	data, err := EncodeArtifactData(spec.ArtifactData{})
 	if err != nil {
 		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
 			Severity: diagnostic.DiagnosticError,

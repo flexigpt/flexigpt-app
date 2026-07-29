@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/engine"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type WorkspaceRef = collection.CollectionRef
@@ -76,7 +76,7 @@ type WorkspaceView struct {
 	DisplayName     string                    `json:"displayName"`
 	Description     string                    `json:"description,omitempty"`
 	Enabled         bool                      `json:"enabled"`
-	Mode            engine.Mode               `json:"mode"`
+	Mode            spec.Mode                 `json:"mode"`
 	PrimarySourceID basespec.SourceID         `json:"primarySourceID,omitempty"`
 	PrimaryPath     string                    `json:"primaryPath,omitempty"`
 	Discovery       WorkspaceDiscovery        `json:"discovery"`
