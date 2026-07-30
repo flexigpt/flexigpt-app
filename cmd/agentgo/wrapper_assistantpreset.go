@@ -12,7 +12,7 @@ import (
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	"github.com/flexigpt/flexigpt-app/internal/skillstore"
+	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
@@ -25,7 +25,7 @@ func InitAssistantPresetStoreWrapper(
 	baseDir string,
 	modelPresetSt *modelpresetStore.ModelPresetStore,
 	toolSt *toolStore.ToolStore,
-	skillSt *skillstore.SkillStore,
+	skillRuntime *skillruntime.SkillRuntime,
 	mcpSt *mcpStore.Store,
 	mcpRt *mcpRuntime.MCPRuntimeManager,
 ) error {
@@ -38,8 +38,8 @@ func InitAssistantPresetStoreWrapper(
 	if toolSt == nil {
 		return errors.New("tool store is nil")
 	}
-	if skillSt == nil {
-		return errors.New("skill store is nil")
+	if skillRuntime == nil {
+		return errors.New("skill runtime is nil")
 	}
 	if mcpSt == nil {
 		return errors.New("mcp store is nil")
@@ -51,7 +51,7 @@ func InitAssistantPresetStoreWrapper(
 	lookups := lookupimpl.NewAssistantPresetReferenceLookups(
 		modelPresetSt,
 		toolSt,
-		skillSt,
+		skillRuntime,
 		mcpSt,
 		mcpRt,
 	)

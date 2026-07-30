@@ -11,112 +11,70 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 )
 
 var errSkillInvalidRequest = errors.New("invalid request")
 
 func (s *SkillRuntime) CreateSkillSession(
 	ctx context.Context,
-	req *spec.CreateSkillSessionRequest,
-) (*spec.CreateSkillSessionResponse, error) {
+	req *skillruntimeSpec.CreateSkillSessionRequest,
+) (*skillruntimeSpec.CreateSkillSessionResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
 	if req == nil || req.Body == nil {
 		return nil, fmt.Errorf("%w: missing request", errSkillInvalidRequest)
 	}
-	if len(req.Body.AllowSkillRefs) == 0 {
-		return nil, fmt.Errorf("%w: allowSkillRefs required", errSkillInvalidRequest)
+	if len(req.Body.AllowArtifacts) == 0 {
+		return nil, fmt.Errorf("%w: allowArtifacts required", errSkillInvalidRequest)
 	}
-	for _, ref := range req.Body.AllowSkillRefs {
-		if err := validateSkillRef(ref); err != nil {
-			return nil, fmt.Errorf("%w: invalid allowSkillRef: %w", errSkillInvalidRequest, err)
-		}
+	if err := validateArtifactRefs(req.Body.AllowArtifacts); err != nil {
+		return nil, fmt.Errorf("%w: invalid allowArtifacts: %w", errSkillInvalidRequest, err)
 	}
-	for _, ref := range req.Body.ActiveSkillRefs {
-		if err := validateSkillRef(ref); err != nil {
-			return nil, fmt.Errorf("%w: invalid activeSkillRef: %w", errSkillInvalidRequest, err)
-		}
+	if err := validateArtifactRefs(req.Body.ActiveArtifacts); err != nil {
+		return nil, fmt.Errorf("%w: invalid activeArtifacts: %w", errSkillInvalidRequest, err)
 	}
-	scopeRefs := append([]spec.SkillRef(nil), req.Body.AllowSkillRefs...)
-	scopeRefs = append(scopeRefs, req.Body.ActiveSkillRefs...)
-	if err := validateWorkspaceScopeForRefs(req.Body.Workspace, scopeRefs); err != nil {
-		return nil, fmt.Errorf("%w: invalid Workspace scope: %w", errSkillInvalidRequest, err)
-	}
+
 	if sessionID := strings.TrimSpace(string(req.Body.CloseSessionID)); sessionID != "" {
 		_ = s.runtime.CloseSession(ctx, agentskillsSpec.SessionID(sessionID))
 	}
 
-	activeRefs := normalizeActiveRefsSubsetOfAllow(req.Body.AllowSkillRefs, req.Body.ActiveSkillRefs)
-	resolved := s.resolveAllowSkillRefs(
-		ctx,
-		req.Body.Workspace,
-		req.Body.AllowSkillRefs,
+	resolved := s.resolveAllowArtifacts(ctx, req.Body.AllowArtifacts)
+	activeRefs := subsetArtifacts(
+		req.Body.AllowArtifacts,
+		req.Body.ActiveArtifacts,
 	)
-	if len(resolved.AllowDefs) == 0 {
-		options := []agentskills.SessionOption{}
-		if req.Body.MaxActivePerSession > 0 {
-			options = append(options, agentskills.WithSessionMaxActivePerSession(req.Body.MaxActivePerSession))
-		}
-		sessionID, _, err := s.runtime.NewSession(ctx, options...)
-		if err != nil {
-			return nil, err
-		}
-		return &spec.CreateSkillSessionResponse{Body: &spec.CreateSkillSessionResponseBody{
-			SessionID:       sessionID,
-			ActiveSkillRefs: []spec.SkillRef{},
-		}}, nil
-	}
-
 	activeDefinitions := map[agentskillsSpec.SkillDef]struct{}{}
 	for _, ref := range activeRefs {
-		if definition, ok := resolved.RefToDef[refKey(ref)]; ok {
+		if definition, found := resolved.RefToDef[artifactRefKey(ref)]; found {
 			activeDefinitions[definition] = struct{}{}
 		}
 	}
+
 	activeDefs := make([]agentskillsSpec.SkillDef, 0, len(activeDefinitions))
 	for definition := range activeDefinitions {
 		activeDefs = append(activeDefs, definition)
 	}
 	sortSkillDefs(activeDefs)
 
-	if len(activeDefs) > 0 {
-		records, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
-			AllowSkills: resolved.AllowDefs,
-			Activity:    agentskillsSpec.SkillActivityAny,
-		})
-		if err != nil {
-			activeDefs = nil
-		} else {
-			knownInstruction := map[agentskillsSpec.SkillDef]struct{}{}
-			for _, record := range records {
-				insert := record.Insert
-				if insert == "" {
-					insert = agentskillsSpec.SkillInsertInstructions
-				}
-				if insert == agentskillsSpec.SkillInsertInstructions {
-					knownInstruction[record.Def] = struct{}{}
-				}
-			}
-			filtered := make([]agentskillsSpec.SkillDef, 0, len(activeDefs))
-			for _, definition := range activeDefs {
-				if _, ok := knownInstruction[definition]; ok {
-					filtered = append(filtered, definition)
-				}
-			}
-			activeDefs = filtered
-		}
-	}
-
 	options := []agentskills.SessionOption{}
 	if req.Body.MaxActivePerSession > 0 {
-		options = append(options, agentskills.WithSessionMaxActivePerSession(req.Body.MaxActivePerSession))
+		options = append(
+			options,
+			agentskills.WithSessionMaxActivePerSession(
+				req.Body.MaxActivePerSession,
+			),
+		)
 	}
 	if len(activeDefs) > 0 {
-		options = append(options, agentskills.WithSessionActiveSkills(activeDefs))
+		options = append(
+			options,
+			agentskills.WithSessionActiveSkills(activeDefs),
+		)
 	}
+
 	sessionID, _, err := s.runtime.NewSession(ctx, options...)
 	if err != nil {
 		return nil, err
@@ -128,29 +86,25 @@ func (s *SkillRuntime) CreateSkillSession(
 		AllowSkills: resolved.AllowDefs,
 	})
 	if err != nil {
-		if errors.Is(err, agentskillsSpec.ErrSessionNotFound) {
-			return nil, err
-		}
-		records = nil
+		return nil, err
 	}
+
 	active := map[agentskillsSpec.SkillDef]struct{}{}
 	for _, record := range records {
 		active[record.Def] = struct{}{}
 	}
-	output := buildActiveSkillRefs(resolved.DefToRefs, active)
-	if output == nil {
-		output = []spec.SkillRef{}
-	}
-	return &spec.CreateSkillSessionResponse{Body: &spec.CreateSkillSessionResponseBody{
-		SessionID:       sessionID,
-		ActiveSkillRefs: output,
-	}}, nil
+	return &skillruntimeSpec.CreateSkillSessionResponse{
+		Body: &skillruntimeSpec.CreateSkillSessionResponseBody{
+			SessionID:       sessionID,
+			ActiveArtifacts: buildActiveArtifacts(resolved.DefToArtifacts, active),
+		},
+	}, nil
 }
 
 func (s *SkillRuntime) CloseSkillSession(
 	ctx context.Context,
-	req *spec.CloseSkillSessionRequest,
-) (*spec.CloseSkillSessionResponse, error) {
+	req *skillruntimeSpec.CloseSkillSessionRequest,
+) (*skillruntimeSpec.CloseSkillSessionResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
@@ -160,13 +114,13 @@ func (s *SkillRuntime) CloseSkillSession(
 	if err := s.runtime.CloseSession(ctx, req.SessionID); err != nil {
 		return nil, err
 	}
-	return &spec.CloseSkillSessionResponse{}, nil
+	return &skillruntimeSpec.CloseSkillSessionResponse{}, nil
 }
 
 func (s *SkillRuntime) GetSkillsPrompt(
 	ctx context.Context,
-	req *spec.GetSkillsPromptRequest,
-) (*spec.GetSkillsPromptResponse, error) {
+	req *skillruntimeSpec.GetSkillsPromptRequest,
+) (*skillruntimeSpec.GetSkillsPromptResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
@@ -174,107 +128,88 @@ func (s *SkillRuntime) GetSkillsPrompt(
 		return nil, fmt.Errorf("%w: Skill prompt filter is required", errSkillInvalidRequest)
 	}
 
-	value := req.Body.Filter
-	if len(value.AllowSkillRefs) == 0 {
-		return &spec.GetSkillsPromptResponse{
-			Body: &spec.GetSkillsPromptResponseBody{},
+	filterRequest := req.Body.Filter
+	if len(filterRequest.AllowArtifacts) == 0 {
+		return &skillruntimeSpec.GetSkillsPromptResponse{
+			Body: &skillruntimeSpec.GetSkillsPromptResponseBody{},
 		}, nil
 	}
-	for _, ref := range value.AllowSkillRefs {
-		if err := validateSkillRef(ref); err != nil {
-			return nil, fmt.Errorf(
-				"%w: invalid filter.allowSkillRefs: %w",
-				errSkillInvalidRequest,
-				err,
-			)
-		}
+	if err := validateArtifactRefs(filterRequest.AllowArtifacts); err != nil {
+		return nil, fmt.Errorf("%w: invalid allowArtifacts: %w", errSkillInvalidRequest, err)
 	}
-	if err := validateWorkspaceScopeForRefs(
-		value.Workspace,
-		value.AllowSkillRefs,
-	); err != nil {
-		return nil, fmt.Errorf(
-			"%w: invalid filter.workspace: %w",
-			errSkillInvalidRequest,
-			err,
-		)
-	}
-	resolved := s.resolveAllowSkillRefs(ctx, value.Workspace, value.AllowSkillRefs)
-	if len(resolved.AllowDefs) == 0 {
-		return &spec.GetSkillsPromptResponse{
-			Body: &spec.GetSkillsPromptResponseBody{},
-		}, nil
-	}
-	if len(value.Inserts) > 0 &&
-		!slices.Contains(value.Inserts, agentskillsSpec.SkillInsertInstructions) {
-		return &spec.GetSkillsPromptResponse{
-			Body: &spec.GetSkillsPromptResponseBody{},
+	if len(filterRequest.Inserts) > 0 &&
+		!containsInstructionInsert(filterRequest.Inserts) {
+		return &skillruntimeSpec.GetSkillsPromptResponse{
+			Body: &skillruntimeSpec.GetSkillsPromptResponseBody{},
 		}, nil
 	}
 
-	filter := &agentskills.SkillFilter{
-		Types:          append([]string(nil), value.Types...),
-		LocationPrefix: value.LocationPrefix,
-		AllowSkills:    resolved.AllowDefs,
-		SessionID:      value.SessionID,
-		Activity:       value.Activity,
+	resolved := s.resolveAllowArtifacts(ctx, filterRequest.AllowArtifacts)
+	if len(resolved.AllowDefs) == 0 {
+		return &skillruntimeSpec.GetSkillsPromptResponse{
+			Body: &skillruntimeSpec.GetSkillsPromptResponseBody{},
+		}, nil
 	}
-	prompt, err := s.runtime.SkillsPrompt(ctx, filter)
+
+	prompt, err := s.runtime.SkillsPrompt(ctx, &agentskills.SkillFilter{
+		Types:          append([]string(nil), filterRequest.Types...),
+		LocationPrefix: filterRequest.LocationPrefix,
+		AllowSkills:    resolved.AllowDefs,
+		SessionID:      filterRequest.SessionID,
+		Activity:       filterRequest.Activity,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &spec.GetSkillsPromptResponse{Body: &spec.GetSkillsPromptResponseBody{Prompt: prompt}}, nil
+	return &skillruntimeSpec.GetSkillsPromptResponse{
+		Body: &skillruntimeSpec.GetSkillsPromptResponseBody{Prompt: prompt},
+	}, nil
 }
 
 func (s *SkillRuntime) ListRuntimeSkills(
 	ctx context.Context,
-	req *spec.ListRuntimeSkillsRequest,
-) (*spec.ListRuntimeSkillsResponse, error) {
+	req *skillruntimeSpec.ListRuntimeSkillsRequest,
+) (*skillruntimeSpec.ListRuntimeSkillsResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
 	if req == nil || req.Body == nil || req.Body.Filter == nil {
 		return nil, fmt.Errorf("%w: missing filter", errSkillInvalidRequest)
 	}
+
 	filterRequest := req.Body.Filter
-	if len(filterRequest.AllowSkillRefs) == 0 {
-		return &spec.ListRuntimeSkillsResponse{
-			Body: &spec.ListRuntimeSkillsResponseBody{Skills: []spec.RuntimeSkillListItem{}},
+	if len(filterRequest.AllowArtifacts) == 0 {
+		return &skillruntimeSpec.ListRuntimeSkillsResponse{
+			Body: &skillruntimeSpec.ListRuntimeSkillsResponseBody{
+				Skills: []skillruntimeSpec.RuntimeSkillListItem{},
+			},
 		}, nil
 	}
-	for _, ref := range filterRequest.AllowSkillRefs {
-		if err := validateSkillRef(ref); err != nil {
-			return nil, fmt.Errorf("%w: invalid filter.allowSkillRefs: %w", errSkillInvalidRequest, err)
-		}
+	if err := validateArtifactRefs(filterRequest.AllowArtifacts); err != nil {
+		return nil, fmt.Errorf("%w: invalid allowArtifacts: %w", errSkillInvalidRequest, err)
 	}
-	if err := validateWorkspaceScopeForRefs(
-		filterRequest.Workspace,
-		filterRequest.AllowSkillRefs,
-	); err != nil {
-		return nil, fmt.Errorf(
-			"%w: invalid filter.workspace: %w",
-			errSkillInvalidRequest,
-			err,
-		)
-	}
+
 	activity := filterRequest.Activity
 	if activity == "" {
 		activity = agentskillsSpec.SkillActivityAny
 	}
-	if activity == agentskillsSpec.SkillActivityActive && strings.TrimSpace(string(filterRequest.SessionID)) == "" {
-		return nil, fmt.Errorf("%w: activity=active requires sessionID", errSkillInvalidRequest)
+	if activity == agentskillsSpec.SkillActivityActive &&
+		strings.TrimSpace(string(filterRequest.SessionID)) == "" {
+		return nil, fmt.Errorf(
+			"%w: activity=active requires sessionID",
+			errSkillInvalidRequest,
+		)
 	}
 
-	resolved := s.resolveAllowSkillRefs(
-		ctx,
-		filterRequest.Workspace,
-		filterRequest.AllowSkillRefs,
-	)
+	resolved := s.resolveAllowArtifacts(ctx, filterRequest.AllowArtifacts)
 	if len(resolved.AllowDefs) == 0 {
-		return &spec.ListRuntimeSkillsResponse{
-			Body: &spec.ListRuntimeSkillsResponseBody{Skills: []spec.RuntimeSkillListItem{}},
+		return &skillruntimeSpec.ListRuntimeSkillsResponse{
+			Body: &skillruntimeSpec.ListRuntimeSkillsResponseBody{
+				Skills: []skillruntimeSpec.RuntimeSkillListItem{},
+			},
 		}, nil
 	}
+
 	records, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
 		Types:          append([]string(nil), filterRequest.Types...),
 		LocationPrefix: filterRequest.LocationPrefix,
@@ -288,7 +223,8 @@ func (s *SkillRuntime) ListRuntimeSkills(
 	}
 
 	active := map[agentskillsSpec.SkillDef]struct{}{}
-	if filterRequest.SessionID != "" && activity == agentskillsSpec.SkillActivityAny {
+	if filterRequest.SessionID != "" &&
+		activity == agentskillsSpec.SkillActivityAny {
 		current, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
 			SessionID:   filterRequest.SessionID,
 			Activity:    agentskillsSpec.SkillActivityActive,
@@ -302,212 +238,188 @@ func (s *SkillRuntime) ListRuntimeSkills(
 		}
 	}
 
-	items := make([]spec.RuntimeSkillListItem, 0, len(records))
-	seen := map[string]struct{}{}
+	items := make([]skillruntimeSpec.RuntimeSkillListItem, 0, len(records))
 	for _, record := range records {
-		for _, ref := range resolved.DefToRefs[record.Def] {
-			key := refKey(ref)
-			if _, found := seen[key]; found {
-				continue
-			}
-			seen[key] = struct{}{}
-			_, isActive := active[record.Def]
-			items = append(items, spec.RuntimeSkillListItem{
-				SkillRef:       ref,
-				Type:           record.Def.Type,
-				Name:           record.Def.Name,
-				DisplayName:    record.DisplayName,
-				Description:    record.Description,
-				Digest:         record.Digest,
-				Insert:         record.Insert,
-				Arguments:      append([]agentskillsSpec.SkillArgument(nil), record.Arguments...),
-				SourceTags:     append([]string(nil), record.Tags...),
-				Resources:      cloneSkillResourceInfo(record.Resources),
-				RawFrontmatter: cloneAnyMap(record.RawFrontmatter),
-				Warnings:       append([]string(nil), record.Warnings...),
-				IsActive: activity == agentskillsSpec.SkillActivityActive ||
-					(activity == agentskillsSpec.SkillActivityAny && isActive),
-			})
+		ref, found := resolved.DefToArtifacts[record.Def]
+		if !found {
+			continue
 		}
+		_, isActive := active[record.Def]
+		items = append(items, skillruntimeSpec.RuntimeSkillListItem{
+			SkillRef:       ref,
+			Type:           record.Def.Type,
+			Name:           record.Def.Name,
+			DisplayName:    record.DisplayName,
+			Description:    record.Description,
+			Digest:         record.Digest,
+			Insert:         record.Insert,
+			Arguments:      append([]agentskillsSpec.SkillArgument(nil), record.Arguments...),
+			SourceTags:     append([]string(nil), record.Tags...),
+			Resources:      cloneSkillResourceInfo(record.Resources),
+			RawFrontmatter: cloneAnyMap(record.RawFrontmatter),
+			Warnings:       append([]string(nil), record.Warnings...),
+			IsActive: activity == agentskillsSpec.SkillActivityActive ||
+				(activity == agentskillsSpec.SkillActivityAny && isActive),
+		})
 	}
 	sort.Slice(items, func(left, right int) bool {
-		return refKey(items[left].SkillRef) < refKey(items[right].SkillRef)
+		return artifactRefKey(items[left].SkillRef) <
+			artifactRefKey(items[right].SkillRef)
 	})
-	return &spec.ListRuntimeSkillsResponse{Body: &spec.ListRuntimeSkillsResponseBody{Skills: items}}, nil
+	return &skillruntimeSpec.ListRuntimeSkillsResponse{
+		Body: &skillruntimeSpec.ListRuntimeSkillsResponseBody{Skills: items},
+	}, nil
 }
 
 func (s *SkillRuntime) RenderSkill(
 	ctx context.Context,
-	req *spec.RenderSkillRequest,
-) (*spec.RenderSkillResponse, error) {
+	req *skillruntimeSpec.RenderSkillRequest,
+) (*skillruntimeSpec.RenderSkillResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
 	if req == nil || req.Body == nil {
 		return nil, fmt.Errorf("%w: missing request", errSkillInvalidRequest)
 	}
-	if err := validateSkillRef(req.Body.SkillRef); err != nil {
-		return nil, fmt.Errorf("%w: invalid skillRef: %w", errSkillInvalidRequest, err)
+	if err := req.Body.Artifact.Validate(); err != nil {
+		return nil, fmt.Errorf("%w: invalid artifact: %w", errSkillInvalidRequest, err)
 	}
-	if err := validateWorkspaceScopeForRefs(
-		req.Body.Workspace,
-		[]spec.SkillRef{req.Body.SkillRef},
-	); err != nil {
-		return nil, fmt.Errorf("%w: invalid Workspace scope: %w", errSkillInvalidRequest, err)
+
+	resolved, found := s.resolveArtifactSkill(ctx, req.Body.Artifact)
+	if !found {
+		return nil, skillruntimeSpec.ErrSkillNotFound
 	}
-	definition, ok := s.definitionForSkillRef(
-		ctx,
-		req.Body.SkillRef,
-		req.Body.Workspace,
-	)
-	if !ok {
-		return nil, errors.New("skill not found")
-	}
-	out, err := s.runtime.RenderSkill(
-		ctx,
-		agentskills.RenderSkillParams{Def: definition, Arguments: req.Body.Arguments},
-	)
+	out, err := s.runtime.RenderSkill(ctx, agentskills.RenderSkillParams{
+		Def:       resolved.Definition,
+		Arguments: req.Body.Arguments,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &spec.RenderSkillResponse{Body: &spec.RenderSkillResponseBody{
-		Text:             out.Text,
-		Insert:           out.Insert,
-		Name:             out.Name,
-		Description:      out.Description,
-		DisplayName:      out.DisplayName,
-		SourceTags:       append([]string(nil), out.Tags...),
-		Resources:        cloneSkillResourceInfo(out.Resources),
-		Arguments:        append([]agentskillsSpec.SkillArgument(nil), out.Arguments...),
-		AppliedArguments: cloneStringMap(out.AppliedArguments),
-		RawFrontmatter:   cloneAnyMap(out.RawFrontmatter),
-		Warnings:         append([]string(nil), out.Warnings...),
-	}}, nil
+	return &skillruntimeSpec.RenderSkillResponse{
+		Body: &skillruntimeSpec.RenderSkillResponseBody{
+			Text:             out.Text,
+			Insert:           out.Insert,
+			Name:             out.Name,
+			Description:      out.Description,
+			DisplayName:      out.DisplayName,
+			SourceTags:       append([]string(nil), out.Tags...),
+			Resources:        cloneSkillResourceInfo(out.Resources),
+			Arguments:        append([]agentskillsSpec.SkillArgument(nil), out.Arguments...),
+			AppliedArguments: cloneStringMap(out.AppliedArguments),
+			RawFrontmatter:   cloneAnyMap(out.RawFrontmatter),
+			Warnings:         append([]string(nil), out.Warnings...),
+		},
+	}, nil
 }
 
-type resolvedAllowSkillRefs struct {
-	DefToRefs map[agentskillsSpec.SkillDef][]spec.SkillRef
-	RefToDef  map[string]agentskillsSpec.SkillDef
-	AllowDefs []agentskillsSpec.SkillDef
+type resolvedAllowArtifacts struct {
+	DefToArtifacts map[agentskillsSpec.SkillDef]artifact.ArtifactRef
+	RefToDef       map[string]agentskillsSpec.SkillDef
+	AllowDefs      []agentskillsSpec.SkillDef
 }
 
-type resolvedDefinitionRefs struct {
-	refs []spec.SkillRef
-}
-
-func (s *SkillRuntime) resolveAllowSkillRefs(
+func (s *SkillRuntime) resolveAllowArtifacts(
 	ctx context.Context,
-	workspaceScope *collection.CollectionRef,
-	refs []spec.SkillRef,
-) resolvedAllowSkillRefs {
-	output := resolvedAllowSkillRefs{
-		DefToRefs: map[agentskillsSpec.SkillDef][]spec.SkillRef{},
-		RefToDef:  map[string]agentskillsSpec.SkillDef{},
+	refs []artifact.ArtifactRef,
+) resolvedAllowArtifacts {
+	output := resolvedAllowArtifacts{
+		DefToArtifacts: map[agentskillsSpec.SkillDef]artifact.ArtifactRef{},
+		RefToDef:       map[string]agentskillsSpec.SkillDef{},
 	}
 
 	seenRefs := map[string]struct{}{}
-	definitions := map[agentskillsSpec.SkillDef]*resolvedDefinitionRefs{}
-
+	byName := map[string][]ResolvedArtifactSkill{}
 	for _, ref := range refs {
-		key := refKey(ref)
-		if key == "||" {
+		if err := ref.Validate(); err != nil {
 			continue
 		}
-		if _, found := seenRefs[key]; found {
+		key := artifactRefKey(ref)
+		if _, exists := seenRefs[key]; exists {
 			continue
 		}
 		seenRefs[key] = struct{}{}
-		definition, ok := s.definitionForSkillRef(
-			ctx,
-			ref,
-			workspaceScope,
+
+		value, found := s.resolveArtifactSkill(ctx, ref)
+		if !found {
+			continue
+		}
+		byName[value.Definition.Name] = append(
+			byName[value.Definition.Name],
+			value,
 		)
-		if !ok {
+	}
+
+	for _, values := range byName {
+		if len(values) != 1 {
 			continue
 		}
-
-		entry := definitions[definition]
-		if entry == nil {
-			entry = &resolvedDefinitionRefs{}
-			definitions[definition] = entry
-		}
-		entry.refs = append(entry.refs, ref)
+		value := values[0]
+		output.DefToArtifacts[value.Definition] = value.Artifact
+		output.RefToDef[artifactRefKey(value.Artifact)] = value.Definition
+		output.AllowDefs = append(output.AllowDefs, value.Definition)
 	}
-
-	refsByName := map[string]map[string]struct{}{}
-	for definition, entry := range definitions {
-		if refsByName[definition.Name] == nil {
-			refsByName[definition.Name] = map[string]struct{}{}
-		}
-		for _, ref := range entry.refs {
-			refsByName[definition.Name][refKey(ref)] = struct{}{}
-		}
-	}
-
-	allowedDefinitions := map[agentskillsSpec.SkillDef]struct{}{}
-	for definition := range definitions {
-		// Runtime selection does not infer source precedence. Distinct durable
-		// references with the same Skill name are ambiguous even when they
-		// happen to project to an identical process-local SkillDef.
-		if len(refsByName[definition.Name]) == 1 {
-			allowedDefinitions[definition] = struct{}{}
-		}
-	}
-
-	for definition, entry := range definitions {
-		if _, allowed := allowedDefinitions[definition]; !allowed {
-			continue
-		}
-
-		output.DefToRefs[definition] = append([]spec.SkillRef(nil), entry.refs...)
-		output.AllowDefs = append(output.AllowDefs, definition)
-		for _, ref := range entry.refs {
-			output.RefToDef[refKey(ref)] = definition
-		}
-	}
-
 	sortSkillDefs(output.AllowDefs)
 	return output
 }
 
-func buildActiveSkillRefs(
-	defToRefs map[agentskillsSpec.SkillDef][]spec.SkillRef,
-	active map[agentskillsSpec.SkillDef]struct{},
-) []spec.SkillRef {
-	seen := map[string]struct{}{}
-	output := make([]spec.SkillRef, 0)
-	for definition := range active {
-		for _, ref := range defToRefs[definition] {
-			key := refKey(ref)
-			if _, found := seen[key]; found {
-				continue
-			}
-			seen[key] = struct{}{}
-			output = append(output, ref)
-		}
+func (s *SkillRuntime) resolveArtifactSkill(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (ResolvedArtifactSkill, bool) {
+	value, err := s.resolver.ResolveArtifactSkill(ctx, ref)
+	if err != nil {
+		return ResolvedArtifactSkill{}, false
 	}
-	sort.Slice(output, func(left, right int) bool {
-		return refKey(output[left]) < refKey(output[right])
-	})
-	return output
+	if err := s.ResyncCollection(ctx, value.Collection); err != nil {
+		return ResolvedArtifactSkill{}, false
+	}
+	value, err = s.resolver.ResolveArtifactSkill(ctx, ref)
+	if err != nil {
+		return ResolvedArtifactSkill{}, false
+	}
+
+	s.rtResyncMu.Lock()
+	_, registered := s.managedRuntime[value.Definition]
+	s.rtResyncMu.Unlock()
+	if !registered {
+		return ResolvedArtifactSkill{}, false
+	}
+	return value, true
 }
 
-func normalizeActiveRefsSubsetOfAllow(
-	allow,
-	active []spec.SkillRef,
-) []spec.SkillRef {
+func validateArtifactRefs(values []artifact.ArtifactRef) error {
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		if err := value.Validate(); err != nil {
+			return err
+		}
+		key := artifactRefKey(value)
+		if _, duplicate := seen[key]; duplicate {
+			return errors.New("duplicate ArtifactRef")
+		}
+		seen[key] = struct{}{}
+	}
+	return nil
+}
+
+func subsetArtifacts(
+	allow []artifact.ArtifactRef,
+	active []artifact.ArtifactRef,
+) []artifact.ArtifactRef {
 	allowed := map[string]struct{}{}
 	for _, ref := range allow {
-		allowed[refKey(ref)] = struct{}{}
+		allowed[artifactRefKey(ref)] = struct{}{}
 	}
+
 	seen := map[string]struct{}{}
-	output := make([]spec.SkillRef, 0, len(active))
+	output := make([]artifact.ArtifactRef, 0, len(active))
 	for _, ref := range active {
-		key := refKey(ref)
-		if _, ok := allowed[key]; !ok {
+		key := artifactRefKey(ref)
+		if _, exists := allowed[key]; !exists {
 			continue
 		}
-		if _, found := seen[key]; found {
+		if _, duplicate := seen[key]; duplicate {
 			continue
 		}
 		seen[key] = struct{}{}
@@ -516,64 +428,27 @@ func normalizeActiveRefsSubsetOfAllow(
 	return output
 }
 
-func refKey(ref spec.SkillRef) string {
-	if ref.Artifact != nil {
-		return "artifact|" +
-			string(ref.Artifact.RootID) + "|" +
-			string(ref.Artifact.ArtifactID)
+func buildActiveArtifacts(
+	definitions map[agentskillsSpec.SkillDef]artifact.ArtifactRef,
+	active map[agentskillsSpec.SkillDef]struct{},
+) []artifact.ArtifactRef {
+	output := make([]artifact.ArtifactRef, 0)
+	for definition := range active {
+		ref, found := definitions[definition]
+		if found {
+			output = append(output, ref)
+		}
 	}
-	return "installed|" +
-		string(ref.BundleID) + "|" +
-		string(ref.SkillSlug) + "|" +
-		string(ref.SkillID)
+	sort.Slice(output, func(left, right int) bool {
+		return artifactRefKey(output[left]) < artifactRefKey(output[right])
+	})
+	return output
 }
 
-func validateSkillRef(ref spec.SkillRef) error {
-	if ref.Artifact != nil {
-		if ref.BundleID != "" || ref.SkillSlug != "" || ref.SkillID != "" {
-			return errors.New(
-				"ArtifactRef and installed Skill fields are mutually exclusive",
-			)
-		}
-		return ref.Artifact.Validate()
-	}
-	if strings.TrimSpace(string(ref.BundleID)) == "" {
-		return errors.New("bundleID is empty")
-	}
-	if strings.TrimSpace(string(ref.SkillSlug)) == "" {
-		return errors.New("skillSlug is empty")
-	}
-	if strings.TrimSpace(string(ref.SkillID)) == "" {
-		return errors.New("skillID is empty")
-	}
-	return nil
-}
-
-func validateWorkspaceScopeForRefs(
-	workspace *collection.CollectionRef,
-	refs []spec.SkillRef,
-) error {
-	if workspace != nil {
-		if err := workspace.Validate(); err != nil {
-			return err
-		}
-	}
-	for _, ref := range refs {
-		if ref.Artifact == nil {
-			continue
-		}
-		if workspace == nil {
-			return errors.New(
-				"Workspace Artifact references require a Workspace scope",
-			)
-		}
-		if ref.Artifact.RootID != workspace.RootID {
-			return errors.New(
-				"Workspace Artifact reference belongs to another Root",
-			)
-		}
-	}
-	return nil
+func containsInstructionInsert(
+	values []agentskillsSpec.SkillInsert,
+) bool {
+	return slices.Contains(values, agentskillsSpec.SkillInsertInstructions)
 }
 
 func cloneStringMap(input map[string]string) map[string]string {
@@ -594,7 +469,9 @@ func cloneAnyMap(input map[string]any) map[string]any {
 	return output
 }
 
-func cloneSkillResourceInfo(input agentskillsSpec.SkillResourceInfo) agentskillsSpec.SkillResourceInfo {
+func cloneSkillResourceInfo(
+	input agentskillsSpec.SkillResourceInfo,
+) agentskillsSpec.SkillResourceInfo {
 	input.Locations = append([]string(nil), input.Locations...)
 	return input
 }

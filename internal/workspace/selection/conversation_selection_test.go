@@ -120,15 +120,10 @@ func TestConversationSelectionHelpersTrackChangesAndUnavailableReferences(t *tes
 				Name: "Context",
 			},
 		},
-		SkillRefs: []ConversationSkillSelectionRef{
+		SkillRefs: []artifact.ArtifactRef{
 			{
-				ConversationResourceSelectionRef: ConversationResourceSelectionRef{
-					Artifact: artifact.ArtifactRef{
-						RootID:     "019d3150-7401-7a6b-a34e-d9032342bc31",
-						ArtifactID: "019d3150-7404-7a6b-a34e-d9032342bc31",
-					},
-				},
-				DisplayName: "Skill",
+				RootID:     "019d3150-7401-7a6b-a34e-d9032342bc31",
+				ArtifactID: "019d3150-7404-7a6b-a34e-d9032342bc31",
 			},
 		},
 	}

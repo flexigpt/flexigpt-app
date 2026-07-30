@@ -8,11 +8,11 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -73,14 +73,8 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 			},
 		},
 	}
-	preset.StartingSkillSelections = []skillstoreSpec.SkillSelection{
-		{
-			SkillRef: skillstoreSpec.SkillRef{
-				BundleID:  bundleitemutils.BundleID("bundle-a"),
-				SkillSlug: testSkillA,
-				SkillID:   testSkillIDA,
-			},
-		},
+	preset.StartingSkillSelections = []spec.ArtifactSkillSelection{
+		artifactSkillSelectionForAssistantPresetTest(),
 	}
 
 	lookups := ReferenceLookups{
@@ -92,7 +86,7 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 		ToolSelections: fakeToolSelectionLookup(func(context.Context, toolSpec.ToolSelection) (ToolSummary, error) {
 			return ToolSummary{IsEnabled: true}, nil
 		}),
-		Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
+		Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
 			return SkillSummary{IsEnabled: true}, nil
 		}),
 	}
@@ -133,7 +127,7 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 	p.StartingText = "mutated starting text"
 	*p.StartingIncludeModelSystemPrompt = false
 	p.StartingToolSelections[0].ToolRef.ToolSlug = "mutated-tool"
-	p.StartingSkillSelections[0].SkillRef.SkillSlug = "mutated-skill"
+	p.StartingSkillSelections[0].Artifact.ArtifactID = "019d3150-7405-7a6b-a34e-d9032342bc31"
 	presets[bundle.ID][preset.ID] = p
 	delete(presets[bundle.ID], preset.ID)
 
@@ -169,8 +163,12 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 	if gotPreset.StartingToolSelections[0].ToolRef.ToolSlug != testToolA {
 		t.Fatalf("tool slug = %q, want %q", gotPreset.StartingToolSelections[0].ToolRef.ToolSlug, testToolA)
 	}
-	if gotPreset.StartingSkillSelections[0].SkillRef.SkillSlug != testSkillA {
-		t.Fatalf("skill slug = %q, want %q", gotPreset.StartingSkillSelections[0].SkillRef.SkillSlug, testSkillA)
+	if gotPreset.StartingSkillSelections[0].Artifact.ArtifactID !=
+		"019d3150-7404-7a6b-a34e-d9032342bc31" {
+		t.Fatalf(
+			"skill ArtifactID = %q",
+			gotPreset.StartingSkillSelections[0].Artifact.ArtifactID,
+		)
 	}
 }
 
@@ -346,5 +344,26 @@ func TestBuiltInData_Close_NilSafe(t *testing.T) {
 	var d *BuiltInData
 	if err := d.Close(); err != nil {
 		t.Fatalf("Close() error: %v", err)
+	}
+}
+
+type artifactSkillLookup func(
+	context.Context,
+	spec.ArtifactSkillSelection,
+) (SkillSummary, error)
+
+func (f artifactSkillLookup) GetSkillSummaryForSelection(
+	ctx context.Context,
+	selection spec.ArtifactSkillSelection,
+) (SkillSummary, error) {
+	return f(ctx, selection)
+}
+
+func artifactSkillSelectionForAssistantPresetTest() spec.ArtifactSkillSelection {
+	return spec.ArtifactSkillSelection{
+		Artifact: artifact.ArtifactRef{
+			RootID:     "019d3150-7401-7a6b-a34e-d9032342bc31",
+			ArtifactID: "019d3150-7404-7a6b-a34e-d9032342bc31",
+		},
 	}
 }

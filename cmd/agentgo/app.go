@@ -17,12 +17,11 @@ const (
 	AppTitle = "FlexiGPT"
 
 	settingsDirectoryName         = "settings"
-	conversationsDirectoryName    = "conversationsv1"
+	conversationsDirectoryName    = "conversationsv2"
 	modelPresetsDirectoryName     = "modelpresetsv1"
 	toolsDirectoryName            = "toolsv1"
-	skillsDirectoryName           = "skillsv1"
 	mcpDirectoryName              = "mcpserversv1"
-	assistantPresetsDirectoryName = "assistantpresetsv1"
+	assistantPresetsDirectoryName = "assistantpresetsv2"
 	// Workspace Collections are stored by the shared artifact store. Do not
 	// add a second Workspace-owned persistence directory. This is deliberately
 	// a clean namespace: startup must not locate, import, copy, or migrate any
@@ -39,7 +38,7 @@ type App struct {
 	modelPresetStoreAPI     *ModelPresetStoreWrapper
 	toolStoreAPI            *ToolStoreWrapper
 	toolRuntimeAPI          *ToolRuntimeWrapper
-	skillStoreAPI           *SkillStoreWrapper
+	skillBundleAPI          *SkillBundleWrapper
 	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
@@ -52,7 +51,6 @@ type App struct {
 	conversationsDirPath    string
 	modelPresetsDirPath     string
 	toolsDirPath            string
-	skillsDirPath           string
 	mcpsDirPath             string
 	assistantPresetsDirPath string
 	artifactStoreDirPath    string
@@ -74,7 +72,6 @@ func NewApp() *App {
 	app.conversationsDirPath = filepath.Join(app.dataBasePath, conversationsDirectoryName)
 	app.modelPresetsDirPath = filepath.Join(app.dataBasePath, modelPresetsDirectoryName)
 	app.toolsDirPath = filepath.Join(app.dataBasePath, toolsDirectoryName)
-	app.skillsDirPath = filepath.Join(app.dataBasePath, skillsDirectoryName)
 	app.mcpsDirPath = filepath.Join(app.dataBasePath, mcpDirectoryName)
 	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, assistantPresetsDirectoryName)
 	app.artifactStoreDirPath = filepath.Join(app.dataBasePath, artifactStoreDirectoryName)
@@ -82,8 +79,7 @@ func NewApp() *App {
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
 		app.modelPresetsDirPath == "" ||
 		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" ||
-		app.skillsDirPath == "" || app.mcpsDirPath == "" ||
-		app.artifactStoreDirPath == "" {
+		app.mcpsDirPath == "" || app.artifactStoreDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"artifactStoreDirPath", app.artifactStoreDirPath,
@@ -92,7 +88,6 @@ func NewApp() *App {
 			"modelPresetsDirPath", app.modelPresetsDirPath,
 			"assistantPresetsDirPath", app.assistantPresetsDirPath,
 			"toolsDirPath", app.toolsDirPath,
-			"skillsDirPath", app.skillsDirPath,
 			"mcpsDirPath", app.mcpsDirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
@@ -112,7 +107,7 @@ func NewApp() *App {
 	app.conversationStoreAPI = &ConversationCollectionWrapper{}
 	app.modelPresetStoreAPI = &ModelPresetStoreWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
-	app.skillStoreAPI = &SkillStoreWrapper{}
+	app.skillBundleAPI = &SkillBundleWrapper{}
 	app.mcpAPI = &MCPWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
@@ -156,15 +151,6 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create tools directory")
 	}
-	if err := ensureAppPrivateDirectory(app.skillsDirPath); err != nil {
-
-		slog.Error(
-			"failed to create skills directory",
-			"skills path", app.skillsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize app: could not create skills directory")
-	}
 	if err := ensureAppPrivateDirectory(app.mcpsDirPath); err != nil {
 
 		slog.Error(
@@ -201,7 +187,6 @@ func NewApp() *App {
 		"conversationsDirPath", app.conversationsDirPath,
 		"modelPresetsDirPath", app.modelPresetsDirPath,
 		"toolsDirPath", app.toolsDirPath,
-		"skillsDirPath", app.skillsDirPath,
 		"mcpsDirPath", app.mcpsDirPath,
 		"assistantPresetsDirPath", app.assistantPresetsDirPath,
 		"artifactStoreDirPath", app.artifactStoreDirPath,
@@ -283,24 +268,23 @@ func (a *App) initManagers() {
 	}
 	slog.Info("workspace initialized")
 
-	err = InitSkillStoreWrapper(
-		a.skillStoreAPI,
-		a.skillsDirPath,
+	err = InitSkillBundleWrapper(
+		a.skillBundleAPI,
+		a.artifactStoreAPI.components,
 		a.workspaceAPI.api.SkillAdapter(),
 	)
 	if err != nil {
 		slog.Error(
-			"couldn't initialize Skill services",
-			"directory", a.skillsDirPath,
+			"couldn't initialize artifact-backed Skill bundles",
 			"error", err,
 		)
-		panic("failed to initialize managers: skill initialization failed\n" + err.Error())
+		panic("failed to initialize managers: skill bundle initialization failed\n" + err.Error())
 	}
-	slog.Info("skill services initialized", "directory", a.skillsDirPath)
+	slog.Info("artifact-backed skill bundles initialized")
 
 	err = BindWorkspaceSkillRuntime(
 		a.workspaceAPI,
-		a.skillStoreAPI.runtime,
+		a.skillBundleAPI.runtime,
 	)
 	if err != nil {
 		slog.Error(
@@ -319,16 +303,18 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: artifact store Workspace synchronization failed\n" + err.Error())
 	}
 
-	err = InitAggregateSkillProvider(a.skillStoreAPI)
+	err = BindArtifactStoreSkillBundleSynchronization(
+		a.artifactStoreAPI,
+		a.skillBundleAPI,
+	)
 	if err != nil {
 		slog.Error(
-			"couldn't initialize aggregate Skill provider",
+			"couldn't bind artifact store Skill Bundle synchronization",
 			"error", err,
 		)
-		panic("failed to initialize managers: aggregate Skill provider initialization failed\n" + err.Error())
+		panic("failed to initialize managers: artifact store Skill Bundle synchronization failed\n" + err.Error())
 	}
 
-	slog.Info("aggregate Skill provider initialized")
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
 		slog.Error(
@@ -375,7 +361,7 @@ func (a *App) initManagers() {
 		a.assistantPresetsDirPath,
 		a.modelPresetStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.skillStoreAPI.store,
+		a.skillBundleAPI.runtime,
 		a.mcpAPI.store,
 		a.mcpAPI.runtime,
 	)
@@ -397,8 +383,7 @@ func (a *App) initManagers() {
 		a.modelPresetStoreAPI.store,
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.skillStoreAPI.store,
-		a.skillStoreAPI.runtime,
+		a.skillBundleAPI.runtime,
 		a.mcpAPI.runtime,
 		a.workspaceAPI.api,
 	)
@@ -452,9 +437,9 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.settingStoreAPI != nil {
 		a.settingStoreAPI.close()
 	}
-	if a.skillStoreAPI != nil {
+	if a.skillBundleAPI != nil {
 		//nolint:contextcheck // Need separate context in shutdown.
-		a.skillStoreAPI.close()
+		a.skillBundleAPI.close()
 	}
 	if a.workspaceAPI != nil {
 		a.workspaceAPI.close()

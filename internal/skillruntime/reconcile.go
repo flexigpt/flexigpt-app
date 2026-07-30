@@ -7,14 +7,10 @@ import (
 	"log/slog"
 	"maps"
 	"sort"
-	"strings"
-	"time"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
-	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 )
 
 type runtimeApplyMode int
@@ -26,248 +22,195 @@ const (
 
 type runtimeDesiredView struct {
 	definitions map[agentskillsSpec.SkillDef]string
+	artifacts   map[agentskillsSpec.SkillDef]string
 }
 
 func newRuntimeDesiredView() runtimeDesiredView {
 	return runtimeDesiredView{
 		definitions: map[agentskillsSpec.SkillDef]string{},
+		artifacts:   map[agentskillsSpec.SkillDef]string{},
 	}
 }
 
-func (v *runtimeDesiredView) add(
-	definition agentskillsSpec.SkillDef,
-	version string,
-) {
+func (v *runtimeDesiredView) add(value ResolvedArtifactSkill) {
 	if v.definitions == nil {
 		v.definitions = map[agentskillsSpec.SkillDef]string{}
 	}
-	current, exists := v.definitions[definition]
-	if !exists {
-		v.definitions[definition] = version
-		return
+	if v.artifacts == nil {
+		v.artifacts = map[agentskillsSpec.SkillDef]string{}
 	}
-	v.definitions[definition] = mergeRuntimeVersions(current, version)
+	v.definitions[value.Definition] = value.Version
+	v.artifacts[value.Definition] = artifactRefKey(value.Artifact)
 }
 
-func cloneRuntimeDesiredView(
-	input runtimeDesiredView,
-) runtimeDesiredView {
+func cloneRuntimeDesiredView(input runtimeDesiredView) runtimeDesiredView {
 	output := newRuntimeDesiredView()
 	maps.Copy(output.definitions, input.definitions)
+	maps.Copy(output.artifacts, input.artifacts)
 	return output
 }
 
-func mergeRuntimeVersions(left, right string) string {
-	values := map[string]struct{}{}
-	for _, value := range append(
-		strings.Split(left, "\x00"),
-		strings.Split(right, "\x00")...,
-	) {
-		if value != "" {
-			values[value] = struct{}{}
-		}
-	}
-	output := make([]string, 0, len(values))
-	for value := range values {
-		output = append(output, value)
-	}
-	sort.Strings(output)
-	return strings.Join(output, "\x00")
-}
-
-// ResyncInstalled updates only the installed desired partition. Runtime
-// ownership is tracked independently from provider type because installed and
-// Workspace filesystem skills both intentionally use provider type "fs".
-func (s *SkillRuntime) ResyncInstalled(ctx context.Context) error {
-	if err := s.ensureConfigured(); err != nil {
-		return err
-	}
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
-	view, err := s.installedDesiredView(ctx, true)
-	if err != nil {
-		return err
-	}
-
-	return s.reconcilePartitionsLocked(
-		ctx,
-		view,
-		cloneWorkspaceDesiredViews(s.managedWorkspaces),
-		runtimeApplyStrict,
-	)
-}
-
-func (s *SkillRuntime) bestEffortInstalledResync(
-	parent context.Context,
-	reason string,
-) {
-	if s == nil || s.runtime == nil || s.store == nil {
-		return
-	}
-
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			slog.Error("skill runtime resync: panic", "reason", reason, "panic", recovered)
-		}
-	}()
-	ctx, cancel := context.WithTimeout(parent, runtimeResyncTimeout)
-	defer cancel()
-	if err := s.resyncInstalledBestEffort(ctx); err != nil {
-		if parent.Err() == nil {
-			slog.Error("skill runtime resync failed", "reason", reason, "err", err)
-		}
-	}
-}
-
-func (s *SkillRuntime) resyncInstalledBestEffort(ctx context.Context) error {
-	if err := s.ensureConfigured(); err != nil {
-		return err
-	}
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
-	view, err := s.installedDesiredView(ctx, true)
-	if err != nil {
-		return err
-	}
-
-	return s.reconcilePartitionsLocked(
-		ctx,
-		view,
-		cloneWorkspaceDesiredViews(s.managedWorkspaces),
-		runtimeApplyBestEffort,
-	)
-}
-
-func (s *SkillRuntime) installedDesiredView(
-	ctx context.Context,
-	logInvalid bool,
-) (runtimeDesiredView, error) {
-	bundles := map[bundleitemutils.BundleID]skillstoreSpec.SkillBundle{}
-	bundleToken := ""
-	for {
-		response, err := s.store.ListSkillBundles(ctx, &skillstoreSpec.ListSkillBundlesRequest{
-			IncludeDisabled: true,
-			PageSize:        256,
-			PageToken:       bundleToken,
-		})
-		if err != nil {
-			return runtimeDesiredView{}, err
-		}
-		if response == nil || response.Body == nil {
-			return runtimeDesiredView{}, errors.New("Skill Store returned an empty bundle list response")
-		}
-		for _, bundle := range response.Body.SkillBundles {
-			bundles[bundle.ID] = bundle
-		}
-		if response.Body.NextPageToken == nil || *response.Body.NextPageToken == "" {
-			break
-		}
-		bundleToken = *response.Body.NextPageToken
-	}
-
-	view := newRuntimeDesiredView()
-	skillToken := ""
-	for {
-		response, err := s.store.ListSkills(ctx, &skillstoreSpec.ListSkillsRequest{
-			IncludeDisabled:     true,
-			IncludeMissing:      true,
-			RecommendedPageSize: 256,
-			PageToken:           skillToken,
-		})
-		if err != nil {
-			return runtimeDesiredView{}, err
-		}
-		if response == nil || response.Body == nil {
-			return runtimeDesiredView{}, errors.New("Skill Store returned an empty Skill list response")
-		}
-		for _, item := range response.Body.SkillListItems {
-			bundle, ok := bundles[item.BundleID]
-			if !ok || !bundle.IsEnabled || !item.SkillDefinition.IsEnabled {
-				continue
-			}
-			definition, err := s.runtimeDefForStoreSkill(item.SkillDefinition)
-			if err != nil {
-				if logInvalid {
-					slog.Error(
-						"runtime desired Skill has invalid definition",
-						"bundleID",
-						item.BundleID,
-						"skill",
-						item.SkillSlug,
-						"err",
-						err,
-					)
-				}
-				continue
-			}
-			view.add(
-				definition,
-				"installed:"+item.SkillDefinition.Digest+
-					":"+item.SkillDefinition.ModifiedAt.UTC().Format(time.RFC3339Nano),
-			)
-		}
-		if response.Body.NextPageToken == nil || *response.Body.NextPageToken == "" {
-			break
-		}
-		skillToken = *response.Body.NextPageToken
-	}
-	return view, nil
-}
-
-func cloneWorkspaceDesiredViews(
+func cloneCollectionDesiredViews(
 	input map[collection.CollectionRef]runtimeDesiredView,
 ) map[collection.CollectionRef]runtimeDesiredView {
 	output := make(
 		map[collection.CollectionRef]runtimeDesiredView,
 		len(input),
 	)
-	for workspace, value := range input {
-		output[workspace] = cloneRuntimeDesiredView(value)
+	for ref, value := range input {
+		output[ref] = cloneRuntimeDesiredView(value)
 	}
 	return output
 }
 
-func mergeDesiredPartitions(
-	installed runtimeDesiredView,
-	workspaces map[collection.CollectionRef]runtimeDesiredView,
+// mergeDesiredCollections deterministically fails closed on any same-name
+// collision. The Agent Skills runtime has global name semantics, so retaining
+// either arbitrary source would turn map or scheduling order into policy.
+func mergeDesiredCollections(
+	collections map[collection.CollectionRef]runtimeDesiredView,
 ) runtimeDesiredView {
-	output := cloneRuntimeDesiredView(installed)
-	for _, workspace := range workspaces {
-		for definition, version := range workspace.definitions {
-			output.add(definition, version)
+	byName := map[string]map[string]struct{}{}
+	for _, view := range collections {
+		for definition := range view.definitions {
+			if byName[definition.Name] == nil {
+				byName[definition.Name] = map[string]struct{}{}
+			}
+			byName[definition.Name][view.artifacts[definition]] = struct{}{}
+		}
+	}
+
+	collided := map[string]struct{}{}
+	for name, artifacts := range byName {
+		if len(artifacts) > 1 {
+			collided[name] = struct{}{}
+			slog.Error(
+				"skill runtime same-name collision rejected",
+				"name",
+				name,
+				"artifacts",
+				len(artifacts),
+			)
+		}
+	}
+
+	output := newRuntimeDesiredView()
+	for _, view := range collections {
+		for definition, version := range view.definitions {
+			if _, collision := collided[definition.Name]; collision {
+				continue
+			}
+			output.definitions[definition] = version
+			output.artifacts[definition] = view.artifacts[definition]
 		}
 	}
 	return output
 }
 
-func (s *SkillRuntime) reconcilePartitionsLocked(
+func (s *SkillRuntime) ResyncCollection(
 	ctx context.Context,
-	installed runtimeDesiredView,
-	workspaces map[collection.CollectionRef]runtimeDesiredView,
+	ref collection.CollectionRef,
+) error {
+	if err := s.ensureConfigured(); err != nil {
+		return err
+	}
+	if err := ref.Validate(); err != nil {
+		return err
+	}
+
+	values, err := s.resolver.ListCollectionSkills(ctx, ref)
+	if err != nil {
+		s.rtResyncMu.Lock()
+		defer s.rtResyncMu.Unlock()
+		return s.failClosedCollectionLocked(ctx, ref, err)
+	}
+
+	desired := newRuntimeDesiredView()
+	for _, value := range values {
+		if err := value.Validate(); err != nil {
+			s.rtResyncMu.Lock()
+			nErr := s.failClosedCollectionLocked(ctx, ref, err)
+			s.rtResyncMu.Unlock()
+			return nErr
+		}
+		desired.add(value)
+	}
+
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
+
+	collections := cloneCollectionDesiredViews(s.managedCollections)
+	collections[ref] = desired
+	return s.reconcileCollectionsLocked(ctx, collections, runtimeApplyStrict)
+}
+
+func (s *SkillRuntime) RemoveCollection(
+	ctx context.Context,
+	ref collection.CollectionRef,
+) error {
+	if err := s.ensureConfigured(); err != nil {
+		return err
+	}
+	if err := ref.Validate(); err != nil {
+		return err
+	}
+
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
+
+	collections := cloneCollectionDesiredViews(s.managedCollections)
+	delete(collections, ref)
+	return s.reconcileCollectionsLocked(ctx, collections, runtimeApplyStrict)
+}
+
+func (s *SkillRuntime) failClosedCollectionLocked(
+	ctx context.Context,
+	ref collection.CollectionRef,
+	cause error,
+) error {
+	collections := cloneCollectionDesiredViews(s.managedCollections)
+	collections[ref] = newRuntimeDesiredView()
+
+	cleanupContext, cancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		runtimeForegroundValidateTimeout,
+	)
+	defer cancel()
+
+	cleanupErr := s.reconcileCollectionsLocked(
+		cleanupContext,
+		collections,
+		runtimeApplyBestEffort,
+	)
+	if cleanupErr != nil {
+		return errors.Join(
+			cause,
+			fmt.Errorf("fail-closed Skill runtime cleanup: %w", cleanupErr),
+		)
+	}
+	return cause
+}
+
+func (s *SkillRuntime) reconcileCollectionsLocked(
+	ctx context.Context,
+	collections map[collection.CollectionRef]runtimeDesiredView,
 	mode runtimeApplyMode,
 ) error {
-	desired := mergeDesiredPartitions(installed, workspaces)
+	desired := mergeDesiredCollections(collections)
 	managed, err := s.runtimeApplyDesired(
 		ctx,
 		s.managedRuntime,
 		desired,
 		mode,
 	)
-	// Agent Skills has no transaction spanning remove/add operations. Keep
-	// desired state and observed runtime state separately even after a partial
-	// failure so the next reconciliation converges instead of starting from
-	// stale bookkeeping.
-	s.managedInstalled = cloneRuntimeDesiredView(installed)
-	s.managedWorkspaces = cloneWorkspaceDesiredViews(workspaces)
+
+	// Runtime registration is inherently non-transactional. Retain the desired
+	// feature partitions even after a partial provider operation so the next
+	// reconciliation converges from actual process-local state.
+	s.managedCollections = cloneCollectionDesiredViews(collections)
 	s.managedRuntime = managed
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
-// runtimeApplyDesired reconciles only definitions previously registered by
-// this SkillRuntime. It never claims all definitions of a provider type.
 func (s *SkillRuntime) runtimeApplyDesired(
 	ctx context.Context,
 	current map[agentskillsSpec.SkillDef]string,
@@ -277,10 +220,7 @@ func (s *SkillRuntime) runtimeApplyDesired(
 	present := make(map[agentskillsSpec.SkillDef]string, len(current))
 	maps.Copy(present, current)
 
-	// Remove definitions that are no longer desired before adding replacement
-	// definitions. Agent Skills commonly enforces name uniqueness, so adding a
-	// same-name replacement before removing the old location cannot converge.
-	var removals []agentskillsSpec.SkillDef
+	removals := make([]agentskillsSpec.SkillDef, 0)
 	for definition := range present {
 		if _, wanted := desired.definitions[definition]; !wanted {
 			removals = append(removals, definition)
@@ -296,25 +236,13 @@ func (s *SkillRuntime) runtimeApplyDesired(
 			if mode == runtimeApplyStrict {
 				return present, err
 			}
-			slog.Error(
-				"skill runtime remove failed",
-				"type",
-				definition.Type,
-				"name",
-				definition.Name,
-				"location",
-				definition.Location,
-				"err",
-				err,
-			)
+			slog.Error("skill runtime remove failed", "name", definition.Name, "err", err)
 			continue
 		}
 		delete(present, definition)
 	}
 
-	// A changed version requires reindexing even when the ephemeral SkillDef
-	// itself is unchanged.
-	var reindexes []agentskillsSpec.SkillDef
+	reindexes := make([]agentskillsSpec.SkillDef, 0)
 	for definition, version := range desired.definitions {
 		if currentVersion, found := present[definition]; found &&
 			currentVersion != version {
@@ -328,110 +256,37 @@ func (s *SkillRuntime) runtimeApplyDesired(
 			if mode == runtimeApplyStrict {
 				return present, err
 			}
-			slog.Error(
-				"skill runtime reindex removal failed",
-				"type", definition.Type,
-				"name", definition.Name,
-				"location", definition.Location,
-				"err", err,
-			)
+			slog.Error("skill runtime reindex removal failed", "name", definition.Name, "err", err)
 			continue
 		}
 		delete(present, definition)
 	}
 
-	var additions []agentskillsSpec.SkillDef
+	additions := make([]agentskillsSpec.SkillDef, 0)
 	for definition := range desired.definitions {
 		if _, found := present[definition]; !found {
 			additions = append(additions, definition)
 		}
 	}
 	sortSkillDefs(additions)
+
 	for _, definition := range additions {
 		if _, err := s.runtime.AddSkill(ctx, definition); err != nil {
 			if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
-				collision := fmt.Errorf(
-					"managed Skill runtime definition already belongs to another owner: type=%q name=%q location=%q",
-					definition.Type,
+				err = fmt.Errorf(
+					"runtime Skill name collision remained after fail-closed reconciliation: %q",
 					definition.Name,
-					definition.Location,
 				)
-				if mode == runtimeApplyStrict {
-					return present, collision
-				}
-				slog.Error("skill runtime definition collision", "error", collision)
-				continue
 			}
 			if mode == runtimeApplyStrict {
 				return present, err
 			}
-			slog.Error(
-				"skill runtime add failed",
-				"type",
-				definition.Type,
-				"name",
-				definition.Name,
-				"location",
-				definition.Location,
-				"err",
-				err,
-			)
+			slog.Error("skill runtime add failed", "name", definition.Name, "err", err)
 			continue
 		}
 		present[definition] = desired.definitions[definition]
 	}
 	return present, nil
-}
-
-func (s *SkillRuntime) definitionForSkillRef(
-	ctx context.Context,
-	ref spec.SkillRef,
-	workspaceScope *collection.CollectionRef,
-) (agentskillsSpec.SkillDef, bool) {
-	if ref.Artifact != nil {
-		definition, resolvedWorkspace, found := s.workspaceDefinitionForArtifact(
-			ctx,
-			*ref.Artifact,
-		)
-		if !found ||
-			(workspaceScope != nil &&
-				resolvedWorkspace != *workspaceScope) {
-			return agentskillsSpec.SkillDef{}, false
-		}
-		return definition, found
-	}
-	if strings.TrimSpace(string(ref.BundleID)) == "" || strings.TrimSpace(string(ref.SkillSlug)) == "" {
-		return agentskillsSpec.SkillDef{}, false
-	}
-	response, err := s.store.GetSkill(ctx, &skillstoreSpec.GetSkillRequest{
-		BundleID:  ref.BundleID,
-		SkillSlug: ref.SkillSlug,
-	})
-	if err != nil || response == nil || response.Body == nil {
-		return agentskillsSpec.SkillDef{}, false
-	}
-	if response.Body.ID != ref.SkillID {
-		return agentskillsSpec.SkillDef{}, false
-	}
-	definition, err := s.runtimeDefForStoreSkill(*response.Body)
-	if err != nil {
-		return agentskillsSpec.SkillDef{}, false
-	}
-	return definition, true
-}
-
-func (s *SkillRuntime) runtimeDefForStoreSkill(
-	skill skillstoreSpec.Skill,
-) (agentskillsSpec.SkillDef, error) {
-	source, err := s.store.ResolveSkillSource(skill)
-	if err != nil {
-		return agentskillsSpec.SkillDef{}, err
-	}
-	return agentskillsSpec.SkillDef{
-		Type:     source.Type,
-		Name:     source.Name,
-		Location: source.Location,
-	}, nil
 }
 
 func sortSkillDefs(values []agentskillsSpec.SkillDef) {
@@ -444,4 +299,8 @@ func sortSkillDefs(values []agentskillsSpec.SkillDef) {
 		}
 		return values[left].Location < values[right].Location
 	})
+}
+
+func artifactRefKey(ref artifact.ArtifactRef) string {
+	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
 }

@@ -16,18 +16,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-type Decoder struct {
-	policy LocatorPolicy
-}
+type Decoder struct{}
 
-func NewDecoder(policy LocatorPolicy) (*Decoder, error) {
-	if policy == nil {
-		return nil, fmt.Errorf(
-			"%w: agent Skill locator policy is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	return &Decoder{policy: policy}, nil
+func NewDecoder() (*Decoder, error) {
+	return &Decoder{}, nil
 }
 
 func (*Decoder) ID() basespec.DecoderID {
@@ -42,9 +34,6 @@ func (d *Decoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if _, supported := d.policy.ExpectedName(candidate.Locator); supported {
-		return discovery.RecognitionPreferred
-	}
 	if candidate.RequestsDecoder(DecoderID) &&
 		strings.EqualFold(
 			path.Base(string(candidate.Locator)),
@@ -59,40 +48,75 @@ func (d *Decoder) Decode(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
-	expectedName, supported := d.policy.ExpectedName(candidate.Locator)
-	if !supported {
-		if !candidate.RequestsDecoder(DecoderID) ||
-			!strings.EqualFold(
-				path.Base(string(candidate.Locator)),
-				DefinitionFileName,
-			) {
-			return nil, nil
-		}
-		parent := path.Dir(string(candidate.Locator))
-		if parent == "." || parent == "/" || parent == "" {
-			return nil, nil
-		}
-		expectedName = path.Base(parent)
+	if !candidate.RequestsDecoder(DecoderID) ||
+		!strings.EqualFold(path.Base(string(candidate.Locator)), DefinitionFileName) {
+		return nil, nil
 	}
 
-	document, warnings, err := agentskills.ParseSkillDocument(
+	parent := path.Dir(string(candidate.Locator))
+	if parent == "." || parent == "/" || parent == "" {
+		return nil, nil
+	}
+	expectedName := path.Base(parent)
+	value, warnings, err := DecodeSkillDocument(
 		candidate.Content,
-		agentskillsSpec.ParseSkillDocumentOptions{},
+		expectedName,
 	)
 	if err != nil {
 		return nil, errorDiagnostics(candidate.Locator, err)
 	}
+	for index := range warnings {
+		warnings[index].Location = &diagnostic.DiagnosticLocation{
+			Locator: candidate.Locator,
+		}
+	}
+	return []discovery.Decoded{{Definition: value}}, warnings
+}
+
+// DecodeSkillDocument is the shared SKILL.md parse-and-definition path used
+// by discovery and managed Skill publication. It deliberately delegates
+// parsing and semantic validation to agentskills-go.
+func DecodeSkillDocument(
+	content []byte,
+	expectedName string,
+) (definition.Definition, []diagnostic.Diagnostic, error) {
+	if err := basespec.ValidateLogicalName(
+		basespec.LogicalName(expectedName),
+	); err != nil {
+		return definition.Definition{}, nil, err
+	}
+
+	document, warnings, err := agentskills.ParseSkillDocument(
+		content,
+		agentskillsSpec.ParseSkillDocumentOptions{
+			ExpectedName: expectedName,
+		},
+	)
+	if err != nil {
+		return definition.Definition{}, nil, err
+	}
 	if document.Name != expectedName {
-		return nil, errorDiagnostics(
-			candidate.Locator,
-			fmt.Errorf(
-				"frontmatter.name %q must match containing directory %q",
-				document.Name,
-				expectedName,
-			),
+		return definition.Definition{}, nil, fmt.Errorf(
+			"frontmatter.name %q must match containing directory %q",
+			document.Name,
+			expectedName,
 		)
 	}
 
+	value, err := definitionForDocument(document)
+	if err != nil {
+		return definition.Definition{}, nil, err
+	}
+	canonical, err := definition.Canonicalize(value)
+	if err != nil {
+		return definition.Definition{}, nil, err
+	}
+	return canonical, warningDiagnostics("", warnings), nil
+}
+
+func definitionForDocument(
+	document agentskillsSpec.SkillDocument,
+) (definition.Definition, error) {
 	arguments := make([]Argument, 0, len(document.Arguments))
 	for _, argument := range document.Arguments {
 		arguments = append(arguments, Argument{
@@ -101,7 +125,7 @@ func (d *Decoder) Decode(
 			Default:     argument.Default,
 		})
 	}
-	body := Body{
+	raw, err := json.Marshal(Body{
 		Name:           document.Name,
 		DisplayName:    document.DisplayName,
 		Description:    document.Description,
@@ -110,35 +134,24 @@ func (d *Decoder) Decode(
 		Tags:           append([]string(nil), document.Tags...),
 		MarkdownBody:   document.MarkdownBody,
 		RawFrontmatter: document.RawFrontmatter,
-	}
-	raw, err := json.Marshal(body)
+	})
 	if err != nil {
-		return nil, errorDiagnostics(candidate.Locator, err)
+		return definition.Definition{}, err
 	}
-	raw, err = jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxDefinitionBodyBytes,
-	)
+	raw, err = jsonutil.CanonicalizeObject(raw, basespec.MaxDefinitionBodyBytes)
 	if err != nil {
-		return nil, errorDiagnostics(candidate.Locator, err)
+		return definition.Definition{}, err
 	}
-	value := definition.Definition{
+	return definition.Definition{
 		Kind:          Kind,
 		SchemaID:      SchemaID,
 		SchemaVersion: SchemaVersion,
 		LogicalName:   basespec.LogicalName(document.Name),
 		DisplayName:   document.DisplayName,
 		Description:   document.Description,
-		Labels: map[string]string{
-			InsertLabelKey: string(document.Insert),
-		},
-		Body: raw,
-	}
-	if err := ValidateDefinition(value); err != nil {
-		return nil, errorDiagnostics(candidate.Locator, err)
-	}
-	return []discovery.Decoded{{Definition: value}},
-		warningDiagnostics(candidate.Locator, warnings)
+		Labels:        map[string]string{InsertLabelKey: string(document.Insert)},
+		Body:          raw,
+	}, nil
 }
 
 func errorDiagnostics(

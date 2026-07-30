@@ -16,6 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
+	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -294,13 +295,7 @@ func TestAPIFilesystemWorkspaceRefreshRuntimeAndAttachmentLifecycle(t *testing.T
 		ContextRefs: []selection.ConversationResourceSelectionRef{{
 			Artifact: contextArtifact.Artifact,
 		}},
-		SkillRefs: []selection.ConversationSkillSelectionRef{
-			{
-				ConversationResourceSelectionRef: selection.ConversationResourceSelectionRef{
-					Artifact: skillArtifact.Artifact,
-				},
-			},
-		},
+		SkillRefs: []artifact.ArtifactRef{skillArtifact.Artifact},
 	})
 	if err != nil || conversation.Usage.Status != selection.ConversationSelectionReady ||
 		len(conversation.Usage.Contexts) != 1 || len(conversation.Usage.Skills) != 1 ||
@@ -662,9 +657,16 @@ type workspaceTestFixture struct {
 
 func newWorkspaceTestFixture(t *testing.T) *workspaceTestFixture {
 	t.Helper()
+	skillDecoder, err := skillartifact.NewDecoder()
+	if err != nil {
+		t.Fatalf("create shared Skill decoder: %v", err)
+	}
 	components, err := system.Open(t.Context(), system.Config{
 		BaseDirectory: t.TempDir(),
-		Decoders:      workspace.BuiltinDecoders(),
+		Decoders: append(
+			workspace.BuiltinDecoders(),
+			skillDecoder,
+		),
 	})
 	if err != nil {
 		t.Fatalf("open Artifact Store components: %v", err)

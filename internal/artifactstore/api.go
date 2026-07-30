@@ -17,8 +17,9 @@ import (
 type API struct {
 	components *system.Components
 
-	mutationMu     sync.RWMutex
-	onRootMutation func(basespec.RootID)
+	mutationMu        sync.RWMutex
+	mutationObservers map[uint64]func(basespec.RootID)
+	nextObserverID    uint64
 }
 
 func New(components *system.Components) (*API, error) {
@@ -27,7 +28,8 @@ func New(components *system.Components) (*API, error) {
 	}
 
 	return &API{
-		components: components,
+		components:        components,
+		mutationObservers: map[uint64]func(basespec.RootID){},
 	}, nil
 }
 
@@ -39,6 +41,8 @@ func (a *API) CreateArtifactRoot(
 	if err != nil {
 		return nil, err
 	}
+
+	a.notifyRootMutation(value.ID)
 
 	return &CreateArtifactRootResponse{
 		Body: &value,
@@ -87,6 +91,8 @@ func (a *API) UpdateArtifactRoot(
 	if err != nil {
 		return nil, err
 	}
+
+	a.notifyRootMutation(request.RootID)
 
 	return &UpdateArtifactRootResponse{
 		Body: &value,
@@ -153,6 +159,8 @@ func (a *API) CreateArtifactSource(
 	if err != nil {
 		return nil, err
 	}
+
+	a.notifyRootMutation(request.RootID)
 
 	return &CreateArtifactSourceResponse{
 		Body: &value,
@@ -375,20 +383,55 @@ func (a *API) RemoveManagedSourcePackage(
 	}, nil
 }
 
+// SubscribeRootMutation registers an independent application-level listener.
+// The returned function is idempotent and may be called during shutdown.
+func (a *API) SubscribeRootMutation(
+	observer func(basespec.RootID),
+) func() {
+	if a == nil || observer == nil {
+		return func() {}
+	}
+
+	a.mutationMu.Lock()
+	a.nextObserverID++
+	id := a.nextObserverID
+	a.mutationObservers[id] = observer
+	a.mutationMu.Unlock()
+
+	return func() {
+		a.mutationMu.Lock()
+		delete(a.mutationObservers, id)
+		a.mutationMu.Unlock()
+	}
+}
+
+// SetRootMutationObserver remains only for callers that require one owned
+// observer slot. New feature composition must use SubscribeRootMutation.
 func (a *API) SetRootMutationObserver(
 	observer func(basespec.RootID),
 ) {
 	a.mutationMu.Lock()
-	a.onRootMutation = observer
+	a.mutationObservers = map[uint64]func(basespec.RootID){}
+	if observer != nil {
+		a.nextObserverID++
+		a.mutationObservers[a.nextObserverID] = observer
+	}
 	a.mutationMu.Unlock()
 }
 
 func (a *API) notifyRootMutation(rootID basespec.RootID) {
 	a.mutationMu.RLock()
-	observer := a.onRootMutation
+	observers := make(
+		[]func(basespec.RootID),
+		0,
+		len(a.mutationObservers),
+	)
+	for _, observer := range a.mutationObservers {
+		observers = append(observers, observer)
+	}
 	a.mutationMu.RUnlock()
 
-	if observer != nil {
+	for _, observer := range observers {
 		observer(rootID)
 	}
 }

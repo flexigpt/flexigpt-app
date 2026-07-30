@@ -3,300 +3,501 @@ package main
 import (
 	"context"
 	"errors"
+	"sync"
+	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/skillbundle"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
-	"github.com/flexigpt/flexigpt-app/internal/skillstore"
-	"github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
-// SkillStoreWrapper exposes SkillStore APIs to Wails bindings (same pattern as other stores).
-type SkillStoreWrapper struct {
-	store             *skillstore.SkillStore
-	runtime           *skillruntime.SkillRuntime
-	installedProvider skillruntime.Provider
-	provider          skillruntime.Provider
+type SkillBundleWrapper struct {
+	api     *skillbundle.API
+	runtime *skillruntime.SkillRuntime
+
+	mu      sync.Mutex
+	managed map[collection.CollectionRef]struct{}
+
+	bootstrapContext context.Context
+	bootstrapCancel  context.CancelFunc
+	bootstrapWG      sync.WaitGroup
 }
 
-func InitSkillStoreWrapper(
-	s *SkillStoreWrapper,
-	skillsDir string,
+func InitSkillBundleWrapper(
+	wrapper *SkillBundleWrapper,
+	components *system.Components,
 	workspaceSkills *skilladapter.Adapter,
 ) error {
-	if s == nil {
-		return errors.New("skill store wrapper is nil")
+	if wrapper == nil || components == nil || workspaceSkills == nil {
+		return errors.New("skill bundle wrapper dependencies are incomplete")
 	}
-	st, err := skillstore.NewSkillStore(skillsDir)
-	if err != nil {
-		return err
-	}
-	runtimeOptions := []skillruntime.SkillRuntimeOption{}
-	if workspaceSkills != nil {
-		runtimeOptions = append(
-			runtimeOptions,
-			skillruntime.WithWorkspaceSkillAdapter(workspaceSkills),
-		)
-	}
-	rt, err := skillruntime.NewSkillRuntime(st, runtimeOptions...)
-	if err != nil {
-		st.Close()
-		return err
-	}
-	installed, err := skillruntime.NewInstalled(st, rt)
-	if err != nil {
-		rt.Close()
-		st.Close()
-		return err
-	}
-	s.store = st
-	s.runtime = rt
-	s.installedProvider = installed
-	s.provider = installed
-	return nil
-}
 
-func InitAggregateSkillProvider(
-	s *SkillStoreWrapper,
-) error {
-	if s == nil || s.runtime == nil || s.installedProvider == nil {
-		return errors.New("skill wrapper is not initialized")
-	}
-	workspaceProvider, err := skillruntime.NewWorkspace(s.runtime)
+	api, err := skillbundle.New(skillbundle.Dependencies{
+		Roots:              components.Roots,
+		Sources:            components.Sources,
+		Collections:        components.Collections,
+		Artifacts:          components.Artifacts,
+		Refresh:            components.Refresh,
+		Catalogs:           components.Catalogs,
+		Definitions:        components.Definitions,
+		SourceRuntime:      components.SourceRuntime,
+		HasDecoder:         components.HasDecoder,
+		DecoderFingerprint: components.DecoderFingerprint,
+		IDGenerator:        uuidutil.UUIDv7Generator{},
+		GetManagedSourceState: func(
+			ctx context.Context,
+			rootID basespec.RootID,
+			sourceID basespec.SourceID,
+		) (sourceSummary source.Summary, generation string, err error) {
+			result, err := components.GetManagedSourceState(ctx, rootID, sourceID)
+			if err != nil {
+				return source.Summary{}, "", err
+			}
+			return result.Source, result.Generation, nil
+		},
+		PublishManagedPackage: func(
+			ctx context.Context,
+			rootID basespec.RootID,
+			sourceID basespec.SourceID,
+			expectedSourceRevision uint64,
+			publication source.ManagedPackagePublication,
+		) (sourceSummary source.Summary, generation string, err error) {
+			result, err := components.PublishManagedPackage(
+				ctx,
+				rootID,
+				sourceID,
+				expectedSourceRevision,
+				publication,
+			)
+			if err != nil {
+				return source.Summary{}, "", err
+			}
+			return result.Source, result.Generation, nil
+		},
+	})
 	if err != nil {
 		return err
 	}
-	aggregate, err := newAggregateSkillProvider(
-		s.installedProvider,
-		workspaceProvider,
+
+	router, err := skillruntime.NewArtifactRouter(
+		components.ArtifactReader,
+		components.CollectionReader,
 	)
 	if err != nil {
 		return err
 	}
-	s.provider = aggregate
+	workspaceResolver, err := skilladapter.NewRuntimeResolver(workspaceSkills)
+	if err != nil {
+		return err
+	}
+	bundleResolver, err := skillbundle.NewRuntimeResolver(api)
+	if err != nil {
+		return err
+	}
+	if err := router.Register(
+		"workspace.collection",
+		workspaceResolver,
+	); err != nil {
+		return err
+	}
+	if err := router.Register(
+		skillbundle.CollectionKind,
+		bundleResolver,
+	); err != nil {
+		return err
+	}
+
+	runtime, err := skillruntime.NewSkillRuntime(
+		skillruntime.WithArtifactResolver(router),
+	)
+	if err != nil {
+		return err
+	}
+
+	parent, cancel := context.WithCancel(context.Background())
+	wrapper.api = api
+	wrapper.runtime = runtime
+	wrapper.managed = map[collection.CollectionRef]struct{}{}
+	wrapper.bootstrapContext = parent
+	wrapper.bootstrapCancel = cancel
+
+	if err := wrapper.bootstrapEmbeddedBuiltIns(context.Background()); err != nil {
+		wrapper.close()
+		return err
+	}
+	wrapper.syncKnownSkillBundles()
+
 	return nil
 }
 
-func mutateInstalledSkill[T any](
-	ctx context.Context,
-	wrapper *SkillStoreWrapper,
-	mutation func() (T, error),
-) (T, error) {
-	var zero T
-	if wrapper == nil || wrapper.store == nil || wrapper.runtime == nil {
-		return zero, errors.New("skill wrapper is not initialized")
-	}
-	response, err := mutation()
-	if err != nil {
-		return zero, err
-	}
-
-	// Runtime state is derived. The durable Skill Store mutation has already
-	// committed and must not be reported as failed because reconciliation is
-	// temporarily unavailable.
-	//nolint:contextcheck // Explicit.
-	wrapper.runtime.RequestInstalledResync()
-	return response, nil
-}
-
-func (s *SkillStoreWrapper) PutSkillBundle(
-	req *spec.PutSkillBundleRequest,
-) (*spec.PutSkillBundleResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PutSkillBundleResponse, error) {
-		ctx := context.Background()
-		return mutateInstalledSkill(ctx, s, func() (*spec.PutSkillBundleResponse, error) {
-			return s.store.PutSkillBundle(ctx, req)
-		})
+func (w *SkillBundleWrapper) CreateSkillBundle(
+	request *skillbundle.CreateBundleRequest,
+) (skillbundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (skillbundle.Bundle, error) {
+		if request == nil {
+			return skillbundle.Bundle{}, errors.New("skill bundle request is required")
+		}
+		value, err := w.api.CreateBundle(context.Background(), *request)
+		if err == nil {
+			w.syncBundle(value.Collection.Ref())
+		}
+		return value, err
 	})
 }
 
-func (s *SkillStoreWrapper) PatchSkillBundle(
-	req *spec.PatchSkillBundleRequest,
-) (*spec.PatchSkillBundleResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PatchSkillBundleResponse, error) {
-		ctx := context.Background()
-		return mutateInstalledSkill(ctx, s, func() (*spec.PatchSkillBundleResponse, error) {
-			return s.store.PatchSkillBundle(ctx, req)
-		})
+func (w *SkillBundleWrapper) GetSkillBundle(
+	ref collection.CollectionRef,
+) (skillbundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (skillbundle.Bundle, error) {
+		return w.api.GetBundle(context.Background(), ref)
 	})
 }
 
-func (s *SkillStoreWrapper) DeleteSkillBundle(
-	req *spec.DeleteSkillBundleRequest,
-) (*spec.DeleteSkillBundleResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.DeleteSkillBundleResponse, error) {
-		ctx := context.Background()
-		return mutateInstalledSkill(ctx, s, func() (*spec.DeleteSkillBundleResponse, error) {
-			return s.store.DeleteSkillBundle(ctx, req)
-		})
+func (w *SkillBundleWrapper) ListSkillBundles(
+	rootID basespec.RootID,
+) ([]skillbundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() ([]skillbundle.Bundle, error) {
+		return w.api.ListBundles(context.Background(), rootID)
 	})
 }
 
-func (s *SkillStoreWrapper) ListSkillBundles(
-	req *spec.ListSkillBundlesRequest,
-) (*spec.ListSkillBundlesResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.ListSkillBundlesResponse, error) {
-		return s.store.ListSkillBundles(context.Background(), req)
+func (w *SkillBundleWrapper) UpdateSkillBundle(
+	request *skillbundle.UpdateBundleRequest,
+) (skillbundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (skillbundle.Bundle, error) {
+		if request == nil {
+			return skillbundle.Bundle{}, errors.New("skill bundle update is required")
+		}
+		value, err := w.api.UpdateBundle(context.Background(), *request)
+		if err == nil {
+			w.syncBundle(request.Bundle)
+		}
+		return value, err
 	})
 }
 
-func (s *SkillStoreWrapper) PutSkill(req *spec.PutSkillRequest) (*spec.PutSkillResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PutSkillResponse, error) {
-		ctx := context.Background()
-		return mutateInstalledSkill(ctx, s, func() (*spec.PutSkillResponse, error) {
-			return s.store.PutSkill(ctx, req)
-		})
+func (w *SkillBundleWrapper) RetireSkillBundle(
+	ref collection.CollectionRef,
+	expectedRevision uint64,
+) (collection.Collection, error) {
+	return middleware.WithRecoveryResp(func() (collection.Collection, error) {
+		value, err := w.api.RetireBundle(
+			context.Background(),
+			ref,
+			expectedRevision,
+		)
+		if err == nil {
+			w.removeBundle(ref)
+		}
+		return value, err
 	})
 }
 
-func (s *SkillStoreWrapper) PutSkillArtifact(
-	req *spec.PutSkillArtifactRequest,
-) (*spec.PutSkillArtifactResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PutSkillArtifactResponse, error) {
-		ctx := context.Background()
-		return mutateInstalledSkill(ctx, s, func() (*spec.PutSkillArtifactResponse, error) {
-			return s.store.PutSkillArtifact(ctx, req)
-		})
+func (w *SkillBundleWrapper) PurgeSkillBundle(
+	ref collection.CollectionRef,
+	expectedRevision uint64,
+) error {
+	return middleware.WithRecovery(func() error {
+		err := w.api.PurgeBundle(context.Background(), ref, expectedRevision)
+		if err == nil {
+			w.removeBundle(ref)
+		}
+		return err
 	})
 }
 
-func (s *SkillStoreWrapper) PatchSkill(req *spec.PatchSkillRequest) (*spec.PatchSkillResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PatchSkillResponse, error) {
-		ctx := context.Background()
-		return mutateInstalledSkill(ctx, s, func() (*spec.PatchSkillResponse, error) {
-			return s.store.PatchSkill(ctx, req)
-		})
+func (w *SkillBundleWrapper) RefreshSkillBundle(
+	ref collection.CollectionRef,
+) error {
+	return middleware.WithRecovery(func() error {
+		_, err := w.api.RefreshBundle(context.Background(), ref)
+		if err == nil {
+			w.syncBundle(ref)
+		}
+		return err
 	})
 }
 
-func (s *SkillStoreWrapper) DeleteSkill(req *spec.DeleteSkillRequest) (*spec.DeleteSkillResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.DeleteSkillResponse, error) {
-		ctx := context.Background()
-		return mutateInstalledSkill(ctx, s, func() (*spec.DeleteSkillResponse, error) {
-			return s.store.DeleteSkill(ctx, req)
-		})
+func (w *SkillBundleWrapper) CreateManagedSkill(
+	request *skillbundle.CreateManagedSkillRequest,
+) (skillbundle.CreateManagedSkillResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (skillbundle.CreateManagedSkillResponse, error) {
+			if request == nil {
+				return skillbundle.CreateManagedSkillResponse{},
+					errors.New("managed skill request is required")
+			}
+			value, err := w.api.CreateManagedSkill(context.Background(), *request)
+			if err == nil {
+				w.syncBundle(request.Bundle)
+			}
+			return value, err
+		},
+	)
+}
+
+func (w *SkillBundleWrapper) AdoptSkill(
+	request *skillbundle.AdoptSkillRequest,
+) (artifact.Artifact, error) {
+	return middleware.WithRecoveryResp(func() (artifact.Artifact, error) {
+		if request == nil {
+			return artifact.Artifact{}, errors.New("skill adoption request is required")
+		}
+		value, err := w.api.AdoptSkill(context.Background(), *request)
+		if err == nil {
+			w.syncBundle(request.Bundle)
+		}
+		return value, err
 	})
 }
 
-func (s *SkillStoreWrapper) GetSkill(req *spec.GetSkillRequest) (*spec.GetSkillResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.GetSkillResponse, error) {
-		return s.store.GetSkill(context.Background(), req)
+func (w *SkillBundleWrapper) PinSkill(
+	request *skillbundle.PinSkillRequest,
+) (artifact.Artifact, error) {
+	return middleware.WithRecoveryResp(func() (artifact.Artifact, error) {
+		if request == nil {
+			return artifact.Artifact{}, errors.New("skill pin request is required")
+		}
+		value, err := w.api.PinSkill(context.Background(), *request)
+		if err == nil {
+			w.syncBundle(request.Bundle)
+		}
+		return value, err
 	})
 }
 
-func (s *SkillStoreWrapper) ListSkills(req *spec.ListSkillsRequest) (*spec.ListSkillsResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.ListSkillsResponse, error) {
-		return s.store.ListSkills(context.Background(), req)
+func (w *SkillBundleWrapper) ListBundleSkills(
+	ref collection.CollectionRef,
+) ([]artifact.Artifact, error) {
+	return middleware.WithRecoveryResp(func() ([]artifact.Artifact, error) {
+		return w.api.ListSkills(context.Background(), ref)
 	})
 }
 
-func (s *SkillStoreWrapper) CreateSkillSession(
-	req *skillruntimeSpec.CreateSkillSessionRequest,
+func (w *SkillBundleWrapper) SetSkillEnabled(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (artifact.Artifact, error) {
+	return middleware.WithRecoveryResp(func() (artifact.Artifact, error) {
+		value, err := w.api.SetSkillEnabled(
+			context.Background(),
+			ref,
+			expectedRevision,
+			enabled,
+		)
+		if err == nil {
+			w.syncBundle(collection.CollectionRef{
+				RootID:       value.RootID,
+				CollectionID: value.CollectionID,
+			})
+		}
+		return value, err
+	})
+}
+
+func (w *SkillBundleWrapper) UnadoptSkill(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	suppress bool,
+) error {
+	return middleware.WithRecovery(func() error {
+		value, err := w.api.GetSkill(context.Background(), ref)
+		if err != nil {
+			return err
+		}
+		err = w.api.UnadoptSkill(
+			context.Background(),
+			ref,
+			expectedRevision,
+			suppress,
+		)
+		if err == nil {
+			w.syncBundle(collection.CollectionRef{
+				RootID:       value.RootID,
+				CollectionID: value.CollectionID,
+			})
+		}
+		return err
+	})
+}
+
+func (w *SkillBundleWrapper) CreateSkillSession(
+	request *skillruntimeSpec.CreateSkillSessionRequest,
 ) (*skillruntimeSpec.CreateSkillSessionResponse, error) {
 	return middleware.WithRecoveryResp(func() (*skillruntimeSpec.CreateSkillSessionResponse, error) {
-		return s.runtime.CreateSkillSession(context.Background(), req)
+		return w.runtime.CreateSkillSession(context.Background(), request)
 	})
 }
 
-func (s *SkillStoreWrapper) CloseSkillSession(
-	req *skillruntimeSpec.CloseSkillSessionRequest,
+func (w *SkillBundleWrapper) CloseSkillSession(
+	request *skillruntimeSpec.CloseSkillSessionRequest,
 ) (*skillruntimeSpec.CloseSkillSessionResponse, error) {
 	return middleware.WithRecoveryResp(func() (*skillruntimeSpec.CloseSkillSessionResponse, error) {
-		return s.runtime.CloseSkillSession(context.Background(), req)
+		return w.runtime.CloseSkillSession(context.Background(), request)
 	})
 }
 
-func (s *SkillStoreWrapper) GetSkillsPrompt(
-	req *skillruntimeSpec.GetSkillsPromptRequest,
+func (w *SkillBundleWrapper) GetSkillsPrompt(
+	request *skillruntimeSpec.GetSkillsPromptRequest,
 ) (*skillruntimeSpec.GetSkillsPromptResponse, error) {
 	return middleware.WithRecoveryResp(func() (*skillruntimeSpec.GetSkillsPromptResponse, error) {
-		return s.runtime.GetSkillsPrompt(context.Background(), req)
+		return w.runtime.GetSkillsPrompt(context.Background(), request)
 	})
 }
 
-func (s *SkillStoreWrapper) ListRuntimeSkills(
-	req *skillruntimeSpec.ListRuntimeSkillsRequest,
+func (w *SkillBundleWrapper) ListRuntimeSkills(
+	request *skillruntimeSpec.ListRuntimeSkillsRequest,
 ) (*skillruntimeSpec.ListRuntimeSkillsResponse, error) {
 	return middleware.WithRecoveryResp(func() (*skillruntimeSpec.ListRuntimeSkillsResponse, error) {
-		return s.runtime.ListRuntimeSkills(context.Background(), req)
+		return w.runtime.ListRuntimeSkills(context.Background(), request)
 	})
 }
 
-func (s *SkillStoreWrapper) RenderSkill(
-	req *skillruntimeSpec.RenderSkillRequest,
+func (w *SkillBundleWrapper) RenderSkill(
+	request *skillruntimeSpec.RenderSkillRequest,
 ) (*skillruntimeSpec.RenderSkillResponse, error) {
 	return middleware.WithRecoveryResp(func() (*skillruntimeSpec.RenderSkillResponse, error) {
-		return s.runtime.RenderSkill(context.Background(), req)
+		return w.runtime.RenderSkill(context.Background(), request)
 	})
 }
 
-func (s *SkillStoreWrapper) InvokeSkillTool(
-	req *skillruntimeSpec.InvokeSkillToolRequest,
+func (w *SkillBundleWrapper) InvokeSkillTool(
+	request *skillruntimeSpec.InvokeSkillToolRequest,
 ) (*skillruntimeSpec.InvokeSkillToolResponse, error) {
 	return middleware.WithRecoveryResp(func() (*skillruntimeSpec.InvokeSkillToolResponse, error) {
-		return s.runtime.InvokeSkillTool(context.Background(), req)
+		return w.runtime.InvokeSkillTool(context.Background(), request)
 	})
 }
 
-func (s *SkillStoreWrapper) ListProvidedSkills(
-	req *skillruntime.ListProvidedSkillsRequest,
-) (*skillruntime.ListProvidedSkillsResponse, error) {
-	return middleware.WithRecoveryResp(func() (*skillruntime.ListProvidedSkillsResponse, error) {
-		if s == nil || s.provider == nil {
-			return nil, errors.New("invalid request")
-		}
-		scope := skillruntime.Scope{}
-		if req != nil {
-			scope.Workspace = req.Workspace
-		}
-		values, err := s.provider.List(context.Background(), scope)
-		if err != nil {
-			return nil, err
-		}
-		return &skillruntime.ListProvidedSkillsResponse{
-			Body: &skillruntime.ListProvidedSkillsResponseBody{
-				Skills: values,
-			},
-		}, nil
-	})
+func BindArtifactStoreSkillBundleSynchronization(
+	artifacts *ArtifactStoreWrapper,
+	bundles *SkillBundleWrapper,
+) error {
+	if artifacts == nil || bundles == nil {
+		return errors.New("artifact and skill bundle wrappers are required")
+	}
+	artifacts.subscribeRootMutation(bundles.syncBundlesForRoot)
+	return nil
 }
 
-func (s *SkillStoreWrapper) RenderProvidedSkill(
-	req *skillruntime.RenderProvidedSkillRequest,
-) (*skillruntime.RenderProvidedSkillResponse, error) {
-	return middleware.WithRecoveryResp(func() (*skillruntime.RenderProvidedSkillResponse, error) {
-		if s == nil || s.provider == nil ||
-			req == nil || req.Body == nil {
-			return nil, errors.New("invalid request")
-		}
-		value, err := s.provider.Render(
-			context.Background(),
-			skillruntime.RenderRequest{
-				Scope:     skillruntime.Scope{Workspace: req.Body.Workspace},
-				Ref:       req.Body.Ref,
-				Arguments: req.Body.Arguments,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		return &skillruntime.RenderProvidedSkillResponse{Body: &value}, nil
-	})
-}
-
-func (s *SkillStoreWrapper) close() {
-	if s == nil {
+func (w *SkillBundleWrapper) syncBundle(ref collection.CollectionRef) {
+	if w == nil || w.runtime == nil {
 		return
 	}
-	if s.runtime != nil {
-		s.runtime.Close()
+	w.mu.Lock()
+	w.managed[ref] = struct{}{}
+	w.mu.Unlock()
+	w.runtime.RequestCollectionResync(ref)
+}
+
+func (w *SkillBundleWrapper) removeBundle(ref collection.CollectionRef) {
+	if w == nil || w.runtime == nil {
+		return
 	}
-	if s.store != nil {
-		s.store.Close()
+	w.mu.Lock()
+	delete(w.managed, ref)
+	w.mu.Unlock()
+	w.runtime.RequestCollectionRemoval(ref)
+}
+
+func (w *SkillBundleWrapper) syncKnownSkillBundles() {
+	w.scheduleBundleSynchronization("", false)
+}
+
+func (w *SkillBundleWrapper) syncBundlesForRoot(rootID basespec.RootID) {
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return
 	}
-	s.provider = nil
-	s.installedProvider = nil
-	s.runtime = nil
-	s.store = nil
+	w.scheduleBundleSynchronization(rootID, true)
+}
+
+func (w *SkillBundleWrapper) scheduleBundleSynchronization(
+	rootID basespec.RootID,
+	filterRoot bool,
+) {
+	if w == nil || w.api == nil || w.runtime == nil ||
+		w.bootstrapContext == nil {
+		return
+	}
+	w.bootstrapWG.Go(func() {
+		ctx, cancel := context.WithTimeout(w.bootstrapContext, 30*time.Second)
+		defer cancel()
+
+		if err := w.bootstrapEmbeddedBuiltIns(ctx); err != nil {
+			return
+		}
+
+		refs, err := w.api.SkillBundleRefs(ctx)
+		if err != nil || ctx.Err() != nil {
+			return
+		}
+		active := make(map[collection.CollectionRef]struct{}, len(refs))
+		for _, ref := range refs {
+			if filterRoot && ref.RootID != rootID {
+				continue
+			}
+			active[ref] = struct{}{}
+			w.syncBundle(ref)
+		}
+
+		w.mu.Lock()
+		managed := make([]collection.CollectionRef, 0, len(w.managed))
+		for ref := range w.managed {
+			if filterRoot && ref.RootID != rootID {
+				continue
+			}
+			managed = append(managed, ref)
+		}
+		w.mu.Unlock()
+
+		for _, ref := range managed {
+			if _, exists := active[ref]; !exists {
+				w.removeBundle(ref)
+			}
+		}
+	})
+}
+
+func (w *SkillBundleWrapper) bootstrapEmbeddedBuiltIns(
+	ctx context.Context,
+) error {
+	if w == nil || w.api == nil {
+		return errors.New("skill bundle API is not initialized")
+	}
+	values, err := w.api.BootstrapEmbeddedBuiltIns(ctx)
+	if err != nil {
+		return err
+	}
+	for _, value := range values {
+		//nolint:contextcheck // Sync op.
+		w.syncBundle(value.Collection.Ref())
+	}
+	return nil
+}
+
+func (w *SkillBundleWrapper) close() {
+	if w == nil {
+		return
+	}
+	if w.bootstrapCancel != nil {
+		w.bootstrapCancel()
+	}
+	w.bootstrapWG.Wait()
+	if w.runtime != nil {
+		w.runtime.Close()
+	}
+	if w.api != nil {
+		_ = w.api.Close()
+	}
+	w.runtime = nil
+	w.api = nil
 }

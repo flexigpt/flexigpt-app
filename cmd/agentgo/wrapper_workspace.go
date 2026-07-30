@@ -69,7 +69,7 @@ func BindArtifactStoreWorkspaceSynchronization(
 	if artifacts == nil || workspaces == nil {
 		return errors.New("artifact and workspace wrappers are required")
 	}
-	artifacts.setRootMutationObserver(
+	artifacts.subscribeRootMutation(
 		workspaces.syncWorkspaceSkillsForRoot,
 	)
 	return nil
@@ -510,7 +510,7 @@ func (w *WorkspaceWrapper) syncWorkspaceSkills(
 	if runtime == nil {
 		return
 	}
-	runtime.RequestWorkspaceResync(ref)
+	runtime.RequestCollectionResync(ref)
 }
 
 func (w *WorkspaceWrapper) syncWorkspaceSkillsForRoot(
@@ -571,10 +571,10 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 			}
 			active[ref] = struct{}{}
 			//nolint:contextcheck // Background.
-			runtime.RequestWorkspaceResync(ref)
+			runtime.RequestCollectionResync(ref)
 		}
 
-		for _, ref := range runtime.ManagedWorkspaceRefs() {
+		for _, ref := range runtime.ManagedCollectionRefs() {
 			if filterRoot && ref.RootID != rootID {
 				continue
 			}
@@ -582,7 +582,7 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 				continue
 			}
 			//nolint:contextcheck // Background.
-			runtime.RequestWorkspaceRemoval(ref)
+			runtime.RequestCollectionRemoval(ref)
 		}
 	}()
 }
@@ -600,7 +600,7 @@ func (w *WorkspaceWrapper) removeWorkspaceSkills(
 	if closed || runtime == nil {
 		return
 	}
-	runtime.RequestWorkspaceRemoval(ref)
+	runtime.RequestCollectionRemoval(ref)
 }
 
 func (w *WorkspaceWrapper) close() {

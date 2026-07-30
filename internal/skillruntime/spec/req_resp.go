@@ -5,8 +5,6 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
 
@@ -15,17 +13,6 @@ var (
 	ErrSkillNotFound  = errors.New("runtime Skill not found")
 )
 
-// SkillRef is a stable runtime-facing identity.
-//
-// Installed references retain their existing bundle and Skill fields until the
-// standalone Skill Store is migrated. Workspace Skills use ArtifactRef only.
-type SkillRef struct {
-	Artifact  *artifact.ArtifactRef        `json:"artifact,omitempty"`
-	BundleID  skillstoreSpec.SkillBundleID `json:"bundleID,omitempty"`
-	SkillSlug skillstoreSpec.SkillSlug     `json:"skillSlug,omitempty"`
-	SkillID   skillstoreSpec.SkillID       `json:"skillID,omitempty"`
-}
-
 // JSONRawString mirrors the ToolRuntime API style; it's a raw JSON string.
 type JSONRawString = string
 
@@ -33,15 +20,12 @@ type RuntimeSkillFilter struct {
 	Types          []string                      `json:"types,omitempty"`
 	Inserts        []agentskillsSpec.SkillInsert `json:"inserts,omitempty"`
 	LocationPrefix string                        `json:"locationPrefix,omitempty"`
-	AllowSkillRefs []SkillRef                    `json:"allowSkillRefs,omitempty"`
-
-	// Workspace scopes Artifact-based Skill references. It is required when
-	// AllowSkillRefs contains one or more Workspace Artifact references.
-	Workspace *collection.CollectionRef `json:"workspace,omitempty"`
+	AllowArtifacts []artifact.ArtifactRef        `json:"allowArtifacts,omitempty"`
 
 	SessionID agentskillsSpec.SessionID     `json:"sessionID,omitempty"`
 	Activity  agentskillsSpec.SkillActivity `json:"activity,omitempty"`
 }
+
 type GetSkillsPromptRequestBody struct {
 	Filter *RuntimeSkillFilter `json:"filter,omitempty"`
 }
@@ -62,23 +46,19 @@ type CreateSkillSessionRequestBody struct {
 	// Optional: close this previous session (best-effort) before creating a new one.
 	CloseSessionID agentskillsSpec.SessionID `json:"closeSessionID,omitempty"`
 
-	MaxActivePerSession int        `json:"maxActivePerSession,omitempty"`
-	AllowSkillRefs      []SkillRef `json:"allowSkillRefs,omitempty"`
-	ActiveSkillRefs     []SkillRef `json:"activeSkillRefs,omitempty"`
-
-	// Workspace scopes Artifact-based Skill references in this session.
-	// Installed Skill references remain valid without this field.
-	Workspace *collection.CollectionRef `json:"workspace,omitempty"`
+	MaxActivePerSession int                    `json:"maxActivePerSession,omitempty"`
+	AllowArtifacts      []artifact.ArtifactRef `json:"allowArtifacts,omitempty"`
+	ActiveArtifacts     []artifact.ArtifactRef `json:"activeArtifacts,omitempty"`
 }
 
-// CreateSkillSessionRequest creates a session using stable source identities.
+// CreateSkillSessionRequest creates a session using Artifact Store identities.
 type CreateSkillSessionRequest struct {
 	Body *CreateSkillSessionRequestBody
 }
 
 type CreateSkillSessionResponseBody struct {
 	SessionID       agentskillsSpec.SessionID `json:"sessionID"`
-	ActiveSkillRefs []SkillRef                `json:"activeSkillRefs"`
+	ActiveArtifacts []artifact.ArtifactRef    `json:"activeArtifacts"`
 }
 
 type CreateSkillSessionResponse struct {
@@ -91,12 +71,8 @@ type CloseSkillSessionRequest struct {
 type CloseSkillSessionResponse struct{}
 
 type RenderSkillRequestBody struct {
-	SkillRef  SkillRef          `json:"skillRef"            required:"true"`
-	Arguments map[string]string `json:"arguments,omitempty"`
-
-	// Workspace is required when SkillRef.Artifact is present and prevents an
-	// ArtifactRef from being resolved outside its selected Workspace.
-	Workspace *collection.CollectionRef `json:"workspace,omitempty"`
+	Artifact  artifact.ArtifactRef `json:"artifact"            required:"true"`
+	Arguments map[string]string    `json:"arguments,omitempty"`
 }
 
 type RenderSkillRequest struct {
@@ -127,10 +103,10 @@ type RenderSkillResponse struct {
 	Body *RenderSkillResponseBody
 }
 
-// RuntimeSkillListItem is the public runtime listing shape keyed by store identity (SkillRef).
-// SkillDef is intentionally NOT exposed.
+// RuntimeSkillListItem is keyed only by durable Artifact Store identity.
+// SkillDef is intentionally process-local and never exposed.
 type RuntimeSkillListItem struct {
-	SkillRef SkillRef `json:"skillRef"`
+	SkillRef artifact.ArtifactRef `json:"skillRef"`
 
 	// Copy of the runtime-facing identity fields (excluding Location) + runtime-indexed metadata.
 	// These are read-only and exist only for display/debug.

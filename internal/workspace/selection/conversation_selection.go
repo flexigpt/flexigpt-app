@@ -47,20 +47,13 @@ type ConversationResourceSelectionRef struct {
 	ArtifactRevision uint64               `json:"artifactRevision,omitempty"`
 }
 
-type ConversationSkillSelectionRef struct {
-	ConversationResourceSelectionRef
-
-	DisplayName string                         `json:"displayName,omitempty"`
-	Insert      workspace.WorkspaceSkillInsert `json:"insert,omitempty"`
-}
-
 type ConversationSelection struct {
 	Workspace         workspace.WorkspaceRef             `json:"workspace"`
 	DisplayName       string                             `json:"displayName,omitempty"`
 	WorkspaceRevision uint64                             `json:"workspaceRevision,omitempty"`
 	CatalogRevision   uint64                             `json:"catalogRevision,omitempty"`
 	ContextRefs       []ConversationResourceSelectionRef `json:"contextRefs,omitempty"`
-	SkillRefs         []ConversationSkillSelectionRef    `json:"skillRefs,omitempty"`
+	SkillRefs         []artifact.ArtifactRef             `json:"skillRefs,omitempty"`
 }
 
 type ConversationContextUsage struct {
@@ -278,12 +271,12 @@ func (cr *ConversationResolver) ResolveConversationSelection(
 	skillArtifactRefs := make([]artifact.ArtifactRef, 0, len(selection.SkillRefs))
 
 	for _, ref := range selection.SkillRefs {
-		if err := ref.Artifact.Validate(); err != nil {
+		if err := ref.Validate(); err != nil {
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
 		}
-		if ref.Artifact.RootID != selection.Workspace.RootID {
+		if ref.RootID != selection.Workspace.RootID {
 			err := fmt.Errorf(
 				"%w: selected Workspace Skill belongs to another Root",
 				basespec.ErrInvalid,
@@ -292,21 +285,17 @@ func (cr *ConversationResolver) ResolveConversationSelection(
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
 		}
-		if _, duplicate := skillUsageByID[ref.Artifact.ArtifactID]; duplicate {
+		if _, duplicate := skillUsageByID[ref.ArtifactID]; duplicate {
 			err := fmt.Errorf("%w: duplicate selected Workspace Skill Artifact", basespec.ErrInvalid)
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
 			}, err
 		}
-		skillUsageByID[ref.Artifact.ArtifactID] = len(usage.Skills)
-		skillArtifactRefs = append(skillArtifactRefs, ref.Artifact)
+		skillUsageByID[ref.ArtifactID] = len(usage.Skills)
+		skillArtifactRefs = append(skillArtifactRefs, ref)
 		usage.Skills = append(usage.Skills, ConversationSkillUsage{
-			Artifact:                 ref.Artifact,
-			Name:                     ref.Name,
-			DisplayName:              ref.DisplayName,
-			Locator:                  ref.Locator,
-			SelectedDefinitionDigest: ref.DefinitionDigest,
-			Status:                   ConversationSkillUsageUnavailable,
+			Artifact: ref,
+			Status:   ConversationSkillUsageUnavailable,
 		})
 	}
 
@@ -352,9 +341,9 @@ func (cr *ConversationResolver) ResolveConversationSelection(
 				current.Changed = conversationResourceChanged(
 					current.SelectedDefinitionDigest,
 					current.UsedDefinitionDigest,
-					selection.SkillRefs[index].ArtifactRevision,
+					0,
 					current.UsedArtifactRevision,
-					selection.SkillRefs[index].Locator,
+					"",
 					current.Locator,
 				)
 
@@ -435,12 +424,8 @@ func unresolvedConversationUsage(
 
 	for _, ref := range selection.SkillRefs {
 		usage.Skills = append(usage.Skills, ConversationSkillUsage{
-			Artifact:                 ref.Artifact,
-			Name:                     ref.Name,
-			DisplayName:              ref.DisplayName,
-			Locator:                  ref.Locator,
-			SelectedDefinitionDigest: ref.DefinitionDigest,
-			Status:                   ConversationSkillUsageUnavailable,
+			Artifact: ref,
+			Status:   ConversationSkillUsageUnavailable,
 		})
 	}
 

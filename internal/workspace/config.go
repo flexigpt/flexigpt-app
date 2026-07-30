@@ -155,19 +155,11 @@ func BuiltinArtifactSupports() []spec.ArtifactSupport {
 	return output
 }
 
+// BuiltinDecoders contains Workspace-owned decoders only. The shared
+// agent.skill decoder is registered exactly once by Artifact Store composition.
 func BuiltinDecoders() []artifactstoreDiscovery.Decoder {
-	config := DefaultConfig()
-	registry, err := config.skillConventions()
-	if err != nil {
-		panic(err)
-	}
-	decoder, err := skillartifact.NewDecoder(registry)
-	if err != nil {
-		panic(err)
-	}
 	return []artifactstoreDiscovery.Decoder{
 		contextadapter.NewContextDecoder(),
-		decoder,
 	}
 }
 

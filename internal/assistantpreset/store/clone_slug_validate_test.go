@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -89,14 +89,8 @@ func TestCloneAssistantPreset(t *testing.T) {
 			},
 		},
 	}
-	orig.StartingSkillSelections = []skillstoreSpec.SkillSelection{
-		{
-			SkillRef: skillstoreSpec.SkillRef{
-				BundleID:  bundleitemutils.BundleID("bundle-a"),
-				SkillSlug: testSkillA,
-				SkillID:   testSkillIDA,
-			},
-		},
+	orig.StartingSkillSelections = []spec.ArtifactSkillSelection{
+		artifactSkillSelectionForAssistantPresetTest(),
 	}
 
 	got := cloneAssistantPreset(orig)
@@ -104,7 +98,7 @@ func TestCloneAssistantPreset(t *testing.T) {
 	orig.StartingModelPresetRef.ProviderName = "changed-provider"
 	*orig.StartingIncludeModelSystemPrompt = false
 	orig.StartingToolSelections[0].ToolRef.ToolSlug = "changed-tool"
-	orig.StartingSkillSelections[0].SkillRef.SkillSlug = "changed-skill"
+	orig.StartingSkillSelections[0].Artifact.ArtifactID = "019d3150-7405-7a6b-a34e-d9032342bc31"
 
 	if got.StartingText != "original starting text\nline two" {
 		t.Fatalf("cloned StartingText = %q", got.StartingText)
@@ -118,8 +112,12 @@ func TestCloneAssistantPreset(t *testing.T) {
 	if got.StartingToolSelections[0].ToolRef.ToolSlug != testToolA {
 		t.Fatalf("cloned tool slug = %q, want %q", got.StartingToolSelections[0].ToolRef.ToolSlug, testToolA)
 	}
-	if got.StartingSkillSelections[0].SkillRef.SkillSlug != testSkillA {
-		t.Fatalf("cloned skill slug = %q, want %q", got.StartingSkillSelections[0].SkillRef.SkillSlug, testSkillA)
+	if got.StartingSkillSelections[0].Artifact.ArtifactID !=
+		"019d3150-7404-7a6b-a34e-d9032342bc31" {
+		t.Fatalf(
+			"cloned skill ArtifactID = %q",
+			got.StartingSkillSelections[0].Artifact.ArtifactID,
+		)
 	}
 }
 
@@ -335,13 +333,7 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 			ToolVersion: testItemVersion(t),
 		},
 	}
-	dupSkillSelection := skillstoreSpec.SkillSelection{
-		SkillRef: skillstoreSpec.SkillRef{
-			BundleID:  bundleitemutils.BundleID("bundle-a"),
-			SkillSlug: testSkillA,
-			SkillID:   testSkillIDA,
-		},
-	}
+	dupSkillSelection := artifactSkillSelectionForAssistantPresetTest()
 
 	tests := []struct {
 		name            string
@@ -448,7 +440,7 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 			name: "duplicate skill refs",
 			preset: func() *spec.AssistantPreset {
 				p := valid
-				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{dupSkillSelection, dupSkillSelection}
+				p.StartingSkillSelections = []spec.ArtifactSkillSelection{dupSkillSelection, dupSkillSelection}
 				return &p
 			}(),
 			wantErrContains: "startingSkillSelections[1]: duplicate skillRef",
@@ -498,13 +490,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			ToolVersion: version,
 		},
 	}
-	skillSelection := skillstoreSpec.SkillSelection{
-		SkillRef: skillstoreSpec.SkillRef{
-			BundleID:  bundleitemutils.BundleID("bundle-a"),
-			SkillSlug: testSkillA,
-			SkillID:   testSkillIDA,
-		},
-	}
+	skillSelection := artifactSkillSelectionForAssistantPresetTest()
 
 	makeBase := func() *spec.AssistantPreset {
 		p := newTestPreset(t, "refs", true)
@@ -609,7 +595,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "skill lookup missing",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []spec.ArtifactSkillSelection{skillSelection}
 				return p
 			}(),
 			wantErrContains: "skill lookup not configured",
@@ -618,11 +604,11 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "skill lookup error",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []spec.ArtifactSkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
+				Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
 					return SkillSummary{}, errors.New("skill boom")
 				}),
 			},
@@ -632,11 +618,11 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "skill disabled",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []spec.ArtifactSkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
+				Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
 					return SkillSummary{IsEnabled: false}, nil
 				}),
 			},
@@ -646,14 +632,14 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "user-message skill is rejected",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []spec.ArtifactSkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
+				Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
 					return SkillSummary{
 						IsEnabled:    true,
-						Insert:       skillstoreSpec.SkillInsertUserMessage,
+						Insert:       agentskillsSpec.SkillInsertUserMessage,
 						HasArguments: true,
 					}, nil
 				}),
@@ -666,7 +652,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				p := makeBase()
 				p.StartingModelPresetRef = &modelRef
 				p.StartingToolSelections = []toolSpec.ToolSelection{toolSel}
-				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{skillSelection}
+				p.StartingSkillSelections = []spec.ArtifactSkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
@@ -680,7 +666,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 						return ToolSummary{IsEnabled: true}, nil
 					},
 				),
-				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
+				Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
 					return SkillSummary{IsEnabled: true}, nil
 				}),
 			},
@@ -691,14 +677,14 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				p := makeBase()
 				selection := skillSelection
 				selection.PreLoadAsActive = true
-				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{selection}
+				p.StartingSkillSelections = []spec.ArtifactSkillSelection{selection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
+				Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
 					return SkillSummary{
 						IsEnabled:    true,
-						Insert:       skillstoreSpec.SkillInsertInstructions,
+						Insert:       agentskillsSpec.SkillInsertInstructions,
 						HasArguments: true,
 					}, nil
 				}),
@@ -712,12 +698,12 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				selection := skillSelection
 				selection.PreLoadAsActive = true
 				selection.UseAsInstructions = true
-				p.StartingSkillSelections = []skillstoreSpec.SkillSelection{selection}
+				p.StartingSkillSelections = []spec.ArtifactSkillSelection{selection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillstoreSpec.SkillSelection) (SkillSummary, error) {
-					return SkillSummary{IsEnabled: true, Insert: skillstoreSpec.SkillInsertInstructions}, nil
+				Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
+					return SkillSummary{IsEnabled: true, Insert: agentskillsSpec.SkillInsertInstructions}, nil
 				}),
 			},
 			wantErrContains: "preLoadAsActive and useAsInstructions cannot both be true",
@@ -847,22 +833,14 @@ func TestJSONHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("skillSelectionRefKey stable for same skillRef", func(t *testing.T) {
-		s1 := skillstoreSpec.SkillSelection{
-			SkillRef: skillstoreSpec.SkillRef{
-				BundleID:  bundleitemutils.BundleID("bundle-a"),
-				SkillSlug: testSkillA,
-				SkillID:   testSkillIDA,
-			},
-			PreLoadAsActive: false,
-		}
-		s2 := skillstoreSpec.SkillSelection{
-			SkillRef: skillstoreSpec.SkillRef{
-				BundleID:  bundleitemutils.BundleID("bundle-a"),
-				SkillSlug: testSkillA,
-				SkillID:   testSkillIDA,
-			},
-			PreLoadAsActive: true,
+	t.Run("skillSelectionRefKey stable for same ArtifactRef", func(t *testing.T) {
+		s1 := artifactSkillSelectionForAssistantPresetTest()
+		s1.PreLoadAsActive = false
+		s2 := artifactSkillSelectionForAssistantPresetTest()
+		s2.PreLoadAsActive = true
+
+		if s1.Artifact != s2.Artifact {
+			t.Fatal("test setup produced different ArtifactRefs")
 		}
 
 		k1, err := skillSelectionRefKey(s1)

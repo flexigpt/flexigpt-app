@@ -9,9 +9,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -196,14 +196,14 @@ func validateAssistantPresetReferences(
 
 		insert := summary.Insert
 		if insert == "" {
-			insert = skillstoreSpec.SkillInsertInstructions
+			insert = agentskillsSpec.SkillInsertInstructions
 		}
 
-		if insert != skillstoreSpec.SkillInsertInstructions {
+		if insert != agentskillsSpec.SkillInsertInstructions {
 			return fmt.Errorf(
 				"startingSkillSelections[%d]: assistant preset skill selections must have insert=%q",
 				i,
-				skillstoreSpec.SkillInsertInstructions,
+				agentskillsSpec.SkillInsertInstructions,
 			)
 		}
 
@@ -294,7 +294,7 @@ func toolSelectionRefKey(selection toolSpec.ToolSelection) (string, error) {
 	return string(raw), nil
 }
 
-func skillSelectionRefKey(selection skillstoreSpec.SkillSelection) (string, error) {
+func skillSelectionRefKey(selection spec.ArtifactSkillSelection) (string, error) {
 	raw, err := json.Marshal(selection)
 	if err != nil {
 		return "", err
@@ -305,10 +305,10 @@ func skillSelectionRefKey(selection skillstoreSpec.SkillSelection) (string, erro
 		return "", errors.New("json unmarshal error")
 	}
 
-	if refRaw, ok := obj["skillRef"]; ok && len(bytes.TrimSpace(refRaw)) > 0 {
+	if refRaw, ok := obj["artifact"]; ok && len(bytes.TrimSpace(refRaw)) > 0 {
 		return string(refRaw), nil
 	}
 
-	// Fallback to the whole serialized selection if skillRef is not present.
+	// Fallback to the whole serialized selection if artifact is not present.
 	return string(raw), nil
 }

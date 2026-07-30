@@ -3,9 +3,10 @@ package store
 import (
 	"context"
 
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	assistantpresetSpec "github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -19,7 +20,7 @@ type ToolSummary struct {
 
 type SkillSummary struct {
 	IsEnabled bool
-	Insert    skillstoreSpec.SkillInsert
+	Insert    agentskillsSpec.SkillInsert
 
 	// HasArguments is used to reject preloaded instruction skills that need runtime input.
 	HasArguments bool
@@ -45,11 +46,11 @@ type ToolSelectionLookup interface {
 }
 
 // SkillLookup validates/loads skill selections without coupling this package
-// to a concrete skill store implementation.
+// to a concrete Artifact Store feature adapter.
 type SkillLookup interface {
 	GetSkillSummaryForSelection(
 		ctx context.Context,
-		selection skillstoreSpec.SkillSelection,
+		selection assistantpresetSpec.ArtifactSkillSelection,
 	) (SkillSummary, error)
 }
 

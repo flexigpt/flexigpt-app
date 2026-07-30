@@ -4,17 +4,17 @@ import (
 	"errors"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
 const (
 	AssistantPresetBundlesMetaFileName      = "assistantpresetbundles.json"
 	AssistantPresetBuiltInOverlayDBFileName = "assistantpresetsbuiltin.overlay.sqlite"
-	SchemaVersion                           = "2026-03-22"
+	SchemaVersion                           = "2026-04-01-artifact-skills-v1"
 	MaxPageSize                             = 256
 	DefaultPageSize                         = 25
 	MaxStartingTextBytes                    = 16 * 1024
@@ -36,6 +36,15 @@ var (
 	ErrAssistantPresetDisabled = errors.New("assistant preset is disabled")
 	ErrNilAssistantPreset      = errors.New("assistant preset is nil")
 )
+
+// ArtifactSkillSelection is a durable Agent Skill selection. Ownership is
+// derived from the selected Artifact's current Collection membership by the
+// Artifact-backed runtime router.
+type ArtifactSkillSelection struct {
+	Artifact          artifact.ArtifactRef `json:"artifact"`
+	PreLoadAsActive   bool                 `json:"preLoadAsActive"`
+	UseAsInstructions bool                 `json:"useAsInstructions"`
+}
 
 // AssistantPreset is an immutable starter configuration snapshot.
 // One (slug, version) is stored as one JSON file.
@@ -65,7 +74,7 @@ type AssistantPreset struct {
 
 	// Ordered skill selections. PreLoadAsActive is only valid for argumentless "insert=instructions" skills,
 	// "insert=user-message" skills behave like user-message templates.
-	StartingSkillSelections []skillstoreSpec.SkillSelection `json:"startingSkillSelections,omitempty"`
+	StartingSkillSelections []ArtifactSkillSelection `json:"startingSkillSelections,omitempty"`
 
 	// StartingMCPContext is copied into the first user turn when this preset is applied.
 	StartingMCPContext *mcpSpec.MCPConversationContext `json:"startingMCPContext,omitempty"`

@@ -40,94 +40,48 @@ func NewWorkspaceInferenceBridge(
 	return &WorkspaceInferenceBridge{resolver: resolver}
 }
 
-func workspaceScopeForSelection(
+// validateArtifactSkillRefsForSelection validates only durable Artifact
+// identities. Artifact membership and owning Collection kind are resolved by
+// skillruntime.ArtifactRouter, never inferred from reference shape.
+func validateArtifactSkillRefsForSelection(
 	sel *selection.ConversationSelection,
-) *collection.CollectionRef {
-	if sel == nil {
-		return nil
-	}
-	value := sel.Workspace
-	return &value
-}
-
-// validateWorkspaceSkillRefsForSelection binds runtime-facing Workspace Skill
-// identities to the Workspace selection carried by the same user turn.
-//
-// The frontend keeps these values aligned, but persisted conversations and API
-// callers are untrusted at this boundary. A Workspace Skill must not survive a
-// detach, root switch, or removal from selection.skillRefs.
-func validateWorkspaceSkillRefsForSelection(
-	sel *selection.ConversationSelection,
-	refs []skillruntimeSpec.SkillRef,
+	refs []artifact.ArtifactRef,
 ) error {
-	selected := make(map[string]struct{})
 	if sel != nil {
 		if err := sel.Workspace.Validate(); err != nil {
 			return fmt.Errorf("invalid Workspace selection: %w", err)
 		}
 		for index, selectedSkill := range sel.SkillRefs {
-			artifactRef := selectedSkill.Artifact
-			if err := artifactRef.Validate(); err != nil {
+			if err := selectedSkill.Validate(); err != nil {
 				return fmt.Errorf(
 					"invalid workspace selection skillRefs[%d]: %w",
 					index,
 					err,
 				)
 			}
-			if artifactRef.RootID != sel.Workspace.RootID {
+			if selectedSkill.RootID != sel.Workspace.RootID {
 				return fmt.Errorf(
 					"workspace selection skillRefs[%d] belongs to another Root",
 					index,
 				)
 			}
-			key := workspaceArtifactRefKey(artifactRef)
-			if _, duplicate := selected[key]; duplicate {
-				return fmt.Errorf(
-					"workspace selection contains duplicate Skill Artifact %q",
-					artifactRef.ArtifactID,
-				)
-			}
-			selected[key] = struct{}{}
 		}
 	}
 
 	seenRuntimeArtifacts := make(map[string]struct{})
 	for _, ref := range refs {
-		if ref.Artifact == nil {
-			continue
-		}
-		if ref.BundleID != "" || ref.SkillSlug != "" || ref.SkillID != "" {
-			return errors.New("workspace skill artifactRef mixes Artifact and installed Skill fields")
-		}
-		if sel == nil {
-			return errors.New(
-				"workspace skill artifactRef was supplied without a Workspace selection",
-			)
-		}
-		if err := ref.Artifact.Validate(); err != nil {
-			return fmt.Errorf("invalid workspace skill artifactRef: %w", err)
-		}
-		if ref.Artifact.RootID != sel.Workspace.RootID {
-			return fmt.Errorf(
-				"workspace Skill Artifact %q belongs to another Root",
-				ref.Artifact.ArtifactID,
-			)
+		if err := ref.Validate(); err != nil {
+			return fmt.Errorf("invalid skill ArtifactRef: %w", err)
 		}
 
-		key := workspaceArtifactRefKey(*ref.Artifact)
+		key := workspaceArtifactRefKey(ref)
 		if _, duplicate := seenRuntimeArtifacts[key]; duplicate {
 			return fmt.Errorf(
-				"duplicate workspace skill artifactRef %q in runtime allow-list",
-				ref.Artifact.ArtifactID,
+				"duplicate Skill ArtifactRef %q in runtime allow-list",
+				ref.ArtifactID,
 			)
 		}
 		seenRuntimeArtifacts[key] = struct{}{}
-		if _, found := selected[key]; !found {
-			return fmt.Errorf(
-				"workspace Skill Artifact %q is not selected for this conversation",
-				ref.Artifact.ArtifactID,
-			)
-		}
 	}
 
 	return nil
@@ -270,31 +224,34 @@ func isGeneratedCurrentContextInput(input inferenceSpec.InputUnion) bool {
 // filterWorkspaceSkillRefsToResolvedSelection prevents a Workspace Skill that
 // was selected in persisted or externally supplied client state from reaching
 // inference unless the authoritative Workspace resolver marked it available
-// for this turn. Installed Skill refs are intentionally left untouched.
+// for this turn. ArtifactRefs not owned by this Workspace selection remain in
+// the caller's explicit runtime allow-list and are resolved by ArtifactRouter.
 func filterWorkspaceSkillRefsToResolvedSelection(
-	refs []skillruntimeSpec.SkillRef,
+	refs []artifact.ArtifactRef,
 	usage *selection.ConversationUsage,
-) []skillruntimeSpec.SkillRef {
+) []artifact.ArtifactRef {
 	if usage == nil || len(refs) == 0 {
 		return refs
 	}
 
+	selected := make(map[string]struct{}, len(usage.Skills))
 	available := make(map[string]struct{}, len(usage.Skills))
 	for _, skill := range usage.Skills {
+		selected[workspaceArtifactRefKey(skill.Artifact)] = struct{}{}
 		if skill.Status != selection.ConversationSkillUsageAvailable {
 			continue
 		}
 		available[workspaceArtifactRefKey(skill.Artifact)] = struct{}{}
 	}
 
-	filtered := make([]skillruntimeSpec.SkillRef, 0, len(refs))
+	filtered := make([]artifact.ArtifactRef, 0, len(refs))
 	for _, ref := range refs {
-		if ref.Artifact == nil {
+		key := workspaceArtifactRefKey(ref)
+		if _, workspaceSelected := selected[key]; !workspaceSelected {
 			filtered = append(filtered, ref)
 			continue
 		}
-
-		if _, ok := available[workspaceArtifactRefKey(*ref.Artifact)]; ok {
+		if _, ok := available[key]; ok {
 			filtered = append(filtered, ref)
 		}
 	}
@@ -303,7 +260,7 @@ func filterWorkspaceSkillRefsToResolvedSelection(
 
 func markWorkspaceSkillSessionUsage(
 	usage *selection.ConversationUsage,
-	enabledSkillRefs []skillruntimeSpec.SkillRef,
+	enabledSkillRefs []artifact.ArtifactRef,
 	availableItems []skillruntimeSpec.RuntimeSkillListItem,
 	activeItems []skillruntimeSpec.RuntimeSkillListItem,
 	advertised bool,
@@ -314,23 +271,17 @@ func markWorkspaceSkillSessionUsage(
 
 	enabled := make(map[string]struct{}, len(enabledSkillRefs))
 	for _, ref := range enabledSkillRefs {
-		if ref.Artifact != nil {
-			enabled[workspaceArtifactRefKey(*ref.Artifact)] = struct{}{}
-		}
+		enabled[workspaceArtifactRefKey(ref)] = struct{}{}
 	}
 
 	available := make(map[string]struct{}, len(availableItems))
 	for _, item := range availableItems {
-		if item.SkillRef.Artifact != nil {
-			available[workspaceArtifactRefKey(*item.SkillRef.Artifact)] = struct{}{}
-		}
+		available[workspaceArtifactRefKey(item.SkillRef)] = struct{}{}
 	}
 
 	active := make(map[string]struct{}, len(activeItems))
 	for _, item := range activeItems {
-		if item.SkillRef.Artifact != nil {
-			active[workspaceArtifactRefKey(*item.SkillRef.Artifact)] = struct{}{}
-		}
+		active[workspaceArtifactRefKey(item.SkillRef)] = struct{}{}
 	}
 
 	for index := range usage.Skills {

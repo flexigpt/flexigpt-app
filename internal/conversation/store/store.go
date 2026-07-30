@@ -278,13 +278,17 @@ func (cc *ConversationCollection) GetConversation(
 	if err != nil {
 		return nil, err
 	}
-	if schemaVersion, _ := stringField(raw, "schemaVersion"); schemaVersion == "" {
+	if schemaVersion, _ := stringField(raw, "schemaVersion"); schemaVersion !=
+		spec.ConversationSchemaVersion {
 		return nil, errors.New("unsupported schema version for conversation")
 	}
 
 	var convo spec.Conversation
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &convo); err != nil {
 		return nil, err
+	}
+	if convo.SchemaVersion != spec.ConversationSchemaVersion {
+		return nil, errors.New("unsupported schema version for conversation")
 	}
 
 	return &spec.GetConversationResponse{Body: &convo}, nil
@@ -330,8 +334,8 @@ func (cc *ConversationCollection) ListConversations(
 		if err := jsonencdec.MapToStructWithJSONTags(raw, &convo); err != nil {
 			continue
 		}
-		if convo.SchemaVersion == "" {
-			// Legacy/dead file; keep it invisible.
+		if convo.SchemaVersion != spec.ConversationSchemaVersion {
+			// Old conversations are intentionally not interpreted as v2.
 			continue
 		}
 

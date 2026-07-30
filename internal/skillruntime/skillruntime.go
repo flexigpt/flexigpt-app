@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -13,23 +12,20 @@ import (
 	"github.com/flexigpt/agentskills-go/fsskillprovider"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/skillstore"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
 const (
 	runtimeResyncTimeout             = 30 * time.Second
 	runtimeForegroundValidateTimeout = 15 * time.Second
-	workspaceReconcileMaxAttempts    = 5
-	workspaceReconcileInitialDelay   = 250 * time.Millisecond
-	workspaceReconcileMaximumDelay   = 4 * time.Second
+	collectionReconcileMaxAttempts   = 5
+	collectionReconcileInitialDelay  = 250 * time.Millisecond
+	collectionReconcileMaximumDelay  = 4 * time.Second
 )
 
 // SkillRuntime owns the in-memory Agent Skills catalog, provider lifecycle,
 // sessions, prompt generation, rendering, and tool invocation.
 type SkillRuntime struct {
-	store             *skillstore.SkillStore
-	workspaceSkills   *skilladapter.Adapter
+	resolver          *ArtifactRouter
 	runtime           *agentskills.Runtime
 	runScriptsEnabled bool
 
@@ -41,21 +37,16 @@ type SkillRuntime struct {
 	backgroundCancel  context.CancelFunc
 	backgroundWG      sync.WaitGroup
 
-	installedResyncMu         sync.Mutex
-	installedResyncPending    bool
-	installedResyncGeneration uint64
+	collectionRequestMu sync.Mutex
+	collectionRequests  map[collection.CollectionRef]collectionReconcileRequest
 
-	workspaceRequestMu sync.Mutex
-	workspaceRequests  map[collection.CollectionRef]workspaceReconcileRequest
-
-	managedInstalled  runtimeDesiredView
-	managedWorkspaces map[collection.CollectionRef]runtimeDesiredView
-	managedRuntime    map[agentskillsSpec.SkillDef]string
+	managedCollections map[collection.CollectionRef]runtimeDesiredView
+	managedRuntime     map[agentskillsSpec.SkillDef]string
 }
 
 type skillRuntimeOptions struct {
 	runtime              *agentskills.Runtime
-	workspaceSkills      *skilladapter.Adapter
+	resolver             *ArtifactRouter
 	runScriptsEnabled    bool
 	runScriptsConfigured bool
 }
@@ -65,21 +56,21 @@ type SkillRuntimeOption func(*skillRuntimeOptions) error
 func WithRuntime(value *agentskills.Runtime) SkillRuntimeOption {
 	return func(options *skillRuntimeOptions) error {
 		if value == nil {
-			return errors.New("Skill runtime is nil")
+			return errors.New("skill runtime is nil")
 		}
 		options.runtime = value
 		return nil
 	}
 }
 
-func WithWorkspaceSkillAdapter(
-	value *skilladapter.Adapter,
+func WithArtifactResolver(
+	value *ArtifactRouter,
 ) SkillRuntimeOption {
 	return func(options *skillRuntimeOptions) error {
 		if value == nil {
-			return errors.New("Workspace Skill adapter is nil")
+			return errors.New("artifact skill resolver is nil")
 		}
-		options.workspaceSkills = value
+		options.resolver = value
 		return nil
 	}
 }
@@ -95,24 +86,23 @@ func WithRunScripts(enabled bool) SkillRuntimeOption {
 	}
 }
 
+// NewSkillRuntime creates an Artifact-backed Agent Skills runtime. Durable
+// Skill identity is always artifact.ArtifactRef; no standalone Skill Store,
+// bundle slug, legacy Skill ID, or source location enters this package.
 func NewSkillRuntime(
-	store *skillstore.SkillStore,
 	opts ...SkillRuntimeOption,
 ) (*SkillRuntime, error) {
-	if store == nil {
-		return nil, errors.New("Skill Store is nil")
-	}
-
 	options := skillRuntimeOptions{}
 	for _, option := range opts {
-		if option == nil {
-			continue
-		}
-		if err := option(&options); err != nil {
-			return nil, err
+		if option != nil {
+			if err := option(&options); err != nil {
+				return nil, err
+			}
 		}
 	}
-	//nolint:gocritic // Dont want a switch.
+	if options.resolver == nil {
+		return nil, errors.New("artifact skill resolver is required")
+	}
 	if options.runtime == nil {
 		runScriptsEnabled := true
 		if options.runScriptsConfigured {
@@ -132,45 +122,23 @@ func NewSkillRuntime(
 			return nil, err
 		}
 		options.runScriptsEnabled = runScriptsEnabled
-	} else if !slices.Contains(
-		options.runtime.ProviderTypes(),
-		fsskillprovider.Type,
-	) {
-		return nil, errors.New(
-			"custom Agent Skills runtime has no filesystem Skill provider",
-		)
 	} else if !options.runScriptsConfigured {
-		// A custom runtime may use a different filesystem-provider policy. Do
-		// not advertise script execution unless the composing application says
-		// that it is enabled.
 		options.runScriptsEnabled = false
 	}
 
 	backgroundContext, backgroundCancel := context.WithCancel(context.Background())
 
 	value := &SkillRuntime{
-		store:             store,
-		workspaceSkills:   options.workspaceSkills,
-		runtime:           options.runtime,
-		runScriptsEnabled: options.runScriptsEnabled,
-		managedInstalled: runtimeDesiredView{
-			definitions: map[agentskillsSpec.SkillDef]string{},
-		},
-		managedWorkspaces: map[collection.CollectionRef]runtimeDesiredView{},
-		managedRuntime:    map[agentskillsSpec.SkillDef]string{},
-		backgroundContext: backgroundContext,
-		backgroundCancel:  backgroundCancel,
-		workspaceRequests: map[collection.CollectionRef]workspaceReconcileRequest{},
+		resolver:           options.resolver,
+		runtime:            options.runtime,
+		runScriptsEnabled:  options.runScriptsEnabled,
+		managedCollections: map[collection.CollectionRef]runtimeDesiredView{},
+		managedRuntime:     map[agentskillsSpec.SkillDef]string{},
+		backgroundContext:  backgroundContext,
+		backgroundCancel:   backgroundCancel,
+		collectionRequests: map[collection.CollectionRef]collectionReconcileRequest{},
 	}
-	value.bestEffortInstalledResync(context.Background(), "init")
 	return value, nil
-}
-
-func (s *SkillRuntime) Store() *skillstore.SkillStore {
-	if s == nil || s.isClosed() {
-		return nil
-	}
-	return s.store
 }
 
 func (s *SkillRuntime) AgentSkillsRuntime() *agentskills.Runtime {
@@ -190,19 +158,18 @@ func (s *SkillRuntime) RunScriptsEnabled() bool {
 	return s.runScriptsEnabled
 }
 
-// ManagedWorkspaceRefs returns the process-local Workspace partitions that
-// currently have derived Agent Skills runtime state. Application composition
-// uses this to remove a partition after a Workspace was retired or purged
-// through a generic Artifact Store lifecycle operation.
-func (s *SkillRuntime) ManagedWorkspaceRefs() []collection.CollectionRef {
+// ManagedCollectionRefs returns derived runtime partitions. Collection kind is
+// deliberately not encoded in a Skill reference; application feature
+// synchronizers use their own typed Collection discovery to decide removal.
+func (s *SkillRuntime) ManagedCollectionRefs() []collection.CollectionRef {
 	if s == nil {
 		return nil
 	}
 	s.rtResyncMu.Lock()
 	defer s.rtResyncMu.Unlock()
 
-	output := make([]collection.CollectionRef, 0, len(s.managedWorkspaces))
-	for ref := range s.managedWorkspaces {
+	output := make([]collection.CollectionRef, 0, len(s.managedCollections))
+	for ref := range s.managedCollections {
 		output = append(output, ref)
 	}
 	sort.Slice(output, func(left, right int) bool {
@@ -214,62 +181,6 @@ func (s *SkillRuntime) ManagedWorkspaceRefs() []collection.CollectionRef {
 	return output
 }
 
-// RequestInstalledResync schedules one coalesced reconciliation of the legacy
-// standalone Skill Store partition. It intentionally does not make a durable
-// Skill Store mutation fail after persistence has committed.
-func (s *SkillRuntime) RequestInstalledResync() {
-	if s == nil {
-		return
-	}
-	parent, started := s.beginBackground()
-	if !started {
-		return
-	}
-
-	s.installedResyncMu.Lock()
-	s.installedResyncGeneration++
-	if s.installedResyncPending {
-		s.installedResyncMu.Unlock()
-		s.endBackground()
-		return
-	}
-	s.installedResyncPending = true
-	s.installedResyncMu.Unlock()
-
-	go func() {
-		defer s.endBackground()
-		defer func() {
-			s.installedResyncMu.Lock()
-			s.installedResyncPending = false
-			s.installedResyncMu.Unlock()
-		}()
-
-		for {
-			if parent.Err() != nil {
-				return
-			}
-			s.installedResyncMu.Lock()
-			generation := s.installedResyncGeneration
-			s.installedResyncMu.Unlock()
-
-			s.bestEffortInstalledResync(
-				parent,
-				"installed-store mutation",
-			)
-
-			s.installedResyncMu.Lock()
-			current := s.installedResyncGeneration
-			s.installedResyncMu.Unlock()
-			if current == generation {
-				return
-			}
-		}
-	}()
-}
-
-// Close stops derived-state reconciliation before the owning Skill Store is
-// closed. Runtime registration is process-local, so no durable mutation occurs
-// during shutdown.
 func (s *SkillRuntime) Close() {
 	if s == nil {
 		return
@@ -312,26 +223,25 @@ func (s *SkillRuntime) Close() {
 			)
 		}
 	}
-	s.managedInstalled = newRuntimeDesiredView()
-	s.managedWorkspaces = map[collection.CollectionRef]runtimeDesiredView{}
+	s.managedCollections = map[collection.CollectionRef]runtimeDesiredView{}
 	s.managedRuntime = map[agentskillsSpec.SkillDef]string{}
 	s.rtResyncMu.Unlock()
 
-	s.workspaceRequestMu.Lock()
-	s.workspaceRequests = nil
-	s.workspaceRequestMu.Unlock()
+	s.collectionRequestMu.Lock()
+	s.collectionRequests = nil
+	s.collectionRequestMu.Unlock()
 }
 
 func (s *SkillRuntime) ensureConfigured() error {
 	if s == nil {
-		return errors.New("Skill runtime is not configured")
+		return errors.New("skill runtime is not configured")
 	}
 	s.lifecycleMu.Lock()
 	closed := s.closed
-	configured := s.store != nil && s.runtime != nil
+	configured := s.resolver != nil && s.runtime != nil
 	s.lifecycleMu.Unlock()
 	if closed || !configured {
-		return errors.New("Skill runtime is not configured")
+		return errors.New("skill runtime is not configured")
 	}
 	return nil
 }

@@ -52,7 +52,7 @@ func TestConfigDefaultsProfilesAndValidation(t *testing.T) {
 		t.Fatalf("BuiltinArtifactSupports leaked mutable storage: %#v", fresh)
 	}
 	decoders := BuiltinDecoders()
-	if len(decoders) != 2 || decoders[0].ID() == decoders[1].ID() {
+	if len(decoders) != 1 {
 		t.Fatalf("BuiltinDecoders=%#v", decoders)
 	}
 	profiles := BuiltinDiscoveryProfiles()

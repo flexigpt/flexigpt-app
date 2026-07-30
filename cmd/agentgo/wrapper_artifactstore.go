@@ -4,17 +4,21 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
 type ArtifactStoreWrapper struct {
 	api        *artifactstore.API
 	components *system.Components
+	observerMu sync.Mutex
+	observers  []func()
 }
 
 func InitArtifactStoreWrapper(
@@ -25,11 +29,20 @@ func InitArtifactStoreWrapper(
 		return errors.New("artifact store wrapper is required")
 	}
 
+	skillDecoder, err := skillartifact.NewDecoder()
+	if err != nil {
+		return err
+	}
+	decoders := append(
+		workspace.BuiltinDecoders(),
+		skillDecoder,
+	)
+
 	components, err := system.Open(
 		context.Background(),
 		system.Config{
 			BaseDirectory: baseDirectory,
-			Decoders:      workspace.BuiltinDecoders(),
+			Decoders:      decoders,
 		},
 	)
 	if err != nil {
@@ -269,14 +282,26 @@ func (w *ArtifactStoreWrapper) RemoveManagedSourcePackage(
 	)
 }
 
-func (w *ArtifactStoreWrapper) setRootMutationObserver(
+func (w *ArtifactStoreWrapper) subscribeRootMutation(
 	observer func(basespec.RootID),
-) {
-	w.api.SetRootMutationObserver(observer)
+) func() {
+	if w == nil || w.api == nil {
+		return func() {}
+	}
+	unsubscribe := w.api.SubscribeRootMutation(observer)
+	w.observerMu.Lock()
+	w.observers = append(w.observers, unsubscribe)
+	w.observerMu.Unlock()
+	return unsubscribe
 }
 
 func (w *ArtifactStoreWrapper) close() {
-	w.api.SetRootMutationObserver(nil)
+	w.observerMu.Lock()
+	for _, unsubscribe := range w.observers {
+		unsubscribe()
+	}
+	w.observers = nil
+	w.observerMu.Unlock()
 
 	if err := w.components.Close(); err != nil {
 		slog.Error("close artifact store", "error", err)

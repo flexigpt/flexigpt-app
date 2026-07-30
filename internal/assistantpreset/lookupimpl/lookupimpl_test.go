@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	assistantpresetSpec "github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	"github.com/flexigpt/flexigpt-app/internal/skillstore"
-	skillstoreSpec "github.com/flexigpt/flexigpt-app/internal/skillstore/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
@@ -26,6 +26,11 @@ const (
 	testToolA         = "tool-a"
 	testSkillA        = "skill-a"
 )
+
+var testArtifactSkillRef = artifact.ArtifactRef{
+	RootID:     "019d3150-7401-7a6b-a34e-d9032342bc31",
+	ArtifactID: "019d3150-7404-7a6b-a34e-d9032342bc31",
+}
 
 func TestNewAssistantPresetReferenceLookups(t *testing.T) {
 	got := NewAssistantPresetReferenceLookups(nil, nil, nil, nil, nil)
@@ -165,36 +170,24 @@ func TestSkillLookupAdapter_GetSkillSummaryForSelection_Errors(t *testing.T) {
 	tests := []struct {
 		name            string
 		adapter         *skillLookupAdapter
-		selection       skillstoreSpec.SkillSelection
+		selection       assistantpresetSpec.ArtifactSkillSelection
 		wantErrContains string
 	}{
 		{
 			name:    testNilReceiver,
 			adapter: nil,
-			selection: skillstoreSpec.SkillSelection{
-				SkillRef: skillstoreSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: testSkillA},
+			selection: assistantpresetSpec.ArtifactSkillSelection{
+				Artifact: testArtifactSkillRef,
 			},
 			wantErrContains: testErrNotConfigured,
 		},
 		{
-			name:    testNilStore,
+			name:    "nil runtime",
 			adapter: &skillLookupAdapter{},
-			selection: skillstoreSpec.SkillSelection{
-				SkillRef: skillstoreSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: testSkillA},
+			selection: assistantpresetSpec.ArtifactSkillSelection{
+				Artifact: testArtifactSkillRef,
 			},
 			wantErrContains: testErrNotConfigured,
-		},
-		{
-			name:            testMissingBundleID,
-			adapter:         &skillLookupAdapter{store: &skillstore.SkillStore{}},
-			selection:       skillstoreSpec.SkillSelection{SkillRef: skillstoreSpec.SkillRef{SkillSlug: testSkillA}},
-			wantErrContains: testErrIncomplete,
-		},
-		{
-			name:            "missing skill slug",
-			adapter:         &skillLookupAdapter{store: &skillstore.SkillStore{}},
-			selection:       skillstoreSpec.SkillSelection{SkillRef: skillstoreSpec.SkillRef{BundleID: testBundleIDA}},
-			wantErrContains: testErrIncomplete,
 		},
 	}
 

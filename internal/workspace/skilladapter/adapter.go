@@ -344,18 +344,16 @@ func skillSummary(
 	return SkillSummary{
 		SchemaVersion: skillartifact.SchemaVersion,
 		ID:            artifactValue.ID,
-
-		Slug: value.Name,
-
-		Name:        value.Name,
-		DisplayName: value.DisplayName,
-		Description: value.Description,
-		Tags:        append([]string(nil), value.Tags...),
-		Insert:      value.Insert,
-		Arguments:   arguments,
-		IsEnabled:   artifactValue.Enabled,
-		CreatedAt:   artifactValue.CreatedAt,
-		ModifiedAt:  artifactValue.ModifiedAt,
+		Slug:          value.Name,
+		Name:          value.Name,
+		DisplayName:   value.DisplayName,
+		Description:   value.Description,
+		Tags:          append([]string(nil), value.Tags...),
+		Insert:        value.Insert,
+		Arguments:     arguments,
+		IsEnabled:     artifactValue.Enabled,
+		CreatedAt:     artifactValue.CreatedAt,
+		ModifiedAt:    artifactValue.ModifiedAt,
 	}
 }
 
