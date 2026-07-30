@@ -495,104 +495,104 @@ transport values only where explicitly required. They are not durable identity.
 | Skill bundle import and export      | Not present                   | There is no portable bundle manifest, relative member resolver, or deterministic archive workflow.                                                                                                             |
 | Ordered metadata migrations         | Not present                   | User Skills use a single map-file schema and built-ins use a separate overlay database.                                                                                                                        |
 
-## 10. Next steps
+## 10. Breaking migration plan
 
-The Artifact Store and Workspace completion does not change standalone Skill
-Store durable ownership. Its direct package implementation remains active
-legacy behavior, not dead code and not an Artifact Store managed Source.
+### 10.1 Cutover contract
 
-Accordingly, this completion pass intentionally performs no deletion or
-dual-write conversion in `internal/skillstore`. Its direct package creation,
-embedded hydration, MapFileStore metadata, and built-in overlay files are not
-dead code. They remain required until the dedicated one-way migration updates
-assistant preset and conversation references in the same release.
+The standalone Skill Store is replaced, not adapted.
 
-Accordingly, `internal/skillstore` filesystem package creation, embedded
-hydration, MapFileStore metadata, built-in overlays, and installed Skill
-runtime references must remain until the one-way migration updates assistant
-preset and conversation references in the same release. They must not be
-dual-written or deleted as cleanup in the Artifact Store and Workspace pass.
+- A standalone installed Skill bundle becomes a `skill.bundle` Collection.
+- A standalone installed Skill becomes an `agent.skill` Artifact.
+- Workspace-discovered Skills remain `agent.skill` Artifacts in
+  `workspace.collection`; they are not moved into Skill bundle Collections.
+- All newly persisted Skill selections use `ArtifactRef`.
+- Legacy `BundleID`, `SkillSlug`, `SkillID`, `SkillType`, and `Location`
+  fields are not accepted as durable Skill identity after cutover.
+- Normal application startup must not read, write, synchronize, or fall back to
+  `internal/skillstore`.
+- No dual write and no permanent legacy-reference adapter is permitted.
+- Runtime origin and Collection ownership are projections resolved from the
+  Artifact, not encoded in a durable Skill reference.
 
-### 10.1 Satisfied Artifact Store prerequisites
+This is an API and persistence breaking change. Product must choose one data
+policy before implementation:
 
-- Implement Collections, Portable Collection Definitions, Artifact refs,
-  managed Sources, adoption, pinning, and suppression.
-- Establish one application-owned Artifact Store.
-- Keep direct movement deferred unless a committed workflow requires it.
+- Version or reset legacy Skill-dependent stores; or
+- Run a one-time offline importer that creates new local Collections, Sources,
+  and Artifacts, rewrites dependent assistant preset and conversation
+  references, and is removed from the normal application path afterward.
 
-These prerequisites are now available. This migration HLD intentionally retains
-the list as a boundary contract, not as an instruction to reopen Artifact Store
-or Workspace persistence during the standalone Skill migration.
+### 10.2 Required target boundaries
 
-### 10.2 Extract the common Skill artifact package
+Artifact Store remains the owner of Roots, Sources, Collections, Artifacts,
+catalogs, managed content publication, and generic lifecycle invariants.
 
-- Move `SKILL.md` decoding and validation out of Workspace-specific ownership.
-- Define `agent.skill` schema and decoder revision.
-- Emit parser warnings as occurrence diagnostics.
-- Keep local metadata out of canonical definitions.
-- Add Skill content-closure enumeration for `SKILL.md`, resources, and scripts.
-- Add native Skill directory and archive exporters.
+The new Skill bundle feature owns:
 
-### 10.3 Implement `skill.bundle` policy
+- `skill.bundle` Collection validation and views.
+- Skill-specific Collection data and attachment-role policy.
+- Skill discovery planning, refresh, adoption, pinning, suppression, and local
+  Artifact data.
+- Built-in bundle bootstrap.
+- Managed and external Skill authoring workflows.
+- Skill bundle listing and management APIs.
 
-- Define Collection data and attachment roles.
-- Define allowed Source scopes.
-- Define automatic versus explicit adoption.
-- Define local Artifact data.
-- Define collision policy.
-- Define the portable `skill.bundle` schema, member references, validator,
-  importer, and exporter.
+`skillartifact` remains the shared owner of `agent.skill` portable definition
+decoding and validation. Workspace and Skill bundle features must use the same
+decoder and definition contract.
 
-### 10.4 Implement managed authoring
+Agent Skills runtime remains process-local. It receives only a verified,
+ephemeral filesystem `SkillDef`; it must not persist runtime locations or use
+legacy Skill Store identity.
 
-- Add staged managed Source writes.
-- Allocate Artifact IDs before source publication.
-- Add idempotency and orphan cleanup.
-- Refresh and adopt through normal Collection behavior.
+### 10.3 Required migration decisions
 
-### 10.5 Convert built-ins
+Before implementation, define:
 
-- Move portable metadata into each `SKILL.md`.
-- Replace the current built-in metadata file with Portable Skill Bundle
-  Definitions plus a minimal application bootstrap index.
-- Register the hydrated tree as a normal Source.
-- Bootstrap Collections and Artifacts idempotently.
-- Replace overlay flags with normal Collection and Artifact enablement.
+- The legacy data disposition policy.
+- The initial same-name runtime collision policy. The default is fail-closed:
+  equal-priority same-name Skills are not registered.
+- The built-in Source strategy. Built-ins must become normal Artifact Store
+  Sources, Collections, and Artifacts with normal enablement.
+- Managed package update semantics for content edits and built-in upgrades.
+- Executable-file semantics for managed Skill scripts.
+- External package root rules and the expected-name behavior for `SKILL.md`.
 
-### 10.6 Port runtime selection
+### 10.4 Ordered implementation checklist
 
-- Replace current Skill reference unions with `ArtifactRef`.
-- Generalize Workspace source verification to all filesystem-backed `agent.skill` Artifacts.
-- Verify Source generation or package closure before registration.
-- Keep runtime state rebuildable and nontransactional.
+- [ ] Register the shared `agent.skill` decoder independently of Workspace.
+- [ ] Add the typed `skill.bundle` feature service, API, planner, policy,
+      query/projection layer, and bootstrap service.
+- [ ] Define strict Collection, attachment, and Artifact-local data contracts.
+- [ ] Implement managed Skill creation as pin, publish, refresh, and verify.
+- [ ] Implement external Skill attachment and explicit adoption or pinning.
+- [ ] Move built-in hydration or materialization under Artifact Store ownership.
+- [ ] Bootstrap built-in Skill bundle Collections idempotently through
+      nonidentity local bootstrap keys.
+- [ ] Replace legacy overlay enablement with normal Collection and Artifact
+      enablement.
+- [ ] Extract shared runtime package verification from the Workspace Skill
+      adapter.
+- [ ] Refactor Skill Runtime to resolve only Artifact-backed Skills and remove
+      its direct Skill Store dependency.
+- [ ] Replace installed and Workspace Skill reference unions with Artifact-based
+      references in runtime APIs, assistant presets, conversations, inference, and
+      frontend state.
+- [ ] Add root-mutation observer fanout so Workspace and Skill bundle runtime
+      synchronization coexist.
+- [ ] Remove standalone Skill Store startup, wrappers, persistence ownership,
+      and legacy runtime code after all callers migrate.
+- [ ] Add end-to-end tests for bootstrap, refresh, managed creation, package
+      verification, runtime reconciliation, collisions, assistant presets,
+      conversations, and clean-profile startup.
 
-### 10.7 Port consumers
+### 10.5 Deferred work
 
-- Update aggregate Skill listing and collision handling.
-- Update Workspace Skill projection.
-- Update assistant preset selection and validation.
-- Update conversation selection persistence.
-- Regenerate Wails bindings and frontend models.
-- Change startup to stop opening the standalone Skill Store.
-
-### 10.8 Handle existing data separately
-
-- Do not introduce dual writes or permanent legacy identity fields.
-- If existing data is retained, use a one-way importer that assigns new Root,
-  Collection, Source, and Artifact IDs.
-- Reset or migrate dependent assistant preset and conversation references in
-  the same application transition.
-
-### 10.9 Implement Skill transfer after the core switch
-
-- Import individual Skill directories and archives into managed or package Sources.
-- Export individual Skills in native directory or archive form.
-- Import Portable Skill Bundle Definitions with embedded, relative, or
-  policy-approved URI members.
-- Export deterministic self-contained Skill bundle archives.
-- Verify member and package digests during import.
-- Add transfer tests for resources, scripts, parser warnings, unavailable
-  Sources, archive traversal, duplicate paths, and local metadata exclusion.
+Portable Skill and Skill bundle import, export, content closure assembly,
+archive handling, URI acquisition, and direct Artifact movement remain separate
+work after the breaking core migration. Their generic requirements belong to
+Artifact Store. This document retains only the Skill-specific package,
+manifest, and closure rules.
 
 ## 11. Acceptance outcomes
 
