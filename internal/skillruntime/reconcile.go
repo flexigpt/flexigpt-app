@@ -155,6 +155,10 @@ func (s *SkillRuntime) ResyncCollection(
 	s.rtResyncMu.Lock()
 	defer s.rtResyncMu.Unlock()
 
+	if s.isClosed() {
+		return basespec.ErrClosed
+	}
+
 	collections := cloneCollectionDesiredViews(s.managedCollections)
 	collections[ref] = desired
 	return s.reconcileCollectionsLocked(ctx, collections, runtimeApplyStrict)
@@ -173,6 +177,10 @@ func (s *SkillRuntime) RemoveCollection(
 
 	s.rtResyncMu.Lock()
 	defer s.rtResyncMu.Unlock()
+
+	if s.isClosed() {
+		return basespec.ErrClosed
+	}
 
 	collections := cloneCollectionDesiredViews(s.managedCollections)
 	delete(collections, ref)
@@ -212,6 +220,10 @@ func (s *SkillRuntime) reconcileCollectionsLocked(
 	collections map[collection.CollectionRef]runtimeDesiredView,
 	mode runtimeApplyMode,
 ) error {
+	if s.isClosed() {
+		return basespec.ErrClosed
+	}
+
 	desired := mergeDesiredCollections(collections)
 	managed, err := s.runtimeApplyDesired(
 		ctx,

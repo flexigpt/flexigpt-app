@@ -10,7 +10,6 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -32,7 +31,6 @@ import (
 type API struct {
 	dependencies Dependencies
 	closed       atomic.Bool
-	bootstrapMu  sync.Mutex
 }
 
 type Bundle struct {
@@ -43,12 +41,15 @@ type Bundle struct {
 }
 
 type CreateBundleRequest struct {
-	RootID       basespec.RootID
-	DisplayName  string
-	Description  string
-	Enabled      bool
-	BootstrapKey string
-	Attachments  []AttachmentDraft
+	RootID         basespec.RootID
+	DisplayName    string
+	Description    string
+	Enabled        bool
+	LogicalName    basespec.LogicalName
+	LogicalVersion basespec.LogicalVersion
+	Labels         map[string]string
+	BootstrapKey   string
+	Attachments    []AttachmentDraft
 }
 
 type UpdateBundleRequest struct {
@@ -163,6 +164,9 @@ func (a *API) CreateBundle(
 	data, err := EncodeCollectionData(CollectionData{
 		SchemaVersion:           CollectionSchemaVersion,
 		DiscoveryPolicyRevision: DiscoveryPolicyRevision,
+		LogicalName:             request.LogicalName,
+		LogicalVersion:          request.LogicalVersion,
+		Labels:                  request.Labels,
 	})
 	if err != nil {
 		return Bundle{}, err
@@ -450,6 +454,90 @@ func (a *API) RefreshBundle(
 		return refresh.Result{}, err
 	}
 	return result, nil
+}
+
+// BuildLinkedPortableBundleDefinition returns a canonical shareable JSON
+// descriptor. It intentionally does not capture packages or acquire content.
+// A multi-source bundle requires future closure packaging and is rejected.
+func (a *API) BuildLinkedPortableBundleDefinition(
+	ctx context.Context,
+	ref collection.CollectionRef,
+) (definition.CollectionDefinition, error) {
+	bundle, err := a.GetBundle(ctx, ref)
+	if err != nil {
+		return definition.CollectionDefinition{}, err
+	}
+
+	snapshot, err := catalog.ReadCurrent(ctx, a.dependencies.Catalogs, ref)
+	if err != nil {
+		return definition.CollectionDefinition{}, err
+	}
+	records, err := a.dependencies.Artifacts.ListByCollection(ctx, ref)
+	if err != nil {
+		return definition.CollectionDefinition{}, err
+	}
+
+	var sourceID basespec.SourceID
+	members := make([]definition.ContentRef, 0)
+	for _, record := range records {
+		if record.Kind != skillartifact.Kind {
+			continue
+		}
+		if record.State != artifact.StateAvailable ||
+			record.ResolvedDefinition == nil {
+			return definition.CollectionDefinition{}, fmt.Errorf(
+				"%w: Skill Artifact %q is not exportable from the current catalog",
+				basespec.ErrReferenceUnresolved,
+				record.ID,
+			)
+		}
+		if sourceID == "" {
+			sourceID = record.Binding.SourceID
+		} else if sourceID != record.Binding.SourceID {
+			return definition.CollectionDefinition{}, fmt.Errorf(
+				"%w: linked Skill Bundle export requires one Source; use future package closure export",
+				basespec.ErrUnsupported,
+			)
+		}
+
+		var occurrence *catalog.Occurrence
+		for index := range snapshot.Occurrences {
+			candidate := &snapshot.Occurrences[index]
+			if candidate.Key.SourceID == record.Binding.SourceID &&
+				candidate.Key.Locator == record.Binding.Locator &&
+				candidate.Key.SubresourceLocator == record.Binding.SubresourceLocator {
+				occurrence = candidate
+				break
+			}
+		}
+		if occurrence == nil ||
+			occurrence.State != catalog.OccurrenceValid ||
+			occurrence.DefinitionDigest == nil ||
+			occurrence.SourceContentDigest == nil ||
+			*occurrence.DefinitionDigest != *record.ResolvedDefinition {
+			return definition.CollectionDefinition{}, fmt.Errorf(
+				"%w: Skill Artifact %q does not match the current catalog",
+				basespec.ErrCatalogStale,
+				record.ID,
+			)
+		}
+
+		digest := *occurrence.SourceContentDigest
+		members = append(members, definition.ContentRef{
+			Locator:   record.Binding.Locator,
+			Digest:    &digest,
+			MediaType: portableSkillMediaType,
+			Role:      string(skillartifact.Kind),
+		})
+	}
+
+	return NewPortableBundleDefinition(PortableBundleMetadata{
+		LogicalName:    bundle.Data.LogicalName,
+		LogicalVersion: bundle.Data.LogicalVersion,
+		DisplayName:    bundle.Collection.DisplayName,
+		Description:    bundle.Collection.Description,
+		Labels:         bundle.Data.Labels,
+	}, members)
 }
 
 func (a *API) CreateManagedSkill(

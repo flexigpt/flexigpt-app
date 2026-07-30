@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
@@ -59,7 +58,7 @@ func Open(
 		_ = db.Close()
 		return nil, fmt.Errorf("ping artifact metadata database: %w", err)
 	}
-	if err := applySchemaMigrations(ctx, db); err != nil {
+	if err := initializeSchemaV1(ctx, db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -77,171 +76,59 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-func applySchemaMigrations(
+func initializeSchemaV1(
 	ctx context.Context,
 	db *sql.DB,
 ) error {
-	if err := validateSchemaMigrations(schemaMigrations); err != nil {
-		return err
-	}
-
-	if _, err := db.ExecContext(
-		ctx,
-		`CREATE TABLE IF NOT EXISTS artifact_schema_migrations (
-			version INTEGER PRIMARY KEY,
-			fingerprint TEXT NOT NULL,
-			applied_at INTEGER NOT NULL
-		)`,
-	); err != nil {
-		return fmt.Errorf("initialize artifact schema ledger: %w", err)
-	}
-	if err := validateAppliedSchemaMigrations(
-		ctx,
-		db,
-		schemaMigrations,
-	); err != nil {
-		return err
-	}
-	for _, migration := range schemaMigrations {
-		var fingerprint string
-		err := db.QueryRowContext(
-			ctx,
-			`SELECT fingerprint
-			 FROM artifact_schema_migrations
-			 WHERE version = ?`,
-			migration.version,
-		).Scan(&fingerprint)
-		switch {
-		case err == nil:
-			if fingerprint != migration.fingerprint {
-				return fmt.Errorf(
-					"%w: artifact schema migration %d has fingerprint %q",
-					basespec.ErrUnsupported,
-					migration.version,
-					fingerprint,
-				)
-			}
-			continue
-		case !errors.Is(err, sql.ErrNoRows):
-			return fmt.Errorf("read artifact schema ledger: %w", err)
-		}
-
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, migration.sql); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf(
-				"apply artifact schema migration %d: %w",
-				migration.version,
-				err,
-			)
-		}
-		if _, err := tx.ExecContext(
-			ctx,
-			`INSERT INTO artifact_schema_migrations(
-				version, fingerprint, applied_at
-			) VALUES (?, ?, ?)`,
-			migration.version,
-			migration.fingerprint,
-			time.Now().UTC().UnixNano(),
-		); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf(
-				"record artifact schema migration %d: %w",
-				migration.version,
-				err,
-			)
-		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func validateAppliedSchemaMigrations(
-	ctx context.Context,
-	db *sql.DB,
-	values []migration,
-) error {
-	rows, err := db.QueryContext(
-		ctx,
-		`SELECT version, fingerprint
-		 FROM artifact_schema_migrations
-		 ORDER BY version`,
-	)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("read artifact schema ledger: %w", err)
+		return err
 	}
-	defer rows.Close()
+	defer func() { _ = tx.Rollback() }()
 
-	expectedIndex := 0
-	for rows.Next() {
-		var version int
-		var fingerprint string
-		if err := rows.Scan(&version, &fingerprint); err != nil {
-			return fmt.Errorf("read artifact schema ledger entry: %w", err)
-		}
-		if expectedIndex >= len(values) {
-			return fmt.Errorf(
-				"%w: artifact metadata database contains unknown migration %d",
-				basespec.ErrUnsupported,
-				version,
-			)
-		}
-		expected := values[expectedIndex]
-		if version != expected.version {
-			return fmt.Errorf(
-				"%w: artifact metadata migration ledger is not an ordered prefix; expected migration %d before %d",
-				basespec.ErrUnsupported,
-				expected.version,
-				version,
-			)
-		}
-		if fingerprint != expected.fingerprint {
-			return fmt.Errorf(
-				"%w: artifact schema migration %d has fingerprint %q",
-				basespec.ErrUnsupported,
-				version,
-				fingerprint,
-			)
-		}
-		expectedIndex++
+	var markerExists int
+	if err := tx.QueryRowContext(
+		ctx,
+		`SELECT EXISTS(
+			SELECT 1
+			FROM sqlite_master
+			WHERE type = 'table' AND name = 'artifact_store_v1'
+		)`,
+	).Scan(&markerExists); err != nil {
+		return err
 	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("read artifact schema ledger: %w", err)
+	if markerExists != 0 {
+		return tx.Commit()
 	}
-	return nil
-}
 
-func validateSchemaMigrations(values []migration) error {
-	previousVersion := 0
-	for _, value := range values {
-		if value.version <= previousVersion {
-			return fmt.Errorf(
-				"%w: artifact schema migrations must have strictly increasing versions",
-				basespec.ErrInvalid,
-			)
-		}
-		if strings.TrimSpace(value.fingerprint) == "" {
-			return fmt.Errorf(
-				"%w: artifact schema migration %d has no fingerprint",
-				basespec.ErrInvalid,
-				value.version,
-			)
-		}
-		if strings.TrimSpace(value.sql) == "" {
-			return fmt.Errorf(
-				"%w: artifact schema migration %d has no SQL",
-				basespec.ErrInvalid,
-				value.version,
-			)
-		}
-		previousVersion = value.version
+	var legacyExists int
+	if err := tx.QueryRowContext(
+		ctx,
+		`SELECT EXISTS(
+			SELECT 1
+			FROM sqlite_master
+			WHERE type = 'table'
+			  AND name IN (
+				'artifact_schema_migrations',
+				'artifact_roots',
+				'artifact_sources',
+				'artifact_collections'
+			  )
+		)`,
+	).Scan(&legacyExists); err != nil {
+		return err
 	}
-	return nil
+	if legacyExists != 0 {
+		return fmt.Errorf(
+			"%w: legacy Artifact Store metadata is not supported; use a fresh artifacts_v1 directory",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	if _, err := tx.ExecContext(ctx, schemaV1); err != nil {
+		return fmt.Errorf("initialize Artifact Store v1 schema: %w", err)
+	}
+	return tx.Commit()
 }
 
 func prepareDatabaseFile(path string) error {

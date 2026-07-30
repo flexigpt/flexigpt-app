@@ -18,12 +18,6 @@ type Source struct {
 	Enabled     bool                `json:"enabled"`
 	Config      json.RawMessage     `json:"-"`
 
-	// ContentGeneration is the last snapshot generation acknowledged after an
-	// application-managed content mutation. It is internal metadata only:
-	// summaries, public APIs, portable definitions, and source configuration
-	// deliberately do not expose it.
-	ContentGeneration string `json:"-"`
-
 	Revision   uint64     `json:"revision"`
 	CreatedAt  time.Time  `json:"createdAt"`
 	ModifiedAt time.Time  `json:"modifiedAt"`
@@ -108,14 +102,6 @@ func (s Source) Validate() error {
 		basespec.MaxConfigBytes,
 	); err != nil {
 		return fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
-	}
-
-	if s.ContentGeneration != "" {
-		if err := basespec.ValidateSourceGeneration(
-			s.ContentGeneration,
-		); err != nil {
-			return fmt.Errorf("source content generation: %w", err)
-		}
 	}
 
 	return nil

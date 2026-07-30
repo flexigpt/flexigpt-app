@@ -1,15 +1,16 @@
 package sqlite
 
-type migration struct {
-	version     int
-	fingerprint string
-	sql         string
-}
+// schemaV1 is the only supported Artifact Store metadata schema.
+//
+// The application creates a fresh artifacts_v1 namespace. There is no
+// migration ledger and no compatibility path for earlier metadata databases.
+const schemaV1 = `
+CREATE TABLE artifact_store_v1 (
+	singleton INTEGER PRIMARY KEY CHECK (singleton = 1)
+);
 
-var schemaMigrations = []migration{{
-	version:     1,
-	fingerprint: "basespec.collections.clean.v1",
-	sql: `
+INSERT INTO artifact_store_v1(singleton) VALUES (1);
+
 CREATE TABLE artifact_roots (
 	id TEXT PRIMARY KEY,
 	display_name TEXT NOT NULL,
@@ -17,9 +18,8 @@ CREATE TABLE artifact_roots (
 	revision INTEGER NOT NULL CHECK (revision > 0),
 	created_at INTEGER NOT NULL,
 	modified_at INTEGER NOT NULL,
-	retired_at INTEGER,
-	UNIQUE (id)
- );
+	retired_at INTEGER
+);
 
 CREATE TABLE artifact_sources (
 	id TEXT PRIMARY KEY,
@@ -47,6 +47,7 @@ CREATE TABLE artifact_collections (
 	created_at INTEGER NOT NULL,
 	modified_at INTEGER NOT NULL,
 	retired_at INTEGER,
+	idempotency_key TEXT NOT NULL DEFAULT '',
 	UNIQUE (root_id, id)
 );
 
@@ -158,6 +159,10 @@ CREATE TABLE artifact_suppressions (
 		REFERENCES artifact_sources(root_id, id) ON DELETE RESTRICT
 );
 
+CREATE UNIQUE INDEX idx_artifact_collections_root_kind_idempotency_key
+	ON artifact_collections(root_id, kind, idempotency_key)
+	WHERE idempotency_key <> '';
+
 CREATE INDEX idx_artifact_sources_root
 	ON artifact_sources(root_id, modified_at DESC);
 
@@ -173,19 +178,14 @@ CREATE INDEX idx_artifact_artifacts_collection
 	ON artifact_artifacts(
 		root_id, collection_id, modified_at DESC
 	);
-`,
-}, {
-	version:     2,
-	fingerprint: "basespec.active-attachment-source.v1",
-	sql: `
+
 CREATE TRIGGER artifact_attachment_requires_active_source_insert
 BEFORE INSERT ON artifact_collection_attachments
 FOR EACH ROW
 WHEN NOT EXISTS (
 	SELECT 1
 	FROM artifact_sources s
-	JOIN artifact_roots r
-	  ON r.id = s.root_id
+	JOIN artifact_roots r ON r.id = s.root_id
 	WHERE s.root_id = NEW.root_id
 	  AND s.id = NEW.source_id
 	  AND s.retired_at IS NULL
@@ -201,34 +201,6 @@ BEGIN
 	SELECT RAISE(ABORT, 'artifact attachment requires active source and collection');
 END;
 
-CREATE TRIGGER artifact_attachment_requires_active_source_update
-BEFORE UPDATE OF root_id, collection_id, source_id
-ON artifact_collection_attachments
-FOR EACH ROW
-WHEN NOT EXISTS (
-	SELECT 1
-	FROM artifact_sources s
-	JOIN artifact_roots r
-	  ON r.id = s.root_id
-	WHERE s.root_id = NEW.root_id
-	  AND s.id = NEW.source_id
-	  AND s.retired_at IS NULL
-	  AND r.retired_at IS NULL
-) OR NOT EXISTS (
-	SELECT 1
-	FROM artifact_collections c
-	WHERE c.root_id = NEW.root_id
-	  AND c.id = NEW.collection_id
-	  AND c.retired_at IS NULL
-)
-BEGIN
-	SELECT RAISE(ABORT, 'artifact attachment requires active source and collection');
-END;
-`,
-}, {
-	version:     3,
-	fingerprint: "basespec.relationship-invariants.v1",
-	sql: `
 CREATE TRIGGER artifact_enabled_attachment_requires_enabled_source_insert
 BEFORE INSERT ON artifact_collection_attachments
 FOR EACH ROW
@@ -236,8 +208,7 @@ WHEN NEW.enabled = 1
  AND NOT EXISTS (
 	SELECT 1
 	FROM artifact_sources s
-	JOIN artifact_roots r
-	  ON r.id = s.root_id
+	JOIN artifact_roots r ON r.id = s.root_id
 	WHERE s.root_id = NEW.root_id
 	  AND s.id = NEW.source_id
 	  AND s.enabled = 1
@@ -256,8 +227,7 @@ WHEN NEW.enabled = 1
  AND NOT EXISTS (
 	SELECT 1
 	FROM artifact_sources s
-	JOIN artifact_roots r
-	  ON r.id = s.root_id
+	JOIN artifact_roots r ON r.id = s.root_id
 	WHERE s.root_id = NEW.root_id
 	  AND s.id = NEW.source_id
 	  AND s.enabled = 1
@@ -295,13 +265,10 @@ WHEN NOT EXISTS (
 	SELECT 1
 	FROM artifact_collection_attachments a
 	JOIN artifact_sources s
-	  ON s.root_id = a.root_id
-	 AND s.id = a.source_id
+	  ON s.root_id = a.root_id AND s.id = a.source_id
 	JOIN artifact_collections c
-	  ON c.root_id = a.root_id
-	 AND c.id = a.collection_id
-	JOIN artifact_roots r
-	  ON r.id = a.root_id
+	  ON c.root_id = a.root_id AND c.id = a.collection_id
+	JOIN artifact_roots r ON r.id = a.root_id
 	WHERE a.root_id = NEW.root_id
 	  AND a.collection_id = NEW.collection_id
 	  AND a.source_id = NEW.source_id
@@ -320,13 +287,10 @@ WHEN NOT EXISTS (
 	SELECT 1
 	FROM artifact_collection_attachments a
 	JOIN artifact_sources s
-	  ON s.root_id = a.root_id
-	 AND s.id = a.source_id
+	  ON s.root_id = a.root_id AND s.id = a.source_id
 	JOIN artifact_collections c
-	  ON c.root_id = a.root_id
-	 AND c.id = a.collection_id
-	JOIN artifact_roots r
-	  ON r.id = a.root_id
+	  ON c.root_id = a.root_id AND c.id = a.collection_id
+	JOIN artifact_roots r ON r.id = a.root_id
 	WHERE a.root_id = NEW.root_id
 	  AND a.collection_id = NEW.collection_id
 	  AND a.source_id = NEW.source_id
@@ -345,13 +309,10 @@ WHEN NOT EXISTS (
 	SELECT 1
 	FROM artifact_collection_attachments a
 	JOIN artifact_sources s
-	  ON s.root_id = a.root_id
-	 AND s.id = a.source_id
+	  ON s.root_id = a.root_id AND s.id = a.source_id
 	JOIN artifact_collections c
-	  ON c.root_id = a.root_id
-	 AND c.id = a.collection_id
-	JOIN artifact_roots r
-	  ON r.id = a.root_id
+	  ON c.root_id = a.root_id AND c.id = a.collection_id
+	JOIN artifact_roots r ON r.id = a.root_id
 	WHERE a.root_id = NEW.root_id
 	  AND a.collection_id = NEW.collection_id
 	  AND a.source_id = NEW.source_id
@@ -362,18 +323,7 @@ WHEN NOT EXISTS (
 BEGIN
 	SELECT RAISE(ABORT, 'artifact occurrence requires attached source');
 END;
-`,
-}, {
-	version:     4,
-	fingerprint: "basespec.source-content-generation.v1",
-	sql: `
-ALTER TABLE artifact_sources
-	ADD COLUMN content_generation TEXT NOT NULL DEFAULT '';
-`,
-}, {
-	version:     5,
-	fingerprint: "basespec.retirement-relationship-invariants.v1",
-	sql: `
+
 CREATE TRIGGER artifact_source_retirement_requires_no_active_attachments
 BEFORE UPDATE OF retired_at ON artifact_sources
 FOR EACH ROW
@@ -418,16 +368,4 @@ BEGIN
 		'artifact root retirement requires no active children'
 	);
 END;
-`,
-}, {
-	version:     6,
-	fingerprint: "basespec.collection-idempotency-key.v1",
-	sql: `
-ALTER TABLE artifact_collections
-	ADD COLUMN idempotency_key TEXT NOT NULL DEFAULT '';
-
-CREATE UNIQUE INDEX idx_artifact_collections_root_kind_idempotency_key
-	ON artifact_collections(root_id, kind, idempotency_key)
-	WHERE idempotency_key <> '';
-`,
-}}
+`

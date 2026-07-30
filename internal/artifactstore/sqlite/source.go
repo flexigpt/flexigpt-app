@@ -11,7 +11,7 @@ import (
 )
 
 const sourceColumns = `
-	id, root_id, kind, display_name, enabled, config_json, content_generation,
+	id, root_id, kind, display_name, enabled, config_json,
 	revision, created_at, modified_at, retired_at`
 
 func (s *Store) createSource(
@@ -33,16 +33,15 @@ func (s *Store) createSource(
 	_, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO artifact_sources (
-			id, root_id, kind, display_name, enabled, config_json, content_generation,
+			id, root_id, kind, display_name, enabled, config_json,
 			revision, created_at, modified_at, retired_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(value.ID),
 		string(value.RootID),
 		string(value.Kind),
 		value.DisplayName,
 		boolInt(value.Enabled),
 		[]byte(value.Config),
-		value.ContentGeneration,
 		value.Revision,
 		timeValue(value.CreatedAt),
 		timeValue(value.ModifiedAt),
@@ -136,7 +135,6 @@ func (s *Store) updateSource(
 		 SET display_name = ?,
 		     enabled = ?,
 		     config_json = ?,
-		     content_generation = ?,
 		     revision = ?,
 		     modified_at = ?
 		 WHERE id = ?
@@ -159,7 +157,6 @@ func (s *Store) updateSource(
 		value.DisplayName,
 		boolInt(value.Enabled),
 		[]byte(value.Config),
-		value.ContentGeneration,
 		value.Revision,
 		timeValue(value.ModifiedAt),
 		string(value.ID),
@@ -305,12 +302,12 @@ type scanner interface {
 
 func scanSource(row scanner) (source.Source, error) {
 	var (
-		id, rootID, kind, displayName, contentGeneration string
-		enabled                                          int
-		config                                           []byte
-		revision                                         uint64
-		createdAt, modifiedAt                            int64
-		retiredAt                                        sql.NullInt64
+		id, rootID, kind, displayName string
+		enabled                       int
+		config                        []byte
+		revision                      uint64
+		createdAt, modifiedAt         int64
+		retiredAt                     sql.NullInt64
 	)
 	if err := row.Scan(
 		&id,
@@ -319,7 +316,6 @@ func scanSource(row scanner) (source.Source, error) {
 		&displayName,
 		&enabled,
 		&config,
-		&contentGeneration,
 		&revision,
 		&createdAt,
 		&modifiedAt,
@@ -328,17 +324,16 @@ func scanSource(row scanner) (source.Source, error) {
 		return source.Source{}, err
 	}
 	value := source.Source{
-		ID:                basespec.SourceID(id),
-		RootID:            basespec.RootID(rootID),
-		Kind:              basespec.SourceKind(kind),
-		DisplayName:       displayName,
-		Enabled:           enabled != 0,
-		Config:            append([]byte(nil), config...),
-		ContentGeneration: contentGeneration,
-		Revision:          revision,
-		CreatedAt:         parseTime(createdAt),
-		ModifiedAt:        parseTime(modifiedAt),
-		RetiredAt:         parseNullableTime(retiredAt),
+		ID:          basespec.SourceID(id),
+		RootID:      basespec.RootID(rootID),
+		Kind:        basespec.SourceKind(kind),
+		DisplayName: displayName,
+		Enabled:     enabled != 0,
+		Config:      append([]byte(nil), config...),
+		Revision:    revision,
+		CreatedAt:   parseTime(createdAt),
+		ModifiedAt:  parseTime(modifiedAt),
+		RetiredAt:   parseNullableTime(retiredAt),
 	}
 	if err := value.Validate(); err != nil {
 		return source.Source{}, fmt.Errorf(

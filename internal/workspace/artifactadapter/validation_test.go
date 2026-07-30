@@ -1,17 +1,12 @@
 package artifactadapter
 
 import (
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/collectiondata"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -120,126 +115,5 @@ func TestWorkspaceDataCodecsRejectUnknownAndOwnData(t *testing.T) {
 		artifact.Artifact{Data: []byte(`[]`)},
 	); !strings.Contains(err.Error(), "JSON value must be an object") {
 		t.Fatalf("invalid artifact runtime data error=%v", err)
-	}
-}
-
-func TestDecodeDefinitionBodyAndWorkspaceStateBoundaries(t *testing.T) {
-	t.Parallel()
-
-	type body struct {
-		Name string `json:"name"`
-	}
-	decoded, err := spec.DecodeDefinitionBody[body](json.RawMessage(`{"name":"ok"}`))
-	if err != nil || decoded.Name != "ok" {
-		t.Fatalf("DecodeDefinitionBody=%#v err=%v", decoded, err)
-	}
-	for _, raw := range []json.RawMessage{
-		[]byte(`{"name":"ok","unknown":true}`),
-		[]byte(`{"name":"ok"} {}`),
-		[]byte(`[]`),
-	} {
-		if _, err := spec.DecodeDefinitionBody[body](raw); !errors.Is(err, spec.ErrInvalidWorkspace) {
-			t.Errorf("DecodeDefinitionBody(%s) error=%v, want spec.ErrInvalidWorkspace", raw, err)
-		}
-	}
-
-	workspace := validationTestCollection(t)
-	mode, primary, err := validateWorkspaceState(
-		workspace,
-		spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"},
-		nil,
-		nil,
-	)
-	if err != nil || mode != spec.ModeEmpty || primary != "" {
-		t.Fatalf("empty workspace mode=%q primary=%q err=%v", mode, primary, err)
-	}
-
-	attachmentData, err := attachmentdata.EncodeAttachmentData(spec.AttachmentData{})
-	if err != nil {
-		t.Fatalf("encode primary attachment: %v", err)
-	}
-	primarySource := validationTestSource(true, fsdir.Kind)
-	primaryAttachment := collection.Attachment{
-		RootID:       workspace.RootID,
-		CollectionID: workspace.ID,
-		SourceID:     primarySource.ID,
-		Role:         spec.RolePrimary,
-		Enabled:      true,
-		Data:         attachmentData,
-		Revision:     1,
-		CreatedAt:    workspace.CreatedAt,
-		ModifiedAt:   workspace.ModifiedAt,
-	}
-	mode, primary, err = validateWorkspaceState(
-		workspace,
-		spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"},
-		[]collection.Attachment{primaryAttachment},
-		[]source.Summary{primarySource},
-	)
-	if err != nil || mode != spec.ModeFilesystem || primary != primarySource.ID {
-		t.Fatalf("filesystem workspace mode=%q primary=%q err=%v", mode, primary, err)
-	}
-
-	disabledSource := primarySource
-	disabledSource.Enabled = false
-	if _, _, err := validateWorkspaceState(
-		workspace,
-		spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"},
-		[]collection.Attachment{primaryAttachment},
-		[]source.Summary{disabledSource},
-	); !errors.Is(
-		err,
-		spec.ErrInvalidWorkspace,
-	) {
-		t.Fatalf("disabled primary error=%v, want spec.ErrInvalidWorkspace", err)
-	}
-	second := primaryAttachment
-	second.SourceID = "019d3150-6f04-7a6b-a34e-d9032342bc31"
-	secondSource := validationTestSource(true, fsdir.Kind)
-	secondSource.ID = second.SourceID
-	if _, _, err := validateWorkspaceState(
-		workspace,
-		spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"},
-		[]collection.Attachment{primaryAttachment, second},
-		[]source.Summary{primarySource, secondSource},
-	); !errors.Is(
-		err,
-		spec.ErrInvalidWorkspace,
-	) {
-		t.Fatalf("multiple primary error=%v, want spec.ErrInvalidWorkspace", err)
-	}
-}
-
-func validationTestCollection(t *testing.T) collection.Collection {
-	t.Helper()
-	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	raw, err := collectiondata.EncodeCollectionData(spec.CollectionData{DiscoveryPolicyRevision: "policy.v1"})
-	if err != nil {
-		t.Fatalf("encode test collection data: %v", err)
-	}
-	return collection.Collection{
-		ID:          "019d3150-6f01-7a6b-a34e-d9032342bc31",
-		RootID:      "019d3150-6f02-7a6b-a34e-d9032342bc31",
-		Kind:        spec.CollectionKind,
-		DisplayName: "Workspace",
-		Enabled:     true,
-		Data:        raw,
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
-	}
-}
-
-func validationTestSource(enabled bool, kind basespec.SourceKind) source.Summary {
-	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	return source.Summary{
-		ID:          "019d3150-6f03-7a6b-a34e-d9032342bc31",
-		RootID:      "019d3150-6f02-7a6b-a34e-d9032342bc31",
-		Kind:        kind,
-		DisplayName: "Source",
-		Enabled:     enabled,
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
 	}
 }

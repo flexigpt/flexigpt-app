@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -16,18 +15,18 @@ import (
 const (
 	AppTitle = "FlexiGPT"
 
-	settingsDirectoryName         = "settings"
-	conversationsDirectoryName    = "conversationsv2"
-	modelPresetsDirectoryName     = "modelpresetsv1"
-	toolsDirectoryName            = "toolsv1"
-	mcpDirectoryName              = "mcpserversv1"
-	assistantPresetsDirectoryName = "assistantpresetsv2"
+	settingsDirectoryName         = "settings_v1"
+	conversationsDirectoryName    = "conversations_v1"
+	modelPresetsDirectoryName     = "model_presets_v1"
+	toolsDirectoryName            = "tools_v1"
+	mcpDirectoryName              = "mcp_servers_v1"
+	assistantPresetsDirectoryName = "assistant_presets_v1"
 	// Workspace Collections are stored by the shared artifact store. Do not
 	// add a second Workspace-owned persistence directory. This is deliberately
 	// a clean namespace: startup must not locate, import, copy, or migrate any
 	// legacy Workspace or Artifact Store directory into it.
-	artifactStoreDirectoryName = "artifactsv1"
-	appDirectoryMode           = 0o770
+	artifactStoreDirectoryName = "artifacts_v1"
+	appDirectoryMode           = 0o700
 )
 
 type App struct {
@@ -203,10 +202,7 @@ func (a *App) GetAppVersion() string {
 }
 
 func ensureAppPrivateDirectory(location string) error {
-	if err := os.MkdirAll(location, os.FileMode(appDirectoryMode)); err != nil {
-		return err
-	}
-	return mapstoreio.ApplyPrivateDirectoryMode(location)
+	return os.MkdirAll(location, os.FileMode(appDirectoryMode))
 }
 
 func (a *App) initManagers() {
@@ -281,39 +277,6 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: skill bundle initialization failed\n" + err.Error())
 	}
 	slog.Info("artifact-backed skill bundles initialized")
-
-	err = BindWorkspaceSkillRuntime(
-		a.workspaceAPI,
-		a.skillBundleAPI.runtime,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't bind workspace skill runtime",
-			"error", err,
-		)
-		panic("failed to initialize managers: workspace skill runtime binding failed\n" + err.Error())
-	}
-
-	err = BindArtifactStoreWorkspaceSynchronization(
-		a.artifactStoreAPI,
-		a.workspaceAPI,
-	)
-	if err != nil {
-		slog.Error("couldn't bind artifact store Workspace synchronization", "error", err)
-		panic("failed to initialize managers: artifact store Workspace synchronization failed\n" + err.Error())
-	}
-
-	err = BindArtifactStoreSkillBundleSynchronization(
-		a.artifactStoreAPI,
-		a.skillBundleAPI,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't bind artifact store Skill Bundle synchronization",
-			"error", err,
-		)
-		panic("failed to initialize managers: artifact store Skill Bundle synchronization failed\n" + err.Error())
-	}
 
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {

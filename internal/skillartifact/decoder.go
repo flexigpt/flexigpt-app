@@ -2,7 +2,6 @@ package skillartifact
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path"
 	"strings"
@@ -13,7 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Decoder struct{}
@@ -122,7 +120,7 @@ func definitionForDocument(
 			Default:     argument.Default,
 		})
 	}
-	raw, err := json.Marshal(Body{
+	raw, err := definition.EncodeBody(Body{
 		Name:           document.Name,
 		DisplayName:    document.DisplayName,
 		Description:    document.Description,
@@ -132,10 +130,6 @@ func definitionForDocument(
 		MarkdownBody:   document.MarkdownBody,
 		RawFrontmatter: document.RawFrontmatter,
 	})
-	if err != nil {
-		return definition.Definition{}, err
-	}
-	raw, err = jsonutil.CanonicalizeObject(raw, basespec.MaxDefinitionBodyBytes)
 	if err != nil {
 		return definition.Definition{}, err
 	}

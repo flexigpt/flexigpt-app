@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -153,7 +152,6 @@ func InitSkillBundleWrapper(
 		wrapper.close()
 		return err
 	}
-	wrapper.syncKnownSkillBundles()
 
 	return nil
 }
@@ -166,9 +164,7 @@ func (w *SkillBundleWrapper) CreateSkillBundle(
 			return skillbundle.Bundle{}, errors.New("skill bundle request is required")
 		}
 		value, err := w.api.CreateBundle(context.Background(), *request)
-		if err == nil {
-			w.syncBundle(value.Collection.Ref())
-		}
+
 		return value, err
 	})
 }
@@ -197,9 +193,7 @@ func (w *SkillBundleWrapper) UpdateSkillBundle(
 			return skillbundle.Bundle{}, errors.New("skill bundle update is required")
 		}
 		value, err := w.api.UpdateBundle(context.Background(), *request)
-		if err == nil {
-			w.syncBundle(request.Bundle)
-		}
+
 		return value, err
 	})
 }
@@ -214,9 +208,7 @@ func (w *SkillBundleWrapper) RetireSkillBundle(
 			ref,
 			expectedRevision,
 		)
-		if err == nil {
-			w.removeBundle(ref)
-		}
+
 		return value, err
 	})
 }
@@ -227,9 +219,7 @@ func (w *SkillBundleWrapper) PurgeSkillBundle(
 ) error {
 	return middleware.WithRecovery(func() error {
 		err := w.api.PurgeBundle(context.Background(), ref, expectedRevision)
-		if err == nil {
-			w.removeBundle(ref)
-		}
+
 		return err
 	})
 }
@@ -239,9 +229,7 @@ func (w *SkillBundleWrapper) RefreshSkillBundle(
 ) error {
 	return middleware.WithRecovery(func() error {
 		_, err := w.api.RefreshBundle(context.Background(), ref)
-		if err == nil {
-			w.syncBundle(ref)
-		}
+
 		return err
 	})
 }
@@ -256,9 +244,7 @@ func (w *SkillBundleWrapper) CreateManagedSkill(
 					errors.New("managed skill request is required")
 			}
 			value, err := w.api.CreateManagedSkill(context.Background(), *request)
-			if err == nil {
-				w.syncBundle(request.Bundle)
-			}
+
 			return value, err
 		},
 	)
@@ -272,9 +258,7 @@ func (w *SkillBundleWrapper) AdoptSkill(
 			return artifact.Artifact{}, errors.New("skill adoption request is required")
 		}
 		value, err := w.api.AdoptSkill(context.Background(), *request)
-		if err == nil {
-			w.syncBundle(request.Bundle)
-		}
+
 		return value, err
 	})
 }
@@ -287,9 +271,7 @@ func (w *SkillBundleWrapper) PinSkill(
 			return artifact.Artifact{}, errors.New("skill pin request is required")
 		}
 		value, err := w.api.PinSkill(context.Background(), *request)
-		if err == nil {
-			w.syncBundle(request.Bundle)
-		}
+
 		return value, err
 	})
 }
@@ -314,12 +296,7 @@ func (w *SkillBundleWrapper) SetSkillEnabled(
 			expectedRevision,
 			enabled,
 		)
-		if err == nil {
-			w.syncBundle(collection.CollectionRef{
-				RootID:       value.RootID,
-				CollectionID: value.CollectionID,
-			})
-		}
+
 		return value, err
 	})
 }
@@ -330,7 +307,7 @@ func (w *SkillBundleWrapper) UnadoptSkill(
 	suppress bool,
 ) error {
 	return middleware.WithRecovery(func() error {
-		value, err := w.api.GetSkill(context.Background(), ref)
+		_, err := w.api.GetSkill(context.Background(), ref)
 		if err != nil {
 			return err
 		}
@@ -340,12 +317,7 @@ func (w *SkillBundleWrapper) UnadoptSkill(
 			expectedRevision,
 			suppress,
 		)
-		if err == nil {
-			w.syncBundle(collection.CollectionRef{
-				RootID:       value.RootID,
-				CollectionID: value.CollectionID,
-			})
-		}
+
 		return err
 	})
 }
@@ -398,100 +370,6 @@ func (w *SkillBundleWrapper) InvokeSkillTool(
 	})
 }
 
-func BindArtifactStoreSkillBundleSynchronization(
-	artifacts *ArtifactStoreWrapper,
-	bundles *SkillBundleWrapper,
-) error {
-	if artifacts == nil || bundles == nil {
-		return errors.New("artifact and skill bundle wrappers are required")
-	}
-	artifacts.subscribeRootMutation(bundles.syncBundlesForRoot)
-	return nil
-}
-
-func (w *SkillBundleWrapper) syncBundle(ref collection.CollectionRef) {
-	if w == nil || ref.Validate() != nil {
-		return
-	}
-	w.mu.Lock()
-	if w.api == nil || w.runtime == nil || w.bootstrapContext == nil {
-		w.mu.Unlock()
-		return
-	}
-	runtime := w.runtime
-
-	w.mu.Unlock()
-	runtime.RequestCollectionResync(ref)
-}
-
-func (w *SkillBundleWrapper) removeBundle(ref collection.CollectionRef) {
-	if w == nil || ref.Validate() != nil {
-		return
-	}
-	w.mu.Lock()
-	runtime := w.runtime
-	if runtime == nil {
-		w.mu.Unlock()
-		return
-	}
-
-	w.mu.Unlock()
-	runtime.RequestCollectionRemoval(ref)
-}
-
-func (w *SkillBundleWrapper) syncKnownSkillBundles() {
-	w.scheduleBundleSynchronization("", false)
-}
-
-func (w *SkillBundleWrapper) syncBundlesForRoot(rootID basespec.RootID) {
-	if err := basespec.ValidateRootID(rootID); err != nil {
-		return
-	}
-	w.scheduleBundleSynchronization(rootID, true)
-}
-
-func (w *SkillBundleWrapper) scheduleBundleSynchronization(
-	rootID basespec.RootID,
-	filterRoot bool,
-) {
-	if w == nil {
-		return
-	}
-	w.mu.Lock()
-	if w.api == nil || w.runtime == nil || w.bootstrapContext == nil {
-		w.mu.Unlock()
-		return
-	}
-	api := w.api
-	parent := w.bootstrapContext
-
-	w.bootstrapWG.Add(1)
-	w.mu.Unlock()
-
-	go func() {
-		defer w.bootstrapWG.Done()
-		ctx, cancel := context.WithTimeout(parent, 30*time.Second)
-		defer cancel()
-
-		if err := w.bootstrapEmbeddedBuiltInsWithAPI(ctx, api); err != nil {
-			return
-		}
-
-		refs, err := api.SkillBundleRefs(ctx)
-		if err != nil || ctx.Err() != nil {
-			return
-		}
-
-		for _, ref := range refs {
-			if filterRoot && ref.RootID != rootID {
-				continue
-			}
-			//nolint:contextcheck // Background.
-			w.syncBundle(ref)
-		}
-	}()
-}
-
 func (w *SkillBundleWrapper) bootstrapEmbeddedBuiltIns(
 	ctx context.Context,
 ) error {
@@ -511,13 +389,9 @@ func (w *SkillBundleWrapper) bootstrapEmbeddedBuiltInsWithAPI(
 	ctx context.Context,
 	api *skillbundle.API,
 ) error {
-	values, err := api.BootstrapEmbeddedBuiltIns(ctx)
+	_, err := api.BootstrapEmbeddedBuiltIns(ctx)
 	if err != nil {
 		return err
-	}
-	for _, value := range values {
-		//nolint:contextcheck // Sync op.
-		w.syncBundle(value.Collection.Ref())
 	}
 	return nil
 }

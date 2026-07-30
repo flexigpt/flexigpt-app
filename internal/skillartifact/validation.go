@@ -1,11 +1,7 @@
 package skillartifact
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
@@ -54,7 +50,7 @@ func DocumentFromDefinition(
 			basespec.ErrInvalid,
 		)
 	}
-	body, err := DecodeBody(value.Body)
+	body, err := definition.DecodeBody[Body](value.Body)
 	if err != nil {
 		return agentskillsSpec.SkillDocument{}, err
 	}
@@ -91,31 +87,6 @@ func DocumentFromDefinition(
 		)
 	}
 	return document, nil
-}
-
-func DecodeBody(raw json.RawMessage) (Body, error) {
-	var output Body
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&output); err != nil {
-		return output, fmt.Errorf(
-			"%w: decode Agent Skill definition: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("definition contains trailing JSON")
-		}
-		return output, fmt.Errorf(
-			"%w: decode Agent Skill definition: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	return output, nil
 }
 
 func toDocument(value Body) agentskillsSpec.SkillDocument {

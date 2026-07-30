@@ -15,11 +15,8 @@ import (
 )
 
 const (
-	runtimeResyncTimeout                = 30 * time.Second
-	runtimeForegroundValidateTimeout    = 15 * time.Second
-	collectionReconcileInitialDelay     = 250 * time.Millisecond
-	collectionReconcileMaximumDelay     = 4 * time.Second
-	collectionReconcileLogAfterAttempts = 5
+	runtimeResyncTimeout             = 30 * time.Second
+	runtimeForegroundValidateTimeout = 15 * time.Second
 )
 
 // SkillRuntime owns the in-memory Agent Skills catalog, provider lifecycle,
@@ -31,15 +28,11 @@ type SkillRuntime struct {
 
 	rtResyncMu sync.Mutex
 
-	lifecycleMu       sync.Mutex
-	closed            bool
-	backgroundContext context.Context
-	backgroundCancel  context.CancelFunc
-	backgroundWG      sync.WaitGroup
+	lifecycleMu sync.RWMutex
+	closed      bool
 
-	collectionRequestMu sync.Mutex
-	collectionRequests  map[collection.CollectionRef]collectionReconcileRequest
-
+	// These maps are only an ephemeral inventory of provider registrations.
+	// Artifact Store remains the source of truth for every Artifact decision.
 	managedCollections map[collection.CollectionRef]runtimeDesiredView
 	managedRuntime     map[agentskillsSpec.SkillDef]string
 }
@@ -126,17 +119,12 @@ func NewSkillRuntime(
 		options.runScriptsEnabled = false
 	}
 
-	backgroundContext, backgroundCancel := context.WithCancel(context.Background())
-
 	value := &SkillRuntime{
 		resolver:           options.resolver,
 		runtime:            options.runtime,
 		runScriptsEnabled:  options.runScriptsEnabled,
 		managedCollections: map[collection.CollectionRef]runtimeDesiredView{},
 		managedRuntime:     map[agentskillsSpec.SkillDef]string{},
-		backgroundContext:  backgroundContext,
-		backgroundCancel:   backgroundCancel,
-		collectionRequests: map[collection.CollectionRef]collectionReconcileRequest{},
 	}
 	return value, nil
 }
@@ -192,13 +180,7 @@ func (s *SkillRuntime) Close() {
 		return
 	}
 	s.closed = true
-	cancel := s.backgroundCancel
 	s.lifecycleMu.Unlock()
-
-	if cancel != nil {
-		cancel()
-	}
-	s.backgroundWG.Wait()
 
 	s.rtResyncMu.Lock()
 	if s.runtime != nil && len(s.managedRuntime) != 0 {
@@ -226,42 +208,24 @@ func (s *SkillRuntime) Close() {
 	s.managedCollections = map[collection.CollectionRef]runtimeDesiredView{}
 	s.managedRuntime = map[agentskillsSpec.SkillDef]string{}
 	s.rtResyncMu.Unlock()
-
-	s.collectionRequestMu.Lock()
-	s.collectionRequests = nil
-	s.collectionRequestMu.Unlock()
 }
 
 func (s *SkillRuntime) ensureConfigured() error {
 	if s == nil {
 		return errors.New("skill runtime is not configured")
 	}
-	s.lifecycleMu.Lock()
+	s.lifecycleMu.RLock()
 	closed := s.closed
 	configured := s.resolver != nil && s.runtime != nil
-	s.lifecycleMu.Unlock()
+	s.lifecycleMu.RUnlock()
 	if closed || !configured {
 		return errors.New("skill runtime is not configured")
 	}
 	return nil
 }
 
-func (s *SkillRuntime) beginBackground() (context.Context, bool) {
-	s.lifecycleMu.Lock()
-	defer s.lifecycleMu.Unlock()
-	if s.closed || s.backgroundContext == nil {
-		return nil, false
-	}
-	s.backgroundWG.Add(1)
-	return s.backgroundContext, true
-}
-
-func (s *SkillRuntime) endBackground() {
-	s.backgroundWG.Done()
-}
-
 func (s *SkillRuntime) isClosed() bool {
-	s.lifecycleMu.Lock()
-	defer s.lifecycleMu.Unlock()
+	s.lifecycleMu.RLock()
+	defer s.lifecycleMu.RUnlock()
 	return s.closed
 }

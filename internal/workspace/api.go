@@ -15,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
@@ -1176,6 +1175,8 @@ func (a *API) enrichWorkspaceSourcePresentation(
 	output *WorkspaceView,
 	value spec.Workspace,
 ) error {
+	localPaths, supportsLocalPaths := a.dependencies.SourceRuntime.(source.LocalPathRuntime)
+
 	for index := range output.Attachments {
 		attachment := &output.Attachments[index]
 		var summaryFound bool
@@ -1187,7 +1188,10 @@ func (a *API) enrichWorkspaceSourcePresentation(
 			attachment.SourceDisplayName = summary.DisplayName
 			attachment.SourceKind = string(summary.Kind)
 			summaryFound = true
-			break
+			if !supportsLocalPaths ||
+				!localPaths.SupportsLocalPath(summary.Kind) {
+				break
+			}
 		}
 		if !summaryFound {
 			return fmt.Errorf(
@@ -1196,7 +1200,8 @@ func (a *API) enrichWorkspaceSourcePresentation(
 				attachment.SourceID,
 			)
 		}
-		if attachment.SourceKind != string(fsdir.Kind) {
+		if !supportsLocalPaths ||
+			!localPaths.SupportsLocalPath(basespec.SourceKind(attachment.SourceKind)) {
 			continue
 		}
 		if err := ctx.Err(); err != nil {
@@ -1220,7 +1225,7 @@ func (a *API) enrichWorkspaceSourcePresentation(
 		}
 		if sourceValue.ID != attachment.SourceID ||
 			sourceValue.RootID != value.Collection.RootID ||
-			sourceValue.Kind != fsdir.Kind {
+			sourceValue.Kind != basespec.SourceKind(attachment.SourceKind) {
 			attachment.Diagnostics = diagnostic.AppendDiagnostics(
 				attachment.Diagnostics,
 				workspaceSourcePresentationDiagnostic(
@@ -1231,17 +1236,6 @@ func (a *API) enrichWorkspaceSourcePresentation(
 			continue
 		}
 
-		localPaths, supported := a.dependencies.SourceRuntime.(source.LocalPathRuntime)
-		if !supported {
-			attachment.Diagnostics = diagnostic.AppendDiagnostics(
-				attachment.Diagnostics,
-				workspaceSourcePresentationDiagnostic(
-					"workspace.source.path-unavailable",
-					"the filesystem Source cannot provide a trusted native path",
-				),
-			)
-			continue
-		}
 		attachment.Path, err = localPaths.ResolveLocalPath(
 			ctx,
 			sourceValue,

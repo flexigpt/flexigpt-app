@@ -162,21 +162,21 @@ func (a *Adapter) ResolveLocalPath(
 func (a *Adapter) BootstrapManagedSource(
 	ctx context.Context,
 	value source.Source,
-) (string, error) {
+) error {
 	if err := ctx.Err(); err != nil {
-		return "", err
+		return err
 	}
 	if err := a.validateSource(ctx, value); err != nil {
-		return "", err
+		return err
 	}
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	if _, err := a.sourceRootPath(value, true); err != nil {
-		return "", err
+		return err
 	}
-	return a.confirmedGeneration(ctx, value)
+	return nil
 }
 
 func (a *Adapter) DiscardBootstrappedManagedSource(

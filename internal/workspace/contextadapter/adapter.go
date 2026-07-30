@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
@@ -167,7 +168,7 @@ func (p *Adapter) Compose(
 			})
 			continue
 		}
-		body, err := spec.DecodeDefinitionBody[contextDefinition](
+		body, err := definition.DecodeBody[contextDefinition](
 			item.Definition.Body,
 		)
 		if err != nil {
@@ -361,7 +362,7 @@ func projectContextDocument(
 	if err := ValidateContextDefinition(value.Definition); err != nil {
 		return output, err
 	}
-	body, err := spec.DecodeDefinitionBody[contextDefinition](
+	body, err := definition.DecodeBody[contextDefinition](
 		value.Definition.Body,
 	)
 	if err != nil {
@@ -380,7 +381,7 @@ func projectContext(
 	if err := ValidateContextDefinition(value.Definition); err != nil {
 		return ContextContribution{}, err
 	}
-	body, err := spec.DecodeDefinitionBody[contextDefinition](value.Definition.Body)
+	body, err := definition.DecodeBody[contextDefinition](value.Definition.Body)
 	if err != nil {
 		return ContextContribution{}, err
 	}

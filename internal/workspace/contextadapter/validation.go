@@ -44,7 +44,7 @@ func ValidateContextDefinition(
 		)
 	}
 
-	body, err := spec.DecodeDefinitionBody[contextDefinition](value.Body)
+	body, err := definition.DecodeBody[contextDefinition](value.Body)
 	if err != nil {
 		return err
 	}

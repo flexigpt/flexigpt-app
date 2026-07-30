@@ -4,23 +4,27 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type CollectionData struct {
-	SchemaVersion           string `json:"schemaVersion"`
-	DiscoveryPolicyRevision string `json:"discoveryPolicyRevision"`
+	SchemaVersion           string                  `json:"schemaVersion"`
+	DiscoveryPolicyRevision string                  `json:"discoveryPolicyRevision"`
+	LogicalName             basespec.LogicalName    `json:"logicalName"`
+	LogicalVersion          basespec.LogicalVersion `json:"logicalVersion,omitempty"`
+	Labels                  map[string]string       `json:"labels,omitempty"`
+}
 
-	// BootstrapKey is retained only to locate collections written before the
-	// durable Collection.IdempotencyKey was introduced. New bundle creation
-	// leaves this field empty. It is never a CollectionID, ArtifactID, or
-	// persistent Skill reference.
-	BootstrapKey string `json:"bootstrapKey,omitempty"`
+func (d CollectionData) Clone() CollectionData {
+	d.Labels = maps.Clone(d.Labels)
+	return d
 }
 
 func EncodeCollectionData(value CollectionData) (json.RawMessage, error) {
+	value = value.Clone()
 	if err := ValidateCollectionData(value); err != nil {
 		return nil, err
 	}
@@ -63,7 +67,7 @@ func DecodeCollectionData(
 	if err := ValidateCollectionData(value); err != nil {
 		return CollectionData{}, err
 	}
-	return value, nil
+	return value.Clone(), nil
 }
 
 func ValidateCollectionData(value CollectionData) error {
@@ -81,14 +85,12 @@ func ValidateCollectionData(value CollectionData) error {
 	); err != nil {
 		return err
 	}
-	if value.BootstrapKey != "" {
-		if err := basespec.ValidateIdentifier(
-			"skill bundle bootstrap key",
-			value.BootstrapKey,
-			basespec.MaxKindBytes,
-		); err != nil {
-			return err
-		}
+	if err := ValidatePortableBundleMetadata(PortableBundleMetadata{
+		LogicalName:    value.LogicalName,
+		LogicalVersion: value.LogicalVersion,
+		Labels:         value.Labels,
+	}); err != nil {
+		return err
 	}
 	return nil
 }

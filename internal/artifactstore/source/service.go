@@ -119,21 +119,12 @@ func (s *Service) Create(
 	}
 
 	if bootstrapper != nil {
-		generation, err := bootstrapper.BootstrapManagedSource(
+		if err := bootstrapper.BootstrapManagedSource(
 			ctx,
 			value.Clone(),
-		)
-		if err != nil {
+		); err != nil {
 			return Summary{}, cleanupBootstrap(err)
 		}
-		if err := basespec.ValidateSourceGeneration(generation); err != nil {
-			return Summary{}, cleanupBootstrap(fmt.Errorf(
-				"%w: managed Source bootstrap returned an invalid generation: %w",
-				basespec.ErrInvalid,
-				err,
-			))
-		}
-		value.ContentGeneration = generation
 	}
 
 	if err := value.Validate(); err != nil {
@@ -357,19 +348,14 @@ func (s *Service) Purge(
 	return s.repository.Purge(ctx, rootID, id, expectedRevision)
 }
 
-// MarkContentChanged acknowledges a snapshot generation after an
-// application-managed Source publication or removal changes visible content.
-//
-// It is intentionally a trusted internal operation. It does not expose Source
-// configuration. Persisting the acknowledged generation makes a source-side
-// mutation recoverable when the source write succeeded but the subsequent
-// metadata update was interrupted.
+// MarkContentChanged advances Source metadata after a successful managed
+// source-side mutation. The actual generation remains source-owned and is
+// read from a confirmed snapshot when needed.
 func (s *Service) MarkContentChanged(
 	ctx context.Context,
 	rootID basespec.RootID,
 	id basespec.SourceID,
 	expectedRevision uint64,
-	generation string,
 ) (Summary, error) {
 	if ctx == nil {
 		return Summary{}, fmt.Errorf(
@@ -392,9 +378,6 @@ func (s *Service) MarkContentChanged(
 			basespec.ErrInvalid,
 		)
 	}
-	if err := basespec.ValidateSourceGeneration(generation); err != nil {
-		return Summary{}, err
-	}
 
 	current, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
@@ -403,15 +386,11 @@ func (s *Service) MarkContentChanged(
 	if current.Revision != expectedRevision {
 		return Summary{}, basespec.ErrConflict
 	}
-	if current.ContentGeneration == generation {
-		return current.Summary(), nil
-	}
 	if current.Revision == ^uint64(0) {
 		return Summary{}, fmt.Errorf("%w: source revision is exhausted", basespec.ErrInvalid)
 	}
 
 	next := current.Clone()
-	next.ContentGeneration = generation
 	next.Revision++
 	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {

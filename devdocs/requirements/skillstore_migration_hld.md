@@ -34,16 +34,11 @@ Collection membership.
 Built-in bootstrap uses an immutable local Collection idempotency key stored
 and uniquely enforced by Artifact Store. The key is scoped by Root and
 Collection kind, is not a CollectionID or ArtifactID, is not portable content,
-and is not exposed through public views. Legacy `bootstrapKey` values in
-Collection data are read only as a compatibility lookup for already-created
-Collections; new writes do not duplicate the key in opaque Collection data.
+and is not exposed through public views.
 
-The standalone `internal/skillstore` package may remain temporarily as a
-legacy reference store and offline migration input. It is not an active
-application owner. Normal startup, runtime registration, assistant preset
-lookup, conversation resolution, inference hydration, and mutation workflows
-must not read from or write to it. No dual write, runtime fallback, or
-best-effort implicit import is permitted.
+The standalone Skill Store is removed from the application tree. This is a
+breaking reset. Normal startup never imports, interprets, or migrates legacy
+Skill Store records.
 
 Keeping the legacy package available does not imply legacy-data compatibility.
 A release must explicitly choose reset/versioning or a one-time importer for
@@ -667,12 +662,14 @@ release-complete:
       reconciliation must never remove a `skill.bundle` runtime partition.
 - [x] Persist bootstrap idempotency in Artifact Store rather than relying only
       on an in-process mutex or opaque Collection data.
+- [x] Remove observer-driven runtime synchronization. Runtime registration is
+      demand-driven from Artifact Store-backed Artifact resolution.
 - [x] Fail closed for unavailable or same-name-colliding Artifact Skill
       allow-list entries rather than silently dropping them.
 - [ ] Add deterministic Skill and bundle import/export only after the portable
       Collection Definition and content-closure contracts exist.
-- [ ] Decide and ship either a reset policy or a one-time offline importer for
-      legacy standalone Skill Store, assistant-preset, and conversation data.
+- [x] Use a clean `*_v1` application namespace and intentionally do not carry
+      standalone Skill Store, assistant-preset, or conversation data forward.
 
 ### 10.5 Deferred work
 

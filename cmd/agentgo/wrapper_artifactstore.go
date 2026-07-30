@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
@@ -17,8 +15,6 @@ import (
 type ArtifactStoreWrapper struct {
 	api        *artifactstore.API
 	components *system.Components
-	observerMu sync.Mutex
-	observers  []func()
 }
 
 func InitArtifactStoreWrapper(
@@ -269,38 +265,15 @@ func (w *ArtifactStoreWrapper) RemoveManagedSourcePackage(
 	)
 }
 
-func (w *ArtifactStoreWrapper) subscribeRootMutation(
-	observer func(basespec.RootID),
-) func() {
-	if w == nil {
-		return func() {}
-	}
-
-	w.observerMu.Lock()
-	defer w.observerMu.Unlock()
-	if w.api == nil {
-		return func() {}
-	}
-	unsubscribe := w.api.SubscribeRootMutation(observer)
-	w.observers = append(w.observers, unsubscribe)
-	return unsubscribe
-}
-
 func (w *ArtifactStoreWrapper) close() {
 	if w == nil {
 		return
 	}
 
-	w.observerMu.Lock()
-	for _, unsubscribe := range w.observers {
-		unsubscribe()
-	}
-	w.observers = nil
 	api := w.api
 	components := w.components
 	w.api = nil
 	w.components = nil
-	w.observerMu.Unlock()
 
 	if api != nil {
 		api.Close()

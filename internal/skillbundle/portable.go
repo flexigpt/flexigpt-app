@@ -1,16 +1,11 @@
 package skillbundle
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 )
 
@@ -43,9 +38,7 @@ func NewPortableBundleDefinition(
 	metadata PortableBundleMetadata,
 	members []definition.ContentRef,
 ) (definition.CollectionDefinition, error) {
-	body, err := json.Marshal(portableBundleBody{
-		MemberFormat: portableMemberFormat,
-	})
+	body, err := definition.EncodeBody(portableBundleBody{MemberFormat: portableMemberFormat})
 	if err != nil {
 		return definition.CollectionDefinition{}, err
 	}
@@ -78,6 +71,13 @@ func CanonicalizePortableBundleDefinition(
 	return canonical, nil
 }
 
+func ValidatePortableBundleMetadata(
+	metadata PortableBundleMetadata,
+) error {
+	_, err := NewPortableBundleDefinition(metadata, nil)
+	return err
+}
+
 func ValidatePortableBundleDefinition(
 	value definition.CollectionDefinition,
 ) error {
@@ -93,15 +93,9 @@ func ValidatePortableBundleDefinition(
 		)
 	}
 
-	var body portableBundleBody
-	decoder := json.NewDecoder(bytes.NewReader(value.Body))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&body); err != nil {
-		return fmt.Errorf("%w: decode portable Skill Bundle body: %w", basespec.ErrInvalid, err)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return fmt.Errorf("%w: portable Skill Bundle body has trailing JSON", basespec.ErrInvalid)
+	body, err := definition.DecodeBody[portableBundleBody](value.Body)
+	if err != nil {
+		return err
 	}
 	if body.MemberFormat != portableMemberFormat {
 		return fmt.Errorf(
@@ -144,35 +138,15 @@ func MarshalPortableBundleDefinition(
 	if err != nil {
 		return nil, err
 	}
-	raw, err := json.Marshal(canonical)
-	if err != nil {
-		return nil, err
-	}
-	return jsonutil.Canonicalize(raw)
+	return definition.MarshalCollectionDefinition(canonical)
 }
 
 func ParsePortableBundleDefinition(
 	raw []byte,
 ) (definition.CollectionDefinition, error) {
-	canonicalJSON, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxDefinitionBytes,
-	)
+	value, err := definition.ParseCollectionDefinition(raw)
 	if err != nil {
 		return definition.CollectionDefinition{}, err
-	}
-	decoder := json.NewDecoder(bytes.NewReader(canonicalJSON))
-	decoder.DisallowUnknownFields()
-	var value definition.CollectionDefinition
-	if err := decoder.Decode(&value); err != nil {
-		return definition.CollectionDefinition{}, err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return definition.CollectionDefinition{}, fmt.Errorf(
-			"%w: portable Skill Bundle JSON has trailing values",
-			basespec.ErrInvalid,
-		)
 	}
 	return CanonicalizePortableBundleDefinition(value)
 }

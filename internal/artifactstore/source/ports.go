@@ -155,14 +155,13 @@ type ManagedPackageWriter interface {
 // Source adapters that need to establish physical Source storage before the
 // Source metadata row is published.
 //
-// BootstrapManagedSource returns the initial snapshot generation that must be
-// persisted with the new Source. DiscardBootstrappedManagedSource compensates
-// only a failed metadata creation and must refuse to remove non-empty content.
+// DiscardBootstrappedManagedSource compensates only a failed metadata creation
+// and must refuse to remove non-empty content.
 type ManagedSourceBootstrapper interface {
 	BootstrapManagedSource(
 		ctx context.Context,
 		value Source,
-	) (generation string, err error)
+	) error
 
 	DiscardBootstrappedManagedSource(
 		ctx context.Context,

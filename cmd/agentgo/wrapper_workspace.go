@@ -3,12 +3,8 @@ package main
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"sync"
-	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
@@ -63,49 +59,6 @@ func InitWorkspaceWrapper(
 	return nil
 }
 
-// BindArtifactStoreWorkspaceSynchronization keeps the process-local Workspace
-// Skill Runtime view derived from Artifact Store mutations. The callback only
-// schedules reconciliation; durable Artifact Store mutations never depend on
-// runtime availability.
-func BindArtifactStoreWorkspaceSynchronization(
-	artifacts *ArtifactStoreWrapper,
-	workspaces *WorkspaceWrapper,
-) error {
-	if artifacts == nil || workspaces == nil {
-		return errors.New("artifact and workspace wrappers are required")
-	}
-	artifacts.subscribeRootMutation(
-		workspaces.syncWorkspaceSkillsForRoot,
-	)
-	return nil
-}
-
-// BindWorkspaceSkillRuntime is application composition. Workspace does not
-// import or know about skillruntime; the application wrapper decides whether
-// Workspace changes should be reflected in a running Skill runtime.
-func BindWorkspaceSkillRuntime(
-	wrapper *WorkspaceWrapper,
-	runtime *skillruntime.SkillRuntime,
-) error {
-	if wrapper == nil {
-		return errors.New("workspace wrapper is not initialized")
-	}
-	if runtime == nil {
-		return errors.New("skill runtime is nil")
-	}
-	wrapper.lifecycleMu.Lock()
-	if wrapper.closed || wrapper.api == nil {
-		wrapper.lifecycleMu.Unlock()
-		return errors.New("workspace wrapper is closed")
-	}
-	wrapper.skillRuntime = runtime
-
-	wrapper.lifecycleMu.Unlock()
-
-	wrapper.syncKnownWorkspaceSkills()
-	return nil
-}
-
 func (w *WorkspaceWrapper) CreateFilesystemWorkspace(
 	request *workspace.CreateFilesystemWorkspaceRequest,
 ) (*workspace.CreateFilesystemWorkspaceResponse, error) {
@@ -118,7 +71,7 @@ func (w *WorkspaceWrapper) CreateFilesystemWorkspace(
 		if response == nil || response.Body == nil {
 			return nil, errors.New("create filesystem Workspace returned an empty response")
 		}
-		w.syncWorkspaceSkills(response.Body.Workspace)
+
 		return response, nil
 	})
 }
@@ -135,7 +88,7 @@ func (w *WorkspaceWrapper) CreateEmptyWorkspace(
 		if response == nil || response.Body == nil {
 			return nil, errors.New("create empty Workspace returned an empty response")
 		}
-		w.syncWorkspaceSkills(response.Body.Workspace)
+
 		return response, nil
 	})
 }
@@ -165,7 +118,6 @@ func (w *WorkspaceWrapper) UpdateWorkspace(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
 
 		return response, nil
 	})
@@ -180,9 +132,7 @@ func (w *WorkspaceWrapper) ReplaceWorkspacePrimarySource(
 		if err != nil {
 			return nil, err
 		}
-		if request != nil {
-			w.syncWorkspaceSkills(request.Workspace)
-		}
+
 		return response, nil
 	})
 }
@@ -196,9 +146,7 @@ func (w *WorkspaceWrapper) SetWorkspacePrimarySource(
 		if err != nil {
 			return nil, err
 		}
-		if request != nil {
-			w.syncWorkspaceSkills(request.Workspace)
-		}
+
 		return response, nil
 	})
 }
@@ -212,7 +160,6 @@ func (w *WorkspaceWrapper) RetireWorkspace(
 		if err != nil {
 			return nil, err
 		}
-		w.removeWorkspaceSkills(request.Workspace)
 
 		return response, nil
 	})
@@ -227,9 +174,7 @@ func (w *WorkspaceWrapper) PurgeWorkspace(
 		if err != nil {
 			return nil, err
 		}
-		if request != nil {
-			w.removeWorkspaceSkills(request.Workspace)
-		}
+
 		return response, nil
 	})
 }
@@ -243,7 +188,7 @@ func (w *WorkspaceWrapper) AttachWorkspaceSource(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
+
 		return response, nil
 	})
 }
@@ -257,7 +202,7 @@ func (w *WorkspaceWrapper) UpdateWorkspaceAttachment(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
+
 		return response, nil
 	})
 }
@@ -271,7 +216,7 @@ func (w *WorkspaceWrapper) DetachWorkspaceSource(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
+
 		return response, nil
 	})
 }
@@ -285,7 +230,7 @@ func (w *WorkspaceWrapper) RefreshWorkspace(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
+
 		return response, nil
 	})
 }
@@ -345,7 +290,7 @@ func (w *WorkspaceWrapper) AdoptWorkspaceOccurrence(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
+
 		return response, nil
 	})
 }
@@ -359,7 +304,7 @@ func (w *WorkspaceWrapper) PinWorkspaceArtifact(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
+
 		return response, nil
 	})
 }
@@ -381,7 +326,7 @@ func (w *WorkspaceWrapper) SuppressWorkspaceBinding(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
+
 		return response, nil
 	})
 }
@@ -395,7 +340,7 @@ func (w *WorkspaceWrapper) UnsuppressWorkspaceBinding(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
+
 		return response, nil
 	})
 }
@@ -449,7 +394,7 @@ func (w *WorkspaceWrapper) SetWorkspaceArtifactEnabled(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
+
 		return response, nil
 	})
 }
@@ -463,7 +408,6 @@ func (w *WorkspaceWrapper) UnadoptWorkspaceArtifact(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
 
 		return response, nil
 	})
@@ -478,9 +422,7 @@ func (w *WorkspaceWrapper) PurgeWorkspaceArtifact(
 		if err != nil {
 			return nil, err
 		}
-		if request != nil {
-			w.syncWorkspaceSkills(request.Workspace)
-		}
+
 		return response, nil
 	})
 }
@@ -494,106 +436,9 @@ func (w *WorkspaceWrapper) SetWorkspaceArtifactRuntimeDisabled(
 		if err != nil {
 			return nil, err
 		}
-		w.syncWorkspaceSkills(request.Workspace)
 
 		return response, nil
 	})
-}
-
-func (w *WorkspaceWrapper) syncWorkspaceSkills(
-	ref collection.CollectionRef,
-) {
-	if w == nil || ref.Validate() != nil {
-		return
-	}
-	w.lifecycleMu.Lock()
-	if w.closed || w.api == nil || w.skillRuntime == nil ||
-		w.bootstrapContext == nil {
-		w.lifecycleMu.Unlock()
-		return
-	}
-	runtime := w.skillRuntime
-	w.lifecycleMu.Unlock()
-	runtime.RequestCollectionResync(ref)
-}
-
-func (w *WorkspaceWrapper) syncWorkspaceSkillsForRoot(
-	rootID basespec.RootID,
-) {
-	if err := basespec.ValidateRootID(rootID); err != nil {
-		return
-	}
-	w.scheduleWorkspaceSkillSynchronization(rootID, true)
-}
-
-func (w *WorkspaceWrapper) syncKnownWorkspaceSkills() {
-	w.scheduleWorkspaceSkillSynchronization("", false)
-}
-
-func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
-	rootID basespec.RootID,
-	filterRoot bool,
-) {
-	if w == nil {
-		return
-	}
-
-	w.lifecycleMu.Lock()
-	if w.closed || w.api == nil || w.skillRuntime == nil ||
-		w.bootstrapContext == nil {
-		w.lifecycleMu.Unlock()
-		return
-	}
-	api := w.api
-	parent := w.bootstrapContext
-
-	w.bootstrapWG.Add(1)
-	w.lifecycleMu.Unlock()
-
-	go func() {
-		defer w.bootstrapWG.Done()
-		ctx, cancel := context.WithTimeout(parent, 30*time.Second)
-		defer cancel()
-
-		refs, err := api.WorkspaceRefs(ctx)
-		if err != nil {
-			slog.Error(
-				"list Workspaces for Skill runtime reconciliation",
-				"error",
-				err,
-			)
-			return
-		}
-		if err := ctx.Err(); err != nil {
-			return
-		}
-
-		for _, ref := range refs {
-			if filterRoot && ref.RootID != rootID {
-				continue
-			}
-
-			//nolint:contextcheck // Background.
-			w.syncWorkspaceSkills(ref)
-		}
-	}()
-}
-
-func (w *WorkspaceWrapper) removeWorkspaceSkills(
-	ref collection.CollectionRef,
-) {
-	if w == nil || ref.Validate() != nil {
-		return
-	}
-	w.lifecycleMu.Lock()
-	if w.closed || w.skillRuntime == nil {
-		w.lifecycleMu.Unlock()
-		return
-	}
-	runtime := w.skillRuntime
-
-	w.lifecycleMu.Unlock()
-	runtime.RequestCollectionRemoval(ref)
 }
 
 func (w *WorkspaceWrapper) close() {

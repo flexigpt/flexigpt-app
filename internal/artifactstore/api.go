@@ -4,35 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
-	"slices"
-	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 )
-
-type rootMutationObserver struct {
-	observer func(basespec.RootID)
-
-	pending map[basespec.RootID]struct{}
-	wake    chan struct{}
-	done    chan struct{}
-	stopped bool
-}
 
 // API provides the transport-independent Artifact Store API.
 //
 // The caller owns the lifecycle of the supplied Components.
 type API struct {
 	components *system.Components
-
-	mutationMu        sync.Mutex
-	mutationObservers map[uint64]*rootMutationObserver
-	nextObserverID    uint64
-	ownedObserverID   uint64
-	closed            bool
 }
 
 func New(components *system.Components) (*API, error) {
@@ -41,8 +22,7 @@ func New(components *system.Components) (*API, error) {
 	}
 
 	return &API{
-		components:        components,
-		mutationObservers: map[uint64]*rootMutationObserver{},
+		components: components,
 	}, nil
 }
 
@@ -54,8 +34,6 @@ func (a *API) CreateArtifactRoot(
 	if err != nil {
 		return nil, err
 	}
-
-	a.notifyRootMutation(value.ID)
 
 	return &CreateArtifactRootResponse{
 		Body: &value,
@@ -230,9 +208,6 @@ func (a *API) UpdateArtifactSource(
 	if err != nil {
 		return nil, err
 	}
-	if value.Revision != request.Body.ExpectedRevision {
-		a.notifyRootMutation(request.RootID)
-	}
 
 	return &UpdateArtifactSourceResponse{
 		Body: &value,
@@ -328,9 +303,6 @@ func (a *API) PublishManagedSourcePackage(
 	if err != nil {
 		return nil, err
 	}
-	if result.Source.Revision != request.Body.ExpectedSourceRevision {
-		a.notifyRootMutation(request.RootID)
-	}
 
 	return &PublishManagedSourcePackageResponse{
 		Body: &PublishManagedSourcePackageResponseBody{
@@ -355,9 +327,6 @@ func (a *API) RemoveManagedSourcePackage(
 	if err != nil {
 		return nil, err
 	}
-	if result.Source.Revision != request.ExpectedSourceRevision {
-		a.notifyRootMutation(request.RootID)
-	}
 
 	return &RemoveManagedSourcePackageResponse{
 		Body: &RemoveManagedSourcePackageResponseBody{
@@ -367,215 +336,6 @@ func (a *API) RemoveManagedSourcePackage(
 	}, nil
 }
 
-// Close stops future mutation-observer delivery. It does not close Components,
-// whose lifecycle remains owned by the caller.
-func (a *API) Close() {
-	if a == nil {
-		return
-	}
-
-	a.mutationMu.Lock()
-	defer a.mutationMu.Unlock()
-	if a.closed {
-		return
-	}
-	a.closed = true
-	for id := range a.mutationObservers {
-		a.stopRootMutationObserverLocked(id)
-	}
-	a.ownedObserverID = 0
-}
-
-// SubscribeRootMutation registers an independent application-level listener.
-// Delivery is asynchronous and coalesced per observer and Root. The returned
-// function is idempotent and may be called during shutdown.
-func (a *API) SubscribeRootMutation(
-	observer func(basespec.RootID),
-) func() {
-	if a == nil || observer == nil {
-		return func() {}
-	}
-
-	registration := &rootMutationObserver{
-		observer: observer,
-		pending:  map[basespec.RootID]struct{}{},
-		wake:     make(chan struct{}, 1),
-		done:     make(chan struct{}),
-	}
-
-	a.mutationMu.Lock()
-	if a.closed {
-		a.mutationMu.Unlock()
-		return func() {}
-	}
-	a.nextObserverID++
-	id := a.nextObserverID
-	a.mutationObservers[id] = registration
-	a.mutationMu.Unlock()
-
-	go a.runRootMutationObserver(registration)
-
-	return func() {
-		a.unsubscribeRootMutation(id)
-	}
-}
-
-// SetRootMutationObserver remains only for callers that require one owned
-// observer slot. New feature composition must use SubscribeRootMutation.
-func (a *API) SetRootMutationObserver(
-	observer func(basespec.RootID),
-) {
-	if a == nil {
-		return
-	}
-
-	var registration *rootMutationObserver
-	a.mutationMu.Lock()
-	if a.closed {
-		a.mutationMu.Unlock()
-		return
-	}
-	if a.ownedObserverID != 0 {
-		a.stopRootMutationObserverLocked(a.ownedObserverID)
-		a.ownedObserverID = 0
-	}
-	if observer != nil {
-		a.nextObserverID++
-		a.ownedObserverID = a.nextObserverID
-		registration = &rootMutationObserver{
-			observer: observer,
-			pending:  map[basespec.RootID]struct{}{},
-			wake:     make(chan struct{}, 1),
-			done:     make(chan struct{}),
-		}
-		a.mutationObservers[a.ownedObserverID] = registration
-	}
-	a.mutationMu.Unlock()
-
-	if registration != nil {
-		go a.runRootMutationObserver(registration)
-	}
-}
-
-// notifyRootMutation delivers a post-commit invalidation. Delivery is
-// asynchronous and bounded: observer latency or failure must not alter a
-// completed durable Artifact Store mutation. Observers must re-read current
-// state and tolerate coalesced notifications for the same Root.
-func (a *API) notifyRootMutation(rootID basespec.RootID) {
-	if a == nil {
-		return
-	}
-
-	a.mutationMu.Lock()
-	defer a.mutationMu.Unlock()
-	if a.closed {
-		return
-	}
-	for _, registration := range a.mutationObservers {
-		if registration.stopped {
-			continue
-		}
-		if registration.pending == nil {
-			registration.pending = map[basespec.RootID]struct{}{}
-		}
-		registration.pending[rootID] = struct{}{}
-		select {
-		case registration.wake <- struct{}{}:
-		default:
-		}
-	}
-}
-
-func (a *API) unsubscribeRootMutation(id uint64) {
-	if a == nil {
-		return
-	}
-	a.mutationMu.Lock()
-	a.stopRootMutationObserverLocked(id)
-	a.mutationMu.Unlock()
-}
-
-func (a *API) stopRootMutationObserverLocked(id uint64) {
-	registration, exists := a.mutationObservers[id]
-	if !exists {
-		return
-	}
-	delete(a.mutationObservers, id)
-	registration.stopped = true
-	registration.pending = nil
-	close(registration.done)
-}
-
-func (a *API) runRootMutationObserver(
-	registration *rootMutationObserver,
-) {
-	for {
-		select {
-		case <-registration.done:
-			return
-		case <-registration.wake:
-		}
-
-		for {
-			rootIDs, active := a.takePendingRootMutations(registration)
-			if !active {
-				return
-			}
-			if len(rootIDs) == 0 {
-				break
-			}
-			for _, rootID := range rootIDs {
-				if !a.rootMutationObserverActive(registration) {
-					return
-				}
-				a.invokeRootMutationObserver(
-					registration.observer,
-					rootID,
-				)
-			}
-		}
-	}
-}
-
-func (a *API) takePendingRootMutations(
-	registration *rootMutationObserver,
-) ([]basespec.RootID, bool) {
-	a.mutationMu.Lock()
-	defer a.mutationMu.Unlock()
-	if a.closed || registration.stopped {
-		return nil, false
-	}
-
-	rootIDs := make([]basespec.RootID, 0, len(registration.pending))
-	for rootID := range registration.pending {
-		rootIDs = append(rootIDs, rootID)
-	}
-	registration.pending = map[basespec.RootID]struct{}{}
-	slices.Sort(rootIDs)
-	return rootIDs, true
-}
-
-func (a *API) rootMutationObserverActive(
-	registration *rootMutationObserver,
-) bool {
-	a.mutationMu.Lock()
-	active := !a.closed && !registration.stopped
-	a.mutationMu.Unlock()
-	return active
-}
-
-func (a *API) invokeRootMutationObserver(
-	observer func(basespec.RootID),
-	rootID basespec.RootID,
-) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			slog.Error(
-				"artifact store root mutation observer panicked",
-				"rootID", rootID,
-				"panic", recovered,
-			)
-		}
-	}()
-	observer(rootID)
-}
+// Close exists for transport lifecycle symmetry. Components remain owned and
+// closed by the application composition root.
+func (*API) Close() {}

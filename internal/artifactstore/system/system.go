@@ -369,7 +369,7 @@ func (c *Components) PublishManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
-
+	requestedGeneration := normalizedPublication.ExpectedGeneration
 	value, err := c.managedSource(
 		ctx,
 		rootID,
@@ -389,18 +389,8 @@ func (c *Components) PublishManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
-	if repaired, err := c.reconcileManagedContentGeneration(
-		ctx,
-		value,
-		expectedSourceRevision,
-		beforeGeneration,
-	); err != nil {
-		return ManagedPackageResult{}, err
-	} else if repaired {
-		return ManagedPackageResult{}, fmt.Errorf(
-			"%w: managed Source metadata was repaired; reload and retry publication",
-			basespec.ErrConflict,
-		)
+	if publication.ExpectedGeneration == "" {
+		publication.ExpectedGeneration = beforeGeneration
 	}
 
 	generation, err := c.managedSources.PublishPackage(
@@ -416,7 +406,10 @@ func (c *Components) PublishManagedPackage(
 		Source:     value.Summary(),
 		Generation: generation,
 	}
-	if generation == value.ContentGeneration {
+	contentChanged := generation != beforeGeneration ||
+		(requestedGeneration != "" &&
+			requestedGeneration != beforeGeneration)
+	if !contentChanged {
 		return result, nil
 	}
 
@@ -425,7 +418,6 @@ func (c *Components) PublishManagedPackage(
 		rootID,
 		sourceID,
 		expectedSourceRevision,
-		generation,
 	)
 	if err != nil {
 		return ManagedPackageResult{}, err
@@ -469,7 +461,7 @@ func (c *Components) RemoveManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
-	if beforeGeneration != value.ContentGeneration {
+	if beforeGeneration != expectedGeneration {
 		exists, err := managedPackageExists(
 			ctx,
 			c.SourceRuntime,
@@ -479,26 +471,25 @@ func (c *Components) RemoveManagedPackage(
 		if err != nil {
 			return ManagedPackageResult{}, err
 		}
+		if exists {
+			return ManagedPackageResult{}, fmt.Errorf(
+				"%w: managed Source changed before package removal",
+				basespec.ErrConflict,
+			)
+		}
 		updated, err := c.Sources.MarkContentChanged(
 			ctx,
 			rootID,
 			sourceID,
 			expectedSourceRevision,
-			beforeGeneration,
 		)
 		if err != nil {
 			return ManagedPackageResult{}, err
 		}
-		if !exists {
-			return ManagedPackageResult{
-				Source:     updated,
-				Generation: beforeGeneration,
-			}, nil
-		}
-		return ManagedPackageResult{}, fmt.Errorf(
-			"%w: managed Source content changed before package removal; reload and retry",
-			basespec.ErrConflict,
-		)
+		return ManagedPackageResult{
+			Source:     updated,
+			Generation: beforeGeneration,
+		}, nil
 	}
 
 	if err := c.managedSources.RemovePackage(
@@ -514,12 +505,17 @@ func (c *Components) RemoveManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
+	if generation == beforeGeneration {
+		return ManagedPackageResult{
+			Source:     value.Summary(),
+			Generation: generation,
+		}, nil
+	}
 	updated, err := c.Sources.MarkContentChanged(
 		ctx,
 		rootID,
 		sourceID,
 		expectedSourceRevision,
-		generation,
 	)
 	if err != nil {
 		return ManagedPackageResult{}, err
@@ -547,32 +543,6 @@ func (c *Components) Close() error {
 		}
 	}
 	return errors.Join(closeErrors...)
-}
-
-// reconcileManagedContentGeneration repairs metadata after a successful
-// source-side publication was not acknowledged before a process crash,
-// cancellation, or transient database failure. It never silently continues a
-// second mutation against an unacknowledged source generation.
-func (c *Components) reconcileManagedContentGeneration(
-	ctx context.Context,
-	value source.Source,
-	expectedSourceRevision uint64,
-	observedGeneration string,
-) (bool, error) {
-	if value.ContentGeneration == observedGeneration {
-		return false, nil
-	}
-
-	if _, err := c.Sources.MarkContentChanged(
-		ctx,
-		value.RootID,
-		value.ID,
-		expectedSourceRevision,
-		observedGeneration,
-	); err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 func managedPackageExists(

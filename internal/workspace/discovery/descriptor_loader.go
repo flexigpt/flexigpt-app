@@ -192,7 +192,7 @@ func (l *DescriptorLoader) Load(
 		)
 	}
 
-	body, err := spec.DecodeDefinitionBody[descriptorBody](descriptor.Body)
+	body, err := definition.DecodeBody[descriptorBody](descriptor.Body)
 	if err != nil {
 		return DescriptorObservation{}, fmt.Errorf(
 			"%w: %w",
