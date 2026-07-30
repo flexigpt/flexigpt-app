@@ -104,7 +104,7 @@ func NewSkillRuntime(
 		return nil, errors.New("artifact skill resolver is required")
 	}
 	if options.runtime == nil {
-		runScriptsEnabled := true
+		runScriptsEnabled := false
 		if options.runScriptsConfigured {
 			runScriptsEnabled = options.runScriptsEnabled
 		}

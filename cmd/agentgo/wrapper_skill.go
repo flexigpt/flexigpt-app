@@ -412,29 +412,33 @@ func BindArtifactStoreSkillBundleSynchronization(
 }
 
 func (w *SkillBundleWrapper) syncBundle(ref collection.CollectionRef) {
-	if w == nil {
+	if w == nil || ref.Validate() != nil {
 		return
 	}
 	w.mu.Lock()
+	if w.api == nil || w.runtime == nil || w.managed == nil {
+		w.mu.Unlock()
+		return
+	}
 	runtime := w.runtime
 	w.managed[ref] = struct{}{}
 	w.mu.Unlock()
-	if runtime != nil {
-		runtime.RequestCollectionResync(ref)
-	}
+	runtime.RequestCollectionResync(ref)
 }
 
 func (w *SkillBundleWrapper) removeBundle(ref collection.CollectionRef) {
-	if w == nil || w.runtime == nil {
+	if w == nil || ref.Validate() != nil {
 		return
 	}
 	w.mu.Lock()
 	runtime := w.runtime
+	if runtime == nil {
+		w.mu.Unlock()
+		return
+	}
 	delete(w.managed, ref)
 	w.mu.Unlock()
-	if runtime != nil {
-		runtime.RequestCollectionRemoval(ref)
-	}
+	runtime.RequestCollectionRemoval(ref)
 }
 
 func (w *SkillBundleWrapper) syncKnownSkillBundles() {
@@ -462,6 +466,13 @@ func (w *SkillBundleWrapper) scheduleBundleSynchronization(
 	}
 	api := w.api
 	parent := w.bootstrapContext
+	managed := make([]collection.CollectionRef, 0, len(w.managed))
+	for ref := range w.managed {
+		if filterRoot && ref.RootID != rootID {
+			continue
+		}
+		managed = append(managed, ref)
+	}
 	w.bootstrapWG.Add(1)
 	w.mu.Unlock()
 
@@ -488,16 +499,8 @@ func (w *SkillBundleWrapper) scheduleBundleSynchronization(
 			w.syncBundle(ref)
 		}
 
-		w.mu.Lock()
-		managed := make([]collection.CollectionRef, 0, len(w.managed))
-		for ref := range w.managed {
-			if filterRoot && ref.RootID != rootID {
-				continue
-			}
-			managed = append(managed, ref)
-		}
-		w.mu.Unlock()
-
+		// Do not include bundles created after this scan started. A later
+		// reconciliation owns those refs and must not be removed by stale data.
 		for _, ref := range managed {
 			if _, exists := active[ref]; !exists {
 				//nolint:contextcheck // Background.
@@ -550,13 +553,15 @@ func (w *SkillBundleWrapper) close() {
 	w.bootstrapContext = nil
 	w.runtime = nil
 	w.api = nil
-	w.managed = nil
 	w.mu.Unlock()
 
 	if cancel != nil {
 		cancel()
 	}
 	w.bootstrapWG.Wait()
+	w.mu.Lock()
+	w.managed = nil
+	w.mu.Unlock()
 	if runtime != nil {
 		runtime.Close()
 	}

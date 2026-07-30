@@ -520,9 +520,11 @@ tool.
 | Shared `agent.skill` definition    | Present                             | `skillartifact` owns shared `SKILL.md` parsing and canonical definition validation for Workspace and Skill Bundle discovery.                                                                                                                                                |
 | External Source linkage            | Present                             | External filesystem content is attached as an Artifact Store Source and represented by a relative Source Binding.                                                                                                                                                           |
 | Built-in hydration                 | Present through managed Source      | Built-ins bootstrap normal managed Sources, Skill Bundle Collections, and Artifacts.                                                                                                                                                                                        |
+| Built-in package upgrades          | Deferred                            | Bootstrap is idempotent add-missing setup, not an in-place package upgrade protocol. Changed built-in package content requires an explicit versioned upgrade workflow.                                                                                                      |
 | Built-in normal Collection state   | Present                             | Built-in enablement uses normal Collection and Artifact enablement.                                                                                                                                                                                                         |
 | Agent Skills runtime               | Present                             | Artifact router resolution, registration, sessions, prompts, rendering, resources, and scripts are Artifact-backed.                                                                                                                                                         |
-| Runtime source verification        | Present                             | Runtime handoff verifies the current catalog occurrence and Source generation through the Source runtime, then delegates native package parsing, resource access, sandboxing, and script execution to `agentskills-go`.                                                     |
+| Runtime source verification        | Present                             | Runtime handoff verifies current catalog occurrence, Source generation, and raw `SKILL.md` content digest through Source snapshots, then delegates native package parsing, resource access, sandboxing, and script execution to `agentskills-go`.                           |
+| Script execution policy            | Present and explicit                | Artifact-backed runtime defaults to scripts disabled. Explicit application composition may enable scripts, while `agentskills-go` and `llmtools-go` retain all execution and sandbox policy.                                                                                |
 | Artifact-backed backend references | Present                             | Assistant presets, conversations, inference, Workspace, and Skill Runtime use Artifact-backed Skill references.                                                                                                                                                             |
 | Legacy Skill Store                 | Reference-only                      | `internal/skillstore` remains migration input and implementation reference only. It is not an active startup, runtime, lookup, or mutation dependency.                                                                                                                      |
 | Same-name policy                   | Partial                             | Aggregate listing marks simultaneously eligible same-name Skills unavailable, and runtime resolution withholds ambiguous durable references. A unified migrated-Collection precedence policy remains deferred.                                                              |
@@ -531,7 +533,7 @@ tool.
 | Inference integration              | Present                             | Inference resolves Artifact-backed Skill allow-lists, Workspace usage, sessions, prompts, and Skill tools through Skill Runtime.                                                                                                                                            |
 | Legacy-data migration              | Reset gate present, importer absent | Assistant presets and conversations use Artifact-reference-specific schema versions. Existing standalone Skill Store and older conversation data still require an explicit reset or offline importer.                                                                       |
 | Individual Skill import and export | Not present                         | There is no native Skill transfer service or package closure builder.                                                                                                                                                                                                       |
-| Skill bundle import and export     | Not present                         | There is no portable bundle manifest, relative member resolver, or deterministic archive workflow.                                                                                                                                                                          |
+| Skill bundle import and export     | Not present                         | Canonical linked `skill.bundle.v1` manifest JSON exists, but there is no package-closure builder, member acquisition resolver, importer, exporter, or deterministic archive workflow.                                                                                       |
 | Ordered metadata migrations        | Not present                         | User Skills use a single map-file schema and built-ins use a separate overlay database.                                                                                                                                                                                     |
 
 ## 10. Breaking migration plan
@@ -663,9 +665,13 @@ release-complete:
 
 Portable Skill and Skill bundle import, export, content closure assembly,
 archive handling, URI acquisition, and direct Artifact movement remain separate
-work after the breaking core migration. Their generic requirements belong to
-Artifact Store. This document retains only the Skill-specific package,
-manifest, and closure rules.
+work after the breaking core migration. The canonical linked manifest is a
+shareable JSON descriptor, not a self-contained export. Their generic
+requirements belong to Artifact Store. This document retains only the
+Skill-specific package, manifest, and closure rules.
+
+Built-in package upgrades also require an explicit versioned publication and
+Artifact reconciliation policy. Bootstrap must not be treated as an upgrader.
 
 ### 10.6 Next-round verification gate
 
@@ -688,8 +694,10 @@ the backend migration clean:
 - Deleting a managed Skill removes source package content and local metadata
   without allowing refresh to recreate the deleted Skill.
 - Runtime handoff delegates package parsing and runtime behavior to
-  `agentskills-go`; it must not introduce custom parsing, sandboxing,
-  executable-file, symlink, or cross-platform path policy.
+  `agentskills-go`; Source snapshots verify the catalogued raw `SKILL.md`
+  digest before native-path handoff. Feature code must not introduce custom
+  parsing, sandboxing, executable-file, symlink, or cross-platform path
+  policy.
 - MapStore-managed definition files are accessed only through MapStore. Feature
   code must not recreate MapStore path, symlink, permission, or durability
   handling.
@@ -697,7 +705,8 @@ the backend migration clean:
 - Feature synchronization tracks only Collections owned by that feature and
   cannot remove another feature's runtime registrations.
 - The runtime rejects a stale registration when the same `SkillDef` has a
-  different resolved Artifact version.
+  different resolved Artifact version, including a changed local Artifact
+  revision.
 - Legacy Skill Store data can only be read through the chosen explicit
   migration or diagnostic path.
 - Portable `skill.bundle` JSON remains a canonical linked manifest until

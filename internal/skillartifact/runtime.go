@@ -8,6 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 // ResolveRuntimePackage converts a verified Skill source locator into the
@@ -23,6 +24,7 @@ func ResolveRuntimePackage(
 	locator basespec.Locator,
 	subresource basespec.SubresourceLocator,
 	expectedGeneration string,
+	expectedContentDigest cryptoutil.Digest,
 ) (string, error) {
 	if ctx == nil {
 		return "", fmt.Errorf(
@@ -65,11 +67,14 @@ func ResolveRuntimePackage(
 		)
 	}
 
-	if err := source.ConfirmSnapshotGeneration(
+	if err := source.VerifySnapshotContentDigest(
 		ctx,
 		runtime,
 		value,
+		locator,
 		expectedGeneration,
+		expectedContentDigest,
+		basespec.MaxCandidateBytes,
 	); err != nil {
 		return "", err
 	}
@@ -91,11 +96,17 @@ func ResolveRuntimePackage(
 		return "", err
 	}
 
-	if err := source.ConfirmSnapshotGeneration(
+	// Keep source generation and byte-integrity verification at the Source
+	// boundary. The Agent Skills provider still owns SKILL.md parsing,
+	// resources, sandboxing, and script execution after this handoff.
+	if err := source.VerifySnapshotContentDigest(
 		ctx,
 		runtime,
 		value,
+		locator,
 		expectedGeneration,
+		expectedContentDigest,
+		basespec.MaxCandidateBytes,
 	); err != nil {
 		return "", err
 	}

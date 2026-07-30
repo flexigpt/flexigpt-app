@@ -24,6 +24,9 @@ type WorkspaceWrapper struct {
 	bootstrapContext context.Context
 	bootstrapCancel  context.CancelFunc
 	bootstrapWG      sync.WaitGroup
+
+	// "managed" contains only Workspace-owned runtime partitions.
+	managed map[collection.CollectionRef]struct{}
 }
 
 func InitWorkspaceWrapper(
@@ -52,9 +55,14 @@ func InitWorkspaceWrapper(
 		return err
 	}
 	bootstrapContext, bootstrapCancel := context.WithCancel(context.Background())
+	wrapper.lifecycleMu.Lock()
+	wrapper.closed = false
 	wrapper.bootstrapContext = bootstrapContext
 	wrapper.bootstrapCancel = bootstrapCancel
 	wrapper.api = api
+	wrapper.skillRuntime = nil
+	wrapper.managed = map[collection.CollectionRef]struct{}{}
+	wrapper.lifecycleMu.Unlock()
 	return nil
 }
 
@@ -82,18 +90,21 @@ func BindWorkspaceSkillRuntime(
 	wrapper *WorkspaceWrapper,
 	runtime *skillruntime.SkillRuntime,
 ) error {
-	if wrapper == nil || wrapper.api == nil {
+	if wrapper == nil {
 		return errors.New("workspace wrapper is not initialized")
 	}
 	if runtime == nil {
 		return errors.New("skill runtime is nil")
 	}
 	wrapper.lifecycleMu.Lock()
-	if wrapper.closed {
+	if wrapper.closed || wrapper.api == nil {
 		wrapper.lifecycleMu.Unlock()
 		return errors.New("workspace wrapper is closed")
 	}
 	wrapper.skillRuntime = runtime
+	if wrapper.managed == nil {
+		wrapper.managed = map[collection.CollectionRef]struct{}{}
+	}
 	wrapper.lifecycleMu.Unlock()
 
 	wrapper.syncKnownWorkspaceSkills()
@@ -497,19 +508,18 @@ func (w *WorkspaceWrapper) SetWorkspaceArtifactRuntimeDisabled(
 func (w *WorkspaceWrapper) syncWorkspaceSkills(
 	ref collection.CollectionRef,
 ) {
-	if w == nil {
+	if w == nil || ref.Validate() != nil {
 		return
 	}
 	w.lifecycleMu.Lock()
-	closed := w.closed
+	if w.closed || w.api == nil || w.skillRuntime == nil ||
+		w.managed == nil {
+		w.lifecycleMu.Unlock()
+		return
+	}
 	runtime := w.skillRuntime
+	w.managed[ref] = struct{}{}
 	w.lifecycleMu.Unlock()
-	if closed {
-		return
-	}
-	if runtime == nil {
-		return
-	}
 	runtime.RequestCollectionResync(ref)
 }
 
@@ -541,8 +551,14 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 		return
 	}
 	api := w.api
-	runtime := w.skillRuntime
 	parent := w.bootstrapContext
+	managed := make([]collection.CollectionRef, 0, len(w.managed))
+	for ref := range w.managed {
+		if filterRoot && ref.RootID != rootID {
+			continue
+		}
+		managed = append(managed, ref)
+	}
 	w.bootstrapWG.Add(1)
 	w.lifecycleMu.Unlock()
 
@@ -571,18 +587,18 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 			}
 			active[ref] = struct{}{}
 			//nolint:contextcheck // Background.
-			runtime.RequestCollectionResync(ref)
+			w.syncWorkspaceSkills(ref)
 		}
 
-		for _, ref := range runtime.ManagedCollectionRefs() {
-			if filterRoot && ref.RootID != rootID {
-				continue
-			}
+		// Only remove Workspace partitions that this wrapper managed before
+		// this scan began. Runtime.ManagedCollectionRefs is cross-feature and
+		// must never be used as a Workspace deletion list.
+		for _, ref := range managed {
 			if _, exists := active[ref]; exists {
 				continue
 			}
 			//nolint:contextcheck // Background.
-			runtime.RequestCollectionRemoval(ref)
+			w.removeWorkspaceSkills(ref)
 		}
 	}()
 }
@@ -590,21 +606,22 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 func (w *WorkspaceWrapper) removeWorkspaceSkills(
 	ref collection.CollectionRef,
 ) {
-	if w == nil {
+	if w == nil || ref.Validate() != nil {
 		return
 	}
 	w.lifecycleMu.Lock()
-	closed := w.closed
-	runtime := w.skillRuntime
-	w.lifecycleMu.Unlock()
-	if closed || runtime == nil {
+	if w.closed || w.skillRuntime == nil {
+		w.lifecycleMu.Unlock()
 		return
 	}
+	runtime := w.skillRuntime
+	delete(w.managed, ref)
+	w.lifecycleMu.Unlock()
 	runtime.RequestCollectionRemoval(ref)
 }
 
 func (w *WorkspaceWrapper) close() {
-	if w == nil || w.api == nil {
+	if w == nil {
 		return
 	}
 	w.lifecycleMu.Lock()
@@ -623,6 +640,9 @@ func (w *WorkspaceWrapper) close() {
 		cancel()
 	}
 	w.bootstrapWG.Wait()
+	w.lifecycleMu.Lock()
+	w.managed = nil
+	w.lifecycleMu.Unlock()
 	if api != nil {
 		_ = api.Close()
 	}

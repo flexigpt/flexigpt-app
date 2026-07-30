@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
@@ -124,10 +123,8 @@ func ValidatePortableBundleDefinition(
 			)
 		}
 		if member.Locator != "" {
-			if !strings.EqualFold(
-				path.Base(string(member.Locator)),
-				skillartifact.DefinitionFileName,
-			) || path.Dir(string(member.Locator)) == "." {
+			if path.Base(string(member.Locator)) != skillartifact.DefinitionFileName ||
+				path.Dir(string(member.Locator)) == "." {
 				return fmt.Errorf(
 					"%w: portable Skill Bundle member %d must locate a package %q",
 					basespec.ErrInvalid,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"path"
 	"slices"
 	"sort"
@@ -242,7 +241,7 @@ func (e *Engine) Discover(
 			)
 		}
 
-		content, err := readEntry(
+		content, err := source.ReadSnapshotEntry(
 			ctx,
 			snapshot,
 			entry,
@@ -925,41 +924,6 @@ func isDirectChild(
 	prefix := string(parent) + "/"
 	relative, found := strings.CutPrefix(string(child), prefix)
 	return found && relative != "" && !strings.Contains(relative, "/")
-}
-
-func readEntry(
-	ctx context.Context,
-	snapshot source.Snapshot,
-	entry source.Entry,
-	maximum int64,
-) ([]byte, error) {
-	reader, err := snapshot.Open(ctx, entry.Locator)
-	if err != nil {
-		return nil, err
-	}
-	content, readErr := io.ReadAll(io.LimitReader(reader, maximum+1))
-	closeErr := reader.Close()
-	if readErr != nil {
-		return nil, readErr
-	}
-	if closeErr != nil {
-		return nil, closeErr
-	}
-	if int64(len(content)) > maximum {
-		return nil, fmt.Errorf(
-			"%w: candidate %q exceeds byte limit",
-			basespec.ErrInvalid,
-			entry.Locator,
-		)
-	}
-	if int64(len(content)) != entry.SizeBytes {
-		return nil, fmt.Errorf(
-			"%w: candidate %q changed size during discovery",
-			basespec.ErrConflict,
-			entry.Locator,
-		)
-	}
-	return content, nil
 }
 
 func applyInvalidForLocator(

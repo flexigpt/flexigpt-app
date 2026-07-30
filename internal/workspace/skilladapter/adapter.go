@@ -428,6 +428,7 @@ func (f *Adapter) resolveRuntimeLocation(
 		item.Artifact.Binding.Locator,
 		item.Artifact.Binding.SubresourceLocator,
 		item.SourceGeneration,
+		item.SourceContentDigest,
 	)
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {

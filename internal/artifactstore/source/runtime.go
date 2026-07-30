@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 // Runtime is a trusted internal capability for consumers that need an
@@ -121,6 +123,177 @@ func ConfirmSnapshotGeneration(
 		)
 	}
 	return errors.Join(snapshot.Confirm(ctx), snapshot.Close())
+}
+
+// ReadSnapshotEntry reads one regular Source snapshot entry with the same
+// bounded-read and size-stability rules used by discovery.
+//
+// It intentionally operates only through Snapshot. Feature code must not
+// recreate this behavior by reading a Source's native filesystem path.
+func ReadSnapshotEntry(
+	ctx context.Context,
+	snapshot Snapshot,
+	entry Entry,
+	maximumBytes int64,
+) ([]byte, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf(
+			"%w: source snapshot read context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if snapshot == nil {
+		return nil, fmt.Errorf(
+			"%w: source snapshot is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := entry.Validate(); err != nil {
+		return nil, err
+	}
+	if !entry.IsRegular {
+		return nil, fmt.Errorf(
+			"%w: source entry %q is not a regular file",
+			basespec.ErrInvalid,
+			entry.Locator,
+		)
+	}
+	if maximumBytes <= 0 || maximumBytes > basespec.MaxScanBytes {
+		return nil, fmt.Errorf(
+			"%w: source snapshot read limit is invalid",
+			basespec.ErrInvalid,
+		)
+	}
+	if entry.SizeBytes > maximumBytes {
+		return nil, fmt.Errorf(
+			"%w: source entry %q exceeds byte limit",
+			basespec.ErrInvalid,
+			entry.Locator,
+		)
+	}
+
+	reader, err := snapshot.Open(ctx, entry.Locator)
+	if err != nil {
+		return nil, err
+	}
+	content, readErr := io.ReadAll(
+		io.LimitReader(reader, maximumBytes+1),
+	)
+	closeErr := reader.Close()
+	if readErr != nil || closeErr != nil {
+		return nil, errors.Join(readErr, closeErr)
+	}
+	if int64(len(content)) > maximumBytes {
+		return nil, fmt.Errorf(
+			"%w: source entry %q exceeds byte limit",
+			basespec.ErrInvalid,
+			entry.Locator,
+		)
+	}
+	if int64(len(content)) != entry.SizeBytes {
+		return nil, fmt.Errorf(
+			"%w: source entry %q changed size during snapshot read",
+			basespec.ErrConflict,
+			entry.Locator,
+		)
+	}
+	return content, nil
+}
+
+// VerifySnapshotContentDigest confirms both the Source generation and the
+// exact bytes of one catalogued Source entry through the Source runtime.
+//
+// This is intentionally generic Source behavior. It does not parse Skill
+// content, resolve native paths, or apply runtime sandbox policy.
+func VerifySnapshotContentDigest(
+	ctx context.Context,
+	runtime Runtime,
+	value Source,
+	locator basespec.Locator,
+	expectedGeneration string,
+	expectedDigest cryptoutil.Digest,
+	maximumBytes int64,
+) (returnErr error) {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: source digest verification context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if runtime == nil {
+		return fmt.Errorf(
+			"%w: source digest verification runtime is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := value.Validate(); err != nil {
+		return err
+	}
+	if err := basespec.ValidateLocator(locator, false); err != nil {
+		return err
+	}
+	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
+		return err
+	}
+	if err := cryptoutil.ValidateDigest(expectedDigest); err != nil {
+		return err
+	}
+	if maximumBytes <= 0 || maximumBytes > basespec.MaxCandidateBytes {
+		return fmt.Errorf(
+			"%w: source digest verification limit is invalid",
+			basespec.ErrInvalid,
+		)
+	}
+
+	snapshot, err := runtime.Open(ctx, value)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		returnErr = errors.Join(returnErr, snapshot.Close())
+	}()
+
+	if snapshot.Generation() != expectedGeneration {
+		return fmt.Errorf(
+			"%w: source generation changed since it was observed",
+			basespec.ErrConflict,
+		)
+	}
+	entry, err := snapshot.Stat(ctx, locator)
+	if err != nil {
+		return err
+	}
+	if entry.Locator != locator {
+		return fmt.Errorf(
+			"%w: source snapshot stat for %q returned %q",
+			basespec.ErrInvalid,
+			locator,
+			entry.Locator,
+		)
+	}
+	content, err := ReadSnapshotEntry(
+		ctx,
+		snapshot,
+		entry,
+		maximumBytes,
+	)
+	if err != nil {
+		return err
+	}
+	if cryptoutil.DigestBytes(content) != expectedDigest {
+		return fmt.Errorf(
+			"%w: source content for %q changed since catalog publication",
+			basespec.ErrConflict,
+			locator,
+		)
+	}
+	return snapshot.Confirm(ctx)
 }
 
 func (r *runtime) Get(

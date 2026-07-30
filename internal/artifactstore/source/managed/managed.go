@@ -69,7 +69,7 @@ func New(base string) (*Adapter, error) {
 	// adapter's private staging directory is excluded.
 	policy := fsdir.TraversalPolicy{
 		ExcludedDirectoryNames: []string{stagingDirectoryName},
-		SkipGitSubmodules:      true,
+		SkipGitSubmodules:      false,
 	}
 	filesystem, err := fsdir.NewWithTraversalPolicy(&policy)
 	if err != nil {

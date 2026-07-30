@@ -568,7 +568,7 @@ Installed and Workspace Skill presentation remains separate:
 | Workspace frontend plumbing        | Present for current scope | Workspace UI projects Collections, Artifacts, observations, Context, Skills, Sources, suppressions, and diagnostics. Artifact-backed installed Skill Bundle catalogs remain isolated; Workspace templates render only through Workspace UI. |
 | Skill runtime handoff              | Present                   | Eligible Sources with trusted local-path capability verify Source generation, occurrence definition, and `SKILL.md` content before exposing a package directory to runtime.                                                                 |
 | Conversation selection provenance  | Present                   | Conversation resolution records selected and used Artifact revisions and definition digests, including partial or unavailable outcomes.                                                                                                     |
-| Derived runtime reconciliation     | Present and nonblocking   | Workspace Skill runtime state is rebuildable. Durable Workspace mutations must not be rolled back because a later runtime refresh is delayed or fails.                                                                                      |
+| Derived runtime reconciliation     | Present and nonblocking   | Workspace Skill runtime state is rebuildable and tracks only feature-owned Workspace partitions. Durable Workspace mutations must not be rolled back because a later runtime refresh is delayed or fails.                                   |
 | Source configuration privacy       | Present                   | Workspace views expose Source summaries and optional trusted local presentation paths, never raw Source configuration.                                                                                                                      |
 | Workspace transfer                 | Not present               | There is no Workspace importer, exporter, archive workflow, URI resolver, or portable content-closure builder.                                                                                                                              |
 | Future Artifact domains            | Not present               | MCP, Tool, Model, Agent, Assistant, and other domains remain absent until each has a complete decoder, validator, projection, and product consumer.                                                                                         |
@@ -624,8 +624,9 @@ The frontend follows the same boundary:
   callback identity cannot cause recursive catalog reloads.
 
 Workspace runtime synchronization tracks only `workspace.collection` refs that
-it previously managed. It must never inspect global runtime partitions as a
-deletion list because the same runtime also contains `skill.bundle` partitions.
+it previously managed before the asynchronous scan began. It must never inspect
+global runtime partitions as a deletion list because the same runtime also
+contains `skill.bundle` partitions.
 
 ### 13.1 Complete Artifact Store prerequisites
 

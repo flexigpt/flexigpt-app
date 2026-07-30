@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/flexigpt/agentskills-go/fsskillprovider"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
@@ -105,7 +106,8 @@ func workspaceResolvedArtifactSkill(
 
 	versionInput := string(value.DefinitionDigest) + "\x00" +
 		string(value.SourceContentDigest) + "\x00" +
-		value.SourceGeneration
+		value.SourceGeneration + "\x00" +
+		strconv.FormatUint(value.ArtifactRevision, 10)
 
 	output := skillruntime.ResolvedArtifactSkill{
 		Artifact:   value.Artifact,

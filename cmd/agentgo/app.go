@@ -437,12 +437,12 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.settingStoreAPI != nil {
 		a.settingStoreAPI.close()
 	}
+	if a.workspaceAPI != nil {
+		a.workspaceAPI.close()
+	}
 	if a.skillBundleAPI != nil {
 		//nolint:contextcheck // Need separate context in shutdown.
 		a.skillBundleAPI.close()
-	}
-	if a.workspaceAPI != nil {
-		a.workspaceAPI.close()
 	}
 	if a.artifactStoreAPI != nil {
 		a.artifactStoreAPI.close()

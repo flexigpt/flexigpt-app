@@ -124,6 +124,7 @@ func (a *API) LoadRuntimeSkill(
 		record.Binding.Locator,
 		record.Binding.SubresourceLocator,
 		expectedGeneration,
+		*occurrence.SourceContentDigest,
 	)
 	if err != nil {
 		return RuntimeSkill{}, err

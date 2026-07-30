@@ -768,15 +768,16 @@ func (a *API) createManagedSkill(
 		return CreateManagedSkillResponse{}, basespec.ErrConflict
 	}
 
-	attachment, sourceValue, err := managedAttachment(bundle)
+	targetRole := RoleManaged
+	if allowBuiltInAttachment {
+		targetRole = RoleBuiltIn
+	}
+	attachment, sourceValue, err := managedAttachmentForRole(
+		bundle,
+		targetRole,
+	)
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
-	}
-	if attachment.Role == RoleBuiltIn && !allowBuiltInAttachment {
-		return CreateManagedSkillResponse{}, fmt.Errorf(
-			"%w: built-in skill packages are read-only",
-			basespec.ErrConflict,
-		)
 	}
 	if !attachment.Enabled || !sourceValue.Enabled {
 		return CreateManagedSkillResponse{}, fmt.Errorf(
@@ -1030,8 +1031,9 @@ func (a *API) discoveryPlan(value Bundle) (discovery.Plan, error) {
 	return plan, nil
 }
 
-func managedAttachment(
+func managedAttachmentForRole(
 	value Bundle,
+	role basespec.AttachmentRole,
 ) (collection.Attachment, source.Summary, error) {
 	sources := make(map[basespec.SourceID]source.Summary, len(value.Sources))
 	for _, sourceValue := range value.Sources {
@@ -1043,8 +1045,17 @@ func managedAttachment(
 		sourceValue source.Summary
 		found       bool
 	)
+	switch role {
+	case RoleManaged, RoleBuiltIn:
+	default:
+		return collection.Attachment{}, source.Summary{}, fmt.Errorf(
+			"%w: unsupported managed Skill attachment role %q",
+			basespec.ErrInvalid,
+			role,
+		)
+	}
 	for _, candidate := range value.Attachments {
-		if candidate.Role != RoleManaged && candidate.Role != RoleBuiltIn {
+		if candidate.Role != role {
 			continue
 		}
 		currentSource, exists := sources[candidate.SourceID]
@@ -1056,8 +1067,9 @@ func managedAttachment(
 		}
 		if found {
 			return collection.Attachment{}, source.Summary{}, fmt.Errorf(
-				"%w: skill bundle has multiple writable managed Sources",
+				"%w: skill bundle has multiple %q attachments",
 				basespec.ErrConflict,
+				role,
 			)
 		}
 		attachment = candidate
@@ -1066,8 +1078,9 @@ func managedAttachment(
 	}
 	if !found {
 		return collection.Attachment{}, source.Summary{}, fmt.Errorf(
-			"%w: skill bundle has no managed Source",
+			"%w: skill bundle has no %q attachment",
 			basespec.ErrAttachmentNotFound,
+			role,
 		)
 	}
 	return attachment, sourceValue, nil
@@ -1106,10 +1119,7 @@ func managedSkillPackageDirectoryOf(
 	binding artifact.SourceBinding,
 ) (basespec.Locator, error) {
 	if binding.SubresourceLocator != "" ||
-		!strings.EqualFold(
-			path.Base(string(binding.Locator)),
-			skillartifact.DefinitionFileName,
-		) {
+		path.Base(string(binding.Locator)) != skillartifact.DefinitionFileName {
 		return "", fmt.Errorf(
 			"%w: managed Skill binding does not identify a package %q",
 			basespec.ErrInvalid,
