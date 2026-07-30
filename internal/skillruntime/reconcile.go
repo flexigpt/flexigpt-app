@@ -10,6 +10,7 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 )
 
@@ -125,6 +126,7 @@ func (s *SkillRuntime) ResyncCollection(
 	}
 
 	desired := newRuntimeDesiredView()
+	names := make(map[string]artifact.ArtifactRef, len(values))
 	for _, value := range values {
 		if err := value.Validate(); err != nil {
 			s.rtResyncMu.Lock()
@@ -132,6 +134,21 @@ func (s *SkillRuntime) ResyncCollection(
 			s.rtResyncMu.Unlock()
 			return nErr
 		}
+		if previous, exists := names[value.Definition.Name]; exists &&
+			previous != value.Artifact {
+			err := fmt.Errorf(
+				"%w: collection %q has multiple runtime Skills named %q",
+				basespec.ErrConflict,
+				ref.CollectionID,
+				value.Definition.Name,
+			)
+			s.rtResyncMu.Lock()
+			e := s.failClosedCollectionLocked(ctx, ref, err)
+			s.rtResyncMu.Unlock()
+			return e
+		}
+		names[value.Definition.Name] = value.Artifact
+
 		desired.add(value)
 	}
 

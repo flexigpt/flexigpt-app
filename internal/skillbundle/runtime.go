@@ -2,9 +2,7 @@ package skillbundle
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strconv"
 
@@ -13,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 )
@@ -80,10 +77,15 @@ func (a *API) LoadRuntimeSkill(
 	if err != nil {
 		return RuntimeSkill{}, err
 	}
-	expectedGeneration, exists := snapshot.SourceGenerations[record.Binding.SourceID]
-	if !exists {
+	occurrence, err := currentSkillOccurrence(snapshot, record)
+	if err != nil {
+		return RuntimeSkill{}, err
+	}
+	expectedGeneration := snapshot.SourceGenerations[record.Binding.SourceID]
+	expectedSourceRevision := snapshot.SourceRevisions[record.Binding.SourceID]
+	if expectedGeneration == "" || expectedSourceRevision == 0 {
 		return RuntimeSkill{}, fmt.Errorf(
-			"%w: Skill Artifact source has no current catalog generation",
+			"%w: Skill Artifact source has no current catalog state",
 			basespec.ErrCatalogStale,
 		)
 	}
@@ -100,10 +102,6 @@ func (a *API) LoadRuntimeSkill(
 	if err := skillartifact.ValidateDefinition(value); err != nil {
 		return RuntimeSkill{}, err
 	}
-	body, err := skillartifact.DecodeBody(value.Body)
-	if err != nil {
-		return RuntimeSkill{}, err
-	}
 
 	sourceValue, err := a.dependencies.SourceRuntime.Get(
 		ctx,
@@ -113,60 +111,73 @@ func (a *API) LoadRuntimeSkill(
 	if err != nil {
 		return RuntimeSkill{}, err
 	}
-	localPaths, supported := a.dependencies.SourceRuntime.(source.LocalPathRuntime)
-	if !supported || !localPaths.SupportsLocalPath(sourceValue.Kind) {
-		return RuntimeSkill{}, fmt.Errorf(
-			"%w: Skill source kind %q has no local runtime projection",
-			basespec.ErrUnsupported,
-			sourceValue.Kind,
-		)
-	}
-
-	current, err := a.dependencies.SourceRuntime.Open(ctx, sourceValue)
-	if err != nil {
-		return RuntimeSkill{}, err
-	}
-	generation := current.Generation()
-	confirmErr := current.Confirm(ctx)
-	closeErr := current.Close()
-	if err := errors.Join(confirmErr, closeErr); err != nil {
-		return RuntimeSkill{}, err
-	}
-	if generation != expectedGeneration {
+	if sourceValue.Revision != expectedSourceRevision {
 		return RuntimeSkill{}, fmt.Errorf(
 			"%w: Skill source changed after catalog publication",
 			basespec.ErrCatalogStale,
 		)
 	}
-
-	location, err := localPaths.ResolveLocalPath(
+	location, err := skillartifact.ResolveRuntimePackage(
 		ctx,
+		a.dependencies.SourceRuntime,
 		sourceValue,
 		record.Binding.Locator,
+		record.Binding.SubresourceLocator,
+		expectedGeneration,
 	)
 	if err != nil {
 		return RuntimeSkill{}, err
 	}
-	if filepath.Base(location) != skillartifact.DefinitionFileName {
-		return RuntimeSkill{}, fmt.Errorf(
-			"%w: Skill binding does not resolve to %q",
-			basespec.ErrInvalid,
-			skillartifact.DefinitionFileName,
-		)
-	}
 
 	versionInput := string(value.Digest) + "\x00" +
-		string(record.ID) + "\x00" + strconv.FormatUint(record.Revision, 10) + "\x00" + generation
+		string(*occurrence.SourceContentDigest) + "\x00" +
+		strconv.FormatUint(record.Revision, 10) + "\x00" +
+		expectedGeneration
 
 	return RuntimeSkill{
 		Artifact:   record.Ref(),
 		Collection: bundleRef,
-		Name:       body.Name,
-		Location:   filepath.Dir(location),
+		Name:       string(value.LogicalName),
+		Location:   location,
 		Version: "skill.bundle:" + string(
 			cryptoutil.DigestBytes([]byte(versionInput)),
 		),
 	}, nil
+}
+
+func currentSkillOccurrence(
+	snapshot catalog.Snapshot,
+	record artifact.Artifact,
+) (catalog.Occurrence, error) {
+	if record.ResolvedDefinition == nil {
+		return catalog.Occurrence{}, fmt.Errorf(
+			"%w: Skill Artifact has no resolved definition",
+			basespec.ErrCatalogStale,
+		)
+	}
+	key := catalog.OccurrenceKey{
+		CollectionID:       record.CollectionID,
+		SourceID:           record.Binding.SourceID,
+		Locator:            record.Binding.Locator,
+		SubresourceLocator: record.Binding.SubresourceLocator,
+	}
+	for _, occurrence := range snapshot.Occurrences {
+		if occurrence.Key != key {
+			continue
+		}
+		if occurrence.State != catalog.OccurrenceValid ||
+			occurrence.Kind != skillartifact.Kind ||
+			occurrence.DefinitionDigest == nil ||
+			occurrence.SourceContentDigest == nil ||
+			*occurrence.DefinitionDigest != *record.ResolvedDefinition {
+			break
+		}
+		return catalog.CloneOccurrence(occurrence), nil
+	}
+	return catalog.Occurrence{}, fmt.Errorf(
+		"%w: Skill Artifact does not match the current catalog occurrence",
+		basespec.ErrCatalogStale,
+	)
 }
 
 // ListRuntimeSkills is deliberately fail-closed. A collection reconciliation

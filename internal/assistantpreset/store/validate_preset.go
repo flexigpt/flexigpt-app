@@ -114,6 +114,13 @@ func validateAssistantPresetStructure(preset *spec.AssistantPreset) error {
 
 	seenSkillRefs := make(map[string]struct{}, len(preset.StartingSkillSelections))
 	for i, selection := range preset.StartingSkillSelections {
+		if err := selection.Artifact.Validate(); err != nil {
+			return fmt.Errorf(
+				"startingSkillSelections[%d].artifact: %w",
+				i,
+				err,
+			)
+		}
 		key, err := skillSelectionRefKey(selection)
 		if err != nil {
 			return fmt.Errorf("startingSkillSelections[%d]: %w", i, err)

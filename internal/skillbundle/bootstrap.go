@@ -104,6 +104,7 @@ func (a *API) BootstrapBuiltInBundle(
 			Bundle:                     existing.Collection.Ref(),
 			ExpectedCollectionRevision: existing.Collection.Revision,
 			SkillName:                  skill.Name,
+			OperationKey:               "builtin-" + request.BootstrapKey + "-" + skill.Name,
 			SKILLMD:                    skill.SKILLMD,
 			Files:                      skill.Files,
 			Enabled:                    skill.Enabled,

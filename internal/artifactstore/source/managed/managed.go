@@ -402,11 +402,11 @@ func (a *Adapter) RemovePackage(
 	}
 	info, err := os.Stat(target)
 	if errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf(
-			"%w: managed package %q",
-			basespec.ErrNotFound,
-			directory,
-		)
+		// Removal is idempotent after a prior successful source-side rename.
+		// Components.RemoveManagedPackage still acknowledges the current
+		// generation in metadata, so a retry converges after a crash between
+		// package removal and Source revision publication.
+		return nil
 	}
 	if err != nil {
 		return err

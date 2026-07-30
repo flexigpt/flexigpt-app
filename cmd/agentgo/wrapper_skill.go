@@ -82,6 +82,27 @@ func InitSkillBundleWrapper(
 			}
 			return result.Source, result.Generation, nil
 		},
+		RemoveManagedPackage: func(
+			ctx context.Context,
+			rootID basespec.RootID,
+			sourceID basespec.SourceID,
+			expectedSourceRevision uint64,
+			directory basespec.Locator,
+			expectedGeneration string,
+		) (sourceSummary source.Summary, generation string, err error) {
+			result, err := components.RemoveManagedPackage(
+				ctx,
+				rootID,
+				sourceID,
+				expectedSourceRevision,
+				directory,
+				expectedGeneration,
+			)
+			if err != nil {
+				return source.Summary{}, "", err
+			}
+			return result.Source, result.Generation, nil
+		},
 	})
 	if err != nil {
 		return err
@@ -123,11 +144,13 @@ func InitSkillBundleWrapper(
 	}
 
 	parent, cancel := context.WithCancel(context.Background())
+	wrapper.mu.Lock()
 	wrapper.api = api
 	wrapper.runtime = runtime
 	wrapper.managed = map[collection.CollectionRef]struct{}{}
 	wrapper.bootstrapContext = parent
 	wrapper.bootstrapCancel = cancel
+	wrapper.mu.Unlock()
 
 	if err := wrapper.bootstrapEmbeddedBuiltIns(context.Background()); err != nil {
 		wrapper.close()
@@ -390,13 +413,16 @@ func BindArtifactStoreSkillBundleSynchronization(
 }
 
 func (w *SkillBundleWrapper) syncBundle(ref collection.CollectionRef) {
-	if w == nil || w.runtime == nil {
+	if w == nil {
 		return
 	}
 	w.mu.Lock()
+	runtime := w.runtime
 	w.managed[ref] = struct{}{}
 	w.mu.Unlock()
-	w.runtime.RequestCollectionResync(ref)
+	if runtime != nil {
+		runtime.RequestCollectionResync(ref)
+	}
 }
 
 func (w *SkillBundleWrapper) removeBundle(ref collection.CollectionRef) {
@@ -404,9 +430,12 @@ func (w *SkillBundleWrapper) removeBundle(ref collection.CollectionRef) {
 		return
 	}
 	w.mu.Lock()
+	runtime := w.runtime
 	delete(w.managed, ref)
 	w.mu.Unlock()
-	w.runtime.RequestCollectionRemoval(ref)
+	if runtime != nil {
+		runtime.RequestCollectionRemoval(ref)
+	}
 }
 
 func (w *SkillBundleWrapper) syncKnownSkillBundles() {
@@ -424,19 +453,29 @@ func (w *SkillBundleWrapper) scheduleBundleSynchronization(
 	rootID basespec.RootID,
 	filterRoot bool,
 ) {
-	if w == nil || w.api == nil || w.runtime == nil ||
-		w.bootstrapContext == nil {
+	if w == nil {
 		return
 	}
-	w.bootstrapWG.Go(func() {
-		ctx, cancel := context.WithTimeout(w.bootstrapContext, 30*time.Second)
+	w.mu.Lock()
+	if w.api == nil || w.runtime == nil || w.bootstrapContext == nil {
+		w.mu.Unlock()
+		return
+	}
+	api := w.api
+	parent := w.bootstrapContext
+	w.bootstrapWG.Add(1)
+	w.mu.Unlock()
+
+	go func() {
+		defer w.bootstrapWG.Done()
+		ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 		defer cancel()
 
-		if err := w.bootstrapEmbeddedBuiltIns(ctx); err != nil {
+		if err := w.bootstrapEmbeddedBuiltInsWithAPI(ctx, api); err != nil {
 			return
 		}
 
-		refs, err := w.api.SkillBundleRefs(ctx)
+		refs, err := api.SkillBundleRefs(ctx)
 		if err != nil || ctx.Err() != nil {
 			return
 		}
@@ -446,6 +485,7 @@ func (w *SkillBundleWrapper) scheduleBundleSynchronization(
 				continue
 			}
 			active[ref] = struct{}{}
+			//nolint:contextcheck // Background.
 			w.syncBundle(ref)
 		}
 
@@ -461,19 +501,33 @@ func (w *SkillBundleWrapper) scheduleBundleSynchronization(
 
 		for _, ref := range managed {
 			if _, exists := active[ref]; !exists {
+				//nolint:contextcheck // Background.
 				w.removeBundle(ref)
 			}
 		}
-	})
+	}()
 }
 
 func (w *SkillBundleWrapper) bootstrapEmbeddedBuiltIns(
 	ctx context.Context,
 ) error {
-	if w == nil || w.api == nil {
+	if w == nil {
 		return errors.New("skill bundle API is not initialized")
 	}
-	values, err := w.api.BootstrapEmbeddedBuiltIns(ctx)
+	w.mu.Lock()
+	api := w.api
+	w.mu.Unlock()
+	if api == nil {
+		return errors.New("skill bundle API is not initialized")
+	}
+	return w.bootstrapEmbeddedBuiltInsWithAPI(ctx, api)
+}
+
+func (w *SkillBundleWrapper) bootstrapEmbeddedBuiltInsWithAPI(
+	ctx context.Context,
+	api *skillbundle.API,
+) error {
+	values, err := api.BootstrapEmbeddedBuiltIns(ctx)
 	if err != nil {
 		return err
 	}
@@ -488,16 +542,26 @@ func (w *SkillBundleWrapper) close() {
 	if w == nil {
 		return
 	}
-	if w.bootstrapCancel != nil {
-		w.bootstrapCancel()
-	}
-	w.bootstrapWG.Wait()
-	if w.runtime != nil {
-		w.runtime.Close()
-	}
-	if w.api != nil {
-		_ = w.api.Close()
-	}
+
+	w.mu.Lock()
+	cancel := w.bootstrapCancel
+	runtime := w.runtime
+	api := w.api
+	w.bootstrapCancel = nil
+	w.bootstrapContext = nil
 	w.runtime = nil
 	w.api = nil
+	w.managed = nil
+	w.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	w.bootstrapWG.Wait()
+	if runtime != nil {
+		runtime.Close()
+	}
+	if api != nil {
+		_ = api.Close()
+	}
 }

@@ -2,11 +2,7 @@ package skilladapter
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -401,26 +397,6 @@ func (f *Adapter) runtimeSource(
 		failures[item.Source.ID] = err
 		return source.Source{}, err
 	}
-	localPaths, supported := f.sourceRuntime.(source.LocalPathRuntime)
-	if !supported ||
-		!localPaths.SupportsLocalPath(sourceValue.Kind) {
-		err := fmt.Errorf(
-			"%w: Workspace Skill source kind %q has no trusted native path",
-			basespec.ErrUnsupported,
-			sourceValue.Kind,
-		)
-		failures[item.Source.ID] = err
-		return source.Source{}, err
-	}
-	if err := verifySourceGeneration(
-		ctx,
-		f.sourceRuntime,
-		sourceValue,
-		item.SourceGeneration,
-	); err != nil {
-		failures[item.Source.ID] = err
-		return source.Source{}, err
-	}
 	verified[item.Source.ID] = sourceValue
 
 	return sourceValue, nil
@@ -431,21 +407,6 @@ func (f *Adapter) resolveRuntimeLocation(
 	item spec.LoadPlanItem,
 	sourceValue source.Source,
 ) (string, error) {
-	localPaths, supported := f.sourceRuntime.(source.LocalPathRuntime)
-	if !supported ||
-		!localPaths.SupportsLocalPath(item.Source.Kind) {
-		return "", fmt.Errorf(
-			"%w: Workspace Skill source kind %q has no native filesystem package",
-			basespec.ErrUnsupported,
-			item.Source.Kind,
-		)
-	}
-	if item.Artifact.Binding.SubresourceLocator != "" {
-		return "", fmt.Errorf(
-			"%w: Workspace Skill cannot use a subresource binding",
-			basespec.ErrUnsupported,
-		)
-	}
 	if item.SourceContentDigest == "" ||
 		item.OccurrenceDefinitionDigest == "" {
 		return "", fmt.Errorf(
@@ -459,63 +420,22 @@ func (f *Adapter) resolveRuntimeLocation(
 			basespec.ErrCatalogStale,
 		)
 	}
-	skillMDPath, err := localPaths.ResolveLocalPath(
-		ctx,
-		sourceValue,
-		item.Artifact.Binding.Locator,
-	)
-	if err != nil {
-		return "", err
-	}
-	if filepath.Base(skillMDPath) != skillartifact.DefinitionFileName {
-		return "", fmt.Errorf(
-			"%w: Workspace Skill locator %q is not %q",
-			basespec.ErrInvalid,
-			item.Artifact.Binding.Locator,
-			skillartifact.DefinitionFileName,
-		)
-	}
-	if err := verifySkillMDContent(
-		skillMDPath,
-		item.SourceContentDigest,
-	); err != nil {
-		return "", err
-	}
-	if err := verifySourceGeneration(
+
+	location, err := skillartifact.ResolveRuntimePackage(
 		ctx,
 		f.sourceRuntime,
 		sourceValue,
+		item.Artifact.Binding.Locator,
+		item.Artifact.Binding.SubresourceLocator,
 		item.SourceGeneration,
-	); err != nil {
+	)
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return "", ctxErr
+		}
 		return "", err
 	}
-	return filepath.Dir(skillMDPath), nil
-}
-
-func verifySourceGeneration(
-	ctx context.Context,
-	runtime source.Runtime,
-	value source.Source,
-	expected string,
-) error {
-	if err := basespec.ValidateSourceGeneration(expected); err != nil {
-		return err
-	}
-	snapshot, err := runtime.Open(ctx, value)
-	if err != nil {
-		return err
-	}
-	if snapshot.Generation() != expected {
-		mismatchErr := fmt.Errorf(
-			"%w: Workspace Skill source changed since catalog publication",
-			basespec.ErrCatalogStale,
-		)
-		return errors.Join(mismatchErr, snapshot.Close())
-	}
-
-	confirmErr := snapshot.Confirm(ctx)
-	closeErr := snapshot.Close()
-	return errors.Join(confirmErr, closeErr)
+	return location, nil
 }
 
 func (f *Adapter) supportsRuntimePath(
@@ -526,56 +446,6 @@ func (f *Adapter) supportsRuntimePath(
 		return false
 	}
 	return localPaths.SupportsLocalPath(kind)
-}
-
-// verifySkillMDContent prevents a selected Workspace record from silently
-// becoming a runtime handle for different SKILL.md content after refresh.
-// Resource and script contents remain normal live filesystem-provider inputs,
-// just as they are for installed filesystem skills.
-func verifySkillMDContent(
-	location string,
-	expected cryptoutil.Digest,
-) error {
-	if err := cryptoutil.ValidateDigest(expected); err != nil {
-		return err
-	}
-	file, err := os.Open(location)
-	if err != nil {
-		return err
-	}
-	info, statErr := file.Stat()
-	if statErr != nil {
-		return errors.Join(statErr, file.Close())
-	}
-	if !info.Mode().IsRegular() {
-		return fmt.Errorf(
-			"%w: Workspace SKILL.md is not a regular file",
-			basespec.ErrInvalid,
-		)
-	}
-	content, readErr := io.ReadAll(
-		io.LimitReader(file, int64(basespec.MaxCandidateBytes)+1),
-	)
-	closeErr := file.Close()
-	if readErr != nil {
-		return readErr
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	if len(content) > basespec.MaxCandidateBytes {
-		return fmt.Errorf(
-			"%w: Workspace SKILL.md exceeds runtime verification limit",
-			basespec.ErrInvalid,
-		)
-	}
-	if cryptoutil.DigestBytes(content) != expected {
-		return fmt.Errorf(
-			"%w: Workspace SKILL.md changed since the current catalog refresh",
-			basespec.ErrCatalogStale,
-		)
-	}
-	return nil
 }
 
 func runtimeLocationDiagnostic(

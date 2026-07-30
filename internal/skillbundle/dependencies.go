@@ -34,6 +34,15 @@ type PublishManagedPackageFunc func(
 	publication source.ManagedPackagePublication,
 ) (source.Summary, string, error)
 
+type RemoveManagedPackageFunc func(
+	ctx context.Context,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
+	expectedSourceRevision uint64,
+	directory basespec.Locator,
+	expectedGeneration string,
+) (source.Summary, string, error)
+
 type Dependencies struct {
 	Roots              RootLister
 	Sources            *source.Service
@@ -49,6 +58,7 @@ type Dependencies struct {
 
 	GetManagedSourceState ManagedSourceStateFunc
 	PublishManagedPackage PublishManagedPackageFunc
+	RemoveManagedPackage  RemoveManagedPackageFunc
 }
 
 func (d Dependencies) Validate() error {
@@ -64,7 +74,8 @@ func (d Dependencies) Validate() error {
 		d.DecoderFingerprint == nil ||
 		d.IDGenerator == nil ||
 		d.GetManagedSourceState == nil ||
-		d.PublishManagedPackage == nil {
+		d.PublishManagedPackage == nil ||
+		d.RemoveManagedPackage == nil {
 		return fmt.Errorf(
 			"%w: skill bundle Artifact Store dependencies are incomplete",
 			basespec.ErrInvalid,

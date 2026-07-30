@@ -86,7 +86,11 @@ func (s *SkillRuntime) CreateSkillSession(
 		AllowSkills: resolved.AllowDefs,
 	})
 	if err != nil {
-		return nil, err
+		closeErr := s.runtime.CloseSession(
+			context.WithoutCancel(ctx),
+			sessionID,
+		)
+		return nil, errors.Join(err, closeErr)
 	}
 
 	active := map[agentskillsSpec.SkillDef]struct{}{}
@@ -380,9 +384,9 @@ func (s *SkillRuntime) resolveArtifactSkill(
 	}
 
 	s.rtResyncMu.Lock()
-	_, registered := s.managedRuntime[value.Definition]
+	registeredVersion, registered := s.managedRuntime[value.Definition]
 	s.rtResyncMu.Unlock()
-	if !registered {
+	if !registered || registeredVersion != value.Version {
 		return ResolvedArtifactSkill{}, false
 	}
 	return value, true

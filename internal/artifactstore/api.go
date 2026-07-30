@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -20,6 +21,7 @@ type API struct {
 	mutationMu        sync.RWMutex
 	mutationObservers map[uint64]func(basespec.RootID)
 	nextObserverID    uint64
+	ownedObserverID   uint64
 }
 
 func New(components *system.Components) (*API, error) {
@@ -411,14 +413,22 @@ func (a *API) SetRootMutationObserver(
 	observer func(basespec.RootID),
 ) {
 	a.mutationMu.Lock()
-	a.mutationObservers = map[uint64]func(basespec.RootID){}
+	if a.ownedObserverID != 0 {
+		delete(a.mutationObservers, a.ownedObserverID)
+		a.ownedObserverID = 0
+	}
 	if observer != nil {
 		a.nextObserverID++
-		a.mutationObservers[a.nextObserverID] = observer
+		a.ownedObserverID = a.nextObserverID
+		a.mutationObservers[a.ownedObserverID] = observer
 	}
 	a.mutationMu.Unlock()
 }
 
+// notifyRootMutation delivers a post-commit invalidation. Delivery is
+// asynchronous: observer latency or failure must not alter a completed durable
+// Artifact Store mutation. Observers must re-read current state and tolerate
+// coalesced or reordered notifications for the same Root.
 func (a *API) notifyRootMutation(rootID basespec.RootID) {
 	a.mutationMu.RLock()
 	observers := make(
@@ -432,6 +442,22 @@ func (a *API) notifyRootMutation(rootID basespec.RootID) {
 	a.mutationMu.RUnlock()
 
 	for _, observer := range observers {
-		observer(rootID)
+		go a.invokeRootMutationObserver(observer, rootID)
 	}
+}
+
+func (a *API) invokeRootMutationObserver(
+	observer func(basespec.RootID),
+	rootID basespec.RootID,
+) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			slog.Error(
+				"artifact store root mutation observer panicked",
+				"rootID", rootID,
+				"panic", recovered,
+			)
+		}
+	}()
+	observer(rootID)
 }

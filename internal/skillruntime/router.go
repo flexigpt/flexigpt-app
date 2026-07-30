@@ -184,6 +184,20 @@ func (r *ArtifactRouter) ListCollectionSkills(
 				basespec.ErrInvalid,
 			)
 		}
+		record, err := r.artifacts.Get(ctx, value.Artifact)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"read runtime Skill %d Artifact: %w",
+				index,
+				err,
+			)
+		}
+		if record.RootID != ref.RootID || record.CollectionID != ref.CollectionID {
+			return nil, fmt.Errorf(
+				"%w: feature loader returned an Artifact outside the requested Collection",
+				basespec.ErrInvalid,
+			)
+		}
 		if _, duplicate := seen[value.Artifact]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: feature loader returned duplicate runtime Artifact %q",

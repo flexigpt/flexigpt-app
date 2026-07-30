@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -21,6 +22,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 )
 
@@ -64,14 +67,16 @@ type CreateManagedSkillRequest struct {
 	Bundle                     collection.CollectionRef
 	ExpectedCollectionRevision uint64
 	SkillName                  string
+	OperationKey               string
 	SKILLMD                    []byte
 	Files                      []source.ManagedPackageFile
 	Enabled                    bool
 }
 
 type CreateManagedSkillResponse struct {
-	Artifact artifact.Artifact
-	Address  artifact.ArtifactAddress
+	Artifact     artifact.Artifact
+	Address      artifact.ArtifactAddress
+	OperationKey string
 }
 
 type AdoptSkillRequest struct {
@@ -474,18 +479,28 @@ func (a *API) AdoptSkill(
 	if snapshot.Revision != request.ExpectedCatalogRevision {
 		return artifact.Artifact{}, basespec.ErrConflict
 	}
+	found := false
 	for _, occurrence := range snapshot.Occurrences {
 		if occurrence.Key != request.Occurrence {
 			continue
 		}
-		if occurrence.Kind != skillartifact.Kind {
+		if occurrence.Kind != skillartifact.Kind ||
+			occurrence.State != catalog.OccurrenceValid ||
+			occurrence.DefinitionDigest == nil {
 			return artifact.Artifact{}, fmt.Errorf(
-				"%w: skill bundle occurrences must have kind %q",
-				basespec.ErrInvalid,
+				"%w: requested occurrence is not an adoptable %q Skill",
+				basespec.ErrReferenceUnresolved,
 				skillartifact.Kind,
 			)
 		}
+		found = true
 		break
+	}
+	if !found {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: requested Skill occurrence is not in the current bundle catalog",
+			basespec.ErrReferenceUnresolved,
+		)
 	}
 
 	return a.dependencies.Artifacts.Adopt(ctx, artifact.AdoptRequest{
@@ -608,7 +623,67 @@ func (a *API) PurgeSkill(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	if _, err := a.GetSkill(ctx, ref); err != nil {
+	value, err := a.GetSkill(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	operationKey, err := managedSkillOperationKeyOf(value.Data)
+	if err != nil {
+		return fmt.Errorf("decode managed Skill local data: %w", err)
+	}
+	if operationKey == "" {
+		return a.dependencies.Artifacts.Purge(ctx, ref, expectedRevision)
+	}
+
+	bundle, err := a.GetBundle(ctx, collection.CollectionRef{
+		RootID:       value.RootID,
+		CollectionID: value.CollectionID,
+	})
+	if err != nil {
+		return err
+	}
+	var role basespec.AttachmentRole
+	for _, attachment := range bundle.Attachments {
+		if attachment.SourceID == value.Binding.SourceID {
+			role = attachment.Role
+			break
+		}
+	}
+	switch role {
+	case RoleBuiltIn:
+		return fmt.Errorf(
+			"%w: built-in Skill packages are read-only",
+			basespec.ErrConflict,
+		)
+	case RoleManaged:
+	default:
+		return fmt.Errorf(
+			"%w: managed Skill Artifact source is not a managed attachment",
+			basespec.ErrConflict,
+		)
+	}
+
+	directory, err := managedSkillPackageDirectoryOf(value.Binding)
+	if err != nil {
+		return err
+	}
+	state, generation, err := a.dependencies.GetManagedSourceState(
+		ctx,
+		value.RootID,
+		value.Binding.SourceID,
+	)
+	if err != nil {
+		return err
+	}
+	if _, _, err := a.dependencies.RemoveManagedPackage(
+		ctx,
+		value.RootID,
+		value.Binding.SourceID,
+		state.Revision,
+		directory,
+		generation,
+	); err != nil {
 		return err
 	}
 	return a.dependencies.Artifacts.Purge(ctx, ref, expectedRevision)
@@ -634,6 +709,11 @@ func (a *API) createManagedSkill(
 	}
 	if err := basespec.ValidateLogicalName(
 		basespec.LogicalName(request.SkillName),
+	); err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
+	if err := validateManagedSkillOperationKey(
+		request.OperationKey,
 	); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
@@ -682,14 +762,13 @@ func (a *API) createManagedSkill(
 			basespec.ErrConflict,
 		)
 	}
-
-	key, err := a.dependencies.IDGenerator.NewID(ctx)
+	directory, err := managedSkillPackageDirectory(
+		request.OperationKey,
+		request.SkillName,
+	)
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	directory := basespec.Locator(
-		path.Join("packages", key, request.SkillName),
-	)
 	skillLocator := basespec.Locator(
 		path.Join(string(directory), skillartifact.DefinitionFileName),
 	)
@@ -699,29 +778,56 @@ func (a *API) createManagedSkill(
 	if err := basespec.ValidatePortableLocator(skillLocator, false); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
+	localData, err := encodeManagedSkillArtifactData(
+		managedSkillArtifactData{OperationKey: request.OperationKey},
+	)
+	if err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
 
 	artifactName := definitionValue.DisplayName
 	if artifactName == "" {
 		artifactName = request.SkillName
 	}
 
-	// Pin before publication. A refresh that runs after publication therefore
-	// updates this exact Artifact rather than automatically adopting a second
-	// Artifact for the same source binding.
-	pinned, err := a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
-		Collection:                 request.Bundle,
-		ExpectedCollectionRevision: request.ExpectedCollectionRevision,
-		Binding: artifact.SourceBinding{
-			SourceID:     sourceValue.ID,
-			Locator:      skillLocator,
-			ExpectedKind: skillartifact.Kind,
-		},
-		Name:    artifactName,
-		Enabled: request.Enabled,
-		Data:    EmptyArtifactData(),
-	})
+	pinned, err := a.findManagedSkillByOperation(
+		ctx,
+		request.Bundle,
+		request.OperationKey,
+	)
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
+	}
+	if pinned != nil {
+		if pinned.Adoption != artifact.AdoptionPinned ||
+			pinned.Binding.SourceID != sourceValue.ID ||
+			pinned.Binding.Locator != skillLocator ||
+			pinned.Binding.ExpectedKind != skillartifact.Kind ||
+			pinned.Name != artifactName ||
+			pinned.Enabled != request.Enabled {
+			return CreateManagedSkillResponse{}, fmt.Errorf(
+				"%w: managed Skill operation %q conflicts with its existing Artifact intent",
+				basespec.ErrConflict,
+				request.OperationKey,
+			)
+		}
+	} else {
+		value, err := a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
+			Collection:                 request.Bundle,
+			ExpectedCollectionRevision: request.ExpectedCollectionRevision,
+			Binding: artifact.SourceBinding{
+				SourceID:     sourceValue.ID,
+				Locator:      skillLocator,
+				ExpectedKind: skillartifact.Kind,
+			},
+			Name:    artifactName,
+			Enabled: request.Enabled,
+			Data:    localData,
+		})
+		if err != nil {
+			return CreateManagedSkillResponse{}, err
+		}
+		pinned = &value
 	}
 
 	state, generation, err := a.dependencies.GetManagedSourceState(
@@ -730,10 +836,13 @@ func (a *API) createManagedSkill(
 		sourceValue.ID,
 	)
 	if err != nil {
-		return CreateManagedSkillResponse{}, err
+		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(request.OperationKey, err)
 	}
 	if state.Revision != sourceValue.Revision {
-		return CreateManagedSkillResponse{}, basespec.ErrConflict
+		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
+			request.OperationKey,
+			basespec.ErrConflict,
+		)
 	}
 
 	_, _, err = a.dependencies.PublishManagedPackage(
@@ -748,31 +857,35 @@ func (a *API) createManagedSkill(
 		},
 	)
 	if err != nil {
-		return CreateManagedSkillResponse{}, err
+		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(request.OperationKey, err)
 	}
 
 	if _, err := a.RefreshBundle(ctx, request.Bundle); err != nil {
-		return CreateManagedSkillResponse{}, err
+		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(request.OperationKey, err)
 	}
 
 	resolved, err := a.dependencies.Artifacts.Get(ctx, pinned.Ref())
 	if err != nil {
-		return CreateManagedSkillResponse{}, err
+		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(request.OperationKey, err)
 	}
 	if resolved.Binding.Locator != skillLocator ||
 		resolved.Binding.ExpectedKind != skillartifact.Kind ||
 		resolved.State != artifact.StateAvailable ||
 		resolved.ResolvedDefinition == nil ||
 		*resolved.ResolvedDefinition != definitionValue.Digest {
-		return CreateManagedSkillResponse{}, fmt.Errorf(
-			"%w: published managed Skill did not resolve to its pinned Artifact",
-			basespec.ErrReferenceUnresolved,
+		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
+			request.OperationKey,
+			fmt.Errorf(
+				"%w: published managed Skill did not resolve to its pinned Artifact",
+				basespec.ErrReferenceUnresolved,
+			),
 		)
 	}
 
 	return CreateManagedSkillResponse{
-		Artifact: resolved,
-		Address:  resolved.Address(),
+		Artifact:     resolved,
+		Address:      resolved.Address(),
+		OperationKey: request.OperationKey,
 	}, nil
 }
 
@@ -967,6 +1080,30 @@ func (skillArtifactPolicy) Derive(
 	}, true, nil
 }
 
+func managedSkillPackageDirectoryOf(
+	binding artifact.SourceBinding,
+) (basespec.Locator, error) {
+	if binding.SubresourceLocator != "" ||
+		!strings.EqualFold(
+			path.Base(string(binding.Locator)),
+			skillartifact.DefinitionFileName,
+		) {
+		return "", fmt.Errorf(
+			"%w: managed Skill binding does not identify a package %q",
+			basespec.ErrInvalid,
+			skillartifact.DefinitionFileName,
+		)
+	}
+	directory := basespec.Locator(path.Dir(string(binding.Locator)))
+	if directory == "." {
+		return "", fmt.Errorf(
+			"%w: managed Skill package cannot be the Source root",
+			basespec.ErrInvalid,
+		)
+	}
+	return directory, source.ValidateManagedPackageDirectory(directory)
+}
+
 func normalizeManagedSkillFiles(
 	skillMD []byte,
 	input []source.ManagedPackageFile,
@@ -1016,4 +1153,117 @@ func normalizeManagedSkillFiles(
 		)
 	}
 	return normalized.Files, found, nil
+}
+
+type managedSkillArtifactData struct {
+	OperationKey string `json:"managedOperationKey,omitempty"`
+}
+
+func validateManagedSkillOperationKey(value string) error {
+	return basespec.ValidateRequiredText(
+		"managed Skill operation key",
+		value,
+		basespec.MaxLogicalNameBytes,
+	)
+}
+
+func encodeManagedSkillArtifactData(
+	value managedSkillArtifactData,
+) (json.RawMessage, error) {
+	if err := validateManagedSkillOperationKey(value.OperationKey); err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxLocalDataBytes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(canonical), nil
+}
+
+func managedSkillOperationKeyOf(raw json.RawMessage) (string, error) {
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxLocalDataBytes,
+	)
+	if err != nil {
+		return "", err
+	}
+	var value managedSkillArtifactData
+	if err := json.Unmarshal(canonical, &value); err != nil {
+		return "", err
+	}
+	if value.OperationKey == "" {
+		return "", nil
+	}
+	if err := validateManagedSkillOperationKey(value.OperationKey); err != nil {
+		return "", err
+	}
+	return value.OperationKey, nil
+}
+
+func managedSkillPackageDirectory(
+	operationKey string,
+	skillName string,
+) (basespec.Locator, error) {
+	if err := validateManagedSkillOperationKey(operationKey); err != nil {
+		return "", err
+	}
+	digest := strings.TrimPrefix(
+		string(cryptoutil.DigestBytes([]byte(operationKey))),
+		cryptoutil.DigestSHA256Prefix,
+	)
+	return basespec.Locator(path.Join("packages", digest, skillName)), nil
+}
+
+func (a *API) findManagedSkillByOperation(
+	ctx context.Context,
+	bundle collection.CollectionRef,
+	operationKey string,
+) (*artifact.Artifact, error) {
+	values, err := a.dependencies.Artifacts.ListByCollection(ctx, bundle)
+	if err != nil {
+		return nil, err
+	}
+	var found *artifact.Artifact
+	for _, value := range values {
+		if value.Kind != skillartifact.Kind {
+			continue
+		}
+		key, err := managedSkillOperationKeyOf(value.Data)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"decode managed Skill Artifact %q local data: %w",
+				value.ID,
+				err,
+			)
+		}
+		if key != operationKey {
+			continue
+		}
+		if found != nil {
+			return nil, fmt.Errorf(
+				"%w: managed Skill operation %q has multiple Artifacts",
+				basespec.ErrConflict,
+				operationKey,
+			)
+		}
+		copyValue := value.Clone()
+		found = &copyValue
+	}
+	return found, nil
+}
+
+func pendingManagedSkillOperationError(operationKey string, cause error) error {
+	return fmt.Errorf(
+		"managed Skill operation %q remains pending; retry with the same operationKey: %w",
+		operationKey,
+		cause,
+	)
 }
