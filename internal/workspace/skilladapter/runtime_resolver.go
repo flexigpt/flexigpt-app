@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/flexigpt/agentskills-go/fsskillprovider"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
@@ -101,12 +100,6 @@ func workspaceResolvedArtifactSkill(
 		return skillruntime.ResolvedArtifactSkill{}, fmt.Errorf(
 			"%w: Workspace Skill is not eligible for runtime registration",
 			basespec.ErrCatalogStale,
-		)
-	}
-	if !filepath.IsAbs(value.RuntimeLocation) {
-		return skillruntime.ResolvedArtifactSkill{}, fmt.Errorf(
-			"%w: Workspace Skill runtime location is not absolute",
-			basespec.ErrInvalid,
 		)
 	}
 

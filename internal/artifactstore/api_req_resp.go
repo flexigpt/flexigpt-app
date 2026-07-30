@@ -3,7 +3,6 @@ package artifactstore
 import (
 	"encoding/json"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -147,15 +146,6 @@ type ListArtifactSourceKindsResponseBody struct {
 
 type ListArtifactSourceKindsResponse struct {
 	Body *ListArtifactSourceKindsResponseBody
-}
-
-type PurgeArtifactRequest struct {
-	Artifact         artifact.ArtifactRef `json:"artifact"         required:"true"`
-	ExpectedRevision uint64               `json:"expectedRevision" required:"true"`
-}
-
-type PurgeArtifactResponse struct {
-	Artifact artifact.ArtifactRef `json:"artifact"`
 }
 
 type GetManagedSourceStateRequest struct {

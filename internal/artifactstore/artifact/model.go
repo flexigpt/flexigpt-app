@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -149,6 +150,13 @@ func (a Artifact) Address() ArtifactAddress {
 		CollectionID: a.CollectionID,
 		ArtifactID:   a.ID,
 		Kind:         a.Kind,
+	}
+}
+
+func (a ArtifactAddress) CollectionRef() collection.CollectionRef {
+	return collection.CollectionRef{
+		RootID:       a.RootID,
+		CollectionID: a.CollectionID,
 	}
 }
 

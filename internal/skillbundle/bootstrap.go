@@ -113,9 +113,6 @@ func (a *API) BootstrapBuiltInBundle(
 		}
 	}
 
-	if _, err := a.RefreshBundle(ctx, existing.Collection.Ref()); err != nil {
-		return Bundle{}, err
-	}
 	return a.GetBundle(ctx, existing.Collection.Ref())
 }
 

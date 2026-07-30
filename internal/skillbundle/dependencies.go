@@ -13,7 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type RootLister interface {
@@ -54,7 +53,6 @@ type Dependencies struct {
 	SourceRuntime      source.Runtime
 	HasDecoder         func(basespec.DecoderID) bool
 	DecoderFingerprint func() (cryptoutil.Digest, error)
-	IDGenerator        uuidutil.Generator
 
 	GetManagedSourceState ManagedSourceStateFunc
 	PublishManagedPackage PublishManagedPackageFunc
@@ -72,7 +70,6 @@ func (d Dependencies) Validate() error {
 		d.SourceRuntime == nil ||
 		d.HasDecoder == nil ||
 		d.DecoderFingerprint == nil ||
-		d.IDGenerator == nil ||
 		d.GetManagedSourceState == nil ||
 		d.PublishManagedPackage == nil ||
 		d.RemoveManagedPackage == nil {

@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	runtimeResyncTimeout             = 30 * time.Second
-	runtimeForegroundValidateTimeout = 15 * time.Second
-	collectionReconcileMaxAttempts   = 5
-	collectionReconcileInitialDelay  = 250 * time.Millisecond
-	collectionReconcileMaximumDelay  = 4 * time.Second
+	runtimeResyncTimeout                = 30 * time.Second
+	runtimeForegroundValidateTimeout    = 15 * time.Second
+	collectionReconcileInitialDelay     = 250 * time.Millisecond
+	collectionReconcileMaximumDelay     = 4 * time.Second
+	collectionReconcileLogAfterAttempts = 5
 )
 
 // SkillRuntime owns the in-memory Agent Skills catalog, provider lifecycle,

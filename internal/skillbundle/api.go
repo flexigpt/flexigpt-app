@@ -623,9 +623,18 @@ func (a *API) PurgeSkill(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
+	if expectedRevision == 0 {
+		return fmt.Errorf(
+			"%w: expected Skill Artifact revision is required",
+			basespec.ErrInvalid,
+		)
+	}
 	value, err := a.GetSkill(ctx, ref)
 	if err != nil {
 		return err
+	}
+	if value.Revision != expectedRevision {
+		return basespec.ErrConflict
 	}
 
 	operationKey, err := managedSkillOperationKeyOf(value.Data)
@@ -634,6 +643,12 @@ func (a *API) PurgeSkill(
 	}
 	if operationKey == "" {
 		return a.dependencies.Artifacts.Purge(ctx, ref, expectedRevision)
+	}
+	if value.Adoption != artifact.AdoptionPinned {
+		return fmt.Errorf(
+			"%w: managed Skill Artifact must remain pinned until purged",
+			basespec.ErrConflict,
+		)
 	}
 
 	bundle, err := a.GetBundle(ctx, collection.CollectionRef{
@@ -684,9 +699,16 @@ func (a *API) PurgeSkill(
 		directory,
 		generation,
 	); err != nil {
-		return err
+		return pendingManagedSkillPurgeError(value.Ref(), err)
 	}
-	return a.dependencies.Artifacts.Purge(ctx, ref, expectedRevision)
+	if err := a.dependencies.Artifacts.Purge(
+		ctx,
+		ref,
+		expectedRevision,
+	); err != nil {
+		return pendingManagedSkillPurgeError(value.Ref(), err)
+	}
+	return nil
 }
 
 // createManagedSkill performs the managed package publication workflow.
@@ -1264,6 +1286,14 @@ func pendingManagedSkillOperationError(operationKey string, cause error) error {
 	return fmt.Errorf(
 		"managed Skill operation %q remains pending; retry with the same operationKey: %w",
 		operationKey,
+		cause,
+	)
+}
+
+func pendingManagedSkillPurgeError(ref artifact.ArtifactRef, cause error) error {
+	return fmt.Errorf(
+		"managed Skill purge for Artifact %q may have completed only the source-side step; reload and retry if the Artifact remains: %w",
+		ref.ArtifactID,
 		cause,
 	)
 }

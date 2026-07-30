@@ -605,12 +605,10 @@ The Artifact API is the entry point for Root and Source administration:
 - List available Source kinds.
 - Read a managed Source's current generation and publish or remove one whole
   managed package.
-- Destructively purge an Artifact only when a caller has already applied any
-  feature-specific membership rule.
 
 Source configuration is accepted on create or replacement but is never returned
 to a client. The current Artifact API deliberately does not expose raw
-Collection editing, generic refresh, adoption, or pinning endpoints. Those
+Collection editing, generic Artifact purge, refresh, adoption, or pinning endpoints. Those
 operations need the policy of the feature that owns the Collection.
 
 ### 9.2 Feature APIs
@@ -632,16 +630,17 @@ establishes its membership and meaning.
 - Send the revision returned by a previous read for every change that asks for
   one. A conflict means the client must reload the affected Root, Source,
   Workspace, or Artifact and let the user retry.
-- Use a feature API for an Artifact that belongs to that feature. The generic
-  purge operation is intentionally not a substitute for feature-level
-  ownership checks.
+- Use a feature API for an Artifact that belongs to that feature. Generic
+  Artifact purge is an internal service capability for trusted feature code,
+  not a public transport operation. A feature that has source-side deletion
+  semantics must perform that workflow before local metadata is purged.
 
 ## 10. Current implementation status
 
 | Capability                              | Status                             | Current implementation                                                                                                                                                                                                    |
 | --------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Root and Source lifecycle               | Present                            | Roots are technical namespaces. Sources are Root-owned, can be attached to multiple same-Root Collections, and support revision-checked lifecycle changes.                                                                |
-| Public Artifact API boundary            | Present and scoped                 | The public API manages Roots, Sources, Source kinds, managed package publication, and direct Artifact purge. It intentionally does not expose raw generic Collection editing.                                             |
+| Public Artifact API boundary            | Present and scoped                 | The public API manages Roots, Sources, Source kinds, and managed package publication. Feature APIs own Artifact deletion workflows where membership or source-side cleanup matters.                                       |
 | Source adapters and snapshots           | Present                            | Filesystem, embedded, managed, and additional adapters can provide bounded source-relative discovery access.                                                                                                              |
 | Collections and attachments             | Present                            | Collections, attachment roles, enablement, local data, retirement, and optimistic revisions are durable platform capabilities used by feature services.                                                                   |
 | Discovery, catalog, and reconciliation  | Present                            | Refresh publishes one Collection-scoped catalog, preserves valid, invalid, and missing observations, and reconciles source-derived Artifact state.                                                                        |
@@ -689,8 +688,11 @@ an empty acknowledgement perform a one-time metadata repair before accepting
 another package mutation.
 
 Managed package generations cover every published payload directory. The
-managed adapter excludes only its private staging directory, rather than
-inheriting the broad project traversal exclusions used by external filesystem
+managed adapter excludes only its private staging directory. MapStore remains
+the storage implementation boundary for immutable definitions and managed file
+payloads; feature code must not inspect MapStore-managed paths, recreate
+MapStore containment rules, or add platform-specific filesystem policy.
+This avoids inheriting the broad project traversal exclusions used by external filesystem
 Sources. This preserves generation-based runtime freshness for normal package
 resources and scripts.
 

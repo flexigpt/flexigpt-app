@@ -418,10 +418,11 @@ The handoff must:
 - Require available source-derived state.
 - Require a current Collection catalog.
 - Verify the occurrence definition digest.
-- Verify `SKILL.md` content.
-- Verify Source generation or an equivalent package content closure.
+- Confirm the catalog Source generation before and after trusted native-path
+  resolution.
 - Keep native paths outside persistent references and portable definitions.
-- Use the normal Agent Skills filesystem provider.
+- Delegate `SKILL.md` parsing, resource access, script policy, sandboxing, and
+  execution to the normal Agent Skills filesystem provider.
 
 The local desktop management API may display a selected Source root path.
 That trusted presentation exception must not become a portable field, runtime
@@ -621,6 +622,10 @@ The frontend follows the same boundary:
   selection surface and inserted as transient composer text.
 - Workspace list refresh is guarded per menu-open transition so a changing
   callback identity cannot cause recursive catalog reloads.
+
+Workspace runtime synchronization tracks only `workspace.collection` refs that
+it previously managed. It must never inspect global runtime partitions as a
+deletion list because the same runtime also contains `skill.bundle` partitions.
 
 ### 13.1 Complete Artifact Store prerequisites
 

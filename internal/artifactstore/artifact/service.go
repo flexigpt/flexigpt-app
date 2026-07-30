@@ -422,6 +422,12 @@ func (s *Service) Unadopt(
 	if expectedRevision == 0 || current.Revision != expectedRevision {
 		return basespec.ErrConflict
 	}
+	if current.Adoption != AdoptionObserved {
+		return fmt.Errorf(
+			"%w: only observed artifacts can be unadopted",
+			basespec.ErrConflict,
+		)
+	}
 
 	var suppression *Suppression
 	if suppress {

@@ -113,22 +113,15 @@ func (s *SkillRuntime) runCollectionReconciliation(
 		if request.Remove {
 			action = "remove"
 		}
-		if attempt >= collectionReconcileMaxAttempts {
-			s.collectionRequestMu.Lock()
-			if current, found := s.collectionRequests[ref]; found &&
-				current.Generation == request.Generation {
-				delete(s.collectionRequests, ref)
-			}
-			s.collectionRequestMu.Unlock()
+		if attempt == collectionReconcileLogAfterAttempts {
 			slog.Error(
-				"skill runtime collection reconciliation exhausted retries",
+				"skill runtime collection reconciliation remains pending",
 				"action", action,
 				"rootID", ref.RootID,
 				"collectionID", ref.CollectionID,
 				"attempts", attempt,
 				"error", err,
 			)
-			return
 		}
 
 		delay := collectionReconcileDelay(attempt)
@@ -146,7 +139,10 @@ func (s *SkillRuntime) runCollectionReconciliation(
 		select {
 		case <-parent.Done():
 			if !timer.Stop() {
-				<-timer.C
+				select {
+				case <-timer.C:
+				default:
+				}
 			}
 			return
 		case <-timer.C:

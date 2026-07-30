@@ -15,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/skillbundle"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 )
 
@@ -51,7 +50,7 @@ func InitSkillBundleWrapper(
 		SourceRuntime:      components.SourceRuntime,
 		HasDecoder:         components.HasDecoder,
 		DecoderFingerprint: components.DecoderFingerprint,
-		IDGenerator:        uuidutil.UUIDv7Generator{},
+
 		GetManagedSourceState: func(
 			ctx context.Context,
 			rootID basespec.RootID,

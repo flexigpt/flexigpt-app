@@ -230,19 +230,6 @@ func (w *ArtifactStoreWrapper) ListArtifactSourceKinds(
 	)
 }
 
-func (w *ArtifactStoreWrapper) PurgeArtifact(
-	request *artifactstore.PurgeArtifactRequest,
-) (*artifactstore.PurgeArtifactResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*artifactstore.PurgeArtifactResponse, error) {
-			return w.api.PurgeArtifact(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
 func (w *ArtifactStoreWrapper) GetManagedSourceState(
 	request *artifactstore.GetManagedSourceStateRequest,
 ) (*artifactstore.GetManagedSourceStateResponse, error) {
@@ -285,28 +272,43 @@ func (w *ArtifactStoreWrapper) RemoveManagedSourcePackage(
 func (w *ArtifactStoreWrapper) subscribeRootMutation(
 	observer func(basespec.RootID),
 ) func() {
-	if w == nil || w.api == nil {
+	if w == nil {
+		return func() {}
+	}
+
+	w.observerMu.Lock()
+	defer w.observerMu.Unlock()
+	if w.api == nil {
 		return func() {}
 	}
 	unsubscribe := w.api.SubscribeRootMutation(observer)
-	w.observerMu.Lock()
 	w.observers = append(w.observers, unsubscribe)
-	w.observerMu.Unlock()
 	return unsubscribe
 }
 
 func (w *ArtifactStoreWrapper) close() {
+	if w == nil {
+		return
+	}
+
 	w.observerMu.Lock()
 	for _, unsubscribe := range w.observers {
 		unsubscribe()
 	}
 	w.observers = nil
-	w.observerMu.Unlock()
-
-	if err := w.components.Close(); err != nil {
-		slog.Error("close artifact store", "error", err)
-	}
-
+	api := w.api
+	components := w.components
 	w.api = nil
 	w.components = nil
+	w.observerMu.Unlock()
+
+	if api != nil {
+		api.Close()
+	}
+	if components == nil {
+		return
+	}
+	if err := components.Close(); err != nil {
+		slog.Error("close artifact store", "error", err)
+	}
 }

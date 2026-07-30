@@ -364,6 +364,12 @@ func (s *Store) unadoptArtifact(
 	if current.Revision != expectedRevision {
 		return basespec.ErrConflict
 	}
+	if current.Adoption != artifact.AdoptionObserved {
+		return fmt.Errorf(
+			"%w: only observed artifacts can be unadopted",
+			basespec.ErrConflict,
+		)
+	}
 
 	collectionRef := collection.CollectionRef{
 		RootID:       current.RootID,

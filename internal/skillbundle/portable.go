@@ -16,10 +16,10 @@ import (
 )
 
 const (
+	PortableBundleSchemaVersion                   = "v1"
+	portableMemberFormat                          = "agent.skill-entrypoint/v1"
+	portableSkillMediaType                        = "text/markdown"
 	PortableBundleSchemaID      basespec.SchemaID = "skill.bundle.v1"
-	PortableBundleSchemaVersion basespec.SchemaID = "v1"
-	portableMemberFormat        basespec.SchemaID = "agent.skill-package/v1"
-	portableSkillMediaType      basespec.SchemaID = "text/markdown"
 )
 
 type PortableBundleMetadata struct {
@@ -34,15 +34,18 @@ type portableBundleBody struct {
 	MemberFormat string `json:"memberFormat"`
 }
 
-// NewPortableBundleDefinition creates a canonical shareable Skill Bundle
-// manifest. Members identify package SKILL.md documents; the package closure
-// itself remains the responsibility of future import/export code.
+// NewPortableBundleDefinition creates a canonical shareable Skill Bundle JSON
+// manifest. ContentRef.Digest is the digest of the raw SKILL.md member bytes,
+// not the digest of the derived Artifact Definition.
+//
+// Members identify package entrypoint documents; the package closure itself remains the responsibility of future
+// import/export code.
 func NewPortableBundleDefinition(
 	metadata PortableBundleMetadata,
 	members []definition.ContentRef,
 ) (definition.CollectionDefinition, error) {
 	body, err := json.Marshal(portableBundleBody{
-		MemberFormat: string(portableMemberFormat),
+		MemberFormat: portableMemberFormat,
 	})
 	if err != nil {
 		return definition.CollectionDefinition{}, err
@@ -51,7 +54,7 @@ func NewPortableBundleDefinition(
 		definition.CollectionDefinition{
 			Kind:           CollectionKind,
 			SchemaID:       PortableBundleSchemaID,
-			SchemaVersion:  string(PortableBundleSchemaVersion),
+			SchemaVersion:  PortableBundleSchemaVersion,
 			LogicalName:    metadata.LogicalName,
 			LogicalVersion: metadata.LogicalVersion,
 			DisplayName:    metadata.DisplayName,
@@ -84,7 +87,7 @@ func ValidatePortableBundleDefinition(
 	}
 	if value.Kind != CollectionKind ||
 		value.SchemaID != PortableBundleSchemaID ||
-		value.SchemaVersion != string(PortableBundleSchemaVersion) {
+		value.SchemaVersion != PortableBundleSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported portable Skill Bundle schema",
 			basespec.ErrInvalid,
@@ -101,7 +104,7 @@ func ValidatePortableBundleDefinition(
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return fmt.Errorf("%w: portable Skill Bundle body has trailing JSON", basespec.ErrInvalid)
 	}
-	if body.MemberFormat != string(portableMemberFormat) {
+	if body.MemberFormat != portableMemberFormat {
 		return fmt.Errorf(
 			"%w: unsupported portable Skill Bundle member format %q",
 			basespec.ErrInvalid,
@@ -111,7 +114,7 @@ func ValidatePortableBundleDefinition(
 
 	for index, member := range value.Members {
 		if member.Role != string(skillartifact.Kind) ||
-			member.MediaType != string(portableSkillMediaType) ||
+			member.MediaType != portableSkillMediaType ||
 			member.Digest == nil ||
 			member.SubresourceLocator != "" {
 			return fmt.Errorf(

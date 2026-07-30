@@ -22,7 +22,6 @@ const maximumDefinitionFileBytes = int64(
 )
 
 type Repository struct {
-	root  string
 	files *mapstore.MapDirectoryStore
 
 	mu     sync.RWMutex
@@ -37,15 +36,8 @@ type definitionKeyAttributes struct {
 type definitionPartitionProvider struct{}
 
 func Open(root string) (*Repository, error) {
-	privateRoot, err := mapstoreio.PreparePrivateDirectory(root)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"prepare definition repository: %w",
-			err,
-		)
-	}
 	files, err := mapstore.NewMapDirectoryStore(
-		privateRoot,
+		root,
 		true,
 		&definitionPartitionProvider{},
 		mapstoreio.BoundedJSONEncoderDecoder{
@@ -59,7 +51,6 @@ func Open(root string) (*Repository, error) {
 		)
 	}
 	return &Repository{
-		root:  privateRoot,
 		files: files,
 	}, nil
 }
@@ -105,7 +96,7 @@ func (r *Repository) Put(
 	if err != nil {
 		return definition.Definition{}, err
 	}
-	key, partition, path, err := r.location(rootID, canonical.Digest, true)
+	key, err := definitionFileKey(rootID, canonical.Digest)
 	if err != nil {
 		return definition.Definition{}, err
 	}
@@ -116,26 +107,12 @@ func (r *Repository) Put(
 		return definition.Definition{}, basespec.ErrClosed
 	}
 
-	_, statErr := os.Stat(path)
-	existed := statErr == nil
-	if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
-		return definition.Definition{}, statErr
-	}
-	if existed {
-		if err := mapstoreio.SecureRegularFile(path); err != nil {
-			return definition.Definition{}, err
-		}
-	}
-
 	fileStore, err := r.files.OpenFile(key, true, data)
 	if err != nil {
 		return definition.Definition{}, fmt.Errorf(
 			"open definition MapStore file: %w",
 			err,
 		)
-	}
-	if err := mapstoreio.SecureRegularFile(path); err != nil {
-		return definition.Definition{}, err
 	}
 	storedMap, err := fileStore.GetAll(true)
 	if err != nil {
@@ -157,16 +134,6 @@ func (r *Repository) Put(
 			stored.Digest,
 		)
 	}
-	if !existed {
-		if err := mapstoreio.SyncRegularFile(path); err != nil {
-			return definition.Definition{}, err
-		}
-		if err := mapstoreio.SyncDirectory(
-			filepath.Join(r.root, partition),
-		); err != nil {
-			return definition.Definition{}, err
-		}
-	}
 	return stored, nil
 }
 
@@ -184,7 +151,7 @@ func (r *Repository) Get(
 	if err := ctx.Err(); err != nil {
 		return definition.Definition{}, err
 	}
-	key, _, path, err := r.location(rootID, digest, false)
+	key, err := definitionFileKey(rootID, digest)
 	if err != nil {
 		return definition.Definition{}, err
 	}
@@ -195,30 +162,9 @@ func (r *Repository) Get(
 		return definition.Definition{}, basespec.ErrClosed
 	}
 
-	info, err := os.Stat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return definition.Definition{}, fmt.Errorf(
-			"%w: definition %q",
-			basespec.ErrDefinitionNotFound,
-			digest,
-		)
-	}
-	if err != nil {
-		return definition.Definition{}, err
-	}
-	if !info.Mode().IsRegular() {
-		return definition.Definition{}, fmt.Errorf(
-			"%w: definition path is not a regular file",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := mapstoreio.SecureRegularFile(path); err != nil {
-		return definition.Definition{}, err
-	}
-
 	fileStore, err := r.files.OpenFile(key, false, map[string]any{})
 	if err != nil {
-		if _, statErr := os.Lstat(path); errors.Is(statErr, os.ErrNotExist) {
+		if errors.Is(err, os.ErrNotExist) {
 			return definition.Definition{}, fmt.Errorf(
 				"%w: definition %q",
 				basespec.ErrDefinitionNotFound,
@@ -244,32 +190,6 @@ func (r *Repository) Get(
 		)
 	}
 	return value, nil
-}
-
-func (r *Repository) location(
-	rootID basespec.RootID,
-	digest cryptoutil.Digest,
-	createParent bool,
-) (key mapstore.FileKey, partition, path string, err error) {
-	key, err = definitionFileKey(rootID, digest)
-	if err != nil {
-		return mapstore.FileKey{}, "", "", err
-	}
-	provider := &definitionPartitionProvider{}
-	partition, err = provider.GetPartitionDir(key)
-	if err != nil {
-		return mapstore.FileKey{}, "", "", err
-	}
-	path, err = mapstoreio.PrivateFilePath(
-		r.root,
-		partition,
-		key.FileName,
-		createParent,
-	)
-	if err != nil {
-		return mapstore.FileKey{}, "", "", err
-	}
-	return key, partition, path, nil
 }
 
 func definitionFileKey(
