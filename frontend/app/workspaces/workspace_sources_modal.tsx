@@ -1,5 +1,5 @@
 import type { SubmitEventHandler } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { FiAlertCircle, FiCheck, FiFolder, FiLink, FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
@@ -12,6 +12,9 @@ import type {
 } from '@/spec/workspace';
 import { WorkspaceAttachmentRole } from '@/spec/workspace';
 
+import { throwIfAborted } from '@/lib/async_utils';
+
+import { useAsyncResource } from '@/hooks/use_async_resource';
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { artifactStoreAPI, workspaceAPI } from '@/apis/baseapi';
@@ -71,6 +74,39 @@ function sortSources(sources: ArtifactSourceSummary[]): ArtifactSourceSummary[] 
 	});
 }
 
+interface WorkspaceSourceCatalogData {
+	sources: ArtifactSourceSummary[];
+	sourceKinds: ArtifactSourceKind[];
+	sourceLoadError?: string;
+	sourceKindsError?: string;
+}
+
+const EMPTY_WORKSPACE_SOURCE_CATALOG: WorkspaceSourceCatalogData = {
+	sources: [],
+	sourceKinds: [],
+};
+
+async function loadWorkspaceSourceCatalog(rootID: string, signal: AbortSignal): Promise<WorkspaceSourceCatalogData> {
+	const [sourcesResult, kindsResult] = await Promise.allSettled([
+		artifactStoreAPI.listArtifactSources(rootID),
+		artifactStoreAPI.listArtifactSourceKinds(),
+	]);
+	throwIfAborted(signal);
+
+	return {
+		sources: sourcesResult.status === 'fulfilled' ? sortSources(sourcesResult.value) : [],
+		sourceKinds: kindsResult.status === 'fulfilled' ? kindsResult.value : [],
+		sourceLoadError:
+			sourcesResult.status === 'rejected'
+				? getErrorMessage(sourcesResult.reason, 'Artifact Store Sources could not be loaded.')
+				: undefined,
+		sourceKindsError:
+			kindsResult.status === 'rejected'
+				? getErrorMessage(kindsResult.reason, 'Artifact Source kinds could not be loaded.')
+				: undefined,
+	};
+}
+
 function parseSourceConfig(raw: string): string {
 	let parsed: unknown;
 
@@ -93,7 +129,6 @@ function parseSourceConfig(raw: string): string {
 }
 
 interface WorkspaceSourceAttachmentCardProps {
-	workspace: WorkspaceView;
 	attachment: WorkspaceAttachmentView;
 	source?: ArtifactSourceSummary;
 	busy: boolean;
@@ -102,8 +137,6 @@ interface WorkspaceSourceAttachmentCardProps {
 }
 
 function WorkspaceSourceAttachmentCard({
-	// oxlint-disable-next-line no-unused-vars
-	workspace,
 	attachment,
 	source,
 	busy,
@@ -113,8 +146,8 @@ function WorkspaceSourceAttachmentCard({
 	const isPrimary = attachment.role === WorkspaceAttachmentRole.Primary;
 	const [role, setRole] = useState<WorkspaceAttachmentRole>(attachment.role);
 	const [enabled, setEnabled] = useState(attachment.enabled);
-	const [recursive, setRecursive] = useState(Boolean(attachment.settings.recursive));
-	const [authoritative, setAuthoritative] = useState(Boolean(attachment.settings.authoritative));
+	const [recursive, setRecursive] = useState(Boolean(attachment.settings?.recursive));
+	const [authoritative, setAuthoritative] = useState(Boolean(attachment.settings?.authoritative));
 	const title = attachment.path ?? attachment.sourceDisplayName ?? source?.displayName ?? 'Attached Source';
 	const subtitle = source ? `${source.kind} · ${source.id}` : (attachment.sourceKind ?? attachment.sourceID);
 
@@ -251,14 +284,41 @@ function WorkspaceSourcesModalContent({
 }: Omit<WorkspaceSourcesModalProps, 'isOpen' | 'onClose'>) {
 	const { requestClose, unmountingRef } = useModalDialogController();
 	const [currentWorkspace, setCurrentWorkspace] = useState(workspace);
-	const [sources, setSources] = useState<ArtifactSourceSummary[]>([]);
-	const [sourceKinds, setSourceKinds] = useState<ArtifactSourceKind[]>([]);
-	const [sourceLoadError, setSourceLoadError] = useState('');
-	const [sourceKindsError, setSourceKindsError] = useState('');
-	const [isSourceLoading, setIsSourceLoading] = useState(false);
 	const [pendingAction, setPendingAction] = useState<string | null>(null);
 	const [actionError, setActionError] = useState('');
 	const [attachmentToDetach, setAttachmentToDetach] = useState<WorkspaceAttachmentView | null>(null);
+
+	const loadSourceCatalog = useCallback(
+		(signal: AbortSignal) => loadWorkspaceSourceCatalog(currentWorkspace.workspace.rootID, signal),
+		[currentWorkspace.workspace.rootID]
+	);
+	const {
+		data: sourceCatalog,
+		error: sourceCatalogError,
+		isLoading: isInitialSourceLoading,
+		isRefreshing: isRefreshingSources,
+		reloadOrThrow: reloadSourceCatalog,
+		setData: setSourceCatalog,
+	} = useAsyncResource(loadSourceCatalog, {
+		initialData: EMPTY_WORKSPACE_SOURCE_CATALOG,
+	});
+	const sources = sourceCatalog.sources;
+	const sourceKinds = sourceCatalog.sourceKinds;
+	const isSourceLoading = isInitialSourceLoading || isRefreshingSources;
+	const sourceLoadError =
+		sourceCatalog.sourceLoadError ??
+		(sourceCatalogError ? getErrorMessage(sourceCatalogError, 'Artifact Store Sources could not be loaded.') : '');
+	const sourceKindsError =
+		sourceCatalog.sourceKindsError ??
+		(sourceCatalogError ? getErrorMessage(sourceCatalogError, 'Artifact Source kinds could not be loaded.') : '');
+
+	const refreshSources = useCallback(async () => {
+		try {
+			await reloadSourceCatalog();
+		} catch {
+			// `useAsyncResource` exposes the resource failure in sourceLoadError.
+		}
+	}, [reloadSourceCatalog]);
 
 	const [selectedExistingSourceID, setSelectedExistingSourceID] = useState('');
 	const [selectedAttachmentRole, setSelectedAttachmentRole] = useState<WorkspaceAttachmentRole>(
@@ -295,40 +355,6 @@ function WorkspaceSourcesModalContent({
 	const selectedExistingSource = sourceByID.get(selectedExistingSourceID);
 	const selectedPrimarySource = sourceByID.get(selectedPrimarySourceID);
 	const effectiveNewSourceKind = newSourceKind || sourceKinds[0] || '';
-
-	const refreshSources = useCallback(async () => {
-		setIsSourceLoading(true);
-		setSourceLoadError('');
-		setSourceKindsError('');
-
-		const [sourcesResult, kindsResult] = await Promise.allSettled([
-			artifactStoreAPI.listArtifactSources(currentWorkspace.workspace.rootID),
-			artifactStoreAPI.listArtifactSourceKinds(),
-		]);
-
-		if (unmountingRef.current) {
-			return;
-		}
-
-		if (sourcesResult.status === 'fulfilled') {
-			setSources(sortSources(sourcesResult.value));
-		} else {
-			setSourceLoadError(getErrorMessage(sourcesResult.reason, 'Artifact Store Sources could not be loaded.'));
-		}
-
-		if (kindsResult.status === 'fulfilled') {
-			setSourceKinds(kindsResult.value);
-		} else {
-			setSourceKindsError(getErrorMessage(kindsResult.reason, 'Artifact Source kinds could not be loaded.'));
-		}
-
-		setIsSourceLoading(false);
-	}, [currentWorkspace.workspace.rootID, unmountingRef]);
-
-	useEffect(() => {
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
-		void refreshSources();
-	}, [refreshSources]);
 
 	const applyUpdatedWorkspace = useCallback(
 		(updated: WorkspaceView) => {
@@ -504,7 +530,11 @@ function WorkspaceSourcesModalContent({
 				});
 
 				if (!unmountingRef.current) {
-					setSources(previous => sortSources(previous.map(item => (item.id === updated.id ? updated : item))));
+					setSourceCatalog(previous => ({
+						...previous,
+						sources: sortSources(previous.sources.map(item => (item.id === updated.id ? updated : item))),
+						sourceLoadError: undefined,
+					}));
 					if (attachedSourceIDs.has(source.id)) {
 						onCatalogInvalidated();
 					}
@@ -519,7 +549,14 @@ function WorkspaceSourcesModalContent({
 				}
 			}
 		},
-		[attachedSourceIDs, currentWorkspace.workspace.rootID, onCatalogInvalidated, pendingAction, unmountingRef]
+		[
+			attachedSourceIDs,
+			setSourceCatalog,
+			currentWorkspace.workspace.rootID,
+			onCatalogInvalidated,
+			pendingAction,
+			unmountingRef,
+		]
 	);
 
 	const registerSource: SubmitEventHandler<HTMLFormElement> = event => {
@@ -567,7 +604,11 @@ function WorkspaceSourcesModalContent({
 				});
 
 				if (!unmountingRef.current) {
-					setSources(previous => sortSources([...previous, created as ArtifactSourceSummary]));
+					setSourceCatalog(previous => ({
+						...previous,
+						sources: sortSources([...previous.sources, created as ArtifactSourceSummary]),
+						sourceLoadError: undefined,
+					}));
 				}
 
 				if (attachNewSource) {
@@ -666,7 +707,6 @@ function WorkspaceSourcesModalContent({
 						{currentWorkspace.attachments.map(attachment => (
 							<WorkspaceSourceAttachmentCard
 								key={`${attachment.sourceID}:${attachment.revision}`}
-								workspace={currentWorkspace}
 								attachment={attachment}
 								source={sourceByID.get(attachment.sourceID)}
 								busy={pendingAction !== null}
@@ -1019,7 +1059,10 @@ function WorkspaceSourcesModalContent({
 									</div>
 								</div>
 								{attachedSourceIDs.has(source.id) ? (
-									<FiCheck size={14} className="text-success" title="Attached" />
+									<span className="text-success inline-flex items-center" title="Attached to this Workspace">
+										<FiCheck size={14} aria-hidden="true" />
+										<span className="sr-only">Attached to this Workspace</span>
+									</span>
 								) : null}
 								<button
 									type="button"

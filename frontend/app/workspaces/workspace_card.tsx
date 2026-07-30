@@ -73,6 +73,22 @@ interface WorkspaceCardProps {
 	onRequestDelete: (workspace: WorkspaceView) => void;
 }
 
+interface WorkspaceCatalogState {
+	workspaceVersion: string;
+	data: WorkspaceCatalogData | null;
+	error: unknown;
+	isLoading: boolean;
+}
+
+function workspaceVersionFor(workspace: WorkspaceView): string {
+	return `${workspaceRefKey(workspace.workspace)}:${workspace.revision}`;
+}
+
+function workspaceSuppressionKey(suppression: WorkspaceSuppressionView): string {
+	const { binding } = suppression;
+	return `${binding.sourceID}:${binding.locator}:${binding.subresourceLocator ?? ''}:${binding.expectedKind}`;
+}
+
 async function loadWorkspaceCatalogData(workspace: WorkspaceView): Promise<WorkspaceCatalogData> {
 	const workspaceRef = workspace.workspace;
 	const catalog = normalizeWorkspaceCatalog(await workspaceAPI.getWorkspaceCatalog(workspaceRef));
@@ -188,9 +204,7 @@ export function WorkspaceCard({
 }: WorkspaceCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [activeTab, setActiveTab] = useState<WorkspaceTab>('contexts');
-	const [catalogData, setCatalogData] = useState<WorkspaceCatalogData | null>(null);
-	const [catalogError, setCatalogError] = useState<unknown>(null);
-	const [isCatalogLoading, setIsCatalogLoading] = useState(false);
+	const [catalogState, setCatalogState] = useState<WorkspaceCatalogState | null>(null);
 	const [recordSearch, setRecordSearch] = useState('');
 	const [refreshSummary, setRefreshSummary] = useState('');
 	const [alertMessage, setAlertMessage] = useState('');
@@ -206,6 +220,11 @@ export function WorkspaceCard({
 	const requestIDRef = useRef(0);
 	const mountedRef = useRef(true);
 	const { isPending, runAction } = usePendingActions();
+	const workspaceVersion = workspaceVersionFor(workspace);
+	const currentCatalogState = catalogState?.workspaceVersion === workspaceVersion ? catalogState : null;
+	const catalogData = currentCatalogState?.data ?? null;
+	const catalogError = currentCatalogState?.error ?? null;
+	const isCatalogLoading = currentCatalogState?.isLoading ?? false;
 
 	useEffect(() => {
 		mountedRef.current = true;
@@ -214,24 +233,6 @@ export function WorkspaceCard({
 			requestIDRef.current += 1;
 		};
 	}, []);
-
-	const workspaceVersion = `${workspaceRefKey(workspace.workspace)}:${workspace.revision}`;
-	const workspaceVersionRef = useRef(workspaceVersion);
-
-	useEffect(() => {
-		if (workspaceVersionRef.current === workspaceVersion) {
-			return;
-		}
-
-		workspaceVersionRef.current = workspaceVersion;
-		requestIDRef.current += 1;
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setCatalogData(null);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setCatalogError(null);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setIsCatalogLoading(false);
-	}, [workspaceVersion]);
 
 	const sourceLabelFor = useCallback(
 		(sourceID: string) => {
@@ -244,39 +245,57 @@ export function WorkspaceCard({
 	const reloadCatalog = useCallback(async () => {
 		const requestID = requestIDRef.current + 1;
 		requestIDRef.current = requestID;
-		setIsCatalogLoading(true);
-		setCatalogError(null);
+		const requestedWorkspace = workspace;
+		const requestedWorkspaceVersion = workspaceVersion;
+
+		setCatalogState(previous => ({
+			workspaceVersion: requestedWorkspaceVersion,
+			data: previous?.workspaceVersion === requestedWorkspaceVersion ? previous.data : null,
+			error: null,
+			isLoading: true,
+		}));
 
 		try {
-			const next = await loadWorkspaceCatalogData(workspace);
+			const next = await loadWorkspaceCatalogData(requestedWorkspace);
 			if (mountedRef.current && requestIDRef.current === requestID) {
-				setCatalogData(next);
-				workspaceVersionRef.current = `${workspaceRefKey(next.catalog.workspace.workspace)}:${next.catalog.workspace.revision}`;
+				setCatalogState({
+					workspaceVersion: workspaceVersionFor(next.catalog.workspace),
+					data: next,
+					error: null,
+					isLoading: false,
+				});
 				onWorkspaceChange(next.catalog.workspace);
 			}
 		} catch (error) {
 			if (mountedRef.current && requestIDRef.current === requestID) {
-				setCatalogError(error);
+				setCatalogState(previous => ({
+					workspaceVersion: requestedWorkspaceVersion,
+					data: previous?.workspaceVersion === requestedWorkspaceVersion ? previous.data : null,
+					error,
+					isLoading: false,
+				}));
 			}
 			throw error;
-		} finally {
-			if (mountedRef.current && requestIDRef.current === requestID) {
-				setIsCatalogLoading(false);
-			}
 		}
-	}, [onWorkspaceChange, workspace]);
+	}, [onWorkspaceChange, workspace, workspaceVersion]);
 
 	const artifacts = useMemo(() => (catalogData ? getWorkspaceArtifacts(catalogData.catalog) : []), [catalogData]);
 
 	const invalidateCatalog = useCallback((message?: string) => {
 		requestIDRef.current += 1;
-		setCatalogData(null);
-		setCatalogError(null);
-		setIsCatalogLoading(false);
+		setCatalogState(null);
 		if (message) {
 			setRefreshSummary(message);
 		}
 	}, []);
+
+	useEffect(() => {
+		if (!isExpanded || catalogData || catalogError || isCatalogLoading) {
+			return;
+		}
+
+		void reloadCatalog().catch(() => undefined);
+	}, [catalogData, catalogError, isCatalogLoading, isExpanded, reloadCatalog]);
 
 	const visibleArtifacts = useMemo(
 		() => artifacts.filter(artifact => workspaceArtifactMatchesSearch(artifact, recordSearch)),
@@ -284,12 +303,32 @@ export function WorkspaceCard({
 	);
 	const diagnostics = useMemo(() => (catalogData ? collectWorkspaceDiagnostics(catalogData) : []), [catalogData]);
 
-	const showFailure = (error: unknown, fallback: string) => {
-		setAlertMessage(getErrorMessage(error, fallback));
-	};
+	const showFailure = useCallback((error: unknown, fallback: string) => {
+		if (mountedRef.current) {
+			setAlertMessage(getErrorMessage(error, fallback));
+		}
+	}, []);
+
+	const showCatalogReloadFailure = useCallback((completedAction: string, error: unknown) => {
+		if (!mountedRef.current) {
+			return;
+		}
+
+		const details = getErrorMessage(error, '');
+		setAlertMessage(details ? `${completedAction} ${details}` : completedAction);
+	}, []);
 
 	const updateArtifactLocally = (artifact: WorkspaceArtifactView) => {
-		setCatalogData(previous => (previous ? replaceWorkspaceArtifact(previous, artifact) : previous));
+		setCatalogState(previous => {
+			if (!previous?.data || previous.workspaceVersion !== workspaceVersion) {
+				return previous;
+			}
+
+			return {
+				...previous,
+				data: replaceWorkspaceArtifact(previous.data, artifact),
+			};
+		});
 		setRecordToInspect(previous =>
 			previous && artifactRefKey(previous.artifact) === artifactRefKey(artifact.artifact) ? artifact : previous
 		);
@@ -301,7 +340,7 @@ export function WorkspaceCard({
 			await runAction(key, async () => {
 				updated = await action();
 			});
-			if (updated) {
+			if (updated && mountedRef.current) {
 				updateArtifactLocally(updated);
 			}
 		} catch (error) {
@@ -319,7 +358,7 @@ export function WorkspaceCard({
 					enabled,
 					discovery: workspace.discovery,
 				});
-				workspaceVersionRef.current = `${workspaceRefKey(updated.workspace)}:${updated.revision}`;
+				void updated;
 			});
 		} catch (error) {
 			showFailure(error, 'Failed to update workspace enable state.');
@@ -327,15 +366,27 @@ export function WorkspaceCard({
 	};
 
 	const refreshWorkspace = async () => {
-		setRefreshSummary('');
+		if (mountedRef.current) {
+			setRefreshSummary('');
+		}
 
 		try {
 			await runAction('workspace:refresh', async () => {
 				const result = await workspaceAPI.refreshWorkspace(workspace.workspace);
-				setRefreshSummary(
-					`Scanned ${result.candidates} candidates. Created ${result.createdArtifacts.length} and updated ${result.updatedArtifacts.length} artifacts.`
-				);
-				await reloadCatalog();
+				if (mountedRef.current) {
+					setRefreshSummary(
+						`Scanned ${result.candidates} candidates. Created ${result.createdArtifacts.length} and updated ${result.updatedArtifacts.length} artifacts.`
+					);
+				}
+
+				try {
+					await reloadCatalog();
+				} catch (reloadError) {
+					showCatalogReloadFailure(
+						'Workspace discovery was refreshed, but the catalog could not be reloaded.',
+						reloadError
+					);
+				}
 			});
 		} catch (error) {
 			showFailure(error, 'Failed to refresh workspace discovery.');
@@ -346,8 +397,11 @@ export function WorkspaceCard({
 		if (submission.kind !== 'update') {
 			throw new Error('Expected a workspace update.');
 		}
+
 		await onUpdateWorkspace(submission.payload);
-		invalidateCatalog('Workspace settings changed. Refresh the Workspace to publish a new discovery catalog.');
+		if (mountedRef.current) {
+			invalidateCatalog('Workspace settings changed. Refresh the Workspace to publish a new discovery catalog.');
+		}
 	};
 
 	const requestArtifactRemoval = (record: WorkspaceArtifactView) => {
@@ -367,11 +421,26 @@ export function WorkspaceCard({
 			suppressRemovedBinding
 		);
 
-		setCatalogData(previous =>
-			previous ? removeWorkspaceArtifact(previous, recordToDelete.artifact.artifactID) : previous
-		);
+		if (!mountedRef.current) {
+			return;
+		}
 
-		await reloadCatalog();
+		setCatalogState(previous => {
+			if (!previous?.data || previous.workspaceVersion !== workspaceVersion) {
+				return previous;
+			}
+
+			return {
+				...previous,
+				data: removeWorkspaceArtifact(previous.data, recordToDelete.artifact.artifactID),
+			};
+		});
+
+		try {
+			await reloadCatalog();
+		} catch (reloadError) {
+			showCatalogReloadFailure('Artifact was removed, but the Workspace catalog could not be reloaded.', reloadError);
+		}
 	};
 
 	const adoptOccurrence = async (occurrence: WorkspaceOccurrenceView) => {
@@ -390,23 +459,38 @@ export function WorkspaceCard({
 			enabled: true,
 			settings: { runtimeDisabled: false },
 		});
-		await reloadCatalog();
+
+		try {
+			await reloadCatalog();
+		} catch (reloadError) {
+			showCatalogReloadFailure('Artifact was adopted, but the Workspace catalog could not be reloaded.', reloadError);
+		}
 	};
 
 	const unsuppressBinding = async (suppression: WorkspaceSuppressionView) => {
-		const key = `suppression:${suppression.binding.sourceID}:${suppression.binding.locator}:${suppression.binding.subresourceLocator ?? ''}`;
+		const suppressionKey = workspaceSuppressionKey(suppression);
+		const pendingKey = `suppression:${suppressionKey}`;
 
 		try {
-			await runAction(key, async () => {
+			await runAction(pendingKey, async () => {
 				await workspaceAPI.unsuppressWorkspaceBinding(workspace.workspace, suppression.binding, suppression.revision);
-				setCatalogData(previous =>
-					previous
-						? {
-								...previous,
-								suppressions: previous.suppressions.filter(item => item !== suppression),
-							}
-						: previous
-				);
+				if (mountedRef.current) {
+					setCatalogState(previous => {
+						if (!previous?.data || previous.workspaceVersion !== workspaceVersion) {
+							return previous;
+						}
+
+						return {
+							...previous,
+							data: {
+								...previous.data,
+								suppressions: previous.data.suppressions.filter(
+									item => workspaceSuppressionKey(item) !== suppressionKey
+								),
+							},
+						};
+					});
+				}
 				setRefreshSummary('Source binding was unsuppressed. Refresh the Workspace to discover and adopt it again.');
 			});
 		} catch (error) {
@@ -517,11 +601,7 @@ export function WorkspaceCard({
 						type="button"
 						className="btn btn-sm btn-ghost rounded-xl"
 						onClick={() => {
-							const nextExpanded = !isExpanded;
-							setIsExpanded(nextExpanded);
-							if (nextExpanded && !catalogData && !isCatalogLoading && !catalogError) {
-								void reloadCatalog().catch(() => undefined);
-							}
+							setIsExpanded(previous => !previous);
 						}}
 						aria-expanded={isExpanded}
 					>
@@ -635,7 +715,14 @@ export function WorkspaceCard({
 							<div className="space-y-3">
 								<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 									<div className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row">
+										<label
+											htmlFor={`workspace-artifact-search-${workspace.workspace.collectionID}`}
+											className="sr-only"
+										>
+											Search Workspace Artifacts
+										</label>
 										<input
+											id={`workspace-artifact-search-${workspace.workspace.collectionID}`}
 											type="search"
 											className="input input-sm min-w-0 grow rounded-xl"
 											value={recordSearch}
@@ -643,6 +730,7 @@ export function WorkspaceCard({
 												setRecordSearch(event.currentTarget.value);
 											}}
 											placeholder="Search Workspace Artifacts..."
+											aria-label="Search Workspace Artifacts"
 										/>
 										<button
 											type="button"
@@ -1089,7 +1177,16 @@ export function WorkspaceCard({
 					setIsArtifactBindingOpen(false);
 				}}
 				workspace={workspace}
-				onChanged={reloadCatalog}
+				onChanged={async () => {
+					try {
+						await reloadCatalog();
+					} catch (reloadError) {
+						showCatalogReloadFailure(
+							'Workspace Artifact binding was changed, but the catalog could not be reloaded.',
+							reloadError
+						);
+					}
+				}}
 			/>
 
 			<WorkspaceResourceDetailsModal
@@ -1122,7 +1219,10 @@ export function WorkspaceCard({
 							Remove Artifact <span className="font-semibold">{recordToDelete?.name}</span>?
 						</p>
 						<p className="text-base-content/70">The source content is not deleted.</p>
-						<label className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-xl border p-3">
+						<label
+							className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-xl border p-3"
+							aria-label="Suppress Binding"
+						>
 							<input
 								type="checkbox"
 								className="checkbox checkbox-sm mt-0.5"
@@ -1131,10 +1231,11 @@ export function WorkspaceCard({
 									setSuppressRemovedBinding(event.currentTarget.checked);
 								}}
 							/>
-							<span className="block font-medium">Prevent automatic re-adoption</span>
-
-							<span className="text-base-content/70 mt-1 block text-xs">
-								Suppress this typed source binding. It can be restored later from the Suppressions tab.
+							<span className="min-w-0">
+								<span className="block font-medium">Prevent automatic re-adoption</span>
+								<span className="text-base-content/70 mt-1 block text-xs">
+									Suppress this typed source binding. It can be restored later from the Suppressions tab.
+								</span>
 							</span>
 						</label>
 						{!suppressRemovedBinding ? (

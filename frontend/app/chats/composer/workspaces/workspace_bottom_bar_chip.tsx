@@ -40,7 +40,19 @@ interface WorkspaceBottomBarChipProps {
 	isInputLocked?: boolean;
 }
 
-export function WorkspaceBottomBarChip({
+export function WorkspaceBottomBarChip(props: WorkspaceBottomBarChipProps) {
+	const { store, isInputLocked = false } = props;
+
+	useEffect(() => {
+		if (isInputLocked) {
+			store.hide();
+		}
+	}, [isInputLocked, store]);
+
+	return <WorkspaceBottomBarChipContent key={isInputLocked ? 'locked' : 'ready'} {...props} />;
+}
+
+function WorkspaceBottomBarChipInner({
 	store,
 	state,
 	activeSkillRefs,
@@ -53,22 +65,13 @@ export function WorkspaceBottomBarChip({
 	const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
 
-	useEffect(() => {
-		if (!isInputLocked) {
-			return;
-		}
-		store.hide();
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setIsCreateOpen(false);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setIsSelectionOpen(false);
-	}, [isInputLocked, store]);
+	const refreshWorkspaces = state.refreshWorkspaces;
 
 	useEffect(() => {
 		if (open) {
-			void state.refreshWorkspaces();
+			void refreshWorkspaces();
 		}
-	}, [open, state]);
+	}, [open, refreshWorkspaces]);
 
 	const visibleWorkspaces = useMemo(() => {
 		const query = search.trim().toLowerCase();
@@ -206,6 +209,7 @@ export function WorkspaceBottomBarChip({
 						onClick={() => {
 							void state.refreshWorkspaces();
 						}}
+						aria-label="Refresh Workspace list"
 						title="Refresh Workspace list"
 					>
 						<FiRefreshCw size={12} />
@@ -272,9 +276,13 @@ export function WorkspaceBottomBarChip({
 					</div>
 				) : null}
 
-				<label className="input input-sm mb-2 flex items-center gap-2 rounded-xl">
-					<FiSearch size={13} />
+				<div className="input input-sm mb-2 flex items-center gap-2 rounded-xl">
+					<label htmlFor="composer-workspace-search" className="sr-only">
+						Search Workspaces
+					</label>
+					<FiSearch size={13} aria-hidden="true" />
 					<input
+						id="composer-workspace-search"
 						type="search"
 						className="grow"
 						value={search}
@@ -282,9 +290,10 @@ export function WorkspaceBottomBarChip({
 							setSearch(event.currentTarget.value);
 						}}
 						placeholder="Search Workspaces..."
+						aria-label="Search Workspaces"
 						spellCheck="false"
 					/>
-				</label>
+				</div>
 
 				{state.workspacesLoading && state.workspaces.length === 0 ? (
 					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
@@ -380,4 +389,7 @@ export function WorkspaceBottomBarChip({
 			/>
 		</div>
 	);
+}
+function WorkspaceBottomBarChipContent(props: WorkspaceBottomBarChipProps) {
+	return <WorkspaceBottomBarChipInner {...props} />;
 }

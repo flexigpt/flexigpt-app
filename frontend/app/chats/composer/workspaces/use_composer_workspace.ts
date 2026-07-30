@@ -16,6 +16,10 @@ import type {
 } from '@/spec/workspace';
 import { WorkspaceSkillInsert } from '@/spec/workspace';
 
+import { throwIfAborted } from '@/lib/async_utils';
+
+import { useAsyncResource } from '@/hooks/use_async_resource';
+
 import { workspaceAPI } from '@/apis/baseapi';
 
 import type { LoadedWorkspaceSelectionCatalog } from '@/chats/composer/workspaces/workspace_selection_loader';
@@ -220,28 +224,31 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
-function workspaceListsHaveSameRevision(previous: readonly WorkspaceView[], next: readonly WorkspaceView[]): boolean {
-	if (previous.length !== next.length) {
-		return false;
-	}
-
-	return previous.every((workspace, index) => {
-		const candidate = next[index];
-		return (
-			candidate !== undefined &&
-			workspaceRefsEqual(candidate.workspace, workspace.workspace) &&
-			candidate.revision === workspace.revision
-		);
-	});
+async function loadComposerWorkspaceList(signal: AbortSignal): Promise<WorkspaceView[]> {
+	const loaded = await listAllWorkspaces();
+	throwIfAborted(signal);
+	return sortWorkspaces(loaded);
 }
 
 export function useComposerWorkspace({
 	applyWorkspaceSkillSelectionState,
 	getCurrentActiveSkillRefs,
 }: UseComposerWorkspaceArgs): ComposerWorkspaceController {
-	const [workspaces, setWorkspaces] = useState<WorkspaceView[]>([]);
-	const [workspacesLoading, setWorkspacesLoading] = useState(false);
-	const [workspacesLoadError, setWorkspacesLoadError] = useState<string | null>(null);
+	const loadWorkspaceList = useCallback((signal: AbortSignal) => loadComposerWorkspaceList(signal), []);
+	const {
+		data: workspaces,
+		error: workspaceListError,
+		isLoading: isInitialWorkspaceListLoading,
+		isRefreshing: isWorkspaceListRefreshing,
+		reloadOrThrow: reloadWorkspaceList,
+		setData: setWorkspaces,
+	} = useAsyncResource(loadWorkspaceList, {
+		initialData: [] as WorkspaceView[],
+	});
+	const workspacesLoading = isInitialWorkspaceListLoading || isWorkspaceListRefreshing;
+	const workspacesLoadError = workspaceListError
+		? getErrorMessage(workspaceListError, 'Workspaces could not be loaded.')
+		: null;
 
 	const [selection, setSelectionState] = useState<WorkspaceConversationSelection>();
 	const [workspace, setWorkspace] = useState<WorkspaceView>();
@@ -277,31 +284,12 @@ export function useComposerWorkspace({
 	);
 
 	const refreshWorkspaces = useCallback(async () => {
-		setWorkspacesLoading(true);
-		setWorkspacesLoadError(null);
 		try {
-			const loaded = await listAllWorkspaces();
-			const next = sortWorkspaces([...loaded]);
-			if (mountedRef.current) {
-				setWorkspaces(previous => {
-					return workspaceListsHaveSameRevision(previous, next) ? previous : next;
-				});
-			}
-		} catch (error) {
-			if (mountedRef.current) {
-				setWorkspacesLoadError(getErrorMessage(error, 'Workspaces could not be loaded.'));
-			}
-		} finally {
-			if (mountedRef.current) {
-				setWorkspacesLoading(false);
-			}
+			await reloadWorkspaceList();
+		} catch {
+			// `useAsyncResource` retains the previous list and exposes the error.
 		}
-	}, []);
-
-	useEffect(() => {
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
-		void refreshWorkspaces();
-	}, [refreshWorkspaces]);
+	}, [reloadWorkspaceList]);
 
 	const applyResolvedWorkspaceSkillRefs = useCallback(
 		async (
@@ -736,6 +724,7 @@ export function useComposerWorkspace({
 		[
 			applyResolvedWorkspaceSkillRefs,
 			attachWorkspace,
+			setWorkspaces,
 			refreshWorkspaces,
 			replaceSelection,
 			workspace?.workspace.rootID,

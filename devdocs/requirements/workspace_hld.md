@@ -74,6 +74,13 @@ A person can:
   runtime path.
 - Keep Workspace state separate from legacy installed Skill persistence and
   keep private Source configuration out of Workspace views.
+- Use Workspace management for Workspace Collections, attachments, discovery,
+  Artifacts, Context, Workspace Skills, suppressions, and diagnostics.
+- Use Artifact Store APIs for Root and Source administration while retaining
+  Workspace APIs as the only Workspace mutation boundary.
+- Keep Workspace Skills out of the installed Skills and Templates management
+  route. They are visible only through Workspace management and a selected
+  Workspace conversation scope.
 
 ### 3.2 Planned, not currently offered
 
@@ -521,6 +528,7 @@ where the necessary feature-level ownership checks have already happened.
 | Artifact-centred catalog views     | Present                 | Catalog responses distinguish observations from recorded Artifacts and expose available, missing, invalid, incompatible, unresolved, and unrecorded states.                    |
 | Context projection and composition | Present                 | Context definitions are validated, ordered, bounded, truncated or excluded by policy, and returned with diagnostics and provenance for callers.                                |
 | Shared Agent Skill projection      | Present                 | Workspace uses the shared `agent.skill` definition and validates `SKILL.md` before runtime use.                                                                                |
+| Workspace frontend plumbing        | Present                 | Workspace UI uses Artifact Store APIs for Root and Source setup, Workspace APIs for Collection and Artifact behavior, and keeps Workspace Skills outside installed Skills UI.  |
 | Skill runtime handoff              | Present                 | Eligible Sources with trusted local-path capability verify Source generation, occurrence definition, and `SKILL.md` content before exposing a package directory to runtime.    |
 | Conversation selection provenance  | Present                 | Conversation resolution records selected and used Artifact revisions and definition digests, including partial or unavailable outcomes.                                        |
 | Derived runtime reconciliation     | Present and nonblocking | Workspace Skill runtime state is rebuildable. Durable Workspace mutations must not be rolled back because a later runtime refresh is delayed or fails.                         |
@@ -557,6 +565,17 @@ Workspace mutations remain typed so Collection kind, attachment role, and
 opaque local data are validated by Workspace policy. Generic Artifact Store
 public APIs intentionally stop at Root, Source, managed-package, and scoped
 destructive Artifact operations.
+
+The frontend follows the same boundary:
+
+- Workspace management uses typed Workspace APIs for Workspace lifecycle,
+  attachment changes, catalog reads, Artifact adoption, suppression, and
+  Artifact mutation.
+- Source registration, Source availability, and Source summaries use the
+  Artifact Store API. Private Source configuration is write-only and is not
+  copied into Workspace or conversation state.
+- Installed Skills remain in the Skills UI. Workspace Skills are projected from
+  selected Workspace Artifacts and are never added to installed Skill bundles.
 
 ### 13.1 Complete Artifact Store prerequisites
 
@@ -615,8 +634,12 @@ destructive Artifact operations.
 
 ### 13.9 Remaining product work
 
-- Make frontend and application flows consistently use the Artifact API for
-  Root and Source administration and the Workspace API for Workspace meaning.
+- Keep new frontend and application flows on the Artifact API for Root and
+  Source administration and on typed Workspace APIs for Workspace meaning.
+  Workspace management and composer selection now follow this rule.
+- Add a dedicated cross-feature Artifact Store Source administration surface
+  only if users need Source management outside a Workspace. The current
+  Workspace Source flow is intentionally a scoped Artifact Store client.
 - Implement portable Workspace import and export only after defining content
   closure, archive, acquisition, provenance, and omission policy.
 - Add explicit source-provisioning flows for built-in, library, package, and
@@ -640,6 +663,12 @@ The Workspace verification suite must cover:
 - Context prompt composition and inference hydration provenance.
 - Skill Source generation and `SKILL.md` digest verification.
 - Retirement and typed Workspace purge.
+- Workspace UI rejection of stale Workspace revisions after delayed catalog
+  responses.
+- Composer Workspace menu refresh behavior without recursive reloads.
+- Installed Skills UI isolation from Workspace-provided Skills.
+- Accessible Workspace search, radio groups, discovery-path fields, and
+  source-binding controls.
 
 The implemented suite also verifies that an empty Workspace can attach a
 filesystem library Source, discover arbitrary Markdown through explicit

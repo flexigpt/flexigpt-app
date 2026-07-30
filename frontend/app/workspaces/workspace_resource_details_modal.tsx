@@ -75,6 +75,7 @@ function WorkspaceResourceDetailsContent({
 				}
 				throwIfAborted(signal);
 			} catch (error) {
+				throwIfAborted(signal);
 				previewError = getErrorMessage(error, 'The artifact content could not be loaded.');
 			}
 
@@ -115,7 +116,7 @@ function WorkspaceResourceDetailsContent({
 		<ManagementDetailsModal
 			isOpen
 			onClose={onClose}
-			title="Workspace Resource"
+			title="Workspace Artifact"
 			description={current.name}
 			modalKey={`${workspaceRefKey(workspace.workspace)}:${artifactRefKey(record.artifact)}:${record.revision}`}
 			width="wide"
@@ -123,7 +124,7 @@ function WorkspaceResourceDetailsContent({
 		>
 			{error ? (
 				<ManagementResourceError
-					title="Workspace resource could not be loaded"
+					title="Workspace Artifact could not be loaded"
 					error={error}
 					isRetrying={isRefreshing}
 					onRetry={reloadOrThrow}
@@ -139,7 +140,9 @@ function WorkspaceResourceDetailsContent({
 					<ManagementInfoRow label="State">
 						<StatusBadge tone={getArtifactStateTone(current.state)}>{current.state}</StatusBadge>
 					</ManagementInfoRow>
+					<ManagementInfoRow label="Adoption">{current.adoption}</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{current.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
+					<ManagementInfoRow label="Use in conversations">{current.runtimeDisabled ? 'No' : 'Yes'}</ManagementInfoRow>
 					<ManagementInfoRow label="Artifact ID" mono>
 						{current.artifact.artifactID}
 					</ManagementInfoRow>

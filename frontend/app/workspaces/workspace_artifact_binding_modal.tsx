@@ -43,11 +43,11 @@ function defaultArtifactName(locator: string): string {
 function isSafeRelativeLocator(locator: string): boolean {
 	const normalized = locator.trim().replaceAll('\\', '/');
 
-	if (!normalized || normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) {
+	if (!normalized || normalized === '.' || normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) {
 		return false;
 	}
 
-	return !normalized.split('/').includes('..');
+	return normalized.split('/').every(segment => Boolean(segment) && segment !== '.' && segment !== '..');
 }
 
 export interface WorkspaceArtifactBindingModalProps {
@@ -187,45 +187,56 @@ function WorkspaceArtifactBindingModalContent({
 				) : null}
 
 				<ModalSection title="Binding action">
-					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-						<label className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
-							<input
-								type="radio"
-								className="radio radio-sm mt-0.5"
-								checked={action === 'pin'}
-								disabled={isSubmitting}
-								onChange={() => {
-									setAction('pin');
-									setSubmitError('');
-								}}
-							/>
-							<FiPlus size={15} className="mt-0.5" />
-							<span>
-								<span className="block font-medium">Pin Artifact</span>
-								<span className="text-base-content/70 mt-1 block text-xs">
-									Create a durable Artifact record even when the source item is currently missing.
+					<fieldset className="m-0 border-0 p-0">
+						<legend className="sr-only">Binding action</legend>
+						<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+							<label className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
+								<input
+									type="radio"
+									name="workspace-binding-action"
+									value="pin"
+									className="radio radio-sm mt-0.5"
+									checked={action === 'pin'}
+									disabled={isSubmitting}
+									onChange={() => {
+										setAction('pin');
+										setSubmitError('');
+									}}
+								/>
+								<FiPlus size={15} className="mt-0.5" aria-hidden="true" />
+								<span className="min-w-0">
+									<span className="block font-medium">Pin Artifact</span>
+									<span className="text-base-content/70 mt-1 block text-xs">
+										Create a durable Artifact record even when the source item is currently missing.
+									</span>
 								</span>
-							</span>
-						</label>
+							</label>
 
-						<label className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
-							<input
-								type="radio"
-								className="radio radio-sm mt-0.5"
-								checked={action === 'suppress'}
-								disabled={isSubmitting}
-								onChange={() => {
-									setAction('suppress');
-									setSubmitError('');
-								}}
-							/>
-
-							<span className="block font-medium">Suppress Binding</span>
-							<span className="text-base-content/70 mt-1 block text-xs">
-								Keep a matching valid observation from being automatically adopted during refresh.
-							</span>
-						</label>
-					</div>
+							<label
+								className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3"
+								aria-label="Suppress Binding"
+							>
+								<input
+									type="radio"
+									name="workspace-binding-action"
+									value="suppress"
+									className="radio radio-sm mt-0.5"
+									checked={action === 'suppress'}
+									disabled={isSubmitting}
+									onChange={() => {
+										setAction('suppress');
+										setSubmitError('');
+									}}
+								/>
+								<span className="min-w-0">
+									<span className="block font-medium">Suppress Binding</span>
+									<span className="text-base-content/70 mt-1 block text-xs">
+										Keep a matching valid observation from being automatically adopted during refresh.
+									</span>
+								</span>
+							</label>
+						</div>
+					</fieldset>
 				</ModalSection>
 
 				<ModalSection title="Typed Source binding">

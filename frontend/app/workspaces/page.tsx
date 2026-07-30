@@ -77,52 +77,72 @@ export default function WorkspacesPage() {
 	const replaceWorkspace = useCallback(
 		(nextWorkspace: WorkspaceView) => {
 			const nextKey = workspaceRefKey(nextWorkspace.workspace);
-			setWorkspaces(previous =>
-				sortWorkspaces(
-					previous.some(workspace => workspaceRefKey(workspace.workspace) === nextKey)
-						? previous.map(workspace => (workspaceRefKey(workspace.workspace) === nextKey ? nextWorkspace : workspace))
-						: [...previous, nextWorkspace]
-				)
-			);
+			setWorkspaces(previous => {
+				const currentWorkspace = previous.find(workspace => workspaceRefKey(workspace.workspace) === nextKey);
+
+				// Catalog reads can complete after a newer Workspace mutation. Never
+				// replace a newer Collection revision with an older response.
+				if (currentWorkspace && currentWorkspace.revision > nextWorkspace.revision) {
+					return previous;
+				}
+
+				const nextWorkspaces = currentWorkspace
+					? previous.map(workspace => (workspaceRefKey(workspace.workspace) === nextKey ? nextWorkspace : workspace))
+					: [...previous, nextWorkspace];
+
+				return sortWorkspaces(nextWorkspaces);
+			});
 		},
 		[setWorkspaces]
 	);
 
-	const createWorkspace = async (submission: WorkspaceSetupSubmission) => {
-		const preferredRootID = workspaces[0]?.workspace.rootID;
-		const created =
-			submission.kind === 'filesystem'
-				? await createFilesystemWorkspaceCollection(submission.payload, preferredRootID)
-				: submission.kind === 'empty'
-					? await createEmptyWorkspaceCollection(submission.payload, preferredRootID)
-					: (() => {
-							throw new Error('Expected a new Workspace payload.');
-						})();
+	const createWorkspace = useCallback(
+		async (submission: WorkspaceSetupSubmission) => {
+			const preferredRootID = workspaces[0]?.workspace.rootID;
+			let created: WorkspaceView;
 
-		replaceWorkspace(created);
+			if (submission.kind === 'filesystem') {
+				created = await createFilesystemWorkspaceCollection(submission.payload, preferredRootID);
+			} else if (submission.kind === 'empty') {
+				created = await createEmptyWorkspaceCollection(submission.payload, preferredRootID);
+			} else {
+				throw new Error('Expected a new Workspace payload.');
+			}
 
-		if (submission.kind === 'empty') {
-			return;
-		}
+			if (mountedRef.current) {
+				replaceWorkspace(created);
+			}
 
-		try {
-			await workspaceAPI.refreshWorkspace(created.workspace);
-			const refreshed = await workspaceAPI.getWorkspace(created.workspace);
-			replaceWorkspace(refreshed);
-		} catch (error) {
-			setAlertMessage(
-				`Workspace was created, but initial discovery failed. Open the workspace and retry Refresh. ${getErrorMessage(
-					error,
-					''
-				)}`.trim()
-			);
-		}
-	};
+			if (submission.kind === 'empty') {
+				return;
+			}
+
+			try {
+				await workspaceAPI.refreshWorkspace(created.workspace);
+				const refreshed = await workspaceAPI.getWorkspace(created.workspace);
+				if (mountedRef.current) {
+					replaceWorkspace(refreshed);
+				}
+			} catch (error) {
+				if (mountedRef.current) {
+					setAlertMessage(
+						`Workspace was created, but initial discovery failed. Open the workspace and retry Refresh. ${getErrorMessage(
+							error,
+							''
+						)}`.trim()
+					);
+				}
+			}
+		},
+		[replaceWorkspace, workspaces]
+	);
 
 	const updateWorkspace = useCallback(
 		async (workspace: WorkspaceView, payload: UpdateWorkspaceBody): Promise<WorkspaceView> => {
 			const updated = await workspaceAPI.updateWorkspace(workspace.workspace, payload);
-			replaceWorkspace(updated);
+			if (mountedRef.current) {
+				replaceWorkspace(updated);
+			}
 			return updated;
 		},
 		[replaceWorkspace]
@@ -140,6 +160,7 @@ export default function WorkspacesPage() {
 		if (mountedRef.current) {
 			const deletingKey = workspaceRefKey(deletingRef);
 			setWorkspaces(previous => previous.filter(workspace => workspaceRefKey(workspace.workspace) !== deletingKey));
+			setWorkspaceToDelete(null);
 		}
 	};
 
@@ -211,9 +232,13 @@ export default function WorkspacesPage() {
 					</div>
 
 					<div className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center">
-						<label className="input input-sm flex grow items-center gap-2 rounded-xl">
-							<FiSearch size={14} />
+						<div className="input input-sm flex grow items-center gap-2 rounded-xl">
+							<label htmlFor="workspace-search" className="sr-only">
+								Search Workspaces
+							</label>
+							<FiSearch size={14} aria-hidden="true" />
 							<input
+								id="workspace-search"
 								type="search"
 								className="grow"
 								value={searchQuery}
@@ -235,7 +260,7 @@ export default function WorkspacesPage() {
 									<FiX size={12} />
 								</button>
 							) : null}
-						</label>
+						</div>
 
 						<div className="text-base-content/70 shrink-0 text-xs">
 							{visibleWorkspaces.length} of {workspaces.length} workspaces

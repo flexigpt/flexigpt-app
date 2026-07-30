@@ -205,6 +205,7 @@ function WorkspaceSetupModalContent({
 	const displayNameID = useId();
 	const descriptionID = useId();
 	const rootPathID = useId();
+	const includeReadmeHelpID = `${displayNameID}-readme-help`;
 
 	const { requestClose, unmountingRef } = useModalDialogController();
 	const errors = useMemo(
@@ -428,44 +429,59 @@ function WorkspaceSetupModalContent({
 						title="Workspace type"
 						description="A Workspace is a Collection. A filesystem Workspace receives a primary project Source immediately; an empty Workspace can be assembled from existing Artifact Store Sources."
 					>
-						<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-							<label className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
-								<input
-									type="radio"
-									className="radio radio-sm mt-0.5"
-									checked={creationMode === 'filesystem'}
-									onChange={() => {
-										setCreationMode('filesystem');
-										setSubmitError('');
-									}}
-									disabled={isSubmitting}
-								/>
-								<span className="block font-medium">Filesystem project</span>
+						<fieldset className="m-0 border-0 p-0">
+							<legend className="sr-only">Workspace type</legend>
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+								<label
+									className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3"
+									aria-label="Filesystem"
+								>
+									<input
+										type="radio"
+										name="workspace-creation-mode"
+										value="filesystem"
+										className="radio radio-sm mt-0.5"
+										checked={creationMode === 'filesystem'}
+										onChange={() => {
+											setCreationMode('filesystem');
+											setSubmitError('');
+										}}
+										disabled={isSubmitting}
+									/>
+									<span className="min-w-0">
+										<span className="block font-medium">Filesystem project</span>
+										<span className="text-base-content/70 mt-1 block text-xs">
+											Create a primary filesystem Source from a project folder.
+										</span>
+									</span>
+								</label>
 
-								<span className="text-base-content/70 mt-1 block text-xs">
-									Create a primary filesystem Source from a project folder.
-								</span>
-							</label>
-
-							<label className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
-								<input
-									type="radio"
-									className="radio radio-sm mt-0.5"
-									checked={creationMode === 'empty'}
-									onChange={() => {
-										setCreationMode('empty');
-										setSubmitError('');
-										setPickerError('');
-									}}
-									disabled={isSubmitting}
-								/>
-
-								<span className="block font-medium">Empty Workspace</span>
-								<span className="text-base-content/70 mt-1 block text-xs">
-									Create the Collection first, then attach root-scoped Sources from Manage Sources.
-								</span>
-							</label>
-						</div>
+								<label
+									className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3"
+									aria-label="Empty"
+								>
+									<input
+										type="radio"
+										name="workspace-creation-mode"
+										value="empty"
+										className="radio radio-sm mt-0.5"
+										checked={creationMode === 'empty'}
+										onChange={() => {
+											setCreationMode('empty');
+											setSubmitError('');
+											setPickerError('');
+										}}
+										disabled={isSubmitting}
+									/>
+									<span className="min-w-0">
+										<span className="block font-medium">Empty Workspace</span>
+										<span className="text-base-content/70 mt-1 block text-xs">
+											Create the Collection first, then attach root-scoped Sources from Manage Sources.
+										</span>
+									</span>
+								</label>
+							</div>
+						</fieldset>
 					</ModalSection>
 				) : null}
 
@@ -622,21 +638,22 @@ function WorkspaceSetupModalContent({
 								</div>
 
 								<ModalField label="Include README" htmlFor={`${displayNameID}-readme`}>
-									<label className="flex items-center gap-3">
+									<div className="flex items-center gap-3">
 										<input
 											id={`${displayNameID}-readme`}
 											type="checkbox"
 											className="toggle toggle-accent"
 											checked={form.includeReadme}
+											aria-describedby={includeReadmeHelpID}
 											onChange={event => {
 												updateForm('includeReadme', event.currentTarget.checked);
 											}}
 											disabled={isSubmitting}
 										/>
-										<span className="text-base-content/70 text-xs">
+										<span id={includeReadmeHelpID} className="text-base-content/70 text-xs">
 											Discover README.md as project Context when it exists.
 										</span>
-									</label>
+									</div>
 								</ModalField>
 
 								{submitted && errors.discovery ? (
@@ -691,6 +708,7 @@ function WorkspaceSetupModalContent({
 												<input
 													type="text"
 													className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
+													aria-label={`Additional Context file ${index + 1}`}
 													value={locator}
 													onChange={event => {
 														updateContextFile(index, event.currentTarget.value);
@@ -766,6 +784,7 @@ function WorkspaceSetupModalContent({
 												<input
 													type="text"
 													className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
+													aria-label={`Additional Skill folder ${index + 1}`}
 													value={locator}
 													onChange={event => {
 														updateSkillRoot(index, event.currentTarget.value);
