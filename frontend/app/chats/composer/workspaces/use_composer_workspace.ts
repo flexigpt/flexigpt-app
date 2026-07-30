@@ -99,15 +99,20 @@ function skillProviderAllowsConversation(provider?: ProvidedSkill): boolean {
 	);
 }
 
-export function isWorkspaceSkillSessionEligible(skill: WorkspaceSkillView, provider?: ProvidedSkill): boolean {
+export function isWorkspaceSkillConversationAvailable(skill: WorkspaceSkillView, provider?: ProvidedSkill): boolean {
 	return (
-		skill.skill.insert === WorkspaceSkillInsert.Instructions &&
 		skill.skill.isEnabled &&
 		skill.state === ArtifactState.Available &&
 		skill.projectionValid &&
 		skill.catalogCurrent &&
 		!skill.runtimeDisabled &&
 		skillProviderAllowsConversation(provider)
+	);
+}
+
+export function isWorkspaceSkillSessionEligible(skill: WorkspaceSkillView, provider?: ProvidedSkill): boolean {
+	return (
+		skill.skill.insert === WorkspaceSkillInsert.Instructions && isWorkspaceSkillConversationAvailable(skill, provider)
 	);
 }
 
@@ -215,8 +220,16 @@ function cloneSelection(
 	return {
 		...selection,
 		workspace: { ...selection.workspace },
-		contextRefs: (selection.contextRefs ?? []).map(ref => Object.assign(ref, { artifact: { ...ref.artifact } })),
-		skillRefs: (selection.skillRefs ?? []).map(ref => Object.assign(ref, { artifact: { ...ref.artifact } })),
+		// oxlint-disable-next-line oxc/no-map-spread
+		contextRefs: (selection.contextRefs ?? []).map(ref => ({
+			...ref,
+			artifact: { ...ref.artifact },
+		})),
+		// oxlint-disable-next-line oxc/no-map-spread
+		skillRefs: (selection.skillRefs ?? []).map(ref => ({
+			...ref,
+			artifact: { ...ref.artifact },
+		})),
 	};
 }
 
@@ -672,8 +685,7 @@ export function useComposerWorkspace({
 
 	const createFilesystemWorkspace = useCallback(
 		async (payload: CreateFilesystemWorkspaceBody) => {
-			const normalizePath = (value: string) =>
-				value.trim().replaceAll('\\', '/').replaceAll(/\/+$/g, '').toLocaleLowerCase();
+			const normalizePath = (value: string) => value.trim().replaceAll('\\', '/').replaceAll(/\/+$/g, '').toLowerCase();
 			const requestedPath = normalizePath(payload.rootPath);
 			const existing = workspaces.find(
 				candidate => candidate.primaryPath && normalizePath(candidate.primaryPath) === requestedPath

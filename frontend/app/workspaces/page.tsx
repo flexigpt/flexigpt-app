@@ -55,6 +55,7 @@ export default function WorkspacesPage() {
 	const [workspaceToDelete, setWorkspaceToDelete] = useState<WorkspaceView | null>(null);
 	const [alertMessage, setAlertMessage] = useState('');
 	const mountedRef = useRef(true);
+	const retiredWorkspaceRevisionsRef = useRef(new Map<string, number>());
 
 	useEffect(() => {
 		mountedRef.current = true;
@@ -153,12 +154,30 @@ export default function WorkspacesPage() {
 			return;
 		}
 
-		const deletingRef = workspaceToDelete.workspace;
-		const retired = await workspaceAPI.retireWorkspace(deletingRef, workspaceToDelete.revision);
-		await workspaceAPI.purgeWorkspace(retired.workspace, retired.revision);
+		const deletingWorkspace = workspaceToDelete;
+		const deletingRef = deletingWorkspace.workspace;
+		const deletingKey = workspaceRefKey(deletingRef);
+		let purgeRevision = retiredWorkspaceRevisionsRef.current.get(deletingKey);
+
+		if (purgeRevision === undefined) {
+			const retired = await workspaceAPI.retireWorkspace(deletingRef, deletingWorkspace.revision);
+			purgeRevision = retired.revision;
+			retiredWorkspaceRevisionsRef.current.set(deletingKey, purgeRevision);
+		}
+
+		try {
+			await workspaceAPI.purgeWorkspace(deletingRef, purgeRevision);
+		} catch (error) {
+			const details = getErrorMessage(error, '');
+			throw new Error(
+				`Workspace was retired, but its stored records could not be purged. Retry Delete Workspace to finish cleanup. ${details}`.trim(),
+				{ cause: error }
+			);
+		}
+
+		retiredWorkspaceRevisionsRef.current.delete(deletingKey);
 
 		if (mountedRef.current) {
-			const deletingKey = workspaceRefKey(deletingRef);
 			setWorkspaces(previous => previous.filter(workspace => workspaceRefKey(workspace.workspace) !== deletingKey));
 			setWorkspaceToDelete(null);
 		}

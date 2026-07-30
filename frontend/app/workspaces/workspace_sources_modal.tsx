@@ -588,6 +588,10 @@ function WorkspaceSourcesModalContent({
 			setActionError('A primary Workspace Source must be enabled.');
 			return;
 		}
+		if (attachNewSource && !newSourceEnabled) {
+			setActionError('Enable the Artifact Store Source before attaching it to this Workspace.');
+			return;
+		}
 
 		setActionError('');
 		setPendingAction('source:create');
@@ -732,7 +736,7 @@ function WorkspaceSourcesModalContent({
 								</div>
 								<div>
 									{attachmentToDetach.role === WorkspaceAttachmentRole.Primary
-										? 'The Workspace will become empty. Source files and the Artifact Store Source are not deleted.'
+										? 'The Workspace will have no primary project Source. Other attachments, source files, and the Artifact Store Source are not deleted.'
 										: 'The Source remains available to other Collections and is not deleted.'}
 								</div>
 							</div>
@@ -986,6 +990,7 @@ function WorkspaceSourcesModalContent({
 									onChange={event => {
 										setNewSourceEnabled(event.currentTarget.checked);
 										if (!event.currentTarget.checked) {
+											setAttachNewSource(false);
 											setAttachNewSourceAsPrimary(false);
 										}
 									}}

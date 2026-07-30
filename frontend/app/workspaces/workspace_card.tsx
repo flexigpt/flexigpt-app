@@ -89,6 +89,14 @@ function workspaceSuppressionKey(suppression: WorkspaceSuppressionView): string 
 	return `${binding.sourceID}:${binding.locator}:${binding.subresourceLocator ?? ''}:${binding.expectedKind}`;
 }
 
+function workspaceOccurrenceKey(occurrence: WorkspaceOccurrenceView): string {
+	return `${occurrence.sourceID}:${occurrence.locator}:${occurrence.subresourceLocator ?? ''}:${occurrence.kind ?? ''}`;
+}
+
+function workspaceOccurrencePendingKey(occurrence: WorkspaceOccurrenceView): string {
+	return `occurrence:${workspaceOccurrenceKey(occurrence)}:adopt`;
+}
+
 async function loadWorkspaceCatalogData(workspace: WorkspaceView): Promise<WorkspaceCatalogData> {
 	const workspaceRef = workspace.workspace;
 	const catalog = normalizeWorkspaceCatalog(await workspaceAPI.getWorkspaceCatalog(workspaceRef));
@@ -237,7 +245,7 @@ export function WorkspaceCard({
 	const sourceLabelFor = useCallback(
 		(sourceID: string) => {
 			const attachment = workspace.attachments.find(item => item.sourceID === sourceID);
-			return attachment?.path ?? attachment?.sourceDisplayName ?? 'Workspace source';
+			return attachment?.path ?? attachment?.sourceDisplayName ?? sourceID;
 		},
 		[workspace.attachments]
 	);
@@ -280,6 +288,10 @@ export function WorkspaceCard({
 	}, [onWorkspaceChange, workspace, workspaceVersion]);
 
 	const artifacts = useMemo(() => (catalogData ? getWorkspaceArtifacts(catalogData.catalog) : []), [catalogData]);
+	const artifactsByRef = useMemo(
+		() => new Map(artifacts.map(artifact => [artifactRefKey(artifact.artifact), artifact] as const)),
+		[artifacts]
+	);
 
 	const invalidateCatalog = useCallback((message?: string) => {
 		requestIDRef.current += 1;
@@ -414,10 +426,11 @@ export function WorkspaceCard({
 			return;
 		}
 
+		const deletingRecord = recordToDelete;
 		await workspaceAPI.unadoptWorkspaceArtifact(
 			workspace.workspace,
-			recordToDelete.artifact,
-			recordToDelete.revision,
+			deletingRecord.artifact,
+			deletingRecord.revision,
 			suppressRemovedBinding
 		);
 
@@ -425,6 +438,7 @@ export function WorkspaceCard({
 			return;
 		}
 
+		const deletingArtifactKey = artifactRefKey(deletingRecord.artifact);
 		setCatalogState(previous => {
 			if (!previous?.data || previous.workspaceVersion !== workspaceVersion) {
 				return previous;
@@ -432,9 +446,14 @@ export function WorkspaceCard({
 
 			return {
 				...previous,
-				data: removeWorkspaceArtifact(previous.data, recordToDelete.artifact.artifactID),
+				data: removeWorkspaceArtifact(previous.data, deletingRecord.artifact.artifactID),
 			};
 		});
+		setRecordToInspect(previous =>
+			previous && artifactRefKey(previous.artifact) === deletingArtifactKey ? null : previous
+		);
+		setRecordToDelete(null);
+		setSuppressRemovedBinding(true);
 
 		try {
 			await reloadCatalog();
@@ -490,8 +509,8 @@ export function WorkspaceCard({
 							},
 						};
 					});
+					setRefreshSummary('Source binding was unsuppressed. Refresh the Workspace to discover and adopt it again.');
 				}
-				setRefreshSummary('Source binding was unsuppressed. Refresh the Workspace to discover and adopt it again.');
 			});
 		} catch (error) {
 			showFailure(error, 'Failed to unsuppress the Workspace source binding.');
@@ -559,10 +578,10 @@ export function WorkspaceCard({
 	);
 
 	const contextArtifact = (context: WorkspaceContextView): WorkspaceArtifactView | undefined =>
-		artifacts.find(artifact => artifactRefKey(artifact.artifact) === artifactRefKey(context.artifact));
+		artifactsByRef.get(artifactRefKey(context.artifact));
 
 	const skillArtifact = (skill: WorkspaceSkillView): WorkspaceArtifactView | undefined =>
-		artifacts.find(artifact => artifactRefKey(artifact.artifact) === artifactRefKey(skill.artifact));
+		artifactsByRef.get(artifactRefKey(skill.artifact));
 
 	const tabs: Array<{ key: WorkspaceTab; label: string; count?: number }> = [
 		{ key: 'contexts', label: 'Contexts', count: catalogData?.contexts.length ?? 0 },
@@ -573,6 +592,11 @@ export function WorkspaceCard({
 		{ key: 'suppressions', label: 'Suppressions', count: catalogData?.suppressions.length ?? 0 },
 		{ key: 'diagnostics', label: 'Diagnostics', count: diagnostics.length },
 	];
+
+	const workspacePanelID = `workspace-panel-${workspace.workspace.rootID}-${workspace.workspace.collectionID}`;
+	const suppressRemovedBindingID = `workspace-remove-suppress-${workspace.workspace.collectionID}-${
+		recordToDelete?.artifact.artifactID ?? 'none'
+	}`;
 
 	return (
 		<>
@@ -604,6 +628,7 @@ export function WorkspaceCard({
 							setIsExpanded(previous => !previous);
 						}}
 						aria-expanded={isExpanded}
+						aria-controls={workspacePanelID}
 					>
 						<span>{isExpanded ? 'Hide' : 'Manage'}</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
@@ -672,11 +697,15 @@ export function WorkspaceCard({
 					</>
 				}
 			>
-				{refreshSummary ? <div className="alert alert-success mt-4 rounded-2xl text-sm">{refreshSummary}</div> : null}
+				{refreshSummary ? (
+					<output className="alert alert-success mt-4 rounded-2xl text-sm" aria-live="polite">
+						{refreshSummary}
+					</output>
+				) : null}
 
 				{isExpanded ? (
-					<div className="mt-6 space-y-4">
-						<div className="flex flex-wrap gap-2">
+					<div id={workspacePanelID} className="mt-6 space-y-4">
+						<div className="flex flex-wrap gap-2" aria-label={`${workspace.displayName} Workspace sections`}>
 							{tabs.map(tab => (
 								<button
 									key={tab.key}
@@ -705,10 +734,10 @@ export function WorkspaceCard({
 						) : null}
 
 						{isCatalogLoading && !catalogData ? (
-							<div className="flex items-center justify-center gap-2 py-10 text-sm">
+							<output className="flex items-center justify-center gap-2 py-10 text-sm" aria-live="polite">
 								<span className="loading loading-spinner loading-sm" />
 								<span>Loading workspace catalog...</span>
-							</div>
+							</output>
 						) : null}
 
 						{catalogData && activeTab === 'records' ? (
@@ -766,13 +795,13 @@ export function WorkspaceCard({
 										<div className="text-sm font-semibold">Discovered but not recorded</div>
 										{catalogData.catalog.unrecordedOccurrences.map((occurrence, index) => (
 											<ManagementItemCard
-												key={`${occurrence.sourceID}:${occurrence.locator}:${index}`}
+												key={`${workspaceOccurrenceKey(occurrence)}:${index}`}
 												title={occurrence.logicalName || occurrence.locator}
 												subtitle={<span className="font-mono">{occurrence.locator}</span>}
 												status={<StatusBadge tone={getOccurrenceStateTone(occurrence)}>{occurrence.state}</StatusBadge>}
 												metadata={
 													<>
-														<MetadataPill label="Source">{occurrence.sourceID}</MetadataPill>
+														<MetadataPill label="Source">{sourceLabelFor(occurrence.sourceID)}</MetadataPill>
 														{occurrence.kind ? (
 															<MetadataPill label="Kind">{getArtifactKindLabel(occurrence.kind)}</MetadataPill>
 														) : null}
@@ -784,9 +813,9 @@ export function WorkspaceCard({
 														<button
 															type="button"
 															className="btn btn-sm btn-ghost rounded-xl"
-															disabled={isPending(`occurrence:${occurrence.sourceID}:${occurrence.locator}:adopt`)}
+															disabled={isPending(workspaceOccurrencePendingKey(occurrence))}
 															onClick={() => {
-																void runAction(`occurrence:${occurrence.sourceID}:${occurrence.locator}:adopt`, () =>
+																void runAction(workspaceOccurrencePendingKey(occurrence), () =>
 																	adoptOccurrence(occurrence)
 																).catch((error: unknown) => {
 																	showFailure(error, 'Failed to adopt the discovered Artifact.');
@@ -813,10 +842,8 @@ export function WorkspaceCard({
 								</div>
 
 								{catalogData.catalog.occurrences.map((occurrence, index) => {
-									const occurrenceKey = `${occurrence.sourceID}:${occurrence.locator}:${
-										occurrence.subresourceLocator ?? ''
-									}:${index}`;
-									const pendingKey = `occurrence:${occurrence.sourceID}:${occurrence.locator}:adopt`;
+									const occurrenceKey = `${workspaceOccurrenceKey(occurrence)}:${index}`;
+									const pendingKey = workspaceOccurrencePendingKey(occurrence);
 
 									return (
 										<ManagementItemCard
@@ -1098,9 +1125,7 @@ export function WorkspaceCard({
 								</div>
 
 								{catalogData.suppressions.map(suppression => {
-									const pendingKey = `suppression:${suppression.binding.sourceID}:${
-										suppression.binding.locator
-									}:${suppression.binding.subresourceLocator ?? ''}`;
+									const pendingKey = `suppression:${workspaceSuppressionKey(suppression)}`;
 
 									return (
 										<ManagementItemCard
@@ -1220,20 +1245,23 @@ export function WorkspaceCard({
 						</p>
 						<p className="text-base-content/70">The source content is not deleted.</p>
 						<label
+							htmlFor={suppressRemovedBindingID}
 							className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-xl border p-3"
 							aria-label="Suppress Binding"
 						>
 							<input
+								id={suppressRemovedBindingID}
 								type="checkbox"
 								className="checkbox checkbox-sm mt-0.5"
 								checked={suppressRemovedBinding}
+								aria-describedby={`${suppressRemovedBindingID}-help`}
 								onChange={event => {
 									setSuppressRemovedBinding(event.currentTarget.checked);
 								}}
 							/>
 							<span className="min-w-0">
 								<span className="block font-medium">Prevent automatic re-adoption</span>
-								<span className="text-base-content/70 mt-1 block text-xs">
+								<span id={`${suppressRemovedBindingID}-help`} className="text-base-content/70 mt-1 block text-xs">
 									Suppress this typed source binding. It can be restored later from the Suppressions tab.
 								</span>
 							</span>

@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
 	FiAlertCircle,
@@ -16,6 +16,7 @@ import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { SkillRef } from '@/spec/skill';
+import { WorkspaceSkillInsert } from '@/spec/workspace';
 
 import {
 	actionTriggerChipClearButtonClasses,
@@ -38,6 +39,7 @@ interface WorkspaceBottomBarChipProps {
 	activeSkillRefs: SkillRef[];
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	isInputLocked?: boolean;
+	onInsertTemplateText: (text: string) => Promise<void> | void;
 }
 
 export function WorkspaceBottomBarChip(props: WorkspaceBottomBarChipProps) {
@@ -58,19 +60,28 @@ function WorkspaceBottomBarChipInner({
 	activeSkillRefs,
 	setActiveSkillRefs,
 	isInputLocked = false,
+	onInsertTemplateText,
 }: WorkspaceBottomBarChipProps) {
 	const open = useStoreState(store, 'open');
 	const [search, setSearch] = useState('');
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
 	const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
+	const refreshedForCurrentOpenRef = useRef(false);
 
 	const refreshWorkspaces = state.refreshWorkspaces;
 
 	useEffect(() => {
-		if (open) {
-			void refreshWorkspaces();
+		if (!open) {
+			refreshedForCurrentOpenRef.current = false;
+			return;
 		}
+		if (refreshedForCurrentOpenRef.current) {
+			return;
+		}
+
+		refreshedForCurrentOpenRef.current = true;
+		void refreshWorkspaces();
 	}, [open, refreshWorkspaces]);
 
 	const visibleWorkspaces = useMemo(() => {
@@ -92,6 +103,9 @@ function WorkspaceBottomBarChipInner({
 	const selectedContextCount = state.selection?.contextRefs?.length ?? 0;
 	const selectedSkillCount = state.selection?.skillRefs?.length ?? 0;
 	const selected = Boolean(state.selection);
+	const workspaceTemplateCount = state.skills.filter(
+		skill => skill.skill.insert === WorkspaceSkillInsert.UserMessage
+	).length;
 
 	const hoverContent = (
 		<HoverTipContent
@@ -106,6 +120,7 @@ function WorkspaceBottomBarChipInner({
 								selectedName,
 								`${selectedContextCount} Context file${selectedContextCount === 1 ? '' : 's'} selected`,
 								`${selectedSkillCount} Workspace Skill${selectedSkillCount === 1 ? '' : 's'} selected`,
+								`${workspaceTemplateCount} Workspace template${workspaceTemplateCount === 1 ? '' : 's'} available`,
 								state.attentionCount > 0
 									? `${state.attentionCount} item${state.attentionCount === 1 ? '' : 's'} need attention`
 									: 'All selected items currently resolve',
@@ -117,7 +132,8 @@ function WorkspaceBottomBarChipInner({
 					title: 'Behavior',
 					items: [
 						'Workspace Context is refetched when sending or editing.',
-						'Workspace Skills use the normal conversation Skill session.',
+						'Workspace instruction Skills use the normal conversation Skill session.',
+						'Workspace user-message Skills render here as transient composer templates.',
 						'Detaching affects future turns only.',
 					],
 				},
@@ -386,6 +402,7 @@ function WorkspaceBottomBarChipInner({
 				activeSkillRefs={activeSkillRefs}
 				setActiveSkillRefs={setActiveSkillRefs}
 				isInputLocked={isInputLocked}
+				onInsertTemplateText={onInsertTemplateText}
 			/>
 		</div>
 	);

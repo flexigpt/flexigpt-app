@@ -126,7 +126,9 @@ function workspaceSkillFromWails(skill: wailsWorkspace.WorkspaceSkillView): Work
 function workspaceSkillLoadFromWails(load: wailsWorkspace.WorkspaceSkillLoadView): WorkspaceSkillLoadView {
 	return {
 		...load,
-		skills: load.skills.map(workspaceSkillFromWails),
+		skills: (load.skills ?? []).map(s => {
+			return workspaceSkillFromWails(s);
+		}),
 	} as WorkspaceSkillLoadView;
 }
 

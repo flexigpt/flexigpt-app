@@ -111,6 +111,8 @@ function WorkspaceResourceDetailsContent({
 		workspace.attachments.find(item => item.sourceID === current.sourceID)?.path,
 		current.locator
 	);
+	const runtimeRelevant =
+		current.kind === WORKSPACE_CONTEXT_ARTIFACT_KIND || current.kind === WORKSPACE_SKILL_ARTIFACT_KIND;
 
 	return (
 		<ManagementDetailsModal
@@ -142,7 +144,9 @@ function WorkspaceResourceDetailsContent({
 					</ManagementInfoRow>
 					<ManagementInfoRow label="Adoption">{current.adoption}</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{current.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
-					<ManagementInfoRow label="Use in conversations">{current.runtimeDisabled ? 'No' : 'Yes'}</ManagementInfoRow>
+					{runtimeRelevant ? (
+						<ManagementInfoRow label="Use in conversations">{current.runtimeDisabled ? 'No' : 'Yes'}</ManagementInfoRow>
+					) : null}
 					<ManagementInfoRow label="Artifact ID" mono>
 						{current.artifact.artifactID}
 					</ManagementInfoRow>

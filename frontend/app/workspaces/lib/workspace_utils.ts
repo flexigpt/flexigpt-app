@@ -52,12 +52,12 @@ export function normalizeWorkspaceCatalog(catalog: WorkspaceCatalogView): Worksp
 		...catalog,
 		diagnostics: normalizeOptionalArray(catalog.diagnostics),
 		resources: normalizeRequiredArray(catalog.resources),
-		groups: normalizeRequiredArray(catalog.groups).map(group =>
-			Object.assign(group, {
-				resources: normalizeRequiredArray(group.resources),
-				unrecorded: normalizeRequiredArray(group.unrecorded),
-			})
-		),
+		// oxlint-disable-next-line oxc/no-map-spread
+		groups: normalizeRequiredArray(catalog.groups).map(group => ({
+			...group,
+			resources: normalizeRequiredArray(group.resources),
+			unrecorded: normalizeRequiredArray(group.unrecorded),
+		})),
 		occurrences: normalizeRequiredArray(catalog.occurrences),
 		validOccurrences: normalizeRequiredArray(catalog.validOccurrences),
 		invalidOccurrences: normalizeRequiredArray(catalog.invalidOccurrences),
@@ -87,7 +87,7 @@ function cleanFilesystemPath(rawPath: string): string {
 			continue;
 		}
 		if (segment === '..') {
-			if (segments.length > 0) {
+			if (segments.length > 0 && segments.at(-1) !== '..') {
 				segments.pop();
 			} else if (!isAbsolute) {
 				segments.push(segment);
@@ -314,6 +314,21 @@ export function replaceWorkspaceArtifact(
 }
 
 export function removeWorkspaceArtifact(data: WorkspaceCatalogData, artifactID: string): WorkspaceCatalogData {
+	const releaseOccurrence = (occurrence: WorkspaceOccurrenceView): WorkspaceOccurrenceView =>
+		occurrence.artifact?.artifactID === artifactID
+			? {
+					...occurrence,
+					recorded: false,
+					artifact: undefined,
+				}
+			: occurrence;
+
+	const occurrences = data.catalog.occurrences.map(releaseOccurrence);
+	const unrecordedOccurrences = occurrences.filter(occurrence => !occurrence.recorded);
+	const removedUnresolvedArtifact = data.catalog.unresolvedArtifacts.some(
+		artifact => artifact.artifact.artifactID === artifactID
+	);
+
 	return {
 		...data,
 		catalog: {
@@ -322,15 +337,18 @@ export function removeWorkspaceArtifact(data: WorkspaceCatalogData, artifactID: 
 			groups: data.catalog.groups.map(group => ({
 				...group,
 				resources: group.resources.filter(resource => resource.artifact.artifact.artifactID !== artifactID),
+				unrecorded: group.unrecorded.map(releaseOccurrence),
 			})),
+			occurrences,
+			validOccurrences: data.catalog.validOccurrences.map(releaseOccurrence),
+			invalidOccurrences: data.catalog.invalidOccurrences.map(releaseOccurrence),
+			missingOccurrences: data.catalog.missingOccurrences.map(releaseOccurrence),
+			unrecordedOccurrences,
+			unrecordedCount: unrecordedOccurrences.length,
 			unresolvedArtifacts: data.catalog.unresolvedArtifacts.filter(
 				artifact => artifact.artifact.artifactID !== artifactID
 			),
-			unresolvedArtifactCount: Math.max(
-				0,
-				data.catalog.unresolvedArtifactCount -
-					(data.catalog.unresolvedArtifacts.some(artifact => artifact.artifact.artifactID === artifactID) ? 1 : 0)
-			),
+			unresolvedArtifactCount: Math.max(0, data.catalog.unresolvedArtifactCount - (removedUnresolvedArtifact ? 1 : 0)),
 		},
 		contexts: data.contexts.filter(context => context.artifact.artifactID !== artifactID),
 		skills: data.skills.filter(skill => skill.artifact.artifactID !== artifactID),

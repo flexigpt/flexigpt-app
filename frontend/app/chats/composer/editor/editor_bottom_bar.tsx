@@ -40,6 +40,7 @@ interface EditorBottomBarProps {
 	mcpMenuState: MenuStore;
 	workspaceMenuState: MenuStore;
 	workspaceState: ComposerWorkspaceController;
+	onInsertWorkspaceTemplateText: (text: string) => Promise<void> | void;
 
 	templateButtonRef: RefObject<HTMLButtonElement | null>;
 	toolButtonRef: RefObject<HTMLButtonElement | null>;
@@ -101,6 +102,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	mcpMenuState,
 	workspaceMenuState,
 	workspaceState,
+	onInsertWorkspaceTemplateText,
 	templateButtonRef,
 	toolButtonRef,
 	attachmentButtonRef,
@@ -164,6 +166,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						activeSkillRefs={workspaceActiveSkillRefs}
 						setActiveSkillRefs={setWorkspaceActiveSkillRefs}
 						isInputLocked={isInputLocked}
+						onInsertTemplateText={onInsertWorkspaceTemplateText}
 					/>
 
 					<AttachmentBottomBarChip

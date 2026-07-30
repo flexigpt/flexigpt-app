@@ -702,40 +702,44 @@ function WorkspaceSetupModalContent({
 										</div>
 									) : null}
 
-									{form.contextFiles.map((locator, index) => (
-										<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
-											<div className="flex gap-2">
-												<input
-													type="text"
-													className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
-													aria-label={`Additional Context file ${index + 1}`}
-													value={locator}
-													onChange={event => {
-														updateContextFile(index, event.currentTarget.value);
-													}}
-													placeholder="docs/project-context.md"
-													spellCheck="false"
-													disabled={isSubmitting}
-												/>
-												<button
-													type="button"
-													className="btn btn-sm btn-ghost rounded-xl"
-													onClick={() => {
-														removeContextFile(index);
-													}}
-													disabled={isSubmitting}
-													aria-label="Remove Context file"
-												>
-													<FiTrash2 size={14} />
-												</button>
-											</div>
-											{locator.trim() && hasProjectFolder ? (
-												<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
-													{workspaceLocatorToPath(form.rootPath, locator)}
+									{form.contextFiles.map((locator, index) => {
+										const inputID = `${displayNameID}-context-file-${index}`;
+										return (
+											<div key={inputID} className="border-base-content/10 rounded-2xl border p-3">
+												<div className="flex gap-2">
+													<input
+														id={inputID}
+														type="text"
+														className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
+														aria-label={`Additional Context file ${index + 1}`}
+														value={locator}
+														onChange={event => {
+															updateContextFile(index, event.currentTarget.value);
+														}}
+														placeholder="docs/project-context.md"
+														spellCheck="false"
+														disabled={isSubmitting}
+													/>
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-xl"
+														onClick={() => {
+															removeContextFile(index);
+														}}
+														disabled={isSubmitting}
+														aria-label={`Remove additional Context file ${index + 1}`}
+													>
+														<FiTrash2 size={14} aria-hidden="true" />
+													</button>
 												</div>
-											) : null}
-										</div>
-									))}
+												{locator.trim() && hasProjectFolder ? (
+													<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
+														{workspaceLocatorToPath(form.rootPath, locator)}
+													</div>
+												) : null}
+											</div>
+										);
+									})}
 								</div>
 
 								<div className="space-y-3">
@@ -778,40 +782,44 @@ function WorkspaceSetupModalContent({
 										</div>
 									) : null}
 
-									{form.skillRoots.map((locator, index) => (
-										<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
-											<div className="flex gap-2">
-												<input
-													type="text"
-													className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
-													aria-label={`Additional Skill folder ${index + 1}`}
-													value={locator}
-													onChange={event => {
-														updateSkillRoot(index, event.currentTarget.value);
-													}}
-													placeholder=".agent-skills"
-													spellCheck="false"
-													disabled={isSubmitting}
-												/>
-												<button
-													type="button"
-													className="btn btn-sm btn-ghost rounded-xl"
-													onClick={() => {
-														removeSkillRoot(index);
-													}}
-													disabled={isSubmitting}
-													aria-label="Remove Skill folder"
-												>
-													<FiTrash2 size={14} />
-												</button>
-											</div>
-											{locator.trim() && hasProjectFolder ? (
-												<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
-													{workspaceLocatorToPath(form.rootPath, locator)}
+									{form.skillRoots.map((locator, index) => {
+										const inputID = `${displayNameID}-skill-root-${index}`;
+										return (
+											<div key={inputID} className="border-base-content/10 rounded-2xl border p-3">
+												<div className="flex gap-2">
+													<input
+														id={inputID}
+														type="text"
+														className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
+														aria-label={`Additional Skill folder ${index + 1}`}
+														value={locator}
+														onChange={event => {
+															updateSkillRoot(index, event.currentTarget.value);
+														}}
+														placeholder=".agent-skills"
+														spellCheck="false"
+														disabled={isSubmitting}
+													/>
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-xl"
+														onClick={() => {
+															removeSkillRoot(index);
+														}}
+														disabled={isSubmitting}
+														aria-label={`Remove additional Skill folder ${index + 1}`}
+													>
+														<FiTrash2 size={14} aria-hidden="true" />
+													</button>
 												</div>
-											) : null}
-										</div>
-									))}
+												{locator.trim() && hasProjectFolder ? (
+													<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
+														{workspaceLocatorToPath(form.rootPath, locator)}
+													</div>
+												) : null}
+											</div>
+										);
+									})}
 								</div>
 							</ModalSection>
 						</div>

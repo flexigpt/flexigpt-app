@@ -285,7 +285,7 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 
 		return {
 			sessionID: body.sessionID,
-			activeSkillRefs: body.activeSkillRefs as SkillRef[],
+			activeSkillRefs: (body.activeSkillRefs ?? []) as SkillRef[],
 		};
 	}
 
@@ -337,7 +337,9 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 			throw new Error('ListProvidedSkills returned an empty response body.');
 		}
 
-		return response.Body.skills.map(providedSkillFromWails);
+		return (response.Body.skills ?? []).map(s => {
+			return providedSkillFromWails(s);
+		});
 	}
 
 	async renderProvidedSkill(

@@ -389,8 +389,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		allSkills,
 		skillsLoading,
 		skillsLoadError,
-		enabledSkillRefs,
 		activeSkillRefs,
+		installedEnabledSkillRefs,
+		installedActiveSkillRefs,
 		setEnabledSkillRefs,
 		setActiveSkillRefs,
 		setActiveSkillRefsFromSession,
@@ -1849,17 +1850,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		onAssistantPresetRuntimeStateChange?.({
 			conversationToolChoices: conversationToolsToChoices(conversationToolsState),
 			webSearchChoices: mapAssistantPresetWebSearchTemplatesToChoices(webSearchTemplates),
-			enabledSkillRefs: getCurrentInstalledEnabledSkillRefs(),
-			activeSkillRefs: getCurrentInstalledActiveSkillRefs(),
+			enabledSkillRefs: installedEnabledSkillRefs,
+			activeSkillRefs: installedActiveSkillRefs,
 			mcpContext: mcp.mcpContext,
 		});
 	}, [
 		conversationToolsState,
-		enabledSkillRefs,
+		installedEnabledSkillRefs,
+		installedActiveSkillRefs,
 		mcp.mcpContext,
-		activeSkillRefs,
-		getCurrentInstalledActiveSkillRefs,
-		getCurrentInstalledEnabledSkillRefs,
 		onAssistantPresetRuntimeStateChange,
 		webSearchTemplates,
 	]);
@@ -2086,6 +2085,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						mcpMenuState={mcpMenu}
 						workspaceMenuState={workspaceMenu}
 						workspaceState={workspace}
+						onInsertWorkspaceTemplateText={handleInsertTemplateText}
 						templateButtonRef={templateButtonRef}
 						toolButtonRef={toolButtonRef}
 						attachmentButtonRef={attachmentButtonRef}
@@ -2110,8 +2110,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onOpenConversationToolDetails={handleOpenConversationToolDetails}
 						allSkills={allSkills}
 						skillsLoading={skillsLoading}
-						enabledSkillRefs={enabledSkillRefs}
-						activeSkillRefs={activeSkillRefs}
+						enabledSkillRefs={installedEnabledSkillRefs}
+						activeSkillRefs={installedActiveSkillRefs}
 						setEnabledSkillRefs={setEnabledSkillRefs}
 						setActiveSkillRefs={setActiveSkillRefs}
 						onEnableAllSkills={enableAllSkills}

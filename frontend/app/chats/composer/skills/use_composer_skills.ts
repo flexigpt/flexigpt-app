@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 import { SkillSessionSyncMode } from '@/spec/skill';
@@ -32,6 +32,8 @@ interface UseComposerSkillsResult {
 	skillsLoadError: string | null;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
+	installedEnabledSkillRefs: SkillRef[];
+	installedActiveSkillRefs: SkillRef[];
 	skillSessionID: string | null;
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
@@ -70,6 +72,19 @@ function workspaceRefKey(workspace?: WorkspaceRef): string {
 
 function workspaceRefsEqual(left?: WorkspaceRef, right?: WorkspaceRef): boolean {
 	return left?.rootID === right?.rootID && left?.collectionID === right?.collectionID;
+}
+
+function stringSetsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+	if (left.size !== right.size) {
+		return false;
+	}
+
+	for (const value of left) {
+		if (!right.has(value)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 function buildSkillSessionStateKey(enabled: SkillRef[], active: SkillRef[], workspace?: WorkspaceRef): string {
@@ -145,6 +160,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	const [skillSessionID, setSkillSessionID] = useState<string | null>(null);
 	const [skillsLoading, setSkillsLoading] = useState(true);
 	const [skillsLoadError, setSkillsLoadError] = useState<string | null>(null);
+	const [workspaceSkillRefKeys, setWorkspaceSkillRefKeys] = useState<ReadonlySet<string>>(() => new Set());
 
 	const sessionStateKeyRef = useRef('');
 	const skillSessionSyncVersionRef = useRef(0);
@@ -183,6 +199,14 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		setSkillSessionID(prev => (prev === next ? prev : next));
 	}, []);
 
+	const updateWorkspaceSkillRefKeysState = useCallback((next: ReadonlySet<string>) => {
+		const copied = new Set(next);
+		workspaceSkillRefKeysRef.current = copied;
+		setWorkspaceSkillRefKeys(previous => {
+			return stringSetsEqual(previous, copied) ? previous : copied;
+		});
+	}, []);
+
 	const getCurrentSkillSessionID = useCallback(() => {
 		return skillSessionIDRef.current;
 	}, []);
@@ -204,6 +228,16 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		const workspaceKeys = workspaceSkillRefKeysRef.current;
 		return activeSkillRefsRef.current.filter(ref => !workspaceKeys.has(skillRefKey(ref)));
 	}, []);
+
+	const installedEnabledSkillRefs = useMemo(
+		() => enabledSkillRefs.filter(ref => !workspaceSkillRefKeys.has(skillRefKey(ref))),
+		[enabledSkillRefs, workspaceSkillRefKeys]
+	);
+
+	const installedActiveSkillRefs = useMemo(
+		() => activeSkillRefs.filter(ref => !workspaceSkillRefKeys.has(skillRefKey(ref))),
+		[activeSkillRefs, workspaceSkillRefKeys]
+	);
 
 	const filterSkillRefsToLoadedCatalog = useCallback((refs: SkillRef[] | null | undefined): SkillRef[] => {
 		// A missing catalog item is diagnostic state, not permission to silently
@@ -267,7 +301,9 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			let syncVersion = skillSessionSyncVersionRef.current;
 
 			workspaceRefRef.current = nextWorkspace;
-			workspaceSkillRefKeysRef.current = nextWorkspaceSkillRefKeys;
+			if (replacesWorkspaceSkillRefs) {
+				updateWorkspaceSkillRefKeysState(nextWorkspaceSkillRefKeys);
+			}
 			updateEnabledSkillRefsState(nextEnabled);
 			updateActiveSkillRefsState(nextActive);
 			if (selectionChanged || forceResetSession) {
@@ -338,7 +374,8 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 				const latestEnabled = enabledSkillRefsRef.current;
 				const latestActive = activeSkillRefsRef.current;
-				const latestSelectionStateKey = buildSkillSessionStateKey(latestEnabled, latestActive);
+				const latestWorkspace = workspaceRefRef.current;
+				const latestSelectionStateKey = buildSkillSessionStateKey(latestEnabled, latestActive, latestWorkspace);
 
 				if (latestSelectionStateKey !== nextSessionStateKey) {
 					closeSkillSessionBestEffort(sess.sessionID);
@@ -365,6 +402,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			updateActiveSkillRefsState,
 			updateEnabledSkillRefsState,
 			updateSkillSessionIDState,
+			updateWorkspaceSkillRefKeysState,
 		]
 	);
 
@@ -673,7 +711,8 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 			const latestEnabled = enabledSkillRefsRef.current;
 			const latestActive = activeSkillRefsRef.current;
-			const latestStateKey = buildSkillSessionStateKey(latestEnabled, latestActive);
+			const latestWorkspace = workspaceRefRef.current;
+			const latestStateKey = buildSkillSessionStateKey(latestEnabled, latestActive, latestWorkspace);
 
 			if (latestStateKey !== currentStateKey) {
 				closeSkillSessionBestEffort(sess.sessionID);
@@ -709,6 +748,8 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		skillsLoadError,
 		enabledSkillRefs,
 		activeSkillRefs,
+		installedEnabledSkillRefs,
+		installedActiveSkillRefs,
 		skillSessionID,
 		setEnabledSkillRefs,
 		setActiveSkillRefs,
