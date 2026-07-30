@@ -3,6 +3,7 @@ package skillbundle
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -55,7 +56,7 @@ func (a *API) BootstrapBuiltInBundle(
 			return Bundle{}, err
 		}
 
-		existing, err = a.CreateBundle(ctx, CreateBundleRequest{
+		created, createErr := a.CreateBundle(ctx, CreateBundleRequest{
 			RootID:       request.RootID,
 			DisplayName:  request.DisplayName,
 			Description:  request.Description,
@@ -67,14 +68,34 @@ func (a *API) BootstrapBuiltInBundle(
 				Enabled:  true,
 			}},
 		})
-		if err != nil {
-			_ = a.dependencies.Sources.Discard(
+		if createErr == nil {
+			existing = created
+		} else {
+			discardErr := a.dependencies.Sources.Discard(
 				context.WithoutCancel(ctx),
 				request.RootID,
 				managedSource.ID,
 				managedSource.Revision,
 			)
-			return Bundle{}, err
+			if !errors.Is(createErr, basespec.ErrConflict) ||
+				discardErr != nil {
+				return Bundle{}, errors.Join(createErr, discardErr)
+			}
+
+			// The unique durable idempotency key may have been claimed by a
+			// concurrent bootstrapper. Its Collection is the winner; do not
+			// create a second bundle or retain this provisional Source.
+			existing, err = a.findBundleByBootstrapKey(
+				ctx,
+				request.RootID,
+				request.BootstrapKey,
+			)
+			if err != nil {
+				return Bundle{}, errors.Join(createErr, err)
+			}
+			if existing.Collection.ID == "" {
+				return Bundle{}, createErr
+			}
 		}
 	}
 
@@ -131,11 +152,18 @@ func (a *API) findBundleByBootstrapKey(
 		if value.Kind != CollectionKind {
 			continue
 		}
-		data, err := DecodeCollectionData(value.Data)
-		if err != nil {
-			return Bundle{}, err
+		matches := value.IdempotencyKey == key
+		if !matches {
+			// Compatibility for bundles created before migration 6. New
+			// bundle writes use Collection.IdempotencyKey and do not duplicate
+			// the key in opaque Collection data.
+			data, err := DecodeCollectionData(value.Data)
+			if err != nil {
+				return Bundle{}, err
+			}
+			matches = data.BootstrapKey == key
 		}
-		if data.BootstrapKey != key {
+		if !matches {
 			continue
 		}
 		bundle, err := a.GetBundle(ctx, value.Ref())

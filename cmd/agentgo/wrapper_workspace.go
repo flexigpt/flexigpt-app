@@ -24,9 +24,6 @@ type WorkspaceWrapper struct {
 	bootstrapContext context.Context
 	bootstrapCancel  context.CancelFunc
 	bootstrapWG      sync.WaitGroup
-
-	// "managed" contains only Workspace-owned runtime partitions.
-	managed map[collection.CollectionRef]struct{}
 }
 
 func InitWorkspaceWrapper(
@@ -61,7 +58,7 @@ func InitWorkspaceWrapper(
 	wrapper.bootstrapCancel = bootstrapCancel
 	wrapper.api = api
 	wrapper.skillRuntime = nil
-	wrapper.managed = map[collection.CollectionRef]struct{}{}
+
 	wrapper.lifecycleMu.Unlock()
 	return nil
 }
@@ -102,9 +99,7 @@ func BindWorkspaceSkillRuntime(
 		return errors.New("workspace wrapper is closed")
 	}
 	wrapper.skillRuntime = runtime
-	if wrapper.managed == nil {
-		wrapper.managed = map[collection.CollectionRef]struct{}{}
-	}
+
 	wrapper.lifecycleMu.Unlock()
 
 	wrapper.syncKnownWorkspaceSkills()
@@ -513,12 +508,11 @@ func (w *WorkspaceWrapper) syncWorkspaceSkills(
 	}
 	w.lifecycleMu.Lock()
 	if w.closed || w.api == nil || w.skillRuntime == nil ||
-		w.managed == nil {
+		w.bootstrapContext == nil {
 		w.lifecycleMu.Unlock()
 		return
 	}
 	runtime := w.skillRuntime
-	w.managed[ref] = struct{}{}
 	w.lifecycleMu.Unlock()
 	runtime.RequestCollectionResync(ref)
 }
@@ -552,13 +546,7 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 	}
 	api := w.api
 	parent := w.bootstrapContext
-	managed := make([]collection.CollectionRef, 0, len(w.managed))
-	for ref := range w.managed {
-		if filterRoot && ref.RootID != rootID {
-			continue
-		}
-		managed = append(managed, ref)
-	}
+
 	w.bootstrapWG.Add(1)
 	w.lifecycleMu.Unlock()
 
@@ -580,25 +568,13 @@ func (w *WorkspaceWrapper) scheduleWorkspaceSkillSynchronization(
 			return
 		}
 
-		active := make(map[collection.CollectionRef]struct{}, len(refs))
 		for _, ref := range refs {
 			if filterRoot && ref.RootID != rootID {
 				continue
 			}
-			active[ref] = struct{}{}
+
 			//nolint:contextcheck // Background.
 			w.syncWorkspaceSkills(ref)
-		}
-
-		// Only remove Workspace partitions that this wrapper managed before
-		// this scan began. Runtime.ManagedCollectionRefs is cross-feature and
-		// must never be used as a Workspace deletion list.
-		for _, ref := range managed {
-			if _, exists := active[ref]; exists {
-				continue
-			}
-			//nolint:contextcheck // Background.
-			w.removeWorkspaceSkills(ref)
 		}
 	}()
 }
@@ -615,7 +591,7 @@ func (w *WorkspaceWrapper) removeWorkspaceSkills(
 		return
 	}
 	runtime := w.skillRuntime
-	delete(w.managed, ref)
+
 	w.lifecycleMu.Unlock()
 	runtime.RequestCollectionRemoval(ref)
 }
@@ -640,9 +616,6 @@ func (w *WorkspaceWrapper) close() {
 		cancel()
 	}
 	w.bootstrapWG.Wait()
-	w.lifecycleMu.Lock()
-	w.managed = nil
-	w.lifecycleMu.Unlock()
 	if api != nil {
 		_ = api.Close()
 	}

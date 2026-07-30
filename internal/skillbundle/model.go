@@ -13,8 +13,10 @@ type CollectionData struct {
 	SchemaVersion           string `json:"schemaVersion"`
 	DiscoveryPolicyRevision string `json:"discoveryPolicyRevision"`
 
-	// BootstrapKey is only an idempotent local bootstrap lookup key.
-	// It is never a CollectionID, ArtifactID, or persistent Skill reference.
+	// BootstrapKey is retained only to locate collections written before the
+	// durable Collection.IdempotencyKey was introduced. New bundle creation
+	// leaves this field empty. It is never a CollectionID, ArtifactID, or
+	// persistent Skill reference.
 	BootstrapKey string `json:"bootstrapKey,omitempty"`
 }
 

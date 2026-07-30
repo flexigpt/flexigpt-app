@@ -12,6 +12,8 @@ import (
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 )
 
@@ -41,7 +43,10 @@ func (s *SkillRuntime) CreateSkillSession(
 		_ = s.runtime.CloseSession(ctx, agentskillsSpec.SessionID(sessionID))
 	}
 
-	resolved := s.resolveAllowArtifacts(ctx, req.Body.AllowArtifacts)
+	resolved, err := s.resolveAllowArtifacts(ctx, req.Body.AllowArtifacts)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
+	}
 	activeRefs := subsetArtifacts(
 		req.Body.AllowArtifacts,
 		req.Body.ActiveArtifacts,
@@ -148,7 +153,10 @@ func (s *SkillRuntime) GetSkillsPrompt(
 		}, nil
 	}
 
-	resolved := s.resolveAllowArtifacts(ctx, filterRequest.AllowArtifacts)
+	resolved, err := s.resolveAllowArtifacts(ctx, filterRequest.AllowArtifacts)
+	if err != nil {
+		return nil, err
+	}
 	if len(resolved.AllowDefs) == 0 {
 		return &skillruntimeSpec.GetSkillsPromptResponse{
 			Body: &skillruntimeSpec.GetSkillsPromptResponseBody{},
@@ -205,7 +213,10 @@ func (s *SkillRuntime) ListRuntimeSkills(
 		)
 	}
 
-	resolved := s.resolveAllowArtifacts(ctx, filterRequest.AllowArtifacts)
+	resolved, err := s.resolveAllowArtifacts(ctx, filterRequest.AllowArtifacts)
+	if err != nil {
+		return nil, err
+	}
 	if len(resolved.AllowDefs) == 0 {
 		return &skillruntimeSpec.ListRuntimeSkillsResponse{
 			Body: &skillruntimeSpec.ListRuntimeSkillsResponseBody{
@@ -326,7 +337,7 @@ type resolvedAllowArtifacts struct {
 func (s *SkillRuntime) resolveAllowArtifacts(
 	ctx context.Context,
 	refs []artifact.ArtifactRef,
-) resolvedAllowArtifacts {
+) (resolvedAllowArtifacts, error) {
 	output := resolvedAllowArtifacts{
 		DefToArtifacts: map[agentskillsSpec.SkillDef]artifact.ArtifactRef{},
 		RefToDef:       map[string]agentskillsSpec.SkillDef{},
@@ -334,6 +345,8 @@ func (s *SkillRuntime) resolveAllowArtifacts(
 
 	seenRefs := map[string]struct{}{}
 	byName := map[string][]ResolvedArtifactSkill{}
+	resynced := map[collection.CollectionRef]error{}
+	unavailable := make([]artifact.ArtifactRef, 0)
 	for _, ref := range refs {
 		if err := ref.Validate(); err != nil {
 			continue
@@ -344,8 +357,13 @@ func (s *SkillRuntime) resolveAllowArtifacts(
 		}
 		seenRefs[key] = struct{}{}
 
-		value, found := s.resolveArtifactSkill(ctx, ref)
+		value, found := s.resolveArtifactSkillWithResync(
+			ctx,
+			ref,
+			resynced,
+		)
 		if !found {
+			unavailable = append(unavailable, ref)
 			continue
 		}
 		byName[value.Definition.Name] = append(
@@ -353,9 +371,14 @@ func (s *SkillRuntime) resolveAllowArtifacts(
 			value,
 		)
 	}
+	if len(unavailable) != 0 {
+		return output, unavailableArtifactSkillsError(unavailable)
+	}
 
-	for _, values := range byName {
+	collisions := make([]string, 0)
+	for name, values := range byName {
 		if len(values) != 1 {
+			collisions = append(collisions, name)
 			continue
 		}
 		value := values[0]
@@ -363,25 +386,62 @@ func (s *SkillRuntime) resolveAllowArtifacts(
 		output.RefToDef[artifactRefKey(value.Artifact)] = value.Definition
 		output.AllowDefs = append(output.AllowDefs, value.Definition)
 	}
+	if len(collisions) != 0 {
+		sort.Strings(collisions)
+		return output, fmt.Errorf(
+			"%w: ambiguous runtime Skill names: %s",
+			basespec.ErrConflict,
+			strings.Join(collisions, ", "),
+		)
+	}
 	sortSkillDefs(output.AllowDefs)
-	return output
+	return output, nil
 }
 
 func (s *SkillRuntime) resolveArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (ResolvedArtifactSkill, bool) {
+	return s.resolveArtifactSkillWithResync(ctx, ref, nil)
+}
+
+// resolveArtifactSkillWithResync keeps request-local synchronization state
+// only. It is not a cache of Artifact Store state: every Artifact is resolved
+// again after its owning Collection has been reconciled.
+func (s *SkillRuntime) resolveArtifactSkillWithResync(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	resynced map[collection.CollectionRef]error,
+) (ResolvedArtifactSkill, bool) {
 	value, err := s.resolver.ResolveArtifactSkill(ctx, ref)
 	if err != nil {
 		return ResolvedArtifactSkill{}, false
 	}
-	if err := s.ResyncCollection(ctx, value.Collection); err != nil {
-		return ResolvedArtifactSkill{}, false
+
+	if resynced == nil {
+		if err := s.ResyncCollection(ctx, value.Collection); err != nil {
+			return ResolvedArtifactSkill{}, false
+		}
+	} else if previous, found := resynced[value.Collection]; found {
+		if previous != nil {
+			return ResolvedArtifactSkill{}, false
+		}
+	} else {
+		err := s.ResyncCollection(ctx, value.Collection)
+		resynced[value.Collection] = err
+		if err != nil {
+			return ResolvedArtifactSkill{}, false
+		}
 	}
-	value, err = s.resolver.ResolveArtifactSkill(ctx, ref)
+
+	refreshed, err := s.resolver.ResolveArtifactSkill(ctx, ref)
 	if err != nil {
 		return ResolvedArtifactSkill{}, false
 	}
+	if refreshed.Collection != value.Collection {
+		return ResolvedArtifactSkill{}, false
+	}
+	value = refreshed
 
 	s.rtResyncMu.Lock()
 	registeredVersion, registered := s.managedRuntime[value.Definition]
@@ -390,6 +450,23 @@ func (s *SkillRuntime) resolveArtifactSkill(
 		return ResolvedArtifactSkill{}, false
 	}
 	return value, true
+}
+
+func unavailableArtifactSkillsError(
+	refs []artifact.ArtifactRef,
+) error {
+	sort.Slice(refs, func(left, right int) bool {
+		return artifactRefKey(refs[left]) < artifactRefKey(refs[right])
+	})
+	values := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		values = append(values, artifactRefKey(ref))
+	}
+	return fmt.Errorf(
+		"%w: unavailable Artifact Skills: %s",
+		basespec.ErrReferenceUnresolved,
+		strings.Join(values, ", "),
+	)
 }
 
 func validateArtifactRefs(values []artifact.ArtifactRef) error {

@@ -10,7 +10,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 
@@ -869,19 +868,6 @@ func writeManagedPackageFiles(
 	}()
 
 	for _, file := range files {
-		parent := path.Dir(string(file.Locator))
-		if parent == "." {
-			continue
-		}
-		if _, err := mapstoreio.EnsurePrivateSubdirectory(
-			root,
-			filepath.FromSlash(parent),
-		); err != nil {
-			return err
-		}
-	}
-
-	for _, file := range files {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -924,53 +910,6 @@ func writeManagedPackageFiles(
 		return err
 	}
 	storesClosed = true
-	return secureAndSyncManagedPackage(root)
-}
-
-func secureAndSyncManagedPackage(root string) error {
-	directories := make([]string, 0)
-	err := filepath.WalkDir(root, func(
-		location string,
-		_ os.DirEntry,
-		walkErr error,
-	) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		info, err := os.Stat(location)
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			if err := mapstoreio.ApplyPrivateDirectoryMode(location); err != nil {
-				return err
-			}
-			directories = append(directories, location)
-			return nil
-		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf(
-				"%w: managed package contains a non-regular file",
-				basespec.ErrInvalid,
-			)
-		}
-		if err := mapstoreio.ApplyPrivateFileMode(location); err != nil {
-			return err
-		}
-		return mapstoreio.SyncRegularFile(location)
-	})
-	if err != nil {
-		return err
-	}
-	sort.Slice(directories, func(left, right int) bool {
-		return len(directories[left]) > len(directories[right])
-	})
-	for _, directory := range directories {
-		if err := mapstoreio.SyncDirectory(directory); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

@@ -31,6 +31,13 @@ The backend source of truth is Artifact Store. New durable Skill selections use
 `ArtifactRef`; runtime ownership is derived from the Artifact's current
 Collection membership.
 
+Built-in bootstrap uses an immutable local Collection idempotency key stored
+and uniquely enforced by Artifact Store. The key is scoped by Root and
+Collection kind, is not a CollectionID or ArtifactID, is not portable content,
+and is not exposed through public views. Legacy `bootstrapKey` values in
+Collection data are read only as a compatibility lookup for already-created
+Collections; new writes do not duplicate the key in opaque Collection data.
+
 The standalone `internal/skillstore` package may remain temporarily as a
 legacy reference store and offline migration input. It is not an active
 application owner. Normal startup, runtime registration, assistant preset
@@ -526,6 +533,8 @@ tool.
 | Runtime source verification        | Present                             | Runtime handoff verifies current catalog occurrence, Source generation, and raw `SKILL.md` content digest through Source snapshots, then delegates native package parsing, resource access, sandboxing, and script execution to `agentskills-go`.                           |
 | Script execution policy            | Present and explicit                | Artifact-backed runtime defaults to scripts disabled. Explicit application composition may enable scripts, while `agentskills-go` and `llmtools-go` retain all execution and sandbox policy.                                                                                |
 | Artifact-backed backend references | Present                             | Assistant presets, conversations, inference, Workspace, and Skill Runtime use Artifact-backed Skill references.                                                                                                                                                             |
+| Runtime synchronization state      | Present and derived only            | Artifact Store is durable authority. `SkillRuntime` retains only process-local provider registrations; Workspace and Skill Bundle wrappers do not mirror managed Collection membership.                                                                                     |
+| Root mutation invalidation         | Present and narrowed                | Notifications are post-commit, coalesced invalidation wake-ups. Root creation and Source revision changes notify; no-op updates and irrelevant lifecycle metadata do not trigger feature scans.                                                                             |
 | Legacy Skill Store                 | Reference-only                      | `internal/skillstore` remains migration input and implementation reference only. It is not an active startup, runtime, lookup, or mutation dependency.                                                                                                                      |
 | Same-name policy                   | Partial                             | Aggregate listing marks simultaneously eligible same-name Skills unavailable, and runtime resolution withholds ambiguous durable references. A unified migrated-Collection precedence policy remains deferred.                                                              |
 | Assistant preset integration       | Present                             | Assistant preset validation resolves `ArtifactSkillSelection` through the Artifact-backed Skill Runtime.                                                                                                                                                                    |
@@ -656,6 +665,10 @@ release-complete:
       own source-side cleanup before using the internal Artifact purge service.
 - [x] Keep Workspace and Skill Bundle synchronizers feature-owned. A Workspace
       reconciliation must never remove a `skill.bundle` runtime partition.
+- [x] Persist bootstrap idempotency in Artifact Store rather than relying only
+      on an in-process mutex or opaque Collection data.
+- [x] Fail closed for unavailable or same-name-colliding Artifact Skill
+      allow-list entries rather than silently dropping them.
 - [ ] Add deterministic Skill and bundle import/export only after the portable
       Collection Definition and content-closure contracts exist.
 - [ ] Decide and ship either a reset policy or a one-time offline importer for
@@ -696,14 +709,17 @@ the backend migration clean:
 - Runtime handoff delegates package parsing and runtime behavior to
   `agentskills-go`; Source snapshots verify the catalogued raw `SKILL.md`
   digest before native-path handoff. Feature code must not introduce custom
-  parsing, sandboxing, executable-file, symlink, or cross-platform path
-  policy.
+  parsing, sandboxing, executable-file, or cross-platform path policy.
+- External filesystem Source symlink containment is enforced by the
+  `source/fsdir` adapter. This is a lower Source-boundary requirement, not a
+  Skill Bundle, Workspace, or Agent Skills runtime responsibility.
 - MapStore-managed definition files are accessed only through MapStore. Feature
   code must not recreate MapStore path, symlink, permission, or durability
   handling.
-- Root mutation observers remain post-commit, coalesced, and non-fatal.
+- Root mutation invalidations remain post-commit, coalesced, non-fatal, and
+  limited to mutations that can change runtime eligibility.
 - Feature synchronization tracks only Collections owned by that feature and
-  cannot remove another feature's runtime registrations.
+  does not maintain a second persistent or in-memory membership authority.
 - The runtime rejects a stale registration when the same `SkillDef` has a
   different resolved Artifact version, including a changed local Artifact
   revision.

@@ -6,6 +6,8 @@ import (
 	"sort"
 	"time"
 
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -160,7 +162,21 @@ func (f *Adapter) Load(
 	sourceFailures := make(map[basespec.SourceID]error)
 
 	for _, item := range loadPlan.Items {
-		if err := skillartifact.ValidateDefinition(item.Definition); err != nil {
+		resourceValue := spec.Resource{
+			Artifact:        item.Artifact,
+			Definition:      item.Definition,
+			Source:          item.Source,
+			CatalogCurrent:  item.CatalogCurrent,
+			ProjectionValid: true,
+		}
+		projected, err := projectWorkspaceSkill(
+			workspace,
+			resourceValue,
+			workspaceValue.Collection.Enabled,
+			true,
+			f.supportsRuntimePath(item.Source.Kind),
+		)
+		if err != nil {
 			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
 				skillProjectionDiagnostic(item.Artifact, err),
@@ -181,28 +197,6 @@ func (f *Adapter) Load(
 			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
 				artifactadapter.RuntimeDecisionDiagnostic(decision, item.Artifact),
-			)
-			continue
-		}
-		resourceValue := spec.Resource{
-			Artifact: item.Artifact,
-
-			Definition:      item.Definition,
-			Source:          item.Source,
-			CatalogCurrent:  item.CatalogCurrent,
-			ProjectionValid: true,
-		}
-		projected, err := projectWorkspaceSkill(
-			workspace,
-			resourceValue,
-			workspaceValue.Collection.Enabled,
-			true,
-			f.supportsRuntimePath(item.Source.Kind),
-		)
-		if err != nil {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
-				output.Diagnostics,
-				skillProjectionDiagnostic(item.Artifact, err),
 			)
 			continue
 		}
@@ -301,21 +295,17 @@ func projectWorkspaceSkill(
 	if dataErr != nil {
 		return output, dataErr
 	}
-	if err := skillartifact.ValidateDefinition(resourceValue.Definition); err != nil {
-		return output, err
-	}
-	body, err := skillartifact.DecodeBody(
-
-		resourceValue.Definition.Body,
+	document, err := skillartifact.DocumentFromDefinition(
+		resourceValue.Definition,
 	)
 	if err != nil {
 		return output, err
 	}
 	markdownBody := ""
 	if includeMarkdown {
-		markdownBody = body.MarkdownBody
+		markdownBody = document.MarkdownBody
 	}
-	output.Skill = skillSummary(resourceValue.Artifact, body)
+	output.Skill = skillSummary(resourceValue.Artifact, document)
 	output.MarkdownBody = markdownBody
 	if resourceValue.Occurrence != nil &&
 		resourceValue.Occurrence.SourceContentDigest != nil {
@@ -327,7 +317,7 @@ func projectWorkspaceSkill(
 
 func skillSummary(
 	artifactValue artifact.Artifact,
-	value skillartifact.Body,
+	value agentskillsSpec.SkillDocument,
 ) SkillSummary {
 	arguments := make([]SkillArgument, 0, len(value.Arguments))
 	for _, argument := range value.Arguments {
@@ -345,7 +335,7 @@ func skillSummary(
 		DisplayName:   value.DisplayName,
 		Description:   value.Description,
 		Tags:          append([]string(nil), value.Tags...),
-		Insert:        value.Insert,
+		Insert:        string(value.Insert),
 		Arguments:     arguments,
 		IsEnabled:     artifactValue.Enabled,
 		CreatedAt:     artifactValue.CreatedAt,

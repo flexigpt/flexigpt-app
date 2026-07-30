@@ -69,16 +69,17 @@ func (s *Service) Create(
 	}
 	now := clockutil.NowUTC(s.clock)
 	value := Collection{
-		ID:          basespec.CollectionID(id),
-		RootID:      rootID,
-		Kind:        draft.Kind,
-		DisplayName: draft.DisplayName,
-		Description: draft.Description,
-		Enabled:     draft.Enabled,
-		Data:        data,
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
+		ID:             basespec.CollectionID(id),
+		RootID:         rootID,
+		Kind:           draft.Kind,
+		DisplayName:    draft.DisplayName,
+		Description:    draft.Description,
+		Enabled:        draft.Enabled,
+		Data:           data,
+		IdempotencyKey: draft.IdempotencyKey,
+		Revision:       1,
+		CreatedAt:      now,
+		ModifiedAt:     now,
 	}
 	if err := value.Validate(); err != nil {
 		return Collection{}, nil, err

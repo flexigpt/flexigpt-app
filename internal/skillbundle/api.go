@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"path"
 	"sort"
 	"strings"
@@ -148,11 +150,19 @@ func (a *API) CreateBundle(
 	if err := basespec.ValidateRootID(request.RootID); err != nil {
 		return Bundle{}, err
 	}
+	if request.BootstrapKey != "" {
+		if err := basespec.ValidateIdentifier(
+			"skill bundle bootstrap key",
+			request.BootstrapKey,
+			basespec.MaxKindBytes,
+		); err != nil {
+			return Bundle{}, err
+		}
+	}
 
 	data, err := EncodeCollectionData(CollectionData{
 		SchemaVersion:           CollectionSchemaVersion,
 		DiscoveryPolicyRevision: DiscoveryPolicyRevision,
-		BootstrapKey:            request.BootstrapKey,
 	})
 	if err != nil {
 		return Bundle{}, err
@@ -175,11 +185,12 @@ func (a *API) CreateBundle(
 		ctx,
 		request.RootID,
 		collection.Draft{
-			Kind:        CollectionKind,
-			DisplayName: request.DisplayName,
-			Description: request.Description,
-			Enabled:     request.Enabled,
-			Data:        data,
+			Kind:           CollectionKind,
+			DisplayName:    request.DisplayName,
+			Description:    request.Description,
+			Enabled:        request.Enabled,
+			Data:           data,
+			IdempotencyKey: request.BootstrapKey,
 		},
 		attachments,
 	)
@@ -821,21 +832,8 @@ func (a *API) createManagedSkill(
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	if pinned != nil {
-		if pinned.Adoption != artifact.AdoptionPinned ||
-			pinned.Binding.SourceID != sourceValue.ID ||
-			pinned.Binding.Locator != skillLocator ||
-			pinned.Binding.ExpectedKind != skillartifact.Kind ||
-			pinned.Name != artifactName ||
-			pinned.Enabled != request.Enabled {
-			return CreateManagedSkillResponse{}, fmt.Errorf(
-				"%w: managed Skill operation %q conflicts with its existing Artifact intent",
-				basespec.ErrConflict,
-				request.OperationKey,
-			)
-		}
-	} else {
-		value, err := a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
+	if pinned == nil {
+		value, pinErr := a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
 			Collection:                 request.Bundle,
 			ExpectedCollectionRevision: request.ExpectedCollectionRevision,
 			Binding: artifact.SourceBinding{
@@ -847,10 +845,39 @@ func (a *API) createManagedSkill(
 			Enabled: request.Enabled,
 			Data:    localData,
 		})
-		if err != nil {
-			return CreateManagedSkillResponse{}, err
+		switch {
+		case pinErr == nil:
+			pinned = &value
+
+		case errors.Is(pinErr, basespec.ErrConflict):
+			// Another caller may have completed the same operation between
+			// our lookup and this insert. Re-read durable Artifact Store state
+			// instead of treating that normal race as a failed operation.
+			pinned, err = a.findManagedSkillByOperation(
+				ctx,
+				request.Bundle,
+				request.OperationKey,
+			)
+			if err != nil {
+				return CreateManagedSkillResponse{}, err
+			}
+			if pinned == nil {
+				return CreateManagedSkillResponse{}, pinErr
+			}
+
+		default:
+			return CreateManagedSkillResponse{}, pinErr
 		}
-		pinned = &value
+	}
+	if err := validateManagedSkillOperationIntent(
+		*pinned,
+		request.OperationKey,
+		sourceValue.ID,
+		skillLocator,
+		artifactName,
+		request.Enabled,
+	); err != nil {
+		return CreateManagedSkillResponse{}, err
 	}
 
 	state, generation, err := a.dependencies.GetManagedSourceState(
@@ -1228,7 +1255,16 @@ func managedSkillOperationKeyOf(raw json.RawMessage) (string, error) {
 		return "", err
 	}
 	var value managedSkillArtifactData
-	if err := json.Unmarshal(canonical, &value); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(canonical))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&value); err != nil {
+		return "", err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("managed Skill Artifact data has trailing JSON")
+		}
 		return "", err
 	}
 	if value.OperationKey == "" {
@@ -1252,6 +1288,30 @@ func managedSkillPackageDirectory(
 		cryptoutil.DigestSHA256Prefix,
 	)
 	return basespec.Locator(path.Join("packages", digest, skillName)), nil
+}
+
+func validateManagedSkillOperationIntent(
+	value artifact.Artifact,
+	operationKey string,
+	sourceID basespec.SourceID,
+	skillLocator basespec.Locator,
+	artifactName string,
+	enabled bool,
+) error {
+	if value.Kind != skillartifact.Kind ||
+		value.Adoption != artifact.AdoptionPinned ||
+		value.Binding.SourceID != sourceID ||
+		value.Binding.Locator != skillLocator ||
+		value.Binding.ExpectedKind != skillartifact.Kind ||
+		value.Name != artifactName ||
+		value.Enabled != enabled {
+		return fmt.Errorf(
+			"%w: managed Skill operation %q conflicts with its existing Artifact intent",
+			basespec.ErrConflict,
+			operationKey,
+		)
+	}
+	return nil
 }
 
 func (a *API) findManagedSkillByOperation(

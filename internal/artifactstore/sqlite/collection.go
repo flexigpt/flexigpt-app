@@ -14,7 +14,7 @@ import (
 
 const collectionColumns = `
 	id, root_id, kind, display_name, description, enabled, data_json,
-	revision, created_at, modified_at, retired_at`
+	revision, created_at, modified_at, retired_at, idempotency_key`
 
 const attachmentColumns = `
 	root_id, collection_id, source_id, role, enabled, data_json,
@@ -83,8 +83,8 @@ func (s *Store) createCollection(
 		ctx,
 		`INSERT INTO artifact_collections (
 			id, root_id, kind, display_name, description, enabled, data_json,
-			revision, created_at, modified_at, retired_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			revision, created_at, modified_at, retired_at, idempotency_key
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(value.ID),
 		string(value.RootID),
 		string(value.Kind),
@@ -96,6 +96,7 @@ func (s *Store) createCollection(
 		timeValue(value.CreatedAt),
 		timeValue(value.ModifiedAt),
 		nullableTime(value.RetiredAt),
+		value.IdempotencyKey,
 	); err != nil {
 		return sqliteError(err)
 	}
@@ -1018,6 +1019,7 @@ func scanCollection(row scanner) (collection.Collection, error) {
 		revision                                   uint64
 		createdAt, modifiedAt                      int64
 		retiredAt                                  sql.NullInt64
+		idempotencyKey                             string
 	)
 	if err := row.Scan(
 		&id,
@@ -1031,22 +1033,24 @@ func scanCollection(row scanner) (collection.Collection, error) {
 		&createdAt,
 		&modifiedAt,
 		&retiredAt,
+		&idempotencyKey,
 	); err != nil {
 		return collection.Collection{}, err
 	}
 
 	value := collection.Collection{
-		ID:          basespec.CollectionID(id),
-		RootID:      basespec.RootID(rootID),
-		Kind:        basespec.CollectionKind(kind),
-		DisplayName: displayName,
-		Description: description,
-		Enabled:     enabled != 0,
-		Data:        append(json.RawMessage(nil), data...),
-		Revision:    revision,
-		CreatedAt:   parseTime(createdAt),
-		ModifiedAt:  parseTime(modifiedAt),
-		RetiredAt:   parseNullableTime(retiredAt),
+		ID:             basespec.CollectionID(id),
+		RootID:         basespec.RootID(rootID),
+		Kind:           basespec.CollectionKind(kind),
+		DisplayName:    displayName,
+		Description:    description,
+		Enabled:        enabled != 0,
+		Data:           append(json.RawMessage(nil), data...),
+		IdempotencyKey: idempotencyKey,
+		Revision:       revision,
+		CreatedAt:      parseTime(createdAt),
+		ModifiedAt:     parseTime(modifiedAt),
+		RetiredAt:      parseNullableTime(retiredAt),
 	}
 	if err := value.Validate(); err != nil {
 		return collection.Collection{}, fmt.Errorf(

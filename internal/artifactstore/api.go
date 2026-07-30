@@ -105,8 +105,6 @@ func (a *API) UpdateArtifactRoot(
 		return nil, err
 	}
 
-	a.notifyRootMutation(request.RootID)
-
 	return &UpdateArtifactRootResponse{
 		Body: &value,
 	}, nil
@@ -125,8 +123,6 @@ func (a *API) RetireArtifactRoot(
 		return nil, err
 	}
 
-	a.notifyRootMutation(request.RootID)
-
 	return &RetireArtifactRootResponse{
 		Body: &value,
 	}, nil
@@ -144,8 +140,6 @@ func (a *API) PurgeArtifactRoot(
 	if err != nil {
 		return nil, err
 	}
-
-	a.notifyRootMutation(request.RootID)
 
 	return &PurgeArtifactRootResponse{
 		RootID: request.RootID,
@@ -172,8 +166,6 @@ func (a *API) CreateArtifactSource(
 	if err != nil {
 		return nil, err
 	}
-
-	a.notifyRootMutation(request.RootID)
 
 	return &CreateArtifactSourceResponse{
 		Body: &value,
@@ -238,8 +230,9 @@ func (a *API) UpdateArtifactSource(
 	if err != nil {
 		return nil, err
 	}
-
-	a.notifyRootMutation(request.RootID)
+	if value.Revision != request.Body.ExpectedRevision {
+		a.notifyRootMutation(request.RootID)
+	}
 
 	return &UpdateArtifactSourceResponse{
 		Body: &value,
@@ -260,8 +253,6 @@ func (a *API) RetireArtifactSource(
 		return nil, err
 	}
 
-	a.notifyRootMutation(request.RootID)
-
 	return &RetireArtifactSourceResponse{
 		Body: &value,
 	}, nil
@@ -280,8 +271,6 @@ func (a *API) PurgeArtifactSource(
 	if err != nil {
 		return nil, err
 	}
-
-	a.notifyRootMutation(request.RootID)
 
 	return &PurgeArtifactSourceResponse{
 		RootID:   request.RootID,
@@ -339,8 +328,9 @@ func (a *API) PublishManagedSourcePackage(
 	if err != nil {
 		return nil, err
 	}
-
-	a.notifyRootMutation(request.RootID)
+	if result.Source.Revision != request.Body.ExpectedSourceRevision {
+		a.notifyRootMutation(request.RootID)
+	}
 
 	return &PublishManagedSourcePackageResponse{
 		Body: &PublishManagedSourcePackageResponseBody{
@@ -365,8 +355,9 @@ func (a *API) RemoveManagedSourcePackage(
 	if err != nil {
 		return nil, err
 	}
-
-	a.notifyRootMutation(request.RootID)
+	if result.Source.Revision != request.ExpectedSourceRevision {
+		a.notifyRootMutation(request.RootID)
+	}
 
 	return &RemoveManagedSourcePackageResponse{
 		Body: &RemoveManagedSourcePackageResponseBody{

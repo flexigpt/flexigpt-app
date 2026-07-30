@@ -419,4 +419,15 @@ BEGIN
 	);
 END;
 `,
+}, {
+	version:     6,
+	fingerprint: "basespec.collection-idempotency-key.v1",
+	sql: `
+ALTER TABLE artifact_collections
+	ADD COLUMN idempotency_key TEXT NOT NULL DEFAULT '';
+
+CREATE UNIQUE INDEX idx_artifact_collections_root_kind_idempotency_key
+	ON artifact_collections(root_id, kind, idempotency_key)
+	WHERE idempotency_key <> '';
+`,
 }}

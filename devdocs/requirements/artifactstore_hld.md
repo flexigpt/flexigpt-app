@@ -216,6 +216,13 @@ A Collection owns:
 The local Collection is not exported verbatim because it contains local state.
 Its shareable representation is a Portable Collection Definition.
 
+An optional immutable local idempotency key may be stored with a Collection.
+It is unique within one Root and Collection kind, is never part of Collection
+data or a Portable Collection Definition, and is never returned through a
+public projection. It exists only for convergent local provisioning workflows,
+such as built-in bundle bootstrap. It does not replace `CollectionID`, does not
+become an Artifact identity, and does not authorize cross-Root access.
+
 ### 5.3.1 Portable Collection Definition
 
 A Portable Collection Definition is an immutable, schema-versioned,
@@ -689,9 +696,13 @@ another package mutation.
 
 Managed package generations cover every published payload directory. The
 managed adapter excludes only its private staging directory. MapStore remains
-the storage implementation boundary for immutable definitions and managed file
-payloads; feature code must not inspect MapStore-managed paths, recreate
-MapStore containment rules, or add platform-specific filesystem policy.
+the storage implementation boundary for immutable definitions and managed
+package file payloads. MapStore owns file-level output behavior, including
+its platform-specific path, permission, and durability handling. The managed
+Source adapter owns only staged package assembly, package equivalence, and the
+atomic package-directory publication boundary. Feature code must not inspect
+MapStore-managed paths, recreate MapStore containment rules, or add
+platform-specific filesystem policy.
 This avoids inheriting the broad project traversal exclusions used by external filesystem
 Sources. This preserves generation-based runtime freshness for normal package
 resources and scripts.

@@ -21,9 +21,7 @@ import (
 type SkillBundleWrapper struct {
 	api     *skillbundle.API
 	runtime *skillruntime.SkillRuntime
-
 	mu      sync.Mutex
-	managed map[collection.CollectionRef]struct{}
 
 	bootstrapContext context.Context
 	bootstrapCancel  context.CancelFunc
@@ -146,7 +144,7 @@ func InitSkillBundleWrapper(
 	wrapper.mu.Lock()
 	wrapper.api = api
 	wrapper.runtime = runtime
-	wrapper.managed = map[collection.CollectionRef]struct{}{}
+
 	wrapper.bootstrapContext = parent
 	wrapper.bootstrapCancel = cancel
 	wrapper.mu.Unlock()
@@ -416,12 +414,12 @@ func (w *SkillBundleWrapper) syncBundle(ref collection.CollectionRef) {
 		return
 	}
 	w.mu.Lock()
-	if w.api == nil || w.runtime == nil || w.managed == nil {
+	if w.api == nil || w.runtime == nil || w.bootstrapContext == nil {
 		w.mu.Unlock()
 		return
 	}
 	runtime := w.runtime
-	w.managed[ref] = struct{}{}
+
 	w.mu.Unlock()
 	runtime.RequestCollectionResync(ref)
 }
@@ -436,7 +434,7 @@ func (w *SkillBundleWrapper) removeBundle(ref collection.CollectionRef) {
 		w.mu.Unlock()
 		return
 	}
-	delete(w.managed, ref)
+
 	w.mu.Unlock()
 	runtime.RequestCollectionRemoval(ref)
 }
@@ -466,13 +464,7 @@ func (w *SkillBundleWrapper) scheduleBundleSynchronization(
 	}
 	api := w.api
 	parent := w.bootstrapContext
-	managed := make([]collection.CollectionRef, 0, len(w.managed))
-	for ref := range w.managed {
-		if filterRoot && ref.RootID != rootID {
-			continue
-		}
-		managed = append(managed, ref)
-	}
+
 	w.bootstrapWG.Add(1)
 	w.mu.Unlock()
 
@@ -489,23 +481,13 @@ func (w *SkillBundleWrapper) scheduleBundleSynchronization(
 		if err != nil || ctx.Err() != nil {
 			return
 		}
-		active := make(map[collection.CollectionRef]struct{}, len(refs))
+
 		for _, ref := range refs {
 			if filterRoot && ref.RootID != rootID {
 				continue
 			}
-			active[ref] = struct{}{}
 			//nolint:contextcheck // Background.
 			w.syncBundle(ref)
-		}
-
-		// Do not include bundles created after this scan started. A later
-		// reconciliation owns those refs and must not be removed by stale data.
-		for _, ref := range managed {
-			if _, exists := active[ref]; !exists {
-				//nolint:contextcheck // Background.
-				w.removeBundle(ref)
-			}
 		}
 	}()
 }
@@ -559,9 +541,7 @@ func (w *SkillBundleWrapper) close() {
 		cancel()
 	}
 	w.bootstrapWG.Wait()
-	w.mu.Lock()
-	w.managed = nil
-	w.mu.Unlock()
+
 	if runtime != nil {
 		runtime.Close()
 	}

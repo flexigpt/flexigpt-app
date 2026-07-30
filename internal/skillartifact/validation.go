@@ -14,69 +14,83 @@ import (
 )
 
 func ValidateDefinition(value definition.Definition) error {
+	_, err := DocumentFromDefinition(value)
+	return err
+}
+
+// DocumentFromDefinition validates the canonical Artifact definition and
+// returns the corresponding agentskills-go document. Consumers must use this
+// projection instead of decoding the Skill body independently.
+//
+// Raw SKILL.md parsing remains exclusively in DecodeSkillDocument, which
+// delegates to agentskills-go.ParseSkillDocument.
+func DocumentFromDefinition(
+	value definition.Definition,
+) (agentskillsSpec.SkillDocument, error) {
 	if value.Kind != Kind {
-		return fmt.Errorf(
+		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill definition kind must be %q",
 			basespec.ErrInvalid,
 			Kind,
 		)
 	}
 	if value.SchemaID != SchemaID {
-		return fmt.Errorf(
+		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill definition schema must be %q",
 			basespec.ErrInvalid,
 			SchemaID,
 		)
 	}
 	if value.SchemaVersion != SchemaVersion {
-		return fmt.Errorf(
+		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill definition schema version must be %q",
 			basespec.ErrInvalid,
 			SchemaVersion,
 		)
 	}
 	if len(value.Dependencies) != 0 {
-		return fmt.Errorf(
+		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Agent Skills cannot declare generic portable dependencies",
 			basespec.ErrInvalid,
 		)
 	}
 	body, err := DecodeBody(value.Body)
 	if err != nil {
-		return err
+		return agentskillsSpec.SkillDocument{}, err
 	}
-	if err := agentskills.ValidateSkillDocument(toDocument(body)); err != nil {
-		return fmt.Errorf(
+	document := toDocument(body)
+	if err := agentskills.ValidateSkillDocument(document); err != nil {
+		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: invalid Agent Skill document: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
 	if string(value.LogicalName) != body.Name {
-		return fmt.Errorf(
+		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill logical name does not match body.name",
 			basespec.ErrInvalid,
 		)
 	}
 	if value.DisplayName != body.DisplayName {
-		return fmt.Errorf(
+		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill display name does not match body.displayName",
 			basespec.ErrInvalid,
 		)
 	}
 	if value.Description != body.Description {
-		return fmt.Errorf(
+		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill description does not match body.description",
 			basespec.ErrInvalid,
 		)
 	}
 	if value.Labels[InsertLabelKey] != body.Insert {
-		return fmt.Errorf(
+		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill insert label does not match body.insert",
 			basespec.ErrInvalid,
 		)
 	}
-	return nil
+	return document, nil
 }
 
 func DecodeBody(raw json.RawMessage) (Body, error) {
