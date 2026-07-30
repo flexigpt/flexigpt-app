@@ -42,6 +42,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
+/**
+ * This route intentionally uses only installed Skill Store APIs. Workspace
+ * Skills are Workspace Artifacts and are shown only in Workspace management
+ * and in the conversation Workspace selector.
+ */
 async function loadSkillBundleData(signal: AbortSignal): Promise<BundleData[]> {
 	const skillBundles = await getAllSkillBundles(undefined, true);
 	throwIfAborted(signal);

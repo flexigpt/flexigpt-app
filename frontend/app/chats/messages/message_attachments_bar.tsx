@@ -34,8 +34,9 @@ import {
 	getAttachmentContentBlockModeTooltip,
 } from '@/chats/composer/attachments/attachment_mode_menu_utils';
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
-import { formatSkillRef, isWorkspaceSkillRef } from '@/skills/lib/skill_identity_utils';
+import { formatSkillRef } from '@/skills/lib/skill_identity_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
+import { artifactRefKey } from '@/workspaces/lib/workspace_api_utils';
 
 /**
  * Get a path/URL for tooltip display, similar to getUIAttachmentPath
@@ -541,6 +542,8 @@ function MessageWorkspaceContextChip({
 	const displayName = usage?.displayName || selection?.displayName || 'Workspace';
 	const requestedContexts = selection?.contextRefs ?? [];
 	const requestedSkills = selection?.skillRefs ?? [];
+	const workspaceRef = usage?.workspace ?? selection?.workspace;
+	const workspaceIdentity = workspaceRef ? `${workspaceRef.rootID}/${workspaceRef.collectionID}` : 'unknown';
 	const hasRecordedUsage = usage !== undefined;
 	const contexts = usage?.contexts ?? [];
 	const skills = usage?.skills ?? [];
@@ -567,7 +570,7 @@ function MessageWorkspaceContextChip({
 			<MenuButton
 				store={menu}
 				className={getMessageBarChipClassName(warningCount > 0 ? 'secondary' : 'info', false, true)}
-				title={`${displayName}\nWorkspace state recorded for this turn`}
+				title={`${displayName}\n${workspaceIdentity}\nWorkspace state recorded for this turn`}
 				data-message-chip="workspace-context"
 			>
 				<FiBriefcase size={14} />
@@ -608,14 +611,14 @@ function MessageWorkspaceContextChip({
 							<div className="mt-1 space-y-1">
 								{requestedContexts.map(item => (
 									<div
-										key={`requested-context:${item.recordID}`}
+										key={`requested-context:${artifactRefKey(item.artifact)}`}
 										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
 									>
 										<FiFileText size={13} className="mt-0.5" />
 										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.name || item.recordID}</div>
+											<div className="truncate text-xs">{item.name || item.artifact.artifactID}</div>
 											<div className="text-base-content/60 truncate font-mono text-[10px]">
-												{item.locator || item.recordID}
+												{item.locator || item.artifact.artifactID}
 											</div>
 										</div>
 										<span className="badge badge-secondary badge-xs">Context</span>
@@ -624,13 +627,17 @@ function MessageWorkspaceContextChip({
 
 								{requestedSkills.map(item => (
 									<div
-										key={`requested-skill:${item.identity}`}
+										key={`requested-skill:${artifactRefKey(item.artifact)}`}
 										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
 									>
 										<FiZap size={13} className="mt-0.5" />
 										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.displayName || item.name || item.recordID}</div>
-											<div className="text-base-content/60 truncate font-mono text-[10px]">{item.identity}</div>
+											<div className="truncate text-xs">
+												{item.displayName || item.name || item.artifact.artifactID}
+											</div>
+											<div className="text-base-content/60 truncate font-mono text-[10px]">
+												{item.artifact.artifactID}
+											</div>
 										</div>
 										<span className="badge badge-info badge-xs">Skill</span>
 									</div>
@@ -654,12 +661,15 @@ function MessageWorkspaceContextChip({
 							<div className="mt-3 text-xs font-semibold">Send-time Context outcome</div>
 							<div className="mt-1 space-y-1">
 								{contexts.map(item => (
-									<div key={item.recordID} className="bg-base-100 flex items-start gap-2 rounded-xl p-2">
+									<div
+										key={artifactRefKey(item.artifact)}
+										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
+									>
 										<FiFileText size={13} className="mt-0.5" />
 										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.name || item.recordID}</div>
+											<div className="truncate text-xs">{item.name || item.artifact.artifactID}</div>
 											<div className="text-base-content/60 truncate font-mono text-[10px]">
-												{item.locator || item.recordID}
+												{item.locator || item.artifact.artifactID}
 											</div>
 										</div>
 										<span className="badge badge-ghost badge-xs">{item.status}</span>
@@ -670,11 +680,18 @@ function MessageWorkspaceContextChip({
 							<div className="mt-3 text-xs font-semibold">Send-time Workspace Skill outcome</div>
 							<div className="mt-1 space-y-1">
 								{skills.map(item => (
-									<div key={item.identity} className="bg-base-100 flex items-start gap-2 rounded-xl p-2">
+									<div
+										key={artifactRefKey(item.artifact)}
+										className="bg-base-100 flex items-start gap-2 rounded-xl p-2"
+									>
 										<FiZap size={13} className="mt-0.5" />
 										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">{item.displayName || item.name || item.recordID}</div>
-											<div className="text-base-content/60 truncate font-mono text-[10px]">{item.identity}</div>
+											<div className="truncate text-xs">
+												{item.displayName || item.name || item.artifact.artifactID}
+											</div>
+											<div className="text-base-content/60 truncate font-mono text-[10px]">
+												{item.artifact.artifactID}
+											</div>
 										</div>
 										{item.sessionAvailable ? <span className="badge badge-info badge-xs">Available</span> : null}
 										{item.active ? <span className="badge badge-success badge-xs">Active</span> : null}
@@ -935,8 +952,8 @@ export function MessageAttachmentsBar({
 	const choices = toolChoices ?? [];
 	const calls = toolCalls ?? [];
 	const outputs = toolOutputs ?? [];
-	const enabledSkills = (enabledSkillRefs ?? []).filter(ref => !isWorkspaceSkillRef(ref));
-	const activeSkills = (activeSkillRefs ?? []).filter(ref => !isWorkspaceSkillRef(ref));
+	const enabledSkills = enabledSkillRefs ?? [];
+	const activeSkills = activeSkillRefs ?? [];
 
 	const normalToolChoices = choices.filter(c => c.toolType !== ToolStoreChoiceType.WebSearch);
 	const webSearchChoices = choices.filter(c => c.toolType === ToolStoreChoiceType.WebSearch);

@@ -1,8 +1,21 @@
+import type {
+	ArtifactAdoptionMode,
+	ArtifactCollectionRef,
+	ArtifactDefinitionView,
+	ArtifactDiagnostic,
+	ArtifactDigest,
+	ArtifactKind,
+	ArtifactLocator,
+	ArtifactOccurrenceState,
+	ArtifactRef,
+	ArtifactSourceBinding,
+	ArtifactSourceID,
+	ArtifactState,
+} from '@/spec/artifact';
+
+export type WorkspaceRef = ArtifactCollectionRef;
 export type WorkspaceRootID = string;
-export type WorkspaceSourceID = string;
-export type WorkspaceRecordID = string;
-export type WorkspaceDigest = string;
-export type WorkspaceLocator = string;
+export type WorkspaceCollectionID = string;
 
 export enum WorkspaceMode {
 	Empty = 'empty',
@@ -15,31 +28,6 @@ export enum WorkspaceAttachmentRole {
 	Library = 'library',
 	AttachedPackage = 'attached-package',
 	Overlay = 'overlay',
-}
-
-export enum WorkspaceArtifactKind {
-	Definition = 'workspace.definition',
-	Context = 'workspace.context',
-	Skill = 'workspace.skill',
-}
-
-export enum WorkspaceRecordState {
-	Available = 'available',
-	Missing = 'missing',
-	Invalid = 'invalid',
-	Incompatible = 'incompatible',
-}
-
-export enum WorkspaceOccurrenceState {
-	Valid = 'valid',
-	Invalid = 'invalid',
-	Missing = 'missing',
-}
-
-export enum WorkspaceDiagnosticSeverity {
-	Error = 'error',
-	Warning = 'warning',
-	Info = 'info',
 }
 
 export enum WorkspaceContextRole {
@@ -66,241 +54,6 @@ export enum WorkspaceSkillInsert {
 	UserMessage = 'user-message',
 }
 
-export interface WorkspaceDiagnosticLocation {
-	locator?: WorkspaceLocator;
-	subresourceLocator?: WorkspaceLocator;
-	line?: number;
-	column?: number;
-}
-
-export interface WorkspaceDiagnostic {
-	severity: WorkspaceDiagnosticSeverity;
-	code: string;
-	message: string;
-	location?: WorkspaceDiagnosticLocation;
-}
-
-export interface WorkspaceDiscoveryRoot {
-	root: WorkspaceLocator;
-	recursive: boolean;
-	includePatterns?: string[];
-}
-
-export interface WorkspaceDiscovery {
-	additionalLocators?: WorkspaceLocator[];
-	additionalRoots?: WorkspaceDiscoveryRoot[];
-	includeReadme?: boolean;
-}
-
-export interface WorkspaceAttachmentSettings {
-	recursive?: boolean;
-	authoritative?: boolean;
-}
-
-export interface WorkspaceAttachmentView {
-	sourceID: WorkspaceSourceID;
-	revision: number;
-	sourceDisplayName?: string;
-	sourceKind?: string;
-	path?: string;
-	role: WorkspaceAttachmentRole;
-	enabled: boolean;
-	settings: WorkspaceAttachmentSettings;
-}
-
-/**
- * Local desktop Workspace projection.
- *
- * Filesystem paths are intentionally exposed to the local management UI.
- * Source configuration, raw source data, attachment data, and trust-reference
- * contents remain excluded.
- */
-export interface WorkspaceView {
-	rootID: WorkspaceRootID;
-	revision: number;
-	displayName: string;
-	description?: string;
-	enabled: boolean;
-	mode: WorkspaceMode;
-	primarySourceID?: WorkspaceSourceID;
-	primaryPath?: string;
-	discovery: WorkspaceDiscovery;
-	attachments: WorkspaceAttachmentView[];
-}
-
-export interface WorkspaceRecordView {
-	id: WorkspaceRecordID;
-	revision: number;
-	name: string;
-	kind: WorkspaceArtifactKind;
-	enabled: boolean;
-	state: WorkspaceRecordState;
-	resolvedDefinition?: WorkspaceDigest;
-	sourceID: WorkspaceSourceID;
-	locator: WorkspaceLocator;
-	subresourceLocator?: WorkspaceLocator;
-	runtimeDisabled: boolean;
-	diagnostics?: WorkspaceDiagnostic[];
-}
-
-export interface WorkspaceResourceView {
-	record: WorkspaceRecordView;
-	definitionDigest: WorkspaceDigest;
-	sourceID: WorkspaceSourceID;
-	locator: WorkspaceLocator;
-	catalogCurrent: boolean;
-	projectionValid: boolean;
-	diagnostics?: WorkspaceDiagnostic[];
-}
-
-export interface WorkspaceOccurrenceView {
-	sourceID: WorkspaceSourceID;
-	locator: WorkspaceLocator;
-	subresourceLocator?: WorkspaceLocator;
-	kind?: WorkspaceArtifactKind;
-	logicalName?: string;
-	logicalVersion?: string;
-	definitionDigest?: WorkspaceDigest;
-	sourceContentDigest?: WorkspaceDigest;
-	state: WorkspaceOccurrenceState;
-	recorded: boolean;
-	recordID?: WorkspaceRecordID;
-	diagnostics?: WorkspaceDiagnostic[];
-}
-
-export interface WorkspaceResourceGroupView {
-	kind: WorkspaceArtifactKind;
-	resources: WorkspaceResourceView[];
-	unrecorded: WorkspaceOccurrenceView[];
-}
-
-export interface WorkspaceCatalogView {
-	workspace: WorkspaceView;
-	catalogRevision: number;
-	catalogCurrent: boolean;
-	diagnostics?: WorkspaceDiagnostic[];
-	resources: WorkspaceResourceView[];
-	groups: WorkspaceResourceGroupView[];
-	occurrences: WorkspaceOccurrenceView[];
-	validOccurrences: WorkspaceOccurrenceView[];
-	invalidOccurrences: WorkspaceOccurrenceView[];
-	missingOccurrences: WorkspaceOccurrenceView[];
-	unrecordedOccurrences: WorkspaceOccurrenceView[];
-	unresolvedRecords: WorkspaceRecordView[];
-	unrecordedCount: number;
-	unresolvedRecordCount: number;
-}
-
-export interface WorkspaceRefreshResult {
-	rootID: WorkspaceRootID;
-	catalogRevision: number;
-	createdRecords: WorkspaceRecordID[];
-	updatedRecords: WorkspaceRecordID[];
-	diagnostics?: WorkspaceDiagnostic[];
-	candidates: number;
-}
-
-export interface WorkspaceContextContribution {
-	recordID: WorkspaceRecordID;
-	definitionDigest: WorkspaceDigest;
-	sourceID: WorkspaceSourceID;
-	locator: WorkspaceLocator;
-	name: string;
-	role: WorkspaceContextRole;
-	mediaType: WorkspaceContextMediaType;
-	content: string;
-	conventionOrder: number;
-	originalBytes: number;
-	includedBytes: number;
-	truncated: boolean;
-}
-
-export interface WorkspaceContextDecision {
-	recordID: WorkspaceRecordID;
-	status: WorkspaceContextCompositionStatus;
-	code?: string;
-	originalBytes: number;
-	includedBytes: number;
-}
-
-export interface WorkspaceContextLoadPlan {
-	rootID: WorkspaceRootID;
-	catalogRevision: number;
-	contributions: WorkspaceContextContribution[];
-	prompt: string;
-	diagnostics?: WorkspaceDiagnostic[];
-	decisions: WorkspaceContextDecision[];
-	promptBytes: number;
-}
-
-export interface WorkspaceContextView {
-	recordID: WorkspaceRecordID;
-	recordRevision: number;
-	definitionDigest: WorkspaceDigest;
-	sourceID: WorkspaceSourceID;
-	locator: WorkspaceLocator;
-	name: string;
-	role: WorkspaceContextRole;
-	mediaType: WorkspaceContextMediaType;
-	enabled: boolean;
-	state: WorkspaceRecordState;
-	catalogCurrent: boolean;
-	projectionValid: boolean;
-	runtimeDisabled: boolean;
-	diagnostics?: WorkspaceDiagnostic[];
-}
-
-export interface WorkspaceContextInspectionView {
-	rootID: WorkspaceRootID;
-	catalogRevision: number;
-	contributions: WorkspaceContextContribution[];
-	diagnostics?: WorkspaceDiagnostic[];
-}
-
-export interface WorkspaceSkillArgument {
-	name: string;
-	description?: string;
-	default?: string;
-}
-
-export interface WorkspaceSkillSummary {
-	schemaVersion: string;
-	id: WorkspaceRecordID;
-	slug: string;
-	name: string;
-	displayName: string;
-	description: string;
-	tags?: string[];
-	insert: WorkspaceSkillInsert;
-	arguments?: WorkspaceSkillArgument[];
-	isEnabled: boolean;
-	createdAt: string;
-	modifiedAt: string;
-}
-
-export interface WorkspaceSkillView {
-	rootID: WorkspaceRootID;
-	recordID: WorkspaceRecordID;
-	definitionDigest: WorkspaceDigest;
-	sourceID: WorkspaceSourceID;
-	locator: WorkspaceLocator;
-	skill: WorkspaceSkillSummary;
-	markdownBody?: string;
-	recordRevision: number;
-	state: WorkspaceRecordState;
-	projectionValid: boolean;
-	catalogCurrent: boolean;
-	runtimeDisabled: boolean;
-	diagnostics?: WorkspaceDiagnostic[];
-}
-
-export interface WorkspaceSkillLoadView {
-	rootID: WorkspaceRootID;
-	catalogRevision: number;
-	skills: WorkspaceSkillView[];
-	diagnostics?: WorkspaceDiagnostic[];
-}
-
 export enum WorkspaceConversationSelectionStatus {
 	Ready = 'ready',
 	Partial = 'partial',
@@ -312,22 +65,378 @@ export enum WorkspaceConversationSkillUsageStatus {
 	Unavailable = 'unavailable',
 }
 
-export interface WorkspaceConversationResourceSelectionRef {
-	recordID: WorkspaceRecordID;
+export interface WorkspaceDiscoveryRoot {
+	root: ArtifactLocator;
+	recursive: boolean;
+	includePatterns?: string[];
+}
+
+export interface WorkspaceDiscovery {
+	additionalLocators?: ArtifactLocator[];
+	additionalRoots?: WorkspaceDiscoveryRoot[];
+	includeReadme?: boolean;
+}
+
+export interface WorkspaceAttachmentSettings {
+	recursive?: boolean;
+	authoritative?: boolean;
+}
+
+export interface WorkspaceAttachmentView {
+	sourceID: ArtifactSourceID;
+	revision: number;
+	role: WorkspaceAttachmentRole;
+	enabled: boolean;
+	sourceDisplayName?: string;
+	sourceKind?: string;
+	path?: string;
+	settings: WorkspaceAttachmentSettings;
+	diagnostics?: ArtifactDiagnostic[];
+}
+
+export interface WorkspaceView {
+	workspace: WorkspaceRef;
+	revision: number;
+	displayName: string;
+	description?: string;
+	enabled: boolean;
+	mode: WorkspaceMode;
+	primarySourceID?: ArtifactSourceID;
+	primaryPath?: string;
+	discovery: WorkspaceDiscovery;
+	attachments: WorkspaceAttachmentView[];
+}
+
+export interface WorkspaceArtifactSettings {
+	runtimeDisabled: boolean;
+}
+
+export interface WorkspaceOccurrenceRef {
+	sourceID: ArtifactSourceID;
+	locator: ArtifactLocator;
+	subresourceLocator?: ArtifactLocator;
+}
+
+export interface WorkspaceArtifactView {
+	artifact: ArtifactRef;
+	revision: number;
+	name: string;
+	kind: ArtifactKind;
+	enabled: boolean;
+	state: ArtifactState;
+	adoption: ArtifactAdoptionMode;
+	resolvedDefinition?: ArtifactDigest;
+	sourceID: ArtifactSourceID;
+	locator: ArtifactLocator;
+	subresourceLocator?: ArtifactLocator;
+	runtimeDisabled: boolean;
+	diagnostics?: ArtifactDiagnostic[];
+}
+
+export interface WorkspaceSuppressionView {
+	workspace: WorkspaceRef;
+	binding: ArtifactSourceBinding;
+	revision: number;
+	createdAt: Date;
+	modifiedAt: Date;
+}
+
+export interface WorkspaceOccurrenceView {
+	sourceID: ArtifactSourceID;
+	locator: ArtifactLocator;
+	subresourceLocator?: ArtifactLocator;
+	kind?: ArtifactKind;
+	logicalName?: string;
+	logicalVersion?: string;
+	definitionDigest?: ArtifactDigest;
+	sourceContentDigest?: ArtifactDigest;
+	state: ArtifactOccurrenceState;
+	recorded: boolean;
+	artifact?: ArtifactRef;
+	diagnostics?: ArtifactDiagnostic[];
+}
+
+export interface WorkspaceResourceView {
+	artifact: WorkspaceArtifactView;
+	definitionDigest: ArtifactDigest;
+	sourceID: ArtifactSourceID;
+	locator: ArtifactLocator;
+	catalogCurrent: boolean;
+	projectionValid: boolean;
+	diagnostics?: ArtifactDiagnostic[];
+}
+
+export interface WorkspaceResourceGroupView {
+	kind: ArtifactKind;
+	resources: WorkspaceResourceView[];
+	unrecorded: WorkspaceOccurrenceView[];
+}
+
+export interface WorkspaceCatalogView {
+	workspace: WorkspaceView;
+	catalogRevision: number;
+	catalogCurrent: boolean;
+	diagnostics?: ArtifactDiagnostic[];
+	resources: WorkspaceResourceView[];
+	groups: WorkspaceResourceGroupView[];
+	occurrences: WorkspaceOccurrenceView[];
+	validOccurrences: WorkspaceOccurrenceView[];
+	invalidOccurrences: WorkspaceOccurrenceView[];
+	missingOccurrences: WorkspaceOccurrenceView[];
+	unrecordedOccurrences: WorkspaceOccurrenceView[];
+	unresolvedArtifacts: WorkspaceArtifactView[];
+	unrecordedCount: number;
+	unresolvedArtifactCount: number;
+}
+
+export interface WorkspaceRefreshResult {
+	workspace: WorkspaceRef;
+	catalogRevision: number;
+	createdArtifacts: ArtifactRef[];
+	updatedArtifacts: ArtifactRef[];
+	diagnostics?: ArtifactDiagnostic[];
+	candidates: number;
+}
+
+export interface WorkspaceLoadPlanItemView {
+	artifact: WorkspaceArtifactView;
+	definition: ArtifactDefinitionView;
+	definitionDigest: ArtifactDigest;
+	sourceID: ArtifactSourceID;
+	sourceKind: string;
+	locator: ArtifactLocator;
+	catalogCurrent: boolean;
+}
+
+export interface WorkspaceLoadPlanView {
+	workspace: WorkspaceRef;
+	catalogRevision: number;
+	items: WorkspaceLoadPlanItemView[];
+	diagnostics?: ArtifactDiagnostic[];
+}
+
+export interface ResolveWorkspaceResourceResult {
+	resource: WorkspaceResourceView;
+	definition: ArtifactDefinitionView;
+}
+
+export interface WorkspaceContextContribution {
+	artifact: ArtifactRef;
+	recordRevision: number;
+	definitionDigest: ArtifactDigest;
+	sourceID: ArtifactSourceID;
+	locator: ArtifactLocator;
+	name: string;
+	role: WorkspaceContextRole;
+	mediaType: WorkspaceContextMediaType;
+	content: string;
+	conventionOrder: number;
+	originalBytes: number;
+	includedBytes: number;
+	truncated: boolean;
+}
+
+export interface WorkspaceContextDecision {
+	artifact: ArtifactRef;
+	status: WorkspaceContextCompositionStatus;
+	code?: string;
+	originalBytes: number;
+	includedBytes: number;
+}
+
+export interface WorkspaceContextView {
+	artifact: ArtifactRef;
+	recordRevision: number;
+	definitionDigest: ArtifactDigest;
+	sourceID: ArtifactSourceID;
+	locator: ArtifactLocator;
+	name: string;
+	role: WorkspaceContextRole;
+	mediaType: WorkspaceContextMediaType;
+	enabled: boolean;
+	state: ArtifactState;
+	catalogCurrent: boolean;
+	projectionValid: boolean;
+	runtimeDisabled: boolean;
+	diagnostics?: ArtifactDiagnostic[];
+}
+
+export interface WorkspaceContextInspectionView {
+	workspace: WorkspaceRef;
+	catalogRevision: number;
+	contributions: WorkspaceContextContribution[];
+	diagnostics?: ArtifactDiagnostic[];
+}
+
+export interface WorkspaceContextLoadPlan {
+	workspace: WorkspaceRef;
+	catalogRevision: number;
+	contributions: WorkspaceContextContribution[];
+	prompt: string;
+	diagnostics?: ArtifactDiagnostic[];
+	decisions: WorkspaceContextDecision[];
+	promptBytes: number;
+}
+
+export interface WorkspaceSkillArgument {
+	name: string;
+	description?: string;
+	default?: string;
+}
+
+export interface WorkspaceSkillSummary {
+	schemaVersion: string;
+	id: string;
+	slug: string;
+	name: string;
+	displayName: string;
+	description: string;
+	tags?: string[];
+	insert: WorkspaceSkillInsert;
+	arguments?: WorkspaceSkillArgument[];
+	isEnabled: boolean;
+	createdAt: Date;
+	modifiedAt: Date;
+}
+
+export interface WorkspaceSkillView {
+	workspace: WorkspaceRef;
+	artifact: ArtifactRef;
+	definitionDigest: ArtifactDigest;
+	sourceID: ArtifactSourceID;
+	locator: ArtifactLocator;
+	skill: WorkspaceSkillSummary;
+	markdownBody?: string;
+	recordRevision: number;
+	state: ArtifactState;
+	projectionValid: boolean;
+	catalogCurrent: boolean;
+	runtimeDisabled: boolean;
+	diagnostics?: ArtifactDiagnostic[];
+}
+
+export interface WorkspaceSkillLoadView {
+	workspace: WorkspaceRef;
+	catalogRevision: number;
+	skills: WorkspaceSkillView[];
+	diagnostics?: ArtifactDiagnostic[];
+}
+
+export interface CreateFilesystemWorkspaceBody {
+	displayName: string;
+	description?: string;
+	rootPath: string;
+	discovery: WorkspaceDiscovery;
+}
+
+export interface CreateEmptyWorkspaceBody {
+	displayName: string;
+	description?: string;
+	discovery: WorkspaceDiscovery;
+}
+
+export interface UpdateWorkspaceBody {
+	expectedRevision: number;
+	displayName: string;
+	description?: string;
+	enabled: boolean;
+	discovery: WorkspaceDiscovery;
+}
+
+export interface ReplaceWorkspacePrimarySourceBody {
+	expectedCollectionRevision: number;
+	previousSourceID: ArtifactSourceID;
+	expectedPreviousAttachmentRevision: number;
+	sourceID: ArtifactSourceID;
+}
+
+export interface SetWorkspacePrimarySourceBody {
+	expectedCollectionRevision: number;
+	previousSourceID?: ArtifactSourceID;
+	expectedPreviousAttachmentRevision?: number;
+	sourceID?: ArtifactSourceID;
+	clear?: boolean;
+}
+
+export interface AttachWorkspaceSourceBody {
+	expectedCollectionRevision: number;
+	sourceID: ArtifactSourceID;
+	role: WorkspaceAttachmentRole;
+	enabled: boolean;
+	settings: WorkspaceAttachmentSettings;
+}
+
+export interface UpdateWorkspaceAttachmentBody {
+	expectedCollectionRevision: number;
+	expectedAttachmentRevision: number;
+	role: WorkspaceAttachmentRole;
+	enabled: boolean;
+	settings: WorkspaceAttachmentSettings;
+}
+
+export interface AdoptWorkspaceOccurrenceBody {
+	expectedCatalogRevision: number;
+	occurrence: WorkspaceOccurrenceRef;
 	name?: string;
-	locator?: WorkspaceLocator;
-	definitionDigest?: WorkspaceDigest;
-	recordRevision?: number;
+	enabled: boolean;
+	settings: WorkspaceArtifactSettings;
+}
+
+export interface PinWorkspaceArtifactBody {
+	expectedCollectionRevision: number;
+	binding: ArtifactSourceBinding;
+	name: string;
+	enabled: boolean;
+	settings: WorkspaceArtifactSettings;
+}
+
+export interface SuppressWorkspaceBindingBody {
+	expectedCollectionRevision: number;
+	binding: ArtifactSourceBinding;
+}
+
+export interface SetWorkspaceArtifactEnabledBody {
+	expectedRevision: number;
+	enabled: boolean;
+}
+
+export interface SetWorkspaceArtifactRuntimeDisabledBody {
+	expectedRevision: number;
+	runtimeDisabled: boolean;
+}
+
+export interface UnadoptWorkspaceArtifactResult {
+	artifact: ArtifactRef;
+}
+
+export interface UnsuppressWorkspaceBindingResult {
+	workspace: WorkspaceRef;
+	binding: ArtifactSourceBinding;
+}
+
+export interface RetireWorkspaceResult {
+	workspace: WorkspaceRef;
+	revision: number;
+}
+
+/**
+ * Persisted conversation selection for the Artifact Store Workspace model.
+ */
+export interface WorkspaceConversationResourceSelectionRef {
+	artifact: ArtifactRef;
+	name?: string;
+	locator?: ArtifactLocator;
+	definitionDigest?: ArtifactDigest;
+	artifactRevision?: number;
 }
 
 export interface WorkspaceConversationSkillSelectionRef extends WorkspaceConversationResourceSelectionRef {
-	identity: string;
 	displayName?: string;
 	insert?: WorkspaceSkillInsert;
 }
 
 export interface WorkspaceConversationSelection {
-	rootID: WorkspaceRootID;
+	workspace: WorkspaceRef;
 	displayName?: string;
 	workspaceRevision?: number;
 	catalogRevision?: number;
@@ -336,102 +445,43 @@ export interface WorkspaceConversationSelection {
 }
 
 export interface WorkspaceConversationContextUsage {
-	recordID: WorkspaceRecordID;
+	artifact: ArtifactRef;
 	name?: string;
-	locator?: WorkspaceLocator;
-	selectedDefinitionDigest?: WorkspaceDigest;
-	usedDefinitionDigest?: WorkspaceDigest;
+	locator?: ArtifactLocator;
+	selectedDefinitionDigest?: ArtifactDigest;
+	usedDefinitionDigest?: ArtifactDigest;
+	usedArtifactRevision?: number;
 	status: WorkspaceContextCompositionStatus;
 	code?: string;
 	originalBytes?: number;
 	includedBytes?: number;
 	changed?: boolean;
-	diagnostics?: WorkspaceDiagnostic[];
+	diagnostics?: ArtifactDiagnostic[];
 }
 
 export interface WorkspaceConversationSkillUsage {
-	recordID: WorkspaceRecordID;
-	identity: string;
+	artifact: ArtifactRef;
 	name?: string;
 	displayName?: string;
-	locator?: WorkspaceLocator;
-	selectedDefinitionDigest?: WorkspaceDigest;
-	usedDefinitionDigest?: WorkspaceDigest;
+	locator?: ArtifactLocator;
+	selectedDefinitionDigest?: ArtifactDigest;
+	usedDefinitionDigest?: ArtifactDigest;
+	usedArtifactRevision?: number;
 	status: WorkspaceConversationSkillUsageStatus;
 	changed?: boolean;
 	sessionAvailable?: boolean;
 	active?: boolean;
 	advertised?: boolean;
-	diagnostics?: WorkspaceDiagnostic[];
+	diagnostics?: ArtifactDiagnostic[];
 }
 
 export interface WorkspaceConversationUsage {
-	rootID: WorkspaceRootID;
+	workspace: WorkspaceRef;
 	displayName?: string;
 	workspaceRevision?: number;
 	catalogRevision?: number;
 	status: WorkspaceConversationSelectionStatus;
 	contexts?: WorkspaceConversationContextUsage[];
 	skills?: WorkspaceConversationSkillUsage[];
-	diagnostics?: WorkspaceDiagnostic[];
-}
-
-export function workspaceSkillIdentity(rootID: WorkspaceRootID, recordID: WorkspaceRecordID): string {
-	return `workspace/${rootID}/${recordID}`;
-}
-
-export function parseWorkspaceSkillIdentity(
-	identity?: string
-): { rootID: WorkspaceRootID; recordID: WorkspaceRecordID } | undefined {
-	const parts = identity?.trim().split('/') ?? [];
-	if (parts.length !== 3 || parts[0] !== 'workspace' || !parts[1] || !parts[2]) {
-		return undefined;
-	}
-
-	return { rootID: parts[1], recordID: parts[2] };
-}
-
-export function isWorkspaceSkillIdentity(identity?: string): boolean {
-	return parseWorkspaceSkillIdentity(identity) !== undefined;
-}
-
-export interface CreateFilesystemWorkspacePayload {
-	displayName: string;
-	description?: string;
-	rootPath: string;
-	discovery: WorkspaceDiscovery;
-}
-
-export interface CreateEmptyWorkspacePayload {
-	displayName: string;
-	description?: string;
-	discovery: WorkspaceDiscovery;
-}
-
-export interface UpdateWorkspacePayload {
-	expectedRevision: number;
-	displayName: string;
-	description?: string;
-	enabled: boolean;
-	discovery: WorkspaceDiscovery;
-}
-
-export interface WorkspaceAttachmentPayload {
-	role: WorkspaceAttachmentRole;
-	enabled: boolean;
-	settings: WorkspaceAttachmentSettings;
-}
-
-export interface AttachWorkspaceSourcePayload extends WorkspaceAttachmentPayload {
-	expectedRootRevision: number;
-}
-
-export interface UpdateWorkspaceAttachmentPayload extends WorkspaceAttachmentPayload {
-	expectedRootRevision: number;
-	expectedAttachmentRevision: number;
-}
-
-export interface DeleteWorkspaceResult {
-	rootID: WorkspaceRootID;
-	revision: number;
+	diagnostics?: ArtifactDiagnostic[];
 }

@@ -1,4 +1,23 @@
 import type {
+	ArtifactDefinitionSelector,
+	ArtifactRef,
+	ArtifactRoot,
+	ArtifactRootID,
+	ArtifactSourceBinding,
+	ArtifactSourceID,
+	ArtifactSourceKind,
+	ArtifactSourceSummary,
+	CreateArtifactRootBody,
+	CreateArtifactSourceBody,
+	ManagedSourcePackageResult,
+	ManagedSourceState,
+	PublishManagedSourcePackageBody,
+	PurgeArtifactRootResult,
+	PurgeArtifactSourceResult,
+	UpdateArtifactRootBody,
+	UpdateArtifactSourceBody,
+} from '@/spec/artifact';
+import type {
 	AssistantPreset,
 	AssistantPresetBundle,
 	AssistantPresetListItem,
@@ -71,23 +90,33 @@ import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolSt
 import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 import type {
-	AttachWorkspaceSourcePayload,
-	CreateEmptyWorkspacePayload,
-	CreateFilesystemWorkspacePayload,
-	DeleteWorkspaceResult,
-	UpdateWorkspaceAttachmentPayload,
-	UpdateWorkspacePayload,
+	AdoptWorkspaceOccurrenceBody,
+	AttachWorkspaceSourceBody,
+	CreateEmptyWorkspaceBody,
+	CreateFilesystemWorkspaceBody,
+	PinWorkspaceArtifactBody,
+	ReplaceWorkspacePrimarySourceBody,
+	ResolveWorkspaceResourceResult,
+	RetireWorkspaceResult,
+	SetWorkspaceArtifactEnabledBody,
+	SetWorkspaceArtifactRuntimeDisabledBody,
+	SetWorkspacePrimarySourceBody,
+	SuppressWorkspaceBindingBody,
+	UnadoptWorkspaceArtifactResult,
+	UnsuppressWorkspaceBindingResult,
+	UpdateWorkspaceAttachmentBody,
+	UpdateWorkspaceBody,
+	WorkspaceArtifactView,
 	WorkspaceCatalogView,
 	WorkspaceContextInspectionView,
 	WorkspaceContextLoadPlan,
 	WorkspaceContextView,
-	WorkspaceRecordID,
-	WorkspaceRecordView,
+	WorkspaceLoadPlanView,
+	WorkspaceRef,
 	WorkspaceRefreshResult,
-	WorkspaceRootID,
 	WorkspaceSkillLoadView,
 	WorkspaceSkillView,
-	WorkspaceSourceID,
+	WorkspaceSuppressionView,
 	WorkspaceView,
 } from '@/spec/workspace';
 
@@ -284,7 +313,8 @@ export interface ISkillStoreAPI {
 		closeSessionID?: string,
 		maxActivePerSession?: number,
 		allowSkillRefs?: SkillRef[],
-		activeSkillRefs?: SkillRef[]
+		activeSkillRefs?: SkillRef[],
+		workspace?: WorkspaceRef
 	): Promise<SkillSession>;
 
 	/** Runtime: close a skill session. */
@@ -295,91 +325,178 @@ export interface ISkillStoreAPI {
 
 	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
 
-	renderSkill(ref: SkillRef, args?: Record<string, string>): Promise<RenderSkillResponse>;
+	renderSkill(ref: SkillRef, args?: Record<string, string>, workspace?: WorkspaceRef): Promise<RenderSkillResponse>;
 
-	listProvidedSkills(workspaceRootID?: string): Promise<ProvidedSkill[]>;
+	listProvidedSkills(workspace?: WorkspaceRef): Promise<ProvidedSkill[]>;
 
 	renderProvidedSkill(
-		identity: string,
+		ref: SkillRef,
 		args?: Record<string, string>,
-		workspaceRootID?: string
+		workspace?: WorkspaceRef
 	): Promise<RenderProvidedSkillResponse>;
 }
 
-/**
- * Flattened frontend-facing Workspace bridge.
- *
- * Request and response `Body` wrappers are intentionally kept inside the Wails
- * bridge. Raw source configuration remains private. Local filesystem paths are
- * exposed through Workspace views because Workspace management intentionally
- * displays selected project locations.
- */
+export interface IArtifactStoreAPI {
+	createArtifactRoot(body: CreateArtifactRootBody): Promise<ArtifactRoot>;
+
+	getArtifactRoot(rootID: ArtifactRootID): Promise<ArtifactRoot>;
+
+	listArtifactRoots(): Promise<ArtifactRoot[]>;
+
+	updateArtifactRoot(rootID: ArtifactRootID, body: UpdateArtifactRootBody): Promise<ArtifactRoot>;
+
+	retireArtifactRoot(rootID: ArtifactRootID, expectedRevision: number): Promise<ArtifactRoot>;
+
+	purgeArtifactRoot(rootID: ArtifactRootID, expectedRevision: number): Promise<PurgeArtifactRootResult>;
+
+	createArtifactSource(rootID: ArtifactRootID, body: CreateArtifactSourceBody): Promise<ArtifactSourceSummary>;
+
+	getArtifactSource(rootID: ArtifactRootID, sourceID: ArtifactSourceID): Promise<ArtifactSourceSummary>;
+
+	listArtifactSources(rootID: ArtifactRootID): Promise<ArtifactSourceSummary[]>;
+
+	updateArtifactSource(
+		rootID: ArtifactRootID,
+		sourceID: ArtifactSourceID,
+		body: UpdateArtifactSourceBody
+	): Promise<ArtifactSourceSummary>;
+
+	retireArtifactSource(
+		rootID: ArtifactRootID,
+		sourceID: ArtifactSourceID,
+		expectedRevision: number
+	): Promise<ArtifactSourceSummary>;
+
+	purgeArtifactSource(
+		rootID: ArtifactRootID,
+		sourceID: ArtifactSourceID,
+		expectedRevision: number
+	): Promise<PurgeArtifactSourceResult>;
+
+	listArtifactSourceKinds(): Promise<ArtifactSourceKind[]>;
+
+	purgeArtifact(artifact: ArtifactRef, expectedRevision: number): Promise<ArtifactRef>;
+
+	getManagedSourceState(rootID: ArtifactRootID, sourceID: ArtifactSourceID): Promise<ManagedSourceState>;
+
+	publishManagedSourcePackage(
+		rootID: ArtifactRootID,
+		sourceID: ArtifactSourceID,
+		body: PublishManagedSourcePackageBody
+	): Promise<ManagedSourcePackageResult>;
+
+	removeManagedSourcePackage(
+		rootID: ArtifactRootID,
+		sourceID: ArtifactSourceID,
+		expectedSourceRevision: number,
+		directory: string,
+		expectedGeneration: string
+	): Promise<ManagedSourcePackageResult>;
+}
 export interface IWorkspaceAPI {
-	createFilesystemWorkspace(payload: CreateFilesystemWorkspacePayload): Promise<WorkspaceView>;
+	createFilesystemWorkspace(rootID: ArtifactRootID, body: CreateFilesystemWorkspaceBody): Promise<WorkspaceView>;
 
-	createEmptyWorkspace(payload: CreateEmptyWorkspacePayload): Promise<WorkspaceView>;
+	createEmptyWorkspace(rootID: ArtifactRootID, body: CreateEmptyWorkspaceBody): Promise<WorkspaceView>;
 
-	getWorkspace(rootID: WorkspaceRootID): Promise<WorkspaceView>;
+	getWorkspace(workspace: WorkspaceRef): Promise<WorkspaceView>;
 
-	listWorkspaces(): Promise<WorkspaceView[]>;
+	listWorkspaces(rootID: ArtifactRootID): Promise<WorkspaceView[]>;
 
-	updateWorkspace(rootID: WorkspaceRootID, payload: UpdateWorkspacePayload): Promise<WorkspaceView>;
+	updateWorkspace(workspace: WorkspaceRef, body: UpdateWorkspaceBody): Promise<WorkspaceView>;
 
-	deleteWorkspace(rootID: WorkspaceRootID, expectedRevision: number): Promise<DeleteWorkspaceResult>;
-
-	attachWorkspaceSource(
-		rootID: WorkspaceRootID,
-		sourceID: WorkspaceSourceID,
-		payload: AttachWorkspaceSourcePayload
+	replaceWorkspacePrimarySource(
+		workspace: WorkspaceRef,
+		body: ReplaceWorkspacePrimarySourceBody
 	): Promise<WorkspaceView>;
 
+	setWorkspacePrimarySource(workspace: WorkspaceRef, body: SetWorkspacePrimarySourceBody): Promise<WorkspaceView>;
+
+	retireWorkspace(workspace: WorkspaceRef, expectedRevision: number): Promise<RetireWorkspaceResult>;
+
+	purgeWorkspace(workspace: WorkspaceRef, expectedRevision: number): Promise<WorkspaceRef>;
+
+	attachWorkspaceSource(workspace: WorkspaceRef, body: AttachWorkspaceSourceBody): Promise<WorkspaceView>;
+
 	updateWorkspaceAttachment(
-		rootID: WorkspaceRootID,
-		sourceID: WorkspaceSourceID,
-		payload: UpdateWorkspaceAttachmentPayload
+		workspace: WorkspaceRef,
+		sourceID: ArtifactSourceID,
+		body: UpdateWorkspaceAttachmentBody
 	): Promise<WorkspaceView>;
 
 	detachWorkspaceSource(
-		rootID: WorkspaceRootID,
-		sourceID: WorkspaceSourceID,
-		expectedRootRevision: number,
+		workspace: WorkspaceRef,
+		sourceID: ArtifactSourceID,
+		expectedCollectionRevision: number,
 		expectedAttachmentRevision: number
 	): Promise<WorkspaceView>;
 
-	refreshWorkspace(rootID: WorkspaceRootID): Promise<WorkspaceRefreshResult>;
+	refreshWorkspace(workspace: WorkspaceRef): Promise<WorkspaceRefreshResult>;
 
-	getWorkspaceCatalog(rootID: WorkspaceRootID): Promise<WorkspaceCatalogView>;
+	getWorkspaceCatalog(workspace: WorkspaceRef): Promise<WorkspaceCatalogView>;
 
-	getWorkspaceRecord(rootID: WorkspaceRootID, recordID: WorkspaceRecordID): Promise<WorkspaceRecordView>;
+	composeWorkspaceLoadPlan(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceLoadPlanView>;
 
-	listWorkspaceContexts(rootID: WorkspaceRootID): Promise<WorkspaceContextView[]>;
+	resolveWorkspaceResource(
+		workspace: WorkspaceRef,
+		artifact?: ArtifactRef,
+		selector?: ArtifactDefinitionSelector
+	): Promise<ResolveWorkspaceResourceResult>;
 
-	loadWorkspaceContexts(
-		rootID: WorkspaceRootID,
-		recordIDs?: WorkspaceRecordID[]
-	): Promise<WorkspaceContextInspectionView>;
+	getWorkspaceArtifact(workspace: WorkspaceRef, artifact: ArtifactRef): Promise<WorkspaceArtifactView>;
 
-	composeWorkspaceContext(rootID: WorkspaceRootID, recordIDs?: WorkspaceRecordID[]): Promise<WorkspaceContextLoadPlan>;
+	listWorkspaceArtifacts(workspace: WorkspaceRef): Promise<WorkspaceArtifactView[]>;
 
-	listWorkspaceSkills(rootID: WorkspaceRootID): Promise<WorkspaceSkillView[]>;
+	adoptWorkspaceOccurrence(workspace: WorkspaceRef, body: AdoptWorkspaceOccurrenceBody): Promise<WorkspaceArtifactView>;
 
-	loadWorkspaceSkills(rootID: WorkspaceRootID, recordIDs: WorkspaceRecordID[]): Promise<WorkspaceSkillLoadView>;
+	pinWorkspaceArtifact(workspace: WorkspaceRef, body: PinWorkspaceArtifactBody): Promise<WorkspaceArtifactView>;
 
-	setWorkspaceRecordEnabled(
-		rootID: WorkspaceRootID,
-		recordID: WorkspaceRecordID,
+	listWorkspaceSuppressions(workspace: WorkspaceRef): Promise<WorkspaceSuppressionView[]>;
+
+	suppressWorkspaceBinding(
+		workspace: WorkspaceRef,
+		body: SuppressWorkspaceBindingBody
+	): Promise<WorkspaceSuppressionView>;
+
+	unsuppressWorkspaceBinding(
+		workspace: WorkspaceRef,
+		binding: ArtifactSourceBinding,
+		expectedRevision: number
+	): Promise<UnsuppressWorkspaceBindingResult>;
+
+	listWorkspaceContexts(workspace: WorkspaceRef): Promise<WorkspaceContextView[]>;
+
+	loadWorkspaceContexts(workspace: WorkspaceRef, artifacts?: ArtifactRef[]): Promise<WorkspaceContextInspectionView>;
+
+	composeWorkspaceContext(workspace: WorkspaceRef, artifacts?: ArtifactRef[]): Promise<WorkspaceContextLoadPlan>;
+
+	listWorkspaceSkills(workspace: WorkspaceRef): Promise<WorkspaceSkillView[]>;
+
+	loadWorkspaceSkills(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceSkillLoadView>;
+
+	setWorkspaceArtifactEnabled(
+		workspace: WorkspaceRef,
+		artifact: ArtifactRef,
+		body: SetWorkspaceArtifactEnabledBody
+	): Promise<WorkspaceArtifactView>;
+
+	unadoptWorkspaceArtifact(
+		workspace: WorkspaceRef,
+		artifact: ArtifactRef,
 		expectedRevision: number,
-		enabled: boolean
-	): Promise<WorkspaceRecordView>;
+		suppress: boolean
+	): Promise<UnadoptWorkspaceArtifactResult>;
 
-	deleteWorkspaceRecord(rootID: WorkspaceRootID, recordID: WorkspaceRecordID, expectedRevision: number): Promise<void>;
+	purgeWorkspaceArtifact(
+		workspace: WorkspaceRef,
+		artifact: ArtifactRef,
+		expectedRevision: number
+	): Promise<ArtifactRef>;
 
-	setWorkspaceRecordRuntimeDisabled(
-		rootID: WorkspaceRootID,
-		recordID: WorkspaceRecordID,
-		expectedRevision: number,
-		runtimeDisabled: boolean
-	): Promise<WorkspaceRecordView>;
+	setWorkspaceArtifactRuntimeDisabled(
+		workspace: WorkspaceRef,
+		artifact: ArtifactRef,
+		body: SetWorkspaceArtifactRuntimeDisabledBody
+	): Promise<WorkspaceArtifactView>;
 }
 
 export interface IToolRuntimeAPI {

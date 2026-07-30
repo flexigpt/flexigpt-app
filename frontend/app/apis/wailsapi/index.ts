@@ -1,6 +1,7 @@
 // oxlint-disable oxc/no-barrel-file
 /* oxlint-disable no-restricted-imports */
 export * from './aggregate';
+export * from './artifact';
 export * from './assistantpresetstore';
 export * from './attachmentsdrop';
 export * from './backend';

@@ -4,6 +4,7 @@ import { setFrontendErrorLogger } from '@/lib/frontend_error_reporter';
 
 import type {
 	IAggregateAPI,
+	IArtifactStoreAPI,
 	IAssistantPresetStoreAPI,
 	IAttachmentsDropAPI,
 	IBackendAPI,
@@ -35,6 +36,7 @@ export let toolStoreAPI: IToolStoreAPI;
 export let toolRuntimeAPI: IToolRuntimeAPI;
 export let skillStoreAPI: ISkillStoreAPI;
 export let assistantPresetStoreAPI: IAssistantPresetStoreAPI;
+export let artifactStoreAPI: IArtifactStoreAPI;
 export let workspaceAPI: IWorkspaceAPI;
 
 // Conditional initialization
@@ -54,6 +56,7 @@ if (IS_WAILS_PLATFORM) {
 	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
 	skillStoreAPI = new wailsImpl.WailsSkillStoreAPI();
 	assistantPresetStoreAPI = new wailsImpl.WailsAssistantPresetStoreAPI();
+	artifactStoreAPI = new wailsImpl.WailsArtifactStoreAPI();
 	workspaceAPI = new wailsImpl.WailsWorkspaceAPI();
 } else {
 	// Error for unsupported platforms

@@ -1,15 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiFileText, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
+import {
+	FiChevronDown,
+	FiChevronUp,
+	FiEdit2,
+	FiEye,
+	FiFileText,
+	FiPlus,
+	FiRefreshCw,
+	FiSettings,
+	FiTrash2,
+} from 'react-icons/fi';
 
+import { ArtifactOccurrenceState } from '@/spec/artifact';
 import type {
-	UpdateWorkspacePayload,
+	UpdateWorkspaceBody,
+	WorkspaceArtifactView,
 	WorkspaceContextView,
-	WorkspaceRecordView,
+	WorkspaceOccurrenceView,
 	WorkspaceSkillView,
+	WorkspaceSuppressionView,
 	WorkspaceView,
 } from '@/spec/workspace';
-import { WorkspaceArtifactKind, WorkspaceMode } from '@/spec/workspace';
+import { WorkspaceMode } from '@/spec/workspace';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
@@ -26,46 +39,54 @@ import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalConfirmDialog } from '@/components/modal/modal_confirm_dialog';
 
+import { artifactRefKey, workspaceRefKey } from '@/workspaces/lib/workspace_api_utils';
 import type { WorkspaceCatalogData } from '@/workspaces/lib/workspace_utils';
 import {
 	collectWorkspaceDiagnostics,
 	getArtifactKindLabel,
+	getArtifactStateTone,
 	getErrorMessage,
 	getOccurrenceStateTone,
-	getRecordStateTone,
-	getWorkspaceRecords,
+	getWorkspaceArtifacts,
 	normalizeWorkspaceCatalog,
-	removeWorkspaceRecord,
-	replaceWorkspaceRecord,
-	workspaceRecordMatchesSearch,
+	removeWorkspaceArtifact,
+	replaceWorkspaceArtifact,
+	WORKSPACE_CONTEXT_ARTIFACT_KIND,
+	WORKSPACE_SKILL_ARTIFACT_KIND,
+	workspaceArtifactMatchesSearch,
 } from '@/workspaces/lib/workspace_utils';
+import { WorkspaceArtifactBindingModal } from '@/workspaces/workspace_artifact_binding_modal';
 import { WorkspaceContextPreview } from '@/workspaces/workspace_context_preview';
 import { WorkspaceDiagnostics } from '@/workspaces/workspace_diagnostics';
 import { WorkspaceResourceDetailsModal } from '@/workspaces/workspace_resource_details_modal';
 import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
 import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
+import { WorkspaceSourcesModal } from '@/workspaces/workspace_sources_modal';
 
-type WorkspaceTab = 'records' | 'contexts' | 'skills' | 'sources' | 'diagnostics';
+type WorkspaceTab = 'records' | 'observations' | 'contexts' | 'skills' | 'sources' | 'suppressions' | 'diagnostics';
 
 interface WorkspaceCardProps {
 	workspace: WorkspaceView;
 	existingDisplayNames: readonly string[];
 	onWorkspaceChange: (workspace: WorkspaceView) => void;
-	onUpdateWorkspace: (payload: UpdateWorkspacePayload) => Promise<WorkspaceView>;
+	onUpdateWorkspace: (payload: UpdateWorkspaceBody) => Promise<WorkspaceView>;
 	onRequestDelete: (workspace: WorkspaceView) => void;
 }
 
-async function loadWorkspaceCatalogData(rootID: string): Promise<WorkspaceCatalogData> {
-	const catalog = normalizeWorkspaceCatalog(await workspaceAPI.getWorkspaceCatalog(rootID));
-	const [contextResult, skillResult] = await Promise.allSettled([
-		workspaceAPI.listWorkspaceContexts(rootID),
-		workspaceAPI.listWorkspaceSkills(rootID),
+async function loadWorkspaceCatalogData(workspace: WorkspaceView): Promise<WorkspaceCatalogData> {
+	const workspaceRef = workspace.workspace;
+	const catalog = normalizeWorkspaceCatalog(await workspaceAPI.getWorkspaceCatalog(workspaceRef));
+	const [contextResult, skillResult, suppressionResult] = await Promise.allSettled([
+		workspaceAPI.listWorkspaceContexts(workspaceRef),
+		workspaceAPI.listWorkspaceSkills(workspaceRef),
+		workspaceAPI.listWorkspaceSuppressions(workspaceRef),
 	]);
 
 	return {
 		catalog,
 		contexts: contextResult.status === 'fulfilled' ? contextResult.value : [],
 		skills: skillResult.status === 'fulfilled' ? skillResult.value : [],
+		suppressions: suppressionResult.status === 'fulfilled' ? suppressionResult.value : [],
 		contextLoadError:
 			contextResult.status === 'rejected'
 				? getErrorMessage(contextResult.reason, 'Workspace contexts could not be loaded.')
@@ -73,6 +94,10 @@ async function loadWorkspaceCatalogData(rootID: string): Promise<WorkspaceCatalo
 		skillLoadError:
 			skillResult.status === 'rejected'
 				? getErrorMessage(skillResult.reason, 'Workspace skills could not be loaded.')
+				: undefined,
+		suppressionLoadError:
+			suppressionResult.status === 'rejected'
+				? getErrorMessage(suppressionResult.reason, 'Workspace suppressions could not be loaded.')
 				: undefined,
 	};
 }
@@ -87,39 +112,41 @@ function RecordControls({
 	onDelete,
 }: {
 	workspace: WorkspaceView;
-	record: WorkspaceRecordView;
+	record: WorkspaceArtifactView;
 	isPending: (key: string) => boolean;
-	onToggleEnabled: (record: WorkspaceRecordView, enabled: boolean) => void;
-	onSetRuntimeDisabled: (record: WorkspaceRecordView, disabled: boolean) => void;
-	onView: (record: WorkspaceRecordView) => void;
-	onDelete: (record: WorkspaceRecordView) => void;
+	onToggleEnabled: (artifact: WorkspaceArtifactView, enabled: boolean) => void;
+	onSetRuntimeDisabled: (artifact: WorkspaceArtifactView, disabled: boolean) => void;
+	onView: (artifact: WorkspaceArtifactView) => void;
+	onDelete: (artifact: WorkspaceArtifactView) => void;
 }) {
-	const runtimeRelevant = record.kind === WorkspaceArtifactKind.Context || record.kind === WorkspaceArtifactKind.Skill;
+	const artifactID = record.artifact.artifactID;
+	const runtimeRelevant =
+		record.kind === WORKSPACE_CONTEXT_ARTIFACT_KIND || record.kind === WORKSPACE_SKILL_ARTIFACT_KIND;
 
 	return (
 		<ActionRow
 			leading={
 				<div className="flex gap-8">
 					<EnabledControl
-						id={`workspace-record-${workspace.rootID}-${record.id}`}
+						id={`workspace-artifact-${workspace.workspace.collectionID}-${artifactID}`}
 						checked={record.enabled}
 						onChange={enabled => {
 							onToggleEnabled(record, enabled);
 						}}
 						disabled={!workspace.enabled}
-						busy={isPending(`${record.id}:enabled`)}
+						busy={isPending(`${artifactID}:enabled`)}
 						title={!workspace.enabled ? 'Enable the workspace first.' : undefined}
 					/>
 					{runtimeRelevant ? (
 						<EnabledControl
-							id={`workspace-runtime-${workspace.rootID}-${record.id}`}
+							id={`workspace-runtime-${workspace.workspace.collectionID}-${artifactID}`}
 							label="Use in conversations"
 							checked={!record.runtimeDisabled}
 							onChange={allowed => {
 								onSetRuntimeDisabled(record, !allowed);
 							}}
 							disabled={!workspace.enabled}
-							busy={isPending(`${record.id}:runtime`)}
+							busy={isPending(`${artifactID}:runtime`)}
 							title="Allows this discovered item to be used when the workspace is selected for a conversation."
 						/>
 					) : null}
@@ -143,10 +170,10 @@ function RecordControls({
 				onClick={() => {
 					onDelete(record);
 				}}
-				disabled={isPending(`${record.id}:delete`)}
+				disabled={isPending(`${artifactID}:remove`)}
 			>
 				<FiTrash2 size={14} />
-				<span>Delete Record</span>
+				<span>Remove Artifact</span>
 			</button>
 		</ActionRow>
 	);
@@ -169,9 +196,12 @@ export function WorkspaceCard({
 	const [alertMessage, setAlertMessage] = useState('');
 
 	const [isEditOpen, setIsEditOpen] = useState(false);
-	const [recordToInspect, setRecordToInspect] = useState<WorkspaceRecordView | null>(null);
-	const [recordToDelete, setRecordToDelete] = useState<WorkspaceRecordView | null>(null);
+	const [recordToInspect, setRecordToInspect] = useState<WorkspaceArtifactView | null>(null);
+	const [recordToDelete, setRecordToDelete] = useState<WorkspaceArtifactView | null>(null);
+	const [suppressRemovedBinding, setSuppressRemovedBinding] = useState(true);
 	const [isContextPreviewOpen, setIsContextPreviewOpen] = useState(false);
+	const [isSourcesOpen, setIsSourcesOpen] = useState(false);
+	const [isArtifactBindingOpen, setIsArtifactBindingOpen] = useState(false);
 
 	const requestIDRef = useRef(0);
 	const mountedRef = useRef(true);
@@ -184,6 +214,24 @@ export function WorkspaceCard({
 			requestIDRef.current += 1;
 		};
 	}, []);
+
+	const workspaceVersion = `${workspaceRefKey(workspace.workspace)}:${workspace.revision}`;
+	const workspaceVersionRef = useRef(workspaceVersion);
+
+	useEffect(() => {
+		if (workspaceVersionRef.current === workspaceVersion) {
+			return;
+		}
+
+		workspaceVersionRef.current = workspaceVersion;
+		requestIDRef.current += 1;
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setCatalogData(null);
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setCatalogError(null);
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setIsCatalogLoading(false);
+	}, [workspaceVersion]);
 
 	const sourceLabelFor = useCallback(
 		(sourceID: string) => {
@@ -200,9 +248,10 @@ export function WorkspaceCard({
 		setCatalogError(null);
 
 		try {
-			const next = await loadWorkspaceCatalogData(workspace.rootID);
+			const next = await loadWorkspaceCatalogData(workspace);
 			if (mountedRef.current && requestIDRef.current === requestID) {
 				setCatalogData(next);
+				workspaceVersionRef.current = `${workspaceRefKey(next.catalog.workspace.workspace)}:${next.catalog.workspace.revision}`;
 				onWorkspaceChange(next.catalog.workspace);
 			}
 		} catch (error) {
@@ -215,12 +264,23 @@ export function WorkspaceCard({
 				setIsCatalogLoading(false);
 			}
 		}
-	}, [onWorkspaceChange, workspace.rootID]);
+	}, [onWorkspaceChange, workspace]);
 
-	const records = useMemo(() => (catalogData ? getWorkspaceRecords(catalogData.catalog) : []), [catalogData]);
-	const visibleRecords = useMemo(
-		() => records.filter(record => workspaceRecordMatchesSearch(record, recordSearch)),
-		[recordSearch, records]
+	const artifacts = useMemo(() => (catalogData ? getWorkspaceArtifacts(catalogData.catalog) : []), [catalogData]);
+
+	const invalidateCatalog = useCallback((message?: string) => {
+		requestIDRef.current += 1;
+		setCatalogData(null);
+		setCatalogError(null);
+		setIsCatalogLoading(false);
+		if (message) {
+			setRefreshSummary(message);
+		}
+	}, []);
+
+	const visibleArtifacts = useMemo(
+		() => artifacts.filter(artifact => workspaceArtifactMatchesSearch(artifact, recordSearch)),
+		[artifacts, recordSearch]
 	);
 	const diagnostics = useMemo(() => (catalogData ? collectWorkspaceDiagnostics(catalogData) : []), [catalogData]);
 
@@ -228,19 +288,21 @@ export function WorkspaceCard({
 		setAlertMessage(getErrorMessage(error, fallback));
 	};
 
-	const updateRecordLocally = (record: WorkspaceRecordView) => {
-		setCatalogData(previous => (previous ? replaceWorkspaceRecord(previous, record) : previous));
-		setRecordToInspect(previous => (previous?.id === record.id ? record : previous));
+	const updateArtifactLocally = (artifact: WorkspaceArtifactView) => {
+		setCatalogData(previous => (previous ? replaceWorkspaceArtifact(previous, artifact) : previous));
+		setRecordToInspect(previous =>
+			previous && artifactRefKey(previous.artifact) === artifactRefKey(artifact.artifact) ? artifact : previous
+		);
 	};
 
-	const runRecordMutation = async (key: string, action: () => Promise<WorkspaceRecordView>, fallback: string) => {
+	const runArtifactMutation = async (key: string, action: () => Promise<WorkspaceArtifactView>, fallback: string) => {
 		try {
-			let updated: WorkspaceRecordView | undefined;
+			let updated: WorkspaceArtifactView | undefined;
 			await runAction(key, async () => {
 				updated = await action();
 			});
 			if (updated) {
-				updateRecordLocally(updated);
+				updateArtifactLocally(updated);
 			}
 		} catch (error) {
 			showFailure(error, fallback);
@@ -257,7 +319,7 @@ export function WorkspaceCard({
 					enabled,
 					discovery: workspace.discovery,
 				});
-				onWorkspaceChange(updated);
+				workspaceVersionRef.current = `${workspaceRefKey(updated.workspace)}:${updated.revision}`;
 			});
 		} catch (error) {
 			showFailure(error, 'Failed to update workspace enable state.');
@@ -269,9 +331,9 @@ export function WorkspaceCard({
 
 		try {
 			await runAction('workspace:refresh', async () => {
-				const result = await workspaceAPI.refreshWorkspace(workspace.rootID);
+				const result = await workspaceAPI.refreshWorkspace(workspace.workspace);
 				setRefreshSummary(
-					`Scanned ${result.candidates} candidates. Created ${result.createdRecords.length} and updated ${result.updatedRecords.length} records.`
+					`Scanned ${result.candidates} candidates. Created ${result.createdArtifacts.length} and updated ${result.updatedArtifacts.length} artifacts.`
 				);
 				await reloadCatalog();
 			});
@@ -284,24 +346,77 @@ export function WorkspaceCard({
 		if (submission.kind !== 'update') {
 			throw new Error('Expected a workspace update.');
 		}
-		const updated = await onUpdateWorkspace(submission.payload);
-		onWorkspaceChange(updated);
-		setCatalogData(null);
+		await onUpdateWorkspace(submission.payload);
+		invalidateCatalog('Workspace settings changed. Refresh the Workspace to publish a new discovery catalog.');
 	};
 
-	const deleteRecord = async () => {
+	const requestArtifactRemoval = (record: WorkspaceArtifactView) => {
+		setSuppressRemovedBinding(true);
+		setRecordToDelete(record);
+	};
+
+	const removeArtifact = async () => {
 		if (!recordToDelete) {
 			return;
 		}
 
-		await workspaceAPI.deleteWorkspaceRecord(workspace.rootID, recordToDelete.id, recordToDelete.revision);
+		await workspaceAPI.unadoptWorkspaceArtifact(
+			workspace.workspace,
+			recordToDelete.artifact,
+			recordToDelete.revision,
+			suppressRemovedBinding
+		);
 
-		setCatalogData(previous => (previous ? removeWorkspaceRecord(previous, recordToDelete.id) : previous));
+		setCatalogData(previous =>
+			previous ? removeWorkspaceArtifact(previous, recordToDelete.artifact.artifactID) : previous
+		);
+
+		await reloadCatalog();
 	};
 
-	const renderRecord = (record: WorkspaceRecordView) => (
+	const adoptOccurrence = async (occurrence: WorkspaceOccurrenceView) => {
+		if (!catalogData || occurrence.state !== ArtifactOccurrenceState.Valid || occurrence.recorded) {
+			return;
+		}
+
+		await workspaceAPI.adoptWorkspaceOccurrence(workspace.workspace, {
+			expectedCatalogRevision: catalogData.catalog.catalogRevision,
+			occurrence: {
+				sourceID: occurrence.sourceID,
+				locator: occurrence.locator,
+				subresourceLocator: occurrence.subresourceLocator,
+			},
+			name: occurrence.logicalName || undefined,
+			enabled: true,
+			settings: { runtimeDisabled: false },
+		});
+		await reloadCatalog();
+	};
+
+	const unsuppressBinding = async (suppression: WorkspaceSuppressionView) => {
+		const key = `suppression:${suppression.binding.sourceID}:${suppression.binding.locator}:${suppression.binding.subresourceLocator ?? ''}`;
+
+		try {
+			await runAction(key, async () => {
+				await workspaceAPI.unsuppressWorkspaceBinding(workspace.workspace, suppression.binding, suppression.revision);
+				setCatalogData(previous =>
+					previous
+						? {
+								...previous,
+								suppressions: previous.suppressions.filter(item => item !== suppression),
+							}
+						: previous
+				);
+				setRefreshSummary('Source binding was unsuppressed. Refresh the Workspace to discover and adopt it again.');
+			});
+		} catch (error) {
+			showFailure(error, 'Failed to unsuppress the Workspace source binding.');
+		}
+	};
+
+	const renderArtifact = (record: WorkspaceArtifactView) => (
 		<ManagementItemCard
-			key={record.id}
+			key={artifactRefKey(record.artifact)}
 			title={record.name}
 			subtitle={
 				<span className="font-mono">
@@ -311,7 +426,7 @@ export function WorkspaceCard({
 			}
 			status={
 				<>
-					<StatusBadge tone={getRecordStateTone(record.state)}>{record.state}</StatusBadge>
+					<StatusBadge tone={getArtifactStateTone(record.state)}>{record.state}</StatusBadge>
 					<StatusBadge tone={record.enabled ? 'success' : 'neutral'}>
 						{record.enabled ? 'Enabled' : 'Disabled'}
 					</StatusBadge>
@@ -332,37 +447,46 @@ export function WorkspaceCard({
 				record={record}
 				isPending={isPending}
 				onToggleEnabled={(current, enabled) => {
-					void runRecordMutation(
-						`${current.id}:enabled`,
-						() => workspaceAPI.setWorkspaceRecordEnabled(workspace.rootID, current.id, current.revision, enabled),
-						'Failed to update record enable state.'
+					void runArtifactMutation(
+						`${current.artifact.artifactID}:enabled`,
+						() =>
+							workspaceAPI.setWorkspaceArtifactEnabled(workspace.workspace, current.artifact, {
+								expectedRevision: current.revision,
+								enabled,
+							}),
+						'Failed to update Artifact enable state.'
 					);
 				}}
 				onSetRuntimeDisabled={(current, disabled) => {
-					void runRecordMutation(
-						`${current.id}:runtime`,
+					void runArtifactMutation(
+						`${current.artifact.artifactID}:runtime`,
 						() =>
-							workspaceAPI.setWorkspaceRecordRuntimeDisabled(workspace.rootID, current.id, current.revision, disabled),
+							workspaceAPI.setWorkspaceArtifactRuntimeDisabled(workspace.workspace, current.artifact, {
+								expectedRevision: current.revision,
+								runtimeDisabled: disabled,
+							}),
 						'Failed to update runtime permission.'
 					);
 				}}
 				onView={setRecordToInspect}
-				onDelete={setRecordToDelete}
+				onDelete={requestArtifactRemoval}
 			/>
 		</ManagementItemCard>
 	);
 
-	const contextRecord = (context: WorkspaceContextView): WorkspaceRecordView | undefined =>
-		records.find(record => record.id === context.recordID);
+	const contextArtifact = (context: WorkspaceContextView): WorkspaceArtifactView | undefined =>
+		artifacts.find(artifact => artifactRefKey(artifact.artifact) === artifactRefKey(context.artifact));
 
-	const skillRecord = (skill: WorkspaceSkillView): WorkspaceRecordView | undefined =>
-		records.find(record => record.id === skill.recordID);
+	const skillArtifact = (skill: WorkspaceSkillView): WorkspaceArtifactView | undefined =>
+		artifacts.find(artifact => artifactRefKey(artifact.artifact) === artifactRefKey(skill.artifact));
 
 	const tabs: Array<{ key: WorkspaceTab; label: string; count?: number }> = [
 		{ key: 'contexts', label: 'Contexts', count: catalogData?.contexts.length ?? 0 },
 		{ key: 'skills', label: 'Skills', count: catalogData?.skills.length ?? 0 },
 		{ key: 'sources', label: 'Sources', count: workspace.attachments.length },
-		{ key: 'records', label: 'All Catalog Records', count: records.length },
+		{ key: 'records', label: 'All Artifacts', count: artifacts.length },
+		{ key: 'observations', label: 'Observations', count: catalogData?.catalog.occurrences.length ?? 0 },
+		{ key: 'suppressions', label: 'Suppressions', count: catalogData?.suppressions.length ?? 0 },
 		{ key: 'diagnostics', label: 'Diagnostics', count: diagnostics.length },
 	];
 
@@ -414,7 +538,7 @@ export function WorkspaceCard({
 				}
 				actionLeading={
 					<EnabledControl
-						id={`workspace-${workspace.rootID}-enabled`}
+						id={`workspace-${workspace.workspace.collectionID}-enabled`}
 						checked={workspace.enabled}
 						onChange={enabled => {
 							void toggleWorkspace(enabled);
@@ -432,7 +556,17 @@ export function WorkspaceCard({
 							}}
 						>
 							<FiEdit2 size={15} />
-							<span>Edit Paths</span>
+							<span>Edit Workspace</span>
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							onClick={() => {
+								setIsSourcesOpen(true);
+							}}
+						>
+							<FiSettings size={15} />
+							<span>Manage Sources</span>
 						</button>
 						<button
 							type="button"
@@ -500,30 +634,42 @@ export function WorkspaceCard({
 						{catalogData && activeTab === 'records' ? (
 							<div className="space-y-3">
 								<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-									<input
-										type="search"
-										className="input input-sm w-full rounded-xl sm:max-w-md"
-										value={recordSearch}
-										onChange={event => {
-											setRecordSearch(event.currentTarget.value);
-										}}
-										placeholder="Search workspace records..."
-									/>
+									<div className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row">
+										<input
+											type="search"
+											className="input input-sm min-w-0 grow rounded-xl"
+											value={recordSearch}
+											onChange={event => {
+												setRecordSearch(event.currentTarget.value);
+											}}
+											placeholder="Search Workspace Artifacts..."
+										/>
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost shrink-0 rounded-xl"
+											onClick={() => {
+												setIsArtifactBindingOpen(true);
+											}}
+										>
+											<FiPlus size={14} />
+											<span>Pin or Suppress</span>
+										</button>
+									</div>
 									<div className="text-base-content/60 text-xs">
 										Catalog revision {catalogData.catalog.catalogRevision}
 										{catalogData.catalog.catalogCurrent ? '' : ' · catalog is stale'}
 									</div>
 								</div>
 
-								{visibleRecords.map(r => {
-									return renderRecord(r);
+								{visibleArtifacts.map(a => {
+									return renderArtifact(a);
 								})}
 
-								{visibleRecords.length === 0 ? (
+								{visibleArtifacts.length === 0 ? (
 									<ManagementEmptyState>
-										{records.length === 0
-											? 'No workspace records were discovered. Refresh the workspace after adding paths.'
-											: 'No records match the current search.'}
+										{artifacts.length === 0
+											? 'No Workspace Artifacts were adopted. Refresh the Workspace after adding paths.'
+											: 'No Artifacts match the current search.'}
 									</ManagementEmptyState>
 								) : null}
 
@@ -544,9 +690,99 @@ export function WorkspaceCard({
 														) : null}
 													</>
 												}
-											/>
+											>
+												{occurrence.state === ArtifactOccurrenceState.Valid ? (
+													<ActionRow>
+														<button
+															type="button"
+															className="btn btn-sm btn-ghost rounded-xl"
+															disabled={isPending(`occurrence:${occurrence.sourceID}:${occurrence.locator}:adopt`)}
+															onClick={() => {
+																void runAction(`occurrence:${occurrence.sourceID}:${occurrence.locator}:adopt`, () =>
+																	adoptOccurrence(occurrence)
+																).catch((error: unknown) => {
+																	showFailure(error, 'Failed to adopt the discovered Artifact.');
+																});
+															}}
+														>
+															<FiPlus size={14} />
+															<span>Adopt Artifact</span>
+														</button>
+													</ActionRow>
+												) : null}
+											</ManagementItemCard>
 										))}
 									</div>
+								) : null}
+							</div>
+						) : null}
+
+						{catalogData && activeTab === 'observations' ? (
+							<div className="space-y-3">
+								<div className="text-base-content/60 px-1 text-xs">
+									Observations describe current source content. Recorded observations have durable Workspace Artifacts;
+									unrecorded observations do not.
+								</div>
+
+								{catalogData.catalog.occurrences.map((occurrence, index) => {
+									const occurrenceKey = `${occurrence.sourceID}:${occurrence.locator}:${
+										occurrence.subresourceLocator ?? ''
+									}:${index}`;
+									const pendingKey = `occurrence:${occurrence.sourceID}:${occurrence.locator}:adopt`;
+
+									return (
+										<ManagementItemCard
+											key={occurrenceKey}
+											title={occurrence.logicalName || occurrence.locator}
+											subtitle={
+												<span className="font-mono">
+													{occurrence.locator}
+													{occurrence.subresourceLocator ? ` / ${occurrence.subresourceLocator}` : ''}
+												</span>
+											}
+											status={
+												<>
+													<StatusBadge tone={getOccurrenceStateTone(occurrence)}>{occurrence.state}</StatusBadge>
+													<StatusBadge tone={occurrence.recorded ? 'success' : 'neutral'}>
+														{occurrence.recorded ? 'Recorded' : 'Unrecorded'}
+													</StatusBadge>
+												</>
+											}
+											metadata={
+												<>
+													<MetadataPill label="Source">{sourceLabelFor(occurrence.sourceID)}</MetadataPill>
+													{occurrence.kind ? (
+														<MetadataPill label="Kind">{getArtifactKindLabel(occurrence.kind)}</MetadataPill>
+													) : null}
+													{occurrence.diagnostics?.length ? (
+														<MetadataPill label="Diagnostics">{occurrence.diagnostics.length}</MetadataPill>
+													) : null}
+												</>
+											}
+										>
+											{!occurrence.recorded && occurrence.state === ArtifactOccurrenceState.Valid ? (
+												<ActionRow>
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-xl"
+														disabled={isPending(pendingKey)}
+														onClick={() => {
+															void runAction(pendingKey, () => adoptOccurrence(occurrence)).catch((error: unknown) => {
+																showFailure(error, 'Failed to adopt the discovered Artifact.');
+															});
+														}}
+													>
+														<FiPlus size={14} />
+														<span>Adopt Artifact</span>
+													</button>
+												</ActionRow>
+											) : null}
+										</ManagementItemCard>
+									);
+								})}
+
+								{catalogData.catalog.occurrences.length === 0 ? (
+									<ManagementEmptyState>No source observations are available.</ManagementEmptyState>
 								) : null}
 							</div>
 						) : null}
@@ -572,18 +808,18 @@ export function WorkspaceCard({
 								) : null}
 
 								{catalogData.contexts.map(context => {
-									const record = contextRecord(context);
+									const record = contextArtifact(context);
 
 									return (
 										<ManagementItemCard
-											key={context.recordID}
+											key={artifactRefKey(context.artifact)}
 											title={context.name}
 											subtitle={
 												context.name !== context.locator ? <span className="font-mono">{context.locator}</span> : null
 											}
 											status={
 												<>
-													<StatusBadge tone={getRecordStateTone(context.state)}>{context.state}</StatusBadge>
+													<StatusBadge tone={getArtifactStateTone(context.state)}>{context.state}</StatusBadge>
 													<StatusBadge tone={context.enabled ? 'success' : 'neutral'}>
 														{context.enabled ? 'Enabled' : 'Disabled'}
 													</StatusBadge>
@@ -597,33 +833,33 @@ export function WorkspaceCard({
 													record={record}
 													isPending={isPending}
 													onToggleEnabled={(current, enabled) => {
-														void runRecordMutation(
-															`${current.id}:enabled`,
+														void runArtifactMutation(
+															`${current.artifact.artifactID}:enabled`,
 															() =>
-																workspaceAPI.setWorkspaceRecordEnabled(
-																	workspace.rootID,
-																	current.id,
-																	current.revision,
-																	enabled
-																),
+																workspaceAPI.setWorkspaceArtifactEnabled(workspace.workspace, current.artifact, {
+																	expectedRevision: current.revision,
+																	enabled,
+																}),
 															'Failed to update context enable state.'
 														);
 													}}
 													onSetRuntimeDisabled={(current, disabled) => {
-														void runRecordMutation(
-															`${current.id}:runtime`,
+														void runArtifactMutation(
+															`${current.artifact.artifactID}:runtime`,
 															() =>
-																workspaceAPI.setWorkspaceRecordRuntimeDisabled(
-																	workspace.rootID,
-																	current.id,
-																	current.revision,
-																	disabled
+																workspaceAPI.setWorkspaceArtifactRuntimeDisabled(
+																	workspace.workspace,
+																	current.artifact,
+																	{
+																		expectedRevision: current.revision,
+																		runtimeDisabled: disabled,
+																	}
 																),
 															'Failed to update context runtime permission.'
 														);
 													}}
 													onView={setRecordToInspect}
-													onDelete={setRecordToDelete}
+													onDelete={requestArtifactRemoval}
 												/>
 											) : null}
 										</ManagementItemCard>
@@ -643,17 +879,17 @@ export function WorkspaceCard({
 								) : null}
 
 								{catalogData.skills.map(skill => {
-									const record = skillRecord(skill);
+									const record = skillArtifact(skill);
 
 									return (
 										<ManagementItemCard
-											key={skill.recordID}
+											key={artifactRefKey(skill.artifact)}
 											title={skill.skill.displayName || skill.skill.name}
 											subtitle={<span className="font-mono">{skill.locator}</span>}
 											description={skill.skill.description}
 											status={
 												<>
-													<StatusBadge tone={getRecordStateTone(skill.state)}>{skill.state}</StatusBadge>
+													<StatusBadge tone={getArtifactStateTone(skill.state)}>{skill.state}</StatusBadge>
 													<StatusBadge tone={skill.skill.isEnabled ? 'success' : 'neutral'}>
 														{skill.skill.isEnabled ? 'Enabled' : 'Disabled'}
 													</StatusBadge>
@@ -678,33 +914,33 @@ export function WorkspaceCard({
 													record={record}
 													isPending={isPending}
 													onToggleEnabled={(current, enabled) => {
-														void runRecordMutation(
-															`${current.id}:enabled`,
+														void runArtifactMutation(
+															`${current.artifact.artifactID}:enabled`,
 															() =>
-																workspaceAPI.setWorkspaceRecordEnabled(
-																	workspace.rootID,
-																	current.id,
-																	current.revision,
-																	enabled
-																),
+																workspaceAPI.setWorkspaceArtifactEnabled(workspace.workspace, current.artifact, {
+																	expectedRevision: current.revision,
+																	enabled,
+																}),
 															'Failed to update skill enable state.'
 														);
 													}}
 													onSetRuntimeDisabled={(current, disabled) => {
-														void runRecordMutation(
-															`${current.id}:runtime`,
+														void runArtifactMutation(
+															`${current.artifact.artifactID}:runtime`,
 															() =>
-																workspaceAPI.setWorkspaceRecordRuntimeDisabled(
-																	workspace.rootID,
-																	current.id,
-																	current.revision,
-																	disabled
+																workspaceAPI.setWorkspaceArtifactRuntimeDisabled(
+																	workspace.workspace,
+																	current.artifact,
+																	{
+																		expectedRevision: current.revision,
+																		runtimeDisabled: disabled,
+																	}
 																),
 															'Failed to update skill runtime permission.'
 														);
 													}}
 													onView={setRecordToInspect}
-													onDelete={setRecordToDelete}
+													onDelete={requestArtifactRemoval}
 												/>
 											) : null}
 										</ManagementItemCard>
@@ -719,6 +955,19 @@ export function WorkspaceCard({
 
 						{activeTab === 'sources' ? (
 							<div className="space-y-3">
+								<div className="flex justify-end">
+									<button
+										type="button"
+										className="btn btn-sm btn-ghost rounded-xl"
+										onClick={() => {
+											setIsSourcesOpen(true);
+										}}
+									>
+										<FiSettings size={14} />
+										<span>Manage Sources</span>
+									</button>
+								</div>
+
 								{workspace.attachments.map(attachment => (
 									<ManagementItemCard
 										key={attachment.sourceID}
@@ -743,9 +992,67 @@ export function WorkspaceCard({
 								) : null}
 
 								<div className="text-base-content/60 rounded-2xl px-1 text-xs">
-									Additional project folders are currently configured as discovery paths. A path-based external source
-									attachment API should be added before exposing source attachment management here.
+									Workspace attachment roles determine how each Artifact Store Source participates in discovery. Source
+									configuration remains private to Artifact Store and is never copied into Workspace data.
 								</div>
+							</div>
+						) : null}
+
+						{catalogData && activeTab === 'suppressions' ? (
+							<div className="space-y-3">
+								{catalogData.suppressionLoadError ? (
+									<div className="alert alert-warning rounded-2xl text-sm">{catalogData.suppressionLoadError}</div>
+								) : null}
+
+								<div className="text-base-content/60 px-1 text-xs">
+									Suppressed source bindings are not automatically adopted during refresh. Unsuppressing a binding does
+									not modify source content.
+								</div>
+
+								{catalogData.suppressions.map(suppression => {
+									const pendingKey = `suppression:${suppression.binding.sourceID}:${
+										suppression.binding.locator
+									}:${suppression.binding.subresourceLocator ?? ''}`;
+
+									return (
+										<ManagementItemCard
+											key={`${pendingKey}:${suppression.revision}`}
+											title={suppression.binding.locator}
+											subtitle={
+												suppression.binding.subresourceLocator ? (
+													<span className="font-mono">{suppression.binding.subresourceLocator}</span>
+												) : null
+											}
+											status={<StatusBadge tone="warning">Suppressed</StatusBadge>}
+											metadata={
+												<>
+													<MetadataPill label="Kind">
+														{getArtifactKindLabel(suppression.binding.expectedKind)}
+													</MetadataPill>
+													<MetadataPill label="Source">{sourceLabelFor(suppression.binding.sourceID)}</MetadataPill>
+												</>
+											}
+										>
+											<ActionRow>
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													disabled={isPending(pendingKey)}
+													onClick={() => {
+														void unsuppressBinding(suppression);
+													}}
+												>
+													<FiRefreshCw size={14} />
+													<span>Unsuppress</span>
+												</button>
+											</ActionRow>
+										</ManagementItemCard>
+									);
+								})}
+
+								{catalogData.suppressions.length === 0 && !catalogData.suppressionLoadError ? (
+									<ManagementEmptyState>No source bindings are suppressed.</ManagementEmptyState>
+								) : null}
 							</div>
 						) : null}
 
@@ -762,6 +1069,27 @@ export function WorkspaceCard({
 				onSubmit={saveWorkspace}
 				workspace={workspace}
 				existingDisplayNames={existingDisplayNames}
+			/>
+
+			<WorkspaceSourcesModal
+				isOpen={isSourcesOpen}
+				onClose={() => {
+					setIsSourcesOpen(false);
+				}}
+				workspace={workspace}
+				onWorkspaceChange={onWorkspaceChange}
+				onCatalogInvalidated={() => {
+					invalidateCatalog('Workspace Sources changed. Refresh the Workspace to publish a new discovery catalog.');
+				}}
+			/>
+
+			<WorkspaceArtifactBindingModal
+				isOpen={isArtifactBindingOpen}
+				onClose={() => {
+					setIsArtifactBindingOpen(false);
+				}}
+				workspace={workspace}
+				onChanged={reloadCatalog}
 			/>
 
 			<WorkspaceResourceDetailsModal
@@ -785,22 +1113,41 @@ export function WorkspaceCard({
 				isOpen={recordToDelete !== null}
 				onClose={() => {
 					setRecordToDelete(null);
+					setSuppressRemovedBinding(true);
 				}}
-				title="Delete Workspace Record"
+				title="Remove Workspace Artifact"
 				message={
-					<div className="space-y-2 text-sm">
+					<div className="space-y-3 text-sm">
 						<p>
-							Delete record <span className="font-semibold">{recordToDelete?.name}</span>?
+							Remove Artifact <span className="font-semibold">{recordToDelete?.name}</span>?
 						</p>
-						<p className="text-base-content/70">
-							The source file is not deleted. A later workspace refresh may discover and record it again.
-						</p>
+						<p className="text-base-content/70">The source content is not deleted.</p>
+						<label className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-xl border p-3">
+							<input
+								type="checkbox"
+								className="checkbox checkbox-sm mt-0.5"
+								checked={suppressRemovedBinding}
+								onChange={event => {
+									setSuppressRemovedBinding(event.currentTarget.checked);
+								}}
+							/>
+							<span className="block font-medium">Prevent automatic re-adoption</span>
+
+							<span className="text-base-content/70 mt-1 block text-xs">
+								Suppress this typed source binding. It can be restored later from the Suppressions tab.
+							</span>
+						</label>
+						{!suppressRemovedBinding ? (
+							<p className="text-warning text-xs">
+								A later Workspace refresh may automatically adopt this Artifact again.
+							</p>
+						) : null}
 					</div>
 				}
-				confirmLabel="Delete Record"
-				busyLabel="Deleting..."
+				confirmLabel={suppressRemovedBinding ? 'Remove and Suppress' : 'Remove Artifact'}
+				busyLabel="Removing..."
 				confirmTone="error"
-				onConfirm={deleteRecord}
+				onConfirm={removeArtifact}
 				blockCancel
 			/>
 

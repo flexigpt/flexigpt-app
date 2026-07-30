@@ -35,7 +35,7 @@ import type {
 } from '@/chats/composer/editor/editor_types';
 import { useComposerSystemPrompt } from '@/chats/composer/skills/use_composer_system_prompt';
 import type { ChatWorkflowStarter, ChatWorkflowStarterAssistantPresetRef } from '@/chats/conversation/starter_intent';
-import { isWorkspaceSkillRef } from '@/skills/lib/skill_identity_utils';
+import { isInstalledSkillRef } from '@/skills/lib/skill_identity_utils';
 
 export interface ComposerBoxHandle {
 	getUIChatOptions: () => UIChatOption;
@@ -149,7 +149,7 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 					? [
 							...prepared.runtimeSelections.enabledSkillRefs,
 							...prev.enabledSkillRefs.filter(r => {
-								return isWorkspaceSkillRef(r);
+								return !isInstalledSkillRef(r);
 							}),
 						]
 					: prev.enabledSkillRefs,
@@ -157,7 +157,7 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 					? [
 							...prepared.runtimeSelections.activeSkillRefs,
 							...(prev.activeSkillRefs ?? []).filter(r => {
-								return isWorkspaceSkillRef(r);
+								return !isInstalledSkillRef(r);
 							}),
 						]
 					: prev.activeSkillRefs,

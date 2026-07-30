@@ -1,4 +1,6 @@
+import type { ArtifactState } from '@/spec/artifact';
 import type { ToolOutputUnion } from '@/spec/tool';
+import type { WorkspaceRef } from '@/spec/workspace';
 
 export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
 	'builtin.skills-load',
@@ -15,47 +17,24 @@ export enum SkillSessionSyncMode {
 }
 
 /**
- * Source classification for a normalized runtime-facing SkillRef.
+ * Wire identity accepted by all Skill Store and Skill Runtime endpoints.
  *
- * `SkillRef` remains wire-compatible with the current Go API. Consumers must
- * use the identity helpers instead of inferring source from missing fields.
+ * Workspace-provided skills retain this reference and carry their workspace
+ * separately through `ProvidedSkill.workspace` or an explicit workspace
+ * request field.
  */
-export enum SkillRefKind {
-	Installed = 'installed',
-	Workspace = 'workspace',
-	Invalid = 'invalid',
-}
-
-export interface InstalledSkillRef {
+export interface SkillRef {
 	bundleID: string;
 	skillSlug: string;
 	skillID: string;
-	identity?: never;
 }
 
-export interface WorkspaceSkillRef {
-	identity: string;
-	bundleID?: never;
-	skillSlug?: never;
-	skillID?: never;
-}
+export type InstalledSkillRef = SkillRef;
 
 export interface InstalledSkillSelection {
 	skillRef: InstalledSkillRef;
 	preLoadAsActive: boolean;
 	useAsInstructions: boolean;
-}
-
-// Store identity for selection/persistence (NOT runtime identity).
-export interface SkillRef {
-	/**
-	 * External provider identity, for example workspace/<rootID>/<recordID>.
-	 * Mutually exclusive with the installed Skill Store fields below.
-	 */
-	identity?: string;
-	bundleID?: string;
-	skillSlug?: string;
-	skillID?: string;
 }
 
 export enum SkillProviderOrigin {
@@ -85,29 +64,29 @@ export interface SkillProviderDiagnostic {
  * not installed-store records and must not be forced into that model.
  */
 export interface ProvidedSkill {
-	identity: string;
+	ref: SkillRef;
 	origin: SkillProviderOrigin;
 	installedRef?: SkillRef;
-	workspaceRootID?: string;
-	workspaceRecordID?: string;
-	recordRevision?: number;
+	workspace?: WorkspaceRef;
+	artifactRevision?: number;
 	name: string;
-	displayName?: string;
-	description?: string;
-	insert?: SkillInsert;
+	displayName: string;
+	description: string;
+	insert: SkillInsert;
 	arguments?: SkillArgument[];
 	tags?: string[];
 	enabled: boolean;
 	available: boolean;
 	runtimeAllowed: boolean;
+	builtIn: boolean;
 	catalogCurrent: boolean;
-	shadowed: boolean;
-	shadowedBy?: string;
 	definitionDigest?: string;
 	sourceID?: string;
 	locator?: string;
-	state?: string;
+	state?: ArtifactState;
 	diagnostics?: SkillProviderDiagnostic[];
+	createdAt: Date;
+	modifiedAt: Date;
 }
 
 export interface SkillSelection {
@@ -117,11 +96,11 @@ export interface SkillSelection {
 }
 
 export interface RuntimeSkillFilter {
-	types?: string[];
+	types?: SkillType[];
 	inserts?: SkillInsert[];
 	locationPrefix?: string;
-	// Store identity allowlist. Backend resolves to SkillDef internally.
 	allowSkillRefs?: SkillRef[];
+	workspace?: WorkspaceRef;
 	sessionID?: string;
 	activity?: string;
 }
@@ -142,7 +121,7 @@ export interface SkillResourceInfo {
 
 export interface RuntimeSkillListItem {
 	skillRef: SkillRef;
-	type?: string;
+	type?: SkillType;
 	name?: string;
 	displayName?: string;
 	description?: string;
@@ -153,7 +132,7 @@ export interface RuntimeSkillListItem {
 	resources: SkillResourceInfo;
 	rawFrontmatter?: Record<string, any>;
 	warnings?: string[];
-	isActive: boolean;
+	isActive?: boolean;
 	errorMessage?: string;
 }
 
@@ -224,13 +203,13 @@ export interface SkillArgument {
 
 interface SkillPresence {
 	status: SkillPresenceStatus;
-	lastCheckedAt?: string;
-	lastSeenAt?: string;
-	missingSince?: string;
+	lastCheckedAt?: Date;
+	lastSeenAt?: Date;
+	missingSince?: Date;
 	lastCheckError?: string;
 }
 
-// Mirrors Go: spec.Skill (time.Time -> string)
+// Mirrors Go: spec.Skill. Wails time values are normalized to Date.
 export interface Skill {
 	schemaVersion: string;
 	id: string;
@@ -259,7 +238,7 @@ export interface Skill {
 	modifiedAt: Date;
 }
 
-// Mirrors Go: spec.SkillBundle (time.Time -> string)
+// Mirrors Go: spec.SkillBundle. Wails time values are normalized to Date.
 export interface SkillBundle {
 	schemaVersion: string;
 	id: string;
@@ -274,7 +253,7 @@ export interface SkillBundle {
 	createdAt: Date;
 	modifiedAt: Date;
 
-	softDeletedAt?: string;
+	softDeletedAt?: Date;
 }
 
 // Mirrors Go: spec.SkillListItem

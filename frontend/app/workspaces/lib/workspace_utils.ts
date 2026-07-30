@@ -1,17 +1,17 @@
+import type { ArtifactDiagnostic, ArtifactKind, ArtifactState } from '@/spec/artifact';
+import {
+	ArtifactDiagnosticSeverity,
+	ArtifactOccurrenceState as ArtifactOccurrenceStateValue,
+	ArtifactState as ArtifactStateValue,
+} from '@/spec/artifact';
 import type {
+	WorkspaceArtifactView,
 	WorkspaceCatalogView,
 	WorkspaceContextView,
-	WorkspaceDiagnostic,
 	WorkspaceOccurrenceView,
-	WorkspaceRecordView,
 	WorkspaceSkillView,
+	WorkspaceSuppressionView,
 	WorkspaceView,
-} from '@/spec/workspace';
-import {
-	WorkspaceArtifactKind,
-	WorkspaceDiagnosticSeverity,
-	WorkspaceOccurrenceState,
-	WorkspaceRecordState,
 } from '@/spec/workspace';
 
 import type { StatusTone } from '@/components/managementui/management_class_consts';
@@ -20,12 +20,17 @@ export interface WorkspaceCatalogData {
 	catalog: WorkspaceCatalogView;
 	contexts: WorkspaceContextView[];
 	skills: WorkspaceSkillView[];
+	suppressions: WorkspaceSuppressionView[];
 	contextLoadError?: string;
 	skillLoadError?: string;
+	suppressionLoadError?: string;
 }
 
 export const WORKSPACE_DEFAULT_CONTEXT_FILES = ['AGENTS.md', 'CLAUDE.md'];
 export const WORKSPACE_DEFAULT_SKILL_ROOTS = ['.skills/**/SKILL.md'];
+
+export const WORKSPACE_CONTEXT_ARTIFACT_KIND = 'workspace.context';
+export const WORKSPACE_SKILL_ARTIFACT_KIND = 'agent.skill';
 
 function normalizeRequiredArray<T>(value: T[] | null | undefined): T[] {
 	return Array.isArray(value) ? value : [];
@@ -58,7 +63,7 @@ export function normalizeWorkspaceCatalog(catalog: WorkspaceCatalogView): Worksp
 		invalidOccurrences: normalizeRequiredArray(catalog.invalidOccurrences),
 		missingOccurrences: normalizeRequiredArray(catalog.missingOccurrences),
 		unrecordedOccurrences: normalizeRequiredArray(catalog.unrecordedOccurrences),
-		unresolvedRecords: normalizeRequiredArray(catalog.unresolvedRecords),
+		unresolvedArtifacts: normalizeRequiredArray(catalog.unresolvedArtifacts),
 	};
 }
 
@@ -168,9 +173,12 @@ export function sortWorkspaces(workspaces: WorkspaceView[]): WorkspaceView[] {
 			return left.enabled ? -1 : 1;
 		}
 
-		return left.displayName.localeCompare(right.displayName, undefined, {
+		const displayNameOrder = left.displayName.localeCompare(right.displayName, undefined, {
 			sensitivity: 'base',
 		});
+		return displayNameOrder !== 0
+			? displayNameOrder
+			: left.workspace.collectionID.localeCompare(right.workspace.collectionID);
 	});
 }
 
@@ -180,7 +188,14 @@ export function workspaceMatchesSearch(workspace: WorkspaceView, rawQuery: strin
 		return true;
 	}
 
-	const haystackParts = [workspace.displayName, workspace.description, workspace.mode, workspace.primaryPath];
+	const haystackParts = [
+		workspace.displayName,
+		workspace.description,
+		workspace.mode,
+		workspace.primaryPath,
+		workspace.workspace.rootID,
+		workspace.workspace.collectionID,
+	];
 
 	for (const locator of workspace.discovery.additionalLocators ?? []) {
 		haystackParts.push(locator);
@@ -203,88 +218,94 @@ export function workspaceMatchesSearch(workspace: WorkspaceView, rawQuery: strin
 	return haystack.includes(query);
 }
 
-export function getWorkspaceRecords(catalog: WorkspaceCatalogView): WorkspaceRecordView[] {
-	const records = new Map<string, WorkspaceRecordView>();
+export function getWorkspaceArtifacts(catalog: WorkspaceCatalogView): WorkspaceArtifactView[] {
+	const artifacts = new Map<string, WorkspaceArtifactView>();
 
 	for (const resource of catalog.resources) {
-		records.set(resource.record.id, resource.record);
+		artifacts.set(resource.artifact.artifact.artifactID, resource.artifact);
 	}
 
-	for (const record of catalog.unresolvedRecords) {
-		records.set(record.id, record);
+	for (const artifact of catalog.unresolvedArtifacts) {
+		artifacts.set(artifact.artifact.artifactID, artifact);
 	}
 
-	return [...records.values()].toSorted((left, right) => {
+	return [...artifacts.values()].toSorted((left, right) => {
 		const kindOrder = left.kind.localeCompare(right.kind);
 		if (kindOrder !== 0) {
 			return kindOrder;
 		}
 
-		return left.name.localeCompare(right.name, undefined, {
+		const nameOrder = left.name.localeCompare(right.name, undefined, {
 			sensitivity: 'base',
 		});
+		if (nameOrder !== 0) {
+			return nameOrder;
+		}
+
+		return left.artifact.artifactID.localeCompare(right.artifact.artifactID);
 	});
 }
 
-export function replaceWorkspaceRecord(
+export function replaceWorkspaceArtifact(
 	data: WorkspaceCatalogData,
-	nextRecord: WorkspaceRecordView
+	nextArtifact: WorkspaceArtifactView
 ): WorkspaceCatalogData {
-	const replace = (record: WorkspaceRecordView): WorkspaceRecordView =>
-		record.id === nextRecord.id ? nextRecord : record;
+	const artifactID = nextArtifact.artifact.artifactID;
+	const replace = (artifact: WorkspaceArtifactView): WorkspaceArtifactView =>
+		artifact.artifact.artifactID === artifactID ? nextArtifact : artifact;
 
 	return {
 		...data,
 		catalog: {
 			...data.catalog,
 			resources: data.catalog.resources.map(resource =>
-				resource.record.id === nextRecord.id
+				resource.artifact.artifact.artifactID === artifactID
 					? {
 							...resource,
-							record: nextRecord,
-							definitionDigest: nextRecord.resolvedDefinition ?? resource.definitionDigest,
+							artifact: nextArtifact,
+							definitionDigest: nextArtifact.resolvedDefinition ?? resource.definitionDigest,
 						}
 					: resource
 			),
 			groups: data.catalog.groups.map(group => ({
 				...group,
 				resources: group.resources.map(resource =>
-					resource.record.id === nextRecord.id
+					resource.artifact.artifact.artifactID === artifactID
 						? {
 								...resource,
-								record: nextRecord,
-								definitionDigest: nextRecord.resolvedDefinition ?? resource.definitionDigest,
+								artifact: nextArtifact,
+								definitionDigest: nextArtifact.resolvedDefinition ?? resource.definitionDigest,
 							}
 						: resource
 				),
 			})),
-			unresolvedRecords: data.catalog.unresolvedRecords.map(replace),
+			unresolvedArtifacts: data.catalog.unresolvedArtifacts.map(replace),
 		},
 		contexts: data.contexts.map(context =>
-			context.recordID === nextRecord.id
+			context.artifact.artifactID === artifactID
 				? {
 						...context,
-						recordRevision: nextRecord.revision,
-						definitionDigest: nextRecord.resolvedDefinition ?? context.definitionDigest,
-						enabled: nextRecord.enabled,
-						state: nextRecord.state,
-						runtimeDisabled: nextRecord.runtimeDisabled,
-						diagnostics: nextRecord.diagnostics,
+						recordRevision: nextArtifact.revision,
+						definitionDigest: nextArtifact.resolvedDefinition ?? context.definitionDigest,
+						enabled: nextArtifact.enabled,
+						state: nextArtifact.state,
+						runtimeDisabled: nextArtifact.runtimeDisabled,
+						diagnostics: nextArtifact.diagnostics,
 					}
 				: context
 		),
 		skills: data.skills.map(skill =>
-			skill.recordID === nextRecord.id
+			skill.artifact.artifactID === artifactID
 				? {
 						...skill,
-						recordRevision: nextRecord.revision,
-						definitionDigest: nextRecord.resolvedDefinition ?? skill.definitionDigest,
-						state: nextRecord.state,
-						runtimeDisabled: nextRecord.runtimeDisabled,
-						diagnostics: nextRecord.diagnostics,
+						recordRevision: nextArtifact.revision,
+						definitionDigest: nextArtifact.resolvedDefinition ?? skill.definitionDigest,
+						state: nextArtifact.state,
+						runtimeDisabled: nextArtifact.runtimeDisabled,
+						diagnostics: nextArtifact.diagnostics,
 						skill: {
 							...skill.skill,
-							isEnabled: nextRecord.enabled,
+							isEnabled: nextArtifact.enabled,
 						},
 					}
 				: skill
@@ -292,36 +313,38 @@ export function replaceWorkspaceRecord(
 	};
 }
 
-export function removeWorkspaceRecord(data: WorkspaceCatalogData, recordID: string): WorkspaceCatalogData {
+export function removeWorkspaceArtifact(data: WorkspaceCatalogData, artifactID: string): WorkspaceCatalogData {
 	return {
 		...data,
 		catalog: {
 			...data.catalog,
-			resources: data.catalog.resources.filter(resource => resource.record.id !== recordID),
+			resources: data.catalog.resources.filter(resource => resource.artifact.artifact.artifactID !== artifactID),
 			groups: data.catalog.groups.map(group => ({
 				...group,
-				resources: group.resources.filter(resource => resource.record.id !== recordID),
+				resources: group.resources.filter(resource => resource.artifact.artifact.artifactID !== artifactID),
 			})),
-			unresolvedRecords: data.catalog.unresolvedRecords.filter(record => record.id !== recordID),
-			unresolvedRecordCount: Math.max(
+			unresolvedArtifacts: data.catalog.unresolvedArtifacts.filter(
+				artifact => artifact.artifact.artifactID !== artifactID
+			),
+			unresolvedArtifactCount: Math.max(
 				0,
-				data.catalog.unresolvedRecordCount -
-					(data.catalog.unresolvedRecords.some(record => record.id === recordID) ? 1 : 0)
+				data.catalog.unresolvedArtifactCount -
+					(data.catalog.unresolvedArtifacts.some(artifact => artifact.artifact.artifactID === artifactID) ? 1 : 0)
 			),
 		},
-		contexts: data.contexts.filter(context => context.recordID !== recordID),
-		skills: data.skills.filter(skill => skill.recordID !== recordID),
+		contexts: data.contexts.filter(context => context.artifact.artifactID !== artifactID),
+		skills: data.skills.filter(skill => skill.artifact.artifactID !== artifactID),
 	};
 }
 
-export function getRecordStateTone(state: WorkspaceRecordState): StatusTone {
+export function getArtifactStateTone(state: ArtifactState): StatusTone {
 	switch (state) {
-		case WorkspaceRecordState.Available:
+		case ArtifactStateValue.Available:
 			return 'success';
-		case WorkspaceRecordState.Missing:
+		case ArtifactStateValue.Missing:
 			return 'warning';
-		case WorkspaceRecordState.Invalid:
-		case WorkspaceRecordState.Incompatible:
+		case ArtifactStateValue.Invalid:
+		case ArtifactStateValue.Incompatible:
 			return 'error';
 		default:
 			return 'neutral';
@@ -330,48 +353,46 @@ export function getRecordStateTone(state: WorkspaceRecordState): StatusTone {
 
 export function getOccurrenceStateTone(occurrence: WorkspaceOccurrenceView): StatusTone {
 	switch (occurrence.state) {
-		case WorkspaceOccurrenceState.Valid:
+		case ArtifactOccurrenceStateValue.Valid:
 			return 'success';
-		case WorkspaceOccurrenceState.Missing:
+		case ArtifactOccurrenceStateValue.Missing:
 			return 'warning';
-		case WorkspaceOccurrenceState.Invalid:
+		case ArtifactOccurrenceStateValue.Invalid:
 			return 'error';
 		default:
 			return 'neutral';
 	}
 }
 
-export function getDiagnosticTone(diagnostic: WorkspaceDiagnostic): StatusTone {
+export function getDiagnosticTone(diagnostic: ArtifactDiagnostic): StatusTone {
 	switch (diagnostic.severity) {
-		case WorkspaceDiagnosticSeverity.Error:
+		case ArtifactDiagnosticSeverity.Error:
 			return 'error';
-		case WorkspaceDiagnosticSeverity.Warning:
+		case ArtifactDiagnosticSeverity.Warning:
 			return 'warning';
-		case WorkspaceDiagnosticSeverity.Info:
+		case ArtifactDiagnosticSeverity.Info:
 			return 'info';
 		default:
 			return 'neutral';
 	}
 }
 
-export function getArtifactKindLabel(kind: WorkspaceArtifactKind): string {
+export function getArtifactKindLabel(kind: ArtifactKind): string {
 	switch (kind) {
-		case WorkspaceArtifactKind.Context:
+		case WORKSPACE_CONTEXT_ARTIFACT_KIND:
 			return 'Context';
-		case WorkspaceArtifactKind.Skill:
+		case WORKSPACE_SKILL_ARTIFACT_KIND:
 			return 'Skill';
-		case WorkspaceArtifactKind.Definition:
-			return 'Workspace definition';
 		default:
 			return kind;
 	}
 }
 
-export function collectWorkspaceDiagnostics(data: WorkspaceCatalogData): WorkspaceDiagnostic[] {
-	const diagnostics: WorkspaceDiagnostic[] = [];
+export function collectWorkspaceDiagnostics(data: WorkspaceCatalogData): ArtifactDiagnostic[] {
+	const diagnostics: ArtifactDiagnostic[] = [];
 	const seen = new Set<string>();
 
-	const add = (items?: WorkspaceDiagnostic[]) => {
+	const add = (items?: ArtifactDiagnostic[]) => {
 		for (const diagnostic of items ?? []) {
 			const key = [
 				diagnostic.severity,
@@ -394,11 +415,11 @@ export function collectWorkspaceDiagnostics(data: WorkspaceCatalogData): Workspa
 
 	for (const resource of data.catalog.resources) {
 		add(resource.diagnostics);
-		add(resource.record.diagnostics);
+		add(resource.artifact.diagnostics);
 	}
 
-	for (const record of data.catalog.unresolvedRecords) {
-		add(record.diagnostics);
+	for (const artifact of data.catalog.unresolvedArtifacts) {
+		add(artifact.diagnostics);
 	}
 
 	for (const occurrence of data.catalog.occurrences) {
@@ -416,19 +437,23 @@ export function collectWorkspaceDiagnostics(data: WorkspaceCatalogData): Workspa
 	return diagnostics;
 }
 
-export function workspaceRecordMatchesSearch(record: WorkspaceRecordView, rawQuery: string): boolean {
+export function workspaceArtifactMatchesSearch(artifact: WorkspaceArtifactView, rawQuery: string): boolean {
 	const query = rawQuery.trim().toLowerCase();
 	if (!query) {
 		return true;
 	}
 
 	return [
-		record.name,
-		record.kind,
-		record.state,
-		record.locator,
-		record.subresourceLocator,
-		...(record.diagnostics ?? []).flatMap(diagnostic => [diagnostic.code, diagnostic.message]),
+		artifact.name,
+		artifact.kind,
+		artifact.state,
+		artifact.locator,
+		artifact.sourceID,
+		artifact.subresourceLocator,
+		artifact.adoption,
+		artifact.resolvedDefinition,
+		artifact.artifact.artifactID,
+		...(artifact.diagnostics ?? []).flatMap(diagnostic => [diagnostic.code, diagnostic.message]),
 	]
 		.filter(Boolean)
 		.join('\n')

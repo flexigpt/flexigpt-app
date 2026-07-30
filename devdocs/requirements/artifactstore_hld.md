@@ -23,10 +23,13 @@ It is authoritative for:
 - The current implementation status.
 - The ordered work needed to satisfy the requirements.
 
-The current implementation is a useful stepping stone. It is not an alternate
-architecture or a compatibility constraint.
+The delivered core is the current platform boundary, not a temporary parallel model. This document separates behavior that exists now from portable transfer and broader domain work that is still planned.
 
 ## 2. Feature intent
+
+Artifact Store makes an Artifact the durable item a person can enable, inspect,
+select, or use. Roots, Sources, Collections, discovery, and catalogs exist to
+give that item a safe place, a current meaning, and explainable provenance.
 
 FlexiGPT manages Skills, Context, Tools, MCP declarations, model definitions,
 agents, assistants, conversations, and future artifact kinds from local,
@@ -307,9 +310,10 @@ It may contain:
 - Portable body data.
 - Portable dependency selectors.
 
-An Artifact Definition may also declare a portable content closure containing
-relative assets or package members. The closure describes portable content,
-not Source configuration or a native runtime path.
+The current Definition envelope carries a portable body and dependency
+selectors. It does not yet carry a generic content closure. Relative assets,
+package members, and their integrity metadata are transfer work, not current
+Artifact Store data.
 
 A single definition may originate from one file, one subresource in an array,
 or a multi-file package.
@@ -586,97 +590,86 @@ A valid self-contained archive may use a layout such as:
 The exact manifest name and member layout are domain-format decisions. Generic
 package code enforces containment, limits, integrity, and deterministic output.
 
-## 9. Generic API direction
+## 9. Product and API boundary
 
-Root and Source operations include:
+The public split is intentional. Artifact Store is the shared system of
+record; feature APIs add only feature meaning. A person should not need to
+know how content is stored to work with it.
 
-    CreateRoot
-    CreateSource
-    UpdateSource
-    RetireSource
-    PurgeSource
-    ListSourceKinds
+### 9.1 Artifact API
 
-Collection operations include:
+The Artifact API is the entry point for Root and Source administration:
 
-    CreateCollection
-    UpdateCollection
-    RetireCollection
-    AttachCollectionSource
-    RefreshCollection
-    GetCollectionCatalog
+- Create, inspect, list, update, retire, and purge Roots.
+- Create, inspect, list, update, retire, and purge Sources.
+- List available Source kinds.
+- Read a managed Source's current generation and publish or remove one whole
+  managed package.
+- Destructively purge an Artifact only when a caller has already applied any
+  feature-specific membership rule.
 
-Artifact operations include:
+Source configuration is accepted on create or replacement but is never returned
+to a client. The current Artifact API deliberately does not expose raw
+Collection editing, generic refresh, adoption, or pinning endpoints. Those
+operations need the policy of the feature that owns the Collection.
 
-    AdoptOccurrence
-    PinSourceBinding
-    SuppressSourceBinding
-    GetArtifact
-    ListCollectionArtifacts
-    SetArtifactEnabled
-    UpdateArtifactData
-    UnadoptArtifact
-    PurgeArtifact
+### 9.2 Feature APIs
 
-Planned transfer operations include:
+Feature APIs, beginning with Workspace, turn generic storage into user-facing
+workflows. They own the meaning of a Collection, attachments, discovery
+choices, automatic adoption, and safe Artifact actions. This keeps an
+Artifact central without allowing a caller to bypass the feature that
+establishes its membership and meaning.
 
-    ImportArtifact
-    ExportArtifact
-    ImportCollection
-    ExportCollection
-    CapturePortableClosure
+### 9.3 Client guidance
 
-`MoveArtifact` is a deferred capability. Until it exists, the service returns
-`ErrUnsupported` and callers use add or import followed by unadoption or deletion.
-
-Consumer APIs wrap these operations with typed feature semantics.
+- Treat an Artifact reference as the durable selection. Do not persist a
+  source path, a catalog position, a digest, or a runtime handle as a
+  substitute for it.
+- Treat a catalog occurrence as an observation. It can be valid and visible
+  before it has a local Artifact, and an Artifact can later become missing,
+  invalid, or incompatible without losing its identity or local settings.
+- Send the revision returned by a previous read for every change that asks for
+  one. A conflict means the client must reload the affected Root, Source,
+  Workspace, or Artifact and let the user retry.
+- Use a feature API for an Artifact that belongs to that feature. The generic
+  purge operation is intentionally not a substitute for feature-level
+  ownership checks.
 
 ## 10. Current implementation status
 
-| Capability                                  | Status                | Current implementation                                                                                                                                                                                                                                             |
-| ------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Safe Source adapters and snapshots          | Present               | Filesystem and embedded adapters provide bounded, source-relative access.                                                                                                                                                                                          |
-| Decoder registry and multi-output discovery | Present               | Recognition, ambiguity handling, diagnostics, and subresources are implemented.                                                                                                                                                                                    |
-| Canonical definitions and digest repository | Present               | Canonical JSON, SHA-256 identity, integrity checks, and filesystem storage exist.                                                                                                                                                                                  |
-| Coherent publication                        | Present               | SQLite atomically publishes Collection catalogs, reconciled Artifact updates, and new Artifacts.                                                                                                                                                                   |
-| Stable local Artifact metadata              | Present               | Root-scoped `ArtifactRef`, Collection membership, source bindings, and local data are persisted.                                                                                                                                                                   |
-| Consumer adoption policy                    | Present               | Consumer policy controls automatic adoption; explicit adopt, pin, suppress, and unadopt exist.                                                                                                                                                                     |
-| Technical namespace Root                    | Present               | Roots are technical namespaces containing Sources and Collections.                                                                                                                                                                                                 |
-| Root-scoped Source containment              | Present               | Sources are Root-owned and may be attached to many same-Root Collections.                                                                                                                                                                                          |
-| Collection aggregate                        | Present               | Typed Collections, attachments, lifecycle, and optimistic revisions are persisted.                                                                                                                                                                                 |
-| Collection catalog and occurrence           | Present               | Catalogs and occurrences are Collection-scoped.                                                                                                                                                                                                                    |
-| Artifact refs and addresses                 | Present               | `ArtifactRef` and `ArtifactAddress` are implemented.                                                                                                                                                                                                               |
-| Pinning and suppression                     | Present               | Typed source bindings support pinning, suppression, and source-derived reconciliation.                                                                                                                                                                             |
-| Future movement-compatible identity         | Present               | Artifact identity is independent of Collection identity; move remains explicitly unsupported.                                                                                                                                                                      |
-| Managed writable Source                     | Present               | Managed Sources stage complete native packages, write payload files through MapStore, and publish by atomic directory rename.                                                                                                                                      |
-| Managed Source catalog invalidation         | Present               | A managed mutation records its acknowledged snapshot generation privately and advances Source revision when that generation changes.                                                                                                                               |
-| Managed Source optimistic API contract      | Present               | Public managed package mutation requires expected Source revision and expected generation where removal is requested.                                                                                                                                              |
-| Managed Source generation inspection        | Present               | A dedicated API returns the current confirmed generation and Source revision without exposing Source configuration or private acknowledgement metadata.                                                                                                            |
-| Managed Source recovery                     | Present               | New managed Sources persist an initial generation baseline. Legacy empty baselines and interrupted metadata acknowledgement are repaired before another mutation can continue.                                                                                     |
-| Retirement relationship invariants          | Present               | A Source may retire after all active Collection attachments are gone; retired attachment history remains until Collection purge.                                                                                                                                   |
-| Portable Collection Definition              | Present foundation    | A canonical generic envelope and safe relative locator resolver exist; persistence and transfer remain pending.                                                                                                                                                    |
-| Multi-output source documents               | Present               | One decoder candidate can emit multiple subresource occurrences.                                                                                                                                                                                                   |
-| Multi-file portable content closure         | Not present           | Definitions do not enumerate package assets or export closure.                                                                                                                                                                                                     |
-| Collection and Artifact import/export       | Not present           | No transfer, package assembly, URI resolver, or native exporter contract exists.                                                                                                                                                                                   |
-| Ordered schema migrations                   | Present               | SQLite uses an ordered migration ledger with immutable migration fingerprints and rejects unknown future migrations.                                                                                                                                               |
-| Shared application composition              | Present for Workspace | Application startup opens one Artifact Store and injects it into Workspace; legacy Skill Store persistence remains intentionally separate.                                                                                                                         |
-| Trusted local-path handoff                  | Present               | Filesystem Sources optionally implement `LocalPathResolver`.                                                                                                                                                                                                       |
-| MapStore-backed content files               | Present and hardened  | Root-scoped immutable definitions and application-managed package payload files use bounded MapDirectoryStore and MapFileStore layouts, reject escaping partition paths, and create private `0600` files.                                                          |
-| Public Root and Source lifecycle API        | Present               | Root retirement and purge plus Source create, read, list, update, retire, purge, kind discovery, and managed-generation inspection are exposed without returning config. Source metadata updates preserve hidden configuration when replacement config is omitted. |
-| Workspace runtime invalidation integration  | Present               | App composition schedules derived Workspace Skill reconciliation after Source, managed-package, and generic Artifact mutations.                                                                                                                                    |
-| Database relationship invariants            | Present               | SQLite triggers reject enabled attachments without enabled Sources and reject new records, suppressions, or occurrences without attachments.                                                                                                                       |
-| Core persistence verification               | Present               | Migration ledgers reject non-prefix histories; tests cover SQLite migration validation, managed package revision and generation advancement, and attached Workspace suppression reconciliation.                                                                    |
-| Legacy filesystem definition repository     | Removed               | `definition/maprepo` is the sole active definition repository implementation.                                                                                                                                                                                      |
+| Capability                              | Status                | Current implementation                                                                                                                                                        |
+| --------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root and Source lifecycle               | Present               | Roots are technical namespaces. Sources are Root-owned, can be attached to multiple same-Root Collections, and support revision-checked lifecycle changes.                    |
+| Public Artifact API boundary            | Present and scoped    | The public API manages Roots, Sources, Source kinds, managed package publication, and direct Artifact purge. It intentionally does not expose raw generic Collection editing. |
+| Source adapters and snapshots           | Present               | Filesystem, embedded, managed, and additional adapters can provide bounded source-relative discovery access.                                                                  |
+| Collections and attachments             | Present               | Collections, attachment roles, enablement, local data, retirement, and optimistic revisions are durable platform capabilities used by feature services.                       |
+| Discovery, catalog, and reconciliation  | Present               | Refresh publishes one Collection-scoped catalog, preserves valid, invalid, and missing observations, and reconciles source-derived Artifact state.                            |
+| Canonical definitions                   | Present               | Immutable definitions use canonical JSON and digest identity, are Root-reachable, and are revalidated on read.                                                                |
+| Artifact lifecycle                      | Present               | Stable Artifact references, observed adoption, pinning, suppression, local enablement, local data, unadoption, and purge are implemented for feature consumers.               |
+| Managed package authoring               | Present               | Managed Sources publish complete staged packages, use source generations as optimistic tokens, and advance Source revision after visible content changes.                     |
+| Catalog currentness and conflicts       | Present               | Publication checks Collection, attachment, Source, catalog, plan, decoder, and snapshot inputs. Consumers can identify stale metadata and require refresh.                    |
+| Persistence and relationship invariants | Present               | SQLite migrations are ordered and fingerprinted. Database and service checks preserve active Root, Source, Collection, attachment, and Artifact relationships.                |
+| Source privacy and local paths          | Present               | Public Source responses omit configuration. Trusted native paths remain an internal capability for adapters that explicitly support them.                                     |
+| Feature integration                     | Present for Workspace | Workspace consumes injected Artifact Store capabilities. The legacy standalone Skill Store remains a separate owner until its dedicated migration.                            |
+| Portable Collection Definition          | Foundation only       | A canonical portable Collection envelope and safe portable reference validation exist, but there is no persisted transfer workflow or generic domain registry yet.            |
+| Portable content closure                | Not present           | Definitions do not yet enumerate the assets, package members, or integrity closure required for portable export.                                                              |
+| Artifact and Collection transfer        | Planned               | Import, export, archive assembly, acquisition, provenance capture, and native domain exporters are not implemented.                                                           |
+| Direct Artifact movement                | Deferred              | Artifact identity is independent of Collection identity, but moving an Artifact between Collections remains unsupported.                                                      |
+| Historical catalogs and materialization | Optional              | Historical publication retention, dependency snapshots, and generic materialization remain future extensions.                                                                 |
 
-## 11. Next steps
+## 11. Current boundary and remaining work
 
-### 11.0 Current core completion boundary
+### 11.0 Delivered core boundary
 
-The current core scope is Root, Source, Collection, attachment, discovery,
-catalog, Artifact, MapStore-backed managed-package, and consumer integration
-behavior. Root, Source, Collection, attachment, catalog, Artifact, and
-managed-package mutations use optimistic revisions. Managed Source content
-changes advance Source revision so existing catalog snapshots become stale.
+The delivered core covers Root, Source, Collection, attachment, discovery,
+catalog publication, durable Artifacts, canonical definitions, and managed
+package publication. Revision-checked mutations ensure that a changed Source
+or Collection makes an older catalog currentness claim invalid.
+
+The public Artifact API intentionally owns shared Root and Source management.
+Collections and Artifact actions are used through feature APIs when their
+meaning depends on feature policy, membership, or local settings.
 
 An application-managed Source also records the last snapshot generation
 acknowledged by metadata. This internal value is not exported through
@@ -765,19 +758,28 @@ remaining work items for the current Artifact Store boundary.
 - Inject Collection-oriented services into Workspace and Skill consumers.
 - Keep store lifecycle ownership in the application.
 
-### 11.8 Deliberate future transfer work
+### 11.8 Remaining priorities
 
-- Implement Artifact import and export using the portable contracts defined
-  before persistence work.
-- Implement Collection import and export with deterministic package closure.
-- Add filesystem and HTTP acquisition resolvers with explicit policy.
-- Keep direct movement, historical catalogs, dependency snapshots,
-  provenance history, and generic materialization deferred until committed
-  workflows require them.
+Portable transfer is the next platform-level capability. It must build on the
+existing local lifecycle rather than introduce another persistence model.
+
+- Define domain-owned native import and export contracts for Collections and
+  Artifacts.
+- Add portable content-closure enumeration and deterministic package assembly.
+- Add explicit, policy-controlled local and remote acquisition rather than
+  allowing discovery to fetch arbitrary URIs.
+- Keep public mutations feature-aware when Collection meaning matters.
+- Treat direct movement as a separate product decision, not an implied side
+  effect of export or import.
+- Defer historical catalogs, dependency snapshots, and generic materialization
+  until a committed workflow needs them.
 
 ## 12. Acceptance outcomes
 
-Artifact Store satisfies this document when:
+The following is the full target acceptance list. The local lifecycle,
+discovery, catalog, and Artifact outcomes are delivered now. Statements that
+require portable closure, import/export, or relative and remote transfer remain
+future acceptance criteria.
 
 - Root is only a technical namespace.
 - Collections own attachments, catalogs, and Artifacts.

@@ -1,297 +1,496 @@
+// oxlint-disable typescript/no-misused-spread
 import type {
-	AttachWorkspaceSourcePayload,
-	CreateEmptyWorkspacePayload,
-	CreateFilesystemWorkspacePayload,
-	DeleteWorkspaceResult,
-	UpdateWorkspaceAttachmentPayload,
-	UpdateWorkspacePayload,
+	ArtifactDefinitionSelector,
+	ArtifactDefinitionView,
+	ArtifactRef,
+	ArtifactSourceBinding,
+	ArtifactSourceID,
+} from '@/spec/artifact';
+import type {
+	AdoptWorkspaceOccurrenceBody,
+	AttachWorkspaceSourceBody,
+	CreateEmptyWorkspaceBody,
+	CreateFilesystemWorkspaceBody,
+	PinWorkspaceArtifactBody,
+	ReplaceWorkspacePrimarySourceBody,
+	ResolveWorkspaceResourceResult,
+	RetireWorkspaceResult,
+	SetWorkspaceArtifactEnabledBody,
+	SetWorkspaceArtifactRuntimeDisabledBody,
+	SetWorkspacePrimarySourceBody,
+	SuppressWorkspaceBindingBody,
+	UnadoptWorkspaceArtifactResult,
+	UnsuppressWorkspaceBindingResult,
+	UpdateWorkspaceAttachmentBody,
+	UpdateWorkspaceBody,
+	WorkspaceArtifactView,
 	WorkspaceCatalogView,
 	WorkspaceContextInspectionView,
 	WorkspaceContextLoadPlan,
 	WorkspaceContextView,
-	WorkspaceRecordID,
-	WorkspaceRecordView,
+	WorkspaceLoadPlanView,
+	WorkspaceRef,
 	WorkspaceRefreshResult,
-	WorkspaceRootID,
 	WorkspaceSkillLoadView,
 	WorkspaceSkillView,
-	WorkspaceSourceID,
+	WorkspaceSuppressionView,
 	WorkspaceView,
 } from '@/spec/workspace';
 
 import type { IWorkspaceAPI } from '@/apis/interface';
+import { rawJSONFromWails, requireWailsBody, toFrontendDate } from '@/apis/wailsapi/transport';
 import {
+	AdoptWorkspaceOccurrence,
 	AttachWorkspaceSource,
 	ComposeWorkspaceContext,
+	ComposeWorkspaceLoadPlan,
 	CreateEmptyWorkspace,
 	CreateFilesystemWorkspace,
-	DeleteWorkspace,
-	DeleteWorkspaceRecord,
 	DetachWorkspaceSource,
 	GetWorkspace,
+	GetWorkspaceArtifact,
 	GetWorkspaceCatalog,
-	GetWorkspaceRecord,
+	ListWorkspaceArtifacts,
 	ListWorkspaceContexts,
 	ListWorkspaces,
 	ListWorkspaceSkills,
+	ListWorkspaceSuppressions,
 	LoadWorkspaceContexts,
 	LoadWorkspaceSkills,
+	PinWorkspaceArtifact,
+	PurgeWorkspace,
+	PurgeWorkspaceArtifact,
 	RefreshWorkspace,
-	SetWorkspaceRecordEnabled,
-	SetWorkspaceRecordRuntimeDisabled,
+	ReplaceWorkspacePrimarySource,
+	ResolveWorkspaceResource,
+	RetireWorkspace,
+	SetWorkspaceArtifactEnabled,
+	SetWorkspaceArtifactRuntimeDisabled,
+	SetWorkspacePrimarySource,
+	SuppressWorkspaceBinding,
+	UnadoptWorkspaceArtifact,
+	UnsuppressWorkspaceBinding,
 	UpdateWorkspace,
 	UpdateWorkspaceAttachment,
 } from '@/apis/wailsjs/go/main/WorkspaceWrapper';
-import type { workspace as workspaceModel } from '@/apis/wailsjs/go/models';
+import type { workspace as wailsWorkspace } from '@/apis/wailsjs/go/models';
 
-function requireResponseBody<T>(body: T | null | undefined, operation: string): T {
-	if (body === null || body === undefined) {
-		throw new Error(`${operation} returned an empty response body`);
-	}
-	return body;
+function artifactDefinitionFromWails(
+	definition: wailsWorkspace.WorkspaceDefinitionView,
+	operation: string
+): ArtifactDefinitionView {
+	return {
+		...definition,
+		body: rawJSONFromWails(definition.body, `${operation}.definition.body`),
+	} as ArtifactDefinitionView;
 }
 
-/**
- * Flattened Workspace transport bridge.
- *
- * The public frontend API intentionally does not expose Go request/response
- * `Body` wrappers, internal source configuration, or raw Workspace data.
- */
+function workspaceLoadPlanFromWails(plan: wailsWorkspace.WorkspaceLoadPlanView): WorkspaceLoadPlanView {
+	return {
+		...plan,
+		items: plan.items.map(item => ({
+			...item,
+			definition: artifactDefinitionFromWails(item.definition, 'ComposeWorkspaceLoadPlan'),
+		})),
+	} as WorkspaceLoadPlanView;
+}
+
+function resolvedWorkspaceResourceFromWails(
+	result: wailsWorkspace.ResolveWorkspaceResourceResponseBody
+): ResolveWorkspaceResourceResult {
+	return {
+		...result,
+		definition: artifactDefinitionFromWails(result.definition, 'ResolveWorkspaceResource'),
+	} as ResolveWorkspaceResourceResult;
+}
+
+function workspaceSuppressionFromWails(suppression: wailsWorkspace.WorkspaceSuppressionView): WorkspaceSuppressionView {
+	return {
+		...suppression,
+		createdAt: toFrontendDate(suppression.createdAt, 'workspaceSuppression.createdAt'),
+		modifiedAt: toFrontendDate(suppression.modifiedAt, 'workspaceSuppression.modifiedAt'),
+	} as WorkspaceSuppressionView;
+}
+
+function workspaceSkillFromWails(skill: wailsWorkspace.WorkspaceSkillView): WorkspaceSkillView {
+	return {
+		...skill,
+		skill: {
+			...skill.skill,
+			createdAt: toFrontendDate(skill.skill.createdAt, 'workspaceSkill.skill.createdAt'),
+			modifiedAt: toFrontendDate(skill.skill.modifiedAt, 'workspaceSkill.skill.modifiedAt'),
+		},
+	} as WorkspaceSkillView;
+}
+
+function workspaceSkillLoadFromWails(load: wailsWorkspace.WorkspaceSkillLoadView): WorkspaceSkillLoadView {
+	return {
+		...load,
+		skills: load.skills.map(workspaceSkillFromWails),
+	} as WorkspaceSkillLoadView;
+}
+
 export class WailsWorkspaceAPI implements IWorkspaceAPI {
-	async createFilesystemWorkspace(payload: CreateFilesystemWorkspacePayload): Promise<WorkspaceView> {
-		const request = {
-			Body: payload as workspaceModel.CreateFilesystemWorkspaceRequestBody,
-		} as workspaceModel.CreateFilesystemWorkspaceRequest;
+	async createFilesystemWorkspace(rootID: string, body: CreateFilesystemWorkspaceBody): Promise<WorkspaceView> {
+		const response = await CreateFilesystemWorkspace({
+			rootID,
+			Body: body,
+		} as Parameters<typeof CreateFilesystemWorkspace>[0]);
 
-		const response = await CreateFilesystemWorkspace(request);
-		return requireResponseBody(response.Body, 'CreateFilesystemWorkspace') as WorkspaceView;
+		return requireWailsBody(response.Body, 'CreateFilesystemWorkspace') as WorkspaceView;
 	}
 
-	async createEmptyWorkspace(payload: CreateEmptyWorkspacePayload): Promise<WorkspaceView> {
-		const request = {
-			Body: payload as workspaceModel.CreateEmptyWorkspaceRequestBody,
-		} as workspaceModel.CreateEmptyWorkspaceRequest;
+	async createEmptyWorkspace(rootID: string, body: CreateEmptyWorkspaceBody): Promise<WorkspaceView> {
+		const response = await CreateEmptyWorkspace({
+			rootID,
+			Body: body,
+		} as Parameters<typeof CreateEmptyWorkspace>[0]);
 
-		const response = await CreateEmptyWorkspace(request);
-		return requireResponseBody(response.Body, 'CreateEmptyWorkspace') as WorkspaceView;
+		return requireWailsBody(response.Body, 'CreateEmptyWorkspace') as WorkspaceView;
 	}
 
-	async getWorkspace(rootID: WorkspaceRootID): Promise<WorkspaceView> {
+	async getWorkspace(workspace: WorkspaceRef): Promise<WorkspaceView> {
 		const response = await GetWorkspace({
-			RootID: rootID,
-		} as workspaceModel.GetWorkspaceRequest);
+			workspace,
+		} as Parameters<typeof GetWorkspace>[0]);
 
-		return requireResponseBody(response.Body, 'GetWorkspace') as WorkspaceView;
+		return requireWailsBody(response.Body, 'GetWorkspace') as WorkspaceView;
 	}
 
-	async listWorkspaces(): Promise<WorkspaceView[]> {
-		const response = await ListWorkspaces({} as workspaceModel.ListWorkspacesRequest);
-		const body = requireResponseBody(response.Body, 'ListWorkspaces');
+	async listWorkspaces(rootID: string): Promise<WorkspaceView[]> {
+		const response = await ListWorkspaces({
+			rootID,
+		} as Parameters<typeof ListWorkspaces>[0]);
 
-		return body.workspaces as WorkspaceView[];
+		const body = requireWailsBody(response.Body, 'ListWorkspaces');
+		return (body.workspaces ?? []) as WorkspaceView[];
 	}
 
-	async updateWorkspace(rootID: WorkspaceRootID, payload: UpdateWorkspacePayload): Promise<WorkspaceView> {
-		const request = {
-			RootID: rootID,
-			Body: payload as workspaceModel.UpdateWorkspaceRequestBody,
-		} as workspaceModel.UpdateWorkspaceRequest;
+	async updateWorkspace(workspace: WorkspaceRef, body: UpdateWorkspaceBody): Promise<WorkspaceView> {
+		const response = await UpdateWorkspace({
+			workspace,
+			Body: body,
+		} as Parameters<typeof UpdateWorkspace>[0]);
 
-		const response = await UpdateWorkspace(request);
-		return requireResponseBody(response.Body, 'UpdateWorkspace') as WorkspaceView;
+		return requireWailsBody(response.Body, 'UpdateWorkspace') as WorkspaceView;
 	}
 
-	async deleteWorkspace(rootID: WorkspaceRootID, expectedRevision: number): Promise<DeleteWorkspaceResult> {
-		const response = await DeleteWorkspace({
-			RootID: rootID,
-			ExpectedRevision: expectedRevision,
-		} as workspaceModel.DeleteWorkspaceRequest);
-
-		return requireResponseBody(response.Body, 'DeleteWorkspace') as DeleteWorkspaceResult;
-	}
-
-	async attachWorkspaceSource(
-		rootID: WorkspaceRootID,
-		sourceID: WorkspaceSourceID,
-		payload: AttachWorkspaceSourcePayload
+	async replaceWorkspacePrimarySource(
+		workspace: WorkspaceRef,
+		body: ReplaceWorkspacePrimarySourceBody
 	): Promise<WorkspaceView> {
-		const request = {
-			RootID: rootID,
-			Body: {
-				sourceID,
-				...payload,
-			} as workspaceModel.AttachWorkspaceSourceRequestBody,
-		} as workspaceModel.AttachWorkspaceSourceRequest;
+		const response = await ReplaceWorkspacePrimarySource({
+			workspace,
+			Body: body,
+		} as Parameters<typeof ReplaceWorkspacePrimarySource>[0]);
 
-		const response = await AttachWorkspaceSource(request);
-		return requireResponseBody(response.Body, 'AttachWorkspaceSource') as WorkspaceView;
+		return requireWailsBody(response.Body, 'ReplaceWorkspacePrimarySource') as WorkspaceView;
+	}
+
+	async setWorkspacePrimarySource(
+		workspace: WorkspaceRef,
+		body: SetWorkspacePrimarySourceBody
+	): Promise<WorkspaceView> {
+		const response = await SetWorkspacePrimarySource({
+			workspace,
+			Body: body,
+		} as Parameters<typeof SetWorkspacePrimarySource>[0]);
+
+		return requireWailsBody(response.Body, 'SetWorkspacePrimarySource') as WorkspaceView;
+	}
+
+	async retireWorkspace(workspace: WorkspaceRef, expectedRevision: number): Promise<RetireWorkspaceResult> {
+		const response = await RetireWorkspace({
+			workspace,
+			expectedRevision,
+		} as Parameters<typeof RetireWorkspace>[0]);
+
+		const body = requireWailsBody(response.Body, 'RetireWorkspace');
+
+		return {
+			workspace: body.workspace,
+			revision: body.revision,
+		};
+	}
+
+	async purgeWorkspace(workspace: WorkspaceRef, expectedRevision: number): Promise<WorkspaceRef> {
+		const response = await PurgeWorkspace({
+			workspace,
+			expectedRevision,
+		} as Parameters<typeof PurgeWorkspace>[0]);
+
+		const body = requireWailsBody(response.Body, 'PurgeWorkspace');
+		return body.workspace as WorkspaceRef;
+	}
+
+	async attachWorkspaceSource(workspace: WorkspaceRef, body: AttachWorkspaceSourceBody): Promise<WorkspaceView> {
+		const response = await AttachWorkspaceSource({
+			workspace,
+			Body: body,
+		} as Parameters<typeof AttachWorkspaceSource>[0]);
+
+		return requireWailsBody(response.Body, 'AttachWorkspaceSource') as WorkspaceView;
 	}
 
 	async updateWorkspaceAttachment(
-		rootID: WorkspaceRootID,
-		sourceID: WorkspaceSourceID,
-		payload: UpdateWorkspaceAttachmentPayload
+		workspace: WorkspaceRef,
+		sourceID: ArtifactSourceID,
+		body: UpdateWorkspaceAttachmentBody
 	): Promise<WorkspaceView> {
-		const request = {
-			RootID: rootID,
-			SourceID: sourceID,
-			Body: payload as workspaceModel.UpdateWorkspaceAttachmentRequestBody,
-		} as workspaceModel.UpdateWorkspaceAttachmentRequest;
+		const response = await UpdateWorkspaceAttachment({
+			workspace,
+			sourceID,
+			Body: body,
+		} as Parameters<typeof UpdateWorkspaceAttachment>[0]);
 
-		const response = await UpdateWorkspaceAttachment(request);
-		return requireResponseBody(response.Body, 'UpdateWorkspaceAttachment') as WorkspaceView;
+		return requireWailsBody(response.Body, 'UpdateWorkspaceAttachment') as WorkspaceView;
 	}
 
 	async detachWorkspaceSource(
-		rootID: WorkspaceRootID,
-		sourceID: WorkspaceSourceID,
-		expectedRootRevision: number,
+		workspace: WorkspaceRef,
+		sourceID: ArtifactSourceID,
+		expectedCollectionRevision: number,
 		expectedAttachmentRevision: number
 	): Promise<WorkspaceView> {
 		const response = await DetachWorkspaceSource({
-			RootID: rootID,
-			SourceID: sourceID,
-			ExpectedRootRevision: expectedRootRevision,
-			ExpectedAttachmentRevision: expectedAttachmentRevision,
-		} as workspaceModel.DetachWorkspaceSourceRequest);
+			workspace,
+			sourceID,
+			expectedCollectionRevision,
+			expectedAttachmentRevision,
+		} as Parameters<typeof DetachWorkspaceSource>[0]);
 
-		return requireResponseBody(response.Body, 'DetachWorkspaceSource') as WorkspaceView;
+		return requireWailsBody(response.Body, 'DetachWorkspaceSource') as WorkspaceView;
 	}
 
-	async refreshWorkspace(rootID: WorkspaceRootID): Promise<WorkspaceRefreshResult> {
+	async refreshWorkspace(workspace: WorkspaceRef): Promise<WorkspaceRefreshResult> {
 		const response = await RefreshWorkspace({
-			RootID: rootID,
-		} as workspaceModel.RefreshWorkspaceRequest);
+			workspace,
+		} as Parameters<typeof RefreshWorkspace>[0]);
 
-		return requireResponseBody(response.Body, 'RefreshWorkspace') as WorkspaceRefreshResult;
+		return requireWailsBody(response.Body, 'RefreshWorkspace') as WorkspaceRefreshResult;
 	}
 
-	async getWorkspaceCatalog(rootID: WorkspaceRootID): Promise<WorkspaceCatalogView> {
+	async getWorkspaceCatalog(workspace: WorkspaceRef): Promise<WorkspaceCatalogView> {
 		const response = await GetWorkspaceCatalog({
-			RootID: rootID,
-		} as workspaceModel.GetWorkspaceCatalogRequest);
+			workspace,
+		} as Parameters<typeof GetWorkspaceCatalog>[0]);
 
-		return requireResponseBody(response.Body, 'GetWorkspaceCatalog') as WorkspaceCatalogView;
+		return requireWailsBody(response.Body, 'GetWorkspaceCatalog') as WorkspaceCatalogView;
 	}
 
-	async getWorkspaceRecord(rootID: WorkspaceRootID, recordID: WorkspaceRecordID): Promise<WorkspaceRecordView> {
-		const response = await GetWorkspaceRecord({
-			RootID: rootID,
-			RecordID: recordID,
-		} as workspaceModel.GetWorkspaceRecordRequest);
+	async composeWorkspaceLoadPlan(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceLoadPlanView> {
+		const response = await ComposeWorkspaceLoadPlan({
+			workspace,
+			Body: { artifacts },
+		} as Parameters<typeof ComposeWorkspaceLoadPlan>[0]);
 
-		return requireResponseBody(response.Body, 'GetWorkspaceRecord') as WorkspaceRecordView;
+		const body = requireWailsBody(response.Body, 'ComposeWorkspaceLoadPlan');
+		return workspaceLoadPlanFromWails(body);
 	}
 
-	async listWorkspaceContexts(rootID: WorkspaceRootID): Promise<WorkspaceContextView[]> {
+	async resolveWorkspaceResource(
+		workspace: WorkspaceRef,
+		artifact?: ArtifactRef,
+		selector?: ArtifactDefinitionSelector
+	): Promise<ResolveWorkspaceResourceResult> {
+		if ((artifact === undefined) === (selector === undefined)) {
+			throw new Error('Provide exactly one of artifact or selector.');
+		}
+
+		const response = await ResolveWorkspaceResource({
+			workspace,
+			Body: { artifact, selector },
+		} as Parameters<typeof ResolveWorkspaceResource>[0]);
+
+		const body = requireWailsBody(response.Body, 'ResolveWorkspaceResource');
+		return resolvedWorkspaceResourceFromWails(body);
+	}
+
+	async getWorkspaceArtifact(workspace: WorkspaceRef, artifact: ArtifactRef): Promise<WorkspaceArtifactView> {
+		const response = await GetWorkspaceArtifact({
+			workspace,
+			artifact,
+		} as Parameters<typeof GetWorkspaceArtifact>[0]);
+
+		return requireWailsBody(response.Body, 'GetWorkspaceArtifact') as WorkspaceArtifactView;
+	}
+
+	async listWorkspaceArtifacts(workspace: WorkspaceRef): Promise<WorkspaceArtifactView[]> {
+		const response = await ListWorkspaceArtifacts({
+			workspace,
+		} as Parameters<typeof ListWorkspaceArtifacts>[0]);
+
+		const body = requireWailsBody(response.Body, 'ListWorkspaceArtifacts');
+		return (body.artifacts ?? []) as WorkspaceArtifactView[];
+	}
+
+	async adoptWorkspaceOccurrence(
+		workspace: WorkspaceRef,
+		body: AdoptWorkspaceOccurrenceBody
+	): Promise<WorkspaceArtifactView> {
+		const response = await AdoptWorkspaceOccurrence({
+			workspace,
+			Body: body,
+		} as Parameters<typeof AdoptWorkspaceOccurrence>[0]);
+
+		return requireWailsBody(response.Body, 'AdoptWorkspaceOccurrence') as WorkspaceArtifactView;
+	}
+
+	async pinWorkspaceArtifact(workspace: WorkspaceRef, body: PinWorkspaceArtifactBody): Promise<WorkspaceArtifactView> {
+		const response = await PinWorkspaceArtifact({
+			workspace,
+			Body: body,
+		} as Parameters<typeof PinWorkspaceArtifact>[0]);
+
+		return requireWailsBody(response.Body, 'PinWorkspaceArtifact') as WorkspaceArtifactView;
+	}
+
+	async listWorkspaceSuppressions(workspace: WorkspaceRef): Promise<WorkspaceSuppressionView[]> {
+		const response = await ListWorkspaceSuppressions({
+			workspace,
+		} as Parameters<typeof ListWorkspaceSuppressions>[0]);
+
+		const body = requireWailsBody(response.Body, 'ListWorkspaceSuppressions');
+		return (body.suppressions ?? []).map(b => {
+			return workspaceSuppressionFromWails(b);
+		});
+	}
+
+	async suppressWorkspaceBinding(
+		workspace: WorkspaceRef,
+		body: SuppressWorkspaceBindingBody
+	): Promise<WorkspaceSuppressionView> {
+		const response = await SuppressWorkspaceBinding({
+			workspace,
+			Body: body,
+		} as Parameters<typeof SuppressWorkspaceBinding>[0]);
+
+		return workspaceSuppressionFromWails(requireWailsBody(response.Body, 'SuppressWorkspaceBinding'));
+	}
+
+	async unsuppressWorkspaceBinding(
+		workspace: WorkspaceRef,
+		binding: ArtifactSourceBinding,
+		expectedRevision: number
+	): Promise<UnsuppressWorkspaceBindingResult> {
+		const response = await UnsuppressWorkspaceBinding({
+			workspace,
+			binding,
+			expectedRevision,
+		} as Parameters<typeof UnsuppressWorkspaceBinding>[0]);
+
+		return requireWailsBody(response.Body, 'UnsuppressWorkspaceBinding');
+	}
+
+	async listWorkspaceContexts(workspace: WorkspaceRef): Promise<WorkspaceContextView[]> {
 		const response = await ListWorkspaceContexts({
-			RootID: rootID,
-		} as workspaceModel.ListWorkspaceContextsRequest);
-		const body = requireResponseBody(response.Body, 'ListWorkspaceContexts');
+			workspace,
+		} as Parameters<typeof ListWorkspaceContexts>[0]);
 
-		return body.contexts as WorkspaceContextView[];
+		const body = requireWailsBody(response.Body, 'ListWorkspaceContexts');
+		return (body.contexts ?? []) as WorkspaceContextView[];
 	}
 
 	async loadWorkspaceContexts(
-		rootID: WorkspaceRootID,
-		recordIDs?: WorkspaceRecordID[]
+		workspace: WorkspaceRef,
+		artifacts?: ArtifactRef[]
 	): Promise<WorkspaceContextInspectionView> {
-		const request = {
-			RootID: rootID,
-			Body: {
-				recordIDs,
-			} as workspaceModel.LoadWorkspaceContextsRequestBody,
-		} as workspaceModel.LoadWorkspaceContextsRequest;
+		const response = await LoadWorkspaceContexts({
+			workspace,
+			Body: { artifacts },
+		} as Parameters<typeof LoadWorkspaceContexts>[0]);
 
-		const response = await LoadWorkspaceContexts(request);
-		return requireResponseBody(response.Body, 'LoadWorkspaceContexts') as WorkspaceContextInspectionView;
+		return requireWailsBody(response.Body, 'LoadWorkspaceContexts') as WorkspaceContextInspectionView;
 	}
 
-	async composeWorkspaceContext(
-		rootID: WorkspaceRootID,
-		recordIDs?: WorkspaceRecordID[]
-	): Promise<WorkspaceContextLoadPlan> {
-		const request = {
-			RootID: rootID,
-			Body: {
-				recordIDs,
-			} as workspaceModel.ComposeWorkspaceContextRequestBody,
-		} as workspaceModel.ComposeWorkspaceContextRequest;
+	async composeWorkspaceContext(workspace: WorkspaceRef, artifacts?: ArtifactRef[]): Promise<WorkspaceContextLoadPlan> {
+		const response = await ComposeWorkspaceContext({
+			workspace,
+			Body: { artifacts },
+		} as Parameters<typeof ComposeWorkspaceContext>[0]);
 
-		const response = await ComposeWorkspaceContext(request);
-		return requireResponseBody(response.Body, 'ComposeWorkspaceContext') as WorkspaceContextLoadPlan;
+		return requireWailsBody(response.Body, 'ComposeWorkspaceContext') as WorkspaceContextLoadPlan;
 	}
 
-	async listWorkspaceSkills(rootID: WorkspaceRootID): Promise<WorkspaceSkillView[]> {
+	async listWorkspaceSkills(workspace: WorkspaceRef): Promise<WorkspaceSkillView[]> {
 		const response = await ListWorkspaceSkills({
-			RootID: rootID,
-		} as workspaceModel.ListWorkspaceSkillsRequest);
-		const body = requireResponseBody(response.Body, 'ListWorkspaceSkills');
+			workspace,
+		} as Parameters<typeof ListWorkspaceSkills>[0]);
 
-		return body.skills as WorkspaceSkillView[];
+		const body = requireWailsBody(response.Body, 'ListWorkspaceSkills');
+		return (body.skills ?? []).map(s => {
+			return workspaceSkillFromWails(s);
+		});
 	}
 
-	async loadWorkspaceSkills(rootID: WorkspaceRootID, recordIDs: WorkspaceRecordID[]): Promise<WorkspaceSkillLoadView> {
-		const request = {
-			RootID: rootID,
-			Body: {
-				recordIDs,
-			} as workspaceModel.LoadWorkspaceSkillsRequestBody,
-		} as workspaceModel.LoadWorkspaceSkillsRequest;
+	async loadWorkspaceSkills(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceSkillLoadView> {
+		const response = await LoadWorkspaceSkills({
+			workspace,
+			Body: { artifacts },
+		} as Parameters<typeof LoadWorkspaceSkills>[0]);
 
-		const response = await LoadWorkspaceSkills(request);
-		return requireResponseBody(response.Body, 'LoadWorkspaceSkills') as WorkspaceSkillLoadView;
+		const body = requireWailsBody(response.Body, 'LoadWorkspaceSkills');
+		return workspaceSkillLoadFromWails(body);
 	}
 
-	async setWorkspaceRecordEnabled(
-		rootID: WorkspaceRootID,
-		recordID: WorkspaceRecordID,
+	async setWorkspaceArtifactEnabled(
+		workspace: WorkspaceRef,
+		artifact: ArtifactRef,
+		body: SetWorkspaceArtifactEnabledBody
+	): Promise<WorkspaceArtifactView> {
+		const response = await SetWorkspaceArtifactEnabled({
+			workspace,
+			artifact,
+			Body: body,
+		} as Parameters<typeof SetWorkspaceArtifactEnabled>[0]);
+
+		return requireWailsBody(response.Body, 'SetWorkspaceArtifactEnabled') as WorkspaceArtifactView;
+	}
+
+	async unadoptWorkspaceArtifact(
+		workspace: WorkspaceRef,
+		artifact: ArtifactRef,
 		expectedRevision: number,
-		enabled: boolean
-	): Promise<WorkspaceRecordView> {
-		const request = {
-			RootID: rootID,
-			RecordID: recordID,
-			Body: {
-				expectedRevision,
-				enabled,
-			} as workspaceModel.SetWorkspaceRecordEnabledRequestBody,
-		} as workspaceModel.SetWorkspaceRecordEnabledRequest;
+		suppress: boolean
+	): Promise<UnadoptWorkspaceArtifactResult> {
+		const response = await UnadoptWorkspaceArtifact({
+			workspace,
+			artifact,
+			expectedRevision,
+			suppress,
+		} as Parameters<typeof UnadoptWorkspaceArtifact>[0]);
 
-		const response = await SetWorkspaceRecordEnabled(request);
-		return requireResponseBody(response.Body, 'SetWorkspaceRecordEnabled') as WorkspaceRecordView;
+		const body = requireWailsBody(response.Body, 'UnadoptWorkspaceArtifact');
+		return {
+			artifact: body.artifact,
+		};
 	}
 
-	async deleteWorkspaceRecord(
-		rootID: WorkspaceRootID,
-		recordID: WorkspaceRecordID,
+	async purgeWorkspaceArtifact(
+		workspace: WorkspaceRef,
+		artifact: ArtifactRef,
 		expectedRevision: number
-	): Promise<void> {
-		const response = await DeleteWorkspaceRecord({
-			RootID: rootID,
-			RecordID: recordID,
-			ExpectedRevision: expectedRevision,
-		} as workspaceModel.DeleteWorkspaceRecordRequest);
+	): Promise<ArtifactRef> {
+		const response = await PurgeWorkspaceArtifact({
+			workspace,
+			artifact,
+			expectedRevision,
+		} as Parameters<typeof PurgeWorkspaceArtifact>[0]);
 
-		requireResponseBody(response.Body, 'DeleteWorkspaceRecord');
+		return requireWailsBody(response.Body, 'PurgeWorkspaceArtifact').artifact;
 	}
 
-	async setWorkspaceRecordRuntimeDisabled(
-		rootID: WorkspaceRootID,
-		recordID: WorkspaceRecordID,
-		expectedRevision: number,
-		runtimeDisabled: boolean
-	): Promise<WorkspaceRecordView> {
-		const request = {
-			RootID: rootID,
-			RecordID: recordID,
-			Body: {
-				expectedRevision,
-				runtimeDisabled,
-			} as workspaceModel.SetWorkspaceRecordRuntimeDisabledRequestBody,
-		} as workspaceModel.SetWorkspaceRecordRuntimeDisabledRequest;
+	async setWorkspaceArtifactRuntimeDisabled(
+		workspace: WorkspaceRef,
+		artifact: ArtifactRef,
+		body: SetWorkspaceArtifactRuntimeDisabledBody
+	): Promise<WorkspaceArtifactView> {
+		const response = await SetWorkspaceArtifactRuntimeDisabled({
+			workspace,
+			artifact,
+			Body: body,
+		} as Parameters<typeof SetWorkspaceArtifactRuntimeDisabled>[0]);
 
-		const response = await SetWorkspaceRecordRuntimeDisabled(request);
-		return requireResponseBody(response.Body, 'SetWorkspaceRecordRuntimeDisabled') as WorkspaceRecordView;
+		return requireWailsBody(response.Body, 'SetWorkspaceArtifactRuntimeDisabled') as WorkspaceArtifactView;
 	}
 }

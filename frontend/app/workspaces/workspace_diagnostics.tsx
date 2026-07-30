@@ -1,4 +1,4 @@
-import type { WorkspaceDiagnostic } from '@/spec/workspace';
+import type { ArtifactDiagnostic } from '@/spec/artifact';
 
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
@@ -6,11 +6,11 @@ import { StatusBadge } from '@/components/managementui/status_badge';
 import { getDiagnosticTone } from '@/workspaces/lib/workspace_utils';
 
 interface WorkspaceDiagnosticsProps {
-	diagnostics?: WorkspaceDiagnostic[];
+	diagnostics?: ArtifactDiagnostic[];
 	emptyMessage?: string;
 }
 
-function getLocationLabel(diagnostic: WorkspaceDiagnostic): string | undefined {
+function getLocationLabel(diagnostic: ArtifactDiagnostic): string | undefined {
 	const location = diagnostic.location;
 	if (!location) {
 		return undefined;

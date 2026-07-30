@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiFolderPlus, FiSearch, FiX } from 'react-icons/fi';
 
-import type { UpdateWorkspacePayload, WorkspaceView } from '@/spec/workspace';
+import type { UpdateWorkspaceBody, WorkspaceView } from '@/spec/workspace';
 import { WorkspaceMode } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
@@ -20,13 +20,19 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import { ModalConfirmDialog } from '@/components/modal/modal_confirm_dialog';
 import { PageFrame } from '@/components/page_frame';
 
+import {
+	createEmptyWorkspaceCollection,
+	createFilesystemWorkspaceCollection,
+	listAllWorkspaces,
+	workspaceRefKey,
+} from '@/workspaces/lib/workspace_api_utils';
 import { getErrorMessage, sortWorkspaces, workspaceMatchesSearch } from '@/workspaces/lib/workspace_utils';
 import { WorkspaceCard } from '@/workspaces/workspace_card';
 import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
 import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
 
 async function loadWorkspaces(signal: AbortSignal): Promise<WorkspaceView[]> {
-	const workspaces = await workspaceAPI.listWorkspaces();
+	const workspaces = await listAllWorkspaces();
 	throwIfAborted(signal);
 	return sortWorkspaces(workspaces);
 }
@@ -70,10 +76,11 @@ export default function WorkspacesPage() {
 
 	const replaceWorkspace = useCallback(
 		(nextWorkspace: WorkspaceView) => {
+			const nextKey = workspaceRefKey(nextWorkspace.workspace);
 			setWorkspaces(previous =>
 				sortWorkspaces(
-					previous.some(workspace => workspace.rootID === nextWorkspace.rootID)
-						? previous.map(workspace => (workspace.rootID === nextWorkspace.rootID ? nextWorkspace : workspace))
+					previous.some(workspace => workspaceRefKey(workspace.workspace) === nextKey)
+						? previous.map(workspace => (workspaceRefKey(workspace.workspace) === nextKey ? nextWorkspace : workspace))
 						: [...previous, nextWorkspace]
 				)
 			);
@@ -82,17 +89,25 @@ export default function WorkspacesPage() {
 	);
 
 	const createWorkspace = async (submission: WorkspaceSetupSubmission) => {
-		if (submission.kind !== 'filesystem') {
-			throw new Error('Expected a new workspace payload.');
-		}
-
-		const created = await workspaceAPI.createFilesystemWorkspace(submission.payload);
+		const preferredRootID = workspaces[0]?.workspace.rootID;
+		const created =
+			submission.kind === 'filesystem'
+				? await createFilesystemWorkspaceCollection(submission.payload, preferredRootID)
+				: submission.kind === 'empty'
+					? await createEmptyWorkspaceCollection(submission.payload, preferredRootID)
+					: (() => {
+							throw new Error('Expected a new Workspace payload.');
+						})();
 
 		replaceWorkspace(created);
 
+		if (submission.kind === 'empty') {
+			return;
+		}
+
 		try {
-			await workspaceAPI.refreshWorkspace(created.rootID);
-			const refreshed = await workspaceAPI.getWorkspace(created.rootID);
+			await workspaceAPI.refreshWorkspace(created.workspace);
+			const refreshed = await workspaceAPI.getWorkspace(created.workspace);
 			replaceWorkspace(refreshed);
 		} catch (error) {
 			setAlertMessage(
@@ -105,8 +120,8 @@ export default function WorkspacesPage() {
 	};
 
 	const updateWorkspace = useCallback(
-		async (workspace: WorkspaceView, payload: UpdateWorkspacePayload): Promise<WorkspaceView> => {
-			const updated = await workspaceAPI.updateWorkspace(workspace.rootID, payload);
+		async (workspace: WorkspaceView, payload: UpdateWorkspaceBody): Promise<WorkspaceView> => {
+			const updated = await workspaceAPI.updateWorkspace(workspace.workspace, payload);
 			replaceWorkspace(updated);
 			return updated;
 		},
@@ -118,10 +133,13 @@ export default function WorkspacesPage() {
 			return;
 		}
 
-		await workspaceAPI.deleteWorkspace(workspaceToDelete.rootID, workspaceToDelete.revision);
+		const deletingRef = workspaceToDelete.workspace;
+		const retired = await workspaceAPI.retireWorkspace(deletingRef, workspaceToDelete.revision);
+		await workspaceAPI.purgeWorkspace(retired.workspace, retired.revision);
 
 		if (mountedRef.current) {
-			setWorkspaces(previous => previous.filter(workspace => workspace.rootID !== workspaceToDelete.rootID));
+			const deletingKey = workspaceRefKey(deletingRef);
+			setWorkspaces(previous => previous.filter(workspace => workspaceRefKey(workspace.workspace) !== deletingKey));
 		}
 	};
 
@@ -134,7 +152,7 @@ export default function WorkspacesPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="Workspaces"
-					description="Manage project roots, discovery paths, context, skills, sources, and runtime permissions."
+					description="Manage Workspace Collections, attached Sources, discovered Artifacts, Context, Skills, and runtime permissions."
 					width="wide"
 					actions={
 						<button
@@ -163,9 +181,13 @@ export default function WorkspacesPage() {
 					<div className="border-base-content/10 bg-base-100 rounded-2xl border p-4 text-sm">
 						<div className="font-semibold">How workspace discovery works</div>
 						<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5 text-xs">
-							<li>Add a project root path when creating a filesystem workspace.</li>
+							<li>
+								Create a filesystem Workspace from a project root, or create an empty Workspace Collection and attach
+								Sources later.
+							</li>
 							<li>AGENTS.md, CLAUDE.md, optional README.md, and .skills folders are discovered automatically.</li>
-							<li>Add project-specific Context files or Skill folders from Edit Workspace, then refresh.</li>
+							<li>Add project-specific Context files or Skill folders from Edit Workspace, then refresh discovery.</li>
+							<li>Manage library, package, overlay, and primary Source attachments from each Workspace.</li>
 						</ul>
 					</div>
 
@@ -223,7 +245,7 @@ export default function WorkspacesPage() {
 					<div className="pb-8">
 						{visibleWorkspaces.map(workspace => (
 							<WorkspaceCard
-								key={workspace.rootID}
+								key={workspaceRefKey(workspace.workspace)}
 								workspace={workspace}
 								existingDisplayNames={existingDisplayNames.filter(
 									name => name.toLowerCase() !== workspace.displayName.toLowerCase()
@@ -236,7 +258,7 @@ export default function WorkspacesPage() {
 
 						{workspaces.length === 0 ? (
 							<ManagementEmptyState className="mt-4">
-								No workspaces configured. Add a project root to get started.
+								No Workspaces configured. Add a project root or create an empty Workspace Collection to get started.
 							</ManagementEmptyState>
 						) : null}
 

@@ -1,29 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { ArtifactRef } from '@/spec/artifact';
+import { ArtifactState } from '@/spec/artifact';
 import type { ProvidedSkill, SkillRef } from '@/spec/skill';
 import { SkillSessionSyncMode } from '@/spec/skill';
 import type {
-	CreateFilesystemWorkspacePayload,
+	CreateFilesystemWorkspaceBody,
 	WorkspaceContextView,
 	WorkspaceConversationResourceSelectionRef,
 	WorkspaceConversationSelection,
 	WorkspaceConversationSkillSelectionRef,
+	WorkspaceRef,
 	WorkspaceSkillView,
 	WorkspaceView,
 } from '@/spec/workspace';
-import { WorkspaceRecordState, WorkspaceSkillInsert } from '@/spec/workspace';
+import { WorkspaceSkillInsert } from '@/spec/workspace';
 
 import { workspaceAPI } from '@/apis/baseapi';
 
 import type { LoadedWorkspaceSelectionCatalog } from '@/chats/composer/workspaces/workspace_selection_loader';
 import { loadWorkspaceSelectionCatalog } from '@/chats/composer/workspaces/workspace_selection_loader';
+import { normalizeSkillRefs, skillRefKey } from '@/skills/lib/skill_identity_utils';
 import {
-	createWorkspaceSkillRef,
-	getWorkspaceSkillRefParts,
-	isWorkspaceSkillRef,
-	normalizeSkillRef,
-	skillRefKey,
-} from '@/skills/lib/skill_identity_utils';
+	artifactRefKey,
+	createFilesystemWorkspaceCollection,
+	listAllWorkspaces,
+	workspaceRefKey,
+	workspaceRefsEqual,
+} from '@/workspaces/lib/workspace_api_utils';
 import { sortWorkspaces } from '@/workspaces/lib/workspace_utils';
 
 interface SkillSelectionApplyOptions {
@@ -32,12 +36,12 @@ interface SkillSelectionApplyOptions {
 }
 
 interface UseComposerWorkspaceArgs {
-	applySkillSelectionState: (
-		enabled: SkillRef[],
-		active: SkillRef[],
+	applyWorkspaceSkillSelectionState: (
+		workspace: WorkspaceRef | undefined,
+		workspaceEnabled: SkillRef[],
+		workspaceActive: SkillRef[],
 		options?: SkillSelectionApplyOptions
 	) => Promise<void>;
-	getCurrentEnabledSkillRefs: () => SkillRef[];
 	getCurrentActiveSkillRefs: () => SkillRef[];
 }
 
@@ -58,7 +62,7 @@ export interface ComposerWorkspaceController {
 	selectedSkillIDs: Set<string>;
 	missingContextRefs: WorkspaceConversationResourceSelectionRef[];
 	missingSkillRefs: WorkspaceConversationSkillSelectionRef[];
-	workspaceSkillProvidersByRecordID: ReadonlyMap<string, ProvidedSkill>;
+	workspaceSkillProvidersByArtifactKey: ReadonlyMap<string, ProvidedSkill>;
 	changedCount: number;
 	attentionCount: number;
 	refreshWorkspaces: () => Promise<void>;
@@ -68,17 +72,17 @@ export interface ComposerWorkspaceController {
 	updateSelectionFromCurrentContents: () => Promise<void>;
 	toggleContext: (context: WorkspaceContextView, selected: boolean) => void;
 	toggleSkill: (skill: WorkspaceSkillView, selected: boolean) => Promise<void>;
-	removeContextRef: (recordID: string) => void;
-	removeSkillRef: (recordID: string) => Promise<void>;
+	removeContextRef: (artifact: ArtifactRef) => void;
+	removeSkillRef: (artifact: ArtifactRef) => Promise<void>;
 	refreshSelectedWorkspace: () => Promise<void>;
-	createFilesystemWorkspace: (payload: CreateFilesystemWorkspacePayload) => Promise<void>;
+	createFilesystemWorkspace: (payload: CreateFilesystemWorkspaceBody) => Promise<void>;
 	getSelectionSnapshot: () => WorkspaceConversationSelection | undefined;
 }
 
 function contextIsEligible(context: WorkspaceContextView): boolean {
 	return (
 		context.enabled &&
-		context.state === WorkspaceRecordState.Available &&
+		context.state === ArtifactState.Available &&
 		context.catalogCurrent &&
 		context.projectionValid &&
 		!context.runtimeDisabled
@@ -87,12 +91,7 @@ function contextIsEligible(context: WorkspaceContextView): boolean {
 
 function skillProviderAllowsConversation(provider?: ProvidedSkill): boolean {
 	return Boolean(
-		provider &&
-		provider.enabled &&
-		provider.available &&
-		provider.runtimeAllowed &&
-		provider.catalogCurrent &&
-		!provider.shadowed
+		provider && provider.enabled && provider.available && provider.runtimeAllowed && provider.catalogCurrent
 	);
 }
 
@@ -100,7 +99,7 @@ export function isWorkspaceSkillSessionEligible(skill: WorkspaceSkillView, provi
 	return (
 		skill.skill.insert === WorkspaceSkillInsert.Instructions &&
 		skill.skill.isEnabled &&
-		skill.state === WorkspaceRecordState.Available &&
+		skill.state === ArtifactState.Available &&
 		skill.projectionValid &&
 		skill.catalogCurrent &&
 		!skill.runtimeDisabled &&
@@ -108,73 +107,97 @@ export function isWorkspaceSkillSessionEligible(skill: WorkspaceSkillView, provi
 	);
 }
 
-function getWorkspaceSkillProvidersByRecordID(providedSkills: ProvidedSkill[]): Map<string, ProvidedSkill> {
-	return new Map(
-		providedSkills
-			.filter(skill => skill.workspaceRecordID)
-			.map(skill => [skill.workspaceRecordID as string, skill] as const)
-	);
+function getWorkspaceSkillProvidersByArtifactKey(
+	providedSkills: ProvidedSkill[],
+	workspaceSkills: WorkspaceSkillView[]
+): Map<string, ProvidedSkill> {
+	const providersByArtifact = new Map<string, ProvidedSkill>();
+	const usedProviderKeys = new Set<string>();
+
+	for (const skill of workspaceSkills) {
+		const provider = providedSkills.find(candidate => {
+			const providerKey = skillRefKey(candidate.ref);
+			if (usedProviderKeys.has(providerKey) || !workspaceRefsEqual(candidate.workspace, skill.workspace)) {
+				return false;
+			}
+
+			if (candidate.ref.skillID === skill.artifact.artifactID || candidate.ref.skillID === skill.skill.id) {
+				return true;
+			}
+
+			if (
+				candidate.definitionDigest &&
+				candidate.definitionDigest === skill.definitionDigest &&
+				candidate.sourceID === skill.sourceID &&
+				candidate.locator === skill.locator
+			) {
+				return true;
+			}
+
+			return candidate.sourceID === skill.sourceID && candidate.locator === skill.locator;
+		});
+
+		if (!provider) {
+			continue;
+		}
+
+		usedProviderKeys.add(skillRefKey(provider.ref));
+		providersByArtifact.set(artifactRefKey(skill.artifact), provider);
+	}
+
+	return providersByArtifact;
 }
 
 function resolveWorkspaceSessionSkillRefs(
 	selection: WorkspaceConversationSelection | undefined,
 	workspaceSkills: WorkspaceSkillView[],
-	workspaceSkillProvidersByRecordID: ReadonlyMap<string, ProvidedSkill>
+	workspaceSkillProvidersByArtifactKey: ReadonlyMap<string, ProvidedSkill>
 ): SkillRef[] {
 	if (!selection) {
 		return [];
 	}
 
-	const skillsByRecordID = new Map(
-		workspaceSkills.filter(skill => skill.rootID === selection.rootID).map(skill => [skill.recordID, skill] as const)
+	const skillsByArtifactKey = new Map(
+		workspaceSkills
+			.filter(skill => workspaceRefsEqual(skill.workspace, selection.workspace))
+			.map(skill => [artifactRefKey(skill.artifact), skill] as const)
 	);
 	const refs: SkillRef[] = [];
 
 	for (const selectionRef of selection.skillRefs ?? []) {
-		const skill = skillsByRecordID.get(selectionRef.recordID);
-		const provider = workspaceSkillProvidersByRecordID.get(selectionRef.recordID);
+		const key = artifactRefKey(selectionRef.artifact);
+		const skill = skillsByArtifactKey.get(key);
+		const provider = workspaceSkillProvidersByArtifactKey.get(key);
 
 		if (!skill || !isWorkspaceSkillSessionEligible(skill, provider)) {
 			continue;
 		}
-
-		const normalized = normalizeSkillRef({ identity: selectionRef.identity });
-		const parts = normalized ? getWorkspaceSkillRefParts(normalized) : undefined;
-
-		if (!normalized || !parts || parts.rootID !== selection.rootID || parts.recordID !== selectionRef.recordID) {
-			continue;
+		if (provider) {
+			refs.push(provider.ref);
 		}
-
-		refs.push(normalized);
 	}
 
-	return refs;
+	return normalizeSkillRefs(refs);
 }
 
 function contextSelectionRef(context: WorkspaceContextView): WorkspaceConversationResourceSelectionRef {
 	return {
-		recordID: context.recordID,
+		artifact: { ...context.artifact },
 		name: context.name,
 		locator: context.locator,
 		definitionDigest: context.definitionDigest,
-		recordRevision: context.recordRevision,
+		artifactRevision: context.recordRevision,
 	};
 }
 
 function skillSelectionRef(skill: WorkspaceSkillView): WorkspaceConversationSkillSelectionRef {
-	const ref = createWorkspaceSkillRef(skill.rootID, skill.recordID);
-	if (!ref) {
-		throw new Error('Workspace Skill has an invalid root or record identity.');
-	}
-
 	return {
-		recordID: skill.recordID,
-		identity: ref.identity,
+		artifact: { ...skill.artifact },
 		name: skill.skill.name,
 		displayName: skill.skill.displayName,
 		locator: skill.locator,
 		definitionDigest: skill.definitionDigest,
-		recordRevision: skill.recordRevision,
+		artifactRevision: skill.recordRevision,
 		insert: skill.skill.insert,
 	};
 }
@@ -187,10 +210,9 @@ function cloneSelection(
 	}
 	return {
 		...selection,
-		// oxlint-disable-next-line oxc/no-map-spread
-		contextRefs: (selection.contextRefs ?? []).map(ref => ({ ...ref })),
-		// oxlint-disable-next-line oxc/no-map-spread
-		skillRefs: (selection.skillRefs ?? []).map(ref => ({ ...ref })),
+		workspace: { ...selection.workspace },
+		contextRefs: (selection.contextRefs ?? []).map(ref => Object.assign(ref, { artifact: { ...ref.artifact } })),
+		skillRefs: (selection.skillRefs ?? []).map(ref => Object.assign(ref, { artifact: { ...ref.artifact } })),
 	};
 }
 
@@ -206,14 +228,15 @@ function workspaceListsHaveSameRevision(previous: readonly WorkspaceView[], next
 	return previous.every((workspace, index) => {
 		const candidate = next[index];
 		return (
-			candidate !== undefined && candidate.rootID === workspace.rootID && candidate.revision === workspace.revision
+			candidate !== undefined &&
+			workspaceRefsEqual(candidate.workspace, workspace.workspace) &&
+			candidate.revision === workspace.revision
 		);
 	});
 }
 
 export function useComposerWorkspace({
-	applySkillSelectionState,
-	getCurrentEnabledSkillRefs,
+	applyWorkspaceSkillSelectionState,
 	getCurrentActiveSkillRefs,
 }: UseComposerWorkspaceArgs): ComposerWorkspaceController {
 	const [workspaces, setWorkspaces] = useState<WorkspaceView[]>([]);
@@ -248,16 +271,16 @@ export function useComposerWorkspace({
 		setSelectionState(cloned);
 	}, []);
 
-	const workspaceSkillProvidersByRecordID = useMemo(
-		() => getWorkspaceSkillProvidersByRecordID(providedSkills),
-		[providedSkills]
+	const workspaceSkillProvidersByArtifactKey = useMemo(
+		() => getWorkspaceSkillProvidersByArtifactKey(providedSkills, skills),
+		[providedSkills, skills]
 	);
 
 	const refreshWorkspaces = useCallback(async () => {
 		setWorkspacesLoading(true);
 		setWorkspacesLoadError(null);
 		try {
-			const loaded = await workspaceAPI.listWorkspaces();
+			const loaded = await listAllWorkspaces();
 			const next = sortWorkspaces([...loaded]);
 			if (mountedRef.current) {
 				setWorkspaces(previous => {
@@ -280,47 +303,32 @@ export function useComposerWorkspace({
 		void refreshWorkspaces();
 	}, [refreshWorkspaces]);
 
-	const replaceWorkspaceSkillRefs = useCallback(
+	const applyResolvedWorkspaceSkillRefs = useCallback(
 		async (
 			nextSelection: WorkspaceConversationSelection | undefined,
 			syncSession: SkillSelectionApplyOptions['syncSession'],
 			loadedCatalog?: Pick<LoadedWorkspaceSelectionCatalog, 'skills' | 'providedSkills'>,
 			forceResetSession = false
 		) => {
-			const installedEnabled = getCurrentEnabledSkillRefs().filter(ref => !isWorkspaceSkillRef(ref));
-			const installedActive = getCurrentActiveSkillRefs().filter(ref => !isWorkspaceSkillRef(ref));
-
 			const workspaceSkills = loadedCatalog?.skills ?? skills;
-			const providersByRecordID = loadedCatalog
-				? getWorkspaceSkillProvidersByRecordID(loadedCatalog.providedSkills)
-				: workspaceSkillProvidersByRecordID;
-			const workspaceEnabled = resolveWorkspaceSessionSkillRefs(nextSelection, workspaceSkills, providersByRecordID);
+			const providersByArtifactKey = loadedCatalog
+				? getWorkspaceSkillProvidersByArtifactKey(loadedCatalog.providedSkills, loadedCatalog.skills)
+				: workspaceSkillProvidersByArtifactKey;
+			const workspaceEnabled = resolveWorkspaceSessionSkillRefs(nextSelection, workspaceSkills, providersByArtifactKey);
 
 			const selectedKeys = new Set(
-				workspaceEnabled.map(r => {
-					return skillRefKey(r);
+				workspaceEnabled.map(k => {
+					return skillRefKey(k);
 				})
 			);
-			const retainedWorkspaceActive = getCurrentActiveSkillRefs().filter(
-				ref => isWorkspaceSkillRef(ref) && selectedKeys.has(skillRefKey(ref))
-			);
+			const retainedWorkspaceActive = getCurrentActiveSkillRefs().filter(ref => selectedKeys.has(skillRefKey(ref)));
 
-			await applySkillSelectionState(
-				[...installedEnabled, ...workspaceEnabled],
-				[...installedActive, ...retainedWorkspaceActive],
-				{
-					syncSession,
-					forceResetSession,
-				}
-			);
+			await applyWorkspaceSkillSelectionState(nextSelection?.workspace, workspaceEnabled, retainedWorkspaceActive, {
+				syncSession,
+				forceResetSession,
+			});
 		},
-		[
-			applySkillSelectionState,
-			getCurrentActiveSkillRefs,
-			getCurrentEnabledSkillRefs,
-			skills,
-			workspaceSkillProvidersByRecordID,
-		]
+		[applyWorkspaceSkillSelectionState, getCurrentActiveSkillRefs, skills, workspaceSkillProvidersByArtifactKey]
 	);
 
 	const loadSelection = useCallback(
@@ -343,7 +351,7 @@ export function useComposerWorkspace({
 			setSelectionError(null);
 
 			try {
-				const loaded = await loadWorkspaceSelectionCatalog(nextSelection.rootID);
+				const loaded = await loadWorkspaceSelectionCatalog(nextSelection.workspace);
 				if (!mountedRef.current || loadVersionRef.current !== version) {
 					return;
 				}
@@ -355,7 +363,12 @@ export function useComposerWorkspace({
 				setCatalogKnown(loaded.catalogKnown);
 				setCatalogRevision(loaded.catalogRevision ?? nextSelection.catalogRevision);
 
-				await replaceWorkspaceSkillRefs(nextSelection, syncSession, loaded, forceResetSession);
+				await applyResolvedWorkspaceSkillRefs(
+					loaded.workspace ? nextSelection : undefined,
+					syncSession,
+					loaded,
+					forceResetSession
+				);
 				if (!mountedRef.current || loadVersionRef.current !== version) {
 					return;
 				}
@@ -368,7 +381,7 @@ export function useComposerWorkspace({
 
 				// Do not leave Workspace refs from a failed selection in the
 				// current Skill Runtime state.
-				await replaceWorkspaceSkillRefs(undefined, syncSession, undefined, forceResetSession);
+				await applyResolvedWorkspaceSkillRefs(undefined, syncSession, undefined, forceResetSession);
 				if (!mountedRef.current || loadVersionRef.current !== version) {
 					return;
 				}
@@ -380,7 +393,7 @@ export function useComposerWorkspace({
 				}
 			}
 		},
-		[replaceSelection, replaceWorkspaceSkillRefs]
+		[applyResolvedWorkspaceSkillRefs, replaceSelection]
 	);
 
 	const attachWorkspace = useCallback(
@@ -391,7 +404,7 @@ export function useComposerWorkspace({
 			setSelectionError(null);
 
 			try {
-				const loaded = await loadWorkspaceSelectionCatalog(nextWorkspace.rootID);
+				const loaded = await loadWorkspaceSelectionCatalog(nextWorkspace.workspace);
 				if (!mountedRef.current || loadVersionRef.current !== version) {
 					return;
 				}
@@ -399,14 +412,10 @@ export function useComposerWorkspace({
 					throw new Error(loaded.errors.join(' ') || 'The selected Workspace is unavailable.');
 				}
 
-				const providersByRecordID = new Map(
-					loaded.providedSkills
-						.filter(skill => skill.workspaceRecordID)
-						.map(skill => [skill.workspaceRecordID as string, skill] as const)
-				);
+				const providersByArtifactKey = getWorkspaceSkillProvidersByArtifactKey(loaded.providedSkills, loaded.skills);
 
 				const nextSelection: WorkspaceConversationSelection = {
-					rootID: loaded.workspace.rootID,
+					workspace: { ...loaded.workspace.workspace },
 					displayName: loaded.workspace.displayName,
 					workspaceRevision: loaded.workspace.revision,
 					catalogRevision: loaded.catalogRevision,
@@ -419,7 +428,7 @@ export function useComposerWorkspace({
 						}),
 					skillRefs: loaded.skills
 						.filter(r => {
-							return isWorkspaceSkillSessionEligible(r, providersByRecordID.get(r.recordID));
+							return isWorkspaceSkillSessionEligible(r, providersByArtifactKey.get(artifactRefKey(r.artifact)));
 						})
 						.map(r => {
 							return skillSelectionRef(r);
@@ -433,7 +442,7 @@ export function useComposerWorkspace({
 				setProvidedSkills(loaded.providedSkills);
 				setCatalogKnown(loaded.catalogKnown);
 				setCatalogRevision(loaded.catalogRevision);
-				await replaceWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.EnsureIfEnabled, loaded);
+				await applyResolvedWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.EnsureIfEnabled, loaded);
 				if (!mountedRef.current || loadVersionRef.current !== version) {
 					return;
 				}
@@ -449,7 +458,7 @@ export function useComposerWorkspace({
 				}
 			}
 		},
-		[replaceSelection, replaceWorkspaceSkillRefs]
+		[applyResolvedWorkspaceSkillRefs, replaceSelection]
 	);
 
 	const restoreSelection = useCallback(
@@ -469,7 +478,7 @@ export function useComposerWorkspace({
 				setSelectionLoading(false);
 				setSelectionError(null);
 
-				await replaceWorkspaceSkillRefs(
+				await applyResolvedWorkspaceSkillRefs(
 					undefined,
 					syncSkills ? SkillSessionSyncMode.IfSessionExists : SkillSessionSyncMode.None
 				);
@@ -478,7 +487,7 @@ export function useComposerWorkspace({
 
 			await loadSelection(nextSelection, syncSkills ? SkillSessionSyncMode.EnsureIfEnabled : SkillSessionSyncMode.None);
 		},
-		[loadSelection, replaceSelection, replaceWorkspaceSkillRefs]
+		[applyResolvedWorkspaceSkillRefs, loadSelection, replaceSelection]
 	);
 
 	const detachWorkspace = useCallback(
@@ -493,12 +502,12 @@ export function useComposerWorkspace({
 			setCatalogRevision(undefined);
 			setSelectionError(null);
 			setSelectionLoading(false);
-			await replaceWorkspaceSkillRefs(
+			await applyResolvedWorkspaceSkillRefs(
 				undefined,
 				syncSkills ? SkillSessionSyncMode.IfSessionExists : SkillSessionSyncMode.None
 			);
 		},
-		[replaceSelection, replaceWorkspaceSkillRefs]
+		[applyResolvedWorkspaceSkillRefs, replaceSelection]
 	);
 
 	const updateSelectionFromCurrentContents = useCallback(async () => {
@@ -508,7 +517,7 @@ export function useComposerWorkspace({
 
 		const current = selectionRef.current;
 		const nextSelection: WorkspaceConversationSelection = {
-			rootID: workspace.rootID,
+			workspace: { ...workspace.workspace },
 			displayName: workspace.displayName,
 			workspaceRevision: workspace.revision,
 			catalogRevision: catalogRevision ?? current?.catalogRevision,
@@ -521,7 +530,10 @@ export function useComposerWorkspace({
 				}),
 			skillRefs: skills
 				.filter(r => {
-					return isWorkspaceSkillSessionEligible(r, workspaceSkillProvidersByRecordID.get(r.recordID));
+					return isWorkspaceSkillSessionEligible(
+						r,
+						workspaceSkillProvidersByArtifactKey.get(artifactRefKey(r.artifact))
+					);
 				})
 				.map(r => {
 					return skillSelectionRef(r);
@@ -531,7 +543,7 @@ export function useComposerWorkspace({
 		replaceSelection(nextSelection);
 		const shouldResetExistingSession =
 			(current?.skillRefs?.length ?? 0) > 0 || (nextSelection.skillRefs && nextSelection.skillRefs.length > 0);
-		await replaceWorkspaceSkillRefs(
+		await applyResolvedWorkspaceSkillRefs(
 			nextSelection,
 			SkillSessionSyncMode.IfSessionExists,
 			undefined,
@@ -540,11 +552,11 @@ export function useComposerWorkspace({
 	}, [
 		catalogRevision,
 		contexts,
+		applyResolvedWorkspaceSkillRefs,
 		replaceSelection,
-		replaceWorkspaceSkillRefs,
 		skills,
 		workspace,
-		workspaceSkillProvidersByRecordID,
+		workspaceSkillProvidersByArtifactKey,
 	]);
 
 	const toggleContext = useCallback(
@@ -554,12 +566,13 @@ export function useComposerWorkspace({
 				return;
 			}
 
-			const byID = new Map((current.contextRefs ?? []).map(ref => [ref.recordID, ref]));
+			const byID = new Map((current.contextRefs ?? []).map(ref => [artifactRefKey(ref.artifact), ref]));
+			const key = artifactRefKey(context.artifact);
 
 			if (selected) {
-				byID.set(context.recordID, contextSelectionRef(context));
+				byID.set(key, contextSelectionRef(context));
 			} else {
-				byID.delete(context.recordID);
+				byID.delete(key);
 			}
 
 			replaceSelection({
@@ -573,19 +586,18 @@ export function useComposerWorkspace({
 	const toggleSkill = useCallback(
 		async (skill: WorkspaceSkillView, selected: boolean) => {
 			const current = selectionRef.current;
-			if (
-				!current ||
-				(selected && !isWorkspaceSkillSessionEligible(skill, workspaceSkillProvidersByRecordID.get(skill.recordID)))
-			) {
+			const key = artifactRefKey(skill.artifact);
+			const provider = workspaceSkillProvidersByArtifactKey.get(key);
+			if (!current || (selected && !isWorkspaceSkillSessionEligible(skill, provider))) {
 				return;
 			}
 
-			const byID = new Map((current.skillRefs ?? []).map(ref => [ref.recordID, ref]));
+			const byID = new Map((current.skillRefs ?? []).map(ref => [artifactRefKey(ref.artifact), ref]));
 
 			if (selected) {
-				byID.set(skill.recordID, skillSelectionRef(skill));
+				byID.set(key, skillSelectionRef(skill));
 			} else {
-				byID.delete(skill.recordID);
+				byID.delete(key);
 			}
 
 			const nextSelection = {
@@ -594,13 +606,13 @@ export function useComposerWorkspace({
 			};
 
 			replaceSelection(nextSelection);
-			await replaceWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.IfSessionExists);
+			await applyResolvedWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.IfSessionExists);
 		},
-		[replaceSelection, replaceWorkspaceSkillRefs, workspaceSkillProvidersByRecordID]
+		[applyResolvedWorkspaceSkillRefs, replaceSelection, workspaceSkillProvidersByArtifactKey]
 	);
 
 	const removeContextRef = useCallback(
-		(recordID: string) => {
+		(artifact: ArtifactRef) => {
 			const current = selectionRef.current;
 			if (!current) {
 				return;
@@ -608,14 +620,16 @@ export function useComposerWorkspace({
 
 			replaceSelection({
 				...current,
-				contextRefs: (current.contextRefs ?? []).filter(ref => ref.recordID !== recordID),
+				contextRefs: (current.contextRefs ?? []).filter(
+					ref => artifactRefKey(ref.artifact) !== artifactRefKey(artifact)
+				),
 			});
 		},
 		[replaceSelection]
 	);
 
 	const removeSkillRef = useCallback(
-		async (recordID: string) => {
+		async (artifact: ArtifactRef) => {
 			const current = selectionRef.current;
 			if (!current) {
 				return;
@@ -623,12 +637,12 @@ export function useComposerWorkspace({
 
 			const nextSelection = {
 				...current,
-				skillRefs: (current.skillRefs ?? []).filter(ref => ref.recordID !== recordID),
+				skillRefs: (current.skillRefs ?? []).filter(ref => artifactRefKey(ref.artifact) !== artifactRefKey(artifact)),
 			};
 			replaceSelection(nextSelection);
-			await replaceWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.IfSessionExists);
+			await applyResolvedWorkspaceSkillRefs(nextSelection, SkillSessionSyncMode.IfSessionExists);
 		},
-		[replaceSelection, replaceWorkspaceSkillRefs]
+		[applyResolvedWorkspaceSkillRefs, replaceSelection]
 	);
 
 	const refreshSelectedWorkspace = useCallback(async () => {
@@ -642,17 +656,17 @@ export function useComposerWorkspace({
 		setSelectionLoading(true);
 		setSelectionError(null);
 		try {
-			await workspaceAPI.refreshWorkspace(current.rootID);
+			await workspaceAPI.refreshWorkspace(current.workspace);
 			if (
 				!mountedRef.current ||
 				loadVersionRef.current !== refreshVersion ||
-				selectionRef.current?.rootID !== current.rootID
+				!workspaceRefsEqual(selectionRef.current?.workspace, current.workspace)
 			) {
 				return;
 			}
 
 			await loadSelection(current, SkillSessionSyncMode.IfSessionExists, (current.skillRefs?.length ?? 0) > 0);
-			if (!mountedRef.current || selectionRef.current?.rootID !== current.rootID) {
+			if (!mountedRef.current || !workspaceRefsEqual(selectionRef.current?.workspace, current.workspace)) {
 				return;
 			}
 
@@ -669,7 +683,7 @@ export function useComposerWorkspace({
 	}, [loadSelection, refreshWorkspaces]);
 
 	const createFilesystemWorkspace = useCallback(
-		async (payload: CreateFilesystemWorkspacePayload) => {
+		async (payload: CreateFilesystemWorkspaceBody) => {
 			const normalizePath = (value: string) =>
 				value.trim().replaceAll('\\', '/').replaceAll(/\/+$/g, '').toLocaleLowerCase();
 			const requestedPath = normalizePath(payload.rootPath);
@@ -682,17 +696,21 @@ export function useComposerWorkspace({
 				return;
 			}
 
-			const created = await workspaceAPI.createFilesystemWorkspace(payload);
-			setWorkspaces(previous => sortWorkspaces([...previous.filter(w => w.rootID !== created.rootID), created]));
+			const preferredRootID = workspace?.workspace.rootID ?? workspaces[0]?.workspace.rootID;
+			const created = await createFilesystemWorkspaceCollection(payload, preferredRootID);
+			const createdKey = workspaceRefKey(created.workspace);
+			setWorkspaces(previous =>
+				sortWorkspaces([...previous.filter(w => workspaceRefKey(w.workspace) !== createdKey), created])
+			);
 			await refreshWorkspaces();
 
 			try {
-				await workspaceAPI.refreshWorkspace(created.rootID);
-				const refreshed = await workspaceAPI.getWorkspace(created.rootID);
+				await workspaceAPI.refreshWorkspace(created.workspace);
+				const refreshed = await workspaceAPI.getWorkspace(created.workspace);
 				await attachWorkspace(refreshed);
 			} catch (error) {
 				const fallbackSelection: WorkspaceConversationSelection = {
-					rootID: created.rootID,
+					workspace: { ...created.workspace },
 					displayName: created.displayName,
 					workspaceRevision: created.revision,
 					contextRefs: [],
@@ -706,7 +724,7 @@ export function useComposerWorkspace({
 				setProvidedSkills([]);
 				setCatalogKnown(false);
 				setCatalogRevision(undefined);
-				await replaceWorkspaceSkillRefs(fallbackSelection, SkillSessionSyncMode.EnsureIfEnabled);
+				await applyResolvedWorkspaceSkillRefs(fallbackSelection, SkillSessionSyncMode.EnsureIfEnabled);
 				setSelectionError(
 					`Workspace was created, but initial discovery failed. Retry refresh before selecting Context or Skills. ${getErrorMessage(
 						error,
@@ -715,24 +733,46 @@ export function useComposerWorkspace({
 				);
 			}
 		},
-		[attachWorkspace, refreshWorkspaces, replaceSelection, replaceWorkspaceSkillRefs, workspaces]
+		[
+			applyResolvedWorkspaceSkillRefs,
+			attachWorkspace,
+			refreshWorkspaces,
+			replaceSelection,
+			workspace?.workspace.rootID,
+			workspaces,
+		]
 	);
 
 	const selectedContextIDs = useMemo(
-		() => new Set((selection?.contextRefs ?? []).map(ref => ref.recordID)),
+		() => new Set((selection?.contextRefs ?? []).map(ref => artifactRefKey(ref.artifact))),
 		[selection]
 	);
-	const selectedSkillIDs = useMemo(() => new Set((selection?.skillRefs ?? []).map(ref => ref.recordID)), [selection]);
+	const selectedSkillIDs = useMemo(
+		() => new Set((selection?.skillRefs ?? []).map(ref => artifactRefKey(ref.artifact))),
+		[selection]
+	);
 
-	const currentContextByID = useMemo(() => new Map(contexts.map(context => [context.recordID, context])), [contexts]);
-	const currentSkillByID = useMemo(() => new Map(skills.map(skill => [skill.recordID, skill])), [skills]);
+	const currentContextByID = useMemo(
+		() => new Map(contexts.map(context => [artifactRefKey(context.artifact), context])),
+		[contexts]
+	);
+	const currentSkillByID = useMemo(
+		() => new Map(skills.map(skill => [artifactRefKey(skill.artifact), skill])),
+		[skills]
+	);
 
 	const missingContextRefs = useMemo(
-		() => (catalogKnown ? (selection?.contextRefs ?? []).filter(ref => !currentContextByID.has(ref.recordID)) : []),
+		() =>
+			catalogKnown
+				? (selection?.contextRefs ?? []).filter(ref => !currentContextByID.has(artifactRefKey(ref.artifact)))
+				: [],
 		[catalogKnown, currentContextByID, selection]
 	);
 	const missingSkillRefs = useMemo(
-		() => (catalogKnown ? (selection?.skillRefs ?? []).filter(ref => !currentSkillByID.has(ref.recordID)) : []),
+		() =>
+			catalogKnown
+				? (selection?.skillRefs ?? []).filter(ref => !currentSkillByID.has(artifactRefKey(ref.artifact)))
+				: [],
 		[catalogKnown, currentSkillByID, selection]
 	);
 
@@ -744,14 +784,14 @@ export function useComposerWorkspace({
 		let count = 0;
 
 		for (const ref of selection?.contextRefs ?? []) {
-			const current = currentContextByID.get(ref.recordID);
+			const current = currentContextByID.get(artifactRefKey(ref.artifact));
 			if (current && ref.definitionDigest && current.definitionDigest !== ref.definitionDigest) {
 				count += 1;
 			}
 		}
 
 		for (const ref of selection?.skillRefs ?? []) {
-			const current = currentSkillByID.get(ref.recordID);
+			const current = currentSkillByID.get(artifactRefKey(ref.artifact));
 			if (current && ref.definitionDigest && current.definitionDigest !== ref.definitionDigest) {
 				count += 1;
 			}
@@ -768,15 +808,18 @@ export function useComposerWorkspace({
 		let count = missingContextRefs.length + missingSkillRefs.length;
 
 		for (const context of contexts) {
-			if (selectedContextIDs.has(context.recordID) && !contextIsEligible(context)) {
+			if (selectedContextIDs.has(artifactRefKey(context.artifact)) && !contextIsEligible(context)) {
 				count += 1;
 			}
 		}
 
 		for (const skill of skills) {
 			if (
-				selectedSkillIDs.has(skill.recordID) &&
-				!isWorkspaceSkillSessionEligible(skill, workspaceSkillProvidersByRecordID.get(skill.recordID))
+				selectedSkillIDs.has(artifactRefKey(skill.artifact)) &&
+				!isWorkspaceSkillSessionEligible(
+					skill,
+					workspaceSkillProvidersByArtifactKey.get(artifactRefKey(skill.artifact))
+				)
 			) {
 				count += 1;
 			}
@@ -790,7 +833,7 @@ export function useComposerWorkspace({
 		selectedContextIDs,
 		selectedSkillIDs,
 		skills,
-		workspaceSkillProvidersByRecordID,
+		workspaceSkillProvidersByArtifactKey,
 		catalogKnown,
 	]);
 
@@ -832,7 +875,7 @@ export function useComposerWorkspace({
 		selectedSkillIDs,
 		missingContextRefs,
 		missingSkillRefs,
-		workspaceSkillProvidersByRecordID,
+		workspaceSkillProvidersByArtifactKey,
 		changedCount,
 		attentionCount,
 		refreshWorkspaces,

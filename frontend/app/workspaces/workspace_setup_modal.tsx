@@ -4,11 +4,13 @@ import { useId, useMemo, useState } from 'react';
 import { FiAlertCircle, FiFolder, FiPlus, FiTrash2, FiUpload } from 'react-icons/fi';
 
 import type {
-	CreateFilesystemWorkspacePayload,
-	UpdateWorkspacePayload,
+	CreateEmptyWorkspaceBody,
+	CreateFilesystemWorkspaceBody,
+	UpdateWorkspaceBody,
 	WorkspaceDiscovery,
 	WorkspaceView,
 } from '@/spec/workspace';
+import { WorkspaceMode } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -31,11 +33,15 @@ import {
 export type WorkspaceSetupSubmission =
 	| {
 			kind: 'filesystem';
-			payload: CreateFilesystemWorkspacePayload;
+			payload: CreateFilesystemWorkspaceBody;
+	  }
+	| {
+			kind: 'empty';
+			payload: CreateEmptyWorkspaceBody;
 	  }
 	| {
 			kind: 'update';
-			payload: UpdateWorkspacePayload;
+			payload: UpdateWorkspaceBody;
 	  };
 
 interface WorkspaceSetupModalProps {
@@ -62,6 +68,8 @@ interface FormErrors {
 	rootPath?: string;
 	discovery?: string;
 }
+
+type WorkspaceCreationMode = 'filesystem' | 'empty';
 
 function normalizeIdentity(value: string): string {
 	return value.trim().toLowerCase();
@@ -133,14 +141,20 @@ function buildDiscovery(form: WorkspaceSetupForm): WorkspaceDiscovery {
 	};
 }
 
+function usesFilesystemRoot(workspace: WorkspaceView | undefined, creationMode: WorkspaceCreationMode): boolean {
+	return workspace ? workspace.mode === WorkspaceMode.Filesystem : creationMode === 'filesystem';
+}
+
 function validateForm(
 	form: WorkspaceSetupForm,
 	workspace: WorkspaceView | undefined,
-	existingDisplayNames: readonly string[]
+	existingDisplayNames: readonly string[],
+	creationMode: WorkspaceCreationMode
 ): FormErrors {
 	const errors: FormErrors = {};
 	const displayName = form.displayName.trim();
 	const rootPath = form.rootPath.trim();
+	const hasFilesystemRoot = usesFilesystemRoot(workspace, creationMode);
 
 	if (!displayName) {
 		errors.displayName = 'Display name is required.';
@@ -150,17 +164,21 @@ function validateForm(
 		errors.displayName = 'Another workspace already uses this display name.';
 	}
 
-	if (!workspace && !rootPath) {
+	if (!workspace && hasFilesystemRoot && !rootPath) {
 		errors.rootPath = 'Choose or paste a project folder.';
 	}
 
-	if (rootPath.length > 4096) {
+	if (hasFilesystemRoot && rootPath.length > 4096) {
 		errors.rootPath = 'Project path is too long.';
 	}
 
-	if ((form.contextFiles.some(value => value.trim()) || form.skillRoots.some(value => value.trim())) && !rootPath) {
+	if (
+		hasFilesystemRoot &&
+		(form.contextFiles.some(value => value.trim()) || form.skillRoots.some(value => value.trim())) &&
+		!rootPath
+	) {
 		errors.discovery = 'Choose a project folder before adding Context files or Skill folders.';
-	} else if (rootPath) {
+	} else if (hasFilesystemRoot && rootPath) {
 		try {
 			buildDiscovery(form);
 		} catch (error) {
@@ -178,6 +196,7 @@ function WorkspaceSetupModalContent({
 	presentation = 'management',
 }: Omit<WorkspaceSetupModalProps, 'isOpen' | 'onClose'>) {
 	const [form, setForm] = useState<WorkspaceSetupForm>(() => initialForm(workspace));
+	const [creationMode, setCreationMode] = useState<WorkspaceCreationMode>('filesystem');
 	const [submitted, setSubmitted] = useState(false);
 	const [submitError, setSubmitError] = useState('');
 	const [pickerError, setPickerError] = useState('');
@@ -189,9 +208,11 @@ function WorkspaceSetupModalContent({
 
 	const { requestClose, unmountingRef } = useModalDialogController();
 	const errors = useMemo(
-		() => validateForm(form, workspace, existingDisplayNames),
-		[existingDisplayNames, form, workspace]
+		() => validateForm(form, workspace, existingDisplayNames, creationMode),
+		[creationMode, existingDisplayNames, form, workspace]
 	);
+	const hasFilesystemRoot = usesFilesystemRoot(workspace, creationMode);
+	const isEmptyWorkspaceCreation = !workspace && creationMode === 'empty';
 
 	const updateForm = <K extends keyof WorkspaceSetupForm>(key: K, value: WorkspaceSetupForm[K]) => {
 		setForm(previous => ({ ...previous, [key]: value }));
@@ -303,9 +324,11 @@ function WorkspaceSetupModalContent({
 			return;
 		}
 
-		let discovery: WorkspaceDiscovery;
+		let discovery: WorkspaceDiscovery = workspace?.discovery ?? {};
 		try {
-			discovery = buildDiscovery(form);
+			if (hasFilesystemRoot) {
+				discovery = buildDiscovery(form);
+			}
 		} catch (error) {
 			setSubmitError(getErrorMessage(error, 'Discovery paths are invalid.'));
 			return;
@@ -323,15 +346,24 @@ function WorkspaceSetupModalContent({
 						discovery,
 					},
 				}
-			: {
-					kind: 'filesystem',
-					payload: {
-						displayName: form.displayName.trim(),
-						description,
-						rootPath: form.rootPath.trim(),
-						discovery,
-					},
-				};
+			: creationMode === 'empty'
+				? {
+						kind: 'empty',
+						payload: {
+							displayName: form.displayName.trim(),
+							description,
+							discovery: {},
+						},
+					}
+				: {
+						kind: 'filesystem',
+						payload: {
+							displayName: form.displayName.trim(),
+							description,
+							rootPath: form.rootPath.trim(),
+							discovery,
+						},
+					};
 
 		setIsSubmitting(true);
 		try {
@@ -350,7 +382,7 @@ function WorkspaceSetupModalContent({
 		}
 	};
 
-	const hasProjectFolder = Boolean(form.rootPath.trim());
+	const hasProjectFolder = hasFilesystemRoot && Boolean(form.rootPath.trim());
 
 	return (
 		<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
@@ -361,9 +393,11 @@ function WorkspaceSetupModalContent({
 				description={
 					workspace
 						? 'Manage the project folder, discovery paths, Context files, and Skill folders.'
-						: presentation === 'composer'
-							? 'Choose or paste a project folder. The Workspace will be created, refreshed, and attached to this conversation.'
-							: 'Choose a project folder. Workspace discovery finds standard Context files and Skills automatically.'
+						: isEmptyWorkspaceCreation
+							? 'Create an empty Workspace Collection now, then attach project, library, package, or overlay Sources later.'
+							: presentation === 'composer'
+								? 'Choose or paste a project folder. The Workspace will be created, refreshed, and attached to this conversation.'
+								: 'Choose a project folder. Workspace discovery finds standard Context files and Skills automatically.'
 				}
 				onClose={requestClose}
 				closeDisabled={isSubmitting}
@@ -389,55 +423,121 @@ function WorkspaceSetupModalContent({
 					</div>
 				) : null}
 
-				<ModalSection
-					title="Project folder"
-					description="Workspace discovery reads this folder but does not execute Skills, scripts, tools, or external processes."
-				>
-					<ModalField
-						label="Folder path"
-						htmlFor={rootPathID}
-						required={!workspace}
-						error={submitted ? errors.rootPath : undefined}
+				{!workspace && presentation !== 'composer' ? (
+					<ModalSection
+						title="Workspace type"
+						description="A Workspace is a Collection. A filesystem Workspace receives a primary project Source immediately; an empty Workspace can be assembled from existing Artifact Store Sources."
 					>
-						<div className="flex flex-col gap-2 sm:flex-row">
-							<input
-								id={rootPathID}
-								type="text"
-								className={`input min-w-0 grow rounded-xl font-mono text-xs ${
-									submitted && errors.rootPath ? 'input-error' : ''
-								}`}
-								value={form.rootPath}
-								onChange={event => {
-									updateForm('rootPath', event.currentTarget.value);
-								}}
-								readOnly={Boolean(workspace)}
-								placeholder="/path/to/project"
-								spellCheck="false"
-								autoComplete="off"
-								disabled={isSubmitting}
-							/>
-							{!workspace ? (
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									onClick={() => {
-										void chooseRootPath();
+						<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+							<label className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
+								<input
+									type="radio"
+									className="radio radio-sm mt-0.5"
+									checked={creationMode === 'filesystem'}
+									onChange={() => {
+										setCreationMode('filesystem');
+										setSubmitError('');
 									}}
 									disabled={isSubmitting}
-								>
-									<FiFolder size={14} />
-									<span>Choose Folder</span>
-								</button>
-							) : null}
-						</div>
-					</ModalField>
+								/>
+								<span className="block font-medium">Filesystem project</span>
 
-					{workspace?.primaryPath ? (
-						<div className="text-base-content/60 text-xs">
-							The primary workspace folder cannot be changed after creation. Create a new workspace if the project
-							moves.
+								<span className="text-base-content/70 mt-1 block text-xs">
+									Create a primary filesystem Source from a project folder.
+								</span>
+							</label>
+
+							<label className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
+								<input
+									type="radio"
+									className="radio radio-sm mt-0.5"
+									checked={creationMode === 'empty'}
+									onChange={() => {
+										setCreationMode('empty');
+										setSubmitError('');
+										setPickerError('');
+									}}
+									disabled={isSubmitting}
+								/>
+
+								<span className="block font-medium">Empty Workspace</span>
+								<span className="text-base-content/70 mt-1 block text-xs">
+									Create the Collection first, then attach root-scoped Sources from Manage Sources.
+								</span>
+							</label>
 						</div>
-					) : null}
+					</ModalSection>
+				) : null}
+
+				<ModalSection
+					title={hasFilesystemRoot ? 'Project folder' : 'Workspace collection'}
+					description={
+						hasFilesystemRoot
+							? 'Workspace discovery reads this folder but does not execute Skills, scripts, tools, or external processes.'
+							: 'This Workspace currently has no primary project Source. Source configuration remains private to Artifact Store.'
+					}
+				>
+					{hasFilesystemRoot ? (
+						<>
+							<ModalField
+								label="Folder path"
+								htmlFor={rootPathID}
+								required={!workspace && hasFilesystemRoot}
+								error={submitted ? errors.rootPath : undefined}
+							>
+								<div className="flex flex-col gap-2 sm:flex-row">
+									<input
+										id={rootPathID}
+										type="text"
+										className={`input min-w-0 grow rounded-xl font-mono text-xs ${
+											submitted && errors.rootPath ? 'input-error' : ''
+										}`}
+										value={form.rootPath}
+										onChange={event => {
+											updateForm('rootPath', event.currentTarget.value);
+										}}
+										readOnly={Boolean(workspace)}
+										placeholder="/path/to/project"
+										spellCheck="false"
+										autoComplete="off"
+										disabled={isSubmitting}
+									/>
+									{!workspace && hasFilesystemRoot ? (
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												void chooseRootPath();
+											}}
+											disabled={isSubmitting}
+										>
+											<FiFolder size={14} />
+											<span>Choose Folder</span>
+										</button>
+									) : null}
+								</div>
+							</ModalField>
+
+							{workspace?.primaryPath ? (
+								<div className="text-base-content/60 text-xs">
+									The primary workspace folder cannot be changed after creation. Create a new workspace if the project
+									moves.
+								</div>
+							) : null}
+						</>
+					) : (
+						<div className="border-base-content/10 bg-base-100 rounded-2xl border p-4 text-sm">
+							<div className="font-semibold">
+								{isEmptyWorkspaceCreation
+									? 'No Source will be attached during creation.'
+									: 'No primary Source is attached.'}
+							</div>
+							<div className="text-base-content/70 mt-1 text-xs">
+								Save the Workspace, then use Manage Sources to attach a library, package, overlay, built-in, or primary
+								filesystem Source.
+							</div>
+						</div>
+					)}
 				</ModalSection>
 
 				<ModalSection title="Identity">
@@ -491,211 +591,218 @@ function WorkspaceSetupModalContent({
 					) : null}
 				</ModalSection>
 
-				<details
-					open={presentation === 'management'}
-					className={presentation === 'composer' ? 'border-base-content/10 bg-base-100 mb-8 rounded-2xl border' : ''}
-				>
-					{presentation === 'composer' ? (
-						<summary className="cursor-pointer list-none p-4 text-sm font-semibold">
-							Additional discovery options
-							<div className="text-base-content/60 mt-1 text-xs font-normal">
-								Add non-standard Context files, Skill folders, or README discovery.
-							</div>
-						</summary>
-					) : null}
-					<div>
-						<ModalSection
-							title="Discovery"
-							description="Use the defaults for normal projects. Add paths only when a project keeps Context or Skills in non-standard locations."
-						>
-							<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3 text-xs">
-								<div className="font-semibold">Default discovery</div>
-								<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5">
-									{WORKSPACE_DEFAULT_CONTEXT_FILES.map(locator => (
-										<li key={locator}>{locator}</li>
-									))}
-									{WORKSPACE_DEFAULT_SKILL_ROOTS.map(locator => (
-										<li key={locator}>{locator}</li>
-									))}
-								</ul>
-							</div>
-
-							<ModalField label="Include README" htmlFor={`${displayNameID}-readme`}>
-								<label className="flex items-center gap-3">
-									<input
-										id={`${displayNameID}-readme`}
-										type="checkbox"
-										className="toggle toggle-accent"
-										checked={form.includeReadme}
-										onChange={event => {
-											updateForm('includeReadme', event.currentTarget.checked);
-										}}
-										disabled={isSubmitting}
-									/>
-									<span className="text-base-content/70 text-xs">
-										Discover README.md as project Context when it exists.
-									</span>
-								</label>
-							</ModalField>
-
-							{submitted && errors.discovery ? (
-								<div className="text-error text-xs" role="alert">
-									{errors.discovery}
+				{hasFilesystemRoot ? (
+					<details
+						open={presentation === 'management'}
+						className={presentation === 'composer' ? 'border-base-content/10 bg-base-100 mb-8 rounded-2xl border' : ''}
+					>
+						{presentation === 'composer' ? (
+							<summary className="cursor-pointer list-none p-4 text-sm font-semibold">
+								Additional discovery options
+								<div className="text-base-content/60 mt-1 text-xs font-normal">
+									Add non-standard Context files, Skill folders, or README discovery.
 								</div>
-							) : null}
-
-							<div className="space-y-3">
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-									<div>
-										<div className="text-sm font-medium">Additional Context files</div>
-										<div className="text-base-content/70 mt-1 text-xs">
-											Add Markdown files that should become project Context.
-										</div>
-									</div>
-									<div className="flex flex-wrap gap-2">
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											onClick={() => {
-												updateForm('contextFiles', [...form.contextFiles, '']);
-											}}
-											disabled={isSubmitting || !hasProjectFolder}
-										>
-											<FiPlus size={14} />
-											<span>Add Path</span>
-										</button>
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											onClick={() => {
-												void chooseContextFiles();
-											}}
-											disabled={isSubmitting || !hasProjectFolder}
-										>
-											<FiUpload size={14} />
-											<span>Choose Files</span>
-										</button>
-									</div>
+							</summary>
+						) : null}
+						<div>
+							<ModalSection
+								title="Discovery"
+								description="Use the defaults for normal projects. Add paths only when a project keeps Context or Skills in non-standard locations."
+							>
+								<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3 text-xs">
+									<div className="font-semibold">Default discovery</div>
+									<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5">
+										{WORKSPACE_DEFAULT_CONTEXT_FILES.map(locator => (
+											<li key={locator}>{locator}</li>
+										))}
+										{WORKSPACE_DEFAULT_SKILL_ROOTS.map(locator => (
+											<li key={locator}>{locator}</li>
+										))}
+									</ul>
 								</div>
 
-								{form.contextFiles.length === 0 ? (
-									<div className="border-base-content/10 text-base-content/60 rounded-2xl border p-4 text-sm">
-										No additional Context files.
+								<ModalField label="Include README" htmlFor={`${displayNameID}-readme`}>
+									<label className="flex items-center gap-3">
+										<input
+											id={`${displayNameID}-readme`}
+											type="checkbox"
+											className="toggle toggle-accent"
+											checked={form.includeReadme}
+											onChange={event => {
+												updateForm('includeReadme', event.currentTarget.checked);
+											}}
+											disabled={isSubmitting}
+										/>
+										<span className="text-base-content/70 text-xs">
+											Discover README.md as project Context when it exists.
+										</span>
+									</label>
+								</ModalField>
+
+								{submitted && errors.discovery ? (
+									<div className="text-error text-xs" role="alert">
+										{errors.discovery}
 									</div>
 								) : null}
 
-								{form.contextFiles.map((locator, index) => (
-									<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
-										<div className="flex gap-2">
-											<input
-												type="text"
-												className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
-												value={locator}
-												onChange={event => {
-													updateContextFile(index, event.currentTarget.value);
-												}}
-												placeholder="docs/project-context.md"
-												spellCheck="false"
-												disabled={isSubmitting}
-											/>
+								<div className="space-y-3">
+									<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+										<div>
+											<div className="text-sm font-medium">Additional Context files</div>
+											<div className="text-base-content/70 mt-1 text-xs">
+												Add Markdown files that should become project Context.
+											</div>
+										</div>
+										<div className="flex flex-wrap gap-2">
 											<button
 												type="button"
 												className="btn btn-sm btn-ghost rounded-xl"
 												onClick={() => {
-													removeContextFile(index);
+													updateForm('contextFiles', [...form.contextFiles, '']);
 												}}
-												disabled={isSubmitting}
-												aria-label="Remove Context file"
+												disabled={isSubmitting || !hasProjectFolder}
 											>
-												<FiTrash2 size={14} />
+												<FiPlus size={14} />
+												<span>Add Path</span>
 											</button>
-										</div>
-										{locator.trim() && hasProjectFolder ? (
-											<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
-												{workspaceLocatorToPath(form.rootPath, locator)}
-											</div>
-										) : null}
-									</div>
-								))}
-							</div>
-
-							<div className="space-y-3">
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-									<div>
-										<div className="text-sm font-medium">Additional Skill folders</div>
-										<div className="text-base-content/70 mt-1 text-xs">
-											Each selected folder is scanned recursively for SKILL.md files.
-										</div>
-									</div>
-									<div className="flex flex-wrap gap-2">
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											onClick={() => {
-												updateForm('skillRoots', [...form.skillRoots, '']);
-											}}
-											disabled={isSubmitting || !hasProjectFolder}
-										>
-											<FiPlus size={14} />
-											<span>Add Path</span>
-										</button>
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											onClick={() => {
-												void chooseSkillRoot();
-											}}
-											disabled={isSubmitting || !hasProjectFolder}
-										>
-											<FiFolder size={14} />
-											<span>Choose Folder</span>
-										</button>
-									</div>
-								</div>
-
-								{form.skillRoots.length === 0 ? (
-									<div className="border-base-content/10 text-base-content/60 rounded-2xl border p-4 text-sm">
-										No additional Skill folders.
-									</div>
-								) : null}
-
-								{form.skillRoots.map((locator, index) => (
-									<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
-										<div className="flex gap-2">
-											<input
-												type="text"
-												className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
-												value={locator}
-												onChange={event => {
-													updateSkillRoot(index, event.currentTarget.value);
-												}}
-												placeholder=".agent-skills"
-												spellCheck="false"
-												disabled={isSubmitting}
-											/>
 											<button
 												type="button"
 												className="btn btn-sm btn-ghost rounded-xl"
 												onClick={() => {
-													removeSkillRoot(index);
+													void chooseContextFiles();
 												}}
-												disabled={isSubmitting}
-												aria-label="Remove Skill folder"
+												disabled={isSubmitting || !hasProjectFolder}
 											>
-												<FiTrash2 size={14} />
+												<FiUpload size={14} />
+												<span>Choose Files</span>
 											</button>
 										</div>
-										{locator.trim() && hasProjectFolder ? (
-											<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
-												{workspaceLocatorToPath(form.rootPath, locator)}
-											</div>
-										) : null}
 									</div>
-								))}
-							</div>
-						</ModalSection>
+
+									{form.contextFiles.length === 0 ? (
+										<div className="border-base-content/10 text-base-content/60 rounded-2xl border p-4 text-sm">
+											No additional Context files.
+										</div>
+									) : null}
+
+									{form.contextFiles.map((locator, index) => (
+										<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
+											<div className="flex gap-2">
+												<input
+													type="text"
+													className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
+													value={locator}
+													onChange={event => {
+														updateContextFile(index, event.currentTarget.value);
+													}}
+													placeholder="docs/project-context.md"
+													spellCheck="false"
+													disabled={isSubmitting}
+												/>
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													onClick={() => {
+														removeContextFile(index);
+													}}
+													disabled={isSubmitting}
+													aria-label="Remove Context file"
+												>
+													<FiTrash2 size={14} />
+												</button>
+											</div>
+											{locator.trim() && hasProjectFolder ? (
+												<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
+													{workspaceLocatorToPath(form.rootPath, locator)}
+												</div>
+											) : null}
+										</div>
+									))}
+								</div>
+
+								<div className="space-y-3">
+									<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+										<div>
+											<div className="text-sm font-medium">Additional Skill folders</div>
+											<div className="text-base-content/70 mt-1 text-xs">
+												Each selected folder is scanned recursively for SKILL.md files.
+											</div>
+										</div>
+										<div className="flex flex-wrap gap-2">
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													updateForm('skillRoots', [...form.skillRoots, '']);
+												}}
+												disabled={isSubmitting || !hasProjectFolder}
+											>
+												<FiPlus size={14} />
+												<span>Add Path</span>
+											</button>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													void chooseSkillRoot();
+												}}
+												disabled={isSubmitting || !hasProjectFolder}
+											>
+												<FiFolder size={14} />
+												<span>Choose Folder</span>
+											</button>
+										</div>
+									</div>
+
+									{form.skillRoots.length === 0 ? (
+										<div className="border-base-content/10 text-base-content/60 rounded-2xl border p-4 text-sm">
+											No additional Skill folders.
+										</div>
+									) : null}
+
+									{form.skillRoots.map((locator, index) => (
+										<div key={`${index}-${locator}`} className="border-base-content/10 rounded-2xl border p-3">
+											<div className="flex gap-2">
+												<input
+													type="text"
+													className="input input-sm min-w-0 grow rounded-xl font-mono text-xs"
+													value={locator}
+													onChange={event => {
+														updateSkillRoot(index, event.currentTarget.value);
+													}}
+													placeholder=".agent-skills"
+													spellCheck="false"
+													disabled={isSubmitting}
+												/>
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													onClick={() => {
+														removeSkillRoot(index);
+													}}
+													disabled={isSubmitting}
+													aria-label="Remove Skill folder"
+												>
+													<FiTrash2 size={14} />
+												</button>
+											</div>
+											{locator.trim() && hasProjectFolder ? (
+												<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
+													{workspaceLocatorToPath(form.rootPath, locator)}
+												</div>
+											) : null}
+										</div>
+									))}
+								</div>
+							</ModalSection>
+						</div>
+					</details>
+				) : workspace ? (
+					<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3 text-xs">
+						Discovery paths are configured against a filesystem primary Source. Attach or replace the primary Source
+						from Manage Sources before editing path-based discovery preferences.
 					</div>
-				</details>
+				) : null}
 
 				<ModalActions className="-mx-4 -mb-4 sm:-mx-6 sm:-mb-6">
 					<button
@@ -716,6 +823,8 @@ function WorkspaceSetupModalContent({
 							</>
 						) : workspace ? (
 							'Save Changes'
+						) : isEmptyWorkspaceCreation ? (
+							'Create Empty Workspace'
 						) : (
 							'Create Workspace'
 						)}
@@ -732,7 +841,9 @@ export function WorkspaceSetupModal(props: WorkspaceSetupModalProps) {
 	}
 
 	const modalKey = props.workspace
-		? `workspace:${props.workspace.rootID}:${props.workspace.revision}`
+		? `workspace:${props.workspace.workspace.rootID}:${
+				props.workspace.workspace.collectionID
+			}:${props.workspace.revision}`
 		: 'workspace:new';
 
 	return (

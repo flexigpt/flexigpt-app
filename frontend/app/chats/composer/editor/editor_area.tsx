@@ -399,16 +399,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		refreshSkills,
 		applyInstalledSkillSelectionState,
 		applySkillSelectionState,
+		applyWorkspaceSkillSelectionState,
 		ensureSkillSession,
 		listActiveSkillRefs,
 		getCurrentSkillSessionID,
 		getCurrentEnabledSkillRefs,
 		getCurrentActiveSkillRefs,
+		getCurrentInstalledEnabledSkillRefs,
+		getCurrentInstalledActiveSkillRefs,
 	} = useComposerSkills();
 
 	const workspace = useComposerWorkspace({
-		applySkillSelectionState,
-		getCurrentEnabledSkillRefs,
+		applyWorkspaceSkillSelectionState,
 		getCurrentActiveSkillRefs,
 	});
 
@@ -1265,8 +1267,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					mcpContext: preparedMCPContext,
 					mcpAppContextUpdates:
 						mcpAppContextUpdates.length > 0 ? mcpAppContextUpdates.map(update => ({ ...update })) : undefined,
-					enabledSkillRefs: effectiveEnabledSkillRefs,
-					activeSkillRefs: activeForMessage,
+					enabledSkillRefs: getCurrentInstalledEnabledSkillRefs(),
+					activeSkillRefs: getCurrentInstalledActiveSkillRefs(),
 					skillSessionID: effectiveSkillSessionID ?? undefined,
 					workspaceSelection: workspace.getSelectionSnapshot(),
 				};
@@ -1311,6 +1313,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			ensureSkillSession,
 			getCurrentActiveSkillRefs,
 			getCurrentEnabledSkillRefs,
+			getCurrentInstalledActiveSkillRefs,
+			getCurrentInstalledEnabledSkillRefs,
 			getCurrentSkillSessionID,
 			getToolRuntimeSnapshot,
 			hasBlockingMCPArgs,
@@ -1845,8 +1849,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		onAssistantPresetRuntimeStateChange?.({
 			conversationToolChoices: conversationToolsToChoices(conversationToolsState),
 			webSearchChoices: mapAssistantPresetWebSearchTemplatesToChoices(webSearchTemplates),
-			enabledSkillRefs,
-			activeSkillRefs,
+			enabledSkillRefs: getCurrentInstalledEnabledSkillRefs(),
+			activeSkillRefs: getCurrentInstalledActiveSkillRefs(),
 			mcpContext: mcp.mcpContext,
 		});
 	}, [
@@ -1854,6 +1858,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		enabledSkillRefs,
 		mcp.mcpContext,
 		activeSkillRefs,
+		getCurrentInstalledActiveSkillRefs,
+		getCurrentInstalledEnabledSkillRefs,
 		onAssistantPresetRuntimeStateChange,
 		webSearchTemplates,
 	]);

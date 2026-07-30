@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 import { SkillSessionSyncMode } from '@/spec/skill';
+import type { WorkspaceRef } from '@/spec/workspace';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 
@@ -13,15 +14,16 @@ import {
 	areSkillRefListsEqual,
 	buildSkillRefsFingerprint,
 	clampActiveSkillRefsToEnabled,
-	isInstalledSkillRef,
-	isWorkspaceSkillRef,
 	normalizeSkillRefs,
 	skillRefFromListItem,
+	skillRefKey,
 } from '@/skills/lib/skill_identity_utils';
 
 interface ApplySkillSelectionStateOptions {
 	syncSession?: SkillSessionSyncMode;
 	forceResetSession?: boolean;
+	workspace?: WorkspaceRef | null;
+	workspaceSkillRefs?: SkillRef[];
 }
 
 interface UseComposerSkillsResult {
@@ -42,6 +44,12 @@ interface UseComposerSkillsResult {
 		nextActiveInput: SkillRef[] | null | undefined,
 		options?: ApplySkillSelectionStateOptions
 	) => Promise<void>;
+	applyWorkspaceSkillSelectionState: (
+		workspace: WorkspaceRef | undefined,
+		nextWorkspaceEnabledInput: SkillRef[] | null | undefined,
+		nextWorkspaceActiveInput: SkillRef[] | null | undefined,
+		options?: Omit<ApplySkillSelectionStateOptions, 'workspace' | 'workspaceSkillRefs'>
+	) => Promise<void>;
 	applyInstalledSkillSelectionState: (
 		nextEnabledInput: SkillRef[] | null | undefined,
 		nextActiveInput: SkillRef[] | null | undefined,
@@ -51,11 +59,21 @@ interface UseComposerSkillsResult {
 	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
 	getCurrentEnabledSkillRefs: () => SkillRef[];
 	getCurrentActiveSkillRefs: () => SkillRef[];
+	getCurrentInstalledEnabledSkillRefs: () => SkillRef[];
+	getCurrentInstalledActiveSkillRefs: () => SkillRef[];
 	getCurrentSkillSessionID: () => string | null;
 }
 
-function buildSkillSessionStateKey(enabled: SkillRef[], active: SkillRef[]): string {
-	return `${buildSkillRefsFingerprint(enabled)}::${buildSkillRefsFingerprint(active)}`;
+function workspaceRefKey(workspace?: WorkspaceRef): string {
+	return workspace ? `${workspace.rootID}:${workspace.collectionID}` : '';
+}
+
+function workspaceRefsEqual(left?: WorkspaceRef, right?: WorkspaceRef): boolean {
+	return left?.rootID === right?.rootID && left?.collectionID === right?.collectionID;
+}
+
+function buildSkillSessionStateKey(enabled: SkillRef[], active: SkillRef[], workspace?: WorkspaceRef): string {
+	return [workspaceRefKey(workspace), buildSkillRefsFingerprint(enabled), buildSkillRefsFingerprint(active)].join('::');
 }
 
 function isInstructionSkillListItem(item: SkillListItem): boolean {
@@ -134,6 +152,8 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	const skillSessionIDRef = useRef<string | null>(null);
 	const enabledSkillRefsRef = useRef<SkillRef[]>([]);
 	const activeSkillRefsRef = useRef<SkillRef[]>([]);
+	const workspaceRefRef = useRef<WorkspaceRef | undefined>(undefined);
+	const workspaceSkillRefKeysRef = useRef<Set<string>>(new Set());
 	const skillsCatalogLoadPromiseRef = useRef<Promise<SkillListItem[]> | null>(null);
 	const enableAllSkillsRequestVersionRef = useRef(0);
 
@@ -175,6 +195,16 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		return activeSkillRefsRef.current;
 	}, []);
 
+	const getCurrentInstalledEnabledSkillRefs = useCallback(() => {
+		const workspaceKeys = workspaceSkillRefKeysRef.current;
+		return enabledSkillRefsRef.current.filter(ref => !workspaceKeys.has(skillRefKey(ref)));
+	}, []);
+
+	const getCurrentInstalledActiveSkillRefs = useCallback(() => {
+		const workspaceKeys = workspaceSkillRefKeysRef.current;
+		return activeSkillRefsRef.current.filter(ref => !workspaceKeys.has(skillRefKey(ref)));
+	}, []);
+
 	const filterSkillRefsToLoadedCatalog = useCallback((refs: SkillRef[] | null | undefined): SkillRef[] => {
 		// A missing catalog item is diagnostic state, not permission to silently
 		// delete a requested ref. The runtime remains authoritative at session
@@ -197,22 +227,47 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		) => {
 			const syncSession = options?.syncSession ?? SkillSessionSyncMode.IfSessionExists;
 			const forceResetSession = options?.forceResetSession ?? false;
+			const replacesWorkspace = options?.workspace !== undefined;
+			const replacesWorkspaceSkillRefs = options?.workspaceSkillRefs !== undefined;
+
+			const previousWorkspace = workspaceRefRef.current;
+			const nextWorkspace = replacesWorkspace ? (options?.workspace ?? undefined) : previousWorkspace;
+
+			const previousWorkspaceSkillRefKeys = workspaceSkillRefKeysRef.current;
+			const nextWorkspaceSkillRefs = replacesWorkspaceSkillRefs
+				? normalizeSkillRefs(options?.workspaceSkillRefs)
+				: undefined;
+			const nextWorkspaceSkillRefKeys = nextWorkspaceSkillRefs
+				? new Set(
+						nextWorkspaceSkillRefs.map(k => {
+							return skillRefKey(k);
+						})
+					)
+				: previousWorkspaceSkillRefKeys;
 
 			const nextEnabled = filterSkillRefsToLoadedCatalog(nextEnabledInput);
 			const nextActive = clampActiveSkillRefsToEnabled(nextEnabled, filterSkillRefsToLoadedCatalog(nextActiveInput));
 			const prevEnabled = enabledSkillRefsRef.current;
 			const prevActive = activeSkillRefsRef.current;
-			const prevSelectionStateKey = buildSkillSessionStateKey(prevEnabled, prevActive);
+			const prevSelectionStateKey = buildSkillSessionStateKey(prevEnabled, prevActive, previousWorkspace);
 
 			const prevSessionID = skillSessionIDRef.current;
 			const prevSessionStateKey = sessionStateKeyRef.current;
-			const nextSessionStateKey = buildSkillSessionStateKey(nextEnabled, nextActive);
+			const nextSessionStateKey = buildSkillSessionStateKey(nextEnabled, nextActive, nextWorkspace);
 			const hadSession = Boolean(prevSessionID);
-			const selectionChanged = prevSelectionStateKey !== nextSessionStateKey;
+			const workspaceChanged = !workspaceRefsEqual(previousWorkspace, nextWorkspace);
+			const workspaceSkillIdentityChanged =
+				replacesWorkspaceSkillRefs &&
+				(previousWorkspaceSkillRefKeys.size !== nextWorkspaceSkillRefKeys.size ||
+					[...previousWorkspaceSkillRefKeys].some(key => !nextWorkspaceSkillRefKeys.has(key)));
+			const selectionChanged =
+				prevSelectionStateKey !== nextSessionStateKey || workspaceChanged || workspaceSkillIdentityChanged;
 
 			const stateChanged = hadSession ? prevSessionStateKey !== nextSessionStateKey || !prevSessionStateKey : false;
 			let syncVersion = skillSessionSyncVersionRef.current;
 
+			workspaceRefRef.current = nextWorkspace;
+			workspaceSkillRefKeysRef.current = nextWorkspaceSkillRefKeys;
 			updateEnabledSkillRefsState(nextEnabled);
 			updateActiveSkillRefsState(nextActive);
 			if (selectionChanged || forceResetSession) {
@@ -272,7 +327,8 @@ export function useComposerSkills(): UseComposerSkillsResult {
 					prevSessionID ?? undefined,
 					undefined,
 					nextEnabled,
-					nextActive
+					nextActive,
+					nextWorkspace
 				);
 
 				if (skillSessionSyncVersionRef.current !== syncVersion) {
@@ -292,7 +348,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 				const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeSkillRefs ?? latestActive);
 				updateSkillSessionIDState(sess.sessionID);
 				updateActiveSkillRefsState(resolvedActive);
-				sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive);
+				sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive, nextWorkspace);
 			} catch {
 				if (skillSessionSyncVersionRef.current !== syncVersion) {
 					return;
@@ -312,24 +368,58 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		]
 	);
 
+	const applyWorkspaceSkillSelectionState = useCallback(
+		async (
+			nextWorkspace: WorkspaceRef | undefined,
+			nextWorkspaceEnabledInput: SkillRef[] | null | undefined,
+			nextWorkspaceActiveInput: SkillRef[] | null | undefined,
+			options?: Omit<ApplySkillSelectionStateOptions, 'workspace' | 'workspaceSkillRefs'>
+		) => {
+			const previousWorkspaceKeys = workspaceSkillRefKeysRef.current;
+			const retainedInstalledEnabled = enabledSkillRefsRef.current.filter(
+				ref => !previousWorkspaceKeys.has(skillRefKey(ref))
+			);
+			const retainedInstalledActive = activeSkillRefsRef.current.filter(
+				ref => !previousWorkspaceKeys.has(skillRefKey(ref))
+			);
+			const nextWorkspaceEnabled = normalizeSkillRefs(nextWorkspaceEnabledInput);
+			const nextWorkspaceEnabledKeys = new Set(
+				nextWorkspaceEnabled.map(k => {
+					return skillRefKey(k);
+				})
+			);
+			const nextWorkspaceActive = normalizeSkillRefs(nextWorkspaceActiveInput).filter(ref =>
+				nextWorkspaceEnabledKeys.has(skillRefKey(ref))
+			);
+
+			await applySkillSelectionState(
+				[...retainedInstalledEnabled, ...nextWorkspaceEnabled],
+				[...retainedInstalledActive, ...nextWorkspaceActive],
+				{
+					...options,
+					workspace: nextWorkspace ?? null,
+					workspaceSkillRefs: nextWorkspaceEnabled,
+				}
+			);
+		},
+		[applySkillSelectionState]
+	);
+
 	const applyInstalledSkillSelectionState = useCallback(
 		async (
 			nextInstalledEnabledInput: SkillRef[] | null | undefined,
 			nextInstalledActiveInput: SkillRef[] | null | undefined,
 			options?: ApplySkillSelectionStateOptions
 		) => {
-			const retainedWorkspaceEnabled = getCurrentEnabledSkillRefs().filter(r => {
-				return isWorkspaceSkillRef(r);
-			});
-			const retainedWorkspaceActive = getCurrentActiveSkillRefs().filter(r => {
-				return isWorkspaceSkillRef(r);
-			});
-			const nextInstalledEnabled = normalizeSkillRefs(nextInstalledEnabledInput).filter(r => {
-				return isInstalledSkillRef(r);
-			});
-			const nextInstalledActive = normalizeSkillRefs(nextInstalledActiveInput).filter(r => {
-				return isInstalledSkillRef(r);
-			});
+			const workspaceKeys = workspaceSkillRefKeysRef.current;
+			const retainedWorkspaceEnabled = getCurrentEnabledSkillRefs().filter(ref => workspaceKeys.has(skillRefKey(ref)));
+			const retainedWorkspaceActive = getCurrentActiveSkillRefs().filter(ref => workspaceKeys.has(skillRefKey(ref)));
+			const nextInstalledEnabled = normalizeSkillRefs(nextInstalledEnabledInput).filter(
+				ref => !workspaceKeys.has(skillRefKey(ref))
+			);
+			const nextInstalledActive = normalizeSkillRefs(nextInstalledActiveInput).filter(
+				ref => !workspaceKeys.has(skillRefKey(ref))
+			);
 
 			await applySkillSelectionState(
 				[...nextInstalledEnabled, ...retainedWorkspaceEnabled],
@@ -376,7 +466,11 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			updateActiveSkillRefsState(nextActive);
 
 			if (skillSessionIDRef.current) {
-				sessionStateKeyRef.current = buildSkillSessionStateKey(enabledSkillRefsRef.current, activeSkillRefsRef.current);
+				sessionStateKeyRef.current = buildSkillSessionStateKey(
+					enabledSkillRefsRef.current,
+					activeSkillRefsRef.current,
+					workspaceRefRef.current
+				);
 			} else {
 				sessionStateKeyRef.current = '';
 			}
@@ -492,9 +586,10 @@ export function useComposerSkills(): UseComposerSkillsResult {
 				return;
 			}
 
+			const workspaceKeys = workspaceSkillRefKeysRef.current;
 			void applySkillSelectionState(
 				[
-					...enabledSkillRefsRef.current.filter(isWorkspaceSkillRef),
+					...enabledSkillRefsRef.current.filter(ref => workspaceKeys.has(skillRefKey(ref))),
 					...loadedSkills
 						.filter(s => {
 							return isInstructionSkillListItem(s);
@@ -510,8 +605,9 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	}, [allSkills, applySkillSelectionState]);
 
 	const disableAllSkills = useCallback(() => {
-		const nextEnabled = enabledSkillRefsRef.current.filter(isWorkspaceSkillRef);
-		const nextActive = activeSkillRefsRef.current.filter(isWorkspaceSkillRef);
+		const workspaceKeys = workspaceSkillRefKeysRef.current;
+		const nextEnabled = enabledSkillRefsRef.current.filter(ref => workspaceKeys.has(skillRefKey(ref)));
+		const nextActive = activeSkillRefsRef.current.filter(ref => workspaceKeys.has(skillRefKey(ref)));
 		void applySkillSelectionState(nextEnabled, nextActive, {
 			syncSession: SkillSessionSyncMode.IfSessionExists,
 		});
@@ -527,6 +623,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			sessionID: sid,
 			activity: 'active',
 			allowSkillRefs,
+			workspace: workspaceRefRef.current,
 		});
 
 		return clampActiveSkillRefsToEnabled(
@@ -542,7 +639,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		}
 
 		const currentActive = activeSkillRefsRef.current;
-		const currentStateKey = buildSkillSessionStateKey(currentEnabled, currentActive);
+		const currentStateKey = buildSkillSessionStateKey(currentEnabled, currentActive, workspaceRefRef.current);
 		const existing = skillSessionIDRef.current;
 
 		if (existing && sessionStateKeyRef.current === currentStateKey) {
@@ -561,7 +658,8 @@ export function useComposerSkills(): UseComposerSkillsResult {
 				existing ?? undefined, // closeSessionID (best-effort)
 				undefined, // maxActivePerSession
 				currentEnabled, // allowSkillRefs (REQUIRED)
-				currentActive // initial active from conversation
+				currentActive, // initial active from conversation
+				workspaceRefRef.current
 			);
 
 			if (!sess.sessionID) {
@@ -585,7 +683,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeSkillRefs ?? latestActive);
 			updateSkillSessionIDState(sess.sessionID);
 			updateActiveSkillRefsState(resolvedActive);
-			sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive);
+			sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive, workspaceRefRef.current);
 
 			return sess.sessionID;
 		} catch (error) {
@@ -619,11 +717,14 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		disableAllSkills,
 		refreshSkills,
 		applySkillSelectionState,
+		applyWorkspaceSkillSelectionState,
 		applyInstalledSkillSelectionState,
 		ensureSkillSession,
 		listActiveSkillRefs,
 		getCurrentEnabledSkillRefs,
 		getCurrentActiveSkillRefs,
+		getCurrentInstalledEnabledSkillRefs,
+		getCurrentInstalledActiveSkillRefs,
 		getCurrentSkillSessionID,
 	};
 }

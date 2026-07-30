@@ -18,7 +18,10 @@ It specifies:
 - Current implementation status.
 - Ordered work needed to reach the target.
 
-Current root-based code is a stepping stone and not a compatibility constraint.
+The delivered Workspace is a feature-specific view over the shared Artifact
+Store. It is not a second project database or a general-purpose Source
+administration API. This document distinguishes delivered behavior from
+portable transfer and future domain work.
 
 ## 2. Feature intent
 
@@ -32,6 +35,10 @@ A Workspace gives a user one coherent project or contextual scope containing:
 - Agent and Assistant definitions.
 - Optional built-in, library, package, or overlay content.
 - Future domain Artifact kinds supported by complete Workspace adapters.
+
+A Workspace is a project scope, not the selected item itself. An Artifact is
+the durable unit that can be enabled, pinned, suppressed, selected for a
+conversation, loaded as Context, or handed to a runtime.
 
 A Workspace is intentionally a heterogeneous Collection. Artifact Store and
 Workspace policy must not assume that all members have one Artifact kind.
@@ -48,26 +55,33 @@ It answers:
 - Which local settings must be omitted from a shared Workspace?
 - Whether a shared Workspace can be imported reproducibly?
 
-## 3. Outcomes
+## 3. Delivered outcome and planned scope
 
-Workspace must allow a user to:
+### 3.1 Available now
 
-- Create a filesystem-backed or empty Workspace.
-- Retain stable Workspace identity independently of a filesystem path.
-- Attach additional Sources by explicit role.
-- Refresh once and receive one coherent catalog.
-- Browse valid, invalid, missing, adopted, and unadopted occurrences.
-- Preserve local Artifact settings across refresh.
-- Select Context and Skills through typed Artifact references.
-- Compose bounded Context for normal inference assembly.
-- Compose validated load plans for selected supported Artifacts.
-- Use eligible filesystem Skills through normal Agent Skills runtime behavior.
-- Keep installed and Workspace persistence ownership separate.
-- Export one Workspace as a portable manifest or self-contained package.
-- Import a shared Workspace from a local file, directory, archive, or
-  policy-approved URI.
-- Preserve native member formats such as Markdown, JSON, YAML, directories,
-  and multi-file Skill packages.
+A person can:
+
+- Create filesystem-backed and empty Workspaces with stable identity.
+- Attach existing Sources by Workspace role.
+- Refresh a Workspace and receive one coherent catalog of observations.
+- Browse valid, invalid, missing, recorded, and unrecorded observations.
+- Automatically adopt supported Context and Skill observations, or explicitly
+  adopt, pin, suppress, unsuppress, disable, or remove an Artifact.
+- Preserve local Artifact settings while source-derived state changes.
+- Persist Context and Skill selections using Artifact references.
+- Compose bounded Context with provenance for an inference caller.
+- Load eligible local-path-backed Skills through the normal Agent Skills
+  runtime path.
+- Keep Workspace state separate from legacy installed Skill persistence and
+  keep private Source configuration out of Workspace views.
+
+### 3.2 Planned, not currently offered
+
+- Import or export a Workspace as a linked manifest or self-contained package.
+- Acquire Workspace content from archives or policy-approved external URIs.
+- Export portable content closures for Skills and other multi-file Artifacts.
+- Add Tool, MCP, Model, Agent, Assistant, and other Artifact domains after
+  each has a complete product path.
 
 ## 4. Dependencies and boundaries
 
@@ -146,8 +160,13 @@ A local Workspace Collection contains:
 
 These values are not exported automatically.
 
-The shareable representation is a Portable Workspace Collection Definition,
-initially represented by `.flexigpt/workspace.json`.
+The current `.flexigpt/workspace.json` reader is an optional primary-source
+bootstrap input. It can contribute relative discovery targets and expected
+content digests to a refresh; it does not create a transferable Workspace or
+export package.
+
+The intended shareable representation is a Portable Workspace Collection
+Definition, initially represented by `.flexigpt/workspace.json`.
 
 Its schema contains only portable data such as:
 
@@ -172,16 +191,18 @@ A Workspace may be shared as:
 - A self-contained archive with the manifest at the package root.
 - A linked manifest containing policy-approved external URIs.
 
+Today, only relative descriptor members in the primary Source are accepted as
+refresh input. Embedded members and external URIs are deliberately rejected
+until import, transfer, and acquisition policy exist.
+
 The initial native format is JSON. A future YAML codec may represent the same
 canonical Portable Workspace Collection Definition without changing the local model.
 
 ### 5.3 Workspace Collection data
 
-Workspace Collection data contains local settings such as:
-
-- Discovery preferences.
-- Context composition preferences.
-- Future local policy references.
+Currently, Workspace Collection data stores discovery preferences and the
+revision of the discovery policy that produced the catalog. Prompt-composition
+limits are application configuration, not saved Workspace data.
 
 The primary Source relationship is represented by the `primary` attachment and
 must not be duplicated as an independently authoritative Source ID in Collection data.
@@ -229,6 +250,35 @@ runtime or product consumer.
 When those domains are supported, the same Workspace Collection may contain
 their Artifacts together. Homogeneous grouping remains available through
 derived kind views and does not require separate Workspace Collections.
+
+### 5.6 Artifact-centred Workspace behavior
+
+Discovery first produces observations. An observation explains what a Source
+currently contains; it is not automatically a user selection. A Workspace
+Artifact is the durable local record for an item the user wants to manage,
+select, enable, or use.
+
+For a client, the distinction is important:
+
+- An unrecorded observation is discoverable content that has no local Artifact.
+- An observed Artifact is created automatically only for supported kinds that
+  are not explicitly suppressed.
+- A pinned Artifact records an intended Source location even before matching
+  content is available.
+- Removing an Artifact can either prevent automatic recreation through
+  suppression or remove only the local record.
+
+The Artifact state explains its source-derived availability:
+
+- Available means the current observation is valid and still matches the
+  Artifact's expected kind.
+- Missing means the source location or subresource is no longer observed.
+- Invalid means the current source content could not be accepted.
+- Incompatible means the same source location now produces a different kind.
+
+Catalog currentness is separate from Artifact state. A visible Artifact can be
+available while its catalog needs refresh because Workspace, Source, decoder,
+or discovery-policy inputs changed.
 
 ## 6. Discovery behavior
 
@@ -402,92 +452,83 @@ Workspace must:
 | `WS-F12` | Resolve explicit references and selectors deterministically.                    | Core     |
 | `WS-F13` | Compose validated generic load plans for selected supported Artifacts.          | Core     |
 | `WS-F14` | Compose bounded Context load plans.                                             | Core     |
-| `WS-F15` | Integrate selected Context with normal inference assembly.                      | Core     |
+| `WS-F15` | Return selected Context with provenance and bounded composition for inference.  | Core     |
 | `WS-F16` | Load selected `agent.skill` Artifacts through normal Agent Skills runtime.      | Core     |
 | `WS-F17` | Preserve resource and script parity for eligible filesystem Skills.             | Core     |
 | `WS-F18` | Keep installed and Workspace persistence ownership separate.                    | Core     |
 | `WS-F19` | Keep local paths, credentials, and runtime handles out of portable definitions. | Core     |
 | `WS-F20` | Return diagnostics for unavailable, denied, stale, or ambiguous selections.     | Core     |
 | `WS-F21` | Allow heterogeneous Artifact kinds according to Workspace policy.               | Core     |
-| `WS-F22` | Define a portable, versioned `workspace.collection` schema.                     | Core     |
+| `WS-F22` | Read a versioned Workspace descriptor safely as an optional refresh input.      | Core     |
 | `WS-F23` | Import and export linked or self-contained Workspaces.                          | Planned  |
 | `WS-F24` | Add future Artifact kinds only with an end-to-end consumer path.                | Core     |
 | `WS-F25` | Support capture, fork, dependency history, and generic materialization.         | Optional |
 
-## 11. API direction
+## 11. API ownership and client journey
 
-Workspace operations include:
+This is the only implementation-oriented section of this document. It explains
+which boundary a client should use without requiring the client to understand
+storage details.
 
-    CreateFilesystemWorkspace(rootID, request) -> WorkspaceRef
-    CreateEmptyWorkspace(rootID, request) -> WorkspaceRef
-    GetWorkspace(workspaceRef)
-    ListWorkspaces(rootID)
-    UpdateWorkspace(workspaceRef, request)
-    RetireWorkspace(workspaceRef)
-    PurgeWorkspace(workspaceRef)
-    ReplaceWorkspacePrimarySource(workspaceRef, request)
-    SetWorkspacePrimarySource(workspaceRef, request)
+### 11.1 Use the Artifact API for shared setup
 
-Attachment and catalog operations include:
+Use the Artifact API to manage Roots, Sources, supported Source kinds, and
+application-managed package contents. A Source's private configuration is
+write-only and must never be treated as Workspace or portable data.
 
-    AttachWorkspaceSource(workspaceRef, request)
-    UpdateWorkspaceAttachment(workspaceRef, sourceID, request)
-    DetachWorkspaceSource(workspaceRef, sourceID, request)
-    RefreshWorkspace(workspaceRef)
-    GetWorkspaceCatalog(workspaceRef)
+### 11.2 Use the Workspace API for Workspace meaning
 
-Artifact and projection operations include:
+Use the Workspace API to create and manage Workspaces, attach Sources, refresh
+discovery, inspect catalogs, and perform Workspace-scoped Artifact actions.
+A filesystem Workspace creation flow can create its primary filesystem Source
+as a convenience; otherwise, create or select Sources through the Artifact API.
+There is intentionally no raw public Collection editor for Workspace state.
 
-    GetWorkspaceArtifact(workspaceRef, artifactRef)
-    ListWorkspaceArtifacts(workspaceRef)
-    AdoptWorkspaceOccurrence(workspaceRef, occurrenceRef)
-    PinWorkspaceArtifact(workspaceRef, sourceBinding)
-    ListWorkspaceSuppressions(workspaceRef)
-    SuppressWorkspaceBinding(workspaceRef, sourceBinding)
-    UnsuppressWorkspaceBinding(workspaceRef, sourceBinding)
-    SetWorkspaceArtifactEnabled(workspaceRef, artifactRef, request)
-    SetWorkspaceArtifactRuntimeDisabled(workspaceRef, artifactRef, request)
-    ComposeWorkspaceLoadPlan(workspaceRef, artifactRefs)
-    ComposeWorkspaceContext(workspaceRef, artifactRefs)
-    LoadWorkspaceSkills(workspaceRef, artifactRefs)
+### 11.3 Typical client flow
 
-Planned transfer operations include:
+1. Create or select a Root and Sources through the Artifact API.
+2. Create an empty Workspace or a filesystem Workspace.
+3. Attach eligible existing Sources where the user wants additional content.
+4. Refresh and present the catalog before asking the user to select content.
+5. Present observations separately from local Artifacts so a user can see what
+   is discovered, adopted, suppressed, missing, or invalid.
+6. Persist user selections with Artifact references, then request Context or
+   Skill projections from the Workspace API.
 
-    ImportWorkspace(rootID, input) -> WorkspaceRef
-    ExportWorkspace(workspaceRef, options) -> PortableOutput
-    ExportWorkspaceArtifact(workspaceRef, artifactRef, options) -> PortableOutput
+### 11.4 Revisions, freshness, and destructive actions
 
-No API infers durable identity from an encoded runtime string.
+Every mutation uses the revision returned by an earlier read. A conflict means
+the displayed state changed and must be reloaded before retrying. Use catalog
+currentness and diagnostics to decide whether a refresh is required; do not
+treat catalog position, source path, definition digest, or runtime location as
+durable identity.
+
+When a Workspace owns an Artifact, use the Workspace API for removal so it can
+verify membership. The generic Artifact purge operation is reserved for callers
+where the necessary feature-level ownership checks have already happened.
 
 ## 12. Current implementation status
 
-| Capability                              | Status                    | Current implementation                                                                                                                                                               |
-| --------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Filesystem and empty Workspace creation | Present                   | Provisioning creates Sources and typed Collections with compensation.                                                                                                                |
-| Workspace Collection identity           | Present                   | A Workspace is a `workspace.collection` addressed by `WorkspaceRef`.                                                                                                                 |
-| Shared application Artifact Store       | Present                   | Application startup opens one Artifact Store and injects its services into Workspace.                                                                                                |
-| Attachment role policy                  | Present as reusable logic | Primary, built-in, library, package, and overlay roles exist for Collection attachments.                                                                                             |
-| Workspace discovery planning            | Present                   | Defaults, profile scopes, explicit decoder hints, preferences, bootstrap definition, and bounds are implemented.                                                                     |
-| Portable Workspace descriptor           | Present foundation        | `.flexigpt/workspace.json` is read as a portable Collection descriptor and remains outside Workspace Artifact Records.                                                               |
-| Context decoding and composition        | Present                   | Context validation, ordering, budgets, truncation, and diagnostics exist.                                                                                                            |
-| Context inference integration           | Present                   | The Workspace inference bridge resolves Context, injects bounded current-turn input, and returns usage provenance.                                                                   |
-| Skill Markdown parsing                  | Present                   | `SKILL.md` parsing and validation are implemented in the Workspace Skill adapter.                                                                                                    |
-| Shared `agent.skill` definition         | Present                   | Workspace uses the shared `agent.skill` definition and decoder.                                                                                                                      |
-| Skill filesystem runtime handoff        | Present                   | Any Source adapter explicitly advertising trusted local paths can perform the verified `SKILL.md` runtime handoff.                                                                   |
-| Full package freshness                  | Point-in-time verified    | Source generation is verified before and after trusted package handoff; portable closure export remains planned.                                                                     |
-| Heterogeneous Collection support        | Present foundation        | Workspace uses one collection-scoped catalog and Artifact lifecycle for all registered supported kinds.                                                                              |
-| Workspace import and export             | Not present               | There is no portable Collection codec, URI resolver, closure builder, or archive workflow.                                                                                           |
-| Typed Workspace and Artifact refs       | Present                   | Workspace uses `WorkspaceRef` and `ArtifactRef`; runtime handles remain process-local.                                                                                               |
-| Runtime reconciliation                  | Present and derived       | Wails wrappers enqueue coalesced runtime reconciliation after durable Workspace mutations; metadata commits do not wait for it.                                                      |
-| Generic Source mutation reconciliation  | Present and derived       | Artifact Store wrapper mutations schedule root-scoped Workspace runtime reconciliation without coupling Artifact Store to runtime.                                                   |
-| Workspace Artifact purge                | Present                   | Workspace exposes membership-checked destructive Artifact purge and schedules derived runtime reconciliation.                                                                        |
-| Primary Source lifecycle                | Present                   | Empty Workspaces can gain, replace, or explicitly clear one primary filesystem Source through a dedicated operation.                                                                 |
-| Attached Source provisioning            | Present for current scope | Artifact Store exposes Source lifecycle APIs and Workspace attaches existing Sources through typed attachment roles.                                                                 |
-| Workspace retirement and purge          | Present                   | Retirement is reversible only through retained metadata; typed purge verifies retired `workspace.collection` kind before delete.                                                     |
-| Core end-to-end verification            | Present                   | Tests cover filesystem Workspace refresh, Context and Skill projection, current-catalog pinning, attached arbitrary Markdown, suppression, unsuppression, and automatic re-adoption. |
-| Future artifact kinds                   | Not present               | MCP, Tool, Model, Agent, and Assistant paths are absent.                                                                                                                             |
+| Capability                         | Status                  | Current implementation                                                                                                                                                         |
+| ---------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Workspace identity and lifecycle   | Present                 | A Workspace is a `workspace.collection` addressed by `WorkspaceRef`. Filesystem and empty creation, update, primary Source changes, retirement, and typed purge are available. |
+| Artifact-first API split           | Present                 | Artifact API owns Root and Source administration. Workspace API owns Workspace policy, catalog views, and Workspace-scoped Artifact actions.                                   |
+| Source attachments and roles       | Present                 | One enabled filesystem primary Source is optional. Built-in, library, package, and overlay attachments can add content under typed Workspace rules.                            |
+| Discovery and refresh              | Present                 | Refresh uses bounded deterministic plans, configured decoders, attachment settings, Workspace preferences, and primary descriptor observations.                                |
+| Descriptor bootstrap               | Present but limited     | `.flexigpt/workspace.json` can add relative discovery targets and expected digests from the primary Source. It is not yet an import/export format.                             |
+| Catalog freshness                  | Present                 | Workspace reports stale catalog metadata, decoder changes, and discovery-policy changes. A refresh produces a coherent replacement catalog.                                    |
+| Artifact lifecycle                 | Present                 | Supported observations can be automatically adopted or manually adopted, pinned, suppressed, unsuppressed, enabled, runtime-disabled, unadopted, or purged.                    |
+| Artifact-centred catalog views     | Present                 | Catalog responses distinguish observations from recorded Artifacts and expose available, missing, invalid, incompatible, unresolved, and unrecorded states.                    |
+| Context projection and composition | Present                 | Context definitions are validated, ordered, bounded, truncated or excluded by policy, and returned with diagnostics and provenance for callers.                                |
+| Shared Agent Skill projection      | Present                 | Workspace uses the shared `agent.skill` definition and validates `SKILL.md` before runtime use.                                                                                |
+| Skill runtime handoff              | Present                 | Eligible Sources with trusted local-path capability verify Source generation, occurrence definition, and `SKILL.md` content before exposing a package directory to runtime.    |
+| Conversation selection provenance  | Present                 | Conversation resolution records selected and used Artifact revisions and definition digests, including partial or unavailable outcomes.                                        |
+| Derived runtime reconciliation     | Present and nonblocking | Workspace Skill runtime state is rebuildable. Durable Workspace mutations must not be rolled back because a later runtime refresh is delayed or fails.                         |
+| Source configuration privacy       | Present                 | Workspace views expose Source summaries and optional trusted local presentation paths, never raw Source configuration.                                                         |
+| Workspace transfer                 | Not present             | There is no Workspace importer, exporter, archive workflow, URI resolver, or portable content-closure builder.                                                                 |
+| Future Artifact domains            | Not present             | MCP, Tool, Model, Agent, Assistant, and other domains remain absent until each has a complete decoder, validator, projection, and product consumer.                            |
 
-## 13. Next steps
+## 13. Current boundary and remaining work
 
 ### 13.0 Current core completion boundary
 
@@ -572,15 +613,21 @@ destructive Artifact operations.
 - Add application flows to create or select built-in, library, package, and overlay Sources.
 - Keep Source transport outside Workspace role semantics.
 
-### 13.9 Add transfer and future kinds in bounded increments
+### 13.9 Remaining product work
 
-- Implement Workspace import and export after the Collection and portable
-  definition contracts are stable.
-- Add MCP only after defining credential references and connection policy.
-- Add Tool, Model, Agent, Assistant, and conversation-related kinds only with
-  complete domain codecs, projectors, and product consumers.
+- Make frontend and application flows consistently use the Artifact API for
+  Root and Source administration and the Workspace API for Workspace meaning.
+- Implement portable Workspace import and export only after defining content
+  closure, archive, acquisition, provenance, and omission policy.
+- Add explicit source-provisioning flows for built-in, library, package, and
+  overlay content without placing source transport details in Workspace data.
+- Keep inference assembly and Skill runtime synchronization at the application
+  edge, with visible diagnostics and retry rather than rollback of committed
+  Workspace metadata.
+- Add future Artifact kinds only with their full decoder, schema validation,
+  adoption policy, projection, runtime or product consumer, and transfer plan.
 
-### 13.10 Core verification suite
+### 13.10 Verification that must stay current
 
 The Workspace verification suite must cover:
 
@@ -602,7 +649,11 @@ future-domain verification remain deferred with their corresponding features.
 
 ## 14. Acceptance outcomes
 
-Workspace satisfies this document when:
+The local Artifact-centred Workspace criteria below describe the delivered
+core. The transfer and portable-package criteria remain target outcomes until
+their importer, exporter, acquisition, and closure work is implemented.
+
+The full Workspace target is complete when:
 
 - A Workspace is a `workspace.collection`.
 - `WorkspaceRef` is its aggregate identity.

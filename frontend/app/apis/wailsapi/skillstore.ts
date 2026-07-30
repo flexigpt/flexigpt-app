@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-misused-spread
 import type {
 	InvokeSkillToolResponse,
 	ListSkillsRequest,
@@ -14,10 +15,12 @@ import type {
 	SkillSession,
 	SkillType,
 } from '@/spec/skill';
+import type { WorkspaceRef } from '@/spec/workspace';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 import type { ISkillStoreAPI } from '@/apis/interface';
+import { requireWailsBody, toFrontendDate } from '@/apis/wailsapi/transport';
 import {
 	CloseSkillSession,
 	CreateSkillSession,
@@ -38,7 +41,64 @@ import {
 	RenderProvidedSkill,
 	RenderSkill,
 } from '@/apis/wailsjs/go/main/SkillStoreWrapper';
-import type { spec } from '@/apis/wailsjs/go/models';
+import type { skillruntime, spec } from '@/apis/wailsjs/go/models';
+
+function optionalFrontendDate(value: unknown, field: string): Date | undefined {
+	if (value === undefined || value === null || value === '') {
+		return undefined;
+	}
+
+	return toFrontendDate(value, field);
+}
+
+function skillFromWails(skill: spec.Skill): Skill {
+	const presence = skill.presence
+		? {
+				...skill.presence,
+				lastCheckedAt: optionalFrontendDate(skill.presence.lastCheckedAt, 'skill.presence.lastCheckedAt'),
+				lastSeenAt: optionalFrontendDate(skill.presence.lastSeenAt, 'skill.presence.lastSeenAt'),
+				missingSince: optionalFrontendDate(skill.presence.missingSince, 'skill.presence.missingSince'),
+			}
+		: undefined;
+
+	return {
+		...skill,
+		...(presence === undefined ? {} : { presence }),
+		createdAt: toFrontendDate(skill.createdAt, 'skill.createdAt'),
+		modifiedAt: toFrontendDate(skill.modifiedAt, 'skill.modifiedAt'),
+	} as Skill;
+}
+
+function skillBundleFromWails(bundle: spec.SkillBundle): SkillBundle {
+	return {
+		...bundle,
+		createdAt: toFrontendDate(bundle.createdAt, 'skillBundle.createdAt'),
+		modifiedAt: toFrontendDate(bundle.modifiedAt, 'skillBundle.modifiedAt'),
+		softDeletedAt: optionalFrontendDate(bundle.softDeletedAt, 'skillBundle.softDeletedAt'),
+	} as SkillBundle;
+}
+
+function skillListItemFromWails(item: spec.SkillListItem): SkillListItem {
+	return {
+		...item,
+		skillDefinition: skillFromWails(item.skillDefinition),
+	} as SkillListItem;
+}
+
+function providedSkillFromWails(skill: skillruntime.Skill): ProvidedSkill {
+	return {
+		...skill,
+		createdAt: toFrontendDate(skill.createdAt, 'providedSkill.createdAt'),
+		modifiedAt: toFrontendDate(skill.modifiedAt, 'providedSkill.modifiedAt'),
+	} as ProvidedSkill;
+}
+
+function renderedProvidedSkillFromWails(skill: skillruntime.RenderedSkill): RenderProvidedSkillResponse {
+	return {
+		...skill,
+		skill: providedSkillFromWails(skill.skill),
+	} as RenderProvidedSkillResponse;
+}
 
 export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	async listSkillBundles(
@@ -48,15 +108,19 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		pageToken?: string
 	): Promise<{ skillBundles: SkillBundle[]; nextPageToken?: string }> {
 		const req = {
-			BundleIDs: bundleIDs,
-			IncludeDisabled: includeDisabled,
-			PageSize: pageSize,
-			PageToken: pageToken,
+			BundleIDs: bundleIDs ?? [],
+			IncludeDisabled: includeDisabled ?? false,
+			PageSize: pageSize ?? 0,
+			PageToken: pageToken ?? '',
 		};
 		const resp = await ListSkillBundles(req as spec.ListSkillBundlesRequest);
+		const body = requireWailsBody(resp.Body, 'ListSkillBundles');
+
 		return {
-			skillBundles: (resp.Body?.skillBundles ?? []) as SkillBundle[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			skillBundles: (body.skillBundles ?? []).map(s => {
+				return skillBundleFromWails(s);
+			}),
+			nextPageToken: body.nextPageToken ?? undefined,
 		};
 	}
 
@@ -96,19 +160,23 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 
 	async listSkills(req: ListSkillsRequest): Promise<{ skillListItems: SkillListItem[]; nextPageToken?: string }> {
 		const inReq = {
-			BundleIDs: req.bundleIDs,
-			Types: req.types,
-			Inserts: req.inserts,
-			Tags: req.tags,
-			IncludeDisabled: req.includeDisabled,
-			IncludeMissing: req.includeMissing,
-			RecommendedPageSize: req.recommendedPageSize,
-			PageToken: req.pageToken,
+			BundleIDs: req.bundleIDs ?? [],
+			Types: req.types ?? [],
+			Inserts: req.inserts ?? [],
+			Tags: req.tags ?? [],
+			IncludeDisabled: req.includeDisabled ?? false,
+			IncludeMissing: req.includeMissing ?? false,
+			RecommendedPageSize: req.recommendedPageSize ?? 0,
+			PageToken: req.pageToken ?? '',
 		};
 		const resp = await ListSkills(inReq as spec.ListSkillsRequest);
+		const body = requireWailsBody(resp.Body, 'ListSkills');
+
 		return {
-			skillListItems: (resp.Body?.skillListItems ?? []) as SkillListItem[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			skillListItems: (body.skillListItems ?? []).map(s => {
+				return skillListItemFromWails(s);
+			}),
+			nextPageToken: body.nextPageToken ?? undefined,
 		};
 	}
 
@@ -146,7 +214,9 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 			Body: payload as spec.PutSkillArtifactRequestBody,
 		};
 		const resp = await PutSkillArtifact(req as spec.PutSkillArtifactRequest);
-		return resp.Body?.skill as Skill;
+		const body = requireWailsBody(resp.Body, 'PutSkillArtifact');
+
+		return skillFromWails(body.skill);
 	}
 
 	async patchSkill(
@@ -180,7 +250,8 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	async getSkill(bundleID: string, skillSlug: string, includeDisabled: boolean): Promise<Skill | undefined> {
 		const req: spec.GetSkillRequest = { BundleID: bundleID, SkillSlug: skillSlug, IncludeDisabled: includeDisabled };
 		const resp = await GetSkill(req);
-		return resp?.Body as Skill;
+
+		return resp.Body ? skillFromWails(resp.Body) : undefined;
 	}
 
 	async getSkillsPrompt(filter?: RuntimeSkillFilter): Promise<string> {
@@ -188,14 +259,16 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 			Body: { filter: filter as spec.RuntimeSkillFilter } as spec.GetSkillsPromptRequestBody,
 		} as spec.GetSkillsPromptRequest;
 		const resp = await GetSkillsPrompt(req);
-		return resp?.Body?.prompt || '';
+
+		return requireWailsBody(resp.Body, 'GetSkillsPrompt').prompt;
 	}
 
 	async createSkillSession(
 		closeSessionID?: string,
 		maxActivePerSession?: number,
 		allowSkillRefs?: SkillRef[],
-		activeSkillRefs?: SkillRef[]
+		activeSkillRefs?: SkillRef[],
+		workspace?: WorkspaceRef
 	): Promise<SkillSession> {
 		const req = {
 			Body: {
@@ -203,13 +276,16 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 				maxActivePerSession: maxActivePerSession,
 				allowSkillRefs: allowSkillRefs,
 				activeSkillRefs: activeSkillRefs,
+				workspace: workspace,
 			} as spec.CreateSkillSessionRequestBody,
 		} as spec.CreateSkillSessionRequest;
 
 		const resp = await CreateSkillSession(req);
+		const body = requireWailsBody(resp.Body, 'CreateSkillSession');
+
 		return {
-			sessionID: resp?.Body?.sessionID ?? '',
-			activeSkillRefs: (resp?.Body?.activeSkillRefs ?? []) as SkillRef[],
+			sessionID: body.sessionID,
+			activeSkillRefs: body.activeSkillRefs as SkillRef[],
 		};
 	}
 
@@ -224,7 +300,9 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		} as spec.ListRuntimeSkillsRequest;
 
 		const resp = await ListRuntimeSkills(req);
-		return (resp?.Body?.skills ?? []) as RuntimeSkillListItem[];
+		const body = requireWailsBody(resp.Body, 'ListRuntimeSkills');
+
+		return (body.skills ?? []) as RuntimeSkillListItem[];
 	}
 
 	async invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse> {
@@ -233,51 +311,52 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		} as spec.InvokeSkillToolRequest;
 
 		const resp = await InvokeSkillTool(req);
-
-		return resp?.Body as InvokeSkillToolResponse;
+		return requireWailsBody(resp.Body, 'InvokeSkillTool') as InvokeSkillToolResponse;
 	}
 
-	async renderSkill(ref: SkillRef, args?: Record<string, string>): Promise<RenderSkillResponse> {
+	async renderSkill(
+		ref: SkillRef,
+		args?: Record<string, string>,
+		workspace?: WorkspaceRef
+	): Promise<RenderSkillResponse> {
 		const req = {
-			Body: { skillRef: ref, arguments: args } as spec.RenderSkillRequestBody,
+			Body: { skillRef: ref, arguments: args, workspace: workspace } as spec.RenderSkillRequestBody,
 		} as spec.RenderSkillRequest;
 
 		const resp = await RenderSkill(req);
 
-		return resp?.Body as RenderSkillResponse;
+		return requireWailsBody(resp.Body, 'RenderSkill') as RenderSkillResponse;
 	}
 
-	async listProvidedSkills(workspaceRootID?: string): Promise<ProvidedSkill[]> {
-		const request = {
-			WorkspaceRootID: workspaceRootID?.trim() ?? '',
-		} as Parameters<typeof ListProvidedSkills>[0];
+	async listProvidedSkills(workspace?: WorkspaceRef): Promise<ProvidedSkill[]> {
+		const response = await ListProvidedSkills({
+			workspace,
+		} as Parameters<typeof ListProvidedSkills>[0]);
 
-		const response = await ListProvidedSkills(request);
-		if (!response?.Body) {
+		if (!response.Body) {
 			throw new Error('ListProvidedSkills returned an empty response body.');
 		}
 
-		return (response.Body.skills ?? []) as ProvidedSkill[];
+		return response.Body.skills.map(providedSkillFromWails);
 	}
 
 	async renderProvidedSkill(
-		identity: string,
+		ref: SkillRef,
 		args?: Record<string, string>,
-		workspaceRootID?: string
+		workspace?: WorkspaceRef
 	): Promise<RenderProvidedSkillResponse> {
-		const request = {
+		const response = await RenderProvidedSkill({
 			Body: {
-				workspaceRootID: workspaceRootID?.trim() ?? '',
-				identity: identity.trim(),
+				workspace,
+				ref,
 				arguments: args,
 			},
-		} as Parameters<typeof RenderProvidedSkill>[0];
+		} as Parameters<typeof RenderProvidedSkill>[0]);
 
-		const response = await RenderProvidedSkill(request);
-		if (!response?.Body) {
+		if (!response.Body) {
 			throw new Error('RenderProvidedSkill returned an empty response body.');
 		}
 
-		return response.Body as RenderProvidedSkillResponse;
+		return renderedProvidedSkillFromWails(response.Body);
 	}
 }

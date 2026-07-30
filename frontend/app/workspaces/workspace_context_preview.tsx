@@ -14,6 +14,7 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { ModalSection } from '@/components/modal/modal_section';
 
+import { artifactRefKey, workspaceRefKey } from '@/workspaces/lib/workspace_api_utils';
 import { formatByteCount } from '@/workspaces/lib/workspace_utils';
 import { WorkspaceDiagnostics } from '@/workspaces/workspace_diagnostics';
 
@@ -26,11 +27,11 @@ interface WorkspaceContextPreviewProps {
 function WorkspaceContextPreviewContent({ onClose, workspace }: Omit<WorkspaceContextPreviewProps, 'isOpen'>) {
 	const loadPlan = useCallback(
 		async (signal: AbortSignal): Promise<WorkspaceContextLoadPlan> => {
-			const plan = await workspaceAPI.composeWorkspaceContext(workspace.rootID);
+			const plan = await workspaceAPI.composeWorkspaceContext(workspace.workspace);
 			throwIfAborted(signal);
 			return plan;
 		},
-		[workspace.rootID]
+		[workspace.workspace]
 	);
 
 	const {
@@ -47,7 +48,7 @@ function WorkspaceContextPreviewContent({ onClose, workspace }: Omit<WorkspaceCo
 		() =>
 			new Map(
 				(plan?.contributions ?? []).map(contribution => [
-					contribution.recordID,
+					artifactRefKey(contribution.artifact),
 					`${contribution.name} (${contribution.locator})`,
 				])
 			),
@@ -60,7 +61,7 @@ function WorkspaceContextPreviewContent({ onClose, workspace }: Omit<WorkspaceCo
 			onClose={onClose}
 			title="Workspace Context Preview"
 			description={`Inspect the composed Context for ${workspace.displayName}. This does not modify a conversation.`}
-			modalKey={`${workspace.rootID}:${workspace.revision}:context-preview`}
+			modalKey={`${workspaceRefKey(workspace.workspace)}:${workspace.revision}:context-preview`}
 			width="wide"
 			height="tall"
 		>
@@ -86,19 +87,22 @@ function WorkspaceContextPreviewContent({ onClose, workspace }: Omit<WorkspaceCo
 					<ModalSection title="Composition decisions">
 						{plan.decisions.length > 0 ? (
 							<div className="space-y-2">
-								{plan.decisions.map(decision => (
-									<div key={decision.recordID} className="border-base-content/10 rounded-2xl border p-3">
-										<div className="flex flex-wrap gap-2">
-											{contributionLabels.get(decision.recordID) ? (
-												<MetadataPill label="Item">{contributionLabels.get(decision.recordID) ?? ''}</MetadataPill>
-											) : null}
-											<MetadataPill label="Status">{decision.status}</MetadataPill>
-											{decision.code ? <MetadataPill label="Code">{decision.code}</MetadataPill> : null}
-											<MetadataPill label="Original">{formatByteCount(decision.originalBytes)}</MetadataPill>
-											<MetadataPill label="Included">{formatByteCount(decision.includedBytes)}</MetadataPill>
+								{plan.decisions.map(decision => {
+									const decisionKey = artifactRefKey(decision.artifact);
+									return (
+										<div key={decisionKey} className="border-base-content/10 rounded-2xl border p-3">
+											<div className="flex flex-wrap gap-2">
+												{contributionLabels.get(decisionKey) ? (
+													<MetadataPill label="Item">{contributionLabels.get(decisionKey) ?? ''}</MetadataPill>
+												) : null}
+												<MetadataPill label="Status">{decision.status}</MetadataPill>
+												{decision.code ? <MetadataPill label="Code">{decision.code}</MetadataPill> : null}
+												<MetadataPill label="Original">{formatByteCount(decision.originalBytes)}</MetadataPill>
+												<MetadataPill label="Included">{formatByteCount(decision.includedBytes)}</MetadataPill>
+											</div>
 										</div>
-									</div>
-								))}
+									);
+								})}
 							</div>
 						) : (
 							<div className="text-base-content/70 text-sm">No composition decisions were returned.</div>
@@ -125,5 +129,10 @@ export function WorkspaceContextPreview(props: WorkspaceContextPreviewProps) {
 		return null;
 	}
 
-	return <WorkspaceContextPreviewContent key={`${props.workspace.rootID}:${props.workspace.revision}`} {...props} />;
+	return (
+		<WorkspaceContextPreviewContent
+			key={`${workspaceRefKey(props.workspace.workspace)}:${props.workspace.revision}`}
+			{...props}
+		/>
+	);
 }

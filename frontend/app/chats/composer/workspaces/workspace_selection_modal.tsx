@@ -2,8 +2,9 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { FiAlertCircle, FiCheck, FiFileText, FiRefreshCw, FiZap } from 'react-icons/fi';
 
+import { ArtifactState } from '@/spec/artifact';
 import type { SkillRef } from '@/spec/skill';
-import { WorkspaceRecordState, WorkspaceSkillInsert } from '@/spec/workspace';
+import { WorkspaceSkillInsert } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -14,7 +15,8 @@ import { ModalSection } from '@/components/modal/modal_section';
 
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
 import { isWorkspaceSkillSessionEligible } from '@/chats/composer/workspaces/use_composer_workspace';
-import { createWorkspaceSkillRef, isWorkspaceSkillRef, skillRefKey } from '@/skills/lib/skill_identity_utils';
+import { skillRefKey } from '@/skills/lib/skill_identity_utils';
+import { artifactRefKey } from '@/workspaces/lib/workspace_api_utils';
 
 interface WorkspaceSelectionModalProps {
 	isOpen: boolean;
@@ -37,13 +39,9 @@ function WorkspaceSelectionModalContent({
 	const { requestClose } = useModalDialogController();
 
 	const activeKeys = new Set(
-		activeSkillRefs
-			.filter(r => {
-				return isWorkspaceSkillRef(r);
-			})
-			.map(r => {
-				return skillRefKey(r);
-			})
+		activeSkillRefs.map(r => {
+			return skillRefKey(r);
+		})
 	);
 
 	const workspaceName = state.workspace?.displayName ?? state.selection?.displayName ?? 'Unavailable Workspace';
@@ -92,17 +90,18 @@ function WorkspaceSelectionModalContent({
 				>
 					<div className="space-y-2">
 						{state.contexts.map(context => {
-							const selected = state.selectedContextIDs.has(context.recordID);
+							const contextKey = artifactRefKey(context.artifact);
+							const selected = state.selectedContextIDs.has(contextKey);
 							const usable =
 								context.enabled &&
-								context.state === WorkspaceRecordState.Available &&
+								context.state === ArtifactState.Available &&
 								context.catalogCurrent &&
 								context.projectionValid &&
 								!context.runtimeDisabled;
 
 							return (
 								<label
-									key={context.recordID}
+									key={contextKey}
 									className={`border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-2xl border p-3 ${
 										selected ? 'border-secondary/50 bg-secondary/10' : ''
 									}`}
@@ -157,13 +156,15 @@ function WorkspaceSelectionModalContent({
 
 						{state.missingContextRefs.map(ref => (
 							<div
-								key={ref.recordID}
+								key={artifactRefKey(ref.artifact)}
 								className="border-warning/40 bg-warning/10 flex items-start gap-3 rounded-2xl border p-3"
 							>
 								<FiAlertCircle size={15} className="text-warning mt-0.5" />
 								<div className="min-w-0 flex-1">
-									<div className="text-sm font-medium">{ref.name || ref.recordID}</div>
-									<div className="text-base-content/60 font-mono text-xs break-all">{ref.locator || ref.recordID}</div>
+									<div className="text-sm font-medium">{ref.name || ref.artifact.artifactID}</div>
+									<div className="text-base-content/60 font-mono text-xs break-all">
+										{ref.locator || ref.artifact.artifactID}
+									</div>
 								</div>
 								<span className="badge badge-warning badge-xs">Missing</span>
 								<button
@@ -171,7 +172,7 @@ function WorkspaceSelectionModalContent({
 									className="btn btn-ghost btn-xs text-error rounded-lg"
 									disabled={isInputLocked}
 									onClick={() => {
-										state.removeContextRef(ref.recordID);
+										state.removeContextRef(ref.artifact);
 									}}
 								>
 									Remove
@@ -187,31 +188,26 @@ function WorkspaceSelectionModalContent({
 				>
 					<div className="space-y-2">
 						{state.skills.map(skill => {
-							const selected = state.selectedSkillIDs.has(skill.recordID);
-							const ref = createWorkspaceSkillRef(skill.rootID, skill.recordID);
-							if (!ref) {
-								return null;
-							}
-							const active = activeKeys.has(skillRefKey(ref));
-							const provider = state.workspaceSkillProvidersByRecordID.get(skill.recordID);
+							const skillKey = artifactRefKey(skill.artifact);
+							const selected = state.selectedSkillIDs.has(skillKey);
+							const provider = state.workspaceSkillProvidersByArtifactKey.get(skillKey);
+							const active = provider ? activeKeys.has(skillRefKey(provider.ref)) : false;
 							const instruction = skill.skill.insert === WorkspaceSkillInsert.Instructions;
 							const usable = isWorkspaceSkillSessionEligible(skill, provider);
-							const canActivate = instruction && (skill.skill.arguments?.length ?? 0) === 0;
+							const canActivate = Boolean(provider) && instruction && (skill.skill.arguments?.length ?? 0) === 0;
 							const unavailableLabel = !instruction
 								? 'Template'
 								: !provider
 									? 'Runtime unavailable'
-									: provider.shadowed
-										? 'Shadowed'
-										: !provider.runtimeAllowed
-											? 'Runtime denied'
-											: skill.runtimeDisabled
-												? 'Runtime disabled'
-												: skill.state;
+									: !provider.runtimeAllowed
+										? 'Runtime denied'
+										: skill.runtimeDisabled
+											? 'Runtime disabled'
+											: skill.state;
 
 							return (
 								<div
-									key={skill.recordID}
+									key={skillKey}
 									className={`border-base-content/10 bg-base-100 rounded-2xl border p-3 ${
 										selected ? 'border-secondary/50 bg-secondary/10' : ''
 									}`}
@@ -268,13 +264,17 @@ function WorkspaceSelectionModalContent({
 													checked={active}
 													disabled={isInputLocked || !usable || !canActivate}
 													onChange={event => {
+														if (!provider) {
+															return;
+														}
 														const checked = event.currentTarget.checked;
 														setActiveSkillRefs(previous => {
 															const byKey = new Map(previous.map(item => [skillRefKey(item), item]));
+															const providerKey = skillRefKey(provider.ref);
 															if (checked) {
-																byKey.set(skillRefKey(ref), ref);
+																byKey.set(providerKey, provider.ref);
 															} else {
-																byKey.delete(skillRefKey(ref));
+																byKey.delete(providerKey);
 															}
 															return [...byKey.values()];
 														});
@@ -295,13 +295,15 @@ function WorkspaceSelectionModalContent({
 
 						{state.missingSkillRefs.map(ref => (
 							<div
-								key={ref.recordID}
+								key={artifactRefKey(ref.artifact)}
 								className="border-warning/40 bg-warning/10 flex items-start gap-3 rounded-2xl border p-3"
 							>
 								<FiAlertCircle size={15} className="text-warning mt-0.5" />
 								<div className="min-w-0 flex-1">
-									<div className="text-sm font-medium">{ref.displayName || ref.name || ref.recordID}</div>
-									<div className="text-base-content/60 font-mono text-xs break-all">{ref.locator || ref.identity}</div>
+									<div className="text-sm font-medium">{ref.displayName || ref.name || ref.artifact.artifactID}</div>
+									<div className="text-base-content/60 font-mono text-xs break-all">
+										{ref.locator || ref.artifact.artifactID}
+									</div>
 								</div>
 								<span className="badge badge-warning badge-xs">Missing</span>
 								<button
@@ -309,7 +311,7 @@ function WorkspaceSelectionModalContent({
 									className="btn btn-ghost btn-xs text-error rounded-lg"
 									disabled={isInputLocked}
 									onClick={() => {
-										void state.removeSkillRef(ref.recordID);
+										void state.removeSkillRef(ref.artifact);
 									}}
 								>
 									Remove

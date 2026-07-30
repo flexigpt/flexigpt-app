@@ -1,8 +1,10 @@
 import type { ProvidedSkill } from '@/spec/skill';
 import { SkillProviderOrigin } from '@/spec/skill';
-import type { WorkspaceContextView, WorkspaceSkillView, WorkspaceView } from '@/spec/workspace';
+import type { WorkspaceContextView, WorkspaceRef, WorkspaceSkillView, WorkspaceView } from '@/spec/workspace';
 
 import { skillStoreAPI, workspaceAPI } from '@/apis/baseapi';
+
+import { workspaceRefsEqual } from '@/workspaces/lib/workspace_api_utils';
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	return error instanceof Error && error.message.trim() ? error.message : fallback;
@@ -18,13 +20,15 @@ export interface LoadedWorkspaceSelectionCatalog {
 	errors: string[];
 }
 
-export async function loadWorkspaceSelectionCatalog(rootID: string): Promise<LoadedWorkspaceSelectionCatalog> {
+export async function loadWorkspaceSelectionCatalog(
+	workspaceRef: WorkspaceRef
+): Promise<LoadedWorkspaceSelectionCatalog> {
 	const [workspaceResult, catalogResult, contextsResult, skillsResult, providersResult] = await Promise.allSettled([
-		workspaceAPI.getWorkspace(rootID),
-		workspaceAPI.getWorkspaceCatalog(rootID),
-		workspaceAPI.listWorkspaceContexts(rootID),
-		workspaceAPI.listWorkspaceSkills(rootID),
-		skillStoreAPI.listProvidedSkills(rootID),
+		workspaceAPI.getWorkspace(workspaceRef),
+		workspaceAPI.getWorkspaceCatalog(workspaceRef),
+		workspaceAPI.listWorkspaceContexts(workspaceRef),
+		workspaceAPI.listWorkspaceSkills(workspaceRef),
+		skillStoreAPI.listProvidedSkills(workspaceRef),
 	]);
 
 	const workspace =
@@ -63,13 +67,14 @@ export async function loadWorkspaceSelectionCatalog(rootID: string): Promise<Loa
 		providedSkills:
 			providersResult.status === 'fulfilled'
 				? providersResult.value.filter(
-						skill => skill.origin === SkillProviderOrigin.Workspace && skill.workspaceRootID === rootID
+						skill => skill.origin === SkillProviderOrigin.Workspace && workspaceRefsEqual(skill.workspace, workspaceRef)
 					)
 				: [],
-		catalogKnown:
-			contextsResult.status === 'fulfilled' &&
-			skillsResult.status === 'fulfilled' &&
-			providersResult.status === 'fulfilled',
+		// Context and Skill Artifact projections determine whether missing
+		// selections can be evaluated. Runtime-provider failure is reported
+		// separately and makes Workspace Skills unavailable without making the
+		// Artifact catalog itself unknown.
+		catalogKnown: contextsResult.status === 'fulfilled' && skillsResult.status === 'fulfilled',
 		errors,
 	};
 }

@@ -103,6 +103,7 @@ func main() {
 			app.modelPresetStoreAPI,
 			app.toolStoreAPI,
 			app.toolRuntimeAPI,
+			app.artifactStoreAPI,
 			app.skillStoreAPI,
 			app.workspaceAPI,
 			app.mcpAPI,

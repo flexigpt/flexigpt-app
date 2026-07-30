@@ -1,30 +1,8 @@
-import type {
-	InstalledSkillRef,
-	SkillListItem,
-	SkillRef,
-	SkillRefKind,
-	SkillSelection,
-	WorkspaceSkillRef,
-} from '@/spec/skill';
-import { SkillRefKind as SkillRefKindValue } from '@/spec/skill';
-import {
-	workspaceSkillIdentity as buildWorkspaceSkillIdentity,
-	parseWorkspaceSkillIdentity as parseWorkspaceSkillIdentityValue,
-} from '@/spec/workspace';
+import type { InstalledSkillRef, SkillListItem, SkillRef, SkillSelection } from '@/spec/skill';
 
 const INSTALLED_SKILL_IDENTITY_PREFIX = 'installed/';
-const WORKSPACE_SKILL_IDENTITY_PREFIX = 'workspace/';
 
-export interface WorkspaceSkillRefParts {
-	rootID: string;
-	recordID: string;
-}
-
-function hasAnyInstalledField(ref: SkillRef): boolean {
-	return Boolean(ref.bundleID?.trim() || ref.skillSlug?.trim() || ref.skillID?.trim());
-}
-
-function installedFields(ref: SkillRef): InstalledSkillRef | undefined {
+function normalizedFields(ref: SkillRef): InstalledSkillRef | undefined {
 	const bundleID = ref.bundleID?.trim();
 	const skillSlug = ref.skillSlug?.trim();
 	const skillID = ref.skillID?.trim();
@@ -36,96 +14,15 @@ function installedFields(ref: SkillRef): InstalledSkillRef | undefined {
 	return { bundleID, skillSlug, skillID };
 }
 
-function parseInstalledIdentity(identity: string): InstalledSkillRef | undefined {
-	const value = identity.trim();
-	const relative = value.startsWith(INSTALLED_SKILL_IDENTITY_PREFIX)
-		? value.slice(INSTALLED_SKILL_IDENTITY_PREFIX.length)
-		: '';
-	const parts = relative.split('/');
-
-	if (parts.length !== 3 || parts.some(part => !part || part.trim() !== part)) {
-		return undefined;
-	}
-
-	return {
-		bundleID: parts[0],
-		skillSlug: parts[1],
-		skillID: parts[2],
-	};
-}
-
-function parseWorkspaceIdentity(identity: string): WorkspaceSkillRefParts | undefined {
-	return parseWorkspaceSkillIdentityValue(identity);
-}
-
-function getSkillRefKind(ref: SkillRef | null | undefined): SkillRefKind {
-	if (!ref) {
-		return SkillRefKindValue.Invalid;
-	}
-
-	const identity = ref.identity?.trim();
-	if (identity) {
-		if (hasAnyInstalledField(ref)) {
-			return SkillRefKindValue.Invalid;
-		}
-
-		if (parseWorkspaceIdentity(identity)) {
-			return SkillRefKindValue.Workspace;
-		}
-		if (parseInstalledIdentity(identity)) {
-			return SkillRefKindValue.Installed;
-		}
-		return SkillRefKindValue.Invalid;
-	}
-
-	return installedFields(ref) ? SkillRefKindValue.Installed : SkillRefKindValue.Invalid;
-}
-
-export function normalizeSkillRef(ref: SkillRef): SkillRef | undefined {
-	switch (getSkillRefKind(ref)) {
-		case SkillRefKindValue.Installed: {
-			const fromIdentity = ref.identity ? parseInstalledIdentity(ref.identity) : undefined;
-			return fromIdentity ?? installedFields(ref);
-		}
-
-		case SkillRefKindValue.Workspace: {
-			const parts = ref.identity ? parseWorkspaceIdentity(ref.identity) : undefined;
-			return parts ? { identity: buildWorkspaceSkillIdentity(parts.rootID, parts.recordID) } : undefined;
-		}
-
-		default:
-			return undefined;
-	}
-}
-
-/**
- * Stable identity used for equality, deduplication, fingerprints, session
- * partitioning, and display fallback.
- *
- * Installed refs normalize to the same key whether an old caller supplied
- * fields or `installed/<bundle>/<slug>/<id>`.
- */
 function getSkillRefStableIdentity(ref: SkillRef | null | undefined): string | undefined {
 	if (!ref) {
 		return undefined;
 	}
 
-	switch (getSkillRefKind(ref)) {
-		case SkillRefKindValue.Installed: {
-			const installed = ref.identity ? parseInstalledIdentity(ref.identity) : installedFields(ref);
-			return installed
-				? `${INSTALLED_SKILL_IDENTITY_PREFIX}${installed.bundleID}/${installed.skillSlug}/${installed.skillID}`
-				: undefined;
-		}
-
-		case SkillRefKindValue.Workspace: {
-			const workspace = ref.identity ? parseWorkspaceIdentity(ref.identity) : undefined;
-			return workspace ? `${WORKSPACE_SKILL_IDENTITY_PREFIX}${workspace.rootID}/${workspace.recordID}` : undefined;
-		}
-
-		default:
-			return undefined;
-	}
+	const normalized = normalizedFields(ref);
+	return normalized
+		? `${INSTALLED_SKILL_IDENTITY_PREFIX}${normalized.bundleID}/${normalized.skillSlug}/${normalized.skillID}`
+		: undefined;
 }
 
 export function skillRefKey(ref: SkillRef): string {
@@ -134,58 +31,26 @@ export function skillRefKey(ref: SkillRef): string {
 		return stableIdentity;
 	}
 
-	return `invalid:${ref.identity?.trim() ?? ''}:${ref.bundleID?.trim() ?? ''}:${ref.skillSlug?.trim() ?? ''}:${ref.skillID?.trim() ?? ''}`;
-}
-
-export function isWorkspaceSkillRef(ref: SkillRef): boolean {
-	return getSkillRefKind(ref) === SkillRefKindValue.Workspace;
+	return `invalid:${ref.bundleID?.trim() ?? ''}:${ref.skillSlug?.trim() ?? ''}:${ref.skillID?.trim() ?? ''}`;
 }
 
 export function isInstalledSkillRef(ref: SkillRef): boolean {
-	return getSkillRefKind(ref) === SkillRefKindValue.Installed;
-}
-
-export function createWorkspaceSkillRef(rootID: string, recordID: string): WorkspaceSkillRef | undefined {
-	const normalizedRootID = rootID.trim();
-	const normalizedRecordID = recordID.trim();
-
-	if (!normalizedRootID || !normalizedRecordID || normalizedRootID.includes('/') || normalizedRecordID.includes('/')) {
-		return undefined;
-	}
-
-	return {
-		identity: buildWorkspaceSkillIdentity(normalizedRootID, normalizedRecordID),
-	};
-}
-
-export function getWorkspaceSkillRefParts(
-	ref: SkillRef | string | null | undefined
-): WorkspaceSkillRefParts | undefined {
-	const identity = typeof ref === 'string' ? ref : ref?.identity;
-	return identity ? parseWorkspaceIdentity(identity) : undefined;
+	return normalizedFields(ref) !== undefined;
 }
 
 export function requireInstalledSkillRef(ref: SkillRef, label = 'Skill reference'): InstalledSkillRef {
-	const normalized = normalizeSkillRef(ref);
-	if (!normalized || !isInstalledSkillRef(normalized)) {
+	const normalized = normalizedFields(ref);
+	if (!normalized) {
 		throw new Error(`${label} must contain an installed bundleID, skillSlug, and skillID.`);
 	}
 
-	return {
-		bundleID: normalized.bundleID as string,
-		skillSlug: normalized.skillSlug as string,
-		skillID: normalized.skillID as string,
-	};
+	return normalized;
 }
 
 export function formatSkillRef(ref: SkillRef): string {
-	const normalized = normalizeSkillRef(ref);
+	const normalized = normalizedFields(ref);
 	if (!normalized) {
 		return 'Invalid Skill reference';
-	}
-
-	if (isWorkspaceSkillRef(normalized)) {
-		return normalized.identity as string;
 	}
 
 	return `${normalized.bundleID}/${normalized.skillSlug}#${normalized.skillID}`;
@@ -204,7 +69,7 @@ export function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[]
 	const seen = new Set<string>();
 
 	for (const r of refs ?? []) {
-		const normalized = normalizeSkillRef(r);
+		const normalized = normalizedFields(r);
 		if (!normalized) {
 			continue;
 		}
@@ -248,7 +113,7 @@ export const clampActiveSkillRefsToEnabled = (
 	const allow = new Set(enabled.map(r => skillRefKey(r)));
 	return dedupeSkillRefs(
 		(activeRefs ?? []).filter(ref => {
-			const normalized = normalizeSkillRef(ref);
+			const normalized = normalizedFields(ref);
 			return normalized !== undefined && allow.has(skillRefKey(normalized));
 		})
 	);

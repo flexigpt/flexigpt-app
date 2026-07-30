@@ -1,12 +1,11 @@
 import { useCallback } from 'react';
 
 import type {
+	WorkspaceArtifactView,
 	WorkspaceContextInspectionView,
-	WorkspaceRecordView,
 	WorkspaceSkillLoadView,
 	WorkspaceView,
 } from '@/spec/workspace';
-import { WorkspaceArtifactKind } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
 
@@ -23,11 +22,14 @@ import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
 
+import { artifactRefKey, workspaceRefKey } from '@/workspaces/lib/workspace_api_utils';
 import {
 	formatByteCount,
 	getArtifactKindLabel,
+	getArtifactStateTone,
 	getErrorMessage,
-	getRecordStateTone,
+	WORKSPACE_CONTEXT_ARTIFACT_KIND,
+	WORKSPACE_SKILL_ARTIFACT_KIND,
 	workspaceLocatorToPath,
 } from '@/workspaces/lib/workspace_utils';
 import { WorkspaceDiagnostics } from '@/workspaces/workspace_diagnostics';
@@ -36,11 +38,11 @@ interface WorkspaceResourceDetailsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	workspace: WorkspaceView;
-	record: WorkspaceRecordView | null;
+	record: WorkspaceArtifactView | null;
 }
 
 interface RecordInspection {
-	record: WorkspaceRecordView;
+	record: WorkspaceArtifactView;
 	context?: WorkspaceContextInspectionView;
 	skill?: WorkspaceSkillLoadView;
 	previewError?: string;
@@ -55,10 +57,10 @@ function WorkspaceResourceDetailsContent({
 	onClose,
 	workspace,
 	record,
-}: Omit<WorkspaceResourceDetailsModalProps, 'isOpen'> & { record: WorkspaceRecordView }) {
+}: Omit<WorkspaceResourceDetailsModalProps, 'isOpen'> & { record: WorkspaceArtifactView }) {
 	const loadInspection = useCallback(
 		async (signal: AbortSignal): Promise<RecordInspection> => {
-			const freshRecord = await workspaceAPI.getWorkspaceRecord(workspace.rootID, record.id);
+			const freshArtifact = await workspaceAPI.getWorkspaceArtifact(workspace.workspace, record.artifact);
 			throwIfAborted(signal);
 
 			let context: WorkspaceContextInspectionView | undefined;
@@ -66,10 +68,10 @@ function WorkspaceResourceDetailsContent({
 			let previewError: string | undefined;
 
 			try {
-				if (freshRecord.kind === WorkspaceArtifactKind.Context) {
-					context = await workspaceAPI.loadWorkspaceContexts(workspace.rootID, [freshRecord.id]);
-				} else if (freshRecord.kind === WorkspaceArtifactKind.Skill) {
-					skill = await workspaceAPI.loadWorkspaceSkills(workspace.rootID, [freshRecord.id]);
+				if (freshArtifact.kind === WORKSPACE_CONTEXT_ARTIFACT_KIND) {
+					context = await workspaceAPI.loadWorkspaceContexts(workspace.workspace, [freshArtifact.artifact]);
+				} else if (freshArtifact.kind === WORKSPACE_SKILL_ARTIFACT_KIND) {
+					skill = await workspaceAPI.loadWorkspaceSkills(workspace.workspace, [freshArtifact.artifact]);
 				}
 				throwIfAborted(signal);
 			} catch (error) {
@@ -77,13 +79,13 @@ function WorkspaceResourceDetailsContent({
 			}
 
 			return {
-				record: freshRecord,
+				record: freshArtifact,
 				context,
 				skill,
 				previewError,
 			};
 		},
-		[record.id, workspace.rootID]
+		[record.artifact, workspace.workspace]
 	);
 
 	const {
@@ -97,8 +99,12 @@ function WorkspaceResourceDetailsContent({
 	});
 
 	const current = inspection?.record ?? record;
-	const contribution = inspection?.context?.contributions.find(item => item.recordID === current.id);
-	const skill = inspection?.skill?.skills.find(item => item.recordID === current.id);
+	const contribution = inspection?.context?.contributions.find(
+		item => artifactRefKey(item.artifact) === artifactRefKey(current.artifact)
+	);
+	const skill = inspection?.skill?.skills.find(
+		item => artifactRefKey(item.artifact) === artifactRefKey(current.artifact)
+	);
 	const source = sourceLabel(workspace, current.sourceID);
 	const location = workspaceLocatorToPath(
 		workspace.attachments.find(item => item.sourceID === current.sourceID)?.path,
@@ -111,7 +117,7 @@ function WorkspaceResourceDetailsContent({
 			onClose={onClose}
 			title="Workspace Resource"
 			description={current.name}
-			modalKey={`${workspace.rootID}:${record.id}:${record.revision}`}
+			modalKey={`${workspaceRefKey(workspace.workspace)}:${artifactRefKey(record.artifact)}:${record.revision}`}
 			width="wide"
 			height="tall"
 		>
@@ -131,9 +137,12 @@ function WorkspaceResourceDetailsContent({
 					<ManagementInfoRow label="Name">{current.name}</ManagementInfoRow>
 					<ManagementInfoRow label="Kind">{getArtifactKindLabel(current.kind)}</ManagementInfoRow>
 					<ManagementInfoRow label="State">
-						<StatusBadge tone={getRecordStateTone(current.state)}>{current.state}</StatusBadge>
+						<StatusBadge tone={getArtifactStateTone(current.state)}>{current.state}</StatusBadge>
 					</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{current.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
+					<ManagementInfoRow label="Artifact ID" mono>
+						{current.artifact.artifactID}
+					</ManagementInfoRow>
 					<ManagementInfoRow label="Source">
 						<span className="break-all">{source}</span>
 					</ManagementInfoRow>
@@ -216,7 +225,7 @@ export function WorkspaceResourceDetailsModal(props: WorkspaceResourceDetailsMod
 
 	return (
 		<WorkspaceResourceDetailsContent
-			key={`${props.workspace.rootID}:${props.record.id}:${props.record.revision}`}
+			key={`${workspaceRefKey(props.workspace.workspace)}:${artifactRefKey(props.record.artifact)}:${props.record.revision}`}
 			{...props}
 			record={props.record}
 		/>

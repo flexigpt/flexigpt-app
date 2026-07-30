@@ -265,10 +265,9 @@ function cloneSkillSelectionForForm(selection: SkillSelection): SkillSelection {
 
 	return {
 		skillRef: {
-			...(ref.identity !== undefined ? { identity: ref.identity } : {}),
-			...(ref.bundleID !== undefined ? { bundleID: ref.bundleID } : {}),
-			...(ref.skillSlug !== undefined ? { skillSlug: ref.skillSlug } : {}),
-			...(ref.skillID !== undefined ? { skillID: ref.skillID } : {}),
+			bundleID: ref.bundleID,
+			skillSlug: ref.skillSlug,
+			skillID: ref.skillID,
 		},
 		preLoadAsActive: selection.preLoadAsActive,
 		useAsInstructions: selection.useAsInstructions,

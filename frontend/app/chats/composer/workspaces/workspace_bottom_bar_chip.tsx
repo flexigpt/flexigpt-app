@@ -28,6 +28,7 @@ import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
 import { WorkspaceSelectionModal } from '@/chats/composer/workspaces/workspace_selection_modal';
+import { workspaceRefsEqual } from '@/workspaces/lib/workspace_api_utils';
 import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
 import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
 
@@ -296,10 +297,10 @@ export function WorkspaceBottomBarChip({
 				) : (
 					<div className="space-y-1">
 						{visibleWorkspaces.map(workspace => {
-							const isCurrent = workspace.rootID === state.selection?.rootID;
+							const isCurrent = workspaceRefsEqual(workspace.workspace, state.selection?.workspace);
 							return (
 								<MenuItem
-									key={workspace.rootID}
+									key={`${workspace.workspace.rootID}:${workspace.workspace.collectionID}`}
 									hideOnClick={false}
 									disabled={!workspace.enabled || isInputLocked}
 									className={`${actionTriggerMenuItemClasses} items-start`}
