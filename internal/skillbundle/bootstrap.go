@@ -70,7 +70,7 @@ func (a *API) BootstrapBuiltInBundle(
 			return Bundle{}, err
 		}
 
-		created, createErr := a.CreateBundle(ctx, CreateBundleRequest{
+		created, createErr := a.createBundle(ctx, CreateBundleRequest{
 			RootID:         request.RootID,
 			LogicalName:    request.LogicalName,
 			LogicalVersion: request.LogicalVersion,
@@ -84,7 +84,7 @@ func (a *API) BootstrapBuiltInBundle(
 				Role:     RoleBuiltIn,
 				Enabled:  true,
 			}},
-		})
+		}, true)
 		if createErr == nil {
 			existing = created
 		} else {
@@ -111,7 +111,11 @@ func (a *API) BootstrapBuiltInBundle(
 				return Bundle{}, errors.Join(createErr, err)
 			}
 			if existing.Collection.ID == "" {
-				return Bundle{}, createErr
+				// The durable bootstrap key can only conflict here when a
+				// retired built-in Collection already owns it. Retirement is
+				// an explicit non-resurrection boundary, not a reason for
+				// ListBundles or startup to fail.
+				return Bundle{}, nil
 			}
 		}
 	}

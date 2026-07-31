@@ -36,12 +36,13 @@ and uniquely enforced by Artifact Store. The key is scoped by Root and
 Collection kind, is not a CollectionID or ArtifactID, is not portable content,
 and is not exposed through public views.
 
-The standalone Skill Store has been removed from the application tree. This is
-a breaking reset. Normal startup never imports, interprets, migrates,
-registers, or writes legacy Skill Store records. A future one-time importer,
-if product requires one, must live outside normal application startup and
-create new Artifact Store identities. It must not restore legacy Skill Store
-code, identity types, path handling, or a dual-write compatibility path.
+The standalone Skill Store remains temporarily in the source tree as a
+reference-only implementation for migration verification. It is not active
+application state. Normal startup never imports, interprets, migrates,
+registers, writes, or resolves legacy Skill Store records. A future one-time
+importer, if product requires one, must live outside normal application startup
+and create new Artifact Store identities. It must not restore legacy Skill
+Store code, identity types, path handling, or a dual-write compatibility path.
 
 ## 2. Feature intent
 
@@ -260,6 +261,11 @@ Managed authoring must:
 - Refresh the target Collection.
 - Adopt the resulting occurrence using the preallocated Artifact ID.
 - Return `ArtifactAddress`.
+- Store a digest-derived local Artifact idempotency key for the caller's
+  operation key so concurrent retries cannot create multiple pending Artifacts.
+- Retain source revision and generation only while publication is pending.
+  Once the Artifact resolves, compact local Artifact data and retain no copied
+  Source state.
 
 A possible internal layout is:
 
@@ -519,7 +525,9 @@ tool.
 | Artifact-backed backend references | Present                             | Assistant presets, conversations, inference, Workspace, and Skill Runtime use Artifact-backed Skill references.                                                                                                                                                             |
 | Runtime synchronization state      | Present and derived only            | Artifact Store is durable authority. `SkillRuntime` retains only process-local provider registrations; Workspace and Skill Bundle wrappers do not mirror managed Collection membership.                                                                                     |
 | Runtime synchronization trigger    | Present and demand-driven           | A selected Artifact is resolved from Artifact Store and reconciled into Agent Skills runtime only when runtime work needs it. No observer or feature-owned membership cache exists.                                                                                         |
-| Legacy Skill Store                 | Removed                             | `internal/skillstore` is absent from the application tree. Legacy data is unsupported until an explicit offline importer is separately approved.                                                                                                                            |
+| External Skill attachment route    | Present                             | A filesystem Source is created through Artifact Store administration, then attached through the typed Skill Bundle boundary and refreshed into `agent.skill` Artifacts.                                                                                                     |
+| Managed operation idempotency      | Present                             | Managed creation uses an Artifact Store-owned hidden idempotency key. Pending source preconditions are removed after the requested Artifact resolves.                                                                                                                       |
+| Legacy Skill Store                 | Reference-only, inactive            | `internal/skillstore` remains temporarily for source comparison only. `cmd/agentgo` does not initialize it, and no normal runtime, selection, inference, or persistence path may call it.                                                                                   |
 | Same-name policy                   | Partial                             | Aggregate listing marks simultaneously eligible same-name Skills unavailable, and runtime resolution withholds ambiguous durable references. A unified migrated-Collection precedence policy remains deferred.                                                              |
 | Assistant preset integration       | Present                             | Assistant preset validation resolves `ArtifactSkillSelection` through the Artifact-backed Skill Runtime.                                                                                                                                                                    |
 | Conversation integration           | Present                             | Conversations persist Artifact-backed Skill references and Workspace selections.                                                                                                                                                                                            |
@@ -538,6 +546,8 @@ legacy reference store and possible offline migration input.
 
 - A standalone installed Skill bundle becomes a `skill.bundle` Collection.
 - A standalone installed Skill becomes an `agent.skill` Artifact.
+- A managed operation key becomes a hidden local Artifact idempotency key, not
+  an Artifact ID, Source generation cache, portable field, or runtime identity.
 - Workspace-discovered Skills remain `agent.skill` Artifacts in
   `workspace.collection`; they are not moved into Skill bundle Collections.
 - All new backend persistence uses `ArtifactRef`.
@@ -551,7 +561,7 @@ legacy reference store and possible offline migration input.
 - A dedicated offline migration or diagnostic command may read legacy
   Skill Store data without changing it. Such a command must be explicit,
   read-only for legacy input, and must not run during normal startup.
-- No dual write and no permanent legacy-reference adapter is permitted.
+- No dual write or active legacy-reference adapter is permitted.
 - Runtime origin and Collection ownership are projections resolved from the
   Artifact, not encoded in a durable Skill reference.
 
@@ -640,8 +650,9 @@ release-complete:
 
 - [x] Keep `internal/skillstore` reference-only. Normal startup does not open,
       mutate, register, or resolve it.
-- [x] Remove the standalone Skill Store implementation and use the clean
-      `*_v1` application namespaces as the breaking persistence boundary.
+- [ ] Remove the reference-only standalone Skill Store package after migration
+      verification is complete. Active application state already uses the clean
+      `*_v1` namespaces as the breaking persistence boundary.
 - [x] Verify the registered runtime version after Artifact resolution before
       treating a `SkillDef` as available.
 - [x] Remove public generic Artifact purge transport. Typed feature workflows
@@ -654,6 +665,10 @@ release-complete:
       demand-driven from Artifact Store-backed Artifact resolution.
 - [x] Fail closed for unavailable or same-name-colliding Artifact Skill
       allow-list entries rather than silently dropping them.
+- [x] Use Artifact Store-owned Artifact idempotency keys for managed operation
+      convergence and remove pending source preconditions after completion.
+- [x] Expose typed Skill Bundle Source attachment while retaining Source
+      configuration ownership in Artifact Store.
 - [ ] Add deterministic Skill and bundle import/export only after the portable
       Collection Definition and content-closure contracts exist.
 - [x] Use a clean `*_v1` application namespace and intentionally do not carry
@@ -667,6 +682,12 @@ work after the breaking core migration. The canonical linked manifest is a
 shareable JSON descriptor, not a self-contained export. Their generic
 requirements belong to Artifact Store. This document retains only the
 Skill-specific package, manifest, and closure rules.
+
+Typed attachment update and detach workflows remain the next local-management
+work item. They must define role-specific cleanup behavior before exposing
+detachment of a managed or built-in Source. In particular, a managed package
+must not become unreachable while a pinned managed Skill Artifact still claims
+source-side deletion responsibility.
 
 Built-in package upgrades also require an explicit versioned publication and
 Artifact reconciliation policy. Bootstrap must not be treated as an upgrader.
@@ -702,11 +723,13 @@ the backend migration clean:
 - A Root created after startup converges its built-in Skill bundle through the
   idempotent feature bootstrap path without a Root observer or feature-owned
   membership cache.
+- Retiring a built-in Collection must not cause bootstrap, listing, or startup
+  to recreate it or fail because its durable bootstrap key remains reserved.
 - MapStore-managed definition files are accessed only through MapStore. Feature
   code must not recreate MapStore path, symlink, permission, or durability
   handling.
-- Root mutation invalidations remain post-commit, coalesced, non-fatal, and
-  limited to mutations that can change runtime eligibility.
+- No Root mutation observer or feature-owned Root membership cache exists.
+  Runtime eligibility is resolved from Artifact Store at demand time.
 - Feature synchronization tracks only Collections owned by that feature and
   does not maintain a second persistent or in-memory membership authority.
 - The runtime rejects a stale registration when the same `SkillDef` has a

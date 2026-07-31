@@ -102,6 +102,11 @@ func (a *API) BootstrapEmbeddedBuiltIns(
 		if err != nil {
 			return nil, err
 		}
+		// A retired built-in Collection deliberately owns its bootstrap key.
+		// Do not resurrect it during normal startup convergence.
+		if value.Collection.ID == "" {
+			continue
+		}
 		output = append(output, value)
 	}
 

@@ -129,6 +129,7 @@ CREATE TABLE artifact_artifacts (
 	revision INTEGER NOT NULL CHECK (revision > 0),
 	created_at INTEGER NOT NULL,
 	modified_at INTEGER NOT NULL,
+	idempotency_key TEXT NOT NULL DEFAULT '',
 	UNIQUE (
 		root_id, collection_id, source_id,
 		locator, subresource_locator, kind
@@ -178,6 +179,10 @@ CREATE INDEX idx_artifact_artifacts_collection
 	ON artifact_artifacts(
 		root_id, collection_id, modified_at DESC
 	);
+
+CREATE UNIQUE INDEX idx_artifact_artifacts_collection_kind_idempotency_key
+	ON artifact_artifacts(root_id, collection_id, kind, idempotency_key)
+	WHERE idempotency_key <> '';
 
 CREATE TRIGGER artifact_attachment_requires_active_source_insert
 BEFORE INSERT ON artifact_collection_attachments

@@ -212,6 +212,7 @@ type PinRequest struct {
 	Name                       string
 	Enabled                    bool
 	Data                       json.RawMessage
+	IdempotencyKey             string
 }
 
 func (s *Service) Pin(
@@ -317,6 +318,7 @@ func (s *Service) Pin(
 		Enabled:            request.Enabled,
 		Adoption:           AdoptionPinned,
 		Data:               data,
+		IdempotencyKey:     request.IdempotencyKey,
 		ResolvedDefinition: resolvedDefinition,
 		State:              state,
 		Diagnostics:        diagnostics,

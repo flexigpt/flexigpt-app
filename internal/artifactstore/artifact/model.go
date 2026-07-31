@@ -120,21 +120,31 @@ func (b SourceBinding) Validate() error {
 }
 
 type Artifact struct {
-	ID                 basespec.ArtifactID     `json:"id"`
-	RootID             basespec.RootID         `json:"rootID"`
-	CollectionID       basespec.CollectionID   `json:"collectionID"`
-	Binding            SourceBinding           `json:"binding"`
-	Kind               basespec.ArtifactKind   `json:"kind"`
-	Name               string                  `json:"name"`
-	Enabled            bool                    `json:"enabled"`
-	Adoption           AdoptionMode            `json:"adoption"`
-	ResolvedDefinition *cryptoutil.Digest      `json:"resolvedDefinition,omitempty"`
-	Data               json.RawMessage         `json:"-"`
-	State              State                   `json:"state"`
-	Diagnostics        []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
-	Revision           uint64                  `json:"revision"`
-	CreatedAt          time.Time               `json:"createdAt"`
-	ModifiedAt         time.Time               `json:"modifiedAt"`
+	ID                 basespec.ArtifactID   `json:"id"`
+	RootID             basespec.RootID       `json:"rootID"`
+	CollectionID       basespec.CollectionID `json:"collectionID"`
+	Binding            SourceBinding         `json:"binding"`
+	Kind               basespec.ArtifactKind `json:"kind"`
+	Name               string                `json:"name"`
+	Enabled            bool                  `json:"enabled"`
+	Adoption           AdoptionMode          `json:"adoption"`
+	ResolvedDefinition *cryptoutil.Digest    `json:"resolvedDefinition,omitempty"`
+	Data               json.RawMessage       `json:"-"`
+
+	// IdempotencyKey is an optional immutable local provisioning key. It is
+	// owned by Artifact Store, never exposed through public projections, and
+	// is not portable Artifact content.
+	//
+	// SQLite enforces uniqueness per Root, Collection, Artifact kind, and
+	// non-empty key. Feature workflows use it to converge concurrent creation
+	// without deriving ArtifactID from a caller-provided operation key.
+	IdempotencyKey string `json:"-"`
+
+	State       State                   `json:"state"`
+	Diagnostics []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Revision    uint64                  `json:"revision"`
+	CreatedAt   time.Time               `json:"createdAt"`
+	ModifiedAt  time.Time               `json:"modifiedAt"`
 }
 
 func (a Artifact) Ref() ArtifactRef {
@@ -206,6 +216,13 @@ func (a Artifact) Validate() error {
 		basespec.MaxLocalDataBytes,
 	); err != nil {
 		return fmt.Errorf("%w: artifact data: %w", basespec.ErrInvalid, err)
+	}
+	if err := basespec.ValidateOptionalText(
+		"artifact idempotency key",
+		a.IdempotencyKey,
+		basespec.MaxLogicalNameBytes,
+	); err != nil {
+		return err
 	}
 	if err := diagnostic.ValidateDiagnostics(a.Diagnostics); err != nil {
 		return err

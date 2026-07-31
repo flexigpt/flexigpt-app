@@ -350,6 +350,7 @@ It contains:
 - Current resolved definition digest, when available.
 - Local enablement and consumer-owned data.
 - Source-derived state and diagnostics.
+- Optional immutable local idempotency key.
 - Revision and timestamps.
 
 Its stable reference is:
@@ -362,6 +363,12 @@ Its current address is:
 
 `ArtifactAddress` is a current projection and must not replace `ArtifactRef` in
 persistent selections.
+
+An Artifact idempotency key is local-only, immutable, and omitted from public
+and portable projections. Artifact Store enforces its uniqueness within one
+Root, Collection, and Artifact kind. It is appropriate for a feature workflow
+such as managed Skill publication, where a caller-supplied operation key must
+converge concurrent creation attempts without becoming an `ArtifactID`.
 
 ### 5.8 Collection catalog
 
@@ -686,7 +693,10 @@ Managed Source snapshot generations are source-owned facts. Artifact Store
 persists Source revisions and catalog publication generations, but does not
 store a second acknowledged-generation cache. A retry derives current state
 from a confirmed Source snapshot and the caller's revision and generation
-preconditions.
+preconditions. A pending feature Artifact may hold immutable source revision
+and generation preconditions only until its requested source-derived state
+becomes available. Completion must remove those preconditions rather than
+retaining a second stale copy of Source state.
 
 For a non-transactional feature workflow such as managed Skill publication,
 the pending Artifact may retain the immutable source revision and generation

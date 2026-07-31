@@ -1,19 +1,15 @@
 package discovery
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -115,57 +111,23 @@ func (l *DescriptorLoader) Load(
 		entry.SizeBytes > basespec.MaxDefinitionBodyBytes {
 		return DescriptorObservation{}, spec.ErrWorkspaceDefinitionInvalid
 	}
-	reader, err := snapshot.Open(ctx, descriptorLocator)
+	content, err := source.ReadSnapshotEntry(
+		ctx,
+		snapshot,
+		entry,
+		int64(basespec.MaxDefinitionBodyBytes),
+	)
 	if err != nil {
 		return DescriptorObservation{}, err
-	}
-	content, readErr := io.ReadAll(io.LimitReader(
-		reader,
-		basespec.MaxDefinitionBodyBytes+1,
-	))
-	closeErr := reader.Close()
-	if readErr != nil {
-		return DescriptorObservation{}, readErr
-	}
-	if closeErr != nil {
-		return DescriptorObservation{}, closeErr
-	}
-	if len(content) > basespec.MaxDefinitionBodyBytes ||
-		int64(len(content)) != entry.SizeBytes {
-		return DescriptorObservation{}, fmt.Errorf(
-			"%w: Workspace descriptor changed or exceeds its limit",
-			basespec.ErrConflict,
-		)
 	}
 	if err := snapshot.Confirm(ctx); err != nil {
 		return DescriptorObservation{}, err
 	}
 
-	canonical, err := jsonutil.CanonicalizeObject(
-		content,
-		basespec.MaxDefinitionBodyBytes,
-	)
+	descriptor, err := definition.ParseCollectionDefinition(content)
 	if err != nil {
 		return DescriptorObservation{}, fmt.Errorf(
-			"%w: canonicalize Workspace descriptor: %w",
-			spec.ErrWorkspaceDefinitionInvalid,
-			err,
-		)
-	}
-
-	rawDescriptor, err := decodeDescriptor(canonical)
-	if err != nil {
-		return DescriptorObservation{}, fmt.Errorf(
-			"%w: decode Workspace descriptor: %w",
-			spec.ErrWorkspaceDefinitionInvalid,
-			err,
-		)
-	}
-
-	descriptor, err := definition.CanonicalizeCollectionDefinition(rawDescriptor)
-	if err != nil {
-		return DescriptorObservation{}, fmt.Errorf(
-			"%w: %w",
+			"%w: parse Workspace descriptor: %w",
 			spec.ErrWorkspaceDefinitionInvalid,
 			err,
 		)
@@ -298,24 +260,6 @@ func (l *DescriptorLoader) Load(
 
 type descriptorBody struct {
 	Discovery spec.DiscoveryPreferences `json:"discovery"`
-}
-
-func decodeDescriptor(raw []byte) (Descriptor, error) {
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-
-	var descriptor Descriptor
-	if err := decoder.Decode(&descriptor); err != nil {
-		return Descriptor{}, err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("descriptor contains trailing JSON values")
-		}
-		return Descriptor{}, err
-	}
-	return descriptor, nil
 }
 
 func resolveDescriptorDiscoveryPreferences(

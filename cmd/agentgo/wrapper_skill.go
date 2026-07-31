@@ -158,6 +158,24 @@ func (w *SkillBundleWrapper) CreateSkillBundle(
 	})
 }
 
+// AttachSkillSource attaches a Source already created through Artifact Store
+// administration. It intentionally accepts only Source identity and typed
+// Skill Bundle role data, never a filesystem path or Source configuration.
+func (w *SkillBundleWrapper) AttachSkillSource(
+	bundle collection.CollectionRef,
+	expectedCollectionRevision uint64,
+	draft skillbundle.AttachmentDraft,
+) (skillbundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (skillbundle.Bundle, error) {
+		return w.api.AttachSource(
+			context.Background(),
+			bundle,
+			expectedCollectionRevision,
+			draft,
+		)
+	})
+}
+
 func (w *SkillBundleWrapper) GetSkillBundle(
 	ref collection.CollectionRef,
 ) (skillbundle.Bundle, error) {

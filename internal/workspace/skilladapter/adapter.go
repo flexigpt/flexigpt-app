@@ -155,11 +155,6 @@ func (f *Adapter) Load(
 		CatalogRevision: loadPlan.CatalogRevision,
 		Diagnostics:     diagnostic.CloneDiagnostics(loadPlan.Diagnostics),
 	}
-	verifiedSources := make(
-		map[basespec.SourceID]source.Source,
-		len(loadPlan.Items),
-	)
-	sourceFailures := make(map[basespec.SourceID]error)
 
 	for _, item := range loadPlan.Items {
 		resourceValue := spec.Resource{
@@ -202,12 +197,7 @@ func (f *Adapter) Load(
 		}
 		projected.SourceContentDigest = item.SourceContentDigest
 		projected.SourceGeneration = item.SourceGeneration
-		sourceValue, err := f.runtimeSource(
-			ctx,
-			item,
-			verifiedSources,
-			sourceFailures,
-		)
+		sourceValue, err := f.runtimeSource(ctx, item)
 		if err != nil {
 			output.Diagnostics = diagnostic.AppendDiagnostics(
 				output.Diagnostics,
@@ -359,22 +349,15 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 func (f *Adapter) runtimeSource(
 	ctx context.Context,
 	item spec.LoadPlanItem,
-	verified map[basespec.SourceID]source.Source,
-	failures map[basespec.SourceID]error,
 ) (source.Source, error) {
-	if value, found := verified[item.Source.ID]; found {
-		return value, nil
-	}
-	if err, found := failures[item.Source.ID]; found {
-		return source.Source{}, err
-	}
+	// Artifact Store owns Source state. Do not retain a feature-owned source
+	// cache merely to avoid repeated reads during one load operation.
 	sourceValue, err := f.sourceRuntime.Get(
 		ctx,
 		item.Artifact.RootID,
 		item.Source.ID,
 	)
 	if err != nil {
-		failures[item.Source.ID] = err
 		return source.Source{}, err
 	}
 	if sourceValue.ID != item.Source.ID ||
@@ -384,11 +367,8 @@ func (f *Adapter) runtimeSource(
 			"%w: Workspace Skill source changed after load-plan composition",
 			basespec.ErrCatalogStale,
 		)
-		failures[item.Source.ID] = err
 		return source.Source{}, err
 	}
-	verified[item.Source.ID] = sourceValue
-
 	return sourceValue, nil
 }
 
