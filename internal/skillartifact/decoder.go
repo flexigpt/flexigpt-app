@@ -2,7 +2,6 @@ package skillartifact
 
 import (
 	"context"
-	"fmt"
 	"path"
 	"strings"
 
@@ -75,12 +74,6 @@ func DecodeSkillDocument(
 	content []byte,
 	expectedName string,
 ) (definition.Definition, []diagnostic.Diagnostic, error) {
-	if err := basespec.ValidateLogicalName(
-		basespec.LogicalName(expectedName),
-	); err != nil {
-		return definition.Definition{}, nil, err
-	}
-
 	document, warnings, err := agentskills.ParseSkillDocument(
 		content,
 		agentskillsSpec.ParseSkillDocumentOptions{
@@ -89,13 +82,6 @@ func DecodeSkillDocument(
 	)
 	if err != nil {
 		return definition.Definition{}, nil, err
-	}
-	if document.Name != expectedName {
-		return definition.Definition{}, nil, fmt.Errorf(
-			"frontmatter.name %q must match containing directory %q",
-			document.Name,
-			expectedName,
-		)
 	}
 
 	value, err := definitionForDocument(document)

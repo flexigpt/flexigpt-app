@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -15,16 +14,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
+	workspaceSpec "github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type SkillBundleWrapper struct {
 	api     *skillbundle.API
 	runtime *skillruntime.SkillRuntime
-	mu      sync.Mutex
-
-	bootstrapContext context.Context
-	bootstrapCancel  context.CancelFunc
-	bootstrapWG      sync.WaitGroup
 }
 
 func InitSkillBundleWrapper(
@@ -120,7 +115,7 @@ func InitSkillBundleWrapper(
 		return err
 	}
 	if err := router.Register(
-		"workspace.collection",
+		workspaceSpec.CollectionKind,
 		workspaceResolver,
 	); err != nil {
 		return err
@@ -139,14 +134,8 @@ func InitSkillBundleWrapper(
 		return err
 	}
 
-	parent, cancel := context.WithCancel(context.Background())
-	wrapper.mu.Lock()
 	wrapper.api = api
 	wrapper.runtime = runtime
-
-	wrapper.bootstrapContext = parent
-	wrapper.bootstrapCancel = cancel
-	wrapper.mu.Unlock()
 
 	if err := wrapper.bootstrapEmbeddedBuiltIns(context.Background()); err != nil {
 		wrapper.close()
@@ -404,9 +393,7 @@ func (w *SkillBundleWrapper) bootstrapEmbeddedBuiltIns(
 	if w == nil {
 		return errors.New("skill bundle API is not initialized")
 	}
-	w.mu.Lock()
 	api := w.api
-	w.mu.Unlock()
 	if api == nil {
 		return errors.New("skill bundle API is not initialized")
 	}
@@ -429,20 +416,10 @@ func (w *SkillBundleWrapper) close() {
 		return
 	}
 
-	w.mu.Lock()
-	cancel := w.bootstrapCancel
 	runtime := w.runtime
 	api := w.api
-	w.bootstrapCancel = nil
-	w.bootstrapContext = nil
 	w.runtime = nil
 	w.api = nil
-	w.mu.Unlock()
-
-	if cancel != nil {
-		cancel()
-	}
-	w.bootstrapWG.Wait()
 
 	if runtime != nil {
 		runtime.Close()

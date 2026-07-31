@@ -3,23 +3,14 @@ package main
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
 type WorkspaceWrapper struct {
-	api          *workspace.API
-	skillRuntime *skillruntime.SkillRuntime
-
-	lifecycleMu      sync.Mutex
-	closed           bool
-	bootstrapContext context.Context
-	bootstrapCancel  context.CancelFunc
-	bootstrapWG      sync.WaitGroup
+	api *workspace.API
 }
 
 func InitWorkspaceWrapper(
@@ -47,15 +38,7 @@ func InitWorkspaceWrapper(
 	if err != nil {
 		return err
 	}
-	bootstrapContext, bootstrapCancel := context.WithCancel(context.Background())
-	wrapper.lifecycleMu.Lock()
-	wrapper.closed = false
-	wrapper.bootstrapContext = bootstrapContext
-	wrapper.bootstrapCancel = bootstrapCancel
 	wrapper.api = api
-	wrapper.skillRuntime = nil
-
-	wrapper.lifecycleMu.Unlock()
 	return nil
 }
 
@@ -445,22 +428,8 @@ func (w *WorkspaceWrapper) close() {
 	if w == nil {
 		return
 	}
-	w.lifecycleMu.Lock()
-	if w.closed {
-		w.lifecycleMu.Unlock()
-		return
-	}
-	w.closed = true
 	api := w.api
-	cancel := w.bootstrapCancel
-	w.skillRuntime = nil
 	w.api = nil
-	w.lifecycleMu.Unlock()
-
-	if cancel != nil {
-		cancel()
-	}
-	w.bootstrapWG.Wait()
 	if api != nil {
 		_ = api.Close()
 	}

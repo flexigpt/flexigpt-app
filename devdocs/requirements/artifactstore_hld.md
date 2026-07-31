@@ -688,6 +688,14 @@ store a second acknowledged-generation cache. A retry derives current state
 from a confirmed Source snapshot and the caller's revision and generation
 preconditions.
 
+For a non-transactional feature workflow such as managed Skill publication,
+the pending Artifact may retain the immutable source revision and generation
+that were used to begin that operation. Those values are operation
+preconditions, not current Source state and not an acknowledged-generation
+cache. A retry reuses them only while the Artifact remains unresolved. This
+allows a completed source-side package write to advance Source metadata exactly
+once after an interrupted acknowledgement.
+
 Managed package generations cover every published payload directory. The
 managed adapter excludes only its private staging directory. MapStore remains
 the storage implementation boundary for immutable definitions and managed
@@ -782,6 +790,10 @@ existing local lifecycle rather than introduce another persistence model.
 - Keep public mutations feature-aware when Collection meaning matters.
 - Treat direct movement as a separate product decision, not an implied side
   effect of export or import.
+- Define an explicit managed-Source physical-retention policy for Source purge.
+  Current metadata purge intentionally does not add an unsafe independent
+  recursive filesystem delete after a database transaction. Any future
+  physical cleanup must be a Source-adapter-owned, recoverable workflow.
 - Defer historical catalogs, dependency snapshots, and generic materialization
   until a committed workflow needs them.
 

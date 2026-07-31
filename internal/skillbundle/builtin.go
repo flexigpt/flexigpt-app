@@ -23,6 +23,46 @@ const (
 	builtInDescription       = "Application-provided Agent Skills."
 )
 
+// EnsureEmbeddedBuiltInsForRoot converges the built-in Collection for one
+// existing Root. It is an idempotent Artifact Store workflow, not an observer
+// or a second in-memory source of membership state.
+func (a *API) EnsureEmbeddedBuiltInsForRoot(
+	ctx context.Context,
+	rootID basespec.RootID,
+) (Bundle, error) {
+	if err := a.Ready(); err != nil {
+		return Bundle{}, err
+	}
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return Bundle{}, err
+	}
+
+	skills, err := embeddedBuiltInSkills(ctx)
+	if err != nil {
+		return Bundle{}, err
+	}
+	return a.bootstrapEmbeddedBuiltInsForRoot(ctx, rootID, skills)
+}
+
+func (a *API) bootstrapEmbeddedBuiltInsForRoot(
+	ctx context.Context,
+	rootID basespec.RootID,
+	skills []BuiltInSkill,
+) (Bundle, error) {
+	if len(skills) == 0 {
+		return Bundle{}, nil
+	}
+	return a.BootstrapBuiltInBundle(ctx, BootstrapBundleRequest{
+		RootID:         rootID,
+		BootstrapKey:   builtInBootstrapKey,
+		LogicalName:    builtInBundleLogicalName,
+		LogicalVersion: builtInBundleVersion,
+		DisplayName:    builtInBundleName,
+		Description:    builtInDescription,
+		Skills:         cloneBuiltInSkills(skills),
+	})
+}
+
 // BootstrapEmbeddedBuiltIns imports built-in packages through the normal
 // managed Source, Collection, Artifact, publication, and refresh path.
 //
@@ -54,15 +94,11 @@ func (a *API) BootstrapEmbeddedBuiltIns(
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		value, err := a.BootstrapBuiltInBundle(ctx, BootstrapBundleRequest{
-			RootID:         root.ID,
-			BootstrapKey:   builtInBootstrapKey,
-			LogicalName:    builtInBundleLogicalName,
-			LogicalVersion: builtInBundleVersion,
-			DisplayName:    builtInBundleName,
-			Description:    builtInDescription,
-			Skills:         cloneBuiltInSkills(skills),
-		})
+		value, err := a.bootstrapEmbeddedBuiltInsForRoot(
+			ctx,
+			root.ID,
+			skills,
+		)
 		if err != nil {
 			return nil, err
 		}

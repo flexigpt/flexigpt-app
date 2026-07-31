@@ -411,7 +411,7 @@ For an eligible filesystem-backed Skill, runtime handoff is:
       -> current Artifact and occurrence
       -> definition and Source generation checks
       -> trusted local-path resolution
-      -> SKILL.md digest verification
+      -> one confirmed SKILL.md digest verification
       -> containing package directory
       -> ephemeral Agent Skills SkillDef
 
@@ -421,8 +421,9 @@ The handoff must:
 - Require available source-derived state.
 - Require a current Collection catalog.
 - Verify the occurrence definition digest.
-- Confirm the catalog Source generation before and after trusted native-path
-  resolution.
+- Resolve the native package location only through the trusted Source runtime,
+  then confirm the catalog Source generation and raw `SKILL.md` digest once
+  immediately before handing the location to Agent Skills.
 - Keep native paths outside persistent references and portable definitions.
 - Delegate `SKILL.md` parsing, resource access, script policy, sandboxing, and
   execution to the normal Agent Skills filesystem provider.

@@ -190,9 +190,15 @@ func entryFromInfo(
 	locator basespec.Locator,
 	info fs.FileInfo,
 ) source.Entry {
+	name := info.Name()
+	if locator != "." {
+		// Entry identity is source-relative and must not depend on a provider
+		// returning a target or implementation-specific FileInfo name.
+		name = path.Base(string(locator))
+	}
 	return source.Entry{
 		Locator:     locator,
-		Name:        info.Name(),
+		Name:        name,
 		SizeBytes:   info.Size(),
 		Mode:        uint32(info.Mode()),
 		ModifiedAt:  info.ModTime().UTC(),

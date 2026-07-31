@@ -67,18 +67,6 @@ func ResolveRuntimePackage(
 		)
 	}
 
-	if err := source.VerifySnapshotContentDigest(
-		ctx,
-		runtime,
-		value,
-		locator,
-		expectedGeneration,
-		expectedContentDigest,
-		basespec.MaxCandidateBytes,
-	); err != nil {
-		return "", err
-	}
-
 	localPaths, supported := runtime.(source.LocalPathRuntime)
 	if !supported || !localPaths.SupportsLocalPath(value.Kind) {
 		return "", fmt.Errorf(
@@ -97,8 +85,8 @@ func ResolveRuntimePackage(
 	}
 
 	// Keep source generation and byte-integrity verification at the Source
-	// boundary. The Agent Skills provider still owns SKILL.md parsing,
-	// resources, sandboxing, and script execution after this handoff.
+	// boundary immediately before native-path handoff. Agent Skills owns
+	// SKILL.md parsing, resource access, sandboxing, and script execution.
 	if err := source.VerifySnapshotContentDigest(
 		ctx,
 		runtime,

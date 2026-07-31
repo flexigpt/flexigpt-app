@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -40,11 +41,11 @@ func (s *snapshot) Stat(
 			locator,
 		)
 	}
-	path, err := s.resolve(locator)
+	p, err := s.resolve(locator)
 	if err != nil {
 		return source.Entry{}, err
 	}
-	info, err := os.Stat(path)
+	info, err := os.Stat(p)
 	if errors.Is(err, os.ErrNotExist) {
 		return source.Entry{}, fmt.Errorf(
 			"%w: source locator %q",
@@ -68,15 +69,15 @@ func (s *snapshot) ReadDir(
 	if s.traversalPolicy.excludesLocator(string(locator)) {
 		return []source.Entry{}, nil
 	}
-	path, err := s.resolveDirectory(locator)
+	p, err := s.resolveDirectory(locator)
 	if err != nil {
 		return nil, err
 	}
-	if locator != "." && s.traversalPolicy.isGitSubmoduleDirectory(path) {
+	if locator != "." && s.traversalPolicy.isGitSubmoduleDirectory(p) {
 		return []source.Entry{}, nil
 	}
 
-	values, err := readDirectoryEntries(path)
+	values, err := readDirectoryEntries(p)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source directory %q",
@@ -97,13 +98,13 @@ func (s *snapshot) ReadDir(
 		if err != nil {
 			return nil, err
 		}
-		info, err := os.Stat(filepath.Join(path, value.Name()))
+		info, err := os.Stat(filepath.Join(p, value.Name()))
 		if err != nil {
 			return nil, err
 		}
 		if info.IsDir() &&
 			(s.traversalPolicy.shouldSkipDirectory(info.Name()) ||
-				s.traversalPolicy.isGitSubmoduleDirectory(filepath.Join(path, value.Name()))) {
+				s.traversalPolicy.isGitSubmoduleDirectory(filepath.Join(p, value.Name()))) {
 			continue
 		}
 		output = append(output, entryFromInfo(child, info))
@@ -164,11 +165,11 @@ func (s *snapshot) Open(
 			locator,
 		)
 	}
-	path, err := s.resolve(locator)
+	p, err := s.resolve(locator)
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.Open(path)
+	file, err := os.Open(p)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source file %q",
@@ -254,7 +255,7 @@ func resolveNativePath(
 			basespec.ErrInvalid,
 		)
 	}
-	path, err := resolveWithinRoot(root, locator)
+	p, err := resolveWithinRoot(root, locator)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf(
 			"%w: source locator %q",
@@ -265,7 +266,7 @@ func resolveNativePath(
 	if err != nil {
 		return "", err
 	}
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf(
 			"%w: source locator %q",
 			basespec.ErrNotFound,
@@ -274,7 +275,7 @@ func resolveNativePath(
 	} else if err != nil {
 		return "", err
 	}
-	return path, nil
+	return p, nil
 }
 
 func resolveWithinRoot(
@@ -311,9 +312,15 @@ func entryFromInfo(
 	locator basespec.Locator,
 	info os.FileInfo,
 ) source.Entry {
+	name := info.Name()
+	if locator != "." {
+		// Os.Stat follows symlinks. The target FileInfo name can differ from
+		// the source-relative name used to reach it.
+		name = path.Base(string(locator))
+	}
 	return source.Entry{
 		Locator:     locator,
-		Name:        info.Name(),
+		Name:        name,
 		SizeBytes:   info.Size(),
 		Mode:        uint32(info.Mode()),
 		ModifiedAt:  info.ModTime().UTC(),
