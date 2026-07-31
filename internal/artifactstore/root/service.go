@@ -2,25 +2,26 @@ package root
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type Service struct {
 	repository Repository
-	ids        uuidutil.Generator
 	clock      clockutil.Clock
+	policy     protection.RootPolicy
 }
 
 func NewService(
 	repository Repository,
-	ids uuidutil.Generator,
 	timeClock clockutil.Clock,
+	policy protection.RootPolicy,
 ) (*Service, error) {
-	if repository == nil || ids == nil || timeClock == nil {
+	if repository == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: root service dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -28,8 +29,8 @@ func NewService(
 	}
 	return &Service{
 		repository: repository,
-		ids:        ids,
 		clock:      timeClock,
+		policy:     policy,
 	}, nil
 }
 
@@ -37,26 +38,32 @@ func (s *Service) Create(
 	ctx context.Context,
 	draft RootDraft,
 ) (Root, error) {
-	id, err := s.ids.NewID(ctx)
-	if err != nil {
+	if err := protection.RequireMutableRoot(ctx, s.policy, draft.ID); err != nil {
 		return Root{}, err
 	}
-	now := clockutil.NowUTC(s.clock)
-	value := Root{
-		ID:          basespec.RootID(id),
-		DisplayName: draft.DisplayName,
-		Description: draft.Description,
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
-	}
-	if err := value.Validate(); err != nil {
+	return s.create(ctx, draft)
+}
+
+// EnsureSystem is reserved for an application-owned protected-topology
+// installer. Artifact Store does not assign any feature meaning to the Root.
+func (s *Service) EnsureSystem(
+	ctx context.Context,
+	draft RootDraft,
+) (Root, error) {
+	if err := basespec.ValidateRootID(draft.ID); err != nil {
 		return Root{}, err
 	}
-	if err := s.repository.Create(ctx, value); err != nil {
+	if s.policy == nil || !s.policy.IsProtectedRoot(draft.ID) {
+		return Root{}, fmt.Errorf(
+			"%w: Root %q is not declared as protected application topology",
+			basespec.ErrProtected,
+			draft.ID,
+		)
+	}
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
 		return Root{}, err
 	}
-	return value, nil
+	return s.create(ctx, draft)
 }
 
 func (s *Service) Get(
@@ -78,6 +85,9 @@ func (s *Service) Update(
 	id basespec.RootID,
 	update RootUpdate,
 ) (Root, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, id); err != nil {
+		return Root{}, err
+	}
 	if update.ExpectedRevision == 0 {
 		return Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
@@ -119,6 +129,9 @@ func (s *Service) Retire(
 	id basespec.RootID,
 	expectedRevision uint64,
 ) (Root, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, id); err != nil {
+		return Root{}, err
+	}
 	if expectedRevision == 0 {
 		return Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
@@ -155,6 +168,9 @@ func (s *Service) Purge(
 	id basespec.RootID,
 	expectedRevision uint64,
 ) error {
+	if err := protection.RequireMutableRoot(ctx, s.policy, id); err != nil {
+		return err
+	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected root revision is required",
@@ -162,4 +178,44 @@ func (s *Service) Purge(
 		)
 	}
 	return s.repository.Purge(ctx, id, expectedRevision)
+}
+
+func (s *Service) create(
+	ctx context.Context,
+	draft RootDraft,
+) (Root, error) {
+	if err := basespec.ValidateRootID(draft.ID); err != nil {
+		return Root{}, err
+	}
+	now := clockutil.NowUTC(s.clock)
+	value := Root{
+		ID:          draft.ID,
+		DisplayName: draft.DisplayName,
+		Description: draft.Description,
+		Revision:    1,
+		CreatedAt:   now,
+		ModifiedAt:  now,
+	}
+	if err := value.Validate(); err != nil {
+		return Root{}, err
+	}
+	if err := s.repository.Create(ctx, value); err == nil {
+		return value, nil
+	} else if !errors.Is(err, basespec.ErrConflict) {
+		return Root{}, err
+	}
+
+	existing, err := s.repository.Get(ctx, draft.ID)
+	if err != nil {
+		return Root{}, err
+	}
+	if existing.DisplayName != draft.DisplayName ||
+		existing.Description != draft.Description {
+		return Root{}, fmt.Errorf(
+			"%w: root %q creation intent differs",
+			basespec.ErrConflict,
+			draft.ID,
+		)
+	}
+	return existing, nil
 }

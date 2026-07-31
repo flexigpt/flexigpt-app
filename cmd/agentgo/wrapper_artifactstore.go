@@ -3,21 +3,20 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/metadata"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
 type ArtifactStoreWrapper struct {
-	api           *artifactstore.API
-	components    *system.Components
-	onRootCreated func(context.Context, basespec.RootID) error
+	api        *artifactstore.API
+	components *system.Components
 }
 
 func InitArtifactStoreWrapper(
@@ -27,13 +26,17 @@ func InitArtifactStoreWrapper(
 	if wrapper == nil {
 		return errors.New("artifact store wrapper is required")
 	}
+	registry, err := metadata.LoadRegistry()
+	if err != nil {
+		return err
+	}
 
 	skillDecoder, err := skillartifact.NewDecoder()
 	if err != nil {
 		return err
 	}
 	decoders := append(
-		workspace.BuiltinDecoders(),
+		workspace.DefaultDecoders(),
 		skillDecoder,
 	)
 
@@ -42,6 +45,9 @@ func InitArtifactStoreWrapper(
 		system.Config{
 			BaseDirectory: baseDirectory,
 			Decoders:      decoders,
+			RootMutationPolicy: protection.StaticRootPolicy{
+				RootID: registry.Root.ID,
+			},
 		},
 	)
 	if err != nil {
@@ -65,26 +71,10 @@ func (w *ArtifactStoreWrapper) CreateArtifactRoot(
 ) (*artifactstore.CreateArtifactRootResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*artifactstore.CreateArtifactRootResponse, error) {
-			ctx := context.Background()
-			response, err := w.api.CreateArtifactRoot(ctx, request)
-			if err != nil {
-				return nil, err
-			}
-			if response == nil || response.Body == nil {
-				return nil, errors.New(
-					"artifact root creation returned an empty response",
-				)
-			}
-			if w.onRootCreated != nil {
-				if err := w.onRootCreated(ctx, response.Body.ID); err != nil {
-					return response, fmt.Errorf(
-						"artifact Root %q was created, but built-in Skill provisioning remains incomplete: %w",
-						response.Body.ID,
-						err,
-					)
-				}
-			}
-			return response, nil
+			return w.api.CreateArtifactRoot(
+				context.Background(),
+				request,
+			)
 		},
 	)
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 const (
@@ -26,7 +25,7 @@ const (
 	// add a second Workspace-owned persistence directory. This is deliberately
 	// a clean namespace: startup must not locate, import, copy, or migrate any
 	// legacy Workspace or Artifact Store directory into it.
-	artifactStoreDirectoryName = "artifacts_v1"
+	artifactStoreDirectoryName = "artifacts_v2"
 	appDirectoryMode           = 0o700
 )
 
@@ -276,16 +275,6 @@ func (a *App) initManagers() {
 			"error", err,
 		)
 		panic("failed to initialize managers: skill bundle initialization failed\n" + err.Error())
-	}
-	a.artifactStoreAPI.onRootCreated = func(
-		ctx context.Context,
-		rootID basespec.RootID,
-	) error {
-		_, err := a.skillBundleAPI.api.EnsureEmbeddedBuiltInsForRoot(
-			ctx,
-			rootID,
-		)
-		return err
 	}
 	slog.Info("artifact-backed skill bundles initialized")
 

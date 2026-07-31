@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition/maprepo"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -24,7 +25,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/sqlite"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type Config struct {
@@ -33,7 +33,7 @@ type Config struct {
 	AdditionalSources         []source.Adapter
 	Decoders                  []discovery.Decoder
 	Clock                     clockutil.Clock
-	IDGenerator               uuidutil.Generator
+	RootMutationPolicy        protection.RootPolicy
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 }
 
@@ -56,10 +56,11 @@ type Components struct {
 	SourceRuntime    source.Runtime
 	discovery        *discovery.Engine
 
-	metadata       *sqlite.Store
-	content        *maprepo.Repository
-	managedSources *source.Registry
-	decoderIDs     map[basespec.DecoderID]struct{}
+	metadata           *sqlite.Store
+	content            *maprepo.Repository
+	managedSources     *source.Registry
+	decoderIDs         map[basespec.DecoderID]struct{}
+	rootMutationPolicy protection.RootPolicy
 }
 
 func Open(
@@ -74,9 +75,6 @@ func Open(
 	}
 	if config.Clock == nil {
 		config.Clock = clockutil.System{}
-	}
-	if config.IDGenerator == nil {
-		config.IDGenerator = uuidutil.UUIDv7Generator{}
 	}
 
 	base, err := filepath.Abs(config.BaseDirectory)
@@ -189,8 +187,8 @@ func Open(
 	sourceService, err := source.NewService(
 		sourceRepository,
 		sourceRegistry,
-		config.IDGenerator,
 		config.Clock,
+		config.RootMutationPolicy,
 	)
 	if err != nil {
 		_ = content.Close()
@@ -199,8 +197,8 @@ func Open(
 	}
 	rootService, err := root.NewService(
 		rootRepository,
-		config.IDGenerator,
 		config.Clock,
+		config.RootMutationPolicy,
 	)
 	if err != nil {
 		_ = content.Close()
@@ -210,8 +208,8 @@ func Open(
 	collectionService, err := collection.NewService(
 		collectionRepository,
 		sourceService,
-		config.IDGenerator,
 		config.Clock,
+		config.RootMutationPolicy,
 	)
 	if err != nil {
 		_ = content.Close()
@@ -222,8 +220,8 @@ func Open(
 		artifactRepository,
 		collectionRepository,
 		catalogRepository,
-		config.IDGenerator,
 		config.Clock,
+		config.RootMutationPolicy,
 	)
 	if err != nil {
 		_ = content.Close()
@@ -240,7 +238,6 @@ func Open(
 		return nil, err
 	}
 	reconciler, err := artifact.NewReconciler(
-		config.IDGenerator,
 		config.Clock,
 	)
 	if err != nil {
@@ -263,6 +260,7 @@ func Open(
 		reconciler,
 		metadata.Publisher(),
 		config.Clock,
+		config.RootMutationPolicy,
 	)
 	if err != nil {
 		_ = content.Close()
@@ -271,21 +269,22 @@ func Open(
 	}
 
 	return &Components{
-		Roots:            rootService,
-		Sources:          sourceService,
-		Collections:      collectionService,
-		Artifacts:        artifactService,
-		Refresh:          refreshService,
-		CollectionReader: collectionRepository,
-		ArtifactReader:   artifactRepository,
-		Catalogs:         catalogRepository,
-		Definitions:      definitions,
-		SourceRuntime:    sourceRuntime,
-		discovery:        discoveryEngine,
-		metadata:         metadata,
-		content:          content,
-		managedSources:   sourceRegistry,
-		decoderIDs:       decoderIDs,
+		Roots:              rootService,
+		Sources:            sourceService,
+		Collections:        collectionService,
+		Artifacts:          artifactService,
+		Refresh:            refreshService,
+		CollectionReader:   collectionRepository,
+		ArtifactReader:     artifactRepository,
+		Catalogs:           catalogRepository,
+		Definitions:        definitions,
+		SourceRuntime:      sourceRuntime,
+		discovery:          discoveryEngine,
+		metadata:           metadata,
+		content:            content,
+		managedSources:     sourceRegistry,
+		decoderIDs:         decoderIDs,
+		rootMutationPolicy: config.RootMutationPolicy,
 	}, nil
 }
 
@@ -295,6 +294,13 @@ func (c *Components) HasDecoder(id basespec.DecoderID) bool {
 	}
 	_, exists := c.decoderIDs[id]
 	return exists
+}
+
+func (c *Components) RootMutationPolicy() protection.RootPolicy {
+	if c == nil {
+		return nil
+	}
+	return c.rootMutationPolicy
 }
 
 // DecoderFingerprint returns the exact decoder capability fingerprint used by
@@ -372,6 +378,138 @@ func (c *Components) PublishManagedPackage(
 	expectedSourceRevision uint64,
 	publication source.ManagedPackagePublication,
 ) (ManagedPackageResult, error) {
+	return c.publishManagedPackage(
+		ctx,
+		rootID,
+		sourceID,
+		expectedSourceRevision,
+		publication,
+		false,
+	)
+}
+
+// PublishProtectedManagedPackage is the trusted protected-topology package
+// publication path. Artifact Store assigns no built-in meaning to this
+// method. Application installers use it only for a Root declared protected by
+// the application RootPolicy.
+func (c *Components) PublishProtectedManagedPackage(
+	ctx context.Context,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
+	expectedSourceRevision uint64,
+	publication source.ManagedPackagePublication,
+) (ManagedPackageResult, error) {
+	if c == nil || !c.isProtectedRoot(rootID) {
+		return ManagedPackageResult{}, fmt.Errorf(
+			"%w: Root %q is not a declared protected topology Root",
+			basespec.ErrProtected,
+			rootID,
+		)
+	}
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return ManagedPackageResult{}, err
+	}
+	return c.publishManagedPackage(
+		ctx,
+		rootID,
+		sourceID,
+		expectedSourceRevision,
+		publication,
+		true,
+	)
+}
+
+// RemoveManagedPackage removes one complete package and advances the Source
+// revision after successful source-side removal.
+func (c *Components) RemoveManagedPackage(
+	ctx context.Context,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
+	expectedSourceRevision uint64,
+	directory basespec.Locator,
+	expectedGeneration string,
+) (ManagedPackageResult, error) {
+	return c.removeManagedPackage(
+		ctx,
+		rootID,
+		sourceID,
+		expectedSourceRevision,
+		directory,
+		expectedGeneration,
+		false,
+	)
+}
+
+// RemoveProtectedManagedPackage is the trusted protected-topology removal
+// path. It is reserved for an explicit installer or update workflow.
+func (c *Components) RemoveProtectedManagedPackage(
+	ctx context.Context,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
+	expectedSourceRevision uint64,
+	directory basespec.Locator,
+	expectedGeneration string,
+) (ManagedPackageResult, error) {
+	if c == nil || !c.isProtectedRoot(rootID) {
+		return ManagedPackageResult{}, fmt.Errorf(
+			"%w: Root %q is not a declared protected topology Root",
+			basespec.ErrProtected,
+			rootID,
+		)
+	}
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return ManagedPackageResult{}, err
+	}
+	return c.removeManagedPackage(
+		ctx,
+		rootID,
+		sourceID,
+		expectedSourceRevision,
+		directory,
+		expectedGeneration,
+		true,
+	)
+}
+
+func (c *Components) Close() error {
+	if c == nil {
+		return nil
+	}
+	var closeErrors []error
+	if c.content != nil {
+		if err := c.content.Close(); err != nil {
+			closeErrors = append(closeErrors, err)
+		}
+	}
+	if c.metadata != nil {
+		if err := c.metadata.Close(); err != nil {
+			closeErrors = append(closeErrors, err)
+		}
+	}
+	return errors.Join(closeErrors...)
+}
+
+func (c *Components) publishManagedPackage(
+	ctx context.Context,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
+	expectedSourceRevision uint64,
+	publication source.ManagedPackagePublication,
+	allowProtected bool,
+) (ManagedPackageResult, error) {
+	if c == nil {
+		return ManagedPackageResult{}, basespec.ErrClosed
+	}
+	if c.isProtectedRoot(rootID) && !allowProtected {
+		return ManagedPackageResult{}, fmt.Errorf(
+			"%w: managed package publication for protected Root %q requires the protected installer path",
+			basespec.ErrProtected,
+			rootID,
+		)
+	}
+	if err := protection.RequireMutableRoot(ctx, c.rootMutationPolicy, rootID); err != nil {
+		return ManagedPackageResult{}, err
+	}
 	normalizedPublication, err := source.NormalizeManagedPackagePublication(
 		publication,
 	)
@@ -435,16 +573,28 @@ func (c *Components) PublishManagedPackage(
 	return result, nil
 }
 
-// RemoveManagedPackage removes one complete package and advances the Source
-// revision after successful source-side removal.
-func (c *Components) RemoveManagedPackage(
+func (c *Components) removeManagedPackage(
 	ctx context.Context,
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
 	expectedSourceRevision uint64,
 	directory basespec.Locator,
 	expectedGeneration string,
+	allowProtected bool,
 ) (ManagedPackageResult, error) {
+	if c == nil {
+		return ManagedPackageResult{}, basespec.ErrClosed
+	}
+	if c.isProtectedRoot(rootID) && !allowProtected {
+		return ManagedPackageResult{}, fmt.Errorf(
+			"%w: managed package removal for protected Root %q requires the protected installer path",
+			basespec.ErrProtected,
+			rootID,
+		)
+	}
+	if err := protection.RequireMutableRoot(ctx, c.rootMutationPolicy, rootID); err != nil {
+		return ManagedPackageResult{}, err
+	}
 	if err := source.ValidateManagedPackageDirectory(directory); err != nil {
 		return ManagedPackageResult{}, err
 	}
@@ -536,24 +686,6 @@ func (c *Components) RemoveManagedPackage(
 	}, nil
 }
 
-func (c *Components) Close() error {
-	if c == nil {
-		return nil
-	}
-	var closeErrors []error
-	if c.content != nil {
-		if err := c.content.Close(); err != nil {
-			closeErrors = append(closeErrors, err)
-		}
-	}
-	if c.metadata != nil {
-		if err := c.metadata.Close(); err != nil {
-			closeErrors = append(closeErrors, err)
-		}
-	}
-	return errors.Join(closeErrors...)
-}
-
 func managedPackageExists(
 	ctx context.Context,
 	runtime source.Runtime,
@@ -585,6 +717,14 @@ func managedPackageExists(
 		)
 	}
 	return true, nil
+}
+
+func (c *Components) isProtectedRoot(
+	rootID basespec.RootID,
+) bool {
+	return c != nil &&
+		c.rootMutationPolicy != nil &&
+		c.rootMutationPolicy.IsProtectedRoot(rootID)
 }
 
 func (c *Components) managedSource(

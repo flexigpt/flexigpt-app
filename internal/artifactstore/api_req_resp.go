@@ -64,6 +64,7 @@ type PurgeArtifactRootResponse struct {
 // ArtifactSourceDraft is write-only. Source configuration can contain local
 // filesystem paths or provider credentials and is not returned by the API.
 type ArtifactSourceDraft struct {
+	ID          basespec.SourceID   `json:"id"          required:"true"`
 	Kind        basespec.SourceKind `json:"kind"        required:"true"`
 	DisplayName string              `json:"displayName" required:"true"`
 	Enabled     bool                `json:"enabled"`

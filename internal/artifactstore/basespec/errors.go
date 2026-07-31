@@ -21,6 +21,7 @@ var (
 	ErrDecoderUnavailable  = errors.New("artifact store: decoder unavailable")
 	ErrAmbiguousDecoder    = errors.New("artifact store: ambiguous decoder")
 	ErrReferenceUnresolved = errors.New("artifact store: reference unresolved")
+	ErrProtected           = errors.New("artifact store: protected")
 	ErrSuppressed          = errors.New("artifact store: source binding suppressed")
 	ErrRetired             = errors.New("artifact store: retired")
 )

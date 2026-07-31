@@ -19,15 +19,13 @@ import (
 const artifactColumns = `
 	id, root_id, collection_id, source_id, locator, subresource_locator,
 	kind, name, enabled, adoption, resolved_definition_digest, data_json,
-	state, diagnostics_json, revision, created_at, modified_at,
-	idempotency_key`
+	state, diagnostics_json, revision, created_at, modified_at`
 
 const activeArtifactColumns = `
 	a.id, a.root_id, a.collection_id, a.source_id, a.locator,
 	a.subresource_locator, a.kind, a.name, a.enabled, a.adoption,
 	a.resolved_definition_digest, a.data_json, a.state,
-	a.diagnostics_json, a.revision, a.created_at, a.modified_at,
-	a.idempotency_key`
+	a.diagnostics_json, a.revision, a.created_at, a.modified_at`
 
 const suppressionColumns = `
 	root_id, collection_id, source_id, locator, subresource_locator,
@@ -237,7 +235,8 @@ func (s *Store) createAdoptedArtifact(
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	if expectedCollectionRevision == 0 ||
+	if value.Revision != 1 ||
+		expectedCollectionRevision == 0 ||
 		expectedCatalogRevision == 0 ||
 		value.Adoption != artifact.AdoptionObserved ||
 		value.State != artifact.StateAvailable ||
@@ -292,7 +291,8 @@ func (s *Store) createPinnedArtifact(
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	if expectedCollectionRevision == 0 ||
+	if value.Revision != 1 ||
+		expectedCollectionRevision == 0 ||
 		value.Adoption != artifact.AdoptionPinned ||
 		(expectedCatalogRevision == 0 &&
 			(value.State != artifact.StateMissing ||
@@ -615,9 +615,8 @@ func insertArtifactTx(
 		`INSERT INTO artifact_artifacts (
 			id, root_id, collection_id, source_id, locator, subresource_locator,
 			kind, name, enabled, adoption, resolved_definition_digest, data_json,
-			state, diagnostics_json, revision, created_at, modified_at,
-			idempotency_key
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			state, diagnostics_json, revision, created_at, modified_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(value.ID),
 		string(value.RootID),
 		string(value.CollectionID),
@@ -635,7 +634,6 @@ func insertArtifactTx(
 		value.Revision,
 		timeValue(value.CreatedAt),
 		timeValue(value.ModifiedAt),
-		value.IdempotencyKey,
 	)
 	if err != nil {
 		return sqliteError(err)
@@ -999,8 +997,7 @@ func sameArtifactManagedFields(
 		) &&
 		current.State == next.State &&
 		diagnostic.EqualDiagnostics(current.Diagnostics, next.Diagnostics) &&
-		current.CreatedAt.Equal(next.CreatedAt) &&
-		current.IdempotencyKey == next.IdempotencyKey
+		current.CreatedAt.Equal(next.CreatedAt)
 }
 
 func scanArtifact(row scanner) (artifact.Artifact, error) {
@@ -1013,7 +1010,6 @@ func scanArtifact(row scanner) (artifact.Artifact, error) {
 		data, diagnosticsRaw               []byte
 		revision                           uint64
 		createdAt, modifiedAt              int64
-		idempotencyKey                     string
 	)
 	if err := row.Scan(
 		&id,
@@ -1033,7 +1029,6 @@ func scanArtifact(row scanner) (artifact.Artifact, error) {
 		&revision,
 		&createdAt,
 		&modifiedAt,
-		&idempotencyKey,
 	); err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -1059,7 +1054,6 @@ func scanArtifact(row scanner) (artifact.Artifact, error) {
 		ResolvedDefinition: parseDigest(resolvedDefinition),
 		Data:               append(json.RawMessage(nil), data...),
 		State:              artifact.State(state),
-		IdempotencyKey:     idempotencyKey,
 		Diagnostics:        diagnostics,
 		Revision:           revision,
 		CreatedAt:          parseTime(createdAt),

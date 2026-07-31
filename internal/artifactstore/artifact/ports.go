@@ -82,6 +82,7 @@ type Repository interface {
 }
 
 type Draft struct {
+	ID      basespec.ArtifactID
 	Name    string
 	Enabled bool
 	Data    json.RawMessage
@@ -93,7 +94,7 @@ type Policy interface {
 		value collection.Collection,
 		occurrence catalog.Occurrence,
 		def definition.Definition,
-	) (Draft, bool, []diagnostic.Diagnostic)
+	) (Draft, bool, []diagnostic.Diagnostic, error)
 }
 
 type SourceStateUpdate struct {

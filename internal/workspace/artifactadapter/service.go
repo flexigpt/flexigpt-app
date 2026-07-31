@@ -8,6 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/attachmentdata"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/collectiondata"
@@ -18,14 +19,16 @@ type Service struct {
 	collections             workspaceCollectionStore
 	sources                 sourceSummaryLookup
 	discoveryPolicyRevision string
+	rootPolicy              protection.RootPolicy
 }
 
 func NewService(
 	collections workspaceCollectionStore,
 	sources sourceSummaryLookup,
 	discoveryPolicyRevision string,
+	rootPolicy protection.RootPolicy,
 ) (*Service, error) {
-	if collections == nil || sources == nil {
+	if collections == nil || sources == nil || rootPolicy == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace service dependencies are incomplete",
 			spec.ErrInvalidWorkspace,
@@ -42,6 +45,7 @@ func NewService(
 		collections:             collections,
 		sources:                 sources,
 		discoveryPolicyRevision: discoveryPolicyRevision,
+		rootPolicy:              rootPolicy,
 	}, nil
 }
 
@@ -49,7 +53,10 @@ func (s *Service) CreateEmpty(
 	ctx context.Context,
 	request spec.EmptyWorkspaceRequest,
 ) (spec.Workspace, error) {
-	if err := basespec.ValidateRootID(request.RootID); err != nil {
+	if err := s.requireWorkspaceRoot(request.RootID); err != nil {
+		return spec.Workspace{}, err
+	}
+	if err := basespec.ValidateCollectionID(request.CollectionID); err != nil {
 		return spec.Workspace{}, err
 	}
 	data := spec.CollectionData{
@@ -64,6 +71,7 @@ func (s *Service) CreateEmpty(
 		ctx,
 		request.RootID,
 		collection.Draft{
+			ID:          request.CollectionID,
 			Kind:        spec.CollectionKind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
@@ -75,14 +83,28 @@ func (s *Service) CreateEmpty(
 	if err != nil {
 		return spec.Workspace{}, err
 	}
-	return s.Get(ctx, created.Ref())
+	value, err := s.Get(ctx, created.Ref())
+	if err != nil {
+		return spec.Workspace{}, err
+	}
+	if value.Mode != spec.ModeEmpty {
+		return spec.Workspace{}, fmt.Errorf(
+			"%w: Workspace %q creation intent differs",
+			basespec.ErrConflict,
+			request.CollectionID,
+		)
+	}
+	return value, nil
 }
 
 func (s *Service) CreateFilesystem(
 	ctx context.Context,
 	request spec.FilesystemWorkspaceRequest,
 ) (spec.Workspace, error) {
-	if err := basespec.ValidateRootID(request.RootID); err != nil {
+	if err := s.requireWorkspaceRoot(request.RootID); err != nil {
+		return spec.Workspace{}, err
+	}
+	if err := basespec.ValidateCollectionID(request.CollectionID); err != nil {
 		return spec.Workspace{}, err
 	}
 	if err := basespec.ValidateSourceID(request.PrimarySourceID); err != nil {
@@ -126,6 +148,7 @@ func (s *Service) CreateFilesystem(
 		ctx,
 		request.RootID,
 		collection.Draft{
+			ID:          request.CollectionID,
 			Kind:        spec.CollectionKind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
@@ -142,14 +165,26 @@ func (s *Service) CreateFilesystem(
 	if err != nil {
 		return spec.Workspace{}, err
 	}
-	return s.Get(ctx, created.Ref())
+	value, err := s.Get(ctx, created.Ref())
+	if err != nil {
+		return spec.Workspace{}, err
+	}
+	if value.Mode != spec.ModeFilesystem ||
+		value.PrimarySourceID != request.PrimarySourceID {
+		return spec.Workspace{}, fmt.Errorf(
+			"%w: Workspace %q creation intent differs",
+			basespec.ErrConflict,
+			request.CollectionID,
+		)
+	}
+	return value, nil
 }
 
 func (s *Service) List(
 	ctx context.Context,
 	rootID basespec.RootID,
 ) ([]spec.Workspace, error) {
-	if err := basespec.ValidateRootID(rootID); err != nil {
+	if err := s.requireWorkspaceRoot(rootID); err != nil {
 		return nil, err
 	}
 	collections, err := s.collections.ListByRoot(ctx, rootID)
@@ -567,6 +602,9 @@ func (s *Service) Purge(
 	if err := ref.Validate(); err != nil {
 		return err
 	}
+	if err := s.requireWorkspaceRoot(ref.RootID); err != nil {
+		return err
+	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Workspace revision is required",
@@ -629,6 +667,9 @@ func (s *Service) Get(
 	ref collection.CollectionRef,
 ) (spec.Workspace, error) {
 	if err := ref.Validate(); err != nil {
+		return spec.Workspace{}, err
+	}
+	if err := s.requireWorkspaceRoot(ref.RootID); err != nil {
 		return spec.Workspace{}, err
 	}
 	value, err := s.collections.Get(ctx, ref)
@@ -701,6 +742,22 @@ func (s *Service) Get(
 		Attachments:     attachments,
 		Sources:         sources,
 	}, nil
+}
+
+func (s *Service) requireWorkspaceRoot(
+	rootID basespec.RootID,
+) error {
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return err
+	}
+	if s.rootPolicy != nil && s.rootPolicy.IsProtectedRoot(rootID) {
+		return fmt.Errorf(
+			"%w: Workspace cannot use protected Root %q",
+			basespec.ErrProtected,
+			rootID,
+		)
+	}
+	return nil
 }
 
 func (s *Service) requirePrimarySource(

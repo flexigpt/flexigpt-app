@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -30,6 +31,7 @@ type Service struct {
 	reconciler  *artifact.Reconciler
 	publisher   Publisher
 	clock       clockutil.Clock
+	policy      protection.RootPolicy
 }
 
 func NewService(
@@ -42,6 +44,7 @@ func NewService(
 	reconciler *artifact.Reconciler,
 	publisher Publisher,
 	timeClock clockutil.Clock,
+	policy protection.RootPolicy,
 ) (*Service, error) {
 	if collections == nil ||
 		catalogs == nil ||
@@ -67,6 +70,7 @@ func NewService(
 		reconciler:  reconciler,
 		publisher:   publisher,
 		clock:       timeClock,
+		policy:      policy,
 	}, nil
 }
 
@@ -76,6 +80,9 @@ func (s *Service) Refresh(
 	plan discovery.Plan,
 	policy artifact.Policy,
 ) (Result, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return Result{}, err
+	}
 	if ctx == nil {
 		return Result{}, fmt.Errorf("%w: refresh context is nil", basespec.ErrInvalid)
 	}

@@ -1,0 +1,32 @@
+{
+	"schemaVersion": "v1",
+	"root": {
+		"id": "0192c4c0-0000-7000-8000-000000000001",
+		"displayName": "Application Built-ins",
+		"description": "Protected application-provided portable Skill packages."
+	},
+	"source": {
+		"id": "0192c4c0-0001-7000-8000-000000000001",
+		"kind": "managed-directory",
+		"displayName": "Application Built-in Packages",
+		"enabled": true
+	},
+	"bundles": [
+		{
+			"id": "0192c4c0-0010-7000-8000-000000000001",
+			"logicalName": "core-instructions",
+			"logicalVersion": "v1",
+			"displayName": "Core Instructions",
+			"description": "Application-provided core instruction Skills.",
+			"enabled": true,
+			"skills": [
+				{
+					"id": "0192c4c0-0100-7000-8000-000000000001",
+					"logicalName": "markdown-output",
+					"package": "core-instructions/markdown-output",
+					"enabled": true
+				}
+			]
+		}
+	]
+}

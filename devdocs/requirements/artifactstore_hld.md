@@ -25,6 +25,10 @@ It is authoritative for:
 
 The delivered core is the current platform boundary, not a temporary parallel model. This document separates behavior that exists now from portable transfer and broader domain work that is still planned.
 
+Identity ownership, shareability, protected built-in topology, and Workspace
+built-in exclusion are additionally governed by
+`artifactstore_identity_shareability_builtin_hld.md`.
+
 ## 2. Feature intent
 
 Artifact Store makes an Artifact the durable item a person can enable, inspect,
@@ -155,6 +159,44 @@ Portable definitions contain only shareable domain content, portable
 references, and integrity metadata. A local entity may record the digest and
 provenance of the portable definition from which it was imported.
 
+### 5.0.1 Caller-supplied IDs and protected built-ins
+
+Root, Source, Collection, and Artifact IDs are caller-supplied UUIDv7 values.
+Generic Artifact Store services validate these IDs but never allocate them.
+Repeated creation with a matching immutable creation intent returns the existing
+record; a changed immutable intent returns conflict. Semantic uniqueness,
+including Artifact source-binding uniqueness, remains independent of ID
+uniqueness. Revision remains the concurrency mechanism for mutable state.
+
+Artifact Store stores no idempotency key. A caller-supplied entity ID is the
+only replay identity for explicit creation. Automatic reconciliation is allowed
+only when feature code supplies `artifact.Draft.ID` through a feature-owned ID
+provider outside Artifact Store. Generic Artifact Store packages do not expose
+an ID-provider abstraction and do not construct UUID generators. The protected
+built-in registry uses committed static UUIDv7
+values and is verified as embedded application metadata during startup. SQLite
+contains only the installed local topology after trusted installation. The
+registry is embedded under `internal/builtin/metadata`; it is not owned by
+Artifact Store and is not a portable package manifest.
+
+The application creates built-ins in one protected system Root. Its Root,
+managed Source, Collections, and Artifacts use committed UUIDv7 values from an
+embedded app-only registry. The registry is SQLite and application metadata
+input, not portable package data. Ordinary APIs cannot modify, retire, purge,
+attach to, or publish into the protected Root. Only the trusted built-in
+installer and update path may do so.
+
+Shareable package data is represented by a package schema with only logical
+bundle and Skill names, package files, `SKILL.md`, optional portable versions,
+and an externally supplied package SHA-256. The SHA-256 is verified against
+canonical package files. App metadata and package metadata are never combined.
+
+Shareable package data contains logical bundle and Skill names, package files,
+`SKILL.md`, optional portable version, and an externally supplied package
+SHA-256. It never contains application UUIDs, local paths, revisions,
+timestamps, enablement, idempotency keys, runtime state, roles, or
+installation-specific metadata.
+
 ### 5.1 Artifact Root
 
 An Artifact Root is a technical namespace and trust boundary.
@@ -215,13 +257,6 @@ A Collection owns:
 
 The local Collection is not exported verbatim because it contains local state.
 Its shareable representation is a Portable Collection Definition.
-
-An optional immutable local idempotency key may be stored with a Collection.
-It is unique within one Root and Collection kind, is never part of Collection
-data or a Portable Collection Definition, and is never returned through a
-public projection. It exists only for convergent local provisioning workflows,
-such as built-in bundle bootstrap. It does not replace `CollectionID`, does not
-become an Artifact identity, and does not authorize cross-Root access.
 
 ### 5.3.1 Portable Collection Definition
 
@@ -350,7 +385,6 @@ It contains:
 - Current resolved definition digest, when available.
 - Local enablement and consumer-owned data.
 - Source-derived state and diagnostics.
-- Optional immutable local idempotency key.
 - Revision and timestamps.
 
 Its stable reference is:
@@ -363,12 +397,6 @@ Its current address is:
 
 `ArtifactAddress` is a current projection and must not replace `ArtifactRef` in
 persistent selections.
-
-An Artifact idempotency key is local-only, immutable, and omitted from public
-and portable projections. Artifact Store enforces its uniqueness within one
-Root, Collection, and Artifact kind. It is appropriate for a feature workflow
-such as managed Skill publication, where a caller-supplied operation key must
-converge concurrent creation attempts without becoming an `ArtifactID`.
 
 ### 5.8 Collection catalog
 
@@ -657,25 +685,25 @@ establishes its membership and meaning.
 
 ## 10. Current implementation status
 
-| Capability                              | Status                           | Current implementation                                                                                                                                                                                                                                     |
-| --------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Root and Source lifecycle               | Present                          | Roots are technical namespaces. Sources are Root-owned, can be attached to multiple same-Root Collections, and support revision-checked lifecycle changes.                                                                                                 |
-| Public Artifact API boundary            | Present and scoped               | The public API manages Roots, Sources, Source kinds, and managed package publication. Feature APIs own Artifact deletion workflows where membership or source-side cleanup matters.                                                                        |
-| Source adapters and snapshots           | Present                          | Filesystem, embedded, managed, and additional adapters can provide bounded source-relative discovery access.                                                                                                                                               |
-| Collections and attachments             | Present                          | Collections, attachment roles, enablement, local data, retirement, and optimistic revisions are durable platform capabilities used by feature services.                                                                                                    |
-| Discovery, catalog, and reconciliation  | Present                          | Refresh publishes one Collection-scoped catalog, preserves valid, invalid, and missing observations, and reconciles source-derived Artifact state.                                                                                                         |
-| Canonical definitions                   | Present                          | Immutable definitions use canonical JSON and digest identity, are Root-reachable, and are revalidated on read.                                                                                                                                             |
-| Artifact lifecycle                      | Present                          | Stable Artifact references, observed adoption, pinning, suppression, local enablement, local data, unadoption, and purge are implemented for feature consumers.                                                                                            |
-| Managed package authoring               | Present                          | Managed Sources publish complete staged packages, use source generations as optimistic tokens, and advance Source revision after visible content changes.                                                                                                  |
-| Catalog currentness and conflicts       | Present                          | Publication checks Collection, attachment, Source, catalog, plan, decoder, and snapshot inputs. Consumers can identify stale metadata and require refresh.                                                                                                 |
-| Persistence and relationship invariants | Present                          | Artifact Store uses one fresh `v1` schema in the `artifacts_v1` namespace. There is no migration ledger or legacy schema compatibility path. Database and service checks preserve active Root, Source, Collection, attachment, and Artifact relationships. |
-| Source privacy and local paths          | Present                          | Public Source responses omit configuration. Trusted native paths remain an internal capability for adapters that explicitly support them.                                                                                                                  |
-| Feature integration                     | Present for Workspace and Skills | Workspace and `skill.bundle` consume injected Artifact Store capabilities. Agent Skills runtime, assistant preset, conversation, and inference use Artifact-backed Skill references.                                                                       |
-| Portable Collection Definition          | Linked Skill manifest present    | The canonical portable Collection envelope exists. `skill.bundle.v1` can build canonical integrity-pinned linked JSON from current Artifact Store state. Package capture, import, URI acquisition, and multi-source closure export remain unavailable.     |
-| Portable content closure                | Not present                      | Definitions do not yet enumerate the assets, package members, or integrity closure required for portable export.                                                                                                                                           |
-| Artifact and Collection transfer        | Planned                          | Import, export, archive assembly, acquisition, provenance capture, and native domain exporters are not implemented.                                                                                                                                        |
-| Direct Artifact movement                | Deferred                         | Artifact identity is independent of Collection identity, but moving an Artifact between Collections remains unsupported.                                                                                                                                   |
-| Historical catalogs and materialization | Optional                         | Historical publication retention, dependency snapshots, and generic materialization remain future extensions.                                                                                                                                              |
+| Capability                              | Status                           | Current implementation                                                                                                                                                                                                                                                                |
+| --------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root and Source lifecycle               | Present                          | Roots are technical namespaces. Sources are Root-owned, can be attached to multiple same-Root Collections, and support revision-checked lifecycle changes.                                                                                                                            |
+| Public Artifact API boundary            | Present and scoped               | The public API manages Roots, Sources, Source kinds, and managed package publication. Feature APIs own Artifact deletion workflows where membership or source-side cleanup matters.                                                                                                   |
+| Source adapters and snapshots           | Present                          | Filesystem, embedded, managed, and additional adapters can provide bounded source-relative discovery access.                                                                                                                                                                          |
+| Collections and attachments             | Present                          | Collections, attachment roles, enablement, local data, retirement, and optimistic revisions are durable platform capabilities used by feature services.                                                                                                                               |
+| Discovery, catalog, and reconciliation  | Present                          | Refresh publishes one Collection-scoped catalog, preserves valid, invalid, and missing observations, and reconciles source-derived Artifact state.                                                                                                                                    |
+| Canonical definitions                   | Present                          | Immutable definitions use canonical JSON and digest identity, are Root-reachable, and are revalidated on read.                                                                                                                                                                        |
+| Artifact lifecycle                      | Present                          | Stable Artifact references, observed adoption, pinning, suppression, local enablement, local data, unadoption, and purge are implemented for feature consumers.                                                                                                                       |
+| Managed package authoring               | Present                          | Managed Sources publish complete staged packages, use source generations as optimistic tokens, and advance Source revision after visible content changes.                                                                                                                             |
+| Catalog currentness and conflicts       | Present                          | Publication checks Collection, attachment, Source, catalog, plan, decoder, and snapshot inputs. Consumers can identify stale metadata and require refresh.                                                                                                                            |
+| Persistence and relationship invariants | Present                          | Artifact Store uses one fresh `v2` schema in the `artifacts_v2` namespace. There is no migration ledger or legacy schema compatibility path. Database and service checks preserve active Root, Source, Collection, attachment, Artifact, and source-binding uniqueness relationships. |
+| Source privacy and local paths          | Present                          | Public Source responses omit configuration. Trusted native paths remain an internal capability for adapters that explicitly support them.                                                                                                                                             |
+| Feature integration                     | Present for Workspace and Skills | Workspace and `skill.bundle` consume injected Artifact Store capabilities. Workspace has no built-in library model. Built-in Skills remain in the protected system Root and are resolved through semantic app metadata references.                                                    |
+| Portable Collection Definition          | Schema primitive only            | Canonical portable envelopes and `ShareableSkillPackage` validation exist. Export from local Skill Bundle records is intentionally disabled until a package-relative content-closure exporter exists.                                                                                 |
+| Portable content closure                | Not present                      | Definitions do not yet enumerate the assets, package members, or integrity closure required for portable export.                                                                                                                                                                      |
+| Artifact and Collection transfer        | Planned                          | Import, export, archive assembly, acquisition, provenance capture, and native domain exporters are not implemented.                                                                                                                                                                   |
+| Direct Artifact movement                | Deferred                         | Artifact identity is independent of Collection identity, but moving an Artifact between Collections remains unsupported.                                                                                                                                                              |
+| Historical catalogs and materialization | Optional                         | Historical publication retention, dependency snapshots, and generic materialization remain future extensions.                                                                                                                                                                         |
 
 ## 11. Current boundary and remaining work
 
@@ -694,21 +722,15 @@ resolution, assistant preset references, conversation references, and inference
 allow-lists.
 
 Managed Source snapshot generations are source-owned facts. Artifact Store
-persists Source revisions and catalog publication generations, but does not
-store a second acknowledged-generation cache. A retry derives current state
-from a confirmed Source snapshot and the caller's revision and generation
-preconditions. A pending feature Artifact may hold immutable source revision
-and generation preconditions only until its requested source-derived state
-becomes available. Completion must remove those preconditions rather than
-retaining a second stale copy of Source state.
+persists catalog publication generations but does not store an
+acknowledged-generation cache or managed-operation replay tokens in Artifact
+local data. A retry re-reads confirmed Source state, uses caller-supplied
+Artifact ID as replay identity, and uses package SHA-256 only to reject
+same-ID retries with different package content.
 
 For a non-transactional feature workflow such as managed Skill publication,
-the pending Artifact may retain the immutable source revision and generation
-that were used to begin that operation. Those values are operation
-preconditions, not current Source state and not an acknowledged-generation
-cache. A retry reuses them only while the Artifact remains unresolved. This
-allows a completed source-side package write to advance Source metadata exactly
-once after an interrupted acknowledgement.
+request-time Source revision and generation remain concurrency preconditions.
+They are never persisted as Artifact-local idempotency or operation state.
 
 Managed package generations cover every published payload directory. The
 managed adapter excludes only its private staging directory. MapStore remains
@@ -730,11 +752,45 @@ MapStore remains the sole Artifact Store implementation for immutable
 definition files and application-managed package payload files. External
 filesystem Sources remain direct filesystem adapters by design.
 
+Protected built-in topology is a generic Artifact Store declaration hook.
+`artifactstore/topology.Declaration` contains only generic protected Root and
+Source declarations. The Store owns protected Root and Source creation,
+validation, and mutation guards.
+The application-owned built-in installer supplies registry metadata and package
+directories through injected ports, then creates feature Collections and
+Artifacts through feature APIs. The installer may receive embedded or external
+package directories through `fs.FS`. Artifact Store never imports built-in registry
+or package code. Workspace has no built-in library model and must retain strict
+same-Root Artifact ownership checks.
+
+Built-in installation is a single protected-topology convergence workflow. It
+does not enumerate ordinary Roots, react to Root creation, or copy Sources,
+Collections, Artifacts, or package files into user Roots. It verifies static
+registry identity through feature-owned installation ports and refreshes a
+built-in Collection only when its catalog is unavailable or stale. Dynamic
+legacy records are never adopted as canonical built-ins; clean `artifacts_v2`
+storage rejects legacy metadata and explicit offline repair is required for
+manually contaminated interim state.
+
+Ordinary managed-package operations reject a protected Root even when a caller
+accidentally carries installer context. A separate protected managed-package
+operation requires both the application Root policy and the trusted installer
+capability. Application composition injects that operation only into the
+feature installer or explicit update path. This remains generic protected
+topology support; Artifact Store does not import or identify built-in feature
+semantics.
+
 Public Source updates treat omitted configuration as "preserve current private
 configuration". Callers can therefore change display name or enablement without
 receiving or resending filesystem paths or other opaque Source configuration.
 Managed package clients obtain their current optimistic generation through a
 dedicated confirmed-state API.
+
+Workspace rejects the protected Root at its feature boundary. This is separate
+from generic protected-root mutation guards: a Workspace cannot be created,
+read, listed, refreshed, or purged under the protected Root, even by code that
+holds trusted installer context. The Workspace `library` role remains a
+same-Root local Source attachment and is not a built-in-library mechanism.
 
 Import, export, archive handling, URI acquisition, portable content closure
 assembly, and direct Artifact movement remain deliberate omissions rather than
@@ -761,7 +817,7 @@ remaining work items for the current Artifact Store boundary.
 
 ### 11.2 Establish evolvable persistence
 
-- Start a clean `artifacts_v1` namespace with one schema and reject older Artifact Store metadata rather than migrating it.
+- Start a clean `artifacts_v2` namespace with one schema and reject older Artifact Store metadata rather than migrating it.
 - Add Root containment to Sources.
 - Introduce `CollectionID`, `CollectionKind`, `ArtifactID`, `ArtifactRef`, and `ArtifactAddress`.
 

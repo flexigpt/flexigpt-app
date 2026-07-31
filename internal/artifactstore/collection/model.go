@@ -33,15 +33,7 @@ type Collection struct {
 	ModifiedAt  time.Time               `json:"modifiedAt"`
 	RetiredAt   *time.Time              `json:"retiredAt,omitempty"`
 
-	// IdempotencyKey is a local-only immutable provisioning key. It is never
-	// returned through public APIs and must not be included in portable
-	// Collection definitions.
-	//
-	// When non-empty, SQLite enforces uniqueness per Root and Collection kind.
-	// Feature bootstrap workflows use it to converge concurrent creation
-	// attempts without deriving CollectionID from a seed key.
-	IdempotencyKey string          `json:"-"`
-	Data           json.RawMessage `json:"-"`
+	Data json.RawMessage `json:"-"`
 }
 
 func (c Collection) Ref() CollectionRef {
@@ -59,13 +51,6 @@ func (c Collection) Validate() error {
 		return err
 	}
 	if err := basespec.ValidateCollectionKind(c.Kind); err != nil {
-		return err
-	}
-	if err := basespec.ValidateOptionalText(
-		"collection idempotency key",
-		c.IdempotencyKey,
-		basespec.MaxLogicalNameBytes,
-	); err != nil {
 		return err
 	}
 	if err := basespec.ValidateRequiredText(
@@ -140,12 +125,12 @@ func (c Collection) Clone() Collection {
 }
 
 type Draft struct {
-	Kind           basespec.CollectionKind `json:"kind"`
-	DisplayName    string                  `json:"displayName"`
-	Description    string                  `json:"description,omitempty"`
-	Enabled        bool                    `json:"enabled"`
-	Data           json.RawMessage         `json:"data"`
-	IdempotencyKey string                  `json:"-"`
+	ID          basespec.CollectionID   `json:"id"`
+	Kind        basespec.CollectionKind `json:"kind"`
+	DisplayName string                  `json:"displayName"`
+	Description string                  `json:"description,omitempty"`
+	Enabled     bool                    `json:"enabled"`
+	Data        json.RawMessage         `json:"data"`
 }
 
 type Update struct {

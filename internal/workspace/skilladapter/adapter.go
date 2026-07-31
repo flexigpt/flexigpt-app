@@ -134,6 +134,65 @@ func (f *Adapter) Load(
 	workspace collection.CollectionRef,
 	artifactRefs []artifact.ArtifactRef,
 ) (SkillLoadPlan, error) {
+	seen := make(map[artifact.ArtifactRef]struct{}, len(artifactRefs))
+	for _, ref := range artifactRefs {
+		if err := ref.Validate(); err != nil {
+			return SkillLoadPlan{}, err
+		}
+		if ref.RootID != workspace.RootID {
+			return SkillLoadPlan{}, fmt.Errorf(
+				"%w: Workspace Skill belongs to another Root",
+				spec.ErrReferenceUnresolved,
+			)
+		}
+		if _, duplicate := seen[ref]; duplicate {
+			return SkillLoadPlan{}, fmt.Errorf(
+				"%w: duplicate Workspace Skill Artifact %q",
+				spec.ErrInvalidWorkspace,
+				ref.ArtifactID,
+			)
+		}
+		seen[ref] = struct{}{}
+	}
+	return f.loadLocal(ctx, workspace, artifactRefs)
+}
+
+func (f *Adapter) LoadArtifact(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (WorkspaceSkill, error) {
+	workspaceValue, resourceValue, err := f.query.ResolveArtifact(ctx, ref)
+	if err != nil {
+		return WorkspaceSkill{}, err
+	}
+	workspace := workspaceValue.Collection.Ref()
+	if resourceValue.Definition.Kind != skillartifact.Kind ||
+		resourceValue.Definition.SchemaID != skillartifact.SchemaID {
+		return WorkspaceSkill{}, fmt.Errorf(
+			"%w: Artifact %q is not an Agent Skill",
+			spec.ErrReferenceUnresolved,
+			ref.ArtifactID,
+		)
+	}
+	plan, err := f.Load(ctx, workspace, []artifact.ArtifactRef{ref})
+	if err != nil {
+		return WorkspaceSkill{}, err
+	}
+	if len(plan.Skills) != 1 {
+		return WorkspaceSkill{}, fmt.Errorf(
+			"%w: Artifact %q is unavailable for runtime loading",
+			spec.ErrReferenceUnresolved,
+			ref.ArtifactID,
+		)
+	}
+	return plan.Skills[0], nil
+}
+
+func (f *Adapter) loadLocal(
+	ctx context.Context,
+	workspace collection.CollectionRef,
+	artifactRefs []artifact.ArtifactRef,
+) (SkillLoadPlan, error) {
 	if err := workspace.Validate(); err != nil {
 		return SkillLoadPlan{}, err
 	}
@@ -222,37 +281,6 @@ func (f *Adapter) Load(
 	}
 	sortWorkspaceSkills(output.Skills)
 	return output, nil
-}
-
-func (f *Adapter) LoadArtifact(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (WorkspaceSkill, error) {
-	workspaceValue, resourceValue, err := f.query.ResolveArtifact(ctx, ref)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-	workspace := workspaceValue.Collection.Ref()
-	if resourceValue.Definition.Kind != skillartifact.Kind ||
-		resourceValue.Definition.SchemaID != skillartifact.SchemaID {
-		return WorkspaceSkill{}, fmt.Errorf(
-			"%w: Artifact %q is not an Agent Skill",
-			spec.ErrReferenceUnresolved,
-			ref.ArtifactID,
-		)
-	}
-	plan, err := f.Load(ctx, workspace, []artifact.ArtifactRef{ref})
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-	if len(plan.Skills) != 1 {
-		return WorkspaceSkill{}, fmt.Errorf(
-			"%w: Artifact %q is unavailable for runtime loading",
-			spec.ErrReferenceUnresolved,
-			ref.ArtifactID,
-		)
-	}
-	return plan.Skills[0], nil
 }
 
 func projectWorkspaceSkill(

@@ -7,25 +7,25 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type Service struct {
 	repository Repository
 	registry   *Registry
-	ids        uuidutil.Generator
 	clock      clockutil.Clock
+	policy     protection.RootPolicy
 }
 
 func NewService(
 	repository Repository,
 	registry *Registry,
-	ids uuidutil.Generator,
 	timeClock clockutil.Clock,
+	policy protection.RootPolicy,
 ) (*Service, error) {
-	if repository == nil || registry == nil || ids == nil || timeClock == nil {
+	if repository == nil || registry == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: source service dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -34,8 +34,8 @@ func NewService(
 	return &Service{
 		repository: repository,
 		registry:   registry,
-		ids:        ids,
 		clock:      timeClock,
+		policy:     policy,
 	}, nil
 }
 
@@ -44,31 +44,52 @@ func (s *Service) Create(
 	rootID basespec.RootID,
 	draft Draft,
 ) (Summary, error) {
+	value, _, err := s.CreateWithStatus(ctx, rootID, draft)
+	return value, err
+}
+
+// CreateWithStatus follows the normal caller-supplied-ID replay contract and
+// additionally reports whether this invocation committed a new Source row.
+//
+// The status is intentionally not persisted and is not part of the public
+// Artifact Store API. Higher-level provisioning workflows use it only to avoid
+// discarding a Source that existed before the current request.
+func (s *Service) CreateWithStatus(
+	ctx context.Context,
+	rootID basespec.RootID,
+	draft Draft,
+) (Summary, bool, error) {
 	if ctx == nil {
-		return Summary{}, fmt.Errorf(
+		return Summary{}, false, fmt.Errorf(
 			"%w: source creation context is nil",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return Summary{}, err
+		return Summary{}, false, err
 	}
 	if err := basespec.ValidateRootID(rootID); err != nil {
-		return Summary{}, err
+		return Summary{}, false, err
+	}
+	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+		return Summary{}, false, err
+	}
+	if err := basespec.ValidateSourceID(draft.ID); err != nil {
+		return Summary{}, false, err
 	}
 	if err := basespec.ValidateSourceKind(draft.Kind); err != nil {
-		return Summary{}, err
+		return Summary{}, false, err
 	}
 	if err := basespec.ValidateRequiredText(
 		"source display name",
 		draft.DisplayName,
 		basespec.MaxDisplayNameBytes,
 	); err != nil {
-		return Summary{}, err
+		return Summary{}, false, err
 	}
 	adapter, exists := s.registry.adapter(draft.Kind)
 	if !exists {
-		return Summary{}, fmt.Errorf(
+		return Summary{}, false, fmt.Errorf(
 			"%w: source adapter %q",
 			basespec.ErrSourceUnavailable,
 			draft.Kind,
@@ -76,23 +97,19 @@ func (s *Service) Create(
 	}
 	config, err := adapter.NormalizeConfig(ctx, draft.Config)
 	if err != nil {
-		return Summary{}, err
+		return Summary{}, false, err
 	}
 	config, err = jsonutil.CanonicalizeObject(
 		config,
 		basespec.MaxConfigBytes,
 	)
 	if err != nil {
-		return Summary{}, fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
+		return Summary{}, false, fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
 	}
 
-	id, err := s.ids.NewID(ctx)
-	if err != nil {
-		return Summary{}, err
-	}
 	now := clockutil.NowUTC(s.clock)
 	value := Source{
-		ID:          basespec.SourceID(id),
+		ID:          draft.ID,
 		RootID:      rootID,
 		Kind:        draft.Kind,
 		DisplayName: draft.DisplayName,
@@ -101,6 +118,29 @@ func (s *Service) Create(
 		Revision:    1,
 		CreatedAt:   now,
 		ModifiedAt:  now,
+	}
+	if err := value.Validate(); err != nil {
+		return Summary{}, false, err
+	}
+
+	// A caller-supplied Source ID is the create replay identity. Check for a
+	// completed prior creation before bootstrapping a managed directory or any
+	// other adapter-owned physical state.
+	existing, lookupErr := s.repository.Get(ctx, rootID, draft.ID)
+	switch {
+	case lookupErr == nil:
+		if sourceCreationIntentMatches(existing, value) {
+			return existing.Summary(), false, nil
+		}
+		return Summary{}, false, fmt.Errorf(
+			"%w: source %q creation intent differs",
+			basespec.ErrConflict,
+			draft.ID,
+		)
+
+	case !errors.Is(lookupErr, basespec.ErrSourceNotFound) &&
+		!errors.Is(lookupErr, basespec.ErrNotFound):
+		return Summary{}, false, lookupErr
 	}
 
 	var bootstrapper ManagedSourceBootstrapper
@@ -123,23 +163,56 @@ func (s *Service) Create(
 			ctx,
 			value.Clone(),
 		); err != nil {
-			return Summary{}, cleanupBootstrap(err)
+			return Summary{}, false, cleanupBootstrap(err)
 		}
 	}
 
-	if err := value.Validate(); err != nil {
-		return Summary{}, cleanupBootstrap(err)
+	createErr := s.repository.Create(ctx, value)
+	if createErr == nil {
+		return value.Summary(), true, nil
 	}
-
-	if err := s.repository.Create(ctx, value); err != nil {
+	if !errors.Is(createErr, basespec.ErrConflict) {
 		// A repository commit error can be ambiguous. Do not remove the
 		// bootstrapped directory after attempting metadata publication:
 		// the Source row may already be durable and must never point to
 		// deleted managed content.
-		return Summary{}, err
+		return Summary{}, false, createErr
 	}
 
-	return value.Summary(), nil
+	existing, lookupErr = s.repository.Get(ctx, rootID, draft.ID)
+	if lookupErr != nil {
+		// A global Source ID may already belong to another Root. Do not turn
+		// that ID collision into an unrelated Source-not-found response. This
+		// is a known non-commit outcome, so an empty managed Source directory
+		// created for this failed attempt can be safely compensated.
+		if errors.Is(lookupErr, basespec.ErrSourceNotFound) ||
+			errors.Is(lookupErr, basespec.ErrNotFound) {
+			return Summary{}, false, cleanupBootstrap(createErr)
+		}
+
+		// A non-not-found lookup failure may follow an ambiguous repository
+		// result. Preserve the bootstrapped directory rather than risking
+		// deletion of content referenced by a durable Source row.
+		return Summary{}, false, createErr
+	}
+	if !sourceCreationIntentMatches(existing, value) {
+		return Summary{}, false, fmt.Errorf(
+			"%w: source %q creation intent differs",
+			basespec.ErrConflict,
+			draft.ID,
+		)
+	}
+	return existing.Summary(), false, nil
+}
+
+func sourceCreationIntentMatches(
+	existing Source,
+	requested Source,
+) bool {
+	return existing.ID == requested.ID &&
+		existing.RootID == requested.RootID &&
+		existing.Kind == requested.Kind &&
+		jsonutil.Equal(existing.Config, requested.Config)
 }
 
 func (s *Service) Get(
@@ -184,6 +257,9 @@ func (s *Service) Update(
 	id basespec.SourceID,
 	update Update,
 ) (Summary, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+		return Summary{}, err
+	}
 	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Summary{}, err
 	}
@@ -268,6 +344,9 @@ func (s *Service) Retire(
 	id basespec.SourceID,
 	expectedRevision uint64,
 ) (Summary, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+		return Summary{}, err
+	}
 	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Summary{}, err
 	}
@@ -318,6 +397,9 @@ func (s *Service) Discard(
 	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
+	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+		return err
+	}
 	if err := basespec.ValidateRootID(rootID); err != nil {
 		return err
 	}
@@ -339,6 +421,9 @@ func (s *Service) Purge(
 	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
+	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+		return err
+	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected source revision is required",
@@ -363,6 +448,9 @@ func (s *Service) MarkContentChanged(
 	id basespec.SourceID,
 	expectedRevision uint64,
 ) (Summary, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+		return Summary{}, err
+	}
 	if ctx == nil {
 		return Summary{}, fmt.Errorf(
 			"%w: source content-change context is nil",

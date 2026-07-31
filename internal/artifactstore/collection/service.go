@@ -3,13 +3,14 @@ package collection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type sourceReader interface {
@@ -23,17 +24,17 @@ type sourceReader interface {
 type Service struct {
 	repository Repository
 	sources    sourceReader
-	ids        uuidutil.Generator
 	clock      clockutil.Clock
+	policy     protection.RootPolicy
 }
 
 func NewService(
 	repository Repository,
 	sources sourceReader,
-	ids uuidutil.Generator,
 	timeClock clockutil.Clock,
+	policy protection.RootPolicy,
 ) (*Service, error) {
-	if repository == nil || sources == nil || ids == nil || timeClock == nil {
+	if repository == nil || sources == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: collection service dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -42,8 +43,8 @@ func NewService(
 	return &Service{
 		repository: repository,
 		sources:    sources,
-		ids:        ids,
 		clock:      timeClock,
+		policy:     policy,
 	}, nil
 }
 
@@ -56,6 +57,12 @@ func (s *Service) Create(
 	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Collection{}, nil, err
 	}
+	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+		return Collection{}, nil, err
+	}
+	if err := basespec.ValidateCollectionID(draft.ID); err != nil {
+		return Collection{}, nil, err
+	}
 	if err := basespec.ValidateCollectionKind(draft.Kind); err != nil {
 		return Collection{}, nil, err
 	}
@@ -63,23 +70,18 @@ func (s *Service) Create(
 	if err != nil {
 		return Collection{}, nil, err
 	}
-	id, err := s.ids.NewID(ctx)
-	if err != nil {
-		return Collection{}, nil, err
-	}
 	now := clockutil.NowUTC(s.clock)
 	value := Collection{
-		ID:             basespec.CollectionID(id),
-		RootID:         rootID,
-		Kind:           draft.Kind,
-		DisplayName:    draft.DisplayName,
-		Description:    draft.Description,
-		Enabled:        draft.Enabled,
-		Data:           data,
-		IdempotencyKey: draft.IdempotencyKey,
-		Revision:       1,
-		CreatedAt:      now,
-		ModifiedAt:     now,
+		ID:          draft.ID,
+		RootID:      rootID,
+		Kind:        draft.Kind,
+		DisplayName: draft.DisplayName,
+		Description: draft.Description,
+		Enabled:     draft.Enabled,
+		Data:        data,
+		Revision:    1,
+		CreatedAt:   now,
+		ModifiedAt:  now,
 	}
 	if err := value.Validate(); err != nil {
 		return Collection{}, nil, err
@@ -130,10 +132,35 @@ func (s *Service) Create(
 		}
 		attachments = append(attachments, attachment)
 	}
-	if err := s.repository.Create(ctx, value, attachments); err != nil {
+	createErr := s.repository.Create(ctx, value, attachments)
+	if createErr == nil {
+		return value.Clone(), cloneAttachments(attachments), nil
+	}
+	if !errors.Is(createErr, basespec.ErrConflict) {
+		return Collection{}, nil, createErr
+	}
+
+	existing, err := s.repository.Get(ctx, value.Ref())
+	if err != nil {
+		// Collection IDs are globally unique in the v2 namespace. A matching
+		// ID in another Root remains an ID conflict, not a not-found result.
+		return Collection{}, nil, createErr
+	}
+	if existing.RootID != value.RootID ||
+		existing.ID != value.ID ||
+		existing.Kind != value.Kind {
+		return Collection{}, nil, fmt.Errorf(
+			"%w: collection %q creation intent differs",
+			basespec.ErrConflict,
+			value.ID,
+		)
+	}
+
+	existingAttachments, err := s.repository.ListAttachments(ctx, value.Ref())
+	if err != nil {
 		return Collection{}, nil, err
 	}
-	return value.Clone(), cloneAttachments(attachments), nil
+	return existing.Clone(), cloneAttachments(existingAttachments), nil
 }
 
 func (s *Service) Get(
@@ -174,6 +201,9 @@ func (s *Service) Update(
 	ref CollectionRef,
 	update Update,
 ) (Collection, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return Collection{}, err
+	}
 	if update.ExpectedRevision == 0 {
 		return Collection{}, fmt.Errorf(
 			"%w: expected collection revision is required",
@@ -221,6 +251,9 @@ func (s *Service) Retire(
 	ref CollectionRef,
 	expectedRevision uint64,
 ) (Collection, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return Collection{}, err
+	}
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
 		return Collection{}, err
@@ -251,6 +284,9 @@ func (s *Service) Purge(
 	ref CollectionRef,
 	expectedRevision uint64,
 ) error {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return err
+	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected collection revision is required",
@@ -287,6 +323,9 @@ func (s *Service) Attach(
 	expectedCollectionRevision uint64,
 	draft AttachmentDraft,
 ) (Collection, Attachment, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return Collection{}, Attachment{}, err
+	}
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
 		return Collection{}, Attachment{}, err
@@ -341,6 +380,9 @@ func (s *Service) UpdateAttachment(
 	sourceID basespec.SourceID,
 	update AttachmentUpdate,
 ) (Collection, Attachment, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return Collection{}, Attachment{}, err
+	}
 	currentCollection, err := s.repository.Get(ctx, ref)
 	if err != nil {
 		return Collection{}, Attachment{}, err
@@ -404,6 +446,9 @@ func (s *Service) Detach(
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
 ) (Collection, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return Collection{}, err
+	}
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
 		return Collection{}, err
@@ -426,6 +471,9 @@ func (s *Service) ReplaceAttachment(
 	ref CollectionRef,
 	replacement AttachmentReplacement,
 ) (Collection, Attachment, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return Collection{}, Attachment{}, err
+	}
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
 		return Collection{}, Attachment{}, err

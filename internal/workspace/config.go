@@ -5,6 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
@@ -42,16 +43,18 @@ type Config struct {
 	SkillRoots              []basespec.Locator
 	ContextComposition      contextadapter.CompositionPolicy
 	SourceUsePolicy         artifactadapter.SourceUsePolicy
+	Clock                   clockutil.Clock
+	AutoAdoptionIDProvider  artifactadapter.ArtifactIDProvider
 }
 
-type builtinArtifactSupport struct {
+type defaultArtifactSupport struct {
 	support spec.ArtifactSupport
 }
 
-// builtinArtifactSupportMatrix is the workspace artifact support matrix.
+// defaultArtifactSupportMatrix is the Workspace-local support matrix.
 //
 // DefaultConfig and decoder construction both derive from this matrix.
-var builtinArtifactSupportMatrix = []builtinArtifactSupport{
+var defaultArtifactSupportMatrix = []defaultArtifactSupport{
 	{
 		support: contextadapter.ArtifactSupport(),
 	},
@@ -67,7 +70,7 @@ var builtinArtifactSupportMatrix = []builtinArtifactSupport{
 
 func DefaultConfig() Config {
 	return Config{
-		Supports:                BuiltinArtifactSupports(),
+		Supports:                DefaultArtifactSupports(),
 		DiscoveryPolicyRevision: defaultDiscoveryPolicyRevision,
 		SkillRoots:              skilladapter.DefaultSkillRoots(),
 		ContextComposition:      contextadapter.DefaultCompositionPolicy(),
@@ -78,10 +81,13 @@ func DefaultConfig() Config {
 func (c Config) normalized() Config {
 	output := c
 	if len(output.Supports) == 0 {
-		output.Supports = BuiltinArtifactSupports()
+		output.Supports = DefaultArtifactSupports()
 	}
 	if output.DiscoveryPolicyRevision == "" {
 		output.DiscoveryPolicyRevision = defaultDiscoveryPolicyRevision
+	}
+	if output.Clock == nil {
+		output.Clock = clockutil.System{}
 	}
 	return output
 }
@@ -143,27 +149,27 @@ func (c Config) normalizedSupports() ([]spec.ArtifactSupport, error) {
 	return output, nil
 }
 
-func BuiltinArtifactSupports() []spec.ArtifactSupport {
+func DefaultArtifactSupports() []spec.ArtifactSupport {
 	output := make(
 		[]spec.ArtifactSupport,
 		0,
-		len(builtinArtifactSupportMatrix),
+		len(defaultArtifactSupportMatrix),
 	)
-	for _, value := range builtinArtifactSupportMatrix {
+	for _, value := range defaultArtifactSupportMatrix {
 		output = append(output, value.support)
 	}
 	return output
 }
 
-// BuiltinDecoders contains Workspace-owned decoders only. The shared
+// DefaultDecoders contains Workspace-owned decoders only. The shared
 // agent.skill decoder is registered exactly once by Artifact Store composition.
-func BuiltinDecoders() []artifactstoreDiscovery.Decoder {
+func DefaultDecoders() []artifactstoreDiscovery.Decoder {
 	return []artifactstoreDiscovery.Decoder{
 		contextadapter.NewContextDecoder(),
 	}
 }
 
-func BuiltinDiscoveryProfiles() spec.DiscoveryProfiles {
+func DefaultDiscoveryProfiles() spec.DiscoveryProfiles {
 	config := DefaultConfig()
 	registry, err := config.skillConventions()
 	if err != nil {

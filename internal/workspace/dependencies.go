@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -36,6 +37,7 @@ type Dependencies struct {
 	SourceRuntime      source.Runtime
 	HasDecoder         func(basespec.DecoderID) bool
 	DecoderFingerprint func() (cryptoutil.Digest, error)
+	RootMutationPolicy protection.RootPolicy
 }
 
 func (d Dependencies) Validate() error {
@@ -48,7 +50,8 @@ func (d Dependencies) Validate() error {
 		d.Definitions == nil ||
 		d.SourceRuntime == nil ||
 		d.HasDecoder == nil ||
-		d.DecoderFingerprint == nil {
+		d.DecoderFingerprint == nil ||
+		d.RootMutationPolicy == nil {
 		return fmt.Errorf(
 			"%w: Workspace Artifact Store dependencies are incomplete",
 			spec.ErrInvalidWorkspace,

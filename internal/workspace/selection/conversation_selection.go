@@ -109,7 +109,7 @@ type ConversationResolver struct {
 
 func NewConversationResolver(workspaceAPI *workspace.API) (*ConversationResolver, error) {
 	if workspaceAPI == nil {
-		return nil, errors.New("nil workspaceAPI providerd")
+		return nil, errors.New("nil workspace API provider")
 	}
 	return &ConversationResolver{workspaceAPI: workspaceAPI}, nil
 }

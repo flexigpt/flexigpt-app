@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"path"
 	"sort"
-	"strings"
 	"sync/atomic"
 
 	"github.com/flexigpt/agentskills-go"
@@ -22,6 +22,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
@@ -45,13 +46,13 @@ type Bundle struct {
 
 type CreateBundleRequest struct {
 	RootID         basespec.RootID
+	CollectionID   basespec.CollectionID
 	DisplayName    string
 	Description    string
 	Enabled        bool
 	LogicalName    basespec.LogicalName
 	LogicalVersion basespec.LogicalVersion
 	Labels         map[string]string
-	BootstrapKey   string
 	Attachments    []AttachmentDraft
 }
 
@@ -72,8 +73,8 @@ type AttachmentDraft struct {
 type CreateManagedSkillRequest struct {
 	Bundle                     collection.CollectionRef
 	ExpectedCollectionRevision uint64
+	ArtifactID                 basespec.ArtifactID
 	SkillName                  string
-	OperationKey               string
 	SKILLMD                    []byte
 
 	// Document is an optional structured authoring input. Serialization is
@@ -84,14 +85,14 @@ type CreateManagedSkillRequest struct {
 }
 
 type CreateManagedSkillResponse struct {
-	Artifact     artifact.Artifact
-	Address      artifact.ArtifactAddress
-	OperationKey string
+	Artifact artifact.Artifact
+	Address  artifact.ArtifactAddress
 }
 
 type AdoptSkillRequest struct {
 	Bundle                  collection.CollectionRef
 	Occurrence              catalog.OccurrenceKey
+	ArtifactID              basespec.ArtifactID
 	ExpectedCatalogRevision uint64
 	Name                    string
 	Enabled                 bool
@@ -100,27 +101,21 @@ type AdoptSkillRequest struct {
 type PinSkillRequest struct {
 	Bundle                     collection.CollectionRef
 	ExpectedCollectionRevision uint64
+	ArtifactID                 basespec.ArtifactID
 	Binding                    artifact.SourceBinding
 	Name                       string
 	Enabled                    bool
 }
 
-type BuiltInSkill struct {
-	Name    string
-	SKILLMD []byte
-	Files   []source.ManagedPackageFile
-	Enabled bool
-}
-
-type BootstrapBundleRequest struct {
-	RootID         basespec.RootID
-	BootstrapKey   string
-	LogicalName    basespec.LogicalName
-	LogicalVersion basespec.LogicalVersion
-	Labels         map[string]string
-	DisplayName    string
-	Description    string
-	Skills         []BuiltInSkill
+type BuiltInBundleTopology struct {
+	RootID         basespec.RootID         `json:"-"`
+	CollectionID   basespec.CollectionID   `json:"-"`
+	SourceID       basespec.SourceID       `json:"-"`
+	LogicalName    basespec.LogicalName    `json:"-"`
+	LogicalVersion basespec.LogicalVersion `json:"-"`
+	DisplayName    string                  `json:"-"`
+	Description    string                  `json:"-"`
+	Enabled        bool                    `json:"-"`
 }
 
 func New(dependencies Dependencies) (*API, error) {
@@ -285,6 +280,9 @@ func (a *API) UpdateBundle(
 	ctx context.Context,
 	request UpdateBundleRequest,
 ) (Bundle, error) {
+	if err := a.requireBundleMutation(ctx, request.Bundle.RootID, false); err != nil {
+		return Bundle{}, err
+	}
 	current, err := a.GetBundle(ctx, request.Bundle)
 	if err != nil {
 		return Bundle{}, err
@@ -319,6 +317,9 @@ func (a *API) RetireBundle(
 	ref collection.CollectionRef,
 	expectedRevision uint64,
 ) (collection.Collection, error) {
+	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
+		return collection.Collection{}, err
+	}
 	if _, err := a.GetBundle(ctx, ref); err != nil {
 		return collection.Collection{}, err
 	}
@@ -331,6 +332,9 @@ func (a *API) PurgeBundle(
 	expectedRevision uint64,
 ) error {
 	if err := a.Ready(); err != nil {
+		return err
+	}
+	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
 		return err
 	}
 	value, err := a.dependencies.Collections.GetRetired(ctx, ref)
@@ -353,6 +357,9 @@ func (a *API) AttachSource(
 	expectedCollectionRevision uint64,
 	draft AttachmentDraft,
 ) (Bundle, error) {
+	if err := a.requireBundleMutation(ctx, bundle.RootID, false); err != nil {
+		return Bundle{}, err
+	}
 	if draft.Role == RoleBuiltIn {
 		return Bundle{}, fmt.Errorf(
 			"%w: skill bundle built-in attachment role is reserved for bootstrap",
@@ -387,116 +394,62 @@ func (a *API) RefreshBundle(
 	ctx context.Context,
 	ref collection.CollectionRef,
 ) (refresh.Result, error) {
-	bundle, err := a.GetBundle(ctx, ref)
-	if err != nil {
-		return refresh.Result{}, err
-	}
-	if !bundle.Collection.Enabled {
-		return refresh.Result{}, fmt.Errorf(
-			"%w: skill bundle %q is disabled",
-			basespec.ErrConflict,
-			ref.CollectionID,
-		)
-	}
-
-	plan, err := a.discoveryPlan(bundle)
-	if err != nil {
-		return refresh.Result{}, err
-	}
-	result, err := a.dependencies.Refresh.Refresh(
-		ctx,
-		ref,
-		plan,
-		skillArtifactPolicy{},
-	)
-	if err != nil {
-		return refresh.Result{}, err
-	}
-	return result, nil
+	return a.refreshBundle(ctx, ref, false)
 }
 
-// BuildLinkedPortableBundleDefinition returns a canonical shareable JSON
-// descriptor. It intentionally does not capture packages or acquire content.
-// A multi-source bundle requires future closure packaging and is rejected.
+// RefreshBuiltInBundle is the trusted feature-level refresh path for a
+// protected built-in Skill Bundle. It is intentionally unavailable through
+// ordinary Skill Bundle mutation APIs.
+func (a *API) RefreshBuiltInBundle(
+	ctx context.Context,
+	ref collection.CollectionRef,
+) (refresh.Result, error) {
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return refresh.Result{}, err
+	}
+	return a.refreshBundle(ctx, ref, true)
+}
+
+// EnsureBuiltInBundleCurrent preserves startup convergence without publishing
+// a new catalog when the protected bundle is already current. It is reserved
+// for the trusted built-in installer and explicit built-in update paths.
+func (a *API) EnsureBuiltInBundleCurrent(
+	ctx context.Context,
+	ref collection.CollectionRef,
+) error {
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return err
+	}
+	bundle, err := a.GetBundle(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	if _, err := a.currentBundleCatalog(ctx, bundle); err == nil {
+		return nil
+	} else if !errors.Is(err, basespec.ErrCatalogUnavailable) &&
+		!errors.Is(err, basespec.ErrCatalogStale) {
+		return err
+	}
+
+	_, err = a.refreshBundle(ctx, ref, true)
+	return err
+}
+
+// BuildLinkedPortableBundleDefinition is intentionally unavailable.
+//
+// Previous implementations emitted current Source locators as portable member
+// locators. Managed Source locators can contain local Artifact UUIDs and are
+// therefore not shareable. A future exporter must construct a package-relative
+// closure with logical names and an externally supplied package SHA-256.
 func (a *API) BuildLinkedPortableBundleDefinition(
 	ctx context.Context,
 	ref collection.CollectionRef,
 ) (definition.CollectionDefinition, error) {
-	bundle, err := a.GetBundle(ctx, ref)
-	if err != nil {
-		return definition.CollectionDefinition{}, err
-	}
-
-	snapshot, err := a.currentBundleCatalog(ctx, bundle)
-	if err != nil {
-		return definition.CollectionDefinition{}, err
-	}
-	records, err := a.dependencies.Artifacts.ListByCollection(ctx, ref)
-	if err != nil {
-		return definition.CollectionDefinition{}, err
-	}
-
-	var sourceID basespec.SourceID
-	members := make([]definition.ContentRef, 0)
-	for _, record := range records {
-		if record.Kind != skillartifact.Kind {
-			continue
-		}
-		if record.State != artifact.StateAvailable ||
-			record.ResolvedDefinition == nil {
-			return definition.CollectionDefinition{}, fmt.Errorf(
-				"%w: Skill Artifact %q is not exportable from the current catalog",
-				basespec.ErrReferenceUnresolved,
-				record.ID,
-			)
-		}
-		if sourceID == "" {
-			sourceID = record.Binding.SourceID
-		} else if sourceID != record.Binding.SourceID {
-			return definition.CollectionDefinition{}, fmt.Errorf(
-				"%w: linked Skill Bundle export requires one Source; use future package closure export",
-				basespec.ErrUnsupported,
-			)
-		}
-
-		var occurrence *catalog.Occurrence
-		for index := range snapshot.Occurrences {
-			candidate := &snapshot.Occurrences[index]
-			if candidate.Key.SourceID == record.Binding.SourceID &&
-				candidate.Key.Locator == record.Binding.Locator &&
-				candidate.Key.SubresourceLocator == record.Binding.SubresourceLocator {
-				occurrence = candidate
-				break
-			}
-		}
-		if occurrence == nil ||
-			occurrence.State != catalog.OccurrenceValid ||
-			occurrence.DefinitionDigest == nil ||
-			occurrence.SourceContentDigest == nil ||
-			*occurrence.DefinitionDigest != *record.ResolvedDefinition {
-			return definition.CollectionDefinition{}, fmt.Errorf(
-				"%w: Skill Artifact %q does not match the current catalog",
-				basespec.ErrCatalogStale,
-				record.ID,
-			)
-		}
-
-		digest := *occurrence.SourceContentDigest
-		members = append(members, definition.ContentRef{
-			Locator:   record.Binding.Locator,
-			Digest:    &digest,
-			MediaType: portableSkillMediaType,
-			Role:      string(skillartifact.Kind),
-		})
-	}
-
-	return NewPortableBundleDefinition(PortableBundleMetadata{
-		LogicalName:    bundle.Data.LogicalName,
-		LogicalVersion: bundle.Data.LogicalVersion,
-		DisplayName:    bundle.Collection.DisplayName,
-		Description:    bundle.Collection.Description,
-		Labels:         bundle.Data.Labels,
-	}, members)
+	return definition.CollectionDefinition{}, fmt.Errorf(
+		"%w: linked Skill Bundle export is disabled until package-closure export is implemented",
+		basespec.ErrUnsupported,
+	)
 }
 
 // BuildLinkedPortableBundleJSON returns the canonical shareable linked bundle
@@ -509,6 +462,7 @@ func (a *API) BuildLinkedPortableBundleJSON(
 	if err != nil {
 		return nil, err
 	}
+
 	return definition.MarshalCollectionDefinition(value)
 }
 
@@ -523,6 +477,9 @@ func (a *API) AdoptSkill(
 	ctx context.Context,
 	request AdoptSkillRequest,
 ) (artifact.Artifact, error) {
+	if err := a.requireBundleMutation(ctx, request.Bundle.RootID, false); err != nil {
+		return artifact.Artifact{}, err
+	}
 	bundle, err := a.GetBundle(ctx, request.Bundle)
 	if err != nil {
 		return artifact.Artifact{}, err
@@ -571,7 +528,11 @@ func (a *API) AdoptSkill(
 		)
 	}
 
+	if err := basespec.ValidateArtifactID(request.ArtifactID); err != nil {
+		return artifact.Artifact{}, err
+	}
 	return a.dependencies.Artifacts.Adopt(ctx, artifact.AdoptRequest{
+		ArtifactID:              request.ArtifactID,
 		Collection:              request.Bundle,
 		Occurrence:              request.Occurrence,
 		ExpectedCatalogRevision: request.ExpectedCatalogRevision,
@@ -585,6 +546,9 @@ func (a *API) PinSkill(
 	ctx context.Context,
 	request PinSkillRequest,
 ) (artifact.Artifact, error) {
+	if err := a.requireBundleMutation(ctx, request.Bundle.RootID, false); err != nil {
+		return artifact.Artifact{}, err
+	}
 	if _, err := a.GetBundle(ctx, request.Bundle); err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -596,6 +560,7 @@ func (a *API) PinSkill(
 		)
 	}
 	return a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
+		ArtifactID:                 request.ArtifactID,
 		Collection:                 request.Bundle,
 		ExpectedCollectionRevision: request.ExpectedCollectionRevision,
 		Binding:                    request.Binding,
@@ -658,6 +623,9 @@ func (a *API) SetSkillEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (artifact.Artifact, error) {
+	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
+		return artifact.Artifact{}, err
+	}
 	if _, err := a.GetSkill(ctx, ref); err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -675,6 +643,9 @@ func (a *API) UnadoptSkill(
 	expectedRevision uint64,
 	suppress bool,
 ) error {
+	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
+		return err
+	}
 	if _, err := a.GetSkill(ctx, ref); err != nil {
 		return err
 	}
@@ -697,25 +668,15 @@ func (a *API) PurgeSkill(
 			basespec.ErrInvalid,
 		)
 	}
+	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
+		return err
+	}
 	value, err := a.GetSkill(ctx, ref)
 	if err != nil {
 		return err
 	}
 	if value.Revision != expectedRevision {
 		return basespec.ErrConflict
-	}
-
-	if !strings.HasPrefix(
-		value.IdempotencyKey,
-		managedSkillIdempotencyKeyPrefix,
-	) {
-		return a.dependencies.Artifacts.Purge(ctx, ref, expectedRevision)
-	}
-	if value.Adoption != artifact.AdoptionPinned {
-		return fmt.Errorf(
-			"%w: managed Skill Artifact must remain pinned until purged",
-			basespec.ErrConflict,
-		)
 	}
 
 	bundle, err := a.GetBundle(ctx, collection.CollectionRef{
@@ -735,15 +696,19 @@ func (a *API) PurgeSkill(
 	switch role {
 	case RoleBuiltIn:
 		return fmt.Errorf(
-			"%w: built-in Skill packages are read-only",
-			basespec.ErrConflict,
+			"%w: built-in Skill packages are protected and read-only",
+			basespec.ErrProtected,
 		)
 	case RoleManaged:
+		if value.Adoption != artifact.AdoptionPinned {
+			return fmt.Errorf(
+				"%w: managed Skill Artifact must remain pinned until purged",
+				basespec.ErrConflict,
+			)
+		}
 	default:
-		return fmt.Errorf(
-			"%w: managed Skill Artifact source is not a managed attachment",
-			basespec.ErrConflict,
-		)
+		return a.dependencies.Artifacts.Purge(ctx, ref, expectedRevision)
+
 	}
 
 	directory, err := managedSkillPackageDirectoryOf(value.Binding)
@@ -776,6 +741,57 @@ func (a *API) PurgeSkill(
 		return pendingManagedSkillPurgeError(value.Ref(), err)
 	}
 	return nil
+}
+
+func (a *API) EnsureBuiltInBundleTopology(
+	ctx context.Context,
+	request BuiltInBundleTopology,
+) (Bundle, error) {
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return Bundle{}, err
+	}
+	bundle, err := a.createBundle(ctx, CreateBundleRequest{
+		RootID:         request.RootID,
+		CollectionID:   request.CollectionID,
+		LogicalName:    request.LogicalName,
+		LogicalVersion: request.LogicalVersion,
+		DisplayName:    request.DisplayName,
+		Description:    request.Description,
+		Enabled:        request.Enabled,
+		Attachments: []AttachmentDraft{{
+			SourceID: request.SourceID,
+			Role:     RoleBuiltIn,
+			Enabled:  true,
+		}},
+	}, true)
+	if err != nil {
+		return Bundle{}, err
+	}
+	if !builtInBundleTopologyMatches(bundle, request) {
+		return Bundle{}, fmt.Errorf(
+			"%w: built-in bundle %q differs from the protected registry declaration",
+			basespec.ErrConflict,
+			request.LogicalName,
+		)
+	}
+	return bundle, nil
+}
+
+func (a *API) InstallBuiltInSkill(
+	ctx context.Context,
+	request CreateManagedSkillRequest,
+) (CreateManagedSkillResponse, error) {
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
+	if err := basespec.ValidateArtifactID(request.ArtifactID); err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
+	return a.createManagedSkill(
+		ctx,
+		request,
+		true,
+	)
 }
 
 func (a *API) currentBundleCatalog(
@@ -823,17 +839,18 @@ func (a *API) createBundle(
 	if err := a.Ready(); err != nil {
 		return Bundle{}, err
 	}
+	if err := basespec.ValidateCollectionID(request.CollectionID); err != nil {
+		return Bundle{}, err
+	}
 	if err := basespec.ValidateRootID(request.RootID); err != nil {
 		return Bundle{}, err
 	}
-	if request.BootstrapKey != "" {
-		if err := basespec.ValidateIdentifier(
-			"skill bundle bootstrap key",
-			request.BootstrapKey,
-			basespec.MaxKindBytes,
-		); err != nil {
-			return Bundle{}, err
-		}
+	if err := a.requireBundleMutation(
+		ctx,
+		request.RootID,
+		allowBuiltInAttachment,
+	); err != nil {
+		return Bundle{}, err
 	}
 
 	data, err := EncodeCollectionData(CollectionData{
@@ -870,19 +887,129 @@ func (a *API) createBundle(
 		ctx,
 		request.RootID,
 		collection.Draft{
-			Kind:           CollectionKind,
-			DisplayName:    request.DisplayName,
-			Description:    request.Description,
-			Enabled:        request.Enabled,
-			Data:           data,
-			IdempotencyKey: request.BootstrapKey,
+			ID:          request.CollectionID,
+			Kind:        CollectionKind,
+			DisplayName: request.DisplayName,
+			Description: request.Description,
+			Enabled:     request.Enabled,
+			Data:        data,
 		},
 		attachments,
 	)
 	if err != nil {
 		return Bundle{}, err
 	}
-	return a.GetBundle(ctx, created.Ref())
+	bundle, err := a.GetBundle(ctx, created.Ref())
+	if err != nil {
+		return Bundle{}, err
+	}
+	if !bundleCreationIntentMatches(bundle, request) {
+		return Bundle{}, fmt.Errorf(
+			"%w: skill bundle %q creation intent differs",
+			basespec.ErrConflict,
+			request.CollectionID,
+		)
+	}
+	return bundle, nil
+}
+
+func bundleCreationIntentMatches(
+	value Bundle,
+	request CreateBundleRequest,
+) bool {
+	return value.Collection.RootID == request.RootID &&
+		value.Collection.ID == request.CollectionID &&
+		value.Collection.Kind == CollectionKind &&
+		value.Data.LogicalName == request.LogicalName &&
+		value.Data.LogicalVersion == request.LogicalVersion &&
+		maps.Equal(value.Data.Labels, request.Labels)
+}
+
+func builtInBundleTopologyMatches(
+	value Bundle,
+	request BuiltInBundleTopology,
+) bool {
+	if value.Collection.RootID != request.RootID ||
+		value.Collection.ID != request.CollectionID ||
+		value.Collection.DisplayName != request.DisplayName ||
+		value.Collection.Description != request.Description ||
+		value.Collection.Enabled != request.Enabled ||
+		len(value.Attachments) != 1 {
+		return false
+	}
+
+	attachment := value.Attachments[0]
+	return attachment.RootID == request.RootID &&
+		attachment.CollectionID == request.CollectionID &&
+		attachment.SourceID == request.SourceID &&
+		attachment.Role == RoleBuiltIn &&
+		attachment.Enabled
+}
+
+func (a *API) requireBundleMutation(
+	ctx context.Context,
+	rootID basespec.RootID,
+	allowProtected bool,
+) error {
+	if err := a.Ready(); err != nil {
+		return err
+	}
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return err
+	}
+	if !a.dependencies.RootMutationPolicy.IsProtectedRoot(rootID) {
+		return nil
+	}
+	if !allowProtected {
+		return fmt.Errorf(
+			"%w: protected Root %q may only be changed through a trusted built-in installer or update path",
+			basespec.ErrProtected,
+			rootID,
+		)
+	}
+	return protection.RequirePrivilegedInstaller(ctx)
+}
+
+func (a *API) refreshBundle(
+	ctx context.Context,
+	ref collection.CollectionRef,
+	allowProtected bool,
+) (refresh.Result, error) {
+	if err := a.requireBundleMutation(
+		ctx,
+		ref.RootID,
+		allowProtected,
+	); err != nil {
+		return refresh.Result{}, err
+	}
+	bundle, err := a.GetBundle(ctx, ref)
+	if err != nil {
+		return refresh.Result{}, err
+	}
+	if !bundle.Collection.Enabled {
+		return refresh.Result{}, fmt.Errorf(
+			"%w: skill bundle %q is disabled",
+			basespec.ErrConflict,
+			ref.CollectionID,
+		)
+	}
+
+	plan, err := a.discoveryPlan(bundle)
+	if err != nil {
+		return refresh.Result{}, err
+	}
+	result, err := a.dependencies.Refresh.Refresh(
+		ctx,
+		ref,
+		plan,
+		skillArtifactPolicy{
+			ids: a.dependencies.AutoAdoptionIDProvider,
+		},
+	)
+	if err != nil {
+		return refresh.Result{}, err
+	}
+	return result, nil
 }
 
 // createManagedSkill performs the managed package publication workflow.
@@ -897,26 +1024,26 @@ func (a *API) createManagedSkill(
 	if err := a.Ready(); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
+	if err := request.Bundle.Validate(); err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
+	if err := a.requireBundleMutation(
+		ctx,
+		request.Bundle.RootID,
+		allowBuiltInAttachment,
+	); err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
+	if err := basespec.ValidateArtifactID(request.ArtifactID); err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
 	if request.ExpectedCollectionRevision == 0 {
 		return CreateManagedSkillResponse{}, fmt.Errorf(
 			"%w: expected skill bundle revision is required",
 			basespec.ErrInvalid,
 		)
 	}
-	if err := basespec.ValidateLogicalName(
-		basespec.LogicalName(request.SkillName),
-	); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if err := validateManagedSkillOperationKey(
-		request.OperationKey,
-	); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	artifactIdempotencyKey, err := managedSkillArtifactIdempotencyKey(
-		request.OperationKey,
-	)
-	if err != nil {
+	if err := basespec.ValidateLogicalName(basespec.LogicalName(request.SkillName)); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
 
@@ -938,10 +1065,11 @@ func (a *API) createManagedSkill(
 				basespec.ErrInvalid,
 			)
 		}
-		skillMDInput, err = agentskills.MarshalSkillDocument(document)
+		encoded, err := agentskills.MarshalSkillDocument(document)
 		if err != nil {
 			return CreateManagedSkillResponse{}, err
 		}
+		skillMDInput = append([]byte(nil), encoded...)
 	}
 	files, skillMD, err := normalizeManagedSkillFiles(
 		skillMDInput,
@@ -956,6 +1084,14 @@ func (a *API) createManagedSkill(
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
+	packageSHA256, err := managedSkillPackageDigest(files)
+	if err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
+	pending := func(cause error) error {
+		return pendingManagedSkillCreateError(request.ArtifactID, cause)
+	}
+
 	if definitionValue.LogicalName != basespec.LogicalName(request.SkillName) {
 		return CreateManagedSkillResponse{}, fmt.Errorf(
 			"%w: SKILL.md name does not match requested skill name",
@@ -966,9 +1102,6 @@ func (a *API) createManagedSkill(
 	bundle, err := a.GetBundle(ctx, request.Bundle)
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
-	}
-	if bundle.Collection.Revision != request.ExpectedCollectionRevision {
-		return CreateManagedSkillResponse{}, basespec.ErrConflict
 	}
 
 	targetRole := RoleManaged
@@ -989,7 +1122,7 @@ func (a *API) createManagedSkill(
 		)
 	}
 	directory, err := managedSkillPackageDirectory(
-		request.OperationKey,
+		request.ArtifactID,
 		request.SkillName,
 	)
 	if err != nil {
@@ -1010,35 +1143,22 @@ func (a *API) createManagedSkill(
 		artifactName = request.SkillName
 	}
 
-	pinned, err := a.findManagedSkillByOperation(
+	pinned, err := a.managedSkillByID(
 		ctx,
-		request.Bundle,
-		request.OperationKey,
+		request.Bundle.RootID,
+		request.ArtifactID,
 	)
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
 	if pinned == nil {
-		state, generation, err := a.dependencies.GetManagedSourceState(
-			ctx,
-			request.Bundle.RootID,
-			sourceValue.ID,
-		)
-		if err != nil {
-			return CreateManagedSkillResponse{}, err
-		}
-		if state.ID != sourceValue.ID ||
-			state.RootID != request.Bundle.RootID {
-			return CreateManagedSkillResponse{}, fmt.Errorf(
-				"%w: managed Source state does not match the selected attachment",
-				basespec.ErrInvalid,
-			)
+		if bundle.Collection.Revision != request.ExpectedCollectionRevision {
+			return CreateManagedSkillResponse{}, basespec.ErrConflict
 		}
 
 		localData, err := encodeManagedSkillArtifactData(
 			managedSkillArtifactData{
-				ExpectedSourceRevision: state.Revision,
-				ExpectedGeneration:     generation,
+				PackageSHA256: packageSHA256,
 			},
 		)
 		if err != nil {
@@ -1046,6 +1166,7 @@ func (a *API) createManagedSkill(
 		}
 
 		value, pinErr := a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
+			ArtifactID:                 request.ArtifactID,
 			Collection:                 request.Bundle,
 			ExpectedCollectionRevision: request.ExpectedCollectionRevision,
 			Binding: artifact.SourceBinding{
@@ -1053,23 +1174,21 @@ func (a *API) createManagedSkill(
 				Locator:      skillLocator,
 				ExpectedKind: skillartifact.Kind,
 			},
-			Name:           artifactName,
-			Enabled:        request.Enabled,
-			Data:           localData,
-			IdempotencyKey: artifactIdempotencyKey,
+			Name:    artifactName,
+			Enabled: request.Enabled,
+			Data:    localData,
 		})
 		switch {
 		case pinErr == nil:
 			pinned = &value
 
 		case errors.Is(pinErr, basespec.ErrConflict):
-			// Another caller may have completed the same operation between
-			// our lookup and this insert. Re-read durable Artifact Store state
-			// instead of treating that normal race as a failed operation.
-			pinned, err = a.findManagedSkillByOperation(
+			// Another caller may have created the same caller-supplied Artifact
+			// ID between the read and the pin attempt.
+			pinned, err = a.managedSkillByID(
 				ctx,
-				request.Bundle,
-				request.OperationKey,
+				request.Bundle.RootID,
+				request.ArtifactID,
 			)
 			if err != nil {
 				return CreateManagedSkillResponse{}, err
@@ -1084,183 +1203,83 @@ func (a *API) createManagedSkill(
 	}
 	if err := validateManagedSkillOperationIntent(
 		*pinned,
-		request.OperationKey,
+		request.Bundle,
+		request.ArtifactID,
 		sourceValue.ID,
 		skillLocator,
 		artifactName,
 		request.Enabled,
+		packageSHA256,
 	); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	if result, complete, completionErr := a.completeManagedSkillCreate(
-		ctx,
+	if result, complete := managedSkillCreateResult(
 		*pinned,
 		sourceValue.ID,
 		skillLocator,
 		definitionValue.Digest,
-		request.OperationKey,
-	); completionErr != nil {
-		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-			request.OperationKey,
-			completionErr,
-		)
-	} else if complete {
+		packageSHA256,
+	); complete {
 		return result, nil
 	}
-	intent, err := managedSkillPublicationIntentOf(pinned.Data)
-	if err != nil {
-		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-			request.OperationKey,
-			err,
-		)
-	}
 
-	state, _, err := a.dependencies.GetManagedSourceState(
+	state, generation, err := a.dependencies.GetManagedSourceState(
 		ctx,
 		request.Bundle.RootID,
 		sourceValue.ID,
 	)
 	if err != nil {
-		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(request.OperationKey, err)
+		return CreateManagedSkillResponse{}, pending(err)
 	}
 	if state.ID != sourceValue.ID ||
 		state.RootID != request.Bundle.RootID {
-		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-			request.OperationKey,
-			fmt.Errorf(
-				"%w: managed Source state does not match the selected attachment",
-				basespec.ErrInvalid,
-			),
-		)
-	}
-	if state.Revision != intent.ExpectedSourceRevision {
-		// Refresh first because an earlier attempt may already have completed
-		// source publication and only failed while returning its result.
-		if _, err := a.RefreshBundle(ctx, request.Bundle); err != nil {
-			return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-				request.OperationKey,
-				err,
-			)
-		}
-		resolved, err := a.dependencies.Artifacts.Get(ctx, pinned.Ref())
-		if err != nil {
-			return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-				request.OperationKey,
-				err,
-			)
-		}
-		if result, complete, completionErr := a.completeManagedSkillCreate(
-			ctx,
-			resolved,
-			sourceValue.ID,
-			skillLocator,
-			definitionValue.Digest,
-			request.OperationKey,
-		); completionErr != nil {
-			return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-				request.OperationKey,
-				completionErr,
-			)
-		} else if complete {
-			return result, nil
-		}
-
-		currentIntent, err := managedSkillPublicationIntentOf(resolved.Data)
-		if err != nil {
-			return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-				request.OperationKey,
-				err,
-			)
-		}
-		state, generation, err := a.dependencies.GetManagedSourceState(
-			ctx,
-			request.Bundle.RootID,
-			sourceValue.ID,
-		)
-		if err != nil {
-			return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-				request.OperationKey,
-				err,
-			)
-		}
-
-		if currentIntent.ExpectedSourceRevision != state.Revision ||
-			currentIntent.ExpectedGeneration != generation {
-			rebasedData, err := encodeManagedSkillArtifactData(
-				managedSkillArtifactData{
-					ExpectedSourceRevision: state.Revision,
-					ExpectedGeneration:     generation,
-				},
-			)
-			if err != nil {
-				return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-					request.OperationKey,
-					err,
-				)
-			}
-			updated, err := a.dependencies.Artifacts.UpdateData(
-				ctx,
-				resolved.Ref(),
-				resolved.Revision,
-				rebasedData,
-			)
-			if err != nil {
-				return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-					request.OperationKey,
-					err,
-				)
-			}
-			pinned = &updated
-			intent = managedSkillArtifactData{
-				ExpectedSourceRevision: state.Revision,
-				ExpectedGeneration:     generation,
-			}
-		} else {
-			pinned = &resolved
-			intent = currentIntent
-		}
+		return CreateManagedSkillResponse{}, pending(fmt.Errorf(
+			"%w: managed Source state does not match the selected attachment",
+			basespec.ErrInvalid,
+		))
 	}
 
-	_, _, err = a.dependencies.PublishManagedPackage(
+	publishPackage := a.dependencies.PublishManagedPackage
+	if allowBuiltInAttachment {
+		publishPackage = a.dependencies.PublishProtectedManagedPackage
+	}
+	_, _, err = publishPackage(
 		ctx,
 		request.Bundle.RootID,
 		sourceValue.ID,
-		intent.ExpectedSourceRevision,
+		state.Revision,
 		source.ManagedPackagePublication{
 			Directory:          directory,
-			ExpectedGeneration: intent.ExpectedGeneration,
+			ExpectedGeneration: generation,
 			Files:              files,
 		},
 	)
 	if err != nil {
-		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(request.OperationKey, err)
+		return CreateManagedSkillResponse{}, pending(err)
 	}
 
-	if _, err := a.RefreshBundle(ctx, request.Bundle); err != nil {
-		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(request.OperationKey, err)
+	if _, err := a.refreshBundle(
+		ctx,
+		request.Bundle,
+		allowBuiltInAttachment,
+	); err != nil {
+		return CreateManagedSkillResponse{}, pending(err)
 	}
 
 	resolved, err := a.dependencies.Artifacts.Get(ctx, pinned.Ref())
 	if err != nil {
-		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(request.OperationKey, err)
+		return CreateManagedSkillResponse{}, pending(err)
 	}
-	if result, complete, completionErr := a.completeManagedSkillCreate(
-		ctx,
+	if result, complete := managedSkillCreateResult(
 		resolved,
 		sourceValue.ID,
 		skillLocator,
 		definitionValue.Digest,
-		request.OperationKey,
-	); completionErr != nil {
-		return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-			request.OperationKey,
-			completionErr,
-		)
-	} else if complete {
+		packageSHA256,
+	); complete {
 		return result, nil
 	}
-	return CreateManagedSkillResponse{}, pendingManagedSkillOperationError(
-		request.OperationKey,
+	return CreateManagedSkillResponse{}, pending(
 		fmt.Errorf(
 			"%w: published managed Skill did not resolve to its pinned Artifact",
 			basespec.ErrReferenceUnresolved,
@@ -1273,11 +1292,11 @@ func managedSkillCreateResult(
 	sourceID basespec.SourceID,
 	skillLocator basespec.Locator,
 	expectedDefinition cryptoutil.Digest,
-	operationKey string,
+	expectedPackageSHA256 cryptoutil.Digest,
 ) (CreateManagedSkillResponse, bool) {
-	idempotencyKey, err := managedSkillArtifactIdempotencyKey(operationKey)
+	intent, err := decodeManagedSkillArtifactData(value.Data)
 	if err != nil ||
-		value.IdempotencyKey != idempotencyKey ||
+		intent.PackageSHA256 != expectedPackageSHA256 ||
 		value.Adoption != artifact.AdoptionPinned ||
 		value.Binding.SourceID != sourceID ||
 		value.Binding.Locator != skillLocator ||
@@ -1288,79 +1307,9 @@ func managedSkillCreateResult(
 		return CreateManagedSkillResponse{}, false
 	}
 	return CreateManagedSkillResponse{
-		Artifact:     value,
-		Address:      value.Address(),
-		OperationKey: operationKey,
+		Artifact: value,
+		Address:  value.Address(),
 	}, true
-}
-
-// completeManagedSkillCreate removes source-observation preconditions after
-// the pending Artifact has resolved. The Artifact Store idempotency key
-// remains the only durable operation identity.
-func (a *API) completeManagedSkillCreate(
-	ctx context.Context,
-	value artifact.Artifact,
-	sourceID basespec.SourceID,
-	skillLocator basespec.Locator,
-	expectedDefinition cryptoutil.Digest,
-	operationKey string,
-) (CreateManagedSkillResponse, bool, error) {
-	result, complete := managedSkillCreateResult(
-		value,
-		sourceID,
-		skillLocator,
-		expectedDefinition,
-		operationKey,
-	)
-	if !complete {
-		return CreateManagedSkillResponse{}, false, nil
-	}
-
-	intent, err := decodeManagedSkillArtifactData(value.Data)
-	if err != nil {
-		return CreateManagedSkillResponse{}, false, err
-	}
-	if intent.ExpectedSourceRevision == 0 {
-		return result, true, nil
-	}
-
-	updated, err := a.dependencies.Artifacts.UpdateData(
-		ctx,
-		value.Ref(),
-		value.Revision,
-		emptyArtifactData(),
-	)
-	if err == nil {
-		result.Artifact = updated
-		result.Address = updated.Address()
-		return result, true, nil
-	}
-	if !errors.Is(err, basespec.ErrConflict) {
-		return CreateManagedSkillResponse{}, false, err
-	}
-
-	current, err := a.dependencies.Artifacts.Get(ctx, value.Ref())
-	if err != nil {
-		return CreateManagedSkillResponse{}, false, err
-	}
-	currentIntent, err := decodeManagedSkillArtifactData(current.Data)
-	if err != nil {
-		return CreateManagedSkillResponse{}, false, err
-	}
-	currentResult, currentComplete := managedSkillCreateResult(
-		current,
-		sourceID,
-		skillLocator,
-		expectedDefinition,
-		operationKey,
-	)
-	if !currentComplete || currentIntent.ExpectedSourceRevision != 0 {
-		return CreateManagedSkillResponse{}, false, fmt.Errorf(
-			"%w: managed Skill completion changed concurrently",
-			basespec.ErrConflict,
-		)
-	}
-	return currentResult, true, nil
 }
 
 func (a *API) validateAttachmentDraft(
@@ -1537,16 +1486,18 @@ func managedAttachmentForRole(
 	return attachment, sourceValue, nil
 }
 
-type skillArtifactPolicy struct{}
+type skillArtifactPolicy struct {
+	ids ArtifactIDProvider
+}
 
-func (skillArtifactPolicy) Derive(
-	_ context.Context,
+func (p skillArtifactPolicy) Derive(
+	ctx context.Context,
 	_ collection.Collection,
 	occurrence catalog.Occurrence,
 	value definition.Definition,
-) (artifact.Draft, bool, []diagnostic.Diagnostic) {
+) (artifact.Draft, bool, []diagnostic.Diagnostic, error) {
 	if occurrence.Kind != skillartifact.Kind {
-		return artifact.Draft{}, false, nil
+		return artifact.Draft{}, false, nil, nil
 	}
 	if err := skillartifact.ValidateDefinition(value); err != nil {
 		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
@@ -1557,13 +1508,27 @@ func (skillArtifactPolicy) Derive(
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,
 			},
-		}}
+		}}, nil
+	}
+	if p.ids == nil {
+		return artifact.Draft{}, false, nil, fmt.Errorf(
+			"%w: skill bundle automatic adoption ID provider is unavailable",
+			basespec.ErrInvalid,
+		)
+	}
+	id, err := p.ids.NewArtifactID(ctx)
+	if err != nil {
+		return artifact.Draft{}, false, nil, err
+	}
+	if err := basespec.ValidateArtifactID(id); err != nil {
+		return artifact.Draft{}, false, nil, err
 	}
 	return artifact.Draft{
+		ID:      id,
 		Name:    value.DisplayName,
 		Enabled: true,
 		Data:    emptyArtifactData(),
-	}, true, nil
+	}, true, nil, nil
 }
 
 func managedSkillPackageDirectoryOf(
@@ -1638,62 +1603,14 @@ func normalizeManagedSkillFiles(
 	return normalized.Files, found, nil
 }
 
-const managedSkillIdempotencyKeyPrefix = "managed-skill:"
-
 type managedSkillArtifactData struct {
-	ExpectedSourceRevision uint64 `json:"expectedSourceRevision,omitempty"`
-	ExpectedGeneration     string `json:"expectedGeneration,omitempty"`
-}
-
-func validateManagedSkillOperationKey(value string) error {
-	return basespec.ValidateRequiredText(
-		"managed Skill operation key",
-		value,
-		basespec.MaxLogicalNameBytes,
-	)
-}
-
-func managedSkillArtifactIdempotencyKey(
-	operationKey string,
-) (string, error) {
-	if err := validateManagedSkillOperationKey(operationKey); err != nil {
-		return "", err
-	}
-	digest := strings.TrimPrefix(
-		string(cryptoutil.DigestBytes([]byte(operationKey))),
-		cryptoutil.DigestSHA256Prefix,
-	)
-	return managedSkillIdempotencyKeyPrefix + digest, nil
+	PackageSHA256 cryptoutil.Digest `json:"packageSHA256"`
 }
 
 func validateManagedSkillArtifactData(
 	value managedSkillArtifactData,
 ) error {
-	switch {
-	case value.ExpectedSourceRevision == 0 && value.ExpectedGeneration == "":
-		return nil
-	case value.ExpectedSourceRevision == 0 || value.ExpectedGeneration == "":
-		return fmt.Errorf(
-			"%w: managed Skill source revision and generation must be supplied together",
-			basespec.ErrInvalid,
-		)
-	}
-	return basespec.ValidateSourceGeneration(value.ExpectedGeneration)
-}
-
-func validateManagedSkillPublicationIntent(
-	value managedSkillArtifactData,
-) error {
-	if err := validateManagedSkillArtifactData(value); err != nil {
-		return err
-	}
-	if value.ExpectedSourceRevision == 0 {
-		return fmt.Errorf(
-			"%w: managed Skill expected Source revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-	return nil
+	return cryptoutil.ValidateDigest(value.PackageSHA256)
 }
 
 func encodeManagedSkillArtifactData(
@@ -1745,46 +1662,31 @@ func decodeManagedSkillArtifactData(
 	return value, nil
 }
 
-func managedSkillPublicationIntentOf(
-	raw json.RawMessage,
-) (managedSkillArtifactData, error) {
-	value, err := decodeManagedSkillArtifactData(raw)
-	if err != nil {
-		return managedSkillArtifactData{}, err
-	}
-	if err := validateManagedSkillPublicationIntent(value); err != nil {
-		return managedSkillArtifactData{}, err
-	}
-	return value, nil
-}
-
 func managedSkillPackageDirectory(
-	operationKey string,
+	artifactID basespec.ArtifactID,
 	skillName string,
 ) (basespec.Locator, error) {
-	if err := validateManagedSkillOperationKey(operationKey); err != nil {
+	if err := basespec.ValidateArtifactID(artifactID); err != nil {
 		return "", err
 	}
-	digest := strings.TrimPrefix(
-		string(cryptoutil.DigestBytes([]byte(operationKey))),
-		cryptoutil.DigestSHA256Prefix,
-	)
-	return basespec.Locator(path.Join("packages", digest, skillName)), nil
+	return basespec.Locator(
+		path.Join("packages", string(artifactID), skillName),
+	), nil
 }
 
 func validateManagedSkillOperationIntent(
 	value artifact.Artifact,
-	operationKey string,
+	bundle collection.CollectionRef,
+	artifactID basespec.ArtifactID,
 	sourceID basespec.SourceID,
 	skillLocator basespec.Locator,
 	artifactName string,
 	enabled bool,
+	packageSHA256 cryptoutil.Digest,
 ) error {
-	idempotencyKey, err := managedSkillArtifactIdempotencyKey(operationKey)
-	if err != nil {
-		return err
-	}
-	if value.IdempotencyKey != idempotencyKey ||
+	if value.ID != artifactID ||
+		value.RootID != bundle.RootID ||
+		value.CollectionID != bundle.CollectionID ||
 		value.Kind != skillartifact.Kind ||
 		value.Adoption != artifact.AdoptionPinned ||
 		value.Binding.SourceID != sourceID ||
@@ -1793,50 +1695,74 @@ func validateManagedSkillOperationIntent(
 		value.Name != artifactName ||
 		value.Enabled != enabled {
 		return fmt.Errorf(
-			"%w: managed Skill operation %q conflicts with its existing Artifact intent",
+			"%w: managed Skill Artifact %q conflicts with its existing creation intent",
 			basespec.ErrConflict,
-			operationKey,
+			artifactID)
+	}
+	intent, err := decodeManagedSkillArtifactData(value.Data)
+	if err != nil {
+		return fmt.Errorf("%w: managed Skill local state: %w", basespec.ErrInvalid, err)
+	}
+	if intent.PackageSHA256 != packageSHA256 {
+		return fmt.Errorf(
+			"%w: managed Skill Artifact %q package content differs",
+			basespec.ErrConflict,
+			artifactID,
 		)
 	}
 	return nil
 }
 
-func (a *API) findManagedSkillByOperation(
-	ctx context.Context,
-	bundle collection.CollectionRef,
-	operationKey string,
-) (*artifact.Artifact, error) {
-	idempotencyKey, err := managedSkillArtifactIdempotencyKey(operationKey)
+func managedSkillPackageDigest(
+	files []source.ManagedPackageFile,
+) (cryptoutil.Digest, error) {
+	normalized, err := source.NormalizeManagedPackagePublication(
+		source.ManagedPackagePublication{
+			Directory: "package",
+			Files:     files,
+		},
+	)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	values, err := a.dependencies.Artifacts.ListByCollection(ctx, bundle)
+	raw, err := json.Marshal(normalized.Files)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	var found *artifact.Artifact
-	for _, value := range values {
-		if value.Kind != skillartifact.Kind ||
-			value.IdempotencyKey != idempotencyKey {
-			continue
-		}
-		if found != nil {
-			return nil, fmt.Errorf(
-				"%w: managed Skill operation %q has multiple Artifacts",
-				basespec.ErrConflict,
-				operationKey,
-			)
-		}
-		copyValue := value.Clone()
-		found = &copyValue
+	canonical, err := jsonutil.Canonicalize(raw)
+	if err != nil {
+		return "", err
 	}
-	return found, nil
+	return cryptoutil.DigestBytes(canonical), nil
 }
 
-func pendingManagedSkillOperationError(operationKey string, cause error) error {
+func (a *API) managedSkillByID(
+	ctx context.Context,
+	rootID basespec.RootID,
+	artifactID basespec.ArtifactID,
+) (*artifact.Artifact, error) {
+	value, err := a.dependencies.Artifacts.Get(ctx, artifact.ArtifactRef{
+		RootID:     rootID,
+		ArtifactID: artifactID,
+	})
+	if errors.Is(err, basespec.ErrArtifactNotFound) {
+		//nolint:nilnil // Explicit.
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	output := value.Clone()
+	return &output, nil
+}
+
+func pendingManagedSkillCreateError(
+	artifactID basespec.ArtifactID,
+	cause error,
+) error {
 	return fmt.Errorf(
-		"managed Skill operation %q remains pending; retry with the same operationKey: %w",
-		operationKey,
+		"managed Skill create for Artifact %q remains pending; retry with the same artifactID: %w",
+		artifactID,
 		cause,
 	)
 }

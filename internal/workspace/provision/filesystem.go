@@ -13,11 +13,11 @@ import (
 )
 
 type sourceManager interface {
-	Create(
+	CreateWithStatus(
 		ctx context.Context,
 		rootID basespec.RootID,
 		draft source.Draft,
-	) (source.Summary, error)
+	) (source.Summary, bool, error)
 
 	Discard(
 		ctx context.Context,
@@ -56,11 +56,13 @@ func NewService(
 }
 
 type Request struct {
-	RootID      basespec.RootID
-	DisplayName string
-	Description string
-	RootPath    string
-	Discovery   spec.DiscoveryPreferences
+	RootID       basespec.RootID
+	CollectionID basespec.CollectionID
+	SourceID     basespec.SourceID
+	DisplayName  string
+	Description  string
+	RootPath     string
+	Discovery    spec.DiscoveryPreferences
 }
 
 func (s *Service) CreateFilesystem(
@@ -73,10 +75,17 @@ func (s *Service) CreateFilesystem(
 	if err != nil {
 		return spec.Workspace{}, err
 	}
-	sourceValue, err := s.sources.Create(
+	if err := basespec.ValidateCollectionID(request.CollectionID); err != nil {
+		return spec.Workspace{}, err
+	}
+	if err := basespec.ValidateSourceID(request.SourceID); err != nil {
+		return spec.Workspace{}, err
+	}
+	sourceValue, sourceCreated, err := s.sources.CreateWithStatus(
 		ctx,
 		request.RootID,
 		source.Draft{
+			ID:          request.SourceID,
 			Kind:        fsdir.Kind,
 			DisplayName: request.DisplayName,
 			Enabled:     true,
@@ -90,6 +99,7 @@ func (s *Service) CreateFilesystem(
 	value, createErr := s.workspaces.CreateFilesystem(
 		ctx,
 		spec.FilesystemWorkspaceRequest{
+			CollectionID:    request.CollectionID,
 			RootID:          request.RootID,
 			DisplayName:     request.DisplayName,
 			Description:     request.Description,
@@ -99,6 +109,10 @@ func (s *Service) CreateFilesystem(
 	)
 	if createErr == nil {
 		return value, nil
+	}
+
+	if !sourceCreated {
+		return spec.Workspace{}, createErr
 	}
 
 	discardErr := s.sources.Discard(

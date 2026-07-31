@@ -25,12 +25,6 @@ var attachmentOperationMatrix = [...]AttachmentOperation{
 		AppliesWorkspaceDiscoveryPreferences: true,
 	},
 	{
-		Role:                               spec.RoleBuiltIn,
-		CanAttach:                          true,
-		DefaultAuthoritative:               true,
-		AllowsAttachmentDiscoveryOverrides: true,
-	},
-	{
 		Role:                               spec.RoleLibrary,
 		CanAttach:                          true,
 		DefaultAuthoritative:               true,

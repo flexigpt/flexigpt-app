@@ -98,18 +98,20 @@ type ResourceGroup struct {
 }
 
 type EmptyWorkspaceRequest struct {
-	RootID      basespec.RootID      `json:"rootID"`
-	DisplayName string               `json:"displayName"`
-	Description string               `json:"description,omitempty"`
-	Discovery   DiscoveryPreferences `json:"discovery"`
+	CollectionID basespec.CollectionID `json:"collectionID"`
+	RootID       basespec.RootID       `json:"rootID"`
+	DisplayName  string                `json:"displayName"`
+	Description  string                `json:"description,omitempty"`
+	Discovery    DiscoveryPreferences  `json:"discovery"`
 }
 
 type FilesystemWorkspaceRequest struct {
-	RootID          basespec.RootID      `json:"rootID"`
-	DisplayName     string               `json:"displayName"`
-	Description     string               `json:"description,omitempty"`
-	PrimarySourceID basespec.SourceID    `json:"primarySourceID"`
-	Discovery       DiscoveryPreferences `json:"discovery"`
+	CollectionID    basespec.CollectionID `json:"collectionID"`
+	RootID          basespec.RootID       `json:"rootID"`
+	DisplayName     string                `json:"displayName"`
+	Description     string                `json:"description,omitempty"`
+	PrimarySourceID basespec.SourceID     `json:"primarySourceID"`
+	Discovery       DiscoveryPreferences  `json:"discovery"`
 }
 
 type UpdateRequest struct {

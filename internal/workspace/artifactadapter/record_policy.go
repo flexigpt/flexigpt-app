@@ -24,13 +24,15 @@ const (
 )
 
 type ArtifactPolicy struct {
+	ids      ArtifactIDProvider
 	supports map[basespec.ArtifactKind]spec.ArtifactSupport
 }
 
 func NewArtifactPolicy(
+	ids ArtifactIDProvider,
 	supports ...spec.ArtifactSupport,
 ) (*ArtifactPolicy, error) {
-	if len(supports) == 0 {
+	if ids == nil || len(supports) == 0 {
 		return nil, fmt.Errorf(
 			"%w: workspace artifact support is required",
 			spec.ErrInvalidWorkspace,
@@ -50,7 +52,10 @@ func NewArtifactPolicy(
 		}
 		values[support.Kind] = support
 	}
-	return &ArtifactPolicy{supports: values}, nil
+	return &ArtifactPolicy{
+		ids:      ids,
+		supports: values,
+	}, nil
 }
 
 func (p *ArtifactPolicy) Supports(
@@ -64,14 +69,14 @@ func (p *ArtifactPolicy) Supports(
 }
 
 func (p *ArtifactPolicy) Derive(
-	_ context.Context,
+	ctx context.Context,
 	_ collection.Collection,
 	occurrence catalog.Occurrence,
 	value definition.Definition,
-) (artifact.Draft, bool, []diagnostic.Diagnostic) {
+) (artifact.Draft, bool, []diagnostic.Diagnostic, error) {
 	support, supported := p.supports[occurrence.Kind]
 	if !supported {
-		return artifact.Draft{}, false, nil
+		return artifact.Draft{}, false, nil, nil
 	}
 	if value.Kind != occurrence.Kind {
 		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
@@ -86,7 +91,7 @@ func (p *ArtifactPolicy) Derive(
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,
 			},
-		}}
+		}}, nil
 	}
 	if value.SchemaID != support.SchemaID {
 		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
@@ -101,7 +106,7 @@ func (p *ArtifactPolicy) Derive(
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,
 			},
-		}}
+		}}, nil
 	}
 	if err := support.Validator(value); err != nil {
 		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
@@ -112,7 +117,7 @@ func (p *ArtifactPolicy) Derive(
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,
 			},
-		}}
+		}}, nil
 	}
 
 	// An empty ArtifactData means runtime use is enabled by default.
@@ -122,15 +127,23 @@ func (p *ArtifactPolicy) Derive(
 			Severity: diagnostic.DiagnosticError,
 			Code:     DiagnosticCodeProjectionInvalid,
 			Message:  diagnosticMessage(err.Error()),
-		}}
+		}}, nil
+	}
+	id, err := p.ids.NewArtifactID(ctx)
+	if err != nil {
+		return artifact.Draft{}, false, nil, err
+	}
+	if err := basespec.ValidateArtifactID(id); err != nil {
+		return artifact.Draft{}, false, nil, err
 	}
 
 	name := artifactName(value.LogicalName, occurrence.Key)
 	return artifact.Draft{
+		ID:      id,
 		Name:    name,
 		Enabled: true,
 		Data:    data,
-	}, true, nil
+	}, true, nil, nil
 }
 
 func artifactName(

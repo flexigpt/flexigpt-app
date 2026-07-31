@@ -4,13 +4,26 @@ import (
 	"context"
 	"errors"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 )
 
 type WorkspaceWrapper struct {
 	api *workspace.API
+}
+
+func workspaceAutoAdoptionIDProvider() artifactadapter.ArtifactIDProvider {
+	generator := uuidutil.UUIDv7Generator{}
+	return artifactadapter.ArtifactIDProviderFunc(
+		func(ctx context.Context) (basespec.ArtifactID, error) {
+			id, err := generator.NewID(ctx)
+			return basespec.ArtifactID(id), err
+		},
+	)
 }
 
 func InitWorkspaceWrapper(
@@ -23,6 +36,9 @@ func InitWorkspaceWrapper(
 	if artifacts == nil {
 		return errors.New("artifact store components are nil")
 	}
+	config := workspace.DefaultConfig()
+	config.AutoAdoptionIDProvider = workspaceAutoAdoptionIDProvider()
+
 	api, err := workspace.New(workspace.Dependencies{
 		Roots:              artifacts.Roots,
 		Sources:            artifacts.Sources,
@@ -34,7 +50,8 @@ func InitWorkspaceWrapper(
 		SourceRuntime:      artifacts.SourceRuntime,
 		HasDecoder:         artifacts.HasDecoder,
 		DecoderFingerprint: artifacts.DecoderFingerprint,
-	}, workspace.DefaultConfig())
+		RootMutationPolicy: artifacts.RootMutationPolicy(),
+	}, config)
 	if err != nil {
 		return err
 	}

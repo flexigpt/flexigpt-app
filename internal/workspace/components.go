@@ -28,6 +28,12 @@ func newComponents(
 	if err := dependencies.Validate(); err != nil {
 		return nil, err
 	}
+	if config.AutoAdoptionIDProvider == nil {
+		return nil, fmt.Errorf(
+			"%w: Workspace automatic-adoption Artifact ID provider is required at application composition",
+			spec.ErrInvalidWorkspace,
+		)
+	}
 
 	supports, err := config.normalizedSupports()
 	if err != nil {
@@ -58,6 +64,7 @@ func newComponents(
 		dependencies.Collections,
 		dependencies.Sources,
 		discoveryPolicyRevision,
+		dependencies.RootMutationPolicy,
 	)
 	if err != nil {
 		return nil, err
@@ -76,7 +83,10 @@ func newComponents(
 	if err != nil {
 		return nil, err
 	}
-	policy, err := artifactadapter.NewArtifactPolicy(supports...)
+	policy, err := artifactadapter.NewArtifactPolicy(
+		config.AutoAdoptionIDProvider,
+		supports...,
+	)
 	if err != nil {
 		return nil, err
 	}

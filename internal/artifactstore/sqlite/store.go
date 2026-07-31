@@ -46,7 +46,7 @@ func Open(
 		_ = db.Close()
 		return nil, fmt.Errorf("ping artifact metadata database: %w", err)
 	}
-	if err := initializeSchemaV1(ctx, db); err != nil {
+	if err := initializeSchemaV2(ctx, db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-func initializeSchemaV1(
+func initializeSchemaV2(
 	ctx context.Context,
 	db *sql.DB,
 ) error {
@@ -76,7 +76,7 @@ func initializeSchemaV1(
 		`SELECT EXISTS(
 			SELECT 1
 			FROM sqlite_master
-			WHERE type = 'table' AND name = 'artifact_store_v1'
+			WHERE type = 'table' AND name = 'artifact_store_v2'
 		)`,
 	).Scan(&markerExists); err != nil {
 		return err
@@ -104,13 +104,13 @@ func initializeSchemaV1(
 	}
 	if legacyExists != 0 {
 		return fmt.Errorf(
-			"%w: legacy Artifact Store metadata is not supported; use a fresh artifacts_v1 directory",
+			"%w: legacy Artifact Store metadata is not supported; use a fresh artifacts_v2 directory",
 			basespec.ErrUnsupported,
 		)
 	}
 
-	if _, err := tx.ExecContext(ctx, schemaV1); err != nil {
-		return fmt.Errorf("initialize Artifact Store v1 schema: %w", err)
+	if _, err := tx.ExecContext(ctx, schemaV2); err != nil {
+		return fmt.Errorf("initialize Artifact Store v2 schema: %w", err)
 	}
 	return tx.Commit()
 }

@@ -14,7 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type bindingIdentity struct {
@@ -51,21 +50,19 @@ func occurrenceIdentityForKey(key catalog.OccurrenceKey) occurrenceIdentity {
 }
 
 type Reconciler struct {
-	ids   uuidutil.Generator
 	clock clockutil.Clock
 }
 
 func NewReconciler(
-	ids uuidutil.Generator,
 	timeClock clockutil.Clock,
 ) (*Reconciler, error) {
-	if ids == nil || timeClock == nil {
+	if timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: artifact reconciler dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
-	return &Reconciler{ids: ids, clock: timeClock}, nil
+	return &Reconciler{clock: timeClock}, nil
 }
 
 // DeriveSourceState derives only the source-owned fields of an existing
@@ -377,13 +374,16 @@ func (r *Reconciler) Reconcile(
 			return Reconciliation{}, err
 		}
 
-		draft, create, diagnostics := policy.Derive(
+		draft, create, diagnostics, err := policy.Derive(
 			ctx,
 			collectionValue,
 			occurrence,
 			value,
 		)
 		if err := diagnostic.ValidateDiagnostics(diagnostics); err != nil {
+			return Reconciliation{}, err
+		}
+		if err != nil {
 			return Reconciliation{}, err
 		}
 
@@ -403,14 +403,13 @@ func (r *Reconciler) Reconcile(
 			return Reconciliation{}, err
 		}
 
-		id, err := r.ids.NewID(ctx)
-		if err != nil {
+		if err := basespec.ValidateArtifactID(draft.ID); err != nil {
 			return Reconciliation{}, err
 		}
 
 		resolved := *occurrence.DefinitionDigest
 		created := Artifact{
-			ID:                 basespec.ArtifactID(id),
+			ID:                 draft.ID,
 			RootID:             collectionValue.RootID,
 			CollectionID:       collectionValue.ID,
 			Binding:            identity.Binding,

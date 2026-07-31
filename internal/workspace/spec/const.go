@@ -8,7 +8,6 @@ const (
 	WorkspaceDescriptorSchemaVersion                         = "v1"
 
 	RolePrimary         basespec.AttachmentRole = "primary"
-	RoleBuiltIn         basespec.AttachmentRole = "builtin"
 	RoleLibrary         basespec.AttachmentRole = "library"
 	RoleAttachedPackage basespec.AttachmentRole = "attached-package"
 	RoleOverlay         basespec.AttachmentRole = "overlay"

@@ -198,6 +198,7 @@ func (a *API) CreateArtifactSource(
 		ctx,
 		request.RootID,
 		source.Draft{
+			ID:          request.Body.ID,
 			Kind:        request.Body.Kind,
 			DisplayName: request.Body.DisplayName,
 			Enabled:     request.Body.Enabled,

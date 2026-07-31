@@ -122,6 +122,7 @@ func (s Source) Summary() Summary {
 }
 
 type Draft struct {
+	ID          basespec.SourceID
 	Kind        basespec.SourceKind
 	DisplayName string
 	Enabled     bool

@@ -7,8 +7,9 @@ import (
 )
 
 type RootDraft struct {
-	DisplayName string `json:"displayName"`
-	Description string `json:"description,omitempty"`
+	ID          basespec.RootID `json:"id"                    required:"true"`
+	DisplayName string          `json:"displayName"           required:"true"`
+	Description string          `json:"description,omitempty"`
 }
 
 type RootUpdate struct {

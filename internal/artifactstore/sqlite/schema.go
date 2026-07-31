@@ -1,15 +1,15 @@
 package sqlite
 
-// schemaV1 is the only supported Artifact Store metadata schema.
+// schemaV2 is the only supported Artifact Store metadata schema.
 //
-// The application creates a fresh artifacts_v1 namespace. There is no
+// The application creates a fresh artifacts_v2 namespace. There is no
 // migration ledger and no compatibility path for earlier metadata databases.
-const schemaV1 = `
-CREATE TABLE artifact_store_v1 (
+const schemaV2 = `
+CREATE TABLE artifact_store_v2 (
 	singleton INTEGER PRIMARY KEY CHECK (singleton = 1)
 );
 
-INSERT INTO artifact_store_v1(singleton) VALUES (1);
+INSERT INTO artifact_store_v2(singleton) VALUES (1);
 
 CREATE TABLE artifact_roots (
 	id TEXT PRIMARY KEY,
@@ -47,7 +47,6 @@ CREATE TABLE artifact_collections (
 	created_at INTEGER NOT NULL,
 	modified_at INTEGER NOT NULL,
 	retired_at INTEGER,
-	idempotency_key TEXT NOT NULL DEFAULT '',
 	UNIQUE (root_id, id)
 );
 
@@ -129,7 +128,6 @@ CREATE TABLE artifact_artifacts (
 	revision INTEGER NOT NULL CHECK (revision > 0),
 	created_at INTEGER NOT NULL,
 	modified_at INTEGER NOT NULL,
-	idempotency_key TEXT NOT NULL DEFAULT '',
 	UNIQUE (
 		root_id, collection_id, source_id,
 		locator, subresource_locator, kind
@@ -160,10 +158,6 @@ CREATE TABLE artifact_suppressions (
 		REFERENCES artifact_sources(root_id, id) ON DELETE RESTRICT
 );
 
-CREATE UNIQUE INDEX idx_artifact_collections_root_kind_idempotency_key
-	ON artifact_collections(root_id, kind, idempotency_key)
-	WHERE idempotency_key <> '';
-
 CREATE INDEX idx_artifact_sources_root
 	ON artifact_sources(root_id, modified_at DESC);
 
@@ -180,9 +174,6 @@ CREATE INDEX idx_artifact_artifacts_collection
 		root_id, collection_id, modified_at DESC
 	);
 
-CREATE UNIQUE INDEX idx_artifact_artifacts_collection_kind_idempotency_key
-	ON artifact_artifacts(root_id, collection_id, kind, idempotency_key)
-	WHERE idempotency_key <> '';
 
 CREATE TRIGGER artifact_attachment_requires_active_source_insert
 BEFORE INSERT ON artifact_collection_attachments

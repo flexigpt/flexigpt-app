@@ -61,6 +61,12 @@ func NewQueryService(
 			spec.ErrInvalidWorkspace,
 		)
 	}
+	if len(supports) == 0 {
+		return nil, fmt.Errorf(
+			"%w: Workspace query requires at least one supported Artifact kind",
+			spec.ErrInvalidWorkspace,
+		)
+	}
 	if err := basespec.ValidateRequiredText(
 		"workspace discovery policy revision",
 		discoveryPolicyRevision,

@@ -33,7 +33,7 @@ A Workspace gives a user one coherent project or contextual scope containing:
 - MCP server declarations.
 - Model presets.
 - Agent and Assistant definitions.
-- Optional built-in, library, package, or overlay content.
+- Optional local library, package, or overlay content.
 - Future domain Artifact kinds supported by complete Workspace adapters.
 
 A Workspace is a project scope, not the selected item itself. An Artifact is
@@ -234,10 +234,13 @@ Workspace policy supports:
 | Role               | Meaning                        |
 | ------------------ | ------------------------------ |
 | `primary`          | Main filesystem project Source |
-| `built-in`         | Application-provided content   |
 | `library`          | Reusable local or team library |
 | `attached-package` | Imported or mounted package    |
 | `overlay`          | Supplemental content           |
+
+All Workspace attachment roles are same-Root Source attachments. In
+particular, `library` is not a protected built-in library, does not cross Root
+boundaries, and does not resolve protected built-in Artifacts.
 
 A filesystem Workspace has exactly one enabled primary filesystem attachment.
 An empty Workspace has none.
@@ -245,7 +248,37 @@ An empty Workspace has none.
 Replacing the primary Source is an explicit Collection operation and does not
 change Workspace identity.
 
+Workspace attachment roles describe only Workspace-local Sources. They must not
+be used to mount the protected built-in Source. There is no Workspace built-in
+bundle, built-in library attachment, built-in Artifact reference table, or
+Workspace API that lists, enables, disables, resolves, or registers protected
+built-in Skills.
+
 ### 5.5 Supported Artifact kinds
+
+### 5.5.1 Cross-Root Artifact exclusion
+
+Workspace has no built-in library model.
+
+- Workspace must reject every cross-Root Artifact reference.
+- Workspace must not attach a protected built-in Source.
+- Workspace must not store `workspace_library_references`.
+- Workspace must not expose enable, disable, list, or resolve APIs for
+  built-in Skills.
+- Workspace runtime registration must include only Workspace-owned Artifacts.
+- Installed built-in Skills remain `skill.bundle` Artifacts in the protected
+  system Root and are consumed outside Workspace through semantic references.
+
+Workspace packages must not import `internal/builtin/metadata`, receive a
+built-in resolver dependency, read the protected built-in registry, or add a
+cross-Root Artifact projection branch. Any unseen Workspace built-in table,
+resolver, API, runtime registration path, or Wails binding must be removed
+rather than migrated. The permitted Workspace `library` role remains a
+same-Root Source attachment and is unrelated to built-in content.
+
+The Workspace `library` attachment role remains valid only for a Source in the
+same Workspace Root. It must not be renamed, expanded, or interpreted as a
+protected built-in library mechanism.
 
 The initial supported kinds are:
 
@@ -458,7 +491,7 @@ Workspace must:
 | `WS-F01` | Create filesystem and empty Workspaces as `workspace.collection` Collections.   | Core     |
 | `WS-F02` | Address Workspaces through `WorkspaceRef`.                                      | Core     |
 | `WS-F03` | Enforce zero or one primary attachment according to Workspace mode.             | Core     |
-| `WS-F04` | Attach built-in, library, package, and overlay Sources.                         | Core     |
+| `WS-F04` | Attach local library, package, and overlay Sources.                             | Core     |
 | `WS-F05` | Replace a primary Source without replacing Workspace identity.                  | Core     |
 | `WS-F06` | Build bounded deterministic discovery plans.                                    | Core     |
 | `WS-F07` | Publish one coherent catalog for one refresh request.                           | Core     |
@@ -561,7 +594,7 @@ Installed and Workspace Skill presentation remains separate:
 | ---------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace identity and lifecycle   | Present                   | A Workspace is a `workspace.collection` addressed by `WorkspaceRef`. Filesystem and empty creation, update, primary Source changes, retirement, and typed purge are available.                                                              |
 | Artifact-first API split           | Present                   | Artifact API owns Root and Source administration. Workspace API owns Workspace policy, catalog views, and Workspace-scoped Artifact actions.                                                                                                |
-| Source attachments and roles       | Present                   | One enabled filesystem primary Source is optional. Built-in, library, package, and overlay attachments can add content under typed Workspace rules.                                                                                         |
+| Source attachments and roles       | Present                   | One enabled filesystem primary Source is optional. Local library, package, and overlay attachments can add same-Root content under typed Workspace rules.                                                                                    |
 | Discovery and refresh              | Present                   | Refresh uses bounded deterministic plans, configured decoders, attachment settings, Workspace preferences, and primary descriptor observations.                                                                                             |
 | Descriptor bootstrap               | Present but limited       | `.flexigpt/workspace.json` can add relative discovery targets and expected digests from the primary Source. It is not yet an import/export format.                                                                                          |
 | Catalog freshness                  | Present                   | Workspace reports stale catalog metadata, decoder changes, and discovery-policy changes. A refresh produces a coherent replacement catalog.                                                                                                 |
@@ -587,6 +620,10 @@ runtime handoff, inference hydration, and derived Skill Runtime reconciliation.
 Current-catalog pins immediately reflect valid, invalid, missing, or
 incompatible observations when a current catalog exists. Conversation usage
 records selected and actually used definition and Artifact revisions.
+
+Workspace has no Workspace built-in feature or built-in Skill access path. Root equality remains strict for
+all Workspace Artifact references. Built-in Skills are installed and consumed
+outside Workspace through the protected app metadata resolver.
 
 Discovery profiles now request registered Workspace decoders for their own
 explicit locators and directory roots. This is required for attached-library

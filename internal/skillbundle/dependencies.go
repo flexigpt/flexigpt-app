@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -43,20 +44,23 @@ type RemoveManagedPackageFunc func(
 ) (source.Summary, string, error)
 
 type Dependencies struct {
-	Roots              RootLister
-	Sources            *source.Service
-	Collections        *collection.Service
-	Artifacts          *artifact.Service
-	Refresh            refresh.Runner
-	Catalogs           catalog.Reader
-	Definitions        definition.Reader
-	SourceRuntime      source.Runtime
-	HasDecoder         func(basespec.DecoderID) bool
-	DecoderFingerprint func() (cryptoutil.Digest, error)
+	Roots                  RootLister
+	Sources                *source.Service
+	Collections            *collection.Service
+	Artifacts              *artifact.Service
+	Refresh                refresh.Runner
+	Catalogs               catalog.Reader
+	Definitions            definition.Reader
+	SourceRuntime          source.Runtime
+	HasDecoder             func(basespec.DecoderID) bool
+	DecoderFingerprint     func() (cryptoutil.Digest, error)
+	RootMutationPolicy     protection.RootPolicy
+	AutoAdoptionIDProvider ArtifactIDProvider
 
-	GetManagedSourceState ManagedSourceStateFunc
-	PublishManagedPackage PublishManagedPackageFunc
-	RemoveManagedPackage  RemoveManagedPackageFunc
+	GetManagedSourceState          ManagedSourceStateFunc
+	PublishManagedPackage          PublishManagedPackageFunc
+	PublishProtectedManagedPackage PublishManagedPackageFunc
+	RemoveManagedPackage           RemoveManagedPackageFunc
 }
 
 func (d Dependencies) Validate() error {
@@ -70,8 +74,11 @@ func (d Dependencies) Validate() error {
 		d.SourceRuntime == nil ||
 		d.HasDecoder == nil ||
 		d.DecoderFingerprint == nil ||
+		d.RootMutationPolicy == nil ||
+		d.AutoAdoptionIDProvider == nil ||
 		d.GetManagedSourceState == nil ||
 		d.PublishManagedPackage == nil ||
+		d.PublishProtectedManagedPackage == nil ||
 		d.RemoveManagedPackage == nil {
 		return fmt.Errorf(
 			"%w: skill bundle Artifact Store dependencies are incomplete",

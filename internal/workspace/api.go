@@ -89,11 +89,13 @@ func (a *API) CreateFilesystemWorkspace(
 		return nil, invalidAPIRequest("filesystem workspace body is required")
 	}
 	value, err := a.provisioner.CreateFilesystem(ctx, provision.Request{
-		DisplayName: request.Body.DisplayName,
-		Description: request.Body.Description,
-		RootPath:    request.Body.RootPath,
-		RootID:      request.RootID,
-		Discovery:   discoveryPreferencesOf(request.Body.Discovery),
+		DisplayName:  request.Body.DisplayName,
+		Description:  request.Body.Description,
+		RootPath:     request.Body.RootPath,
+		CollectionID: request.Body.WorkspaceID,
+		SourceID:     request.Body.SourceID,
+		RootID:       request.RootID,
+		Discovery:    discoveryPreferencesOf(request.Body.Discovery),
 	})
 	if err != nil {
 		return nil, err
@@ -118,10 +120,11 @@ func (a *API) CreateEmptyWorkspace(
 	value, err := a.workspace.service.CreateEmpty(
 		ctx,
 		spec.EmptyWorkspaceRequest{
-			RootID:      request.RootID,
-			DisplayName: request.Body.DisplayName,
-			Description: request.Body.Description,
-			Discovery:   discoveryPreferencesOf(request.Body.Discovery),
+			CollectionID: request.Body.WorkspaceID,
+			RootID:       request.RootID,
+			DisplayName:  request.Body.DisplayName,
+			Description:  request.Body.Description,
+			Discovery:    discoveryPreferencesOf(request.Body.Discovery),
 		},
 	)
 	if err != nil {
@@ -198,6 +201,9 @@ func (a *API) WorkspaceRefs(
 
 	refs := make([]WorkspaceRef, 0)
 	for _, rootValue := range roots {
+		if a.dependencies.RootMutationPolicy.IsProtectedRoot(rootValue.ID) {
+			continue
+		}
 		values, err := a.dependencies.Collections.ListByRoot(
 			ctx,
 			rootValue.ID,
@@ -646,6 +652,7 @@ func (a *API) AdoptWorkspaceOccurrence(
 		return nil, err
 	}
 	value, err := a.dependencies.Artifacts.Adopt(ctx, artifact.AdoptRequest{
+		ArtifactID:              request.Body.ArtifactID,
 		Collection:              request.Workspace,
 		Occurrence:              key,
 		ExpectedCatalogRevision: request.Body.ExpectedCatalogRevision,
@@ -686,6 +693,7 @@ func (a *API) PinWorkspaceArtifact(
 		return nil, err
 	}
 	value, err := a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
+		ArtifactID:                 request.Body.ArtifactID,
 		Collection:                 request.Workspace,
 		ExpectedCollectionRevision: request.Body.ExpectedCollectionRevision,
 		Binding:                    request.Body.Binding,
@@ -1420,7 +1428,9 @@ func workspaceSuppressionViewOf(
 	value artifact.Suppression,
 ) WorkspaceSuppressionView {
 	return WorkspaceSuppressionView{
-		Workspace:  collection.CollectionRef{RootID: value.RootID, CollectionID: value.CollectionID},
+		Workspace: collection.CollectionRef{
+			RootID: value.RootID, CollectionID: value.CollectionID,
+		},
 		Binding:    value.Binding,
 		Revision:   value.Revision,
 		CreatedAt:  value.CreatedAt,

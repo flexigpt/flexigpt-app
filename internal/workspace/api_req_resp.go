@@ -315,10 +315,12 @@ type WorkspaceSkillLoadView struct {
 }
 
 type CreateFilesystemWorkspaceRequestBody struct {
-	DisplayName string             `json:"displayName"           required:"true"`
-	Description string             `json:"description,omitempty"`
-	RootPath    string             `json:"rootPath"              required:"true"`
-	Discovery   WorkspaceDiscovery `json:"discovery"`
+	WorkspaceID basespec.CollectionID `json:"workspaceID"           required:"true"`
+	SourceID    basespec.SourceID     `json:"sourceID"              required:"true"`
+	DisplayName string                `json:"displayName"           required:"true"`
+	Description string                `json:"description,omitempty"`
+	RootPath    string                `json:"rootPath"              required:"true"`
+	Discovery   WorkspaceDiscovery    `json:"discovery"`
 }
 
 type CreateFilesystemWorkspaceRequest struct {
@@ -331,9 +333,10 @@ type CreateFilesystemWorkspaceResponse struct {
 }
 
 type CreateEmptyWorkspaceRequestBody struct {
-	DisplayName string             `json:"displayName"           required:"true"`
-	Description string             `json:"description,omitempty"`
-	Discovery   WorkspaceDiscovery `json:"discovery"`
+	WorkspaceID basespec.CollectionID `json:"workspaceID"           required:"true"`
+	DisplayName string                `json:"displayName"           required:"true"`
+	Description string                `json:"description,omitempty"`
+	Discovery   WorkspaceDiscovery    `json:"discovery"`
 }
 
 type CreateEmptyWorkspaceRequest struct {
@@ -555,6 +558,7 @@ type ListWorkspaceArtifactsResponse struct {
 type AdoptWorkspaceOccurrenceRequestBody struct {
 	ExpectedCatalogRevision uint64                    `json:"expectedCatalogRevision" required:"true"`
 	Occurrence              WorkspaceOccurrenceRef    `json:"occurrence"              required:"true"`
+	ArtifactID              basespec.ArtifactID       `json:"artifactID"              required:"true"`
 	Name                    string                    `json:"name,omitempty"`
 	Enabled                 bool                      `json:"enabled"                 required:"true"`
 	Settings                WorkspaceArtifactSettings `json:"settings"`
@@ -572,6 +576,7 @@ type AdoptWorkspaceOccurrenceResponse struct {
 type PinWorkspaceArtifactRequestBody struct {
 	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision" required:"true"`
 	Binding                    artifact.SourceBinding    `json:"binding"                    required:"true"`
+	ArtifactID                 basespec.ArtifactID       `json:"artifactID"                 required:"true"`
 	Name                       string                    `json:"name"                       required:"true"`
 	Enabled                    bool                      `json:"enabled"                    required:"true"`
 	Settings                   WorkspaceArtifactSettings `json:"settings"`

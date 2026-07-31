@@ -217,6 +217,13 @@ func (p Publication) Validate() error {
 		if err := validateArtifact(value); err != nil {
 			return fmt.Errorf("artifact create %d: %w", index, err)
 		}
+		if value.Revision != 1 {
+			return fmt.Errorf(
+				"%w: artifact create %d must start at revision one",
+				basespec.ErrInvalid,
+				index,
+			)
+		}
 
 		if value.Adoption != artifact.AdoptionObserved {
 			return fmt.Errorf(

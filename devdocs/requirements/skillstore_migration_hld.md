@@ -31,10 +31,13 @@ The backend source of truth is Artifact Store. New durable Skill selections use
 `ArtifactRef`; runtime ownership is derived from the Artifact's current
 Collection membership.
 
-Built-in bootstrap uses an immutable local Collection idempotency key stored
-and uniquely enforced by Artifact Store. The key is scoped by Root and
-Collection kind, is not a CollectionID or ArtifactID, is not portable content,
-and is not exposed through public views.
+Built-ins use one protected static system Root. The Root, managed Source,
+Skill Bundle Collections, and Skill Artifacts use committed UUIDv7 values from
+app-only embedded built-in metadata. The built-in registry is not a portable
+Skill package and is not owned by Artifact Store. Application composition
+provides the protected-Root policy and invokes the built-in installer through
+narrow Artifact Store and Skill Bundle ports. No user Root receives copied
+built-in Sources, Collections, or Artifacts.
 
 The standalone Skill Store remains temporarily in the source tree as a
 reference-only implementation for migration verification. It is not active
@@ -261,11 +264,11 @@ Managed authoring must:
 - Refresh the target Collection.
 - Adopt the resulting occurrence using the preallocated Artifact ID.
 - Return `ArtifactAddress`.
-- Store a digest-derived local Artifact idempotency key for the caller's
-  operation key so concurrent retries cannot create multiple pending Artifacts.
-- Retain source revision and generation only while publication is pending.
-  Once the Artifact resolves, compact local Artifact data and retain no copied
-  Source state.
+- Use the caller-supplied `ArtifactID` as the sole durable create replay
+  identity.
+- Store package SHA-256 only as immutable package-content intent.
+- Read Source revision and generation immediately before publication. They are
+  request-time concurrency preconditions and are never stored in Artifact data.
 
 A possible internal layout is:
 
@@ -286,27 +289,37 @@ The absolute path remains Source configuration. It is not stored in the Skill Ar
 
 ### 5.4 Built-in Skills
 
-Built-in packages must use a normal Source and normal Collection and Artifact state.
+Built-in packages use a normal managed Source and normal Collection and
+Artifact state inside the one protected static system Root.
 
-The first implementation may hydrate embedded packages into a filesystem Source
-because Agent Skills currently requires filesystem packages for full resource
-and script behavior.
+The first implementation hydrates embedded packages into a managed Source
+because Agent Skills currently requires a trusted native filesystem package
+path for full resource and script behavior.
 
-Each built-in bundle should use the same Portable Skill Bundle Definition used
-for normal sharing and import. It contains:
+The app-only registry contains static IDs, logical bundle and Skill names,
+embedded package locations, enablement defaults, and a registry schema version.
+It must not contain raw package bytes or duplicate `SKILL.md` metadata.
 
-- Stable logical URI or bootstrap key.
-- Collection display metadata.
-- Relative Skill package member references.
-- Seed version.
+Shareable package data contains only logical bundle and Skill names, package
+files, `SKILL.md`, optional portable versions, and externally supplied package
+SHA-256 values. It contains no app UUIDs, source locations, revisions,
+timestamps, enablement, idempotency keys, or installation metadata.
 
-The bootstrap key finds an existing local Collection but is not its `CollectionID`
-and is not a persistent Skill reference.
+Built-in installer updates are explicit trusted installation operations. Normal
+Skill Bundle creation, refresh, mutation, retirement, and purge APIs cannot
+mutate the protected built-in topology.
 
 Portable Skill metadata currently duplicated in `skills.json` must move into
 the corresponding `SKILL.md`. A reduced seed descriptor may remain for
 an application index of built-in bundle manifests, but it must not duplicate
 portable Skill content.
+
+Ordinary managed-package publication and removal also reject the protected Root.
+The built-in installer receives a separate protected managed-package callback
+from application composition. That callback requires installer capability and
+the configured protected Root. A future package upgrade workflow must use the
+same protected callback and must remain separate from ordinary managed Skill
+creation, update, and deletion flows.
 
 ### 5.5 Imported Skills
 
@@ -422,7 +435,7 @@ It must:
 | `SK-F07` | Preserve local Skill metadata during source refresh.                                | Core     |
 | `SK-F08` | Avoid Collection-derived Skill identity so future direct movement remains possible. | Deferred |
 | `SK-F09` | Use normal Collection and Artifact enablement for built-ins.                        | Core     |
-| `SK-F10` | Bootstrap built-in Collections idempotently through nonidentity seed keys.          | Core     |
+| `SK-F10` | Bootstrap one protected built-in topology through static registry UUIDv7 IDs.       | Core     |
 | `SK-F11` | Keep local user tags separate from Source tags.                                     | Core     |
 | `SK-F12` | Persist Skill selections as `ArtifactRef`.                                          | Core     |
 | `SK-F13` | Project eligible filesystem Skills into ephemeral Agent Skills definitions.         | Core     |
@@ -518,16 +531,17 @@ tool.
 | External Source linkage            | Present                             | External filesystem content is attached as an Artifact Store Source and represented by a relative Source Binding.                                                                                                                                                           |
 | Built-in hydration                 | Present through managed Source      | Built-ins bootstrap normal managed Sources, Skill Bundle Collections, and Artifacts.                                                                                                                                                                                        |
 | Built-in package upgrades          | Deferred                            | Bootstrap is idempotent add-missing setup, not an in-place package upgrade protocol. Changed built-in package content requires an explicit versioned upgrade workflow.                                                                                                      |
+| Built-in startup convergence       | Present                             | Startup validates registry packages, fences conflicting dynamic Skill Bundles and Artifacts, converges static topology, and refreshes only an unavailable or stale built-in catalog.                                                                                          |
 | Built-in normal Collection state   | Present                             | Built-in enablement uses normal Collection and Artifact enablement.                                                                                                                                                                                                         |
 | Agent Skills runtime               | Present                             | Artifact router resolution, registration, sessions, prompts, rendering, resources, and scripts are Artifact-backed.                                                                                                                                                         |
-| Managed operation recovery         | Present                             | A pending managed Skill retains source revision and generation operation preconditions. A retry refreshes first, then performs at most one revision-checked rebase when an unrelated package advanced the same Source. Preconditions are removed after resolution.          |
+| Managed operation recovery         | Present                             | Managed Skill retries use the caller-supplied Artifact ID and immutable package SHA-256. Source revision and generation are read immediately before publication and remain request-time concurrency preconditions only.                                                          |
 | Runtime source verification        | Present                             | Runtime handoff verifies current catalog occurrence, Source generation, and raw `SKILL.md` content digest through Source snapshots, then delegates native package parsing, resource access, sandboxing, and script execution to `agentskills-go`.                           |
 | Script execution policy            | Present and explicit                | Artifact-backed runtime defaults to scripts disabled. Explicit application composition may enable scripts, while `agentskills-go` and `llmtools-go` retain all execution and sandbox policy.                                                                                |
 | Artifact-backed backend references | Present                             | Assistant presets, conversations, inference, Workspace, and Skill Runtime use Artifact-backed Skill references.                                                                                                                                                             |
 | Runtime synchronization state      | Present and derived only            | Artifact Store is durable authority. Before reconciliation, `SkillRuntime` re-reads every process-local Collection partition and drops unavailable partitions. Its maps are only the inventory required to remove and reindex Agent Skills provider registrations.          |
 | Runtime synchronization trigger    | Present and demand-driven           | A selected Artifact is resolved from Artifact Store and reconciled into Agent Skills runtime only when runtime work needs it. No observer or feature-owned membership cache exists.                                                                                         |
 | External Skill attachment route    | Present                             | A filesystem Source is created through Artifact Store administration, then attached through the typed Skill Bundle boundary and refreshed into `agent.skill` Artifacts.                                                                                                     |
-| Managed operation idempotency      | Present                             | Managed creation uses an Artifact Store-owned hidden idempotency key. Pending source preconditions are removed after the requested Artifact resolves.                                                                                                                       |
+| Managed create replay              | Present                             | Managed creation uses the caller-supplied Artifact ID as replay identity and package SHA-256 as immutable package-content intent. There is no hidden idempotency key or durable source-operation state.                                                                       |
 | Legacy Skill Store                 | Reference-only, inactive            | `internal/skillstore` remains temporarily for source comparison only. `cmd/agentgo` does not initialize it, and no normal runtime, selection, inference, or persistence path may call it.                                                                                   |
 | Same-name policy                   | Partial                             | Aggregate listing marks simultaneously eligible same-name Skills unavailable, and runtime resolution withholds ambiguous durable references. A unified migrated-Collection precedence policy remains deferred.                                                              |
 | Assistant preset integration       | Present                             | Assistant preset validation resolves `ArtifactSkillSelection` through the Artifact-backed Skill Runtime.                                                                                                                                                                    |
@@ -547,8 +561,8 @@ legacy reference store and possible offline migration input.
 
 - A standalone installed Skill bundle becomes a `skill.bundle` Collection.
 - A standalone installed Skill becomes an `agent.skill` Artifact.
-- A managed operation key becomes a hidden local Artifact idempotency key, not
-  an Artifact ID, Source generation cache, portable field, or runtime identity.
+- A caller-supplied Artifact ID is managed-Skill create replay identity.
+- No hidden local Artifact idempotency key or Source-generation cache exists.
 - Workspace-discovered Skills remain `agent.skill` Artifacts in
   `workspace.collection`; they are not moved into Skill bundle Collections.
 - All new backend persistence uses `ArtifactRef`.
@@ -640,7 +654,8 @@ Before implementation, define:
       Artifact resolution. No Root mutation observer is retained.
 - [x] Reject legacy assistant-preset and conversation schemas rather than
       silently interpreting standalone Skill Store identities.
-- [x] Add retry-safe managed Skill creation using a caller-provided operation key.
+- [x] Add retry-safe managed Skill creation using the caller-supplied
+      `ArtifactID` as the sole replay identity.
 - [x] Remove managed package content before purging a managed Skill Artifact.
 - [x] Move Source generation confirmation and runtime package handoff out of
       Workspace and Skill Bundle adapters.
@@ -651,8 +666,9 @@ release-complete:
 
 - [x] Keep `internal/skillstore` reference-only. Normal startup does not open,
       mutate, register, or resolve it.
-- [x] Keep Skill Bundle listing read-only. Existing Roots are bootstrapped at
-      startup and new Roots use an explicit application-composition workflow.
+- [x] Keep Skill Bundle listing read-only. Built-ins are installed only in one
+      global protected Root; existing and newly created user Roots receive no
+      copied built-in Source, Collection, or Artifact.
 - [x] Revalidate discovery-plan and decoder fingerprints before Skill adoption,
       portable linked-manifest generation, or runtime handoff.
 - [x] Use `v1` for the inactive reference Skill Store schema label so all clean
@@ -666,14 +682,14 @@ release-complete:
       own source-side cleanup before using the internal Artifact purge service.
 - [x] Keep Workspace and Skill Bundle synchronizers feature-owned. A Workspace
       reconciliation must never remove a `skill.bundle` runtime partition.
-- [x] Persist bootstrap idempotency in Artifact Store rather than relying only
-      on an in-process mutex or opaque Collection data.
+- [x] Use static registry Collection and Artifact IDs for built-in topology
+      convergence rather than a bootstrap key or opaque Collection data.
 - [x] Remove observer-driven runtime synchronization. Runtime registration is
       demand-driven from Artifact Store-backed Artifact resolution.
 - [x] Fail closed for unavailable or same-name-colliding Artifact Skill
       allow-list entries rather than silently dropping them.
-- [x] Use Artifact Store-owned Artifact idempotency keys for managed operation
-      convergence and remove pending source preconditions after completion.
+- [x] Use caller-supplied Artifact IDs for managed create replay and retain
+      only package SHA-256 as immutable package-content intent.
 - [x] Expose typed Skill Bundle Source attachment while retaining Source
       configuration ownership in Artifact Store.
 - [ ] Add deterministic Skill and bundle import/export only after the portable
@@ -739,9 +755,9 @@ the backend migration clean:
   `source/fsdir` adapter. Any future containment policy belongs exclusively to
   that Source adapter, not to Skill Bundle, Workspace, MapStore, or Agent
   Skills runtime code.
-- A Root created after startup converges its built-in Skill bundle through the
-  explicit application-composition bootstrap path without a Root observer or
-  feature-owned membership cache. Listing a bundle must not mutate state.
+- A Root created after startup receives no copied built-in Source, Collection,
+  or Artifact. Built-in installation targets only the static protected Root,
+  and listing a bundle must not mutate state.
 - A decoder or discovery-plan revision change makes Skill adoption, runtime
   projection, and linked portable JSON generation return catalog stale until
   refresh succeeds.

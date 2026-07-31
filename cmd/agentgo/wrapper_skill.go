@@ -3,15 +3,20 @@ package main
 import (
 	"context"
 	"errors"
+	"io/fs"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
+	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/metadata"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/skillbundle"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 	workspaceSpec "github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -30,17 +35,30 @@ func InitSkillBundleWrapper(
 		return errors.New("skill bundle wrapper dependencies are incomplete")
 	}
 
+	idGenerator := uuidutil.UUIDv7Generator{}
+	autoAdoptionIDProvider := skillbundle.ArtifactIDProviderFunc(
+		func(ctx context.Context) (basespec.ArtifactID, error) {
+			id, err := idGenerator.NewID(ctx)
+			if err != nil {
+				return "", err
+			}
+			return basespec.ArtifactID(id), nil
+		},
+	)
+
 	api, err := skillbundle.New(skillbundle.Dependencies{
-		Roots:              components.Roots,
-		Sources:            components.Sources,
-		Collections:        components.Collections,
-		Artifacts:          components.Artifacts,
-		Refresh:            components.Refresh,
-		Catalogs:           components.Catalogs,
-		Definitions:        components.Definitions,
-		SourceRuntime:      components.SourceRuntime,
-		HasDecoder:         components.HasDecoder,
-		DecoderFingerprint: components.DecoderFingerprint,
+		Roots:                  components.Roots,
+		Sources:                components.Sources,
+		Collections:            components.Collections,
+		Artifacts:              components.Artifacts,
+		Refresh:                components.Refresh,
+		Catalogs:               components.Catalogs,
+		Definitions:            components.Definitions,
+		SourceRuntime:          components.SourceRuntime,
+		HasDecoder:             components.HasDecoder,
+		DecoderFingerprint:     components.DecoderFingerprint,
+		RootMutationPolicy:     components.RootMutationPolicy(),
+		AutoAdoptionIDProvider: autoAdoptionIDProvider,
 
 		GetManagedSourceState: func(
 			ctx context.Context,
@@ -61,6 +79,25 @@ func InitSkillBundleWrapper(
 			publication source.ManagedPackagePublication,
 		) (sourceSummary source.Summary, generation string, err error) {
 			result, err := components.PublishManagedPackage(
+				ctx,
+				rootID,
+				sourceID,
+				expectedSourceRevision,
+				publication,
+			)
+			if err != nil {
+				return source.Summary{}, "", err
+			}
+			return result.Source, result.Generation, nil
+		},
+		PublishProtectedManagedPackage: func(
+			ctx context.Context,
+			rootID basespec.RootID,
+			sourceID basespec.SourceID,
+			expectedSourceRevision uint64,
+			publication source.ManagedPackagePublication,
+		) (sourceSummary source.Summary, generation string, err error) {
+			result, err := components.PublishProtectedManagedPackage(
 				ctx,
 				rootID,
 				sourceID,
@@ -136,7 +173,32 @@ func InitSkillBundleWrapper(
 	wrapper.api = api
 	wrapper.runtime = runtime
 
-	if err := wrapper.bootstrapEmbeddedBuiltIns(context.Background()); err != nil {
+	registry, err := metadata.LoadRegistry()
+	if err != nil {
+		wrapper.close()
+		return err
+	}
+	packages, err := fs.Sub(
+		builtin.BuiltInSkillBundlesFS,
+		builtin.BuiltInSkillBundlesRootDir,
+	)
+	if err != nil {
+		wrapper.close()
+		return err
+	}
+	builtIns, err := artifactbuiltin.NewInstaller(
+		artifactbuiltin.InstallerDependencies{
+			Topology: components,
+			Skills:   api,
+			Registry: registry,
+			Packages: packages,
+		},
+	)
+	if err != nil {
+		wrapper.close()
+		return err
+	}
+	if err := builtIns.Ensure(context.Background()); err != nil {
 		wrapper.close()
 		return err
 	}
@@ -189,19 +251,6 @@ func (w *SkillBundleWrapper) ListSkillBundles(
 	return middleware.WithRecoveryResp(func() ([]skillbundle.Bundle, error) {
 		return w.api.ListBundles(context.Background(), rootID)
 	})
-}
-
-func (w *SkillBundleWrapper) EnsureBuiltInSkillsForRoot(
-	rootID basespec.RootID,
-) (skillbundle.Bundle, error) {
-	return middleware.WithRecoveryResp(
-		func() (skillbundle.Bundle, error) {
-			return w.api.EnsureEmbeddedBuiltInsForRoot(
-				context.Background(),
-				rootID,
-			)
-		},
-	)
 }
 
 func (w *SkillBundleWrapper) UpdateSkillBundle(
@@ -415,30 +464,6 @@ func (w *SkillBundleWrapper) InvokeSkillTool(
 	return middleware.WithRecoveryResp(func() (*skillruntime.InvokeSkillToolResponse, error) {
 		return w.runtime.InvokeSkillTool(context.Background(), request)
 	})
-}
-
-func (w *SkillBundleWrapper) bootstrapEmbeddedBuiltIns(
-	ctx context.Context,
-) error {
-	if w == nil {
-		return errors.New("skill bundle API is not initialized")
-	}
-	api := w.api
-	if api == nil {
-		return errors.New("skill bundle API is not initialized")
-	}
-	return w.bootstrapEmbeddedBuiltInsWithAPI(ctx, api)
-}
-
-func (w *SkillBundleWrapper) bootstrapEmbeddedBuiltInsWithAPI(
-	ctx context.Context,
-	api *skillbundle.API,
-) error {
-	_, err := api.BootstrapEmbeddedBuiltIns(ctx)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (w *SkillBundleWrapper) close() {
