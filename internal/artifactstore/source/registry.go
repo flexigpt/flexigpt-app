@@ -46,6 +46,9 @@ func (r *Registry) Open(
 	if ctx == nil {
 		return nil, basespec.ErrInvalid
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if err := value.Validate(); err != nil {
 		return nil, err
 	}

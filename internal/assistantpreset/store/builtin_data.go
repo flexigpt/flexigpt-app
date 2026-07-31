@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -72,7 +73,7 @@ func NewBuiltInData(
 	if overlayBaseDir == "" {
 		return nil, fmt.Errorf("%w: overlayBaseDir", spec.ErrInvalidDir)
 	}
-	if err := os.MkdirAll(overlayBaseDir, 0o755); err != nil {
+	if err := os.MkdirAll(overlayBaseDir, 0o700); err != nil {
 		return nil, err
 	}
 
@@ -291,6 +292,15 @@ func (d *BuiltInData) populateDataFromFS(ctx context.Context) error {
 	if err := json.Unmarshal(rawManifest, &manifest); err != nil {
 		return err
 	}
+	if manifest.SchemaVersion != spec.SchemaVersion {
+		return fmt.Errorf(
+			"unsupported built-in assistant preset schema version %q",
+			manifest.SchemaVersion,
+		)
+	}
+	if manifest.Bundles == nil {
+		return errors.New("built-in assistant preset manifest bundles are required")
+	}
 
 	bundleMap := make(
 		map[bundleitemutils.BundleID]spec.AssistantPresetBundle,
@@ -325,7 +335,13 @@ func (d *BuiltInData) populateDataFromFS(ctx context.Context) error {
 	err = fs.WalkDir(
 		bundlesFS,
 		".",
-		func(inPath string, de fs.DirEntry, _ error) error {
+		func(inPath string, de fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if de == nil {
+				return fmt.Errorf("built-in assistant preset walk entry is nil for %q", inPath)
+			}
 			if de.IsDir() || path.Ext(inPath) != ".json" {
 				return nil
 			}

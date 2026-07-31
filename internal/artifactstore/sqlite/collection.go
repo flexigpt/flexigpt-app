@@ -320,7 +320,16 @@ func (s *Store) purgeCollection(
 		)
 	}
 
-	result, err := s.db.ExecContext(
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := getActiveRootTx(ctx, tx, ref.RootID); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM artifact_collections
 		 WHERE id = ?
@@ -334,10 +343,13 @@ func (s *Store) purgeCollection(
 	if err != nil {
 		return sqliteError(err)
 	}
-	return requireOneChanged(
+	if err := requireOneChanged(
 		result,
 		"collection changed or was not retired before purge",
-	)
+	); err != nil {
+		return err
+	}
+	return sqliteError(tx.Commit())
 }
 
 func (s *Store) attachCollectionSource(

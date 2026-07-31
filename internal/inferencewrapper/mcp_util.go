@@ -649,6 +649,12 @@ func formatMCPContextSection(
 	lines := []string{
 		"### " + title,
 	}
+	if bundleID != "" {
+		lines = append(lines, "Bundle: "+string(bundleID))
+	}
+	if serverID != "" {
+		lines = append(lines, "Server: "+string(serverID))
+	}
 	if strings.TrimSpace(name) != "" {
 		lines = append(lines, "Prompt Name: "+name)
 	}

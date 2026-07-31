@@ -320,6 +320,7 @@ func (i *Installer) packageFiles(
 	packageRoot basespec.Locator,
 ) ([]source.ManagedPackageFile, error) {
 	files := make([]source.ManagedPackageFile, 0)
+	var totalBytes int64
 	err := fs.WalkDir(i.packages, string(packageRoot), func(
 		location string,
 		entry fs.DirEntry,
@@ -327,6 +328,13 @@ func (i *Installer) packageFiles(
 	) error {
 		if walkErr != nil {
 			return walkErr
+		}
+		if entry == nil {
+			return fmt.Errorf(
+				"%w: built-in package walk returned no entry for %q",
+				basespec.ErrInvalid,
+				location,
+			)
 		}
 		if err := ctx.Err(); err != nil {
 			return err
@@ -339,6 +347,23 @@ func (i *Installer) packageFiles(
 				"%w: built-in package file %q is not regular",
 				basespec.ErrInvalid,
 				location,
+			)
+		}
+		if len(files) >= basespec.MaxDiscoveryEntries {
+			return fmt.Errorf(
+				"%w: built-in package exceeds the file count limit",
+				basespec.ErrInvalid,
+			)
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.Size() < 0 ||
+			info.Size() > basespec.MaxScanBytes-totalBytes {
+			return fmt.Errorf(
+				"%w: built-in package exceeds the byte limit",
+				basespec.ErrInvalid,
 			)
 		}
 		relative, found := strings.CutPrefix(
@@ -359,6 +384,14 @@ func (i *Installer) packageFiles(
 		if err != nil {
 			return err
 		}
+		if int64(len(content)) != info.Size() {
+			return fmt.Errorf(
+				"%w: built-in package file %q changed while being read",
+				basespec.ErrConflict,
+				location,
+			)
+		}
+		totalBytes += int64(len(content))
 		files = append(files, source.ManagedPackageFile{
 			Locator: basespec.Locator(relative),
 			Content: append([]byte(nil), content...),

@@ -3,12 +3,17 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/dirpartition"
 	"github.com/flexigpt/mapstore-go/ftsengine"
@@ -196,6 +201,9 @@ func (cc *ConversationCollection) PutConversation(
 	if req.Body.Meta != nil {
 		currentConversation.Meta = req.Body.Meta
 	}
+	if err := validateConversationV1(currentConversation); err != nil {
+		return nil, err
+	}
 
 	data, err := jsonencdec.StructWithJSONTagsToMap(currentConversation)
 	if err != nil {
@@ -225,6 +233,9 @@ func (cc *ConversationCollection) PutMessagesToConversation(
 	currentConversation.ModifiedAt = time.Now().UTC()
 	currentConversation.Messages = req.Body.Messages
 
+	if err := validateConversationV1(currentConversation); err != nil {
+		return nil, err
+	}
 	filename, err := cc.fileNameFromConversation(*currentConversation)
 	if err != nil {
 		return nil, err
@@ -290,6 +301,9 @@ func (cc *ConversationCollection) GetConversation(
 	if convo.SchemaVersion != spec.ConversationSchemaVersion {
 		return nil, errors.New("unsupported schema version for conversation")
 	}
+	if err := validateConversationV1(&convo); err != nil {
+		return nil, err
+	}
 
 	return &spec.GetConversationResponse{Body: &convo}, nil
 }
@@ -336,6 +350,9 @@ func (cc *ConversationCollection) ListConversations(
 		}
 		if convo.SchemaVersion != spec.ConversationSchemaVersion {
 			// Older conversations are intentionally not interpreted as v1.
+			continue
+		}
+		if err := validateConversationV1(&convo); err != nil {
 			continue
 		}
 
@@ -400,4 +417,110 @@ func (cc *ConversationCollection) fileNameFromConversation(c spec.Conversation) 
 		return "", err
 	}
 	return info.FileName, nil
+}
+
+func validateConversationV1(value *spec.Conversation) error {
+	if value == nil {
+		return errors.New("conversation is nil")
+	}
+	if value.SchemaVersion != spec.ConversationSchemaVersion {
+		return errors.New("unsupported schema version for conversation")
+	}
+	if strings.TrimSpace(value.ID) == "" {
+		return errors.New("conversation ID is empty")
+	}
+
+	for index := range value.Messages {
+		message := &value.Messages[index]
+		if err := validateConversationArtifactRefs(
+			fmt.Sprintf("messages[%d].enabledSkillRefs", index),
+			message.EnabledSkillRefs,
+		); err != nil {
+			return err
+		}
+		if err := validateConversationArtifactRefs(
+			fmt.Sprintf("messages[%d].activeSkillRefs", index),
+			message.ActiveSkillRefs,
+		); err != nil {
+			return err
+		}
+		if message.WorkspaceSelection == nil {
+			continue
+		}
+
+		selected := message.WorkspaceSelection
+		if err := selected.Workspace.Validate(); err != nil {
+			return fmt.Errorf(
+				"messages[%d].workspaceSelection.workspace: %w",
+				index,
+				err,
+			)
+		}
+		if err := validateConversationSelectionRefs(
+			fmt.Sprintf(
+				"messages[%d].workspaceSelection.contextRefs",
+				index,
+			),
+			selected.ContextRefs,
+			selected.Workspace.RootID,
+		); err != nil {
+			return err
+		}
+		if err := validateConversationSelectionRefs(
+			fmt.Sprintf(
+				"messages[%d].workspaceSelection.skillRefs",
+				index,
+			),
+			selected.SkillRefs,
+			selected.Workspace.RootID,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateConversationArtifactRefs(
+	field string,
+	refs []artifact.ArtifactRef,
+) error {
+	seen := make(map[string]struct{}, len(refs))
+	for index, ref := range refs {
+		if err := ref.Validate(); err != nil {
+			return fmt.Errorf("%s[%d]: %w", field, index, err)
+		}
+		key := string(ref.RootID) + "\x00" + string(ref.ArtifactID)
+		if _, duplicate := seen[key]; duplicate {
+			return fmt.Errorf("%s[%d]: duplicate ArtifactRef", field, index)
+		}
+		seen[key] = struct{}{}
+	}
+	return nil
+}
+
+func validateConversationSelectionRefs(
+	field string,
+	refs []selection.ConversationResourceSelectionRef,
+	rootID basespec.RootID,
+) error {
+	seen := make(map[string]struct{}, len(refs))
+	for index, ref := range refs {
+		if err := ref.Artifact.Validate(); err != nil {
+			return fmt.Errorf("%s[%d].artifact: %w", field, index, err)
+		}
+		if ref.Artifact.RootID != rootID {
+			return fmt.Errorf(
+				"%s[%d].artifact: Artifact belongs to another Root",
+				field,
+				index,
+			)
+		}
+		key := string(ref.Artifact.RootID) + "\x00" +
+			string(ref.Artifact.ArtifactID)
+		if _, duplicate := seen[key]; duplicate {
+			return fmt.Errorf("%s[%d]: duplicate ArtifactRef", field, index)
+		}
+		seen[key] = struct{}{}
+	}
+	return nil
 }

@@ -224,6 +224,10 @@ func (r *Reconciler) Reconcile(
 		map[occurrenceIdentity]struct{},
 		len(existing),
 	)
+	seenArtifactIDs := make(
+		map[basespec.ArtifactID]struct{},
+		len(existing),
+	)
 	for index, value := range existing {
 		if err := value.Validate(); err != nil {
 			return Reconciliation{}, fmt.Errorf(
@@ -240,6 +244,14 @@ func (r *Reconciler) Reconcile(
 				basespec.ErrInvalid,
 			)
 		}
+		if _, duplicate := seenArtifactIDs[value.ID]; duplicate {
+			return Reconciliation{}, fmt.Errorf(
+				"%w: duplicate existing artifact ID %q",
+				basespec.ErrInvalid,
+				value.ID,
+			)
+		}
+		seenArtifactIDs[value.ID] = struct{}{}
 
 		identity := bindingIdentity{
 			CollectionID: value.CollectionID,
@@ -406,6 +418,13 @@ func (r *Reconciler) Reconcile(
 		if err := basespec.ValidateArtifactID(draft.ID); err != nil {
 			return Reconciliation{}, err
 		}
+		if _, exists := seenArtifactIDs[draft.ID]; exists {
+			return Reconciliation{}, fmt.Errorf(
+				"%w: automatic adoption reused artifact ID %q",
+				basespec.ErrConflict,
+				draft.ID,
+			)
+		}
 
 		resolved := *occurrence.DefinitionDigest
 		created := Artifact{
@@ -434,6 +453,7 @@ func (r *Reconciler) Reconcile(
 
 		result.Creates = append(result.Creates, created)
 		existingByBinding[identity] = created
+		seenArtifactIDs[created.ID] = struct{}{}
 	}
 	return result, nil
 }

@@ -594,7 +594,7 @@ Installed and Workspace Skill presentation remains separate:
 | ---------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace identity and lifecycle   | Present                   | A Workspace is a `workspace.collection` addressed by `WorkspaceRef`. Filesystem and empty creation, update, primary Source changes, retirement, and typed purge are available.                                                              |
 | Artifact-first API split           | Present                   | Artifact API owns Root and Source administration. Workspace API owns Workspace policy, catalog views, and Workspace-scoped Artifact actions.                                                                                                |
-| Source attachments and roles       | Present                   | One enabled filesystem primary Source is optional. Local library, package, and overlay attachments can add same-Root content under typed Workspace rules.                                                                                    |
+| Source attachments and roles       | Present                   | One enabled filesystem primary Source is optional. Local library, package, and overlay attachments can add same-Root content under typed Workspace rules.                                                                                   |
 | Discovery and refresh              | Present                   | Refresh uses bounded deterministic plans, configured decoders, attachment settings, Workspace preferences, and primary descriptor observations.                                                                                             |
 | Descriptor bootstrap               | Present but limited       | `.flexigpt/workspace.json` can add relative discovery targets and expected digests from the primary Source. It is not yet an import/export format.                                                                                          |
 | Catalog freshness                  | Present                   | Workspace reports stale catalog metadata, decoder changes, and discovery-policy changes. A refresh produces a coherent replacement catalog.                                                                                                 |
@@ -668,8 +668,10 @@ Workspace does not receive Artifact Store observer callbacks and does not scan
 Roots after mutation. The next runtime use resolves the durable Artifact and
 its current Collection ownership directly through Artifact Store.
 
-`fsdir` currently permits normal operating-system symlink traversal. This is
-accepted for now and must not be compensated for in Workspace code.
+Workspace has no symlink policy. MapStore-managed payload behavior belongs to
+MapStore, while direct filesystem Source behavior belongs only to the selected
+Source adapter. Workspace must not clean, resolve, reject, or otherwise apply
+a second symlink policy above the Source adapter boundary.
 
 ### 13.1 Complete Artifact Store prerequisites
 

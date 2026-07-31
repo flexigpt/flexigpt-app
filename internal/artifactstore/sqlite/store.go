@@ -85,30 +85,6 @@ func initializeSchemaV2(
 		return tx.Commit()
 	}
 
-	var legacyExists int
-	if err := tx.QueryRowContext(
-		ctx,
-		`SELECT EXISTS(
-			SELECT 1
-			FROM sqlite_master
-			WHERE type = 'table'
-			  AND name IN (
-				'artifact_schema_migrations',
-				'artifact_roots',
-				'artifact_sources',
-				'artifact_collections'
-			  )
-		)`,
-	).Scan(&legacyExists); err != nil {
-		return err
-	}
-	if legacyExists != 0 {
-		return fmt.Errorf(
-			"%w: legacy Artifact Store metadata is not supported; use a fresh artifacts_v2 directory",
-			basespec.ErrUnsupported,
-		)
-	}
-
 	if _, err := tx.ExecContext(ctx, schema); err != nil {
 		return fmt.Errorf("initialize Artifact Store v2 schema: %w", err)
 	}

@@ -249,7 +249,29 @@ func (s *Store) discardSource(
 	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
-	result, err := s.db.ExecContext(
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateSourceID(id); err != nil {
+		return err
+	}
+	if expectedRevision == 0 {
+		return fmt.Errorf(
+			"%w: expected source revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := getActiveRootTx(ctx, tx, rootID); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM artifact_sources
 		 WHERE id = ?
@@ -270,10 +292,13 @@ func (s *Store) discardSource(
 	if err != nil {
 		return sqliteError(err)
 	}
-	return requireOneChanged(
+	if err := requireOneChanged(
 		result,
 		"source changed or was attached before discard",
-	)
+	); err != nil {
+		return err
+	}
+	return sqliteError(tx.Commit())
 }
 
 func (s *Store) purgeSource(
@@ -282,7 +307,29 @@ func (s *Store) purgeSource(
 	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
-	result, err := s.db.ExecContext(
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateSourceID(id); err != nil {
+		return err
+	}
+	if expectedRevision == 0 {
+		return fmt.Errorf(
+			"%w: expected source revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := getActiveRootTx(ctx, tx, rootID); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM artifact_sources
 		 WHERE id = ? AND root_id = ? AND revision = ? AND retired_at IS NOT NULL`,
@@ -293,7 +340,13 @@ func (s *Store) purgeSource(
 	if err != nil {
 		return sqliteError(err)
 	}
-	return requireOneChanged(result, "source changed or was not retired before purge")
+	if err := requireOneChanged(
+		result,
+		"source changed or was not retired before purge",
+	); err != nil {
+		return err
+	}
+	return sqliteError(tx.Commit())
 }
 
 type scanner interface {

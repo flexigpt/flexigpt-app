@@ -66,7 +66,7 @@ func encodeJSON(value any) ([]byte, error) {
 
 func decodeJSON(raw []byte, target any) error {
 	if len(raw) == 0 {
-		raw = []byte("{}")
+		return fmt.Errorf("%w: persisted JSON is empty", basespec.ErrInvalid)
 	}
 	if err := json.Unmarshal(raw, target); err != nil {
 		return err
