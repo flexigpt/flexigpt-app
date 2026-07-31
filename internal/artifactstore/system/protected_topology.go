@@ -10,13 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 )
 
-// These aliases preserve the existing system package API for callers that
-// have not yet moved to artifactstore/topology.
-type (
-	ProtectedTopologyDeclaration = topology.Declaration
-	ProtectedTopology            = topology.Installed
-)
-
 // EnsureProtectedTopology creates or verifies a declared protected Root and
 // its generic Sources. Feature installers remain responsible for feature
 // Collections, Artifacts, package validation, and package publication.

@@ -99,7 +99,8 @@ func sqliteError(err error) error {
 		return fmt.Errorf("%w: source still has enabled attachments", basespec.ErrConflict)
 	case strings.Contains(message, "artifact source retirement requires no active attachments"):
 		return fmt.Errorf("%w: source is still attached to an active collection", basespec.ErrConflict)
-	case strings.Contains(message, "artifact root retirement requires no active children"):
+	case strings.Contains(message, "artifact root retirement requires no active children"),
+		strings.Contains(message, "artifact root purge requires no active children"):
 		return fmt.Errorf("%w: root still owns active sources or collections", basespec.ErrConflict)
 	case strings.Contains(message, "artifact record requires attached source"),
 		strings.Contains(message, "artifact suppression requires attached source"),

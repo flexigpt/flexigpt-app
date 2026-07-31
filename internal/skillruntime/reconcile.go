@@ -211,12 +211,6 @@ func desiredCollectionView(
 	return desired, nil
 }
 
-/*
-The previous ResyncCollection body that resolved only `ref`, cloned
-`managedCollections`, and merged the cached desired view is replaced by the
-code above.
-*/
-
 func (s *SkillRuntime) RemoveCollection(
 	ctx context.Context,
 	ref collection.CollectionRef,

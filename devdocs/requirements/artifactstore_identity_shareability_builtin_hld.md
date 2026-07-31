@@ -235,7 +235,8 @@ semantic built-in references.
 Artifact Store uses a clean `artifacts_v2` namespace.
 
 - There is no schema migration ledger.
-- Legacy Artifact Store metadata is rejected.
+- Artifact Store does not inspect, classify, migrate, or adapt legacy Artifact
+  Store metadata. Deployment chooses a fresh directory instead.
 - Dynamic legacy built-ins are never imported into canonical built-in topology.
 - Fresh installation creates exactly one protected Root and one protected
   managed Source after the trusted installer runs.

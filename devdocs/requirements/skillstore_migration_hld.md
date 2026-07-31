@@ -751,10 +751,10 @@ the backend migration clean:
   `agentskills-go`; Source snapshots verify the catalogued raw `SKILL.md`
   digest once immediately before native-path handoff. Feature code must not introduce custom
   parsing, sandboxing, executable-file, or cross-platform path policy.
-- External filesystem Source symlink traversal is currently accepted by the
-  `source/fsdir` adapter. Any future containment policy belongs exclusively to
-  that Source adapter, not to Skill Bundle, Workspace, MapStore, or Agent
-  Skills runtime code.
+- MapStore owns link behavior for MapStore-managed payloads. Workspace, Skill
+  Bundle, and runtime layers must not add a second link policy. Direct
+  filesystem Source behavior must be defined by the selected source adapter;
+  MapStore cannot protect paths it does not own.
 - A Root created after startup receives no copied built-in Source, Collection,
   or Artifact. Built-in installation targets only the static protected Root,
   and listing a bundle must not mutate state.

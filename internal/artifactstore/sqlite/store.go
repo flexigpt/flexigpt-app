@@ -109,7 +109,7 @@ func initializeSchemaV2(
 		)
 	}
 
-	if _, err := tx.ExecContext(ctx, schemaV2); err != nil {
+	if _, err := tx.ExecContext(ctx, schema); err != nil {
 		return fmt.Errorf("initialize Artifact Store v2 schema: %w", err)
 	}
 	return tx.Commit()

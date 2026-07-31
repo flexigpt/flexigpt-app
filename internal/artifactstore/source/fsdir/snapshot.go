@@ -314,8 +314,7 @@ func entryFromInfo(
 ) source.Entry {
 	name := info.Name()
 	if locator != "." {
-		// Os.Stat follows symlinks. The target FileInfo name can differ from
-		// the source-relative name used to reach it.
+		// Persist source-relative identity rather than host filesystem naming.
 		name = path.Base(string(locator))
 	}
 	return source.Entry{

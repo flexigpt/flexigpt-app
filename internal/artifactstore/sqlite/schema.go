@@ -1,10 +1,11 @@
 package sqlite
 
-// schemaV2 is the only supported Artifact Store metadata schema.
+// schema is the only Artifact Store metadata schema.
 //
-// The application creates a fresh artifacts_v2 namespace. There is no
-// migration ledger and no compatibility path for earlier metadata databases.
-const schemaV2 = `
+// The configured Artifact Store directory is a clean persistence boundary.
+// There is no migration ledger and no compatibility inspection or adaptation
+// for earlier metadata databases.
+const schema = `
 CREATE TABLE artifact_store_v2 (
 	singleton INTEGER PRIMARY KEY CHECK (singleton = 1)
 );
@@ -362,6 +363,27 @@ BEGIN
 	SELECT RAISE(
 		ABORT,
 		'artifact root retirement requires no active children'
+	);
+END;
+
+CREATE TRIGGER artifact_root_purge_requires_no_active_children
+BEFORE DELETE ON artifact_roots
+FOR EACH ROW
+WHEN EXISTS (
+	SELECT 1
+	FROM artifact_sources
+	WHERE root_id = OLD.id
+	  AND retired_at IS NULL
+	UNION ALL
+	SELECT 1
+	FROM artifact_collections
+	WHERE root_id = OLD.id
+	  AND retired_at IS NULL
+)
+BEGIN
+	SELECT RAISE(
+		ABORT,
+		'artifact root purge requires no active children'
 	);
 END;
 `

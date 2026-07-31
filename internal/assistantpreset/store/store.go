@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"runtime/debug"
 	"slices"
@@ -1250,8 +1249,9 @@ func (s *AssistantPresetStore) sweepSoftDeleted() {
 
 		delete(all.Bundles, id)
 		changed = true
-		_ = os.RemoveAll(filepath.Join(s.baseDir, dirInfo.DirName))
 
+		// MapStore owns partition path and link behavior. Leave an empty
+		// partition until MapStore provides an explicit cleanup operation.
 		slog.Info("hard-deleted assistant preset bundle", "bundleID", id)
 	}
 
