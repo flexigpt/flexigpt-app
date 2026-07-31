@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -26,6 +27,15 @@ func (a *API) BootstrapBuiltInBundle(
 	); err != nil {
 		return Bundle{}, err
 	}
+	if err := basespec.ValidateLogicalName(request.LogicalName); err != nil {
+		return Bundle{}, err
+	}
+	if err := basespec.ValidateLogicalVersion(
+		request.LogicalVersion,
+		true,
+	); err != nil {
+		return Bundle{}, err
+	}
 
 	existing, err := a.findBundleByBootstrapKey(
 		ctx,
@@ -34,6 +44,16 @@ func (a *API) BootstrapBuiltInBundle(
 	)
 	if err != nil {
 		return Bundle{}, err
+	}
+	if existing.Collection.ID != "" &&
+		(existing.Data.LogicalName != request.LogicalName ||
+			existing.Data.LogicalVersion != request.LogicalVersion ||
+			!maps.Equal(existing.Data.Labels, request.Labels)) {
+		return Bundle{}, fmt.Errorf(
+			"%w: built-in bundle bootstrap key %q has incompatible portable metadata",
+			basespec.ErrConflict,
+			request.BootstrapKey,
+		)
 	}
 	if existing.Collection.ID == "" {
 		managedSource, err := a.dependencies.Sources.Create(
@@ -51,11 +71,14 @@ func (a *API) BootstrapBuiltInBundle(
 		}
 
 		created, createErr := a.CreateBundle(ctx, CreateBundleRequest{
-			RootID:       request.RootID,
-			DisplayName:  request.DisplayName,
-			Description:  request.Description,
-			Enabled:      true,
-			BootstrapKey: request.BootstrapKey,
+			RootID:         request.RootID,
+			LogicalName:    request.LogicalName,
+			LogicalVersion: request.LogicalVersion,
+			Labels:         maps.Clone(request.Labels),
+			DisplayName:    request.DisplayName,
+			Description:    request.Description,
+			Enabled:        true,
+			BootstrapKey:   request.BootstrapKey,
 			Attachments: []AttachmentDraft{{
 				SourceID: managedSource.ID,
 				Role:     RoleBuiltIn,

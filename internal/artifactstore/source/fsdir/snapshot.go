@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -18,7 +19,7 @@ type snapshot struct {
 	root            string
 	generation      string
 	traversalPolicy normalizedTraversalPolicy
-	closed          bool
+	closed          atomic.Bool
 }
 
 func (s *snapshot) Generation() string {
@@ -210,12 +211,12 @@ func (s *snapshot) Confirm(ctx context.Context) error {
 }
 
 func (s *snapshot) Close() error {
-	s.closed = true
+	s.closed.Store(true)
 	return nil
 }
 
 func (s *snapshot) ensureOpen(ctx context.Context) error {
-	if s == nil || s.closed {
+	if s == nil || s.closed.Load() {
 		return basespec.ErrClosed
 	}
 	return ctx.Err()

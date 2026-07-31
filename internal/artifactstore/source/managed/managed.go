@@ -51,12 +51,9 @@ func New(base string) (*Adapter, error) {
 			basespec.ErrInvalid,
 		)
 	}
-	absolute, err := mapstoreio.PreparePrivateDirectory(base)
+	absolute, err := filepath.Abs(base)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"prepare managed Source base directory: %w",
-			err,
-		)
+		return nil, err
 	}
 
 	// Managed packages are application-owned immutable payloads. Their source
@@ -75,7 +72,7 @@ func New(base string) (*Adapter, error) {
 		return nil, err
 	}
 	return &Adapter{
-		base:       absolute,
+		base:       filepath.Clean(absolute),
 		filesystem: filesystem,
 	}, nil
 }
@@ -223,19 +220,15 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	if err := os.Remove(root); err != nil {
 		return err
 	}
-
 	parent := filepath.Dir(root)
 	empty, err = managedDirectoryEmpty(parent)
 	if err != nil {
 		return err
 	}
 	if empty {
-		if err := os.Remove(parent); err != nil {
-			return err
-		}
-		return mapstoreio.SyncDirectory(a.base)
+		return os.Remove(parent)
 	}
-	return mapstoreio.SyncDirectory(parent)
+	return nil
 }
 
 func (a *Adapter) PublishPackage(
@@ -310,13 +303,11 @@ func (a *Adapter) PublishPackage(
 		return "", err
 	}
 
-	stagingRoot, err := mapstoreio.EnsurePrivateSubdirectory(
-		root,
-		stagingDirectoryName,
-	)
-	if err != nil {
+	stagingRoot := filepath.Join(root, stagingDirectoryName)
+	if err := os.MkdirAll(stagingRoot, directoryMode); err != nil {
 		return "", err
 	}
+
 	temporary, err := os.MkdirTemp(stagingRoot, "package-*")
 	if err != nil {
 		return "", err
@@ -353,9 +344,6 @@ func (a *Adapter) PublishPackage(
 	}
 	committed = true
 	_ = os.RemoveAll(temporary)
-	if err := mapstoreio.SyncDirectory(filepath.Dir(target)); err != nil {
-		return "", err
-	}
 	return a.confirmedGeneration(ctx, value)
 }
 
@@ -417,13 +405,11 @@ func (a *Adapter) RemovePackage(
 		)
 	}
 
-	stagingRoot, err := mapstoreio.EnsurePrivateSubdirectory(
-		root,
-		stagingDirectoryName,
-	)
-	if err != nil {
+	stagingRoot := filepath.Join(root, stagingDirectoryName)
+	if err := os.MkdirAll(stagingRoot, directoryMode); err != nil {
 		return err
 	}
+
 	tombstone, err := os.MkdirTemp(stagingRoot, "remove-*")
 	if err != nil {
 		return err
@@ -443,7 +429,7 @@ func (a *Adapter) RemovePackage(
 	); err != nil {
 		return err
 	}
-	return mapstoreio.SyncDirectory(root)
+	return nil
 }
 
 func (a *Adapter) validateSource(ctx context.Context, value source.Source) error {
@@ -477,14 +463,18 @@ func (a *Adapter) sourceRootPath(
 	value source.Source,
 	create bool,
 ) (string, error) {
-	relative := filepath.Join(
+	root := filepath.Join(
 		string(value.RootID),
 		string(value.ID),
 	)
-	if create {
-		return mapstoreio.EnsurePrivateSubdirectory(a.base, relative)
+	root = filepath.Join(a.base, root)
+	if !create {
+		return root, nil
 	}
-	return mapstoreio.PrivateSubdirectoryPath(a.base, relative)
+	if err := os.MkdirAll(root, directoryMode); err != nil {
+		return "", err
+	}
+	return root, nil
 }
 
 func (a *Adapter) filesystemSource(
@@ -579,58 +569,26 @@ func managedPackagePath(
 	if err := validatePackageDirectory(directory); err != nil {
 		return "", err
 	}
+
 	parent := path.Dir(string(directory))
 	parentPath := root
-	var err error
 	if parent != "." {
-		relative := filepath.FromSlash(parent)
+		parentPath = filepath.Join(root, filepath.FromSlash(parent))
 		if createParent {
-			parentPath, err = mapstoreio.EnsurePrivateSubdirectory(
-				root,
-				relative,
-			)
-		} else {
-			parentPath, err = mapstoreio.PrivateSubdirectoryPath(
-				root,
-				relative,
-			)
-		}
-		if err != nil {
-			return "", err
+			if err := os.MkdirAll(parentPath, directoryMode); err != nil {
+				return "", err
+			}
 		}
 	}
-	target := filepath.Join(
+	return filepath.Join(
 		parentPath,
 		filepath.FromSlash(path.Base(string(directory))),
-	)
-	relative, err := filepath.Rel(root, target)
-	if err != nil {
-		return "", err
-	}
-	if relative == ".." ||
-		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
-		filepath.IsAbs(relative) {
-		return "", fmt.Errorf("%w: managed package escapes source root", basespec.ErrInvalid)
-	}
-	return target, nil
+	), nil
 }
 
 func pruneEmptyManagedParents(root, start string) error {
 	root = filepath.Clean(root)
 	current := filepath.Clean(start)
-	relative, err := filepath.Rel(root, current)
-	if err != nil {
-		return err
-	}
-	if relative == ".." ||
-		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
-		filepath.IsAbs(relative) {
-		return fmt.Errorf(
-			"%w: managed package parent escapes source root",
-			basespec.ErrInvalid,
-		)
-	}
-
 	for current != root {
 		entries, err := os.ReadDir(current)
 		if errors.Is(err, os.ErrNotExist) {
@@ -645,9 +603,6 @@ func pruneEmptyManagedParents(root, start string) error {
 		}
 		parent := filepath.Dir(current)
 		if err := os.Remove(current); err != nil {
-			return err
-		}
-		if err := mapstoreio.SyncDirectory(parent); err != nil {
 			return err
 		}
 		current = parent

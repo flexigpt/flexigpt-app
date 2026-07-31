@@ -234,6 +234,21 @@ func (w *SkillBundleWrapper) RefreshSkillBundle(
 	})
 }
 
+func (w *SkillBundleWrapper) GetLinkedPortableSkillBundleJSON(
+	ref collection.CollectionRef,
+) (string, error) {
+	return middleware.WithRecoveryResp(func() (string, error) {
+		value, err := w.api.BuildLinkedPortableBundleJSON(
+			context.Background(),
+			ref,
+		)
+		if err != nil {
+			return "", err
+		}
+		return string(value), nil
+	})
+}
+
 func (w *SkillBundleWrapper) CreateManagedSkill(
 	request *skillbundle.CreateManagedSkillRequest,
 ) (skillbundle.CreateManagedSkillResponse, error) {
@@ -319,6 +334,19 @@ func (w *SkillBundleWrapper) UnadoptSkill(
 		)
 
 		return err
+	})
+}
+
+func (w *SkillBundleWrapper) PurgeSkill(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+) error {
+	return middleware.WithRecovery(func() error {
+		return w.api.PurgeSkill(
+			context.Background(),
+			ref,
+			expectedRevision,
+		)
 	})
 }
 

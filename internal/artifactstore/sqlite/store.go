@@ -3,15 +3,12 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
 
 	_ "github.com/glebarez/go-sqlite"
 )
@@ -38,15 +35,6 @@ func Open(
 		return nil, err
 	}
 	path = filepath.Clean(absolute)
-	if strings.HasPrefix(filepath.VolumeName(path), `\\`) {
-		return nil, fmt.Errorf(
-			"%w: SQLite database paths on UNC or device shares are unsupported",
-			basespec.ErrUnsupported,
-		)
-	}
-	if err := prepareDatabaseFile(path); err != nil {
-		return nil, err
-	}
 
 	db, err := sql.Open("sqlite", dataSourceName(path))
 	if err != nil {
@@ -59,10 +47,6 @@ func Open(
 		return nil, fmt.Errorf("ping artifact metadata database: %w", err)
 	}
 	if err := initializeSchemaV1(ctx, db); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	if err := secureDatabaseFiles(path); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -129,51 +113,6 @@ func initializeSchemaV1(
 		return fmt.Errorf("initialize Artifact Store v1 schema: %w", err)
 	}
 	return tx.Commit()
-}
-
-func prepareDatabaseFile(path string) error {
-	info, err := os.Stat(path)
-	switch {
-	case err == nil:
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf(
-				"%w: SQLite path must identify a regular file",
-				basespec.ErrInvalid,
-			)
-		}
-	case errors.Is(err, os.ErrNotExist):
-		if _, err := mapstoreio.PreparePrivateDirectory(
-			filepath.Dir(path),
-		); err != nil {
-			return err
-		}
-	default:
-		return err
-	}
-
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return fmt.Errorf("prepare artifact metadata database: %w", err)
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return mapstoreio.ApplyPrivateFileMode(path)
-}
-
-func secureDatabaseFiles(path string) error {
-	for _, candidate := range []string{
-		path,
-		path + "-wal",
-		path + "-shm",
-		path + "-journal",
-	} {
-		if err := mapstoreio.ApplyPrivateFileMode(candidate); err != nil &&
-			!errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("secure artifact metadata database: %w", err)
-		}
-	}
-	return nil
 }
 
 func dataSourceName(path string) string {

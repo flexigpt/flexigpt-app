@@ -53,7 +53,7 @@ type ConversationSelection struct {
 	WorkspaceRevision uint64                             `json:"workspaceRevision,omitempty"`
 	CatalogRevision   uint64                             `json:"catalogRevision,omitempty"`
 	ContextRefs       []ConversationResourceSelectionRef `json:"contextRefs,omitempty"`
-	SkillRefs         []artifact.ArtifactRef             `json:"skillRefs,omitempty"`
+	SkillRefs         []ConversationResourceSelectionRef `json:"skillRefs,omitempty"`
 }
 
 type ConversationContextUsage struct {
@@ -270,7 +270,8 @@ func (cr *ConversationResolver) ResolveConversationSelection(
 	skillUsageByID := make(map[basespec.ArtifactID]int, len(selection.SkillRefs))
 	skillArtifactRefs := make([]artifact.ArtifactRef, 0, len(selection.SkillRefs))
 
-	for _, ref := range selection.SkillRefs {
+	for _, selected := range selection.SkillRefs {
+		ref := selected.Artifact
 		if err := ref.Validate(); err != nil {
 			return ConversationResolution{
 				Usage: unresolvedConversationUsage(selection, err),
@@ -294,8 +295,11 @@ func (cr *ConversationResolver) ResolveConversationSelection(
 		skillUsageByID[ref.ArtifactID] = len(usage.Skills)
 		skillArtifactRefs = append(skillArtifactRefs, ref)
 		usage.Skills = append(usage.Skills, ConversationSkillUsage{
-			Artifact: ref,
-			Status:   ConversationSkillUsageUnavailable,
+			Artifact:                 ref,
+			Name:                     selected.Name,
+			Locator:                  selected.Locator,
+			SelectedDefinitionDigest: selected.DefinitionDigest,
+			Status:                   ConversationSkillUsageUnavailable,
 		})
 	}
 
@@ -341,9 +345,9 @@ func (cr *ConversationResolver) ResolveConversationSelection(
 				current.Changed = conversationResourceChanged(
 					current.SelectedDefinitionDigest,
 					current.UsedDefinitionDigest,
-					0,
+					selection.SkillRefs[index].ArtifactRevision,
 					current.UsedArtifactRevision,
-					"",
+					selection.SkillRefs[index].Locator,
 					current.Locator,
 				)
 
@@ -423,9 +427,13 @@ func unresolvedConversationUsage(
 	}
 
 	for _, ref := range selection.SkillRefs {
+		artifactRef := ref.Artifact
 		usage.Skills = append(usage.Skills, ConversationSkillUsage{
-			Artifact: ref,
-			Status:   ConversationSkillUsageUnavailable,
+			Artifact:                 artifactRef,
+			Name:                     ref.Name,
+			Locator:                  ref.Locator,
+			SelectedDefinitionDigest: ref.DefinitionDigest,
+			Status:                   ConversationSkillUsageUnavailable,
 		})
 	}
 

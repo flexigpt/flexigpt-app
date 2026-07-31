@@ -457,7 +457,7 @@ schema may remain visible as an unsupported or invalid occurrence.
 | `AS-F03` | Create and manage typed Collections within a Root.                                     | Core        |
 | `AS-F04` | Attach one Source to multiple Collections in the same Root.                            | Core        |
 | `AS-F05` | Let consumers validate Collection kinds, data, roles, and attachment data.             | Core        |
-| `AS-F06` | Traverse Source snapshots with locator, symlink, count, depth, and byte limits.        | Core        |
+| `AS-F06` | Traverse Source snapshots with locator, count, depth, and byte limits.                 | Core        |
 | `AS-F07` | Support independent Source adapters and format decoders.                               | Core        |
 | `AS-F08` | Allow one candidate to emit zero, one, or multiple occurrences.                        | Core        |
 | `AS-F09` | Canonicalize portable definitions and identify them by digest.                         | Core        |
@@ -482,6 +482,8 @@ schema may remain visible as an unsupported or invalid occurrence.
 | `AS-F28` | Import and export Collections with deterministic member and asset closure.             | Planned     |
 | `AS-F29` | Resolve relative locators and policy-approved external URIs during import.             | Planned     |
 | `AS-F30` | Support history, dependency snapshots, provenance history, and materialization.        | Optional    |
+
+`fsdir` currently permits normal operating-system symlink traversal. Symlink containment is deferred Source-adapter policy and is not implemented here.
 
 ## 7. Quality and security requirements
 
@@ -691,10 +693,11 @@ managed adapter excludes only its private staging directory. MapStore remains
 the storage implementation boundary for immutable definitions and managed
 package file payloads. MapStore owns file-level output behavior, including
 its platform-specific path, permission, and durability handling. The managed
-Source adapter owns only staged package assembly, package equivalence, and the
-atomic package-directory publication boundary. Feature code must not inspect
-MapStore-managed paths, recreate MapStore containment rules, or add
-platform-specific filesystem policy.
+Source adapter owns only staged package assembly, package equivalence, and the atomic package-directory publication
+boundary. Artifact Store does not layer another private-directory, permission,
+symlink, or platform-specific durability abstraction around MapStore-managed
+definition and package payload files. Feature code must not inspect
+MapStore-managed paths or recreate MapStore containment rules.
 This avoids inheriting the broad project traversal exclusions used by external filesystem
 Sources. This preserves generation-based runtime freshness for normal package
 resources and scripts.

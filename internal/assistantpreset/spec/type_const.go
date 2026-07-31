@@ -14,7 +14,7 @@ import (
 const (
 	AssistantPresetBundlesMetaFileName      = "assistantpresetbundles.json"
 	AssistantPresetBuiltInOverlayDBFileName = "assistantpresetsbuiltin.overlay.sqlite"
-	SchemaVersion                           = "2026-04-01-artifact-skills-v1"
+	SchemaVersion                           = "v1"
 	MaxPageSize                             = 256
 	DefaultPageSize                         = 25
 	MaxStartingTextBytes                    = 16 * 1024

@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	builtInBootstrapKey = "builtin.agent-skills.v1"
-	builtInBundleName   = "Built-in Skills"
-	builtInDescription  = "Application-provided Agent Skills."
+	builtInBootstrapKey      = "builtin-agent-skills-seed"
+	builtInBundleLogicalName = "built-in-agent-skills"
+	builtInBundleVersion     = "v1"
+	builtInBundleName        = "Built-in Skills"
+	builtInDescription       = "Application-provided Agent Skills."
 )
 
 // BootstrapEmbeddedBuiltIns imports built-in packages through the normal
@@ -53,11 +55,13 @@ func (a *API) BootstrapEmbeddedBuiltIns(
 			return nil, err
 		}
 		value, err := a.BootstrapBuiltInBundle(ctx, BootstrapBundleRequest{
-			RootID:       root.ID,
-			BootstrapKey: builtInBootstrapKey,
-			DisplayName:  builtInBundleName,
-			Description:  builtInDescription,
-			Skills:       cloneBuiltInSkills(skills),
+			RootID:         root.ID,
+			BootstrapKey:   builtInBootstrapKey,
+			LogicalName:    builtInBundleLogicalName,
+			LogicalVersion: builtInBundleVersion,
+			DisplayName:    builtInBundleName,
+			Description:    builtInDescription,
+			Skills:         cloneBuiltInSkills(skills),
 		})
 		if err != nil {
 			return nil, err

@@ -106,11 +106,14 @@ type BuiltInSkill struct {
 }
 
 type BootstrapBundleRequest struct {
-	RootID       basespec.RootID
-	BootstrapKey string
-	DisplayName  string
-	Description  string
-	Skills       []BuiltInSkill
+	RootID         basespec.RootID
+	BootstrapKey   string
+	LogicalName    basespec.LogicalName
+	LogicalVersion basespec.LogicalVersion
+	Labels         map[string]string
+	DisplayName    string
+	Description    string
+	Skills         []BuiltInSkill
 }
 
 func New(dependencies Dependencies) (*API, error) {
@@ -538,6 +541,19 @@ func (a *API) BuildLinkedPortableBundleDefinition(
 		Description:    bundle.Collection.Description,
 		Labels:         bundle.Data.Labels,
 	}, members)
+}
+
+// BuildLinkedPortableBundleJSON returns the canonical shareable linked bundle
+// descriptor. It deliberately does not claim to contain a package closure.
+func (a *API) BuildLinkedPortableBundleJSON(
+	ctx context.Context,
+	ref collection.CollectionRef,
+) ([]byte, error) {
+	value, err := a.BuildLinkedPortableBundleDefinition(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return definition.MarshalCollectionDefinition(value)
 }
 
 func (a *API) CreateManagedSkill(

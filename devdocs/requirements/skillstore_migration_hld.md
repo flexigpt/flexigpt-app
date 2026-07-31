@@ -37,14 +37,11 @@ Collection kind, is not a CollectionID or ArtifactID, is not portable content,
 and is not exposed through public views.
 
 The standalone Skill Store is removed from the application tree. This is a
-breaking reset. Normal startup never imports, interprets, or migrates legacy
-Skill Store records.
-
-Keeping the legacy package available does not imply legacy-data compatibility.
-A release must explicitly choose reset/versioning or a one-time importer for
-existing standalone Skill bundles and old persisted Skill selections. Until
-that policy is implemented, the application must not silently reinterpret old
-records as Artifact-backed selections.
+breaking reset. Normal startup never imports, interprets, migrates, registers,
+or writes legacy Skill Store records. A future one-time importer, if product
+requires one, must live outside normal application startup and create new
+Artifact Store identities. It must not restore legacy Skill Store code,
+identity types, path handling, or a dual-write compatibility path.
 
 The Artifact Store and Workspace transition does not migrate the standalone
 Skill Store. During this phase, installed Skills retain their existing
@@ -529,8 +526,8 @@ tool.
 | Script execution policy            | Present and explicit                | Artifact-backed runtime defaults to scripts disabled. Explicit application composition may enable scripts, while `agentskills-go` and `llmtools-go` retain all execution and sandbox policy.                                                                                |
 | Artifact-backed backend references | Present                             | Assistant presets, conversations, inference, Workspace, and Skill Runtime use Artifact-backed Skill references.                                                                                                                                                             |
 | Runtime synchronization state      | Present and derived only            | Artifact Store is durable authority. `SkillRuntime` retains only process-local provider registrations; Workspace and Skill Bundle wrappers do not mirror managed Collection membership.                                                                                     |
-| Root mutation invalidation         | Present and narrowed                | Notifications are post-commit, coalesced invalidation wake-ups. Root creation and Source revision changes notify; no-op updates and irrelevant lifecycle metadata do not trigger feature scans.                                                                             |
-| Legacy Skill Store                 | Reference-only                      | `internal/skillstore` remains migration input and implementation reference only. It is not an active startup, runtime, lookup, or mutation dependency.                                                                                                                      |
+| Runtime synchronization trigger    | Present and demand-driven           | A selected Artifact is resolved from Artifact Store and reconciled into Agent Skills runtime only when runtime work needs it. No observer or feature-owned membership cache exists.                                                                                         |
+| Legacy Skill Store                 | Removed                             | `internal/skillstore` is absent from the application tree. Legacy data is unsupported until an explicit offline importer is separately approved.                                                                                                                            |
 | Same-name policy                   | Partial                             | Aggregate listing marks simultaneously eligible same-name Skills unavailable, and runtime resolution withholds ambiguous durable references. A unified migrated-Collection precedence policy remains deferred.                                                              |
 | Assistant preset integration       | Present                             | Assistant preset validation resolves `ArtifactSkillSelection` through the Artifact-backed Skill Runtime.                                                                                                                                                                    |
 | Conversation integration           | Present                             | Conversations persist Artifact-backed Skill references and Workspace selections.                                                                                                                                                                                            |
@@ -652,8 +649,8 @@ release-complete:
 
 - [x] Keep `internal/skillstore` reference-only. Normal startup does not open,
       mutate, register, or resolve it.
-- [x] Make root-mutation observer delivery non-fatal, bounded, and coalesced
-      after durable metadata commit.
+- [x] Remove the standalone Skill Store implementation and use the clean
+      `*_v1` application namespaces as the breaking persistence boundary.
 - [x] Verify the registered runtime version after Artifact resolution before
       treating a `SkillDef` as available.
 - [x] Remove public generic Artifact purge transport. Typed feature workflows
@@ -707,9 +704,10 @@ the backend migration clean:
   `agentskills-go`; Source snapshots verify the catalogued raw `SKILL.md`
   digest before native-path handoff. Feature code must not introduce custom
   parsing, sandboxing, executable-file, or cross-platform path policy.
-- External filesystem Source symlink containment is enforced by the
-  `source/fsdir` adapter. This is a lower Source-boundary requirement, not a
-  Skill Bundle, Workspace, or Agent Skills runtime responsibility.
+- External filesystem Source symlink traversal is currently accepted by the
+  `source/fsdir` adapter. Any future containment policy belongs exclusively to
+  that Source adapter, not to Skill Bundle, Workspace, MapStore, or Agent
+  Skills runtime code.
 - MapStore-managed definition files are accessed only through MapStore. Feature
   code must not recreate MapStore path, symlink, permission, or durability
   handling.

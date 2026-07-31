@@ -16,7 +16,7 @@ const (
 	ConversationFileExtension = "json"
 	MaxPageSize               = 256
 	DefaultPageSize           = 12
-	ConversationSchemaVersion = "v2.0.0"
+	ConversationSchemaVersion = "v1"
 )
 
 // ConversationMessage represents a single *turn* in the conversation.

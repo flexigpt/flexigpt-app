@@ -52,14 +52,14 @@ func validateArtifactSkillRefsForSelection(
 			return fmt.Errorf("invalid Workspace selection: %w", err)
 		}
 		for index, selectedSkill := range sel.SkillRefs {
-			if err := selectedSkill.Validate(); err != nil {
+			if err := selectedSkill.Artifact.Validate(); err != nil {
 				return fmt.Errorf(
 					"invalid workspace selection skillRefs[%d]: %w",
 					index,
 					err,
 				)
 			}
-			if selectedSkill.RootID != sel.Workspace.RootID {
+			if selectedSkill.Artifact.RootID != sel.Workspace.RootID {
 				return fmt.Errorf(
 					"workspace selection skillRefs[%d] belongs to another Root",
 					index,

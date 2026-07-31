@@ -39,9 +39,7 @@ func (s *SkillRuntime) CreateSkillSession(
 		return nil, fmt.Errorf("%w: invalid activeArtifacts: %w", errSkillInvalidRequest, err)
 	}
 
-	if sessionID := strings.TrimSpace(string(req.Body.CloseSessionID)); sessionID != "" {
-		_ = s.runtime.CloseSession(ctx, agentskillsSpec.SessionID(sessionID))
-	}
+	previousSessionID := strings.TrimSpace(string(req.Body.CloseSessionID))
 
 	resolved, err := s.resolveAllowArtifacts(ctx, req.Body.AllowArtifacts)
 	if err != nil {
@@ -102,6 +100,14 @@ func (s *SkillRuntime) CreateSkillSession(
 	for _, record := range records {
 		active[record.Def] = struct{}{}
 	}
+
+	// Preserve the old session until the replacement has been created and
+	// inspected successfully. Closing the old session is explicitly best
+	// effort and must not invalidate a successful new session response.
+	if previousSessionID != "" {
+		_ = s.runtime.CloseSession(context.WithoutCancel(ctx), agentskillsSpec.SessionID(previousSessionID))
+	}
+
 	return &skillruntimeSpec.CreateSkillSessionResponse{
 		Body: &skillruntimeSpec.CreateSkillSessionResponseBody{
 			SessionID:       sessionID,

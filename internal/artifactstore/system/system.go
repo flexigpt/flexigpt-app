@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -14,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition/maprepo"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -79,13 +79,22 @@ func Open(
 		config.IDGenerator = uuidutil.UUIDv7Generator{}
 	}
 
-	base, err := mapstoreio.PreparePrivateDirectory(
-		config.BaseDirectory,
-	)
+	base, err := filepath.Abs(config.BaseDirectory)
 	if err != nil {
 		return nil, err
 	}
-
+	base = filepath.Clean(base)
+	info, err := os.Stat(base)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"%w: artifact system base directory is unavailable: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%w: artifact system base is not a directory", basespec.ErrInvalid)
+	}
 	metadata, err := sqlite.Open(
 		ctx,
 		filepath.Join(base, "artifact-metadata.sqlite"),
@@ -560,7 +569,7 @@ func managedPackageExists(
 	confirmErr := snapshot.Confirm(ctx)
 	closeErr := snapshot.Close()
 	if confirmErr != nil || closeErr != nil {
-		return false, errors.Join(confirmErr, closeErr)
+		return false, errors.Join(statErr, confirmErr, closeErr)
 	}
 	if errors.Is(statErr, basespec.ErrNotFound) {
 		return false, nil

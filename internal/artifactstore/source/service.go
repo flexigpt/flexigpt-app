@@ -130,9 +130,15 @@ func (s *Service) Create(
 	if err := value.Validate(); err != nil {
 		return Summary{}, cleanupBootstrap(err)
 	}
+
 	if err := s.repository.Create(ctx, value); err != nil {
-		return Summary{}, cleanupBootstrap(err)
+		// A repository commit error can be ambiguous. Do not remove the
+		// bootstrapped directory after attempting metadata publication:
+		// the Source row may already be durable and must never point to
+		// deleted managed content.
+		return Summary{}, err
 	}
+
 	return value.Summary(), nil
 }
 

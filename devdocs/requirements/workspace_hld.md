@@ -158,7 +158,10 @@ Workspace Artifact selections persist:
 
     ArtifactRef{RootID, ArtifactID}
 
-All Workspace operations must validate current Collection membership.
+All Workspace operations must validate current Collection membership. Persisted
+Context and Skill selections also retain their selected Artifact revision,
+definition digest, and locator so inference usage can report whether the
+resolved Artifact changed before the turn ran.
 
 ### 5.2 Local and portable Workspace representations
 
@@ -626,6 +629,9 @@ The frontend follows the same boundary:
 Workspace does not receive Artifact Store observer callbacks and does not scan
 Roots after mutation. The next runtime use resolves the durable Artifact and
 its current Collection ownership directly through Artifact Store.
+
+`fsdir` currently permits normal operating-system symlink traversal. This is
+accepted for now and must not be compensated for in Workspace code.
 
 ### 13.1 Complete Artifact Store prerequisites
 
