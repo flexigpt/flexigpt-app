@@ -307,6 +307,12 @@ It contains:
 Artifact Store validates structure and containment. The consumer validates role
 meaning and attachment data.
 
+An active Collection attachment cannot be detached or replaced while local
+Artifacts or suppressions still bind to that Source. A feature must first
+unadopt, purge, or otherwise clean up those local records through its typed
+lifecycle workflow. This prevents a local Artifact from retaining a Source
+Binding that is no longer structurally mounted in its Collection.
+
 ### 5.5 Source binding and occurrence
 
 A Source Binding identifies source-relative intent:
@@ -696,7 +702,7 @@ establishes its membership and meaning.
 | Artifact lifecycle                      | Present                          | Stable Artifact references, observed adoption, pinning, suppression, local enablement, local data, unadoption, and purge are implemented for feature consumers.                                                                                                                       |
 | Managed package authoring               | Present                          | Managed Sources publish complete staged packages, use source generations as optimistic tokens, and advance Source revision after visible content changes.                                                                                                                             |
 | Catalog currentness and conflicts       | Present                          | Publication checks Collection, attachment, Source, catalog, plan, decoder, and snapshot inputs. Consumers can identify stale metadata and require refresh.                                                                                                                            |
-| Persistence and relationship invariants | Present                          | Artifact Store uses one fresh `v2` schema in the `artifacts_v2` namespace. There is no migration ledger or legacy schema compatibility path. Database and service checks preserve active Root, Source, Collection, attachment, Artifact, and source-binding uniqueness relationships. |
+| Persistence and relationship invariants | Present with detach guard        | Artifact Store uses one fresh `v2` schema in the `artifacts_v2` namespace. There is no migration ledger or legacy schema compatibility path. Database and service checks preserve active Root, Source, Collection, attachment, Artifact, and source-binding uniqueness relationships. Attachment deletion is blocked while bound Artifacts or suppressions remain. |
 | Source privacy and local paths          | Present                          | Public Source responses omit configuration. Trusted native paths remain an internal capability for adapters that explicitly support them.                                                                                                                                             |
 | Feature integration                     | Present for Workspace and Skills | Workspace and `skill.bundle` consume injected Artifact Store capabilities. Workspace has no built-in library model. Built-in Skills remain in the protected system Root and are resolved through semantic app metadata references.                                                    |
 | Portable Collection Definition          | Schema primitive only            | Canonical portable envelopes and `ShareableSkillPackage` validation exist. Export from local Skill Bundle records is intentionally disabled until a package-relative content-closure exporter exists.                                                                                 |
@@ -869,10 +875,12 @@ existing local lifecycle rather than introduce another persistence model.
   Workspace, Skill Bundle, and Artifact projection layers must not clean,
   normalize, resolve symlinks, or apply platform-specific path rules a second
   time.
-- Define an explicit managed-Source physical-retention policy for Source purge.
-  Current metadata purge intentionally does not add an unsafe independent
-  recursive filesystem delete after a database transaction. Any future
-  physical cleanup must be a Source-adapter-owned, recoverable workflow.
+- Define explicit Source and Root physical-retention policies. Current metadata
+  purge intentionally does not add an unsafe independent recursive filesystem
+  delete after a database transaction. Managed Source directories and
+  Root-scoped immutable definition partitions can therefore remain physically
+  retained after metadata purge. Any future cleanup must be Source- or
+  content-repository-owned and recoverable.
 - Defer historical catalogs, dependency snapshots, and generic materialization
   until a committed workflow needs them.
 

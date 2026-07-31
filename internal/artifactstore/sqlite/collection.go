@@ -641,6 +641,14 @@ func (s *Store) detachCollectionSource(
 	if attachment.Revision != expectedAttachmentRevision {
 		return collection.Collection{}, basespec.ErrConflict
 	}
+	if err := requireNoAttachmentBoundRecordsTx(
+		ctx,
+		tx,
+		ref,
+		sourceID,
+	); err != nil {
+		return collection.Collection{}, err
+	}
 
 	result, err := tx.ExecContext(
 		ctx,
@@ -743,6 +751,15 @@ func (s *Store) replaceCollectionAttachment(
 		return collection.Collection{}, err
 	}
 
+	if err := requireNoAttachmentBoundRecordsTx(
+		ctx,
+		tx,
+		ref,
+		previousSourceID,
+	); err != nil {
+		return collection.Collection{}, err
+	}
+
 	result, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM artifact_collection_attachments
@@ -782,6 +799,48 @@ func (s *Store) replaceCollectionAttachment(
 		return collection.Collection{}, err
 	}
 	return updated.Clone(), nil
+}
+
+func requireNoAttachmentBoundRecordsTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	ref collection.CollectionRef,
+	sourceID basespec.SourceID,
+) error {
+	var exists int
+	err := tx.QueryRowContext(
+		ctx,
+		`SELECT EXISTS(
+			SELECT 1
+			FROM artifact_artifacts
+			WHERE root_id = ?
+			  AND collection_id = ?
+			  AND source_id = ?
+			UNION ALL
+			SELECT 1
+			FROM artifact_suppressions
+			WHERE root_id = ?
+			  AND collection_id = ?
+			  AND source_id = ?
+		)`,
+		string(ref.RootID),
+		string(ref.CollectionID),
+		string(sourceID),
+		string(ref.RootID),
+		string(ref.CollectionID),
+		string(sourceID),
+	).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists != 0 {
+		return fmt.Errorf(
+			"%w: detach source %q only after its Artifacts and suppressions are removed",
+			basespec.ErrConflict,
+			sourceID,
+		)
+	}
+	return nil
 }
 
 func getActiveCollectionTx(

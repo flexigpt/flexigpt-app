@@ -153,6 +153,28 @@ func (e *Engine) Discover(
 		return Result{}, err
 	}
 
+	discoveredLocators := make(
+		map[basespec.Locator]struct{},
+		len(entries),
+	)
+	for _, entry := range entries {
+		discoveredLocators[entry.Locator] = struct{}{}
+	}
+	missingExpected := make([]basespec.Locator, 0)
+	for locator := range plan.ExpectedContentDigests {
+		if _, found := discoveredLocators[locator]; !found {
+			missingExpected = append(missingExpected, locator)
+		}
+	}
+	if len(missingExpected) != 0 {
+		slices.Sort(missingExpected)
+		return Result{}, fmt.Errorf(
+			"%w: expected source content %q was not found",
+			basespec.ErrReferenceUnresolved,
+			missingExpected[0],
+		)
+	}
+
 	occurrences := make(map[catalog.OccurrenceKey]catalog.Occurrence, len(previous))
 	for index, value := range previous {
 		if value.Key.SourceID != sourceID {

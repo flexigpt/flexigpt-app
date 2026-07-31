@@ -300,6 +300,18 @@ func (r *runtime) Get(
 	rootID basespec.RootID,
 	id basespec.SourceID,
 ) (Source, error) {
+	if r == nil || r.reader == nil {
+		return Source{}, basespec.ErrClosed
+	}
+	if ctx == nil {
+		return Source{}, fmt.Errorf(
+			"%w: source runtime context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return Source{}, err
+	}
 	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Source{}, err
 	}
@@ -336,6 +348,18 @@ func (r *runtime) Open(
 	ctx context.Context,
 	value Source,
 ) (Snapshot, error) {
+	if r == nil || r.opener == nil {
+		return nil, basespec.ErrClosed
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf(
+			"%w: source runtime context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if err := value.Validate(); err != nil {
 		return nil, err
 	}
