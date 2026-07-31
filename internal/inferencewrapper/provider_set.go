@@ -23,7 +23,6 @@ import (
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
-	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
@@ -379,8 +378,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	if ps.skillRuntime != nil && len(enabledSkillRefs) > 0 {
-		var availableSkillItems []skillruntimeSpec.RuntimeSkillListItem
-		var activeSkillItems []skillruntimeSpec.RuntimeSkillListItem
+		var availableSkillItems []skillruntime.RuntimeSkillListItem
+		var activeSkillItems []skillruntime.RuntimeSkillListItem
 		if skillSessionID == "" {
 			if workspaceUsage != nil && len(workspaceUsage.Skills) > 0 {
 				markWorkspaceSkillSessionUsage(
@@ -399,9 +398,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			return nil, errors.New("enabledSkillRefs provided but skillSessionID is missing")
 		}
 		// Active skills count in this session (restricted to allowlist).
-		activeResp, aerr := ps.skillRuntime.ListRuntimeSkills(ctx, &skillruntimeSpec.ListRuntimeSkillsRequest{
-			Body: &skillruntimeSpec.ListRuntimeSkillsRequestBody{
-				Filter: &skillruntimeSpec.RuntimeSkillFilter{
+		activeResp, aerr := ps.skillRuntime.ListRuntimeSkills(ctx, &skillruntime.ListRuntimeSkillsRequest{
+			Body: &skillruntime.ListRuntimeSkillsRequestBody{
+				Filter: &skillruntime.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
 					Activity:       agentskillsSpec.SkillActivityAny,
 					AllowArtifacts: enabledSkillRefs,
@@ -419,9 +418,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			availableSkillItems = activeResp.Body.Skills
 		}
 
-		activeResp, aerr = ps.skillRuntime.ListRuntimeSkills(ctx, &skillruntimeSpec.ListRuntimeSkillsRequest{
-			Body: &skillruntimeSpec.ListRuntimeSkillsRequestBody{
-				Filter: &skillruntimeSpec.RuntimeSkillFilter{
+		activeResp, aerr = ps.skillRuntime.ListRuntimeSkills(ctx, &skillruntime.ListRuntimeSkillsRequest{
+			Body: &skillruntime.ListRuntimeSkillsRequestBody{
+				Filter: &skillruntime.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
 					Activity:       agentskillsSpec.SkillActivityActive,
 					AllowArtifacts: enabledSkillRefs,
@@ -449,9 +448,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			promptActivity = agentskillsSpec.SkillActivityAny
 		}
 
-		promptResp, perr := ps.skillRuntime.GetSkillsPrompt(ctx, &skillruntimeSpec.GetSkillsPromptRequest{
-			Body: &skillruntimeSpec.GetSkillsPromptRequestBody{
-				Filter: &skillruntimeSpec.RuntimeSkillFilter{
+		promptResp, perr := ps.skillRuntime.GetSkillsPrompt(ctx, &skillruntime.GetSkillsPromptRequest{
+			Body: &skillruntime.GetSkillsPromptRequestBody{
+				Filter: &skillruntime.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
 					Activity:       promptActivity,
 					AllowArtifacts: enabledSkillRefs,

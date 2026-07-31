@@ -8,15 +8,14 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
-	"github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 )
 
 const maxSkillToolArgsBytes = 1 << 20
 
 func (s *SkillRuntime) InvokeSkillTool(
 	ctx context.Context,
-	req *spec.InvokeSkillToolRequest,
-) (*spec.InvokeSkillToolResponse, error) {
+	req *InvokeSkillToolRequest,
+) (*InvokeSkillToolResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
@@ -64,7 +63,7 @@ func (s *SkillRuntime) InvokeSkillTool(
 	}
 
 	outputs, callErr := llmtoolsutil.CallUsingRegistry(ctx, registry, functionID, json.RawMessage(arguments))
-	response := &spec.InvokeSkillToolResponse{Body: &spec.InvokeSkillToolResponseBody{
+	response := &InvokeSkillToolResponse{Body: &InvokeSkillToolResponseBody{
 		Outputs:   outputs,
 		Meta:      map[string]any{"toolName": toolName},
 		IsBuiltIn: true,

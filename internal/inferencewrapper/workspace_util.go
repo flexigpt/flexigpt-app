@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
+	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
 
@@ -261,8 +261,8 @@ func filterWorkspaceSkillRefsToResolvedSelection(
 func markWorkspaceSkillSessionUsage(
 	usage *selection.ConversationUsage,
 	enabledSkillRefs []artifact.ArtifactRef,
-	availableItems []skillruntimeSpec.RuntimeSkillListItem,
-	activeItems []skillruntimeSpec.RuntimeSkillListItem,
+	availableItems []skillruntime.RuntimeSkillListItem,
+	activeItems []skillruntime.RuntimeSkillListItem,
 	advertised bool,
 ) {
 	if usage == nil || len(usage.Skills) == 0 {

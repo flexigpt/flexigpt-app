@@ -1,4 +1,4 @@
-package spec
+package skillruntime
 
 import (
 	"errors"

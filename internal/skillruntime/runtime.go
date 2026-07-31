@@ -18,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	skillruntimeSpec "github.com/flexigpt/flexigpt-app/internal/skillruntime/spec"
 )
 
 var errSkillInvalidRequest = errors.New("invalid request")
@@ -221,8 +220,8 @@ func (s *SkillRuntime) Close() {
 
 func (s *SkillRuntime) CreateSkillSession(
 	ctx context.Context,
-	req *skillruntimeSpec.CreateSkillSessionRequest,
-) (*skillruntimeSpec.CreateSkillSessionResponse, error) {
+	req *CreateSkillSessionRequest,
+) (*CreateSkillSessionResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
@@ -308,8 +307,8 @@ func (s *SkillRuntime) CreateSkillSession(
 		_ = s.runtime.CloseSession(context.WithoutCancel(ctx), agentskillsSpec.SessionID(previousSessionID))
 	}
 
-	return &skillruntimeSpec.CreateSkillSessionResponse{
-		Body: &skillruntimeSpec.CreateSkillSessionResponseBody{
+	return &CreateSkillSessionResponse{
+		Body: &CreateSkillSessionResponseBody{
 			SessionID:       sessionID,
 			ActiveArtifacts: buildActiveArtifacts(resolved.DefToArtifacts, active),
 		},
@@ -318,8 +317,8 @@ func (s *SkillRuntime) CreateSkillSession(
 
 func (s *SkillRuntime) CloseSkillSession(
 	ctx context.Context,
-	req *skillruntimeSpec.CloseSkillSessionRequest,
-) (*skillruntimeSpec.CloseSkillSessionResponse, error) {
+	req *CloseSkillSessionRequest,
+) (*CloseSkillSessionResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
@@ -329,13 +328,13 @@ func (s *SkillRuntime) CloseSkillSession(
 	if err := s.runtime.CloseSession(ctx, req.SessionID); err != nil {
 		return nil, err
 	}
-	return &skillruntimeSpec.CloseSkillSessionResponse{}, nil
+	return &CloseSkillSessionResponse{}, nil
 }
 
 func (s *SkillRuntime) GetSkillsPrompt(
 	ctx context.Context,
-	req *skillruntimeSpec.GetSkillsPromptRequest,
-) (*skillruntimeSpec.GetSkillsPromptResponse, error) {
+	req *GetSkillsPromptRequest,
+) (*GetSkillsPromptResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
@@ -345,8 +344,8 @@ func (s *SkillRuntime) GetSkillsPrompt(
 
 	filterRequest := req.Body.Filter
 	if len(filterRequest.AllowArtifacts) == 0 {
-		return &skillruntimeSpec.GetSkillsPromptResponse{
-			Body: &skillruntimeSpec.GetSkillsPromptResponseBody{},
+		return &GetSkillsPromptResponse{
+			Body: &GetSkillsPromptResponseBody{},
 		}, nil
 	}
 	if err := validateArtifactRefs(filterRequest.AllowArtifacts); err != nil {
@@ -354,8 +353,8 @@ func (s *SkillRuntime) GetSkillsPrompt(
 	}
 	if len(filterRequest.Inserts) > 0 &&
 		!containsInstructionInsert(filterRequest.Inserts) {
-		return &skillruntimeSpec.GetSkillsPromptResponse{
-			Body: &skillruntimeSpec.GetSkillsPromptResponseBody{},
+		return &GetSkillsPromptResponse{
+			Body: &GetSkillsPromptResponseBody{},
 		}, nil
 	}
 
@@ -364,8 +363,8 @@ func (s *SkillRuntime) GetSkillsPrompt(
 		return nil, err
 	}
 	if len(resolved.AllowDefs) == 0 {
-		return &skillruntimeSpec.GetSkillsPromptResponse{
-			Body: &skillruntimeSpec.GetSkillsPromptResponseBody{},
+		return &GetSkillsPromptResponse{
+			Body: &GetSkillsPromptResponseBody{},
 		}, nil
 	}
 
@@ -379,15 +378,15 @@ func (s *SkillRuntime) GetSkillsPrompt(
 	if err != nil {
 		return nil, err
 	}
-	return &skillruntimeSpec.GetSkillsPromptResponse{
-		Body: &skillruntimeSpec.GetSkillsPromptResponseBody{Prompt: prompt},
+	return &GetSkillsPromptResponse{
+		Body: &GetSkillsPromptResponseBody{Prompt: prompt},
 	}, nil
 }
 
 func (s *SkillRuntime) ListRuntimeSkills(
 	ctx context.Context,
-	req *skillruntimeSpec.ListRuntimeSkillsRequest,
-) (*skillruntimeSpec.ListRuntimeSkillsResponse, error) {
+	req *ListRuntimeSkillsRequest,
+) (*ListRuntimeSkillsResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
@@ -397,9 +396,9 @@ func (s *SkillRuntime) ListRuntimeSkills(
 
 	filterRequest := req.Body.Filter
 	if len(filterRequest.AllowArtifacts) == 0 {
-		return &skillruntimeSpec.ListRuntimeSkillsResponse{
-			Body: &skillruntimeSpec.ListRuntimeSkillsResponseBody{
-				Skills: []skillruntimeSpec.RuntimeSkillListItem{},
+		return &ListRuntimeSkillsResponse{
+			Body: &ListRuntimeSkillsResponseBody{
+				Skills: []RuntimeSkillListItem{},
 			},
 		}, nil
 	}
@@ -424,9 +423,9 @@ func (s *SkillRuntime) ListRuntimeSkills(
 		return nil, err
 	}
 	if len(resolved.AllowDefs) == 0 {
-		return &skillruntimeSpec.ListRuntimeSkillsResponse{
-			Body: &skillruntimeSpec.ListRuntimeSkillsResponseBody{
-				Skills: []skillruntimeSpec.RuntimeSkillListItem{},
+		return &ListRuntimeSkillsResponse{
+			Body: &ListRuntimeSkillsResponseBody{
+				Skills: []RuntimeSkillListItem{},
 			},
 		}, nil
 	}
@@ -459,14 +458,14 @@ func (s *SkillRuntime) ListRuntimeSkills(
 		}
 	}
 
-	items := make([]skillruntimeSpec.RuntimeSkillListItem, 0, len(records))
+	items := make([]RuntimeSkillListItem, 0, len(records))
 	for _, record := range records {
 		ref, found := resolved.DefToArtifacts[record.Def]
 		if !found {
 			continue
 		}
 		_, isActive := active[record.Def]
-		items = append(items, skillruntimeSpec.RuntimeSkillListItem{
+		items = append(items, RuntimeSkillListItem{
 			SkillRef:       ref,
 			Type:           record.Def.Type,
 			Name:           record.Def.Name,
@@ -487,15 +486,15 @@ func (s *SkillRuntime) ListRuntimeSkills(
 		return artifactRefKey(items[left].SkillRef) <
 			artifactRefKey(items[right].SkillRef)
 	})
-	return &skillruntimeSpec.ListRuntimeSkillsResponse{
-		Body: &skillruntimeSpec.ListRuntimeSkillsResponseBody{Skills: items},
+	return &ListRuntimeSkillsResponse{
+		Body: &ListRuntimeSkillsResponseBody{Skills: items},
 	}, nil
 }
 
 func (s *SkillRuntime) RenderSkill(
 	ctx context.Context,
-	req *skillruntimeSpec.RenderSkillRequest,
-) (*skillruntimeSpec.RenderSkillResponse, error) {
+	req *RenderSkillRequest,
+) (*RenderSkillResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
@@ -508,7 +507,7 @@ func (s *SkillRuntime) RenderSkill(
 
 	resolved, found := s.resolveArtifactSkill(ctx, req.Body.Artifact)
 	if !found {
-		return nil, skillruntimeSpec.ErrSkillNotFound
+		return nil, ErrSkillNotFound
 	}
 	out, err := s.runtime.RenderSkill(ctx, agentskills.RenderSkillParams{
 		Def:       resolved.Definition,
@@ -517,8 +516,8 @@ func (s *SkillRuntime) RenderSkill(
 	if err != nil {
 		return nil, err
 	}
-	return &skillruntimeSpec.RenderSkillResponse{
-		Body: &skillruntimeSpec.RenderSkillResponseBody{
+	return &RenderSkillResponse{
+		Body: &RenderSkillResponseBody{
 			Text:             out.Text,
 			Insert:           out.Insert,
 			Name:             out.Name,
