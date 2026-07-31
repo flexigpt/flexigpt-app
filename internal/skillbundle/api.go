@@ -577,7 +577,7 @@ func (a *API) AdoptSkill(
 		ExpectedCatalogRevision: request.ExpectedCatalogRevision,
 		Name:                    request.Name,
 		Enabled:                 request.Enabled,
-		Data:                    EmptyArtifactData(),
+		Data:                    emptyArtifactData(),
 	})
 }
 
@@ -601,7 +601,7 @@ func (a *API) PinSkill(
 		Binding:                    request.Binding,
 		Name:                       request.Name,
 		Enabled:                    request.Enabled,
-		Data:                       EmptyArtifactData(),
+		Data:                       emptyArtifactData(),
 	})
 }
 
@@ -1328,7 +1328,7 @@ func (a *API) completeManagedSkillCreate(
 		ctx,
 		value.Ref(),
 		value.Revision,
-		EmptyArtifactData(),
+		emptyArtifactData(),
 	)
 	if err == nil {
 		result.Artifact = updated
@@ -1562,7 +1562,7 @@ func (skillArtifactPolicy) Derive(
 	return artifact.Draft{
 		Name:    value.DisplayName,
 		Enabled: true,
-		Data:    EmptyArtifactData(),
+		Data:    emptyArtifactData(),
 	}, true, nil
 }
 
@@ -1847,4 +1847,8 @@ func pendingManagedSkillPurgeError(ref artifact.ArtifactRef, cause error) error 
 		ref.ArtifactID,
 		cause,
 	)
+}
+
+func emptyArtifactData() json.RawMessage {
+	return json.RawMessage(jsonutil.EmptyObject)
 }

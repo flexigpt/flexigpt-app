@@ -94,7 +94,3 @@ func ValidateCollectionData(value CollectionData) error {
 	}
 	return nil
 }
-
-func EmptyArtifactData() json.RawMessage {
-	return json.RawMessage(jsonutil.EmptyObject)
-}
