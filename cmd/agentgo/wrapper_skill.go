@@ -192,6 +192,19 @@ func (w *SkillBundleWrapper) ListSkillBundles(
 	})
 }
 
+func (w *SkillBundleWrapper) EnsureBuiltInSkillsForRoot(
+	rootID basespec.RootID,
+) (skillbundle.Bundle, error) {
+	return middleware.WithRecoveryResp(
+		func() (skillbundle.Bundle, error) {
+			return w.api.EnsureEmbeddedBuiltInsForRoot(
+				context.Background(),
+				rootID,
+			)
+		},
+	)
+}
+
 func (w *SkillBundleWrapper) UpdateSkillBundle(
 	request *skillbundle.UpdateBundleRequest,
 ) (skillbundle.Bundle, error) {

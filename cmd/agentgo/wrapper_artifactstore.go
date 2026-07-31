@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
@@ -13,8 +15,9 @@ import (
 )
 
 type ArtifactStoreWrapper struct {
-	api        *artifactstore.API
-	components *system.Components
+	api           *artifactstore.API
+	components    *system.Components
+	onRootCreated func(context.Context, basespec.RootID) error
 }
 
 func InitArtifactStoreWrapper(
@@ -62,10 +65,26 @@ func (w *ArtifactStoreWrapper) CreateArtifactRoot(
 ) (*artifactstore.CreateArtifactRootResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*artifactstore.CreateArtifactRootResponse, error) {
-			return w.api.CreateArtifactRoot(
-				context.Background(),
-				request,
-			)
+			ctx := context.Background()
+			response, err := w.api.CreateArtifactRoot(ctx, request)
+			if err != nil {
+				return nil, err
+			}
+			if response == nil || response.Body == nil {
+				return nil, errors.New(
+					"artifact root creation returned an empty response",
+				)
+			}
+			if w.onRootCreated != nil {
+				if err := w.onRootCreated(ctx, response.Body.ID); err != nil {
+					return response, fmt.Errorf(
+						"artifact Root %q was created, but built-in Skill provisioning remains incomplete: %w",
+						response.Body.ID,
+						err,
+					)
+				}
+			}
+			return response, nil
 		},
 	)
 }

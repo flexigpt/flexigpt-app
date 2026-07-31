@@ -3,7 +3,6 @@ package source
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -130,16 +129,13 @@ func (r *Registry) ResolveLocalPath(
 			value.Kind,
 		)
 	}
-	location, err := resolver.ResolveLocalPath(ctx, value.Clone(), locator)
+	location, err := resolver.ResolveLocalPath(
+		ctx,
+		value.Clone(),
+		locator,
+	)
 	if err != nil {
 		return "", err
-	}
-	location = filepath.Clean(location)
-	if !filepath.IsAbs(location) {
-		return "", fmt.Errorf(
-			"%w: source adapter returned a non-absolute local path",
-			basespec.ErrInvalid,
-		)
 	}
 	return location, nil
 }

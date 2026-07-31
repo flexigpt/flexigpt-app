@@ -773,7 +773,7 @@ func (*packagePartitionProvider) GetPartitionDir(
 	if parent == "." {
 		return "", nil
 	}
-	return filepath.FromSlash(parent), nil
+	return parent, nil
 }
 
 func (*packagePartitionProvider) ListPartitions(

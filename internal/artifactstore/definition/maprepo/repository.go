@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 	"sync"
 
@@ -241,7 +241,7 @@ func (*definitionPartitionProvider) GetPartitionDir(
 			basespec.ErrInvalid,
 		)
 	}
-	return filepath.Join(
+	return path.Join(
 		string(attributes.RootID),
 		"sha256",
 		hexDigest[:2],

@@ -118,51 +118,104 @@ func (s *SkillRuntime) ResyncCollection(
 		return err
 	}
 
-	values, err := s.resolver.ListCollectionSkills(ctx, ref)
-	if err != nil {
-		s.rtResyncMu.Lock()
-		defer s.rtResyncMu.Unlock()
-		return s.failClosedCollectionLocked(ctx, ref, err)
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
+	if s.isClosed() {
+		return basespec.ErrClosed
 	}
 
+	refs := make([]collection.CollectionRef, 0, len(s.managedCollections)+1)
+	for current := range s.managedCollections {
+		refs = append(refs, current)
+	}
+	if _, exists := s.managedCollections[ref]; !exists {
+		refs = append(refs, ref)
+	}
+	sort.Slice(refs, func(left, right int) bool {
+		if refs[left].RootID != refs[right].RootID {
+			return refs[left].RootID < refs[right].RootID
+		}
+		return refs[left].CollectionID < refs[right].CollectionID
+	})
+
+	collections := make(
+		map[collection.CollectionRef]runtimeDesiredView,
+		len(refs),
+	)
+	for _, currentRef := range refs {
+		values, err := s.resolver.ListCollectionSkills(ctx, currentRef)
+		if err != nil {
+			if currentRef == ref {
+				return s.failClosedCollectionLocked(ctx, ref, err)
+			}
+			slog.Warn(
+				"dropping unavailable Skill runtime Collection",
+				"rootID", currentRef.RootID,
+				"collectionID", currentRef.CollectionID,
+				"error", err,
+			)
+			continue
+		}
+
+		desired, err := desiredCollectionView(currentRef, values)
+		if err != nil {
+			if currentRef == ref {
+				return s.failClosedCollectionLocked(ctx, ref, err)
+			}
+			slog.Warn(
+				"dropping invalid Skill runtime Collection",
+				"rootID", currentRef.RootID,
+				"collectionID", currentRef.CollectionID,
+				"error", err,
+			)
+			continue
+		}
+		collections[currentRef] = desired
+	}
+
+	return s.reconcileCollectionsLocked(
+		ctx,
+		collections,
+		runtimeApplyStrict,
+	)
+}
+
+func desiredCollectionView(
+	ref collection.CollectionRef,
+	values []ResolvedArtifactSkill,
+) (runtimeDesiredView, error) {
 	desired := newRuntimeDesiredView()
 	names := make(map[string]artifact.ArtifactRef, len(values))
 	for _, value := range values {
 		if err := value.Validate(); err != nil {
-			s.rtResyncMu.Lock()
-			nErr := s.failClosedCollectionLocked(ctx, ref, err)
-			s.rtResyncMu.Unlock()
-			return nErr
+			return runtimeDesiredView{}, err
+		}
+		if value.Collection != ref {
+			return runtimeDesiredView{}, fmt.Errorf(
+				"%w: runtime Skill belongs to another Collection",
+				basespec.ErrInvalid,
+			)
 		}
 		if previous, exists := names[value.Definition.Name]; exists &&
 			previous != value.Artifact {
-			err := fmt.Errorf(
+			return runtimeDesiredView{}, fmt.Errorf(
 				"%w: collection %q has multiple runtime Skills named %q",
 				basespec.ErrConflict,
 				ref.CollectionID,
 				value.Definition.Name,
 			)
-			s.rtResyncMu.Lock()
-			e := s.failClosedCollectionLocked(ctx, ref, err)
-			s.rtResyncMu.Unlock()
-			return e
 		}
 		names[value.Definition.Name] = value.Artifact
-
 		desired.add(value)
 	}
-
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
-
-	if s.isClosed() {
-		return basespec.ErrClosed
-	}
-
-	collections := cloneCollectionDesiredViews(s.managedCollections)
-	collections[ref] = desired
-	return s.reconcileCollectionsLocked(ctx, collections, runtimeApplyStrict)
+	return desired, nil
 }
+
+/*
+The previous ResyncCollection body that resolved only `ref`, cloned
+`managedCollections`, and merged the cached desired view is replaced by the
+code above.
+*/
 
 func (s *SkillRuntime) RemoveCollection(
 	ctx context.Context,
@@ -193,7 +246,7 @@ func (s *SkillRuntime) failClosedCollectionLocked(
 	cause error,
 ) error {
 	collections := cloneCollectionDesiredViews(s.managedCollections)
-	collections[ref] = newRuntimeDesiredView()
+	delete(collections, ref)
 
 	cleanupContext, cancel := context.WithTimeout(
 		context.WithoutCancel(ctx),

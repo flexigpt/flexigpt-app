@@ -38,25 +38,10 @@ const (
 	MaxDiscoveryCandidates = 100_000
 	MaxDiscoveryEntries    = 1_000_000
 	MaxDiscoveryDepth      = 256
-
-	maxPortablePathSegmentBytes = 255
 )
 
-var (
-	identifierPattern = regexp.MustCompile(
-		`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`,
-	)
-
-	windowsReservedPathNames = map[string]struct{}{
-		"CON":  {},
-		"PRN":  {},
-		"AUX":  {},
-		"NUL":  {},
-		"COM1": {}, "COM2": {}, "COM3": {}, "COM4": {}, "COM5": {},
-		"COM6": {}, "COM7": {}, "COM8": {}, "COM9": {},
-		"LPT1": {}, "LPT2": {}, "LPT3": {}, "LPT4": {}, "LPT5": {},
-		"LPT6": {}, "LPT7": {}, "LPT8": {}, "LPT9": {},
-	}
+var identifierPattern = regexp.MustCompile(
+	`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`,
 )
 
 type (
@@ -206,56 +191,13 @@ func ValidateSubresourceLocator(value SubresourceLocator) error {
 }
 
 // ValidatePortableLocator applies the platform-independent locator rules used
-// for managed content and portable packages.
+// for managed content and portable packages. Platform-specific filename
+// mapping and collision handling belong to the storage implementation.
 //
 // Generic Source locators can describe an existing platform-specific Source.
-// Portable locators are stricter because the same package must not acquire a
-// different meaning after being moved between Unix and Windows.
+// Portable locators remain bounded slash-separated relative references.
 func ValidatePortableLocator(value Locator, allowRoot bool) error {
-	if err := ValidateLocator(value, allowRoot); err != nil {
-		return err
-	}
-	if value == "." {
-		return nil
-	}
-
-	for segment := range strings.SplitSeq(string(value), "/") {
-		if len(segment) > maxPortablePathSegmentBytes {
-			return fmt.Errorf(
-				"%w: portable locator segment %q exceeds %d bytes",
-				ErrInvalid,
-				segment,
-				maxPortablePathSegmentBytes,
-			)
-		}
-		if strings.ContainsAny(segment, `<>:"|?*`) {
-			return fmt.Errorf(
-				"%w: portable locator segment %q contains a platform-disallowed filename character",
-				ErrInvalid,
-				segment,
-			)
-		}
-		if strings.TrimRight(segment, " .") != segment {
-			return fmt.Errorf(
-				"%w: portable locator segment %q ends in a space or dot",
-				ErrInvalid,
-				segment,
-			)
-		}
-
-		base := segment
-		if before, _, found := strings.Cut(segment, "."); found {
-			base = before
-		}
-		if _, reserved := windowsReservedPathNames[strings.ToUpper(base)]; reserved {
-			return fmt.Errorf(
-				"%w: portable locator segment %q is a reserved platform name",
-				ErrInvalid,
-				segment,
-			)
-		}
-	}
-	return nil
+	return ValidateLocator(value, allowRoot)
 }
 
 func ValidatePortableSubresourceLocator(value SubresourceLocator) error {

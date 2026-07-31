@@ -3,7 +3,6 @@ package source
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
@@ -50,10 +49,6 @@ func NormalizeManagedPackagePublication(
 	output := input
 	output.Files = make([]ManagedPackageFile, len(input.Files))
 	seen := make(map[basespec.Locator]struct{}, len(input.Files))
-	seenCaseFolded := make(
-		map[string]basespec.Locator,
-		len(input.Files),
-	)
 	var total int64
 
 	for index, file := range input.Files {
@@ -75,17 +70,6 @@ func NormalizeManagedPackagePublication(
 			)
 		}
 		seen[file.Locator] = struct{}{}
-
-		caseFolded := strings.ToLower(string(file.Locator))
-		if previous, duplicate := seenCaseFolded[caseFolded]; duplicate {
-			return ManagedPackagePublication{}, fmt.Errorf(
-				"%w: managed package files %q and %q collide on case-insensitive filesystems",
-				basespec.ErrInvalid,
-				previous,
-				file.Locator,
-			)
-		}
-		seenCaseFolded[caseFolded] = file.Locator
 
 		if int64(len(file.Content)) > basespec.MaxScanBytes-total {
 			return ManagedPackagePublication{}, fmt.Errorf(

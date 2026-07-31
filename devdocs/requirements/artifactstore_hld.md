@@ -413,11 +413,15 @@ Portable locator rules include:
 - No absolute paths.
 - No `.` or `..` segments.
 - No archive escape.
-- Deterministic case and normalization rules defined by the package format.
+- Bounded UTF-8 path segments with no control characters.
 
 Absolute filesystem paths may be supplied to a local import request, but they
 become private Source configuration and must not be written into portable
 definitions.
+
+Platform-specific filename mapping, case collision handling, permissions, and
+symlink behavior belong to the selected Source or MapStore implementation.
+Generic Artifact and feature layers must not duplicate those policies.
 
 An HTTP or HTTPS URI is acquisition input, not permission for discovery to
 perform arbitrary network access. A resolver must enforce scheme, redirect,
@@ -716,6 +720,8 @@ boundary. Artifact Store does not layer another private-directory, permission,
 symlink, or platform-specific durability abstraction around MapStore-managed
 definition and package payload files. Feature code must not inspect
 MapStore-managed paths or recreate MapStore containment rules.
+Portable locator validation therefore remains platform-neutral. Storage
+adapters reject or map platform-specific collisions when materializing content.
 This avoids inheriting the broad project traversal exclusions used by external filesystem
 Sources. This preserves generation-based runtime freshness for normal package
 resources and scripts.
@@ -800,6 +806,13 @@ existing local lifecycle rather than introduce another persistence model.
 - Keep public mutations feature-aware when Collection meaning matters.
 - Treat direct movement as a separate product decision, not an implied side
   effect of export or import.
+- Keep Agent Skills registration maps process-local and derived. Every
+  reconciliation must re-read Artifact Store before changing registrations;
+  cached Collection membership must never decide durable eligibility.
+- Keep native path validation in Source adapters. Generic Source Runtime,
+  Workspace, Skill Bundle, and Artifact projection layers must not clean,
+  normalize, resolve symlinks, or apply platform-specific path rules a second
+  time.
 - Define an explicit managed-Source physical-retention policy for Source purge.
   Current metadata purge intentionally does not add an unsafe independent
   recursive filesystem delete after a database transaction. Any future

@@ -73,7 +73,7 @@ func (a *API) LoadRuntimeSkill(
 		)
 	}
 
-	snapshot, err := catalog.ReadCurrent(ctx, a.dependencies.Catalogs, bundleRef)
+	snapshot, err := a.currentBundleCatalog(ctx, bundle)
 	if err != nil {
 		return RuntimeSkill{}, err
 	}

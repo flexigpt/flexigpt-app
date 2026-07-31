@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -394,13 +393,6 @@ func (r *runtime) ResolveLocalPath(
 	)
 	if err != nil {
 		return "", err
-	}
-	location = filepath.Clean(location)
-	if !filepath.IsAbs(location) {
-		return "", fmt.Errorf(
-			"%w: source runtime returned a non-absolute local path",
-			basespec.ErrInvalid,
-		)
 	}
 	return location, nil
 }

@@ -510,6 +510,7 @@ tool.
 | ---------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SKILL.md` parsing and validation  | Present                             | `agentskills-go` is used by managed creation and Workspace discovery.                                                                                                                                                                                                       |
 | Managed Skill document creation    | Present                             | `skillbundle.CreateManagedSkill` uses the shared `skillartifact` decoder, pins, publishes through the managed Source capability, refreshes, and resolves an Artifact. Managed deletion preflights revision state and reports retry-required source-side partial completion. |
+| Structured managed authoring       | Present                             | Callers may supply an Agent Skills `SkillDocument`; serialization is delegated to `agentskills-go`. Raw `SKILL.md` and complete package inputs remain supported.                                                                                                            |
 | Managed Artifact Source            | Present at platform layer           | Artifact Store owns MapStore-backed staged writable Source publication and removal. Skill Bundle code must delegate to this capability rather than create package files itself.                                                                                             |
 | Skill bundle Collection            | Present                             | `skill.bundle` uses normal Artifact Store Collections, attachments, catalog publication, Artifacts, enablement, and revisions.                                                                                                                                              |
 | Portable Skill Bundle Definition   | Present, linked-manifest codec      | `skill.bundle.v1` provides canonical shareable JSON over `CollectionDefinition` with integrity-pinned raw `SKILL.md` entrypoints. It is not yet a self-contained package export, persisted transfer record, importer, or closure assembler.                                 |
@@ -519,11 +520,11 @@ tool.
 | Built-in package upgrades          | Deferred                            | Bootstrap is idempotent add-missing setup, not an in-place package upgrade protocol. Changed built-in package content requires an explicit versioned upgrade workflow.                                                                                                      |
 | Built-in normal Collection state   | Present                             | Built-in enablement uses normal Collection and Artifact enablement.                                                                                                                                                                                                         |
 | Agent Skills runtime               | Present                             | Artifact router resolution, registration, sessions, prompts, rendering, resources, and scripts are Artifact-backed.                                                                                                                                                         |
-| Managed operation recovery         | Present                             | A pending managed Skill retains immutable source revision and generation preconditions. A retry recovers a package write whose Source metadata acknowledgement was interrupted without adding a second generation cache.                                                    |
+| Managed operation recovery         | Present                             | A pending managed Skill retains source revision and generation operation preconditions. A retry refreshes first, then performs at most one revision-checked rebase when an unrelated package advanced the same Source. Preconditions are removed after resolution.          |
 | Runtime source verification        | Present                             | Runtime handoff verifies current catalog occurrence, Source generation, and raw `SKILL.md` content digest through Source snapshots, then delegates native package parsing, resource access, sandboxing, and script execution to `agentskills-go`.                           |
 | Script execution policy            | Present and explicit                | Artifact-backed runtime defaults to scripts disabled. Explicit application composition may enable scripts, while `agentskills-go` and `llmtools-go` retain all execution and sandbox policy.                                                                                |
 | Artifact-backed backend references | Present                             | Assistant presets, conversations, inference, Workspace, and Skill Runtime use Artifact-backed Skill references.                                                                                                                                                             |
-| Runtime synchronization state      | Present and derived only            | Artifact Store is durable authority. `SkillRuntime` retains only process-local provider registrations; Workspace and Skill Bundle wrappers do not mirror managed Collection membership.                                                                                     |
+| Runtime synchronization state      | Present and derived only            | Artifact Store is durable authority. Before reconciliation, `SkillRuntime` re-reads every process-local Collection partition and drops unavailable partitions. Its maps are only the inventory required to remove and reindex Agent Skills provider registrations.          |
 | Runtime synchronization trigger    | Present and demand-driven           | A selected Artifact is resolved from Artifact Store and reconciled into Agent Skills runtime only when runtime work needs it. No observer or feature-owned membership cache exists.                                                                                         |
 | External Skill attachment route    | Present                             | A filesystem Source is created through Artifact Store administration, then attached through the typed Skill Bundle boundary and refreshed into `agent.skill` Artifacts.                                                                                                     |
 | Managed operation idempotency      | Present                             | Managed creation uses an Artifact Store-owned hidden idempotency key. Pending source preconditions are removed after the requested Artifact resolves.                                                                                                                       |
@@ -650,6 +651,12 @@ release-complete:
 
 - [x] Keep `internal/skillstore` reference-only. Normal startup does not open,
       mutate, register, or resolve it.
+- [x] Keep Skill Bundle listing read-only. Existing Roots are bootstrapped at
+      startup and new Roots use an explicit application-composition workflow.
+- [x] Revalidate discovery-plan and decoder fingerprints before Skill adoption,
+      portable linked-manifest generation, or runtime handoff.
+- [x] Use `v1` for the inactive reference Skill Store schema label so all clean
+      persistence contracts use one version vocabulary.
 - [ ] Remove the reference-only standalone Skill Store package after migration
       verification is complete. Active application state already uses the clean
       `*_v1` namespaces as the breaking persistence boundary.
@@ -682,6 +689,18 @@ work after the breaking core migration. The canonical linked manifest is a
 shareable JSON descriptor, not a self-contained export. Their generic
 requirements belong to Artifact Store. This document retains only the
 Skill-specific package, manifest, and closure rules.
+
+Two parity items remain before the old package can be deleted:
+
+- Add a typed installed-Skill management projection with portable document
+  metadata, local display metadata, local user tags, diagnostics, filtering,
+  and pagination. Returning only raw Artifact Records does not replace the old
+  management list and get behavior.
+- Add an Agent Skills session allow-list capability upstream. Prompt filtering
+  currently limits what is advertised, but the attached `agentskills-go`
+  session API does not persist an allowed-Skill set for `skills-load`. This
+  must be fixed in `agentskills-go`, not recreated as an application-side
+  sandbox or parallel session catalog.
 
 Typed attachment update and detach workflows remain the next local-management
 work item. They must define role-specific cleanup behavior before exposing
@@ -721,8 +740,13 @@ the backend migration clean:
   that Source adapter, not to Skill Bundle, Workspace, MapStore, or Agent
   Skills runtime code.
 - A Root created after startup converges its built-in Skill bundle through the
-  idempotent feature bootstrap path without a Root observer or feature-owned
-  membership cache.
+  explicit application-composition bootstrap path without a Root observer or
+  feature-owned membership cache. Listing a bundle must not mutate state.
+- A decoder or discovery-plan revision change makes Skill adoption, runtime
+  projection, and linked portable JSON generation return catalog stale until
+  refresh succeeds.
+- A pending managed Skill can rebase after another package advances the same
+  managed Source and cannot remain permanently stuck on its first revision.
 - Retiring a built-in Collection must not cause bootstrap, listing, or startup
   to recreate it or fail because its durable bootstrap key remains reserved.
 - MapStore-managed definition files are accessed only through MapStore. Feature

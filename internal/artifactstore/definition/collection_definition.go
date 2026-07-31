@@ -224,7 +224,6 @@ func (d CollectionDefinition) Validate() error {
 	}
 
 	seen := make(map[string]struct{}, len(d.Members))
-	seenPortablePaths := make(map[string]struct{}, len(d.Members))
 	for index, member := range d.Members {
 		if err := member.Validate(); err != nil {
 			return fmt.Errorf("portable collection members[%d]: %w", index, err)
@@ -238,20 +237,6 @@ func (d CollectionDefinition) Validate() error {
 			)
 		}
 		seen[identity] = struct{}{}
-
-		if member.Locator == "" {
-			continue
-		}
-		portablePath := strings.ToLower(string(member.Locator)) + "\x00" +
-			strings.ToLower(string(member.SubresourceLocator))
-		if _, duplicate := seenPortablePaths[portablePath]; duplicate {
-			return fmt.Errorf(
-				"%w: portable collection members contain a case-ambiguous locator at index %d",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-		seenPortablePaths[portablePath] = struct{}{}
 	}
 	return nil
 }

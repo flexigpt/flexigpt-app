@@ -335,7 +335,7 @@ func (cc *ConversationCollection) ListConversations(
 			continue
 		}
 		if convo.SchemaVersion != spec.ConversationSchemaVersion {
-			// Old conversations are intentionally not interpreted as v2.
+			// Older conversations are intentionally not interpreted as v1.
 			continue
 		}
 

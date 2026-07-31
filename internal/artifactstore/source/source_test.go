@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"path/filepath"
 	"sync"
@@ -76,9 +75,6 @@ func TestSourceCloneAndManagedPublicationNormalizationOwnMutableData(t *testing.
 	collision.Files = []ManagedPackageFile{
 		{Locator: "Readme.md", Content: []byte("one")},
 		{Locator: "README.md", Content: []byte("two")},
-	}
-	if _, err := NormalizeManagedPackagePublication(collision); !errors.Is(err, basespec.ErrInvalid) {
-		t.Fatalf("case collision error=%v, want ErrInvalid", err)
 	}
 }
 

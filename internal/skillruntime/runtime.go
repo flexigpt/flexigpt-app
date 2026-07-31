@@ -433,9 +433,6 @@ func (s *SkillRuntime) resolveArtifactSkillWithResync(
 	if err != nil {
 		return ResolvedArtifactSkill{}, false
 	}
-	if s.registrationMatches(value) {
-		return value, true
-	}
 
 	if resynced == nil {
 		if err := s.ResyncCollection(ctx, value.Collection); err != nil {
