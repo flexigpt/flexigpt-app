@@ -46,7 +46,7 @@ func Open(
 		_ = db.Close()
 		return nil, fmt.Errorf("ping artifact metadata database: %w", err)
 	}
-	if err := initializeSchemaV2(ctx, db); err != nil {
+	if err := initializeSchema(ctx, db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-func initializeSchemaV2(
+func initializeSchema(
 	ctx context.Context,
 	db *sql.DB,
 ) error {
@@ -76,7 +76,7 @@ func initializeSchemaV2(
 		`SELECT EXISTS(
 			SELECT 1
 			FROM sqlite_master
-			WHERE type = 'table' AND name = 'artifact_store_v2'
+			WHERE type = 'table' AND name = 'artifact_store_v1'
 		)`,
 	).Scan(&markerExists); err != nil {
 		return err
@@ -86,7 +86,7 @@ func initializeSchemaV2(
 	}
 
 	if _, err := tx.ExecContext(ctx, schema); err != nil {
-		return fmt.Errorf("initialize Artifact Store v2 schema: %w", err)
+		return fmt.Errorf("initialize Artifact Store schema: %w", err)
 	}
 	return tx.Commit()
 }

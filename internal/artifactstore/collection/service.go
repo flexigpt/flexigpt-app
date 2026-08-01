@@ -142,7 +142,7 @@ func (s *Service) Create(
 
 	existing, err := s.repository.Get(ctx, value.Ref())
 	if err != nil {
-		// Collection IDs are globally unique in the v2 namespace. A matching
+		// Collection IDs are globally unique in the namespace. A matching
 		// ID in another Root remains an ID conflict, not a not-found result.
 		return Collection{}, nil, createErr
 	}

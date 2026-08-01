@@ -6,11 +6,11 @@ package sqlite
 // There is no migration ledger and no compatibility inspection or adaptation
 // for earlier metadata databases.
 const schema = `
-CREATE TABLE artifact_store_v2 (
+CREATE TABLE artifact_store_v1 (
 	singleton INTEGER PRIMARY KEY CHECK (singleton = 1)
 );
 
-INSERT INTO artifact_store_v2(singleton) VALUES (1);
+INSERT INTO artifact_store_v1(singleton) VALUES (1);
 
 CREATE TABLE artifact_roots (
 	id TEXT PRIMARY KEY,

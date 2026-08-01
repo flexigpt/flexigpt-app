@@ -25,7 +25,7 @@ const (
 	// add a second Workspace-owned persistence directory. This is deliberately
 	// a clean namespace: startup must not locate, import, copy, or migrate any
 	// legacy Workspace or Artifact Store directory into it.
-	artifactStoreDirectoryName = "artifacts_v2"
+	artifactStoreDirectoryName = "artifacts_v1"
 	appDirectoryMode           = 0o700
 )
 

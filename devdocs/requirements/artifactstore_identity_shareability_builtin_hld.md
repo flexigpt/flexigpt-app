@@ -43,12 +43,12 @@ Explicit creation follows this contract:
 
 Creation intent is intentionally narrower than all mutable fields:
 
-| Entity | Creation intent |
-| --- | --- |
-| Root | Root ID, initial display name, initial description |
-| Source | Root ID, Source ID, Source kind, normalized private configuration |
-| Collection | Root ID, Collection ID, Collection kind |
-| Artifact | Root ID, Artifact ID, Collection ID, binding, kind, adoption mode, name |
+| Entity     | Creation intent                                                         |
+| ---------- | ----------------------------------------------------------------------- |
+| Root       | Root ID, initial display name, initial description                      |
+| Source     | Root ID, Source ID, Source kind, normalized private configuration       |
+| Collection | Root ID, Collection ID, Collection kind                                 |
+| Artifact   | Root ID, Artifact ID, Collection ID, binding, kind, adoption mode, name |
 
 Feature services may impose additional semantic intent. `skill.bundle`, for
 example, validates portable logical bundle metadata. Protected built-in setup
@@ -186,7 +186,7 @@ The trusted installer sequence is:
 
 The installer never adopts, copies, renames, or migrates dynamic built-in
 records into canonical topology. Legacy Artifact Store metadata is rejected by
-the clean `artifacts_v2` namespace gate. A manually contaminated `artifacts_v2`
+the clean `artifacts_v1` namespace gate. A manually contaminated `artifacts_v1`
 installation fails with conflict and requires an explicit offline repair tool.
 
 ## 7. Built-in semantic references
@@ -231,8 +231,6 @@ used by app-owned assistant, MCP, and runtime-default integrations through
 semantic built-in references.
 
 ## 9. Storage migration boundary
-
-Artifact Store uses a clean `artifacts_v2` namespace.
 
 - There is no schema migration ledger.
 - Artifact Store does not inspect, classify, migrate, or adapt legacy Artifact
