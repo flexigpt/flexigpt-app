@@ -11,7 +11,7 @@ require (
 	github.com/flexigpt/mapstore-go v0.3.5
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/uuid v1.6.0
-	github.com/modelcontextprotocol/go-sdk v1.7.0-pre.3
+	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/wailsapp/wails/v2 v2.13.0
 	golang.org/x/oauth2 v0.36.0
 )
