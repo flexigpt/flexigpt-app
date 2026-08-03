@@ -108,10 +108,17 @@ It declares:
 
 - One protected Root ID.
 - One managed Source ID.
-- Static Collection IDs for logical bundles.
-- Static Artifact IDs for logical Skills.
-- Logical names, optional logical versions, package locations, enablement
-  defaults, and a registry schema version.
+- Static local Collection IDs.
+- Static local Artifact IDs.
+- References to embedded portable Collection packages.
+- A mapping from each static Artifact ID to one portable Collection member.
+- Local installation defaults and a registry schema version.
+
+Portable Collection logical names, versions, display metadata, member
+locators, member digests, and Skill semantics belong to the portable Collection
+package and its `SKILL.md` files. The registry must not duplicate those
+portable fields. A registry reference to a portable payload is an installer
+input, not portable package content.
 
 Artifact Store owns only the generic protected topology declaration:
 
@@ -171,18 +178,24 @@ user Roots as installation targets.
 The trusted installer sequence is:
 
 1. Load and validate embedded application registry metadata.
-2. Validate every registry UUIDv7 value and every package directory against
-   the injected embedded or external `fs.FS`.
+2. Validate every registry UUIDv7 value, every referenced portable Collection
+   package, every relative member locator, and every declared content digest
+   against the injected embedded or external `fs.FS`.
 3. Ensure the one declared protected Root and managed Source.
 4. Reject an active `skill.bundle` in the protected Root that uses a declared
    built-in logical bundle name with a non-registry Collection ID.
 5. Ensure each static built-in Collection and attachment topology.
 6. Reject an undeclared active `agent.skill` Artifact in a canonical built-in
    Skill Bundle.
-7. Ensure each static Artifact and its managed package through the protected
-   package publication path.
+7. Materialize each complete portable Collection package into the shared
+   managed Source and ensure each static Artifact against its derived
+   source-relative member locator.
 8. Refresh only when the catalog is unavailable or stale. A current catalog
    must not be republished merely because the application restarted.
+
+When one protected managed Source contains several portable Collection
+packages, each Collection attachment must carry a Collection-owned local
+discovery scope. The Source itself must not identify or select Collections.
 
 The installer never adopts, copies, renames, or migrates dynamic built-in
 records into canonical topology. Legacy Artifact Store metadata is rejected by

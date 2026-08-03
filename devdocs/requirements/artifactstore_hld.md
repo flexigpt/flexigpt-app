@@ -227,6 +227,15 @@ The invariant is:
 
     Source.RootID == Collection.RootID
 
+A Source is a generic byte provider. It must not encode Collection kind,
+portable logical name, bundle identity, Artifact identity, or source scope
+policy. A Collection owns the semantic interpretation of Source content
+through its attachment data and feature discovery plan.
+
+A Source may physically contain several portable Collection packages. The
+Source remains unaware of those packages as semantic entities; Collection
+attachments select their applicable source-relative discovery scope.
+
 Cross-Root reuse requires an explicit clone, import, or future sharing capability.
 
 ### 5.3 Collection
@@ -306,6 +315,13 @@ It contains:
 
 Artifact Store validates structure and containment. The consumer validates role
 meaning and attachment data.
+
+Attachment data is local mount configuration. It may define a source-relative
+discovery root, role-specific policy, or other consumer-owned information.
+It is not portable Collection content and must not be copied into a Portable
+Collection Definition. For example, a built-in Collection can mount one shared
+managed Source with a local `discoveryRoot` that selects only that Collection's
+portable package directory.
 
 An active Collection attachment cannot be detached or replaced while local
 Artifacts or suppressions still bind to that Source. A feature must first
@@ -777,6 +793,14 @@ built-in Collection only when its catalog is unavailable or stale. Dynamic
 records are never adopted as canonical built-ins. A manually contaminated
 clean directory is an operational failure requiring explicit offline repair,
 not a migration or compatibility workflow.
+
+The built-in registry is application installation metadata only. It contains
+protected local IDs, local defaults, and references to embedded portable
+Collection packages. Portable logical names, versions, display metadata,
+member locators, and member integrity metadata belong only to the portable
+Collection package. A shared built-in Source is a generic managed content
+container; each built-in Collection uses local attachment data to scope
+discovery to its own source-relative package root.
 
 Ordinary managed-package operations reject a protected Root even when a caller
 accidentally carries installer context. A separate protected managed-package

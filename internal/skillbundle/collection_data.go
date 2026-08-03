@@ -7,6 +7,7 @@ import (
 	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -16,10 +17,16 @@ type CollectionData struct {
 	LogicalName             basespec.LogicalName    `json:"logicalName"`
 	LogicalVersion          basespec.LogicalVersion `json:"logicalVersion,omitempty"`
 	Labels                  map[string]string       `json:"labels,omitempty"`
+
+	// PortableDefinitionDigest is local provenance only. It identifies the
+	// canonical portable Collection payload from which this local Collection
+	// was installed without embedding that portable payload in SQLite.
+	PortableDefinitionDigest *cryptoutil.Digest `json:"portableDefinitionDigest,omitempty"`
 }
 
 func (d CollectionData) Clone() CollectionData {
 	d.Labels = maps.Clone(d.Labels)
+	d.PortableDefinitionDigest = cryptoutil.CloneDigest(d.PortableDefinitionDigest)
 	return d
 }
 
@@ -91,6 +98,11 @@ func ValidateCollectionData(value CollectionData) error {
 		Labels:         value.Labels,
 	}); err != nil {
 		return err
+	}
+	if value.PortableDefinitionDigest != nil {
+		if err := cryptoutil.ValidateDigest(*value.PortableDefinitionDigest); err != nil {
+			return err
+		}
 	}
 	return nil
 }

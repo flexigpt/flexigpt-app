@@ -13,6 +13,7 @@ const (
 	PortableBundleSchemaVersion                   = "v1"
 	portableMemberFormat                          = "agent.skill-entrypoint/v1"
 	portableSkillMediaType                        = "text/markdown"
+	PortableCollectionFileName                    = "collection.json"
 	PortableBundleSchemaID      basespec.SchemaID = "skill.bundle.v1"
 )
 

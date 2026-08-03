@@ -45,15 +45,16 @@ type Bundle struct {
 }
 
 type CreateBundleRequest struct {
-	RootID         basespec.RootID
-	CollectionID   basespec.CollectionID
-	DisplayName    string
-	Description    string
-	Enabled        bool
-	LogicalName    basespec.LogicalName
-	LogicalVersion basespec.LogicalVersion
-	Labels         map[string]string
-	Attachments    []AttachmentDraft
+	RootID                   basespec.RootID
+	CollectionID             basespec.CollectionID
+	DisplayName              string
+	Description              string
+	Enabled                  bool
+	LogicalName              basespec.LogicalName
+	LogicalVersion           basespec.LogicalVersion
+	Labels                   map[string]string
+	PortableDefinitionDigest *cryptoutil.Digest
+	Attachments              []AttachmentDraft
 }
 
 type UpdateBundleRequest struct {
@@ -65,9 +66,11 @@ type UpdateBundleRequest struct {
 }
 
 type AttachmentDraft struct {
-	SourceID basespec.SourceID
-	Role     basespec.AttachmentRole
-	Enabled  bool
+	SourceID              basespec.SourceID
+	Role                  basespec.AttachmentRole
+	Enabled               bool
+	DiscoveryRoot         basespec.Locator
+	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
 }
 
 type CreateManagedSkillRequest struct {
@@ -108,14 +111,17 @@ type PinSkillRequest struct {
 }
 
 type BuiltInBundleTopology struct {
-	RootID         basespec.RootID         `json:"-"`
-	CollectionID   basespec.CollectionID   `json:"-"`
-	SourceID       basespec.SourceID       `json:"-"`
-	LogicalName    basespec.LogicalName    `json:"-"`
-	LogicalVersion basespec.LogicalVersion `json:"-"`
-	DisplayName    string                  `json:"-"`
-	Description    string                  `json:"-"`
-	Enabled        bool                    `json:"-"`
+	RootID                   basespec.RootID                        `json:"-"`
+	CollectionID             basespec.CollectionID                  `json:"-"`
+	SourceID                 basespec.SourceID                      `json:"-"`
+	LogicalName              basespec.LogicalName                   `json:"-"`
+	LogicalVersion           basespec.LogicalVersion                `json:"-"`
+	DisplayName              string                                 `json:"-"`
+	Description              string                                 `json:"-"`
+	Enabled                  bool                                   `json:"-"`
+	DiscoveryRoot            basespec.Locator                       `json:"-"`
+	ExpectedMemberDigests    map[basespec.Locator]cryptoutil.Digest `json:"-"`
+	PortableDefinitionDigest cryptoutil.Digest                      `json:"-"`
 }
 
 func New(dependencies Dependencies) (*API, error) {
@@ -751,17 +757,20 @@ func (a *API) EnsureBuiltInBundleTopology(
 		return Bundle{}, err
 	}
 	bundle, err := a.createBundle(ctx, CreateBundleRequest{
-		RootID:         request.RootID,
-		CollectionID:   request.CollectionID,
-		LogicalName:    request.LogicalName,
-		LogicalVersion: request.LogicalVersion,
-		DisplayName:    request.DisplayName,
-		Description:    request.Description,
-		Enabled:        request.Enabled,
+		RootID:                   request.RootID,
+		CollectionID:             request.CollectionID,
+		LogicalName:              request.LogicalName,
+		LogicalVersion:           request.LogicalVersion,
+		DisplayName:              request.DisplayName,
+		Description:              request.Description,
+		Enabled:                  request.Enabled,
+		PortableDefinitionDigest: &request.PortableDefinitionDigest,
 		Attachments: []AttachmentDraft{{
-			SourceID: request.SourceID,
-			Role:     RoleBuiltIn,
-			Enabled:  true,
+			SourceID:              request.SourceID,
+			Role:                  RoleBuiltIn,
+			Enabled:               true,
+			DiscoveryRoot:         request.DiscoveryRoot,
+			ExpectedMemberDigests: request.ExpectedMemberDigests,
 		}},
 	}, true)
 	if err != nil {
@@ -854,11 +863,12 @@ func (a *API) createBundle(
 	}
 
 	data, err := EncodeCollectionData(CollectionData{
-		SchemaVersion:           CollectionSchemaVersion,
-		DiscoveryPolicyRevision: DiscoveryPolicyRevision,
-		LogicalName:             request.LogicalName,
-		LogicalVersion:          request.LogicalVersion,
-		Labels:                  request.Labels,
+		SchemaVersion:            CollectionSchemaVersion,
+		DiscoveryPolicyRevision:  DiscoveryPolicyRevision,
+		LogicalName:              request.LogicalName,
+		LogicalVersion:           request.LogicalVersion,
+		Labels:                   request.Labels,
+		PortableDefinitionDigest: cryptoutil.CloneDigest(request.PortableDefinitionDigest),
 	})
 	if err != nil {
 		return Bundle{}, err
@@ -875,11 +885,22 @@ func (a *API) createBundle(
 		if err := a.validateAttachmentDraft(ctx, request.RootID, draft); err != nil {
 			return Bundle{}, err
 		}
+		attachmentData, err := NewAttachmentData(
+			draft.DiscoveryRoot,
+			draft.ExpectedMemberDigests,
+		)
+		if err != nil {
+			return Bundle{}, err
+		}
+		encodedAttachmentData, err := EncodeAttachmentData(attachmentData)
+		if err != nil {
+			return Bundle{}, err
+		}
 		attachments = append(attachments, collection.AttachmentDraft{
 			SourceID: draft.SourceID,
 			Role:     draft.Role,
 			Enabled:  draft.Enabled,
-			Data:     json.RawMessage(`{}`),
+			Data:     encodedAttachmentData,
 		})
 	}
 
@@ -922,7 +943,11 @@ func bundleCreationIntentMatches(
 		value.Collection.Kind == CollectionKind &&
 		value.Data.LogicalName == request.LogicalName &&
 		value.Data.LogicalVersion == request.LogicalVersion &&
-		maps.Equal(value.Data.Labels, request.Labels)
+		maps.Equal(value.Data.Labels, request.Labels) &&
+		cryptoutil.IsDigestEqual(
+			value.Data.PortableDefinitionDigest,
+			request.PortableDefinitionDigest,
+		)
 }
 
 func builtInBundleTopologyMatches(
@@ -939,11 +964,31 @@ func builtInBundleTopologyMatches(
 	}
 
 	attachment := value.Attachments[0]
-	return attachment.RootID == request.RootID &&
+	expectedAttachment, err := NewAttachmentData(
+		request.DiscoveryRoot,
+		request.ExpectedMemberDigests,
+	)
+	if err != nil {
+		return false
+	}
+	actualAttachment, err := DecodeAttachmentData(attachment.Data)
+	if err != nil {
+		return false
+	}
+	return value.Data.PortableDefinitionDigest != nil &&
+		*value.Data.PortableDefinitionDigest ==
+			request.PortableDefinitionDigest &&
+		attachment.RootID == request.RootID &&
 		attachment.CollectionID == request.CollectionID &&
 		attachment.SourceID == request.SourceID &&
 		attachment.Role == RoleBuiltIn &&
-		attachment.Enabled
+		attachment.Enabled &&
+		actualAttachment.DiscoveryRoot ==
+			expectedAttachment.DiscoveryRoot &&
+		maps.Equal(
+			actualAttachment.ExpectedMemberDigests,
+			expectedAttachment.ExpectedMemberDigests,
+		)
 }
 
 func (a *API) requireBundleMutation(
@@ -998,13 +1043,17 @@ func (a *API) refreshBundle(
 	if err != nil {
 		return refresh.Result{}, err
 	}
+	var policy artifact.Policy = skillArtifactPolicy{
+		ids: a.dependencies.AutoAdoptionIDProvider,
+	}
+	if allowProtected {
+		policy = builtInSkillArtifactPolicy{}
+	}
 	result, err := a.dependencies.Refresh.Refresh(
 		ctx,
 		ref,
 		plan,
-		skillArtifactPolicy{
-			ids: a.dependencies.AutoAdoptionIDProvider,
-		},
+		policy,
 	)
 	if err != nil {
 		return refresh.Result{}, err
@@ -1323,6 +1372,12 @@ func (a *API) validateAttachmentDraft(
 	if err := validateRole(draft.Role); err != nil {
 		return err
 	}
+	if _, err := NewAttachmentData(
+		draft.DiscoveryRoot,
+		draft.ExpectedMemberDigests,
+	); err != nil {
+		return err
+	}
 	value, err := a.dependencies.Sources.Get(ctx, rootID, draft.SourceID)
 	if err != nil {
 		return err
@@ -1336,6 +1391,9 @@ func (a *API) validateAttachment(
 	value collection.Attachment,
 ) error {
 	if err := validateRole(value.Role); err != nil {
+		return err
+	}
+	if _, err := DecodeAttachmentData(value.Data); err != nil {
 		return err
 	}
 	sourceValue, err := a.dependencies.Sources.Get(
@@ -1400,6 +1458,14 @@ func (a *API) discoveryPlan(value Bundle) (discovery.Plan, error) {
 		if !attachment.Enabled {
 			continue
 		}
+		attachmentData, err := DecodeAttachmentData(attachment.Data)
+		if err != nil {
+			return discovery.Plan{}, err
+		}
+		expectedContentDigests, err := attachmentData.SourceExpectedContentDigests()
+		if err != nil {
+			return discovery.Plan{}, err
+		}
 		sourceValue, found := sources[attachment.SourceID]
 		if !found || !sourceValue.Enabled {
 			continue
@@ -1407,17 +1473,18 @@ func (a *API) discoveryPlan(value Bundle) (discovery.Plan, error) {
 		plans = append(plans, discovery.SourcePlan{
 			SourceID: attachment.SourceID,
 			DirectoryRoots: []discovery.DirectoryRoot{{
-				Root:            ".",
+				Root:            attachmentData.DiscoveryRoot,
 				Recursive:       true,
 				IncludePatterns: []string{skillartifact.DefinitionFileName},
 			}},
 			DecoderHints: []discovery.DecoderHint{{
-				Locator:    ".",
+				Locator:    attachmentData.DiscoveryRoot,
 				Recursive:  true,
 				DecoderIDs: []basespec.DecoderID{skillartifact.DecoderID},
 			}},
-			AllowedDecoderIDs: []basespec.DecoderID{skillartifact.DecoderID},
-			Authoritative:     true,
+			ExpectedContentDigests: expectedContentDigests,
+			AllowedDecoderIDs:      []basespec.DecoderID{skillartifact.DecoderID},
+			Authoritative:          true,
 		}.Normalized())
 	}
 
@@ -1571,7 +1638,7 @@ func normalizeManagedSkillFiles(
 
 	normalized, err := source.NormalizeManagedPackagePublication(
 		source.ManagedPackagePublication{
-			Directory: "package",
+			Directory: locatorPackage,
 			Files:     input,
 		},
 	)
@@ -1718,7 +1785,7 @@ func managedSkillPackageDigest(
 ) (cryptoutil.Digest, error) {
 	normalized, err := source.NormalizeManagedPackagePublication(
 		source.ManagedPackagePublication{
-			Directory: "package",
+			Directory: locatorPackage,
 			Files:     files,
 		},
 	)

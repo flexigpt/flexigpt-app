@@ -1,30 +1,33 @@
 package metadata
 
 import (
+	"io/fs"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/builtin"
 )
 
 // ResolveBuiltInSkill resolves only protected application metadata. It does
 // not inspect user Roots, shareable packages, SQLite paths, or Source state.
 func ResolveBuiltInSkill(
-	bundleLogicalName string,
+	collectionLogicalName string,
 	skillLogicalName string,
 ) (artifact.ArtifactRef, error) {
-	bundle := basespec.LogicalName(bundleLogicalName)
+	collection := basespec.LogicalName(collectionLogicalName)
 	skill := basespec.LogicalName(skillLogicalName)
-	if err := basespec.ValidateLogicalName(bundle); err != nil {
+	if err := basespec.ValidateLogicalName(collection); err != nil {
 		return artifact.ArtifactRef{}, err
 	}
 	if err := basespec.ValidateLogicalName(skill); err != nil {
 		return artifact.ArtifactRef{}, err
 	}
 
-	registry, err := LoadRegistry()
+	registry, err := loadEmbeddedHydratedRegistry()
 	if err != nil {
 		return artifact.ArtifactRef{}, err
 	}
-	return registry.ResolveSkill(bundle, skill)
+	return registry.ResolveSkill(collection, skill)
 }
 
 func ResolveBuiltInSkillReference(
@@ -34,9 +37,24 @@ func ResolveBuiltInSkillReference(
 		return artifact.ArtifactRef{}, err
 	}
 
-	registry, err := LoadRegistry()
+	registry, err := loadEmbeddedHydratedRegistry()
 	if err != nil {
 		return artifact.ArtifactRef{}, err
 	}
-	return registry.ResolveSkill(reference.Bundle, reference.Skill)
+	return registry.ResolveSkill(reference.Collection, reference.Skill)
+}
+
+func loadEmbeddedHydratedRegistry() (HydratedRegistry, error) {
+	registry, err := LoadRegistry()
+	if err != nil {
+		return HydratedRegistry{}, err
+	}
+	packages, err := fs.Sub(
+		builtin.BuiltInSkillBundlesFS,
+		builtin.BuiltInSkillBundlesRootDir,
+	)
+	if err != nil {
+		return HydratedRegistry{}, err
+	}
+	return registry.Hydrate(packages)
 }

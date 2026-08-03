@@ -151,6 +151,12 @@ Its stable reference is:
 
     WorkspaceRef{RootID, CollectionID}
 
+A Root can own many Workspace Collections. A Workspace is one Collection, not
+a parent of child Collections. Its heterogeneous Context, Skill, and future
+Artifact kinds are members of that one Collection. Other Workspaces and other
+feature Collections are sibling Collections under the same Root unless a
+separate trust, retention, or account boundary requires another Root.
+
 The Collection ID is the Workspace aggregate identity. A Root ID is only the
 namespace.
 
