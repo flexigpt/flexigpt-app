@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import {
 	FiBookOpen,
-	FiBriefcase,
 	FiFilePlus,
+	FiFolderPlus,
 	FiLayers,
 	FiMessageSquare,
 	FiServer,
@@ -97,7 +97,7 @@ export function Sidebar({ children }: SidebarProps) {
 								aria-label="Workspaces"
 								title="Workspaces"
 							>
-								<FiBriefcase size={24} />
+								<FiFolderPlus size={24} />
 							</Link>
 						</li>
 						<li className="mt-4">

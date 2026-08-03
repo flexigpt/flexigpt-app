@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 
 import {
-	FiBriefcase,
 	FiChevronRight,
 	FiCode,
 	FiFileText,
+	FiFolderPlus,
 	FiGlobe,
 	FiImage,
 	FiLink,
@@ -573,7 +573,7 @@ function MessageWorkspaceContextChip({
 				title={`${displayName}\n${workspaceIdentity}\nWorkspace state recorded for this turn`}
 				data-message-chip="workspace-context"
 			>
-				<FiBriefcase size={14} />
+				<FiFolderPlus size={14} />
 				<span className="max-w-32 truncate">{displayName}</span>
 				{contextBadgeCount > 0 ? (
 					<span className="badge badge-secondary badge-xs">

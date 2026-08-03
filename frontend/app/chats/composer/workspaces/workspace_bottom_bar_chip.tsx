@@ -1,16 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-	FiAlertCircle,
-	FiBriefcase,
-	FiCheck,
-	FiFolderPlus,
-	FiRefreshCw,
-	FiSearch,
-	FiSettings,
-	FiX,
-} from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiFolderPlus, FiRefreshCw, FiSearch, FiSettings, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
@@ -162,7 +153,7 @@ function WorkspaceBottomBarChipInner({
 						aria-label="Select Workspace"
 					>
 						<ActionTriggerChipContent
-							icon={<FiBriefcase size={14} />}
+							icon={<FiFolderPlus size={14} />}
 							label={selected ? selectedName : 'Workspace'}
 							count={
 								selectedContextCount > 0 ? (
@@ -344,7 +335,7 @@ function WorkspaceBottomBarChipInner({
 											});
 									}}
 								>
-									<FiBriefcase size={14} className="mt-0.5 shrink-0" />
+									<FiFolderPlus size={14} className="mt-0.5 shrink-0" />
 									<div className="min-w-0 flex-1">
 										<div className="truncate text-xs font-medium">{workspace.displayName}</div>
 										{workspace.primaryPath ? (
