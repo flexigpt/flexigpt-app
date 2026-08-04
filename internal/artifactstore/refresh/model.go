@@ -48,14 +48,19 @@ type Publication struct {
 	ExpectedCollectionRevision  uint64
 	ExpectedAttachmentRevisions map[basespec.SourceID]uint64
 	ExpectedSourceRevisions     map[basespec.SourceID]uint64
-	SourceGenerations           map[basespec.SourceID]string
-	PlanFingerprint             cryptoutil.Digest
-	DecoderFingerprint          cryptoutil.Digest
-	Occurrences                 []catalog.Occurrence
-	ArtifactCreates             []artifact.Artifact
-	ArtifactUpdates             []artifact.SourceStateUpdate
-	Diagnostics                 []diagnostic.Diagnostic
-	PublishedAt                 time.Time
+
+	// SourceGenerations contains one confirmed generation for every Source
+	// whose attachment and Source are enabled at publication time. Publisher
+	// verifies that set against persisted metadata.
+	SourceGenerations map[basespec.SourceID]string
+
+	PlanFingerprint    cryptoutil.Digest
+	DecoderFingerprint cryptoutil.Digest
+	Occurrences        []catalog.Occurrence
+	ArtifactCreates    []artifact.Artifact
+	ArtifactUpdates    []artifact.SourceStateUpdate
+	Diagnostics        []diagnostic.Diagnostic
+	PublishedAt        time.Time
 }
 
 func (p Publication) Validate() error {

@@ -267,6 +267,7 @@ func (s *Store) createAdoptedArtifact(
 		tx,
 		ref,
 		expectedCatalogRevision,
+		currentCollection.Revision,
 	); err != nil {
 		return err
 	}
@@ -327,12 +328,20 @@ func (s *Store) createPinnedArtifact(
 			tx,
 			ref,
 			expectedCatalogRevision,
+			currentCollection.Revision,
 		); err != nil {
 			return err
 		}
 		if err := requirePinnedSourceStateTx(ctx, tx, value); err != nil {
 			return err
 		}
+	} else if err := requireCatalogUnavailableOrStaleTx(
+		ctx,
+		tx,
+		ref,
+		currentCollection.Revision,
+	); err != nil {
+		return err
 	}
 	if err := insertArtifactTx(ctx, tx, value); err != nil {
 		return err
@@ -771,22 +780,26 @@ func requireCurrentCatalogTx(
 	ctx context.Context,
 	tx *sql.Tx,
 	ref collection.CollectionRef,
-	expectedRevision uint64,
+	expectedCatalogRevision uint64,
+	expectedCollectionRevision uint64,
 ) error {
 	var (
 		revision               uint64
+		collectionRevision     uint64
 		attachmentRevisionsRaw []byte
 		sourceRevisionsRaw     []byte
 	)
 	err := tx.QueryRowContext(
 		ctx,
-		`SELECT revision, attachment_revisions_json, source_revisions_json
+		`SELECT revision, collection_revision,
+		        attachment_revisions_json, source_revisions_json
 		 FROM artifact_current_catalogs
 		 WHERE root_id = ? AND collection_id = ?`,
 		string(ref.RootID),
 		string(ref.CollectionID),
 	).Scan(
 		&revision,
+		&collectionRevision,
 		&attachmentRevisionsRaw,
 		&sourceRevisionsRaw,
 	)
@@ -800,9 +813,15 @@ func requireCurrentCatalogTx(
 	if err != nil {
 		return err
 	}
-	if revision != expectedRevision {
+	if revision != expectedCatalogRevision {
 		return fmt.Errorf(
 			"%w: catalog changed during artifact adoption",
+			basespec.ErrConflict,
+		)
+	}
+	if collectionRevision != expectedCollectionRevision {
+		return fmt.Errorf(
+			"%w: catalog collection revision changed",
 			basespec.ErrConflict,
 		)
 	}
@@ -831,6 +850,71 @@ func requireCurrentCatalogTx(
 		!maps.Equal(catalogSourceRevisions, currentSources) {
 		return fmt.Errorf(
 			"%w: catalog metadata changed during artifact adoption",
+			basespec.ErrConflict,
+		)
+	}
+	return nil
+}
+
+// requireCatalogUnavailableOrStaleTx validates the zero catalog-revision pin
+// path. A pinned Artifact may use that path only when no catalog exists or
+// when the existing catalog is stale against current Collection metadata.
+func requireCatalogUnavailableOrStaleTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	ref collection.CollectionRef,
+	expectedCollectionRevision uint64,
+) error {
+	var (
+		catalogCollectionRevision uint64
+		attachmentRevisionsRaw    []byte
+		sourceRevisionsRaw        []byte
+	)
+	err := tx.QueryRowContext(
+		ctx,
+		`SELECT collection_revision,
+		        attachment_revisions_json, source_revisions_json
+		 FROM artifact_current_catalogs
+		 WHERE root_id = ? AND collection_id = ?`,
+		string(ref.RootID),
+		string(ref.CollectionID),
+	).Scan(
+		&catalogCollectionRevision,
+		&attachmentRevisionsRaw,
+		&sourceRevisionsRaw,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	catalogAttachmentRevisions := map[basespec.SourceID]uint64{}
+	catalogSourceRevisions := map[basespec.SourceID]uint64{}
+	if err := decodeJSON(
+		attachmentRevisionsRaw,
+		&catalogAttachmentRevisions,
+	); err != nil {
+		return err
+	}
+	if err := decodeJSON(sourceRevisionsRaw, &catalogSourceRevisions); err != nil {
+		return err
+	}
+
+	currentAttachments, currentSources, err := currentAttachmentSourceRevisionsTx(
+		ctx,
+		tx,
+		ref,
+	)
+	if err != nil {
+		return err
+	}
+	if catalogCollectionRevision == expectedCollectionRevision &&
+		maps.Equal(catalogAttachmentRevisions, currentAttachments) &&
+		maps.Equal(catalogSourceRevisions, currentSources) {
+		return fmt.Errorf(
+			"%w: current catalog requires an expected revision",
 			basespec.ErrConflict,
 		)
 	}

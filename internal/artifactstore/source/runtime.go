@@ -178,6 +178,13 @@ func ReadSnapshotEntry(
 	if err != nil {
 		return nil, err
 	}
+	if reader == nil {
+		return nil, fmt.Errorf(
+			"%w: source snapshot returned a nil reader for %q",
+			basespec.ErrInvalid,
+			entry.Locator,
+		)
+	}
 	content, readErr := io.ReadAll(
 		io.LimitReader(reader, maximumBytes+1),
 	)
@@ -368,7 +375,9 @@ func (r *runtime) Open(
 		return nil, err
 	}
 	if err := validateSnapshot(snapshot); err != nil {
-		_ = snapshot.Close()
+		if snapshot != nil {
+			_ = snapshot.Close()
+		}
 		return nil, err
 	}
 	return snapshot, nil

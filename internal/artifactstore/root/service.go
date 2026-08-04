@@ -199,15 +199,17 @@ func (s *Service) create(
 	if err := value.Validate(); err != nil {
 		return Root{}, err
 	}
-	if err := s.repository.Create(ctx, value); err == nil {
+	createErr := s.repository.Create(ctx, value)
+	if createErr == nil {
 		return value, nil
-	} else if !errors.Is(err, basespec.ErrConflict) {
-		return Root{}, err
+	}
+	if !errors.Is(createErr, basespec.ErrConflict) {
+		return Root{}, createErr
 	}
 
 	existing, err := s.repository.Get(ctx, draft.ID)
 	if err != nil {
-		return Root{}, err
+		return Root{}, createErr
 	}
 	if existing.DisplayName != draft.DisplayName ||
 		existing.Description != draft.Description {

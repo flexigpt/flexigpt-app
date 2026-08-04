@@ -65,7 +65,9 @@ func (r *Registry) Open(
 		return nil, err
 	}
 	if err := validateSnapshot(snapshot); err != nil {
-		_ = snapshot.Close()
+		if snapshot != nil {
+			_ = snapshot.Close()
+		}
 		return nil, err
 	}
 	return snapshot, nil

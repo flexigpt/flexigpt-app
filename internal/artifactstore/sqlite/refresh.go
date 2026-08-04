@@ -77,6 +77,15 @@ func (p *Publisher) Publish(
 			basespec.ErrConflict,
 		)
 	}
+	if err := requirePublishedSourceGenerationsTx(
+		ctx,
+		tx,
+		publication.Ref.RootID,
+		publication.Ref.CollectionID,
+		publication.SourceGenerations,
+	); err != nil {
+		return catalog.Snapshot{}, err
+	}
 
 	attachmentRevisionsRaw, err := encodeJSON(
 		publication.ExpectedAttachmentRevisions,
@@ -255,6 +264,62 @@ func (p *Publisher) Publish(
 		return catalog.Snapshot{}, err
 	}
 	return catalog.CloneSnapshot(snapshot), nil
+}
+
+func requirePublishedSourceGenerationsTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	rootID basespec.RootID,
+	collectionID basespec.CollectionID,
+	generations map[basespec.SourceID]string,
+) error {
+	rows, err := tx.QueryContext(
+		ctx,
+		`SELECT a.source_id
+		 FROM artifact_collection_attachments a
+		 JOIN artifact_sources s
+		   ON s.root_id = a.root_id
+		  AND s.id = a.source_id
+		 WHERE a.root_id = ?
+		   AND a.collection_id = ?
+		   AND a.enabled = 1
+		   AND s.enabled = 1
+		   AND s.retired_at IS NULL
+		 ORDER BY a.source_id`,
+		string(rootID),
+		string(collectionID),
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	expected := make(map[basespec.SourceID]struct{})
+	for rows.Next() {
+		var sourceID string
+		if err := rows.Scan(&sourceID); err != nil {
+			return err
+		}
+		expected[basespec.SourceID(sourceID)] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(expected) != len(generations) {
+		return fmt.Errorf(
+			"%w: publication source generations do not match enabled collection sources",
+			basespec.ErrInvalid,
+		)
+	}
+	for sourceID := range expected {
+		if _, exists := generations[sourceID]; !exists {
+			return fmt.Errorf(
+				"%w: publication source generations do not match enabled collection sources",
+				basespec.ErrInvalid,
+			)
+		}
+	}
+	return nil
 }
 
 func updateArtifactSourceStateTx(

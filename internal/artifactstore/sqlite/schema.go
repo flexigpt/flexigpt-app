@@ -1,16 +1,19 @@
 package sqlite
 
-// schema is the only Artifact Store metadata schema.
-//
-// The configured Artifact Store directory is a clean persistence boundary.
-// There is no migration ledger and no compatibility inspection or adaptation
-// for earlier metadata databases.
+// schema is the base Artifact Store metadata schema installed at migration
+// version one. Forward changes are coordinated by the migration ledger in
+// store.go rather than by implicit schema inspection.
 const schema = `
 CREATE TABLE artifact_store_v1 (
 	singleton INTEGER PRIMARY KEY CHECK (singleton = 1)
 );
 
 INSERT INTO artifact_store_v1(singleton) VALUES (1);
+
+CREATE TABLE artifact_schema_migrations (
+	version INTEGER PRIMARY KEY CHECK (version > 0),
+	applied_at INTEGER NOT NULL
+);
 
 CREATE TABLE artifact_roots (
 	id TEXT PRIMARY KEY,
