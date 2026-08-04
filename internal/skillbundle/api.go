@@ -788,11 +788,83 @@ func (a *API) EnsureBuiltInBundleTopology(
 		return Bundle{}, err
 	}
 	if !builtInBundleTopologyMatches(bundle, request) {
-		return Bundle{}, fmt.Errorf(
-			"%w: built-in bundle %q differs from the protected registry declaration",
-			basespec.ErrConflict,
-			request.LogicalName,
-		)
+		data, err := EncodeCollectionData(CollectionData{
+			SchemaVersion:            CollectionSchemaVersion,
+			DiscoveryPolicyRevision:  DiscoveryPolicyRevision,
+			LogicalName:              request.LogicalName,
+			LogicalVersion:           request.LogicalVersion,
+			Labels:                   bundle.Data.Labels,
+			PortableDefinitionDigest: &request.PortableDefinitionDigest,
+		})
+		if err != nil {
+			return Bundle{}, err
+		}
+
+		if bundle.Collection.DisplayName != request.DisplayName ||
+			bundle.Collection.Description != request.Description ||
+			!bytes.Equal(bundle.Collection.Data, data) {
+			if _, err := a.dependencies.Collections.Update(
+				ctx,
+				bundle.Collection.Ref(),
+				collection.Update{
+					ExpectedRevision: bundle.Collection.Revision,
+					DisplayName:      request.DisplayName,
+					Description:      request.Description,
+					Enabled:          request.Enabled,
+					Data:             data,
+				},
+			); err != nil {
+				return Bundle{}, err
+			}
+		}
+
+		if len(bundle.Attachments) == 1 {
+			attachment := bundle.Attachments[0]
+			attachmentData, err := NewAttachmentData(
+				request.DiscoveryRoot,
+				request.ExpectedMemberDigests,
+			)
+			if err != nil {
+				return Bundle{}, err
+			}
+			encodedAttachmentData, err := EncodeAttachmentData(attachmentData)
+			if err != nil {
+				return Bundle{}, err
+			}
+			if attachment.Role != RoleBuiltIn || !attachment.Enabled ||
+				!bytes.Equal(attachment.Data, encodedAttachmentData) {
+				currentColl, err := a.dependencies.Collections.Get(ctx, bundle.Collection.Ref())
+				if err != nil {
+					return Bundle{}, err
+				}
+				if _, _, err := a.dependencies.Collections.UpdateAttachment(
+					ctx,
+					bundle.Collection.Ref(),
+					request.SourceID,
+					collection.AttachmentUpdate{
+						ExpectedCollectionRevision: currentColl.Revision,
+						ExpectedAttachmentRevision: attachment.Revision,
+						Role:                       RoleBuiltIn,
+						Enabled:                    true,
+						Data:                       encodedAttachmentData,
+					},
+				); err != nil {
+					return Bundle{}, err
+				}
+			}
+		}
+
+		bundle, err = a.GetBundle(ctx, bundle.Collection.Ref())
+		if err != nil {
+			return Bundle{}, err
+		}
+		if !builtInBundleTopologyMatches(bundle, request) {
+			return Bundle{}, fmt.Errorf(
+				"%w: built-in bundle %q differs from the protected registry declaration",
+				basespec.ErrConflict,
+				request.LogicalName,
+			)
+		}
 	}
 	return bundle, nil
 }
@@ -952,13 +1024,7 @@ func bundleCreationIntentMatches(
 	return value.Collection.RootID == request.RootID &&
 		value.Collection.ID == request.CollectionID &&
 		value.Collection.Kind == CollectionKind &&
-		value.Data.LogicalName == request.LogicalName &&
-		value.Data.LogicalVersion == request.LogicalVersion &&
-		maps.Equal(value.Data.Labels, request.Labels) &&
-		cryptoutil.IsDigestEqual(
-			value.Data.PortableDefinitionDigest,
-			request.PortableDefinitionDigest,
-		)
+		value.Data.LogicalName == request.LogicalName
 }
 
 func builtInBundleTopologyMatches(
@@ -1267,9 +1333,6 @@ func (a *API) createManagedSkill(
 		request.ArtifactID,
 		sourceValue.ID,
 		skillLocator,
-		artifactName,
-		request.Enabled,
-		packageSHA256,
 	); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
@@ -1758,9 +1821,6 @@ func validateManagedSkillOperationIntent(
 	artifactID basespec.ArtifactID,
 	sourceID basespec.SourceID,
 	skillLocator basespec.Locator,
-	artifactName string,
-	enabled bool,
-	packageSHA256 cryptoutil.Digest,
 ) error {
 	if value.ID != artifactID ||
 		value.RootID != bundle.RootID ||
@@ -1769,25 +1829,13 @@ func validateManagedSkillOperationIntent(
 		value.Adoption != artifact.AdoptionPinned ||
 		value.Binding.SourceID != sourceID ||
 		value.Binding.Locator != skillLocator ||
-		value.Binding.ExpectedKind != skillartifact.Kind ||
-		value.Name != artifactName ||
-		value.Enabled != enabled {
+		value.Binding.ExpectedKind != skillartifact.Kind {
 		return fmt.Errorf(
 			"%w: managed Skill Artifact %q conflicts with its existing creation intent",
 			basespec.ErrConflict,
 			artifactID)
 	}
-	intent, err := decodeManagedSkillArtifactData(value.Data)
-	if err != nil {
-		return fmt.Errorf("%w: managed Skill local state: %w", basespec.ErrInvalid, err)
-	}
-	if intent.PackageSHA256 != packageSHA256 {
-		return fmt.Errorf(
-			"%w: managed Skill Artifact %q package content differs",
-			basespec.ErrConflict,
-			artifactID,
-		)
-	}
+
 	return nil
 }
 

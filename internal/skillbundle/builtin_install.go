@@ -427,11 +427,28 @@ func (a *API) ensurePinnedManagedSkill(
 		artifactID,
 		sourceID,
 		skillLocator,
-		name,
-		enabled,
-		packageSHA256,
 	); err != nil {
 		return artifact.Artifact{}, err
+	}
+
+	intent, err := decodeManagedSkillArtifactData(pinned.Data)
+	if err != nil || intent.PackageSHA256 != packageSHA256 {
+		localData, err := encodeManagedSkillArtifactData(
+			managedSkillArtifactData{PackageSHA256: packageSHA256},
+		)
+		if err != nil {
+			return artifact.Artifact{}, err
+		}
+		updated, err := a.dependencies.Artifacts.UpdateData(
+			ctx,
+			pinned.Ref(),
+			pinned.Revision,
+			localData,
+		)
+		if err != nil {
+			return artifact.Artifact{}, err
+		}
+		pinned = &updated
 	}
 	return pinned.Clone(), nil
 }
