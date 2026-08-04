@@ -26,7 +26,7 @@ func validateAssistantPresetBundle(bundle *spec.AssistantPresetBundle) error {
 	if bundle == nil {
 		return errors.New("bundle is nil")
 	}
-	if bundle.SchemaVersion != spec.SchemaVersion {
+	if !spec.IsSupportedSchemaVersion(bundle.SchemaVersion) {
 		return fmt.Errorf(
 			"schemaVersion %q does not match expected %q",
 			bundle.SchemaVersion,
@@ -66,7 +66,7 @@ func validateAssistantPresetStructure(preset *spec.AssistantPreset) error {
 	if preset == nil {
 		return spec.ErrNilAssistantPreset
 	}
-	if preset.SchemaVersion != spec.SchemaVersion {
+	if !spec.IsSupportedSchemaVersion(preset.SchemaVersion) {
 		return fmt.Errorf(
 			"schemaVersion %q does not match expected %q",
 			preset.SchemaVersion,

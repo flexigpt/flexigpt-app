@@ -1279,7 +1279,7 @@ func (s *AssistantPresetStore) readAllBundles(forceFetch bool) (spec.AllBundles,
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &all); err != nil {
 		return all, err
 	}
-	if all.SchemaVersion != spec.SchemaVersion {
+	if !spec.IsSupportedSchemaVersion(all.SchemaVersion) {
 		return spec.AllBundles{}, fmt.Errorf(
 			"unsupported assistant preset bundle schema version %q",
 			all.SchemaVersion,

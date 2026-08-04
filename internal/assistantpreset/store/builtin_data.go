@@ -292,7 +292,7 @@ func (d *BuiltInData) populateDataFromFS(ctx context.Context) error {
 	if err := json.Unmarshal(rawManifest, &manifest); err != nil {
 		return err
 	}
-	if manifest.SchemaVersion != spec.SchemaVersion {
+	if !spec.IsSupportedSchemaVersion(manifest.SchemaVersion) {
 		return fmt.Errorf(
 			"unsupported built-in assistant preset schema version %q",
 			manifest.SchemaVersion,

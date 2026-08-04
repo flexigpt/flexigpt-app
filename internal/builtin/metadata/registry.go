@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	SchemaVersion        = "v2"
+	SchemaVersion        = "v1"
 	collectionEntrypoint = "collection.json"
 	skillEntrypoint      = "SKILL.md"
 )

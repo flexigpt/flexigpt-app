@@ -37,6 +37,10 @@ var (
 	ErrNilAssistantPreset      = errors.New("assistant preset is nil")
 )
 
+func IsSupportedSchemaVersion(version string) bool {
+	return version == SchemaVersion || version == "2026-03-22"
+}
+
 // ArtifactSkillSelection is a durable Agent Skill selection. Ownership is
 // derived from the selected Artifact's current Collection membership by the
 // Artifact-backed runtime router.

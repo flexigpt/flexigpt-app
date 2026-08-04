@@ -122,6 +122,12 @@ func DecodeAttachmentData(
 		}
 		return AttachmentData{}, err
 	}
+	if value.SchemaVersion == "" {
+		value.SchemaVersion = AttachmentDataSchemaVersion
+	}
+	if value.DiscoveryRoot == "" {
+		value.DiscoveryRoot = "."
+	}
 	if err := value.Validate(); err != nil {
 		return AttachmentData{}, err
 	}

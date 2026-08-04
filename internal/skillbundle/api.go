@@ -378,8 +378,19 @@ func (a *API) AttachSource(
 	if err := a.validateAttachmentDraft(ctx, bundle.RootID, draft); err != nil {
 		return Bundle{}, err
 	}
+	attachmentData, err := NewAttachmentData(
+		draft.DiscoveryRoot,
+		draft.ExpectedMemberDigests,
+	)
+	if err != nil {
+		return Bundle{}, err
+	}
+	encodedAttachmentData, err := EncodeAttachmentData(attachmentData)
+	if err != nil {
+		return Bundle{}, err
+	}
 
-	_, _, err := a.dependencies.Collections.Attach(
+	_, _, err = a.dependencies.Collections.Attach(
 		ctx,
 		bundle,
 		expectedCollectionRevision,
@@ -387,7 +398,7 @@ func (a *API) AttachSource(
 			SourceID: draft.SourceID,
 			Role:     draft.Role,
 			Enabled:  draft.Enabled,
-			Data:     json.RawMessage(`{}`),
+			Data:     encodedAttachmentData,
 		},
 	)
 	if err != nil {

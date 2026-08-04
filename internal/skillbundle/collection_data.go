@@ -71,6 +71,12 @@ func DecodeCollectionData(
 			err,
 		)
 	}
+	if value.SchemaVersion == "" {
+		value.SchemaVersion = CollectionSchemaVersion
+	}
+	if value.DiscoveryPolicyRevision == "" {
+		value.DiscoveryPolicyRevision = DiscoveryPolicyRevision
+	}
 	if err := ValidateCollectionData(value); err != nil {
 		return CollectionData{}, err
 	}
