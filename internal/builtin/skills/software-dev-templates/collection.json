@@ -1,0 +1,28 @@
+{
+	"kind": "skill.bundle",
+	"schemaID": "skill.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "software-dev-templates",
+	"displayName": "Software Dev Templates",
+	"description": "Builtin software development template skills.",
+	"body": {
+		"memberFormat": "agent.skill-entrypoint/v1"
+	},
+	"members": [
+		{
+			"locator": "diagrams-stage/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "fe-stack-react-vite/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "go-table-tests/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		}
+	]
+}

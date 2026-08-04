@@ -1078,6 +1078,9 @@ func (a *API) workspaceArtifact(
 			workspace.CollectionID,
 		)
 	}
+	if err := a.requireWorkspaceArtifactKind(value.Kind); err != nil {
+		return artifact.Artifact{}, err
+	}
 	return value, nil
 }
 
@@ -1533,7 +1536,7 @@ func workspaceCatalogViewOf(
 			projected.Resources = append(
 				projected.Resources,
 				WorkspaceResourceView{
-					Artifact:         workspaceArtifactViewOf(resourceValue.Artifact),
+					Artifact:         artifactView,
 					DefinitionDigest: resourceValue.Definition.Digest,
 					SourceID:         resourceValue.Source.ID,
 					Locator:          resourceValue.Artifact.Binding.Locator,

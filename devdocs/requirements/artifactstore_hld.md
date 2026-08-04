@@ -1333,28 +1333,28 @@ The local lifecycle follows the intended architecture:
 
 ### Requirement mapping
 
-| Requirement                            | Status                           | Mapping                                                                                      |
-| -------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------- |
-| `AS-R01` plane separation              | Present                          | Local entities, canonical Definitions, private Sources, and derived runtime are separated    |
-| `AS-R02` Root and Source lifecycle     | Present                          | Root-scoped Source services and adapters                                                     |
-| `AS-R03` Collections and Source Mounts | Present                          | Collection and attachment persistence with same-Root checks                                  |
-| `AS-R04` coherent catalog              | Present                          | One current Collection catalog with revision and generation checks                           |
-| `AS-R05` Observation states            | Present                          | Catalogs preserve valid, invalid, and missing states; reconciliation derives incompatibility |
-| `AS-R06` immutable Definitions         | Present for Artifact Definitions | Canonical Collection Definition envelope exists; repository linkage remains transfer work    |
-| `AS-R07` Artifact lifecycle            | Present                          | Adoption, pinning, suppression, unadoption, and purge                                        |
-| `AS-R08` caller-supplied IDs           | Present                          | UUIDv7 validation and create replay                                                          |
-| `AS-R09` managed Source publication    | Present                          | Staging, generation, package publication, and recovery behavior                              |
-| `AS-R10` Artifact transfer             | Missing                          | No complete importer or exporter                                                             |
-| `AS-R11` Collection transfer           | Missing                          | No complete package import or export                                                         |
-| `AS-R12` Content Closure               | Missing                          | Definitions do not enumerate assets and package files                                        |
-| `AS-R13` domain adapters               | Present                          | Workspace and Skill decoders and policy remain outside core                                  |
-| `AS-R14` protected built-ins           | Partial                          | Protected topology exists, but Skill package convergence remains partial                     |
-| `AS-R15` runtime resolution            | Present for Agent Skills         | Artifact-backed resolver verifies current state                                              |
-| `AS-R16` typed feature boundary        | Present                          | Raw public Collection mutation is not exposed                                                |
-| `AS-R17` local state preservation      | Present                          | Source reconciliation preserves local Artifact fields                                        |
-| `AS-R18` import provenance             | Missing                          | Transfer is not implemented                                                                  |
-| `AS-R19` schema evolution              | Partial                          | Clean `v1` boundary exists, migration ledger is absent                                       |
-| `AS-R20` package safety                | Partial                          | Source bounds and managed storage exist; archive and URI import are missing                  |
+| Requirement                            | Status                           | Mapping                                                                                                      |
+| -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `AS-R01` plane separation              | Present                          | Local entities, canonical Definitions, private Sources, and derived runtime are separated                    |
+| `AS-R02` Root and Source lifecycle     | Present                          | Root-scoped Source services and adapters                                                                     |
+| `AS-R03` Collections and Source Mounts | Present                          | Collection and attachment persistence with same-Root checks                                                  |
+| `AS-R04` coherent catalog              | Present                          | One current Collection catalog with revision and generation checks                                           |
+| `AS-R05` Observation states            | Present                          | Catalogs preserve valid, invalid, and missing states; reconciliation derives incompatibility                 |
+| `AS-R06` immutable Definitions         | Present for Artifact Definitions | Canonical Collection Definition envelope exists; repository linkage remains transfer work                    |
+| `AS-R07` Artifact lifecycle            | Present                          | Adoption, pinning, suppression, unadoption, and purge                                                        |
+| `AS-R08` caller-supplied IDs           | Present                          | UUIDv7 validation and create replay                                                                          |
+| `AS-R09` managed Source publication    | Present                          | Staging, generation, package publication, and recovery behavior                                              |
+| `AS-R10` Artifact transfer             | Missing                          | No complete importer or exporter                                                                             |
+| `AS-R11` Collection transfer           | Missing                          | No complete package import or export                                                                         |
+| `AS-R12` Content Closure               | Missing                          | Definitions do not enumerate assets and package files                                                        |
+| `AS-R13` domain adapters               | Present                          | Workspace and Skill decoders and policy remain outside core                                                  |
+| `AS-R14` protected built-ins           | Present                          | Protected topology, 6 built-in Skill Bundles (26 skills), and Assistant Presets converged via Artifact Store |
+| `AS-R15` runtime resolution            | Present for Agent Skills         | Artifact-backed resolver verifies current state                                                              |
+| `AS-R16` typed feature boundary        | Present                          | Raw public Collection mutation is not exposed                                                                |
+| `AS-R17` local state preservation      | Present                          | Source reconciliation preserves local Artifact fields                                                        |
+| `AS-R18` import provenance             | Missing                          | Transfer is not implemented                                                                                  |
+| `AS-R19` schema evolution              | Partial                          | Clean `v1` boundary exists, migration ledger is absent                                                       |
+| `AS-R20` package safety                | Partial                          | Source bounds and managed storage exist; archive and URI import are missing                                  |
 
 ### Current persistence behavior
 

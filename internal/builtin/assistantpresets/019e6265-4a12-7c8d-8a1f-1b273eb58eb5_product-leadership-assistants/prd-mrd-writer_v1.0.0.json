@@ -11,34 +11,30 @@
 	"startingIncludeModelSystemPrompt": true,
 	"startingSkillSelections": [
 		{
-			"skillRef": {
-				"bundleID": "core-instructions",
-				"skillSlug": "markdown-output",
-				"skillID": "markdown-output"
+			"artifact": {
+				"rootID": "0192c4c0-0000-7000-8000-000000000001",
+				"artifactID": "0192c4c0-0100-7000-8000-000000000001"
 			},
 			"useAsInstructions": true
 		},
 		{
-			"skillRef": {
-				"bundleID": "core-instructions",
-				"skillSlug": "use-explicit-tools-batched",
-				"skillID": "use-explicit-tools-batched"
+			"artifact": {
+				"rootID": "0192c4c0-0000-7000-8000-000000000001",
+				"artifactID": "0192c4c0-0100-7000-8000-000000000002"
 			},
 			"useAsInstructions": true
 		},
 		{
-			"skillRef": {
-				"bundleID": "core-instructions",
-				"skillSlug": "grounded-local-work",
-				"skillID": "grounded-local-work"
+			"artifact": {
+				"rootID": "0192c4c0-0000-7000-8000-000000000001",
+				"artifactID": "0192c4c0-0100-7000-8000-000000000003"
 			},
 			"useAsInstructions": true
 		},
 		{
-			"skillRef": {
-				"bundleID": "product-leadership",
-				"skillSlug": "prd-mrd-authoring",
-				"skillID": "prd-mrd-authoring"
+			"artifact": {
+				"rootID": "0192c4c0-0000-7000-8000-000000000001",
+				"artifactID": "0192c4c0-0400-7000-8000-000000000001"
 			},
 			"preLoadAsActive": true
 		}

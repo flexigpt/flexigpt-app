@@ -1,0 +1,38 @@
+{
+	"kind": "skill.bundle",
+	"schemaID": "skill.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "technical-content-writing",
+	"displayName": "Technical Content Writing",
+	"description": "Skills for software and product documentation, API references, release notes, and troubleshooting guides.",
+	"body": {
+		"memberFormat": "agent.skill-entrypoint/v1"
+	},
+	"members": [
+		{
+			"locator": "docs-audit/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "docs-authoring/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "api-reference-authoring/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "release-notes-authoring/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "troubleshooting-guide-authoring/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		}
+	]
+}

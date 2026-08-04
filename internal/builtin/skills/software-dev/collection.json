@@ -1,0 +1,53 @@
+{
+	"kind": "skill.bundle",
+	"schemaID": "skill.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "software-dev",
+	"displayName": "Software Development",
+	"description": "Software Development Lifecycle Skills",
+	"body": {
+		"memberFormat": "agent.skill-entrypoint/v1"
+	},
+	"members": [
+		{
+			"locator": "designing-system-architecture/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "refactoring-code/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "reviewing-code/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "spec-driven-dev/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "codebase-exploration/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "test-case-design/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "bug-investigation/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "test-implementation/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		}
+	]
+}

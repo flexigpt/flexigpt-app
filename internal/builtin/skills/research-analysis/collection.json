@@ -1,0 +1,18 @@
+{
+	"kind": "skill.bundle",
+	"schemaID": "skill.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "research-analysis",
+	"displayName": "Research and Analysis",
+	"description": "Skills for research briefs based on local or attached source material.",
+	"body": {
+		"memberFormat": "agent.skill-entrypoint/v1"
+	},
+	"members": [
+		{
+			"locator": "research-brief-authoring/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		}
+	]
+}

@@ -7,7 +7,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 
 // oxlint-disable-next-line no-restricted-imports
-import pkg from './package.json';
+import pkg from './package.json' with { type: 'json' };
 
 const baseDeps = Object.keys(pkg.dependencies ?? {});
 

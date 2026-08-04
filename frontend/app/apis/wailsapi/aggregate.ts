@@ -93,11 +93,10 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		if (onStreamTextData) {
 			textCallbackId = `text-${rid}`;
 
-			let lastTrimmedText = '';
+			let lastText = '';
 			const textCb = (t: string) => {
-				const d = t.trim();
-				if (d !== lastTrimmedText) {
-					lastTrimmedText = d;
+				if (t !== lastText) {
+					lastText = t;
 					onStreamTextData(t);
 				}
 			};
@@ -106,11 +105,10 @@ export class WailsAggregateAPI implements IAggregateAPI {
 
 		if (onStreamThinkingData) {
 			thinkingCallbackId = `thinking-${rid}`;
-			let lastTrimmedThinking = '';
+			let lastThinking = '';
 			const thinkingCb = (t: string) => {
-				const d = t.trim();
-				if (d !== lastTrimmedThinking) {
-					lastTrimmedThinking = d;
+				if (t !== lastThinking) {
+					lastThinking = t;
 					onStreamThinkingData(t);
 				}
 			};

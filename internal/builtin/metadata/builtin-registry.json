@@ -11,19 +11,175 @@
 		"displayName": "Application Built-in Packages",
 		"enabled": true
 	},
-	"bundles": [
+	"collections": [
 		{
 			"id": "0192c4c0-0010-7000-8000-000000000001",
-			"logicalName": "core-instructions",
-			"logicalVersion": "v1",
-			"displayName": "Core Instructions",
-			"description": "Application-provided core instruction Skills.",
+			"payload": "core-instructions/collection.json",
 			"enabled": true,
-			"skills": [
+			"artifacts": [
 				{
 					"id": "0192c4c0-0100-7000-8000-000000000001",
-					"logicalName": "markdown-output",
-					"package": "core-instructions/markdown-output",
+					"member": "markdown-output/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0100-7000-8000-000000000002",
+					"member": "use-explicit-tools-batched/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0100-7000-8000-000000000003",
+					"member": "grounded-local-work/SKILL.md",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"id": "0192c4c0-0010-7000-8000-000000000002",
+			"payload": "software-dev/collection.json",
+			"enabled": true,
+			"artifacts": [
+				{
+					"id": "0192c4c0-0200-7000-8000-000000000001",
+					"member": "designing-system-architecture/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0200-7000-8000-000000000002",
+					"member": "refactoring-code/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0200-7000-8000-000000000003",
+					"member": "reviewing-code/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0200-7000-8000-000000000004",
+					"member": "spec-driven-dev/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0200-7000-8000-000000000005",
+					"member": "codebase-exploration/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0200-7000-8000-000000000006",
+					"member": "test-case-design/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0200-7000-8000-000000000007",
+					"member": "bug-investigation/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0200-7000-8000-000000000008",
+					"member": "test-implementation/SKILL.md",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"id": "0192c4c0-0010-7000-8000-000000000003",
+			"payload": "software-dev-templates/collection.json",
+			"enabled": true,
+			"artifacts": [
+				{
+					"id": "0192c4c0-0300-7000-8000-000000000001",
+					"member": "diagrams-stage/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0300-7000-8000-000000000002",
+					"member": "fe-stack-react-vite/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0300-7000-8000-000000000003",
+					"member": "go-table-tests/SKILL.md",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"id": "0192c4c0-0010-7000-8000-000000000004",
+			"payload": "product-leadership/collection.json",
+			"enabled": true,
+			"artifacts": [
+				{
+					"id": "0192c4c0-0400-7000-8000-000000000001",
+					"member": "prd-mrd-authoring/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0400-7000-8000-000000000002",
+					"member": "decision-record-authoring/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0400-7000-8000-000000000003",
+					"member": "user-feedback-analysis/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0400-7000-8000-000000000004",
+					"member": "roadmap-prioritization/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0400-7000-8000-000000000005",
+					"member": "delivery-risk-review/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0400-7000-8000-000000000006",
+					"member": "status-update-authoring/SKILL.md",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"id": "0192c4c0-0010-7000-8000-000000000005",
+			"payload": "technical-content-writing/collection.json",
+			"enabled": true,
+			"artifacts": [
+				{
+					"id": "0192c4c0-0500-7000-8000-000000000001",
+					"member": "docs-audit/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0500-7000-8000-000000000002",
+					"member": "docs-authoring/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0500-7000-8000-000000000003",
+					"member": "api-reference-authoring/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0500-7000-8000-000000000004",
+					"member": "release-notes-authoring/SKILL.md",
+					"enabled": true
+				},
+				{
+					"id": "0192c4c0-0500-7000-8000-000000000005",
+					"member": "troubleshooting-guide-authoring/SKILL.md",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"id": "0192c4c0-0010-7000-8000-000000000006",
+			"payload": "research-analysis/collection.json",
+			"enabled": true,
+			"artifacts": [
+				{
+					"id": "0192c4c0-0600-7000-8000-000000000001",
+					"member": "research-brief-authoring/SKILL.md",
 					"enabled": true
 				}
 			]

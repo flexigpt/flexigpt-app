@@ -1,0 +1,28 @@
+{
+	"kind": "skill.bundle",
+	"schemaID": "skill.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "core-instructions",
+	"displayName": "Core Instructions",
+	"description": "Builtin instruction-only skills.",
+	"body": {
+		"memberFormat": "agent.skill-entrypoint/v1"
+	},
+	"members": [
+		{
+			"locator": "markdown-output/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "use-explicit-tools-batched/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "grounded-local-work/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		}
+	]
+}

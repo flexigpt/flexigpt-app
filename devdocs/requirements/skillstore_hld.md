@@ -908,28 +908,28 @@ The major missing capabilities are:
 
 ### Requirement mapping
 
-| Requirement                                | Status                             | Mapping                                                         |
-| ------------------------------------------ | ---------------------------------- | --------------------------------------------------------------- |
-| `SK-R01` Skill Bundle Collection           | Present                            | `skill.bundle` uses Artifact Store Collection                   |
-| `SK-R02` Skill Artifact                    | Present                            | Installed and Workspace Skills use `agent.skill`                |
-| `SK-R03` `SKILL.md` authority              | Present                            | Common parser and validator                                     |
-| `SK-R04` shared decoder                    | Present                            | `skillartifact` used by Skill Bundle and Workspace              |
-| `SK-R05` managed lifecycle                 | Present with known management gaps | Create and delete are implemented; update semantics need review |
-| `SK-R06` external Skills                   | Present                            | Filesystem Source and relative Source Binding                   |
-| `SK-R07` local metadata preservation       | Present                            | Artifact local data survives refresh                            |
-| `SK-R08` ArtifactRef selections            | Present                            | Presets, conversations, inference, Workspace                    |
-| `SK-R09` runtime projection                | Present                            | Verified ephemeral `SkillDef`                                   |
-| `SK-R10` portable bundle format            | Partial                            | Linked manifest exists, self-contained package does not         |
-| `SK-R11` standalone transfer               | Missing                            | No importer or exporter                                         |
-| `SK-R12` bundle transfer                   | Missing                            | No complete package workflow                                    |
-| `SK-R13` resources and scripts closure     | Missing                            | No generic Skill closure builder                                |
-| `SK-R14` built-in package installation     | Partial                            | Protected topology exists; package convergence incomplete       |
-| `SK-R15` metadata separation               | Partial                            | Registry cleanup and package loading remain incomplete          |
-| `SK-R16` same-name collision               | Partial                            | Fail-closed behavior exists in some paths                       |
-| `SK-R17` derived runtime state             | Present                            | Demand-driven reconciliation from Artifact Store                |
-| `SK-R18` ownership separation              | Present                            | Installed and Workspace Skills remain separate                  |
-| `SK-R19` portable exclusion of local state | Missing                            | No complete exporter verifies portable output                   |
-| `SK-R20` legacy Store inactive             | Present                            | Reference-only package remains in source tree                   |
+| Requirement                                | Status                             | Mapping                                                                                                      |
+| ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `SK-R01` Skill Bundle Collection           | Present                            | `skill.bundle` uses Artifact Store Collection                                                                |
+| `SK-R02` Skill Artifact                    | Present                            | Installed and Workspace Skills use `agent.skill`                                                             |
+| `SK-R03` `SKILL.md` authority              | Present                            | Common parser and validator                                                                                  |
+| `SK-R04` shared decoder                    | Present                            | `skillartifact` used by Skill Bundle and Workspace                                                           |
+| `SK-R05` managed lifecycle                 | Present with known management gaps | Create and delete are implemented; update semantics need review                                              |
+| `SK-R06` external Skills                   | Present                            | Filesystem Source and relative Source Binding                                                                |
+| `SK-R07` local metadata preservation       | Present                            | Artifact local data survives refresh                                                                         |
+| `SK-R08` ArtifactRef selections            | Present                            | Presets, conversations, inference, Workspace                                                                 |
+| `SK-R09` runtime projection                | Present                            | Verified ephemeral `SkillDef`                                                                                |
+| `SK-R10` portable bundle format            | Partial                            | Linked manifest exists, self-contained package does not                                                      |
+| `SK-R11` standalone transfer               | Missing                            | No importer or exporter                                                                                      |
+| `SK-R12` bundle transfer                   | Missing                            | No complete package workflow                                                                                 |
+| `SK-R13` resources and scripts closure     | Missing                            | No generic Skill closure builder                                                                             |
+| `SK-R14` built-in package installation     | Present                            | Protected topology, 6 built-in Skill Bundles (26 skills), and Assistant Presets converged via Artifact Store |
+| `SK-R15` metadata separation               | Present                            | App registry metadata and portable collection descriptors are fully separated                                |
+| `SK-R16` same-name collision               | Partial                            | Fail-closed behavior exists in some paths                                                                    |
+| `SK-R17` derived runtime state             | Present                            | Demand-driven reconciliation from Artifact Store                                                             |
+| `SK-R18` ownership separation              | Present                            | Installed and Workspace Skills remain separate                                                               |
+| `SK-R19` portable exclusion of local state | Missing                            | No complete exporter verifies portable output                                                                |
+| `SK-R20` legacy Store inactive             | Present                            | Reference-only package remains in source tree                                                                |
 
 ### Current managed Skill workflow
 

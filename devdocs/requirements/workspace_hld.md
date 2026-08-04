@@ -562,7 +562,7 @@ Workspace owns only Workspace Artifacts.
 
 - Installed Skills remain in `skill.bundle` Collections.
 - Built-in Skills remain in the protected Root.
-- Workspace does not mount or adopt them.
+- Workspace does not mount or adopt them, and rejects protected-root access.
 - Workspace Artifact references remain same-Root.
 - The application may combine Workspace and installed Skill selections for a conversation or agent preset.
 - Portable Workspace packages may include their own Skill members.
@@ -830,28 +830,28 @@ The current `.flexigpt/workspace.json` support is a limited discovery bootstrap,
 
 ### Requirement mapping
 
-| Requirement                                | Status               | Mapping                                                   |
-| ------------------------------------------ | -------------------- | --------------------------------------------------------- |
-| `WS-R01` Workspace Collection              | Present              | Workspace uses `workspace.collection`                     |
-| `WS-R02` WorkspaceRef                      | Present              | Root and Collection identity                              |
-| `WS-R03` empty and filesystem modes        | Present              | Empty and filesystem creation flows are implemented       |
-| `WS-R04` one primary Source                | Present              | Mount policy enforces primary behavior                    |
-| `WS-R05` additional Source roles           | Present              | Library, package, and overlay mounts                      |
-| `WS-R06` deterministic discovery           | Present              | Bounded planner and decoder fingerprints                  |
-| `WS-R07` coherent catalog                  | Present              | One Collection refresh publication                        |
-| `WS-R08` Context and Skills                | Present              | `workspace.context` and shared `agent.skill`              |
-| `WS-R09` automatic adoption                | Present              | Auto-adoption and suppression                             |
-| `WS-R10` preserve local state              | Present              | Refresh reconciliation preserves local settings           |
-| `WS-R11` Context composition               | Present              | Bounded load plans and provenance                         |
-| `WS-R12` Skill runtime                     | Present              | Verified Artifact-backed handoff                          |
-| `WS-R13` separate Skill ownership          | Present              | Workspace Skills excluded from installed Skill management |
-| `WS-R14` protected Root rejection          | Present              | Workspace feature boundary rejects protected Root         |
-| `WS-R15` portable Workspace schema         | Partial              | Descriptor exists only as limited bootstrap               |
-| `WS-R16` Workspace export                  | Missing              | No linked or self-contained exporter                      |
-| `WS-R17` Workspace import                  | Missing              | No importer or identity planning                          |
-| `WS-R18` member closure                    | Missing              | Depends on Artifact Store and Skill closure support       |
-| `WS-R19` no local state in portable output | Architectural target | No exporter yet                                           |
-| `WS-R20` typed API boundary                | Present              | Workspace mutations use typed service                     |
+| Requirement                                | Status               | Mapping                                                       |
+| ------------------------------------------ | -------------------- | ------------------------------------------------------------- |
+| `WS-R01` Workspace Collection              | Present              | Workspace uses `workspace.collection`                         |
+| `WS-R02` WorkspaceRef                      | Present              | Root and Collection identity                                  |
+| `WS-R03` empty and filesystem modes        | Present              | Empty and filesystem creation flows are implemented           |
+| `WS-R04` one primary Source                | Present              | Mount policy enforces primary behavior                        |
+| `WS-R05` additional Source roles           | Present              | Library, package, and overlay mounts                          |
+| `WS-R06` deterministic discovery           | Present              | Bounded planner and decoder fingerprints                      |
+| `WS-R07` coherent catalog                  | Present              | One Collection refresh publication                            |
+| `WS-R08` Context and Skills                | Present              | `workspace.context` and shared `agent.skill`                  |
+| `WS-R09` automatic adoption                | Present              | Auto-adoption and suppression                                 |
+| `WS-R10` preserve local state              | Present              | Refresh reconciliation preserves local settings               |
+| `WS-R11` Context composition               | Present              | Bounded load plans and provenance                             |
+| `WS-R12` Skill runtime                     | Present              | Verified Artifact-backed handoff                              |
+| `WS-R13` separate Skill ownership          | Present              | Workspace Skills excluded from installed Skill management     |
+| `WS-R14` protected Root rejection          | Present              | Workspace feature boundary rejects protected Root and Sources |
+| `WS-R15` portable Workspace schema         | Partial              | Descriptor exists only as limited bootstrap                   |
+| `WS-R16` Workspace export                  | Missing              | No linked or self-contained exporter                          |
+| `WS-R17` Workspace import                  | Missing              | No importer or identity planning                              |
+| `WS-R18` member closure                    | Missing              | Depends on Artifact Store and Skill closure support           |
+| `WS-R19` no local state in portable output | Architectural target | No exporter yet                                               |
+| `WS-R20` typed API boundary                | Present              | Workspace mutations use typed service                         |
 
 ### Current Workspace workflow
 

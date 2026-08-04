@@ -1,0 +1,43 @@
+{
+	"kind": "skill.bundle",
+	"schemaID": "skill.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "product-leadership",
+	"displayName": "Product and Leadership",
+	"description": "Skills for PRDs, MRDs, decision records, feedback analysis, roadmap prioritization, delivery risk review, and status updates.",
+	"body": {
+		"memberFormat": "agent.skill-entrypoint/v1"
+	},
+	"members": [
+		{
+			"locator": "prd-mrd-authoring/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "decision-record-authoring/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "user-feedback-analysis/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "roadmap-prioritization/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "delivery-risk-review/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		},
+		{
+			"locator": "status-update-authoring/SKILL.md",
+			"mediaType": "text/markdown",
+			"role": "agent.skill"
+		}
+	]
+}

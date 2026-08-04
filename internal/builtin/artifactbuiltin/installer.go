@@ -130,7 +130,7 @@ func (i *Installer) EnsureBuiltInBundles(
 
 	output := make([]skillbundle.Bundle, 0, len(i.hydrated.Collections))
 	for _, value := range i.hydrated.OrderedCollections() {
-		value, err := i.skills.EnsureBuiltInBundleTopology(
+		bundle, err := i.skills.EnsureBuiltInBundleTopology(
 			ctx,
 			skillbundle.BuiltInBundleTopology{
 				RootID:                   i.registry.Root.ID,
@@ -149,7 +149,7 @@ func (i *Installer) EnsureBuiltInBundles(
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, value)
+		output = append(output, bundle)
 	}
 	return output, nil
 }
