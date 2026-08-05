@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef } from 'react';
+import { memo, useSyncExternalStore } from 'react';
 
 import { EnhancedMarkdown } from '@/components/markdown/markdown_enhanced';
 
@@ -32,73 +32,34 @@ function stringArraysEqual(left?: string[], right?: string[]): boolean {
 	return left.every((value, index) => value === right[index]);
 }
 
-function AppendOnlyStreamingText(props: { source: MessageStreamSource; align: string }) {
-	const textElementRef = useRef<HTMLDivElement | null>(null);
-	const loaderElementRef = useRef<HTMLDivElement | null>(null);
-	const renderedLengthRef = useRef(0);
-	const hasVisibleTextRef = useRef(false);
-
-	useLayoutEffect(() => {
-		const textElement = textElementRef.current;
-		const loaderElement = loaderElementRef.current;
-		if (!textElement || !loaderElement) {
-			return;
-		}
-
-		renderedLengthRef.current = 0;
-		hasVisibleTextRef.current = false;
-		textElement.textContent = '';
-
-		const syncText = () => {
-			const nextText = props.source.getText();
-			const previousLength = renderedLengthRef.current;
-
-			if (nextText.length < previousLength) {
-				textElement.textContent = nextText;
-				renderedLengthRef.current = nextText.length;
-				hasVisibleTextRef.current = /\S/.test(nextText);
-			} else if (nextText.length > previousLength) {
-				const appendedText = nextText.slice(previousLength);
-				const currentTextNode = textElement.firstChild;
-
-				if (previousLength > 0 && currentTextNode instanceof Text && currentTextNode.nextSibling === null) {
-					currentTextNode.appendData(appendedText);
-				} else {
-					textElement.textContent = nextText;
-				}
-
-				renderedLengthRef.current = nextText.length;
-
-				if (!hasVisibleTextRef.current && /\S/.test(appendedText)) {
-					hasVisibleTextRef.current = true;
-				}
-			}
-
-			const hasVisibleText = hasVisibleTextRef.current;
-			textElement.style.display = hasVisibleText ? '' : 'none';
-			loaderElement.style.display = hasVisibleText ? 'none' : '';
-		};
-
-		syncText();
-		return props.source.subscribe(syncText);
-	}, [props.source]);
+function StreamingMarkdownContent(props: {
+	source: MessageStreamSource;
+	align: string;
+	diffCandidatePaths?: string[];
+	defaultCodeBlockExpanded: boolean;
+}) {
+	// Use text itself as the snapshot. Thinking-only stream notifications do
+	// not cause the Markdown tree to reparse when the visible answer is unchanged.
+	const text = useSyncExternalStore(props.source.subscribe, props.source.getText, props.source.getText);
+	const hasText = /\S/.test(text);
 
 	return (
-		<>
-			<div
-				ref={textElementRef}
-				className={`${props.align} wrap-break-word whitespace-pre-wrap`}
-				style={{
-					display: 'none',
-					lineHeight: 1.5,
-					fontSize: 14,
-					contain: 'paint',
-				}}
-			/>
-			<div ref={loaderElementRef} className="flex items-center gap-2 p-0">
+		<div className="p-0">
+			{hasText ? (
+				<EnhancedMarkdown
+					text={text}
+					align={props.align}
+					isBusy={true}
+					diffCandidatePaths={props.diffCandidatePaths}
+					defaultCodeBlockExpanded={props.defaultCodeBlockExpanded}
+				/>
+			) : null}
+
+			<output className="flex items-center gap-2 p-0" aria-live="polite">
 				Thinking <span className="loading loading-dots loading-sm ml-2" />
-			</div>
-		</>
+				<span className="sr-only">Generating response</span>
+			</output>
+		</div>
 	);
 }
 
@@ -129,9 +90,17 @@ export const MessageContentCard = memo(function MessageContentCard({
 	const renderBusy = isBusy;
 
 	// The live source owns text rendering while this message has the
-	// in-flight request. Non-streaming requests keep showing the loader.
+	// in-flight request. Streaming Markdown deliberately ignores deferred
+	// transcript rendering so the current answer remains formatted.
 	if (isBusy && streamSource) {
-		return <AppendOnlyStreamingText source={streamSource} align={align} />;
+		return (
+			<StreamingMarkdownContent
+				source={streamSource}
+				align={align}
+				diffCandidatePaths={diffCandidatePaths}
+				defaultCodeBlockExpanded={defaultCodeBlockExpanded}
+			/>
+		);
 	}
 
 	// If we truly have nothing:

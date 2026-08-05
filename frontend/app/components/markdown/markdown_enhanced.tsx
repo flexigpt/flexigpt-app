@@ -275,14 +275,15 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 					);
 				}
 
-				if (isBusy && language.toLowerCase() === 'math') {
+				// Streaming keeps fenced code cheap and literal. In particular,
+				// this avoids Shiki, Mermaid rendering, diff parsing, and KaTeX.
+				if (isBusy) {
 					return (
 						<pre className="app-text-code app-bg-code my-4 overflow-auto rounded-lg p-2 text-sm">
-							<code>{value}</code>
+							<code className={className}>{value}</code>
 						</pre>
 					);
 				}
-
 				return (
 					<CodeBlock
 						language={language}

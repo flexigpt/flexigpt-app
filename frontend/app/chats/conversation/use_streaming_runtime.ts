@@ -19,21 +19,7 @@ interface UseStreamingRuntimeArgs {
 	selectedTabIdRef: RefObject<string>;
 }
 
-const SHORT_STREAM_RENDER_INTERVAL_MS = 32;
-const LONG_STREAM_RENDER_INTERVAL_MS = 50;
-const VERY_LONG_STREAM_RENDER_INTERVAL_MS = 80;
 const BACKGROUND_STREAM_COMPACT_CHUNK_COUNT = 256;
-
-function getStreamRenderInterval(buffer: StreamBuffer): number {
-	const displayedLength = buffer.text.display.length + buffer.thinking.display.length;
-	if (displayedLength >= 64_000) {
-		return VERY_LONG_STREAM_RENDER_INTERVAL_MS;
-	}
-	if (displayedLength >= 16_000) {
-		return LONG_STREAM_RENDER_INTERVAL_MS;
-	}
-	return SHORT_STREAM_RENDER_INTERVAL_MS;
-}
 
 function flushStreamChannel(channel: StreamChannelBuffer): void {
 	if (channel.flushedIdx >= channel.chunks.length) {
@@ -61,7 +47,6 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 	const streamBuffersRef = useRef(new Map<string, StreamBuffer>());
 	const streamVersionRef = useRef(new Map<string, number>());
 	const streamListenersRef = useRef(new Map<string, Set<() => void>>());
-	const notifyTimersRef = useRef(new Map<string, number | null>());
 
 	useLayoutEffect(() => {
 		tabIdSetRef.current = tabIdSet;
@@ -90,12 +75,6 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 	const clearStreamBuffer = useCallback(
 		(tabId: string) => {
-			const pendingTimer = notifyTimersRef.current.get(tabId) ?? null;
-			if (pendingTimer !== null) {
-				window.clearTimeout(pendingTimer);
-				notifyTimersRef.current.set(tabId, null);
-			}
-
 			const buffer = getStreamBuffer(tabId);
 
 			buffer.text.chunks = [];
@@ -199,23 +178,9 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 				return;
 			}
 
-			const existingTimer = notifyTimersRef.current.get(tabId) ?? null;
-			if (existingTimer !== null) {
-				return;
-			}
-
-			const renderInterval = getStreamRenderInterval(buffer);
-			const timer = window.setTimeout(() => {
-				notifyTimersRef.current.set(tabId, null);
-
-				if (!tabIdSetRef.current.has(tabId) || selectedTabIdRef.current !== tabId) {
-					return;
-				}
-
-				notifyStreamNow(tabId);
-			}, renderInterval);
-
-			notifyTimersRef.current.set(tabId, timer);
+			// The backend controls event cadence. Do not add a second client-side
+			// timer: each active-tab stream event should be visible immediately.
+			notifyStreamNow(tabId);
 		},
 		[flushStreamForTab, getStreamBuffer, notifyStreamNow, selectedTabIdRef]
 	);
@@ -240,11 +205,6 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 			streamBuffersRef.current.delete(tabId);
 			streamVersionRef.current.delete(tabId);
 
-			const timer = notifyTimersRef.current.get(tabId) ?? null;
-			if (timer !== null) {
-				window.clearTimeout(timer);
-			}
-			notifyTimersRef.current.delete(tabId);
 			streamListenersRef.current.delete(tabId);
 		},
 		[getAbortRef]
@@ -252,7 +212,6 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 	useEffect(() => {
 		const abortRefsCurrent = abortRefs.current;
-		const notifyTimersCurrent = notifyTimersRef.current;
 
 		return () => {
 			try {
@@ -261,12 +220,6 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 				}
 			} catch {
 				// ignore
-			}
-
-			for (const timer of notifyTimersCurrent.values()) {
-				if (timer !== null) {
-					window.clearTimeout(timer);
-				}
 			}
 		};
 	}, []);

@@ -102,6 +102,17 @@ export function Sidebar({ children }: SidebarProps) {
 						</li>
 						<li className="mt-4">
 							<Link
+								to="/skills/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="Skills"
+								title="Skills"
+							>
+								<FiFilePlus size={24} />
+							</Link>
+						</li>
+						<li className="mt-4">
+							<Link
 								to="/mcpservers/"
 								className="flex size-12 items-center justify-center rounded-full p-0"
 								onClick={toggle}
@@ -124,17 +135,6 @@ export function Sidebar({ children }: SidebarProps) {
 						</li>
 						<li className="mt-4">
 							<Link
-								to="/skills/"
-								className="flex size-12 items-center justify-center rounded-full p-0"
-								onClick={toggle}
-								aria-label="Skills"
-								title="Skills"
-							>
-								<FiFilePlus size={24} />
-							</Link>
-						</li>
-						<li className="mt-4">
-							<Link
 								to="/modelpresets/"
 								className="flex size-12 items-center justify-center rounded-full p-0"
 								onClick={toggle}
@@ -144,7 +144,6 @@ export function Sidebar({ children }: SidebarProps) {
 								<FiSliders size={24} />
 							</Link>
 						</li>
-
 						<li className="mt-4">
 							<Link
 								to="/settings/"
@@ -156,7 +155,6 @@ export function Sidebar({ children }: SidebarProps) {
 								<FiSettings size={24} />
 							</Link>
 						</li>
-
 						<li className="mt-4">
 							<Link
 								to="/docs/"

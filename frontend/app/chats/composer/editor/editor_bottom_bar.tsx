@@ -169,6 +169,32 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						onInsertTemplateText={onInsertWorkspaceTemplateText}
 					/>
 
+					<SkillsBottomBarChip
+						store={skillsMenuState}
+						shortcut={shortcutLabels.skills}
+						allSkills={allSkills}
+						loading={skillsLoading}
+						loadError={skillsLoadError}
+						enabledSkillRefs={enabledSkillRefs}
+						activeSkillRefs={activeSkillRefs}
+						setEnabledSkillRefs={setEnabledSkillRefs}
+						setActiveSkillRefs={setActiveSkillRefs}
+						onEnableAll={onEnableAllSkills}
+						onDisableAll={onDisableAllSkills}
+						onRefreshSkills={onRefreshSkills}
+						systemPrompt={systemPrompt}
+						isInputLocked={isInputLocked}
+					/>
+
+					<SkillTemplateBottomBarChip
+						store={templateMenuState}
+						buttonRef={templateButtonRef}
+						shortcut={shortcutLabels.templates}
+						onInsertTemplateText={onInsertTemplateText}
+						onAttachResourcePaths={onAttachTemplateResourcePaths}
+						isInputLocked={isInputLocked}
+					/>
+
 					<AttachmentBottomBarChip
 						store={attachmentMenuState}
 						buttonRef={attachmentButtonRef}
@@ -210,32 +236,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						setWebSearchTemplates={setWebSearchTemplates}
 						onWebSearchArgsBlockedChange={onWebSearchArgsBlockedChange}
 						toolArgsEventTarget={toolArgsEventTarget}
-						isInputLocked={isInputLocked}
-					/>
-
-					<SkillsBottomBarChip
-						store={skillsMenuState}
-						shortcut={shortcutLabels.skills}
-						allSkills={allSkills}
-						loading={skillsLoading}
-						loadError={skillsLoadError}
-						enabledSkillRefs={enabledSkillRefs}
-						activeSkillRefs={activeSkillRefs}
-						setEnabledSkillRefs={setEnabledSkillRefs}
-						setActiveSkillRefs={setActiveSkillRefs}
-						onEnableAll={onEnableAllSkills}
-						onDisableAll={onDisableAllSkills}
-						onRefreshSkills={onRefreshSkills}
-						systemPrompt={systemPrompt}
-						isInputLocked={isInputLocked}
-					/>
-
-					<SkillTemplateBottomBarChip
-						store={templateMenuState}
-						buttonRef={templateButtonRef}
-						shortcut={shortcutLabels.templates}
-						onInsertTemplateText={onInsertTemplateText}
-						onAttachResourcePaths={onAttachTemplateResourcePaths}
 						isInputLocked={isInputLocked}
 					/>
 				</div>

@@ -7,7 +7,7 @@ import { ThinkingFence } from '@/components/markdown/thinking_fence';
 import type { MessageStreamSource } from '@/chats/messages/message_content_card';
 
 const EMPTY_STREAM_SUBSCRIBE = () => () => {};
-const EMPTY_STREAM_SNAPSHOT = () => 0;
+const EMPTY_STREAM_TEXT_SNAPSHOT = () => '';
 
 function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'summary' | 'thinking'): string {
 	const items = reasoning ?? [];
@@ -30,17 +30,17 @@ export const MessageThinkingSection = memo(function MessageThinkingSection(props
 }) {
 	const { isBusy, reasoningContents, streamSource } = props;
 
-	useSyncExternalStore(
+	const streamedThinking = useSyncExternalStore(
 		streamSource?.subscribe ?? EMPTY_STREAM_SUBSCRIBE,
-		streamSource?.getVersionSnapshot ?? EMPTY_STREAM_SNAPSHOT,
-		EMPTY_STREAM_SNAPSHOT
+		streamSource?.getThinking ?? EMPTY_STREAM_TEXT_SNAPSHOT,
+		EMPTY_STREAM_TEXT_SNAPSHOT
 	);
 
 	const finalSummary = useMemo(() => joinReasoningParts(reasoningContents, 'summary'), [reasoningContents]);
 	const finalThinking = useMemo(() => joinReasoningParts(reasoningContents, 'thinking'), [reasoningContents]);
 
 	// Prefer streamed thinking while busy; otherwise show final thinking.
-	const thinkingText = isBusy ? (streamSource?.getThinking() ?? '') : finalThinking.trimEnd();
+	const thinkingText = isBusy ? streamedThinking : finalThinking.trimEnd();
 
 	// Thinking is optional: only show when we actually have something to display.
 	const hasSummary = /\S/.test(finalSummary);

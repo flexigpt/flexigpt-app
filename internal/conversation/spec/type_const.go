@@ -28,7 +28,7 @@ type ConversationMessage struct {
 	ID        string                 `json:"id"`
 	CreatedAt time.Time              `json:"createdAt"`
 	Role      inferenceSpec.RoleEnum `json:"role"`
-	Status    inferenceSpec.Status   `json:"status,omitzero"`
+	Status    inferenceSpec.Status   `json:"status"`
 
 	// Default model configuration for this turn. This can be empty and would mean that model param have been carried
 	// over from previous messages. Same for model ref.
