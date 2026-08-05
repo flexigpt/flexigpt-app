@@ -33,7 +33,7 @@ import {
 	supportsOutputVerbosity,
 } from '@/modelpresets/lib/capabilities_override';
 import { getChatInputOptions } from '@/modelpresets/lib/uichatoption_helper';
-import { isInstalledSkillRef, normalizeSkillSelectionsToRefs } from '@/skills/lib/skill_identity_utils';
+import { isSkillArtifactRef, normalizeSkillSelectionsToRefs } from '@/skills/lib/skill_identity_utils';
 
 type ChatInputOptionsResult = Awaited<ReturnType<typeof getChatInputOptions>>;
 
@@ -675,9 +675,9 @@ export function useAssistantContextState(): AssistantContextController {
 			const requestedSkillSels = preset.startingSkillSelections ?? [];
 
 			for (const selection of requestedSkillSels) {
-				if (!isInstalledSkillRef(selection.skillRef)) {
+				if (!isSkillArtifactRef(selection.artifact)) {
 					throw new Error(
-						'Assistant preset contains a malformed Skill reference. Installed bundleID, skillSlug, and skillID are required.'
+						'Assistant preset contains an invalid Skill reference. ArtifactRef (rootID and artifactID) is required.'
 					);
 				}
 			}
@@ -696,15 +696,15 @@ export function useAssistantContextState(): AssistantContextController {
 				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
 
 				const invalidSkillSel = sessionSkillSels.find(sel => {
-					const skillOption = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
+					const skillOption = skillOptionByKey.get(buildSkillRefKey(sel.artifact));
 					return !skillOption || !skillOption.isSelectable;
 				});
 
 				if (invalidSkillSel) {
-					const invalidSkillOption = skillOptionByKey.get(buildSkillRefKey(invalidSkillSel.skillRef));
+					const invalidSkillOption = skillOptionByKey.get(buildSkillRefKey(invalidSkillSel.artifact));
 					throw new Error(
 						invalidSkillOption?.availabilityReason ??
-							`Skill "${invalidSkillSel.skillRef.bundleID}/${invalidSkillSel.skillRef.skillSlug}#${invalidSkillSel.skillRef.skillID}" is not currently available.`
+							`Skill "${invalidSkillSel.artifact.rootID}/${invalidSkillSel.artifact.artifactID}" is not currently available.`
 					);
 				}
 			}

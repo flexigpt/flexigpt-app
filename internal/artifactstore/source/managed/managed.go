@@ -266,18 +266,19 @@ func (a *Adapter) PublishPackage(
 	if err != nil {
 		return "", err
 	}
-	if exists {
-		if !equivalent {
-			return "", fmt.Errorf(
-				"%w: managed package %q already exists with different content",
-				basespec.ErrConflict,
-				publication.Directory,
-			)
-		}
+	if exists && equivalent {
 		return a.confirmedGeneration(ctx, value)
 	}
 
-	if publication.ExpectedGeneration != "" {
+	if exists && publication.ExpectedGeneration == "" {
+		return "", fmt.Errorf(
+			"%w: replacing managed package %q requires an expected generation",
+			basespec.ErrConflict,
+			publication.Directory,
+		)
+	}
+
+	if publication.ExpectedGeneration != "" || exists {
 		if err := basespec.ValidateSourceGeneration(
 			publication.ExpectedGeneration,
 		); err != nil {
@@ -289,7 +290,7 @@ func (a *Adapter) PublishPackage(
 		}
 		if current != publication.ExpectedGeneration {
 			return "", fmt.Errorf(
-				"%w: managed Source changed before package publication",
+				"%w: managed Source changed before package publication or replacement",
 				basespec.ErrConflict,
 			)
 		}
@@ -331,19 +332,67 @@ func (a *Adapter) PublishPackage(
 		return "", err
 	}
 
-	// The target package must not already exist. Renaming a fully staged
-	// directory is the Source-side publication boundary.
+	var previousPackage string
+	if exists {
+		previousPackage, err = os.MkdirTemp(
+			stagingRoot,
+			"previous-package-*",
+		)
+		if err != nil {
+			return "", err
+		}
+		if err := os.Remove(previousPackage); err != nil {
+			return "", err
+		}
+		if err := os.Rename(target, previousPackage); err != nil {
+			return "", fmt.Errorf(
+				"stage previous managed package for replacement: %w",
+				err,
+			)
+		}
+	}
+
+	restorePrevious := func(cause error) error {
+		if previousPackage == "" {
+			return cause
+		}
+
+		removeErr := os.RemoveAll(target)
+		restoreErr := os.Rename(previousPackage, target)
+		return errors.Join(cause, removeErr, restoreErr)
+	}
+
+	// Renaming the fully staged package is the source-side publication
+	// boundary. For replacement, the previous complete package is retained in
+	// staging until the new package has been installed successfully.
 	if err := os.Rename(packageRoot, target); err != nil {
-		exists, equivalent, verifyErr := equivalentPackage(target, files)
-		if verifyErr == nil && exists && equivalent {
+		targetExists, targetEquivalent, verifyErr := equivalentPackage(
+			target,
+			files,
+		)
+		if verifyErr == nil && targetExists && targetEquivalent {
 			committed = true
 			_ = os.RemoveAll(temporary)
+			if previousPackage != "" {
+				_ = os.RemoveAll(previousPackage)
+			}
 			return a.confirmedGeneration(ctx, value)
 		}
-		return "", fmt.Errorf("publish managed package: %w", err)
+		return "", restorePrevious(
+			fmt.Errorf("publish managed package: %w", err),
+		)
 	}
+
 	committed = true
 	_ = os.RemoveAll(temporary)
+	if previousPackage != "" {
+		if err := os.RemoveAll(previousPackage); err != nil {
+			return "", fmt.Errorf(
+				"remove replaced managed package staging data: %w",
+				err,
+			)
+		}
+	}
 	return a.confirmedGeneration(ctx, value)
 }
 

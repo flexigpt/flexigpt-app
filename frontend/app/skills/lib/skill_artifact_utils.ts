@@ -1,4 +1,5 @@
-import type { Skill, SkillArgument, SkillInsert, SkillResourceInfo } from '@/spec/skill';
+import type { Skill, SkillArgument, SkillResourceInfo } from '@/spec/skill';
+import { SkillInsert } from '@/spec/skill';
 
 export type SkillInsertFilter = 'all' | SkillInsert;
 
@@ -17,11 +18,11 @@ export interface SkillMarkdownScaffoldInput {
 }
 
 export function normalizeSkillInsert(insert?: string | null): NormalizedSkillInsert {
-	if (insert === 'user-message' || insert === 'instructions') {
+	if (insert === SkillInsert.UserMessage || insert === SkillInsert.Instructions) {
 		return { value: insert, isDefaulted: false };
 	}
 
-	return { value: 'instructions', isDefaulted: true };
+	return { value: SkillInsert.Instructions, isDefaulted: true };
 }
 
 export function normalizeSkillSourceTags(sourceTags?: string[] | null): string[] {
@@ -47,22 +48,22 @@ export function skillMatchesInsertFilter(insert?: string | null, filter: SkillIn
 
 export function getSkillInsertLabel(insert?: string | null): string {
 	const normalized = normalizeSkillInsert(insert);
-	const label = normalized.value === 'user-message' ? 'User message' : 'Instructions';
+	const label = normalized.value === SkillInsert.UserMessage ? 'User message' : 'Instructions';
 	return normalized.isDefaulted ? `${label} (default)` : label;
 }
 
 export function getSkillInsertShortLabel(insert?: string | null): string {
-	return normalizeSkillInsert(insert).value === 'user-message' ? 'User-message' : 'Instructions';
+	return normalizeSkillInsert(insert).value === SkillInsert.UserMessage ? 'User-message' : 'Instructions';
 }
 
 export function getSkillInsertDescription(insert?: string | null): string {
-	return normalizeSkillInsert(insert).value === 'user-message'
+	return normalizeSkillInsert(insert).value === SkillInsert.UserMessage
 		? 'Rendered into the user message or composer body. It is not loaded as active session context.'
 		: 'Loaded as skill instructions/context. It can be preloaded into sessions and shown to the model.';
 }
 
 export function getSkillInsertLongGuidance(insert?: string | null): string {
-	return normalizeSkillInsert(insert).value === 'user-message'
+	return normalizeSkillInsert(insert).value === SkillInsert.UserMessage
 		? 'Use this when the skill is a prompt-like template. The rendered text is inserted into a user message or composer draft. Indexed filesystem resources can be selected as ordinary message attachments. The skill is not loaded as persistent session context.'
 		: 'Use this when the skill is standing instruction or context. It can be enabled for a conversation and loaded as an active session skill.';
 }
@@ -106,7 +107,7 @@ function skillArgumentCount(skill: Pick<Skill, 'arguments'>): number {
 }
 
 export function isInstructionInsertSkill(skill: Pick<Skill, 'insert'>): boolean {
-	return normalizeSkillInsert(skill.insert).value === 'instructions';
+	return normalizeSkillInsert(skill.insert).value === SkillInsert.Instructions;
 }
 
 export function skillCanBeRenderedAsInstructionPrompt(
@@ -289,14 +290,14 @@ export function buildSkillMarkdownScaffold(input: SkillMarkdownScaffoldInput): s
 	const displayName = input.displayName?.trim() || humanizeName(name);
 	const body =
 		input.body?.trim() ||
-		(insert === 'user-message'
+		(insert === SkillInsert.UserMessage
 			? 'Write the user-message template body here. Use $argument or {{ argument }} placeholders.'
 			: 'Write instruction/context material here. The model can load this as active session context.');
 	const args = input.arguments?.filter(arg => arg.name.trim()) ?? [];
 
 	const lines: string[] = ['---', `name: ${yamlQuote(name)}`, `description: ${yamlQuote(description)}`];
 
-	if (insert !== 'instructions') {
+	if (insert !== SkillInsert.Instructions) {
 		lines.push(`insert: ${yamlQuote(insert)}`);
 	} else {
 		lines.push('insert: instructions');
@@ -329,7 +330,7 @@ export function buildSkillForkBodyPlaceholder(source: Skill): string {
 	const insert = normalizeSkillInsert(source.insert).value;
 	const sourceLabel = source.displayName || source.name || source.slug;
 
-	return insert === 'user-message'
+	return insert === SkillInsert.UserMessage
 		? `Forked from "${sourceLabel}". Replace this placeholder with the new user-message template body.\n\nUse $argument or {{ argument }} placeholders declared above.`
 		: `Forked from "${sourceLabel}". Replace this placeholder with instruction/context material.\n\nOnly instruction skills can be activated in a skill session.`;
 }

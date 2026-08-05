@@ -1,5 +1,4 @@
 import type {
-	ArtifactRef,
 	ArtifactRoot,
 	ArtifactRootID,
 	ArtifactSourceID,
@@ -12,12 +11,21 @@ import type {
 	PublishManagedSourcePackageBody,
 	PurgeArtifactRootResult,
 	PurgeArtifactSourceResult,
+	RemoveManagedSourcePackageBody,
 	UpdateArtifactRootBody,
 	UpdateArtifactSourceBody,
 } from '@/spec/artifact';
 
 import type { IArtifactStoreAPI } from '@/apis/interface';
-import { byteArrayToWails, rawJSONObjectToWails, requireWailsBody, toFrontendDate } from '@/apis/wailsapi/transport';
+import {
+	byteArrayToWails,
+	rawJSONObjectToWails,
+	requireWailsArray,
+	requireWailsBody,
+	requireWailsObject,
+	requireWailsString,
+	toFrontendDate,
+} from '@/apis/wailsapi/transport';
 import {
 	CreateArtifactRoot,
 	CreateArtifactSource,
@@ -28,7 +36,6 @@ import {
 	ListArtifactSourceKinds,
 	ListArtifactSources,
 	PublishManagedSourcePackage,
-	PurgeArtifact,
 	PurgeArtifactRoot,
 	PurgeArtifactSource,
 	RemoveManagedSourcePackage,
@@ -38,17 +45,8 @@ import {
 	UpdateArtifactSource,
 } from '@/apis/wailsjs/go/main/ArtifactStoreWrapper';
 
-type WailsObject = Record<string, any>;
-
-function asObject(value: unknown, operation: string): WailsObject {
-	if (value === null || typeof value !== 'object') {
-		throw new Error(`${operation} returned an invalid object.`);
-	}
-	return value as WailsObject;
-}
-
 function artifactRootFromWails(value: unknown): ArtifactRoot {
-	const root = asObject(value, 'ArtifactRoot');
+	const root = requireWailsObject(value, 'ArtifactRoot');
 
 	return {
 		id: root.id as ArtifactRootID,
@@ -58,11 +56,11 @@ function artifactRootFromWails(value: unknown): ArtifactRoot {
 		createdAt: toFrontendDate(root.createdAt, 'artifactRoot.createdAt'),
 		modifiedAt: toFrontendDate(root.modifiedAt, 'artifactRoot.modifiedAt'),
 		retiredAt: root.retiredAt ? toFrontendDate(root.retiredAt, 'artifactRoot.retiredAt') : undefined,
-	};
+	} as ArtifactRoot;
 }
 
 function artifactSourceFromWails(value: unknown): ArtifactSourceSummary {
-	const source = asObject(value, 'ArtifactSourceSummary');
+	const source = requireWailsObject(value, 'ArtifactSourceSummary');
 
 	return {
 		id: source.id as ArtifactSourceID,
@@ -79,6 +77,7 @@ function artifactSourceFromWails(value: unknown): ArtifactSourceSummary {
 
 function createSourceBodyToWails(body: CreateArtifactSourceBody): unknown {
 	return {
+		id: body.id,
 		kind: body.kind,
 		displayName: body.displayName,
 		enabled: body.enabled,
@@ -126,9 +125,9 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 
 	async listArtifactRoots(): Promise<ArtifactRoot[]> {
 		const response = await ListArtifactRoots({} as Parameters<typeof ListArtifactRoots>[0]);
-		const body = asObject(requireWailsBody(response.Body, 'ListArtifactRoots'), 'ListArtifactRoots');
+		const body = requireWailsObject(requireWailsBody(response.Body, 'ListArtifactRoots'), 'ListArtifactRoots');
 
-		return ((body.roots as unknown[]) ?? []).map(r => {
+		return requireWailsArray(body.roots, 'ListArtifactRoots.roots').map(r => {
 			return artifactRootFromWails(r);
 		});
 	}
@@ -152,7 +151,7 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 	}
 
 	async purgeArtifactRoot(rootID: ArtifactRootID, expectedRevision: number): Promise<PurgeArtifactRootResult> {
-		const result = asObject(
+		const result = requireWailsObject(
 			await PurgeArtifactRoot({
 				RootID: rootID,
 				expectedRevision,
@@ -160,7 +159,7 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 			'PurgeArtifactRoot'
 		);
 
-		return { rootID: result.rootID as ArtifactRootID };
+		return { rootID: requireWailsString(result.rootID, 'PurgeArtifactRoot.rootID') as ArtifactRootID };
 	}
 
 	async createArtifactSource(rootID: ArtifactRootID, body: CreateArtifactSourceBody): Promise<ArtifactSourceSummary> {
@@ -186,10 +185,10 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 			RootID: rootID,
 		} as Parameters<typeof ListArtifactSources>[0]);
 
-		const body = asObject(requireWailsBody(response.Body, 'ListArtifactSources'), 'ListArtifactSources');
-		return ((body.sources as unknown[]) ?? []).map(s => {
-			return artifactSourceFromWails(s);
-		});
+		const body = requireWailsObject(requireWailsBody(response.Body, 'ListArtifactSources'), 'ListArtifactSources');
+		return requireWailsArray(body.sources, 'ListArtifactSources.sources').map(source =>
+			artifactSourceFromWails(source)
+		);
 	}
 
 	async updateArtifactSource(
@@ -225,7 +224,7 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 		sourceID: ArtifactSourceID,
 		expectedRevision: number
 	): Promise<PurgeArtifactSourceResult> {
-		const result = asObject(
+		const result = requireWailsObject(
 			await PurgeArtifactSource({
 				RootID: rootID,
 				SourceID: sourceID,
@@ -242,21 +241,14 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 
 	async listArtifactSourceKinds(): Promise<ArtifactSourceKind[]> {
 		const response = await ListArtifactSourceKinds({} as Parameters<typeof ListArtifactSourceKinds>[0]);
-		const body = asObject(requireWailsBody(response.Body, 'ListArtifactSourceKinds'), 'ListArtifactSourceKinds');
-
-		return ((body.kinds as string[]) ?? []) as ArtifactSourceKind[];
-	}
-
-	async purgeArtifact(artifact: ArtifactRef, expectedRevision: number): Promise<ArtifactRef> {
-		const result = asObject(
-			await PurgeArtifact({
-				artifact,
-				expectedRevision,
-			} as Parameters<typeof PurgeArtifact>[0]),
-			'PurgeArtifact'
+		const body = requireWailsObject(
+			requireWailsBody(response.Body, 'ListArtifactSourceKinds'),
+			'ListArtifactSourceKinds'
 		);
 
-		return result.artifact as ArtifactRef;
+		return requireWailsArray(body.kinds, 'ListArtifactSourceKinds.kinds').map(
+			(kind, index) => requireWailsString(kind, `ListArtifactSourceKinds.kinds[${index}]`) as ArtifactSourceKind
+		);
 	}
 
 	async getManagedSourceState(rootID: ArtifactRootID, sourceID: ArtifactSourceID): Promise<ManagedSourceState> {
@@ -265,8 +257,7 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 			sourceID,
 		} as Parameters<typeof GetManagedSourceState>[0]);
 
-		const body = asObject(requireWailsBody(response.Body, 'GetManagedSourceState'), 'GetManagedSourceState');
-
+		const body = requireWailsObject(requireWailsBody(response.Body, 'GetManagedSourceState'), 'GetManagedSourceState');
 		return {
 			generation: body.generation as string,
 			source: artifactSourceFromWails(body.source),
@@ -284,7 +275,7 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 			Body: publishManagedPackageBodyToWails(body),
 		} as Parameters<typeof PublishManagedSourcePackage>[0]);
 
-		const responseBody = asObject(
+		const responseBody = requireWailsObject(
 			requireWailsBody(response.Body, 'PublishManagedSourcePackage'),
 			'PublishManagedSourcePackage'
 		);
@@ -298,23 +289,24 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 	async removeManagedSourcePackage(
 		rootID: ArtifactRootID,
 		sourceID: ArtifactSourceID,
-		expectedSourceRevision: number,
-		directory: string,
-		expectedGeneration: string
+		body: RemoveManagedSourcePackageBody
 	): Promise<ManagedSourcePackageResult> {
 		const response = await RemoveManagedSourcePackage({
 			rootID,
 			sourceID,
-			expectedSourceRevision,
-			directory,
-			expectedGeneration,
+			expectedSourceRevision: body.expectedSourceRevision,
+			directory: body.directory,
+			expectedGeneration: body.expectedGeneration,
 		} as Parameters<typeof RemoveManagedSourcePackage>[0]);
 
-		const body = asObject(requireWailsBody(response.Body, 'RemoveManagedSourcePackage'), 'RemoveManagedSourcePackage');
+		const responseBody = requireWailsObject(
+			requireWailsBody(response.Body, 'RemoveManagedSourcePackage'),
+			'RemoveManagedSourcePackage'
+		);
 
 		return {
-			generation: body.generation as string,
-			source: artifactSourceFromWails(body.source),
+			generation: responseBody.generation as string,
+			source: artifactSourceFromWails(responseBody.source),
 		};
 	}
 }

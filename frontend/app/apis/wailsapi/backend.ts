@@ -5,6 +5,13 @@ import type { Attachment, DirectoryAttachmentsResult, FileFilter, PathAttachment
 
 import type { IBackendAPI, ILogger } from '@/apis/interface';
 import {
+	attachmentFromWails,
+	directoryAttachmentsResultFromWails,
+	pathAttachmentsResultFromWails,
+	requireNonBlankString,
+	requireWailsArray,
+} from '@/apis/wailsapi/transport';
+import {
 	GetAppVersion,
 	GetPathsAsAttachments,
 	OpenDirectoryAsAttachments,
@@ -187,63 +194,40 @@ export class WailsBackendAPI implements IBackendAPI {
 	}
 
 	openURL(url: string): void {
-		BrowserOpenURL(url);
+		BrowserOpenURL(requireNonBlankString(url, 'url'));
 	}
 
 	async openURLAsAttachment(rawURL: string): Promise<Attachment | undefined> {
 		try {
 			const att = await OpenURLAsAttachment(rawURL);
-			return att as Attachment;
+			return attachmentFromWails(att, 'OpenURLAsAttachment');
 		} catch (err) {
-			console.error('Error saving file:', err);
+			console.error('Error opening URL as attachment:', err);
 		}
 		return undefined;
 	}
 
 	async saveFile(defaultFilename: string, contentBase64: string, additionalFilters?: Array<FileFilter>): Promise<void> {
-		// Call the Go backend method to save the file
-		try {
-			await SaveFile(defaultFilename, contentBase64, additionalFilters ?? []);
-		} catch (err) {
-			console.error('Error saving file:', err);
-		}
+		await SaveFile(defaultFilename, contentBase64, additionalFilters ?? []);
 	}
 
 	async openMultipleFilesAsAttachments(
 		allowMultiple: boolean,
 		additionalFilters?: Array<FileFilter>
 	): Promise<Attachment[]> {
-		try {
-			const attachments = await OpenMultipleFilesAsAttachments(allowMultiple, additionalFilters ?? []);
-
-			return (attachments as Attachment[]) ?? [];
-		} catch (err) {
-			console.error('Error opening file dialog:', err);
-			return [];
-		}
+		const attachments = await OpenMultipleFilesAsAttachments(allowMultiple, additionalFilters ?? []);
+		return requireWailsArray(attachments, 'OpenMultipleFilesAsAttachments').map((attachment, index) =>
+			attachmentFromWails(attachment, `OpenMultipleFilesAsAttachments[${index}]`)
+		);
 	}
 
 	async openDirectoryAsAttachments(maxFiles: number): Promise<DirectoryAttachmentsResult> {
-		try {
-			const dirResults = await OpenDirectoryAsAttachments(maxFiles);
-
-			return (dirResults as DirectoryAttachmentsResult) ?? [];
-		} catch (err) {
-			console.error('Error opening dir dialog:', err);
-			const res: DirectoryAttachmentsResult = {
-				dirPath: '',
-				attachments: [],
-				overflowDirs: [],
-				maxFiles: 0,
-				totalSize: 0,
-				hasMore: false,
-			};
-			return res;
-		}
+		const result = await OpenDirectoryAsAttachments(maxFiles);
+		return directoryAttachmentsResultFromWails(result, 'OpenDirectoryAsAttachments');
 	}
 
 	async getPathsAsAttachments(paths: string[], maxFilesPerDir: number): Promise<PathAttachmentsResult> {
 		const pathResults = await GetPathsAsAttachments(paths, maxFilesPerDir);
-		return pathResults as PathAttachmentsResult;
+		return pathAttachmentsResultFromWails(pathResults, 'GetPathsAsAttachments');
 	}
 }

@@ -2,12 +2,23 @@ import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 export type ArtifactRootID = string;
 export type ArtifactSourceID = string;
-type ArtifactCollectionID = string;
-type ArtifactID = string;
+export type ArtifactCollectionID = string;
+export type ArtifactID = string;
+
+/**
+ * Artifact kinds and Source kinds are registry-extensible backend identifiers.
+ * They intentionally remain strings rather than frontend enums.
+ */
 export type ArtifactKind = string;
 export type ArtifactSourceKind = string;
 export type ArtifactLocator = string;
 export type ArtifactDigest = string;
+type ArtifactSourceGeneration = string;
+
+/**
+ * Write-only adapter configuration. It is never returned by Source APIs.
+ */
+type ArtifactSourceConfig = JSONRawString;
 
 export enum ArtifactAdoptionMode {
 	Observed = 'observed',
@@ -41,6 +52,11 @@ export interface ArtifactRef {
 export interface ArtifactCollectionRef {
 	rootID: ArtifactRootID;
 	collectionID: ArtifactCollectionID;
+}
+
+export interface ArtifactAddress extends ArtifactRef {
+	collectionID: ArtifactCollectionID;
+	kind: ArtifactKind;
 }
 
 export interface PurgeArtifactRootResult {
@@ -77,6 +93,7 @@ export interface ArtifactRoot {
 }
 
 export interface CreateArtifactRootBody {
+	id: ArtifactRootID;
 	displayName: string;
 	description?: string;
 }
@@ -86,14 +103,6 @@ export interface UpdateArtifactRootBody {
 	displayName: string;
 	description?: string;
 }
-
-/**
- * Raw JSON object passed to an Artifact Store source adapter.
- *
- * This is write-only. Source configuration is intentionally absent from
- * source summaries returned by the backend.
- */
-type ArtifactSourceConfig = JSONRawString;
 
 export interface ArtifactSourceSummary {
 	id: ArtifactSourceID;
@@ -108,6 +117,7 @@ export interface ArtifactSourceSummary {
 }
 
 export interface CreateArtifactSourceBody {
+	id: ArtifactSourceID;
 	kind: ArtifactSourceKind;
 	displayName: string;
 	enabled: boolean;
@@ -126,7 +136,7 @@ export interface UpdateArtifactSourceBody {
 	config?: ArtifactSourceConfig;
 }
 
-interface ManagedPackageFile {
+export interface ManagedSourcePackageFile {
 	locator: ArtifactLocator;
 	content: Uint8Array;
 }
@@ -134,17 +144,23 @@ interface ManagedPackageFile {
 export interface PublishManagedSourcePackageBody {
 	expectedSourceRevision: number;
 	directory: ArtifactLocator;
-	expectedGeneration?: string;
-	files: ManagedPackageFile[];
+	expectedGeneration?: ArtifactSourceGeneration;
+	files: ManagedSourcePackageFile[];
+}
+
+export interface RemoveManagedSourcePackageBody {
+	expectedSourceRevision: number;
+	directory: ArtifactLocator;
+	expectedGeneration: ArtifactSourceGeneration;
 }
 
 export interface ManagedSourceState {
-	generation: string;
+	generation: ArtifactSourceGeneration;
 	source: ArtifactSourceSummary;
 }
 
 export interface ManagedSourcePackageResult {
-	generation: string;
+	generation: ArtifactSourceGeneration;
 	source: ArtifactSourceSummary;
 }
 

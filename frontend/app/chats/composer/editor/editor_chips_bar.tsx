@@ -2,6 +2,7 @@ import { memo } from 'react';
 
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
+import { UIToolCallStatus } from '@/spec/inference';
 
 import { DirectoryChip } from '@/chats/composer/attachments/attachment_directory_chip';
 import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
@@ -59,7 +60,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	onOpenToolCallDetails,
 }: EditorChipsBarProps) {
 	const hasVisibleToolCalls = toolCalls.some(
-		toolCall => toolCall.status !== 'discarded' && toolCall.status !== 'succeeded'
+		toolCall => toolCall.status !== UIToolCallStatus.Discarded && toolCall.status !== UIToolCallStatus.Succeeded
 	);
 
 	const hasAnyChips =

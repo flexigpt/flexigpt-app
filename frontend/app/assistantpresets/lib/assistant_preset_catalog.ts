@@ -1,18 +1,19 @@
+import type { ArtifactRef } from '@/spec/artifact';
+import { ArtifactState } from '@/spec/artifact';
 import type { AssistantModelPresetOption, ModelPresetRef, ProviderPreset } from '@/spec/modelpreset';
-import type { AssistantSkillOption, InstalledSkillSelection } from '@/spec/skill';
-import { SkillPresenceStatus } from '@/spec/skill';
+import type { AssistantSkillOption } from '@/spec/skill';
+import { SkillBundleAttachmentRole, SkillInsert } from '@/spec/skill';
 import type { AssistantToolOption, ToolRef } from '@/spec/tool';
 
 import { raceWithAbortSignal, withTimeout } from '@/lib/async_utils';
 
-import { modelPresetStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
+import { artifactStoreAPI, modelPresetStoreAPI, skillBundleAPI, toolStoreAPI } from '@/apis/baseapi';
 
 import {
 	buildModelPresetRefKey,
 	buildSkillRefKey,
 	buildToolRefKey,
 } from '@/assistantpresets/lib/assistant_preset_utils';
-import { isInstructionInsertSkill } from '@/skills/lib/skill_artifact_utils';
 
 export interface AssistantPresetEditorCatalog {
 	modelPresetOptions: AssistantModelPresetOption[];
@@ -254,84 +255,75 @@ export function loadToolOptions(options: AssistantPresetCatalogLoadOptions = {})
 	return loadWithCache(toolOptionsCache, loadToolOptionsUncached, options.force === true);
 }
 
+function artifactRefKey(ref: ArtifactRef): string {
+	return `${ref.rootID}:${ref.artifactID}`;
+}
+
 async function loadSkillOptionsUncached(): Promise<AssistantSkillOption[]> {
-	const [skillBundles, skillListItems] = await Promise.all([
-		collectAllPages(
-			pageToken => skillStoreAPI.listSkillBundles(undefined, true, 200, pageToken),
-			response => response.skillBundles,
-			response => response.nextPageToken
-		),
-		collectAllPages(
-			pageToken =>
-				skillStoreAPI.listSkills({
-					bundleIDs: [],
-					types: [],
-					includeDisabled: true,
-					includeMissing: true,
-					recommendedPageSize: 200,
-					pageToken: pageToken,
-				}),
-			response => response.skillListItems,
-			response => response.nextPageToken
-		),
-	]);
+	const roots = await artifactStoreAPI.listArtifactRoots();
+	const bundleGroups = await Promise.all(roots.map(root => skillBundleAPI.listSkillBundles(root.id)));
+	const bundles = bundleGroups.flat();
+	const artifactGroups = await Promise.all(
+		bundles.map(async bundle => ({
+			bundle,
+			artifacts: await skillBundleAPI.listSkillBundleArtifacts(bundle.bundle),
+		}))
+	);
+	const artifactRefs = artifactGroups.flatMap(group => group.artifacts.map(artifact => artifact.artifact));
+	const runtimeSkills =
+		artifactRefs.length > 0 ? await skillBundleAPI.listRuntimeSkills({ allowArtifacts: artifactRefs }) : [];
+	const runtimeSkillByArtifact = new Map(runtimeSkills.map(skill => [artifactRefKey(skill.artifact), skill]));
 
-	const bundleByID = new Map(skillBundles.map(bundle => [bundle.id, bundle]));
+	const options: AssistantSkillOption[] = artifactGroups.flatMap(({ bundle, artifacts }) =>
+		artifacts.flatMap(artifact => {
+			const runtimeSkill = runtimeSkillByArtifact.get(artifactRefKey(artifact.artifact));
+			if (!runtimeSkill) {
+				return [];
+			}
 
-	const options: AssistantSkillOption[] = skillListItems.map(item => {
-		const bundle = bundleByID.get(item.bundleID);
-		const skill = item.skillDefinition;
+			let availabilityReason: string | undefined;
+			if (!bundle.enabled) {
+				availabilityReason = 'Skill Bundle is disabled.';
+			} else if (!artifact.enabled) {
+				availabilityReason = 'Skill is disabled.';
+			} else if (artifact.state !== ArtifactState.Available) {
+				availabilityReason = `Skill is ${artifact.state}.`;
+			} else if (runtimeSkill.errorMessage) {
+				availabilityReason = runtimeSkill.errorMessage;
+			} else if (runtimeSkill.insert !== SkillInsert.Instructions) {
+				availabilityReason =
+					'User-message Skills are composer templates and cannot be selected as Assistant Preset session Skills.';
+			}
 
-		const isBundleKnown = bundle !== undefined;
-		const isBundleEnabled = bundle?.isEnabled ?? false;
-		const isSkillEnabled = skill.isEnabled;
+			const bundleDisplayName = bundle.displayName || bundle.logicalName || bundle.bundle.collectionID;
+			const isBuiltIn = bundle.attachments.some(attachment => attachment.role === SkillBundleAttachmentRole.BuiltIn);
 
-		let availabilityReason: string | undefined;
-		if (!isBundleKnown) {
-			availabilityReason = 'Skill bundle no longer exists.';
-		} else if (!isBundleEnabled) {
-			availabilityReason = 'Skill bundle is disabled.';
-		} else if (!isSkillEnabled) {
-			availabilityReason = 'Skill is disabled.';
-		} else if (skill.presence?.status === SkillPresenceStatus.Missing) {
-			availabilityReason = 'Skill files are missing from the configured location.';
-		} else if (skill.presence?.status === SkillPresenceStatus.Error) {
-			availabilityReason = skill.presence.lastCheckError || 'Skill files could not be verified.';
-		} else if (!isInstructionInsertSkill(skill)) {
-			availabilityReason =
-				'User-message skills are composer templates and cannot be assistant preset skill-session selections.';
-		}
-
-		const sel: InstalledSkillSelection = {
-			skillRef: {
-				bundleID: item.bundleID,
-				skillSlug: item.skillSlug,
-				skillID: skill.id,
-			},
-			preLoadAsActive: false,
-			useAsInstructions: false,
-		};
-
-		const bundleDisplayName = bundle ? getBundleDisplayName(bundle, item.bundleID) : item.bundleSlug || item.bundleID;
-
-		return {
-			key: buildSkillRefKey(sel.skillRef),
-			sel,
-			skillDefinition: skill,
-
-			bundleSlug: bundle?.slug || item.bundleSlug || item.bundleID,
-			bundleDisplayName,
-
-			isBuiltIn: skill.isBuiltIn,
-			isBundleEnabled,
-			isSkillEnabled,
-			isSelectable: availabilityReason === undefined,
-			availabilityReason,
-			label: `${skill.displayName || skill.name || skill.slug} — ${bundleDisplayName} (${item.skillSlug} · ${
-				skill.insert || 'instructions'
-			})`,
-		};
-	});
+			return [
+				{
+					key: buildSkillRefKey(artifact.artifact),
+					sel: {
+						artifact: {
+							rootID: artifact.artifact.rootID,
+							artifactID: artifact.artifact.artifactID,
+						},
+						preLoadAsActive: false,
+						useAsInstructions: false,
+					},
+					skillDefinition: runtimeSkill,
+					bundleSlug: bundle.logicalName,
+					bundleDisplayName,
+					isBuiltIn,
+					isBundleEnabled: bundle.enabled,
+					isSkillEnabled: artifact.enabled,
+					isSelectable: availabilityReason === undefined,
+					availabilityReason,
+					label: `${runtimeSkill.displayName || runtimeSkill.name || artifact.name} — ${bundleDisplayName} (${
+						runtimeSkill.insert ?? SkillInsert.Instructions
+					})`,
+				},
+			];
+		})
+	);
 
 	return sortByBuiltInThenLabel(options);
 }

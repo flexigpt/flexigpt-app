@@ -1,3 +1,4 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type { Attachment } from '@/spec/attachment';
 import type {
 	InferenceError,
@@ -15,7 +16,6 @@ import type {
 } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
 
@@ -40,8 +40,8 @@ export interface StoreConversationMessage {
 	mcpContext?: MCPConversationContext;
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	attachments?: Attachment[];
-	enabledSkillRefs?: SkillRef[];
-	activeSkillRefs?: SkillRef[];
+	enabledSkillRefs?: ArtifactRef[];
+	activeSkillRefs?: ArtifactRef[];
 
 	workspaceSelection?: WorkspaceConversationSelection;
 	workspaceUsage?: WorkspaceConversationUsage;
@@ -92,7 +92,7 @@ export interface RestorableConversationContext {
 	mcpContext?: MCPConversationContext;
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	webSearchChoices: ToolStoreChoice[];
-	enabledSkillRefs: SkillRef[];
-	activeSkillRefs: SkillRef[];
+	enabledSkillRefs: ArtifactRef[];
+	activeSkillRefs: ArtifactRef[];
 	workspaceSelection?: WorkspaceConversationSelection;
 }

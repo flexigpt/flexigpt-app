@@ -9,6 +9,7 @@ import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_d
 import { ensureMakeID } from '@/lib/uuid_utils';
 
 import type { IAggregateAPI } from '@/apis/interface';
+import { optionalWailsBody, requireNonBlankString, throwIfAborted } from '@/apis/wailsapi/transport';
 import {
 	ApplyUnifiedDiff,
 	CancelCompletion,
@@ -24,26 +25,23 @@ import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 export class WailsAggregateAPI implements IAggregateAPI {
 	async applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut> {
 		const resp = await ApplyUnifiedDiff(args as texttoolSpec.ApplyUnifiedDiffArgs);
+		if (resp === null || typeof resp !== 'object') {
+			throw new Error('ApplyUnifiedDiff returned an invalid response.');
+		}
 		return resp as ApplyUnifiedDiffOut;
 	}
 
 	async postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void> {
-		if (!providerName) {
-			throw new Error('Missing providerName or payload');
-		}
 		const r = {
-			ProviderName: providerName,
+			ProviderName: requireNonBlankString(providerName, 'providerName'),
 			Body: payload as wailsSpec.PostProviderPresetRequestBody,
 		};
 		await PostProviderPreset(r as wailsSpec.PostProviderPresetRequest);
 	}
 
 	async deleteProviderPreset(providerName: ProviderName): Promise<void> {
-		if (!providerName) {
-			throw new Error('Missing providerName');
-		}
 		const r = {
-			ProviderName: providerName,
+			ProviderName: requireNonBlankString(providerName, 'providerName'),
 		};
 		await DeleteProviderPreset(r as wailsSpec.DeleteProviderPresetRequest);
 	}
@@ -85,6 +83,10 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		onStreamThinkingData?: (text: string) => void
 	): Promise<CompletionResponseBody | undefined> {
 		const rid = ensureMakeID(requestId);
+
+		// Do not subscribe to events or invoke Go when the caller cancelled before
+		// the request reached this boundary.
+		throwIfAborted(signal);
 
 		let textCallbackId = '';
 		let thinkingCallbackId = '';
@@ -130,16 +132,8 @@ export class WailsAggregateAPI implements IAggregateAPI {
 				return;
 			}
 
-			// Already aborted before we even start => do NOT start backend call.
-
-			if (signal.aborted) {
-				reject(new DOMException('Aborted', 'AbortError'));
-				return;
-			}
-
 			abortHandler = () => {
-				// Detach server-side
-				this.cancelCompletion(rid).catch(() => {});
+				void CancelCompletion(rid).catch(() => {});
 				reject(new DOMException('Aborted', 'AbortError'));
 			};
 
@@ -151,8 +145,8 @@ export class WailsAggregateAPI implements IAggregateAPI {
 
 		try {
 			const resp = await Promise.race([responsePromise, abortPromise]);
-			const respBody = resp.Body as wailsSpec.CompletionResponseBody;
-			return respBody as CompletionResponseBody;
+			const respBody = optionalWailsBody(resp.Body);
+			return respBody as CompletionResponseBody | undefined;
 		} finally {
 			// Always clean up
 
@@ -172,13 +166,6 @@ export class WailsAggregateAPI implements IAggregateAPI {
 	}
 
 	async cancelCompletion(requestId: string): Promise<void> {
-		if (!requestId) {
-			return;
-		}
-		try {
-			await CancelCompletion(requestId);
-		} catch {
-			/* Swallow any Go-side error; we only care that the signal aborts */
-		}
+		await CancelCompletion(requireNonBlankString(requestId, 'requestId'));
 	}
 }

@@ -24,6 +24,8 @@ import type {
 } from '@/spec/workspace';
 import { WorkspaceMode } from '@/spec/workspace';
 
+import { getUUIDv7 } from '@/lib/uuid_utils';
+
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import { workspaceAPI } from '@/apis/baseapi';
@@ -197,7 +199,7 @@ function RecordControls({
 				disabled={isPending(`${artifactID}:remove`)}
 			>
 				<FiTrash2 size={14} />
-				<span>Remove Artifact</span>
+				<span>Remove Resource</span>
 			</button>
 		</ActionRow>
 	);
@@ -387,7 +389,7 @@ export function WorkspaceCard({
 				const result = await workspaceAPI.refreshWorkspace(workspace.workspace);
 				if (mountedRef.current) {
 					setRefreshSummary(
-						`Scanned ${result.candidates} candidates. Created ${result.createdArtifacts.length} and updated ${result.updatedArtifacts.length} artifacts.`
+						`Scanned ${result.candidates} candidates. Created ${result.createdArtifacts.length} and updated ${result.updatedArtifacts.length} resources.`
 					);
 				}
 
@@ -427,12 +429,10 @@ export function WorkspaceCard({
 		}
 
 		const deletingRecord = recordToDelete;
-		await workspaceAPI.unadoptWorkspaceArtifact(
-			workspace.workspace,
-			deletingRecord.artifact,
-			deletingRecord.revision,
-			suppressRemovedBinding
-		);
+		await workspaceAPI.unadoptWorkspaceArtifact(workspace.workspace, deletingRecord.artifact, {
+			expectedRevision: deletingRecord.revision,
+			suppress: suppressRemovedBinding,
+		});
 
 		if (!mountedRef.current) {
 			return;
@@ -458,7 +458,7 @@ export function WorkspaceCard({
 		try {
 			await reloadCatalog();
 		} catch (reloadError) {
-			showCatalogReloadFailure('Artifact was removed, but the Workspace catalog could not be reloaded.', reloadError);
+			showCatalogReloadFailure('Resource was removed, but the Workspace catalog could not be reloaded.', reloadError);
 		}
 	};
 
@@ -474,6 +474,7 @@ export function WorkspaceCard({
 				locator: occurrence.locator,
 				subresourceLocator: occurrence.subresourceLocator,
 			},
+			artifactID: getUUIDv7(),
 			name: occurrence.logicalName || undefined,
 			enabled: true,
 			settings: { runtimeDisabled: false },
@@ -482,7 +483,7 @@ export function WorkspaceCard({
 		try {
 			await reloadCatalog();
 		} catch (reloadError) {
-			showCatalogReloadFailure('Artifact was adopted, but the Workspace catalog could not be reloaded.', reloadError);
+			showCatalogReloadFailure('Resource was adopted, but the Workspace catalog could not be reloaded.', reloadError);
 		}
 	};
 
@@ -557,7 +558,7 @@ export function WorkspaceCard({
 								expectedRevision: current.revision,
 								enabled,
 							}),
-						'Failed to update Artifact enable state.'
+						'Failed to update resource enable state.'
 					);
 				}}
 				onSetRuntimeDisabled={(current, disabled) => {
@@ -587,7 +588,7 @@ export function WorkspaceCard({
 		{ key: 'contexts', label: 'Contexts', count: catalogData?.contexts.length ?? 0 },
 		{ key: 'skills', label: 'Skills', count: catalogData?.skills.length ?? 0 },
 		{ key: 'sources', label: 'Sources', count: workspace.attachments.length },
-		{ key: 'records', label: 'All Artifacts', count: artifacts.length },
+		{ key: 'records', label: 'All Resources', count: artifacts.length },
 		{ key: 'observations', label: 'Observations', count: catalogData?.catalog.occurrences.length ?? 0 },
 		{ key: 'suppressions', label: 'Suppressions', count: catalogData?.suppressions.length ?? 0 },
 		{ key: 'diagnostics', label: 'Diagnostics', count: diagnostics.length },
@@ -748,7 +749,7 @@ export function WorkspaceCard({
 											htmlFor={`workspace-artifact-search-${workspace.workspace.collectionID}`}
 											className="sr-only"
 										>
-											Search Workspace Artifacts
+											Search Workspace Resources
 										</label>
 										<input
 											id={`workspace-artifact-search-${workspace.workspace.collectionID}`}
@@ -758,8 +759,8 @@ export function WorkspaceCard({
 											onChange={event => {
 												setRecordSearch(event.currentTarget.value);
 											}}
-											placeholder="Search Workspace Artifacts..."
-											aria-label="Search Workspace Artifacts"
+											placeholder="Search workspace resources..."
+											aria-label="Search workspace resources"
 										/>
 										<button
 											type="button"
@@ -769,7 +770,7 @@ export function WorkspaceCard({
 											}}
 										>
 											<FiPlus size={14} />
-											<span>Pin or Suppress</span>
+											<span>Pin or Suppress Resource</span>
 										</button>
 									</div>
 									<div className="text-base-content/60 text-xs">
@@ -785,8 +786,8 @@ export function WorkspaceCard({
 								{visibleArtifacts.length === 0 ? (
 									<ManagementEmptyState>
 										{artifacts.length === 0
-											? 'No Workspace Artifacts were adopted. Refresh the Workspace after adding paths.'
-											: 'No Artifacts match the current search.'}
+											? 'No workspace resources are available. Refresh after adding project files or skill folders.'
+											: 'No resources match the current search.'}
 									</ManagementEmptyState>
 								) : null}
 
@@ -818,12 +819,12 @@ export function WorkspaceCard({
 																void runAction(workspaceOccurrencePendingKey(occurrence), () =>
 																	adoptOccurrence(occurrence)
 																).catch((error: unknown) => {
-																	showFailure(error, 'Failed to adopt the discovered Artifact.');
+																	showFailure(error, 'Failed to adopt the discovered resource.');
 																});
 															}}
 														>
 															<FiPlus size={14} />
-															<span>Adopt Artifact</span>
+															<span>Add Resource</span>
 														</button>
 													</ActionRow>
 												) : null}
@@ -883,12 +884,12 @@ export function WorkspaceCard({
 														disabled={isPending(pendingKey)}
 														onClick={() => {
 															void runAction(pendingKey, () => adoptOccurrence(occurrence)).catch((error: unknown) => {
-																showFailure(error, 'Failed to adopt the discovered Artifact.');
+																showFailure(error, 'Failed to adopt the discovered resource.');
 															});
 														}}
 													>
 														<FiPlus size={14} />
-														<span>Adopt Artifact</span>
+														<span>Adopt Resource</span>
 													</button>
 												</ActionRow>
 											) : null}
@@ -1107,8 +1108,8 @@ export function WorkspaceCard({
 								) : null}
 
 								<div className="text-base-content/60 rounded-2xl px-1 text-xs">
-									Workspace attachment roles determine how each Artifact Store Source participates in discovery. Source
-									configuration remains private to Artifact Store and is never copied into Workspace data.
+									Workspace source roles determine how each source participates in discovery. Source configuration
+									remains private and is never copied into workspace data.
 								</div>
 							</div>
 						) : null}
@@ -1237,11 +1238,11 @@ export function WorkspaceCard({
 					setRecordToDelete(null);
 					setSuppressRemovedBinding(true);
 				}}
-				title="Remove Workspace Artifact"
+				title="Remove Workspace Resource"
 				message={
 					<div className="space-y-3 text-sm">
 						<p>
-							Remove Artifact <span className="font-semibold">{recordToDelete?.name}</span>?
+							Remove resource <span className="font-semibold">{recordToDelete?.name}</span>?
 						</p>
 						<p className="text-base-content/70">The source content is not deleted.</p>
 						<label
@@ -1268,12 +1269,12 @@ export function WorkspaceCard({
 						</label>
 						{!suppressRemovedBinding ? (
 							<p className="text-warning text-xs">
-								A later Workspace refresh may automatically adopt this Artifact again.
+								A later workspace refresh may automatically add this resource again.
 							</p>
 						) : null}
 					</div>
 				}
-				confirmLabel={suppressRemovedBinding ? 'Remove and Suppress' : 'Remove Artifact'}
+				confirmLabel={suppressRemovedBinding ? 'Remove and Suppress' : 'Remove Resource'}
 				busyLabel="Removing..."
 				confirmTone="error"
 				onConfirm={removeArtifact}

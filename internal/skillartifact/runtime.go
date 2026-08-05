@@ -75,18 +75,11 @@ func ResolveRuntimePackage(
 			value.Kind,
 		)
 	}
-	location, err := localPaths.ResolveLocalPath(
-		ctx,
-		value,
-		packageLocator,
-	)
-	if err != nil {
-		return "", err
-	}
 
-	// Keep source generation and byte-integrity verification at the Source
-	// boundary immediately before native-path handoff. Agent Skills owns
-	// SKILL.md parsing, resource access, sandboxing, and script execution.
+	// Verify the exact catalogued entry before requesting a native package
+	// path. Source adapters remain responsible for containment and path
+	// resolution, while the artifact boundary verifies the generation and
+	// bytes used to derive this Skill definition.
 	if err := source.VerifySnapshotContentDigest(
 		ctx,
 		runtime,
@@ -96,6 +89,15 @@ func ResolveRuntimePackage(
 		expectedContentDigest,
 		basespec.MaxCandidateBytes,
 	); err != nil {
+		return "", err
+	}
+
+	location, err := localPaths.ResolveLocalPath(
+		ctx,
+		value,
+		packageLocator,
+	)
+	if err != nil {
 		return "", err
 	}
 	return location, nil

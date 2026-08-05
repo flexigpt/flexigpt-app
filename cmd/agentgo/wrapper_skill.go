@@ -333,6 +333,16 @@ func (w *SkillBundleWrapper) CreateManagedSkill(
 	)
 }
 
+func (w *SkillBundleWrapper) GetManagedSkillDocument(
+	ref artifact.ArtifactRef,
+) (skillbundle.ManagedSkillDocument, error) {
+	return middleware.WithRecoveryResp(
+		func() (skillbundle.ManagedSkillDocument, error) {
+			return w.api.GetManagedSkillDocument(context.Background(), ref)
+		},
+	)
+}
+
 func (w *SkillBundleWrapper) AdoptSkill(
 	request *skillbundle.AdoptSkillRequest,
 ) (artifact.Artifact, error) {

@@ -1,6 +1,7 @@
 import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-icons/fi';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
+import { UIToolCallStatus } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
@@ -27,13 +28,11 @@ function buildOrderedToolChipItems(toolCalls: UIToolCall[], toolOutputs: UIToolO
 	const seenNonDiscardedCallIDs = new Set<string>();
 
 	for (const toolCall of toolCalls) {
-		if (toolCall.status === 'discarded') {
+		if (toolCall.status === UIToolCallStatus.Discarded) {
 			continue;
 		}
-
 		seenNonDiscardedCallIDs.add(toolCall.callID);
-
-		if (toolCall.status === 'succeeded') {
+		if (toolCall.status === UIToolCallStatus.Succeeded) {
 			const output = outputByCallID.get(toolCall.callID);
 
 			if (output) {
@@ -166,9 +165,9 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 	const label = getPrettyToolName(toolCall.name);
 	const truncatedLabel = label.length > 64 ? `${label.slice(0, 61)}…` : label;
 
-	const isRunning = toolCall.status === 'running';
-	const isPending = toolCall.status === 'pending';
-	const isFailed = toolCall.status === 'failed';
+	const isRunning = toolCall.status === UIToolCallStatus.Running;
+	const isPending = toolCall.status === UIToolCallStatus.Pending;
+	const isFailed = toolCall.status === UIToolCallStatus.Failed;
 
 	const isRunnableType = isRunnableComposerToolCall(toolCall);
 	const isAutoExecute =

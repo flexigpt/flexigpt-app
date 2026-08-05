@@ -1,4 +1,5 @@
 import type { ProviderName } from '@/spec/inference';
+import { ProviderSDKType } from '@/spec/inference';
 import type {
 	ModelPresetID,
 	PatchModelPresetPayload,
@@ -8,6 +9,7 @@ import type {
 } from '@/spec/modelpreset';
 
 import type { IModelPresetStoreAPI } from '@/apis/interface';
+import { enumFromWails, omitUndefined, requireWailsBody } from '@/apis/wailsapi/transport';
 import {
 	DeleteModelPreset,
 	GetDefaultProvider,
@@ -22,6 +24,7 @@ import type { spec } from '@/apis/wailsjs/go/models';
 function normalizeProviderPreset(provider: ProviderPreset): ProviderPreset {
 	return {
 		...provider,
+		sdkType: enumFromWails(provider.sdkType, ProviderSDKType, 'providerPreset.sdkType'),
 		defaultHeaders: provider.defaultHeaders ?? {},
 		modelPresets: provider.modelPresets ?? {},
 	};
@@ -30,7 +33,8 @@ function normalizeProviderPreset(provider: ProviderPreset): ProviderPreset {
 export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 	async getDefaultProvider(): Promise<ProviderName> {
 		const resp = await GetDefaultProvider({});
-		return resp.Body?.defaultProvider ?? '';
+		const body = requireWailsBody(resp.Body, 'GetDefaultProvider');
+		return body.defaultProvider;
 	}
 
 	async patchDefaultProvider(providerName: ProviderName): Promise<void> {
@@ -47,13 +51,13 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		if (!providerName) {
 			throw new Error('Missing providerName');
 		}
-		const body = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+		const body = omitUndefined(payload as Record<string, unknown>);
 		if (Object.keys(body).length === 0) {
 			throw new Error('Provider patch payload is empty');
 		}
 		const r = {
 			ProviderName: providerName,
-			Body: body as spec.PatchProviderPresetRequestBody,
+			Body: body as unknown as spec.PatchProviderPresetRequestBody,
 		};
 		await PatchProviderPreset(r as spec.PatchProviderPresetRequest);
 	}
@@ -82,14 +86,14 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		if (!providerName || !modelPresetID) {
 			throw new Error('Missing arguments');
 		}
-		const body = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+		const body = omitUndefined(payload as Record<string, unknown>);
 		if (Object.keys(body).length === 0) {
 			throw new Error('Model patch payload is empty');
 		}
 		const r = {
 			ProviderName: providerName,
 			ModelPresetID: modelPresetID,
-			Body: body as spec.PatchModelPresetRequestBody,
+			Body: body as unknown as spec.PatchModelPresetRequestBody,
 		} as spec.PatchModelPresetRequest;
 		await PatchModelPreset(r);
 	}
@@ -118,10 +122,11 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 			PageToken: pageToken ?? '',
 		};
 		const resp = await ListProviderPresets(r);
-		const providers = ((resp.Body?.providers ?? []) as ProviderPreset[]).map(p => normalizeProviderPreset(p));
+		const body = requireWailsBody(resp.Body, 'ListProviderPresets');
+		const providers = (body.providers ?? []).map(p => normalizeProviderPreset(p as ProviderPreset));
 		return {
 			providers: providers,
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			nextPageToken: body.nextPageToken || undefined,
 		};
 	}
 }

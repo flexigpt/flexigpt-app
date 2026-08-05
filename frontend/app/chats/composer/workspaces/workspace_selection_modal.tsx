@@ -4,13 +4,13 @@ import { useId, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFileText, FiRefreshCw, FiZap } from 'react-icons/fi';
 
 import { ArtifactState } from '@/spec/artifact';
-import type { ProvidedSkill, SkillRef } from '@/spec/skill';
+import type { SkillRef } from '@/spec/skill';
 import type { WorkspaceRef, WorkspaceSkillView } from '@/spec/workspace';
 import { WorkspaceSkillInsert } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import { skillStoreAPI } from '@/apis/baseapi';
+import { skillBundleAPI } from '@/apis/baseapi';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
@@ -19,10 +19,7 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
-import {
-	isWorkspaceSkillConversationAvailable,
-	isWorkspaceSkillSessionEligible,
-} from '@/chats/composer/workspaces/use_composer_workspace';
+import { isWorkspaceSkillConversationAvailable } from '@/chats/composer/workspaces/use_composer_workspace';
 import { skillRefKey } from '@/skills/lib/skill_identity_utils';
 import { artifactRefKey } from '@/workspaces/lib/workspace_api_utils';
 
@@ -42,7 +39,6 @@ const diagnosticTitle = (diagnostics?: Array<{ code: string; message: string }>)
 interface WorkspaceTemplateTarget {
 	workspace: WorkspaceRef;
 	skill: WorkspaceSkillView;
-	provider: ProvidedSkill;
 }
 
 interface WorkspaceTemplateRenderModalProps {
@@ -52,7 +48,7 @@ interface WorkspaceTemplateRenderModalProps {
 	onInserted: () => void;
 }
 
-function workspaceSkillUnavailableLabel(skill: WorkspaceSkillView, provider?: ProvidedSkill): string {
+function workspaceSkillUnavailableLabel(skill: WorkspaceSkillView): string {
 	if (!skill.skill.isEnabled) {
 		return 'Disabled';
 	}
@@ -67,21 +63,6 @@ function workspaceSkillUnavailableLabel(skill: WorkspaceSkillView, provider?: Pr
 	}
 	if (skill.runtimeDisabled) {
 		return 'Runtime disabled';
-	}
-	if (!provider) {
-		return 'Runtime unavailable';
-	}
-	if (!provider.enabled) {
-		return 'Provider disabled';
-	}
-	if (!provider.available) {
-		return 'Provider unavailable';
-	}
-	if (!provider.runtimeAllowed) {
-		return 'Runtime denied';
-	}
-	if (!provider.catalogCurrent) {
-		return 'Provider catalog stale';
 	}
 	return 'Unavailable';
 }
@@ -112,12 +93,8 @@ function WorkspaceTemplateRenderModalContent({
 		setIsSubmitting(true);
 
 		try {
-			const rendered = await skillStoreAPI.renderProvidedSkill(target.provider.ref, argumentValues, target.workspace);
+			const rendered = await skillBundleAPI.renderSkill(target.skill.artifact, argumentValues);
 
-			if (!rendered.available) {
-				const diagnostics = diagnosticTitle(rendered.diagnostics);
-				throw new Error(diagnostics || 'The Workspace template is not currently available.');
-			}
 			if (rendered.insert !== WorkspaceSkillInsert.UserMessage) {
 				throw new Error(
 					`Expected a user-message template, but the renderer returned ${rendered.insert ?? 'no insert type'}.`
@@ -395,13 +372,11 @@ function WorkspaceSelectionModalContent({
 							{state.skills.map(skill => {
 								const skillKey = artifactRefKey(skill.artifact);
 								const selected = state.selectedSkillIDs.has(skillKey);
-								const provider = state.workspaceSkillProvidersByArtifactKey.get(skillKey);
-								const active = provider ? activeKeys.has(skillRefKey(provider.ref)) : false;
+								const active = activeKeys.has(skillRefKey(skill.artifact));
 								const instruction = skill.skill.insert === WorkspaceSkillInsert.Instructions;
-								const providerAvailable = isWorkspaceSkillConversationAvailable(skill, provider);
-								const usable = instruction ? isWorkspaceSkillSessionEligible(skill, provider) : providerAvailable;
-								const canActivate = Boolean(provider) && instruction && (skill.skill.arguments?.length ?? 0) === 0;
-								const unavailableLabel = workspaceSkillUnavailableLabel(skill, provider);
+								const usable = isWorkspaceSkillConversationAvailable(skill);
+								const canActivate = instruction && (skill.skill.arguments?.length ?? 0) === 0;
+								const unavailableLabel = workspaceSkillUnavailableLabel(skill);
 								const selectedWorkspaceRef = state.workspace?.workspace ?? state.selection?.workspace;
 
 								return (
@@ -453,11 +428,6 @@ function WorkspaceSelectionModalContent({
 												<span className={`badge badge-xs ${usable ? 'badge-success' : 'badge-warning'}`}>
 													{usable ? 'Available' : unavailableLabel}
 												</span>
-												{provider?.diagnostics?.length ? (
-													<span className="badge badge-warning badge-xs" title={diagnosticTitle(provider.diagnostics)}>
-														Details
-													</span>
-												) : null}
 											</span>
 										</div>
 
@@ -466,15 +436,14 @@ function WorkspaceSelectionModalContent({
 												<button
 													type="button"
 													className="btn btn-sm btn-ghost rounded-xl"
-													disabled={isInputLocked || !usable || !provider || !selectedWorkspaceRef}
+													disabled={isInputLocked || !usable || !selectedWorkspaceRef}
 													onClick={() => {
-														if (!provider || !selectedWorkspaceRef) {
+														if (!selectedWorkspaceRef) {
 															return;
 														}
 														setTemplateTarget({
 															workspace: selectedWorkspaceRef,
 															skill,
-															provider,
 														});
 													}}
 												>
@@ -501,15 +470,12 @@ function WorkspaceSelectionModalContent({
 														disabled={isInputLocked || !usable || !canActivate}
 														aria-label={`Activate ${skill.skill.displayName || skill.skill.name} in the Skill session`}
 														onChange={event => {
-															if (!provider) {
-																return;
-															}
 															const checked = event.currentTarget.checked;
 															setActiveSkillRefs(previous => {
 																const byKey = new Map(previous.map(item => [skillRefKey(item), item]));
-																const providerKey = skillRefKey(provider.ref);
+																const providerKey = skillRefKey(skill.artifact);
 																if (checked) {
-																	byKey.set(providerKey, provider.ref);
+																	byKey.set(providerKey, skill.artifact);
 																} else {
 																	byKey.delete(providerKey);
 																}

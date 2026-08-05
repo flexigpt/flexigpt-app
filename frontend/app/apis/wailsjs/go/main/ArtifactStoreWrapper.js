@@ -38,10 +38,6 @@ export function PublishManagedSourcePackage(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['PublishManagedSourcePackage'](arg1);
 }
 
-export function PurgeArtifact(arg1) {
-  return window['go']['main']['ArtifactStoreWrapper']['PurgeArtifact'](arg1);
-}
-
 export function PurgeArtifactRoot(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['PurgeArtifactRoot'](arg1);
 }

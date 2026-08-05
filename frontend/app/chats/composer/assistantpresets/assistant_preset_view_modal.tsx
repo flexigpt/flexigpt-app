@@ -60,12 +60,17 @@ function formatToolLabel(choice: {
 }
 
 function formatSkillSelectionLabel(sel: SkillSelection) {
-	const metaParts = [`${sel.skillRef.bundleID} • ${sel.skillRef.skillID}`];
+	const ref = sel?.artifact;
+	const refLabel = ref?.rootID && ref?.artifactID ? `${ref.rootID}/${ref.artifactID}` : 'Skill';
+	const metaParts = [ref?.rootID && ref?.artifactID ? `${ref.rootID}:${ref.artifactID}` : 'Skill'];
 	if (sel.preLoadAsActive) {
 		metaParts.push('Preload as active');
 	}
+	if (sel.useAsInstructions) {
+		metaParts.push('System instructions');
+	}
 	return {
-		title: sel.skillRef.skillSlug,
+		title: refLabel,
 		meta: metaParts.join(' • '),
 	};
 }
@@ -349,7 +354,7 @@ function AssistantPresetViewModalContent({
 		? currentRuntimeSnapshot.enabledSkillRefs.map(r => {
 				const identity = formatSkillRef(r);
 				return {
-					title: r.skillSlug || identity,
+					title: identity,
 					meta: identity,
 				};
 			})

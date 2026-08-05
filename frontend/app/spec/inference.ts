@@ -461,7 +461,13 @@ export interface CompletionResponseBody {
 	workspaceUsage?: WorkspaceConversationUsage;
 }
 
-type UIToolCallStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'discarded';
+export enum UIToolCallStatus {
+	Pending = 'pending',
+	Running = 'running',
+	Succeeded = 'succeeded',
+	Failed = 'failed',
+	Discarded = 'discarded',
+}
 
 /**
  * UI representation of a tool call (for chips).

@@ -6,12 +6,17 @@ import type {
 	WorkspaceView,
 } from '@/spec/workspace';
 
+import { getUUIDv7 } from '@/lib/uuid_utils';
+
 import { artifactStoreAPI, workspaceAPI } from '@/apis/baseapi';
 
 import { sortWorkspaces } from '@/workspaces/lib/workspace_utils';
 
 const DEFAULT_WORKSPACE_ROOT_DISPLAY_NAME = 'FlexiGPT Workspaces';
 const DEFAULT_WORKSPACE_ROOT_DESCRIPTION = 'Technical Artifact Store namespace used for Workspace collections.';
+
+export type CreateFilesystemWorkspaceInput = Omit<CreateFilesystemWorkspaceBody, 'workspaceID' | 'sourceID'>;
+export type CreateEmptyWorkspaceInput = Omit<CreateEmptyWorkspaceBody, 'workspaceID'>;
 
 let workspaceRootCreationPromise: Promise<ArtifactRootID> | undefined;
 
@@ -63,9 +68,11 @@ async function resolveWorkspaceCreationRoot(preferredRootID?: ArtifactRootID): P
 	}
 
 	const created = await artifactStoreAPI.createArtifactRoot({
+		id: getUUIDv7(),
 		displayName: DEFAULT_WORKSPACE_ROOT_DISPLAY_NAME,
 		description: DEFAULT_WORKSPACE_ROOT_DESCRIPTION,
 	});
+
 	return created.id;
 }
 
@@ -86,15 +93,26 @@ async function createWorkspaceInResolvedRoot<T>(
 }
 
 export async function createFilesystemWorkspaceCollection(
-	body: CreateFilesystemWorkspaceBody,
+	body: CreateFilesystemWorkspaceInput,
 	preferredRootID?: ArtifactRootID
 ): Promise<WorkspaceView> {
-	return createWorkspaceInResolvedRoot(preferredRootID, rootID => workspaceAPI.createFilesystemWorkspace(rootID, body));
+	return createWorkspaceInResolvedRoot(preferredRootID, rootID =>
+		workspaceAPI.createFilesystemWorkspace(rootID, {
+			...body,
+			workspaceID: getUUIDv7(),
+			sourceID: getUUIDv7(),
+		})
+	);
 }
 
 export async function createEmptyWorkspaceCollection(
-	body: CreateEmptyWorkspaceBody,
+	body: CreateEmptyWorkspaceInput,
 	preferredRootID?: ArtifactRootID
 ): Promise<WorkspaceView> {
-	return createWorkspaceInResolvedRoot(preferredRootID, rootID => workspaceAPI.createEmptyWorkspace(rootID, body));
+	return createWorkspaceInResolvedRoot(preferredRootID, rootID =>
+		workspaceAPI.createEmptyWorkspace(rootID, {
+			...body,
+			workspaceID: getUUIDv7(),
+		})
+	);
 }

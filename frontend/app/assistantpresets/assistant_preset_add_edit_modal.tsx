@@ -61,7 +61,7 @@ import {
 	getSkillPreloadEligibilityReason,
 	isInstructionInsertSkill,
 } from '@/skills/lib/skill_artifact_utils';
-import { isInstalledSkillRef } from '@/skills/lib/skill_identity_utils';
+import { isSkillArtifactRef } from '@/skills/lib/skill_identity_utils';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface AddEditAssistantPresetModalProps {
@@ -261,13 +261,19 @@ function getSuggestedNextVersion(initialData: PresetItem, existingPresets: Prese
 }
 
 function cloneSkillSelectionForForm(selection: SkillSelection): SkillSelection {
-	const ref = selection.skillRef;
+	const artifact = selection?.artifact;
+	if (!artifact || typeof artifact !== 'object') {
+		return {
+			artifact: { rootID: '', artifactID: '' },
+			preLoadAsActive: selection?.preLoadAsActive,
+			useAsInstructions: selection?.useAsInstructions,
+		};
+	}
 
 	return {
-		skillRef: {
-			bundleID: ref.bundleID,
-			skillSlug: ref.skillSlug,
-			skillID: ref.skillID,
+		artifact: {
+			rootID: artifact.rootID,
+			artifactID: artifact.artifactID,
 		},
 		preLoadAsActive: selection.preLoadAsActive,
 		useAsInstructions: selection.useAsInstructions,
@@ -511,7 +517,7 @@ function AddEditAssistantPresetModalContent({
 	}, [formData.startingToolSelections, toolOptions, toolOptionByKey, selectedStartingModelOption]);
 
 	const availableSkillOptions = useMemo<SimpleSelectableOption[]>(() => {
-		const selected = new Set(formData.startingSkillSelections.map(sel => buildSkillRefKey(sel.skillRef)));
+		const selected = new Set(formData.startingSkillSelections.map(sel => buildSkillRefKey(sel.artifact)));
 
 		return skillOptions
 			.filter(option => option.isSelectable && !selected.has(option.key))
@@ -675,38 +681,38 @@ function AddEditAssistantPresetModalContent({
 			}
 
 			if (state.startingSkillSelections.length > 0) {
-				const keys = state.startingSkillSelections.map(sel => buildSkillRefKey(sel.skillRef));
+				const keys = state.startingSkillSelections.map(sel => buildSkillRefKey(sel.artifact));
 				if (new Set(keys).size !== keys.length) {
 					nextErrors.startingSkillSelections = 'Skill selections must be unique.';
 				} else {
 					const invalid = state.startingSkillSelections.find(sel => {
-						if (!isInstalledSkillRef(sel.skillRef)) {
+						if (!isSkillArtifactRef(sel.artifact)) {
 							return true;
 						}
 
-						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
+						const option = skillOptionByKey.get(buildSkillRefKey(sel.artifact));
 						return option ? !option.isSelectable : !skillCatalogUnavailable;
 					});
 
 					if (invalid) {
-						nextErrors.startingSkillSelections = !isInstalledSkillRef(invalid.skillRef)
-							? 'Assistant presets may only contain installed Skill Store references, not Workspace Skill references.'
+						nextErrors.startingSkillSelections = !isSkillArtifactRef(invalid.artifact)
+							? 'Assistant presets may only contain installed Skill references, not Workspace Skill references.'
 							: 'Every selected skill must still exist and be enabled.';
 					}
 
 					const invalidPreload = state.startingSkillSelections.find(sel => {
-						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
+						const option = skillOptionByKey.get(buildSkillRefKey(sel.artifact));
 						return sel.preLoadAsActive && option && getSkillPreloadEligibilityReason(option.skillDefinition);
 					});
 					if (!nextErrors.startingSkillSelections && invalidPreload) {
-						const option = skillOptionByKey.get(buildSkillRefKey(invalidPreload.skillRef));
+						const option = skillOptionByKey.get(buildSkillRefKey(invalidPreload.artifact));
 						nextErrors.startingSkillSelections =
 							(option && getSkillPreloadEligibilityReason(option.skillDefinition)) ??
 							'Only argumentless instruction skills can be preloaded as active session skills.';
 					}
 
 					const invalidInstructionUse = state.startingSkillSelections.find(sel => {
-						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
+						const option = skillOptionByKey.get(buildSkillRefKey(sel.artifact));
 						return (
 							sel.useAsInstructions &&
 							(option
@@ -717,7 +723,7 @@ function AddEditAssistantPresetModalContent({
 						);
 					});
 					if (!nextErrors.startingSkillSelections && invalidInstructionUse) {
-						const option = skillOptionByKey.get(buildSkillRefKey(invalidInstructionUse.skillRef));
+						const option = skillOptionByKey.get(buildSkillRefKey(invalidInstructionUse.artifact));
 						nextErrors.startingSkillSelections =
 							option && getSkillInstructionPromptEligibilityReason(option.skillDefinition)
 								? getSkillInstructionPromptEligibilityReason(option.skillDefinition)
@@ -831,9 +837,9 @@ function AddEditAssistantPresetModalContent({
 	const skillDisplayItems = useMemo<SkillSelectionDisplayItem[]>(
 		() =>
 			formData.startingSkillSelections.map(sel => {
-				const ref = sel.skillRef;
+				const ref = sel.artifact;
 				const key = buildSkillRefKey(ref);
-				const installedRef = isInstalledSkillRef(ref);
+				const installedRef = isSkillArtifactRef(ref);
 				const option = skillOptionByKey.get(key);
 				const useAsInstructionsDisabledReason = option
 					? getSkillInstructionPromptEligibilityReason(option.skillDefinition)
@@ -845,7 +851,7 @@ function AddEditAssistantPresetModalContent({
 
 				return {
 					key,
-					title: option?.label ?? `${ref.skillSlug} — ${ref.bundleID}`,
+					title: option?.label ?? `${ref.artifactID} (${ref.rootID})`,
 					subtitle: option
 						? `${option.bundleDisplayName} · ${option.skillDefinition.type}`
 						: 'Reference no longer exists in catalog.',

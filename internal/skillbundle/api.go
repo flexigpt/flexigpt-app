@@ -79,6 +79,7 @@ type CreateManagedSkillRequest struct {
 	ArtifactID                 basespec.ArtifactID
 	SkillName                  string
 	SKILLMD                    []byte
+	ExpectedArtifactRevision   uint64
 
 	// Document is an optional structured authoring input. Serialization is
 	// delegated to agentskills-go. It is mutually exclusive with SKILLMD.
@@ -90,6 +91,14 @@ type CreateManagedSkillRequest struct {
 type CreateManagedSkillResponse struct {
 	Artifact artifact.Artifact
 	Address  artifact.ArtifactAddress
+}
+
+// ManagedSkillDocument is the editable projection for a managed Skill.
+// It deliberately contains the canonical SKILL.md document only. It never
+// exposes Source configuration, a native filesystem path, or package internals.
+type ManagedSkillDocument struct {
+	Artifact artifact.Artifact
+	Document agentskillsSpec.SkillDocument
 }
 
 type AdoptSkillRequest struct {
@@ -488,6 +497,69 @@ func (a *API) CreateManagedSkill(
 	request CreateManagedSkillRequest,
 ) (CreateManagedSkillResponse, error) {
 	return a.createManagedSkill(ctx, request, false)
+}
+
+// GetManagedSkillDocument reads the canonical definition for a managed Skill
+// package. External and discovered Skills remain source-owned and intentionally
+// do not expose an editable document through this API.
+func (a *API) GetManagedSkillDocument(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (ManagedSkillDocument, error) {
+	if err := a.Ready(); err != nil {
+		return ManagedSkillDocument{}, err
+	}
+
+	value, err := a.GetSkill(ctx, ref)
+	if err != nil {
+		return ManagedSkillDocument{}, err
+	}
+	if value.Adoption != artifact.AdoptionPinned {
+		return ManagedSkillDocument{}, fmt.Errorf(
+			"%w: only managed Skills can be edited",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	bundleRef := collection.CollectionRef{
+		RootID:       value.RootID,
+		CollectionID: value.CollectionID,
+	}
+	bundle, err := a.GetBundle(ctx, bundleRef)
+	if err != nil {
+		return ManagedSkillDocument{}, err
+	}
+	attachment, _, err := managedAttachmentForRole(bundle, RoleManaged)
+	if err != nil {
+		return ManagedSkillDocument{}, err
+	}
+	if attachment.SourceID != value.Binding.SourceID {
+		return ManagedSkillDocument{}, fmt.Errorf(
+			"%w: Skill is not stored in this bundle's managed source",
+			basespec.ErrUnsupported,
+		)
+	}
+	if _, err := managedSkillPackageDirectoryOf(value.Binding); err != nil {
+		return ManagedSkillDocument{}, err
+	}
+	if value.ResolvedDefinition == nil {
+		return ManagedSkillDocument{}, fmt.Errorf(
+			"%w: managed Skill has no current definition",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+
+	definitionValue, err := definition.ReadCanonical(
+		ctx, a.dependencies.Definitions, value.RootID, *value.ResolvedDefinition,
+	)
+	if err != nil {
+		return ManagedSkillDocument{}, err
+	}
+	document, err := skillartifact.DocumentFromDefinition(definitionValue)
+	if err != nil {
+		return ManagedSkillDocument{}, err
+	}
+	return ManagedSkillDocument{Artifact: value.Clone(), Document: document}, nil
 }
 
 func (a *API) AdoptSkill(
@@ -1278,6 +1350,9 @@ func (a *API) createManagedSkill(
 		return CreateManagedSkillResponse{}, err
 	}
 	if pinned == nil {
+		if request.ExpectedArtifactRevision != 0 {
+			return CreateManagedSkillResponse{}, basespec.ErrConflict
+		}
 		if bundle.Collection.Revision != request.ExpectedCollectionRevision {
 			return CreateManagedSkillResponse{}, basespec.ErrConflict
 		}
@@ -1326,7 +1401,11 @@ func (a *API) createManagedSkill(
 		default:
 			return CreateManagedSkillResponse{}, pinErr
 		}
+	} else if request.ExpectedArtifactRevision == 0 ||
+		pinned.Revision != request.ExpectedArtifactRevision {
+		return CreateManagedSkillResponse{}, basespec.ErrConflict
 	}
+
 	if err := validateManagedSkillOperationIntent(
 		*pinned,
 		request.Bundle,
@@ -1400,7 +1479,35 @@ func (a *API) createManagedSkill(
 		definitionValue.Digest,
 		packageSHA256,
 	); complete {
-		return result, nil
+		return a.setManagedSkillEnabled(ctx, result, request.Enabled)
+	}
+
+	// Refresh reconciles source-derived fields. Package provenance is
+	// collection-local authoring metadata, so it is updated afterwards using
+	// the freshly reconciled Artifact revision.
+	localData, err := encodeManagedSkillArtifactData(
+		managedSkillArtifactData{PackageSHA256: packageSHA256},
+	)
+	if err != nil {
+		return CreateManagedSkillResponse{}, pending(err)
+	}
+	resolved, err = a.dependencies.Artifacts.UpdateData(
+		ctx,
+		resolved.Ref(),
+		resolved.Revision,
+		localData,
+	)
+	if err != nil {
+		return CreateManagedSkillResponse{}, pending(err)
+	}
+	if result, complete := managedSkillCreateResult(
+		resolved,
+		sourceValue.ID,
+		skillLocator,
+		definitionValue.Digest,
+		packageSHA256,
+	); complete {
+		return a.setManagedSkillEnabled(ctx, result, request.Enabled)
 	}
 	return CreateManagedSkillResponse{}, pending(
 		fmt.Errorf(
@@ -1433,6 +1540,28 @@ func managedSkillCreateResult(
 		Artifact: value,
 		Address:  value.Address(),
 	}, true
+}
+
+func (a *API) setManagedSkillEnabled(
+	ctx context.Context,
+	result CreateManagedSkillResponse,
+	enabled bool,
+) (CreateManagedSkillResponse, error) {
+	if result.Artifact.Enabled == enabled {
+		return result, nil
+	}
+	updated, err := a.dependencies.Artifacts.SetEnabled(
+		ctx,
+		result.Artifact.Ref(),
+		result.Artifact.Revision,
+		enabled,
+	)
+	if err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
+	result.Artifact = updated
+	result.Address = updated.Address()
+	return result, nil
 }
 
 func (a *API) validateAttachmentDraft(

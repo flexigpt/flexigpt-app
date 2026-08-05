@@ -6,10 +6,13 @@ import { FiAlertCircle, FiMapPin, FiPlus } from 'react-icons/fi';
 import type { ArtifactSourceBinding } from '@/spec/artifact';
 import type { WorkspaceAttachmentView, WorkspaceView } from '@/spec/workspace';
 
+import { getUUIDv7 } from '@/lib/uuid_utils';
+
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { workspaceAPI } from '@/apis/baseapi';
 
+import { Dropdown } from '@/components/dropdown';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
@@ -26,8 +29,8 @@ import {
 type BindingAction = 'pin' | 'suppress';
 
 const ARTIFACT_KIND_OPTIONS = [
-	{ value: WORKSPACE_CONTEXT_ARTIFACT_KIND, label: 'Context Artifact' },
-	{ value: WORKSPACE_SKILL_ARTIFACT_KIND, label: 'Workspace Skill Artifact' },
+	{ value: WORKSPACE_CONTEXT_ARTIFACT_KIND, label: 'Context document' },
+	{ value: WORKSPACE_SKILL_ARTIFACT_KIND, label: 'Workspace skill' },
 ] as const;
 
 function sourceLabel(attachment: WorkspaceAttachmentView): string {
@@ -80,6 +83,17 @@ function WorkspaceArtifactBindingModalContent({
 		[sourceID, workspace.attachments]
 	);
 	const hasAttachments = workspace.attachments.length > 0;
+	const sourceDropdownItems = useMemo(
+		() =>
+			Object.fromEntries(
+				workspace.attachments.map(attachment => [attachment.sourceID, { isEnabled: attachment.enabled }])
+			),
+		[workspace.attachments]
+	);
+	const resourceTypeDropdownItems = useMemo(
+		() => Object.fromEntries(ARTIFACT_KIND_OPTIONS.map(option => [option.value, { isEnabled: true }])),
+		[]
+	);
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
 		event.preventDefault();
@@ -91,7 +105,7 @@ function WorkspaceArtifactBindingModalContent({
 
 		const normalizedLocator = locator.trim().replaceAll('\\', '/');
 		if (!sourceID) {
-			setSubmitError('Select an attached Workspace Source.');
+			setSubmitError('Select an attached workspace source.');
 			return;
 		}
 		if (!isSafeRelativeLocator(normalizedLocator)) {
@@ -99,7 +113,7 @@ function WorkspaceArtifactBindingModalContent({
 			return;
 		}
 		if (!kind.trim()) {
-			setSubmitError('Select an expected Artifact kind.');
+			setSubmitError('Select a workspace resource type.');
 			return;
 		}
 
@@ -118,6 +132,7 @@ function WorkspaceArtifactBindingModalContent({
 				if (action === 'pin') {
 					await workspaceAPI.pinWorkspaceArtifact(workspace.workspace, {
 						expectedCollectionRevision: workspace.revision,
+						artifactID: getUUIDv7(),
 						binding,
 						name: name.trim() || defaultArtifactName(normalizedLocator),
 						enabled,
@@ -147,7 +162,7 @@ function WorkspaceArtifactBindingModalContent({
 						getErrorMessage(
 							error,
 							action === 'pin'
-								? 'The Workspace Artifact could not be pinned.'
+								? 'The Workspace Resource could not be pinned.'
 								: 'The Workspace Source binding could not be suppressed.'
 						)
 					);
@@ -163,11 +178,11 @@ function WorkspaceArtifactBindingModalContent({
 	return (
 		<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl flex-col overflow-hidden rounded-2xl p-0">
 			<ModalHeader
-				title={action === 'pin' ? 'Pin Workspace Artifact' : 'Suppress Workspace Binding'}
+				title={action === 'pin' ? 'Pin Workspace Resource' : 'Suppress Workspace Resource'}
 				description={
 					action === 'pin'
-						? 'Pin a typed Source binding before content exists, so it remains a durable Workspace Artifact when the source becomes available.'
-						: 'Prevent automatic adoption for one typed Source binding. Suppression does not alter source files.'
+						? 'Pin a context document or workspace skill location before content exists, so it remains available when the source returns.'
+						: 'Prevent automatic discovery from adding one typed workspace resource. Suppression does not alter source files.'
 				}
 				onClose={requestClose}
 				closeDisabled={isSubmitting}
@@ -205,9 +220,9 @@ function WorkspaceArtifactBindingModalContent({
 								/>
 								<FiPlus size={15} className="mt-0.5" aria-hidden="true" />
 								<span className="min-w-0">
-									<span className="block font-medium">Pin Artifact</span>
+									<span className="block font-medium">Pin Resource</span>
 									<span className="text-base-content/70 mt-1 block text-xs">
-										Create a durable Artifact record even when the source item is currently missing.
+										Create a durable workspace resource record even when the source item is currently missing.
 									</span>
 								</span>
 							</label>
@@ -239,32 +254,31 @@ function WorkspaceArtifactBindingModalContent({
 					</fieldset>
 				</ModalSection>
 
-				<ModalSection title="Typed Source binding">
+				<ModalSection title="Workspace resource location">
 					{!hasAttachments ? (
 						<div className="alert alert-warning rounded-2xl text-sm">
 							<FiAlertCircle size={14} />
-							<span>Attach a Workspace Source before pinning or suppressing a Source binding.</span>
+							<span>Attach a workspace source before pinning or suppressing a resource location.</span>
 						</div>
 					) : null}
 
-					<ModalField label="Attached Source" htmlFor="workspace-binding-source" required>
-						<select
-							id="workspace-binding-source"
-							className="select w-full rounded-xl"
-							value={sourceID}
+					<ModalField label="Attached source" htmlFor="workspace-binding-source" required>
+						<Dropdown<string>
+							dropdownItems={sourceDropdownItems}
+							orderedKeys={workspace.attachments.map(attachment => attachment.sourceID)}
+							selectedKey={sourceID}
+							onChange={setSourceID}
 							disabled={isSubmitting || !hasAttachments}
-							onChange={event => {
-								setSourceID(event.currentTarget.value);
+							placeholderLabel="Select a source"
+							title="Select an attached workspace source"
+							getDisplayName={key => {
+								const a = workspace.attachments.find(item => item.sourceID === key);
+								if (a !== undefined) {
+									return sourceLabel(a);
+								}
+								return '';
 							}}
-						>
-							<option value="">Select a Source</option>
-							{workspace.attachments.map(attachment => (
-								<option key={attachment.sourceID} value={attachment.sourceID}>
-									{sourceLabel(attachment)}
-									{attachment.enabled ? '' : ' [attachment disabled]'}
-								</option>
-							))}
-						</select>
+						/>
 					</ModalField>
 
 					<ModalField
@@ -294,7 +308,7 @@ function WorkspaceArtifactBindingModalContent({
 					<ModalField
 						label="Subresource locator"
 						htmlFor="workspace-binding-subresource"
-						hint="Optional. Use this only when one Source file emits multiple Artifact definitions."
+						hint="Optional. Use this only when one source file contains multiple typed workspace resources."
 					>
 						<input
 							id="workspace-binding-subresource"
@@ -310,37 +324,31 @@ function WorkspaceArtifactBindingModalContent({
 						/>
 					</ModalField>
 
-					<ModalField label="Expected Artifact kind" htmlFor="workspace-binding-kind" required>
-						<select
-							id="workspace-binding-kind"
-							className="select w-full rounded-xl"
-							value={kind}
+					<ModalField label="Resource type" htmlFor="workspace-binding-kind" required>
+						<Dropdown<string>
+							dropdownItems={resourceTypeDropdownItems}
+							orderedKeys={ARTIFACT_KIND_OPTIONS.map(option => option.value)}
+							selectedKey={kind}
+							onChange={setKind}
 							disabled={isSubmitting || !hasAttachments}
-							onChange={event => {
-								setKind(event.currentTarget.value);
-							}}
-						>
-							{ARTIFACT_KIND_OPTIONS.map(option => (
-								<option key={option.value} value={option.value}>
-									{option.label} ({option.value})
-								</option>
-							))}
-						</select>
+							title="Select a workspace resource type"
+							getDisplayName={value => ARTIFACT_KIND_OPTIONS.find(option => option.value === value)?.label ?? value}
+						/>
 					</ModalField>
 
 					{selectedAttachment ? (
 						<div className="text-base-content/60 text-xs">
-							Binding Source ID: <span className="font-mono">{selectedAttachment.sourceID}</span>
+							Source reference: <span className="font-mono">{selectedAttachment.sourceID}</span>
 						</div>
 					) : null}
 				</ModalSection>
 
 				{action === 'pin' ? (
-					<ModalSection title="Pinned Artifact settings">
+					<ModalSection title="Pinned resource settings">
 						<ModalField
-							label="Artifact name"
+							label="Resource name"
 							htmlFor="workspace-binding-name"
-							hint="When empty, the final locator path segment becomes the Artifact name."
+							hint="When empty, the final locator path segment becomes the resource name."
 						>
 							<input
 								id="workspace-binding-name"
@@ -367,7 +375,7 @@ function WorkspaceArtifactBindingModalContent({
 										setEnabled(event.currentTarget.checked);
 									}}
 								/>
-								Enable Artifact
+								Enable Resource
 							</label>
 							<label className="flex items-center gap-3 text-sm">
 								<input
@@ -403,9 +411,9 @@ function WorkspaceArtifactBindingModalContent({
 								Saving...
 							</>
 						) : action === 'pin' ? (
-							'Pin Artifact'
+							'Pin Resource'
 						) : (
-							'Suppress Binding'
+							'Suppress Resource'
 						)}
 					</button>
 				</ModalActions>

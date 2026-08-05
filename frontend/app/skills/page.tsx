@@ -3,13 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiPlus, FiSearch, FiTag, FiX } from 'react-icons/fi';
 
 import type { SkillBundle } from '@/spec/skill';
+import { SkillInsert } from '@/spec/skill';
 
 import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
-import { skillStoreAPI } from '@/apis/baseapi';
+import { skillManagementAPI } from '@/apis/baseapi';
 import { getAllSkillBundles, getAllSkills } from '@/apis/list_helper';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
@@ -151,13 +152,13 @@ export default function SkillsPage() {
 				description: 'Show every skill record in every bundle.',
 			},
 			{
-				value: 'instructions' as const,
+				value: SkillInsert.Instructions,
 				label: 'Instruction skills',
 				count: insertCounts.instructions,
 				description: getSkillInsertDescription('instructions'),
 			},
 			{
-				value: 'user-message' as const,
+				value: SkillInsert.UserMessage,
 				label: 'User-message templates',
 				count: insertCounts['user-message'],
 				description: getSkillInsertDescription('user-message'),
@@ -215,7 +216,12 @@ export default function SkillsPage() {
 	const handleBundleEnableChange = useCallback(
 		async (bundleID: string, nextEnabled: boolean) => {
 			try {
-				await skillStoreAPI.patchSkillBundle(bundleID, nextEnabled);
+				const bundle = bundles.find(item => item.bundle.id === bundleID)?.bundle;
+				if (bundle?.isBuiltIn) {
+					throw new Error('Built-in Skill Bundles are protected and read only.');
+				}
+
+				await skillManagementAPI.patchSkillBundle(bundleID, nextEnabled);
 
 				if (!isMountedRef.current) {
 					return;
@@ -236,7 +242,7 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[setBundles]
+		[setBundles, bundles]
 	);
 
 	const handleSkillEnableChange = useCallback(
@@ -253,7 +259,7 @@ export default function SkillsPage() {
 			}
 
 			try {
-				await skillStoreAPI.patchSkill(bundleID, skillSlug, nextEnabled);
+				await skillManagementAPI.patchSkill(bundleID, skillSlug, nextEnabled);
 
 				if (!isMountedRef.current) {
 					return;
@@ -297,7 +303,7 @@ export default function SkillsPage() {
 			}
 
 			try {
-				await skillStoreAPI.deleteSkill(bundleID, skillSlug);
+				await skillManagementAPI.deleteSkill(bundleID, skillSlug);
 
 				if (!isMountedRef.current) {
 					return;
@@ -346,24 +352,33 @@ export default function SkillsPage() {
 			try {
 				// A successful write is authoritative even if the follow-up list refresh fails.
 				if (existingSkillSlug) {
-					await skillStoreAPI.patchSkill(
-						bundleID,
-						existingSkillSlug,
-						partial.isEnabled,
-						partial.location,
-						partial.displayName,
-						partial.description,
-						partial.tags
-					);
+					const existingSkill = bundleData.skills.find(skill => skill.slug === existingSkillSlug);
+					if (!existingSkill) {
+						throw new Error('Skill not found.');
+					}
+
+					if (partial.artifactCreate) {
+						await skillManagementAPI.updateManagedSkill(bundleID, existingSkill.id, partial.artifactCreate);
+					} else {
+						await skillManagementAPI.patchSkill(
+							bundleID,
+							existingSkillSlug,
+							partial.isEnabled,
+							partial.location,
+							partial.displayName,
+							partial.description,
+							partial.tags
+						);
+					}
 				} else if (partial.artifactCreate) {
-					const slug = (partial.slug ?? '').trim();
+					const slug = (partial.name ?? partial.slug ?? '').trim();
 					const create = partial.artifactCreate;
 
 					if (!slug) {
 						throw new Error('Missing skill slug.');
 					}
 
-					const _ = await skillStoreAPI.putSkillArtifact(bundleID, slug, {
+					await skillManagementAPI.putSkillArtifact(bundleID, getUUIDv7(), {
 						name: create.name,
 						displayName: create.displayName,
 						description: create.description,
@@ -394,17 +409,7 @@ export default function SkillsPage() {
 						throw new Error('Missing skill location.');
 					}
 
-					await skillStoreAPI.putSkill(
-						bundleID,
-						slug,
-						partial.type,
-						location,
-						name,
-						partial.isEnabled ?? true,
-						partial.displayName,
-						partial.description,
-						partial.tags
-					);
+					await skillManagementAPI.registerFilesystemSkills(bundleID, location, partial.displayName || name);
 				}
 			} catch (err) {
 				console.error(existingSkillSlug ? 'Edit skill failed:' : 'Add skill failed:', err);
@@ -455,7 +460,7 @@ export default function SkillsPage() {
 		setIsDeletingBundle(true);
 
 		try {
-			await skillStoreAPI.deleteSkillBundle(deletingBundle.id);
+			await skillManagementAPI.deleteSkillBundle(deletingBundle.id);
 
 			if (!isMountedRef.current) {
 				return;
@@ -481,7 +486,7 @@ export default function SkillsPage() {
 		async (slug: string, display: string, description?: string) => {
 			try {
 				const id = getUUIDv7();
-				await skillStoreAPI.putSkillBundle(id, slug, display, true, description);
+				await skillManagementAPI.putSkillBundle(id, slug, display, true, description);
 				try {
 					await reloadOrThrow();
 				} catch (refreshError) {
@@ -499,6 +504,28 @@ export default function SkillsPage() {
 			}
 		},
 		[reloadOrThrow]
+	);
+
+	const handleEditBundle = useCallback(
+		async (bundleID: string, displayName: string, description?: string) => {
+			await skillManagementAPI.updateSkillBundleMetadata(bundleID, displayName, description);
+
+			if (!isMountedRef.current) {
+				return;
+			}
+
+			setBundles(previous =>
+				previous.map(item =>
+					item.bundle.id === bundleID
+						? {
+								...item,
+								bundle: { ...item.bundle, displayName, description },
+							}
+						: item
+				)
+			);
+		},
+		[setBundles]
 	);
 
 	if (isLoading && !hasResolved) {
@@ -690,6 +717,7 @@ export default function SkillsPage() {
 								onToggleSkillEnable={handleSkillEnableChange}
 								onDeleteSkill={handleDeleteSkill}
 								onSubmitSkill={handleSubmitSkill}
+								onEditBundle={handleEditBundle}
 								onRequestBundleDelete={bundle => {
 									setBundleToDelete(bundle);
 								}}

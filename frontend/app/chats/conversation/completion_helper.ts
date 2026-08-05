@@ -14,7 +14,7 @@ import type {
 	URLCitation,
 	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
-import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status } from '@/spec/inference';
+import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
 import type { MCPConversationContext, MCPProviderToolMapping, MCPToolSelection } from '@/spec/mcp';
 import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
 import type { ModelPresetID } from '@/spec/modelpreset';
@@ -607,7 +607,8 @@ function deriveUIToolCallFromToolCall(
 	// means "search was (or will be) handled by the provider", not a
 	// pending client-side action. Mark it as 'succeeded' so it is never
 	// treated as a pending/runnable chip.
-	const status: UIToolCall['status'] = type === ToolStoreChoiceType.WebSearch ? 'succeeded' : 'pending';
+	const status: UIToolCall['status'] =
+		type === ToolStoreChoiceType.WebSearch ? UIToolCallStatus.Succeeded : UIToolCallStatus.Pending;
 
 	return {
 		id: toolCall.id || toolCall.callID,

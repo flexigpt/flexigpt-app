@@ -26,9 +26,25 @@ import type {
 	PutMCPServerPayload,
 	PutMCPServerSecretResponseBody,
 } from '@/spec/mcp';
-import { DefaultMCPPageSize, MaxMCPServerPageSize } from '@/spec/mcp';
+import {
+	DefaultMCPPageSize,
+	MaxMCPServerPageSize,
+	MCPAuthHealthState,
+	MCPAuthState,
+	MCPHTTPAuthMode,
+	MCPServerStatus,
+	MCPTransportType,
+	MCPTrustLevel,
+} from '@/spec/mcp';
 
 import type { IMCPAPI } from '@/apis/interface';
+import {
+	enumFromWails,
+	normalizePageSize,
+	optionalWailsBody,
+	requireWailsBody,
+	toFrontendTimestamp,
+} from '@/apis/wailsapi/transport';
 import {
 	CancelPendingMCPOAuthAuthorization,
 	CompleteMCPArgument,
@@ -66,11 +82,50 @@ import {
 } from '@/apis/wailsjs/go/main/MCPWrapper';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
-function normalizeMCPPageSize(pageSize?: number): number {
-	if (typeof pageSize !== 'number' || !Number.isFinite(pageSize) || pageSize <= 0) {
-		return DefaultMCPPageSize;
-	}
-	return Math.min(pageSize, MaxMCPServerPageSize);
+function mcpServerFromWails(server: MCPServerConfig, field: string): MCPServerConfig {
+	return {
+		...server,
+		transport: enumFromWails(server.transport, MCPTransportType, `${field}.transport`),
+		trustLevel: enumFromWails(server.trustLevel, MCPTrustLevel, `${field}.trustLevel`),
+		createdAt: toFrontendTimestamp(server.createdAt, `${field}.createdAt`),
+		modifiedAt: toFrontendTimestamp(server.modifiedAt, `${field}.modifiedAt`),
+		streamableHttp:
+			server.streamableHttp === undefined
+				? undefined
+				: {
+						...server.streamableHttp,
+						authMode: enumFromWails(
+							server.streamableHttp.authMode,
+							MCPHTTPAuthMode,
+							`${field}.streamableHttp.authMode`
+						),
+					},
+	};
+}
+
+function mcpRuntimeSnapshotFromWails(snapshot: MCPServerRuntimeSnapshot, field: string): MCPServerRuntimeSnapshot {
+	return {
+		...snapshot,
+		status: enumFromWails(snapshot.status, MCPServerStatus, `${field}.status`),
+	};
+}
+
+function mcpAuthStatusFromWails(status: MCPAuthStatus, field: string): MCPAuthStatus {
+	return {
+		...status,
+		authMode: enumFromWails(status.authMode, MCPHTTPAuthMode, `${field}.authMode`),
+		state: enumFromWails(status.state, MCPAuthState, `${field}.state`),
+		expiresAt: status.expiresAt ? toFrontendTimestamp(status.expiresAt, `${field}.expiresAt`) : undefined,
+	};
+}
+
+function mcpAuthHealthFromWails(health: MCPAuthHealth, field: string): MCPAuthHealth {
+	return {
+		...health,
+		authMode: enumFromWails(health.authMode, MCPHTTPAuthMode, `${field}.authMode`),
+		state: enumFromWails(health.state, MCPAuthHealthState, `${field}.state`),
+		expiresAt: health.expiresAt ? toFrontendTimestamp(health.expiresAt, `${field}.expiresAt`) : undefined,
+	};
 }
 
 /**
@@ -86,13 +141,14 @@ export class WailsMCPAPI implements IMCPAPI {
 		const resp = await ListMCPBundles({
 			BundleIDs: bundleIDs ?? [],
 			IncludeDisabled: includeDisabled ?? false,
-			PageSize: normalizeMCPPageSize(pageSize),
-			PageToken: pageToken,
+			PageSize: normalizePageSize(pageSize, DefaultMCPPageSize, MaxMCPServerPageSize),
+			PageToken: pageToken ?? '',
 		} as wailsSpec.ListMCPBundlesRequest);
 
+		const body = requireWailsBody(resp.Body, 'ListMCPBundles');
 		return {
-			bundles: (resp.Body?.bundles ?? []) as MCPBundle[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			bundles: (body.bundles ?? []) as MCPBundle[],
+			nextPageToken: body.nextPageToken || undefined,
 		};
 	}
 
@@ -146,13 +202,16 @@ export class WailsMCPAPI implements IMCPAPI {
 			ServerIDs: serverIDs ?? [],
 			Enabled: enabled,
 			IncludeDisabled: includeDisabled ?? false,
-			PageSize: normalizeMCPPageSize(pageSize),
-			PageToken: pageToken,
+			PageSize: normalizePageSize(pageSize, DefaultMCPPageSize, MaxMCPServerPageSize),
+			PageToken: pageToken ?? '',
 		} as wailsSpec.ListMCPServersRequest);
 
+		const body = requireWailsBody(resp.Body, 'ListMCPServers');
 		return {
-			servers: (resp.Body?.servers ?? []) as MCPServerConfig[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			servers: (body.servers ?? []).map(server =>
+				mcpServerFromWails(server as MCPServerConfig, 'ListMCPServers.servers')
+			),
+			nextPageToken: body.nextPageToken || undefined,
 		};
 	}
 
@@ -172,7 +231,8 @@ export class WailsMCPAPI implements IMCPAPI {
 			ServerID: serverID,
 		} as wailsSpec.GetMCPServerRequest);
 
-		return resp?.Body as MCPServerConfig | undefined;
+		const body = optionalWailsBody(resp.Body);
+		return body === undefined ? undefined : mcpServerFromWails(body as MCPServerConfig, 'GetMCPServer');
 	}
 
 	async patchMCPServerEnabled(bundleID: string, serverID: MCPServerID, enabled: boolean): Promise<void> {
@@ -215,7 +275,8 @@ export class WailsMCPAPI implements IMCPAPI {
 			} as wailsSpec.PatchMCPServerSetupRequestBody,
 		} as wailsSpec.PatchMCPServerSetupRequest);
 
-		return resp?.Body as MCPServerConfig | undefined;
+		const body = optionalWailsBody(resp.Body);
+		return body === undefined ? undefined : mcpServerFromWails(body as MCPServerConfig, 'PatchMCPServerSetup');
 	}
 
 	async patchMCPSettings(oauthLoopbackListenAddr?: string): Promise<MCPSettingsView | undefined> {
@@ -225,7 +286,7 @@ export class WailsMCPAPI implements IMCPAPI {
 			} as wailsSpec.PatchMCPSettingsRequestBody,
 		} as wailsSpec.PatchMCPSettingsRequest);
 
-		return resp?.Body as MCPSettingsView | undefined;
+		return optionalWailsBody(resp.Body) as MCPSettingsView | undefined;
 	}
 
 	async getMCPSettings(): Promise<MCPSettingsView | undefined> {
@@ -246,7 +307,10 @@ export class WailsMCPAPI implements IMCPAPI {
 			ServerID: serverID,
 		} as wailsSpec.ConnectMCPServerRequest);
 
-		return resp?.Body as MCPServerRuntimeSnapshot | undefined;
+		const body = optionalWailsBody(resp.Body);
+		return body === undefined
+			? undefined
+			: mcpRuntimeSnapshotFromWails(body as MCPServerRuntimeSnapshot, 'ConnectMCPServer');
 	}
 
 	async disconnectMCPServer(bundleID: string, serverID: MCPServerID): Promise<void> {
@@ -262,7 +326,10 @@ export class WailsMCPAPI implements IMCPAPI {
 			ServerID: serverID,
 		} as wailsSpec.RefreshMCPServerRequest);
 
-		return resp?.Body as MCPServerRuntimeSnapshot | undefined;
+		const body = optionalWailsBody(resp.Body);
+		return body === undefined
+			? undefined
+			: mcpRuntimeSnapshotFromWails(body as MCPServerRuntimeSnapshot, 'RefreshMCPServer');
 	}
 
 	async getMCPServerStatus(bundleID: string, serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined> {
@@ -271,7 +338,10 @@ export class WailsMCPAPI implements IMCPAPI {
 			ServerID: serverID,
 		} as wailsSpec.GetMCPServerStatusRequest);
 
-		return resp?.Body as MCPServerRuntimeSnapshot | undefined;
+		const body = optionalWailsBody(resp.Body);
+		return body === undefined
+			? undefined
+			: mcpRuntimeSnapshotFromWails(body as MCPServerRuntimeSnapshot, 'GetMCPServerStatus');
 	}
 
 	async listMCPServerTools(
@@ -283,13 +353,14 @@ export class WailsMCPAPI implements IMCPAPI {
 		const resp = await ListMCPServerTools({
 			BundleID: bundleID,
 			ServerID: serverID,
-			PageSize: normalizeMCPPageSize(pageSize),
-			PageToken: pageToken,
+			PageSize: normalizePageSize(pageSize, DefaultMCPPageSize, MaxMCPServerPageSize),
+			PageToken: pageToken ?? '',
 		} as wailsSpec.ListMCPServerToolsRequest);
 
+		const body = requireWailsBody(resp.Body, 'ListMCPServerTools');
 		return {
-			tools: (resp.Body?.tools ?? []) as MCPToolCapability[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			tools: (body.tools ?? []) as MCPToolCapability[],
+			nextPageToken: body.nextPageToken || undefined,
 		};
 	}
 
@@ -302,13 +373,14 @@ export class WailsMCPAPI implements IMCPAPI {
 		const resp = await ListMCPServerResources({
 			BundleID: bundleID,
 			ServerID: serverID,
-			PageSize: normalizeMCPPageSize(pageSize),
-			PageToken: pageToken,
+			PageSize: normalizePageSize(pageSize, DefaultMCPPageSize, MaxMCPServerPageSize),
+			PageToken: pageToken ?? '',
 		} as wailsSpec.ListMCPServerResourcesRequest);
 
+		const body = requireWailsBody(resp.Body, 'ListMCPServerResources');
 		return {
-			resources: (resp.Body?.resources ?? []) as MCPResourceRef[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			resources: (body.resources ?? []) as MCPResourceRef[],
+			nextPageToken: body.nextPageToken || undefined,
 		};
 	}
 
@@ -321,13 +393,14 @@ export class WailsMCPAPI implements IMCPAPI {
 		const resp = await ListMCPServerResourceTemplates({
 			BundleID: bundleID,
 			ServerID: serverID,
-			PageSize: normalizeMCPPageSize(pageSize),
-			PageToken: pageToken,
+			PageSize: normalizePageSize(pageSize, DefaultMCPPageSize, MaxMCPServerPageSize),
+			PageToken: pageToken ?? '',
 		} as wailsSpec.ListMCPServerResourceTemplatesRequest);
 
+		const body = requireWailsBody(resp.Body, 'ListMCPServerResourceTemplates');
 		return {
-			resourceTemplates: (resp.Body?.resourceTemplates ?? []) as MCPResourceTemplateRef[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			resourceTemplates: (body.resourceTemplates ?? []) as MCPResourceTemplateRef[],
+			nextPageToken: body.nextPageToken || undefined,
 		};
 	}
 
@@ -340,13 +413,14 @@ export class WailsMCPAPI implements IMCPAPI {
 		const resp = await ListMCPServerPrompts({
 			BundleID: bundleID,
 			ServerID: serverID,
-			PageSize: normalizeMCPPageSize(pageSize),
-			PageToken: pageToken,
+			PageSize: normalizePageSize(pageSize, DefaultMCPPageSize, MaxMCPServerPageSize),
+			PageToken: pageToken ?? '',
 		} as wailsSpec.ListMCPServerPromptsRequest);
 
+		const body = requireWailsBody(resp.Body, 'ListMCPServerPrompts');
 		return {
-			prompts: (resp.Body?.prompts ?? []) as MCPPromptRef[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			prompts: (body.prompts ?? []) as MCPPromptRef[],
+			nextPageToken: body.nextPageToken || undefined,
 		};
 	}
 
@@ -359,12 +433,11 @@ export class WailsMCPAPI implements IMCPAPI {
 			BundleID: bundleID,
 			ServerID: serverID,
 			Body: {
-				serverID,
 				uri,
 			} as wailsSpec.MCPReadResourceRequestBody,
 		} as wailsSpec.MCPReadResourceRequest);
 
-		return resp?.Body as MCPReadResourceResponseBody | undefined;
+		return optionalWailsBody(resp.Body) as MCPReadResourceResponseBody | undefined;
 	}
 
 	async getMCPPrompt(
@@ -377,13 +450,12 @@ export class WailsMCPAPI implements IMCPAPI {
 			BundleID: bundleID,
 			ServerID: serverID,
 			Body: {
-				serverID,
 				promptName,
 				arguments: promptArguments,
 			} as wailsSpec.MCPGetPromptRequestBody,
 		} as wailsSpec.MCPGetPromptRequest);
 
-		return resp?.Body as MCPGetPromptResponseBody | undefined;
+		return optionalWailsBody(resp.Body) as MCPGetPromptResponseBody | undefined;
 	}
 
 	async completeMCPArgument(
@@ -399,7 +471,6 @@ export class WailsMCPAPI implements IMCPAPI {
 			BundleID: bundleID,
 			ServerID: serverID,
 			Body: {
-				serverID,
 				refType,
 				name,
 				argumentName,
@@ -418,7 +489,19 @@ export class WailsMCPAPI implements IMCPAPI {
 		const resp = await EvaluateMCPToolCall({
 			BundleID: bundleID,
 			ServerID: request.serverID,
-			Body: request as unknown as wailsSpec.InvokeMCPToolRequestBody,
+			Body: {
+				source: request.source,
+				toolName: request.toolName,
+				providerToolName: request.providerToolName,
+				toolDigest: request.toolDigest,
+				arguments: request.arguments,
+				approvalID: request.approvalID,
+				approvalToken: request.approvalToken,
+				conversationID: request.conversationID,
+				messageID: request.messageID,
+				toolUseID: request.toolUseID,
+				appInstanceID: request.appInstanceID,
+			} as wailsSpec.InvokeMCPToolRequestBody,
 		} as wailsSpec.EvaluateMCPToolCallRequest);
 
 		return resp?.Body as MCPApprovalEvaluation | undefined;
@@ -431,7 +514,19 @@ export class WailsMCPAPI implements IMCPAPI {
 		const resp = await InvokeMCPTool({
 			BundleID: bundleID,
 			ServerID: request.serverID,
-			Body: request as unknown as wailsSpec.InvokeMCPToolRequestBody,
+			Body: {
+				source: request.source,
+				toolName: request.toolName,
+				providerToolName: request.providerToolName,
+				toolDigest: request.toolDigest,
+				arguments: request.arguments,
+				approvalID: request.approvalID,
+				approvalToken: request.approvalToken,
+				conversationID: request.conversationID,
+				messageID: request.messageID,
+				toolUseID: request.toolUseID,
+				appInstanceID: request.appInstanceID,
+			} as wailsSpec.InvokeMCPToolRequestBody,
 		} as wailsSpec.InvokeMCPToolRequest);
 
 		return resp?.Body as InvokeMCPToolResponseBody | undefined;
@@ -470,7 +565,8 @@ export class WailsMCPAPI implements IMCPAPI {
 			ServerID: serverID,
 		} as wailsSpec.GetMCPServerAuthStatusRequest);
 
-		return resp?.Body as MCPAuthStatus | undefined;
+		const body = optionalWailsBody(resp.Body);
+		return body === undefined ? undefined : mcpAuthStatusFromWails(body as MCPAuthStatus, 'GetMCPServerAuthStatus');
 	}
 
 	async getMCPServerAuthHealth(bundleID: string, serverID: MCPServerID): Promise<MCPAuthHealth | undefined> {
@@ -479,7 +575,8 @@ export class WailsMCPAPI implements IMCPAPI {
 			ServerID: serverID,
 		} as wailsSpec.GetMCPServerAuthHealthRequest);
 
-		return resp?.Body as MCPAuthHealth | undefined;
+		const body = optionalWailsBody(resp.Body);
+		return body === undefined ? undefined : mcpAuthHealthFromWails(body as MCPAuthHealth, 'GetMCPServerAuthHealth');
 	}
 
 	async putMCPServerSecret(

@@ -20,8 +20,6 @@ export function ListArtifactSources(arg1:artifactstore.ListArtifactSourcesReques
 
 export function PublishManagedSourcePackage(arg1:artifactstore.PublishManagedSourcePackageRequest):Promise<artifactstore.PublishManagedSourcePackageResponse>;
 
-export function PurgeArtifact(arg1:artifactstore.PurgeArtifactRequest):Promise<artifactstore.PurgeArtifactResponse>;
-
 export function PurgeArtifactRoot(arg1:artifactstore.PurgeArtifactRootRequest):Promise<artifactstore.PurgeArtifactRootResponse>;
 
 export function PurgeArtifactSource(arg1:artifactstore.PurgeArtifactSourceRequest):Promise<artifactstore.PurgeArtifactSourceResponse>;

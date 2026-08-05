@@ -13,12 +13,14 @@ import type {
 import { WorkspaceAttachmentRole } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
+import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { artifactStoreAPI, workspaceAPI } from '@/apis/baseapi';
 
+import { Dropdown } from '@/components/dropdown';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalField } from '@/components/modal/modal_field';
@@ -31,18 +33,22 @@ import { getErrorMessage } from '@/workspaces/lib/workspace_utils';
 type AttachmentEdit = Pick<UpdateWorkspaceAttachmentBody, 'role' | 'enabled' | 'settings'>;
 
 const NON_PRIMARY_ROLES: WorkspaceAttachmentRole[] = [
-	WorkspaceAttachmentRole.BuiltIn,
 	WorkspaceAttachmentRole.Library,
 	WorkspaceAttachmentRole.AttachedPackage,
 	WorkspaceAttachmentRole.Overlay,
 ];
 
+const NON_PRIMARY_ROLE_ITEMS = Object.fromEntries(NON_PRIMARY_ROLES.map(role => [role, { isEnabled: true }])) as Record<
+	WorkspaceAttachmentRole,
+	{ isEnabled: boolean }
+>;
+
+const FILESYSTEM_SOURCE_KIND = 'fs-directory';
+
 function attachmentRoleLabel(role: WorkspaceAttachmentRole): string {
 	switch (role) {
 		case WorkspaceAttachmentRole.Primary:
 			return 'Primary project';
-		case WorkspaceAttachmentRole.BuiltIn:
-			return 'Built-in';
 		case WorkspaceAttachmentRole.Library:
 			return 'Library';
 		case WorkspaceAttachmentRole.AttachedPackage:
@@ -151,6 +157,13 @@ function WorkspaceSourceAttachmentCard({
 	const title = attachment.path ?? attachment.sourceDisplayName ?? source?.displayName ?? 'Attached Source';
 	const subtitle = source ? `${source.kind} · ${source.id}` : (attachment.sourceKind ?? attachment.sourceID);
 
+	const saveEdit = () =>
+		onSave(attachment, {
+			role: isPrimary ? WorkspaceAttachmentRole.Primary : role,
+			enabled: isPrimary ? true : enabled,
+			settings: isPrimary ? {} : attachmentSettings(recursive, authoritative),
+		});
+
 	return (
 		<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -191,20 +204,15 @@ function WorkspaceSourceAttachmentCard({
 						{isPrimary ? (
 							<div className="input input-sm flex items-center rounded-xl">{attachmentRoleLabel(attachment.role)}</div>
 						) : (
-							<select
-								className="select select-sm w-full rounded-xl"
-								value={role}
+							<Dropdown<WorkspaceAttachmentRole>
+								dropdownItems={NON_PRIMARY_ROLE_ITEMS}
+								orderedKeys={NON_PRIMARY_ROLES}
+								selectedKey={role}
+								onChange={setRole}
 								disabled={busy}
-								onChange={event => {
-									setRole(event.currentTarget.value as WorkspaceAttachmentRole);
-								}}
-							>
-								{NON_PRIMARY_ROLES.map(option => (
-									<option key={option} value={option}>
-										{attachmentRoleLabel(option)}
-									</option>
-								))}
-							</select>
+								title="Select workspace source role"
+								getDisplayName={attachmentRoleLabel}
+							/>
 						)}
 					</label>
 
@@ -221,31 +229,39 @@ function WorkspaceSourceAttachmentCard({
 						<span>{isPrimary ? 'Primary Sources must remain enabled' : 'Enable this Source attachment'}</span>
 					</label>
 
-					<label className="flex items-center gap-3 text-sm">
-						<input
-							type="checkbox"
-							className="toggle toggle-accent toggle-sm"
-							checked={recursive}
-							disabled={busy}
-							onChange={event => {
-								setRecursive(event.currentTarget.checked);
-							}}
-						/>
-						<span>Discover recursively when the Source supports it</span>
-					</label>
-
-					<label className="flex items-center gap-3 text-sm">
-						<input
-							type="checkbox"
-							className="toggle toggle-accent toggle-sm"
-							checked={authoritative}
-							disabled={busy}
-							onChange={event => {
-								setAuthoritative(event.currentTarget.checked);
-							}}
-						/>
-						<span>Use this attachment as authoritative input</span>
-					</label>
+					{isPrimary ? (
+						<div className="text-base-content/70 text-xs sm:col-span-2">
+							Primary project discovery uses the workspace project settings. Attachment-level discovery overrides apply
+							only to additional sources.
+						</div>
+					) : (
+						<>
+							<label className="flex items-center gap-3 text-sm">
+								<input
+									type="checkbox"
+									className="toggle toggle-accent toggle-sm"
+									checked={recursive}
+									disabled={busy}
+									onChange={event => {
+										setRecursive(event.currentTarget.checked);
+									}}
+								/>
+								<span>Discover recursively when supported</span>
+							</label>
+							<label className="flex items-center gap-3 text-sm">
+								<input
+									type="checkbox"
+									className="toggle toggle-accent toggle-sm"
+									checked={authoritative}
+									disabled={busy}
+									onChange={event => {
+										setAuthoritative(event.currentTarget.checked);
+									}}
+								/>
+								<span>Use this source as authoritative input</span>
+							</label>
+						</>
+					)}
 				</div>
 
 				<div className="mt-3 flex justify-end">
@@ -254,11 +270,7 @@ function WorkspaceSourceAttachmentCard({
 						className="btn btn-sm btn-ghost rounded-xl"
 						disabled={busy}
 						onClick={() => {
-							void onSave(attachment, {
-								role: isPrimary ? WorkspaceAttachmentRole.Primary : role,
-								enabled: isPrimary ? true : enabled,
-								settings: attachmentSettings(recursive, authoritative),
-							});
+							void saveEdit();
 						}}
 					>
 						Save attachment settings
@@ -349,12 +361,24 @@ function WorkspaceSourcesModalContent({
 		[attachedSourceIDs, sources]
 	);
 	const primaryCandidates = useMemo(
-		() => sources.filter(source => source.id !== primaryAttachment?.sourceID),
-		[primaryAttachment?.sourceID, sources]
+		() => sources.filter(source => source.kind === FILESYSTEM_SOURCE_KIND && !attachedSourceIDs.has(source.id)),
+		[attachedSourceIDs, sources]
 	);
 	const selectedExistingSource = sourceByID.get(selectedExistingSourceID);
 	const selectedPrimarySource = sourceByID.get(selectedPrimarySourceID);
 	const effectiveNewSourceKind = newSourceKind || sourceKinds[0] || '';
+	const attachableSourceItems = useMemo(
+		() => Object.fromEntries(attachableSources.map(source => [source.id, { isEnabled: source.enabled }])),
+		[attachableSources]
+	);
+	const primarySourceItems = useMemo(
+		() => Object.fromEntries(primaryCandidates.map(source => [source.id, { isEnabled: source.enabled }])),
+		[primaryCandidates]
+	);
+	const sourceKindItems = useMemo(
+		() => Object.fromEntries(sourceKinds.map(kind => [kind, { isEnabled: true }])),
+		[sourceKinds]
+	);
 
 	const applyUpdatedWorkspace = useCallback(
 		(updated: WorkspaceView) => {
@@ -416,7 +440,7 @@ function WorkspaceSourcesModalContent({
 		async (sourceID: string) => {
 			const source = sourceByID.get(sourceID);
 			if (source && !source.enabled) {
-				setActionError('Enable the Artifact Store Source before using it as a Workspace primary Source.');
+				setActionError('Enable the registered source before using it as the project source.');
 				return false;
 			}
 
@@ -478,12 +502,10 @@ function WorkspaceSourcesModalContent({
 					throw new Error('The Source attachment no longer belongs to this Workspace.');
 				}
 
-				return workspaceAPI.detachWorkspaceSource(
-					current.workspace,
-					latestAttachment.sourceID,
-					current.revision,
-					latestAttachment.revision
-				);
+				return workspaceAPI.detachWorkspaceSource(current.workspace, latestAttachment.sourceID, {
+					expectedCollectionRevision: current.revision,
+					expectedAttachmentRevision: latestAttachment.revision,
+				});
 			});
 		},
 		[clearPrimarySource, runWorkspaceMutation]
@@ -491,11 +513,11 @@ function WorkspaceSourcesModalContent({
 
 	const attachExistingSource = useCallback(async () => {
 		if (!selectedExistingSource) {
-			setActionError('Select an Artifact Store Source to attach.');
+			setActionError('Select a registered source to attach.');
 			return;
 		}
 		if (!selectedExistingSource.enabled) {
-			setActionError('Enable the Artifact Store Source before attaching it to this Workspace.');
+			setActionError('Enable the source before attaching it to this workspace.');
 			return;
 		}
 
@@ -601,6 +623,7 @@ function WorkspaceSourcesModalContent({
 
 			try {
 				created = await artifactStoreAPI.createArtifactSource(currentWorkspace.workspace.rootID, {
+					id: getUUIDv7(),
 					kind: effectiveNewSourceKind,
 					displayName,
 					enabled: newSourceEnabled,
@@ -683,7 +706,7 @@ function WorkspaceSourcesModalContent({
 		<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl p-0">
 			<ModalHeader
 				title="Manage Workspace Sources"
-				description={`Attach root-scoped Artifact Store Sources to ${currentWorkspace.displayName}. Source configuration is private and never stored in Workspace data.`}
+				description={`Attach registered sources to ${currentWorkspace.displayName}. Source configuration remains private and is never stored in workspace data.`}
 				onClose={requestClose}
 				closeDisabled={pendingAction !== null}
 			/>
@@ -766,46 +789,37 @@ function WorkspaceSourcesModalContent({
 
 				<ModalSection
 					title="Attach an existing Source"
-					description="Attach an enabled Source already registered in this Workspace Root. Primary Source changes use the separate typed primary-source operation."
+					description="Attach an enabled source already registered for this workspace. Project source changes use the dedicated project-source action."
 				>
 					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-						<label className="space-y-1">
-							<span className="text-xs font-medium">Artifact Store Source</span>
-							<select
-								className="select select-sm w-full rounded-xl"
-								value={selectedExistingSourceID}
-								disabled={pendingAction !== null || attachableSources.length === 0}
-								onChange={event => {
-									setSelectedExistingSourceID(event.currentTarget.value);
-								}}
-							>
-								<option value="">Select a Source</option>
-								{attachableSources.map(source => (
-									<option key={source.id} value={source.id}>
-										{sourceLabel(source)}
-										{source.enabled ? '' : ' [disabled]'}
-									</option>
-								))}
-							</select>
-						</label>
+						<span className="text-xs font-medium">Registered source</span>
+						<Dropdown<string>
+							dropdownItems={attachableSourceItems}
+							orderedKeys={attachableSources.map(source => source.id)}
+							selectedKey={selectedExistingSourceID}
+							onChange={setSelectedExistingSourceID}
+							disabled={pendingAction !== null || attachableSources.length === 0}
+							placeholderLabel="Select a source"
+							title="Select a source to attach"
+							getDisplayName={key => {
+								const a = sourceByID.get(key);
+								if (a !== undefined) {
+									return sourceLabel(a);
+								}
+								return '';
+							}}
+						/>
 
-						<label className="space-y-1">
-							<span className="text-xs font-medium">Workspace role</span>
-							<select
-								className="select select-sm w-full rounded-xl"
-								value={selectedAttachmentRole}
-								disabled={pendingAction !== null}
-								onChange={event => {
-									setSelectedAttachmentRole(event.currentTarget.value as WorkspaceAttachmentRole);
-								}}
-							>
-								{NON_PRIMARY_ROLES.map(role => (
-									<option key={role} value={role}>
-										{attachmentRoleLabel(role)}
-									</option>
-								))}
-							</select>
-						</label>
+						<span className="text-xs font-medium">Workspace role</span>
+						<Dropdown<WorkspaceAttachmentRole>
+							dropdownItems={NON_PRIMARY_ROLE_ITEMS}
+							orderedKeys={NON_PRIMARY_ROLES}
+							selectedKey={selectedAttachmentRole}
+							onChange={setSelectedAttachmentRole}
+							disabled={pendingAction !== null}
+							title="Select attachment role"
+							getDisplayName={attachmentRoleLabel}
+						/>
 					</div>
 
 					<div className="mt-3 flex flex-wrap items-center gap-4">
@@ -852,25 +866,22 @@ function WorkspaceSourcesModalContent({
 					description="A filesystem Workspace has one enabled primary filesystem Source. The backend validates Source eligibility and preserves Workspace identity when the primary Source changes."
 				>
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-						<label className="grow space-y-1">
-							<span className="text-xs font-medium">Replace or set primary Source</span>
-							<select
-								className="select select-sm w-full rounded-xl"
-								value={selectedPrimarySourceID}
-								disabled={pendingAction !== null || primaryCandidates.length === 0}
-								onChange={event => {
-									setSelectedPrimarySourceID(event.currentTarget.value);
-								}}
-							>
-								<option value="">Select a Source</option>
-								{primaryCandidates.map(source => (
-									<option key={source.id} value={source.id}>
-										{sourceLabel(source)}
-										{source.enabled ? '' : ' [disabled]'}
-									</option>
-								))}
-							</select>
-						</label>
+						<Dropdown<string>
+							dropdownItems={primarySourceItems}
+							orderedKeys={primaryCandidates.map(source => source.id)}
+							selectedKey={selectedPrimarySourceID}
+							onChange={setSelectedPrimarySourceID}
+							disabled={pendingAction !== null || primaryCandidates.length === 0}
+							placeholderLabel="Select a filesystem source"
+							title="Select the project source"
+							getDisplayName={key => {
+								const a = sourceByID.get(key);
+								if (a !== undefined) {
+									return sourceLabel(a);
+								}
+								return '';
+							}}
+						/>
 						<button
 							type="button"
 							className="btn btn-sm btn-ghost rounded-xl"
@@ -901,11 +912,11 @@ function WorkspaceSourcesModalContent({
 				</ModalSection>
 
 				<details className="border-base-content/10 bg-base-100 rounded-2xl border">
-					<summary className="cursor-pointer p-4 text-sm font-semibold">Register a new Artifact Store Source</summary>
+					<summary className="cursor-pointer p-4 text-sm font-semibold">Register a new source</summary>
 					<form className="border-base-content/10 space-y-4 border-t p-4" onSubmit={registerSource}>
 						<div className="text-base-content/70 text-xs">
-							Source configuration is sent only to Artifact Store and is write-only. It is never included in Workspace
-							views, Workspace selections, portable definitions, or conversation state.
+							Source configuration is write-only. It is never included in workspace views, Workspace selections,
+							portable definitions, or conversation state.
 						</div>
 
 						{sourceKindsError ? (
@@ -919,20 +930,15 @@ function WorkspaceSourcesModalContent({
 							<label className="space-y-1">
 								<span className="text-xs font-medium">Source kind</span>
 								{sourceKinds.length > 0 ? (
-									<select
-										className="select select-sm w-full rounded-xl"
-										value={effectiveNewSourceKind}
+									<Dropdown<string>
+										dropdownItems={sourceKindItems}
+										orderedKeys={sourceKinds}
+										selectedKey={effectiveNewSourceKind}
+										onChange={setNewSourceKind}
 										disabled={pendingAction !== null}
-										onChange={event => {
-											setNewSourceKind(event.currentTarget.value);
-										}}
-									>
-										{sourceKinds.map(kind => (
-											<option key={kind} value={kind}>
-												{kind}
-											</option>
-										))}
-									</select>
+										title="Select source type"
+										getDisplayName={kind => kind}
+									/>
 								) : (
 									<input
 										type="text"
@@ -1041,7 +1047,7 @@ function WorkspaceSourcesModalContent({
 
 				<ModalSection
 					title="Root Source availability"
-					description="Source enablement is shared by every Collection in this Root. Changing it can make attached catalogs stale."
+					description="Source enablement is shared by every workspace in this source group. Changing it can make attached catalogs stale."
 				>
 					<div className="max-h-56 space-y-2 overflow-y-auto">
 						{isSourceLoading && sources.length === 0 ? (
@@ -1083,7 +1089,7 @@ function WorkspaceSourcesModalContent({
 						))}
 
 						{!isSourceLoading && sources.length === 0 && !sourceLoadError ? (
-							<div className="text-base-content/60 text-sm">No Artifact Store Sources are registered in this Root.</div>
+							<div className="text-base-content/60 text-sm">No sources are registered for this workspace.</div>
 						) : null}
 					</div>
 

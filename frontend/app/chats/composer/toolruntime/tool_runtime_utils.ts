@@ -1,4 +1,5 @@
 import type { UIToolCall } from '@/spec/inference';
+import { UIToolCallStatus } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
 import { SKILLS_AUTOEXEC_TOOL_CHOICES } from '@/spec/skill';
 
@@ -33,14 +34,18 @@ export function isAutoSubmitEligibleToolCall(toolCall: UIToolCall): boolean {
 }
 
 export function getPendingRunnableToolCalls(toolCalls: UIToolCall[]): UIToolCall[] {
-	return toolCalls.filter(toolCall => toolCall.status === 'pending' && isRunnableComposerToolCall(toolCall));
+	return toolCalls.filter(
+		toolCall => toolCall.status === UIToolCallStatus.Pending && isRunnableComposerToolCall(toolCall)
+	);
 }
 
 export function getNextPendingAutoExecutableToolCall(toolCalls: UIToolCall[]): UIToolCall | null {
 	return (
 		toolCalls.find(toolCall => {
 			return (
-				toolCall.status === 'pending' && isRunnableComposerToolCall(toolCall) && isAutoSubmitEligibleToolCall(toolCall)
+				toolCall.status === UIToolCallStatus.Pending &&
+				isRunnableComposerToolCall(toolCall) &&
+				isAutoSubmitEligibleToolCall(toolCall)
 			);
 		}) ?? null
 	);

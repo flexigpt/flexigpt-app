@@ -7,6 +7,14 @@ import type {
 
 import type { IAssistantPresetStoreAPI } from '@/apis/interface';
 import {
+	omitUndefined,
+	optionalFrontendDate,
+	optionalWailsBody,
+	requireWailsArray,
+	requireWailsBody,
+	toFrontendDate,
+} from '@/apis/wailsapi/transport';
+import {
 	DeleteAssistantPreset,
 	DeleteAssistantPresetBundle,
 	GetAssistantPreset,
@@ -19,53 +27,27 @@ import {
 } from '@/apis/wailsjs/go/main/AssistantPresetStoreWrapper';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
-function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
-	return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined)) as Partial<T>;
-}
-
-function toRequiredDate(value: unknown, fieldName: string): Date {
-	if (value instanceof Date) {
-		return value;
-	}
-
-	if (typeof value === 'string' || typeof value === 'number') {
-		const d = new Date(value);
-		if (!Number.isNaN(d.getTime())) {
-			return d;
-		}
-	}
-
-	throw new Error(`Invalid or missing date for ${fieldName}`);
-}
-
-function toOptionalDate(value: unknown, fieldName: string): Date | undefined {
-	if (value === undefined || value === null || value === '') {
-		return undefined;
-	}
-	return toRequiredDate(value, fieldName);
-}
-
 function normalizeAssistantPreset(preset: AssistantPreset): AssistantPreset {
 	return {
 		...preset,
-		createdAt: toRequiredDate(preset.createdAt, 'assistantPreset.createdAt'),
-		modifiedAt: toRequiredDate(preset.modifiedAt, 'assistantPreset.modifiedAt'),
+		createdAt: toFrontendDate(preset.createdAt, 'assistantPreset.createdAt'),
+		modifiedAt: toFrontendDate(preset.modifiedAt, 'assistantPreset.modifiedAt'),
 	};
 }
 
 function normalizeAssistantPresetBundle(bundle: AssistantPresetBundle): AssistantPresetBundle {
 	return {
 		...bundle,
-		createdAt: toRequiredDate(bundle.createdAt, 'assistantPresetBundle.createdAt'),
-		modifiedAt: toRequiredDate(bundle.modifiedAt, 'assistantPresetBundle.modifiedAt'),
-		softDeletedAt: toOptionalDate(bundle.softDeletedAt, 'assistantPresetBundle.softDeletedAt'),
+		createdAt: toFrontendDate(bundle.createdAt, 'assistantPresetBundle.createdAt'),
+		modifiedAt: toFrontendDate(bundle.modifiedAt, 'assistantPresetBundle.modifiedAt'),
+		softDeletedAt: optionalFrontendDate(bundle.softDeletedAt, 'assistantPresetBundle.softDeletedAt'),
 	};
 }
 
 function normalizeAssistantPresetListItem(item: AssistantPresetListItem): AssistantPresetListItem {
 	return {
 		...item,
-		modifiedAt: toOptionalDate(item.modifiedAt, 'assistantPresetListItem.modifiedAt'),
+		modifiedAt: optionalFrontendDate(item.modifiedAt, 'assistantPresetListItem.modifiedAt'),
 	};
 }
 
@@ -84,12 +66,14 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		};
 
 		const resp = await ListAssistantPresetBundles(req);
+		const body = requireWailsBody(resp.Body, 'ListAssistantPresetBundles');
 
 		return {
-			assistantPresetBundles: ((resp.Body?.assistantPresetBundles ?? []) as AssistantPresetBundle[]).map(b =>
-				normalizeAssistantPresetBundle(b)
-			),
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			assistantPresetBundles: requireWailsArray<AssistantPresetBundle>(
+				body.assistantPresetBundles,
+				'ListAssistantPresetBundles.assistantPresetBundles'
+			).map(b => normalizeAssistantPresetBundle(b)),
+			nextPageToken: body.nextPageToken || undefined,
 		};
 	}
 
@@ -146,12 +130,14 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		};
 
 		const resp = await ListAssistantPresets(req);
+		const body = requireWailsBody(resp.Body, 'ListAssistantPresets');
 
 		return {
-			assistantPresetListItems: ((resp.Body?.assistantPresetListItems ?? []) as AssistantPresetListItem[]).map(i =>
-				normalizeAssistantPresetListItem(i)
-			),
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
+			assistantPresetListItems: requireWailsArray<AssistantPresetListItem>(
+				body.assistantPresetListItems,
+				'ListAssistantPresets.assistantPresetListItems'
+			).map(i => normalizeAssistantPresetListItem(i)),
+			nextPageToken: body.nextPageToken || undefined,
 		};
 	}
 
@@ -223,6 +209,7 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		};
 
 		const resp = await GetAssistantPreset(req);
-		return resp.Body ? normalizeAssistantPreset(resp.Body as AssistantPreset) : undefined;
+		const body = optionalWailsBody(resp.Body);
+		return body === undefined ? undefined : normalizeAssistantPreset(body as AssistantPreset);
 	}
 }

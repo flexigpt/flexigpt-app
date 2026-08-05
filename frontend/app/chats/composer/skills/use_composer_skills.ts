@@ -2,12 +2,12 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
-import { SkillSessionSyncMode } from '@/spec/skill';
+import { RuntimeSkillActivity, SkillSessionSyncMode } from '@/spec/skill';
 import type { WorkspaceRef } from '@/spec/workspace';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 
-import { skillStoreAPI } from '@/apis/baseapi';
+import { skillBundleAPI, skillManagementAPI } from '@/apis/baseapi';
 
 import { isInstructionInsertSkill } from '@/skills/lib/skill_artifact_utils';
 import {
@@ -17,6 +17,7 @@ import {
 	normalizeSkillRefs,
 	skillRefFromListItem,
 	skillRefKey,
+	toArtifactRefs,
 } from '@/skills/lib/skill_identity_utils';
 
 interface ApplySkillSelectionStateOptions {
@@ -99,28 +100,8 @@ let composerSkillsCatalogCache: SkillListItem[] | undefined;
 let composerSkillsCatalogPromise: Promise<SkillListItem[]> | undefined;
 
 async function fetchComposerSkillsCatalog(): Promise<SkillListItem[]> {
-	const out: SkillListItem[] = [];
-	let token: string | undefined;
-
-	for (let guard = 0; guard < 50; guard += 1) {
-		const resp = await skillStoreAPI.listSkills({
-			bundleIDs: [],
-			types: [],
-			inserts: ['instructions'],
-			includeDisabled: false,
-			includeMissing: false,
-			recommendedPageSize: 200,
-			pageToken: token,
-		});
-
-		out.push(...(resp.skillListItems ?? []));
-		token = resp.nextPageToken;
-		if (!token) {
-			break;
-		}
-	}
-
-	return out;
+	const items = await skillManagementAPI.listSkills(undefined, false);
+	return items.filter(item => isInstructionInsertSkill(item.skillDefinition));
 }
 
 function loadComposerSkillsCatalog(force = false): Promise<SkillListItem[]> {
@@ -250,7 +231,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		if (!sid) {
 			return;
 		}
-		void skillStoreAPI.closeSkillSession(sid).catch(() => {});
+		void skillBundleAPI.closeSkillSession(sid).catch(() => {});
 	}, []);
 
 	const applySkillSelectionState = useCallback(
@@ -359,13 +340,11 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			}
 
 			try {
-				const sess = await skillStoreAPI.createSkillSession(
-					prevSessionID ?? undefined,
-					undefined,
-					nextEnabled,
-					nextActive,
-					nextWorkspace
-				);
+				const sess = await skillBundleAPI.createSkillSession({
+					closeSessionID: prevSessionID ?? undefined,
+					allowArtifacts: toArtifactRefs(nextEnabled),
+					activeArtifacts: toArtifactRefs(nextActive),
+				});
 
 				if (skillSessionSyncVersionRef.current !== syncVersion) {
 					closeSkillSessionBestEffort(sess.sessionID);
@@ -382,7 +361,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 					return;
 				}
 
-				const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeSkillRefs ?? latestActive);
+				const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeArtifacts ?? latestActive);
 				updateSkillSessionIDState(sess.sessionID);
 				updateActiveSkillRefsState(resolvedActive);
 				sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive, nextWorkspace);
@@ -543,7 +522,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			if (!sid) {
 				return;
 			}
-			void skillStoreAPI.closeSkillSession(sid).catch(() => {});
+			void skillBundleAPI.closeSkillSession(sid).catch(() => {});
 		};
 	}, []);
 
@@ -657,16 +636,16 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			return [];
 		}
 
-		const items = await skillStoreAPI.listRuntimeSkills({
+		const allowArtifacts = toArtifactRefs(allowSkillRefs);
+		const items = await skillBundleAPI.listRuntimeSkills({
 			sessionID: sid,
-			activity: 'active',
-			allowSkillRefs,
-			workspace: workspaceRefRef.current,
+			activity: RuntimeSkillActivity.Active,
+			allowArtifacts,
 		});
 
 		return clampActiveSkillRefsToEnabled(
 			allowSkillRefs,
-			(items ?? []).map(it => it.skillRef)
+			(items ?? []).map(it => it.artifact)
 		);
 	}, []);
 
@@ -692,13 +671,11 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		sessionStateKeyRef.current = '';
 
 		try {
-			const sess = await skillStoreAPI.createSkillSession(
-				existing ?? undefined, // closeSessionID (best-effort)
-				undefined, // maxActivePerSession
-				currentEnabled, // allowSkillRefs (REQUIRED)
-				currentActive, // initial active from conversation
-				workspaceRefRef.current
-			);
+			const sess = await skillBundleAPI.createSkillSession({
+				closeSessionID: existing ?? undefined,
+				allowArtifacts: toArtifactRefs(currentEnabled),
+				activeArtifacts: toArtifactRefs(currentActive),
+			});
 
 			if (!sess.sessionID) {
 				throw new Error('Skill runtime did not return a session ID.');
@@ -719,7 +696,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 				return null;
 			}
 
-			const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeSkillRefs ?? latestActive);
+			const resolvedActive = clampActiveSkillRefsToEnabled(latestEnabled, sess.activeArtifacts ?? latestActive);
 			updateSkillSessionIDState(sess.sessionID);
 			updateActiveSkillRefsState(resolvedActive);
 			sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive, workspaceRefRef.current);

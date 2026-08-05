@@ -27,6 +27,7 @@ import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
+import { UIToolCallStatus } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/mcp';
 import { MCPExecutionMode } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
@@ -1144,7 +1145,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setSubmitError(null);
 			const pendingRunnableToolCallIDs = runPendingTools
 				? toolCalls
-						.filter(toolCall => toolCall.status === 'pending' && isRunnableComposerToolCall(toolCall))
+						.filter(toolCall => toolCall.status === UIToolCallStatus.Pending && isRunnableComposerToolCall(toolCall))
 						.map(toolCall => toolCall.id)
 				: [];
 			const hadPendingTools = pendingRunnableToolCallIDs.length > 0;
@@ -1194,10 +1195,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const finalToolOutputs: UIToolOutput[] = runtimeAfterRun.toolOutputs;
 				const unfinishedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
 					toolCall =>
-						(toolCall.status === 'pending' || toolCall.status === 'running') && isRunnableComposerToolCall(toolCall)
+						(toolCall.status === UIToolCallStatus.Pending || toolCall.status === UIToolCallStatus.Running) &&
+						isRunnableComposerToolCall(toolCall)
 				);
 				const failedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
-					toolCall => toolCall.status === 'failed' && isRunnableComposerToolCall(toolCall)
+					toolCall => toolCall.status === UIToolCallStatus.Failed && isRunnableComposerToolCall(toolCall)
 				);
 
 				if (unfinishedRunnableToolCalls.length > 0) {
@@ -1375,7 +1377,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		const unfinishedRunnableToolCalls = toolCalls.filter(
 			toolCall =>
-				(toolCall.status === 'pending' || toolCall.status === 'running') && isRunnableComposerToolCall(toolCall)
+				(toolCall.status === UIToolCallStatus.Pending || toolCall.status === UIToolCallStatus.Running) &&
+				isRunnableComposerToolCall(toolCall)
 		);
 
 		if (unfinishedRunnableToolCalls.length > 0) {
@@ -1383,7 +1386,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		const failedRunnableToolCalls = toolCalls.filter(
-			toolCall => toolCall.status === 'failed' && isRunnableComposerToolCall(toolCall)
+			toolCall => toolCall.status === UIToolCallStatus.Failed && isRunnableComposerToolCall(toolCall)
 		);
 
 		if (failedRunnableToolCalls.length > 0) {

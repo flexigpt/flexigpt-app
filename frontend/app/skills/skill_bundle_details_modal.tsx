@@ -42,6 +42,10 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 					<ManagementInfoRow label="ID" mono>
 						{bundle.id}
 					</ManagementInfoRow>
+					<ManagementInfoRow label="Root ID" mono>
+						{bundle.rootID}
+					</ManagementInfoRow>
+					<ManagementInfoRow label="Collection revision">{bundle.revision}</ManagementInfoRow>
 					<ManagementInfoRow label="Built-in">{bundle.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{bundle.isEnabled ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Description">
@@ -50,6 +54,26 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 					<ManagementInfoRow label="Created">{String(bundle.createdAt)}</ManagementInfoRow>
 					<ManagementInfoRow label="Modified">{String(bundle.modifiedAt)}</ManagementInfoRow>
 				</ManagementInfoGrid>
+			</ModalSection>
+
+			<ModalSection title="Artifact Sources">
+				{bundle.attachments.length > 0 ? (
+					<div className="space-y-2">
+						{bundle.attachments.map(attachment => (
+							<div key={attachment.sourceID} className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
+								<div className="flex flex-wrap gap-2">
+									<MetadataPill label="Role">{attachment.role}</MetadataPill>
+									<MetadataPill label="State">{attachment.enabled ? 'Enabled' : 'Disabled'}</MetadataPill>
+									{attachment.sourceKind ? <MetadataPill label="Kind">{attachment.sourceKind}</MetadataPill> : null}
+								</div>
+								<div className="mt-2 text-sm">{attachment.sourceDisplayName || 'Attached Source'}</div>
+								<div className="text-base-content/60 mt-1 font-mono text-xs break-all">{attachment.sourceID}</div>
+							</div>
+						))}
+					</div>
+				) : (
+					<div className="text-base-content/70 text-sm">No Sources attached.</div>
+				)}
 			</ModalSection>
 
 			<ModalSection title="Skill summary">

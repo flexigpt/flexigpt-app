@@ -192,7 +192,7 @@ export default function WorkspacesPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="Workspaces"
-					description="Manage Workspace Collections, attached Sources, discovered Artifacts, Context, Skills, and runtime permissions."
+					description="Manage project sources, discovered context documents, workspace skills, and conversation permissions."
 					width="wide"
 					actions={
 						<button
@@ -222,12 +222,12 @@ export default function WorkspacesPage() {
 						<div className="font-semibold">How workspace discovery works</div>
 						<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5 text-xs">
 							<li>
-								Create a filesystem Workspace from a project root, or create an empty Workspace Collection and attach
-								Sources later.
+								Create a filesystem workspace from a project root, or create an empty workspace and attach sources
+								later.
 							</li>
 							<li>AGENTS.md, CLAUDE.md, optional README.md, and .skills folders are discovered automatically.</li>
 							<li>Add project-specific Context files or Skill folders from Edit Workspace, then refresh discovery.</li>
-							<li>Manage library, package, overlay, and primary Source attachments from each Workspace.</li>
+							<li>Manage library, package, overlay, and primary source attachments from each workspace.</li>
 						</ul>
 					</div>
 
@@ -302,7 +302,7 @@ export default function WorkspacesPage() {
 
 						{workspaces.length === 0 ? (
 							<ManagementEmptyState className="mt-4">
-								No Workspaces configured. Add a project root or create an empty Workspace Collection to get started.
+								No workspaces configured. Add a project root or create an empty workspace to get started.
 							</ManagementEmptyState>
 						) : null}
 
@@ -333,7 +333,7 @@ export default function WorkspacesPage() {
 								Delete workspace <span className="font-semibold">{workspaceToDelete?.displayName}</span>?
 							</p>
 							<p className="text-base-content/70">
-								This removes the workspace catalog and stored records. It does not delete project files.
+								This removes the workspace index and saved workspace settings. It does not delete project files.
 							</p>
 						</div>
 					}

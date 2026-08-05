@@ -3,6 +3,7 @@ import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/s
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 import type { IToolRuntimeAPI } from '@/apis/interface';
+import { rawJSONToWails, requireWailsBody } from '@/apis/wailsapi/transport';
 import { InvokeTool } from '@/apis/wailsjs/go/main/ToolRuntimeWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
@@ -14,18 +15,18 @@ export class WailsToolRuntimeAPI implements IToolRuntimeAPI {
 		args?: JSONRawString,
 		httpOptions?: InvokeHTTPOptions,
 		goOptions?: InvokeGoOptions
-	): Promise<any> {
+	): Promise<InvokeToolResponse> {
 		const req = {
 			BundleID: bundleID,
 			ToolSlug: toolSlug,
 			Version: version,
 			Body: {
-				args: args ?? {},
-				httpOptions: httpOptions as spec.InvokeHTTPOptions,
-				goOptions: goOptions as spec.InvokeGoOptions,
+				args: rawJSONToWails(args ?? '{}', 'tool arguments'),
+				httpOptions: httpOptions as spec.InvokeHTTPOptions | undefined,
+				goOptions: goOptions as spec.InvokeGoOptions | undefined,
 			} as spec.InvokeToolRequestBody,
 		} as spec.InvokeToolRequest;
 		const resp = await InvokeTool(req);
-		return resp.Body as InvokeToolResponse;
+		return requireWailsBody(resp.Body, 'InvokeTool') as InvokeToolResponse;
 	}
 }

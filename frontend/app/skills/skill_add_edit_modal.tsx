@@ -1,17 +1,17 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { FiAlertCircle, FiCopy, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiCopy, FiFolder, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
-import type { Skill, SkillArgument, SkillInsert } from '@/spec/skill';
-import { SkillType } from '@/spec/skill';
+import type { Skill, SkillArgument, SkillArtifactCreateInput } from '@/spec/skill';
+import { SkillInsert, SkillType } from '@/spec/skill';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug, validateTags } from '@/lib/text_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import { skillStoreAPI } from '@/apis/baseapi';
+import { backendAPI, skillManagementAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
@@ -41,17 +41,6 @@ import {
 	normalizeSkillSourceTags,
 	stringifySkillFrontmatter,
 } from '@/skills/lib/skill_artifact_utils';
-
-interface SkillArtifactCreateInput {
-	name: string;
-	displayName?: string;
-	description?: string;
-	insert: SkillInsert;
-	arguments?: SkillArgument[];
-	tags?: string[];
-	markdownBody: string;
-	isEnabled: boolean;
-}
 
 export interface SkillUpsertInput extends Partial<Skill> {
 	artifactCreate?: SkillArtifactCreateInput;
@@ -87,6 +76,7 @@ interface ErrorState {
 	type?: string;
 	location?: string;
 	tags?: string;
+	description?: string;
 	markdownBody?: string;
 }
 
@@ -285,7 +275,10 @@ function AddEditSkillModalContent({
 	// Match the Tool modal pattern: unsupported impls can exist (viewable),
 	// but cannot be created/edited in the UI.
 	const isLockedSkill =
-		!isForkMode && (Boolean(initialData?.skill?.isBuiltIn) || initialData?.skill?.type === SkillType.EmbeddedFS);
+		!isForkMode &&
+		(Boolean(initialData?.skill?.isBuiltIn) ||
+			initialData?.skill?.type === SkillType.EmbeddedFS ||
+			(requestedMode === 'edit' && initialData?.skill?.isManaged === false));
 	const effectiveMode: ModalMode = isLockedSkill ? 'view' : isForkMode ? 'add' : requestedMode;
 	const isViewMode = effectiveMode === 'view';
 	const isEditMode = effectiveMode === 'edit';
@@ -313,7 +306,7 @@ function AddEditSkillModalContent({
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState('');
 	const [scaffoldInsert, setScaffoldInsert] = useState<SkillInsert>(() =>
-		isForkMode ? normalizeSkillInsert(initialData?.skill?.insert).value : 'user-message'
+		isForkMode ? normalizeSkillInsert(initialData?.skill?.insert).value : SkillInsert.UserMessage
 	);
 	const [scaffoldArgumentsText, setScaffoldArgumentsText] = useState(() =>
 		isForkMode ? buildSkillArgumentText(initialData?.skill?.arguments) : ''
@@ -323,6 +316,8 @@ function AddEditSkillModalContent({
 	);
 	const [scaffoldCopied, setScaffoldCopied] = useState(false);
 	const [locationCopied, setLocationCopied] = useState(false);
+	const [documentLoading, setDocumentLoading] = useState(isEditMode);
+	const [documentLoaded, setDocumentLoaded] = useState(false);
 
 	const artifactSkill = initialData?.skill;
 	const artifactArguments = artifactSkill?.arguments ?? [];
@@ -417,6 +412,12 @@ function AddEditSkillModalContent({
 		if (isAddMode && creationMode === 'create' && !scaffoldBody.trim()) {
 			next.markdownBody = 'SKILL.md body is required.';
 		}
+		if (((isAddMode && creationMode === 'create') || isEditMode) && !state.description.trim()) {
+			next.description = 'Description is required for a managed Skill.';
+		}
+		if (isEditMode && !scaffoldBody.trim()) {
+			next.markdownBody = 'SKILL.md body is required.';
+		}
 		if (isAddMode && creationMode === 'create' && scaffoldArgumentError) {
 			next.markdownBody = scaffoldArgumentError;
 		}
@@ -439,6 +440,50 @@ function AddEditSkillModalContent({
 			window.clearTimeout(focusTimer);
 		};
 	}, [isAddMode]);
+
+	useEffect(() => {
+		if (!isEditMode || !initialData) {
+			return;
+		}
+
+		let cancelled = false;
+		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
+		setDocumentLoading(true);
+
+		void skillManagementAPI
+			.getManagedSkillDocument(initialData.bundleID, initialData.skill.id)
+			.then(view => {
+				if (cancelled) {
+					return;
+				}
+				setFormData(previous => ({
+					...previous,
+					name: view.document.name,
+					displayName: view.document.displayName ?? '',
+					description: view.document.description,
+					tags: (view.document.tags ?? []).join(', '),
+					isEnabled: view.artifact.enabled,
+				}));
+				setScaffoldInsert(view.document.insert);
+				setScaffoldArgumentsText(buildSkillArgumentText(view.document.arguments));
+				setScaffoldBody(view.document.markdownBody);
+				setDocumentLoaded(true);
+			})
+			.catch((error: unknown) => {
+				if (!cancelled) {
+					setSubmitError(error instanceof Error ? error.message : 'Managed Skill document could not be loaded.');
+				}
+			})
+			.finally(() => {
+				if (!cancelled) {
+					setDocumentLoading(false);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [initialData, isEditMode]);
 
 	const prefillCandidates = prefillSkills ?? existingSkills;
 	const copyableSkills = useMemo(
@@ -498,14 +543,7 @@ function AddEditSkillModalContent({
 		setPreviewError('');
 
 		try {
-			const resp = await skillStoreAPI.renderSkill(
-				{
-					bundleID: initialData.bundleID,
-					skillSlug: artifactSkill.slug,
-					skillID: artifactSkill.id,
-				},
-				previewArgs
-			);
+			const resp = await skillManagementAPI.renderSkill(artifactSkill.ref, previewArgs);
 
 			if (!unmountingRef.current) {
 				setPreviewResult({
@@ -624,7 +662,7 @@ function AddEditSkillModalContent({
 		};
 
 		const payload: SkillUpsertInput =
-			isAddMode && creationMode === 'create'
+			(isAddMode && creationMode === 'create') || (isEditMode && documentLoaded)
 				? {
 						...common,
 						artifactCreate: {
@@ -661,6 +699,24 @@ function AddEditSkillModalContent({
 					setIsSubmitting(false);
 				}
 			});
+	};
+
+	const chooseExistingSkillFolder = async () => {
+		setSubmitError('');
+		try {
+			const path = await backendAPI.pickDirectoryPath();
+			if (!path) {
+				return;
+			}
+			setFormData(previous => ({
+				...previous,
+				location: path,
+				// oxlint-disable-next-line unicorn/prefer-array-find
+				displayName: previous.displayName || path.replaceAll('\\', '/').split('/').filter(Boolean).at(-1) || '',
+			}));
+		} catch (error) {
+			setSubmitError(error instanceof Error ? error.message : 'Could not choose a Skill folder.');
+		}
 	};
 
 	const headerTitle = isForkMode
@@ -810,7 +866,7 @@ function AddEditSkillModalContent({
 							</div>
 						)}
 
-						{isAddMode && creationMode === 'create' && (
+						{((isAddMode && creationMode === 'create') || isEditMode) && (
 							<div className="collapse-arrow border-base-content/10 bg-base-100 collapse rounded-2xl border">
 								<input type="checkbox" defaultChecked />
 								<div className="collapse-title text-sm font-semibold">Managed SKILL.md content</div>
@@ -834,7 +890,11 @@ function AddEditSkillModalContent({
 												filterDisabled={false}
 												title="Select insert behavior"
 												getDisplayName={key => skillInsertDropdownItems[key]?.displayName ?? key}
+												disabled={documentLoading}
 											/>
+											{documentLoading ? (
+												<div className="text-base-content/60 text-xs">Loading managed Skill document...</div>
+											) : null}
 											<div className="text-base-content/70 text-xs">{getSkillInsertLongGuidance(scaffoldInsert)}</div>
 										</div>
 									</div>
@@ -889,7 +949,7 @@ function AddEditSkillModalContent({
 													setScaffoldBody(e.target.value);
 												}}
 												placeholder={
-													scaffoldInsert === 'user-message'
+													scaffoldInsert === SkillInsert.UserMessage
 														? 'Summarize the following text in a $tone tone:\n\n$text'
 														: 'Always follow these instructions when this skill is active...'
 												}
@@ -985,22 +1045,34 @@ function AddEditSkillModalContent({
 								hint="Folder containing SKILL.md."
 								error={errors.location}
 							>
-								<input
-									id="skill-location"
-									type="text"
-									name="location"
-									value={
-										isAddMode && creationMode === 'create'
-											? 'Managed automatically in the app skill store'
-											: formData.location
-									}
-									onChange={handleInput}
-									readOnly={isViewMode || (isAddMode && creationMode === 'create')}
-									className={`input w-full rounded-xl ${errors.location ? 'input-error' : ''}`}
-									spellCheck="false"
-									autoComplete="off"
-									aria-invalid={Boolean(errors.location)}
-								/>
+								<div className="flex flex-col gap-2 sm:flex-row">
+									<input
+										id="skill-location"
+										type="text"
+										name="location"
+										value={
+											isAddMode && creationMode === 'create'
+												? 'Managed automatically in Artifact Store'
+												: formData.location
+										}
+										onChange={handleInput}
+										readOnly={isViewMode || (isAddMode && creationMode === 'create')}
+										className={`input min-w-0 grow rounded-xl ${errors.location ? 'input-error' : ''}`}
+										spellCheck="false"
+										autoComplete="off"
+										aria-invalid={Boolean(errors.location)}
+									/>
+									{isAddMode && creationMode === 'register' ? (
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => void chooseExistingSkillFolder()}
+										>
+											<FiFolder size={14} />
+											<span>Choose Folder</span>
+										</button>
+									) : null}
+								</div>
 							</ModalField>
 						</ModalSection>
 
@@ -1045,6 +1117,11 @@ function AddEditSkillModalContent({
 									className="textarea h-20 w-full rounded-xl"
 									spellCheck="false"
 								/>
+								{errors.description ? (
+									<div className="label">
+										<span className="text-error text-xs">{errors.description}</span>
+									</div>
+								) : null}
 							</ModalField>
 
 							<ModalField label="Tags" htmlFor="skill-tags" error={errors.tags}>

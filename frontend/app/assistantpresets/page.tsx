@@ -21,6 +21,7 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import { PageFrame } from '@/components/page_frame';
 
 import { AssistantPresetBundleCard } from '@/assistantpresets/assistant_preset_bundle_card';
+import { AssistantPresetBundleEditModal } from '@/assistantpresets/assistant_preset_bundle_edit_modal';
 import type { PresetItem } from '@/assistantpresets/lib/assistant_preset_editor_types';
 import {
 	getAllAssistantPresetBundles,
@@ -101,6 +102,7 @@ export default function AssistantPresetsPage() {
 	const [bundleToDeleteID, setBundleToDeleteID] = useState<string | null>(null);
 	const [isDeletingBundle, setIsDeletingBundle] = useState(false);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+	const [bundleToEdit, setBundleToEdit] = useState<AssistantPresetBundle | null>(null);
 
 	const bundleToDelete =
 		bundleToDeleteID === null
@@ -380,6 +382,38 @@ export default function AssistantPresetsPage() {
 		[reloadOrThrow]
 	);
 
+	const handleEditBundle = useCallback(
+		async (bundle: AssistantPresetBundle, displayName: string, description?: string) => {
+			if (bundle.isBuiltIn) {
+				throw new Error('Built-in assistant preset bundles cannot be edited.');
+			}
+
+			await assistantPresetStoreAPI.putAssistantPresetBundle(
+				bundle.id,
+				bundle.slug,
+				displayName,
+				bundle.isEnabled,
+				description
+			);
+
+			setBundles(previous =>
+				previous.map(item =>
+					item.bundle.id === bundle.id
+						? {
+								...item,
+								bundle: {
+									...item.bundle,
+									displayName,
+									description,
+								},
+							}
+						: item
+				)
+			);
+		},
+		[setBundles]
+	);
+
 	if (isLoading && !hasResolved) {
 		return <Loader text="Loading assistant preset bundles…" />;
 	}
@@ -434,6 +468,9 @@ export default function AssistantPresetsPage() {
 							onDeleteBundleRequested={bundleID => {
 								setBundleToDeleteID(bundleID);
 							}}
+							onEditBundleRequested={bundle => {
+								setBundleToEdit(bundle);
+							}}
 							copyablePresets={allPresetItems}
 						/>
 					))}
@@ -463,6 +500,15 @@ export default function AssistantPresetsPage() {
 					existingSlugs={bundles.map(bundleData => bundleData.bundle.slug)}
 					existingDisplayNames={bundles.map(bundleData => bundleData.bundle.displayName || bundleData.bundle.slug)}
 					failureMessage="Failed to create assistant preset bundle."
+				/>
+
+				<AssistantPresetBundleEditModal
+					isOpen={bundleToEdit !== null}
+					bundle={bundleToEdit}
+					onClose={() => {
+						setBundleToEdit(null);
+					}}
+					onSubmit={handleEditBundle}
 				/>
 
 				<ActionDeniedAlertModal

@@ -1,9 +1,18 @@
+// oxlint-disable typescript/no-misused-spread
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
+import { RoleEnum, Status } from '@/spec/inference';
 
 import { parseAnyToTime } from '@/lib/date_utils';
 import { extractTimeFromUUIDv7Str } from '@/lib/uuid_utils';
 
 import type { IConversationStoreAPI } from '@/apis/interface';
+import {
+	enumFromWails,
+	optionalWailsBody,
+	requireWailsArray,
+	requireWailsBody,
+	toFrontendDate,
+} from '@/apis/wailsapi/transport';
 import {
 	DeleteConversation,
 	GetConversation,
@@ -49,7 +58,8 @@ export class WailsConversationStoreAPI implements IConversationStoreAPI {
 	async getConversation(id: string, title: string, forceFetch?: boolean): Promise<StoreConversation | null> {
 		const req = { ID: id, Title: title, ForceFetch: forceFetch ?? false };
 		const c = await GetConversation(req as wailsSpec.GetConversationRequest);
-		return c.Body as StoreConversation;
+		const body = optionalWailsBody(c.Body);
+		return body === undefined ? null : conversationFromWails(body);
 	}
 
 	async listConversations(
@@ -58,9 +68,12 @@ export class WailsConversationStoreAPI implements IConversationStoreAPI {
 	): Promise<{ conversations: ConversationSearchItem[]; nextToken?: string }> {
 		const req = { PageToken: token || '', PageSize: pageSize ?? 20 };
 		const resp = await ListConversations(req as wailsSpec.ListConversationsRequest);
+		const body = requireWailsBody(resp.Body, 'ListConversations');
 		return {
-			conversations: mapConversationsToSearchItems(resp.Body ? resp.Body.conversationListItems : []),
-			nextToken: resp.Body?.nextPageToken,
+			conversations: mapConversationsToSearchItems(
+				requireWailsArray(body.conversationListItems, 'ListConversations.conversationListItems')
+			),
+			nextToken: body.nextPageToken || undefined,
 		};
 	}
 
@@ -71,12 +84,31 @@ export class WailsConversationStoreAPI implements IConversationStoreAPI {
 	): Promise<{ conversations: ConversationSearchItem[]; nextToken?: string }> {
 		const req = { Query: query, PageToken: token || '', PageSize: pageSize || 10 };
 		const resp = await SearchConversations(req as wailsSpec.SearchConversationsRequest);
+		const body = requireWailsBody(resp.Body, 'SearchConversations');
 
 		return {
-			conversations: mapConversationsToSearchItems(resp.Body ? resp.Body.conversationListItems : []),
-			nextToken: resp.Body?.nextPageToken,
+			conversations: mapConversationsToSearchItems(
+				requireWailsArray(body.conversationListItems, 'SearchConversations.conversationListItems')
+			),
+			nextToken: body.nextPageToken || undefined,
 		};
 	}
+}
+
+function conversationFromWails(conversation: wailsSpec.Conversation): StoreConversation {
+	return {
+		...conversation,
+		createdAt: toFrontendDate(conversation.createdAt, 'conversation.createdAt'),
+		modifiedAt: toFrontendDate(conversation.modifiedAt, 'conversation.modifiedAt'),
+		messages: requireWailsArray<wailsSpec.ConversationMessage>(conversation.messages, 'conversation.messages').map(
+			(message, index) =>
+				Object.assign(message, {
+					createdAt: toFrontendDate(message.createdAt, `conversation.messages[${index}].createdAt`),
+					role: enumFromWails(message.role, RoleEnum, `conversation.messages[${index}].role`),
+					status: enumFromWails(message.status, Status, `conversation.messages[${index}].status`),
+				})
+		),
+	} as StoreConversation;
 }
 
 function mapConversationsToSearchItems(conversations: Array<wailsSpec.ConversationListItem>): ConversationSearchItem[] {

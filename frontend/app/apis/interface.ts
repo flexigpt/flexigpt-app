@@ -14,6 +14,7 @@ import type {
 	PublishManagedSourcePackageBody,
 	PurgeArtifactRootResult,
 	PurgeArtifactSourceResult,
+	RemoveManagedSourcePackageBody,
 	UpdateArtifactRootBody,
 	UpdateArtifactSourceBody,
 } from '@/spec/artifact';
@@ -71,20 +72,25 @@ import type {
 } from '@/spec/modelpreset';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
+	AdoptSkillBody,
+	AttachSkillBundleSourceBody,
+	CreateManagedSkillBody,
+	CreateManagedSkillResult,
+	CreateSkillBundleBody,
+	CreateSkillSessionOptions,
 	InvokeSkillToolResponse,
-	ListSkillsRequest,
-	ProvidedSkill,
-	PutSkillArtifactPayload,
-	RenderProvidedSkillResponse,
+	ManagedSkillDocumentView,
+	PinSkillBody,
 	RenderSkillResponse,
+	RetireSkillBundleResult,
 	RuntimeSkillFilter,
 	RuntimeSkillListItem,
-	Skill,
-	SkillBundle,
-	SkillListItem,
-	SkillRef,
+	SetSkillEnabledBody,
+	SkillArtifactView,
+	SkillBundleRef,
+	SkillBundleView,
 	SkillSession,
-	SkillType,
+	UpdateSkillBundleBody,
 } from '@/spec/skill';
 import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
@@ -94,6 +100,7 @@ import type {
 	AttachWorkspaceSourceBody,
 	CreateEmptyWorkspaceBody,
 	CreateFilesystemWorkspaceBody,
+	DetachWorkspaceSourceBody,
 	PinWorkspaceArtifactBody,
 	ReplaceWorkspacePrimarySourceBody,
 	ResolveWorkspaceResourceResult,
@@ -102,6 +109,7 @@ import type {
 	SetWorkspaceArtifactRuntimeDisabledBody,
 	SetWorkspacePrimarySourceBody,
 	SuppressWorkspaceBindingBody,
+	UnadoptWorkspaceArtifactBody,
 	UnadoptWorkspaceArtifactResult,
 	UnsuppressWorkspaceBindingResult,
 	UpdateWorkspaceAttachmentBody,
@@ -246,94 +254,50 @@ export interface IToolStoreAPI {
 	getTool(bundleID: string, toolSlug: string, version: string): Promise<Tool | undefined>;
 }
 
-export interface ISkillStoreAPI {
-	/** List skill bundles, optionally filtered by IDs, disabled, and paginated. */
-	listSkillBundles(
-		bundleIDs?: string[],
-		includeDisabled?: boolean,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ skillBundles: SkillBundle[]; nextPageToken?: string }>;
+export interface ISkillBundleAPI {
+	createSkillBundle(rootID: ArtifactRootID, body: CreateSkillBundleBody): Promise<SkillBundleView>;
 
-	/** Create or update a skill bundle. */
-	putSkillBundle(
-		bundleID: string,
-		slug: string,
-		displayName: string,
-		isEnabled: boolean,
-		description?: string
-	): Promise<void>;
+	getSkillBundle(bundle: SkillBundleRef): Promise<SkillBundleView>;
 
-	/** Patch (enable/disable) a bundle. */
-	patchSkillBundle(bundleID: string, isEnabled: boolean): Promise<void>;
+	listSkillBundles(rootID: ArtifactRootID): Promise<SkillBundleView[]>;
 
-	/** Delete a bundle. */
-	deleteSkillBundle(bundleID: string): Promise<void>;
+	updateSkillBundle(bundle: SkillBundleRef, body: UpdateSkillBundleBody): Promise<SkillBundleView>;
 
-	/** List skills, optionally filtered by bundleIDs/types and paginated. */
-	listSkills(req: ListSkillsRequest): Promise<{ skillListItems: SkillListItem[]; nextPageToken?: string }>;
+	retireSkillBundle(bundle: SkillBundleRef, expectedRevision: number): Promise<RetireSkillBundleResult>;
 
-	/** Create or update a skill. */
-	putSkill(
-		bundleID: string,
-		skillSlug: string,
-		skillType: SkillType,
-		location: string,
-		name: string,
-		isEnabled: boolean,
-		displayName?: string,
-		description?: string,
-		tags?: string[]
-	): Promise<void>;
+	purgeSkillBundle(bundle: SkillBundleRef, expectedRevision: number): Promise<SkillBundleRef>;
 
-	putSkillArtifact(bundleID: string, skillSlug: string, payload: PutSkillArtifactPayload): Promise<Skill>;
+	attachSkillBundleSource(bundle: SkillBundleRef, body: AttachSkillBundleSourceBody): Promise<SkillBundleView>;
 
-	/** Patch a skill (enable/disable, location). */
-	patchSkill(
-		bundleID: string,
-		skillSlug: string,
-		isEnabled?: boolean,
-		location?: string,
-		displayName?: string,
-		description?: string,
-		tags?: string[]
-	): Promise<void>;
+	refreshSkillBundle(bundle: SkillBundleRef): Promise<void>;
 
-	/** Delete a skill. */
-	deleteSkill(bundleID: string, skillSlug: string): Promise<void>;
+	listSkillBundleArtifacts(bundle: SkillBundleRef): Promise<SkillArtifactView[]>;
 
-	/** Get a skill. */
-	getSkill(bundleID: string, skillSlug: string, includeDisabled: boolean): Promise<Skill | undefined>;
+	createManagedSkill(bundle: SkillBundleRef, body: CreateManagedSkillBody): Promise<CreateManagedSkillResult>;
 
-	/** Runtime: get a skills prompt. */
-	getSkillsPrompt(filter?: RuntimeSkillFilter): Promise<string>;
+	getManagedSkillDocument(artifact: ArtifactRef): Promise<ManagedSkillDocumentView>;
 
-	/** Runtime: create a skill session. */
-	createSkillSession(
-		closeSessionID?: string,
-		maxActivePerSession?: number,
-		allowSkillRefs?: SkillRef[],
-		activeSkillRefs?: SkillRef[],
-		workspace?: WorkspaceRef
-	): Promise<SkillSession>;
+	adoptSkill(bundle: SkillBundleRef, body: AdoptSkillBody): Promise<SkillArtifactView>;
 
-	/** Runtime: close a skill session. */
+	pinSkill(bundle: SkillBundleRef, body: PinSkillBody): Promise<SkillArtifactView>;
+
+	setSkillEnabled(artifact: ArtifactRef, body: SetSkillEnabledBody): Promise<SkillArtifactView>;
+
+	unadoptSkill(artifact: ArtifactRef, expectedRevision: number, suppress: boolean): Promise<ArtifactRef>;
+
+	purgeSkill(artifact: ArtifactRef, expectedRevision: number): Promise<ArtifactRef>;
+
+	getSkillsPrompt(filter: RuntimeSkillFilter): Promise<string>;
+
+	createSkillSession(options: CreateSkillSessionOptions): Promise<SkillSession>;
+
 	closeSkillSession(sessionID: string): Promise<void>;
 
-	/** Runtime: list skills from the runtime catalog (optionally filtered). */
-	listRuntimeSkills(filter?: RuntimeSkillFilter): Promise<RuntimeSkillListItem[]>;
+	listRuntimeSkills(filter: RuntimeSkillFilter): Promise<RuntimeSkillListItem[]>;
 
 	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
 
-	renderSkill(ref: SkillRef, args?: Record<string, string>, workspace?: WorkspaceRef): Promise<RenderSkillResponse>;
-
-	listProvidedSkills(workspace?: WorkspaceRef): Promise<ProvidedSkill[]>;
-
-	renderProvidedSkill(
-		ref: SkillRef,
-		args?: Record<string, string>,
-		workspace?: WorkspaceRef
-	): Promise<RenderProvidedSkillResponse>;
+	renderSkill(artifact: ArtifactRef, args?: Record<string, string>): Promise<RenderSkillResponse>;
 }
 
 export interface IArtifactStoreAPI {
@@ -375,8 +339,6 @@ export interface IArtifactStoreAPI {
 
 	listArtifactSourceKinds(): Promise<ArtifactSourceKind[]>;
 
-	purgeArtifact(artifact: ArtifactRef, expectedRevision: number): Promise<ArtifactRef>;
-
 	getManagedSourceState(rootID: ArtifactRootID, sourceID: ArtifactSourceID): Promise<ManagedSourceState>;
 
 	publishManagedSourcePackage(
@@ -388,11 +350,10 @@ export interface IArtifactStoreAPI {
 	removeManagedSourcePackage(
 		rootID: ArtifactRootID,
 		sourceID: ArtifactSourceID,
-		expectedSourceRevision: number,
-		directory: string,
-		expectedGeneration: string
+		body: RemoveManagedSourcePackageBody
 	): Promise<ManagedSourcePackageResult>;
 }
+
 export interface IWorkspaceAPI {
 	createFilesystemWorkspace(rootID: ArtifactRootID, body: CreateFilesystemWorkspaceBody): Promise<WorkspaceView>;
 
@@ -426,8 +387,7 @@ export interface IWorkspaceAPI {
 	detachWorkspaceSource(
 		workspace: WorkspaceRef,
 		sourceID: ArtifactSourceID,
-		expectedCollectionRevision: number,
-		expectedAttachmentRevision: number
+		body: DetachWorkspaceSourceBody
 	): Promise<WorkspaceView>;
 
 	refreshWorkspace(workspace: WorkspaceRef): Promise<WorkspaceRefreshResult>;
@@ -482,8 +442,7 @@ export interface IWorkspaceAPI {
 	unadoptWorkspaceArtifact(
 		workspace: WorkspaceRef,
 		artifact: ArtifactRef,
-		expectedRevision: number,
-		suppress: boolean
+		body: UnadoptWorkspaceArtifactBody
 	): Promise<UnadoptWorkspaceArtifactResult>;
 
 	purgeWorkspaceArtifact(

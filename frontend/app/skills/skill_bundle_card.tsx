@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 
-import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiGitBranch, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiGitBranch, FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type { Skill, SkillBundle } from '@/spec/skill';
-import { SkillPresenceStatus } from '@/spec/skill';
+import { SkillInsert, SkillPresenceStatus } from '@/spec/skill';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
@@ -35,6 +35,7 @@ import {
 import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import { AddEditSkillModal } from '@/skills/skill_add_edit_modal';
 import { SkillBundleDetailsModal } from '@/skills/skill_bundle_details_modal';
+import { SkillBundleEditModal } from '@/skills/skill_bundle_edit_modal';
 
 type SkillModalMode = 'add' | 'edit' | 'view' | 'fork';
 
@@ -52,6 +53,7 @@ interface SkillBundleCardProps {
 	onDeleteSkill: (bundleID: string, skillID: string, skillSlug: string) => Promise<void>;
 	onSubmitSkill: (bundleID: string, partial: SkillUpsertInput, existingSkillSlug?: string) => Promise<void>;
 	onRequestBundleDelete: (bundle: SkillBundle) => void;
+	onEditBundle: (bundleID: string, displayName: string, description?: string) => Promise<void>;
 }
 
 function PresenceStatusBadge({ skill }: { skill: Skill }) {
@@ -106,6 +108,7 @@ export function SkillBundleCard({
 	onDeleteSkill,
 	onSubmitSkill,
 	onRequestBundleDelete,
+	onEditBundle,
 }: SkillBundleCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 
@@ -117,6 +120,7 @@ export function SkillBundleCard({
 	const [skillToEdit, setSkillToEdit] = useState<Skill | undefined>(undefined);
 
 	const [isBundleDetailsOpen, setIsBundleDetailsOpen] = useState(false);
+	const [isBundleEditOpen, setIsBundleEditOpen] = useState(false);
 
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
@@ -165,6 +169,9 @@ export function SkillBundleCard({
 	};
 
 	const patchSkillEnable = (skill: Skill, nextEnabled: boolean) => {
+		if (bundle.isBuiltIn || skill.isBuiltIn) {
+			return;
+		}
 		void runActionWithAlert(
 			`${skill.id}:toggle`,
 			() => onToggleSkillEnable(bundle.id, skill.id, skill.slug, nextEnabled),
@@ -292,6 +299,7 @@ export function SkillBundleCard({
 						onChange={toggleBundleEnable}
 						busy={isPending('bundle:toggle')}
 						compact={false}
+						disabled={bundle.isBuiltIn}
 					/>
 				}
 				actions={
@@ -308,6 +316,25 @@ export function SkillBundleCard({
 						</button>
 						{!bundle.isBuiltIn ? (
 							<>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									onClick={() => {
+										setIsBundleEditOpen(true);
+									}}
+								>
+									<FiEdit2 size={16} />
+									<span>Edit Bundle</span>
+								</button>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									disabled={isPending('bundle:refresh') || !bundle.isEnabled}
+									onClick={() => void refreshSkills()}
+								>
+									<FiRefreshCw size={16} />
+									<span>{isPending('bundle:refresh') ? 'Refreshing...' : 'Refresh'}</span>
+								</button>
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
@@ -375,7 +402,7 @@ export function SkillBundleCard({
 								const insert = normalizeSkillInsert(skill.insert).value;
 								const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
 								const usage =
-									insert === 'user-message'
+									insert === SkillInsert.UserMessage
 										? 'Composer template'
 										: instructionUseReason
 											? 'Session only'
@@ -433,7 +460,7 @@ export function SkillBundleCard({
 													onChange={enabled => {
 														patchSkillEnable(skill, enabled);
 													}}
-													disabled={!bundle.isEnabled}
+													disabled={!bundle.isEnabled || bundle.isBuiltIn || skill.isBuiltIn}
 													busy={isPending(`${skill.id}:toggle`)}
 													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
 												/>
@@ -456,8 +483,8 @@ export function SkillBundleCard({
 												onClick={() => {
 													openSkillModal('edit', skill);
 												}}
-												disabled={skill.isBuiltIn || bundle.isBuiltIn}
-												title={skill.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be edited' : 'Edit'}
+												disabled={skill.isBuiltIn || bundle.isBuiltIn || !skill.isManaged}
+												title={!skill.isManaged ? 'Only managed Skills can be edited' : 'Edit'}
 											>
 												<FiEdit2 size={15} />
 												<span>Edit</span>
@@ -535,6 +562,15 @@ export function SkillBundleCard({
 				}}
 				bundle={bundle}
 				skills={skills}
+			/>
+
+			<SkillBundleEditModal
+				isOpen={isBundleEditOpen}
+				onClose={() => {
+					setIsBundleEditOpen(false);
+				}}
+				bundle={bundle}
+				onSubmit={onEditBundle}
 			/>
 
 			<ActionDeniedAlertModal

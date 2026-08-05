@@ -12,10 +12,11 @@ import type {
 	ArtifactSourceID,
 	ArtifactState,
 } from '@/spec/artifact';
+import { SkillInsert as WorkspaceSkillInsert } from '@/spec/skill';
+
+export { WorkspaceSkillInsert };
 
 export type WorkspaceRef = ArtifactCollectionRef;
-export type WorkspaceRootID = string;
-export type WorkspaceCollectionID = string;
 
 export enum WorkspaceMode {
 	Empty = 'empty',
@@ -24,7 +25,6 @@ export enum WorkspaceMode {
 
 export enum WorkspaceAttachmentRole {
 	Primary = 'primary',
-	BuiltIn = 'built-in',
 	Library = 'library',
 	AttachedPackage = 'attached-package',
 	Overlay = 'overlay',
@@ -47,11 +47,6 @@ export enum WorkspaceContextCompositionStatus {
 	Excluded = 'excluded',
 	Denied = 'denied',
 	Unavailable = 'unavailable',
-}
-
-export enum WorkspaceSkillInsert {
-	Instructions = 'instructions',
-	UserMessage = 'user-message',
 }
 
 export enum WorkspaceConversationSelectionStatus {
@@ -323,6 +318,8 @@ export interface WorkspaceSkillLoadView {
 }
 
 export interface CreateFilesystemWorkspaceBody {
+	workspaceID: string;
+	sourceID: ArtifactSourceID;
 	displayName: string;
 	description?: string;
 	rootPath: string;
@@ -330,6 +327,7 @@ export interface CreateFilesystemWorkspaceBody {
 }
 
 export interface CreateEmptyWorkspaceBody {
+	workspaceID: string;
 	displayName: string;
 	description?: string;
 	discovery: WorkspaceDiscovery;
@@ -374,9 +372,15 @@ export interface UpdateWorkspaceAttachmentBody {
 	settings: WorkspaceAttachmentSettings;
 }
 
+export interface DetachWorkspaceSourceBody {
+	expectedCollectionRevision: number;
+	expectedAttachmentRevision: number;
+}
+
 export interface AdoptWorkspaceOccurrenceBody {
 	expectedCatalogRevision: number;
 	occurrence: WorkspaceOccurrenceRef;
+	artifactID: string;
 	name?: string;
 	enabled: boolean;
 	settings: WorkspaceArtifactSettings;
@@ -384,6 +388,7 @@ export interface AdoptWorkspaceOccurrenceBody {
 
 export interface PinWorkspaceArtifactBody {
 	expectedCollectionRevision: number;
+	artifactID: string;
 	binding: ArtifactSourceBinding;
 	name: string;
 	enabled: boolean;
@@ -403,6 +408,11 @@ export interface SetWorkspaceArtifactEnabledBody {
 export interface SetWorkspaceArtifactRuntimeDisabledBody {
 	expectedRevision: number;
 	runtimeDisabled: boolean;
+}
+
+export interface UnadoptWorkspaceArtifactBody {
+	expectedRevision: number;
+	suppress: boolean;
 }
 
 export interface UnadoptWorkspaceArtifactResult {

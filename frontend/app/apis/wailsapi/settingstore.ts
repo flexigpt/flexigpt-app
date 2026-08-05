@@ -4,14 +4,13 @@ import type {
 	AuthKeyMeta,
 	AuthKeyName,
 	AuthKeyType,
-	DebugLogLevel,
 	DebugSettings,
 	SettingsSchema,
-	ThemeType,
 } from '@/spec/setting';
-import { DEFAULT_DEBUG_SETTINGS } from '@/spec/setting';
+import { DebugLogLevel, DEFAULT_DEBUG_SETTINGS, ThemeType } from '@/spec/setting';
 
 import type { ISettingStoreAPI } from '@/apis/interface';
+import { enumFromWails, requireWailsBody } from '@/apis/wailsapi/transport';
 import { GetAuthKey, GetSettings, SetAppTheme, SetDebugSettings } from '@/apis/wailsjs/go/main/SettingStoreWrapper';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
@@ -33,8 +32,8 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 				disableContentStripping: settings.disableContentStripping,
 				logLevel: settings.logLevel,
 			},
-		};
-		await SetDebugSettings(r as any);
+		} as wailsSpec.SetDebugSettingsRequest;
+		await SetDebugSettings(r);
 	}
 
 	async getAuthKey(type: AuthKeyType, keyName: AuthKeyName): Promise<AuthKey> {
@@ -43,7 +42,8 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 			KeyName: keyName,
 		};
 		const resp = await GetAuthKey(r as wailsSpec.GetAuthKeyRequest);
-		return { secret: resp.Body?.secret ?? '', sha256: resp.Body?.sha256 ?? '', nonEmpty: resp.Body?.nonEmpty ?? false };
+		const body = requireWailsBody(resp.Body, 'GetAuthKey');
+		return { secret: body.secret, sha256: body.sha256, nonEmpty: body.nonEmpty };
 	}
 
 	async getSettings(forceFetch?: boolean): Promise<SettingsSchema> {
@@ -51,18 +51,21 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 			ForceFetch: !!forceFetch,
 		};
 		const resp = await GetSettings(r);
-		const debug = resp.Body?.debug;
+		const body = requireWailsBody(resp.Body, 'GetSettings');
+		const debug = body.debug;
 		return {
 			appTheme: {
-				type: resp.Body?.appTheme.type as ThemeType,
-				name: resp.Body?.appTheme.name ?? '',
+				type: enumFromWails(body.appTheme.type, ThemeType, 'settings.appTheme.type'),
+				name: body.appTheme.name,
 			},
 			debug: {
 				logLLMReqResp: debug?.logLLMReqResp ?? DEFAULT_DEBUG_SETTINGS.logLLMReqResp,
 				disableContentStripping: debug?.disableContentStripping ?? DEFAULT_DEBUG_SETTINGS.disableContentStripping,
-				logLevel: (debug?.logLevel as DebugLogLevel) ?? DEFAULT_DEBUG_SETTINGS.logLevel,
+				logLevel: debug?.logLevel
+					? enumFromWails(debug.logLevel, DebugLogLevel, 'settings.debug.logLevel')
+					: DEFAULT_DEBUG_SETTINGS.logLevel,
 			},
-			authKeys: resp.Body?.authKeys as AuthKeyMeta[],
+			authKeys: body.authKeys as AuthKeyMeta[],
 		};
 	}
 }

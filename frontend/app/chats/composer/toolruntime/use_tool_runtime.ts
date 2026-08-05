@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
+import { UIToolCallStatus } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
@@ -52,11 +53,11 @@ function runtimeReducer(state: ComposerToolRuntimeState, action: Action): Compos
 				if (toolCall.id !== action.callId) {
 					return toolCall;
 				}
-				if (toolCall.status === 'running' && toolCall.errorMessage === undefined) {
+				if (toolCall.status === UIToolCallStatus.Running && toolCall.errorMessage === undefined) {
 					return toolCall;
 				}
 				changed = true;
-				return { ...toolCall, status: 'running', errorMessage: undefined } as UIToolCall;
+				return { ...toolCall, status: UIToolCallStatus.Running, errorMessage: undefined } as UIToolCall;
 			});
 			return changed ? { ...state, toolCalls: nextToolCalls } : state;
 		}
@@ -67,11 +68,11 @@ function runtimeReducer(state: ComposerToolRuntimeState, action: Action): Compos
 				if (toolCall.id !== action.callId) {
 					return toolCall;
 				}
-				if (toolCall.status === 'failed' && toolCall.errorMessage === action.errorMessage) {
+				if (toolCall.status === UIToolCallStatus.Failed && toolCall.errorMessage === action.errorMessage) {
 					return toolCall;
 				}
 				changed = true;
-				return { ...toolCall, status: 'failed', errorMessage: action.errorMessage } as UIToolCall;
+				return { ...toolCall, status: UIToolCallStatus.Failed, errorMessage: action.errorMessage } as UIToolCall;
 			});
 			return changed ? { ...state, toolCalls: nextToolCalls } : state;
 		}
@@ -226,7 +227,7 @@ export function useComposerToolRuntime({
 			if (!toolCall) {
 				return null;
 			}
-			if (toolCall.status !== 'pending' && toolCall.status !== 'failed') {
+			if (toolCall.status !== UIToolCallStatus.Pending && toolCall.status !== UIToolCallStatus.Failed) {
 				return null;
 			}
 
@@ -308,7 +309,7 @@ export function useComposerToolRuntime({
 
 			for (const toolCall of pending) {
 				const latest = stateRef.current.toolCalls.find(current => current.id === toolCall.id);
-				if (!latest || latest.status !== 'pending') {
+				if (!latest || latest.status !== UIToolCallStatus.Pending) {
 					continue;
 				}
 
@@ -352,7 +353,7 @@ export function useComposerToolRuntime({
 					webSearchToolCallItems: output.webSearchToolCallItems,
 					choiceID: output.choiceID,
 					type: output.type,
-					status: 'pending',
+					status: UIToolCallStatus.Pending,
 					toolStoreChoice: output.toolStoreChoice,
 					mcpToolSelection: output.mcpToolSelection,
 				};
@@ -391,7 +392,7 @@ export function useComposerToolRuntime({
 				webSearchToolCallItems: output.webSearchToolCallItems,
 				choiceID: output.choiceID,
 				type: output.type,
-				status: 'pending',
+				status: UIToolCallStatus.Pending,
 				toolStoreChoice: output.toolStoreChoice,
 				errorMessage: undefined,
 			};
@@ -415,11 +416,11 @@ export function useComposerToolRuntime({
 	}, []);
 
 	const hasPendingToolCalls = useMemo(
-		() => state.toolCalls.some(toolCall => toolCall.status === 'pending'),
+		() => state.toolCalls.some(toolCall => toolCall.status === UIToolCallStatus.Pending),
 		[state.toolCalls]
 	);
 	const hasRunningToolCalls = useMemo(
-		() => state.toolCalls.some(toolCall => toolCall.status === 'running'),
+		() => state.toolCalls.some(toolCall => toolCall.status === UIToolCallStatus.Running),
 		[state.toolCalls]
 	);
 

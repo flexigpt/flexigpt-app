@@ -1,6 +1,20 @@
-import type { ArtifactState } from '@/spec/artifact';
+import type {
+	ArtifactAddress,
+	ArtifactAdoptionMode,
+	ArtifactCollectionID,
+	ArtifactCollectionRef,
+	ArtifactDiagnostic,
+	ArtifactDigest,
+	ArtifactID,
+	ArtifactKind,
+	ArtifactLocator,
+	ArtifactRef,
+	ArtifactSourceBinding,
+	ArtifactSourceID,
+	ArtifactState,
+	ManagedSourcePackageFile,
+} from '@/spec/artifact';
 import type { ToolOutputUnion } from '@/spec/tool';
-import type { WorkspaceRef } from '@/spec/workspace';
 
 export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
 	'builtin.skills-load',
@@ -8,111 +22,225 @@ export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
 	'builtin.skills-readresource',
 ]);
 
-export type SkillInsert = 'instructions' | 'user-message';
-
 export enum SkillSessionSyncMode {
 	None = 'none',
 	IfSessionExists = 'if-session-exists',
 	EnsureIfEnabled = 'ensure-if-enabled',
 }
 
-/**
- * Wire identity accepted by all Skill Store and Skill Runtime endpoints.
- *
- * Workspace-provided skills retain this reference and carry their workspace
- * separately through `ProvidedSkill.workspace` or an explicit workspace
- * request field.
- */
-export interface SkillRef {
-	bundleID: string;
-	skillSlug: string;
-	skillID: string;
+export enum SkillInsert {
+	Instructions = 'instructions',
+	UserMessage = 'user-message',
 }
 
-export type InstalledSkillRef = SkillRef;
+export type SkillBundleRef = ArtifactCollectionRef;
 
-export interface InstalledSkillSelection {
-	skillRef: InstalledSkillRef;
+export enum SkillBundleAttachmentRole {
+	Managed = 'managed',
+	BuiltIn = 'builtin',
+	External = 'external',
+	Imported = 'imported',
+	Library = 'library',
+}
+
+export interface SkillSelection {
+	artifact: ArtifactRef;
 	preLoadAsActive: boolean;
 	useAsInstructions: boolean;
 }
 
-export enum SkillProviderOrigin {
-	Installed = 'installed',
-	Workspace = 'workspace',
-}
-
-/**
- * @public
- */
-export interface SkillProviderDiagnostic {
-	severity: 'error' | 'warning' | 'info';
-	code: string;
-	message: string;
-	location?: {
-		locator?: string;
-		subresourceLocator?: string;
-		line?: number;
-		column?: number;
-	};
-}
-
-/**
- * Read-only aggregate provider projection.
- *
- * This is intentionally separate from `SkillListItem`: Workspace Skills are
- * not installed-store records and must not be forced into that model.
- */
-export interface ProvidedSkill {
-	ref: SkillRef;
-	origin: SkillProviderOrigin;
-	installedRef?: SkillRef;
-	workspace?: WorkspaceRef;
-	artifactRevision?: number;
+export interface SkillArgument {
 	name: string;
-	displayName: string;
-	description: string;
-	insert: SkillInsert;
-	arguments?: SkillArgument[];
-	tags?: string[];
+	description?: string;
+	default?: string;
+}
+
+interface SkillBundleAttachmentDraft {
+	sourceID: ArtifactSourceID;
+	role: SkillBundleAttachmentRole;
 	enabled: boolean;
-	available: boolean;
-	runtimeAllowed: boolean;
-	builtIn: boolean;
-	catalogCurrent: boolean;
-	definitionDigest?: string;
-	sourceID?: string;
-	locator?: string;
-	state?: ArtifactState;
-	diagnostics?: SkillProviderDiagnostic[];
+	discoveryRoot: ArtifactLocator;
+	expectedMemberDigests?: Record<ArtifactLocator, ArtifactDigest>;
+}
+
+interface SkillBundleAttachmentView {
+	sourceID: ArtifactSourceID;
+	revision: number;
+	role: SkillBundleAttachmentRole;
+	enabled: boolean;
+	sourceDisplayName?: string;
+	sourceKind?: string;
+}
+
+export interface SkillBundleView {
+	bundle: SkillBundleRef;
+	revision: number;
+	displayName: string;
+	description?: string;
+	enabled: boolean;
+	retiredAt?: Date;
+	logicalName: string;
+	logicalVersion?: string;
+	labels?: Record<string, string>;
+	portableDefinitionDigest?: ArtifactDigest;
+	attachments: SkillBundleAttachmentView[];
 	createdAt: Date;
 	modifiedAt: Date;
 }
 
-export interface SkillSelection {
-	skillRef: SkillRef;
-	preLoadAsActive: boolean;
-	useAsInstructions: boolean;
+export interface RetireSkillBundleResult {
+	bundle: SkillBundleRef;
+	revision: number;
+}
+
+export interface SkillArtifactView {
+	artifact: ArtifactRef;
+	address: ArtifactAddress;
+	revision: number;
+	name: string;
+	kind: ArtifactKind;
+	enabled: boolean;
+	adoption: ArtifactAdoptionMode;
+	state: ArtifactState;
+	binding: ArtifactSourceBinding;
+	definitionDigest?: ArtifactDigest;
+	diagnostics?: ArtifactDiagnostic[];
+	createdAt: Date;
+	modifiedAt: Date;
+}
+
+export interface CreateSkillBundleBody {
+	collectionID: ArtifactCollectionID;
+	displayName: string;
+	description?: string;
+	enabled: boolean;
+	logicalName: string;
+	logicalVersion?: string;
+	labels?: Record<string, string>;
+	portableDefinitionDigest?: ArtifactDigest;
+	attachments?: SkillBundleAttachmentDraft[];
+}
+
+export interface UpdateSkillBundleBody {
+	expectedRevision: number;
+	displayName: string;
+	description?: string;
+	enabled: boolean;
+}
+
+export interface AttachSkillBundleSourceBody extends SkillBundleAttachmentDraft {
+	expectedCollectionRevision: number;
+}
+
+interface SkillOccurrenceRef {
+	sourceID: ArtifactSourceID;
+	locator: ArtifactLocator;
+	subresourceLocator?: ArtifactLocator;
+}
+
+export interface AdoptSkillBody {
+	expectedCatalogRevision: number;
+	occurrence: SkillOccurrenceRef;
+	artifactID: ArtifactID;
+	name: string;
+	enabled: boolean;
+}
+
+export interface PinSkillBody {
+	expectedCollectionRevision: number;
+	artifactID: ArtifactID;
+	binding: ArtifactSourceBinding;
+	name: string;
+	enabled: boolean;
+}
+
+export interface SkillDocumentInput {
+	name: string;
+	displayName?: string;
+	description: string;
+	insert: SkillInsert;
+	arguments?: SkillArgument[];
+	tags?: string[];
+	markdownBody: string;
+	rawFrontmatter?: Record<string, unknown>;
+}
+
+interface CreateManagedSkillCommon {
+	expectedCollectionRevision: number;
+	/**
+	 * Required when replacing an existing managed skill package. New managed
+	 * skills omit this value.
+	 */
+	expectedArtifactRevision?: number;
+	artifactID: ArtifactID;
+	skillName: string;
+	files?: ManagedSourcePackageFile[];
+	enabled: boolean;
+}
+
+/**
+ * The backend accepts exactly one semantic authoring input. `files`, when
+ * present, are the complete package-relative native payload and must contain
+ * the same `SKILL.md` bytes as `skillMD`.
+ */
+export type CreateManagedSkillBody = CreateManagedSkillCommon &
+	(
+		| {
+				skillMD: Uint8Array;
+				document?: never;
+		  }
+		| {
+				skillMD?: never;
+				document: SkillDocumentInput;
+		  }
+	);
+
+export interface CreateManagedSkillResult {
+	artifact: SkillArtifactView;
+	address: ArtifactAddress;
+}
+
+/**
+ * Editable managed Skill source projected from its canonical definition.
+ * This deliberately exposes no source configuration or filesystem path.
+ */
+export interface ManagedSkillDocumentView {
+	artifact: SkillArtifactView;
+	document: SkillDocumentInput;
+}
+
+export interface SetSkillEnabledBody {
+	expectedRevision: number;
+	enabled: boolean;
+}
+
+export enum RuntimeSkillActivity {
+	Any = 'any',
+	Active = 'active',
 }
 
 export interface RuntimeSkillFilter {
-	types?: SkillType[];
+	types?: string[];
 	inserts?: SkillInsert[];
+	allowArtifacts: ArtifactRef[];
 	locationPrefix?: string;
-	allowSkillRefs?: SkillRef[];
-	workspace?: WorkspaceRef;
 	sessionID?: string;
-	activity?: string;
+	activity?: RuntimeSkillActivity;
 }
 
-type SkillSessionID = string;
+export interface CreateSkillSessionOptions {
+	closeSessionID?: string;
+	maxActivePerSession?: number;
+	allowArtifacts: ArtifactRef[];
+	activeArtifacts?: ArtifactRef[];
+}
 
 export interface SkillSession {
-	sessionID: SkillSessionID;
-	activeSkillRefs: SkillRef[];
+	sessionID: string;
+	activeArtifacts: ArtifactRef[];
 }
 
-export interface SkillResourceInfo {
+interface SkillResourceSummary {
 	hasResources: boolean;
 	totalCount: number;
 	locations?: string[];
@@ -120,52 +248,41 @@ export interface SkillResourceInfo {
 }
 
 export interface RuntimeSkillListItem {
-	skillRef: SkillRef;
-	type?: SkillType;
+	artifact: ArtifactRef;
 	name?: string;
 	displayName?: string;
+	type?: string;
 	description?: string;
-	digest?: string;
+	definitionDigest?: ArtifactDigest;
 	insert?: SkillInsert;
 	arguments?: SkillArgument[];
 	sourceTags?: string[];
-	resources: SkillResourceInfo;
-	rawFrontmatter?: Record<string, any>;
+	resources: SkillResourceSummary;
+	rawFrontmatter?: Record<string, unknown>;
 	warnings?: string[];
 	isActive?: boolean;
 	errorMessage?: string;
 }
 
-export interface RenderProvidedSkillResponse {
-	skill: ProvidedSkill;
-	available: boolean;
-	text?: string;
-	insert?: SkillInsert;
-	arguments?: SkillArgument[];
-	appliedArguments?: Record<string, string>;
-	diagnostics?: SkillProviderDiagnostic[];
-}
+/**
+ * A selectable installed Skill Bundle Artifact for management UIs such as
+ * Assistant Presets. Workspace Skills are deliberately not represented here:
+ * they are selected through a Workspace conversation selection instead.
+ */
+export interface AssistantSkillOption {
+	key: string;
+	sel: SkillSelection;
+	skillDefinition: RuntimeSkillListItem;
 
-export interface ListSkillsRequest {
-	bundleIDs?: string[];
-	types?: SkillType[];
-	inserts?: SkillInsert[];
-	tags?: string[];
-	includeDisabled?: boolean;
-	includeMissing?: boolean;
-	recommendedPageSize?: number;
-	pageToken?: string;
-}
+	bundleSlug: string;
+	bundleDisplayName: string;
 
-export interface PutSkillArtifactPayload {
-	name?: string;
-	isEnabled: boolean;
-	displayName?: string;
-	description?: string;
-	insert?: SkillInsert;
-	arguments?: SkillArgument[];
-	tags?: string[];
-	markdownBody: string;
+	isBuiltIn: boolean;
+	isBundleEnabled: boolean;
+	isSkillEnabled: boolean;
+	isSelectable: boolean;
+	availabilityReason?: string;
+	label: string;
 }
 
 export interface RenderSkillResponse {
@@ -175,30 +292,38 @@ export interface RenderSkillResponse {
 	description?: string;
 	displayName?: string;
 	sourceTags?: string[];
-	resources: SkillResourceInfo;
+	resources: SkillResourceSummary;
 	arguments?: SkillArgument[];
 	appliedArguments?: Record<string, string>;
-	rawFrontmatter?: Record<string, any>;
+	rawFrontmatter?: Record<string, unknown>;
 	warnings?: string[];
 }
-// Mirrors Go: spec.SkillType
+
+export interface InvokeSkillToolResponse {
+	outputs?: ToolOutputUnion[];
+	meta?: Record<string, unknown>;
+	isBuiltIn: boolean;
+	isError?: boolean;
+	errorMessage?: string;
+}
+
+/**
+ * Management-only projection over Artifact Store Skill entities.
+ *
+ * Durable identity remains `ArtifactRef` and `SkillBundleRef`. These views
+ * exist so management components do not need to duplicate joins between
+ * Bundle, Artifact, and runtime metadata.
+ */
 export enum SkillType {
 	FS = 'fs',
 	EmbeddedFS = 'embeddedfs',
 }
 
-// Mirrors Go: spec.SkillPresenceStatus
 export enum SkillPresenceStatus {
-	Unknown = 'unknown',
 	Present = 'present',
 	Missing = 'missing',
 	Error = 'error',
-}
-
-export interface SkillArgument {
-	name: string;
-	description?: string;
-	default?: string;
+	Unknown = 'unknown',
 }
 
 interface SkillPresence {
@@ -209,84 +334,71 @@ interface SkillPresence {
 	lastCheckError?: string;
 }
 
-// Mirrors Go: spec.Skill. Wails time values are normalized to Date.
+export type SkillResourceInfo = SkillResourceSummary;
+
+export interface SkillArtifactCreateInput {
+	name: string;
+	displayName?: string;
+	description: string;
+	insert: SkillInsert;
+	arguments?: SkillArgument[];
+	tags?: string[];
+	markdownBody: string;
+	isEnabled: boolean;
+}
+
 export interface Skill {
 	schemaVersion: string;
 	id: string;
+	ref: ArtifactRef;
+	revision: number;
 	slug: string;
-
-	type: SkillType;
-	location: string;
 	name: string;
-
 	displayName?: string;
 	description?: string;
-	tags?: string[];
+	type: SkillType;
+	location: string;
 	insert?: SkillInsert;
 	arguments?: SkillArgument[];
+	tags?: string[];
 	resources: SkillResourceInfo;
-	rawFrontmatter?: Record<string, any>;
+	digest?: ArtifactDigest;
+	rawFrontmatter?: Record<string, unknown>;
 	runtimeWarnings?: string[];
-	digest?: string;
-
 	presence?: SkillPresence;
-
 	isEnabled: boolean;
 	isBuiltIn: boolean;
-
+	isManaged: boolean;
+	adoption: ArtifactAdoptionMode;
+	state: ArtifactState;
+	diagnostics?: ArtifactDiagnostic[];
 	createdAt: Date;
 	modifiedAt: Date;
 }
 
-// Mirrors Go: spec.SkillBundle. Wails time values are normalized to Date.
 export interface SkillBundle {
 	schemaVersion: string;
 	id: string;
+	rootID: string;
+	ref: SkillBundleRef;
+	revision: number;
 	slug: string;
-
+	logicalVersion?: string;
+	labels?: Record<string, string>;
 	displayName?: string;
 	description?: string;
-
 	isEnabled: boolean;
 	isBuiltIn: boolean;
-
+	attachments: SkillBundleAttachmentView[];
 	createdAt: Date;
 	modifiedAt: Date;
-
-	softDeletedAt?: Date;
 }
 
-// Mirrors Go: spec.SkillListItem
 export interface SkillListItem {
 	bundleID: string;
 	bundleSlug: string;
-
 	skillSlug: string;
-	isBuiltIn: boolean;
-
 	skillDefinition: Skill;
 }
 
-export interface InvokeSkillToolResponse {
-	outputs?: ToolOutputUnion[];
-	meta?: Record<string, any>;
-	isBuiltIn: boolean;
-	isError?: boolean;
-	errorMessage?: string;
-}
-
-export interface AssistantSkillOption {
-	key: string;
-	label: string;
-	sel: InstalledSkillSelection;
-	skillDefinition: Skill;
-
-	bundleSlug: string;
-	bundleDisplayName: string;
-
-	isBuiltIn: boolean;
-	isSelectable: boolean;
-	isBundleEnabled: boolean;
-	isSkillEnabled: boolean;
-	availabilityReason?: string;
-}
+export type SkillRef = ArtifactRef;

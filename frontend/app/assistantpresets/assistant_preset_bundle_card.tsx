@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { FiChevronDown, FiChevronUp, FiEye, FiGitBranch, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiGitBranch, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import type { AssistantPreset, AssistantPresetBundle } from '@/spec/assistantpreset';
 
@@ -37,6 +37,7 @@ interface AssistantPresetBundleCardProps {
 		partial: AssistantPresetUpsertInput
 	) => Promise<void>;
 	onDeleteBundleRequested: (bundleID: string) => void;
+	onEditBundleRequested: (bundle: AssistantPresetBundle) => void;
 	copyablePresets: PresetItem[];
 }
 
@@ -57,6 +58,7 @@ export function AssistantPresetBundleCard({
 	onDeletePreset,
 	onSubmitPreset,
 	onDeleteBundleRequested,
+	onEditBundleRequested,
 	copyablePresets,
 }: AssistantPresetBundleCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
@@ -264,6 +266,16 @@ export function AssistantPresetBundleCard({
 						</button>
 						{!bundle.isBuiltIn ? (
 							<>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									onClick={() => {
+										onEditBundleRequested(bundle);
+									}}
+								>
+									<FiEdit2 size={16} />
+									<span>Edit Bundle</span>
+								</button>
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"

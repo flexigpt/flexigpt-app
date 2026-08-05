@@ -5,7 +5,7 @@ import { ToolOutputKind } from '@/spec/tool';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
-import { mcpAPI, skillStoreAPI, toolRuntimeAPI } from '@/apis/baseapi';
+import { mcpAPI, skillBundleAPI, toolRuntimeAPI } from '@/apis/baseapi';
 
 import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
@@ -375,7 +375,7 @@ export async function executeComposerToolCall({
 
 		try {
 			const resp = await withTimeout(
-				skillStoreAPI.invokeSkillTool(sid, toolCall.name, args),
+				skillBundleAPI.invokeSkillTool(sid, toolCall.name, args),
 				TOOL_CALL_TIMEOUT_MS,
 				`Tool call "${toolCall.name}" timed out after ${Math.round(TOOL_CALL_TIMEOUT_MS / 1000)} seconds.`
 			);

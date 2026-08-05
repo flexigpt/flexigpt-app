@@ -1,13 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import type { ModelParam } from '@/spec/inference';
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID, PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY } from '@/spec/modelpreset';
-import type { InstalledSkillRef } from '@/spec/skill';
+import { SkillInsert } from '@/spec/skill';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
 
-import { skillStoreAPI } from '@/apis/baseapi';
+import { skillManagementAPI } from '@/apis/baseapi';
 
 import { loadSkillOptions } from '@/assistantpresets/lib/assistant_preset_catalog';
 import type { AssistantPresetPreparedApplication } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
@@ -17,7 +18,7 @@ import {
 	getSkillInstructionPromptEligibilityReason,
 	normalizeSkillSourceTags,
 } from '@/skills/lib/skill_artifact_utils';
-import { requireInstalledSkillRef, skillRefKey } from '@/skills/lib/skill_identity_utils';
+import { skillRefKey } from '@/skills/lib/skill_identity_utils';
 
 interface ComposerSystemPromptPreparedSelection {
 	hasIncludeModelSystemPromptSelection: boolean;
@@ -31,7 +32,7 @@ interface RenderedInstructionSkillSource {
 	identityKey?: string;
 	displayName: string;
 	prompt: string;
-	skillRef: InstalledSkillRef;
+	skillRef: ArtifactRef;
 	sourceTags?: string[];
 }
 
@@ -83,14 +84,15 @@ function buildInstructionSkillPromptItem(draft: RenderedInstructionSkillSource):
 	return {
 		identityKey: draft.identityKey ?? stableKey,
 		sourceKind: 'skill',
-		bundleID: draft.skillRef.bundleID,
+		bundleID: draft.skillRef.rootID,
 		bundleDisplayName: 'Skill instructions',
-		bundleSlug: draft.skillRef.bundleID,
+		bundleSlug: draft.skillRef.rootID,
 		displayName: draft.displayName,
-		sourceSlug: draft.skillRef.skillSlug,
+		sourceSlug: draft.skillRef.artifactID,
 		text: draft.prompt,
 		sourceTags: normalizeSkillSourceTags(draft.sourceTags),
 		isBuiltIn: false,
+		skillRef: draft.skillRef,
 	};
 }
 
@@ -266,44 +268,42 @@ export function useComposerSystemPrompt(args: {
 
 			if (hasInstructionSourceSelection) {
 				const requestedPromptKeys = dedupeStringArray(
-					instructionSkillSelections.map(sel => `skill-instructions:${skillRefKey(sel.skillRef)}`)
+					instructionSkillSelections.map(sel => `skill-instructions:${skillRefKey(sel.artifact)}`)
 				);
 
 				const skillOptions = await loadSkillOptions({ force: true });
 				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
 
 				for (const selection of instructionSkillSelections) {
-					const skillKey = skillRefKey(selection.skillRef);
+					const skillKey = skillRefKey(selection.artifact);
 					const option = skillOptionByKey.get(skillKey);
-					const installedRef = requireInstalledSkillRef(selection.skillRef, 'Assistant preset instruction Skill');
 
 					if (!option || !option.isSelectable) {
 						throw new Error(
 							option?.availabilityReason ??
-								`Instruction skill "${selection.skillRef.bundleID}/${selection.skillRef.skillSlug}#${selection.skillRef.skillID}" is not currently available.`
+								`Instruction skill "${selection.artifact.rootID}/${selection.artifact.artifactID}" is not currently available.`
 						);
 					}
 
 					const reason = getSkillInstructionPromptEligibilityReason(option.skillDefinition);
 					if (reason) {
-						throw new Error(
-							`${option.skillDefinition.displayName || option.skillDefinition.name || option.skillDefinition.slug}: ${reason}`
-						);
+						throw new Error(`${option.skillDefinition.displayName || option.skillDefinition.name || ''}: ${reason}`);
 					}
 
-					const rendered = await skillStoreAPI.renderSkill(selection.skillRef, {});
-					if (rendered.insert !== 'instructions') {
-						throw new Error(`Skill "${option.skillDefinition.slug}" did not render as instruction text.`);
+					const rendered = await skillManagementAPI.renderSkill(selection.artifact, {});
+					if (rendered.insert !== SkillInsert.Instructions) {
+						throw new Error(
+							`Skill "${option.skillDefinition.name || option.skillDefinition.displayName}" did not render as instruction text.`
+						);
 					}
 
 					preparedInstructionSources.push(
 						buildInstructionSkillPromptItem({
 							identityKey: `skill-instructions:${skillKey}`,
-							displayName:
-								option.skillDefinition.displayName || option.skillDefinition.name || option.skillDefinition.slug,
+							displayName: option.skillDefinition.displayName || option.skillDefinition.name || '',
 							prompt: rendered.text,
 							sourceTags: rendered.sourceTags,
-							skillRef: installedRef,
+							skillRef: selection.artifact,
 						})
 					);
 				}

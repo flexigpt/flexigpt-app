@@ -104,7 +104,7 @@ interface AttachmentGenericRef {
 	origHandle: string;
 }
 
-enum AttachmentContentBlockKind {
+export enum AttachmentContentBlockKind {
 	text = 'text',
 	image = 'image',
 	file = 'file',

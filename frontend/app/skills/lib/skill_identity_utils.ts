@@ -1,91 +1,73 @@
-import type { InstalledSkillRef, SkillListItem, SkillRef, SkillSelection } from '@/spec/skill';
+import type { ArtifactRef } from '@/spec/artifact';
+import type { SkillListItem, SkillRef, SkillSelection } from '@/spec/skill';
 
-const INSTALLED_SKILL_IDENTITY_PREFIX = 'installed/';
-
-function normalizedFields(ref: SkillRef): InstalledSkillRef | undefined {
-	const bundleID = ref.bundleID?.trim();
-	const skillSlug = ref.skillSlug?.trim();
-	const skillID = ref.skillID?.trim();
-
-	if (!bundleID || !skillSlug || !skillID) {
-		return undefined;
+export function isSkillArtifactRef(ref: unknown): ref is ArtifactRef {
+	if (ref === null || typeof ref !== 'object') {
+		return false;
 	}
-
-	return { bundleID, skillSlug, skillID };
-}
-
-function getSkillRefStableIdentity(ref: SkillRef | null | undefined): string | undefined {
-	if (!ref) {
-		return undefined;
-	}
-
-	const normalized = normalizedFields(ref);
-	return normalized
-		? `${INSTALLED_SKILL_IDENTITY_PREFIX}${normalized.bundleID}/${normalized.skillSlug}/${normalized.skillID}`
-		: undefined;
+	const value = ref as Partial<ArtifactRef>;
+	return (
+		typeof value.rootID === 'string' &&
+		value.rootID.trim().length > 0 &&
+		typeof value.artifactID === 'string' &&
+		value.artifactID.trim().length > 0
+	);
 }
 
 export function skillRefKey(ref: SkillRef): string {
-	const stableIdentity = getSkillRefStableIdentity(ref);
-	if (stableIdentity) {
-		return stableIdentity;
-	}
-
-	return `invalid:${ref.bundleID?.trim() ?? ''}:${ref.skillSlug?.trim() ?? ''}:${ref.skillID?.trim() ?? ''}`;
-}
-
-export function isInstalledSkillRef(ref: SkillRef): boolean {
-	return normalizedFields(ref) !== undefined;
-}
-
-export function requireInstalledSkillRef(ref: SkillRef, label = 'Skill reference'): InstalledSkillRef {
-	const normalized = normalizedFields(ref);
-	if (!normalized) {
-		throw new Error(`${label} must contain an installed bundleID, skillSlug, and skillID.`);
-	}
-
-	return normalized;
+	return `${ref.rootID}:${ref.artifactID}`;
 }
 
 export function formatSkillRef(ref: SkillRef): string {
-	const normalized = normalizedFields(ref);
-	if (!normalized) {
-		return 'Invalid Skill reference';
-	}
-
-	return `${normalized.bundleID}/${normalized.skillSlug}#${normalized.skillID}`;
+	return `${ref.rootID}/${ref.artifactID}`;
 }
 
 export function skillRefFromListItem(item: SkillListItem): SkillRef {
-	return {
-		bundleID: item.bundleID,
-		skillSlug: item.skillSlug,
-		skillID: item.skillDefinition.id,
-	};
+	return item.skillDefinition.ref;
+}
+
+function toArtifactRef(ref: SkillRef): ArtifactRef {
+	return { rootID: ref.rootID, artifactID: ref.artifactID };
+}
+
+export function toArtifactRefs(refs: SkillRef[] | null | undefined): ArtifactRef[] {
+	if (!refs || refs.length === 0) {
+		return [];
+	}
+	const out: ArtifactRef[] = [];
+	const seen = new Set<string>();
+
+	for (const r of refs) {
+		const aRef = toArtifactRef(r);
+		if (!aRef) {
+			continue;
+		}
+		const key = `${aRef.rootID}:${aRef.artifactID}`;
+		if (!seen.has(key)) {
+			seen.add(key);
+			out.push(aRef);
+		}
+	}
+	return out;
 }
 
 export function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[] {
-	const out: SkillRef[] = [];
 	const seen = new Set<string>();
-
+	const out: SkillRef[] = [];
 	for (const r of refs ?? []) {
-		const normalized = normalizedFields(r);
-		if (!normalized) {
-			continue;
+		const key = skillRefKey(r);
+		if (!seen.has(key)) {
+			seen.add(key);
+			out.push({ rootID: r.rootID, artifactID: r.artifactID });
 		}
-		const k = skillRefKey(normalized);
-		if (seen.has(k)) {
-			continue;
-		}
-		seen.add(k);
-		out.push(normalized);
+		continue;
 	}
 	return out;
 }
 
 export const normalizeSkillSelectionsToRefs = (sels: SkillSelection[] | null | undefined): SkillRef[] => {
 	const r = sels?.map(item => {
-		return item.skillRef;
+		return item.artifact;
 	});
 	return normalizeSkillRefs(r ?? []);
 };
@@ -113,8 +95,7 @@ export const clampActiveSkillRefsToEnabled = (
 	const allow = new Set(enabled.map(r => skillRefKey(r)));
 	return dedupeSkillRefs(
 		(activeRefs ?? []).filter(ref => {
-			const normalized = normalizedFields(ref);
-			return normalized !== undefined && allow.has(skillRefKey(normalized));
+			return allow.has(skillRefKey(ref));
 		})
 	);
 };

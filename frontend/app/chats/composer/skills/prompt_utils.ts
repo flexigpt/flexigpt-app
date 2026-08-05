@@ -1,3 +1,5 @@
+import type { SkillRef } from '@/spec/skill';
+
 const SYSTEM_PROMPT_SEPARATOR = '\n---\n';
 
 export interface SystemInstructionSource {
@@ -11,6 +13,7 @@ export interface SystemInstructionSource {
 	bundleDisplayName: string;
 	bundleSlug?: string;
 	isBuiltIn: boolean;
+	skillRef?: SkillRef;
 }
 
 function normalizePromptPart(value: string): string {

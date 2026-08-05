@@ -12,6 +12,8 @@ import type {
 } from '@/spec/workspace';
 import { WorkspaceMode } from '@/spec/workspace';
 
+import { getUUIDv7 } from '@/lib/uuid_utils';
+
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { backendAPI } from '@/apis/baseapi';
@@ -336,6 +338,7 @@ function WorkspaceSetupModalContent({
 		}
 
 		const description = form.description.trim() || undefined;
+
 		const submission: WorkspaceSetupSubmission = workspace
 			? {
 					kind: 'update',
@@ -351,6 +354,7 @@ function WorkspaceSetupModalContent({
 				? {
 						kind: 'empty',
 						payload: {
+							workspaceID: getUUIDv7(),
 							displayName: form.displayName.trim(),
 							description,
 							discovery: {},
@@ -359,6 +363,8 @@ function WorkspaceSetupModalContent({
 				: {
 						kind: 'filesystem',
 						payload: {
+							workspaceID: getUUIDv7(),
+							sourceID: getUUIDv7(),
 							displayName: form.displayName.trim(),
 							description,
 							rootPath: form.rootPath.trim(),
@@ -395,7 +401,7 @@ function WorkspaceSetupModalContent({
 					workspace
 						? 'Manage the project folder, discovery paths, Context files, and Skill folders.'
 						: isEmptyWorkspaceCreation
-							? 'Create an empty Workspace Collection now, then attach project, library, package, or overlay Sources later.'
+							? 'Create an empty Workspace now, then attach project, library, package, or overlay Sources later.'
 							: presentation === 'composer'
 								? 'Choose or paste a project folder. The Workspace will be created, refreshed, and attached to this conversation.'
 								: 'Choose a project folder. Workspace discovery finds standard Context files and Skills automatically.'

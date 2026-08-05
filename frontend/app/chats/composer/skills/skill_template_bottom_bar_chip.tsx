@@ -7,11 +7,11 @@ import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { SkillArgument, SkillListItem } from '@/spec/skill';
-import { SkillType } from '@/spec/skill';
+import { SkillInsert, SkillType } from '@/spec/skill';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import { skillStoreAPI } from '@/apis/baseapi';
+import { skillManagementAPI } from '@/apis/baseapi';
 
 import {
 	ActionTriggerChipContent,
@@ -243,28 +243,10 @@ function getSkillAttachmentPaths(item: SkillListItem | null): string[] {
 }
 
 async function collectUserMessageSkillTemplates(): Promise<SkillListItem[]> {
-	const out: SkillListItem[] = [];
-	let pageToken: string | undefined = undefined;
-
-	for (let guard = 0; guard < 50; guard += 1) {
-		const resp = await skillStoreAPI.listSkills({
-			bundleIDs: [],
-			types: [],
-			inserts: ['user-message'],
-			includeDisabled: false,
-			includeMissing: false,
-			recommendedPageSize: 200,
-			pageToken,
-		});
-
-		out.push(...(resp.skillListItems ?? []));
-		pageToken = resp.nextPageToken;
-		if (!pageToken) {
-			break;
-		}
-	}
-
-	return out.toSorted(compareSkillTemplateListItems);
+	const all = await skillManagementAPI.listSkills(undefined, false);
+	return all
+		.filter(item => item.skillDefinition.insert === SkillInsert.UserMessage)
+		.toSorted(compareSkillTemplateListItems);
 }
 
 function useUserMessageSkillTemplates(open: boolean) {
@@ -340,7 +322,7 @@ function renderSkillTemplateMenuItem(item: SkillListItem, onPick: (item: SkillLi
 						<span className="ml-1">{resourceCount}</span>
 					</span>
 				) : null}
-				<span className="badge badge-ghost badge-xs">{item.isBuiltIn ? 'built-in' : 'custom'}</span>
+				<span className="badge badge-ghost badge-xs">{item.skillDefinition.isBuiltIn ? 'built-in' : 'custom'}</span>
 			</div>
 		</MenuItem>
 	);
@@ -517,10 +499,10 @@ function SkillTemplateRenderModalContent({
 		setSubmitting(true);
 		setSubmitError('');
 
-		void skillStoreAPI
+		void skillManagementAPI
 			.renderSkill(skillRefFromListItem(item), formState.arguments)
 			.then(async rendered => {
-				if (rendered.insert !== 'user-message') {
+				if (rendered.insert !== SkillInsert.UserMessage) {
 					throw new Error(`Expected a user-message template, but renderer returned insert=${rendered.insert}.`);
 				}
 				const result = await onInsert({
@@ -792,8 +774,8 @@ function SkillTemplateBottomBarChipInner({
 
 			let inserted = false;
 			try {
-				const rendered = await skillStoreAPI.renderSkill(skillRefFromListItem(item), {});
-				if (rendered.insert !== 'user-message') {
+				const rendered = await skillManagementAPI.renderSkill(skillRefFromListItem(item), {});
+				if (rendered.insert !== SkillInsert.UserMessage) {
 					throw new Error(`Expected a user-message template, but renderer returned insert=${rendered.insert}.`);
 				}
 				await onInsertTemplateText(rendered.text);

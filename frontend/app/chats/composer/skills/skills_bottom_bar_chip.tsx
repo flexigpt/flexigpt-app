@@ -7,10 +7,11 @@ import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { SkillBundle, SkillListItem, SkillRef } from '@/spec/skill';
+import { SkillInsert } from '@/spec/skill';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import { skillStoreAPI } from '@/apis/baseapi';
+import { skillManagementAPI } from '@/apis/baseapi';
 import { getAllSkillBundles } from '@/apis/list_helper';
 
 import {
@@ -40,13 +41,7 @@ import {
 	skillCanBePreloadedAsActive,
 	skillCanBeRenderedAsInstructionPrompt,
 } from '@/skills/lib/skill_artifact_utils';
-import {
-	dedupeSkillRefs,
-	isInstalledSkillRef,
-	requireInstalledSkillRef,
-	skillRefFromListItem,
-	skillRefKey,
-} from '@/skills/lib/skill_identity_utils';
+import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
 const SIMPLE_SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const skillRowActionButtonClasses = 'btn btn-ghost btn-xs rounded-lg';
@@ -274,27 +269,26 @@ function AddInstructionSkillModalContent({
 		setIsSubmitting(true);
 		setSubmitError('');
 
-		void skillStoreAPI
+		void skillManagementAPI
 			.putSkillArtifact(bundleID, normalizedName, {
 				name: normalizedName,
 				displayName: displayName.trim() || normalizedName,
 				description:
 					initialDraft?.description ||
 					`Instruction skill created from the composer. Use when these instructions should guide the assistant.`,
-				insert: 'instructions',
+				insert: SkillInsert.Instructions,
 				arguments: [],
 				tags: ['composer'],
 				markdownBody: body.trim(),
 				isEnabled: true,
 			})
-			.then(async resp => {
+			.then(async createdSkill => {
 				const bundle = bundles.find(item => item.id === bundleID);
 				await onCreated({
 					bundleID,
 					bundleSlug: bundle?.slug ?? bundleID,
 					skillSlug: normalizedName,
-					isBuiltIn: false,
-					skillDefinition: resp,
+					skillDefinition: createdSkill,
 				});
 				if (!unmountingRef.current) {
 					requestClose(true);
@@ -582,16 +576,17 @@ export function SkillsBottomBarChip({
 
 	const addSkillAsSystemInstructions = useCallback(
 		async (item: SkillListItem, values: Record<string, string>) => {
-			const rendered = await skillStoreAPI.renderSkill(skillRefFromListItem(item), values);
-			if (rendered.insert !== 'instructions') {
+			const rendered = await skillManagementAPI.renderSkill(skillRefFromListItem(item), values);
+
+			if (rendered.insert !== SkillInsert.Instructions) {
 				throw new Error(`Expected instruction skill, but renderer returned insert=${rendered.insert}.`);
 			}
-			const skillRef = requireInstalledSkillRef(skillRefFromListItem(item), 'Instruction Skill');
+
 			systemPrompt.addAndSelectInstructionSkillSource({
 				identityKey: getInstructionSourceIdentityKey(item),
 				displayName: getSkillDisplayLabel(item),
 				prompt: rendered.text,
-				skillRef,
+				skillRef: item.skillDefinition.ref,
 				sourceTags: rendered.sourceTags,
 			});
 		},
@@ -621,14 +616,6 @@ export function SkillsBottomBarChip({
 	const hasConfiguredSkillState = configuredCount > 0 || activeCount > 0;
 	const hasSelectedSystemInstructionState =
 		systemPrompt.includeModelDefault || systemPrompt.selectedInstructionSourceKeys.length > 0;
-	const hasClearableSkillState =
-		enabledSkillRefs.some(r => {
-			return isInstalledSkillRef(r);
-		}) ||
-		activeSkillRefs.some(r => {
-			return isInstalledSkillRef(r);
-		}) ||
-		hasSelectedSystemInstructionState;
 
 	const hoverTipContent = useMemo(
 		() => (
@@ -661,7 +648,7 @@ export function SkillsBottomBarChip({
 								},
 							]
 						: []),
-					...(hasClearableSkillState
+					...(hasSelectedSystemInstructionState
 						? [
 								{
 									id: 'clear-action',
@@ -680,7 +667,7 @@ export function SkillsBottomBarChip({
 			activeCount,
 			configuredCount,
 			enabledCount,
-			hasClearableSkillState,
+			hasSelectedSystemInstructionState,
 			loadError,
 			loading,
 			shortcut,
@@ -711,13 +698,13 @@ export function SkillsBottomBarChip({
 		async (item: SkillListItem) => {
 			setSkillActionError(null);
 			try {
-				const rendered = await skillStoreAPI.renderSkill(skillRefFromListItem(item), {});
+				const rendered = await skillManagementAPI.renderSkill(skillRefFromListItem(item), {});
 				const sourceLabel = getSkillDisplayLabel(item);
 				const nextName = makeUniqueSimpleSkillName(`${item.skillDefinition.name || item.skillSlug}-fork`, allSkills);
 
 				setInstructionModalMode('fork');
 				setInstructionDraft({
-					bundleID: item.isBuiltIn ? undefined : item.bundleID,
+					bundleID: item.skillDefinition.isBuiltIn ? undefined : item.bundleID,
 					displayName: `${sourceLabel} Copy`,
 					name: nextName,
 					body: rendered.text || `Forked from "${sourceLabel}". Replace this placeholder with instructions.`,
@@ -998,7 +985,7 @@ export function SkillsBottomBarChip({
 						/>
 					</MenuButton>
 
-					{hasClearableSkillState ? (
+					{hasSelectedSystemInstructionState ? (
 						<button
 							type="button"
 							className={actionTriggerChipClearButtonClasses}

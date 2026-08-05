@@ -76,7 +76,7 @@ function WorkspaceResourceDetailsContent({
 				throwIfAborted(signal);
 			} catch (error) {
 				throwIfAborted(signal);
-				previewError = getErrorMessage(error, 'The artifact content could not be loaded.');
+				previewError = getErrorMessage(error, 'The resource content could not be loaded.');
 			}
 
 			return {
@@ -118,7 +118,7 @@ function WorkspaceResourceDetailsContent({
 		<ManagementDetailsModal
 			isOpen
 			onClose={onClose}
-			title="Workspace Artifact"
+			title="Workspace Resource"
 			description={current.name}
 			modalKey={`${workspaceRefKey(workspace.workspace)}:${artifactRefKey(record.artifact)}:${record.revision}`}
 			width="wide"
@@ -126,7 +126,7 @@ function WorkspaceResourceDetailsContent({
 		>
 			{error ? (
 				<ManagementResourceError
-					title="Workspace Artifact could not be loaded"
+					title="Workspace resource details could not be loaded"
 					error={error}
 					isRetrying={isRefreshing}
 					onRetry={reloadOrThrow}
@@ -147,9 +147,6 @@ function WorkspaceResourceDetailsContent({
 					{runtimeRelevant ? (
 						<ManagementInfoRow label="Use in conversations">{current.runtimeDisabled ? 'No' : 'Yes'}</ManagementInfoRow>
 					) : null}
-					<ManagementInfoRow label="Artifact ID" mono>
-						{current.artifact.artifactID}
-					</ManagementInfoRow>
 					<ManagementInfoRow label="Source">
 						<span className="break-all">{source}</span>
 					</ManagementInfoRow>
@@ -183,7 +180,7 @@ function WorkspaceResourceDetailsContent({
 			) : null}
 
 			{skill ? (
-				<ModalSection title="Skill artifact">
+				<ModalSection title="Skill details">
 					<ManagementInfoGrid>
 						<ManagementInfoRow label="Display name">{skill.skill.displayName || skill.skill.name}</ManagementInfoRow>
 						<ManagementInfoRow label="Description">{skill.skill.description || 'None'}</ManagementInfoRow>
