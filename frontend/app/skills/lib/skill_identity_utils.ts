@@ -26,7 +26,10 @@ export function skillRefFromListItem(item: SkillListItem): SkillRef {
 	return item.skillDefinition.ref;
 }
 
-function toArtifactRef(ref: SkillRef): ArtifactRef {
+function toArtifactRef(ref: SkillRef): ArtifactRef | null {
+	if (!isSkillArtifactRef(ref)) {
+		return null;
+	}
 	return { rootID: ref.rootID, artifactID: ref.artifactID };
 }
 
@@ -55,6 +58,9 @@ export function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[]
 	const seen = new Set<string>();
 	const out: SkillRef[] = [];
 	for (const r of refs ?? []) {
+		if (!isSkillArtifactRef(r)) {
+			continue;
+		}
 		const key = skillRefKey(r);
 		if (!seen.has(key)) {
 			seen.add(key);
