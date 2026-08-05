@@ -18,7 +18,7 @@ import {
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
 import type { MessageStreamSource } from '@/chats/messages/message_content_card';
-import { MessageContentCard } from '@/chats/messages/message_content_card';
+import { MessageContentCard, useMessageStreamSnapshot } from '@/chats/messages/message_content_card';
 import { MessageFooterArea } from '@/chats/messages/message_footer';
 import { MessageThinkingSection } from '@/chats/messages/message_thinking_section';
 
@@ -132,6 +132,7 @@ export const ChatMessage = memo(function ChatMessage({
 	streamSource,
 }: ChatMessageProps) {
 	const isUser = message.role === RoleEnum.User;
+	const streamSnapshot = useMessageStreamSnapshot(streamSource, isBusy);
 	const align = !isUser ? 'items-end text-left' : 'items-start text-left';
 	const leftColSpan = !isUser ? 'col-span-1 lg:col-span-2' : 'col-span-1';
 	const rightColSpan = !isUser ? 'col-span-1' : 'col-span-1 lg:col-span-2';
@@ -157,6 +158,8 @@ export const ChatMessage = memo(function ChatMessage({
 	const baseContent = message.uiContent ?? '';
 	const hasAnyContent = /\S/.test(baseContent);
 	const hasError = message.status === Status.Failed || !!message.error;
+	const hasStreamedText = streamSnapshot.text.length > 0;
+	const hasStreamedThinking = streamSnapshot.thinking.length > 0;
 
 	const hasAnyReasoning =
 		message.uiReasoningContents?.some(rc => {
@@ -207,12 +210,15 @@ export const ChatMessage = memo(function ChatMessage({
 
 	const hasMCPAppsView = mcpAppViews.length > 0;
 
-	// Body wrapper should exist only if something inside can render:
-	// - content (final/streamed)
-	// - busy
-	// - error
-	// - MCP App output
-	const showBody = isBusy || hasAnyContent || hasError || hasMCPAppsView;
+	// A busy placeholder is intentionally not enough to render a bubble. Until
+	// the provider sends meaningful content, only the compact footer status is
+	// shown. This eliminates the empty assistant bubble.
+	const showBody =
+		hasAnyContent ||
+		hasError ||
+		hasMCPAppsView ||
+		hasAnyReasoning ||
+		(isBusy && (hasStreamedText || hasStreamedThinking));
 	return (
 		<div className="grid grid-cols-12 p-1" style={{ fontSize: 14 }}>
 			{/* Row 1 ── icon + message bubble (only when showCardRow) */}
@@ -233,7 +239,7 @@ export const ChatMessage = memo(function ChatMessage({
 							<MessageThinkingSection
 								isBusy={isBusy}
 								reasoningContents={message.uiReasoningContents}
-								streamSource={streamSource}
+								streamedThinking={streamSnapshot.thinking}
 								openWhenComplete={hasError}
 							/>
 						)}
@@ -245,7 +251,7 @@ export const ChatMessage = memo(function ChatMessage({
 								align={align}
 								renderAsMarkdown={renderMarkdown && !deferRichRendering}
 								diffCandidatePaths={diffCandidatePaths}
-								streamSource={streamSource}
+								streamingText={isBusy ? streamSnapshot.text : undefined}
 							/>
 							{/* Fallback for error-only messages with no text content */}
 							{!hasAnyContent && hasError && !isBusy && (
@@ -340,7 +346,8 @@ export const ChatMessage = memo(function ChatMessage({
 							reasoningContents={message.uiReasoningContents}
 							isBusy={isBusy}
 							bodyPresent={showBody}
-							streamSource={streamSource}
+							streamText={streamSnapshot.text}
+							streamThinking={streamSnapshot.thinking}
 							disableMarkdown={!renderMarkdown}
 							onDisableMarkdownChange={handleDisableMarkdownChange}
 							usage={message.usage}

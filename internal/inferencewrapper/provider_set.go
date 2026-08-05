@@ -549,8 +549,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		CapabilityResolver: capabilityResolver,
 	}
 
-	// Keep stream batching at the provider boundary. The frontend renders each
-	// callback immediately and must not add its own debounce or timer.
+	// Keep provider batching at the transport boundary. The frontend owns
+	// paint-aligned rendering and additionally coalesces visible updates to
+	// avoid UI work more often than its stream frame budget.
 	if req.OnStreamText != nil || req.OnStreamThinking != nil {
 		opts.StreamHandler = makeStreamHandler(req.OnStreamText, req.OnStreamThinking)
 		opts.StreamConfig = &inferenceSpec.StreamConfig{

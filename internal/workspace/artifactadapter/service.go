@@ -184,9 +184,6 @@ func (s *Service) List(
 	ctx context.Context,
 	rootID basespec.RootID,
 ) ([]spec.Workspace, error) {
-	if err := s.requireWorkspaceRoot(rootID); err != nil {
-		return nil, err
-	}
 	collections, err := s.collections.ListByRoot(ctx, rootID)
 	if err != nil {
 		return nil, err
@@ -669,9 +666,7 @@ func (s *Service) Get(
 	if err := ref.Validate(); err != nil {
 		return spec.Workspace{}, err
 	}
-	if err := s.requireWorkspaceRoot(ref.RootID); err != nil {
-		return spec.Workspace{}, err
-	}
+
 	value, err := s.collections.Get(ctx, ref)
 	if err != nil {
 		return spec.Workspace{}, err

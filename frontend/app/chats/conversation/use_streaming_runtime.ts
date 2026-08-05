@@ -8,6 +8,12 @@ interface StreamChannelBuffer {
 	display: string;
 }
 
+interface StreamPublishSchedule {
+	timerID: number | null;
+	frameID: number | null;
+	lastPublishedAt: number;
+}
+
 export interface StreamBuffer {
 	text: StreamChannelBuffer;
 	thinking: StreamChannelBuffer;
@@ -15,10 +21,13 @@ export interface StreamBuffer {
 
 interface UseStreamingRuntimeArgs {
 	tabs: ChatTabState[];
+	selectedTabId: string;
 	selectedTabIdRef: RefObject<string>;
 }
 
 const BACKGROUND_STREAM_COMPACT_CHUNK_COUNT = 256;
+const STREAM_RENDER_FPS = 30;
+const STREAM_RENDER_INTERVAL_MS = 1000 / STREAM_RENDER_FPS;
 
 function flushStreamChannel(channel: StreamChannelBuffer): void {
 	if (channel.chunks.length === 0) {
@@ -37,7 +46,11 @@ function readStreamChannel(channel: StreamChannelBuffer): string {
 	return `${channel.display}${channel.chunks.join('')}`;
 }
 
-export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRuntimeArgs) {
+function getStreamClock(): number {
+	return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+export function useStreamingRuntime({ tabs, selectedTabId, selectedTabIdRef }: UseStreamingRuntimeArgs) {
 	const tabIdSet = useMemo(() => new Set(tabs.map(tab => tab.tabId)), [tabs]);
 	const tabIdSetRef = useRef(tabIdSet);
 
@@ -49,6 +62,7 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 	const streamBuffersRef = useRef(new Map<string, StreamBuffer>());
 	const streamVersionRef = useRef(new Map<string, number>());
 	const streamListenersRef = useRef(new Map<string, Set<() => void>>());
+	const streamPublishSchedulesRef = useRef(new Map<string, StreamPublishSchedule>());
 
 	useLayoutEffect(() => {
 		tabIdSetRef.current = tabIdSet;
@@ -116,6 +130,17 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 		return readStreamChannel(buffer.thinking);
 	}, []);
 
+	// Visible stream getters intentionally expose only `display`, never pending
+	// chunks. This guarantees that rendering cannot bypass the frame scheduler
+	// because of an unrelated React render.
+	const getVisibleStreamTextForTab = useCallback((tabId: string) => {
+		return streamBuffersRef.current.get(tabId)?.text.display ?? '';
+	}, []);
+
+	const getVisibleStreamThinkingForTab = useCallback((tabId: string) => {
+		return streamBuffersRef.current.get(tabId)?.thinking.display ?? '';
+	}, []);
+
 	const bumpStreamVersion = useCallback((tabId: string) => {
 		const nextVersion = (streamVersionRef.current.get(tabId) ?? 0) + 1;
 		streamVersionRef.current.set(tabId, nextVersion);
@@ -142,9 +167,8 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 		};
 	}, []);
 
-	const notifyStreamNow = useCallback(
+	const emitStreamUpdate = useCallback(
 		(tabId: string) => {
-			flushStreamForTab(tabId);
 			bumpStreamVersion(tabId);
 
 			const listeners = streamListenersRef.current.get(tabId);
@@ -156,7 +180,52 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 				cb();
 			}
 		},
-		[bumpStreamVersion, flushStreamForTab]
+		[bumpStreamVersion]
+	);
+
+	const getPublishSchedule = useCallback((tabId: string): StreamPublishSchedule => {
+		let schedule = streamPublishSchedulesRef.current.get(tabId);
+		if (!schedule) {
+			schedule = {
+				timerID: null,
+				frameID: null,
+				lastPublishedAt: Number.NEGATIVE_INFINITY,
+			};
+			streamPublishSchedulesRef.current.set(tabId, schedule);
+		}
+		return schedule;
+	}, []);
+
+	const cancelScheduledStreamPublish = useCallback((tabId: string) => {
+		const schedule = streamPublishSchedulesRef.current.get(tabId);
+		if (!schedule) {
+			return;
+		}
+
+		if (schedule.timerID !== null) {
+			window.clearTimeout(schedule.timerID);
+			schedule.timerID = null;
+		}
+		if (schedule.frameID !== null) {
+			window.cancelAnimationFrame(schedule.frameID);
+			schedule.frameID = null;
+		}
+	}, []);
+
+	const publishStream = useCallback(
+		(tabId: string, force = false) => {
+			// Background tabs retain complete stream state, but they do not cause
+			// React work until shown again.
+			if (!force && selectedTabIdRef.current !== tabId) {
+				flushStreamForTab(tabId);
+				return;
+			}
+
+			flushStreamForTab(tabId);
+			getPublishSchedule(tabId).lastPublishedAt = getStreamClock();
+			emitStreamUpdate(tabId);
+		},
+		[emitStreamUpdate, flushStreamForTab, getPublishSchedule, selectedTabIdRef]
 	);
 
 	const notifyStreamSoon = useCallback(
@@ -164,20 +233,89 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 			const buffer = getStreamBuffer(tabId);
 
 			if (selectedTabIdRef.current !== tabId) {
-				const pendingChunkCount = buffer.text.chunks.length + buffer.thinking.chunks.length;
+				cancelScheduledStreamPublish(tabId);
 
+				const pendingChunkCount = buffer.text.chunks.length + buffer.thinking.chunks.length;
 				if (pendingChunkCount >= BACKGROUND_STREAM_COMPACT_CHUNK_COUNT) {
 					flushStreamForTab(tabId);
 				}
 				return;
 			}
 
-			// The backend controls event cadence. Do not add a second client-side
-			// timer: each active-tab stream event should be visible immediately.
-			notifyStreamNow(tabId);
+			const schedule = getPublishSchedule(tabId);
+			if (schedule.timerID !== null || schedule.frameID !== null) {
+				return;
+			}
+
+			const requestFrame = () => {
+				if (schedule.frameID !== null) {
+					return;
+				}
+
+				schedule.frameID = window.requestAnimationFrame(frameTime => {
+					schedule.frameID = null;
+
+					const remaining = STREAM_RENDER_INTERVAL_MS - (frameTime - schedule.lastPublishedAt);
+					if (remaining > 0) {
+						schedule.timerID = window.setTimeout(() => {
+							schedule.timerID = null;
+							requestFrame();
+						}, Math.ceil(remaining));
+						return;
+					}
+
+					publishStream(tabId);
+				});
+			};
+
+			const elapsed = getStreamClock() - schedule.lastPublishedAt;
+			if (elapsed >= STREAM_RENDER_INTERVAL_MS) {
+				requestFrame();
+				return;
+			}
+
+			schedule.timerID = window.setTimeout(
+				() => {
+					schedule.timerID = null;
+					requestFrame();
+				},
+				Math.ceil(STREAM_RENDER_INTERVAL_MS - elapsed)
+			);
 		},
-		[flushStreamForTab, getStreamBuffer, notifyStreamNow, selectedTabIdRef]
+		[
+			cancelScheduledStreamPublish,
+			flushStreamForTab,
+			getPublishSchedule,
+			getStreamBuffer,
+			publishStream,
+			selectedTabIdRef,
+		]
 	);
+
+	// Explicit lifecycle publication. This is deliberately not used for normal
+	// chunks; normal chunks always use notifyStreamSoon().
+	const notifyStreamNow = useCallback(
+		(tabId: string) => {
+			cancelScheduledStreamPublish(tabId);
+			publishStream(tabId, true);
+		},
+		[cancelScheduledStreamPublish, publishStream]
+	);
+
+	// A background stream may have buffered chunks without a publish. Make it
+	// visible synchronously when the user activates that tab.
+	useLayoutEffect(() => {
+		if (!selectedTabId) {
+			return;
+		}
+
+		const buffer = streamBuffersRef.current.get(selectedTabId);
+		if (!buffer || (buffer.text.chunks.length === 0 && buffer.thinking.chunks.length === 0)) {
+			return;
+		}
+
+		notifyStreamNow(selectedTabId);
+	}, [notifyStreamNow, selectedTabId]);
 
 	const clearStreamForTab = useCallback(
 		(tabId: string) => {
@@ -189,6 +327,8 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 	const disposeStreamRuntime = useCallback(
 		(tabId: string) => {
+			cancelScheduledStreamPublish(tabId);
+
 			const abortRef = getAbortRef(tabId);
 			abortRef.current?.abort();
 			abortRef.current = null;
@@ -197,15 +337,15 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 			requestIdByTabRef.current.delete(tabId);
 			streamBuffersRef.current.delete(tabId);
 			streamVersionRef.current.delete(tabId);
-
 			streamListenersRef.current.delete(tabId);
+			streamPublishSchedulesRef.current.delete(tabId);
 		},
-		[getAbortRef]
+		[cancelScheduledStreamPublish, getAbortRef]
 	);
 
 	useEffect(() => {
 		const abortRefsCurrent = abortRefs.current;
-
+		const streamPublishSchedulesRefCurrent = streamPublishSchedulesRef.current;
 		return () => {
 			try {
 				for (const refObj of abortRefsCurrent.values()) {
@@ -214,6 +354,16 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 			} catch {
 				// ignore
 			}
+
+			for (const schedule of streamPublishSchedulesRefCurrent.values()) {
+				if (schedule.timerID !== null) {
+					window.clearTimeout(schedule.timerID);
+				}
+				if (schedule.frameID !== null) {
+					window.cancelAnimationFrame(schedule.frameID);
+				}
+			}
+			streamPublishSchedulesRefCurrent.clear();
 		};
 	}, []);
 
@@ -225,6 +375,8 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 		clearStreamForTab,
 		getFullStreamTextForTab,
 		getFullStreamThinkingForTab,
+		getVisibleStreamTextForTab,
+		getVisibleStreamThinkingForTab,
 		getStreamVersionSnapshot,
 		subscribeToStream,
 		notifyStreamNow,

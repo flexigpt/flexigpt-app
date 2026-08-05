@@ -629,6 +629,8 @@ function ConversationAreaInner(
 		clearStreamForTab,
 		getFullStreamTextForTab,
 		getFullStreamThinkingForTab,
+		getVisibleStreamTextForTab,
+		getVisibleStreamThinkingForTab,
 		getStreamVersionSnapshot,
 		subscribeToStream,
 		notifyStreamNow,
@@ -637,6 +639,7 @@ function ConversationAreaInner(
 		disposeStreamRuntime,
 	} = useStreamingRuntime({
 		tabs,
+		selectedTabId,
 		selectedTabIdRef,
 	});
 
@@ -819,13 +822,13 @@ function ConversationAreaInner(
 	);
 
 	const getActiveStreamText = useCallback(
-		() => getFullStreamTextForTab(activeTabId),
-		[activeTabId, getFullStreamTextForTab]
+		() => getVisibleStreamTextForTab(activeTabId),
+		[activeTabId, getVisibleStreamTextForTab]
 	);
 
 	const getActiveStreamThinking = useCallback(
-		() => getFullStreamThinkingForTab(activeTabId),
-		[activeTabId, getFullStreamThinkingForTab]
+		() => getVisibleStreamThinkingForTab(activeTabId),
+		[activeTabId, getVisibleStreamThinkingForTab]
 	);
 
 	const activeStreamSource = useMemo(

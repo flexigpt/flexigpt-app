@@ -9,6 +9,43 @@ export interface MessageStreamSource {
 	getThinking: () => string;
 }
 
+export interface MessageStreamSnapshot {
+	version: number;
+	text: string;
+	thinking: string;
+}
+
+const EMPTY_STREAM_SUBSCRIBE = () => () => {};
+const EMPTY_STREAM_VERSION = () => 0;
+const EMPTY_STREAM_SNAPSHOT: MessageStreamSnapshot = {
+	version: 0,
+	text: '',
+	thinking: '',
+};
+
+// oxlint-disable-next-line react/only-export-components
+export function useMessageStreamSnapshot(
+	source: MessageStreamSource | undefined,
+	enabled: boolean
+): MessageStreamSnapshot {
+	const activeSource = enabled ? source : undefined;
+	const version = useSyncExternalStore(
+		activeSource?.subscribe ?? EMPTY_STREAM_SUBSCRIBE,
+		activeSource?.getVersionSnapshot ?? EMPTY_STREAM_VERSION,
+		EMPTY_STREAM_VERSION
+	);
+
+	if (!activeSource) {
+		return EMPTY_STREAM_SNAPSHOT;
+	}
+
+	return {
+		version,
+		text: activeSource.getText(),
+		thinking: activeSource.getThinking(),
+	};
+}
+
 interface MessageContentCardProps {
 	messageID: string;
 	// Final text
@@ -17,7 +54,7 @@ interface MessageContentCardProps {
 	align: string;
 	renderAsMarkdown?: boolean;
 	diffCandidatePaths?: string[];
-	streamSource?: MessageStreamSource;
+	streamingText?: string;
 	defaultCodeBlockExpanded?: boolean;
 }
 
@@ -43,7 +80,8 @@ interface StreamingMarkdownState {
 	segments: StreamingMarkdownSegment[];
 }
 
-const STREAMING_MARKDOWN_SEGMENT_TARGET_LENGTH = 4_096;
+const MAX_STREAMING_MARKDOWN_SEGMENTS = 96;
+const STREAMING_MARKDOWN_COMPACT_SEGMENT_COUNT = 24;
 
 function findSafeStreamingMarkdownCutoff(text: string): number {
 	let openFence: string | undefined;
@@ -78,12 +116,22 @@ function appendStreamingMarkdownSegment(
 	generation: number,
 	offset: number
 ): StreamingMarkdownSegment[] {
-	const previous = segments.at(-1);
-	if (previous && previous.text.length + text.length <= STREAMING_MARKDOWN_SEGMENT_TARGET_LENGTH) {
-		return [...segments.slice(0, -1), { ...previous, text: `${previous.text}${text}` }];
+	const next = [...segments, { key: `${generation}:${offset}`, text }];
+
+	// Never mutate the latest committed segment. EnhancedMarkdown is memoized,
+	// so immutable segments avoid reparsing old content for every new chunk.
+	if (next.length <= MAX_STREAMING_MARKDOWN_SEGMENTS) {
+		return next;
 	}
 
-	return [...segments, { key: `${generation}:${offset}`, text }];
+	const compacted = next.slice(0, STREAMING_MARKDOWN_COMPACT_SEGMENT_COUNT);
+	return [
+		{
+			key: `${generation}:compact:${offset}`,
+			text: compacted.map(segment => segment.text).join(''),
+		},
+		...next.slice(STREAMING_MARKDOWN_COMPACT_SEGMENT_COUNT),
+	];
 }
 
 function useStreamingMarkdownSegments(text: string) {
@@ -130,15 +178,14 @@ function useStreamingMarkdownSegments(text: string) {
 }
 
 function StreamingMarkdownContent(props: {
-	source: MessageStreamSource;
+	text: string;
 	align: string;
 	diffCandidatePaths?: string[];
 	defaultCodeBlockExpanded: boolean;
 }) {
-	const text = useSyncExternalStore(props.source.subscribe, props.source.getText, props.source.getText);
-	const { segments, tail } = useStreamingMarkdownSegments(text);
+	const { segments, tail } = useStreamingMarkdownSegments(props.text);
 
-	if (text.length === 0) {
+	if (props.text.length === 0) {
 		return null;
 	}
 
@@ -177,7 +224,7 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 		prev.align === next.align &&
 		prev.renderAsMarkdown === next.renderAsMarkdown &&
 		stringArraysEqual(prev.diffCandidatePaths, next.diffCandidatePaths) &&
-		prev.streamSource === next.streamSource &&
+		prev.streamingText === next.streamingText &&
 		prev.defaultCodeBlockExpanded === next.defaultCodeBlockExpanded
 	);
 }
@@ -189,7 +236,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 	align,
 	renderAsMarkdown = true,
 	diffCandidatePaths,
-	streamSource,
+	streamingText,
 	defaultCodeBlockExpanded = true,
 }: MessageContentCardProps) {
 	const textToRender = content;
@@ -198,10 +245,10 @@ export const MessageContentCard = memo(function MessageContentCard({
 	// The live source owns text rendering while this message has the
 	// in-flight request. Streaming Markdown deliberately ignores deferred
 	// transcript rendering so the current answer remains formatted.
-	if (isBusy && streamSource) {
+	if (isBusy && streamingText !== undefined) {
 		return (
 			<StreamingMarkdownContent
-				source={streamSource}
+				text={streamingText}
 				align={align}
 				diffCandidatePaths={diffCandidatePaths}
 				defaultCodeBlockExpanded={defaultCodeBlockExpanded}

@@ -9,7 +9,6 @@ import { HoverTip } from '@/components/hover_tip';
 import { stripCustomMDFences } from '@/components/markdown/custom_md_utils';
 
 import { getDebugDetailsMarkdown } from '@/chats/conversation/completion_helper';
-import type { MessageStreamSource } from '@/chats/messages/message_content_card';
 import { MessageDetailsModal } from '@/chats/messages/message_details_modal';
 import { MessageStreamingStatus } from '@/chats/messages/message_streaming_status';
 
@@ -22,7 +21,8 @@ interface MessageFooterAreaProps {
 	reasoningContents?: ReasoningContent[];
 	isBusy: boolean;
 	bodyPresent: boolean;
-	streamSource?: MessageStreamSource;
+	streamText?: string;
+	streamThinking?: string;
 	disableMarkdown: boolean;
 	onDisableMarkdownChange: (checked: boolean) => void;
 	usage?: InferenceUsage;
@@ -49,7 +49,8 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	reasoningContents,
 	isBusy,
 	bodyPresent,
-	streamSource,
+	streamText,
+	streamThinking,
 	disableMarkdown,
 	onDisableMarkdownChange,
 	usage,
@@ -115,8 +116,8 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 			<div
 				className={`flex items-center space-x-6 ${bodyPresent ? 'justify-between' : isUser ? 'justify-start' : 'justify-end'}`}
 			>
-				{isBusy && streamSource ? (
-					<MessageStreamingStatus source={streamSource} />
+				{isBusy ? (
+					<MessageStreamingStatus streamText={streamText} streamThinking={streamThinking} />
 				) : hasUsage && usage ? (
 					<HoverTip content={usageTooltip} placement="top" wrapperElement="div">
 						<div className="flex items-center bg-transparent p-0 text-xs">

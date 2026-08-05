@@ -1,13 +1,8 @@
-import { memo, useMemo, useState, useSyncExternalStore } from 'react';
+import { memo, useMemo, useState } from 'react';
 
 import type { ReasoningContent } from '@/spec/inference';
 
 import { ThinkingFence } from '@/components/markdown/thinking_fence';
-
-import type { MessageStreamSource } from '@/chats/messages/message_content_card';
-
-const EMPTY_STREAM_SUBSCRIBE = () => () => {};
-const EMPTY_STREAM_TEXT_SNAPSHOT = () => '';
 
 function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'summary' | 'thinking'): string {
 	const items = reasoning ?? [];
@@ -26,17 +21,12 @@ export const MessageThinkingSection = memo(function MessageThinkingSection(props
 	isBusy: boolean;
 	/** Final reasoning (if provider sends it at end) */
 	reasoningContents?: ReasoningContent[];
-	streamSource?: MessageStreamSource;
+	/** Frame-published reasoning snapshot from the parent ChatMessage. */
+	streamedThinking?: string;
 	/** Keep abruptly interrupted reasoning visible with its terminal error. */
 	openWhenComplete?: boolean;
 }) {
-	const { isBusy, reasoningContents, streamSource, openWhenComplete = false } = props;
-
-	const streamedThinking = useSyncExternalStore(
-		streamSource?.subscribe ?? EMPTY_STREAM_SUBSCRIBE,
-		streamSource?.getThinking ?? EMPTY_STREAM_TEXT_SNAPSHOT,
-		EMPTY_STREAM_TEXT_SNAPSHOT
-	);
+	const { isBusy, reasoningContents, streamedThinking = '', openWhenComplete = false } = props;
 
 	const finalSummary = useMemo(() => joinReasoningParts(reasoningContents, 'summary'), [reasoningContents]);
 	const finalThinking = useMemo(() => joinReasoningParts(reasoningContents, 'thinking'), [reasoningContents]);
