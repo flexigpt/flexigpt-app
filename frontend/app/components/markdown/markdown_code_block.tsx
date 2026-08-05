@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { FiAlertTriangle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
@@ -19,6 +19,7 @@ interface CodeProps {
 	diffCandidatePaths?: string[];
 	diffWorkspaceRoots?: string[];
 	defaultExpanded?: boolean;
+	disableControls?: boolean;
 }
 
 interface MermaidResultState {
@@ -84,6 +85,7 @@ export function CodeBlock({
 	diffCandidatePaths,
 	diffWorkspaceRoots,
 	defaultExpanded = true,
+	disableControls = false,
 }: CodeProps) {
 	const codeBodyId = useId();
 
@@ -115,11 +117,13 @@ export function CodeBlock({
 	const defaultIsExpanded = isMermaid ? hasMermaidSyntaxError && !hideMermaidCode : defaultExpanded;
 	const isExpanded = expansionOverride?.key === codeBlockKey ? expansionOverride.isExpanded : defaultIsExpanded;
 
-	const { elementRef, activated: richCodeWorkActivated } = useNearViewport(!isBusy);
-	const html = useHighlight(value, language, richCodeWorkActivated && isExpanded);
+	const highlightedValue = useDeferredValue(value);
+	const valueForHighlight = isBusy ? highlightedValue : value;
+	const { elementRef, activated: richCodeWorkActivated } = useNearViewport(!isMermaid || !isBusy);
+	const html = useHighlight(valueForHighlight, language, richCodeWorkActivated && isExpanded);
 	const isDiffLike = useMemo(
-		() => richCodeWorkActivated && !isBusy && looksLikeUnifiedDiff(value, language),
-		[isBusy, language, richCodeWorkActivated, value]
+		() => richCodeWorkActivated && !disableControls && looksLikeUnifiedDiff(value, language),
+		[disableControls, language, richCodeWorkActivated, value]
 	);
 
 	const highlightedHtml = html ?? '';
@@ -163,7 +167,7 @@ export function CodeBlock({
 	return (
 		<>
 			<div ref={elementRef} className="app-bg-code my-4 overflow-hidden rounded-lg">
-				<div className="app-bg-code-header flex min-w-0 items-center justify-between gap-2 px-2 py-0.5">
+				<div className="app-bg-code-header flex min-h-9 min-w-0 items-center justify-between gap-2 px-2 py-0.5">
 					<div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-xs" title={headerTitle}>
 						<span
 							className={`inline-flex max-w-48 min-w-0 shrink-0 items-center gap-1 leading-none ${
@@ -187,35 +191,37 @@ export function CodeBlock({
 							/>
 						) : null}
 					</div>
-					<div className="flex shrink-0 items-center gap-1">
-						<DownloadButton
-							language={language}
-							valueFetcher={fetchValue}
-							size={16}
-							className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
-						/>
+					{!disableControls ? (
+						<div className="flex shrink-0 items-center gap-1">
+							<DownloadButton
+								language={language}
+								valueFetcher={fetchValue}
+								size={16}
+								className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+							/>
 
-						<CopyButton
-							value={value}
-							className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
-							size={16}
-						/>
-						<button
-							type="button"
-							className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
-							onClick={handleToggleExpanded}
-							aria-expanded={isExpanded}
-							aria-controls={codeBodyId}
-							title={isExpanded ? 'Collapse code' : 'Expand code'}
-						>
-							{isExpanded ? (
-								<FiChevronUp aria-hidden="true" size={16} />
-							) : (
-								<FiChevronDown aria-hidden="true" size={16} />
-							)}
-							<span className="sr-only">{isExpanded ? 'Collapse code' : 'Expand code'}</span>
-						</button>
-					</div>
+							<CopyButton
+								value={value}
+								className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								size={16}
+							/>
+							<button
+								type="button"
+								className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								onClick={handleToggleExpanded}
+								aria-expanded={isExpanded}
+								aria-controls={codeBodyId}
+								title={isExpanded ? 'Collapse code' : 'Expand code'}
+							>
+								{isExpanded ? (
+									<FiChevronUp aria-hidden="true" size={16} />
+								) : (
+									<FiChevronDown aria-hidden="true" size={16} />
+								)}
+								<span className="sr-only">{isExpanded ? 'Collapse code' : 'Expand code'}</span>
+							</button>
+						</div>
+					) : null}
 				</div>
 
 				{isExpanded && (
@@ -233,7 +239,7 @@ export function CodeBlock({
 				)}
 			</div>
 
-			{isMermaid && !isBusy && richCodeWorkActivated ? (
+			{isMermaid && !isBusy && !disableControls && richCodeWorkActivated ? (
 				<MermaidDiagram code={value} onRenderStatusChange={handleMermaidRenderStatusChange} />
 			) : null}
 		</>

@@ -208,8 +208,10 @@ export const ChatMessage = memo(function ChatMessage({
 	const hasMCPAppsView = mcpAppViews.length > 0;
 
 	// Body wrapper should exist only if something inside can render:
-	// - content (final/streamed) OR
-	// - busy (content card will show loader while busy)
+	// - content (final/streamed)
+	// - busy
+	// - error
+	// - MCP App output
 	const showBody = isBusy || hasAnyContent || hasError || hasMCPAppsView;
 	return (
 		<div className="grid grid-cols-12 p-1" style={{ fontSize: 14 }}>
@@ -232,6 +234,7 @@ export const ChatMessage = memo(function ChatMessage({
 								isBusy={isBusy}
 								reasoningContents={message.uiReasoningContents}
 								streamSource={streamSource}
+								openWhenComplete={hasError}
 							/>
 						)}
 						<div className="px-4 py-2">
@@ -303,7 +306,7 @@ export const ChatMessage = memo(function ChatMessage({
 			</div>
 			<div className="col-span-10 min-w-0 lg:col-span-9">
 				<div
-					className={`min-w-0 items-center gap-2 px-2 ${hasAttachmentsBar || !showBody ? 'flex' : ''} ${showBody ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
+					className={`flex min-w-0 items-center gap-2 px-2 ${showBody ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
 				>
 					{hasAttachmentsBar && (
 						<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
@@ -326,9 +329,7 @@ export const ChatMessage = memo(function ChatMessage({
 					)}
 
 					<div
-						className={`min-w-0 items-center px-1 py-0 ${
-							+hasAttachmentsBar ? (showBody ? 'flex flex-1' : 'flex') : !showBody ? 'flex' : ''
-						} ${!showBody ? (isUser ? 'justify-start' : 'justify-end') : ''}`}
+						className={`flex min-w-0 flex-1 items-center px-1 py-0 ${!showBody ? (isUser ? 'justify-start' : 'justify-end') : ''}`}
 					>
 						<MessageFooterArea
 							messageID={message.id}
@@ -339,6 +340,7 @@ export const ChatMessage = memo(function ChatMessage({
 							reasoningContents={message.uiReasoningContents}
 							isBusy={isBusy}
 							bodyPresent={showBody}
+							streamSource={streamSource}
 							disableMarkdown={!renderMarkdown}
 							onDisableMarkdownChange={handleDisableMarkdownChange}
 							usage={message.usage}

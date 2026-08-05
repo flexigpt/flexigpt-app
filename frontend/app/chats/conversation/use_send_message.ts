@@ -2,8 +2,8 @@ import type { RefObject } from 'react';
 import { useCallback } from 'react';
 
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
-import type { InferenceError, ModelParam, OutputUnion, UIToolCall } from '@/spec/inference';
-import { ContentItemKind, OutputKind, RoleEnum, Status } from '@/spec/inference';
+import type { InferenceError, ModelParam, UIToolCall } from '@/spec/inference';
+import { RoleEnum, Status } from '@/spec/inference';
 import type { ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
 import type { ToolStoreChoice } from '@/spec/tool';
 
@@ -16,6 +16,15 @@ import type {
 	EditorSubmitPayload,
 } from '@/chats/composer/editor/editor_types';
 import { sliceMessagesForSend } from '@/chats/composer/previousmessages/previous_messages_helper';
+import {
+	applyCompletionMetadata,
+	buildTerminalAssistantMessage,
+	getFailureTerminalLine,
+	getInferenceFailureMessage,
+	hasNonTextAssistantOutcome,
+	reconcileAssistantTextWithStream,
+	streamHasData,
+} from '@/chats/conversation/completion_finalizer';
 import { HandleCompletion } from '@/chats/conversation/completion_helper';
 import {
 	applyAssistantPersistenceContext,
@@ -38,7 +47,6 @@ interface UseSendMessageArgs {
 	tabExists: (tabId: string) => boolean;
 	getAbortRef: (tabId: string) => { current: AbortController | null };
 	requestIdByTabRef: RefObject<Map<string, string | null>>;
-	tokensReceivedByTabRef: RefObject<Map<string, boolean | null>>;
 	clearStreamBuffer: (tabId: string) => void;
 	notifyStreamNow: (tabId: string) => void;
 	notifyStreamSoon: (tabId: string) => void;
@@ -52,50 +60,6 @@ interface UseSendMessageArgs {
 		toolCalls: UIToolCall[],
 		finishPayload: AssistantTurnFinishedPayload
 	) => boolean;
-}
-
-function buildTerminalAssistantOutputs(assistantMessageId: string, status: Status, uiContent: string): OutputUnion[] {
-	return [
-		{
-			kind: OutputKind.OutputMessage,
-			outputMessage: {
-				id: assistantMessageId,
-				role: RoleEnum.Assistant,
-				status,
-				contents: [
-					{
-						kind: ContentItemKind.Text,
-						textItem: {
-							text: uiContent,
-						},
-					},
-				],
-			},
-		},
-	];
-}
-
-function buildTerminalAssistantMessage(args: {
-	assistantPlaceholder: ConversationMessage;
-	status: Status;
-	partialText: string;
-	terminalLine: string;
-	error?: InferenceError;
-	debugDetails?: unknown;
-	uiDebugDetails?: string;
-}): ConversationMessage {
-	const baseText = args.partialText.trimEnd();
-	const uiContent = baseText ? `${baseText}\n\n${args.terminalLine}` : args.terminalLine;
-
-	return {
-		...args.assistantPlaceholder,
-		status: args.status,
-		error: args.error,
-		debugDetails: args.debugDetails,
-		uiDebugDetails: args.uiDebugDetails,
-		uiContent,
-		outputs: buildTerminalAssistantOutputs(args.assistantPlaceholder.id, args.status, uiContent),
-	};
 }
 
 function findLatestUserMessage(messages: ConversationMessage[]): ConversationMessage | undefined {
@@ -117,7 +81,6 @@ export function useSendMessage({
 	tabExists,
 	getAbortRef,
 	requestIdByTabRef,
-	tokensReceivedByTabRef,
 	clearStreamBuffer,
 	notifyStreamNow,
 	notifyStreamSoon,
@@ -137,8 +100,6 @@ export function useSendMessage({
 			let queuedRunnableToolCalls: UIToolCall[] = [];
 
 			abortRef.current?.abort();
-			tokensReceivedByTabRef.current.set(tabId, false);
-
 			const allMessages = sliceMessagesForSend(updatedChatWithUserMessage.messages, options.includePreviousMessages);
 			if (allMessages.length === 0) {
 				return;
@@ -185,31 +146,26 @@ export function useSendMessage({
 			}
 
 			const onStreamTextData = (textData: string) => {
-				if (!textData) {
+				// Empty chunks are valid no-ops, never an end-of-stream signal.
+				if (typeof textData !== 'string' || textData.length === 0) {
 					return;
 				}
 				if (requestIdByTabRef.current.get(tabId) !== reqId) {
 					return;
 				}
 
-				if (tokensReceivedByTabRef.current.get(tabId) !== true) {
-					tokensReceivedByTabRef.current.set(tabId, true);
-				}
 				streamBuffer.text.chunks.push(textData);
 				notifyStreamSoon(tabId);
 			};
 
 			const onStreamThinkingData = (thinkingData: string) => {
-				if (!thinkingData) {
+				if (typeof thinkingData !== 'string' || thinkingData.length === 0) {
 					return;
 				}
 				if (requestIdByTabRef.current.get(tabId) !== reqId) {
 					return;
 				}
 
-				if (tokensReceivedByTabRef.current.get(tabId) !== true) {
-					tokensReceivedByTabRef.current.set(tabId, true);
-				}
 				streamBuffer.thinking.chunks.push(thinkingData);
 				notifyStreamSoon(tabId);
 			};
@@ -266,43 +222,79 @@ export function useSendMessage({
 					onStreamThinkingData
 				);
 
+				// Yield only to already-queued bridge microtasks. This does not add
+				// a timer or frame delay during normal streaming.
+				await Promise.resolve();
+
 				if (!tabExists(tabId)) {
 					return;
 				}
 				if (requestIdByTabRef.current.get(tabId) !== reqId) {
 					return;
 				}
+
 				const partialText = getFullStreamTextForTab(tabId);
 				const partialThinking = getFullStreamThinkingForTab(tabId);
-				const hasPartialStream = partialText.trim().length > 0 || partialThinking.trim().length > 0;
+				const hasPartialText = streamHasData(partialText);
+				const hasPartialStream = hasPartialText || streamHasData(partialThinking);
 
 				if (responseMessage) {
-					let finalResponseMessage = responseMessage;
+					const responseError = responseMessage.error ?? rawResponse?.inferenceResponse?.error;
+					const responseFailed = responseMessage.status === Status.Failed || !!responseError;
+					let finalResponseMessage: ConversationMessage;
 
-					const isErrorResponseWithoutOutputs =
-						finalResponseMessage.status === Status.Failed &&
-						!!rawResponse?.inferenceResponse?.error &&
-						(rawResponse?.inferenceResponse?.outputs?.length ?? 0) === 0;
-
-					// If backend streamed something but finalized as an error without
-					// outputs, keep the streamed text and only show thinking as a
-					// transient UI overlay.
-					if (hasPartialStream && isErrorResponseWithoutOutputs) {
-						const backendErrorMessage =
-							typeof finalResponseMessage.error?.message === 'string' &&
-							finalResponseMessage.error.message.trim().length > 0
-								? finalResponseMessage.error.message.trim()
-								: 'Got error in API processing.';
+					if (responseFailed) {
+						const rawOutputs = rawResponse?.inferenceResponse?.outputs ?? [];
+						const baseText = rawOutputs.length > 0 ? (responseMessage.uiContent ?? '') : '';
+						const failureError =
+							responseError ??
+							({
+								code: 'unknown',
+								message: 'The API returned an incomplete response.',
+							} as InferenceError);
+						const hasContentBeforeFailure = hasPartialStream || streamHasData(baseText);
 
 						finalResponseMessage = buildTerminalAssistantMessage({
-							assistantPlaceholder,
+							baseMessage: responseMessage,
 							status: Status.Failed,
 							partialText,
-							terminalLine: `> Error: ${backendErrorMessage}`,
-							error: finalResponseMessage.error,
-							debugDetails: finalResponseMessage.debugDetails,
-							uiDebugDetails: finalResponseMessage.uiDebugDetails,
+							partialThinking,
+							baseText,
+							error: failureError,
+							terminalLine: getFailureTerminalLine(
+								getInferenceFailureMessage(failureError, 'The API returned an incomplete response.'),
+								hasContentBeforeFailure
+							),
+							preferStreamedText: hasPartialText,
+							includeStreamedThinking: true,
 						});
+					} else {
+						// Inspect the backend's final payload before reconciling it
+						// with streamed text. Otherwise an empty final payload would
+						// incorrectly look successful merely because streaming had
+						// already produced visible content.
+						const finalPayloadHasOutcome =
+							/\S/.test(responseMessage.uiContent ?? '') || hasNonTextAssistantOutcome(responseMessage);
+
+						if (!finalPayloadHasOutcome) {
+							const noResponseError = {
+								code: 'empty_completion_response',
+								message: 'The backend ended without a usable final response.',
+							} as InferenceError;
+
+							finalResponseMessage = buildTerminalAssistantMessage({
+								baseMessage: responseMessage,
+								status: Status.Failed,
+								partialText,
+								partialThinking,
+								error: noResponseError,
+								terminalLine: getFailureTerminalLine(noResponseError.message, hasPartialStream),
+								preferStreamedText: true,
+								includeStreamedThinking: true,
+							});
+						} else {
+							finalResponseMessage = reconcileAssistantTextWithStream(responseMessage, partialText);
+						}
 					}
 
 					const persistedAssistantMessage = applyAssistantPersistenceContext(
@@ -317,20 +309,7 @@ export function useSendMessage({
 						modifiedAt: new Date(),
 					};
 
-					if (currentUserMsg?.id && (rawResponse?.hydratedCurrentInputs || rawResponse?.workspaceUsage)) {
-						finalChat = {
-							...finalChat,
-							messages: finalChat.messages.map(message =>
-								message.id === currentUserMsg.id
-									? {
-											...message,
-											inputs: rawResponse?.hydratedCurrentInputs ?? message.inputs,
-											workspaceUsage: rawResponse?.workspaceUsage,
-										}
-									: message
-							),
-						};
-					}
+					finalChat = applyCompletionMetadata(finalChat, currentUserMsg?.id, rawResponse);
 
 					saveUpdatedConversation(tabId, finalChat);
 
@@ -340,47 +319,31 @@ export function useSendMessage({
 						);
 					}
 				} else {
-					const newPartialText = getFullStreamTextForTab(tabId);
-					const newPartialThinking = getFullStreamThinkingForTab(tabId);
-					const hasPS = newPartialText.trim().length > 0 || newPartialThinking.trim().length > 0;
-
-					const fallbackBase = hasPS
-						? buildTerminalAssistantMessage({
-								assistantPlaceholder,
-								status: Status.Failed,
-								partialText,
-								terminalLine: '> Error: No response was returned by the backend.',
-								error: {
-									code: 'unknown',
-									message: 'No response was returned by the backend.',
-								} as InferenceError,
-							})
-						: {
-								...assistantPlaceholder,
-								status: Status.Failed,
-								error: {
-									code: 'unknown',
-									message: 'No response was returned by the backend.',
-								} as InferenceError,
-								uiContent: '> Error: No response was returned by the backend.',
-								outputs: buildTerminalAssistantOutputs(
-									assistantPlaceholder.id,
-									Status.Failed,
-									'> Error: No response was returned by the backend.'
-								),
-							};
-
+					const fallbackError = {
+						code: 'unknown',
+						message: 'No response was returned by the backend.',
+					} as InferenceError;
 					const fallbackMsg = applyAssistantPersistenceContext(
-						fallbackBase,
+						buildTerminalAssistantMessage({
+							baseMessage: assistantPlaceholder,
+							status: Status.Failed,
+							partialText,
+							partialThinking,
+							error: fallbackError,
+							terminalLine: getFailureTerminalLine(fallbackError.message, hasPartialStream),
+							preferStreamedText: true,
+							includeStreamedThinking: true,
+						}),
 						effectiveModelPresetRef,
 						persistedAssistantModelParam
 					);
 
-					const finalChat: Conversation = {
+					let finalChat: Conversation = {
 						...chatWithPlaceholder,
 						messages: [...chatWithPlaceholder.messages.slice(0, -1), fallbackMsg],
 						modifiedAt: new Date(),
 					};
+					finalChat = applyCompletionMetadata(finalChat, currentUserMsg?.id, rawResponse);
 
 					saveUpdatedConversation(tabId, finalChat);
 				}
@@ -393,9 +356,11 @@ export function useSendMessage({
 				}
 
 				if ((error as DOMException).name === 'AbortError') {
-					const tokensReceived = tokensReceivedByTabRef.current.get(tabId);
+					const partialText = getFullStreamTextForTab(tabId);
+					const partialThinking = getFullStreamThinkingForTab(tabId);
+					const hasPartialStream = streamHasData(partialText) || streamHasData(partialThinking);
 
-					if (!tokensReceived) {
+					if (!hasPartialStream) {
 						updateTab(tabId, tab => {
 							const idx = tab.conversation.messages.findIndex(message => message.id === assistantPlaceholder.id);
 							if (idx === -1) {
@@ -409,16 +374,15 @@ export function useSendMessage({
 							};
 						});
 					} else {
-						const partialText = getFullStreamTextForTab(tabId);
-
 						const partialMsg = applyAssistantPersistenceContext(
 							buildTerminalAssistantMessage({
-								assistantPlaceholder,
+								baseMessage: assistantPlaceholder,
 								status: Status.Completed,
 								partialText,
-								terminalLine: '> API aborted after partial response...',
+								partialThinking,
+								terminalLine: '> Generation stopped before the API returned a final response.',
+								includeStreamedThinking: true,
 							}),
-
 							effectiveModelPresetRef,
 							persistedAssistantModelParam
 						);
@@ -440,17 +404,23 @@ export function useSendMessage({
 							: 'Unexpected error while processing this request.';
 
 					const partialText = getFullStreamTextForTab(tabId);
+					const partialThinking = getFullStreamThinkingForTab(tabId);
+					const fallbackError = {
+						code: 'unknown',
+						message: errorMessage,
+					} as InferenceError;
+					const hasPartialStream = streamHasData(partialText) || streamHasData(partialThinking);
 
 					const fallbackMsg = applyAssistantPersistenceContext(
 						buildTerminalAssistantMessage({
-							assistantPlaceholder,
+							baseMessage: assistantPlaceholder,
 							status: Status.Failed,
 							partialText,
-							terminalLine: `> Error: ${errorMessage}`,
-							error: {
-								code: 'unknown',
-								message: errorMessage,
-							} as InferenceError,
+							partialThinking,
+							terminalLine: getFailureTerminalLine(errorMessage, hasPartialStream),
+							error: fallbackError,
+							preferStreamedText: true,
+							includeStreamedThinking: true,
 						}),
 						effectiveModelPresetRef,
 						persistedAssistantModelParam
@@ -465,13 +435,22 @@ export function useSendMessage({
 					saveUpdatedConversation(tabId, finalChat);
 				}
 			} finally {
+				if (abortRef.current === controller) {
+					abortRef.current = null;
+				}
+
 				if (tabExists(tabId) && requestIdByTabRef.current.get(tabId) === reqId) {
 					updateTab(tabId, tab => (tab.isBusy ? { ...tab, isBusy: false } : tab));
-					clearStreamBuffer(tabId);
 
 					const finishPayload: AssistantTurnFinishedPayload = {
 						loadedRunnableToolCallCount: queuedRunnableToolCalls.length,
 					};
+
+					// Keep the last stream snapshot until the next request or
+					// explicit tab cleanup. Clearing it before React commits the
+					// final message can make the live card briefly render empty.
+					// The next request clears this buffer before installing its
+					// placeholder, so stale text cannot enter another turn.
 
 					const deliverAssistantTurn = () => {
 						if (!tabExists(tabId)) {
@@ -487,6 +466,10 @@ export function useSendMessage({
 					// React commits the completion transition. No animation frame is
 					// needed, and background windows must not pause this delivery.
 					deliverAssistantTurn();
+
+					if (requestIdByTabRef.current.get(tabId) === reqId) {
+						requestIdByTabRef.current.set(tabId, null);
+					}
 				}
 			}
 		},
@@ -504,7 +487,6 @@ export function useSendMessage({
 			scrollTabToBottomSoon,
 			selectedTabIdRef,
 			tabExists,
-			tokensReceivedByTabRef,
 			updateTab,
 		]
 	);

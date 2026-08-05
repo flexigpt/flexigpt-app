@@ -51,7 +51,7 @@ interface SkillBundleCardProps {
 	onToggleBundleEnable: (bundleID: string, nextEnabled: boolean) => Promise<void>;
 	onToggleSkillEnable: (bundleID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => Promise<void>;
 	onDeleteSkill: (bundleID: string, skillID: string, skillSlug: string) => Promise<void>;
-	onSubmitSkill: (bundleID: string, partial: SkillUpsertInput, existingSkillSlug?: string) => Promise<void>;
+	onSubmitSkill: (bundleID: string, partial: SkillUpsertInput, existingSkillID?: string) => Promise<void>;
 	onRequestBundleDelete: (bundle: SkillBundle) => void;
 	onEditBundle: (bundleID: string, displayName: string, description?: string) => Promise<void>;
 }
@@ -254,8 +254,8 @@ export function SkillBundleCard({
 	};
 
 	const handleSubmitSkill = async (partial: SkillUpsertInput) => {
-		const existingSkillSlug = skillModalMode === 'edit' ? skillToEdit?.slug : undefined;
-		await runAction(`${skillToEdit?.id ?? 'new'}:save`, () => onSubmitSkill(bundle.id, partial, existingSkillSlug));
+		const existingSkillID = skillModalMode === 'edit' ? skillToEdit?.id : undefined;
+		await runAction(`${skillToEdit?.id ?? 'new'}:save`, () => onSubmitSkill(bundle.id, partial, existingSkillID));
 	};
 
 	return (

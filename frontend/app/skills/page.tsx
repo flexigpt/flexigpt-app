@@ -173,6 +173,7 @@ export default function SkillsPage() {
 			bundleRefreshRequestIdRef.current[bundleID] = requestId;
 
 			try {
+				await skillManagementAPI.refreshSkillBundle(bundleID);
 				const skillListItems = await getAllSkills([bundleID], undefined, true, true);
 				const freshSkills = skillListItems.map(item => item.skillDefinition);
 
@@ -259,7 +260,7 @@ export default function SkillsPage() {
 			}
 
 			try {
-				await skillManagementAPI.patchSkill(bundleID, skillSlug, nextEnabled);
+				await skillManagementAPI.patchSkill(bundleID, skillID, nextEnabled);
 
 				if (!isMountedRef.current) {
 					return;
@@ -303,7 +304,7 @@ export default function SkillsPage() {
 			}
 
 			try {
-				await skillManagementAPI.deleteSkill(bundleID, skillSlug);
+				await skillManagementAPI.deleteSkill(bundleID, skillID);
 
 				if (!isMountedRef.current) {
 					return;
@@ -340,7 +341,7 @@ export default function SkillsPage() {
 				throw new Error('Enable the skill bundle before adding or editing skills.');
 			}
 			if (existingSkillSlug) {
-				const existingSkill = bundleData.skills.find(skill => skill.slug === existingSkillSlug);
+				const existingSkill = bundleData.skills.find(skill => skill.id === existingSkillSlug);
 				if (!existingSkill) {
 					throw new Error('Skill not found.');
 				}
@@ -352,7 +353,7 @@ export default function SkillsPage() {
 			try {
 				// A successful write is authoritative even if the follow-up list refresh fails.
 				if (existingSkillSlug) {
-					const existingSkill = bundleData.skills.find(skill => skill.slug === existingSkillSlug);
+					const existingSkill = bundleData.skills.find(skill => skill.id === existingSkillSlug);
 					if (!existingSkill) {
 						throw new Error('Skill not found.');
 					}
@@ -362,7 +363,7 @@ export default function SkillsPage() {
 					} else {
 						await skillManagementAPI.patchSkill(
 							bundleID,
-							existingSkillSlug,
+							existingSkill.id,
 							partial.isEnabled,
 							partial.location,
 							partial.displayName,
@@ -389,27 +390,17 @@ export default function SkillsPage() {
 						isEnabled: create.isEnabled,
 					});
 				} else {
-					const slug = (partial.slug ?? '').trim();
-					const name = (partial.name ?? '').trim();
 					const location = (partial.location ?? '').trim();
-
-					if (!slug) {
-						throw new Error('Missing skill slug.');
-					}
-
-					if (!name) {
-						throw new Error('Missing skill name.');
-					}
-
-					if (partial.type === undefined) {
-						throw new Error('Missing skill type.');
-					}
+					const sourceDisplayName = (partial.displayName ?? '').trim();
 
 					if (!location) {
 						throw new Error('Missing skill location.');
 					}
+					if (!sourceDisplayName) {
+						throw new Error('Missing source display name.');
+					}
 
-					await skillManagementAPI.registerFilesystemSkills(bundleID, location, partial.displayName || name);
+					await skillManagementAPI.registerFilesystemSkills(bundleID, location, sourceDisplayName);
 				}
 			} catch (err) {
 				console.error(existingSkillSlug ? 'Edit skill failed:' : 'Add skill failed:', err);

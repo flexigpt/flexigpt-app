@@ -28,8 +28,9 @@ import (
 )
 
 const (
+	// Backend batching is the only intentional stream throttle.
 	defaultFlushIntervalMillis = 32
-	defaultFlushChunkSize      = 512
+	defaultFlushChunkSize      = 256
 )
 
 // ProviderSetAPI is a thin aggregator on top of inference-go's ProviderSetAPI.
@@ -548,6 +549,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		CapabilityResolver: capabilityResolver,
 	}
 
+	// Keep stream batching at the provider boundary. The frontend renders each
+	// callback immediately and must not add its own debounce or timer.
 	if req.OnStreamText != nil || req.OnStreamThinking != nil {
 		opts.StreamHandler = makeStreamHandler(req.OnStreamText, req.OnStreamThinking)
 		opts.StreamConfig = &inferenceSpec.StreamConfig{
@@ -557,6 +560,25 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	b, err := ps.inner.FetchCompletion(ctx, req.Provider, infReq, opts)
+
+	// A nil or empty successful final payload is not a usable completion.
+	// Streaming may already have delivered visible text, so the frontend will
+	// preserve it and append this error instead of replacing it with blank UI.
+	if b == nil && err == nil {
+		b = &inferenceSpec.FetchCompletionResponse{
+			Error: &inferenceSpec.Error{
+				Code:    "empty_completion_response",
+				Message: "provider finished without a final response payload",
+			},
+		}
+	}
+	if b != nil && err == nil && b.Error == nil && len(b.Outputs) == 0 {
+		b.Error = &inferenceSpec.Error{
+			Code:    "empty_completion_response",
+			Message: "provider finished without final output",
+		}
+	}
+
 	if b != nil && workspaceUsage != nil {
 		b.DebugDetails = mergeCompletionDebugDetails(
 			b.DebugDetails,
@@ -820,13 +842,27 @@ func makeStreamHandler(
 	return func(ev inferenceSpec.StreamEvent) error {
 		switch ev.Kind {
 		case inferenceSpec.StreamContentKindText:
-			if onText != nil && ev.Text != nil {
-				return onText(ev.Text.Text)
+			if onText == nil || ev.Text == nil {
+				return nil
 			}
+
+			// Text is a delta chunk. Empty chunks are valid no-ops and are not
+			// completion markers. Do not collapse repeated equal chunks here.
+			text := ev.Text.Text
+			if text == "" {
+				return nil
+			}
+			return onText(text)
 		case inferenceSpec.StreamContentKindThinking:
-			if onThinking != nil && ev.Thinking != nil {
-				return onThinking(ev.Thinking.Text)
+			if onThinking == nil || ev.Thinking == nil {
+				return nil
 			}
+
+			thinking := ev.Thinking.Text
+			if thinking == "" {
+				return nil
+			}
+			return onThinking(thinking)
 		}
 		return nil
 	}

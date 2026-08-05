@@ -32,6 +32,8 @@ import (
 
 var appSlogLevelVar slog.LevelVar
 
+const preCanceledRetention = 2 * time.Minute
+
 func init() {
 	appSlogLevelVar.Set(slog.LevelInfo)
 }
@@ -256,17 +258,14 @@ func (w *AggregrateWrapper) FetchCompletion(
 		if w.appContext == nil {
 			return nil, errors.New("appContext is not set (call SetWrappedProviderAppContext during startup)")
 		}
-		if w.completionCancels == nil {
-			w.completionCancels = map[string]context.CancelFunc{}
-		}
-		if w.preCanceled == nil {
-			w.preCanceled = map[string]time.Time{}
-		}
 
 		ctx, cancel := context.WithCancel(w.appContext)
 		defer cancel()
 
 		w.completionCancelMux.Lock()
+		w.ensureCompletionStateLocked()
+		w.prunePreCanceledLocked(time.Now().UTC())
+
 		// If a cancel arrived before the fetch registered, honor it.
 		if _, ok := w.preCanceled[requestID]; ok {
 			delete(w.preCanceled, requestID)
@@ -299,6 +298,11 @@ func (w *AggregrateWrapper) FetchCompletion(
 				if err := ctx.Err(); err != nil {
 					return err
 				}
+				if textData == "" {
+					// Empty deltas are valid no-ops. They do not indicate that
+					// the stream has finished or failed.
+					return nil
+				}
 				//nolint:contextcheck // Need to pass app context here and not new context.
 				runtime.EventsEmit(w.appContext, textCallbackID, textData)
 				return nil
@@ -308,6 +312,9 @@ func (w *AggregrateWrapper) FetchCompletion(
 			req.OnStreamThinking = func(thinkingData string) error {
 				if err := ctx.Err(); err != nil {
 					return err
+				}
+				if thinkingData == "" {
+					return nil
 				}
 				//nolint:contextcheck // Need to pass app context here and not new context.
 				runtime.EventsEmit(w.appContext, thinkingCallbackID, thinkingData)
@@ -354,43 +361,56 @@ func (w *AggregrateWrapper) FetchCompletion(
 	})
 }
 
-func (w *AggregrateWrapper) CancelCompletion(id string) error {
-	var err error
+func (w *AggregrateWrapper) CancelCompletion(id string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			// Log the panic plus stack trace.
 			slog.Error("panic recovered",
 				slog.Any("panic", r),
 				slog.String("stacktrace", string(debug.Stack())),
 			)
-
-			// Overwrite err so the caller sees we failed.
 			err = fmt.Errorf("panic recovered: %v", r)
 		}
 	}()
 
 	if id == "" {
-		return err
+		return nil
 	}
+
 	w.completionCancelMux.Lock()
 	defer w.completionCancelMux.Unlock()
+
+	w.ensureCompletionStateLocked()
+	w.prunePreCanceledLocked(time.Now().UTC())
+
 	if c, ok := w.completionCancels[id]; ok {
 		c()
-		delete(w.completionCancels, id)
-		return err
+		// Keep the entry until FetchCompletion exits. This prevents request-ID
+		// reuse from registering another request while the original one is still
+		// unwinding after cancellation.
+		return nil
 	}
 
 	// Cancel arrived before FetchCompletion registered the cancel func.
 	w.preCanceled[id] = time.Now().UTC()
+	return nil
+}
 
-	// Best-effort pruning to avoid unbounded growth.
-	cutoff := time.Now().UTC().Add(-2 * time.Minute)
-	for k, t := range w.preCanceled {
-		if t.Before(cutoff) {
-			delete(w.preCanceled, k)
+func (w *AggregrateWrapper) ensureCompletionStateLocked() {
+	if w.completionCancels == nil {
+		w.completionCancels = map[string]context.CancelFunc{}
+	}
+	if w.preCanceled == nil {
+		w.preCanceled = map[string]time.Time{}
+	}
+}
+
+func (w *AggregrateWrapper) prunePreCanceledLocked(now time.Time) {
+	cutoff := now.Add(-preCanceledRetention)
+	for requestID, canceledAt := range w.preCanceled {
+		if canceledAt.Before(cutoff) {
+			delete(w.preCanceled, requestID)
 		}
 	}
-	return err
 }
 
 func initProviderSetUsingSettingsAndPresets(

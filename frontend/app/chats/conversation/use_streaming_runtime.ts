@@ -5,7 +5,6 @@ import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
 interface StreamChannelBuffer {
 	chunks: string[];
-	flushedIdx: number;
 	display: string;
 }
 
@@ -22,16 +21,20 @@ interface UseStreamingRuntimeArgs {
 const BACKGROUND_STREAM_COMPACT_CHUNK_COUNT = 256;
 
 function flushStreamChannel(channel: StreamChannelBuffer): void {
-	if (channel.flushedIdx >= channel.chunks.length) {
+	if (channel.chunks.length === 0) {
 		return;
 	}
 
-	const pending =
-		channel.flushedIdx === 0 ? channel.chunks.join('') : channel.chunks.slice(channel.flushedIdx).join('');
-
-	channel.display += pending;
+	channel.display += channel.chunks.join('');
 	channel.chunks = [];
-	channel.flushedIdx = 0;
+}
+
+function readStreamChannel(channel: StreamChannelBuffer): string {
+	if (channel.chunks.length === 0) {
+		return channel.display;
+	}
+
+	return `${channel.display}${channel.chunks.join('')}`;
 }
 
 export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRuntimeArgs) {
@@ -42,7 +45,6 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 	const abortRefs = useRef(new Map<string, { current: AbortController | null }>());
 	const requestIdByTabRef = useRef(new Map<string, string | null>());
-	const tokensReceivedByTabRef = useRef(new Map<string, boolean | null>());
 
 	const streamBuffersRef = useRef(new Map<string, StreamBuffer>());
 	const streamVersionRef = useRef(new Map<string, number>());
@@ -65,8 +67,8 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 		let buffer = streamBuffersRef.current.get(tabId);
 		if (!buffer) {
 			buffer = {
-				text: { chunks: [], flushedIdx: 0, display: '' },
-				thinking: { chunks: [], flushedIdx: 0, display: '' },
+				text: { chunks: [], display: '' },
+				thinking: { chunks: [], display: '' },
 			};
 			streamBuffersRef.current.set(tabId, buffer);
 		}
@@ -78,11 +80,9 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 			const buffer = getStreamBuffer(tabId);
 
 			buffer.text.chunks = [];
-			buffer.text.flushedIdx = 0;
 			buffer.text.display = '';
 
 			buffer.thinking.chunks = [];
-			buffer.thinking.flushedIdx = 0;
 			buffer.thinking.display = '';
 		},
 		[getStreamBuffer]
@@ -104,10 +104,7 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 			return '';
 		}
 
-		const channel = buffer.text;
-		flushStreamChannel(channel);
-
-		return channel.display;
+		return readStreamChannel(buffer.text);
 	}, []);
 
 	const getFullStreamThinkingForTab = useCallback((tabId: string) => {
@@ -116,10 +113,7 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 			return '';
 		}
 
-		const channel = buffer.thinking;
-		flushStreamChannel(channel);
-
-		return channel.display;
+		return readStreamChannel(buffer.thinking);
 	}, []);
 
 	const bumpStreamVersion = useCallback((tabId: string) => {
@@ -201,7 +195,6 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 			abortRefs.current.delete(tabId);
 			requestIdByTabRef.current.delete(tabId);
-			tokensReceivedByTabRef.current.delete(tabId);
 			streamBuffersRef.current.delete(tabId);
 			streamVersionRef.current.delete(tabId);
 
@@ -237,7 +230,6 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 		notifyStreamNow,
 		notifyStreamSoon,
 		requestIdByTabRef,
-		tokensReceivedByTabRef,
 		disposeStreamRuntime,
 	};
 }

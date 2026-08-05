@@ -405,7 +405,7 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 	);
 
 	return (
-		<div className="bg-base-200 flex max-h-128 w-full min-w-0 flex-col overflow-hidden">
+		<div className="bg-base-200 flex w-full min-w-0 flex-col overflow-hidden">
 			<div className="shrink-0">
 				<EditorContextBar context={assistantContext} assistantPreset={assistantPreset} systemPrompt={systemPrompt} />
 			</div>
@@ -424,25 +424,23 @@ const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function
 				confirmButtonText="Abort"
 			/>
 
-			<div className="min-h-0 flex-1 overflow-hidden">
-				<EditorArea
-					ref={editorAreaRef}
-					isGenerating={isGenerating}
-					isInputLocked={isInputLocked}
-					currentProviderSDKType={chatOptions.providerSDKType}
-					shortcutConfig={shortcutConfig}
-					onSubmit={handleSubmitMessage}
-					onRequestStop={() => {
-						if (isGenerating) {
-							setAbortConfirmationRequested(true);
-						}
-					}}
-					onAssistantPresetRuntimeStateChange={replaceAssistantRuntimeSnapshot}
-					editingMessageId={editingMessageId}
-					cancelEditing={onCancelEditing}
-					systemPrompt={systemPrompt}
-				/>
-			</div>
+			<EditorArea
+				ref={editorAreaRef}
+				isGenerating={isGenerating}
+				isInputLocked={isInputLocked}
+				currentProviderSDKType={chatOptions.providerSDKType}
+				shortcutConfig={shortcutConfig}
+				onSubmit={handleSubmitMessage}
+				onRequestStop={() => {
+					if (isGenerating) {
+						setAbortConfirmationRequested(true);
+					}
+				}}
+				onAssistantPresetRuntimeStateChange={replaceAssistantRuntimeSnapshot}
+				editingMessageId={editingMessageId}
+				cancelEditing={onCancelEditing}
+				systemPrompt={systemPrompt}
+			/>
 		</div>
 	);
 });

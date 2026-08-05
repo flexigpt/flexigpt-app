@@ -94,10 +94,12 @@ function toSkill(
 	runtimeError?: string
 ): Skill {
 	const builtIn = bundleIsBuiltIn(bundle);
-	const managed = bundle.attachments.some(
-		attachment =>
-			attachment.sourceID === artifact.binding.sourceID && attachment.role === SkillBundleAttachmentRole.Managed
-	);
+	const managed =
+		artifact.adoption === ArtifactAdoptionMode.Pinned &&
+		bundle.attachments.some(
+			attachment =>
+				attachment.sourceID === artifact.binding.sourceID && attachment.role === SkillBundleAttachmentRole.Managed
+		);
 	const fallbackName = skillNameFromLocator(artifact.binding.locator);
 	const name = runtime?.name?.trim() || fallbackName;
 	const displayName = runtime?.displayName?.trim() || artifact.name || name;
@@ -388,7 +390,7 @@ export class SkillManagementAPI {
 		return this.skills.getManagedSkillDocument(artifact.artifact);
 	}
 
-	async registerFilesystemSkills(bundleID: string, rootPath: string, displayName: string): Promise<void> {
+	async registerFilesystemSkills(bundleID: string, rootPath: string, sourceDisplayName: string): Promise<void> {
 		const bundle = await this.resolveBundle(bundleID);
 		const sourceID = getUUIDv7();
 		let sourceRevision: number | undefined;
@@ -397,7 +399,7 @@ export class SkillManagementAPI {
 			const source = await this.artifacts.createArtifactSource(bundle.bundle.rootID, {
 				id: sourceID,
 				kind: FILESYSTEM_SOURCE_KIND,
-				displayName,
+				displayName: sourceDisplayName,
 				enabled: true,
 				config: JSON.stringify({ rootPath }),
 			});
@@ -421,7 +423,7 @@ export class SkillManagementAPI {
 
 	async patchSkill(
 		bundleID: string,
-		skillSlug: string,
+		artifactID: string,
 		isEnabled?: boolean,
 		_location?: string,
 		displayName?: string,
@@ -429,7 +431,7 @@ export class SkillManagementAPI {
 		tags?: string[]
 	): Promise<void> {
 		const bundle = await this.resolveBundle(bundleID);
-		const artifact = await this.resolveSkillArtifact(bundle, skillSlug);
+		const artifact = await this.resolveArtifact(bundle, artifactID);
 		const hasDocumentChanges = displayName !== undefined || description !== undefined || tags !== undefined;
 
 		if (!hasDocumentChanges) {
@@ -456,9 +458,9 @@ export class SkillManagementAPI {
 		});
 	}
 
-	async deleteSkill(bundleID: string, skillSlug: string): Promise<void> {
+	async deleteSkill(bundleID: string, artifactID: string): Promise<void> {
 		const bundle = await this.resolveBundle(bundleID);
-		const artifact = await this.resolveSkillArtifact(bundle, skillSlug);
+		const artifact = await this.resolveArtifact(bundle, artifactID);
 
 		if (artifact.adoption === ArtifactAdoptionMode.Observed) {
 			await this.skills.unadoptSkill(artifact.artifact, artifact.revision, true);
@@ -515,29 +517,6 @@ export class SkillManagementAPI {
 			throw new Error('Skill Artifact not found.');
 		}
 		return artifact;
-	}
-
-	private async resolveSkillArtifact(bundle: SkillBundleView, skillSlug: string): Promise<SkillArtifactView> {
-		const artifacts = await this.skills.listSkillBundleArtifacts(bundle.bundle);
-
-		for (const artifact of artifacts) {
-			if (artifact.artifact.artifactID === skillSlug || skillNameFromLocator(artifact.binding.locator) === skillSlug) {
-				return artifact;
-			}
-
-			try {
-				const runtime = await this.skills.listRuntimeSkills({
-					allowArtifacts: [artifact.artifact],
-				});
-				if (runtime.some(value => value.name === skillSlug)) {
-					return artifact;
-				}
-			} catch {
-				// An unavailable runtime projection can still be managed by Artifact ID.
-			}
-		}
-
-		throw new Error('Skill not found.');
 	}
 
 	private async ensureManagedAttachment(bundle: SkillBundleView): Promise<SkillBundleView> {

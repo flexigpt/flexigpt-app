@@ -610,6 +610,7 @@ function ConversationAreaInner(
 	const activeEditingMessageId = activeTab?.editingMessageId ?? null;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
+
 	const activeConversationContentIsHydrating = activeTabIsHydrating && messageCount === 0;
 
 	useLayoutEffect(() => {
@@ -633,7 +634,6 @@ function ConversationAreaInner(
 		notifyStreamNow,
 		notifyStreamSoon,
 		requestIdByTabRef,
-		tokensReceivedByTabRef,
 		disposeStreamRuntime,
 	} = useStreamingRuntime({
 		tabs,
@@ -714,6 +714,7 @@ function ConversationAreaInner(
 	const {
 		setScrollContainerRef,
 		setScrollContentRef,
+		setScrollFooterRef,
 		handleScroll,
 		isAtBottom,
 		isAtTop,
@@ -746,7 +747,6 @@ function ConversationAreaInner(
 		tabExists,
 		getAbortRef,
 		requestIdByTabRef,
-		tokensReceivedByTabRef,
 		clearStreamBuffer,
 		notifyStreamNow,
 		notifyStreamSoon,
@@ -937,7 +937,7 @@ function ConversationAreaInner(
 					ref={setScrollContainerRef}
 					onScroll={handleScroll}
 					className="size-full overscroll-contain py-1"
-					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'auto', overflowY: 'auto' }}
+					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none', overflowY: 'auto' }}
 				>
 					<div ref={setScrollContentRef} className="mx-auto w-11/12 xl:w-5/6">
 						{activeTabIsHydrating && messageCount === 0 ? (
@@ -953,10 +953,11 @@ function ConversationAreaInner(
 								deferRichWork={activeTabIsHydrating}
 							/>
 						)}
+						<div ref={setScrollFooterRef} className="h-px w-full" data-chat-scroll-footer aria-hidden="true" />
 					</div>
 				</div>
 
-				<div className="pointer-events-none absolute right-4 bottom-4 z-10 xl:right-24">
+				<div className="pointer-events-none absolute right-4 bottom-4 z-30 xl:right-24">
 					<div className="pointer-events-auto flex flex-col items-center gap-2">
 						{!isAtTop ? (
 							<ButtonScrollToTop

@@ -37,14 +37,19 @@ const strictSchema = {
 };
 
 const streamingRemarkPlugins: PluggableList = [remarkGfm, supersub, remarkGemoji];
-const finalRemarkPlugins: PluggableList = [remarkGfm, remarkMath, remarkInlineCodeMath, supersub, remarkGemoji];
+const richRemarkPlugins: PluggableList = [remarkGfm, remarkMath, remarkInlineCodeMath, supersub, remarkGemoji];
 
 const rehypeKatexOptions = {
 	throwOnError: false,
 };
 
 const streamingRehypePlugins: PluggableList = [rehypeRaw, [rehypeSanitize, strictSchema], rehypeSlug];
-const finalRehypePlugins: PluggableList = [...streamingRehypePlugins, [rehypeKatex, rehypeKatexOptions] as const];
+const richRehypePlugins: PluggableList = [
+	rehypeRaw,
+	[rehypeSanitize, strictSchema],
+	rehypeSlug,
+	[rehypeKatex, rehypeKatexOptions] as const,
+];
 
 interface CodeComponentProps extends HTMLAttributes<HTMLElement>, ExtraProps {
 	inline?: boolean;
@@ -91,10 +96,10 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 }: EnhancedMarkdownProps) {
 	const processedText = useMemo(() => {
 		return isBusy ? text : SanitizeLaTeXOutsideFences(text);
-	}, [text, isBusy]);
+	}, [isBusy, text]);
 
-	const remarkPlugins = isBusy ? streamingRemarkPlugins : finalRemarkPlugins;
-	const rehypePlugins = isBusy ? streamingRehypePlugins : finalRehypePlugins;
+	const remarkPlugins = isBusy ? streamingRemarkPlugins : richRemarkPlugins;
+	const rehypePlugins = isBusy ? streamingRehypePlugins : richRehypePlugins;
 
 	const components = useMemo(() => {
 		// oxlint-disable-next-line react/display-name
@@ -275,15 +280,8 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 					);
 				}
 
-				// Streaming keeps fenced code cheap and literal. In particular,
-				// this avoids Shiki, Mermaid rendering, diff parsing, and KaTeX.
-				if (isBusy) {
-					return (
-						<pre className="app-text-code app-bg-code my-4 overflow-auto rounded-lg p-2 text-sm">
-							<code className={className}>{value}</code>
-						</pre>
-					);
-				}
+				// Streaming retains highlighted code, while CodeBlock suppresses
+				// copy, download, diff, expansion, and Mermaid controls.
 				return (
 					<CodeBlock
 						language={language}
@@ -293,6 +291,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 						diffCandidatePaths={diffCandidatePaths}
 						diffWorkspaceRoots={diffWorkspaceRoots}
 						defaultExpanded={defaultCodeBlockExpanded}
+						disableControls={isBusy}
 					/>
 				);
 			},

@@ -2,8 +2,8 @@ import type { RefObject } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const SCROLL_AT_TOP_THRESHOLD = 8;
-const SCROLL_AT_BOTTOM_THRESHOLD = 128;
-const SCROLL_AUTO_FOLLOW_THRESHOLD = 24;
+const SCROLL_AT_BOTTOM_THRESHOLD = 24;
+const SCROLL_AUTO_FOLLOW_THRESHOLD = 96;
 const MESSAGE_SCROLL_POSITION_TOLERANCE = 1;
 
 function getDistanceFromBottom(el: HTMLElement): number {
@@ -16,6 +16,20 @@ function isElementAtBottom(el: HTMLElement): boolean {
 
 function shouldElementAutoFollow(el: HTMLElement): boolean {
 	return getDistanceFromBottom(el) <= SCROLL_AUTO_FOLLOW_THRESHOLD;
+}
+
+function isScrollFooterNear(scroller: HTMLElement, footer: HTMLElement | null): boolean {
+	if (!footer) {
+		return shouldElementAutoFollow(scroller);
+	}
+
+	const scrollerRect = scroller.getBoundingClientRect();
+	const footerRect = footer.getBoundingClientRect();
+
+	return (
+		footerRect.top <= scrollerRect.bottom + SCROLL_AUTO_FOLLOW_THRESHOLD &&
+		footerRect.bottom >= scrollerRect.top - SCROLL_AUTO_FOLLOW_THRESHOLD
+	);
 }
 
 function isElementAtTop(el: HTMLElement): boolean {
@@ -147,10 +161,12 @@ export function useScrollRestore({
 
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const scrollContentRef = useRef<HTMLDivElement | null>(null);
+	const scrollFooterRef = useRef<HTMLDivElement | null>(null);
 	const messageScrollTopsRef = useRef<number[]>([]);
 	const messagePositionsDirtyRef = useRef(true);
 
 	const scrollTopByTabRef = useRef(new Map<string, number>());
+	const autoFollowByTabRef = useRef(new Map<string, boolean>());
 	const shouldAutoFollowRef = useRef(true);
 
 	const seededScrollFromStorageRef = useRef(false);
@@ -203,6 +219,20 @@ export function useScrollRestore({
 		scrollTopByTabRef.current.set(tabId, el.scrollTop);
 	}, []);
 
+	const setAutoFollowForTab = useCallback((tabId: string, value: boolean) => {
+		shouldAutoFollowRef.current = value;
+		if (tabId) {
+			autoFollowByTabRef.current.set(tabId, value);
+		}
+	}, []);
+
+	const updateAutoFollowFromPosition = useCallback(
+		(el: HTMLElement, tabId: string) => {
+			setAutoFollowForTab(tabId, isScrollFooterNear(el, scrollFooterRef.current));
+		},
+		[setAutoFollowForTab]
+	);
+
 	const setScrollIndicatorStateIfChanged = useCallback((next: ScrollIndicatorState) => {
 		const prev = scrollIndicatorStateRef.current;
 		if (
@@ -228,7 +258,6 @@ export function useScrollRestore({
 
 			const nextAtTop = isElementAtTop(el);
 			const nextAtBottom = isElementAtBottom(el);
-			shouldAutoFollowRef.current = shouldElementAutoFollow(el);
 
 			if (includeMessageJumps && messagePositionsDirtyRef.current) {
 				refreshMessageElementCache();
@@ -314,6 +343,44 @@ export function useScrollRestore({
 		messagePositionsDirtyRef.current = true;
 	}, []);
 
+	const setScrollFooterRef = useCallback((el: HTMLDivElement | null) => {
+		scrollFooterRef.current = el;
+	}, []);
+
+	useEffect(() => {
+		const root = scrollContainerRef.current;
+		const footer = scrollFooterRef.current;
+		if (!root || !footer || typeof IntersectionObserver === 'undefined') {
+			return;
+		}
+
+		const observer = new IntersectionObserver(
+			entries => {
+				if (!entries.some(entry => entry.isIntersecting)) {
+					return;
+				}
+
+				// Intersection may enable following when the user returns to
+				// the footer. It deliberately does not disable following:
+				// content growth can temporarily move the footer out of view
+				// before ResizeObserver performs the pinned scroll.
+				const tabId = selectedTabIdRef.current;
+				setAutoFollowForTab(tabId, true);
+				scheduleScrollStateUpdate(false);
+			},
+			{
+				root,
+				rootMargin: `0px 0px ${SCROLL_AUTO_FOLLOW_THRESHOLD}px 0px`,
+				threshold: 0,
+			}
+		);
+
+		observer.observe(footer);
+		return () => {
+			observer.disconnect();
+		};
+	}, [messageCount, scheduleScrollStateUpdate, selectedTabId, selectedTabIdRef, setAutoFollowForTab]);
+
 	const handleScroll = useCallback(() => {
 		const el = scrollContainerRef.current;
 		const tabId = selectedTabIdRef.current;
@@ -321,23 +388,32 @@ export function useScrollRestore({
 			return;
 		}
 
-		shouldAutoFollowRef.current = shouldElementAutoFollow(el);
+		updateAutoFollowFromPosition(el, tabId);
 		persistScrollPosition(tabId, el);
 		scheduleScrollStateUpdate(false);
 		scheduleMessageJumpStateUpdate();
-	}, [persistScrollPosition, scheduleMessageJumpStateUpdate, scheduleScrollStateUpdate, selectedTabIdRef]);
+	}, [
+		persistScrollPosition,
+		scheduleMessageJumpStateUpdate,
+		scheduleScrollStateUpdate,
+		selectedTabIdRef,
+		updateAutoFollowFromPosition,
+	]);
 
-	const scrollElementToBottom = useCallback((el: HTMLElement | null) => {
-		if (!el) {
-			return;
-		}
-		const nextTop = Math.max(0, el.scrollHeight - el.clientHeight);
-		shouldAutoFollowRef.current = true;
+	const scrollElementToBottom = useCallback(
+		(el: HTMLElement | null, tabId = selectedTabIdRef.current) => {
+			if (!el) {
+				return;
+			}
+			const nextTop = Math.max(0, el.scrollHeight - el.clientHeight);
+			setAutoFollowForTab(tabId, true);
 
-		if (Math.abs(el.scrollTop - nextTop) > 1) {
-			el.scrollTop = nextTop;
-		}
-	}, []);
+			if (Math.abs(el.scrollTop - nextTop) > 1) {
+				el.scrollTop = nextTop;
+			}
+		},
+		[selectedTabIdRef, setAutoFollowForTab]
+	);
 
 	const previousRenderRef = useRef({
 		selectedTabId: '',
@@ -357,13 +433,17 @@ export function useScrollRestore({
 		const messageCountIncreased = previous.selectedTabId === selectedTabId && messageCount > previous.messageCount;
 
 		if (el && selectedTabId && !activeTabIsHydrating && (selectedChanged || justFinishedHydrating)) {
-			const nextTop = scrollTopByTabRef.current.get(selectedTabId) ?? 0;
-			shouldAutoFollowRef.current = false;
-			el.scrollTop = nextTop;
+			if (autoFollowByTabRef.current.get(selectedTabId) === true) {
+				scrollElementToBottom(el, selectedTabId);
+			} else {
+				const nextTop = scrollTopByTabRef.current.get(selectedTabId) ?? 0;
+				el.scrollTop = nextTop;
+				updateAutoFollowFromPosition(el, selectedTabId);
+			}
 			persistScrollPosition(selectedTabId, el);
 			scheduleScrollStateUpdate(true);
 		} else if (el && selectedTabId && !activeTabIsHydrating && messageCountIncreased && shouldAutoFollowRef.current) {
-			scrollElementToBottom(el);
+			scrollElementToBottom(el, selectedTabId);
 			persistScrollPosition(selectedTabId, el);
 			scheduleScrollStateUpdate(true);
 		} else if (el) {
@@ -383,6 +463,7 @@ export function useScrollRestore({
 		selectedTabId,
 		refreshMessageElementCache,
 		scheduleScrollStateUpdate,
+		updateAutoFollowFromPosition,
 	]);
 
 	useEffect(() => {
@@ -423,7 +504,7 @@ export function useScrollRestore({
 				}
 
 				if (!activeTabIsHydratingRef.current && shouldAutoFollowRef.current) {
-					scrollElementToBottom(scrollerEl);
+					scrollElementToBottom(scrollerEl, tabId);
 					persistScrollPosition(tabId, scrollerEl);
 				}
 
@@ -465,7 +546,7 @@ export function useScrollRestore({
 						return;
 					}
 
-					scrollElementToBottom(el);
+					scrollElementToBottom(el, tabId);
 					persistScrollPosition(tabId, el);
 					updateScrollStateNow(el);
 				});
@@ -482,9 +563,10 @@ export function useScrollRestore({
 		}
 
 		el.scrollTo({ top: 0, behavior: 'auto' });
+		updateAutoFollowFromPosition(el, tabId);
 		persistScrollPosition(tabId, el);
 		updateScrollStateNow(el);
-	}, [persistScrollPosition, selectedTabIdRef, updateScrollStateNow]);
+	}, [persistScrollPosition, selectedTabIdRef, updateAutoFollowFromPosition, updateScrollStateNow]);
 
 	const scrollActiveToBottom = useCallback(() => {
 		const lastIndex = messageCount - 1;
@@ -498,7 +580,7 @@ export function useScrollRestore({
 			return;
 		}
 
-		scrollElementToBottom(el);
+		scrollElementToBottom(el, tabId);
 		persistScrollPosition(tabId, el);
 		updateScrollStateNow(el);
 	}, [messageCount, persistScrollPosition, scrollElementToBottom, selectedTabIdRef, updateScrollStateNow]);
@@ -521,10 +603,17 @@ export function useScrollRestore({
 		}
 
 		if (scrollMessageAtIndex(el, messageTops, previousIndex)) {
+			updateAutoFollowFromPosition(el, tabId);
 			persistScrollPosition(tabId, el);
 			updateScrollStateNow(el);
 		}
-	}, [persistScrollPosition, refreshMessageElementCache, selectedTabIdRef, updateScrollStateNow]);
+	}, [
+		persistScrollPosition,
+		refreshMessageElementCache,
+		selectedTabIdRef,
+		updateAutoFollowFromPosition,
+		updateScrollStateNow,
+	]);
 
 	const scrollActiveToNextMessage = useCallback(() => {
 		const el = scrollContainerRef.current;
@@ -544,10 +633,17 @@ export function useScrollRestore({
 		}
 
 		if (scrollMessageAtIndex(el, messageTops, nextIndex)) {
+			updateAutoFollowFromPosition(el, tabId);
 			persistScrollPosition(tabId, el);
 			updateScrollStateNow(el);
 		}
-	}, [persistScrollPosition, refreshMessageElementCache, selectedTabIdRef, updateScrollStateNow]);
+	}, [
+		persistScrollPosition,
+		refreshMessageElementCache,
+		selectedTabIdRef,
+		updateAutoFollowFromPosition,
+		updateScrollStateNow,
+	]);
 
 	const scrollActivePageBy = useCallback(
 		(direction: 1 | -1) => {
@@ -562,10 +658,11 @@ export function useScrollRestore({
 				top: Math.max(0, Math.min(el.scrollHeight - el.clientHeight, el.scrollTop + delta)),
 				behavior: 'auto',
 			});
+			updateAutoFollowFromPosition(el, tabId);
 			persistScrollPosition(tabId, el);
 			updateScrollStateNow(el);
 		},
-		[persistScrollPosition, selectedTabIdRef, updateScrollStateNow]
+		[persistScrollPosition, selectedTabIdRef, updateAutoFollowFromPosition, updateScrollStateNow]
 	);
 
 	const resetScrollToTop = useCallback(
@@ -581,10 +678,11 @@ export function useScrollRestore({
 			}
 
 			el.scrollTo({ top: 0, behavior: 'auto' });
+			updateAutoFollowFromPosition(el, tabId);
 			persistScrollPosition(tabId, el);
 			updateScrollStateNow(el);
 		},
-		[persistScrollPosition, selectedTabIdRef, updateScrollStateNow]
+		[persistScrollPosition, selectedTabIdRef, updateAutoFollowFromPosition, updateScrollStateNow]
 	);
 
 	const setScrollTopForTab = useCallback((tabId: string, top: number) => {
@@ -601,11 +699,13 @@ export function useScrollRestore({
 
 	const disposeScrollRuntime = useCallback((tabId: string) => {
 		scrollTopByTabRef.current.delete(tabId);
+		autoFollowByTabRef.current.delete(tabId);
 	}, []);
 
 	return {
 		setScrollContainerRef,
 		setScrollContentRef,
+		setScrollFooterRef,
 		handleScroll,
 		isAtBottom,
 		isAtTop,

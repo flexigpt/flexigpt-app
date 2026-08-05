@@ -1867,12 +1867,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	]);
 
 	return (
-		<>
-			<form
-				ref={formRef}
-				onSubmit={handleSubmit}
-				className="mx-0 flex max-h-full w-full max-w-full min-w-0 flex-col overflow-hidden"
-			>
+		<div className="mx-0 flex max-h-128 w-full min-w-0 flex-col overflow-hidden">
+			<form ref={formRef} onSubmit={handleSubmit} className="max-h-full">
 				{submitError ? (
 					<div className="alert alert-error mx-4 mt-3 mb-1 flex items-start gap-2 text-sm" role="alert">
 						<FiAlertTriangle size={16} className="mt-0.5" />
@@ -1889,10 +1885,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				) : null}
 
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>
-					<div className="bg-base-100 border-base-200 flex min-h-0 w-full max-w-full min-w-0 flex-[1_1_auto] overflow-hidden rounded-2xl border">
+					<div className="bg-base-100 border-base-200 flex max-h-full min-h-0 w-full max-w-full min-w-0 flex-[1_1_auto] overflow-hidden rounded-2xl border">
 						<div className="flex min-h-0 min-w-0 grow flex-col p-0">
 							{editingMessageId && (
-								<div className="flex items-center justify-end gap-2 pt-1 pr-3 pb-0 text-xs">
+								<div className="flex min-h-0 items-center justify-end gap-2 pt-1 pr-3 pb-0 text-xs">
 									<div className="flex items-center gap-2">
 										<FiEdit2 size={14} />
 										<span>Editing an earlier message. Sending will replace it and drop all later messages.</span>
@@ -2159,6 +2155,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				webSearchTemplates={webSearchTemplates}
 				setWebSearchTemplates={setWebSearchTemplates}
 			/>
-		</>
+		</div>
 	);
 });

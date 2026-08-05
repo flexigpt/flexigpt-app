@@ -27,8 +27,10 @@ export const MessageThinkingSection = memo(function MessageThinkingSection(props
 	/** Final reasoning (if provider sends it at end) */
 	reasoningContents?: ReasoningContent[];
 	streamSource?: MessageStreamSource;
+	/** Keep abruptly interrupted reasoning visible with its terminal error. */
+	openWhenComplete?: boolean;
 }) {
-	const { isBusy, reasoningContents, streamSource } = props;
+	const { isBusy, reasoningContents, streamSource, openWhenComplete = false } = props;
 
 	const streamedThinking = useSyncExternalStore(
 		streamSource?.subscribe ?? EMPTY_STREAM_SUBSCRIBE,
@@ -48,7 +50,7 @@ export const MessageThinkingSection = memo(function MessageThinkingSection(props
 	const shouldShow = hasSummary || hasThinking;
 
 	const [manualOpen, setManualOpen] = useState<boolean | null>(null);
-	const open = manualOpen ?? isBusy;
+	const open = manualOpen ?? (isBusy || openWhenComplete);
 
 	const summaryNode = (
 		<div className="flex items-center gap-2">
@@ -73,7 +75,7 @@ export const MessageThinkingSection = memo(function MessageThinkingSection(props
 					streaming={isBusy}
 					maxRows={10}
 					autoScroll={isBusy}
-					defaultOpen={isBusy}
+					defaultOpen={isBusy || openWhenComplete}
 				/>
 			) : null}
 
@@ -88,7 +90,7 @@ export const MessageThinkingSection = memo(function MessageThinkingSection(props
 					streaming={isBusy}
 					maxRows={10}
 					autoScroll={isBusy}
-					defaultOpen={isBusy}
+					defaultOpen={isBusy || openWhenComplete}
 				/>
 			) : null}
 		</div>

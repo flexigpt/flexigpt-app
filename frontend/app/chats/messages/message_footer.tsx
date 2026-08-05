@@ -9,7 +9,9 @@ import { HoverTip } from '@/components/hover_tip';
 import { stripCustomMDFences } from '@/components/markdown/custom_md_utils';
 
 import { getDebugDetailsMarkdown } from '@/chats/conversation/completion_helper';
+import type { MessageStreamSource } from '@/chats/messages/message_content_card';
 import { MessageDetailsModal } from '@/chats/messages/message_details_modal';
+import { MessageStreamingStatus } from '@/chats/messages/message_streaming_status';
 
 interface MessageFooterAreaProps {
 	messageID: string;
@@ -20,6 +22,7 @@ interface MessageFooterAreaProps {
 	reasoningContents?: ReasoningContent[];
 	isBusy: boolean;
 	bodyPresent: boolean;
+	streamSource?: MessageStreamSource;
 	disableMarkdown: boolean;
 	onDisableMarkdownChange: (checked: boolean) => void;
 	usage?: InferenceUsage;
@@ -46,6 +49,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	reasoningContents,
 	isBusy,
 	bodyPresent,
+	streamSource,
 	disableMarkdown,
 	onDisableMarkdownChange,
 	usage,
@@ -58,6 +62,14 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	const hasInlineHiddenReasoning = !bodyPresent && hasReasoningContent(reasoningContents);
 	const hasDetails = hasDebugDetails || hasInlineHiddenReasoning;
 	const hasContent = !!cardCopyContent;
+	const hasUsage = Boolean(
+		usage &&
+		(usage.inputTokensTotal > 0 ||
+			usage.inputTokensCached > 0 ||
+			usage.inputTokensUncached > 0 ||
+			usage.outputTokens > 0 ||
+			usage.reasoningTokens > 0)
+	);
 
 	const renderedMessageDetails = useMemo(() => {
 		if (!isDetailsOpen || /\S/.test(messageDetails)) {
@@ -73,36 +85,39 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 		setIsDetailsOpen(prev => !prev);
 	}, [hasDetails, isBusy]);
 
-	const usageTooltip = usage
-		? (() => {
-				const parts: string[] = [];
+	const usageTooltip =
+		hasUsage && usage
+			? (() => {
+					const parts: string[] = [];
 
-				if (usage.inputTokensTotal > 0) {
-					parts.push(`Total input tokens: ${usage.inputTokensTotal}`);
-				}
-				if (usage.inputTokensCached > 0) {
-					parts.push(`Input cached tokens: ${usage.inputTokensCached}`);
-					if (usage.inputTokensUncached > 0) {
-						parts.push(`Input uncached tokens: ${usage.inputTokensUncached}`);
+					if (usage.inputTokensTotal > 0) {
+						parts.push(`Total input tokens: ${usage.inputTokensTotal}`);
 					}
-				}
-				if (usage.outputTokens > 0) {
-					parts.push(`Total output tokens: ${usage.outputTokens}`);
-				}
-				if (usage.reasoningTokens > 0) {
-					parts.push(`Reasoning tokens: ${usage.reasoningTokens}`);
-				}
+					if (usage.inputTokensCached > 0) {
+						parts.push(`Input cached tokens: ${usage.inputTokensCached}`);
+						if (usage.inputTokensUncached > 0) {
+							parts.push(`Input uncached tokens: ${usage.inputTokensUncached}`);
+						}
+					}
+					if (usage.outputTokens > 0) {
+						parts.push(`Total output tokens: ${usage.outputTokens}`);
+					}
+					if (usage.reasoningTokens > 0) {
+						parts.push(`Reasoning tokens: ${usage.reasoningTokens}`);
+					}
 
-				return parts.join('\n');
-			})()
-		: '';
+					return parts.join('\n');
+				})()
+			: '';
 
 	return (
 		<div className={bodyPresent ? 'grow' : ''}>
 			<div
 				className={`flex items-center space-x-6 ${bodyPresent ? 'justify-between' : isUser ? 'justify-start' : 'justify-end'}`}
 			>
-				{usage && !isBusy && (
+				{isBusy && streamSource ? (
+					<MessageStreamingStatus source={streamSource} />
+				) : hasUsage && usage ? (
 					<HoverTip content={usageTooltip} placement="top" wrapperElement="div">
 						<div className="flex items-center bg-transparent p-0 text-xs">
 							<div className="flex items-center">
@@ -112,9 +127,9 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 							</div>
 						</div>
 					</HoverTip>
-				)}
+				) : null}
 
-				<div className={`flex items-center justify-end space-x-6 ${!isBusy && !usage ? 'w-full' : ''}`}>
+				<div className={`flex items-center justify-end space-x-6 ${!isBusy && !hasUsage ? 'w-full' : ''}`}>
 					{hasContent && !isBusy && (
 						<label className="ml-1 flex h-full items-center space-x-2 truncate p-1" title="Disable Markdown">
 							<input

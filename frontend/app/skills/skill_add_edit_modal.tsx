@@ -285,6 +285,8 @@ function AddEditSkillModalContent({
 	const isAddMode = effectiveMode === 'add';
 
 	const [creationMode, setCreationMode] = useState<'create' | 'register'>('create');
+	const isRegisteringFolder = isAddMode && creationMode === 'register';
+
 	const [formData, setFormData] = useState<SkillFormData>(() =>
 		getInitialFormData(initialData, existingSkills, requestedMode)
 	);
@@ -400,6 +402,15 @@ function AddEditSkillModalContent({
 
 	const validateForm = (state: SkillFormData): ErrorState => {
 		let next: ErrorState = {};
+
+		if (isRegisteringFolder) {
+			next = validateField('location', state.location, next);
+			if (!state.displayName.trim()) {
+				next.displayName = 'Source name is required.';
+			}
+			return next;
+		}
+
 		next = validateField('name', state.name, next);
 		next = validateField('slug', state.slug, next);
 		next = validateField('type', state.type, next);
@@ -570,7 +581,9 @@ function AddEditSkillModalContent({
 		setCreationMode(nextMode);
 		setSubmitError('');
 		setErrors(current =>
-			nextMode === 'create' ? omitManyKeys(current, ['location']) : omitManyKeys(current, ['markdownBody'])
+			nextMode === 'create'
+				? omitManyKeys(current, ['location', 'displayName'])
+				: omitManyKeys(current, ['markdownBody'])
 		);
 	};
 
@@ -625,7 +638,13 @@ function AddEditSkillModalContent({
 
 		setFormData(prev => ({ ...prev, [name]: newVal }));
 
-		if (['displayName', 'name', 'slug', 'type', 'location', 'tags'].includes(name)) {
+		if (name === 'displayName' && isRegisteringFolder) {
+			setErrors(prev =>
+				String(newVal).trim()
+					? omitManyKeys(prev, ['displayName'])
+					: { ...prev, displayName: 'Source name is required.' }
+			);
+		} else if (['displayName', 'name', 'slug', 'type', 'location', 'tags'].includes(name)) {
 			setErrors(prev => validateField(name as keyof ErrorState, String(newVal), prev));
 		}
 	};
@@ -661,8 +680,12 @@ function AddEditSkillModalContent({
 			isEnabled: formData.isEnabled,
 		};
 
-		const payload: SkillUpsertInput =
-			(isAddMode && creationMode === 'create') || (isEditMode && documentLoaded)
+		const payload: SkillUpsertInput = isRegisteringFolder
+			? {
+					displayName: formData.displayName.trim(),
+					location: formData.location.trim(),
+				}
+			: (isAddMode && creationMode === 'create') || (isEditMode && documentLoaded)
 				? {
 						...common,
 						artifactCreate: {
@@ -803,7 +826,7 @@ function AddEditSkillModalContent({
 										<span>
 											<span className="block font-medium">Register existing folder</span>
 											<span className="text-base-content/70 block text-xs">
-												Use an existing folder containing SKILL.md.
+												Discover every SKILL.md file found under an existing folder.
 											</span>
 										</span>
 									</label>
@@ -811,7 +834,7 @@ function AddEditSkillModalContent({
 							</ModalSection>
 						)}
 
-						{isAddMode && (
+						{isAddMode && creationMode === 'create' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<div className="label col-span-3">
 									<span className="text-sm">Prefill from Existing</span>
@@ -979,70 +1002,81 @@ function AddEditSkillModalContent({
 							</div>
 						)}
 
-						<ModalSection title="Identity">
-							<ModalField
-								label="Name"
-								htmlFor="skill-name"
-								required
-								hint="Artifact name from SKILL.md."
-								error={errors.name}
-							>
-								<input
-									id="skill-name"
-									ref={nameInputRef}
-									type="text"
-									name="name"
-									value={formData.name}
-									onChange={handleInput}
-									readOnly={isViewMode || isEditMode}
-									className={`input w-full rounded-xl ${errors.name ? 'input-error' : ''}`}
-									spellCheck="false"
-									autoComplete="off"
-									aria-invalid={Boolean(errors.name)}
-								/>
-							</ModalField>
+						<ModalSection title={isRegisteringFolder ? 'Folder source' : 'Identity'}>
+							{!isRegisteringFolder ? (
+								<>
+									<ModalField
+										label="Name"
+										htmlFor="skill-name"
+										required
+										hint="Artifact name from SKILL.md."
+										error={errors.name}
+									>
+										<input
+											id="skill-name"
+											ref={nameInputRef}
+											type="text"
+											name="name"
+											value={formData.name}
+											onChange={handleInput}
+											readOnly={isViewMode || isEditMode}
+											className={`input w-full rounded-xl ${errors.name ? 'input-error' : ''}`}
+											spellCheck="false"
+											autoComplete="off"
+											aria-invalid={Boolean(errors.name)}
+										/>
+									</ModalField>
 
-							<ModalField
-								label="Slug"
-								htmlFor="skill-slug"
-								required
-								hint="Store identifier within this bundle."
-								error={errors.slug}
-							>
-								<input
-									id="skill-slug"
-									type="text"
-									name="slug"
-									value={formData.slug}
-									onChange={handleInput}
-									readOnly={isViewMode || isEditMode}
-									className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
-									spellCheck="false"
-									autoComplete="off"
-									aria-invalid={Boolean(errors.slug)}
-								/>
-							</ModalField>
+									<ModalField
+										label="Slug"
+										htmlFor="skill-slug"
+										required
+										hint="Store identifier within this bundle."
+										error={errors.slug}
+									>
+										<input
+											id="skill-slug"
+											type="text"
+											name="slug"
+											value={formData.slug}
+											onChange={handleInput}
+											readOnly={isViewMode || isEditMode}
+											className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
+											spellCheck="false"
+											autoComplete="off"
+											aria-invalid={Boolean(errors.slug)}
+										/>
+									</ModalField>
 
-							<ModalField label="Type" required hint="Built-in EmbeddedFS skills are read only." error={errors.type}>
-								{isEditMode || isViewMode ? (
-									<ReadOnlyValue value={skillTypeDropdownItems[formData.type].displayName} />
-								) : (
-									<Dropdown<SkillType>
-										dropdownItems={skillTypeDropdownItems}
-										selectedKey={formData.type}
-										onChange={onSkillTypeChange}
-										filterDisabled={true}
-										title="Select skill type"
-										getDisplayName={k => skillTypeDropdownItems[k].displayName}
-									/>
-								)}
-							</ModalField>
+									<ModalField
+										label="Type"
+										required
+										hint="Built-in EmbeddedFS skills are read only."
+										error={errors.type}
+									>
+										{isEditMode || isViewMode ? (
+											<ReadOnlyValue value={skillTypeDropdownItems[formData.type].displayName} />
+										) : (
+											<Dropdown<SkillType>
+												dropdownItems={skillTypeDropdownItems}
+												selectedKey={formData.type}
+												onChange={onSkillTypeChange}
+												filterDisabled={true}
+												title="Select skill type"
+												getDisplayName={k => skillTypeDropdownItems[k].displayName}
+											/>
+										)}
+									</ModalField>
+								</>
+							) : null}
 
 							<ModalField
 								label="Location"
 								htmlFor="skill-location"
 								required={!isAddMode || creationMode === 'register'}
-								hint="Folder containing SKILL.md."
+								hint={
+									isRegisteringFolder ? 'Folder to scan recursively for SKILL.md files.' : 'Folder containing SKILL.md.'
+								}
 								error={errors.location}
 							>
 								<div className="flex flex-col gap-2 sm:flex-row">
@@ -1076,11 +1110,17 @@ function AddEditSkillModalContent({
 							</ModalField>
 						</ModalSection>
 
-						<ModalSection title="Presentation">
+						<ModalSection title={isRegisteringFolder ? 'Source presentation' : 'Presentation'}>
 							<ModalField
-								label="Display Name"
+								label={isRegisteringFolder ? 'Source name' : 'Display Name'}
 								htmlFor="skill-display-name"
-								hint="Falls back to the skill name when empty."
+								required={isRegisteringFolder}
+								hint={
+									isRegisteringFolder
+										? 'Label for this discovered filesystem source.'
+										: 'Falls back to the skill name when empty.'
+								}
+								error={errors.displayName}
 							>
 								<input
 									id="skill-display-name"
@@ -1089,55 +1129,60 @@ function AddEditSkillModalContent({
 									value={formData.displayName}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className="input w-full rounded-xl"
+									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
+									aria-invalid={Boolean(errors.displayName)}
 								/>
 							</ModalField>
 
-							<ModalField label="Enabled" htmlFor="skill-enabled">
-								<input
-									id="skill-enabled"
-									type="checkbox"
-									name="isEnabled"
-									checked={formData.isEnabled}
-									onChange={handleInput}
-									className="toggle toggle-accent disabled:opacity-80"
-									disabled={isViewMode}
-								/>
-							</ModalField>
+							{!isRegisteringFolder ? (
+								<>
+									<ModalField label="Enabled" htmlFor="skill-enabled">
+										<input
+											id="skill-enabled"
+											type="checkbox"
+											name="isEnabled"
+											checked={formData.isEnabled}
+											onChange={handleInput}
+											className="toggle toggle-accent disabled:opacity-80"
+											disabled={isViewMode}
+										/>
+									</ModalField>
 
-							<ModalField label="Description" htmlFor="skill-description" align="start">
-								<textarea
-									id="skill-description"
-									name="description"
-									value={formData.description}
-									onChange={handleInput}
-									readOnly={isViewMode}
-									className="textarea h-20 w-full rounded-xl"
-									spellCheck="false"
-								/>
-								{errors.description ? (
-									<div className="label">
-										<span className="text-error text-xs">{errors.description}</span>
-									</div>
-								) : null}
-							</ModalField>
+									<ModalField label="Description" htmlFor="skill-description" align="start">
+										<textarea
+											id="skill-description"
+											name="description"
+											value={formData.description}
+											onChange={handleInput}
+											readOnly={isViewMode}
+											className="textarea h-20 w-full rounded-xl"
+											spellCheck="false"
+										/>
+										{errors.description ? (
+											<div className="label">
+												<span className="text-error text-xs">{errors.description}</span>
+											</div>
+										) : null}
+									</ModalField>
 
-							<ModalField label="Tags" htmlFor="skill-tags" error={errors.tags}>
-								<input
-									id="skill-tags"
-									type="text"
-									name="tags"
-									value={formData.tags}
-									onChange={handleInput}
-									readOnly={isViewMode}
-									className={`input w-full rounded-xl ${errors.tags ? 'input-error' : ''}`}
-									placeholder="comma, separated, tags"
-									spellCheck="false"
-									aria-invalid={Boolean(errors.tags)}
-								/>
-							</ModalField>
+									<ModalField label="Tags" htmlFor="skill-tags" error={errors.tags}>
+										<input
+											id="skill-tags"
+											type="text"
+											name="tags"
+											value={formData.tags}
+											onChange={handleInput}
+											readOnly={isViewMode}
+											className={`input w-full rounded-xl ${errors.tags ? 'input-error' : ''}`}
+											placeholder="comma, separated, tags"
+											spellCheck="false"
+											aria-invalid={Boolean(errors.tags)}
+										/>
+									</ModalField>
+								</>
+							) : null}
 						</ModalSection>
 
 						{artifactSkill && !isForkMode && (
@@ -1416,7 +1461,13 @@ function AddEditSkillModalContent({
 
 							{!isViewMode && (
 								<button type="submit" className="btn btn-primary rounded-xl" disabled={!isAllValid}>
-									{isSubmitting ? 'Saving…' : 'Save'}
+									{isSubmitting
+										? isRegisteringFolder
+											? 'Registering…'
+											: 'Saving…'
+										: isRegisteringFolder
+											? 'Register Folder'
+											: 'Save'}
 								</button>
 							)}
 						</ModalActions>

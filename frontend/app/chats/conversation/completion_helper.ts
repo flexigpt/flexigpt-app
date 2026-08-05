@@ -90,10 +90,6 @@ export async function HandleCompletion(
 
 	// Error with no outputs at all -> fall back to existing "error stub".
 	return getErrorStub(modelParams, assistantPlaceholder, resp, undefined);
-	// Important:
-	// Transport/runtime failures must be finalized by the caller because only
-	// the caller has access to the live stream buffers. If we swallow the
-	// error here, already-streamed text/thinking gets lost. So throw error always.
 }
 
 function getErrorStub(
@@ -124,7 +120,7 @@ function getErrorStub(
 		{
 			kind: OutputKind.OutputMessage,
 			outputMessage: {
-				id: getUUIDv7(),
+				id: assistantPlaceholder.id || getUUIDv7(),
 				role: RoleEnum.Assistant,
 				status: Status.Failed,
 				contents: [
