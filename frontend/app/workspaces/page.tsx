@@ -99,23 +99,18 @@ export default function WorkspacesPage() {
 
 	const createWorkspace = useCallback(
 		async (submission: WorkspaceSetupSubmission) => {
-			const preferredRootID = workspaces[0]?.workspace.rootID;
 			let created: WorkspaceView;
 
 			if (submission.kind === 'filesystem') {
-				created = await createFilesystemWorkspaceCollection(submission.payload, preferredRootID);
+				created = await createFilesystemWorkspaceCollection(submission.payload);
 			} else if (submission.kind === 'empty') {
-				created = await createEmptyWorkspaceCollection(submission.payload, preferredRootID);
+				created = await createEmptyWorkspaceCollection(submission.payload);
 			} else {
 				throw new Error('Expected a new Workspace payload.');
 			}
 
 			if (mountedRef.current) {
 				replaceWorkspace(created);
-			}
-
-			if (submission.kind === 'empty') {
-				return;
 			}
 
 			try {
@@ -135,7 +130,7 @@ export default function WorkspacesPage() {
 				}
 			}
 		},
-		[replaceWorkspace, workspaces]
+		[replaceWorkspace]
 	);
 
 	const updateWorkspace = useCallback(

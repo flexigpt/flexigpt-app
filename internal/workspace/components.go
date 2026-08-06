@@ -12,10 +12,11 @@ import (
 )
 
 type components struct {
-	service   *artifactadapter.Service
-	refresher *discovery.Refresher
-	query     *artifactadapter.QueryService
-	policy    *artifactadapter.ArtifactPolicy
+	workspaceRootID basespec.RootID
+	service         *artifactadapter.Service
+	refresher       *discovery.Refresher
+	query           *artifactadapter.QueryService
+	policy          *artifactadapter.ArtifactPolicy
 
 	contextAdapter *contextadapter.Adapter
 	skillAdapter   *skilladapter.Adapter
@@ -64,6 +65,7 @@ func newComponents(
 		dependencies.Collections,
 		dependencies.Sources,
 		discoveryPolicyRevision,
+		config.WorkspaceRootID,
 		dependencies.RootMutationPolicy,
 	)
 	if err != nil {
@@ -130,11 +132,12 @@ func newComponents(
 		return nil, err
 	}
 	return &components{
-		service:        service,
-		refresher:      refresher,
-		query:          query,
-		policy:         policy,
-		contextAdapter: contextAdapter,
-		skillAdapter:   skillAdapter,
+		workspaceRootID: config.WorkspaceRootID,
+		service:         service,
+		refresher:       refresher,
+		query:           query,
+		policy:          policy,
+		contextAdapter:  contextAdapter,
+		skillAdapter:    skillAdapter,
 	}, nil
 }

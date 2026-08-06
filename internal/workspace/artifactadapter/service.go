@@ -19,6 +19,7 @@ type Service struct {
 	collections             workspaceCollectionStore
 	sources                 sourceSummaryLookup
 	discoveryPolicyRevision string
+	workspaceRootID         basespec.RootID
 	rootPolicy              protection.RootPolicy
 }
 
@@ -26,12 +27,23 @@ func NewService(
 	collections workspaceCollectionStore,
 	sources sourceSummaryLookup,
 	discoveryPolicyRevision string,
+	workspaceRootID basespec.RootID,
 	rootPolicy protection.RootPolicy,
 ) (*Service, error) {
 	if collections == nil || sources == nil || rootPolicy == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace service dependencies are incomplete",
 			spec.ErrInvalidWorkspace,
+		)
+	}
+	if err := basespec.ValidateRootID(workspaceRootID); err != nil {
+		return nil, err
+	}
+	if rootPolicy.IsProtectedRoot(workspaceRootID) {
+		return nil, fmt.Errorf(
+			"%w: configured Workspace Root %q is protected",
+			spec.ErrInvalidWorkspace,
+			workspaceRootID,
 		)
 	}
 	if err := basespec.ValidateRequiredText(
@@ -45,18 +57,39 @@ func NewService(
 		collections:             collections,
 		sources:                 sources,
 		discoveryPolicyRevision: discoveryPolicyRevision,
+		workspaceRootID:         workspaceRootID,
 		rootPolicy:              rootPolicy,
 	}, nil
+}
+
+// ValidateFilesystemCreate validates all Workspace-owned creation inputs that
+// can be checked before provisioning a filesystem Source.
+func (s *Service) ValidateFilesystemCreate(
+	request spec.FilesystemWorkspaceRequest,
+) error {
+	if err := s.validateWorkspaceCreate(
+		request.RootID,
+		request.CollectionID,
+		request.DisplayName,
+		request.Description,
+		request.Discovery,
+	); err != nil {
+		return err
+	}
+	return basespec.ValidateSourceID(request.PrimarySourceID)
 }
 
 func (s *Service) CreateEmpty(
 	ctx context.Context,
 	request spec.EmptyWorkspaceRequest,
 ) (spec.Workspace, error) {
-	if err := s.requireWorkspaceRoot(request.RootID); err != nil {
-		return spec.Workspace{}, err
-	}
-	if err := basespec.ValidateCollectionID(request.CollectionID); err != nil {
+	if err := s.validateWorkspaceCreate(
+		request.RootID,
+		request.CollectionID,
+		request.DisplayName,
+		request.Description,
+		request.Discovery,
+	); err != nil {
 		return spec.Workspace{}, err
 	}
 	data := spec.CollectionData{
@@ -101,13 +134,7 @@ func (s *Service) CreateFilesystem(
 	ctx context.Context,
 	request spec.FilesystemWorkspaceRequest,
 ) (spec.Workspace, error) {
-	if err := s.requireWorkspaceRoot(request.RootID); err != nil {
-		return spec.Workspace{}, err
-	}
-	if err := basespec.ValidateCollectionID(request.CollectionID); err != nil {
-		return spec.Workspace{}, err
-	}
-	if err := basespec.ValidateSourceID(request.PrimarySourceID); err != nil {
+	if err := s.ValidateFilesystemCreate(request); err != nil {
 		return spec.Workspace{}, err
 	}
 	sourceValue, err := s.sources.Get(
@@ -184,6 +211,9 @@ func (s *Service) List(
 	ctx context.Context,
 	rootID basespec.RootID,
 ) ([]spec.Workspace, error) {
+	if err := s.requireWorkspaceRoot(rootID); err != nil {
+		return nil, err
+	}
 	collections, err := s.collections.ListByRoot(ctx, rootID)
 	if err != nil {
 		return nil, err
@@ -663,6 +693,9 @@ func (s *Service) Get(
 	ctx context.Context,
 	ref collection.CollectionRef,
 ) (spec.Workspace, error) {
+	if err := s.requireWorkspaceRoot(ref.RootID); err != nil {
+		return spec.Workspace{}, err
+	}
 	if err := ref.Validate(); err != nil {
 		return spec.Workspace{}, err
 	}
@@ -739,17 +772,60 @@ func (s *Service) Get(
 	}, nil
 }
 
+func (s *Service) validateWorkspaceCreate(
+	rootID basespec.RootID,
+	collectionID basespec.CollectionID,
+	displayName string,
+	description string,
+	discovery spec.DiscoveryPreferences,
+) error {
+	if s == nil || s.rootPolicy == nil {
+		return fmt.Errorf(
+			"%w: Workspace service is unavailable",
+			spec.ErrInvalidWorkspace,
+		)
+	}
+	if err := s.requireWorkspaceRoot(rootID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateCollectionID(collectionID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateRequiredText(
+		"Workspace display name",
+		displayName,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+	if err := basespec.ValidateOptionalText(
+		"Workspace description",
+		description,
+		basespec.MaxDescriptionBytes,
+	); err != nil {
+		return err
+	}
+	return spec.ValidateDiscoveryPreferences(discovery)
+}
+
 func (s *Service) requireWorkspaceRoot(
 	rootID basespec.RootID,
 ) error {
 	if err := basespec.ValidateRootID(rootID); err != nil {
 		return err
 	}
-	if s.rootPolicy != nil && s.rootPolicy.IsProtectedRoot(rootID) {
+	if s.rootPolicy.IsProtectedRoot(rootID) {
 		return fmt.Errorf(
 			"%w: Workspace cannot use protected Root %q",
 			basespec.ErrProtected,
 			rootID,
+		)
+	}
+	if rootID != s.workspaceRootID {
+		return fmt.Errorf(
+			"%w: Workspace Root must be %q",
+			spec.ErrInvalidWorkspace,
+			s.workspaceRootID,
 		)
 	}
 	return nil

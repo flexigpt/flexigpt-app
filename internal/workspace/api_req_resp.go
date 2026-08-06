@@ -324,7 +324,9 @@ type CreateFilesystemWorkspaceRequestBody struct {
 }
 
 type CreateFilesystemWorkspaceRequest struct {
-	RootID basespec.RootID `json:"rootID" required:"true"`
+	// RootID is retained for transport compatibility. Workspace creation uses
+	// the single Root configured by application composition.
+	RootID basespec.RootID `json:"rootID,omitempty"`
 	Body   *CreateFilesystemWorkspaceRequestBody
 }
 
@@ -340,7 +342,9 @@ type CreateEmptyWorkspaceRequestBody struct {
 }
 
 type CreateEmptyWorkspaceRequest struct {
-	RootID basespec.RootID `json:"rootID" required:"true"`
+	// RootID is retained for transport compatibility. Workspace creation uses
+	// the single Root configured by application composition.
+	RootID basespec.RootID `json:"rootID,omitempty"`
 	Body   *CreateEmptyWorkspaceRequestBody
 }
 
@@ -357,7 +361,9 @@ type GetWorkspaceResponse struct {
 }
 
 type ListWorkspacesRequest struct {
-	RootID basespec.RootID `json:"rootID" required:"true"`
+	// RootID is retained for transport compatibility. Listing uses the
+	// application-configured Workspace Root.
+	RootID basespec.RootID `json:"rootID,omitempty"`
 }
 
 type ListWorkspacesResponseBody struct {

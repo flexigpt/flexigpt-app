@@ -129,7 +129,10 @@ func (s *Service) Retire(
 	id basespec.RootID,
 	expectedRevision uint64,
 ) (Root, error) {
-	if err := protection.RequireMutableRoot(ctx, s.policy, id); err != nil {
+	if err := basespec.ValidateRootID(id); err != nil {
+		return Root{}, err
+	}
+	if err := protection.RequireRootDeletion(ctx, s.policy, id); err != nil {
 		return Root{}, err
 	}
 	if expectedRevision == 0 {
@@ -168,7 +171,10 @@ func (s *Service) Purge(
 	id basespec.RootID,
 	expectedRevision uint64,
 ) error {
-	if err := protection.RequireMutableRoot(ctx, s.policy, id); err != nil {
+	if err := basespec.ValidateRootID(id); err != nil {
+		return err
+	}
+	if err := protection.RequireRootDeletion(ctx, s.policy, id); err != nil {
 		return err
 	}
 	if expectedRevision == 0 {

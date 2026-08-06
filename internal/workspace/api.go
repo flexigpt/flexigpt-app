@@ -88,13 +88,17 @@ func (a *API) CreateFilesystemWorkspace(
 	if request == nil || request.Body == nil {
 		return nil, invalidAPIRequest("filesystem workspace body is required")
 	}
+
+	// Workspace is composed with one application-owned Root. Root selection
+	// is not a client-controlled part of Workspace creation.
+	rootID := a.workspace.workspaceRootID
 	value, err := a.provisioner.CreateFilesystem(ctx, provision.Request{
 		DisplayName:  request.Body.DisplayName,
 		Description:  request.Body.Description,
 		RootPath:     request.Body.RootPath,
 		CollectionID: request.Body.WorkspaceID,
 		SourceID:     request.Body.SourceID,
-		RootID:       request.RootID,
+		RootID:       rootID,
 		Discovery:    discoveryPreferencesOf(request.Body.Discovery),
 	})
 	if err != nil {
@@ -117,11 +121,15 @@ func (a *API) CreateEmptyWorkspace(
 	if request == nil || request.Body == nil {
 		return nil, invalidAPIRequest("empty workspace body is required")
 	}
+
+	// Keep empty and filesystem Workspaces in the same configured namespace,
+	// independently of any Root currently selected by a client.
+	rootID := a.workspace.workspaceRootID
 	value, err := a.workspace.service.CreateEmpty(
 		ctx,
 		spec.EmptyWorkspaceRequest{
 			CollectionID: request.Body.WorkspaceID,
-			RootID:       request.RootID,
+			RootID:       rootID,
 			DisplayName:  request.Body.DisplayName,
 			Description:  request.Body.Description,
 			Discovery:    discoveryPreferencesOf(request.Body.Discovery),
@@ -168,7 +176,10 @@ func (a *API) ListWorkspaces(
 	if request == nil {
 		return nil, invalidAPIRequest("workspace list request is required")
 	}
-	values, err := a.workspace.service.List(ctx, request.RootID)
+
+	// Listing follows the same single-Root contract as creation. In
+	// particular, a stale UI cannot enumerate the protected built-in Root.
+	values, err := a.workspace.service.List(ctx, a.workspace.workspaceRootID)
 	if err != nil {
 		return nil, err
 	}
@@ -185,38 +196,23 @@ func (a *API) ListWorkspaces(
 	}, nil
 }
 
-// WorkspaceRefs returns all active Workspace Collection references without
-// projecting source configuration or native local paths. Application
-// composition uses it to rebuild the derived Agent Skills runtime view.
+// WorkspaceRefs returns active Workspace Collection references from the
+// configured Workspace Root without projecting Source configuration or native
+// local paths. Application composition uses it to rebuild the derived Agent
+// Skills runtime view.
 func (a *API) WorkspaceRefs(
 	ctx context.Context,
 ) ([]WorkspaceRef, error) {
 	if err := a.Ready(); err != nil {
 		return nil, err
 	}
-	roots, err := a.dependencies.Roots.List(ctx)
+	values, err := a.workspace.service.List(ctx, a.workspace.workspaceRootID)
 	if err != nil {
 		return nil, err
 	}
-
-	refs := make([]WorkspaceRef, 0)
-	for _, rootValue := range roots {
-		if a.dependencies.RootMutationPolicy.IsProtectedRoot(rootValue.ID) {
-			continue
-		}
-		values, err := a.dependencies.Collections.ListByRoot(
-			ctx,
-			rootValue.ID,
-		)
-		if err != nil {
-			return nil, err
-		}
-		for _, value := range values {
-			if value.Kind != spec.CollectionKind {
-				continue
-			}
-			refs = append(refs, value.Ref())
-		}
+	refs := make([]WorkspaceRef, 0, len(values))
+	for _, value := range values {
+		refs = append(refs, value.Collection.Ref())
 	}
 	sort.Slice(refs, func(left, right int) bool {
 		if refs[left].RootID != refs[right].RootID {

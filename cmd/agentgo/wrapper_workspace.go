@@ -37,6 +37,7 @@ func InitWorkspaceWrapper(
 		return errors.New("artifact store components are nil")
 	}
 	config := workspace.DefaultConfig()
+	config.WorkspaceRootID = defaultWorkspaceRootID
 	config.AutoAdoptionIDProvider = workspaceAutoAdoptionIDProvider()
 
 	api, err := workspace.New(workspace.Dependencies{

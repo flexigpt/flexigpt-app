@@ -14,12 +14,29 @@ type RootPolicy interface {
 	IsProtectedRoot(r basespec.RootID) bool
 }
 
+// RootDeletionPolicy is an optional lifecycle policy for Roots that must
+// remain present while still allowing ordinary mutation of their descendants.
+//
+// A retained Root is intentionally different from a protected topology Root:
+// protected Roots reject ordinary Source, Collection, and Artifact mutations;
+// retained Roots reject only Root retirement and purge.
+type RootDeletionPolicy interface {
+	IsRootDeletionProtected(rootID basespec.RootID) bool
+}
+
 type StaticRootPolicy struct {
-	RootID basespec.RootID
+	RootID         basespec.RootID
+	RetainedRootID basespec.RootID
 }
 
 func (p StaticRootPolicy) IsProtectedRoot(rootID basespec.RootID) bool {
 	return p.RootID != "" && p.RootID == rootID
+}
+
+func (p StaticRootPolicy) IsRootDeletionProtected(
+	rootID basespec.RootID,
+) bool {
+	return p.RetainedRootID != "" && p.RetainedRootID == rootID
 }
 
 type privilegedInstallerContextKey struct{}
@@ -65,4 +82,24 @@ func RequireMutableRoot(
 		basespec.ErrProtected,
 		rootID,
 	)
+}
+
+// RequireRootDeletion permits normal mutable-root checks and additionally
+// rejects retirement or purge of a retained application Root. Retention is
+// not bypassed by installer context because it is an application data-retention
+// policy rather than protected-topology installation access.
+func RequireRootDeletion(
+	ctx context.Context,
+	policy RootPolicy,
+	rootID basespec.RootID,
+) error {
+	if deletionPolicy, supported := policy.(RootDeletionPolicy); supported &&
+		deletionPolicy.IsRootDeletionProtected(rootID) {
+		return fmt.Errorf(
+			"%w: root %q is retained and cannot be retired or purged",
+			basespec.ErrProtected,
+			rootID,
+		)
+	}
+	return RequireMutableRoot(ctx, policy, rootID)
 }

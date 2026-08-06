@@ -264,18 +264,20 @@ function WorkspaceSourceAttachmentCard({
 					)}
 				</div>
 
-				<div className="mt-3 flex justify-end">
-					<button
-						type="button"
-						className="btn btn-sm btn-ghost rounded-xl"
-						disabled={busy}
-						onClick={() => {
-							void saveEdit();
-						}}
-					>
-						Save attachment settings
-					</button>
-				</div>
+				{!isPrimary ? (
+					<div className="mt-3 flex justify-end">
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							disabled={busy}
+							onClick={() => {
+								void saveEdit();
+							}}
+						>
+							Save attachment settings
+						</button>
+					</div>
+				) : null}
 			</details>
 		</div>
 	);
@@ -596,6 +598,10 @@ function WorkspaceSourcesModalContent({
 			setActionError(getErrorMessage(error, 'Source configuration is invalid.'));
 			return;
 		}
+		if (attachNewSourceAsPrimary && effectiveNewSourceKind !== FILESYSTEM_SOURCE_KIND) {
+			setActionError('Only a filesystem Source can be used as the primary Workspace Source.');
+			return;
+		}
 
 		const displayName = newSourceDisplayName.trim();
 		if (!displayName) {
@@ -863,7 +869,7 @@ function WorkspaceSourcesModalContent({
 
 				<ModalSection
 					title="Primary Source"
-					description="A filesystem Workspace has one enabled primary filesystem Source. The backend validates Source eligibility and preserves Workspace identity when the primary Source changes."
+					description="A filesystem Workspace has one enabled primary filesystem Source. Workspace identity is preserved when it changes. Remove Artifacts and suppressions bound to the current primary Source before replacing or clearing it."
 				>
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-end">
 						<Dropdown<string>
@@ -1078,7 +1084,21 @@ function WorkspaceSourcesModalContent({
 								<button
 									type="button"
 									className="btn btn-xs btn-ghost rounded-lg"
-									disabled={pendingAction !== null}
+									disabled={
+										pendingAction !== null ||
+										(source.enabled &&
+											currentWorkspace.attachments.some(
+												attachment => attachment.sourceID === source.id && attachment.enabled
+											))
+									}
+									title={
+										source.enabled &&
+										currentWorkspace.attachments.some(
+											attachment => attachment.sourceID === source.id && attachment.enabled
+										)
+											? 'Disable the Workspace attachment before disabling this Source.'
+											: undefined
+									}
 									onClick={() => {
 										void toggleSourceEnabled(source);
 									}}

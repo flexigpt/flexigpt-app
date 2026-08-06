@@ -5,20 +5,16 @@ import type {
 	WorkspaceRef,
 	WorkspaceView,
 } from '@/spec/workspace';
+import { DEFAULT_WORKSPACE_ROOT_ID } from '@/spec/workspace';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { artifactStoreAPI, workspaceAPI } from '@/apis/baseapi';
+import { workspaceAPI } from '@/apis/baseapi';
 
 import { sortWorkspaces } from '@/workspaces/lib/workspace_utils';
 
-const DEFAULT_WORKSPACE_ROOT_DISPLAY_NAME = 'FlexiGPT Workspaces';
-const DEFAULT_WORKSPACE_ROOT_DESCRIPTION = 'Technical Artifact Store namespace used for Workspace collections.';
-
 export type CreateFilesystemWorkspaceInput = Omit<CreateFilesystemWorkspaceBody, 'workspaceID' | 'sourceID'>;
 export type CreateEmptyWorkspaceInput = Omit<CreateEmptyWorkspaceBody, 'workspaceID'>;
-
-let workspaceRootCreationPromise: Promise<ArtifactRootID> | undefined;
 
 export function workspaceRefKey(workspace: WorkspaceRef): string {
 	return `${workspace.rootID}:${workspace.collectionID}`;
@@ -36,60 +32,15 @@ export function workspaceRefsEqual(
 }
 
 export async function listAllWorkspaces(): Promise<WorkspaceView[]> {
-	const roots = await artifactStoreAPI.listArtifactRoots();
-	if (roots.length === 0) {
-		return [];
-	}
-
-	const workspaceLists = await Promise.all(roots.map(root => workspaceAPI.listWorkspaces(root.id)));
-
-	return sortWorkspaces(workspaceLists.flat());
-}
-
-async function resolveWorkspaceCreationRoot(preferredRootID?: ArtifactRootID): Promise<ArtifactRootID> {
-	const roots = await artifactStoreAPI.listArtifactRoots();
-
-	if (preferredRootID) {
-		const preferred = roots.find(root => root.id === preferredRootID);
-		if (preferred) {
-			return preferred.id;
-		}
-	}
-
-	const defaultRoot = roots.find(
-		root => root.displayName.trim().toLowerCase() === DEFAULT_WORKSPACE_ROOT_DISPLAY_NAME.toLowerCase()
-	);
-	if (defaultRoot) {
-		return defaultRoot.id;
-	}
-
-	if (roots[0]) {
-		return roots[0].id;
-	}
-
-	const created = await artifactStoreAPI.createArtifactRoot({
-		id: getUUIDv7(),
-		displayName: DEFAULT_WORKSPACE_ROOT_DISPLAY_NAME,
-		description: DEFAULT_WORKSPACE_ROOT_DESCRIPTION,
-	});
-
-	return created.id;
+	return sortWorkspaces(await workspaceAPI.listWorkspaces(DEFAULT_WORKSPACE_ROOT_ID));
 }
 
 async function createWorkspaceInResolvedRoot<T>(
 	preferredRootID: ArtifactRootID | undefined,
 	create: (rootID: ArtifactRootID) => Promise<T>
 ): Promise<T> {
-	const rootPromise = workspaceRootCreationPromise ?? resolveWorkspaceCreationRoot(preferredRootID);
-	workspaceRootCreationPromise = rootPromise;
-
-	try {
-		return await create(await rootPromise);
-	} finally {
-		if (workspaceRootCreationPromise === rootPromise) {
-			workspaceRootCreationPromise = undefined;
-		}
-	}
+	const rootID = preferredRootID === DEFAULT_WORKSPACE_ROOT_ID ? preferredRootID : DEFAULT_WORKSPACE_ROOT_ID;
+	return create(rootID);
 }
 
 export async function createFilesystemWorkspaceCollection(

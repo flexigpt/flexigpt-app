@@ -12,7 +12,7 @@ import {
 	FiTrash2,
 } from 'react-icons/fi';
 
-import { ArtifactOccurrenceState } from '@/spec/artifact';
+import { ArtifactAdoptionMode, ArtifactOccurrenceState } from '@/spec/artifact';
 import type {
 	UpdateWorkspaceBody,
 	WorkspaceArtifactView,
@@ -419,7 +419,7 @@ export function WorkspaceCard({
 	};
 
 	const requestArtifactRemoval = (record: WorkspaceArtifactView) => {
-		setSuppressRemovedBinding(true);
+		setSuppressRemovedBinding(record.adoption === ArtifactAdoptionMode.Observed);
 		setRecordToDelete(record);
 	};
 
@@ -429,10 +429,14 @@ export function WorkspaceCard({
 		}
 
 		const deletingRecord = recordToDelete;
-		await workspaceAPI.unadoptWorkspaceArtifact(workspace.workspace, deletingRecord.artifact, {
-			expectedRevision: deletingRecord.revision,
-			suppress: suppressRemovedBinding,
-		});
+		if (deletingRecord.adoption === ArtifactAdoptionMode.Observed) {
+			await workspaceAPI.unadoptWorkspaceArtifact(workspace.workspace, deletingRecord.artifact, {
+				expectedRevision: deletingRecord.revision,
+				suppress: suppressRemovedBinding,
+			});
+		} else {
+			await workspaceAPI.purgeWorkspaceArtifact(workspace.workspace, deletingRecord.artifact, deletingRecord.revision);
+		}
 
 		if (!mountedRef.current) {
 			return;
@@ -598,6 +602,7 @@ export function WorkspaceCard({
 	const suppressRemovedBindingID = `workspace-remove-suppress-${workspace.workspace.collectionID}-${
 		recordToDelete?.artifact.artifactID ?? 'none'
 	}`;
+	const canSuppressRemovedBinding = recordToDelete?.adoption === ArtifactAdoptionMode.Observed;
 
 	return (
 		<>
@@ -1245,36 +1250,51 @@ export function WorkspaceCard({
 							Remove resource <span className="font-semibold">{recordToDelete?.name}</span>?
 						</p>
 						<p className="text-base-content/70">The source content is not deleted.</p>
-						<label
-							htmlFor={suppressRemovedBindingID}
-							className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-xl border p-3"
-							aria-label="Suppress Binding"
-						>
-							<input
-								id={suppressRemovedBindingID}
-								type="checkbox"
-								className="checkbox checkbox-sm mt-0.5"
-								checked={suppressRemovedBinding}
-								aria-describedby={`${suppressRemovedBindingID}-help`}
-								onChange={event => {
-									setSuppressRemovedBinding(event.currentTarget.checked);
-								}}
-							/>
-							<span className="min-w-0">
-								<span className="block font-medium">Prevent automatic re-adoption</span>
-								<span id={`${suppressRemovedBindingID}-help`} className="text-base-content/70 mt-1 block text-xs">
-									Suppress this typed source binding. It can be restored later from the Suppressions tab.
-								</span>
-							</span>
-						</label>
-						{!suppressRemovedBinding ? (
+						{canSuppressRemovedBinding ? (
+							<>
+								<label
+									htmlFor={suppressRemovedBindingID}
+									className="border-base-content/10 bg-base-100 flex cursor-pointer items-start gap-3 rounded-xl border p-3"
+									aria-label="Suppress Binding"
+								>
+									<input
+										id={suppressRemovedBindingID}
+										type="checkbox"
+										className="checkbox checkbox-sm mt-0.5"
+										checked={suppressRemovedBinding}
+										aria-describedby={`${suppressRemovedBindingID}-help`}
+										onChange={event => {
+											setSuppressRemovedBinding(event.currentTarget.checked);
+										}}
+									/>
+									<span className="min-w-0">
+										<span className="block font-medium">Prevent automatic re-adoption</span>
+										<span id={`${suppressRemovedBindingID}-help`} className="text-base-content/70 mt-1 block text-xs">
+											Suppress this typed source binding. It can be restored later from the Suppressions tab.
+										</span>
+									</span>
+								</label>
+								{!suppressRemovedBinding ? (
+									<p className="text-warning text-xs">
+										A later workspace refresh may automatically add this resource again.
+									</p>
+								) : null}
+							</>
+						) : (
 							<p className="text-warning text-xs">
-								A later workspace refresh may automatically add this resource again.
+								This pinned record will be purged. Suppress its binding separately if it must not be automatically
+								adopted during a later refresh.
 							</p>
-						) : null}
+						)}
 					</div>
 				}
-				confirmLabel={suppressRemovedBinding ? 'Remove and Suppress' : 'Remove Resource'}
+				confirmLabel={
+					canSuppressRemovedBinding
+						? suppressRemovedBinding
+							? 'Remove and Suppress'
+							: 'Remove Resource'
+						: 'Remove Pinned Resource'
+				}
 				busyLabel="Removing..."
 				confirmTone="error"
 				onConfirm={removeArtifact}

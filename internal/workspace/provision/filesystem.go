@@ -28,6 +28,10 @@ type sourceManager interface {
 }
 
 type workspaceManager interface {
+	ValidateFilesystemCreate(
+		request spec.FilesystemWorkspaceRequest,
+	) error
+
 	CreateFilesystem(
 		ctx context.Context,
 		request spec.FilesystemWorkspaceRequest,
@@ -69,16 +73,22 @@ func (s *Service) CreateFilesystem(
 	ctx context.Context,
 	request Request,
 ) (spec.Workspace, error) {
+	workspaceRequest := spec.FilesystemWorkspaceRequest{
+		CollectionID:    request.CollectionID,
+		RootID:          request.RootID,
+		DisplayName:     request.DisplayName,
+		Description:     request.Description,
+		PrimarySourceID: request.SourceID,
+		Discovery:       request.Discovery,
+	}
+	if err := s.workspaces.ValidateFilesystemCreate(workspaceRequest); err != nil {
+		return spec.Workspace{}, err
+	}
+
 	config, err := json.Marshal(fsdir.Config{
 		RootPath: request.RootPath,
 	})
 	if err != nil {
-		return spec.Workspace{}, err
-	}
-	if err := basespec.ValidateCollectionID(request.CollectionID); err != nil {
-		return spec.Workspace{}, err
-	}
-	if err := basespec.ValidateSourceID(request.SourceID); err != nil {
 		return spec.Workspace{}, err
 	}
 	sourceValue, sourceCreated, err := s.sources.CreateWithStatus(
@@ -96,17 +106,8 @@ func (s *Service) CreateFilesystem(
 		return spec.Workspace{}, err
 	}
 
-	value, createErr := s.workspaces.CreateFilesystem(
-		ctx,
-		spec.FilesystemWorkspaceRequest{
-			CollectionID:    request.CollectionID,
-			RootID:          request.RootID,
-			DisplayName:     request.DisplayName,
-			Description:     request.Description,
-			PrimarySourceID: sourceValue.ID,
-			Discovery:       request.Discovery,
-		},
-	)
+	workspaceRequest.PrimarySourceID = sourceValue.ID
+	value, createErr := s.workspaces.CreateFilesystem(ctx, workspaceRequest)
 	if createErr == nil {
 		return value, nil
 	}

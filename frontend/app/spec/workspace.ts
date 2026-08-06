@@ -8,6 +8,7 @@ import type {
 	ArtifactLocator,
 	ArtifactOccurrenceState,
 	ArtifactRef,
+	ArtifactRootID,
 	ArtifactSourceBinding,
 	ArtifactSourceID,
 	ArtifactState,
@@ -15,6 +16,10 @@ import type {
 import { SkillInsert as WorkspaceSkillInsert } from '@/spec/skill';
 
 export { WorkspaceSkillInsert };
+
+// This value is created and retained by `InitArtifactStoreWrapper`. It is not
+// the protected built-in topology Root.
+export const DEFAULT_WORKSPACE_ROOT_ID: ArtifactRootID = '0198f097-0d5b-7000-8000-000000000001';
 
 export type WorkspaceRef = ArtifactCollectionRef;
 

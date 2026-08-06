@@ -542,8 +542,8 @@ function WorkspaceSetupModalContent({
 
 							{workspace?.primaryPath ? (
 								<div className="text-base-content/60 text-xs">
-									The primary workspace folder cannot be changed after creation. Create a new workspace if the project
-									moves.
+									The primary path is read-only in this form. Use Manage Sources to replace or clear the primary
+									filesystem Source while preserving Workspace identity.
 								</div>
 							) : null}
 						</>

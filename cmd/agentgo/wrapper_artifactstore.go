@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/metadata"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
@@ -19,6 +22,21 @@ type ArtifactStoreWrapper struct {
 	components *system.Components
 }
 
+const defaultWorkspaceRootID basespec.RootID = "0198f097-0d5b-7000-8000-000000000001"
+
+const (
+	defaultWorkspaceRootDisplayName = "FlexiGPT Workspaces"
+	defaultWorkspaceRootDescription = "Local namespace for user Workspace collections."
+)
+
+func defaultWorkspaceRootDraft() root.RootDraft {
+	return root.RootDraft{
+		ID:          defaultWorkspaceRootID,
+		DisplayName: defaultWorkspaceRootDisplayName,
+		Description: defaultWorkspaceRootDescription,
+	}
+}
+
 func InitArtifactStoreWrapper(
 	wrapper *ArtifactStoreWrapper,
 	baseDirectory string,
@@ -29,6 +47,13 @@ func InitArtifactStoreWrapper(
 	registry, err := metadata.LoadRegistry()
 	if err != nil {
 		return err
+	}
+	if registry.Root.ID == defaultWorkspaceRootID {
+		return fmt.Errorf(
+			"%w: protected built-in Root %q and retained Workspace Root must use distinct IDs",
+			basespec.ErrInvalid,
+			registry.Root.ID,
+		)
 	}
 
 	skillDecoder, err := skillartifact.NewDecoder()
@@ -46,12 +71,21 @@ func InitArtifactStoreWrapper(
 			BaseDirectory: baseDirectory,
 			Decoders:      decoders,
 			RootMutationPolicy: protection.StaticRootPolicy{
-				RootID: registry.Root.ID,
+				RootID:         registry.Root.ID,
+				RetainedRootID: defaultWorkspaceRootID,
 			},
 		},
 	)
 	if err != nil {
 		return err
+	}
+
+	if _, err := components.Roots.Create(
+		context.Background(),
+		defaultWorkspaceRootDraft(),
+	); err != nil {
+		_ = components.Close()
+		return fmt.Errorf("ensure default Workspace Root: %w", err)
 	}
 
 	api, err := artifactstore.New(components)

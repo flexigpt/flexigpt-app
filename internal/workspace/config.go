@@ -37,6 +37,7 @@ func defaultDiscoveryProfiles() spec.DiscoveryProfiles {
 }
 
 type Config struct {
+	WorkspaceRootID         basespec.RootID
 	Supports                []spec.ArtifactSupport
 	DiscoveryProfiles       spec.DiscoveryProfiles
 	DiscoveryPolicyRevision string
