@@ -84,7 +84,7 @@
 		"eslint-plugin-react-hooks": "^7.1.1",
 		"eslint-plugin-react-you-might-not-need-an-effect": "^1.0.1",
 		"jiti": "^2.7.0",
-		"jsdom": "^29.1.1",
+		"jsdom": "^30.0.1",
 		"knip": "^6.31.0",
 		"oxlint": "^1.77.0",
 		"oxlint-tsgolint": "^7.0.2001",
