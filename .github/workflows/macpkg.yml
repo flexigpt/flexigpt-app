@@ -120,7 +120,7 @@ jobs:
           echo "NOTARIZE_ENABLED: ${NOTARIZE_ENABLED}"
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: "recursive"
 
@@ -142,7 +142,7 @@ jobs:
       # Import certs only if signing is enabled
       - name: Import Code-Signing Certificates for macOS
         if: ${{ env.SIGNING_ENABLED == 'true' }}
-        uses: Apple-Actions/import-codesign-certs@v6
+        uses: Apple-Actions/import-codesign-certs@v7
         with:
           keychain-password: ${{ env.MACOS_SIGN_APPLE_APP_PASSWORD }}
           p12-file-base64: ${{ env.MACOS_SIGN_APP_CERT }}
@@ -150,7 +150,7 @@ jobs:
 
       - name: Import Code-Signing Certificates for macOS installer
         if: ${{ env.SIGNING_ENABLED == 'true' }}
-        uses: Apple-Actions/import-codesign-certs@v6
+        uses: Apple-Actions/import-codesign-certs@v7
         with:
           keychain-password: ${{ env.MACOS_SIGN_APPLE_APP_PASSWORD }}
           p12-file-base64: ${{ env.MACOS_SIGN_INSTALLER_CERT }}
@@ -183,7 +183,7 @@ jobs:
         run: chmod +x build/bin/*/Contents/MacOS/*
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ env.RELEASE_MODE != 'true' }}
         with:
           name: ${{ env.COMMON_BUILD_NAME }}-macos-universal-${{ env.VERSION_TAG }}

@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout current repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Run multi-repo cloc
         id: cloc
@@ -69,7 +69,7 @@ jobs:
 
       - name: Upload cloc artifact
         if: ${{ inputs.upload_artifact }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: multi-repo-cloc-${{ github.run_number }}
           path: ${{ steps.cloc.outputs.output_dir }}

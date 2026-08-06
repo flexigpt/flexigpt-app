@@ -155,8 +155,10 @@ type ManagedPackageWriter interface {
 // Source adapters that need to establish physical Source storage before the
 // Source metadata row is published.
 //
-// DiscardBootstrappedManagedSource compensates only a failed metadata creation
-// and must refuse to remove non-empty content.
+// DiscardBootstrappedManagedSource is used for failed source provisioning and
+// for discarding a bundle-owned Source after all published packages were
+// removed. It must refuse to remove published package content, but may remove
+// adapter-private staging state.
 type ManagedSourceBootstrapper interface {
 	BootstrapManagedSource(
 		ctx context.Context,

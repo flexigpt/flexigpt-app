@@ -399,6 +399,15 @@ func (s *Service) Discard(
 	id basespec.SourceID,
 	expectedRevision uint64,
 ) error {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: source discard context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return err
 	}
@@ -414,7 +423,25 @@ func (s *Service) Discard(
 			basespec.ErrInvalid,
 		)
 	}
-	return s.repository.Discard(ctx, rootID, id, expectedRevision)
+
+	current, err := s.repository.Get(ctx, rootID, id)
+	if err != nil {
+		return err
+	}
+	if current.Revision != expectedRevision {
+		return basespec.ErrConflict
+	}
+
+	cleanupContext := context.WithoutCancel(ctx)
+	if err := s.discardManagedStorage(cleanupContext, current); err != nil {
+		return err
+	}
+	return s.repository.Discard(
+		cleanupContext,
+		rootID,
+		id,
+		expectedRevision,
+	)
 }
 
 func (s *Service) Purge(
@@ -500,4 +527,25 @@ func (s *Service) MarkContentChanged(
 
 func (s *Service) Kinds() []basespec.SourceKind {
 	return s.registry.Kinds()
+}
+
+func (s *Service) discardManagedStorage(
+	ctx context.Context,
+	value Source,
+) error {
+	adapter, exists := s.registry.adapter(value.Kind)
+	if !exists {
+		return nil
+	}
+	bootstrapper, supported := adapter.(ManagedSourceBootstrapper)
+	if !supported {
+		return nil
+	}
+	if err := bootstrapper.DiscardBootstrappedManagedSource(
+		ctx,
+		value.Clone(),
+	); err != nil {
+		return fmt.Errorf("discard managed Source storage: %w", err)
+	}
+	return nil
 }

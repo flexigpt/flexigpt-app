@@ -180,6 +180,9 @@ func (i *Installer) EnsureBuiltInArtifacts(
 		if err := i.rejectDynamicBuiltInArtifacts(ctx, current, value); err != nil {
 			return err
 		}
+		if !current.Collection.Enabled {
+			continue
+		}
 
 		files, err := i.packageFiles(ctx, value.SourceScope)
 		if err != nil {
@@ -240,6 +243,9 @@ func (i *Installer) EnsureBuiltInArtifacts(
 	// Refresh every Collection only after all package writes have completed.
 	for _, value := range i.hydrated.OrderedCollections() {
 		current := byCollectionID[value.Registration.ID]
+		if !current.Collection.Enabled {
+			continue
+		}
 		if err := i.skills.EnsureBuiltInBundleCurrent(
 			ctx,
 			current.Collection.Ref(),
@@ -283,7 +289,14 @@ func (i *Installer) rejectDynamicBuiltInBundles(
 
 	for _, bundle := range bundles {
 		expectedID, builtIn := declared[bundle.Data.LogicalName]
-		if !builtIn || bundle.Collection.ID == expectedID {
+		if !builtIn {
+			return fmt.Errorf(
+				"%w: undeclared built-in Skill Bundle %q remains installed",
+				basespec.ErrConflict,
+				bundle.Data.LogicalName,
+			)
+		}
+		if bundle.Collection.ID == expectedID {
 			continue
 		}
 		return fmt.Errorf(

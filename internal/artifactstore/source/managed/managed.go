@@ -207,13 +207,13 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 			basespec.ErrInvalid,
 		)
 	}
-	empty, err := managedDirectoryEmpty(root)
+	discardable, err := managedSourceDirectoryDiscardable(root)
 	if err != nil {
 		return err
 	}
-	if !empty {
+	if !discardable {
 		return fmt.Errorf(
-			"%w: refusing to discard a non-empty bootstrapped managed Source",
+			"%w: refusing to discard a managed Source with published package content",
 			basespec.ErrConflict,
 		)
 	}
@@ -221,7 +221,7 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 		return err
 	}
 	parent := filepath.Dir(root)
-	empty, err = managedDirectoryEmpty(parent)
+	empty, err := managedDirectoryEmpty(parent)
 	if err != nil {
 		return err
 	}
@@ -557,6 +557,15 @@ func (a *Adapter) confirmedGeneration(
 		return "", errors.Join(confirmErr, closeErr)
 	}
 	return generation, nil
+}
+
+// ValidatePackagePublication applies managed-directory-specific checks before
+// callers persist Artifact metadata or start an external publication step.
+func ValidatePackagePublication(
+	publication source.ManagedPackagePublication,
+) error {
+	_, err := validatePublication(publication)
+	return err
 }
 
 func validatePublication(
@@ -915,6 +924,22 @@ func writeManagedPackageFiles(
 	}
 	storesClosed = true
 	return nil
+}
+
+func managedSourceDirectoryDiscardable(location string) (bool, error) {
+	entries, err := os.ReadDir(location)
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if entry.Name() != stagingDirectoryName || !entry.IsDir() {
+			return false, nil
+		}
+		if err := os.RemoveAll(filepath.Join(location, entry.Name())); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 func managedDirectoryEmpty(location string) (bool, error) {

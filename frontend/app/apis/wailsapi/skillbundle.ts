@@ -106,6 +106,7 @@ function skillBundleFromWails(bundle: wailsSkillBundle.Bundle): SkillBundleView 
 		logicalVersion: bundle.Data.logicalVersion ?? undefined,
 		labels: bundle.Data.labels ?? undefined,
 		portableDefinitionDigest: bundle.Data.portableDefinitionDigest ?? undefined,
+		managedSourceID: bundle.Data.managedSourceID ?? undefined,
 		attachments: bundle.Attachments.map(attachment => {
 			const source = sourcesByID.get(attachment.sourceID);
 
@@ -223,6 +224,7 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 			LogicalVersion: body.logicalVersion ?? '',
 			Labels: body.labels ?? {},
 			PortableDefinitionDigest: body.portableDefinitionDigest,
+			ManagedSourceID: body.managedSourceID ?? '',
 			Attachments: (body.attachments ?? []).map(attachment => ({
 				SourceID: attachment.sourceID,
 				Role: attachment.role,

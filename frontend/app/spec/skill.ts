@@ -83,6 +83,7 @@ export interface SkillBundleView {
 	logicalVersion?: string;
 	labels?: Record<string, string>;
 	portableDefinitionDigest?: ArtifactDigest;
+	managedSourceID?: ArtifactSourceID;
 	attachments: SkillBundleAttachmentView[];
 	createdAt: Date;
 	modifiedAt: Date;
@@ -118,6 +119,11 @@ export interface CreateSkillBundleBody {
 	logicalVersion?: string;
 	labels?: Record<string, string>;
 	portableDefinitionDigest?: ArtifactDigest;
+
+	// Requests Artifact Store to provision and exclusively assign a managed
+	// source to this bundle. It must not also appear in `attachments`.
+	managedSourceID?: ArtifactSourceID;
+
 	attachments?: SkillBundleAttachmentDraft[];
 }
 
@@ -385,6 +391,7 @@ export interface SkillBundle {
 	slug: string;
 	logicalVersion?: string;
 	labels?: Record<string, string>;
+	managedSourceID?: ArtifactSourceID;
 	displayName?: string;
 	description?: string;
 	isEnabled: boolean;

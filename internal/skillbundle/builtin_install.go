@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
 )
@@ -118,6 +119,10 @@ func (a *API) InstallBuiltInCollection(
 	if err != nil {
 		return nil, err
 	}
+	if err := managed.ValidatePackagePublication(publication); err != nil {
+		return nil, err
+	}
+
 	filesByLocator := make(
 		map[basespec.Locator][]byte,
 		len(publication.Files),
@@ -388,7 +393,7 @@ func (a *API) ensurePinnedManagedSkill(
 	}
 	if pinned == nil {
 		localData, err := encodeManagedSkillArtifactData(
-			managedSkillArtifactData{PackageSHA256: packageSHA256},
+			newManagedSkillArtifactData(packageSHA256, enabled),
 		)
 		if err != nil {
 			return artifact.Artifact{}, err
@@ -446,7 +451,7 @@ func (a *API) ensurePinnedManagedSkill(
 	intent, err := decodeManagedSkillArtifactData(pinned.Data)
 	if err != nil || intent.PackageSHA256 != packageSHA256 {
 		localData, err := encodeManagedSkillArtifactData(
-			managedSkillArtifactData{PackageSHA256: packageSHA256},
+			newManagedSkillArtifactData(packageSHA256, enabled),
 		)
 		if err != nil {
 			return artifact.Artifact{}, err

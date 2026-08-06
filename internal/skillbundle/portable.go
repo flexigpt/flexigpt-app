@@ -109,7 +109,6 @@ func ValidatePortableBundleDefinition(
 	for index, member := range value.Members {
 		if member.Role != string(skillartifact.Kind) ||
 			member.MediaType != portableSkillMediaType ||
-			member.Digest == nil ||
 			member.SubresourceLocator != "" {
 			return fmt.Errorf(
 				"%w: portable Skill Bundle member %d is not an integrity-pinned SKILL.md member",

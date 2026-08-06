@@ -59,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: "recursive"
 
@@ -132,7 +132,7 @@ jobs:
         run: cp "${WIN_INSTALLER_PATH}" "${FINAL_PKG_PATH}"
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ env.RELEASE_MODE != 'true' }}
         with:
           name: ${{ env.COMMON_BUILD_NAME }}-win-amd64-${{ env.VERSION_TAG }}

@@ -23,6 +23,7 @@ const DEFAULT_SKILL_ROOT_DISPLAY_NAME = 'FlexiGPT Skills';
 const DEFAULT_SKILL_ROOT_DESCRIPTION = 'Artifact Store namespace for user-managed Skill Bundles.';
 const MANAGED_SOURCE_KIND = 'managed-directory';
 const FILESYSTEM_SOURCE_KIND = 'fs-directory';
+const DEFAULT_SKILL_ROOT_ID: ArtifactRootID = '0198f097-0d5c-7000-8000-000000000001';
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim()) {
@@ -78,6 +79,7 @@ function toSkillBundle(bundle: SkillBundleView): SkillBundle {
 		logicalVersion: bundle.logicalVersion,
 		labels: bundle.labels,
 		displayName: bundle.displayName,
+		managedSourceID: bundle.managedSourceID,
 		description: bundle.description,
 		isEnabled: bundle.enabled,
 		isBuiltIn: bundleIsBuiltIn(bundle),
@@ -250,40 +252,14 @@ export class SkillManagementAPI {
 		description?: string
 	): Promise<void> {
 		const rootID = await this.resolveCreationRoot();
-		const sourceID = getUUIDv7();
-		let sourceRevision: number | undefined;
-
-		try {
-			const source = await this.artifacts.createArtifactSource(rootID, {
-				id: sourceID,
-				kind: MANAGED_SOURCE_KIND,
-				displayName: `${displayName} managed Skills`,
-				enabled: true,
-				config: '{}',
-			});
-			sourceRevision = source.revision;
-
-			await this.skills.createSkillBundle(rootID, {
-				collectionID: bundleID,
-				displayName,
-				description,
-				enabled: isEnabled,
-				logicalName: slug,
-				attachments: [
-					{
-						sourceID,
-						role: SkillBundleAttachmentRole.Managed,
-						enabled: true,
-						discoveryRoot: '.',
-					},
-				],
-			});
-		} catch (error) {
-			if (sourceRevision !== undefined) {
-				await this.cleanupSource(rootID, sourceID, sourceRevision);
-			}
-			throw error;
-		}
+		await this.skills.createSkillBundle(rootID, {
+			collectionID: bundleID,
+			displayName,
+			description,
+			enabled: isEnabled,
+			logicalName: slug,
+			managedSourceID: getUUIDv7(),
+		});
 	}
 
 	async patchSkillBundle(bundleID: string, enabled: boolean): Promise<void> {
@@ -318,14 +294,16 @@ export class SkillManagementAPI {
 			throw new Error('Remove all Skills before deleting the Skill Bundle.');
 		}
 
-		const managedSourceIDs = bundle.attachments
-			.filter(attachment => attachment.role === SkillBundleAttachmentRole.Managed)
-			.map(attachment => attachment.sourceID);
+		const legacyManagedSourceIDs = bundle.managedSourceID
+			? []
+			: bundle.attachments
+					.filter(attachment => attachment.role === SkillBundleAttachmentRole.Managed)
+					.map(attachment => attachment.sourceID);
 
 		const retired = await this.skills.retireSkillBundle(bundle.bundle, bundle.revision);
 		await this.skills.purgeSkillBundle(bundle.bundle, retired.revision);
 
-		for (const sourceID of managedSourceIDs) {
+		for (const sourceID of legacyManagedSourceIDs) {
 			try {
 				const source = await this.artifacts.getArtifactSource(bundle.bundle.rootID, sourceID);
 				const retiredSource = await this.artifacts.retireArtifactSource(
@@ -405,16 +383,22 @@ export class SkillManagementAPI {
 			});
 			sourceRevision = source.revision;
 
-			const updated = await this.skills.attachSkillBundleSource(bundle.bundle, {
+			await this.skills.attachSkillBundleSource(bundle.bundle, {
 				expectedCollectionRevision: bundle.revision,
 				sourceID,
 				role: SkillBundleAttachmentRole.External,
 				enabled: true,
 				discoveryRoot: '.',
 			});
-			await this.skills.refreshSkillBundle(updated.bundle);
 		} catch (error) {
 			if (sourceRevision !== undefined) {
+				const latest = await this.resolveBundle(bundleID).catch(() => undefined);
+				if (latest?.attachments.some(attachment => attachment.sourceID === sourceID)) {
+					// The wrapper may have committed attachment metadata and
+					// failed only during its follow-up refresh. The caller's
+					// normal bundle refresh can now converge safely.
+					return;
+				}
 				await this.cleanupSource(bundle.bundle.rootID, sourceID, sourceRevision);
 			}
 			throw error;
@@ -545,6 +529,14 @@ export class SkillManagementAPI {
 			});
 		} catch (error) {
 			if (sourceRevision !== undefined) {
+				const latest = await this.resolveBundle(bundle.bundle.collectionID).catch(() => undefined);
+				if (
+					latest?.attachments.some(
+						attachment => attachment.sourceID === sourceID && attachment.role === SkillBundleAttachmentRole.Managed
+					)
+				) {
+					return latest;
+				}
 				await this.cleanupSource(bundle.bundle.rootID, sourceID, sourceRevision);
 			}
 			throw error;
@@ -565,15 +557,13 @@ export class SkillManagementAPI {
 
 	private async resolveOrCreateRoot(): Promise<ArtifactRootID> {
 		const roots = await this.artifacts.listArtifactRoots();
-		const existing = roots.find(
-			root => root.displayName.trim().toLowerCase() === DEFAULT_SKILL_ROOT_DISPLAY_NAME.toLowerCase()
-		);
+		const existing = roots.find(root => root.id === DEFAULT_SKILL_ROOT_ID);
 		if (existing) {
 			return existing.id;
 		}
 
 		const created = await this.artifacts.createArtifactRoot({
-			id: getUUIDv7(),
+			id: DEFAULT_SKILL_ROOT_ID,
 			displayName: DEFAULT_SKILL_ROOT_DISPLAY_NAME,
 			description: DEFAULT_SKILL_ROOT_DESCRIPTION,
 		});

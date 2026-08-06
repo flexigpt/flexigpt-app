@@ -36,7 +36,7 @@ jobs:
       options: --privileged
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: "recursive"
 
@@ -85,7 +85,7 @@ jobs:
           # disable-rofiles-fuse: "true"
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ env.RELEASE_MODE != 'true' }}
         with:
           name: ${{ env.COMMON_BUILD_NAME }}-linux-amd64-${{ env.VERSION_TAG }}

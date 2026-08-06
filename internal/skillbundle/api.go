@@ -390,6 +390,15 @@ func (a *API) PurgeBundle(
 		if err != nil {
 			return err
 		}
+		if ownedSource.Kind != managed.Kind {
+			return fmt.Errorf(
+				"%w: bundle-owned managed Source %q has kind %q, not %q",
+				basespec.ErrInvalid,
+				data.ManagedSourceID,
+				ownedSource.Kind,
+				managed.Kind,
+			)
+		}
 	}
 	if err := a.dependencies.Collections.Purge(ctx, ref, expectedRevision); err != nil {
 		return err
@@ -1035,18 +1044,17 @@ func (a *API) EnsureBuiltInBundleTopology(
 
 func (a *API) InstallBuiltInSkill(
 	ctx context.Context,
-	request CreateManagedSkillRequest,
+	_ CreateManagedSkillRequest,
 ) (CreateManagedSkillResponse, error) {
+	if err := a.Ready(); err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	if err := basespec.ValidateArtifactID(request.ArtifactID); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	return a.createManagedSkill(
-		ctx,
-		request,
-		true,
+	return CreateManagedSkillResponse{}, fmt.Errorf(
+		"%w: built-in Skills must be installed through InstallBuiltInCollection",
+		basespec.ErrUnsupported,
 	)
 }
 
@@ -1131,11 +1139,20 @@ func (a *API) createBundle(
 				basespec.ErrInvalid,
 			)
 		}
-		roleCounts[draft.Role]++
-		if draft.Role == RoleManaged && roleCounts[draft.Role] > 1 {
+		if request.ManagedSourceID != "" &&
+			draft.SourceID == request.ManagedSourceID {
 			return Bundle{}, fmt.Errorf(
-				"%w: skill bundle can have only one managed attachment",
+				"%w: managedSourceID is provisioned and attached by bundle creation and must not also be an explicit attachment",
 				basespec.ErrInvalid,
+			)
+		}
+		roleCounts[draft.Role]++
+		if (draft.Role == RoleManaged || draft.Role == RoleBuiltIn) &&
+			roleCounts[draft.Role] > 1 {
+			return Bundle{}, fmt.Errorf(
+				"%w: skill bundle can have only one %q attachment",
+				basespec.ErrInvalid,
+				draft.Role,
 			)
 		}
 		if err := a.validateAttachmentDraft(ctx, request.RootID, draft); err != nil {
@@ -1168,13 +1185,11 @@ func (a *API) createBundle(
 				basespec.ErrInvalid,
 			)
 		}
-		for _, draft := range request.Attachments {
-			if draft.Role == RoleManaged {
-				return Bundle{}, fmt.Errorf(
-					"%w: managedSourceID cannot be combined with an explicit managed attachment",
-					basespec.ErrInvalid,
-				)
-			}
+		if roleCounts[RoleManaged] != 0 {
+			return Bundle{}, fmt.Errorf(
+				"%w: managedSourceID cannot be combined with an explicit managed attachment",
+				basespec.ErrInvalid,
+			)
 		}
 
 		value, createdNew, err := a.dependencies.Sources.CreateWithStatus(
@@ -1568,6 +1583,22 @@ func (a *API) createManagedSkill(
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
+	if request.ExpectedCollectionRevision == 0 {
+		return CreateManagedSkillResponse{}, fmt.Errorf(
+			"%w: expected Skill Bundle revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+	if bundle.Collection.Revision != request.ExpectedCollectionRevision {
+		return CreateManagedSkillResponse{}, basespec.ErrConflict
+	}
+	if !bundle.Collection.Enabled {
+		return CreateManagedSkillResponse{}, fmt.Errorf(
+			"%w: Skill Bundle %q is disabled",
+			basespec.ErrConflict,
+			request.Bundle.CollectionID,
+		)
+	}
 
 	targetRole := RoleManaged
 	if allowBuiltInAttachment {
@@ -1602,10 +1633,24 @@ func (a *API) createManagedSkill(
 	if err := basespec.ValidatePortableLocator(skillLocator, false); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
+	if err := managed.ValidatePackagePublication(
+		source.ManagedPackagePublication{
+			Directory: directory,
+			Files:     files,
+		},
+	); err != nil {
+		return CreateManagedSkillResponse{}, err
+	}
 
 	artifactName := definitionValue.DisplayName
 	if artifactName == "" {
 		artifactName = request.SkillName
+	}
+	packageData, err := encodeManagedSkillArtifactData(
+		newManagedSkillArtifactData(packageSHA256, request.Enabled),
+	)
+	if err != nil {
+		return CreateManagedSkillResponse{}, err
 	}
 
 	pinned, err := a.managedSkillByID(
@@ -1620,24 +1665,6 @@ func (a *API) createManagedSkill(
 		if request.ExpectedArtifactRevision != 0 {
 			return CreateManagedSkillResponse{}, basespec.ErrConflict
 		}
-		if request.ExpectedCollectionRevision == 0 {
-			return CreateManagedSkillResponse{}, fmt.Errorf(
-				"%w: expected skill bundle revision is required for a new managed Skill",
-				basespec.ErrInvalid,
-			)
-		}
-		if bundle.Collection.Revision != request.ExpectedCollectionRevision {
-			return CreateManagedSkillResponse{}, basespec.ErrConflict
-		}
-
-		localData, err := encodeManagedSkillArtifactData(
-			managedSkillArtifactData{
-				PackageSHA256: packageSHA256,
-			},
-		)
-		if err != nil {
-			return CreateManagedSkillResponse{}, err
-		}
 
 		value, pinErr := a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
 			ArtifactID:                 request.ArtifactID,
@@ -1650,7 +1677,7 @@ func (a *API) createManagedSkill(
 			},
 			Name:    artifactName,
 			Enabled: request.Enabled,
-			Data:    localData,
+			Data:    packageData,
 		})
 		switch {
 		case pinErr == nil:
@@ -1686,13 +1713,16 @@ func (a *API) createManagedSkill(
 		return CreateManagedSkillResponse{}, err
 	}
 
+	intent, intentErr := decodeManagedSkillArtifactData(pinned.Data)
+	samePackageIntent := intentErr == nil &&
+		intent.PackageSHA256 == packageSHA256 &&
+		((intent.Enabled == nil && pinned.Enabled == request.Enabled) ||
+			(intent.Enabled != nil && *intent.Enabled == request.Enabled))
+
 	if request.ExpectedArtifactRevision == 0 {
-		// Zero is both the initial-create token and the replay token for a
-		// create that became pending after its Artifact was pinned. Resume only
-		// when the persisted package intent is byte-for-byte equivalent.
-		intent, intentErr := decodeManagedSkillArtifactData(pinned.Data)
-		if intentErr != nil ||
-			intent.PackageSHA256 != packageSHA256 ||
+		// Zero is the initial-create token and an idempotent replay token.
+		// The persisted package data is the durable operation marker.
+		if !samePackageIntent ||
 			pinned.Name != artifactName {
 			return CreateManagedSkillResponse{}, fmt.Errorf(
 				"%w: managed Skill Artifact %q already exists with different creation intent",
@@ -1700,8 +1730,24 @@ func (a *API) createManagedSkill(
 				request.ArtifactID,
 			)
 		}
-	} else if pinned.Revision != request.ExpectedArtifactRevision {
-		return CreateManagedSkillResponse{}, basespec.ErrConflict
+	} else if !samePackageIntent {
+		if pinned.Revision != request.ExpectedArtifactRevision {
+			return CreateManagedSkillResponse{}, basespec.ErrConflict
+		}
+
+		// Persist full package intent before touching source-side storage.
+		// If publication or refresh later fails, this marker permits a retry
+		// using the original Artifact revision.
+		updated, err := a.dependencies.Artifacts.UpdateData(
+			ctx,
+			pinned.Ref(),
+			pinned.Revision,
+			packageData,
+		)
+		if err != nil {
+			return CreateManagedSkillResponse{}, err
+		}
+		pinned = &updated
 	}
 
 	if pinned.Name != artifactName {
@@ -1771,34 +1817,6 @@ func (a *API) createManagedSkill(
 	}
 
 	resolved, err := a.dependencies.Artifacts.Get(ctx, pinned.Ref())
-	if err != nil {
-		return CreateManagedSkillResponse{}, pending(err)
-	}
-	if result, complete := managedSkillCreateResult(
-		resolved,
-		sourceValue.ID,
-		skillLocator,
-		definitionValue.Digest,
-		packageSHA256,
-	); complete {
-		return a.setManagedSkillEnabled(ctx, result, request.Enabled)
-	}
-
-	// Refresh reconciles source-derived fields. Package provenance is
-	// collection-local authoring metadata, so it is updated afterwards using
-	// the freshly reconciled Artifact revision.
-	localData, err := encodeManagedSkillArtifactData(
-		managedSkillArtifactData{PackageSHA256: packageSHA256},
-	)
-	if err != nil {
-		return CreateManagedSkillResponse{}, pending(err)
-	}
-	resolved, err = a.dependencies.Artifacts.UpdateData(
-		ctx,
-		resolved.Ref(),
-		resolved.Revision,
-		localData,
-	)
 	if err != nil {
 		return CreateManagedSkillResponse{}, pending(err)
 	}
@@ -2202,6 +2220,21 @@ func normalizeManagedSkillFiles(
 
 type managedSkillArtifactData struct {
 	PackageSHA256 cryptoutil.Digest `json:"packageSHA256"`
+
+	// Enabled is part of the durable managed-Skill operation intent. It is a
+	// pointer so records created before this field existed remain readable.
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+func newManagedSkillArtifactData(
+	packageSHA256 cryptoutil.Digest,
+	enabled bool,
+) managedSkillArtifactData {
+	requestedEnabled := enabled
+	return managedSkillArtifactData{
+		PackageSHA256: packageSHA256,
+		Enabled:       &requestedEnabled,
+	}
 }
 
 func validateManagedSkillArtifactData(

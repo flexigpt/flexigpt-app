@@ -5,7 +5,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup GoLang
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v7
       with:
         go-version-file: "go.mod"
 
@@ -15,7 +15,7 @@ runs:
         run_install: false
 
     - name: Install Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
         node-version-file: "package.json"
         cache: "pnpm"
