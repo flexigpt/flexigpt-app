@@ -647,6 +647,68 @@ func (s *Service) Purge(
 	return s.repository.Purge(ctx, ref, expectedRevision)
 }
 
+// PurgeAndSuppress destructively removes one local Artifact Record and
+// records its binding as suppressed in the same repository transaction.
+//
+// It is for source-owned Artifacts whose source role would otherwise
+// automatically adopt the same occurrence again after the next refresh.
+func (s *Service) PurgeAndSuppress(
+	ctx context.Context,
+	ref ArtifactRef,
+	expectedRevision uint64,
+) error {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return err
+	}
+	if err := ref.Validate(); err != nil {
+		return err
+	}
+	if expectedRevision == 0 {
+		return fmt.Errorf(
+			"%w: expected artifact revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+
+	current, err := s.repository.Get(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if err := s.ensureArtifactCollection(ctx, current); err != nil {
+		return err
+	}
+	if current.Revision != expectedRevision {
+		return basespec.ErrConflict
+	}
+
+	collectionRef := collection.CollectionRef{
+		RootID:       current.RootID,
+		CollectionID: current.CollectionID,
+	}
+	if err := s.requireAttachedBinding(ctx, collectionRef, current.Binding); err != nil {
+		return err
+	}
+
+	now := clockutil.NowUTC(s.clock)
+	suppression := Suppression{
+		RootID:       current.RootID,
+		CollectionID: current.CollectionID,
+		Binding:      current.Binding,
+		Revision:     1,
+		CreatedAt:    now,
+		ModifiedAt:   now,
+	}
+	if err := suppression.Validate(); err != nil {
+		return err
+	}
+	return s.repository.PurgeAndSuppress(
+		ctx,
+		ref,
+		expectedRevision,
+		suppression,
+	)
+}
+
 func (s *Service) activeCollection(
 	ctx context.Context,
 	ref collection.CollectionRef,

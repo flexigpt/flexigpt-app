@@ -74,6 +74,13 @@ type Repository interface {
 		expectedRevision uint64,
 	) error
 
+	PurgeAndSuppress(
+		ctx context.Context,
+		ref ArtifactRef,
+		expectedRevision uint64,
+		suppression Suppression,
+	) error
+
 	Purge(
 		ctx context.Context,
 		ref ArtifactRef,

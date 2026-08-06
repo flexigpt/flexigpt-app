@@ -596,6 +596,93 @@ func (s *Store) purgeArtifact(
 	return tx.Commit()
 }
 
+func (s *Store) purgeArtifactAndSuppress(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	suppression artifact.Suppression,
+) error {
+	if err := ref.Validate(); err != nil {
+		return err
+	}
+	if err := suppression.Validate(); err != nil {
+		return err
+	}
+	if expectedRevision == 0 || suppression.Revision != 1 {
+		return fmt.Errorf(
+			"%w: invalid artifact purge with suppression",
+			basespec.ErrInvalid,
+		)
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := getActiveRootTx(ctx, tx, ref.RootID); err != nil {
+		return err
+	}
+	current, err := getArtifactTx(ctx, tx, ref)
+	if err != nil {
+		return err
+	}
+	if current.Revision != expectedRevision {
+		return basespec.ErrConflict
+	}
+
+	collectionRef := collection.CollectionRef{
+		RootID:       current.RootID,
+		CollectionID: current.CollectionID,
+	}
+	if _, err := getActiveCollectionTx(ctx, tx, collectionRef); err != nil {
+		return err
+	}
+	if suppression.RootID != current.RootID ||
+		suppression.CollectionID != current.CollectionID ||
+		suppression.Binding != current.Binding {
+		return fmt.Errorf(
+			"%w: suppression does not match artifact binding",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := requireAttachedSourceTx(
+		ctx,
+		tx,
+		collectionRef,
+		suppression.Binding.SourceID,
+	); err != nil {
+		return err
+	}
+
+	result, err := tx.ExecContext(
+		ctx,
+		`DELETE FROM artifact_artifacts
+		 WHERE id = ? AND root_id = ? AND revision = ?`,
+		string(ref.ArtifactID),
+		string(ref.RootID),
+		expectedRevision,
+	)
+	if err != nil {
+		return sqliteError(err)
+	}
+	if err := requireOneChanged(
+		result,
+		"artifact changed during purge with suppression",
+	); err != nil {
+		return err
+	}
+
+	// This runs after the delete but inside the same transaction. A refresh
+	// cannot observe a gap in which the binding is neither represented nor
+	// suppressed.
+	if err := insertSuppressionTx(ctx, tx, suppression, false); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // insertArtifactTx is intentionally a pure insert. Callers must establish
 // Collection membership, current catalog, and source-binding preconditions
 // before invoking it.

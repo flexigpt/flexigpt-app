@@ -21,7 +21,6 @@ import type { IArtifactStoreAPI, ISkillBundleAPI } from '@/apis/interface';
 
 const DEFAULT_SKILL_ROOT_DISPLAY_NAME = 'FlexiGPT Skills';
 const DEFAULT_SKILL_ROOT_DESCRIPTION = 'Artifact Store namespace for user-managed Skill Bundles.';
-const MANAGED_SOURCE_KIND = 'managed-directory';
 const FILESYSTEM_SOURCE_KIND = 'fs-directory';
 const DEFAULT_SKILL_ROOT_ID: ArtifactRootID = '0198f097-0d5c-7000-8000-000000000001';
 
@@ -98,6 +97,7 @@ function toSkill(
 	const builtIn = bundleIsBuiltIn(bundle);
 	const managed =
 		artifact.adoption === ArtifactAdoptionMode.Pinned &&
+		bundle.managedSourceID === artifact.binding.sourceID &&
 		bundle.attachments.some(
 			attachment =>
 				attachment.sourceID === artifact.binding.sourceID && attachment.role === SkillBundleAttachmentRole.Managed
@@ -294,32 +294,12 @@ export class SkillManagementAPI {
 			throw new Error('Remove all Skills before deleting the Skill Bundle.');
 		}
 
-		const legacyManagedSourceIDs = bundle.managedSourceID
-			? []
-			: bundle.attachments
-					.filter(attachment => attachment.role === SkillBundleAttachmentRole.Managed)
-					.map(attachment => attachment.sourceID);
-
 		const retired = await this.skills.retireSkillBundle(bundle.bundle, bundle.revision);
 		await this.skills.purgeSkillBundle(bundle.bundle, retired.revision);
-
-		for (const sourceID of legacyManagedSourceIDs) {
-			try {
-				const source = await this.artifacts.getArtifactSource(bundle.bundle.rootID, sourceID);
-				const retiredSource = await this.artifacts.retireArtifactSource(
-					bundle.bundle.rootID,
-					sourceID,
-					source.revision
-				);
-				await this.artifacts.purgeArtifactSource(bundle.bundle.rootID, sourceID, retiredSource.revision);
-			} catch (error) {
-				console.error('Skill Bundle was deleted but managed Source cleanup failed:', error);
-			}
-		}
 	}
 
 	async putSkillArtifact(bundleID: string, artifactID: string, input: SkillArtifactCreateInput): Promise<Skill> {
-		const bundle = await this.ensureManagedAttachment(await this.resolveBundle(bundleID));
+		const bundle = await this.requireManagedAttachment(await this.resolveBundle(bundleID));
 		const resp = await this.skills.createManagedSkill(bundle.bundle, {
 			expectedCollectionRevision: bundle.revision,
 			artifactID,
@@ -503,44 +483,23 @@ export class SkillManagementAPI {
 		return artifact;
 	}
 
-	private async ensureManagedAttachment(bundle: SkillBundleView): Promise<SkillBundleView> {
-		if (bundle.attachments.some(attachment => attachment.role === SkillBundleAttachmentRole.Managed)) {
-			return bundle;
+	private async requireManagedAttachment(bundle: SkillBundleView): Promise<SkillBundleView> {
+		if (!bundle.managedSourceID) {
+			throw new Error(
+				'This Skill Bundle has no bundle-owned managed Source. It is a legacy or incomplete bundle and must be repaired before adding managed Skills.'
+			);
 		}
 
-		const sourceID = getUUIDv7();
-		let sourceRevision: number | undefined;
-		try {
-			const source = await this.artifacts.createArtifactSource(bundle.bundle.rootID, {
-				id: sourceID,
-				kind: MANAGED_SOURCE_KIND,
-				displayName: `${bundle.displayName} managed Skills`,
-				enabled: true,
-				config: '{}',
-			});
-			sourceRevision = source.revision;
-
-			return await this.skills.attachSkillBundleSource(bundle.bundle, {
-				expectedCollectionRevision: bundle.revision,
-				sourceID,
-				role: SkillBundleAttachmentRole.Managed,
-				enabled: true,
-				discoveryRoot: '.',
-			});
-		} catch (error) {
-			if (sourceRevision !== undefined) {
-				const latest = await this.resolveBundle(bundle.bundle.collectionID).catch(() => undefined);
-				if (
-					latest?.attachments.some(
-						attachment => attachment.sourceID === sourceID && attachment.role === SkillBundleAttachmentRole.Managed
-					)
-				) {
-					return latest;
-				}
-				await this.cleanupSource(bundle.bundle.rootID, sourceID, sourceRevision);
-			}
-			throw error;
+		const managedAttachments = bundle.attachments.filter(
+			attachment => attachment.role === SkillBundleAttachmentRole.Managed
+		);
+		if (managedAttachments.length !== 1 || managedAttachments[0].sourceID !== bundle.managedSourceID) {
+			throw new Error(
+				'The Skill Bundle managed Source ownership record does not match its managed attachment. Repair the bundle before adding managed Skills.'
+			);
 		}
+
+		return bundle;
 	}
 
 	private async resolveCreationRoot(): Promise<ArtifactRootID> {

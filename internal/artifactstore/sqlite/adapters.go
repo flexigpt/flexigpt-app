@@ -395,3 +395,17 @@ func (r *ArtifactRepository) Purge(
 		expectedRevision,
 	)
 }
+
+func (r *ArtifactRepository) PurgeAndSuppress(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	suppression artifact.Suppression,
+) error {
+	return r.store.purgeArtifactAndSuppress(
+		ctx,
+		ref,
+		expectedRevision,
+		suppression,
+	)
+}

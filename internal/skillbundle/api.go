@@ -121,18 +121,21 @@ type PinSkillRequest struct {
 }
 
 type BuiltInBundleTopology struct {
-	RootID                   basespec.RootID                        `json:"-"`
-	CollectionID             basespec.CollectionID                  `json:"-"`
-	SourceID                 basespec.SourceID                      `json:"-"`
-	LogicalName              basespec.LogicalName                   `json:"-"`
-	LogicalVersion           basespec.LogicalVersion                `json:"-"`
-	DisplayName              string                                 `json:"-"`
-	Description              string                                 `json:"-"`
-	Labels                   map[string]string                      `json:"-"`
-	Enabled                  bool                                   `json:"-"`
-	DiscoveryRoot            basespec.Locator                       `json:"-"`
-	ExpectedMemberDigests    map[basespec.Locator]cryptoutil.Digest `json:"-"`
-	PortableDefinitionDigest cryptoutil.Digest                      `json:"-"`
+	RootID                basespec.RootID                        `json:"-"`
+	CollectionID          basespec.CollectionID                  `json:"-"`
+	SourceID              basespec.SourceID                      `json:"-"`
+	LogicalName           basespec.LogicalName                   `json:"-"`
+	LogicalVersion        basespec.LogicalVersion                `json:"-"`
+	DisplayName           string                                 `json:"-"`
+	Description           string                                 `json:"-"`
+	Labels                map[string]string                      `json:"-"`
+	Enabled               bool                                   `json:"-"`
+	DiscoveryRoot         basespec.Locator                       `json:"-"`
+	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest `json:"-"`
+
+	// Optional local provenance. Embedded package bytes and member digests
+	// remain independently verified during built-in installation.
+	PortableDefinitionDigest *cryptoutil.Digest `json:"-"`
 }
 
 func New(dependencies Dependencies) (*API, error) {
@@ -217,7 +220,9 @@ func (a *API) GetBundle(
 		}
 		sources = append(sources, value)
 	}
-
+	if err := validateBundleAttachmentTopology(data, attachments); err != nil {
+		return Bundle{}, err
+	}
 	sort.Slice(attachments, func(left, right int) bool {
 		return attachments[left].SourceID < attachments[right].SourceID
 	})
@@ -434,6 +439,12 @@ func (a *API) AttachSource(
 			basespec.ErrInvalid,
 		)
 	}
+	if draft.Role == RoleManaged {
+		return Bundle{}, fmt.Errorf(
+			"%w: managed attachments must be provisioned through managedSourceID when the bundle is created",
+			basespec.ErrInvalid,
+		)
+	}
 	current, err := a.GetBundle(ctx, bundle)
 	if err != nil {
 		return Bundle{}, err
@@ -595,6 +606,9 @@ func (a *API) GetManagedSkillDocument(
 	}
 	attachment, _, err := managedAttachmentForRole(bundle, RoleManaged)
 	if err != nil {
+		return ManagedSkillDocument{}, err
+	}
+	if err := requireBundleOwnedManagedSource(bundle, attachment.SourceID); err != nil {
 		return ManagedSkillDocument{}, err
 	}
 	if attachment.SourceID != value.Binding.SourceID {
@@ -881,6 +895,9 @@ func (a *API) PurgeSkill(
 				basespec.ErrConflict,
 			)
 		}
+		if err := requireBundleOwnedManagedSource(bundle, value.Binding.SourceID); err != nil {
+			return err
+		}
 	default:
 		if value.Adoption == artifact.AdoptionObserved {
 			return a.dependencies.Artifacts.Unadopt(
@@ -890,7 +907,7 @@ func (a *API) PurgeSkill(
 				true,
 			)
 		}
-		return a.dependencies.Artifacts.Purge(ctx, ref, expectedRevision)
+		return a.dependencies.Artifacts.PurgeAndSuppress(ctx, ref, expectedRevision)
 	}
 
 	directory, err := managedSkillPackageDirectoryOf(value.Binding)
@@ -947,7 +964,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 		Description:              request.Description,
 		Labels:                   request.Labels,
 		Enabled:                  request.Enabled,
-		PortableDefinitionDigest: &request.PortableDefinitionDigest,
+		PortableDefinitionDigest: cryptoutil.CloneDigest(request.PortableDefinitionDigest),
 		Attachments: []AttachmentDraft{{
 			SourceID:              request.SourceID,
 			Role:                  RoleBuiltIn,
@@ -966,7 +983,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 			LogicalName:              request.LogicalName,
 			LogicalVersion:           request.LogicalVersion,
 			Labels:                   request.Labels,
-			PortableDefinitionDigest: &request.PortableDefinitionDigest,
+			PortableDefinitionDigest: request.PortableDefinitionDigest,
 		})
 		if err != nil {
 			return Bundle{}, err
@@ -1139,6 +1156,12 @@ func (a *API) createBundle(
 				basespec.ErrInvalid,
 			)
 		}
+		if draft.Role == RoleManaged {
+			return Bundle{}, fmt.Errorf(
+				"%w: managed attachments must be provisioned through managedSourceID",
+				basespec.ErrInvalid,
+			)
+		}
 		if request.ManagedSourceID != "" &&
 			draft.SourceID == request.ManagedSourceID {
 			return Bundle{}, fmt.Errorf(
@@ -1182,12 +1205,6 @@ func (a *API) createBundle(
 		if allowBuiltInAttachment {
 			return Bundle{}, fmt.Errorf(
 				"%w: protected bundle topology must declare its attachment explicitly",
-				basespec.ErrInvalid,
-			)
-		}
-		if roleCounts[RoleManaged] != 0 {
-			return Bundle{}, fmt.Errorf(
-				"%w: managedSourceID cannot be combined with an explicit managed attachment",
 				basespec.ErrInvalid,
 			)
 		}
@@ -1386,7 +1403,7 @@ func builtInBundleTopologyMatches(
 		value.Collection.Enabled != request.Enabled ||
 		value.Data.LogicalName != request.LogicalName ||
 		value.Data.LogicalVersion != request.LogicalVersion ||
-		!maps.Equal(value.Data.Labels, request.Labels) ||
+		value.Data.ManagedSourceID != "" ||
 		len(value.Attachments) != 1 {
 		return false
 	}
@@ -1403,9 +1420,10 @@ func builtInBundleTopologyMatches(
 	if err != nil {
 		return false
 	}
-	return value.Data.PortableDefinitionDigest != nil &&
-		*value.Data.PortableDefinitionDigest ==
-			request.PortableDefinitionDigest &&
+	return cryptoutil.IsDigestEqual(
+		value.Data.PortableDefinitionDigest,
+		request.PortableDefinitionDigest,
+	) &&
 		attachment.RootID == request.RootID &&
 		attachment.CollectionID == request.CollectionID &&
 		attachment.SourceID == request.SourceID &&
@@ -1611,6 +1629,11 @@ func (a *API) createManagedSkill(
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
+	if targetRole == RoleManaged {
+		if err := requireBundleOwnedManagedSource(bundle, sourceValue.ID); err != nil {
+			return CreateManagedSkillResponse{}, err
+		}
+	}
 	if !attachment.Enabled || !sourceValue.Enabled {
 		return CreateManagedSkillResponse{}, fmt.Errorf(
 			"%w: managed Skill source is disabled",
@@ -1712,6 +1735,14 @@ func (a *API) createManagedSkill(
 	); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
+	if request.ExpectedArtifactRevision != 0 &&
+		pinned.Revision != request.ExpectedArtifactRevision {
+		return CreateManagedSkillResponse{}, fmt.Errorf(
+			"%w: managed Skill Artifact %q changed since it was read",
+			basespec.ErrConflict,
+			request.ArtifactID,
+		)
+	}
 
 	intent, intentErr := decodeManagedSkillArtifactData(pinned.Data)
 	samePackageIntent := intentErr == nil &&
@@ -1731,9 +1762,6 @@ func (a *API) createManagedSkill(
 			)
 		}
 	} else if !samePackageIntent {
-		if pinned.Revision != request.ExpectedArtifactRevision {
-			return CreateManagedSkillResponse{}, basespec.ErrConflict
-		}
 
 		// Persist full package intent before touching source-side storage.
 		// If publication or refresh later fails, this marker permits a retry
@@ -1763,15 +1791,26 @@ func (a *API) createManagedSkill(
 		pinned = &updated
 	}
 
-	if result, complete := managedSkillCreateResult(
+	if pinned.Enabled != request.Enabled {
+		updated, err := a.dependencies.Artifacts.SetEnabled(
+			ctx,
+			pinned.Ref(),
+			pinned.Revision,
+			request.Enabled,
+		)
+		if err != nil {
+			return CreateManagedSkillResponse{}, err
+		}
+		pinned = &updated
+	}
+
+	currentResult, completeBeforePublication := managedSkillCreateResult(
 		*pinned,
 		sourceValue.ID,
 		skillLocator,
 		definitionValue.Digest,
 		packageSHA256,
-	); complete {
-		return a.setManagedSkillEnabled(ctx, result, request.Enabled)
-	}
+	)
 
 	state, generation, err := a.dependencies.GetManagedSourceState(
 		ctx,
@@ -1793,7 +1832,7 @@ func (a *API) createManagedSkill(
 	if allowBuiltInAttachment {
 		publishPackage = a.dependencies.PublishProtectedManagedPackage
 	}
-	_, _, err = publishPackage(
+	publishedSource, publishedGeneration, err := publishPackage(
 		ctx,
 		request.Bundle.RootID,
 		sourceValue.ID,
@@ -1806,6 +1845,19 @@ func (a *API) createManagedSkill(
 	)
 	if err != nil {
 		return CreateManagedSkillResponse{}, pending(err)
+	}
+
+	if publishedSource.ID != sourceValue.ID ||
+		publishedSource.RootID != request.Bundle.RootID {
+		return CreateManagedSkillResponse{}, pending(fmt.Errorf(
+			"%w: managed Source publication returned another Source",
+			basespec.ErrInvalid,
+		))
+	}
+	if completeBeforePublication &&
+		publishedSource.Revision == state.Revision &&
+		publishedGeneration == generation {
+		return currentResult, nil
 	}
 
 	if _, err := a.refreshBundle(
@@ -1827,7 +1879,13 @@ func (a *API) createManagedSkill(
 		definitionValue.Digest,
 		packageSHA256,
 	); complete {
-		return a.setManagedSkillEnabled(ctx, result, request.Enabled)
+		if resolved.Name != artifactName || resolved.Enabled != request.Enabled {
+			return CreateManagedSkillResponse{}, pending(fmt.Errorf(
+				"%w: managed Skill Artifact changed during package publication",
+				basespec.ErrConflict,
+			))
+		}
+		return result, nil
 	}
 	return CreateManagedSkillResponse{}, pending(
 		fmt.Errorf(
@@ -1862,26 +1920,66 @@ func managedSkillCreateResult(
 	}, true
 }
 
-func (a *API) setManagedSkillEnabled(
-	ctx context.Context,
-	result CreateManagedSkillResponse,
-	enabled bool,
-) (CreateManagedSkillResponse, error) {
-	if result.Artifact.Enabled == enabled {
-		return result, nil
-	}
-	updated, err := a.dependencies.Artifacts.SetEnabled(
-		ctx,
-		result.Artifact.Ref(),
-		result.Artifact.Revision,
-		enabled,
+func validateBundleAttachmentTopology(
+	data CollectionData,
+	attachments []collection.Attachment,
+) error {
+	var (
+		managedAttachmentCount int
+		managedAttachmentID    basespec.SourceID
+		builtInAttachmentCount int
 	)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
+	for _, attachment := range attachments {
+		switch attachment.Role {
+		case RoleManaged:
+			managedAttachmentCount++
+			managedAttachmentID = attachment.SourceID
+		case RoleBuiltIn:
+			builtInAttachmentCount++
+		}
 	}
-	result.Artifact = updated
-	result.Address = updated.Address()
-	return result, nil
+	if managedAttachmentCount > 1 {
+		return fmt.Errorf(
+			"%w: skill bundle has multiple managed attachments",
+			basespec.ErrInvalid,
+		)
+	}
+	if builtInAttachmentCount > 1 {
+		return fmt.Errorf(
+			"%w: skill bundle has multiple built-in attachments",
+			basespec.ErrInvalid,
+		)
+	}
+	if data.ManagedSourceID == "" {
+		// Legacy bundles can still be read. They cannot be used for new
+		// managed package writes until an explicit ownership repair exists.
+		return nil
+	}
+	if managedAttachmentCount != 1 ||
+		managedAttachmentID != data.ManagedSourceID {
+		return fmt.Errorf(
+			"%w: bundle-owned managed Source %q is not its sole managed attachment",
+			basespec.ErrInvalid,
+			data.ManagedSourceID,
+		)
+	}
+	return nil
+}
+
+func requireBundleOwnedManagedSource(
+	bundle Bundle,
+	sourceID basespec.SourceID,
+) error {
+	if bundle.Data.ManagedSourceID == "" ||
+		bundle.Data.ManagedSourceID != sourceID {
+		return fmt.Errorf(
+			"%w: managed Source %q is not owned by Skill Bundle %q",
+			basespec.ErrConflict,
+			sourceID,
+			bundle.Collection.ID,
+		)
+	}
+	return nil
 }
 
 func (a *API) validateAttachmentDraft(
@@ -2384,7 +2482,7 @@ func pendingManagedSkillCreateError(
 
 func pendingManagedSkillPurgeError(ref artifact.ArtifactRef, cause error) error {
 	return fmt.Errorf(
-		"managed Skill purge for Artifact %q may have completed only the source-side step; reload and retry if the Artifact remains: %w",
+		"managed Skill create for Artifact %q remains pending; reload its current revision before retrying a replacement with the same artifactID: %w",
 		ref.ArtifactID,
 		cause,
 	)
