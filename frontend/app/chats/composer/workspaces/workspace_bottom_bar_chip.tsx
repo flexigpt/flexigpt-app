@@ -134,7 +134,7 @@ function WorkspaceBottomBarChipInner({
 
 	return (
 		<div className="relative shrink-0" data-bottom-bar-workspace>
-			<HoverTip content={hoverContent} placement="top" tooltipClassName="max-w-sm">
+			<HoverTip content={hoverContent} placement="top" wrapperElement="div" tooltipClassName="max-w-sm">
 				<div
 					className={`${actionTriggerChipSurfaceClasses} border ${
 						selected

@@ -1299,8 +1299,8 @@ function AddEditSkillModalContent({
 													) : null}
 												</div>
 												<div className="text-base-content/70 mt-1 text-xs">
-													To update resources or edit SKILL.md directly, change files in this folder and then re-enable
-													the skill or restart the app to refresh runtime metadata.
+													To update resources or edit SKILL.md directly, change files in this folder and then use
+													Refresh on the owning Skill Bundle.
 												</div>
 											</div>
 										</ManagementInfoRow>

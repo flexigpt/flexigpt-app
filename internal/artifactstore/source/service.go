@@ -212,6 +212,8 @@ func sourceCreationIntentMatches(
 	return existing.ID == requested.ID &&
 		existing.RootID == requested.RootID &&
 		existing.Kind == requested.Kind &&
+		existing.DisplayName == requested.DisplayName &&
+		existing.Enabled == requested.Enabled &&
 		jsonutil.Equal(existing.Config, requested.Config)
 }
 

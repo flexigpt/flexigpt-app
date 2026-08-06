@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"sort"
+	"strings"
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -69,7 +70,7 @@ func cloneCollectionDesiredViews(
 // either arbitrary source would turn map or scheduling order into policy.
 func mergeDesiredCollections(
 	collections map[collection.CollectionRef]runtimeDesiredView,
-) runtimeDesiredView {
+) (runtimeDesiredView, error) {
 	byName := map[string]map[string]struct{}{}
 	for _, view := range collections {
 		for definition := range view.definitions {
@@ -104,7 +105,20 @@ func mergeDesiredCollections(
 			output.artifacts[definition] = view.artifacts[definition]
 		}
 	}
-	return output
+	if len(collided) == 0 {
+		return output, nil
+	}
+
+	names := make([]string, 0, len(collided))
+	for name := range collided {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return output, fmt.Errorf(
+		"%w: runtime Skill names are ambiguous across Collections: %s",
+		basespec.ErrConflict,
+		strings.Join(names, ", "),
+	)
 }
 
 func (s *SkillRuntime) ResyncCollection(
@@ -271,7 +285,7 @@ func (s *SkillRuntime) reconcileCollectionsLocked(
 		return basespec.ErrClosed
 	}
 
-	desired := mergeDesiredCollections(collections)
+	desired, mergeErr := mergeDesiredCollections(collections)
 	managed, err := s.runtimeApplyDesired(
 		ctx,
 		s.managedRuntime,
@@ -284,7 +298,7 @@ func (s *SkillRuntime) reconcileCollectionsLocked(
 	// reconciliation converges from actual process-local state.
 	s.managedCollections = cloneCollectionDesiredViews(collections)
 	s.managedRuntime = managed
-	return err
+	return errors.Join(mergeErr, err)
 }
 
 func (s *SkillRuntime) runtimeApplyDesired(

@@ -430,6 +430,13 @@ func (a *API) ensurePinnedManagedSkill(
 	); err != nil {
 		return artifact.Artifact{}, err
 	}
+	if pinned.Name != name {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: built-in Artifact %q name differs from the current package",
+			basespec.ErrConflict,
+			artifactID,
+		)
+	}
 
 	intent, err := decodeManagedSkillArtifactData(pinned.Data)
 	if err != nil || intent.PackageSHA256 != packageSHA256 {
@@ -444,6 +451,18 @@ func (a *API) ensurePinnedManagedSkill(
 			pinned.Ref(),
 			pinned.Revision,
 			localData,
+		)
+		if err != nil {
+			return artifact.Artifact{}, err
+		}
+		pinned = &updated
+	}
+	if pinned.Enabled != enabled {
+		updated, err := a.dependencies.Artifacts.SetEnabled(
+			ctx,
+			pinned.Ref(),
+			pinned.Revision,
+			enabled,
 		)
 		if err != nil {
 			return artifact.Artifact{}, err

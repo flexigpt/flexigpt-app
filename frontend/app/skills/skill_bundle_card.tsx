@@ -28,6 +28,7 @@ import {
 	getSkillResourceCountLabel,
 	getSkillResourceTooltip,
 	normalizeSkillInsert,
+	skillHasResources,
 	skillMatchesInsertFilter,
 	skillMatchesSearch,
 	skillMatchesTags,
@@ -401,6 +402,7 @@ export function SkillBundleCard({
 							{visibleSkills.map(skill => {
 								const insert = normalizeSkillInsert(skill.insert).value;
 								const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
+								const editWouldReplaceResources = skill.isManaged && skillHasResources(skill);
 								const usage =
 									insert === SkillInsert.UserMessage
 										? 'Composer template'
@@ -483,8 +485,14 @@ export function SkillBundleCard({
 												onClick={() => {
 													openSkillModal('edit', skill);
 												}}
-												disabled={skill.isBuiltIn || bundle.isBuiltIn || !skill.isManaged}
-												title={!skill.isManaged ? 'Only managed Skills can be edited' : 'Edit'}
+												disabled={skill.isBuiltIn || bundle.isBuiltIn || !skill.isManaged || editWouldReplaceResources}
+												title={
+													!skill.isManaged
+														? 'Only managed Skills can be edited'
+														: editWouldReplaceResources
+															? 'This package has resources. Document-only editing is disabled to avoid deleting them.'
+															: 'Edit'
+												}
 											>
 												<FiEdit2 size={15} />
 												<span>Edit</span>

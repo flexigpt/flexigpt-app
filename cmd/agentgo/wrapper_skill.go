@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"log/slog"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -203,6 +204,26 @@ func InitSkillBundleWrapper(
 		return err
 	}
 
+	refs, err := api.SkillBundleRefs(context.Background())
+	if err != nil {
+		wrapper.close()
+		return err
+	}
+	for _, ref := range refs {
+		if err := runtime.ResyncCollection(context.Background(), ref); err != nil {
+			if components.RootMutationPolicy().IsProtectedRoot(ref.RootID) {
+				wrapper.close()
+				return err
+			}
+			slog.Warn(
+				"could not load user Skill Bundle into runtime",
+				"rootID", ref.RootID,
+				"collectionID", ref.CollectionID,
+				"error", err,
+			)
+		}
+	}
+
 	return nil
 }
 
@@ -261,8 +282,21 @@ func (w *SkillBundleWrapper) UpdateSkillBundle(
 			return skillbundle.Bundle{}, errors.New("skill bundle update is required")
 		}
 		value, err := w.api.UpdateBundle(context.Background(), *request)
+		if err != nil {
+			return value, err
+		}
 
-		return value, err
+		ref := value.Collection.Ref()
+		if !value.Collection.Enabled {
+			return value, w.runtime.RemoveCollection(
+				context.Background(),
+				ref,
+			)
+		}
+		return value, w.runtime.ResyncCollection(
+			context.Background(),
+			ref,
+		)
 	})
 }
 
@@ -276,8 +310,14 @@ func (w *SkillBundleWrapper) RetireSkillBundle(
 			ref,
 			expectedRevision,
 		)
+		if err != nil {
+			return value, err
+		}
 
-		return value, err
+		return value, w.runtime.RemoveCollection(
+			context.Background(),
+			ref,
+		)
 	})
 }
 
@@ -286,9 +326,14 @@ func (w *SkillBundleWrapper) PurgeSkillBundle(
 	expectedRevision uint64,
 ) error {
 	return middleware.WithRecovery(func() error {
-		err := w.api.PurgeBundle(context.Background(), ref, expectedRevision)
-
-		return err
+		if err := w.api.PurgeBundle(
+			context.Background(),
+			ref,
+			expectedRevision,
+		); err != nil {
+			return err
+		}
+		return w.runtime.RemoveCollection(context.Background(), ref)
 	})
 }
 
@@ -297,8 +342,10 @@ func (w *SkillBundleWrapper) RefreshSkillBundle(
 ) error {
 	return middleware.WithRecovery(func() error {
 		_, err := w.api.RefreshBundle(context.Background(), ref)
-
-		return err
+		if err != nil {
+			return err
+		}
+		return w.runtime.ResyncCollection(context.Background(), ref)
 	})
 }
 
@@ -327,8 +374,14 @@ func (w *SkillBundleWrapper) CreateManagedSkill(
 					errors.New("managed skill request is required")
 			}
 			value, err := w.api.CreateManagedSkill(context.Background(), *request)
-
-			return value, err
+			if err != nil {
+				return value, err
+			}
+			ref := collection.CollectionRef{
+				RootID:       value.Artifact.RootID,
+				CollectionID: value.Artifact.CollectionID,
+			}
+			return value, w.runtime.ResyncCollection(context.Background(), ref)
 		},
 	)
 }
@@ -351,8 +404,17 @@ func (w *SkillBundleWrapper) AdoptSkill(
 			return artifact.Artifact{}, errors.New("skill adoption request is required")
 		}
 		value, err := w.api.AdoptSkill(context.Background(), *request)
+		if err != nil {
+			return value, err
+		}
 
-		return value, err
+		return value, w.runtime.ResyncCollection(
+			context.Background(),
+			collection.CollectionRef{
+				RootID:       value.RootID,
+				CollectionID: value.CollectionID,
+			},
+		)
 	})
 }
 
@@ -364,8 +426,17 @@ func (w *SkillBundleWrapper) PinSkill(
 			return artifact.Artifact{}, errors.New("skill pin request is required")
 		}
 		value, err := w.api.PinSkill(context.Background(), *request)
+		if err != nil {
+			return value, err
+		}
 
-		return value, err
+		return value, w.runtime.ResyncCollection(
+			context.Background(),
+			collection.CollectionRef{
+				RootID:       value.RootID,
+				CollectionID: value.CollectionID,
+			},
+		)
 	})
 }
 
@@ -389,8 +460,17 @@ func (w *SkillBundleWrapper) SetSkillEnabled(
 			expectedRevision,
 			enabled,
 		)
-
-		return value, err
+		if err != nil {
+			return value, err
+		}
+		collectionRef := collection.CollectionRef{
+			RootID:       value.RootID,
+			CollectionID: value.CollectionID,
+		}
+		return value, w.runtime.ResyncCollection(
+			context.Background(),
+			collectionRef,
+		)
 	})
 }
 
@@ -400,18 +480,25 @@ func (w *SkillBundleWrapper) UnadoptSkill(
 	suppress bool,
 ) error {
 	return middleware.WithRecovery(func() error {
-		_, err := w.api.GetSkill(context.Background(), ref)
+		value, err := w.api.GetSkill(context.Background(), ref)
 		if err != nil {
 			return err
 		}
-		err = w.api.UnadoptSkill(
+		if err := w.api.UnadoptSkill(
 			context.Background(),
 			ref,
 			expectedRevision,
 			suppress,
+		); err != nil {
+			return err
+		}
+		return w.runtime.ResyncCollection(
+			context.Background(),
+			collection.CollectionRef{
+				RootID:       value.RootID,
+				CollectionID: value.CollectionID,
+			},
 		)
-
-		return err
 	})
 }
 
@@ -420,10 +507,23 @@ func (w *SkillBundleWrapper) PurgeSkill(
 	expectedRevision uint64,
 ) error {
 	return middleware.WithRecovery(func() error {
-		return w.api.PurgeSkill(
+		value, err := w.api.GetSkill(context.Background(), ref)
+		if err != nil {
+			return err
+		}
+		if err := w.api.PurgeSkill(
 			context.Background(),
 			ref,
 			expectedRevision,
+		); err != nil {
+			return err
+		}
+		return w.runtime.ResyncCollection(
+			context.Background(),
+			collection.CollectionRef{
+				RootID:       value.RootID,
+				CollectionID: value.CollectionID,
+			},
 		)
 	})
 }

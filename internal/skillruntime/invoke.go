@@ -57,6 +57,12 @@ func (s *SkillRuntime) InvokeSkillTool(
 	case "skills-readresource":
 		functionID = string(agentskillsSpec.FuncIDSkillsReadResource)
 	case "skills-runscript":
+		if !s.runScriptsEnabled {
+			return nil, fmt.Errorf(
+				"%w: skills-runscript is disabled by runtime policy",
+				errSkillInvalidRequest,
+			)
+		}
 		functionID = string(agentskillsSpec.FuncIDSkillsRunScript)
 	default:
 		return nil, fmt.Errorf("%w: unknown toolName %q", errSkillInvalidRequest, toolName)

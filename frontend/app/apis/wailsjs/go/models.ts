@@ -2349,6 +2349,7 @@ export namespace skillbundle {
 	export class CreateBundleRequest {
 	    RootID: string;
 	    CollectionID: string;
+	    ManagedSourceID: string;
 	    DisplayName: string;
 	    Description: string;
 	    Enabled: boolean;
@@ -2366,6 +2367,7 @@ export namespace skillbundle {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.RootID = source["RootID"];
 	        this.CollectionID = source["CollectionID"];
+	        this.ManagedSourceID = source["ManagedSourceID"];
 	        this.DisplayName = source["DisplayName"];
 	        this.Description = source["Description"];
 	        this.Enabled = source["Enabled"];

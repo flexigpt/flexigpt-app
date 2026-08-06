@@ -1,4 +1,5 @@
-import type { FocusEventHandler, MouseEventHandler, ReactNode } from 'react';
+import type { FocusEventHandler, KeyboardEventHandler, MouseEventHandler, ReactNode } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { Tooltip, useTooltipStore } from '@ariakit/react';
 
@@ -22,7 +23,10 @@ interface HoverTipProps {
 	placement?: HoverTipPlacement;
 	gutter?: number;
 	overflowPadding?: number;
+	showDelay?: number;
+	hideDelay?: number;
 	disabled?: boolean;
+	suspended?: boolean;
 	wrapperClassName?: string;
 	wrapperElement?: 'span' | 'div';
 	tooltipClassName?: string;
@@ -74,37 +78,174 @@ export function HoverTip({
 	placement = 'top',
 	gutter = 8,
 	overflowPadding = 8,
+	showDelay = 400,
+	hideDelay = 100,
 	disabled = false,
+	suspended = false,
 	wrapperClassName = 'inline-flex max-w-full',
 	wrapperElement = 'span',
 	tooltipClassName = '',
 }: HoverTipProps) {
 	const tooltip = useTooltipStore({ placement });
 	const Wrapper = wrapperElement ?? 'span';
-	const hasContent = !(content === null || (typeof content === 'string' && content.trim() === ''));
+	const hasContent =
+		content !== null &&
+		content !== undefined &&
+		content !== false &&
+		content !== true &&
+		!(typeof content === 'string' && content.trim() === '');
+	const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const isAnchorHoveredRef = useRef(false);
+	const isTooltipHoveredRef = useRef(false);
+	const isFocusWithinRef = useRef(false);
+	const suppressFocusUntilRef = useRef(0);
 
-	const hideTip = () => {
-		tooltip.hide();
-		tooltip.setAnchorElement(null);
-	};
-
-	const showForCurrentTarget: MouseEventHandler<HTMLElement> = event => {
-		tooltip.setAnchorElement(event.currentTarget);
-		tooltip.show();
-	};
-
-	const showForFocusedTarget: FocusEventHandler<HTMLElement> = event => {
-		tooltip.setAnchorElement(event.target as HTMLElement);
-		tooltip.show();
-	};
-
-	const hideOnBlurCapture: FocusEventHandler<HTMLElement> = event => {
-		const nextTarget = event.relatedTarget as Node | null;
-		if (nextTarget && event.currentTarget.contains(nextTarget)) {
+	const cancelScheduledShow = useCallback(() => {
+		if (showTimerRef.current === null) {
 			return;
 		}
+		clearTimeout(showTimerRef.current);
+		showTimerRef.current = null;
+	}, []);
+
+	const cancelScheduledHide = useCallback(() => {
+		if (hideTimerRef.current === null) {
+			return;
+		}
+		clearTimeout(hideTimerRef.current);
+		hideTimerRef.current = null;
+	}, []);
+
+	const hideTip = useCallback(() => {
+		cancelScheduledShow();
+		cancelScheduledHide();
+		tooltip.hide();
+		tooltip.setAnchorElement(null);
+	}, [cancelScheduledHide, cancelScheduledShow, tooltip]);
+
+	const scheduleHideIfInactive = useCallback(() => {
+		if (isAnchorHoveredRef.current || isTooltipHoveredRef.current || isFocusWithinRef.current) {
+			return;
+		}
+
+		cancelScheduledHide();
+
+		if (hideDelay <= 0) {
+			hideTip();
+			return;
+		}
+
+		hideTimerRef.current = setTimeout(() => {
+			hideTimerRef.current = null;
+			if (isAnchorHoveredRef.current || isTooltipHoveredRef.current || isFocusWithinRef.current) {
+				return;
+			}
+			hideTip();
+		}, hideDelay);
+	}, [cancelScheduledHide, hideDelay, hideTip]);
+
+	useEffect(() => {
+		return () => {
+			cancelScheduledShow();
+			cancelScheduledHide();
+		};
+	}, [cancelScheduledHide, cancelScheduledShow]);
+
+	useEffect(() => {
+		if (!hasContent || disabled || suspended) {
+			isAnchorHoveredRef.current = false;
+			isTooltipHoveredRef.current = false;
+			isFocusWithinRef.current = false;
+			hideTip();
+		}
+	}, [disabled, hasContent, hideTip, suspended]);
+
+	const showForCurrentTarget: MouseEventHandler<HTMLElement> = useCallback(
+		event => {
+			isAnchorHoveredRef.current = true;
+			cancelScheduledHide();
+			cancelScheduledShow();
+
+			const anchor = event.currentTarget;
+			const showNow = () => {
+				showTimerRef.current = null;
+				if (!isAnchorHoveredRef.current || suspended) {
+					return;
+				}
+				tooltip.setAnchorElement(anchor);
+				tooltip.show();
+			};
+
+			if (showDelay <= 0) {
+				showNow();
+				return;
+			}
+
+			showTimerRef.current = setTimeout(showNow, showDelay);
+		},
+		[cancelScheduledHide, cancelScheduledShow, showDelay, suspended, tooltip]
+	);
+
+	const showForFocusedTarget: FocusEventHandler<HTMLElement> = useCallback(
+		event => {
+			isFocusWithinRef.current = true;
+			cancelScheduledHide();
+			cancelScheduledShow();
+
+			if (Date.now() < suppressFocusUntilRef.current) {
+				return;
+			}
+
+			tooltip.setAnchorElement(event.target as HTMLElement);
+			tooltip.show();
+		},
+		[cancelScheduledHide, cancelScheduledShow, tooltip]
+	);
+
+	const hideOnBlurCapture: FocusEventHandler<HTMLElement> = useCallback(
+		event => {
+			const nextTarget = event.relatedTarget as Node | null;
+			if (nextTarget && event.currentTarget.contains(nextTarget)) {
+				return;
+			}
+			isFocusWithinRef.current = false;
+			scheduleHideIfInactive();
+		},
+		[scheduleHideIfInactive]
+	);
+
+	const hideForPointerInteraction = useCallback(() => {
+		// Pointer activation moves focus before click. Prevent that focus event
+		// from reopening a tooltip that has just been dismissed.
+		suppressFocusUntilRef.current = Date.now() + 100;
 		hideTip();
-	};
+	}, [hideTip]);
+
+	const hideAfterMouseLeave: MouseEventHandler<HTMLElement> = useCallback(() => {
+		isAnchorHoveredRef.current = false;
+		cancelScheduledShow();
+		scheduleHideIfInactive();
+	}, [cancelScheduledShow, scheduleHideIfInactive]);
+
+	const keepTipVisible = useCallback(() => {
+		isTooltipHoveredRef.current = true;
+		cancelScheduledHide();
+	}, [cancelScheduledHide]);
+
+	const hideAfterTooltipLeave = useCallback(() => {
+		isTooltipHoveredRef.current = false;
+		scheduleHideIfInactive();
+	}, [scheduleHideIfInactive]);
+
+	const hideOnEscape: KeyboardEventHandler<HTMLElement> = useCallback(
+		event => {
+			if (event.key === 'Escape') {
+				hideTip();
+			}
+		},
+		[hideTip]
+	);
 
 	if (!hasContent || disabled) {
 		// oxlint-disable-next-line react/jsx-no-useless-fragment
@@ -115,22 +256,29 @@ export function HoverTip({
 		<>
 			<Wrapper
 				className={wrapperClassName}
-				onMouseEnter={showForCurrentTarget}
-				onMouseLeave={hideTip}
-				onFocusCapture={showForFocusedTarget}
-				onBlurCapture={hideOnBlurCapture}
+				onMouseEnter={suspended ? undefined : showForCurrentTarget}
+				onMouseLeave={suspended ? undefined : hideAfterMouseLeave}
+				onFocusCapture={suspended ? undefined : showForFocusedTarget}
+				onBlurCapture={suspended ? undefined : hideOnBlurCapture}
+				onPointerDownCapture={suspended ? undefined : hideForPointerInteraction}
+				onClickCapture={suspended ? undefined : hideTip}
+				onKeyDownCapture={suspended ? undefined : hideOnEscape}
 			>
 				{children}
 			</Wrapper>
-			<Tooltip
-				store={tooltip}
-				gutter={gutter}
-				overflowPadding={overflowPadding}
-				portal
-				className={`rounded-box bg-base-100 text-base-content border-base-300 z-1000 max-w-xs border px-3 py-2 text-xs/4 whitespace-pre-line shadow-xl ${tooltipClassName}`}
-			>
-				{content}
-			</Tooltip>
+			{suspended ? null : (
+				<Tooltip
+					store={tooltip}
+					gutter={gutter}
+					overflowPadding={overflowPadding}
+					portal
+					onMouseEnter={keepTipVisible}
+					onMouseLeave={hideAfterTooltipLeave}
+					className={`rounded-box bg-base-100 text-base-content border-base-300 pointer-events-auto z-1000 max-w-xs border px-3 py-2 text-xs/4 whitespace-pre-line shadow-xl ${tooltipClassName}`}
+				>
+					{content}
+				</Tooltip>
+			)}
 		</>
 	);
 }

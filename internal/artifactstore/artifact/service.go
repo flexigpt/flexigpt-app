@@ -688,7 +688,9 @@ func (s *Service) resolveCreateConflict(
 		existing.Binding != requested.Binding ||
 		existing.Kind != requested.Kind ||
 		existing.Adoption != requested.Adoption ||
-		existing.Name != requested.Name {
+		existing.Name != requested.Name ||
+		existing.Enabled != requested.Enabled ||
+		!jsonutil.Equal(existing.Data, requested.Data) {
 		return Artifact{}, fmt.Errorf(
 			"%w: artifact %q creation intent differs",
 			basespec.ErrConflict,

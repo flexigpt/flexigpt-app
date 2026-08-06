@@ -47,6 +47,7 @@ type Bundle struct {
 type CreateBundleRequest struct {
 	RootID                   basespec.RootID
 	CollectionID             basespec.CollectionID
+	ManagedSourceID          basespec.SourceID
 	DisplayName              string
 	Description              string
 	Enabled                  bool
@@ -775,6 +776,7 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
+	bundleRef := bundle.Collection.Ref()
 	var role basespec.AttachmentRole
 	for _, attachment := range bundle.Attachments {
 		if attachment.SourceID == value.Binding.SourceID {
@@ -796,8 +798,15 @@ func (a *API) PurgeSkill(
 			)
 		}
 	default:
+		if value.Adoption == artifact.AdoptionObserved {
+			return a.dependencies.Artifacts.Unadopt(
+				ctx,
+				ref,
+				expectedRevision,
+				true,
+			)
+		}
 		return a.dependencies.Artifacts.Purge(ctx, ref, expectedRevision)
-
 	}
 
 	directory, err := managedSkillPackageDirectoryOf(value.Binding)
@@ -828,6 +837,12 @@ func (a *API) PurgeSkill(
 		expectedRevision,
 	); err != nil {
 		return pendingManagedSkillPurgeError(value.Ref(), err)
+	}
+	if _, err := a.refreshBundle(ctx, bundleRef, false); err != nil {
+		return pendingManagedSkillPurgeError(value.Ref(), fmt.Errorf(
+			"skill package and artifact were removed, but bundle refresh failed: %w",
+			err,
+		))
 	}
 	return nil
 }
@@ -1059,6 +1074,70 @@ func (a *API) createBundle(
 		})
 	}
 
+	var provisionedSource *source.Summary
+	if request.ManagedSourceID != "" {
+		if allowBuiltInAttachment {
+			return Bundle{}, fmt.Errorf(
+				"%w: protected bundle topology must declare its attachment explicitly",
+				basespec.ErrInvalid,
+			)
+		}
+		for _, draft := range request.Attachments {
+			if draft.Role == RoleManaged {
+				return Bundle{}, fmt.Errorf(
+					"%w: managedSourceID cannot be combined with an explicit managed attachment",
+					basespec.ErrInvalid,
+				)
+			}
+		}
+
+		value, createdNew, err := a.dependencies.Sources.CreateWithStatus(
+			ctx,
+			request.RootID,
+			source.Draft{
+				ID:          request.ManagedSourceID,
+				Kind:        managed.Kind,
+				DisplayName: request.DisplayName,
+				Enabled:     true,
+				Config:      json.RawMessage(jsonutil.EmptyObject),
+			},
+		)
+		if err != nil {
+			return Bundle{}, err
+		}
+		if createdNew {
+			provisionedSource = &value
+		}
+
+		attachmentData, err := NewAttachmentData(".", nil)
+		if err != nil {
+			return Bundle{}, err
+		}
+		encodedAttachmentData, err := EncodeAttachmentData(attachmentData)
+		if err != nil {
+			return Bundle{}, err
+		}
+		attachments = append(attachments, collection.AttachmentDraft{
+			SourceID: request.ManagedSourceID,
+			Role:     RoleManaged,
+			Enabled:  true,
+			Data:     encodedAttachmentData,
+		})
+	}
+
+	cleanupProvisionedSource := func(cause error) error {
+		if provisionedSource == nil {
+			return cause
+		}
+		cleanupErr := a.dependencies.Sources.Discard(
+			context.WithoutCancel(ctx),
+			request.RootID,
+			provisionedSource.ID,
+			provisionedSource.Revision,
+		)
+		return errors.Join(cause, cleanupErr)
+	}
+
 	created, _, err := a.dependencies.Collections.Create(
 		ctx,
 		request.RootID,
@@ -1073,11 +1152,27 @@ func (a *API) createBundle(
 		attachments,
 	)
 	if err != nil {
-		return Bundle{}, err
+		return Bundle{}, cleanupProvisionedSource(err)
 	}
 	bundle, err := a.GetBundle(ctx, created.Ref())
 	if err != nil {
 		return Bundle{}, err
+	}
+	if provisionedSource != nil {
+		attached := false
+		for _, attachment := range bundle.Attachments {
+			if attachment.SourceID == provisionedSource.ID &&
+				attachment.Role == RoleManaged {
+				attached = true
+				break
+			}
+		}
+		if !attached {
+			return Bundle{}, cleanupProvisionedSource(fmt.Errorf(
+				"%w: provisioned managed Source was not attached to the bundle",
+				basespec.ErrConflict,
+			))
+		}
 	}
 	if !bundleCreationIntentMatches(bundle, request) {
 		return Bundle{}, fmt.Errorf(
@@ -1235,12 +1330,6 @@ func (a *API) createManagedSkill(
 	if err := basespec.ValidateArtifactID(request.ArtifactID); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	if request.ExpectedCollectionRevision == 0 {
-		return CreateManagedSkillResponse{}, fmt.Errorf(
-			"%w: expected skill bundle revision is required",
-			basespec.ErrInvalid,
-		)
-	}
 	if err := basespec.ValidateLogicalName(basespec.LogicalName(request.SkillName)); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
@@ -1353,6 +1442,12 @@ func (a *API) createManagedSkill(
 		if request.ExpectedArtifactRevision != 0 {
 			return CreateManagedSkillResponse{}, basespec.ErrConflict
 		}
+		if request.ExpectedCollectionRevision == 0 {
+			return CreateManagedSkillResponse{}, fmt.Errorf(
+				"%w: expected skill bundle revision is required for a new managed Skill",
+				basespec.ErrInvalid,
+			)
+		}
 		if bundle.Collection.Revision != request.ExpectedCollectionRevision {
 			return CreateManagedSkillResponse{}, basespec.ErrConflict
 		}
@@ -1401,9 +1496,6 @@ func (a *API) createManagedSkill(
 		default:
 			return CreateManagedSkillResponse{}, pinErr
 		}
-	} else if request.ExpectedArtifactRevision == 0 ||
-		pinned.Revision != request.ExpectedArtifactRevision {
-		return CreateManagedSkillResponse{}, basespec.ErrConflict
 	}
 
 	if err := validateManagedSkillOperationIntent(
@@ -1415,6 +1507,25 @@ func (a *API) createManagedSkill(
 	); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
+
+	if request.ExpectedArtifactRevision == 0 {
+		// Zero is both the initial-create token and the replay token for a
+		// create that became pending after its Artifact was pinned. Resume only
+		// when the persisted package intent is byte-for-byte equivalent.
+		intent, intentErr := decodeManagedSkillArtifactData(pinned.Data)
+		if intentErr != nil ||
+			intent.PackageSHA256 != packageSHA256 ||
+			pinned.Name != artifactName {
+			return CreateManagedSkillResponse{}, fmt.Errorf(
+				"%w: managed Skill Artifact %q already exists with different creation intent",
+				basespec.ErrConflict,
+				request.ArtifactID,
+			)
+		}
+	} else if pinned.Revision != request.ExpectedArtifactRevision {
+		return CreateManagedSkillResponse{}, basespec.ErrConflict
+	}
+
 	if result, complete := managedSkillCreateResult(
 		*pinned,
 		sourceValue.ID,
@@ -1422,7 +1533,7 @@ func (a *API) createManagedSkill(
 		definitionValue.Digest,
 		packageSHA256,
 	); complete {
-		return result, nil
+		return a.setManagedSkillEnabled(ctx, result, request.Enabled)
 	}
 
 	state, generation, err := a.dependencies.GetManagedSourceState(
@@ -1793,9 +1904,13 @@ func (p skillArtifactPolicy) Derive(
 	if err := basespec.ValidateArtifactID(id); err != nil {
 		return artifact.Draft{}, false, nil, err
 	}
+	name := value.DisplayName
+	if name == "" {
+		name = string(value.LogicalName)
+	}
 	return artifact.Draft{
 		ID:      id,
-		Name:    value.DisplayName,
+		Name:    name,
 		Enabled: true,
 		Data:    emptyArtifactData(),
 	}, true, nil, nil
