@@ -105,6 +105,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 		// oxlint-disable-next-line react/display-name
 		const renderHeading =
 			(tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', baseClassName: string, options?: { hide?: boolean }) =>
+			// oxlint-disable-next-line react/function-component-definition
 			({ node, children, className, id, ...rest }: CustomComponentProps) => {
 				if (options?.hide) {
 					return id ? <div id={id} className="scroll-mt-4" aria-hidden="true" /> : null;
