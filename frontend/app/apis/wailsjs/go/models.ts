@@ -13187,7 +13187,7 @@ export namespace workspace {
 		}
 	}
 	export class CreateEmptyWorkspaceRequest {
-	    rootID: string;
+	    rootID?: string;
 	    Body?: CreateEmptyWorkspaceRequestBody;
 	
 	    static createFrom(source: any = {}) {
@@ -13290,7 +13290,7 @@ export namespace workspace {
 		}
 	}
 	export class CreateFilesystemWorkspaceRequest {
-	    rootID: string;
+	    rootID?: string;
 	    Body?: CreateFilesystemWorkspaceRequestBody;
 	
 	    static createFrom(source: any = {}) {
@@ -14369,7 +14369,7 @@ export namespace workspace {
 	}
 	
 	export class ListWorkspacesRequest {
-	    rootID: string;
+	    rootID?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ListWorkspacesRequest(source);
