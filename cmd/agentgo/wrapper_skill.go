@@ -249,11 +249,30 @@ func (w *SkillBundleWrapper) AttachSkillSource(
 	draft skillbundle.AttachmentDraft,
 ) (skillbundle.Bundle, error) {
 	return middleware.WithRecoveryResp(func() (skillbundle.Bundle, error) {
-		return w.api.AttachSource(
+		value, err := w.api.AttachSource(
 			context.Background(),
 			bundle,
 			expectedCollectionRevision,
 			draft,
+		)
+		if err != nil {
+			return value, err
+		}
+		if !value.Collection.Enabled {
+			return value, w.runtime.RemoveCollection(
+				context.Background(),
+				value.Collection.Ref(),
+			)
+		}
+		if _, err := w.api.RefreshBundle(
+			context.Background(),
+			value.Collection.Ref(),
+		); err != nil {
+			return value, err
+		}
+		return value, w.runtime.ResyncCollection(
+			context.Background(),
+			value.Collection.Ref(),
 		)
 	})
 }
@@ -292,6 +311,12 @@ func (w *SkillBundleWrapper) UpdateSkillBundle(
 				context.Background(),
 				ref,
 			)
+		}
+		if _, err := w.api.RefreshBundle(
+			context.Background(),
+			ref,
+		); err != nil {
+			return value, err
 		}
 		return value, w.runtime.ResyncCollection(
 			context.Background(),

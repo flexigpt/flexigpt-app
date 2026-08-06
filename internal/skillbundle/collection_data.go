@@ -18,6 +18,11 @@ type CollectionData struct {
 	LogicalVersion          basespec.LogicalVersion `json:"logicalVersion,omitempty"`
 	Labels                  map[string]string       `json:"labels,omitempty"`
 
+	// ManagedSourceID identifies the managed Source provisioned exclusively
+	// for this bundle. An empty value means attached Sources are externally
+	// administered and are not deleted with the bundle.
+	ManagedSourceID basespec.SourceID `json:"managedSourceID,omitempty"`
+
 	// PortableDefinitionDigest is local provenance only. It identifies the
 	// canonical portable Collection payload from which this local Collection
 	// was installed without embedding that portable payload in SQLite.
@@ -104,6 +109,11 @@ func ValidateCollectionData(value CollectionData) error {
 		Labels:         value.Labels,
 	}); err != nil {
 		return err
+	}
+	if value.ManagedSourceID != "" {
+		if err := basespec.ValidateSourceID(value.ManagedSourceID); err != nil {
+			return err
+		}
 	}
 	if value.PortableDefinitionDigest != nil {
 		if err := cryptoutil.ValidateDigest(*value.PortableDefinitionDigest); err != nil {

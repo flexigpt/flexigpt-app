@@ -190,7 +190,7 @@ func (s *Store) updateArtifact(
 			basespec.ErrInvalid,
 		)
 	}
-	if !sameArtifactManagedFields(current, value) {
+	if !sameArtifactImmutableFields(current, value) {
 		return fmt.Errorf(
 			"%w: artifact update attempted to change source-derived fields",
 			basespec.ErrInvalid,
@@ -200,7 +200,8 @@ func (s *Store) updateArtifact(
 	result, err := tx.ExecContext(
 		ctx,
 		`UPDATE artifact_artifacts
-		 SET enabled = ?,
+		 SET name = ?,
+		     enabled = ?,
 		     data_json = ?,
 		     revision = ?,
 		     modified_at = ?
@@ -208,6 +209,7 @@ func (s *Store) updateArtifact(
 		   AND root_id = ?
 		   AND collection_id = ?
 		   AND revision = ?`,
+		value.Name,
 		boolInt(value.Enabled),
 		[]byte(value.Data),
 		value.Revision,
@@ -1064,7 +1066,7 @@ func getArtifactTx(
 	return value, err
 }
 
-func sameArtifactManagedFields(
+func sameArtifactImmutableFields(
 	current artifact.Artifact,
 	next artifact.Artifact,
 ) bool {
@@ -1073,7 +1075,6 @@ func sameArtifactManagedFields(
 		current.CollectionID == next.CollectionID &&
 		current.Binding == next.Binding &&
 		current.Kind == next.Kind &&
-		current.Name == next.Name &&
 		current.Adoption == next.Adoption &&
 		cryptoutil.IsDigestEqual(
 			current.ResolvedDefinition,

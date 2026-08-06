@@ -2293,6 +2293,7 @@ export namespace skillbundle {
 	    logicalName: string;
 	    logicalVersion?: string;
 	    labels?: Record<string, string>;
+	    managedSourceID?: string;
 	    portableDefinitionDigest?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2306,6 +2307,7 @@ export namespace skillbundle {
 	        this.logicalName = source["logicalName"];
 	        this.logicalVersion = source["logicalVersion"];
 	        this.labels = source["labels"];
+	        this.managedSourceID = source["managedSourceID"];
 	        this.portableDefinitionDigest = source["portableDefinitionDigest"];
 	    }
 	}

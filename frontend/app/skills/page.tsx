@@ -168,12 +168,14 @@ export default function SkillsPage() {
 	);
 
 	const refreshBundleSkills = useCallback(
-		async (bundleID: string) => {
+		async (bundleID: string, refreshSource = true) => {
 			const requestId = (bundleRefreshRequestIdRef.current[bundleID] ?? 0) + 1;
 			bundleRefreshRequestIdRef.current[bundleID] = requestId;
 
 			try {
-				await skillManagementAPI.refreshSkillBundle(bundleID);
+				if (refreshSource) {
+					await skillManagementAPI.refreshSkillBundle(bundleID);
+				}
 				const skillListItems = await getAllSkills([bundleID], undefined, true, true);
 				const freshSkills = skillListItems.map(item => item.skillDefinition);
 
@@ -329,7 +331,7 @@ export default function SkillsPage() {
 	);
 
 	const handleSubmitSkill = useCallback(
-		async (bundleID: string, partial: SkillUpsertInput, existingSkillSlug?: string) => {
+		async (bundleID: string, partial: SkillUpsertInput, existingSkillID?: string) => {
 			const bundleData = bundles.find(item => item.bundle.id === bundleID);
 			if (!bundleData) {
 				throw new Error('Skill bundle not found.');
@@ -340,8 +342,8 @@ export default function SkillsPage() {
 			if (!bundleData.bundle.isEnabled) {
 				throw new Error('Enable the skill bundle before adding or editing skills.');
 			}
-			if (existingSkillSlug) {
-				const existingSkill = bundleData.skills.find(skill => skill.id === existingSkillSlug);
+			if (existingSkillID) {
+				const existingSkill = bundleData.skills.find(skill => skill.id === existingSkillID);
 				if (!existingSkill) {
 					throw new Error('Skill not found.');
 				}
@@ -352,8 +354,8 @@ export default function SkillsPage() {
 
 			try {
 				// A successful write is authoritative even if the follow-up list refresh fails.
-				if (existingSkillSlug) {
-					const existingSkill = bundleData.skills.find(skill => skill.id === existingSkillSlug);
+				if (existingSkillID) {
+					const existingSkill = bundleData.skills.find(skill => skill.id === existingSkillID);
 					if (!existingSkill) {
 						throw new Error('Skill not found.');
 					}
@@ -379,7 +381,7 @@ export default function SkillsPage() {
 						throw new Error('Missing skill slug.');
 					}
 
-					await skillManagementAPI.putSkillArtifact(bundleID, getUUIDv7(), {
+					await skillManagementAPI.putSkillArtifact(bundleID, partial.artifactID ?? getUUIDv7(), {
 						name: create.name,
 						displayName: create.displayName,
 						description: create.description,
@@ -403,12 +405,12 @@ export default function SkillsPage() {
 					await skillManagementAPI.registerFilesystemSkills(bundleID, location, sourceDisplayName);
 				}
 			} catch (err) {
-				console.error(existingSkillSlug ? 'Edit skill failed:' : 'Add skill failed:', err);
+				console.error(existingSkillID ? 'Edit skill failed:' : 'Add skill failed:', err);
 				throw err;
 			}
 
 			try {
-				await refreshBundleSkills(bundleID);
+				await refreshBundleSkills(bundleID, !partial.artifactCreate);
 			} catch (err) {
 				console.error('Skill was saved but bundle refresh failed:', err);
 				if (isMountedRef.current) {

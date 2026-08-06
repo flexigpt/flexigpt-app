@@ -8,6 +8,7 @@ import { SkillInsert, SkillType } from '@/spec/skill';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug, validateTags } from '@/lib/text_utils';
+import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -44,6 +45,7 @@ import {
 
 export interface SkillUpsertInput extends Partial<Skill> {
 	artifactCreate?: SkillArtifactCreateInput;
+	artifactID?: string;
 }
 
 function buildSkillPreviewArgs(args?: SkillArgument[] | null): Record<string, string> {
@@ -134,7 +136,7 @@ function getInitialFormData(
 			return {
 				displayName: `${s.displayName || s.name || s.slug} Copy`,
 				name,
-				slug,
+				slug: slug,
 				type: SkillType.FS,
 				location: '',
 				description: s.description ?? '',
@@ -287,6 +289,7 @@ function AddEditSkillModalContent({
 	const [creationMode, setCreationMode] = useState<'create' | 'register'>('create');
 	const isRegisteringFolder = isAddMode && creationMode === 'register';
 
+	const [createArtifactID] = useState(() => getUUIDv7());
 	const [formData, setFormData] = useState<SkillFormData>(() =>
 		getInitialFormData(initialData, existingSkills, requestedMode)
 	);
@@ -340,9 +343,21 @@ function AddEditSkillModalContent({
 				description: formData.description,
 				insert: scaffoldInsert,
 				arguments: scaffoldArguments,
+				tags: formData.tags
+					.split(',')
+					.map(tag => tag.trim())
+					.filter(Boolean),
 				body: scaffoldBody,
 			}),
-		[formData.description, formData.displayName, formData.name, scaffoldArguments, scaffoldBody, scaffoldInsert]
+		[
+			formData.description,
+			formData.displayName,
+			formData.name,
+			formData.tags,
+			scaffoldArguments,
+			scaffoldBody,
+			scaffoldInsert,
+		]
 	);
 
 	const validateField = (field: keyof ErrorState, val: string | SkillType, currentErrors: ErrorState): ErrorState => {
@@ -635,10 +650,17 @@ function AddEditSkillModalContent({
 		const target = e.target as HTMLInputElement;
 		const { name, value, type, checked } = target;
 		const newVal = type === 'checkbox' ? checked : value;
+		const syncManagedSlug = name === 'name' && isAddMode && creationMode === 'create';
 
-		setFormData(prev => ({ ...prev, [name]: newVal }));
+		setFormData(prev => ({
+			...prev,
+			[name]: newVal,
+			...(syncManagedSlug ? { slug: String(newVal) } : {}),
+		}));
 
-		if (name === 'displayName' && isRegisteringFolder) {
+		if (syncManagedSlug) {
+			setErrors(prev => validateField('slug', String(newVal), validateField('name', String(newVal), prev)));
+		} else if (name === 'displayName' && isRegisteringFolder) {
 			setErrors(prev =>
 				String(newVal).trim()
 					? omitManyKeys(prev, ['displayName'])
@@ -688,6 +710,7 @@ function AddEditSkillModalContent({
 			: (isAddMode && creationMode === 'create') || (isEditMode && documentLoaded)
 				? {
 						...common,
+						artifactID: createArtifactID,
 						artifactCreate: {
 							name: formData.name.trim(),
 							displayName: common.displayName,
@@ -1040,7 +1063,7 @@ function AddEditSkillModalContent({
 											name="slug"
 											value={formData.slug}
 											onChange={handleInput}
-											readOnly={isViewMode || isEditMode}
+											readOnly={isViewMode || isEditMode || (isAddMode && creationMode === 'create')}
 											className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
 											spellCheck="false"
 											autoComplete="off"

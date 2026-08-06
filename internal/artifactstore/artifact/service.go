@@ -385,6 +385,48 @@ func (s *Service) SetEnabled(
 	return next.Clone(), nil
 }
 
+func (s *Service) SetName(
+	ctx context.Context,
+	ref ArtifactRef,
+	expectedRevision uint64,
+	name string,
+) (Artifact, error) {
+	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+		return Artifact{}, err
+	}
+	if err := basespec.ValidateRequiredText(
+		"artifact name",
+		name,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return Artifact{}, err
+	}
+	current, err := s.repository.Get(ctx, ref)
+	if err != nil {
+		return Artifact{}, err
+	}
+	if err := s.ensureArtifactCollection(ctx, current); err != nil {
+		return Artifact{}, err
+	}
+	if expectedRevision == 0 || current.Revision != expectedRevision {
+		return Artifact{}, basespec.ErrConflict
+	}
+	if current.Name == name {
+		return current.Clone(), nil
+	}
+	next := current
+	next.Name = name
+	next.Revision++
+	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
+	if err := next.Validate(); err != nil {
+		return Artifact{}, err
+	}
+	if err := s.repository.Update(ctx, next, expectedRevision); err != nil {
+		return Artifact{}, err
+	}
+	return next.Clone(), nil
+}
+
 func (s *Service) UpdateData(
 	ctx context.Context,
 	ref ArtifactRef,

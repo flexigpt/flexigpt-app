@@ -14,6 +14,7 @@ export interface SkillMarkdownScaffoldInput {
 	displayName?: string;
 	insert: SkillInsert;
 	arguments?: SkillArgument[];
+	tags?: string[];
 	body?: string;
 }
 
@@ -294,6 +295,7 @@ export function buildSkillMarkdownScaffold(input: SkillMarkdownScaffoldInput): s
 			? 'Write the user-message template body here. Use $argument or {{ argument }} placeholders.'
 			: 'Write instruction/context material here. The model can load this as active session context.');
 	const args = input.arguments?.filter(arg => arg.name.trim()) ?? [];
+	const tags = input.tags?.map(tag => tag.trim()).filter(Boolean) ?? [];
 
 	const lines: string[] = ['---', `name: ${yamlQuote(name)}`, `description: ${yamlQuote(description)}`];
 
@@ -301,6 +303,13 @@ export function buildSkillMarkdownScaffold(input: SkillMarkdownScaffoldInput): s
 		lines.push(`insert: ${yamlQuote(insert)}`);
 	} else {
 		lines.push('insert: instructions');
+	}
+
+	if (tags.length > 0) {
+		lines.push('tags:');
+		for (const tag of tags) {
+			lines.push(`  - ${yamlQuote(tag)}`);
+		}
 	}
 
 	if (args.length > 0) {

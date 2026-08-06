@@ -431,11 +431,16 @@ func (a *API) ensurePinnedManagedSkill(
 		return artifact.Artifact{}, err
 	}
 	if pinned.Name != name {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: built-in Artifact %q name differs from the current package",
-			basespec.ErrConflict,
-			artifactID,
+		updated, err := a.dependencies.Artifacts.SetName(
+			ctx,
+			pinned.Ref(),
+			pinned.Revision,
+			name,
 		)
+		if err != nil {
+			return artifact.Artifact{}, err
+		}
+		pinned = &updated
 	}
 
 	intent, err := decodeManagedSkillArtifactData(pinned.Data)

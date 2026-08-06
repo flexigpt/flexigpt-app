@@ -140,6 +140,7 @@ func (i *Installer) EnsureBuiltInBundles(
 				LogicalVersion:           value.Definition.LogicalVersion,
 				DisplayName:              value.Definition.DisplayName,
 				Description:              value.Definition.Description,
+				Labels:                   value.Definition.Labels,
 				Enabled:                  value.Registration.Enabled,
 				DiscoveryRoot:            value.SourceScope,
 				ExpectedMemberDigests:    value.ExpectedMemberDigests,

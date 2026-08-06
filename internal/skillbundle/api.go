@@ -128,6 +128,7 @@ type BuiltInBundleTopology struct {
 	LogicalVersion           basespec.LogicalVersion                `json:"-"`
 	DisplayName              string                                 `json:"-"`
 	Description              string                                 `json:"-"`
+	Labels                   map[string]string                      `json:"-"`
 	Enabled                  bool                                   `json:"-"`
 	DiscoveryRoot            basespec.Locator                       `json:"-"`
 	ExpectedMemberDigests    map[basespec.Locator]cryptoutil.Digest `json:"-"`
@@ -339,6 +340,16 @@ func (a *API) RetireBundle(
 	if _, err := a.GetBundle(ctx, ref); err != nil {
 		return collection.Collection{}, err
 	}
+	skills, err := a.ListSkills(ctx, ref)
+	if err != nil {
+		return collection.Collection{}, err
+	}
+	if len(skills) != 0 {
+		return collection.Collection{}, fmt.Errorf(
+			"%w: remove all Skills before retiring the bundle",
+			basespec.ErrConflict,
+		)
+	}
 	return a.dependencies.Collections.Retire(ctx, ref, expectedRevision)
 }
 
@@ -364,7 +375,39 @@ func (a *API) PurgeBundle(
 			ref.CollectionID,
 		)
 	}
-	return a.dependencies.Collections.Purge(ctx, ref, expectedRevision)
+	data, err := DecodeCollectionData(value.Data)
+	if err != nil {
+		return err
+	}
+
+	var ownedSource source.Summary
+	if data.ManagedSourceID != "" {
+		ownedSource, err = a.dependencies.Sources.Get(
+			ctx,
+			ref.RootID,
+			data.ManagedSourceID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	if err := a.dependencies.Collections.Purge(ctx, ref, expectedRevision); err != nil {
+		return err
+	}
+	if data.ManagedSourceID != "" {
+		if err := a.dependencies.Sources.Discard(
+			ctx,
+			ref.RootID,
+			data.ManagedSourceID,
+			ownedSource.Revision,
+		); err != nil {
+			return fmt.Errorf(
+				"bundle was purged but its owned managed Source remains pending cleanup: %w",
+				err,
+			)
+		}
+	}
+	return nil
 }
 
 func (a *API) AttachSource(
@@ -382,8 +425,19 @@ func (a *API) AttachSource(
 			basespec.ErrInvalid,
 		)
 	}
-	if _, err := a.GetBundle(ctx, bundle); err != nil {
+	current, err := a.GetBundle(ctx, bundle)
+	if err != nil {
 		return Bundle{}, err
+	}
+	if draft.Role == RoleManaged {
+		for _, attachment := range current.Attachments {
+			if attachment.Role == RoleManaged {
+				return Bundle{}, fmt.Errorf(
+					"%w: skill bundle already has a managed attachment",
+					basespec.ErrConflict,
+				)
+			}
+		}
 	}
 	if err := a.validateAttachmentDraft(ctx, bundle.RootID, draft); err != nil {
 		return Bundle{}, err
@@ -580,6 +634,16 @@ func (a *API) AdoptSkill(
 			basespec.ErrInvalid,
 		)
 	}
+	role, err := bundleAttachmentRole(bundle, request.Occurrence.SourceID)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if role == RoleManaged || role == RoleBuiltIn {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: managed and built-in Skill occurrences require their dedicated installation flow",
+			basespec.ErrUnsupported,
+		)
+	}
 	if request.ExpectedCatalogRevision == 0 {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: expected skill bundle catalog revision is required",
@@ -639,7 +703,8 @@ func (a *API) PinSkill(
 	if err := a.requireBundleMutation(ctx, request.Bundle.RootID, false); err != nil {
 		return artifact.Artifact{}, err
 	}
-	if _, err := a.GetBundle(ctx, request.Bundle); err != nil {
+	bundle, err := a.GetBundle(ctx, request.Bundle)
+	if err != nil {
 		return artifact.Artifact{}, err
 	}
 	if request.Binding.ExpectedKind != skillartifact.Kind {
@@ -647,6 +712,16 @@ func (a *API) PinSkill(
 			"%w: skill bundle pins only support %q",
 			basespec.ErrInvalid,
 			skillartifact.Kind,
+		)
+	}
+	role, err := bundleAttachmentRole(bundle, request.Binding.SourceID)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if role == RoleManaged || role == RoleBuiltIn {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: managed and built-in attachments require their dedicated pinning flow",
+			basespec.ErrUnsupported,
 		)
 	}
 	return a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
@@ -861,6 +936,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 		LogicalVersion:           request.LogicalVersion,
 		DisplayName:              request.DisplayName,
 		Description:              request.Description,
+		Labels:                   request.Labels,
 		Enabled:                  request.Enabled,
 		PortableDefinitionDigest: &request.PortableDefinitionDigest,
 		Attachments: []AttachmentDraft{{
@@ -880,7 +956,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 			DiscoveryPolicyRevision:  DiscoveryPolicyRevision,
 			LogicalName:              request.LogicalName,
 			LogicalVersion:           request.LogicalVersion,
-			Labels:                   bundle.Data.Labels,
+			Labels:                   request.Labels,
 			PortableDefinitionDigest: &request.PortableDefinitionDigest,
 		})
 		if err != nil {
@@ -889,6 +965,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 
 		if bundle.Collection.DisplayName != request.DisplayName ||
 			bundle.Collection.Description != request.Description ||
+			bundle.Collection.Enabled != request.Enabled ||
 			!bytes.Equal(bundle.Collection.Data, data) {
 			if _, err := a.dependencies.Collections.Update(
 				ctx,
@@ -1038,6 +1115,7 @@ func (a *API) createBundle(
 		LogicalName:              request.LogicalName,
 		LogicalVersion:           request.LogicalVersion,
 		Labels:                   request.Labels,
+		ManagedSourceID:          request.ManagedSourceID,
 		PortableDefinitionDigest: cryptoutil.CloneDigest(request.PortableDefinitionDigest),
 	})
 	if err != nil {
@@ -1045,10 +1123,18 @@ func (a *API) createBundle(
 	}
 
 	attachments := make([]collection.AttachmentDraft, 0, len(request.Attachments))
+	roleCounts := make(map[basespec.AttachmentRole]int)
 	for _, draft := range request.Attachments {
 		if draft.Role == RoleBuiltIn && !allowBuiltInAttachment {
 			return Bundle{}, fmt.Errorf(
 				"%w: skill bundle built-in attachment role is reserved for bootstrap",
+				basespec.ErrInvalid,
+			)
+		}
+		roleCounts[draft.Role]++
+		if draft.Role == RoleManaged && roleCounts[draft.Role] > 1 {
+			return Bundle{}, fmt.Errorf(
+				"%w: skill bundle can have only one managed attachment",
 				basespec.ErrInvalid,
 			)
 		}
@@ -1175,11 +1261,11 @@ func (a *API) createBundle(
 		}
 	}
 	if !bundleCreationIntentMatches(bundle, request) {
-		return Bundle{}, fmt.Errorf(
+		return Bundle{}, cleanupProvisionedSource(fmt.Errorf(
 			"%w: skill bundle %q creation intent differs",
 			basespec.ErrConflict,
 			request.CollectionID,
-		)
+		))
 	}
 	return bundle, nil
 }
@@ -1188,10 +1274,90 @@ func bundleCreationIntentMatches(
 	value Bundle,
 	request CreateBundleRequest,
 ) bool {
-	return value.Collection.RootID == request.RootID &&
-		value.Collection.ID == request.CollectionID &&
-		value.Collection.Kind == CollectionKind &&
-		value.Data.LogicalName == request.LogicalName
+	if value.Collection.RootID != request.RootID ||
+		value.Collection.ID != request.CollectionID ||
+		value.Collection.Kind != CollectionKind {
+		return false
+	}
+	if value.Collection.ID != request.CollectionID ||
+		value.Collection.DisplayName != request.DisplayName ||
+		value.Collection.Description != request.Description ||
+		value.Collection.Enabled != request.Enabled ||
+		value.Data.LogicalName != request.LogicalName ||
+		value.Data.LogicalVersion != request.LogicalVersion ||
+		value.Data.ManagedSourceID != request.ManagedSourceID ||
+		!maps.Equal(value.Data.Labels, request.Labels) ||
+		!cryptoutil.IsDigestEqual(
+			value.Data.PortableDefinitionDigest,
+			request.PortableDefinitionDigest,
+		) {
+		return false
+	}
+
+	expected := make(map[basespec.SourceID]AttachmentDraft)
+	for _, draft := range request.Attachments {
+		if _, duplicate := expected[draft.SourceID]; duplicate {
+			return false
+		}
+		expected[draft.SourceID] = draft
+	}
+	if request.ManagedSourceID != "" {
+		if _, duplicate := expected[request.ManagedSourceID]; duplicate {
+			return false
+		}
+		expected[request.ManagedSourceID] = AttachmentDraft{
+			SourceID:      request.ManagedSourceID,
+			Role:          RoleManaged,
+			Enabled:       true,
+			DiscoveryRoot: ".",
+		}
+	}
+	if len(expected) != len(value.Attachments) {
+		return false
+	}
+
+	for _, attachment := range value.Attachments {
+		draft, found := expected[attachment.SourceID]
+		if !found ||
+			attachment.Role != draft.Role ||
+			attachment.Enabled != draft.Enabled {
+			return false
+		}
+		actualData, err := DecodeAttachmentData(attachment.Data)
+		if err != nil {
+			return false
+		}
+		expectedData, err := NewAttachmentData(
+			draft.DiscoveryRoot,
+			draft.ExpectedMemberDigests,
+		)
+		if err != nil ||
+			actualData.DiscoveryRoot != expectedData.DiscoveryRoot ||
+			!maps.Equal(
+				actualData.ExpectedMemberDigests,
+				expectedData.ExpectedMemberDigests,
+			) {
+			return false
+		}
+	}
+
+	if request.ManagedSourceID != "" {
+		found := false
+		for _, sourceValue := range value.Sources {
+			if sourceValue.ID != request.ManagedSourceID {
+				continue
+			}
+			found = sourceValue.RootID == request.RootID &&
+				sourceValue.Kind == managed.Kind &&
+				sourceValue.DisplayName == request.DisplayName &&
+				sourceValue.Enabled
+			break
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func builtInBundleTopologyMatches(
@@ -1203,6 +1369,9 @@ func builtInBundleTopologyMatches(
 		value.Collection.DisplayName != request.DisplayName ||
 		value.Collection.Description != request.Description ||
 		value.Collection.Enabled != request.Enabled ||
+		value.Data.LogicalName != request.LogicalName ||
+		value.Data.LogicalVersion != request.LogicalVersion ||
+		!maps.Equal(value.Data.Labels, request.Labels) ||
 		len(value.Attachments) != 1 {
 		return false
 	}
@@ -1287,8 +1456,17 @@ func (a *API) refreshBundle(
 	if err != nil {
 		return refresh.Result{}, err
 	}
+
+	autoAdoptSources := make(map[basespec.SourceID]struct{})
+	for _, attachment := range bundle.Attachments {
+		switch attachment.Role {
+		case RoleExternal, RoleImported, RoleLibrary:
+			autoAdoptSources[attachment.SourceID] = struct{}{}
+		}
+	}
 	var policy artifact.Policy = skillArtifactPolicy{
-		ids: a.dependencies.AutoAdoptionIDProvider,
+		ids:              a.dependencies.AutoAdoptionIDProvider,
+		autoAdoptSources: autoAdoptSources,
 	}
 	if allowProtected {
 		policy = builtInSkillArtifactPolicy{}
@@ -1524,6 +1702,19 @@ func (a *API) createManagedSkill(
 		}
 	} else if pinned.Revision != request.ExpectedArtifactRevision {
 		return CreateManagedSkillResponse{}, basespec.ErrConflict
+	}
+
+	if pinned.Name != artifactName {
+		updated, err := a.dependencies.Artifacts.SetName(
+			ctx,
+			pinned.Ref(),
+			pinned.Revision,
+			artifactName,
+		)
+		if err != nil {
+			return CreateManagedSkillResponse{}, err
+		}
+		pinned = &updated
 	}
 
 	if result, complete := managedSkillCreateResult(
@@ -1867,8 +2058,26 @@ func managedAttachmentForRole(
 	return attachment, sourceValue, nil
 }
 
+func bundleAttachmentRole(
+	value Bundle,
+	sourceID basespec.SourceID,
+) (basespec.AttachmentRole, error) {
+	for _, attachment := range value.Attachments {
+		if attachment.SourceID == sourceID {
+			return attachment.Role, nil
+		}
+	}
+	return "", fmt.Errorf(
+		"%w: source %q is not attached to bundle %q",
+		basespec.ErrAttachmentNotFound,
+		sourceID,
+		value.Collection.ID,
+	)
+}
+
 type skillArtifactPolicy struct {
-	ids ArtifactIDProvider
+	ids              ArtifactIDProvider
+	autoAdoptSources map[basespec.SourceID]struct{}
 }
 
 func (p skillArtifactPolicy) Derive(
@@ -1878,6 +2087,9 @@ func (p skillArtifactPolicy) Derive(
 	value definition.Definition,
 ) (artifact.Draft, bool, []diagnostic.Diagnostic, error) {
 	if occurrence.Kind != skillartifact.Kind {
+		return artifact.Draft{}, false, nil, nil
+	}
+	if _, allowed := p.autoAdoptSources[occurrence.Key.SourceID]; !allowed {
 		return artifact.Draft{}, false, nil, nil
 	}
 	if err := skillartifact.ValidateDefinition(value); err != nil {
