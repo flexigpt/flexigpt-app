@@ -1,4 +1,4 @@
-package skillartifact
+package artifact
 
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 

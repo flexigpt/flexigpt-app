@@ -59,8 +59,8 @@ import {
 } from '@/apis/wailsjs/go/main/SkillBundleWrapper';
 import type {
 	artifact as wailsArtifact,
-	skillbundle as wailsSkillBundle,
-	skillruntime as wailsSkillRuntime,
+	bundle as wailsSkillBundle,
+	runtime as wailsSkillRuntime,
 	spec as wailsSpec,
 } from '@/apis/wailsjs/go/models';
 

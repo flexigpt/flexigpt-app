@@ -24,12 +24,12 @@ const (
 )
 
 type ArtifactPolicy struct {
-	ids      ArtifactIDProvider
+	ids      artifact.ArtifactIDProvider
 	supports map[basespec.ArtifactKind]spec.ArtifactSupport
 }
 
 func NewArtifactPolicy(
-	ids ArtifactIDProvider,
+	ids artifact.ArtifactIDProvider,
 	supports ...spec.ArtifactSupport,
 ) (*ArtifactPolicy, error) {
 	if ids == nil || len(supports) == 0 {

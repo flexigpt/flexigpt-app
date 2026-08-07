@@ -1,4 +1,4 @@
-package skillbundle
+package bundle
 
 import (
 	"fmt"
@@ -6,24 +6,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
-
-const (
-	PortableBundleSchemaVersion                   = "v1"
-	portableMemberFormat                          = "agent.skill-entrypoint/v1"
-	portableSkillMediaType                        = "text/markdown"
-	PortableCollectionFileName                    = "collection.json"
-	PortableBundleSchemaID      basespec.SchemaID = "skill.bundle.v1"
-)
-
-type PortableBundleMetadata struct {
-	LogicalName    basespec.LogicalName
-	LogicalVersion basespec.LogicalVersion
-	DisplayName    string
-	Description    string
-	Labels         map[string]string
-}
 
 type portableBundleBody struct {
 	MemberFormat string `json:"memberFormat"`
@@ -107,7 +91,7 @@ func ValidatePortableBundleDefinition(
 	}
 
 	for index, member := range value.Members {
-		if member.Role != string(skillartifact.Kind) ||
+		if member.Role != string(skillArtifact.Kind) ||
 			member.MediaType != portableSkillMediaType ||
 			member.SubresourceLocator != "" {
 			return fmt.Errorf(
@@ -117,13 +101,13 @@ func ValidatePortableBundleDefinition(
 			)
 		}
 		if member.Locator != "" {
-			if path.Base(string(member.Locator)) != skillartifact.DefinitionFileName ||
+			if path.Base(string(member.Locator)) != skillArtifact.DefinitionFileName ||
 				path.Dir(string(member.Locator)) == "." {
 				return fmt.Errorf(
 					"%w: portable Skill Bundle member %d must locate a package %q",
 					basespec.ErrInvalid,
 					index,
-					skillartifact.DefinitionFileName,
+					skillArtifact.DefinitionFileName,
 				)
 			}
 		}

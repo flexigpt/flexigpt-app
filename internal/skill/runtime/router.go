@@ -1,4 +1,4 @@
-package skillruntime
+package runtime
 
 import (
 	"context"

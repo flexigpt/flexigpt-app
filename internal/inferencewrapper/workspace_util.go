@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
+	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
 
@@ -42,7 +42,7 @@ func NewWorkspaceInferenceBridge(
 
 // validateArtifactSkillRefsForSelection validates only durable Artifact
 // identities. Artifact membership and owning Collection kind are resolved by
-// skillruntime.ArtifactRouter, never inferred from reference shape.
+// skillRuntime.ArtifactRouter, never inferred from reference shape.
 func validateArtifactSkillRefsForSelection(
 	sel *selection.ConversationSelection,
 	refs []artifact.ArtifactRef,
@@ -261,8 +261,8 @@ func filterWorkspaceSkillRefsToResolvedSelection(
 func markWorkspaceSkillSessionUsage(
 	usage *selection.ConversationUsage,
 	enabledSkillRefs []artifact.ArtifactRef,
-	availableItems []skillruntime.RuntimeSkillListItem,
-	activeItems []skillruntime.RuntimeSkillListItem,
+	availableItems []skillRuntime.RuntimeSkillListItem,
+	activeItems []skillRuntime.RuntimeSkillListItem,
 	advertised bool,
 ) {
 	if usage == nil || len(usage.Skills) == 0 {

@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/metadata"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
@@ -56,7 +56,7 @@ func InitArtifactStoreWrapper(
 		)
 	}
 
-	skillDecoder, err := skillartifact.NewDecoder()
+	skillDecoder, err := skillArtifact.NewDecoder()
 	if err != nil {
 		return err
 	}

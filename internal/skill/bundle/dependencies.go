@@ -1,4 +1,4 @@
-package skillbundle
+package bundle
 
 import (
 	"context"
@@ -55,7 +55,7 @@ type Dependencies struct {
 	HasDecoder             func(basespec.DecoderID) bool
 	DecoderFingerprint     func() (cryptoutil.Digest, error)
 	RootMutationPolicy     protection.RootPolicy
-	AutoAdoptionIDProvider ArtifactIDProvider
+	AutoAdoptionIDProvider artifact.ArtifactIDProvider
 
 	GetManagedSourceState          ManagedSourceStateFunc
 	PublishManagedPackage          PublishManagedPackageFunc

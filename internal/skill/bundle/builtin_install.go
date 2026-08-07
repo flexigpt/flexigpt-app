@@ -1,4 +1,4 @@
-package skillbundle
+package bundle
 
 import (
 	"context"
@@ -9,15 +9,33 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
 
 const locatorPackage basespec.Locator = "package"
+
+// builtInSkillArtifactPolicy deliberately creates no observed Artifacts.
+// Protected topology has one declared static Artifact ID for every member.
+// Unknown source content may remain visible as a catalog occurrence, but it
+// must never silently become a canonical built-in Artifact.
+type builtInSkillArtifactPolicy struct{}
+
+func (builtInSkillArtifactPolicy) Derive(
+	_ context.Context,
+	_ collection.Collection,
+	_ catalog.Occurrence,
+	_ definition.Definition,
+) (artifact.Draft, bool, []diagnostic.Diagnostic, error) {
+	return artifact.Draft{}, false, nil, nil
+}
 
 // BuiltInCollectionInstallRequest is trusted installer input. It materializes
 // exactly one complete portable Collection package in one managed Source
@@ -153,13 +171,13 @@ func (a *API) InstallBuiltInCollection(
 		if err := basespec.ValidatePortableLocator(skill.Member, false); err != nil {
 			return nil, fmt.Errorf("skills[%d]: %w", index, err)
 		}
-		if path.Base(string(skill.Member)) != skillartifact.DefinitionFileName ||
+		if path.Base(string(skill.Member)) != skillArtifact.DefinitionFileName ||
 			path.Dir(string(skill.Member)) == "." {
 			return nil, fmt.Errorf(
 				"%w: built-in member %q is not a packaged %q",
 				basespec.ErrInvalid,
 				skill.Member,
-				skillartifact.DefinitionFileName,
+				skillArtifact.DefinitionFileName,
 			)
 		}
 		if _, duplicate := seenArtifactIDs[skill.ArtifactID]; duplicate {
@@ -218,7 +236,7 @@ func (a *API) InstallBuiltInCollection(
 			return nil, err
 		}
 		expectedName := path.Base(path.Dir(string(skill.Member)))
-		definitionValue, _, err := skillartifact.DecodeSkillDocument(
+		definitionValue, _, err := skillArtifact.DecodeSkillDocument(
 			normalizedSkillMD,
 			expectedName,
 		)
@@ -405,7 +423,7 @@ func (a *API) ensurePinnedManagedSkill(
 			Binding: artifact.SourceBinding{
 				SourceID:     sourceID,
 				Locator:      skillLocator,
-				ExpectedKind: skillartifact.Kind,
+				ExpectedKind: skillArtifact.Kind,
 			},
 			Name:    name,
 			Enabled: enabled,

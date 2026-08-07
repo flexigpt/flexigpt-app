@@ -1,4 +1,4 @@
-package skillruntime
+package runtime
 
 import (
 	"errors"
@@ -12,6 +12,8 @@ var (
 	ErrInvalidRequest = errors.New("invalid Skill runtime request")
 	ErrSkillNotFound  = errors.New("runtime Skill not found")
 )
+
+const maxSkillToolArgsBytes = 1 << 20
 
 // JSONRawString mirrors the ToolRuntime API style; it's a raw JSON string.
 type JSONRawString = string
@@ -166,4 +168,15 @@ type InvokeSkillToolResponseBody struct {
 
 type InvokeSkillToolResponse struct {
 	Body *InvokeSkillToolResponseBody
+}
+
+// ArtifactSkillSummary is the runtime-derived summary used by durable
+// selection validators. It contains no filesystem path and no process-local
+// SkillDef identity.
+type ArtifactSkillSummary struct {
+	Artifact     artifact.ArtifactRef
+	IsEnabled    bool
+	Insert       agentskillsSpec.SkillInsert
+	HasArguments bool
+	HasResources bool
 }

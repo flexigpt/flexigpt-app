@@ -4,26 +4,14 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 )
 
 type WorkspaceWrapper struct {
 	api *workspace.API
-}
-
-func workspaceAutoAdoptionIDProvider() artifactadapter.ArtifactIDProvider {
-	generator := uuidutil.UUIDv7Generator{}
-	return artifactadapter.ArtifactIDProviderFunc(
-		func(ctx context.Context) (basespec.ArtifactID, error) {
-			id, err := generator.NewID(ctx)
-			return basespec.ArtifactID(id), err
-		},
-	)
 }
 
 func InitWorkspaceWrapper(
@@ -38,7 +26,7 @@ func InitWorkspaceWrapper(
 	}
 	config := workspace.DefaultConfig()
 	config.WorkspaceRootID = defaultWorkspaceRootID
-	config.AutoAdoptionIDProvider = workspaceAutoAdoptionIDProvider()
+	config.AutoAdoptionIDProvider = artifact.UUIDArtifactIDProvider()
 
 	api, err := workspace.New(workspace.Dependencies{
 		Roots:              artifacts.Roots,

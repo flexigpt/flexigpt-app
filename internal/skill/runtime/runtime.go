@@ -1,7 +1,8 @@
-package skillruntime
+package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,6 +19,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
 
 var errSkillInvalidRequest = errors.New("invalid request")
@@ -531,6 +533,127 @@ func (s *SkillRuntime) RenderSkill(
 			Warnings:         append([]string(nil), out.Warnings...),
 		},
 	}, nil
+}
+
+// DescribeArtifactSkill resolves and indexes a selected ArtifactRef through
+// the ownership router before reading Agent Skills metadata. The Artifact
+// record and its Collection membership, rather than reference shape, decide
+// the owning feature adapter.
+func (s *SkillRuntime) DescribeArtifactSkill(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (ArtifactSkillSummary, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return ArtifactSkillSummary{}, err
+	}
+	if err := ref.Validate(); err != nil {
+		return ArtifactSkillSummary{}, err
+	}
+
+	resolved, found := s.resolveArtifactSkill(ctx, ref)
+	if !found {
+		return ArtifactSkillSummary{}, fmt.Errorf(
+			"%w: skill Artifact %q is unavailable",
+			basespec.ErrReferenceUnresolved,
+			ref.ArtifactID,
+		)
+	}
+
+	records, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
+		AllowSkills: []agentskillsSpec.SkillDef{resolved.Definition},
+		Activity:    agentskillsSpec.SkillActivityAny,
+	})
+	if err != nil {
+		return ArtifactSkillSummary{}, err
+	}
+
+	for _, record := range records {
+		if record.Def != resolved.Definition {
+			continue
+		}
+		return ArtifactSkillSummary{
+			Artifact:     ref,
+			IsEnabled:    true,
+			Insert:       record.Insert,
+			HasArguments: len(record.Arguments) != 0,
+			HasResources: record.Resources.HasResources,
+		}, nil
+	}
+
+	return ArtifactSkillSummary{}, fmt.Errorf(
+		"%w: runtime did not index skill Artifact %q",
+		basespec.ErrReferenceUnresolved,
+		ref.ArtifactID,
+	)
+}
+
+func (s *SkillRuntime) InvokeSkillTool(
+	ctx context.Context,
+	req *InvokeSkillToolRequest,
+) (*InvokeSkillToolResponse, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
+	}
+	if req == nil || req.Body == nil {
+		return nil, fmt.Errorf("%w: missing request", errSkillInvalidRequest)
+	}
+	sessionID := strings.TrimSpace(string(req.Body.SessionID))
+	if sessionID == "" {
+		return nil, fmt.Errorf("%w: sessionID required", errSkillInvalidRequest)
+	}
+	toolName := strings.TrimSpace(req.Body.ToolName)
+	if toolName == "" {
+		return nil, fmt.Errorf("%w: toolName required", errSkillInvalidRequest)
+	}
+	arguments := strings.TrimSpace(req.Body.Args)
+	if arguments == "" {
+		arguments = "{}"
+	}
+	if len(arguments) > maxSkillToolArgsBytes {
+		return nil, fmt.Errorf("%w: args too large", errSkillInvalidRequest)
+	}
+	if !json.Valid([]byte(arguments)) {
+		return nil, fmt.Errorf("%w: args must be valid JSON", errSkillInvalidRequest)
+	}
+	if arguments[0] != '{' {
+		return nil, fmt.Errorf("%w: args must be a JSON object", errSkillInvalidRequest)
+	}
+
+	registry, err := s.runtime.NewSessionRegistry(ctx, agentskillsSpec.SessionID(sessionID))
+	if err != nil {
+		return nil, err
+	}
+	var functionID string
+	switch toolName {
+	case "skills-load":
+		functionID = string(agentskillsSpec.FuncIDSkillsLoad)
+	case "skills-unload":
+		functionID = string(agentskillsSpec.FuncIDSkillsUnload)
+	case "skills-readresource":
+		functionID = string(agentskillsSpec.FuncIDSkillsReadResource)
+	case "skills-runscript":
+		if !s.runScriptsEnabled {
+			return nil, fmt.Errorf(
+				"%w: skills-runscript is disabled by runtime policy",
+				errSkillInvalidRequest,
+			)
+		}
+		functionID = string(agentskillsSpec.FuncIDSkillsRunScript)
+	default:
+		return nil, fmt.Errorf("%w: unknown toolName %q", errSkillInvalidRequest, toolName)
+	}
+
+	outputs, callErr := llmtoolsutil.CallUsingRegistry(ctx, registry, functionID, json.RawMessage(arguments))
+	response := &InvokeSkillToolResponse{Body: &InvokeSkillToolResponseBody{
+		Outputs:   outputs,
+		Meta:      map[string]any{"toolName": toolName},
+		IsBuiltIn: true,
+	}}
+	if callErr != nil {
+		response.Body.IsError = true
+		response.Body.ErrorMessage = callErr.Error()
+	}
+	return response, nil
 }
 
 func (s *SkillRuntime) ensureConfigured() error {

@@ -15,8 +15,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
-	"github.com/flexigpt/flexigpt-app/internal/skillbundle"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
+	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
 
 type HydratedRegistry struct {
@@ -188,7 +188,7 @@ func hydrateCollection(
 		memberContents[member.Locator] = append([]byte(nil), content...)
 	}
 
-	canonical, err := skillbundle.CanonicalizePortableBundleDefinition(payload)
+	canonical, err := skillBundle.CanonicalizePortableBundleDefinition(payload)
 	if err != nil {
 		return HydratedCollection{}, err
 	}
@@ -234,7 +234,7 @@ func hydrateCollection(
 		}
 
 		expectedName := path.Base(path.Dir(string(member.Locator)))
-		skillDefinition, _, err := skillartifact.DecodeSkillDocument(
+		skillDefinition, _, err := skillArtifact.DecodeSkillDocument(
 			memberContents[member.Locator],
 			expectedName,
 		)

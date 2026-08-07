@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -106,8 +106,8 @@ func (f *Adapter) List(
 	}
 	output := make([]WorkspaceSkill, 0)
 	for _, resourceValue := range view.Resources {
-		if resourceValue.Definition.Kind != skillartifact.Kind ||
-			resourceValue.Definition.SchemaID != skillartifact.SchemaID {
+		if resourceValue.Definition.Kind != skillArtifact.Kind ||
+			resourceValue.Definition.SchemaID != skillArtifact.SchemaID {
 			continue
 		}
 		value, err := projectWorkspaceSkill(
@@ -166,8 +166,8 @@ func (f *Adapter) LoadArtifact(
 		return WorkspaceSkill{}, err
 	}
 	workspace := workspaceValue.Collection.Ref()
-	if resourceValue.Definition.Kind != skillartifact.Kind ||
-		resourceValue.Definition.SchemaID != skillartifact.SchemaID {
+	if resourceValue.Definition.Kind != skillArtifact.Kind ||
+		resourceValue.Definition.SchemaID != skillArtifact.SchemaID {
 		return WorkspaceSkill{}, fmt.Errorf(
 			"%w: Artifact %q is not an Agent Skill",
 			spec.ErrReferenceUnresolved,
@@ -313,7 +313,7 @@ func projectWorkspaceSkill(
 	if dataErr != nil {
 		return output, dataErr
 	}
-	document, err := skillartifact.DocumentFromDefinition(
+	document, err := skillArtifact.DocumentFromDefinition(
 		resourceValue.Definition,
 	)
 	if err != nil {
@@ -346,7 +346,7 @@ func skillSummary(
 		})
 	}
 	return SkillSummary{
-		SchemaVersion: skillartifact.SchemaVersion,
+		SchemaVersion: skillArtifact.SchemaVersion,
 		ID:            artifactValue.ID,
 		Slug:          value.Name,
 		Name:          value.Name,
@@ -373,7 +373,7 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 // resolveRuntimeLocation performs the Workspace-owned handoff from a selected
 // source-linked record to a native filesystem skill package. It does not
 // register or execute the skill. Agent Skills runtime lifecycle remains in
-// skillruntime.
+// skillRuntime.
 func (f *Adapter) runtimeSource(
 	ctx context.Context,
 	item spec.LoadPlanItem,
@@ -419,7 +419,7 @@ func (f *Adapter) resolveRuntimeLocation(
 		)
 	}
 
-	location, err := skillartifact.ResolveRuntimePackage(
+	location, err := skillArtifact.ResolveRuntimePackage(
 		ctx,
 		f.sourceRuntime,
 		sourceValue,

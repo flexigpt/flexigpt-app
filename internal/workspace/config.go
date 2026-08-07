@@ -3,10 +3,11 @@ package workspace
 import (
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
-	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
@@ -45,7 +46,7 @@ type Config struct {
 	ContextComposition      contextadapter.CompositionPolicy
 	SourceUsePolicy         artifactadapter.SourceUsePolicy
 	Clock                   clockutil.Clock
-	AutoAdoptionIDProvider  artifactadapter.ArtifactIDProvider
+	AutoAdoptionIDProvider  artifact.ArtifactIDProvider
 }
 
 type defaultArtifactSupport struct {
@@ -61,10 +62,10 @@ var defaultArtifactSupportMatrix = []defaultArtifactSupport{
 	},
 	{
 		support: spec.ArtifactSupport{
-			Kind:      skillartifact.Kind,
-			SchemaID:  skillartifact.SchemaID,
-			DecoderID: skillartifact.DecoderID,
-			Validator: skillartifact.ValidateDefinition,
+			Kind:      skillArtifact.Kind,
+			SchemaID:  skillArtifact.SchemaID,
+			DecoderID: skillArtifact.DecoderID,
+			Validator: skillArtifact.ValidateDefinition,
 		},
 	},
 }

@@ -1,4 +1,4 @@
-package skillbundle
+package bundle
 
 import (
 	"bytes"
@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 
 	"github.com/flexigpt/agentskills-go"
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -29,7 +28,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
 
 type API struct {
@@ -37,116 +36,15 @@ type API struct {
 	closed       atomic.Bool
 }
 
-type Bundle struct {
-	Collection  collection.Collection
-	Data        CollectionData
-	Attachments []collection.Attachment
-	Sources     []source.Summary
-}
-
-type CreateBundleRequest struct {
-	RootID                   basespec.RootID
-	CollectionID             basespec.CollectionID
-	ManagedSourceID          basespec.SourceID
-	DisplayName              string
-	Description              string
-	Enabled                  bool
-	LogicalName              basespec.LogicalName
-	LogicalVersion           basespec.LogicalVersion
-	Labels                   map[string]string
-	PortableDefinitionDigest *cryptoutil.Digest
-	Attachments              []AttachmentDraft
-}
-
-type UpdateBundleRequest struct {
-	Bundle           collection.CollectionRef
-	ExpectedRevision uint64
-	DisplayName      string
-	Description      string
-	Enabled          bool
-}
-
-type AttachmentDraft struct {
-	SourceID              basespec.SourceID
-	Role                  basespec.AttachmentRole
-	Enabled               bool
-	DiscoveryRoot         basespec.Locator
-	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
-}
-
-type CreateManagedSkillRequest struct {
-	Bundle                     collection.CollectionRef
-	ExpectedCollectionRevision uint64
-	ArtifactID                 basespec.ArtifactID
-	SkillName                  string
-	SKILLMD                    []byte
-	ExpectedArtifactRevision   uint64
-
-	// Document is an optional structured authoring input. Serialization is
-	// delegated to agentskills-go. It is mutually exclusive with SKILLMD.
-	Document *agentskillsSpec.SkillDocument
-	Files    []source.ManagedPackageFile
-	Enabled  bool
-}
-
-type CreateManagedSkillResponse struct {
-	Artifact artifact.Artifact
-	Address  artifact.ArtifactAddress
-}
-
-// ManagedSkillDocument is the editable projection for a managed Skill.
-// It deliberately contains the canonical SKILL.md document only. It never
-// exposes Source configuration, a native filesystem path, or package internals.
-type ManagedSkillDocument struct {
-	Artifact artifact.Artifact
-	Document agentskillsSpec.SkillDocument
-}
-
-type AdoptSkillRequest struct {
-	Bundle                  collection.CollectionRef
-	Occurrence              catalog.OccurrenceKey
-	ArtifactID              basespec.ArtifactID
-	ExpectedCatalogRevision uint64
-	Name                    string
-	Enabled                 bool
-}
-
-type PinSkillRequest struct {
-	Bundle                     collection.CollectionRef
-	ExpectedCollectionRevision uint64
-	ArtifactID                 basespec.ArtifactID
-	Binding                    artifact.SourceBinding
-	Name                       string
-	Enabled                    bool
-}
-
-type BuiltInBundleTopology struct {
-	RootID                basespec.RootID                        `json:"-"`
-	CollectionID          basespec.CollectionID                  `json:"-"`
-	SourceID              basespec.SourceID                      `json:"-"`
-	LogicalName           basespec.LogicalName                   `json:"-"`
-	LogicalVersion        basespec.LogicalVersion                `json:"-"`
-	DisplayName           string                                 `json:"-"`
-	Description           string                                 `json:"-"`
-	Labels                map[string]string                      `json:"-"`
-	Enabled               bool                                   `json:"-"`
-	DiscoveryRoot         basespec.Locator                       `json:"-"`
-	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest `json:"-"`
-
-	// Optional local provenance. Embedded package bytes and member digests
-	// remain independently verified during built-in installation.
-	PortableDefinitionDigest *cryptoutil.Digest `json:"-"`
-}
-
 func New(dependencies Dependencies) (*API, error) {
 	if err := dependencies.Validate(); err != nil {
 		return nil, err
 	}
-	if !dependencies.HasDecoder(skillartifact.DecoderID) {
+	if !dependencies.HasDecoder(skillArtifact.DecoderID) {
 		return nil, fmt.Errorf(
 			"%w: shared agent skill decoder %q is not registered",
 			basespec.ErrDecoderUnavailable,
-			skillartifact.DecoderID,
+			skillArtifact.DecoderID,
 		)
 	}
 	return &API{dependencies: dependencies}, nil
@@ -633,7 +531,7 @@ func (a *API) GetManagedSkillDocument(
 	if err != nil {
 		return ManagedSkillDocument{}, err
 	}
-	document, err := skillartifact.DocumentFromDefinition(definitionValue)
+	document, err := skillArtifact.DocumentFromDefinition(definitionValue)
 	if err != nil {
 		return ManagedSkillDocument{}, err
 	}
@@ -686,13 +584,13 @@ func (a *API) AdoptSkill(
 		if occurrence.Key != request.Occurrence {
 			continue
 		}
-		if occurrence.Kind != skillartifact.Kind ||
+		if occurrence.Kind != skillArtifact.Kind ||
 			occurrence.State != catalog.OccurrenceValid ||
 			occurrence.DefinitionDigest == nil {
 			return artifact.Artifact{}, fmt.Errorf(
 				"%w: requested occurrence is not an adoptable %q Skill",
 				basespec.ErrReferenceUnresolved,
-				skillartifact.Kind,
+				skillArtifact.Kind,
 			)
 		}
 		found = true
@@ -730,11 +628,11 @@ func (a *API) PinSkill(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if request.Binding.ExpectedKind != skillartifact.Kind {
+	if request.Binding.ExpectedKind != skillArtifact.Kind {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: skill bundle pins only support %q",
 			basespec.ErrInvalid,
-			skillartifact.Kind,
+			skillArtifact.Kind,
 		)
 	}
 	role, err := bundleAttachmentRole(bundle, request.Binding.SourceID)
@@ -771,7 +669,7 @@ func (a *API) ListSkills(
 	}
 	output := make([]artifact.Artifact, 0, len(values))
 	for _, value := range values {
-		if value.Kind == skillartifact.Kind {
+		if value.Kind == skillArtifact.Kind {
 			output = append(output, value)
 		}
 	}
@@ -789,7 +687,7 @@ func (a *API) GetSkill(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if value.Kind != skillartifact.Kind {
+	if value.Kind != skillArtifact.Kind {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: artifact %q is not an agent skill",
 			basespec.ErrNotFound,
@@ -1576,7 +1474,7 @@ func (a *API) createManagedSkill(
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	definitionValue, _, err := skillartifact.DecodeSkillDocument(skillMD,
+	definitionValue, _, err := skillArtifact.DecodeSkillDocument(skillMD,
 		request.SkillName,
 	)
 	if err != nil {
@@ -1648,7 +1546,7 @@ func (a *API) createManagedSkill(
 		return CreateManagedSkillResponse{}, err
 	}
 	skillLocator := basespec.Locator(
-		path.Join(string(directory), skillartifact.DefinitionFileName),
+		path.Join(string(directory), skillArtifact.DefinitionFileName),
 	)
 	if err := source.ValidateManagedPackageDirectory(directory); err != nil {
 		return CreateManagedSkillResponse{}, err
@@ -1696,7 +1594,7 @@ func (a *API) createManagedSkill(
 			Binding: artifact.SourceBinding{
 				SourceID:     sourceValue.ID,
 				Locator:      skillLocator,
-				ExpectedKind: skillartifact.Kind,
+				ExpectedKind: skillArtifact.Kind,
 			},
 			Name:    artifactName,
 			Enabled: request.Enabled,
@@ -1908,7 +1806,7 @@ func managedSkillCreateResult(
 		value.Adoption != artifact.AdoptionPinned ||
 		value.Binding.SourceID != sourceID ||
 		value.Binding.Locator != skillLocator ||
-		value.Binding.ExpectedKind != skillartifact.Kind ||
+		value.Binding.ExpectedKind != skillArtifact.Kind ||
 		value.State != artifact.StateAvailable ||
 		value.ResolvedDefinition == nil ||
 		*value.ResolvedDefinition != expectedDefinition {
@@ -2096,15 +1994,15 @@ func (a *API) discoveryPlan(value Bundle) (discovery.Plan, error) {
 			DirectoryRoots: []discovery.DirectoryRoot{{
 				Root:            attachmentData.DiscoveryRoot,
 				Recursive:       true,
-				IncludePatterns: []string{skillartifact.DefinitionFileName},
+				IncludePatterns: []string{skillArtifact.DefinitionFileName},
 			}},
 			DecoderHints: []discovery.DecoderHint{{
 				Locator:    attachmentData.DiscoveryRoot,
 				Recursive:  true,
-				DecoderIDs: []basespec.DecoderID{skillartifact.DecoderID},
+				DecoderIDs: []basespec.DecoderID{skillArtifact.DecoderID},
 			}},
 			ExpectedContentDigests: expectedContentDigests,
-			AllowedDecoderIDs:      []basespec.DecoderID{skillartifact.DecoderID},
+			AllowedDecoderIDs:      []basespec.DecoderID{skillArtifact.DecoderID},
 			Authoritative:          true,
 		}.Normalized())
 	}
@@ -2192,7 +2090,7 @@ func bundleAttachmentRole(
 }
 
 type skillArtifactPolicy struct {
-	ids              ArtifactIDProvider
+	ids              artifact.ArtifactIDProvider
 	autoAdoptSources map[basespec.SourceID]struct{}
 }
 
@@ -2202,13 +2100,13 @@ func (p skillArtifactPolicy) Derive(
 	occurrence catalog.Occurrence,
 	value definition.Definition,
 ) (artifact.Draft, bool, []diagnostic.Diagnostic, error) {
-	if occurrence.Kind != skillartifact.Kind {
+	if occurrence.Kind != skillArtifact.Kind {
 		return artifact.Draft{}, false, nil, nil
 	}
 	if _, allowed := p.autoAdoptSources[occurrence.Key.SourceID]; !allowed {
 		return artifact.Draft{}, false, nil, nil
 	}
-	if err := skillartifact.ValidateDefinition(value); err != nil {
+	if err := skillArtifact.ValidateDefinition(value); err != nil {
 		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
 			Severity: diagnostic.DiagnosticError,
 			Code:     "skill.bundle.definition-invalid",
@@ -2248,11 +2146,11 @@ func managedSkillPackageDirectoryOf(
 	binding artifact.SourceBinding,
 ) (basespec.Locator, error) {
 	if binding.SubresourceLocator != "" ||
-		path.Base(string(binding.Locator)) != skillartifact.DefinitionFileName {
+		path.Base(string(binding.Locator)) != skillArtifact.DefinitionFileName {
 		return "", fmt.Errorf(
 			"%w: managed Skill binding does not identify a package %q",
 			basespec.ErrInvalid,
-			skillartifact.DefinitionFileName,
+			skillArtifact.DefinitionFileName,
 		)
 	}
 	directory := basespec.Locator(path.Dir(string(binding.Locator)))
@@ -2277,7 +2175,7 @@ func normalizeManagedSkillFiles(
 			)
 		}
 		return []source.ManagedPackageFile{{
-			Locator: basespec.Locator(skillartifact.DefinitionFileName),
+			Locator: basespec.Locator(skillArtifact.DefinitionFileName),
 			Content: append([]byte(nil), skillMD...),
 		}}, append([]byte(nil), skillMD...), nil
 	}
@@ -2294,7 +2192,7 @@ func normalizeManagedSkillFiles(
 
 	var found []byte
 	for _, file := range normalized.Files {
-		if file.Locator != skillartifact.DefinitionFileName {
+		if file.Locator != skillArtifact.DefinitionFileName {
 			continue
 		}
 		found = append([]byte(nil), file.Content...)
@@ -2304,7 +2202,7 @@ func normalizeManagedSkillFiles(
 		return nil, nil, fmt.Errorf(
 			"%w: managed skill package must contain %q",
 			basespec.ErrInvalid,
-			skillartifact.DefinitionFileName,
+			skillArtifact.DefinitionFileName,
 		)
 	}
 	if len(skillMD) != 0 && !bytes.Equal(skillMD, found) {
@@ -2412,11 +2310,11 @@ func validateManagedSkillOperationIntent(
 	if value.ID != artifactID ||
 		value.RootID != bundle.RootID ||
 		value.CollectionID != bundle.CollectionID ||
-		value.Kind != skillartifact.Kind ||
+		value.Kind != skillArtifact.Kind ||
 		value.Adoption != artifact.AdoptionPinned ||
 		value.Binding.SourceID != sourceID ||
 		value.Binding.Locator != skillLocator ||
-		value.Binding.ExpectedKind != skillartifact.Kind {
+		value.Binding.ExpectedKind != skillArtifact.Kind {
 		return fmt.Errorf(
 			"%w: managed Skill Artifact %q conflicts with its existing creation intent",
 			basespec.ErrConflict,

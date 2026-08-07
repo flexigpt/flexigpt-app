@@ -1,4 +1,4 @@
-package skillbundle
+package bundle
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/skillartifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
 
 // RuntimeSkill is the typed Skill Bundle handoff to application composition.
@@ -62,7 +62,7 @@ func (a *API) LoadRuntimeSkill(
 			bundleRef.CollectionID,
 		)
 	}
-	if record.Kind != skillartifact.Kind ||
+	if record.Kind != skillArtifact.Kind ||
 		!record.Enabled ||
 		record.State != artifact.StateAvailable ||
 		record.ResolvedDefinition == nil {
@@ -99,7 +99,7 @@ func (a *API) LoadRuntimeSkill(
 	if err != nil {
 		return RuntimeSkill{}, err
 	}
-	if err := skillartifact.ValidateDefinition(value); err != nil {
+	if err := skillArtifact.ValidateDefinition(value); err != nil {
 		return RuntimeSkill{}, err
 	}
 
@@ -117,7 +117,7 @@ func (a *API) LoadRuntimeSkill(
 			basespec.ErrCatalogStale,
 		)
 	}
-	location, err := skillartifact.ResolveRuntimePackage(
+	location, err := skillArtifact.ResolveRuntimePackage(
 		ctx,
 		a.dependencies.SourceRuntime,
 		sourceValue,
@@ -167,7 +167,7 @@ func currentSkillOccurrence(
 			continue
 		}
 		if occurrence.State != catalog.OccurrenceValid ||
-			occurrence.Kind != skillartifact.Kind ||
+			occurrence.Kind != skillArtifact.Kind ||
 			occurrence.DefinitionDigest == nil ||
 			occurrence.SourceContentDigest == nil ||
 			*occurrence.DefinitionDigest != *record.ResolvedDefinition {

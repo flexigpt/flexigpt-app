@@ -1,4 +1,4 @@
-package skillruntime
+package runtime
 
 import (
 	"context"
@@ -43,26 +43,6 @@ func (v *runtimeDesiredView) add(value ResolvedArtifactSkill) {
 	}
 	v.definitions[value.Definition] = value.Version
 	v.artifacts[value.Definition] = artifactRefKey(value.Artifact)
-}
-
-func cloneRuntimeDesiredView(input runtimeDesiredView) runtimeDesiredView {
-	output := newRuntimeDesiredView()
-	maps.Copy(output.definitions, input.definitions)
-	maps.Copy(output.artifacts, input.artifacts)
-	return output
-}
-
-func cloneCollectionDesiredViews(
-	input map[collection.CollectionRef]runtimeDesiredView,
-) map[collection.CollectionRef]runtimeDesiredView {
-	output := make(
-		map[collection.CollectionRef]runtimeDesiredView,
-		len(input),
-	)
-	for ref, value := range input {
-		output[ref] = cloneRuntimeDesiredView(value)
-	}
-	return output
 }
 
 // mergeDesiredCollections deterministically fails closed on any same-name
@@ -192,37 +172,6 @@ func (s *SkillRuntime) ResyncCollection(
 		collections,
 		runtimeApplyStrict,
 	)
-}
-
-func desiredCollectionView(
-	ref collection.CollectionRef,
-	values []ResolvedArtifactSkill,
-) (runtimeDesiredView, error) {
-	desired := newRuntimeDesiredView()
-	names := make(map[string]artifact.ArtifactRef, len(values))
-	for _, value := range values {
-		if err := value.Validate(); err != nil {
-			return runtimeDesiredView{}, err
-		}
-		if value.Collection != ref {
-			return runtimeDesiredView{}, fmt.Errorf(
-				"%w: runtime Skill belongs to another Collection",
-				basespec.ErrInvalid,
-			)
-		}
-		if previous, exists := names[value.Definition.Name]; exists &&
-			previous != value.Artifact {
-			return runtimeDesiredView{}, fmt.Errorf(
-				"%w: collection %q has multiple runtime Skills named %q",
-				basespec.ErrConflict,
-				ref.CollectionID,
-				value.Definition.Name,
-			)
-		}
-		names[value.Definition.Name] = value.Artifact
-		desired.add(value)
-	}
-	return desired, nil
 }
 
 func (s *SkillRuntime) RemoveCollection(
@@ -379,6 +328,37 @@ func (s *SkillRuntime) runtimeApplyDesired(
 	return present, nil
 }
 
+func desiredCollectionView(
+	ref collection.CollectionRef,
+	values []ResolvedArtifactSkill,
+) (runtimeDesiredView, error) {
+	desired := newRuntimeDesiredView()
+	names := make(map[string]artifact.ArtifactRef, len(values))
+	for _, value := range values {
+		if err := value.Validate(); err != nil {
+			return runtimeDesiredView{}, err
+		}
+		if value.Collection != ref {
+			return runtimeDesiredView{}, fmt.Errorf(
+				"%w: runtime Skill belongs to another Collection",
+				basespec.ErrInvalid,
+			)
+		}
+		if previous, exists := names[value.Definition.Name]; exists &&
+			previous != value.Artifact {
+			return runtimeDesiredView{}, fmt.Errorf(
+				"%w: collection %q has multiple runtime Skills named %q",
+				basespec.ErrConflict,
+				ref.CollectionID,
+				value.Definition.Name,
+			)
+		}
+		names[value.Definition.Name] = value.Artifact
+		desired.add(value)
+	}
+	return desired, nil
+}
+
 func sortSkillDefs(values []agentskillsSpec.SkillDef) {
 	sort.Slice(values, func(left, right int) bool {
 		if values[left].Type != values[right].Type {
@@ -389,6 +369,26 @@ func sortSkillDefs(values []agentskillsSpec.SkillDef) {
 		}
 		return values[left].Location < values[right].Location
 	})
+}
+
+func cloneCollectionDesiredViews(
+	input map[collection.CollectionRef]runtimeDesiredView,
+) map[collection.CollectionRef]runtimeDesiredView {
+	output := make(
+		map[collection.CollectionRef]runtimeDesiredView,
+		len(input),
+	)
+	for ref, value := range input {
+		output[ref] = cloneRuntimeDesiredView(value)
+	}
+	return output
+}
+
+func cloneRuntimeDesiredView(input runtimeDesiredView) runtimeDesiredView {
+	output := newRuntimeDesiredView()
+	maps.Copy(output.definitions, input.definitions)
+	maps.Copy(output.artifacts, input.artifacts)
+	return output
 }
 
 func artifactRefKey(ref artifact.ArtifactRef) string {

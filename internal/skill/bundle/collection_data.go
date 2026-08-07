@@ -1,4 +1,4 @@
-package skillbundle
+package bundle
 
 import (
 	"bytes"

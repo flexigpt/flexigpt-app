@@ -434,6 +434,10 @@ linters:
           alias: ${1}Runtime
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/discovery
           alias: ${1}Discovery
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/artifact
+          alias: ${1}Artifact
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/bundle
+          alias: ${1}Bundle
 
     nakedret:
       # No naked returns, ever.

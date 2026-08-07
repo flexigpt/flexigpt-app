@@ -1,4 +1,4 @@
-package skillbundle
+package bundle
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/skillruntime"
+	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
 // RuntimeResolver is the Skill Bundle feature adapter registered with the
@@ -28,10 +28,10 @@ func NewRuntimeResolver(api *API) (*RuntimeResolver, error) {
 func (r *RuntimeResolver) ResolveArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (skillruntime.ResolvedArtifactSkill, error) {
+) (skillRuntime.ResolvedArtifactSkill, error) {
 	value, err := r.api.LoadRuntimeSkill(ctx, ref)
 	if err != nil {
-		return skillruntime.ResolvedArtifactSkill{}, err
+		return skillRuntime.ResolvedArtifactSkill{}, err
 	}
 	return resolvedArtifactSkillOf(value)
 }
@@ -39,13 +39,13 @@ func (r *RuntimeResolver) ResolveArtifactSkill(
 func (r *RuntimeResolver) ListCollectionSkills(
 	ctx context.Context,
 	ref collection.CollectionRef,
-) ([]skillruntime.ResolvedArtifactSkill, error) {
+) ([]skillRuntime.ResolvedArtifactSkill, error) {
 	values, err := r.api.ListRuntimeSkills(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]skillruntime.ResolvedArtifactSkill, 0, len(values))
+	output := make([]skillRuntime.ResolvedArtifactSkill, 0, len(values))
 	for _, value := range values {
 		projected, err := resolvedArtifactSkillOf(value)
 		if err != nil {
@@ -58,8 +58,8 @@ func (r *RuntimeResolver) ListCollectionSkills(
 
 func resolvedArtifactSkillOf(
 	value RuntimeSkill,
-) (skillruntime.ResolvedArtifactSkill, error) {
-	output := skillruntime.ResolvedArtifactSkill{
+) (skillRuntime.ResolvedArtifactSkill, error) {
+	output := skillRuntime.ResolvedArtifactSkill{
 		Artifact:   value.Artifact,
 		Collection: value.Collection,
 		Definition: agentskillsSpec.SkillDef{
@@ -70,7 +70,7 @@ func resolvedArtifactSkillOf(
 		Version: value.Version,
 	}
 	if err := output.Validate(); err != nil {
-		return skillruntime.ResolvedArtifactSkill{}, err
+		return skillRuntime.ResolvedArtifactSkill{}, err
 	}
 	return output, nil
 }

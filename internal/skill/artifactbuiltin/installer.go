@@ -16,26 +16,27 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/metadata"
-	"github.com/flexigpt/flexigpt-app/internal/skillbundle"
+
+	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
 
 type skillInstaller interface {
 	ListBundles(
 		ctx context.Context,
 		rootID basespec.RootID,
-	) ([]skillbundle.Bundle, error)
+	) ([]skillBundle.Bundle, error)
 	ListSkills(
 		ctx context.Context,
 		ref collection.CollectionRef,
 	) ([]artifact.Artifact, error)
 	EnsureBuiltInBundleTopology(
 		ctx context.Context,
-		t skillbundle.BuiltInBundleTopology,
-	) (skillbundle.Bundle, error)
+		t skillBundle.BuiltInBundleTopology,
+	) (skillBundle.Bundle, error)
 	InstallBuiltInCollection(
 		ctx context.Context,
-		c skillbundle.BuiltInCollectionInstallRequest,
-	) ([]skillbundle.CreateManagedSkillResponse, error)
+		c skillBundle.BuiltInCollectionInstallRequest,
+	) ([]skillBundle.CreateManagedSkillResponse, error)
 	EnsureBuiltInBundleCurrent(
 		ctx context.Context,
 		ref collection.CollectionRef,
@@ -119,7 +120,7 @@ func (i *Installer) EnsureBuiltInSource(
 
 func (i *Installer) EnsureBuiltInBundles(
 	ctx context.Context,
-) ([]skillbundle.Bundle, error) {
+) ([]skillBundle.Bundle, error) {
 	ctx = protection.WithPrivilegedInstaller(ctx)
 	if _, err := i.EnsureBuiltInSource(ctx); err != nil {
 		return nil, err
@@ -128,11 +129,11 @@ func (i *Installer) EnsureBuiltInBundles(
 		return nil, err
 	}
 
-	output := make([]skillbundle.Bundle, 0, len(i.hydrated.Collections))
+	output := make([]skillBundle.Bundle, 0, len(i.hydrated.Collections))
 	for _, value := range i.hydrated.OrderedCollections() {
 		bundle, err := i.skills.EnsureBuiltInBundleTopology(
 			ctx,
-			skillbundle.BuiltInBundleTopology{
+			skillBundle.BuiltInBundleTopology{
 				RootID:                i.registry.Root.ID,
 				CollectionID:          value.Registration.ID,
 				SourceID:              i.registry.Source.ID,
@@ -162,7 +163,7 @@ func (i *Installer) EnsureBuiltInArtifacts(
 	if err != nil {
 		return err
 	}
-	byCollectionID := make(map[basespec.CollectionID]skillbundle.Bundle, len(bundles))
+	byCollectionID := make(map[basespec.CollectionID]skillBundle.Bundle, len(bundles))
 	for _, bundle := range bundles {
 		byCollectionID[bundle.Collection.ID] = bundle
 	}
@@ -187,19 +188,19 @@ func (i *Installer) EnsureBuiltInArtifacts(
 		if err != nil {
 			return err
 		}
-		request := skillbundle.BuiltInCollectionInstallRequest{
+		request := skillBundle.BuiltInCollectionInstallRequest{
 			Bundle:                     current.Collection.Ref(),
 			ExpectedCollectionRevision: current.Collection.Revision,
 			PackageDirectory:           value.SourceScope,
 			PackageFiles:               files,
 			Skills: make(
-				[]skillbundle.BuiltInCollectionSkill,
+				[]skillBundle.BuiltInCollectionSkill,
 				0,
 				len(value.Artifacts),
 			),
 		}
 		for _, skill := range value.Artifacts {
-			request.Skills = append(request.Skills, skillbundle.BuiltInCollectionSkill{
+			request.Skills = append(request.Skills, skillBundle.BuiltInCollectionSkill{
 				ArtifactID: skill.Registration.ID,
 				Member:     skill.Member.Locator,
 				Enabled:    skill.Registration.Enabled,
@@ -310,7 +311,7 @@ func (i *Installer) rejectDynamicBuiltInBundles(
 
 func (i *Installer) rejectDynamicBuiltInArtifacts(
 	ctx context.Context,
-	current skillbundle.Bundle,
+	current skillBundle.Bundle,
 	declaredCollection metadata.HydratedCollection,
 ) error {
 	artifacts, err := i.skills.ListSkills(ctx, current.Collection.Ref())
