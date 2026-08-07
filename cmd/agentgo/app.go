@@ -268,6 +268,7 @@ func (a *App) initManagers() {
 		a.skillBundleAPI,
 		a.artifactStoreAPI.components,
 		a.workspaceAPI.api.SkillAdapter(),
+		a.artifactStoreAPI.builtInTopology,
 	)
 	if err != nil {
 		slog.Error(

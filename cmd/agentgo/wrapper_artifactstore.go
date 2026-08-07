@@ -11,15 +11,16 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/metadata"
+	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
 type ArtifactStoreWrapper struct {
-	api        *artifactstore.API
-	components *system.Components
+	api             *artifactstore.API
+	components      *system.Components
+	builtInTopology builtin.Registry
 }
 
 const defaultWorkspaceRootID basespec.RootID = "0198f097-0d5b-7000-8000-000000000001"
@@ -44,7 +45,7 @@ func InitArtifactStoreWrapper(
 	if wrapper == nil {
 		return errors.New("artifact store wrapper is required")
 	}
-	registry, err := metadata.LoadRegistry()
+	registry, err := builtin.LoadRegistry()
 	if err != nil {
 		return err
 	}
@@ -96,6 +97,7 @@ func InitArtifactStoreWrapper(
 
 	wrapper.components = components
 	wrapper.api = api
+	wrapper.builtInTopology = registry
 
 	return nil
 }
@@ -315,6 +317,7 @@ func (w *ArtifactStoreWrapper) close() {
 
 	api := w.api
 	components := w.components
+	w.builtInTopology = builtin.Registry{}
 	w.api = nil
 	w.components = nil
 

@@ -1,8 +1,7 @@
-package metadata
+package artifactbuiltin
 
 import (
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
@@ -20,13 +20,10 @@ import (
 )
 
 const (
-	SchemaVersion        = "v1"
-	collectionEntrypoint = "collection.json"
-	skillEntrypoint      = "SKILL.md"
+	RegistrySchemaVersion = "v1"
+	collectionEntrypoint  = "collection.json"
+	skillEntrypoint       = "SKILL.md"
 )
-
-//go:embed builtin-registry.json
-var registryJSON []byte
 
 type HydratedRegistry struct {
 	Registry    Registry
@@ -49,26 +46,11 @@ type HydratedArtifact struct {
 	SourceDirectory   basespec.Locator
 }
 
-// Registry is application metadata. It is never a portable Skill package
-// manifest and must never be serialized into an export payload.
+// Registry is the non-portable registration manifest for embedded Agent
+// Skills. It is not a portable Skill Bundle definition and is never exported.
 type Registry struct {
 	SchemaVersion string       `json:"schemaVersion"`
-	Root          Root         `json:"root"`
-	Source        Source       `json:"source"`
 	Collections   []Collection `json:"collections"`
-}
-
-type Root struct {
-	ID          basespec.RootID `json:"id"`
-	DisplayName string          `json:"displayName"`
-	Description string          `json:"description,omitempty"`
-}
-
-type Source struct {
-	ID          basespec.SourceID   `json:"id"`
-	Kind        basespec.SourceKind `json:"kind"`
-	DisplayName string              `json:"displayName"`
-	Enabled     bool                `json:"enabled"`
 }
 
 type Collection struct {
@@ -100,7 +82,7 @@ func (r SkillReference) Validate() error {
 }
 
 func LoadRegistry() (Registry, error) {
-	decoder := json.NewDecoder(bytes.NewReader(registryJSON))
+	decoder := json.NewDecoder(bytes.NewReader(builtin.SkillRegistryJSON))
 	decoder.DisallowUnknownFields()
 
 	var value Registry
@@ -121,62 +103,23 @@ func LoadRegistry() (Registry, error) {
 }
 
 func (r Registry) Validate() error {
-	if r.SchemaVersion != SchemaVersion {
+	if r.SchemaVersion != RegistrySchemaVersion {
 		return fmt.Errorf(
-			"%w: unsupported built-in registry schema %q",
+			"%w: unsupported built-in Skill registry schema %q",
 			basespec.ErrInvalid,
 			r.SchemaVersion,
 		)
 	}
-	if err := basespec.ValidateRootID(r.Root.ID); err != nil {
-		return err
-	}
-	if err := basespec.ValidateRequiredText(
-		"built-in root display name",
-		r.Root.DisplayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return err
-	}
-	if err := basespec.ValidateOptionalText(
-		"built-in root description",
-		r.Root.Description,
-		basespec.MaxDescriptionBytes,
-	); err != nil {
-		return err
-	}
-	if err := basespec.ValidateSourceID(r.Source.ID); err != nil {
-		return err
-	}
-	if err := basespec.ValidateSourceKind(r.Source.Kind); err != nil {
-		return err
-	}
-	if err := basespec.ValidateRequiredText(
-		"built-in Source display name",
-		r.Source.DisplayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return err
-	}
 	if len(r.Collections) == 0 {
 		return fmt.Errorf(
-			"%w: built-in registry has no Collection registrations",
+			"%w: built-in Skill registry has no Collection registrations",
 			basespec.ErrInvalid,
-		)
-	}
-	if r.Root.ID == basespec.RootID(r.Source.ID) {
-		return fmt.Errorf(
-			"%w: built-in Root and Source IDs must differ",
-			basespec.ErrConflict,
 		)
 	}
 
 	collectionIDs := make(map[basespec.CollectionID]struct{}, len(r.Collections))
 	artifactIDs := make(map[basespec.ArtifactID]struct{})
-	allIDs := map[string]struct{}{
-		string(r.Root.ID):   {},
-		string(r.Source.ID): {},
-	}
+	allIDs := make(map[string]struct{}, len(r.Collections))
 
 	for collectionIndex, collection := range r.Collections {
 		if err := basespec.ValidateCollectionID(collection.ID); err != nil {

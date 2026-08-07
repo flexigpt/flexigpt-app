@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"log/slog"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -12,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/metadata"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/skill/artifactbuiltin"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
@@ -30,9 +28,13 @@ func InitSkillBundleWrapper(
 	wrapper *SkillBundleWrapper,
 	components *system.Components,
 	workspaceSkills *workspaceadapter.Adapter,
+	builtInTopology builtin.Registry,
 ) error {
 	if wrapper == nil || components == nil || workspaceSkills == nil {
 		return errors.New("skill bundle wrapper dependencies are incomplete")
+	}
+	if err := builtInTopology.Validate(); err != nil {
+		return err
 	}
 
 	autoAdoptionIDProvider := artifact.UUIDArtifactIDProvider()
@@ -163,32 +165,41 @@ func InitSkillBundleWrapper(
 	wrapper.api = api
 	wrapper.runtime = runtime
 
-	registry, err := metadata.LoadRegistry()
+	skillRegistry, err := artifactbuiltin.LoadRegistry()
 	if err != nil {
 		wrapper.close()
 		return err
 	}
-	packages, err := fs.Sub(
-		builtin.BuiltInSkillBundlesFS,
-		builtin.BuiltInSkillBundlesRootDir,
-	)
+	packages, err := builtin.EmbeddedSkillsPackages()
 	if err != nil {
 		wrapper.close()
 		return err
 	}
 	builtIns, err := artifactbuiltin.NewInstaller(
 		artifactbuiltin.InstallerDependencies{
-			Topology: components,
-			Skills:   api,
-			Registry: registry,
-			Packages: packages,
+			Skills:          api,
+			BuiltInTopology: builtInTopology,
+			SkillRegistry:   skillRegistry,
+			Packages:        packages,
 		},
 	)
 	if err != nil {
 		wrapper.close()
 		return err
 	}
-	if err := builtIns.Ensure(context.Background()); err != nil {
+	bootstrap, err := builtin.NewBootstrapRegistry(
+		builtInTopology,
+		components,
+	)
+	if err != nil {
+		wrapper.close()
+		return err
+	}
+	if err := bootstrap.Register(builtIns); err != nil {
+		wrapper.close()
+		return err
+	}
+	if err := bootstrap.Ensure(context.Background()); err != nil {
 		wrapper.close()
 		return err
 	}

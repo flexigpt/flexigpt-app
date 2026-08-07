@@ -2,21 +2,16 @@ package artifactbuiltin
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/fs"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/metadata"
-
+	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
 
@@ -44,85 +39,90 @@ type skillInstaller interface {
 }
 
 type InstallerDependencies struct {
-	Topology topology.Ensurer
-	Skills   skillInstaller
-	Registry metadata.Registry
-	Packages fs.FS
+	Skills          skillInstaller
+	BuiltInTopology builtin.Registry
+	SkillRegistry   Registry
+	Packages        fs.FS
 }
 
 type Installer struct {
-	topology topology.Ensurer
-	skills   skillInstaller
-	registry metadata.Registry
-	hydrated metadata.HydratedRegistry
-	packages fs.FS
+	skills          skillInstaller
+	builtInTopology builtin.Registry
+	hydrated        HydratedRegistry
+	packages        fs.FS
 }
 
 func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
-	if dependencies.Topology == nil ||
-		dependencies.Skills == nil ||
+	if dependencies.Skills == nil ||
 		dependencies.Packages == nil {
 		return nil, fmt.Errorf("%w: built-in installer dependencies are incomplete", basespec.ErrInvalid)
 	}
-	if err := dependencies.Registry.Validate(); err != nil {
+	if err := dependencies.BuiltInTopology.Validate(); err != nil {
 		return nil, err
 	}
-	if dependencies.Registry.Source.Kind != managed.Kind {
+	if err := dependencies.SkillRegistry.Validate(); err != nil {
+		return nil, err
+	}
+	if dependencies.BuiltInTopology.Source.Kind != managed.Kind {
 		return nil, fmt.Errorf(
 			"%w: built-in Source kind must be %q",
 			basespec.ErrInvalid,
 			managed.Kind,
 		)
 	}
-	hydrated, err := dependencies.Registry.Hydrate(
+	hydrated, err := dependencies.SkillRegistry.Hydrate(
 		dependencies.Packages,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &Installer{
-		topology: dependencies.Topology,
-		skills:   dependencies.Skills,
-		registry: dependencies.Registry,
-		hydrated: hydrated,
-		packages: dependencies.Packages,
+		skills:          dependencies.Skills,
+		builtInTopology: dependencies.BuiltInTopology,
+		hydrated:        hydrated,
+		packages:        dependencies.Packages,
 	}, nil
 }
 
-func (i *Installer) EnsureBuiltInSystemRoot(
-	ctx context.Context,
-) (root.Root, error) {
-	t, err := i.ensureTopology(ctx)
-	if err != nil {
-		return root.Root{}, err
-	}
-	return t.Root, nil
+func (*Installer) BuiltInName() string {
+	return "agent.skill"
 }
 
-func (i *Installer) EnsureBuiltInSource(
-	ctx context.Context,
-) (source.Summary, error) {
-	t, err := i.ensureTopology(ctx)
-	if err != nil {
-		return source.Summary{}, err
+func (i *Installer) BuiltInIDs() []string {
+	if i == nil {
+		return nil
 	}
-	if len(t.Sources) != 1 ||
-		t.Sources[0].ID != i.registry.Source.ID {
-		return source.Summary{}, fmt.Errorf(
-			"%w: protected built-in Source declaration was not satisfied",
-			basespec.ErrInvalid,
-		)
+	count := 0
+	for _, value := range i.hydrated.Collections {
+		count += 1 + len(value.Artifacts)
 	}
-	return t.Sources[0], nil
+	output := make([]string, 0, count)
+	for _, value := range i.hydrated.OrderedCollections() {
+		output = append(output, string(value.Registration.ID))
+		for _, artifact := range value.Artifacts {
+			output = append(output, string(artifact.Registration.ID))
+		}
+	}
+	return output
+}
+
+func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
+	if i == nil {
+		return nil
+	}
+	output := make([]basespec.Locator, 0, len(i.hydrated.Collections))
+	for _, value := range i.hydrated.OrderedCollections() {
+		output = append(output, value.SourceScope)
+	}
+	return output
 }
 
 func (i *Installer) EnsureBuiltInBundles(
 	ctx context.Context,
 ) ([]skillBundle.Bundle, error) {
-	ctx = protection.WithPrivilegedInstaller(ctx)
-	if _, err := i.EnsureBuiltInSource(ctx); err != nil {
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
 		return nil, err
 	}
 	if err := i.rejectDynamicBuiltInBundles(ctx); err != nil {
@@ -134,9 +134,9 @@ func (i *Installer) EnsureBuiltInBundles(
 		bundle, err := i.skills.EnsureBuiltInBundleTopology(
 			ctx,
 			skillBundle.BuiltInBundleTopology{
-				RootID:                i.registry.Root.ID,
+				RootID:                i.builtInTopology.Root.ID,
 				CollectionID:          value.Registration.ID,
-				SourceID:              i.registry.Source.ID,
+				SourceID:              i.builtInTopology.Source.ID,
 				LogicalName:           value.Definition.LogicalName,
 				LogicalVersion:        value.Definition.LogicalVersion,
 				DisplayName:           value.Definition.DisplayName,
@@ -158,7 +158,9 @@ func (i *Installer) EnsureBuiltInBundles(
 func (i *Installer) EnsureBuiltInArtifacts(
 	ctx context.Context,
 ) error {
-	ctx = protection.WithPrivilegedInstaller(ctx)
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return err
+	}
 	bundles, err := i.EnsureBuiltInBundles(ctx)
 	if err != nil {
 		return err
@@ -225,7 +227,7 @@ func (i *Installer) EnsureBuiltInArtifacts(
 				if result.Artifact.ID != skill.Registration.ID {
 					continue
 				}
-				found = result.Artifact.RootID == i.registry.Root.ID &&
+				found = result.Artifact.RootID == i.builtInTopology.Root.ID &&
 					result.Artifact.CollectionID == value.Registration.ID
 				break
 			}
@@ -259,13 +261,7 @@ func (i *Installer) EnsureBuiltInArtifacts(
 func (i *Installer) Ensure(
 	ctx context.Context,
 ) error {
-	if _, err := i.EnsureBuiltInSystemRoot(ctx); err != nil {
-		return err
-	}
-	if _, err := i.EnsureBuiltInSource(ctx); err != nil {
-		return err
-	}
-	if _, err := i.EnsureBuiltInBundles(ctx); err != nil {
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
 		return err
 	}
 	return i.EnsureBuiltInArtifacts(ctx)
@@ -274,7 +270,7 @@ func (i *Installer) Ensure(
 func (i *Installer) rejectDynamicBuiltInBundles(
 	ctx context.Context,
 ) error {
-	bundles, err := i.skills.ListBundles(ctx, i.registry.Root.ID)
+	bundles, err := i.skills.ListBundles(ctx, i.builtInTopology.Root.ID)
 	if err != nil {
 		return err
 	}
@@ -312,7 +308,7 @@ func (i *Installer) rejectDynamicBuiltInBundles(
 func (i *Installer) rejectDynamicBuiltInArtifacts(
 	ctx context.Context,
 	current skillBundle.Bundle,
-	declaredCollection metadata.HydratedCollection,
+	declaredCollection HydratedCollection,
 ) error {
 	artifacts, err := i.skills.ListSkills(ctx, current.Collection.Ref())
 	if err != nil {
@@ -341,116 +337,26 @@ func (i *Installer) rejectDynamicBuiltInArtifacts(
 	return nil
 }
 
-func (i *Installer) ensureTopology(
-	ctx context.Context,
-) (topology.Installed, error) {
-	ctx = protection.WithPrivilegedInstaller(ctx)
-	return i.topology.EnsureProtectedTopology(
-		ctx,
-		topology.Declaration{
-			Root: root.RootDraft{
-				ID:          i.registry.Root.ID,
-				DisplayName: i.registry.Root.DisplayName,
-				Description: i.registry.Root.Description,
-			},
-			Sources: []source.Draft{{
-				ID:          i.registry.Source.ID,
-				Kind:        i.registry.Source.Kind,
-				DisplayName: i.registry.Source.DisplayName,
-				Enabled:     i.registry.Source.Enabled,
-				Config:      json.RawMessage(`{}`),
-			}},
-		},
-	)
-}
-
 func (i *Installer) packageFiles(
 	ctx context.Context,
 	packageRoot basespec.Locator,
 ) ([]source.ManagedPackageFile, error) {
-	files := make([]source.ManagedPackageFile, 0)
-	var totalBytes int64
-	err := fs.WalkDir(i.packages, string(packageRoot), func(
-		location string,
-		entry fs.DirEntry,
-		walkErr error,
-	) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry == nil {
-			return fmt.Errorf(
-				"%w: built-in package walk returned no entry for %q",
-				basespec.ErrInvalid,
-				location,
-			)
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if !entry.Type().IsRegular() {
-			return fmt.Errorf(
-				"%w: built-in package file %q is not regular",
-				basespec.ErrInvalid,
-				location,
-			)
-		}
-		if len(files) >= basespec.MaxDiscoveryEntries {
-			return fmt.Errorf(
-				"%w: built-in package exceeds the file count limit",
-				basespec.ErrInvalid,
-			)
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if info.Size() < 0 ||
-			info.Size() > basespec.MaxScanBytes-totalBytes {
-			return fmt.Errorf(
-				"%w: built-in package exceeds the byte limit",
-				basespec.ErrInvalid,
-			)
-		}
-		relative, found := strings.CutPrefix(
-			location,
-			string(packageRoot)+"/",
-		)
-		if !found || relative == "" {
-			return fmt.Errorf(
-				"%w: invalid built-in package file %q",
-				basespec.ErrInvalid,
-				location,
-			)
-		}
-		if err := basespec.ValidatePortableLocator(basespec.Locator(relative), false); err != nil {
-			return err
-		}
-		content, err := fs.ReadFile(i.packages, location)
-		if err != nil {
-			return err
-		}
-		if int64(len(content)) != info.Size() {
-			return fmt.Errorf(
-				"%w: built-in package file %q changed while being read",
-				basespec.ErrConflict,
-				location,
-			)
-		}
-		totalBytes += int64(len(content))
-		files = append(files, source.ManagedPackageFile{
-			Locator: basespec.Locator(relative),
-			Content: append([]byte(nil), content...),
-		})
-		return nil
-	})
+	embeddedFiles, err := builtin.ReadPackageFiles(
+		ctx,
+		i.packages,
+		packageRoot,
+	)
 	if err != nil {
 		return nil, err
 	}
-	normalized, err := source.NormalizeManagedPackagePublication(
+	files := make([]source.ManagedPackageFile, 0, len(embeddedFiles))
+	for _, file := range embeddedFiles {
+		files = append(files, source.ManagedPackageFile{
+			Locator: file.Locator,
+			Content: append([]byte(nil), file.Content...),
+		})
+	}
+	publication, err := source.NormalizeManagedPackagePublication(
 		source.ManagedPackagePublication{
 			Directory: packageRoot,
 			Files:     files,
@@ -459,5 +365,5 @@ func (i *Installer) packageFiles(
 	if err != nil {
 		return nil, err
 	}
-	return normalized.Files, nil
+	return publication.Files, nil
 }

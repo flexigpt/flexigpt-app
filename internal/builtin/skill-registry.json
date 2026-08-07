@@ -1,16 +1,5 @@
 {
 	"schemaVersion": "v1",
-	"root": {
-		"id": "0192c4c0-0000-7000-8000-000000000001",
-		"displayName": "Application Built-ins",
-		"description": "Protected application-provided portable Skill packages."
-	},
-	"source": {
-		"id": "0192c4c0-0001-7000-8000-000000000001",
-		"kind": "managed-directory",
-		"displayName": "Application Built-in Packages",
-		"enabled": true
-	},
 	"collections": [
 		{
 			"id": "0192c4c0-0010-7000-8000-000000000001",
