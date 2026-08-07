@@ -163,8 +163,9 @@ func (a *API) ListBundles(
 }
 
 // SkillBundleRefs returns every active Skill Bundle Collection. Runtime startup
-// uses this to reconcile derived Agent Skills state without treating a runtime
-// ref shape as a source-of-truth ownership discriminator.
+// inventory and maintenance code may use this without treating a runtime ref
+// shape as a source-of-truth ownership discriminator. Process-local runtime
+// registration is resolved and reconciled lazily from Artifact identity.
 func (a *API) SkillBundleRefs(
 	ctx context.Context,
 ) ([]collection.CollectionRef, error) {

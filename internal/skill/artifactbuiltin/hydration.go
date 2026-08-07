@@ -68,6 +68,7 @@ func (i *Installer) PrepareBuiltInHydration(
 	}
 
 	i.pendingHydration = nil
+	i.hydrationCurrent = false
 	fingerprint, err := i.desiredHydrationFingerprint(ctx)
 	if err != nil {
 		return err
@@ -91,6 +92,9 @@ func (i *Installer) PrepareBuiltInHydration(
 	}
 	if found && equalHydration(previous, desired) {
 		i.pendingHydration = &desired
+		// This marker is written only after the complete installation commits,
+		// so equality is the normal startup fast path.
+		i.hydrationCurrent = true
 		return nil
 	}
 
@@ -150,7 +154,17 @@ func (i *Installer) CommitBuiltInHydration(
 			basespec.ErrInvalid,
 		)
 	}
-	return i.hydrator.PutTopologyHydration(ctx, *i.pendingHydration)
+	if i.hydrationCurrent {
+		return nil
+	}
+	if err := i.hydrator.PutTopologyHydration(
+		ctx,
+		*i.pendingHydration,
+	); err != nil {
+		return err
+	}
+	i.hydrationCurrent = true
+	return nil
 }
 
 func (i *Installer) desiredHydrationFingerprint(

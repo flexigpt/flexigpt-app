@@ -320,7 +320,7 @@ func (a *API) InstallBuiltInCollection(
 	); err != nil {
 		return nil, pendingBuiltInCollectionInstallError(request.Bundle, err)
 	}
-	if _, err := a.refreshBundle(ctx, request.Bundle, true); err != nil {
+	if err := a.EnsureBuiltInBundleCurrent(ctx, request.Bundle); err != nil {
 		return nil, pendingBuiltInCollectionInstallError(request.Bundle, err)
 	}
 

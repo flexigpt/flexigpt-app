@@ -174,6 +174,110 @@ func (s *SkillRuntime) ResyncCollection(
 	)
 }
 
+// WarmCollections best-effort warms process-local runtime registrations for
+// known Collections. It is intended for optional background startup warmup.
+//
+// Durable Artifact Store state remains authoritative. Failed Collections are
+// omitted from this pass and can be resolved again through normal lazy
+// foreground reconciliation.
+func (s *SkillRuntime) WarmCollections(
+	ctx context.Context,
+	refs []collection.CollectionRef,
+) error {
+	if err := s.ensureConfigured(); err != nil {
+		return err
+	}
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: Skill runtime warmup context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	normalized, err := normalizeWarmCollectionRefs(refs)
+	if err != nil {
+		return err
+	}
+
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
+	if s.isClosed() {
+		return basespec.ErrClosed
+	}
+
+	// Preserve views that were already loaded by a foreground request while
+	// the warmup was waiting for the runtime mutex.
+	collections := cloneCollectionDesiredViews(s.managedCollections)
+	var warmErr error
+
+	for _, ref := range normalized {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(warmErr, err)
+		}
+
+		values, err := s.resolver.ListCollectionSkills(ctx, ref)
+		if err != nil {
+			warmErr = errors.Join(
+				warmErr,
+				fmt.Errorf(
+					"warm Skill runtime Collection %q: %w",
+					ref.CollectionID,
+					err,
+				),
+			)
+			continue
+		}
+
+		desired, err := desiredCollectionView(ref, values)
+		if err != nil {
+			warmErr = errors.Join(
+				warmErr,
+				fmt.Errorf(
+					"build warmed Skill runtime Collection %q: %w",
+					ref.CollectionID,
+					err,
+				),
+			)
+			continue
+		}
+		collections[ref] = desired
+	}
+
+	applyErr := s.reconcileCollectionsLocked(
+		ctx,
+		collections,
+		runtimeApplyBestEffort,
+	)
+	return errors.Join(warmErr, applyErr)
+}
+
+func normalizeWarmCollectionRefs(
+	refs []collection.CollectionRef,
+) ([]collection.CollectionRef, error) {
+	seen := make(map[collection.CollectionRef]struct{}, len(refs))
+	output := make([]collection.CollectionRef, 0, len(refs))
+	for _, ref := range refs {
+		if err := ref.Validate(); err != nil {
+			return nil, err
+		}
+		if _, duplicate := seen[ref]; duplicate {
+			continue
+		}
+		seen[ref] = struct{}{}
+		output = append(output, ref)
+	}
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].RootID != output[right].RootID {
+			return output[left].RootID < output[right].RootID
+		}
+		return output[left].CollectionID < output[right].CollectionID
+	})
+	return output, nil
+}
+
 func (s *SkillRuntime) RemoveCollection(
 	ctx context.Context,
 	ref collection.CollectionRef,

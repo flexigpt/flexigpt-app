@@ -2,6 +2,7 @@ package bundle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -187,18 +188,39 @@ func currentSkillOccurrence(
 func (a *API) ListRuntimeSkills(
 	ctx context.Context,
 	bundle collection.CollectionRef,
-) ([]RuntimeSkill, error) {
+) (output []RuntimeSkill, returnErr error) {
 	records, err := a.ListSkills(ctx, bundle)
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]RuntimeSkill, 0, len(records))
+	eligible := make([]artifact.ArtifactRef, 0, len(records))
 	for _, record := range records {
 		if !record.Enabled || record.State != artifact.StateAvailable {
 			continue
 		}
-		value, err := a.LoadRuntimeSkill(ctx, record.Ref())
+		eligible = append(eligible, record.Ref())
+	}
+	if len(eligible) == 0 {
+		return []RuntimeSkill{}, nil
+	}
+
+	sessionCtx, session, err := skillArtifact.NewRuntimePackageResolutionSession(
+		ctx,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		returnErr = errors.Join(
+			returnErr,
+			session.Close(sessionCtx),
+		)
+	}()
+
+	output = make([]RuntimeSkill, 0, len(eligible))
+	for _, ref := range eligible {
+		value, err := a.LoadRuntimeSkill(sessionCtx, ref)
 		if err != nil {
 			return nil, err
 		}

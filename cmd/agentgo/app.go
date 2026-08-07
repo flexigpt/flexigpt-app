@@ -368,6 +368,10 @@ func (a *App) startup(ctx context.Context) { //nolint:all
 
 	// Load the frontend.
 	runtime.WindowShow(a.ctx) //nolint:contextcheck // Use app context.
+	if a.skillBundleAPI != nil {
+		//nolint:contextcheck // Use app context.
+		a.skillBundleAPI.startBackgroundWarmup(a.ctx)
+	}
 }
 
 // domReady is called after front-end resources have been loaded.

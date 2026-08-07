@@ -69,6 +69,7 @@ type Installer struct {
 	hydrator        TopologyHydrator
 
 	pendingHydration *topology.Hydration
+	hydrationCurrent bool
 }
 
 func NewInstaller(
@@ -285,7 +286,38 @@ func (i *Installer) Ensure(
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
 		return err
 	}
+	if i.hydrationCurrent {
+		if err := i.ensureBuiltInCatalogsCurrent(ctx); err == nil {
+			return nil
+		}
+		i.hydrationCurrent = false
+	}
 	return i.EnsureBuiltInArtifacts(ctx)
+}
+
+func (i *Installer) ensureBuiltInCatalogsCurrent(
+	ctx context.Context,
+) error {
+	for _, value := range i.hydrated.OrderedCollections() {
+		if !value.Registration.Enabled {
+			continue
+		}
+		ref := collection.CollectionRef{
+			RootID:       i.builtInTopology.Root.ID,
+			CollectionID: value.Registration.ID,
+		}
+		if err := i.skills.EnsureBuiltInBundleCurrent(
+			ctx,
+			ref,
+		); err != nil {
+			return fmt.Errorf(
+				"ensure current built-in Collection %q: %w",
+				value.Registration.ID,
+				err,
+			)
+		}
+	}
+	return nil
 }
 
 func (i *Installer) rejectDynamicBuiltInBundles(

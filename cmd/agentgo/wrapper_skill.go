@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -22,7 +24,16 @@ import (
 type SkillBundleWrapper struct {
 	api     *skillBundle.API
 	runtime *skillRuntime.SkillRuntime
+
+	warmupMu     sync.Mutex
+	warmupCancel context.CancelFunc
+	warmupDone   chan struct{}
 }
+
+const (
+	skillRuntimeWarmupDelay   = time.Second
+	skillRuntimeWarmupTimeout = time.Minute
+)
 
 func InitSkillBundleWrapper(
 	wrapper *SkillBundleWrapper,
@@ -205,25 +216,10 @@ func InitSkillBundleWrapper(
 		return err
 	}
 
-	refs, err := api.SkillBundleRefs(context.Background())
-	if err != nil {
-		wrapper.close()
-		return err
-	}
-	for _, ref := range refs {
-		if err := runtime.ResyncCollection(context.Background(), ref); err != nil {
-			if components.RootMutationPolicy().IsProtectedRoot(ref.RootID) {
-				wrapper.close()
-				return err
-			}
-			slog.Warn(
-				"could not load user Skill Bundle into runtime",
-				"rootID", ref.RootID,
-				"collectionID", ref.CollectionID,
-				"error", err,
-			)
-		}
-	}
+	// Runtime registrations are process-local derived state. Artifact-facing
+	// Skill Runtime calls reconcile the owning Collection on first use, so
+	// eagerly loading every persisted Bundle here only duplicates catalog,
+	// definition, and Source verification during application initialization.
 
 	return nil
 }
@@ -602,9 +598,97 @@ func (w *SkillBundleWrapper) InvokeSkillTool(
 	})
 }
 
+// startBackgroundWarmup starts optional runtime projection after Wails has
+// started. Runtime state is derived only, so a failed warmup is safe: normal
+// Artifact-backed runtime calls reconcile the requested Collection lazily.
+func (w *SkillBundleWrapper) startBackgroundWarmup(
+	parent context.Context,
+) {
+	if w == nil || parent == nil {
+		return
+	}
+
+	w.warmupMu.Lock()
+	if w.warmupCancel != nil || w.api == nil || w.runtime == nil {
+		w.warmupMu.Unlock()
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(
+		parent,
+		skillRuntimeWarmupTimeout,
+	)
+	api := w.api
+	runtime := w.runtime
+	done := make(chan struct{})
+	w.warmupCancel = cancel
+	w.warmupDone = done
+	w.warmupMu.Unlock()
+
+	go func() {
+		defer close(done)
+		defer cancel()
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				slog.Error(
+					"panic during background Skill runtime warmup",
+					"panic",
+					recovered,
+				)
+			}
+		}()
+
+		timer := time.NewTimer(skillRuntimeWarmupDelay)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			return
+		}
+
+		refs, err := api.SkillBundleRefs(ctx)
+		if err != nil {
+			if ctx.Err() == nil {
+				slog.Warn(
+					"list Skill Bundles for background runtime warmup",
+					"error",
+					err,
+				)
+			}
+			return
+		}
+
+		if err := runtime.WarmCollections(ctx, refs); err != nil {
+			if ctx.Err() == nil {
+				slog.Warn(
+					"background Skill runtime warmup completed partially",
+					"collections",
+					len(refs),
+					"error",
+					err,
+				)
+			}
+		}
+	}()
+}
+
 func (w *SkillBundleWrapper) close() {
 	if w == nil {
 		return
+	}
+
+	w.warmupMu.Lock()
+	cancel := w.warmupCancel
+	done := w.warmupDone
+	w.warmupCancel = nil
+	w.warmupDone = nil
+	w.warmupMu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	if done != nil {
+		<-done
 	}
 
 	runtime := w.runtime
