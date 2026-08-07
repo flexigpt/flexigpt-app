@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/skill/artifactbuiltin"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
+	"github.com/flexigpt/flexigpt-app/internal/skill/workspaceadapter"
 	workspaceSpec "github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -29,7 +29,7 @@ type SkillBundleWrapper struct {
 func InitSkillBundleWrapper(
 	wrapper *SkillBundleWrapper,
 	components *system.Components,
-	workspaceSkills *skilladapter.Adapter,
+	workspaceSkills *workspaceadapter.Adapter,
 ) error {
 	if wrapper == nil || components == nil || workspaceSkills == nil {
 		return errors.New("skill bundle wrapper dependencies are incomplete")
@@ -132,7 +132,7 @@ func InitSkillBundleWrapper(
 	if err != nil {
 		return err
 	}
-	workspaceResolver, err := skilladapter.NewRuntimeResolver(workspaceSkills)
+	workspaceResolver, err := workspaceadapter.NewRuntimeResolver(workspaceSkills)
 	if err != nil {
 		return err
 	}

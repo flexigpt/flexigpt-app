@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/skill/workspaceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -19,7 +19,7 @@ type components struct {
 	policy          *artifactadapter.ArtifactPolicy
 
 	contextAdapter *contextadapter.Adapter
-	skillAdapter   *skilladapter.Adapter
+	skillAdapter   *workspaceadapter.Adapter
 }
 
 func newComponents(
@@ -123,7 +123,7 @@ func newComponents(
 	if err != nil {
 		return nil, err
 	}
-	skillAdapter, err := skilladapter.NewAdapter(
+	skillAdapter, err := workspaceadapter.NewAdapter(
 		query,
 		runtimePolicy,
 		dependencies.SourceRuntime,

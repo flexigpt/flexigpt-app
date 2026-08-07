@@ -8,10 +8,10 @@ import (
 	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/skill/workspaceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -74,7 +74,7 @@ func DefaultConfig() Config {
 	return Config{
 		Supports:                DefaultArtifactSupports(),
 		DiscoveryPolicyRevision: defaultDiscoveryPolicyRevision,
-		SkillRoots:              skilladapter.DefaultSkillRoots(),
+		SkillRoots:              workspaceadapter.DefaultSkillRoots(),
 		ContextComposition:      contextadapter.DefaultCompositionPolicy(),
 		SourceUsePolicy:         artifactadapter.NewArtifactRuntimePolicy(),
 	}
@@ -95,7 +95,7 @@ func (c Config) normalized() Config {
 }
 
 func (c Config) normalizedDiscoveryProfiles(
-	skillConventions *skilladapter.ConventionRegistry,
+	skillConventions *workspaceadapter.ConventionRegistry,
 ) spec.DiscoveryProfiles {
 	var profiles spec.DiscoveryProfiles
 	if len(c.DiscoveryProfiles.Primary.ExplicitLocators) == 0 &&
@@ -180,8 +180,8 @@ func DefaultDiscoveryProfiles() spec.DiscoveryProfiles {
 	return config.normalizedDiscoveryProfiles(registry)
 }
 
-func (c Config) skillConventions() (*skilladapter.ConventionRegistry, error) {
-	return skilladapter.NewConventionRegistry(c.SkillRoots...)
+func (c Config) skillConventions() (*workspaceadapter.ConventionRegistry, error) {
+	return workspaceadapter.NewConventionRegistry(c.SkillRoots...)
 }
 
 func (c Config) discoveryPolicyRevision() (string, error) {

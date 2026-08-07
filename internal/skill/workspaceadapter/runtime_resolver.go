@@ -1,4 +1,4 @@
-package skilladapter
+package workspaceadapter
 
 import (
 	"context"

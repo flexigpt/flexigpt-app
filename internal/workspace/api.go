@@ -16,10 +16,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/skill/workspaceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/provision"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/skilladapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -69,7 +69,7 @@ func (a *API) Close() error {
 
 // SkillAdapter returns the Workspace-owned Skill source adapter. Consumers may
 // list or load Workspace Skills, but lifecycle policy remains outside workspace.
-func (a *API) SkillAdapter() *skilladapter.Adapter {
+func (a *API) SkillAdapter() *workspaceadapter.Adapter {
 	if a == nil ||
 		a.closed.Load() ||
 		a.workspace == nil {
@@ -1740,7 +1740,7 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 	}
 }
 
-func workspaceSkillViewOf(value skilladapter.WorkspaceSkill) WorkspaceSkillView {
+func workspaceSkillViewOf(value workspaceadapter.WorkspaceSkill) WorkspaceSkillView {
 	summary := WorkspaceSkillSummary{
 		SchemaVersion: value.Skill.SchemaVersion,
 		ID:            value.Skill.ID,
@@ -1780,7 +1780,7 @@ func workspaceSkillViewOf(value skilladapter.WorkspaceSkill) WorkspaceSkillView 
 }
 
 func workspaceSkillLoadViewOf(
-	value skilladapter.SkillLoadPlan,
+	value workspaceadapter.SkillLoadPlan,
 ) WorkspaceSkillLoadView {
 	output := WorkspaceSkillLoadView{
 		Workspace:       value.Workspace,
