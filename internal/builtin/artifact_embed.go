@@ -12,10 +12,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
-//go:embed builtin-registry.json
+//go:embed artifact-builtin-registry.json
 var registryJSON []byte
 
-//go:embed skill-registry.json
+//go:embed skills/skill-registry.json
 var SkillRegistryJSON []byte
 
 //go:embed skills
@@ -27,7 +27,7 @@ const embeddedSkillsPackagesRoot = "skills"
 // directories. Generic built-in code validates the filesystem boundary but
 // does not own or inspect Skill package content.
 func EmbeddedSkillsPackages() (fs.FS, error) {
-	return OpenPackageFS(embeddedSkillsPackagesFS, embeddedSkillsPackagesRoot)
+	return openPackageFS(embeddedSkillsPackagesFS, embeddedSkillsPackagesRoot)
 }
 
 // PackageFile is an immutable-by-convention copy of one regular embedded file
@@ -35,36 +35,6 @@ func EmbeddedSkillsPackages() (fs.FS, error) {
 type PackageFile struct {
 	Locator basespec.Locator
 	Content []byte
-}
-
-// OpenPackageFS validates and opens an artifact-family-owned embedded package
-// subtree. The caller owns the embed.FS and the subtree name.
-func OpenPackageFS(
-	embedded fs.FS,
-	root string,
-) (fs.FS, error) {
-	if embedded == nil {
-		return nil, fmt.Errorf("%w: embedded filesystem is nil", basespec.ErrInvalid)
-	}
-	if root == "" || !fs.ValidPath(root) {
-		return nil, fmt.Errorf(
-			"%w: invalid embedded package root %q",
-			basespec.ErrInvalid,
-			root,
-		)
-	}
-	info, err := fs.Stat(embedded, root)
-	if err != nil {
-		return nil, fmt.Errorf("stat embedded package root %q: %w", root, err)
-	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf(
-			"%w: embedded package root %q is not a directory",
-			basespec.ErrInvalid,
-			root,
-		)
-	}
-	return fs.Sub(embedded, root)
 }
 
 // ReadPackageFiles reads a complete embedded package directory into a bounded,
@@ -188,4 +158,34 @@ func ReadPackageFiles(
 		return files[left].Locator < files[right].Locator
 	})
 	return files, nil
+}
+
+// openPackageFS validates and opens an artifact-family-owned embedded package
+// subtree. The caller owns the embed.FS and the subtree name.
+func openPackageFS(
+	embedded fs.FS,
+	root string,
+) (fs.FS, error) {
+	if embedded == nil {
+		return nil, fmt.Errorf("%w: embedded filesystem is nil", basespec.ErrInvalid)
+	}
+	if root == "" || !fs.ValidPath(root) {
+		return nil, fmt.Errorf(
+			"%w: invalid embedded package root %q",
+			basespec.ErrInvalid,
+			root,
+		)
+	}
+	info, err := fs.Stat(embedded, root)
+	if err != nil {
+		return nil, fmt.Errorf("stat embedded package root %q: %w", root, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf(
+			"%w: embedded package root %q is not a directory",
+			basespec.ErrInvalid,
+			root,
+		)
+	}
+	return fs.Sub(embedded, root)
 }
