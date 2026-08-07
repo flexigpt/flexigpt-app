@@ -20,6 +20,16 @@ Workspace and Skills define their domain-specific behavior in their own HLDs.
 
 The final section records current implementation status, code mapping, and next steps.
 
+## Current delivery scope
+
+The current delivery is the local Artifact Store control plane, protected
+built-in hydration, feature and runtime integration, and Wails-facing
+administration bindings.
+
+Portable Artifact and Collection transfer, generic content closures and
+archives, and direct Artifact move are intentionally deferred. Test work is
+handled separately and is not listed as an outstanding architecture task here.
+
 ## Architectural statement
 
 Artifact Store manages local installations of portable domain content.
@@ -82,10 +92,9 @@ The initial design does not require:
 - Generic feature policy inside Artifact Store.
 - A public raw Collection editor.
 
-Until direct Artifact movement is implemented, callers export or copy portable
-content into a target Collection and then unadopt or delete the original
-Artifact. The copied Artifact receives a new local `ArtifactID`. A direct move
-request returns an explicit unsupported result.
+Direct Artifact movement is deferred. The implemented `artifact.Service.Move`
+method returns `basespec.ErrUnsupported`, and no Artifact or Collection
+import/export fallback is currently exposed.
 
 ## Architectural planes
 
@@ -412,6 +421,31 @@ A member may be:
 
 The initial release may support embedded and relative members while rejecting external URIs.
 
+#### Current implemented Collection envelope
+
+The implemented generic portable Collection envelope is
+`definition.CollectionDefinition`:
+
+```text
+CollectionDefinition {
+  Digest
+  Kind
+  SchemaID
+  SchemaVersion
+  LogicalName
+  LogicalVersion
+  DisplayName
+  Description
+  Labels
+  Body
+  Members []ContentRef
+}
+```
+
+`ContentRef` currently contains `Locator`, `URI`, `SubresourceLocator`,
+`Digest`, `MediaType`, and `Role`. Stable member keys, expected derived
+Definition digests, closure digests, and package profiles remain deferred.
+
 ### Collection portable state
 
 A local Collection may track:
@@ -510,6 +544,12 @@ LocalFeatureData {
   Body
 }
 ```
+
+Current core persistence accepts bounded canonical JSON objects for Collection,
+Attachment, Artifact, and private Source data. Artifact Store does not yet
+enforce a generic local-data envelope or load feature schemas itself. Skill
+Bundle and Workspace currently decode their own local data, which must remain
+feature-local after the pending shareable-document schema consolidation.
 
 ## Identity and create replay
 
@@ -966,6 +1006,23 @@ It does not duplicate:
 
 ### Protection model
 
+The current built-in metadata is split by ownership:
+
+- `internal/builtin/artifact-builtin-registry.json` declares the protected Root
+  and shared managed Source.
+- `internal/builtin/skills/skill-registry.json` declares static Skill
+  Collection and Artifact registrations, package payload locations, and member
+  entrypoints.
+- Embedded `collection.json` files own portable Collection semantics and member
+  content references.
+
+`artifactbuiltin` hydrates embedded `collection.json` payloads, calculates
+member content digests from package bytes, publishes complete package
+directories to the protected managed Source, pins static Artifacts, and
+refreshes scoped Collection catalogs. A persisted hydration fingerprint covers
+topology, registrations, canonical Collection Definitions, member digests, and
+package files.
+
 Protected structural state includes:
 
 - Protected Root identity.
@@ -1081,11 +1138,13 @@ SQLite stores local control-plane metadata:
 - Artifact Records.
 - Suppressions.
 - Definition reachability.
-- Collection portable state.
-- Import provenance.
+- Protected topology hydration state.
 - Schema-versioned local feature data.
 
-A migration ledger is required before the local schema is considered stable for production user data.
+The current schema starts at version one and has a migration ledger. Schema
+version two adds `artifact_topology_hydrations`. Collection portable-state
+linkage, generic shareable-artifact persistence, and import provenance are not
+yet persisted.
 
 ### Content repository
 
@@ -1261,51 +1320,50 @@ This section records:
 
 ### Current summary
 
-The local Artifact Store lifecycle is substantially implemented.
+The local Artifact Store lifecycle and protected built-in installation path are
+implemented.
 
 Present capabilities include:
 
 - Roots and Sources.
 - Filesystem, embedded, and managed Source adapters.
 - Collections and Source Mounts.
-- Collection-scoped catalogs.
+- Collection-scoped catalogs with source, attachment, plan, decoder, and
+  generation currentness checks.
 - Immutable canonical Artifact Definitions.
+- Canonical Portable Collection Definition codecs.
 - Artifact adoption, pinning, suppression, and purge.
 - Managed package publication.
 - Revision and Source-generation currentness.
 - Workspace and Skill Bundle integration.
 - Artifact-backed Skill runtime resolution.
-- Protected topology support.
+- Protected topology hydration and embedded `collection.json` installation.
+- Wails-facing Artifact Store, Workspace, and Skill integration.
 
-The main missing platform capability is portable transfer:
-
-- Generic Content Closure.
-- Portable Collection persistence and linkage.
-- Artifact import and export.
-- Collection import and export.
-- Deterministic package assembly.
-- Archive acquisition.
-- Import provenance.
+Portable transfer, generic content closure, archive handling, import
+provenance, and direct Artifact move are intentionally deferred rather than
+active delivery gaps.
 
 ### Current implementation architecture
 
-| Architecture area        | Current component                                                        |
-| ------------------------ | ------------------------------------------------------------------------ |
-| Application ownership    | Application opens one Artifact Store during startup and injects services |
-| Root and Source services | Artifact Store Root and Source service packages                          |
-| Source adapters          | Filesystem, embedded, managed, and registered adapters                   |
-| Content persistence      | `MapStore` for immutable Definitions and managed package payloads        |
-| Collection lifecycle     | Collection and Collection Attachment services                            |
-| Discovery                | Source snapshots, plans, registered decoders, bounded traversal          |
-| Catalog publication      | Collection-scoped current catalog and currentness validation             |
-| Definition repository    | Canonical JSON and digest-addressed Definition storage                   |
-| Artifact lifecycle       | Adoption, pinning, suppression, local update, unadoption, and purge      |
-| Protected topology       | `artifactstore/topology.Declaration` and protected Root policy           |
-| Built-in app metadata    | `internal/builtin/metadata`, outside Artifact Store                      |
-| Built-in installer       | `artifactbuiltin`, using injected topology and Skill Bundle ports        |
-| Public Artifact API      | Root, Source, Source kind, and managed package administration            |
-| Feature mutation         | Workspace and Skill Bundle typed services                                |
-| Portable transfer        | Not implemented as a complete platform service                           |
+| Architecture area           | Current component                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| Application ownership       | Application opens one Artifact Store during startup and injects services           |
+| Root and Source services    | Artifact Store Root and Source service packages                                    |
+| Source adapters             | Filesystem, embedded, managed, and registered adapters                             |
+| Content persistence         | `MapStore` for immutable Definitions and managed package payloads                  |
+| Collection lifecycle        | Collection and Collection Attachment services                                      |
+| Discovery                   | Source snapshots, plans, registered decoders, bounded traversal                    |
+| Catalog publication         | Collection-scoped current catalog and currentness validation                       |
+| Definition repository       | Canonical JSON and digest-addressed Definition storage                             |
+| Artifact lifecycle          | Adoption, pinning, suppression, local update, unadoption, and purge                |
+| Protected topology          | `artifactstore/topology.Declaration` and protected Root policy                     |
+| Built-in topology metadata  | `internal/builtin/artifact-builtin-registry.json`                                  |
+| Built-in Skill registration | `internal/builtin/skills/skill-registry.json` and embedded `collection.json` files |
+| Built-in installer          | `internal/skill/artifactbuiltin`, using injected topology and Skill Bundle ports   |
+| Public Artifact API         | Root, Source, Source kind, and managed package administration                      |
+| Feature mutation            | Workspace and Skill Bundle typed services                                          |
+| Portable transfer           | Deferred                                                                           |
 
 ### Current local workflow
 
@@ -1333,28 +1391,28 @@ The local lifecycle follows the intended architecture:
 
 ### Requirement mapping
 
-| Requirement                            | Status                           | Mapping                                                                                                      |
-| -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `AS-R01` plane separation              | Present                          | Local entities, canonical Definitions, private Sources, and derived runtime are separated                    |
-| `AS-R02` Root and Source lifecycle     | Present                          | Root-scoped Source services and adapters                                                                     |
-| `AS-R03` Collections and Source Mounts | Present                          | Collection and attachment persistence with same-Root checks                                                  |
-| `AS-R04` coherent catalog              | Present                          | One current Collection catalog with revision and generation checks                                           |
-| `AS-R05` Observation states            | Present                          | Catalogs preserve valid, invalid, and missing states; reconciliation derives incompatibility                 |
-| `AS-R06` immutable Definitions         | Present for Artifact Definitions | Canonical Collection Definition envelope exists; repository linkage remains transfer work                    |
-| `AS-R07` Artifact lifecycle            | Present                          | Adoption, pinning, suppression, unadoption, and purge                                                        |
-| `AS-R08` caller-supplied IDs           | Present                          | UUIDv7 validation and create replay                                                                          |
-| `AS-R09` managed Source publication    | Present                          | Staging, generation, package publication, and recovery behavior                                              |
-| `AS-R10` Artifact transfer             | Missing                          | No complete importer or exporter                                                                             |
-| `AS-R11` Collection transfer           | Missing                          | No complete package import or export                                                                         |
-| `AS-R12` Content Closure               | Missing                          | Definitions do not enumerate assets and package files                                                        |
-| `AS-R13` domain adapters               | Present                          | Workspace and Skill decoders and policy remain outside core                                                  |
-| `AS-R14` protected built-ins           | Present                          | Protected topology, 6 built-in Skill Bundles (26 skills), and Assistant Presets converged via Artifact Store |
-| `AS-R15` runtime resolution            | Present for Agent Skills         | Artifact-backed resolver verifies current state                                                              |
-| `AS-R16` typed feature boundary        | Present                          | Raw public Collection mutation is not exposed                                                                |
-| `AS-R17` local state preservation      | Present                          | Source reconciliation preserves local Artifact fields                                                        |
-| `AS-R18` import provenance             | Missing                          | Transfer is not implemented                                                                                  |
-| `AS-R19` schema evolution              | Partial                          | Clean `v1` boundary exists, migration ledger is absent                                                       |
-| `AS-R20` package safety                | Partial                          | Source bounds and managed storage exist; archive and URI import are missing                                  |
+| Requirement                            | Status                             | Mapping                                                                                                    |
+| -------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `AS-R01` plane separation              | Present                            | Local entities, canonical Definitions, private Sources, and derived runtime are separated                  |
+| `AS-R02` Root and Source lifecycle     | Present                            | Root-scoped Source services and adapters                                                                   |
+| `AS-R03` Collections and Source Mounts | Present                            | Collection and attachment persistence with same-Root checks                                                |
+| `AS-R04` coherent catalog              | Present                            | One current Collection catalog with revision and generation checks                                         |
+| `AS-R05` Observation states            | Present                            | Catalogs preserve valid, invalid, and missing states; reconciliation derives incompatibility               |
+| `AS-R06` immutable Definitions         | Partial                            | Artifact Definitions are root-scoped and persisted; Collection Definition codecs are not repository-backed |
+| `AS-R07` Artifact lifecycle            | Present                            | Adoption, pinning, suppression, unadoption, and purge                                                      |
+| `AS-R08` caller-supplied IDs           | Present                            | UUIDv7 validation and create replay                                                                        |
+| `AS-R09` managed Source publication    | Present                            | Staging, generation, package publication, and recovery behavior                                            |
+| `AS-R10` Artifact transfer             | Deferred                           | No complete importer or exporter is in the current delivery                                                |
+| `AS-R11` Collection transfer           | Deferred                           | No complete package import or export is in the current delivery                                            |
+| `AS-R12` Content Closure               | Deferred                           | No generic closure model is in the current delivery                                                        |
+| `AS-R13` domain adapters               | Present                            | Workspace and Skill decoders and policy remain outside core                                                |
+| `AS-R14` protected built-ins           | Present                            | Protected topology hydrates embedded `collection.json` Skill packages through Artifact Store               |
+| `AS-R15` runtime resolution            | Present for Agent Skills           | Artifact-backed resolver verifies current state                                                            |
+| `AS-R16` typed feature boundary        | Present                            | Raw public Collection mutation is not exposed                                                              |
+| `AS-R17` local state preservation      | Present                            | Source reconciliation preserves local Artifact fields                                                      |
+| `AS-R18` import provenance             | Deferred                           | Transfer is not implemented in the current delivery                                                        |
+| `AS-R19` schema evolution              | Present with pending consolidation | SQLite v1-to-v2 migrations exist; generic shareable-document schemas remain pending                        |
+| `AS-R20` package safety                | Partial                            | Source bounds and managed package safety exist; archive and URI transfer are deferred                      |
 
 ### Current persistence behavior
 
@@ -1362,6 +1420,7 @@ Current persistence includes:
 
 - Fresh `artifact_store_v1` marker and migration-ledger version-one baseline.
 - Bootstrap of existing pre-ledger Artifact Store v1 databases into the ledger.
+- Transactional migration to schema version two for topology hydration records.
 - No migration from legacy standalone feature stores.
 - Root containment.
 - Source and Collection revisions.
@@ -1373,20 +1432,24 @@ Current persistence includes:
 - Private Source configuration.
 - Managed Source generation.
 
-### Known gaps against the revised HLD
+### Deferred transfer design and active schema consolidation
 
-#### Portable Collection state
+Portable transfer, archive, closure, acquisition, provenance, and move design
+below is deferred. It does not describe missing current local-lifecycle work.
 
-The HLD now requires a first-class relationship between a local Collection and:
+#### Pending: schema-backed shareable artifact documents
 
-- Current Portable Collection Definition digest.
-- Original imported digest.
-- Package provenance.
-- Source manifest binding.
-- Portable member-key mapping.
+Add canonical JSON schema documents and associated Go schema types/codecs under
+`internal/builtin/schema` for shareable Artifact and Collection documents,
+beginning with embedded built-in `collection.json` files.
 
-Current implementation does not yet persist this relationship as a complete
-first-class Collection portable-state model.
+Artifact Store must use registered schemas to canonicalize, validate, store,
+and retrieve those shareable artifacts uniformly, while preserving root-scoped
+access controls and without importing Skill or Workspace feature packages.
+
+After migration, remove duplicated shareable-document parsing, hydration, and
+retrieval code from Skill and Workspace. This is the active pending
+architecture item and is separate from deferred import/export.
 
 #### Digest taxonomy
 
@@ -1432,14 +1495,17 @@ The following are missing:
 #### Built-in preference policy
 
 Current protected-root guards intentionally deny ordinary preference mutation.
-There is no generic user-toggleable protected Collection or Artifact setting.
-If product policy requires one, the owning feature must add an explicit narrow
-preference operation that cannot mutate protected topology, bindings, or managed package content.
+Protected Collection and Artifact enablement is installer-owned. If product
+policy later permits a user preference, the owning feature must add an explicit
+narrow operation that cannot mutate protected topology, bindings, or managed
+package content.
 
 #### Schema migration
 
-- The migration ledger records the version-one baseline and rejects unsupported future versions.
-- Every future SQLite schema change must add a transactional forward migration and advance the current supported schema version.
+- The migration ledger records the version-one baseline and schema version two
+  topology-hydration migration.
+- Every future SQLite schema change must add a transactional forward migration,
+  advance the supported version, and reject unsupported future versions.
 
 #### Observation output identity
 
@@ -1448,7 +1514,11 @@ Current occurrence identity uses Collection, Source, locator, and subresource.
 - The decoder engine explicitly rejects duplicate outputs for this key.
 - A future `OutputKey` expansion requires a schema migration and corresponding Binding, catalog, and uniqueness-key changes.
 
-### Code-level next steps
+### Deferred transfer design
+
+All remaining transfer-oriented work in this section is deferred. The
+schema-backed shareable-artifact consolidation above is the active architecture
+follow-up.
 
 #### Define portable core types
 
@@ -1508,19 +1578,19 @@ Extend Artifact Store persistence with:
 - Source manifest binding where applicable.
 - Portable member-key to local Artifact mapping or provenance.
 
-#### Complete protected topology policy
+#### Maintain protected topology policy
 
 Review:
 
 - `artifactstore/topology.Declaration`.
 - Protected Root guards.
 - Protected managed package methods.
-- Feature-level enablement APIs.
 - Built-in installer capability injection.
 
-Add tests proving structural mutation remains protected while approved local preferences behave as designed.
+The implemented policy keeps protected topology and enablement installer-owned.
+Any future approved local preference must remain narrower than structural mutation.
 
-#### Add migration ledger
+#### Maintain the migration ledger
 
 - For every future metadata schema revision, add a transactional migration to the Artifact Store migration runner, record its applied version, and retain explicit rejection of unsupported future schemas.
 - This does not require migration from the old standalone Skill Store.

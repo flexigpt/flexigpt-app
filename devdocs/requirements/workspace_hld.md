@@ -20,6 +20,16 @@ Generic Artifact Store behavior is defined in `artifactstore_hld.md`.
 
 The final section records current implementation mapping and next steps.
 
+## Current delivery scope
+
+The current Workspace delivery includes lifecycle management, catalog and
+Artifact management, Context composition, Skill runtime handoff, conversation
+selection, inference hydration, frontend bindings, and application composition.
+
+Portable Workspace import/export, Context and Skill content-closure transfer,
+and direct Artifact move are deferred. Test work is handled separately and is
+not listed as an outstanding architecture task here.
+
 ## Architectural statement
 
 A Workspace is a local project Collection that discovers and manages heterogeneous project content.
@@ -97,7 +107,12 @@ WorkspaceRef {
 }
 ```
 
-A Root may own multiple Workspaces.
+A configured Workspace Root may own multiple Workspaces. Current application
+composition uses one retained, non-protected Workspace Root. Public create and
+list requests retain a Root field only for transport compatibility; Workspace
+creation and listing use the configured Root rather than a caller-selected Root.
+
+A Workspace cannot use the protected built-in Root.
 
 A Workspace is not a Root and does not own child Collections.
 
@@ -131,15 +146,16 @@ Local Workspace state includes:
 
 Local Workspace data uses a versioned schema.
 
-```text
-WorkspaceLocalData {
-  SchemaID = "workspace.local"
-  SchemaVersion
-  DiscoveryOverrides
-  AutoAdoptionPolicy
-  ContextPolicyOverrides
-}
-```
+Current implementation stores feature-local canonical JSON as:
+
+- Collection data containing `DiscoveryPolicyRevision` and discovery preferences.
+- Attachment data containing optional recursive and authoritative overrides.
+- Artifact data containing `RuntimeDisabled`.
+
+Workspace decodes and validates these structures itself. Artifact Store
+currently validates canonical-object shape and size for local feature data.
+The pending shared schema work must preserve that separation while moving
+shareable document schema ownership and retrieval into Artifact Store.
 
 Prompt and byte limits that are application-wide remain application configuration rather than Workspace data.
 
@@ -219,8 +235,8 @@ A portable Workspace uses:
 
 ```text
 CollectionKind = "workspace.collection"
-SchemaID = "workspace.collection"
-SchemaVersion = 1
+SchemaID = "workspace.collection.v1"
+SchemaVersion = "v1"
 ```
 
 Conceptually:
@@ -269,6 +285,18 @@ It must not contain:
 - Credential references.
 - Conversation state.
 - Diagnostics or timestamps.
+
+### Current descriptor profile
+
+`.flexigpt/workspace.json` is currently parsed as
+`definition.CollectionDefinition` with schema ID `workspace.collection.v1` and
+schema version `v1`. Its body contains Workspace discovery preferences.
+Current descriptor members support only relative locators and optional exact
+content digests from the primary Source.
+
+Stable member keys, expected derived Definition digests, closure digests,
+embedded materialization, external URI acquisition, package profiles, and local
+provenance are deferred transfer behavior.
 
 ## Workspace descriptor
 
@@ -405,7 +433,8 @@ sequenceDiagram
 
 The refresh:
 
-- Reads one descriptor from the same primary Source snapshot used for discovery.
+- Reads and confirms the descriptor from a primary Source snapshot, then pins
+  that generation in the subsequent Artifact Store discovery plan.
 - Does not publish an intermediate catalog.
 - Automatically adopts supported Context and Skill Observations unless suppressed.
 - Preserves existing local Artifact state.
@@ -590,6 +619,9 @@ Workspace resolution must:
 
 ## Workspace export workflow
 
+This workflow is deferred. No current Workspace API or Artifact Store service
+exports linked or self-contained Workspace packages.
+
 The caller chooses:
 
 - Linked descriptor export.
@@ -612,6 +644,9 @@ Workspace:
 Local enablement does not silently determine portable membership. Export selection is explicit.
 
 ## Workspace import workflow
+
+This workflow is deferred. No current Workspace API or Artifact Store service
+imports a portable Workspace package or allocates an import identity plan.
 
 Workspace import:
 
@@ -647,16 +682,17 @@ resolver, or add a protected-root projection branch.
 
 ### Create empty Workspace
 
-- Caller selects a Root.
 - Caller supplies a Workspace Collection ID.
-- Workspace creates `workspace.collection`.
+- Application composition selects the configured Workspace Root.
+- Workspace creates `workspace.collection` in that Root.
 - No primary Source is created.
 - Local defaults are stored.
 - The empty catalog may be absent until refresh.
 
 ### Create filesystem Workspace
 
-- Caller creates or selects a filesystem Source through Artifact administration.
+- Workspace provisioning creates or replays a filesystem Source through Artifact
+  Store administration.
 - Workspace creates `workspace.collection`.
 - Workspace mounts the Source as `primary`.
 - Workspace may perform an initial refresh.
@@ -715,7 +751,7 @@ Clients use Workspace APIs for:
 - Artifact enablement.
 - Context projection.
 - Workspace Skill resolution.
-- Workspace import and export.
+- Deferred future Workspace import and export.
 - Typed purge.
 
 There is no raw public Collection mutation route.
@@ -794,7 +830,7 @@ This section contains:
 
 ### Current summary
 
-The local Workspace lifecycle is substantially complete for:
+The local Workspace lifecycle and application integration are complete for:
 
 - Empty and filesystem Workspaces.
 - Source Mounts.
@@ -803,10 +839,11 @@ The local Workspace lifecycle is substantially complete for:
 - Artifact adoption and suppression.
 - Context composition.
 - Artifact-backed Skill runtime handoff.
-- Conversation and inference integration.
-- Workspace frontend management.
+- Conversation selection and usage provenance.
+- Inference Context hydration and Artifact-backed Skill allow-lists.
+- Workspace frontend management and Wails bindings.
 
-Portable Workspace transfer is not implemented.
+Portable Workspace transfer and direct Artifact move are deferred.
 
 The current `.flexigpt/workspace.json` support is a limited discovery bootstrap, not a complete import or export format.
 
@@ -826,32 +863,32 @@ The current `.flexigpt/workspace.json` support is a limited discovery bootstrap,
 | Skill runtime handoff       | Artifact router and Agent Skills runtime                                           |
 | Conversation provenance     | Workspace selection and usage recording                                            |
 | Runtime synchronization     | Demand-driven resolution from Artifact Store                                       |
-| Portable transfer           | Not implemented                                                                    |
+| Portable transfer           | Deferred                                                                           |
 
 ### Requirement mapping
 
-| Requirement                                | Status               | Mapping                                                       |
-| ------------------------------------------ | -------------------- | ------------------------------------------------------------- |
-| `WS-R01` Workspace Collection              | Present              | Workspace uses `workspace.collection`                         |
-| `WS-R02` WorkspaceRef                      | Present              | Root and Collection identity                                  |
-| `WS-R03` empty and filesystem modes        | Present              | Empty and filesystem creation flows are implemented           |
-| `WS-R04` one primary Source                | Present              | Mount policy enforces primary behavior                        |
-| `WS-R05` additional Source roles           | Present              | Library, package, and overlay mounts                          |
-| `WS-R06` deterministic discovery           | Present              | Bounded planner and decoder fingerprints                      |
-| `WS-R07` coherent catalog                  | Present              | One Collection refresh publication                            |
-| `WS-R08` Context and Skills                | Present              | `workspace.context` and shared `agent.skill`                  |
-| `WS-R09` automatic adoption                | Present              | Auto-adoption and suppression                                 |
-| `WS-R10` preserve local state              | Present              | Refresh reconciliation preserves local settings               |
-| `WS-R11` Context composition               | Present              | Bounded load plans and provenance                             |
-| `WS-R12` Skill runtime                     | Present              | Verified Artifact-backed handoff                              |
-| `WS-R13` separate Skill ownership          | Present              | Workspace Skills excluded from installed Skill management     |
-| `WS-R14` protected Root rejection          | Present              | Workspace feature boundary rejects protected Root and Sources |
-| `WS-R15` portable Workspace schema         | Partial              | Descriptor exists only as limited bootstrap                   |
-| `WS-R16` Workspace export                  | Missing              | No linked or self-contained exporter                          |
-| `WS-R17` Workspace import                  | Missing              | No importer or identity planning                              |
-| `WS-R18` member closure                    | Missing              | Depends on Artifact Store and Skill closure support           |
-| `WS-R19` no local state in portable output | Architectural target | No exporter yet                                               |
-| `WS-R20` typed API boundary                | Present              | Workspace mutations use typed service                         |
+| Requirement                                | Status                 | Mapping                                                                               |
+| ------------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------- |
+| `WS-R01` Workspace Collection              | Present                | Workspace uses `workspace.collection`                                                 |
+| `WS-R02` WorkspaceRef                      | Present                | Root and Collection identity                                                          |
+| `WS-R03` empty and filesystem modes        | Present                | Empty and filesystem creation flows are implemented                                   |
+| `WS-R04` one primary Source                | Present                | Mount policy enforces primary behavior                                                |
+| `WS-R05` additional Source roles           | Present                | Library, package, and overlay mounts                                                  |
+| `WS-R06` deterministic discovery           | Present                | Bounded planner and decoder fingerprints                                              |
+| `WS-R07` coherent catalog                  | Present                | One Collection refresh publication                                                    |
+| `WS-R08` Context and Skills                | Present                | `workspace.context` and shared `agent.skill`                                          |
+| `WS-R09` automatic adoption                | Present                | Auto-adoption and suppression                                                         |
+| `WS-R10` preserve local state              | Present                | Refresh reconciliation preserves local settings                                       |
+| `WS-R11` Context composition               | Present                | Bounded load plans and provenance                                                     |
+| `WS-R12` Skill runtime                     | Present                | Verified Artifact-backed handoff                                                      |
+| `WS-R13` separate Skill ownership          | Present                | Workspace Skills excluded from installed Skill management                             |
+| `WS-R14` protected Root rejection          | Present                | Workspace feature boundary rejects protected Root and Sources                         |
+| `WS-R15` portable Workspace schema         | Partial                | `workspace.collection.v1` descriptor profile exists; schema-backed sharing is pending |
+| `WS-R16` Workspace export                  | Deferred               | No linked or self-contained exporter in the current delivery                          |
+| `WS-R17` Workspace import                  | Deferred               | No importer or identity planning in the current delivery                              |
+| `WS-R18` member closure                    | Deferred               | Depends on deferred Artifact Store and Skill closure support                          |
+| `WS-R19` no local state in portable output | Present in local model | Local state is separate; transferable-output verification is deferred                 |
+| `WS-R20` typed API boundary                | Present                | Workspace mutations use typed service                                                 |
 
 ### Current Workspace workflow
 
@@ -941,7 +978,23 @@ Current implementation provides:
 - Workspace session freshness retains `WorkspaceRef` so asynchronous session
   results cannot be accepted for another Workspace.
 
-### Known gaps
+### Deferred transfer design and pending schema consolidation
+
+#### Pending: schema-backed shareable Workspace documents
+
+Add canonical JSON schema documents and associated Go schema types/codecs under
+`internal/builtin/schema` for shareable Artifact and Collection documents.
+Artifact Store must use those schemas to validate, canonicalize, store, and
+retrieve shareable Workspace documents uniformly.
+
+This migration must absorb the current Workspace-specific descriptor path,
+including `workspace/discovery.DescriptorLoader`, the `descriptorBody` decoder
+for `.flexigpt/workspace.json`, and Workspace-side retrieval and validation of
+shareable Collection documents.
+
+After Artifact Store owns schema-backed document storage and retrieval, remove
+the duplicated Workspace implementation code. This is the active pending
+architecture item and is separate from deferred import/export.
 
 ### Portable Workspace schema
 
@@ -962,6 +1015,8 @@ Missing or incomplete fields include:
 - Complete schema validation.
 - Import provenance.
 
+The current descriptor profile remains sufficient for local discovery bootstrap.
+
 #### Context closure
 
 Workspace Context export needs a domain Content Closure implementation that provides:
@@ -973,6 +1028,8 @@ Workspace Context export needs a domain Content Closure implementation that prov
 - Closure digest.
 
 #### Skill closure dependency
+
+This work is deferred with portable Workspace transfer.
 
 Workspace Skill export depends on the shared Skill closure implementation.
 
@@ -1018,7 +1075,10 @@ Workspace local Collection and Artifact data should be checked for:
 - Upgrade behavior.
 - Separation from portable Workspace DTOs.
 
-### Code-level next steps
+### Deferred transfer design
+
+All transfer-oriented work below is deferred. The schema-backed
+shareable-document consolidation above remains the active architecture item.
 
 #### Define `workspace.collection.v1`
 
@@ -1096,7 +1156,8 @@ Do not expose raw generic Collection bodies.
 
 #### Verify built-in exclusion
 
-Add or retain tests proving:
+The verification checklist is deferred outside this HLD status update. When
+scheduled, it must prove:
 
 - Protected Root is rejected during Workspace create, get, list, refresh, import, and purge.
 - Protected Source cannot be mounted.
@@ -1123,6 +1184,9 @@ Cover:
 
 ### Recommended implementation order
 
+The following transfer order is deferred and is not a current implementation
+commitment.
+
 - Finalize Artifact Store portable envelope and closure contracts.
 - Define `workspace.collection.v1`.
 - Unify descriptor parsing.
@@ -1136,6 +1200,9 @@ Cover:
 - Add additional Artifact kinds only after this path is stable.
 
 ### Required frontend and integration verification
+
+Frontend, conversation, and inference integration are complete for the current
+delivery. The detailed verification checklist remains deferred.
 
 Verify:
 
