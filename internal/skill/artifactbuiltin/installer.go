@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
@@ -38,11 +39,26 @@ type skillInstaller interface {
 	) error
 }
 
+// TopologyHydrator is intentionally narrower than system.Components. It gives
+// the built-in installer durable desired-state storage and a trusted,
+// root-scoped replacement operation without coupling artifactbuiltin to the
+// concrete Artifact Store composition.
+type TopologyHydrator interface {
+	topology.HydrationStore
+
+	ResetTopologyHydration(
+		ctx context.Context,
+		installerName string,
+		rootID basespec.RootID,
+	) error
+}
+
 type InstallerDependencies struct {
 	Skills          skillInstaller
 	BuiltInTopology builtin.Registry
 	SkillRegistry   Registry
 	Packages        fs.FS
+	Hydrator        TopologyHydrator
 }
 
 type Installer struct {
@@ -50,13 +66,17 @@ type Installer struct {
 	builtInTopology builtin.Registry
 	hydrated        HydratedRegistry
 	packages        fs.FS
+	hydrator        TopologyHydrator
+
+	pendingHydration *topology.Hydration
 }
 
 func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
 	if dependencies.Skills == nil ||
-		dependencies.Packages == nil {
+		dependencies.Packages == nil ||
+		dependencies.Hydrator == nil {
 		return nil, fmt.Errorf("%w: built-in installer dependencies are incomplete", basespec.ErrInvalid)
 	}
 	if err := dependencies.BuiltInTopology.Validate(); err != nil {
@@ -83,6 +103,7 @@ func NewInstaller(
 		builtInTopology: dependencies.BuiltInTopology,
 		hydrated:        hydrated,
 		packages:        dependencies.Packages,
+		hydrator:        dependencies.Hydrator,
 	}, nil
 }
 

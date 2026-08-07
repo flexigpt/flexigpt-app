@@ -176,6 +176,35 @@ func (a *Adapter) BootstrapManagedSource(
 	return nil
 }
 
+// RemoveManagedRoot removes all managed Source directories below one application-owned Root. "system.Components"
+// authorizes this operation before it reaches the adapter.
+func (a *Adapter) RemoveManagedRoot(
+	ctx context.Context,
+	rootID basespec.RootID,
+) error {
+	if a == nil {
+		return basespec.ErrClosed
+	}
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: managed root removal context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	root, err := a.managedRootPath(rootID)
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(root)
+}
+
 func (a *Adapter) DiscardBootstrappedManagedSource(
 	ctx context.Context,
 	value source.Source,
@@ -508,15 +537,42 @@ func (a *Adapter) validateSource(ctx context.Context, value source.Source) error
 	return nil
 }
 
+func (a *Adapter) managedRootPath(
+	rootID basespec.RootID,
+) (string, error) {
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return "", err
+	}
+
+	base := filepath.Clean(a.base)
+	root := filepath.Join(base, string(rootID))
+	relative, err := filepath.Rel(base, root)
+	if err != nil {
+		return "", err
+	}
+	if relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
+		filepath.IsAbs(relative) {
+		return "", fmt.Errorf(
+			"%w: managed Root path escapes managed Source base",
+			basespec.ErrInvalid,
+		)
+	}
+	return root, nil
+}
+
 func (a *Adapter) sourceRootPath(
 	value source.Source,
 	create bool,
 ) (string, error) {
-	root := filepath.Join(
-		string(value.RootID),
-		string(value.ID),
-	)
-	root = filepath.Join(a.base, root)
+	if err := basespec.ValidateSourceID(value.ID); err != nil {
+		return "", err
+	}
+	root, err := a.managedRootPath(value.RootID)
+	if err != nil {
+		return "", err
+	}
+	root = filepath.Join(root, string(value.ID))
 	if !create {
 		return root, nil
 	}

@@ -252,6 +252,47 @@ func (r *Registry) RemovePackage(
 	)
 }
 
+// RemoveManagedRoot removes adapter-owned managed storage for a complete Root.
+// It is a trusted topology-maintenance capability and is intentionally not
+// exposed by source.Service.
+func (r *Registry) RemoveManagedRoot(
+	ctx context.Context,
+	rootID basespec.RootID,
+) error {
+	if r == nil {
+		return basespec.ErrClosed
+	}
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: managed root removal context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return err
+	}
+
+	for _, kind := range r.kinds {
+		adapter := r.adapters[kind]
+		remover, supported := adapter.(ManagedRootRemover)
+		if !supported {
+			continue
+		}
+		if err := remover.RemoveManagedRoot(ctx, rootID); err != nil {
+			return fmt.Errorf(
+				"remove managed storage for root %q through adapter %q: %w",
+				rootID,
+				kind,
+				err,
+			)
+		}
+	}
+	return nil
+}
+
 func (r *Registry) Kinds() []basespec.SourceKind {
 	if r == nil {
 		return nil

@@ -23,6 +23,16 @@ type Installer interface {
 	Ensure(ctx context.Context) error
 }
 
+// HydrationInstaller participates in desired-state reconciliation for
+// binary-owned built-ins. PrepareBuiltInHydration runs before generic topology
+// installation; CommitBuiltInHydration runs only after every installer has
+// completed successfully.
+type HydrationInstaller interface {
+	PrepareBuiltInHydration(ctx context.Context) error
+
+	CommitBuiltInHydration(ctx context.Context) error
+}
+
 type registeredInstaller struct {
 	name      string
 	installer Installer
@@ -166,6 +176,20 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	})
 
 	ctx = protection.WithPrivilegedInstaller(ctx)
+	for _, entry := range entries {
+		hydrator, supported := entry.installer.(HydrationInstaller)
+		if !supported {
+			continue
+		}
+		if err := hydrator.PrepareBuiltInHydration(ctx); err != nil {
+			return fmt.Errorf(
+				"prepare built-in hydration for installer %q: %w",
+				entry.name,
+				err,
+			)
+		}
+	}
+
 	if _, err := r.configuration.EnsureTopology(ctx, r.topology); err != nil {
 		return fmt.Errorf("ensure built-in topology: %w", err)
 	}
@@ -173,6 +197,19 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		if err := entry.installer.Ensure(ctx); err != nil {
 			return fmt.Errorf(
 				"ensure built-in installer %q: %w",
+				entry.name,
+				err,
+			)
+		}
+	}
+	for _, entry := range entries {
+		hydrator, supported := entry.installer.(HydrationInstaller)
+		if !supported {
+			continue
+		}
+		if err := hydrator.CommitBuiltInHydration(ctx); err != nil {
+			return fmt.Errorf(
+				"commit built-in hydration for installer %q: %w",
 				entry.name,
 				err,
 			)

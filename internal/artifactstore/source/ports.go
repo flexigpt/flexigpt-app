@@ -171,6 +171,19 @@ type ManagedSourceBootstrapper interface {
 	) error
 }
 
+// ManagedRootRemover is a trusted adapter capability used only when an
+// application-owned topology is being replaced as a whole. It removes all
+// managed Source storage below one Root, including packages that are no longer
+// declared by a newer binary.
+//
+// It must never be exposed through public Source APIs.
+type ManagedRootRemover interface {
+	RemoveManagedRoot(
+		ctx context.Context,
+		rootID basespec.RootID,
+	) error
+}
+
 type Adapter interface {
 	Kind() basespec.SourceKind
 

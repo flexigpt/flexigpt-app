@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -23,6 +24,7 @@ const maximumDefinitionFileBytes = int64(
 
 type Repository struct {
 	files *mapstore.MapDirectoryStore
+	root  string
 
 	mu     sync.RWMutex
 	closed bool
@@ -52,6 +54,7 @@ func Open(root string) (*Repository, error) {
 	}
 	return &Repository{
 		files: files,
+		root:  filepath.Clean(root),
 	}, nil
 }
 
@@ -69,6 +72,58 @@ func (r *Repository) Close() error {
 		return nil
 	}
 	return r.files.CloseAll()
+}
+
+// RemoveRoot removes all immutable definitions scoped to a Root. It is used
+// only by trusted startup topology replacement before normal definition reads
+// or writes occur in the process.
+func (r *Repository) RemoveRoot(
+	ctx context.Context,
+	rootID basespec.RootID,
+) error {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: definition root removal context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return err
+	}
+
+	if r == nil || r.closed || r.files == nil {
+		return basespec.ErrClosed
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	base, err := filepath.Abs(r.root)
+	if err != nil {
+		return err
+	}
+	location := filepath.Join(base, string(rootID))
+	relative, err := filepath.Rel(base, location)
+	if err != nil {
+		return err
+	}
+	if relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
+		filepath.IsAbs(relative) {
+		return fmt.Errorf(
+			"%w: definition Root path escapes repository root",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := os.RemoveAll(location); err != nil {
+		return fmt.Errorf(
+			"remove definitions for root %q: %w",
+			rootID,
+			err,
+		)
+	}
+	return nil
 }
 
 func (r *Repository) Put(

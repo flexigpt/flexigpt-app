@@ -181,6 +181,7 @@ func InitSkillBundleWrapper(
 			BuiltInTopology: builtInTopology,
 			SkillRegistry:   skillRegistry,
 			Packages:        packages,
+			Hydrator:        components,
 		},
 	)
 	if err != nil {
