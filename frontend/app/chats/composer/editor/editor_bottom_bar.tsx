@@ -160,6 +160,18 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		>
 			<div className="flex items-center gap-1 overflow-x-auto p-1 text-xs shadow-none">
 				<div className="flex items-center gap-1">
+					<AttachmentBottomBarChip
+						store={attachmentMenuState}
+						buttonRef={attachmentButtonRef}
+						shortcut={shortcutLabels.attachments}
+						onAttachFiles={onAttachFiles}
+						onAttachDirectory={onAttachDirectory}
+						onAttachURL={onAttachURL}
+						onOpenAttachmentUrlModal={onOpenAttachmentUrlModal}
+						onUrlAttachmentModalClose={onUrlAttachmentModalClose}
+						isInputLocked={isInputLocked}
+					/>
+
 					<WorkspaceBottomBarChip
 						store={workspaceMenuState}
 						state={workspaceState}
@@ -192,18 +204,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						shortcut={shortcutLabels.templates}
 						onInsertTemplateText={onInsertTemplateText}
 						onAttachResourcePaths={onAttachTemplateResourcePaths}
-						isInputLocked={isInputLocked}
-					/>
-
-					<AttachmentBottomBarChip
-						store={attachmentMenuState}
-						buttonRef={attachmentButtonRef}
-						shortcut={shortcutLabels.attachments}
-						onAttachFiles={onAttachFiles}
-						onAttachDirectory={onAttachDirectory}
-						onAttachURL={onAttachURL}
-						onOpenAttachmentUrlModal={onOpenAttachmentUrlModal}
-						onUrlAttachmentModalClose={onUrlAttachmentModalClose}
 						isInputLocked={isInputLocked}
 					/>
 
