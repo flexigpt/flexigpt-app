@@ -429,10 +429,11 @@ func (s *Service) Remove(
 		ctx,
 		collectionRef,
 		current.Binding.SourceID,
-		false,
+		true,
 	); err != nil {
 		return err
 	}
+
 	if _, found := request.Plan.BySource()[current.Binding.SourceID]; !found {
 		return fmt.Errorf(
 			"%w: managed artifact removal plan does not include its source",
@@ -477,14 +478,8 @@ func (s *Service) Remove(
 	); err != nil {
 		return err
 	}
-	if err := s.dependencies.Artifacts.Purge(
-		ctx,
-		current.Ref(),
-		current.Revision,
-	); err != nil {
-		return err
-	}
-	_, err = s.dependencies.Refresh.Refresh(
+
+	if _, err := s.dependencies.Refresh.Refresh(
 		ctx,
 		collection.CollectionRef{
 			RootID:       current.RootID,
@@ -492,8 +487,46 @@ func (s *Service) Remove(
 		},
 		request.Plan,
 		request.RefreshPolicy,
+	); err != nil {
+		return err
+	}
+
+	resolved, err := s.dependencies.Artifacts.Get(ctx, current.Ref())
+	if err != nil {
+		return err
+	}
+	if resolved.Binding != current.Binding ||
+		resolved.Adoption != artifact.AdoptionPinned ||
+		resolved.State != artifact.StateMissing {
+		return fmt.Errorf(
+			"%w: managed package removal did not make Artifact %q missing",
+			basespec.ErrConflict,
+			current.ID,
+		)
+	}
+
+	expectedRevision := current.Revision
+	if current.State != artifact.StateMissing {
+		if expectedRevision == ^uint64(0) {
+			return fmt.Errorf(
+				"%w: managed Artifact revision is exhausted",
+				basespec.ErrInvalid,
+			)
+		}
+		expectedRevision++
+	}
+	if resolved.Revision != expectedRevision {
+		return fmt.Errorf(
+			"%w: managed Artifact changed during package removal",
+			basespec.ErrConflict,
+		)
+	}
+
+	return s.dependencies.Artifacts.Purge(
+		ctx,
+		resolved.Ref(),
+		resolved.Revision,
 	)
-	return err
 }
 
 func (s *Service) validatePublishRequest(

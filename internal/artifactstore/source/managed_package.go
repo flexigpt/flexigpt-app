@@ -2,6 +2,7 @@ package source
 
 import (
 	"fmt"
+	"path"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -49,8 +50,10 @@ func NormalizeManagedPackagePublication(
 	output := input
 	output.Files = make([]ManagedPackageFile, len(input.Files))
 	seen := make(map[basespec.Locator]struct{}, len(input.Files))
-	var total int64
+	filesByIdentity := make(map[string]basespec.Locator, len(input.Files))
+	directoriesByIdentity := make(map[string]basespec.Locator)
 
+	var total int64
 	for index, file := range input.Files {
 		if err := basespec.ValidatePortableLocator(
 			file.Locator,
@@ -70,6 +73,50 @@ func NormalizeManagedPackagePublication(
 			)
 		}
 		seen[file.Locator] = struct{}{}
+
+		identity, err := basespec.PortableLocatorIdentity(
+			file.Locator,
+			false,
+		)
+		if err != nil {
+			return ManagedPackagePublication{}, err
+		}
+		if previous, collision := filesByIdentity[identity]; collision {
+			return ManagedPackagePublication{}, fmt.Errorf(
+				"%w: managed package file %q collides with %q",
+				basespec.ErrInvalid,
+				file.Locator,
+				previous,
+			)
+		}
+		if child, conflict := directoriesByIdentity[identity]; conflict {
+			return ManagedPackagePublication{}, fmt.Errorf(
+				"%w: managed package file %q conflicts with child path %q",
+				basespec.ErrInvalid,
+				file.Locator,
+				child,
+			)
+		}
+
+		for parent := path.Dir(string(file.Locator)); parent != "."; parent = path.Dir(parent) {
+			parentIdentity, err := basespec.PortableLocatorIdentity(
+				basespec.Locator(parent),
+				false,
+			)
+			if err != nil {
+				return ManagedPackagePublication{}, err
+			}
+			if parentFile, conflict := filesByIdentity[parentIdentity]; conflict {
+				return ManagedPackagePublication{}, fmt.Errorf(
+					"%w: managed package path %q is below file %q",
+					basespec.ErrInvalid,
+					file.Locator,
+					parentFile,
+				)
+			}
+			directoriesByIdentity[parentIdentity] = file.Locator
+		}
+		filesByIdentity[identity] = file.Locator
 
 		if int64(len(file.Content)) > basespec.MaxScanBytes-total {
 			return ManagedPackagePublication{}, fmt.Errorf(

@@ -1313,6 +1313,7 @@ func builtInBundleTopologyMatches(
 		value.Data.LogicalName != request.LogicalName ||
 		value.Data.LogicalVersion != request.LogicalVersion ||
 		value.Data.ManagedSourceID != "" ||
+		!maps.Equal(value.Data.Labels, request.Labels) ||
 		len(value.Attachments) != 1 {
 		return false
 	}

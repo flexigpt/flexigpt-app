@@ -2,6 +2,7 @@ package basespec
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"strings"
 	"unicode"
@@ -43,6 +44,32 @@ const (
 var identifierPattern = regexp.MustCompile(
 	`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`,
 )
+
+var portableReservedBaseNames = map[string]struct{}{
+	"AUX":    {},
+	"CON":    {},
+	"CLOCK$": {},
+	"COM1":   {},
+	"COM2":   {},
+	"COM3":   {},
+	"COM4":   {},
+	"COM5":   {},
+	"COM6":   {},
+	"COM7":   {},
+	"COM8":   {},
+	"COM9":   {},
+	"LPT1":   {},
+	"LPT2":   {},
+	"LPT3":   {},
+	"LPT4":   {},
+	"LPT5":   {},
+	"LPT6":   {},
+	"LPT7":   {},
+	"LPT8":   {},
+	"LPT9":   {},
+	"NUL":    {},
+	"PRN":    {},
+}
 
 type (
 	RootID             string
@@ -197,7 +224,57 @@ func ValidateSubresourceLocator(value SubresourceLocator) error {
 // Generic Source locators can describe an existing platform-specific Source.
 // Portable locators remain bounded slash-separated relative references.
 func ValidatePortableLocator(value Locator, allowRoot bool) error {
-	return ValidateLocator(value, allowRoot)
+	if err := validateRelativePath(
+		"portable locator",
+		string(value),
+		allowRoot,
+	); err != nil {
+		return err
+	}
+	if value == "." {
+		return nil
+	}
+
+	for segment := range strings.SplitSeq(string(value), "/") {
+		if strings.HasSuffix(segment, ".") ||
+			strings.HasSuffix(segment, " ") {
+			return fmt.Errorf(
+				"%w: portable locator contains a trailing dot or space",
+				ErrInvalid,
+			)
+		}
+		if strings.ContainsAny(segment, `<>"|?*`) {
+			return fmt.Errorf(
+				"%w: portable locator contains a platform-reserved character",
+				ErrInvalid,
+			)
+		}
+
+		baseName, _, _ := strings.Cut(segment, ".")
+		if _, reserved := portableReservedBaseNames[strings.ToUpper(baseName)]; reserved {
+			return fmt.Errorf(
+				"%w: portable locator contains reserved basename %q",
+				ErrInvalid,
+				segment,
+			)
+		}
+	}
+	return nil
+}
+
+// PortableLocatorIdentity returns the case-insensitive portable identity used
+// to reject package entries that would collide on case-insensitive filesystems.
+func PortableLocatorIdentity(
+	value Locator,
+	allowRoot bool,
+) (string, error) {
+	if err := ValidatePortableLocator(value, allowRoot); err != nil {
+		return "", err
+	}
+	if value == "." {
+		return ".", nil
+	}
+	return strings.ToLower(string(value)), nil
 }
 
 func ValidatePortableSubresourceLocator(value SubresourceLocator) error {
@@ -205,6 +282,43 @@ func ValidatePortableSubresourceLocator(value SubresourceLocator) error {
 		return nil
 	}
 	return ValidatePortableLocator(Locator(value), false)
+}
+
+// ValidateIncludePattern validates a source-relative glob. It deliberately
+// rejects path traversal and host-path syntax before passing the pattern to
+// path.Match.
+func ValidateIncludePattern(pattern string) error {
+	if err := ValidateRequiredText(
+		"discovery pattern",
+		pattern,
+		MaxLocatorBytes,
+	); err != nil {
+		return err
+	}
+	if strings.HasPrefix(pattern, "/") ||
+		strings.ContainsAny(pattern, `\:`) {
+		return fmt.Errorf(
+			"%w: discovery pattern contains a disallowed path character",
+			ErrInvalid,
+		)
+	}
+	for segment := range strings.SplitSeq(pattern, "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return fmt.Errorf(
+				"%w: discovery pattern contains an invalid path segment",
+				ErrInvalid,
+			)
+		}
+	}
+	if _, err := path.Match(pattern, "candidate"); err != nil {
+		return fmt.Errorf(
+			"%w: invalid discovery pattern %q: %w",
+			ErrInvalid,
+			pattern,
+			err,
+		)
+	}
+	return nil
 }
 
 func validateRelativePath(label, value string, allowRoot bool) error {

@@ -271,33 +271,14 @@ func VerifySnapshotContentDigest(
 			basespec.ErrConflict,
 		)
 	}
-	entry, err := snapshot.Stat(ctx, locator)
-	if err != nil {
-		return err
-	}
-	if entry.Locator != locator {
-		return fmt.Errorf(
-			"%w: source snapshot stat for %q returned %q",
-			basespec.ErrInvalid,
-			locator,
-			entry.Locator,
-		)
-	}
-	content, err := ReadSnapshotEntry(
+	if err := verifySnapshotEntry(
 		ctx,
 		snapshot,
-		entry,
+		locator,
+		expectedDigest,
 		maximumBytes,
-	)
-	if err != nil {
+	); err != nil {
 		return err
-	}
-	if cryptoutil.DigestBytes(content) != expectedDigest {
-		return fmt.Errorf(
-			"%w: source content for %q changed since catalog publication",
-			basespec.ErrConflict,
-			locator,
-		)
 	}
 	return snapshot.Confirm(ctx)
 }

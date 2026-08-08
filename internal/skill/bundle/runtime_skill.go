@@ -12,7 +12,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
 
@@ -205,12 +207,13 @@ func (a *API) ListRuntimeSkills(
 		return []RuntimeSkill{}, nil
 	}
 
-	sessionCtx, session, err := skillArtifact.NewRuntimePackageResolutionSession(
+	sessionCtx, session, err := source.NewVerificationSession(
 		ctx,
 	)
 	if err != nil {
 		return nil, err
 	}
+
 	defer func() {
 		returnErr = errors.Join(
 			returnErr,

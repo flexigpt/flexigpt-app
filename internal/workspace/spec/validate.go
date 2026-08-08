@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 )
 
 func ValidateDiscoveryPreferences(
@@ -40,13 +39,4 @@ func ValidateDiscoveryPreferences(
 		seenRoots[root.Root] = struct{}{}
 	}
 	return nil
-}
-
-// ValidateIncludePattern validates a source-relative glob. It deliberately
-// rejects path traversal and host-path syntax before passing the pattern to
-// path.Match.
-//
-// Deprecated: use artifactstore/discovery.ValidateIncludePattern.
-func ValidateIncludePattern(pattern string) error {
-	return artifactstoreDiscovery.ValidateIncludePattern(pattern)
 }

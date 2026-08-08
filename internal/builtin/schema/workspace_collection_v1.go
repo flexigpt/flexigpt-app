@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -372,7 +371,7 @@ func validateWorkspaceDiscoveryV1(value WorkspaceDiscoveryV1) error {
 
 		patterns := make(map[string]struct{}, len(root.IncludePatterns))
 		for _, pattern := range root.IncludePatterns {
-			if err := artifactstoreDiscovery.ValidateIncludePattern(pattern); err != nil {
+			if err := basespec.ValidateIncludePattern(pattern); err != nil {
 				return err
 			}
 			if _, duplicate := patterns[pattern]; duplicate {

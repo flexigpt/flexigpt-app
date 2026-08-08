@@ -3,7 +3,6 @@ package discovery
 import (
 	"fmt"
 	"maps"
-	"path"
 	"slices"
 	"sort"
 	"strings"
@@ -26,7 +25,7 @@ func (r DirectoryRoot) Validate() error {
 	}
 	seenPatterns := make(map[string]struct{}, len(r.IncludePatterns))
 	for _, pattern := range r.IncludePatterns {
-		if err := ValidateIncludePattern(pattern); err != nil {
+		if err := basespec.ValidateIncludePattern(pattern); err != nil {
 			return err
 		}
 		if _, duplicate := seenPatterns[pattern]; duplicate {
@@ -37,43 +36,6 @@ func (r DirectoryRoot) Validate() error {
 			)
 		}
 		seenPatterns[pattern] = struct{}{}
-	}
-	return nil
-}
-
-// ValidateIncludePattern validates a source-relative glob. It deliberately
-// rejects path traversal and host-path syntax before passing the pattern to
-// path.Match.
-func ValidateIncludePattern(pattern string) error {
-	if err := basespec.ValidateRequiredText(
-		"discovery pattern",
-		pattern,
-		basespec.MaxLocatorBytes,
-	); err != nil {
-		return err
-	}
-	if strings.HasPrefix(pattern, "/") ||
-		strings.ContainsAny(pattern, `\:`) {
-		return fmt.Errorf(
-			"%w: discovery pattern contains a disallowed path character",
-			basespec.ErrInvalid,
-		)
-	}
-	for segment := range strings.SplitSeq(pattern, "/") {
-		if segment == "" || segment == "." || segment == ".." {
-			return fmt.Errorf(
-				"%w: discovery pattern contains an invalid path segment",
-				basespec.ErrInvalid,
-			)
-		}
-	}
-	if _, err := path.Match(pattern, "candidate"); err != nil {
-		return fmt.Errorf(
-			"%w: invalid discovery pattern %q: %w",
-			basespec.ErrInvalid,
-			pattern,
-			err,
-		)
 	}
 	return nil
 }

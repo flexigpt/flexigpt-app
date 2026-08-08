@@ -13,6 +13,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
 
@@ -199,10 +201,15 @@ func (i *Installer) EnsureBuiltInArtifacts(
 			continue
 		}
 
-		files, err := i.packageFiles(ctx, value.SourceScope)
+		files, err := i.packageFiles(
+			ctx,
+			value.SourceScope,
+			value.Definition,
+		)
 		if err != nil {
 			return err
 		}
+
 		request := skillBundle.BuiltInCollectionInstallRequest{
 			Bundle:                     current.Collection.Ref(),
 			ExpectedCollectionRevision: current.Collection.Revision,
@@ -378,6 +385,7 @@ func (i *Installer) rejectDynamicBuiltInArtifacts(
 func (i *Installer) packageFiles(
 	ctx context.Context,
 	packageRoot basespec.Locator,
+	document builtinSchema.SkillCollectionV1,
 ) ([]source.ManagedPackageFile, error) {
 	embeddedFiles, err := builtin.ReadPackageFiles(
 		ctx,
@@ -387,13 +395,33 @@ func (i *Installer) packageFiles(
 	if err != nil {
 		return nil, err
 	}
+
+	canonicalDocument, err := builtinSchema.MarshalSkillCollectionV1(document)
+	if err != nil {
+		return nil, err
+	}
+
 	files := make([]source.ManagedPackageFile, 0, len(embeddedFiles))
+	foundDocument := false
 	for _, file := range embeddedFiles {
+		content := append([]byte(nil), file.Content...)
+		if file.Locator == builtinSchema.SkillCollectionV1FileName {
+			content = append([]byte(nil), canonicalDocument...)
+			foundDocument = true
+		}
 		files = append(files, source.ManagedPackageFile{
 			Locator: file.Locator,
-			Content: append([]byte(nil), file.Content...),
+			Content: content,
 		})
 	}
+	if !foundDocument {
+		return nil, fmt.Errorf(
+			"%w: built-in package lacks %q",
+			basespec.ErrInvalid,
+			builtinSchema.SkillCollectionV1FileName,
+		)
+	}
+
 	publication, err := source.NormalizeManagedPackagePublication(
 		source.ManagedPackagePublication{
 			Directory: packageRoot,
