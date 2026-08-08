@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 )
@@ -23,6 +24,9 @@ func New(components *system.Components) (*API, error) {
 		components.Roots == nil ||
 		components.Sources == nil {
 		return nil, errors.New("artifact store components are required")
+	}
+	if components.Shareables == nil {
+		return nil, errors.New("artifact store shareable documents are required")
 	}
 
 	return &API{
@@ -179,6 +183,29 @@ func (a *API) PurgeArtifactRoot(
 	return &PurgeArtifactRootResponse{
 		RootID: request.RootID,
 	}, nil
+}
+
+func (a *API) GetShareableCollectionDocument(
+	ctx context.Context,
+	request *GetShareableCollectionDocumentRequest,
+) (*GetShareableCollectionDocumentResponse, error) {
+	if err := a.check(ctx); err != nil {
+		return nil, err
+	}
+	if err := requireRequest(request, "get shareable collection document request"); err != nil {
+		return nil, err
+	}
+	value, err := a.components.Shareables.GetCollection(
+		ctx,
+		collection.CollectionRef{
+			RootID:       request.RootID,
+			CollectionID: request.CollectionID,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &GetShareableCollectionDocumentResponse{Body: &value}, nil
 }
 
 func (a *API) CreateArtifactSource(
@@ -468,7 +495,8 @@ func (a *API) check(ctx context.Context) error {
 	if a == nil ||
 		a.components == nil ||
 		a.components.Roots == nil ||
-		a.components.Sources == nil {
+		a.components.Sources == nil ||
+		a.components.Shareables == nil {
 		return basespec.ErrClosed
 	}
 	if ctx == nil {

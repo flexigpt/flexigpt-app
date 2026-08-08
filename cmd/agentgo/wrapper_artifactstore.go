@@ -10,10 +10,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
+	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 
@@ -65,6 +67,9 @@ func InitArtifactStoreWrapper(
 		workspace.DefaultDecoders(),
 		skillDecoder,
 	)
+	shareableCodecs := []shareable.Codec{
+		skillBundle.NewShareableCodec(),
+	}
 
 	components, err := system.Open(
 		context.Background(),
@@ -75,6 +80,7 @@ func InitArtifactStoreWrapper(
 				RootID:         registry.Root.ID,
 				RetainedRootID: defaultWorkspaceRootID,
 			},
+			ShareableCodecs: shareableCodecs,
 		},
 	)
 	if err != nil {
@@ -173,6 +179,19 @@ func (w *ArtifactStoreWrapper) PurgeArtifactRoot(
 	return middleware.WithRecoveryResp(
 		func() (*artifactstore.PurgeArtifactRootResponse, error) {
 			return w.api.PurgeArtifactRoot(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) GetShareableCollectionDocument(
+	request *artifactstore.GetShareableCollectionDocumentRequest,
+) (*artifactstore.GetShareableCollectionDocumentResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.GetShareableCollectionDocumentResponse, error) {
+			return w.api.GetShareableCollectionDocument(
 				context.Background(),
 				request,
 			)

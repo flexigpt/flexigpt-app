@@ -21,6 +21,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -466,6 +467,14 @@ func (a *API) BuildLinkedPortableBundleJSON(
 	return definition.MarshalCollectionDefinition(value)
 }
 
+func (a *API) StorePortableBundleDefinition(
+	ctx context.Context,
+	ref collection.CollectionRef,
+	input definition.CollectionDefinition,
+) error {
+	return a.storePortableBundleDefinition(ctx, ref, input, false)
+}
+
 func (a *API) CreateManagedSkill(
 	ctx context.Context,
 	request CreateManagedSkillRequest,
@@ -773,7 +782,6 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	bundleRef := bundle.Collection.Ref()
 	var role basespec.AttachmentRole
 	for _, attachment := range bundle.Attachments {
 		if attachment.SourceID == value.Binding.SourceID {
@@ -813,36 +821,21 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	state, generation, err := a.dependencies.GetManagedSourceState(
-		ctx,
-		value.RootID,
-		value.Binding.SourceID,
-	)
+	plan, err := a.discoveryPlan(bundle)
 	if err != nil {
 		return err
 	}
-	if _, _, err := a.dependencies.RemoveManagedPackage(
+	if err := a.dependencies.ManagedArtifacts.Remove(
 		ctx,
-		value.RootID,
-		value.Binding.SourceID,
-		state.Revision,
-		directory,
-		generation,
+		managedartifact.RemoveRequest{
+			Artifact:       value,
+			Package:        directory,
+			Plan:           plan,
+			RefreshPolicy:  a.refreshPolicy(bundle, false),
+			AllowProtected: false,
+		},
 	); err != nil {
 		return pendingManagedSkillPurgeError(value.Ref(), err)
-	}
-	if err := a.dependencies.Artifacts.Purge(
-		ctx,
-		ref,
-		expectedRevision,
-	); err != nil {
-		return pendingManagedSkillPurgeError(value.Ref(), err)
-	}
-	if _, err := a.refreshBundle(ctx, bundleRef, false); err != nil {
-		return pendingManagedSkillPurgeError(value.Ref(), fmt.Errorf(
-			"skill package and artifact were removed, but bundle refresh failed: %w",
-			err,
-		))
 	}
 	return nil
 }
@@ -955,6 +948,29 @@ func (a *API) EnsureBuiltInBundleTopology(
 			)
 		}
 	}
+	if request.PortableDefinition != nil {
+		canonical, err := CanonicalizePortableBundleDefinition(
+			*request.PortableDefinition,
+		)
+		if err != nil {
+			return Bundle{}, err
+		}
+		if request.PortableDefinitionDigest != nil &&
+			canonical.Digest != *request.PortableDefinitionDigest {
+			return Bundle{}, fmt.Errorf(
+				"%w: built-in portable definition digest differs from its document",
+				basespec.ErrDigestMismatch,
+			)
+		}
+		if err := a.storePortableBundleDefinition(
+			ctx,
+			bundle.Collection.Ref(),
+			canonical,
+			true,
+		); err != nil {
+			return Bundle{}, err
+		}
+	}
 	return bundle, nil
 }
 
@@ -972,6 +988,56 @@ func (a *API) InstallBuiltInSkill(
 		"%w: built-in Skills must be installed through InstallBuiltInCollection",
 		basespec.ErrUnsupported,
 	)
+}
+
+func (a *API) storePortableBundleDefinition(
+	ctx context.Context,
+	ref collection.CollectionRef,
+	input definition.CollectionDefinition,
+	allowProtected bool,
+) error {
+	if err := a.Ready(); err != nil {
+		return err
+	}
+	if err := a.requireBundleMutation(ctx, ref.RootID, allowProtected); err != nil {
+		return err
+	}
+	bundle, err := a.GetBundle(ctx, ref)
+	if err != nil {
+		return err
+	}
+	canonical, err := CanonicalizePortableBundleDefinition(input)
+	if err != nil {
+		return err
+	}
+	if bundle.Data.PortableDefinitionDigest != nil &&
+		*bundle.Data.PortableDefinitionDigest != canonical.Digest {
+		return fmt.Errorf(
+			"%w: bundle provenance digest differs from the supplied portable document",
+			basespec.ErrConflict,
+		)
+	}
+
+	existing, err := a.dependencies.Shareables.GetCollection(ctx, ref)
+	switch {
+	case err == nil:
+		if existing.Binding.Digest != canonical.Digest {
+			return fmt.Errorf(
+				"%w: bundle already has a different stored portable document",
+				basespec.ErrConflict,
+			)
+		}
+	case errors.Is(err, basespec.ErrShareableDocumentNotFound):
+	default:
+		return err
+	}
+
+	raw, err := MarshalPortableBundleDefinition(canonical)
+	if err != nil {
+		return err
+	}
+	_, err = a.dependencies.Shareables.StoreCollection(ctx, ref, raw)
+	return err
 }
 
 func (a *API) currentBundleCatalog(
@@ -1388,7 +1454,17 @@ func (a *API) refreshBundle(
 	if err != nil {
 		return refresh.Result{}, err
 	}
+	policy := a.refreshPolicy(bundle, allowProtected)
+	return a.dependencies.Refresh.Refresh(ctx, ref, plan, policy)
+}
 
+func (a *API) refreshPolicy(
+	bundle Bundle,
+	allowProtected bool,
+) artifact.Policy {
+	if allowProtected {
+		return builtInSkillArtifactPolicy{}
+	}
 	autoAdoptSources := make(map[basespec.SourceID]struct{})
 	for _, attachment := range bundle.Attachments {
 		switch attachment.Role {
@@ -1396,23 +1472,10 @@ func (a *API) refreshBundle(
 			autoAdoptSources[attachment.SourceID] = struct{}{}
 		}
 	}
-	var policy artifact.Policy = skillArtifactPolicy{
+	return skillArtifactPolicy{
 		ids:              a.dependencies.AutoAdoptionIDProvider,
 		autoAdoptSources: autoAdoptSources,
 	}
-	if allowProtected {
-		policy = builtInSkillArtifactPolicy{}
-	}
-	result, err := a.dependencies.Refresh.Refresh(
-		ctx,
-		ref,
-		plan,
-		policy,
-	)
-	if err != nil {
-		return refresh.Result{}, err
-	}
-	return result, nil
 }
 
 // createManagedSkill performs the managed package publication workflow.
@@ -1703,82 +1766,36 @@ func (a *API) createManagedSkill(
 		pinned = &updated
 	}
 
-	currentResult, completeBeforePublication := managedSkillCreateResult(
-		*pinned,
-		sourceValue.ID,
-		skillLocator,
-		definitionValue.Digest,
-		packageSHA256,
-	)
-
-	state, generation, err := a.dependencies.GetManagedSourceState(
-		ctx,
-		request.Bundle.RootID,
-		sourceValue.ID,
-	)
+	plan, err := a.discoveryPlan(bundle)
 	if err != nil {
 		return CreateManagedSkillResponse{}, pending(err)
 	}
-	if state.ID != sourceValue.ID ||
-		state.RootID != request.Bundle.RootID {
-		return CreateManagedSkillResponse{}, pending(fmt.Errorf(
-			"%w: managed Source state does not match the selected attachment",
-			basespec.ErrInvalid,
-		))
-	}
-
-	publishPackage := a.dependencies.PublishManagedPackage
-	if allowBuiltInAttachment {
-		publishPackage = a.dependencies.PublishProtectedManagedPackage
-	}
-	publishedSource, publishedGeneration, err := publishPackage(
+	published, err := a.dependencies.ManagedArtifacts.Publish(
 		ctx,
-		request.Bundle.RootID,
-		sourceValue.ID,
-		state.Revision,
-		source.ManagedPackagePublication{
-			Directory:          directory,
-			ExpectedGeneration: generation,
-			Files:              files,
+		managedartifact.PublishRequest{
+			Artifact:           *pinned,
+			ExpectedDefinition: definitionValue.Digest,
+			Package: source.ManagedPackagePublication{
+				Directory: directory,
+				Files:     files,
+			},
+			Plan:           plan,
+			RefreshPolicy:  a.refreshPolicy(bundle, allowBuiltInAttachment),
+			AllowProtected: allowBuiltInAttachment,
 		},
 	)
 	if err != nil {
 		return CreateManagedSkillResponse{}, pending(err)
 	}
-
-	if publishedSource.ID != sourceValue.ID ||
-		publishedSource.RootID != request.Bundle.RootID {
-		return CreateManagedSkillResponse{}, pending(fmt.Errorf(
-			"%w: managed Source publication returned another Source",
-			basespec.ErrInvalid,
-		))
-	}
-	if completeBeforePublication &&
-		publishedSource.Revision == state.Revision &&
-		publishedGeneration == generation {
-		return currentResult, nil
-	}
-
-	if _, err := a.refreshBundle(
-		ctx,
-		request.Bundle,
-		allowBuiltInAttachment,
-	); err != nil {
-		return CreateManagedSkillResponse{}, pending(err)
-	}
-
-	resolved, err := a.dependencies.Artifacts.Get(ctx, pinned.Ref())
-	if err != nil {
-		return CreateManagedSkillResponse{}, pending(err)
-	}
 	if result, complete := managedSkillCreateResult(
-		resolved,
+		published.Artifact,
 		sourceValue.ID,
 		skillLocator,
 		definitionValue.Digest,
 		packageSHA256,
 	); complete {
-		if resolved.Name != artifactName || resolved.Enabled != request.Enabled {
+		if published.Artifact.Name != artifactName ||
+			published.Artifact.Enabled != request.Enabled {
 			return CreateManagedSkillResponse{}, pending(fmt.Errorf(
 				"%w: managed Skill Artifact changed during package publication",
 				basespec.ErrConflict,
@@ -1788,7 +1805,7 @@ func (a *API) createManagedSkill(
 	}
 	return CreateManagedSkillResponse{}, pending(
 		fmt.Errorf(
-			"%w: published managed Skill did not resolve to its pinned Artifact",
+			"%w: managed package did not resolve to its pinned Artifact",
 			basespec.ErrReferenceUnresolved,
 		),
 	)

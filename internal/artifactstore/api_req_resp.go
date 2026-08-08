@@ -5,6 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -59,6 +60,15 @@ type PurgeArtifactRootRequest struct {
 
 type PurgeArtifactRootResponse struct {
 	RootID basespec.RootID `json:"rootID"`
+}
+
+type GetShareableCollectionDocumentRequest struct {
+	RootID       basespec.RootID       `path:"rootID"       required:"true"`
+	CollectionID basespec.CollectionID `path:"collectionID" required:"true"`
+}
+
+type GetShareableCollectionDocumentResponse struct {
+	Body *shareable.CollectionDocument
 }
 
 // ArtifactSourceDraft is write-only. Source configuration can contain local

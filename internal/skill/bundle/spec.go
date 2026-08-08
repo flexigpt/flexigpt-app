@@ -6,6 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -123,6 +124,10 @@ type BuiltInBundleTopology struct {
 	// Optional local provenance. Embedded package bytes and member digests
 	// remain independently verified during built-in installation.
 	PortableDefinitionDigest *cryptoutil.Digest `json:"-"`
+
+	// PortableDefinition is stored through Artifact Store's generic
+	// shareable-document service after local topology creation succeeds.
+	PortableDefinition *definition.CollectionDefinition `json:"-"`
 }
 
 // ManagedSkillDocument is the editable projection for a managed Skill.

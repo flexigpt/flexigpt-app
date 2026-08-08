@@ -23,14 +23,21 @@ type Installer interface {
 	Ensure(ctx context.Context) error
 }
 
-// HydrationInstaller participates in desired-state reconciliation for
-// binary-owned built-ins. PrepareBuiltInHydration runs before generic topology
-// installation; CommitBuiltInHydration runs only after every installer has
-// completed successfully.
+// HydrationInstaller supplies artifact-family desired state and receives the
+// result of generic hydration comparison. It does not read or write hydration
+// markers and it does not reset topology roots itself.
 type HydrationInstaller interface {
-	PrepareBuiltInHydration(ctx context.Context) error
+	Installer
 
-	CommitBuiltInHydration(ctx context.Context) error
+	DesiredHydration(ctx context.Context) (topology.Hydration, error)
+
+	EnsureHydration(ctx context.Context, current bool) error
+}
+
+type preparedHydration struct {
+	installer string
+	desired   topology.Hydration
+	current   bool
 }
 
 type registeredInstaller struct {
@@ -44,6 +51,7 @@ type registeredInstaller struct {
 type BootstrapRegistry struct {
 	configuration Registry
 	topology      topology.Ensurer
+	hydrator      topology.HydrationCoordinator
 
 	mu         sync.RWMutex
 	installers map[string]Installer
@@ -54,10 +62,11 @@ type BootstrapRegistry struct {
 func NewBootstrapRegistry(
 	configuration Registry,
 	ensurer topology.Ensurer,
+	hydrator topology.HydrationCoordinator,
 ) (*BootstrapRegistry, error) {
-	if ensurer == nil {
+	if ensurer == nil || hydrator == nil {
 		return nil, fmt.Errorf(
-			"%w: built-in bootstrap topology ensurer is nil",
+			"%w: built-in bootstrap dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
@@ -67,6 +76,7 @@ func NewBootstrapRegistry(
 	return &BootstrapRegistry{
 		configuration: configuration,
 		topology:      ensurer,
+		hydrator:      hydrator,
 		installers:    map[string]Installer{},
 		ids: map[string]string{
 			string(configuration.Root.ID):   "protected built-in Root",
@@ -176,24 +186,65 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	})
 
 	ctx = protection.WithPrivilegedInstaller(ctx)
+	prepared := make([]preparedHydration, 0, len(entries))
 	for _, entry := range entries {
-		hydrator, supported := entry.installer.(HydrationInstaller)
+		installer, supported := entry.installer.(HydrationInstaller)
 		if !supported {
 			continue
 		}
-		if err := hydrator.PrepareBuiltInHydration(ctx); err != nil {
+		desired, err := installer.DesiredHydration(ctx)
+		if err != nil {
 			return fmt.Errorf(
-				"prepare built-in hydration for installer %q: %w",
+				"build desired hydration for installer %q: %w",
 				entry.name,
 				err,
 			)
 		}
+		if desired.InstallerName != entry.name {
+			return fmt.Errorf(
+				"%w: built-in installer %q returned hydration name %q",
+				basespec.ErrInvalid,
+				entry.name,
+				desired.InstallerName,
+			)
+		}
+		current, err := r.hydrator.PrepareTopologyHydration(ctx, desired)
+		if err != nil {
+			return fmt.Errorf(
+				"prepare topology hydration for installer %q: %w",
+				entry.name,
+				err,
+			)
+		}
+		prepared = append(prepared, preparedHydration{
+			installer: entry.name,
+			desired:   desired,
+			current:   current,
+		})
 	}
 
 	if _, err := r.configuration.EnsureTopology(ctx, r.topology); err != nil {
 		return fmt.Errorf("ensure built-in topology: %w", err)
 	}
 	for _, entry := range entries {
+		hydrated, supported := entry.installer.(HydrationInstaller)
+		if supported {
+			var current bool
+			for _, value := range prepared {
+				if value.installer == entry.name {
+					current = value.current
+					break
+				}
+			}
+			if err := hydrated.EnsureHydration(ctx, current); err != nil {
+				return fmt.Errorf(
+					"ensure built-in installer %q: %w",
+					entry.name,
+					err,
+				)
+			}
+			continue
+		}
 		if err := entry.installer.Ensure(ctx); err != nil {
 			return fmt.Errorf(
 				"ensure built-in installer %q: %w",
@@ -202,15 +253,14 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 			)
 		}
 	}
-	for _, entry := range entries {
-		hydrator, supported := entry.installer.(HydrationInstaller)
-		if !supported {
+	for _, value := range prepared {
+		if value.current {
 			continue
 		}
-		if err := hydrator.CommitBuiltInHydration(ctx); err != nil {
+		if err := r.hydrator.CommitTopologyHydration(ctx, value.desired); err != nil {
 			return fmt.Errorf(
-				"commit built-in hydration for installer %q: %w",
-				entry.name,
+				"commit topology hydration for installer %q: %w",
+				value.installer,
 				err,
 			)
 		}

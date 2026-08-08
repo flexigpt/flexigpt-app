@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -44,127 +43,54 @@ type hydrationPackageFile struct {
 	Size    int64             `json:"size"`
 }
 
-// PrepareBuiltInHydration runs before generic topology creation. A changed
-// binary-owned registry or package removes the previous hydration first, so
-// the normal strict create APIs only ever see an empty topology or an exact
-// replay of the current binary's desired state.
-func (i *Installer) PrepareBuiltInHydration(
+func (i *Installer) DesiredHydration(
 	ctx context.Context,
-) error {
-	if i == nil || i.hydrator == nil {
-		return basespec.ErrClosed
+) (topology.Hydration, error) {
+	if i == nil {
+		return topology.Hydration{}, basespec.ErrClosed
 	}
 	if ctx == nil {
-		return fmt.Errorf(
+		return topology.Hydration{}, fmt.Errorf(
 			"%w: built-in hydration context is nil",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return err
+		return topology.Hydration{}, err
 	}
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
-		return err
+		return topology.Hydration{}, err
 	}
 
-	i.pendingHydration = nil
-	i.hydrationCurrent = false
 	fingerprint, err := i.desiredHydrationFingerprint(ctx)
 	if err != nil {
-		return err
+		return topology.Hydration{}, err
 	}
-	desired := topology.Hydration{
+	value := topology.Hydration{
 		InstallerName: i.BuiltInName(),
 		RootID:        i.builtInTopology.Root.ID,
 		SourceID:      i.builtInTopology.Source.ID,
 		Fingerprint:   fingerprint,
 	}
-	if err := desired.Validate(); err != nil {
-		return err
+	if err := value.Validate(); err != nil {
+		return topology.Hydration{}, err
 	}
-
-	previous, found, err := i.hydrator.GetTopologyHydration(
-		ctx,
-		desired.InstallerName,
-	)
-	if err != nil {
-		return err
-	}
-	if found && equalHydration(previous, desired) {
-		i.pendingHydration = &desired
-		// This marker is written only after the complete installation commits,
-		// so equality is the normal startup fast path.
-		i.hydrationCurrent = true
-		return nil
-	}
-
-	roots := map[basespec.RootID]struct{}{
-		desired.RootID: {},
-	}
-	if found {
-		roots[previous.RootID] = struct{}{}
-	}
-	orderedRoots := make([]basespec.RootID, 0, len(roots))
-	for rootID := range roots {
-		orderedRoots = append(orderedRoots, rootID)
-	}
-	slices.Sort(orderedRoots)
-
-	for _, rootID := range orderedRoots {
-		if err := i.hydrator.ResetTopologyHydration(
-			ctx,
-			desired.InstallerName,
-			rootID,
-		); err != nil {
-			return fmt.Errorf(
-				"reset stale built-in hydration root %q: %w",
-				rootID,
-				err,
-			)
-		}
-	}
-
-	i.pendingHydration = &desired
-	return nil
+	return value, nil
 }
 
-// CommitBuiltInHydration records completion only after BootstrapRegistry has
-// successfully installed every registered built-in family.
-func (i *Installer) CommitBuiltInHydration(
+func (i *Installer) EnsureHydration(
 	ctx context.Context,
+	current bool,
 ) error {
-	if i == nil || i.hydrator == nil {
-		return basespec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: built-in hydration context is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
 		return err
 	}
-	if i.pendingHydration == nil {
-		return fmt.Errorf(
-			"%w: built-in hydration was not prepared",
-			basespec.ErrInvalid,
-		)
+	if current {
+		if err := i.ensureBuiltInCatalogsCurrent(ctx); err == nil {
+			return nil
+		}
 	}
-	if i.hydrationCurrent {
-		return nil
-	}
-	if err := i.hydrator.PutTopologyHydration(
-		ctx,
-		*i.pendingHydration,
-	); err != nil {
-		return err
-	}
-	i.hydrationCurrent = true
-	return nil
+	return i.EnsureBuiltInArtifacts(ctx)
 }
 
 func (i *Installer) desiredHydrationFingerprint(
@@ -186,7 +112,6 @@ func (i *Installer) desiredHydrationFingerprint(
 		if err != nil {
 			return "", err
 		}
-
 		value := hydrationCollection{
 			Registration:          collectionValue.Registration,
 			DefinitionDigest:      collectionValue.Definition.Digest,
@@ -214,7 +139,6 @@ func (i *Installer) desiredHydrationFingerprint(
 		}
 		input.Collections = append(input.Collections, value)
 	}
-
 	raw, err := json.Marshal(input)
 	if err != nil {
 		return "", err
@@ -224,14 +148,4 @@ func (i *Installer) desiredHydrationFingerprint(
 		return "", err
 	}
 	return cryptoutil.DigestBytes(canonical), nil
-}
-
-func equalHydration(
-	left topology.Hydration,
-	right topology.Hydration,
-) bool {
-	return left.InstallerName == right.InstallerName &&
-		left.RootID == right.RootID &&
-		left.SourceID == right.SourceID &&
-		left.Fingerprint == right.Fingerprint
 }

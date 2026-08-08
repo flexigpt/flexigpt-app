@@ -10,7 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
@@ -57,82 +56,13 @@ func InitSkillBundleWrapper(
 		Refresh:                components.Refresh,
 		Catalogs:               components.Catalogs,
 		Definitions:            components.Definitions,
+		Shareables:             components.Shareables,
+		ManagedArtifacts:       components.ManagedArtifacts,
 		SourceRuntime:          components.SourceRuntime,
 		HasDecoder:             components.HasDecoder,
 		DecoderFingerprint:     components.DecoderFingerprint,
 		RootMutationPolicy:     components.RootMutationPolicy(),
 		AutoAdoptionIDProvider: autoAdoptionIDProvider,
-
-		GetManagedSourceState: func(
-			ctx context.Context,
-			rootID basespec.RootID,
-			sourceID basespec.SourceID,
-		) (sourceSummary source.Summary, generation string, err error) {
-			result, err := components.GetManagedSourceState(ctx, rootID, sourceID)
-			if err != nil {
-				return source.Summary{}, "", err
-			}
-			return result.Source, result.Generation, nil
-		},
-		PublishManagedPackage: func(
-			ctx context.Context,
-			rootID basespec.RootID,
-			sourceID basespec.SourceID,
-			expectedSourceRevision uint64,
-			publication source.ManagedPackagePublication,
-		) (sourceSummary source.Summary, generation string, err error) {
-			result, err := components.PublishManagedPackage(
-				ctx,
-				rootID,
-				sourceID,
-				expectedSourceRevision,
-				publication,
-			)
-			if err != nil {
-				return source.Summary{}, "", err
-			}
-			return result.Source, result.Generation, nil
-		},
-		PublishProtectedManagedPackage: func(
-			ctx context.Context,
-			rootID basespec.RootID,
-			sourceID basespec.SourceID,
-			expectedSourceRevision uint64,
-			publication source.ManagedPackagePublication,
-		) (sourceSummary source.Summary, generation string, err error) {
-			result, err := components.PublishProtectedManagedPackage(
-				ctx,
-				rootID,
-				sourceID,
-				expectedSourceRevision,
-				publication,
-			)
-			if err != nil {
-				return source.Summary{}, "", err
-			}
-			return result.Source, result.Generation, nil
-		},
-		RemoveManagedPackage: func(
-			ctx context.Context,
-			rootID basespec.RootID,
-			sourceID basespec.SourceID,
-			expectedSourceRevision uint64,
-			directory basespec.Locator,
-			expectedGeneration string,
-		) (sourceSummary source.Summary, generation string, err error) {
-			result, err := components.RemoveManagedPackage(
-				ctx,
-				rootID,
-				sourceID,
-				expectedSourceRevision,
-				directory,
-				expectedGeneration,
-			)
-			if err != nil {
-				return source.Summary{}, "", err
-			}
-			return result.Source, result.Generation, nil
-		},
 	})
 	if err != nil {
 		return err
@@ -192,7 +122,6 @@ func InitSkillBundleWrapper(
 			BuiltInTopology: builtInTopology,
 			SkillRegistry:   skillRegistry,
 			Packages:        packages,
-			Hydrator:        components,
 		},
 	)
 	if err != nil {
@@ -201,6 +130,7 @@ func InitSkillBundleWrapper(
 	}
 	bootstrap, err := builtin.NewBootstrapRegistry(
 		builtInTopology,
+		components,
 		components,
 	)
 	if err != nil {

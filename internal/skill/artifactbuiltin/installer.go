@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
@@ -39,26 +38,11 @@ type skillInstaller interface {
 	) error
 }
 
-// TopologyHydrator is intentionally narrower than system.Components. It gives
-// the built-in installer durable desired-state storage and a trusted,
-// root-scoped replacement operation without coupling artifactbuiltin to the
-// concrete Artifact Store composition.
-type TopologyHydrator interface {
-	topology.HydrationStore
-
-	ResetTopologyHydration(
-		ctx context.Context,
-		installerName string,
-		rootID basespec.RootID,
-	) error
-}
-
 type InstallerDependencies struct {
 	Skills          skillInstaller
 	BuiltInTopology builtin.Registry
 	SkillRegistry   Registry
 	Packages        fs.FS
-	Hydrator        TopologyHydrator
 }
 
 type Installer struct {
@@ -66,18 +50,13 @@ type Installer struct {
 	builtInTopology builtin.Registry
 	hydrated        HydratedRegistry
 	packages        fs.FS
-	hydrator        TopologyHydrator
-
-	pendingHydration *topology.Hydration
-	hydrationCurrent bool
 }
 
 func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
 	if dependencies.Skills == nil ||
-		dependencies.Packages == nil ||
-		dependencies.Hydrator == nil {
+		dependencies.Packages == nil {
 		return nil, fmt.Errorf("%w: built-in installer dependencies are incomplete", basespec.ErrInvalid)
 	}
 	if err := dependencies.BuiltInTopology.Validate(); err != nil {
@@ -104,7 +83,6 @@ func NewInstaller(
 		builtInTopology: dependencies.BuiltInTopology,
 		hydrated:        hydrated,
 		packages:        dependencies.Packages,
-		hydrator:        dependencies.Hydrator,
 	}, nil
 }
 
@@ -153,20 +131,24 @@ func (i *Installer) EnsureBuiltInBundles(
 
 	output := make([]skillBundle.Bundle, 0, len(i.hydrated.Collections))
 	for _, value := range i.hydrated.OrderedCollections() {
+		portableDefinition := value.Definition.Clone()
+		portableDigest := value.Definition.Digest
 		bundle, err := i.skills.EnsureBuiltInBundleTopology(
 			ctx,
 			skillBundle.BuiltInBundleTopology{
-				RootID:                i.builtInTopology.Root.ID,
-				CollectionID:          value.Registration.ID,
-				SourceID:              i.builtInTopology.Source.ID,
-				LogicalName:           value.Definition.LogicalName,
-				LogicalVersion:        value.Definition.LogicalVersion,
-				DisplayName:           value.Definition.DisplayName,
-				Description:           value.Definition.Description,
-				Labels:                value.Definition.Labels,
-				Enabled:               value.Registration.Enabled,
-				DiscoveryRoot:         value.SourceScope,
-				ExpectedMemberDigests: value.ExpectedMemberDigests,
+				RootID:                   i.builtInTopology.Root.ID,
+				CollectionID:             value.Registration.ID,
+				SourceID:                 i.builtInTopology.Source.ID,
+				LogicalName:              value.Definition.LogicalName,
+				LogicalVersion:           value.Definition.LogicalVersion,
+				DisplayName:              value.Definition.DisplayName,
+				Description:              value.Definition.Description,
+				Labels:                   value.Definition.Labels,
+				Enabled:                  value.Registration.Enabled,
+				DiscoveryRoot:            value.SourceScope,
+				ExpectedMemberDigests:    value.ExpectedMemberDigests,
+				PortableDefinition:       &portableDefinition,
+				PortableDefinitionDigest: &portableDigest,
 			},
 		)
 		if err != nil {
@@ -285,12 +267,6 @@ func (i *Installer) Ensure(
 ) error {
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
 		return err
-	}
-	if i.hydrationCurrent {
-		if err := i.ensureBuiltInCatalogsCurrent(ctx); err == nil {
-			return nil
-		}
-		i.hydrationCurrent = false
 	}
 	return i.EnsureBuiltInArtifacts(ctx)
 }

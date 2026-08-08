@@ -43,6 +43,25 @@ func (h Hydration) Validate() error {
 	return nil
 }
 
+// HydrationCoordinator reconciles binary-owned topology state before and
+// after artifact-family installation. The artifact family supplies only its
+// desired hydration identity and fingerprint.
+//
+// PrepareTopologyHydration returns current=true when the persisted desired
+// state exactly matches the supplied value. When current=false it removes
+// stale topology state, but does not write the new marker until commit.
+type HydrationCoordinator interface {
+	PrepareTopologyHydration(
+		ctx context.Context,
+		desired Hydration,
+	) (current bool, err error)
+
+	CommitTopologyHydration(
+		ctx context.Context,
+		desired Hydration,
+	) error
+}
+
 // HydrationStore persists successful installer hydration state. It is an
 // internal composition capability and is never exposed through public APIs.
 type HydrationStore interface {

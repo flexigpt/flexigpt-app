@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
@@ -60,6 +61,96 @@ func (c *Components) PutTopologyHydration(
 	return c.metadata.PutTopologyHydration(ctx, value)
 }
 
+// PrepareTopologyHydration reconciles persisted desired-state metadata before
+// a built-in installer creates local topology.
+//
+// The installer computes its own fingerprint because that is artifact-family
+// semantic knowledge. Artifact Store owns comparison, stale-root selection,
+// trusted reset, and retry-safe marker lifecycle.
+func (c *Components) PrepareTopologyHydration(
+	ctx context.Context,
+	desired topology.Hydration,
+) (bool, error) {
+	if c == nil || c.metadata == nil {
+		return false, basespec.ErrClosed
+	}
+	if ctx == nil {
+		return false, fmt.Errorf(
+			"%w: topology hydration context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return false, err
+	}
+	if err := desired.Validate(); err != nil {
+		return false, err
+	}
+
+	previous, found, err := c.GetTopologyHydration(
+		ctx,
+		desired.InstallerName,
+	)
+	if err != nil {
+		return false, err
+	}
+	if found && equalTopologyHydration(previous, desired) {
+		return true, nil
+	}
+
+	roots := map[basespec.RootID]struct{}{
+		desired.RootID: {},
+	}
+	if found {
+		roots[previous.RootID] = struct{}{}
+	}
+	orderedRoots := make([]basespec.RootID, 0, len(roots))
+	for rootID := range roots {
+		orderedRoots = append(orderedRoots, rootID)
+	}
+	slices.Sort(orderedRoots)
+
+	for _, rootID := range orderedRoots {
+		if err := c.ResetTopologyHydration(
+			ctx,
+			desired.InstallerName,
+			rootID,
+		); err != nil {
+			return false, fmt.Errorf(
+				"reset stale topology hydration root %q: %w",
+				rootID,
+				err,
+			)
+		}
+	}
+	return false, nil
+}
+
+// CommitTopologyHydration records successful installation only after the
+// generic topology and artifact-family installation paths both complete.
+func (c *Components) CommitTopologyHydration(
+	ctx context.Context,
+	desired topology.Hydration,
+) error {
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return err
+	}
+	return c.PutTopologyHydration(ctx, desired)
+}
+
+func equalTopologyHydration(
+	left topology.Hydration,
+	right topology.Hydration,
+) bool {
+	return left.InstallerName == right.InstallerName &&
+		left.RootID == right.RootID &&
+		left.SourceID == right.SourceID &&
+		left.Fingerprint == right.Fingerprint
+}
+
 // ResetTopologyHydration removes all local state for a binary-owned topology.
 //
 // A reset is authorized only when rootID is the current protected Root or the
@@ -77,7 +168,8 @@ func (c *Components) ResetTopologyHydration(
 	if c == nil ||
 		c.metadata == nil ||
 		c.content == nil ||
-		c.managedSources == nil {
+		c.managedSources == nil ||
+		c.shareableDocuments == nil {
 		return basespec.ErrClosed
 	}
 	if ctx == nil {
@@ -136,6 +228,13 @@ func (c *Components) ResetTopologyHydration(
 		)
 	}
 
+	if err := c.shareableDocuments.RemoveRoot(ctx, rootID); err != nil {
+		return fmt.Errorf(
+			"purge shareable documents for topology root %q: %w",
+			rootID,
+			err,
+		)
+	}
 	if err := c.content.RemoveRoot(ctx, rootID); err != nil {
 		return fmt.Errorf(
 			"purge immutable definitions for topology root %q: %w",

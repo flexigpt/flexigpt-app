@@ -15,9 +15,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition/maprepo"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/embedded"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
@@ -33,6 +35,7 @@ type Config struct {
 	AdditionalSources         []source.Adapter
 	Decoders                  []discovery.Decoder
 	Clock                     clockutil.Clock
+	ShareableCodecs           []shareable.Codec
 	RootMutationPolicy        protection.RootPolicy
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 }
@@ -49,6 +52,8 @@ type Components struct {
 	Artifacts   *artifact.Service
 	Refresh     *refresh.Service
 
+	Shareables       *shareable.Service
+	ManagedArtifacts *managedartifact.Service
 	CollectionReader collection.Reader
 	ArtifactReader   artifact.Reader
 	Catalogs         catalog.Reader
@@ -59,6 +64,7 @@ type Components struct {
 	metadata           *sqlite.Store
 	content            *maprepo.Repository
 	managedSources     *source.Registry
+	shareableDocuments *shareable.FileRepository
 	decoderIDs         map[basespec.DecoderID]struct{}
 	rootMutationPolicy protection.RootPolicy
 }
@@ -109,10 +115,27 @@ func Open(
 		return nil, err
 	}
 
+	shareableDocuments, err := shareable.OpenFileRepository(
+		filepath.Join(base, "shareable-documents"),
+	)
+	if err != nil {
+		_ = content.Close()
+		_ = metadata.Close()
+		return nil, err
+	}
+	shareableRegistry, err := shareable.NewRegistry(config.ShareableCodecs...)
+	if err != nil {
+		_ = shareableDocuments.Close()
+		_ = content.Close()
+		_ = metadata.Close()
+		return nil, err
+	}
+
 	filesystemAdapter, err := fsdir.NewWithTraversalPolicy(
 		config.FilesystemTraversalPolicy,
 	)
 	if err != nil {
+		_ = shareableDocuments.Close()
 		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
@@ -122,6 +145,7 @@ func Open(
 		filepath.Join(base, "managed-sources"),
 	)
 	if err != nil {
+		_ = shareableDocuments.Close()
 		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
@@ -129,10 +153,17 @@ func Open(
 
 	embeddedAdapter, err := embedded.New(config.EmbeddedProviders)
 	if err != nil {
+		_ = shareableDocuments.Close()
 		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
+	openSucceeded := false
+	defer func() {
+		if !openSucceeded {
+			_ = shareableDocuments.Close()
+		}
+	}()
 
 	sourceAdapters := make([]source.Adapter, 0, 3+len(config.AdditionalSources))
 	sourceAdapters = append(
@@ -167,6 +198,19 @@ func Open(
 			_, err := rootRepository.Get(ctx, rootID)
 			return err
 		},
+	)
+	if err != nil {
+		_ = content.Close()
+		_ = metadata.Close()
+		return nil, err
+	}
+
+	shareableService, err := shareable.NewService(
+		shareableRegistry,
+		shareableDocuments,
+		metadata.ShareableDocuments(),
+		collectionRepository,
+		config.RootMutationPolicy,
 	)
 	if err != nil {
 		_ = content.Close()
@@ -268,13 +312,14 @@ func Open(
 		return nil, err
 	}
 
-	return &Components{
+	components := &Components{
 		Roots:              rootService,
 		Sources:            sourceService,
 		Collections:        collectionService,
 		Artifacts:          artifactService,
 		Refresh:            refreshService,
 		CollectionReader:   collectionRepository,
+		Shareables:         shareableService,
 		ArtifactReader:     artifactRepository,
 		Catalogs:           catalogRepository,
 		Definitions:        definitions,
@@ -283,9 +328,89 @@ func Open(
 		metadata:           metadata,
 		content:            content,
 		managedSources:     sourceRegistry,
+		shareableDocuments: shareableDocuments,
 		decoderIDs:         decoderIDs,
 		rootMutationPolicy: config.RootMutationPolicy,
-	}, nil
+	}
+	managedArtifacts, err := managedartifact.NewService(
+		managedartifact.Dependencies{
+			Artifacts:   artifactService,
+			Collections: collectionRepository,
+			Refresh:     refreshService,
+			Policy:      config.RootMutationPolicy,
+			GetSourceState: func(
+				ctx context.Context,
+				rootID basespec.RootID,
+				sourceID basespec.SourceID,
+			) (managedartifact.SourceState, error) {
+				result, err := components.GetManagedSourceState(
+					ctx,
+					rootID,
+					sourceID,
+				)
+				if err != nil {
+					return managedartifact.SourceState{}, err
+				}
+				return managedartifact.SourceState{
+					Source:     result.Source,
+					Generation: result.Generation,
+				}, nil
+			},
+			PublishPackage: func(
+				ctx context.Context,
+				rootID basespec.RootID,
+				sourceID basespec.SourceID,
+				expectedRevision uint64,
+				publication source.ManagedPackagePublication,
+			) (managedartifact.SourceState, error) {
+				result, err := components.PublishManagedPackage(
+					ctx,
+					rootID,
+					sourceID,
+					expectedRevision,
+					publication,
+				)
+				if err != nil {
+					return managedartifact.SourceState{}, err
+				}
+				return managedartifact.SourceState{
+					Source:     result.Source,
+					Generation: result.Generation,
+				}, nil
+			},
+			PublishProtectedPackage: func(
+				ctx context.Context,
+				rootID basespec.RootID,
+				sourceID basespec.SourceID,
+				expectedRevision uint64,
+				publication source.ManagedPackagePublication,
+			) (managedartifact.SourceState, error) {
+				result, err := components.PublishProtectedManagedPackage(
+					ctx,
+					rootID,
+					sourceID,
+					expectedRevision,
+					publication,
+				)
+				if err != nil {
+					return managedartifact.SourceState{}, err
+				}
+				return managedartifact.SourceState{
+					Source:     result.Source,
+					Generation: result.Generation,
+				}, nil
+			},
+			RemovePackage:          components.removeManagedArtifactPackage,
+			RemoveProtectedPackage: components.removeProtectedManagedArtifactPackage,
+		},
+	)
+	if err != nil {
+		_ = components.Close()
+		return nil, err
+	}
+	components.ManagedArtifacts = managedArtifacts
+	openSucceeded = true
+	return components, nil
 }
 
 func (c *Components) HasDecoder(id basespec.DecoderID) bool {
@@ -480,6 +605,9 @@ func (c *Components) Close() error {
 		if err := c.content.Close(); err != nil {
 			closeErrors = append(closeErrors, err)
 		}
+	}
+	if c.shareableDocuments != nil {
+		closeErrors = append(closeErrors, c.shareableDocuments.Close())
 	}
 	if c.metadata != nil {
 		if err := c.metadata.Close(); err != nil {
@@ -787,4 +915,54 @@ func sourceSnapshotGeneration(
 		return "", err
 	}
 	return generation, nil
+}
+
+func (c *Components) removeManagedArtifactPackage(
+	ctx context.Context,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
+	expectedRevision uint64,
+	directory basespec.Locator,
+	expectedGeneration string,
+) (managedartifact.SourceState, error) {
+	result, err := c.RemoveManagedPackage(
+		ctx,
+		rootID,
+		sourceID,
+		expectedRevision,
+		directory,
+		expectedGeneration,
+	)
+	if err != nil {
+		return managedartifact.SourceState{}, err
+	}
+	return managedartifact.SourceState{
+		Source:     result.Source,
+		Generation: result.Generation,
+	}, nil
+}
+
+func (c *Components) removeProtectedManagedArtifactPackage(
+	ctx context.Context,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
+	expectedRevision uint64,
+	directory basespec.Locator,
+	expectedGeneration string,
+) (managedartifact.SourceState, error) {
+	result, err := c.RemoveProtectedManagedPackage(
+		ctx,
+		rootID,
+		sourceID,
+		expectedRevision,
+		directory,
+		expectedGeneration,
+	)
+	if err != nil {
+		return managedartifact.SourceState{}, err
+	}
+	return managedartifact.SourceState{
+		Source:     result.Source,
+		Generation: result.Generation,
+	}, nil
 }

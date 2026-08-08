@@ -1,0 +1,129 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://schemas.flexigpt.app/builtin/skill-collection-v1.schema.json",
+	"title": "FlexiGPT Skill Bundle Collection",
+	"description": "Portable collection.json manifest for a Skill Bundle package.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["kind", "schemaID", "schemaVersion", "logicalName", "body"],
+	"properties": {
+		"digest": {
+			"type": "string",
+			"pattern": "^sha256:[a-f0-9]{64}$"
+		},
+		"kind": {
+			"const": "skill.bundle"
+		},
+		"schemaID": {
+			"const": "skill.bundle.v1"
+		},
+		"schemaVersion": {
+			"const": "v1"
+		},
+		"logicalName": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"logicalVersion": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"displayName": {
+			"type": "string",
+			"maxLength": 256
+		},
+		"description": {
+			"type": "string",
+			"maxLength": 16384
+		},
+		"labels": {
+			"type": "object",
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 256
+			},
+			"maxProperties": 64
+		},
+		"body": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["memberFormat"],
+			"properties": {
+				"memberFormat": {
+					"const": "agent.skill-entrypoint/v1"
+				}
+			}
+		},
+		"members": {
+			"type": "array",
+			"maxItems": 100000,
+			"items": {
+				"$ref": "#/$defs/contentRef"
+			}
+		}
+	},
+	"$defs": {
+		"contentRef": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["role", "mediaType"],
+			"properties": {
+				"locator": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 4096
+				},
+				"uri": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 16384
+				},
+				"subresourceLocator": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 4096
+				},
+				"digest": {
+					"type": "string",
+					"pattern": "^sha256:[a-f0-9]{64}$"
+				},
+				"mediaType": {
+					"const": "text/markdown"
+				},
+				"role": {
+					"const": "agent.skill"
+				}
+			},
+			"oneOf": [
+				{
+					"required": ["locator"],
+					"not": {
+						"required": ["uri"]
+					}
+				},
+				{
+					"required": ["uri"],
+					"not": {
+						"required": ["locator"]
+					}
+				},
+				{
+					"required": ["subresourceLocator"],
+					"not": {
+						"anyOf": [
+							{
+								"required": ["locator"]
+							},
+							{
+								"required": ["uri"]
+							}
+						]
+					}
+				}
+			]
+		}
+	}
+}

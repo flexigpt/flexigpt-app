@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
@@ -290,37 +291,22 @@ func (a *API) InstallBuiltInCollection(
 		}
 	}
 
-	state, generation, err := a.dependencies.GetManagedSourceState(
-		ctx,
-		request.Bundle.RootID,
-		sourceValue.ID,
-	)
+	plan, err := a.discoveryPlan(bundle)
 	if err != nil {
 		return nil, pendingBuiltInCollectionInstallError(request.Bundle, err)
 	}
-	if state.ID != sourceValue.ID || state.RootID != request.Bundle.RootID {
-		return nil, pendingBuiltInCollectionInstallError(
-			request.Bundle,
-			fmt.Errorf(
-				"%w: managed Source state does not match built-in attachment",
-				basespec.ErrInvalid,
-			),
-		)
-	}
-	if _, _, err := a.dependencies.PublishProtectedManagedPackage(
+	if _, err := a.dependencies.ManagedArtifacts.PublishCollection(
 		ctx,
-		request.Bundle.RootID,
-		sourceValue.ID,
-		state.Revision,
-		source.ManagedPackagePublication{
-			Directory:          publication.Directory,
-			ExpectedGeneration: generation,
-			Files:              publication.Files,
+		managedartifact.PublishCollectionRequest{
+			Collection:     request.Bundle,
+			SourceID:       sourceValue.ID,
+			Package:        publication,
+			Plan:           plan,
+			RefreshPolicy:  builtInSkillArtifactPolicy{},
+			AllowProtected: true,
+			ForceRefresh:   true,
 		},
 	); err != nil {
-		return nil, pendingBuiltInCollectionInstallError(request.Bundle, err)
-	}
-	if err := a.EnsureBuiltInBundleCurrent(ctx, request.Bundle); err != nil {
 		return nil, pendingBuiltInCollectionInstallError(request.Bundle, err)
 	}
 

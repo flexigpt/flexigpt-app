@@ -9,9 +9,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -19,29 +21,6 @@ import (
 type RootLister interface {
 	List(ctx context.Context) ([]root.Root, error)
 }
-
-type ManagedSourceStateFunc func(
-	ctx context.Context,
-	rootID basespec.RootID,
-	sourceID basespec.SourceID,
-) (source.Summary, string, error)
-
-type PublishManagedPackageFunc func(
-	ctx context.Context,
-	rootID basespec.RootID,
-	sourceID basespec.SourceID,
-	expectedSourceRevision uint64,
-	publication source.ManagedPackagePublication,
-) (source.Summary, string, error)
-
-type RemoveManagedPackageFunc func(
-	ctx context.Context,
-	rootID basespec.RootID,
-	sourceID basespec.SourceID,
-	expectedSourceRevision uint64,
-	directory basespec.Locator,
-	expectedGeneration string,
-) (source.Summary, string, error)
 
 type Dependencies struct {
 	Roots                  RootLister
@@ -51,16 +30,13 @@ type Dependencies struct {
 	Refresh                refresh.Runner
 	Catalogs               catalog.Reader
 	Definitions            definition.Reader
+	Shareables             *shareable.Service
+	ManagedArtifacts       *managedartifact.Service
 	SourceRuntime          source.Runtime
 	HasDecoder             func(basespec.DecoderID) bool
 	DecoderFingerprint     func() (cryptoutil.Digest, error)
 	RootMutationPolicy     protection.RootPolicy
 	AutoAdoptionIDProvider artifact.ArtifactIDProvider
-
-	GetManagedSourceState          ManagedSourceStateFunc
-	PublishManagedPackage          PublishManagedPackageFunc
-	PublishProtectedManagedPackage PublishManagedPackageFunc
-	RemoveManagedPackage           RemoveManagedPackageFunc
 }
 
 func (d Dependencies) Validate() error {
@@ -71,15 +47,13 @@ func (d Dependencies) Validate() error {
 		d.Refresh == nil ||
 		d.Catalogs == nil ||
 		d.Definitions == nil ||
+		d.Shareables == nil ||
+		d.ManagedArtifacts == nil ||
 		d.SourceRuntime == nil ||
 		d.HasDecoder == nil ||
 		d.DecoderFingerprint == nil ||
 		d.RootMutationPolicy == nil ||
-		d.AutoAdoptionIDProvider == nil ||
-		d.GetManagedSourceState == nil ||
-		d.PublishManagedPackage == nil ||
-		d.PublishProtectedManagedPackage == nil ||
-		d.RemoveManagedPackage == nil {
+		d.AutoAdoptionIDProvider == nil {
 		return fmt.Errorf(
 			"%w: skill bundle Artifact Store dependencies are incomplete",
 			basespec.ErrInvalid,

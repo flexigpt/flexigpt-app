@@ -20,13 +20,14 @@ type Store struct {
 
 const (
 	initialSchemaVersion = 1
-	currentSchemaVersion = 2
+	currentSchemaVersion = 3
 )
 
 type schemaMigration func(context.Context, *sql.Tx) error
 
 var schemaMigrations = map[int]schemaMigration{
 	2: migrateSchemaV2,
+	3: migrateSchemaV3,
 }
 
 func Open(
