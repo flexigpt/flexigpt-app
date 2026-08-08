@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://schemas.flexigpt.app/builtin/skill-collection-v1.schema.json",
+	"$id": "https://raw.githubusercontent.com/flexigpt/flexigpt-app/refs/heads/main/internal/builtin/schema/skill-collection-v1.schema.json",
 	"title": "FlexiGPT Skill Bundle Collection",
 	"description": "Portable collection.json manifest for a Skill Bundle package.",
 	"type": "object",
