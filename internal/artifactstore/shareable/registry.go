@@ -3,15 +3,54 @@ package shareable
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sort"
+	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
+
+type HTTPURLLoader http.Client
+
+func (l *HTTPURLLoader) Load(url string) (any, error) {
+	client := (*http.Client)(l)
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request for %s: %w", url, err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("%s returned status code %d", url, resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	return jsonschema.UnmarshalJSON(resp.Body)
+}
+
+func newHTTPURLLoader(insecure bool) *HTTPURLLoader {
+	httpLoader := HTTPURLLoader(http.Client{
+		Timeout: 15 * time.Second,
+	})
+	if insecure {
+		httpLoader.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
+		}
+	}
+	return &httpLoader
+}
 
 type registeredCodec struct {
 	codec  Codec
@@ -171,7 +210,13 @@ func compilePublishedJSONSchema(raw []byte) (*jsonschema.Schema, error) {
 		)
 	}
 
+	loader := jsonschema.SchemeURLLoader{
+		"file":  jsonschema.FileLoader{},
+		"https": newHTTPURLLoader(false),
+	}
+
 	compiler := jsonschema.NewCompiler()
+	compiler.UseLoader(loader)
 	if err := compiler.AddResource(value.ID, bytes.NewReader(raw)); err != nil {
 		return nil, fmt.Errorf(
 			"%w: register published JSON Schema %q: %w",
