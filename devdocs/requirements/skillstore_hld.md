@@ -1,197 +1,162 @@
 # Skills on Artifact Store High-Level Design
 
-## Document role
+## Document status and authority
 
-This document defines Skill management on Artifact Store.
+This document defines the current authoritative design baseline for Skills on
+Artifact Store. It is intended to supersede the prior Skill HLD and its
+current-scope replacement after review and adoption.
 
-It is authoritative for:
+This HLD defines Skill-specific architecture, ownership, invariants,
+requirements, and current product boundaries. Generic Root, Source,
+Collection, Catalog, Artifact, Definition, managed-publication, and protected
+topology mechanics are defined by the Artifact Store HLD.
 
-- Skill Bundle and Skill representation.
-- Portable Skill semantics.
-- Managed, external, imported, Workspace, and built-in Skill behavior.
-- Standalone Skill meaning.
-- Skill Bundle import and export.
-- Runtime projection into Agent Skills.
-- Skill selection identity.
-- Migration from the previous standalone Skill Store.
+Authority is ordered as follows:
 
-Generic Artifact Store behavior is defined in `artifactstore_hld.md`.
+- This HLD governs intended Skill architecture, product decisions, and change
+  gates.
+- Implemented code, embedded schemas, and public API contracts are the source
+  of truth for current behavior.
+- A conflict between this HLD and implemented behavior must be resolved
+  explicitly. It must not become an undocumented compatibility rule.
 
-The final section records current implementation mapping and next steps.
+This document does not commit the product to future Skill transfer work.
+Standalone transfer, Bundle transfer, archives, closures, and import provenance
+remain out of scope until a later HLD amendment is approved.
 
-## Current delivery scope
+## Purpose
 
-The active Skill backend is Artifact Store-backed and includes managed and
-external Skill lifecycle, built-in hydration, runtime projection, assistant
-preset integration, conversation integration, inference integration, and
-frontend bindings.
+Skills are source-backed domain content whose semantic authority is `SKILL.md`.
 
-Standalone and Bundle import/export, generic Skill content closure and archive
-support, and direct Skill move are deferred. Test work is handled separately
-and is not listed as an outstanding architecture task here.
+The Skill domain provides:
+
+- Installed Skill Bundles as local `skill.bundle` Collections.
+- Installed Skills as local `agent.skill` Artifacts.
+- Shared Skill decoding for installed Bundles and Workspaces.
+- Linked external and library Skills without package copying.
+- Managed application-authored Skill packages.
+- Protected built-in Skill package hydration.
+- Artifact-backed runtime projection into Agent Skills.
+- Artifact-backed durable Skill selection and runtime allow-lists.
+
+The Skill domain does not own Root administration, generic metadata
+persistence, generic Source safety, native Source configuration, generic
+package transfer, or Agent Skills runtime sessions and execution policy.
+
+## Current scope
+
+Skills currently support four local ownership modes.
+
+| Mode           | Native-byte authority              | Native package location     | Artifact Store copy behavior  |
+| -------------- | ---------------------------------- | --------------------------- | ----------------------------- |
+| External Skill | User-selected filesystem Source    | Original external directory | No package-tree copy          |
+| Library Skill  | Same-Root linked filesystem Source | Original library directory  | No package-tree copy          |
+| Managed Skill  | Application-authored package       | Bundle-owned managed Source | Written by the application    |
+| Built-in Skill | Embedded application package       | Protected managed Source    | Hydrated by trusted installer |
+
+There is no imported Skill mode in the current delivery.
+
+### Explicit non-goals
+
+The following are intentionally unsupported:
+
+- Standalone Skill import or export.
+- Skill Bundle import or export.
+- Archive creation or extraction.
+- Generic Skill Content Closure generation.
+- Portable package provenance.
+- Imported Skill Attachment roles.
+- Source-independent offline copies of linked Skills.
+- Generic package CAS.
+- Cross-Root transfer.
+- Direct Skill or Artifact move between Bundles or Workspaces.
+- General rebinding of an existing Skill to another Source Binding.
+- Generic URI acquisition.
+
+`artifact.Service.Move` remains unsupported.
 
 ## Architectural statement
 
-A Skill is portable domain content whose native authority is `SKILL.md`.
-
-Locally, every Skill is represented as an `agent.skill` Artifact Record.
-
-An installed Skill belongs to a `skill.bundle` Collection.
-
-A Workspace Skill belongs to a `workspace.collection`.
-
-Both placements use the same portable Definition and runtime projection.
-
-A standalone Skill is independently importable and exportable. It is not collectionless in local persistence.
-
-Built-in Skills use the same portable Skill and Skill Bundle formats as user content. Static local built-in IDs and installation defaults remain in the app-owned built-in registry.
-
-## Domain mapping
-
-| Skill concept          | Artifact Store concept                           |
-| ---------------------- | ------------------------------------------------ |
-| Installed Skill Bundle | Local Collection of kind `skill.bundle`          |
-| Portable Skill Bundle  | Portable Collection Definition                   |
-| Installed Skill        | Local Artifact of kind `agent.skill`             |
-| Workspace Skill        | `agent.skill` Artifact owned by a Workspace      |
-| Standalone Skill       | Independently transferable `agent.skill` package |
-| Skill directory        | Native Source-backed content closure             |
-| `SKILL.md`             | Portable Skill semantic authority and entrypoint |
-| Skill selection        | `ArtifactRef` plus selection behavior            |
-| Runtime Skill          | Ephemeral Agent Skills `SkillDef`                |
-
-## Skill architecture
-
-```mermaid
-flowchart LR
-    API[Skill Bundle API] --> SERVICE[Skill Bundle Service]
-    SERVICE --> CORE[Artifact Store]
-    SERVICE --> DECODER[Shared agent.skill Decoder]
-    SERVICE --> EXPORTER[Skill Exporter and Closure Enumerator]
-    CORE --> CATALOG[Skill Bundle Catalog]
-    CATALOG --> ROUTER[Artifact Skill Router]
-    ROUTER --> RUNTIME[Agent Skills Runtime]
-    BUILTIN[Built-in Installer] --> SERVICE
-    WORKSPACE[Workspace Service] --> DECODER
-    WORKSPACE --> ROUTER
-```
-
-`skillartifact` owns common `agent.skill` portable decoding and validation.
-
-Both Skill Bundle and Workspace use the same decoder.
-
-The Skill Bundle service owns installed Skill policy. Workspace owns Workspace placement policy.
-
-## Skill Bundle model
-
-A Skill Bundle is:
+A Skill has one semantic authority:
 
 ```text
-CollectionKind = "skill.bundle"
+SKILL.md
 ```
 
-Its local reference is:
+The shared Agent Skill decoder parses `SKILL.md` and derives one immutable
+canonical `agent.skill` Definition. The Definition is a semantic projection,
+not a portable package archive or byte-for-byte replacement for a linked Skill
+directory.
 
-```text
-CollectionRef {
-  RootID
-  CollectionID
-}
-```
-
-The local Skill Bundle contains:
-
-- Local identity.
-- Common enablement.
-- Local display alias.
-- Source Mounts.
-- Local ordering and presentation preferences.
-- Artifact Records.
-- Catalog and diagnostics.
-- Import provenance.
-- Retirement state.
-
-The local Collection Record is not exported directly.
-
-## Portable Skill Bundle Definition
-
-A Portable Skill Bundle uses:
-
-```text
-CollectionKind = "skill.bundle"
-SchemaID = "skill.bundle.v1"
-SchemaVersion = "v1"
-```
-
-Conceptually:
-
-```json
-{
-  "kind": "skill.bundle",
-  "schema": "skill.bundle",
-  "schemaVersion": 1,
-  "namespace": "example",
-  "name": "writing-skills",
-  "version": "1.0.0",
-  "labels": {},
-  "body": {
-    "description": "Portable writing Skills"
-  },
-  "members": [
-    {
-      "key": "markdown-output",
-      "kind": "agent.skill",
-      "content": {
-        "locator": "skills/markdown-output/SKILL.md",
-        "base": "package"
-      },
-      "expectedDefinitionDigest": "sha256:...",
-      "expectedClosureDigest": "sha256:..."
-    }
-  ]
-}
-```
-
-The bundle owns:
-
-- Logical bundle namespace and name.
-- Logical version.
-- Portable display metadata.
-- Portable labels.
-- Ordered or unordered member relationships.
-- Package-relative member locators.
-- Expected member integrity.
-
-The bundle must not contain local Collection or Artifact IDs.
-
-A member `key` is stable within the bundle and is used by:
-
-- Import identity planning.
-- Built-in registry mapping.
-- Package diagnostics.
-- Member update reconciliation.
-
-A member key is not a local Artifact ID.
-
-### Current implemented portable profile
-
-The current codec uses `schema.SkillCollectionV1` and generic
-`schema.ContentRef` members. Built-in package `collection.json` files use
-this profile. Member integrity is the digest of raw `SKILL.md` bytes, not an
-expected derived Definition digest or a closure digest.
-
-Stable member keys, expected Definition digests, closure digests, and
-self-contained package profiles remain deferred transfer design.
-
-## Skill Artifact model
-
-A Skill is:
+An installed Skill is represented locally as:
 
 ```text
 ArtifactKind = "agent.skill"
 ```
 
-Its local durable reference is:
+An installed Skill Bundle is represented locally as:
+
+```text
+CollectionKind = "skill.bundle"
+```
+
+A Workspace-discovered Skill is also an `agent.skill` Artifact, but belongs to
+`workspace.collection` and remains governed by Workspace policy. Skill Bundle
+and Workspace share decoder and Definition semantics but do not share
+Collection ownership or lifecycle policy.
+
+## Goals
+
+The Skill domain must:
+
+- Treat `SKILL.md` as the semantic authority for every Skill.
+- Use one shared `agent.skill` decoder and Definition contract for Bundle and
+  Workspace discovery.
+- Keep local Skill identity, local settings, Source configuration, runtime
+  state, and native paths outside the Skill Definition.
+- Support linked external and library Skills without copying user-selected
+  package trees.
+- Support application-authored managed Skill creation, same-binding update,
+  retry, and deletion.
+- Support protected built-in package hydration with static application-owned
+  local IDs.
+- Preserve local Artifact identity and local settings across compatible source
+  updates.
+- Use `ArtifactRef` for durable Skill selections.
+- Project only current verified Skills into ephemeral runtime objects.
+- Fail closed on runtime Skill-name collisions.
+- Keep installed Skill Bundle ownership separate from Workspace Skill
+  ownership.
+- Keep the legacy standalone Skill Store inactive in normal application
+  composition.
+
+## Domain model
+
+| Skill concept            | Artifact Store representation                                          |
+| ------------------------ | ---------------------------------------------------------------------- |
+| Installed Skill Bundle   | Local `skill.bundle` Collection                                        |
+| Installed Skill          | Local `agent.skill` Artifact                                           |
+| Workspace Skill          | `agent.skill` Artifact in `workspace.collection`                       |
+| Durable Skill selection  | `ArtifactRef` plus local selection behavior                            |
+| Skill package entrypoint | `SKILL.md` at a Source-relative locator                                |
+| Runtime Skill            | Ephemeral Agent Skills runtime definition                              |
+| Built-in registration    | App-owned static Collection and Artifact IDs mapped to package members |
+
+### Skill Bundle
+
+A Skill Bundle is a local Collection. It contains local identity, display data,
+enablement, local Bundle data, Source Attachments, Catalog state, Artifacts,
+Suppressions, and retirement state.
+
+Bundle local data includes logical Bundle metadata and, where applicable, the
+ID of a Bundle-owned managed Source. It is local state and is not a portable
+Bundle manifest.
+
+A local Bundle is never exported in the current delivery.
+
+### Skill Artifact
+
+A Skill Artifact has a durable reference:
 
 ```text
 ArtifactRef {
@@ -200,65 +165,20 @@ ArtifactRef {
 }
 ```
 
-Its current placement is:
+Its local record includes Collection membership, Source Binding, current
+Definition digest when available, adoption mode, enablement, local managed
+operation data where applicable, diagnostics, revision, and timestamps.
 
-```text
-ArtifactAddress {
-  RootID
-  CollectionID
-  ArtifactID
-  Kind = "agent.skill"
-}
-```
+Runtime path, runtime `SkillDef`, package directory, runtime registration,
+session state, and Source configuration are never durable Skill identity.
 
-The Artifact Record stores:
+### Package convention
 
-- Local identity.
-- Current Collection membership.
-- Source Binding.
-- Current Definition digest.
-- Enablement.
-- Local display alias.
-- Local user tags.
-- Source-derived state.
-- Diagnostics.
-- Revision.
+The current decoder recognizes a `SKILL.md` file only when discovery explicitly
+requests the shared Skill decoder. `SKILL.md` must belong to a containing Skill
+directory. The expected Skill name is the parent directory name.
 
-It does not store a runtime path as identity.
-
-## Portable Skill Definition
-
-The canonical `agent.skill` Definition is derived from `SKILL.md`.
-
-It contains portable semantics such as:
-
-- Logical name.
-- Display name.
-- Description.
-- Arguments.
-- Insert behavior.
-- Source or author labels.
-- Markdown instructions.
-- Domain-approved frontmatter.
-
-It must not contain:
-
-- Root, Source, Collection, or Artifact IDs.
-- Local enablement.
-- Local user tags.
-- Absolute paths.
-- Runtime registrations.
-- Runtime sessions.
-- Credential values.
-- Local diagnostics.
-
-Parser warnings belong to local Observations and diagnostics.
-
-The exact `SKILL.md` byte digest belongs to the source Observation and package integrity model.
-
-## Skill package closure
-
-A Skill is normally a multi-file package.
+A normal Skill package may contain:
 
 ```text
 <skill-name>/
@@ -267,1200 +187,406 @@ A Skill is normally a multi-file package.
   scripts/
 ```
 
-The Skill Content Closure includes:
+Resources and scripts are supported as native package files for linked,
+managed, and built-in runtime behavior. They are not currently modeled as a
+generic portable closure and cannot be transferred through a generic export or
+import facility.
 
-- `SKILL.md`.
-- Domain-approved resource files.
-- Domain-approved scripts.
-- Required package metadata.
+## Source Attachment roles
 
-It excludes:
+A `skill.bundle` supports exactly these local Attachment roles.
 
-- Files outside the Skill package root.
-- Local app metadata.
-- Source configuration.
-- Runtime indexes.
-- Generated session state.
-- Secret material injected by the app.
+| Role       | Meaning                                          | Current source constraint                                                              |
+| ---------- | ------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `managed`  | Bundle-owned application-authored package Source | One managed attachment at most; requires `managed-directory`                           |
+| `builtin`  | Protected application-owned package Source       | One built-in attachment at most; requires protected `managed-directory` installer flow |
+| `external` | User-selected filesystem Skill Source            | Requires `fs-directory`                                                                |
+| `library`  | Reusable same-Root filesystem Skill Source       | Requires `fs-directory`                                                                |
 
-The closure enumerator defines:
+`imported` is not a supported role.
 
-- Package root.
-- Entry point.
-- Included file roles.
-- File digests.
-- Closure digest.
-- Portable executable intent where supported.
+The `managed` role cannot be attached arbitrarily. It is provisioned as the
+Bundle-owned managed Source during Bundle creation. The `builtin` role is
+reserved for trusted protected-topology installation. Ordinary generic Bundle
+attachment APIs may attach only eligible external or library Sources.
 
-Runtime execution permission remains local policy even if a script is included portably.
+Attachment roles, discovery roots, and expected member digests are local
+Bundle policy. They are not portable Skill metadata.
 
-## Portable authority and local projection
+## Skill Definition and source authority
 
-Portable metadata has one authority.
+The canonical `agent.skill` Definition contains semantic fields derived from
+`SKILL.md`, including logical name, display name, description, arguments,
+insert behavior, tags, Markdown instructions, and domain-approved frontmatter
+projection.
 
-- Skill semantic metadata is owned by `SKILL.md`.
-- Bundle semantic metadata is owned by the Portable Skill Bundle Definition.
-- The built-in registry does not duplicate portable metadata.
-- Any retained app seed descriptor may index package resources, but it must not
-  duplicate portable Skill names, descriptions, frontmatter, instructions, or
-  member integrity metadata.
-- Local list views may cache portable metadata, but the cache is rebuildable and not export authority.
-- Local display aliases and user tags remain separate.
-- No `MapStore` path, bundle key, overlay key, managed storage layout, or source
-  location is durable Skill identity.
+The Definition must not contain:
 
-If the bundle manifest repeats a Skill logical name for indexing, import must verify it matches the decoded `SKILL.md` Definition.
+- Root, Source, Collection, or Artifact IDs.
+- Local enablement or aliases.
+- Local user tags.
+- Absolute paths or package layout paths.
+- Runtime registrations or session state.
+- Credential values.
+- Local diagnostics.
 
-## Skill placement
+The exact raw `SKILL.md` byte digest belongs to the Catalog Observation and
+runtime verification path. Resources and scripts remain native Source content.
 
-### Installed Skill
+For linked Skills, Artifact Store may retain a semantic Definition projection,
+including parsed Markdown semantics, but does not retain a full native Skill
+package as an offline fallback.
 
-An installed Skill belongs to a `skill.bundle`.
+## Current Skill Collection document profile
 
-It is managed through the Skill Bundle feature API.
-
-### Workspace Skill
-
-A Workspace Skill belongs to a `workspace.collection`.
-
-It is managed through Workspace APIs.
-
-It does not appear in installed Skill Bundle management.
-
-### Standalone Skill
-
-Standalone means:
-
-- Independently importable.
-- Independently exportable.
-- Not dependent on exporting its containing bundle.
-
-A standalone Skill still requires a destination Collection after import.
-
-The destination may be:
-
-- An explicitly selected Skill Bundle.
-- A local personal or default Skill Bundle.
-- A Workspace, through Workspace import policy.
-
-The default Skill Bundle mapping is local app state. Direct Skill movement and
-the import/export relocation fallback are deferred. The current Artifact Store
-move operation returns `basespec.ErrUnsupported`.
-
-## Skill Source Mount roles
-
-A `skill.bundle` supports:
-
-| Role       | Meaning                                               |
-| ---------- | ----------------------------------------------------- |
-| `managed`  | Application-authored Skill packages                   |
-| `builtin`  | App-installed portable packages in the protected Root |
-| `external` | User-selected filesystem packages                     |
-| `imported` | Locally imported package content                      |
-| `library`  | Reusable same-Root Skill content                      |
-
-Artifact Store owns Source and Mount mechanics.
-
-Skill Bundle owns:
-
-- Allowed roles.
-- Discovery scope.
-- Adoption policy.
-- Package layout expectations.
-- Collision policy.
-- Typed detach and cleanup behavior.
-
-## Create Skill Bundle workflow
-
-The caller supplies:
-
-- Root.
-- Collection ID.
-- Local display defaults.
-- Optional managed Source or existing Source Mount.
-
-Skill Bundle service:
-
-- Validates the Root is allowed.
-- Creates `skill.bundle`.
-- Creates or attaches the selected Source.
-- Stores local bundle settings.
-- Stores optional local portable-definition digest provenance when supplied.
-- Does not publish a portable bundle manifest through a public transfer API.
-- Returns `CollectionRef`.
-
-Ordinary callers cannot create bundles in the protected Root.
-
-## Managed Skill creation workflow
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Skills as Skill Bundle Service
-    participant Core as Artifact Store
-    participant Source as Managed Source
-    participant Decoder as agent.skill Decoder
-    participant DB as SQLite
-
-    Client->>Skills: Create Skill with ArtifactID and package
-    Skills->>Decoder: Serialize and validate SKILL.md
-    Skills->>Source: Stage complete Skill package
-    Source-->>Skills: Package digest
-    Skills->>Core: Pin expected Source Binding
-    Skills->>Source: Publish package with expected generation
-    Skills->>Core: Refresh Skill Bundle
-    Core->>Decoder: Decode published SKILL.md
-    Core->>DB: Publish catalog and reconcile Artifact
-    Skills->>Core: Resolve expected Artifact
-    Core-->>Client: ArtifactAddress
-```
-
-The workflow:
-
-- Uses caller-supplied `ArtifactID` as create replay identity.
-- Uses package digest as immutable package-content intent.
-- Uses Source revision and generation as request-time concurrency tokens.
-- Keeps the internal managed Source layout private.
-- Validates through the common `agent.skill` decoder.
-- Returns an Artifact only after discovery confirms published content.
-
-An internal layout may include local IDs, but export rewrites content into a portable layout.
-
-## Managed Skill update workflow
-
-Managed Skill update:
-
-- Resolves the existing Artifact and Source Binding.
-- Verifies expected Artifact and Source revisions.
-- Serializes and validates replacement package content.
-- Stages and publishes the replacement at the existing stable binding where possible.
-- Refreshes the owning Skill Bundle.
-- Reconciles the existing Artifact to the new Definition.
-- Preserves local enablement, alias, and user tags.
-- Returns the new Artifact revision and Definition digest.
-
-A package path change requires explicit trusted rebind behavior or create-copy-remove semantics.
-
-## Managed Skill deletion workflow
-
-Deletion:
-
-- Resolves the Artifact through Skill Bundle ownership.
-- Verifies expected revisions.
-- Suppresses or otherwise prevents automatic recreation.
-- Removes managed package content from the Source.
-- Advances Source generation.
-- Refreshes or marks the catalog stale.
-- Purges or unadopts local Artifact metadata according to requested behavior.
-- Reports retry-required state if source deletion completed but metadata cleanup failed.
-
-Generic public Artifact purge is not used directly.
-
-## External Skill workflow
-
-The caller:
-
-- Creates or selects a filesystem Source in the same Root.
-- Selects a target Skill Bundle.
-- Supplies a relative Skill entrypoint or discovery root.
-
-Skill Bundle service:
-
-- Mounts the Source using role `external`.
-- Validates mount-local discovery scope.
-- Refreshes the bundle.
-- Finds or pins the expected `SKILL.md` Source Binding.
-- Adopts the valid Observation.
-- Returns `ArtifactAddress`.
-
-The absolute filesystem path remains private Source configuration.
-
-## Standalone Skill import workflow
-
-The caller supplies:
-
-- Portable directory, archive, or supported native input.
-- Explicit destination Skill Bundle or request to use the personal bundle.
-- Import options.
-
-The workflow:
-
-- Detects and validates `agent.skill`.
-- Validates all package-relative paths and file digests.
-- Parses `SKILL.md`.
-- Enumerates and validates the complete closure.
-- Resolves or creates the destination bundle.
-- Allocates a new local Artifact ID.
-- Stages content in an imported or managed Source.
-- Mounts the Source if needed.
-- Publishes content.
-- Refreshes the destination bundle.
-- Adopts the exact imported member.
-- Records package provenance.
-- Returns `ArtifactAddress`.
-
-The package does not supply the local Artifact ID.
-
-## Skill Bundle import workflow
-
-The workflow:
-
-- Validates `skill.bundle.v1`.
-- Validates every required member and closure.
-- Rejects duplicate member keys.
-- Rejects path collisions and closure escape.
-- Allocates local Source, Collection, and Artifact IDs.
-- Stages the complete package.
-- Creates the local `skill.bundle`.
-- Mounts the imported Source.
-- Publishes the package.
-- Refreshes the bundle.
-- Adopts members using the member-key identity plan.
-- Records bundle and member provenance.
-
-The initial release fails the complete import when a required member is invalid.
-
-## Standalone Skill export workflow
-
-The workflow:
-
-- Resolves the Artifact and owning Collection.
-- Verifies it is an `agent.skill`.
-- Verifies current catalog and Source state.
-- Loads the portable Definition.
-- Captures `SKILL.md` and the complete closure.
-- Verifies exact content digests.
-- Emits a native directory or deterministic archive.
-- Excludes local metadata.
-
-The exported Skill is independent of its local containing bundle.
-
-## Skill Bundle export workflow
-
-The workflow:
-
-- Resolves the local `skill.bundle`.
-- Selects members using explicit export options.
-- Builds a Portable Skill Bundle Definition.
-- Assigns stable package member keys.
-- Exports each selected Skill closure.
-- Writes package-relative member locators.
-- Computes Definition, closure, Collection, and package digests.
-- Reports unavailable, denied, invalid, or omitted Skills.
-- Emits linked or self-contained output.
-
-Local bundle enablement and presentation ordering are not copied unless the domain explicitly defines a distinct portable equivalent.
-
-## Built-in Skill workflow
-
-Built-in Skills follow the protected topology contract in `artifactstore_hld.md`.
-
-The app-owned registry supplies:
-
-- Static Root, Source, Collection, and Artifact IDs.
-- Portable package references.
-- Artifact ID to member-key mappings.
-- Installation defaults.
-- Expected package digests.
-
-Portable Skill Bundle packages supply:
-
-- Logical bundle identity.
-- Portable metadata.
-- Member keys.
-- Member locators.
-- Member integrity.
-- `SKILL.md` and native files.
-
-Startup installation:
-
-- Validates registry and packages.
-- Ensures the protected Root and Source.
-- Publishes package content.
-- Ensures canonical Skill Bundle Collections.
-- Ensures static Artifacts from member mappings.
-- Refreshes stale catalogs.
-- Preserves local preferences.
-- Validates every static UUIDv7 value, package directory, member key, and
-  expected package digest before mutation.
-- Rejects a non-registry active bundle that claims a declared built-in logical
-  bundle name.
-- Rejects undeclared active `agent.skill` Artifacts in canonical built-in
-  Skill Bundles.
-
-Ordinary managed Skill operations cannot modify built-in package content or topology.
-
-Built-in packages are hydrated into the protected managed Source because Agent
-Skills requires a trusted native filesystem package directory for normal
-resource and script behavior.
-
-One protected managed Source may contain multiple bundle package roots. Each
-canonical built-in Skill Bundle uses Mount-local discovery scope to select only
-its own package subtree.
-
-### Current built-in implementation
-
-The implemented built-in metadata is split by ownership:
-
-- `internal/builtin/artifact-builtin-registry.json` supplies the protected Root
-  and shared managed Source.
-- `internal/builtin/skills/skill-registry.json` supplies static Collection and
-  Artifact IDs, package payload locations, member entrypoints, and defaults.
-- Embedded `collection.json` files supply portable Collection semantics and
-  member references.
-
-`artifactbuiltin` hydrates `collection.json` payloads from embedded bytes,
-calculates member digests, publishes complete package directories, pins static
-Artifacts, and refreshes scoped catalogs. A persisted topology hydration
-fingerprint drives stale protected-topology replacement before installation.
-
-Protected Collection and Artifact enablement is installer-owned. There is no
-ordinary user-preference mutation path for built-in topology or package data.
-
-## Built-in semantic references
-
-Portable app references to built-in Skills use:
-
-```json
-{
-  "bundle": "core-instructions",
-  "skill": "markdown-output"
-}
-```
-
-The application resolves this reference through built-in metadata.
-
-A local assistant preset may store the resolved `ArtifactRef`.
-
-Export converts it back to a semantic reference or returns a portability error.
-
-## Skill runtime selection
-
-Persistent Skill selection uses:
+The current schema-backed Skill Collection document is:
 
 ```text
-SkillSelection {
-  Artifact
-  PreLoadAsActive
-  UseAsInstructions
-}
+kind:          skill.bundle
+schemaID:      skill.bundle.v1
+schemaVersion: v1
+file name:     collection.json
 ```
 
-`Artifact` is an `ArtifactRef`.
-
-No persistent Skill selection contains:
-
-- Bundle ID as runtime identity.
-- Skill slug as local identity.
-- Source path.
-- `SkillDef`.
-- Runtime provider registration ID.
-
-## Runtime resolution workflow
-
-```mermaid
-flowchart LR
-    REF[ArtifactRef] --> ARTIFACT[Resolve Artifact Record]
-    ARTIFACT --> OWNER[Resolve Owning Collection]
-    OWNER --> POLICY[Apply Skill Bundle or Workspace Policy]
-    POLICY --> CURRENT[Verify Current Catalog and Availability]
-    CURRENT --> DEFINITION[Validate agent.skill Definition]
-    DEFINITION --> SOURCE[Verify Source Generation and SKILL.md Digest]
-    SOURCE --> PATH[Resolve Trusted Package Directory]
-    PATH --> SKILLDEF[Create Ephemeral SkillDef]
-    SKILLDEF --> RUNTIME[Agent Skills Runtime]
-```
-
-Runtime resolution verifies:
-
-- Artifact and Collection enablement.
-- Current Collection membership.
-- Current catalog.
-- Current Definition digest.
-- Source generation or package closure.
-- Exact `SKILL.md` content from one confirmed snapshot immediately before
-  trusted native-path handoff.
-- Trusted local path capability when required.
-
-The Agent Skills runtime owns:
-
-- Provider registration.
-- Runtime Skill indexing.
-- Sessions.
-- Prompts.
-- Rendering.
-- Resource access.
-- Script execution.
-- Sandbox behavior.
-
-Artifact Store remains durable authority.
-
-Artifact-backed runtime defaults scripts to disabled. Application composition
-may explicitly enable scripts, while Agent Skills and `llmtools-go` retain
-execution and sandbox policy ownership.
-
-## Name collision policy
-
-Skill name collisions must never resolve through map order, path order, or registration order.
-
-The initial policy is fail-closed:
-
-- Equal-precedence same-name Skills are unavailable.
-- Diagnostics identify every colliding Artifact.
-- Explicit `ArtifactRef` still identifies the local record, but runtime registration may reject ambiguity where the upstream runtime requires unique names.
-- A future precedence policy must be explicit and explainable.
-
-## Consumer integration
-
-Backend consumers persist Artifact-based references.
-
-| Consumer         | Durable representation                   |
-| ---------------- | ---------------------------------------- |
-| Skill runtime    | `ArtifactRef`                            |
-| Assistant preset | Artifact-backed Skill selection          |
-| Conversation     | Enabled and active `ArtifactRef` lists   |
-| Inference        | Artifact-backed allow-list               |
-| Workspace        | Workspace-owned `ArtifactRef` selections |
-
-The Artifact router resolves current Collection ownership before choosing Skill Bundle or Workspace policy.
-
-No consumer persists runtime `SkillDef` or local Source paths.
-
-## Requirements
-
-| ID       | Requirement                                                                       |
-| -------- | --------------------------------------------------------------------------------- |
-| `SK-R01` | Represent installed Skill Bundles as `skill.bundle` Collections                   |
-| `SK-R02` | Represent all Skills as `agent.skill` Artifacts                                   |
-| `SK-R03` | Use `SKILL.md` as portable Skill authority                                        |
-| `SK-R04` | Share one `agent.skill` decoder between Skill Bundle and Workspace                |
-| `SK-R05` | Support managed Skill creation, update, and deletion                              |
-| `SK-R06` | Support external filesystem Skills through relative Source Bindings               |
-| `SK-R07` | Preserve local Skill metadata across refresh and update                           |
-| `SK-R08` | Use `ArtifactRef` for every durable Skill selection                               |
-| `SK-R09` | Project verified Artifacts into ephemeral Agent Skills runtime objects            |
-| `SK-R10` | Define a portable `skill.bundle.v1` format                                        |
-| `SK-R11` | Support independently importable and exportable standalone Skills                 |
-| `SK-R12` | Support complete Skill Bundle import and export                                   |
-| `SK-R13` | Preserve `SKILL.md`, resources, and scripts in Content Closures                   |
-| `SK-R14` | Install built-ins through portable packages and app-only static metadata          |
-| `SK-R15` | Keep built-in and portable metadata separate                                      |
-| `SK-R16` | Use fail-closed same-name collision behavior                                      |
-| `SK-R17` | Keep runtime synchronization derived from Artifact Store                          |
-| `SK-R18` | Keep installed and Workspace Skill ownership separate                             |
-| `SK-R19` | Keep local paths, enablement, user tags, and runtime state out of portable Skills |
-| `SK-R20` | Eliminate active dependence on the previous standalone Skill Store                |
+This document profile is currently used for embedded built-in package
+hydration and canonicalization. It is not a public Bundle import or export
+format.
+
+Current member behavior is intentionally limited:
+
+- Members use generic `ContentRef` forms.
+- Built-in hydration requires a package-relative `SKILL.md` locator.
+- Built-in member integrity is the exact raw `SKILL.md` digest.
+- There are no stable portable member keys.
+- There are no expected derived Definition digests.
+- There are no closure digests or package profiles.
+- There is no generic persisted Collection-document repository.
+- URI forms can be structurally valid but are not resolved in current Skill
+  workflows.
+
+Static built-in Artifact registration maps an app-owned Artifact ID to a
+package-relative `SKILL.md` locator. It does not map to a portable member key.
+
+## Base invariants
+
+- `SKILL.md` is the single semantic authority for a Skill.
+- Every current Skill is represented as an `agent.skill` Artifact.
+- Local Artifact identity never enters `SKILL.md` or `collection.json`.
+- Installed Bundle ownership and Workspace ownership remain separate.
+- Durable Skill selections use `ArtifactRef`, never Bundle slug, source path,
+  runtime `SkillDef`, or legacy Skill identity.
+- Linked external and library Skill package trees are not copied into managed
+  package storage.
+- Managed Skill packages are application-authored local content, not imports.
+- Built-ins are application-owned packages hydrated into protected managed
+  storage.
+- Local aliases, enablement, Bundle display state, managed-operation data, and
+  runtime state remain local.
+- Source reconciliation preserves local Artifact identity and local fields.
+- Runtime registration is derived from current Artifact Store state and is not
+  a second durable Skill catalog.
+- Same-name runtime ambiguity is fail-closed.
+- Scripts are disabled by default unless application composition explicitly
+  enables them.
+- No current flow imports, exports, archives, snapshots, or creates portable
+  closures for Skills.
+
+## Linked external and library Skill behavior
+
+An external or library Skill remains linked to its original filesystem Source.
+Artifact Store stores local Source configuration, Attachment policy, Catalog
+state, source generation, source-content digest, derived Definition, and local
+Artifact state. It does not store a copied package tree, archive, provenance
+record, or offline resource fallback.
+
+A direct Skill-directory selection must be normalized to the decoder contract.
+For a selected directory such as a Skill package directory, the Source root
+must normally be its parent directory and the Attachment discovery root must
+select the Skill directory. A Source rooted directly at the Skill directory
+does not satisfy the current decoder convention because `SKILL.md` may not be
+at the Source root.
+
+External and library Attachments participate in normal Bundle discovery and
+can be automatically adopted through feature-provided IDs. Suppression prevents
+a removed local Artifact from being automatically recreated on later refresh.
+
+If linked content changes or disappears:
+
+- Refresh reconciles Catalog and Artifact source-derived state.
+- Runtime resolution fails closed when source generation or raw `SKILL.md`
+  content no longer matches current Catalog state.
+- A retained Definition can support diagnostics and display but is not a
+  native package fallback.
+
+## Managed Skill lifecycle
+
+Managed Skills are application-authored packages written through a
+Bundle-owned `managed-directory` Source.
+
+### Creation and update
+
+A managed create or update operation:
+
+1. Accepts raw `SKILL.md`, a structured Skill document, or a complete package
+   file list.
+2. Validates and derives the shared `agent.skill` Definition.
+3. Establishes or validates a pinned Artifact with caller-supplied Artifact
+   identity and stable Source Binding.
+4. Records local package-operation intent.
+5. Stages and publishes the complete managed package directory.
+6. Advances managed Source state when content changed.
+7. Refreshes the owning Bundle.
+8. Resolves the pinned Artifact only after discovery confirms the expected
+   Definition.
+
+Managed update is same-binding replacement. General Artifact rebinding and
+move are unsupported.
+
+A managed package digest is a local authoring and replay intent over the
+managed package files. It is not a portable package digest, closure digest, or
+transport digest.
+
+Source publication and SQLite metadata are separate transactions. A failure
+can leave an operation pending; retry uses the same Artifact ID and package
+intent.
+
+### Deletion
 
-## Migration addendum
-
-### Migration intent
+Managed deletion is typed:
 
-Artifact Store replaces the previous standalone Skill Store as the active backend source of truth.
+1. Resolve the managed pinned Artifact and its Bundle-owned managed Source.
+2. Remove the managed package directory through the managed Source.
+3. Refresh the Bundle and confirm the Artifact becomes missing.
+4. Purge local Artifact metadata.
 
-The old Skill Store may remain temporarily as:
+External or library Skill removal normally unadopts or purges local metadata
+with suppression according to Bundle policy. It does not delete externally
+owned files. Built-in Skills are protected and cannot be deleted through
+ordinary Skill APIs.
 
-- Read-only reference code.
-- Offline migration input.
-- Test comparison input.
+## Runtime projection and selection
 
-It must not remain:
-
-- Active application state.
-- A runtime registration source.
-- A fallback resolver.
-- A dual-write target.
-- An identity provider for new Skills.
+Runtime resolution begins with `ArtifactRef` and resolves the owning Collection
+before choosing Bundle or Workspace policy.
 
-### Model mapping
+A runtime Skill projection verifies:
 
-| Previous Skill Store concept       | New model                                                |
-| ---------------------------------- | -------------------------------------------------------- |
-| Installed bundle                   | `skill.bundle` Collection                                |
-| Installed Skill                    | `agent.skill` Artifact                                   |
-| Bundle ID                          | No longer durable runtime identity                       |
-| Skill slug                         | Portable logical field only                              |
-| Skill location                     | Private Source configuration and relative Source Binding |
-| Installed or Workspace type branch | Derived from current Collection ownership                |
-| Skill runtime record               | Ephemeral projection from Artifact Store                 |
-| Bundle metadata file               | Portable Skill Bundle Definition where shareable         |
-| Local settings                     | Artifact Store and Skill-local SQLite state              |
+- Artifact and Collection ownership.
+- Collection and Artifact enablement.
+- Current Catalog and matching current Observation.
+- Current `agent.skill` Definition compatibility.
+- Source revision and source generation.
+- Exact raw `SKILL.md` source-content digest.
+- Trusted native local-path capability before package-path handoff.
 
-### Identity migration
+The result is an ephemeral Agent Skills runtime definition and native package
+location. Runtime registration, sessions, prompt rendering, resources, script
+execution, and sandboxing are owned by Agent Skills and its runtime provider.
 
-Legacy IDs are not reused automatically as Artifact Store IDs.
-
-An offline importer:
+### Collision policy
 
-- Allocates new Root, Source, Collection, and Artifact UUIDv7 values.
-- Creates new Source Bindings.
-- Creates new `ArtifactRef` selections.
-- Records legacy identifiers only as local migration provenance if needed.
-- Rewrites dependent assistant preset and conversation references.
+The Agent Skills runtime has global name semantics. Equal Skill names from
+more than one Artifact are fail-closed:
 
-Portable output never contains legacy IDs.
+- No candidate wins by map order, source order, path order, or registration
+  order.
+- Colliding names are removed from desired runtime registration.
+- Collection reconciliation reports conflict rather than choosing a winner.
+- Artifact-backed allow-lists reject ambiguous requested names.
 
-### Migration policy options
-
-Product must choose one policy before release.
+### Durable selections
 
-#### Reset policy
-
-- Start with clean Artifact Store state.
-- Reject old assistant preset and conversation schemas.
-- Leave old Skill Store files untouched.
-- Require users to reinstall or reimport Skills.
-- Remove reference code after verification.
-
-#### Offline importer policy
-
-- Run an explicit migration command outside normal startup.
-- Open the old Skill Store read-only.
-- Validate every legacy Skill package.
-- Create new Artifact Store identities.
-- Publish packages into managed or imported Sources.
-- Create Skill Bundle Collections and Skill Artifacts.
-- Rewrite dependent local references.
-- Produce a migration report.
-- Never write back to the legacy store.
-- Remove the importer from normal application composition.
-
-No automatic startup migration is permitted.
-
-### Offline migration workflow
-
-```mermaid
-sequenceDiagram
-    participant Tool as Offline Migration Tool
-    participant Legacy as Legacy Skill Store
-    participant Skills as Skill Bundle Service
-    participant Core as Artifact Store
-    participant Consumers as Preset and Conversation Stores
-
-    Tool->>Legacy: Open read-only
-    Legacy-->>Tool: Bundles, Skills, local settings
-    Tool->>Tool: Validate packages and allocate new IDs
-    Tool->>Skills: Create bundles and import Skills
-    Skills->>Core: Publish, refresh, and adopt
-    Core-->>Tool: New ArtifactRefs
-    Tool->>Consumers: Rewrite dependent references
-    Tool-->>Tool: Emit migration report
-```
-
-The migration is complete only when:
-
-- Every migrated Skill resolves through Artifact Store.
-- Every dependent reference is rewritten or reported unresolved.
-- Runtime registers only Artifact-backed Skills.
-- Normal startup no longer opens the legacy store.
-- No dual write remains.
-
-### Legacy package removal
-
-The old package may be deleted after:
-
-- Artifact-backed installed Skill management reaches required product parity.
-- Managed create, update, delete, and recovery are verified.
-- Assistant presets, conversations, inference, and Workspace use `ArtifactRef`.
-- Runtime registration no longer imports legacy identity.
-- Reset or offline migration policy is complete.
-- Reference-only tests have been replaced.
-
-### Migration non-goals
-
-Migration does not:
-
-- Preserve legacy IDs as new Artifact IDs.
-- Preserve absolute paths in portable content.
-- Add a compatibility adapter to runtime.
-- Keep both stores active.
-- Run every application startup.
-- Introduce a permanent legacy identity branch.
-
-### Acceptance outcomes
-
-Skill management satisfies this HLD when:
-
-- Installed bundles are `skill.bundle` Collections.
-- Installed and Workspace Skills use the same `agent.skill` Definition.
-- Standalone Skills can be imported and exported independently.
-- Skill Bundles preserve complete member closures.
-- Built-ins use portable packages with separate app registry metadata.
-- All durable Skill selections use `ArtifactRef`.
-- Runtime receives only verified ephemeral Skill projections.
-- Local aliases, user tags, paths, and enablement never enter portable packages.
-- The old Skill Store is inactive and either removed or retained only for explicit offline use.
-
-## Skills Implementation Status and Next Steps
-
-This section records:
-
-- Current package ownership.
-- Implemented requirements.
-- Partial and missing behavior.
-- Legacy Skill Store status.
-- Code-level next steps.
-- Verification required before completion.
-
-### Current summary
-
-The active backend Skill lifecycle, protected built-in installation, runtime
-integration, and frontend integration are Artifact Store-backed.
-
-Present capabilities include:
-
-- `skill.bundle` Collections.
-- Shared `agent.skill` decoding.
-- Managed Skill creation, same-binding replacement/update, and deletion.
-- External filesystem Skills.
-- Artifact-backed runtime resolution.
-- Assistant preset, conversation, inference, Workspace, and frontend
-  integration.
-- Caller-supplied Artifact ID replay.
-- Protected built-in topology hydrated from embedded `collection.json` files.
-- Inactive reference-only legacy Skill Store.
-
-Standalone and Bundle transfer, generic content closure, archive handling, and
-direct move are deferred. They are not active delivery gaps for the current
-Artifact-backed Skill lifecycle.
-
-### Current implementation architecture
-
-| Responsibility                 | Current package or component                                                 |
-| ------------------------------ | ---------------------------------------------------------------------------- |
-| Installed Skill feature        | `skillbundle`                                                                |
-| Shared portable Skill decoding | `skillartifact`                                                              |
-| Agent Skills implementation    | `agentskills-go`                                                             |
-| Runtime tools and execution    | `llmtools-go` and Agent Skills runtime                                       |
-| Artifact routing               | `internal/skill/runtime.ArtifactRouter`                                      |
-| Built-in topology metadata     | `internal/builtin/artifact-builtin-registry.json`                            |
-| Built-in Skill registration    | `internal/builtin/skills/skill-registry.json` and embedded `collection.json` |
-| Built-in installer             | `internal/skill/artifactbuiltin`                                             |
-| Legacy Skill Store             | `internal/skillstore`, reference-only                                        |
-| Application composition        | `cmd/agentgo`                                                                |
-| Managed payload storage        | Artifact Store managed Source and `MapStore`                                 |
-| Portable Skill Bundle          | `skill.bundle.v1` linked manifest codec                                      |
-| Transfer service               | Not implemented                                                              |
-
-### Requirement mapping
-
-| Requirement                                | Status                     | Mapping                                                                                      |
-| ------------------------------------------ | -------------------------- | -------------------------------------------------------------------------------------------- |
-| `SK-R01` Skill Bundle Collection           | Present                    | `skill.bundle` uses Artifact Store Collection                                                |
-| `SK-R02` Skill Artifact                    | Present                    | Installed and Workspace Skills use `agent.skill`                                             |
-| `SK-R03` `SKILL.md` authority              | Present                    | Common parser and validator                                                                  |
-| `SK-R04` shared decoder                    | Present                    | `skillartifact` used by Skill Bundle and Workspace                                           |
-| `SK-R05` managed lifecycle                 | Present                    | Create, replacement, refresh, retry, and managed deletion are implemented                    |
-| `SK-R06` external Skills                   | Present                    | Filesystem Source and relative Source Binding                                                |
-| `SK-R07` local metadata preservation       | Present                    | Artifact local data survives refresh                                                         |
-| `SK-R08` ArtifactRef selections            | Present                    | Presets, conversations, inference, Workspace                                                 |
-| `SK-R09` runtime projection                | Present                    | Verified ephemeral `SkillDef`                                                                |
-| `SK-R10` portable bundle format            | Partial                    | Canonical `collection.json` codec exists; public package transfer is deferred                |
-| `SK-R11` standalone transfer               | Deferred                   | No importer or exporter in the current delivery                                              |
-| `SK-R12` bundle transfer                   | Deferred                   | No complete package workflow in the current delivery                                         |
-| `SK-R13` resources and scripts closure     | Deferred                   | No generic Skill closure builder in the current delivery                                     |
-| `SK-R14` built-in package installation     | Present                    | Protected topology hydrates embedded `collection.json` Skill packages through Artifact Store |
-| `SK-R15` metadata separation               | Present                    | App registry metadata and portable collection descriptors are fully separated                |
-| `SK-R16` same-name collision               | Present                    | Runtime merge and requested allow-lists fail closed on ambiguous names                       |
-| `SK-R17` derived runtime state             | Present                    | Demand-driven reconciliation from Artifact Store                                             |
-| `SK-R18` ownership separation              | Present                    | Installed and Workspace Skills remain separate                                               |
-| `SK-R19` portable exclusion of local state | Present in persisted model | Definitions and collection JSON omit local state; transfer verification is deferred          |
-| `SK-R20` legacy Store inactive             | Present                    | Reference-only package remains in source tree                                                |
-
-### Current managed Skill workflow
-
-Current behavior:
-
-```mermaid
-flowchart LR
-    REQUEST[Managed Skill Request] --> SERIALIZE[agentskills-go Serialization]
-    SERIALIZE --> VALIDATE[skillartifact Validation]
-    VALIDATE --> PIN[Pin Artifact Binding]
-    PIN --> PUBLISH[Managed Source Publication]
-    PUBLISH --> REFRESH[Skill Bundle Refresh]
-    REFRESH --> RESOLVE[Resolve Artifact]
-    RESOLVE --> RUNTIME[Artifact-backed Runtime]
-```
-
-The workflow uses:
-
-- Caller-supplied `ArtifactID`.
-- Package SHA-256 as immutable content intent.
-- Request-time Source revision and generation.
-- Shared decoder validation.
-- Managed Source staging and publication.
-- Refresh before final Artifact resolution.
-
-### Implemented behavior
-
-#### Skill Bundle Collection
-
-Current implementation provides:
-
-- Typed `skill.bundle` service.
-- Source Mount policy.
-- Collection catalog.
-- Artifact enablement.
-- Local Skill data.
-- External Source support.
-- Managed Source support.
-
-#### Managed Skills
-
-Current implementation provides:
-
-- Raw `SKILL.md` input.
-- Structured `SkillDocument` input.
-- Complete package input.
-- Managed package staging.
-- Pinning.
-- Publication.
-- Refresh.
-- Replay through caller-supplied Artifact ID.
-- Managed content cleanup before local purge.
-- Retry-required reporting for partial deletion.
-
-#### Shared Skill definition
-
-Current implementation provides:
-
-- `SKILL.md` parsing through `agentskills-go`.
-- Canonical `agent.skill` Definition.
-- Shared use by Workspace and Skill Bundle.
-- Definition validation before runtime.
-
-#### Runtime
-
-Current implementation provides:
-
-- Artifact router.
-- Current Collection ownership resolution.
-- Source generation verification.
-- Raw `SKILL.md` digest verification.
-- Native package path handoff.
-- Demand-driven registration.
-- Runtime version validation.
-- Fail-closed unavailable allow-list behavior.
-- Scripts disabled by default unless explicitly enabled.
-- Before reconciliation, runtime re-reads each process-local Collection
-  partition and removes unavailable partitions. Cached membership never decides
-  durable Artifact eligibility.
-
-#### Consumer migration
-
-Current implementation provides:
-
-- Assistant preset Artifact selections.
-- Conversation Artifact references.
-- Inference Artifact-backed allow-lists.
-- Workspace Artifact references.
-- No active use of legacy Bundle ID, Skill ID, slug, or location.
-
-#### Legacy Store
-
-Current implementation provides:
-
-- `internal/skillstore` remains in source only for reference or explicit tooling.
-- `cmd/agentgo` does not initialize it as active state.
-- Runtime does not register legacy Skills.
-- New writes do not target it.
-- Older schemas are rejected or reset rather than silently adapted.
-
-### Known gaps
-
-#### Pending: schema-backed shareable Skill documents
-
-Add canonical JSON schema documents and associated Go schema types/codecs under
-`internal/builtin/schema`. Artifact Store must use those schemas to
-canonicalize, validate, store, and retrieve shareable Skill and Collection
-documents uniformly.
-
-This migration must absorb the current duplicated portable-document behavior in
-`internal/skill/artifactbuiltin/registry.go` and
-`internal/skill/bundle/portable.go`, together with any Skill Bundle code that
-owns shareable document semantics.
-
-After Artifact Store owns schema-backed storage and retrieval, remove the
-duplicated Skill-specific parsing and hydration code. This is pending and is
-separate from deferred import/export.
-
-#### Portable Skill closure
-
-There is no reusable Skill closure enumerator covering:
-
-- Package root.
-- `SKILL.md`.
-- Resource files.
-- Script files.
-- File roles.
-- Exact digests.
-- Closure digest.
-- Portable executable intent.
-
-Runtime Source verification is not a replacement for portable closure.
-
-This work is deferred with portable Skill and Bundle transfer.
-
-#### Standalone Skill transfer
-
-There is no service for:
-
-- Native directory export.
-- Deterministic Skill archive export.
-- Native Skill directory import.
-- Archive import.
-- Import into an explicit bundle.
-- Personal/default bundle resolution.
-- Import provenance.
-
-This work is deferred.
-
-#### Skill Bundle transfer
-
-The linked `skill.bundle.v1` manifest is not a self-contained package.
-
-Missing behavior includes:
-
-- Member-key identity planning.
-- Closure assembly.
-- Deterministic package layout.
-- Bundle package validation.
-- Bundle import.
-- Bundle export.
-- Omission diagnostics.
-
-This work is deferred with generic Content Closure and transfer orchestration.
-
-#### Built-in package convergence
-
-Built-in hydration is implemented for the current package model:
-
-- Embedded `collection.json` files are hydrated into canonical Collection Definitions.
-- Mount-local discovery scope selects each package directory in the shared protected Source.
-- Package files and member digests participate in desired-state hydration.
-- Static Artifacts are pinned and reconciled from scoped catalog observations.
-- Dynamic built-in bundle and Artifact contamination is rejected.
-
-#### Built-in package upgrades
-
-The current upgrade protocol compares the desired hydration fingerprint and
-performs a trusted protected-topology reset and reinstall when it changes.
-Protected enablement and topology are installer-owned.
-
-#### Installed-Skill management projection
-
-The old management experience included more than raw Artifact rows.
-
-A typed projection is still needed for:
-
-- Portable Skill metadata.
-- Local alias and user tags.
-- Availability and diagnostics.
-- Filtering.
-- Pagination.
-- Bundle context.
-- Current Definition and package state.
-
-#### Same-name policy
-
-The current runtime policy is fail-closed. Collection reconciliation omits
-colliding names, returns an explicit conflict, and requested artifact
-allow-lists reject ambiguous names before runtime flows use a candidate.
-
-#### Agent Skills session allow-list
-
-Application composition passes resolved Artifact-backed allow-lists into the
-Agent Skills session, prompt, list, and tool paths. Future upstream work must
-not introduce an application-side shadow Skill catalog.
-
-#### Local update semantics
-
-Managed Skill content-update behavior should be verified as a first-class workflow, including:
-
-- Stable Source Binding.
-- Expected Artifact revision.
-- Expected Source revision and generation.
-- Package digest intent.
-- Preservation of local data.
-- Runtime version invalidation.
-
-The current `CreateManagedSkill` replay/update path performs same-binding replacement, refresh, and runtime version invalidation.
-
-### Migration status
-
-### Current cutover behavior
-
-Current cutover behavior includes:
-
-- Artifact Store is active Skill authority.
-- New Skill selections use `ArtifactRef`.
-- Assistant presets use Artifact-backed selections.
-- Conversations use Artifact-backed references.
-- Inference uses Artifact-backed allow-lists.
-- Workspace uses Artifact-backed Skills.
-- Legacy runtime identity is inactive.
-- No dual write exists.
-- Clean `v1` application namespaces are used.
-- Assistant preset, conversation, inference, and Workspace integration use the Artifact-backed runtime path.
-- No normal application startup path initializes `internal/skillstore`.
-
-#### Remaining migration work
-
-- Remove `internal/skillstore` after final verification.
-- Replace any remaining legacy-only tests.
-- Complete installed-Skill management projection.
-- Complete upstream session allow-list behavior.
-- Confirm reset or offline migration policy for released legacy data.
-- Remove temporary migration diagnostics or adapters, if any exist.
-- Verify no normal package imports `internal/skillstore`.
-
-#### Offline importer status
-
-No offline importer is implemented.
-
-If product chooses reset policy, this is acceptable.
-
-Portable import is deferred. An offline importer must remain outside normal application startup.
-
-If product chooses migration, an explicit external command remains required.
-
-### Deferred transfer design
-
-#### Implement Skill Content Closure
-
-Add to `skillartifact` or a closely owned Skill portability package:
-
-- Package-root detection.
-- Entry-point validation.
-- Resource and script enumeration.
-- File-role classification.
-- Exact digest calculation.
-- Closure digest generation.
-- Portable path validation.
-- Source snapshot confirmation.
-
-Use Artifact Store generic closure types.
-
-Do not place archive mechanics in `skillartifact`.
-
-#### Implement standalone Skill exporter
-
-Add a typed Skill service operation that:
-
-- Resolves the Artifact through its owning feature.
-- Verifies current state.
-- Obtains the shared Skill closure.
-- Emits native directory or deterministic archive output.
-- Excludes local metadata.
-- Works for both installed and Workspace-owned Skills where policy allows.
-
-#### Implement standalone Skill importer
-
-Add support for:
-
-- Explicit target Skill Bundle.
-- Personal/default bundle resolution.
-- Managed or imported package Source.
-- Caller or application-generated Artifact ID.
-- Refresh and adoption.
-- Provenance.
-- Replay with the same ID and package digest.
-
-Workspace-targeted import remains owned by Workspace.
-
-#### Implement Skill Bundle export
-
-Extend `skill.bundle.v1` from linked manifest to complete package export:
-
-- Stable member keys.
-- Explicit member Definitions.
-- Skill closure references.
-- Relative package layout.
-- Bundle and package digests.
-- Omission diagnostics.
-- Deterministic output.
-
-#### Implement Skill Bundle import
-
-Add typed import that:
-
-- Validates complete bundle package.
-- Allocates Collection, Source, and Artifact IDs.
-- Publishes all package files.
-- Creates Source Mount.
-- Refreshes bundle.
-- Adopts members by member key.
-- Records provenance.
-- Fails atomically at the logical package level for invalid required members.
-
-#### Complete built-in package installer
-
-Update `artifactbuiltin` to:
-
-- Read portable Skill Bundle packages through the shared package reader.
-- Validate package and member digests.
-- Resolve registry member-key mappings.
-- Publish package trees under stable protected Source roots.
-- Scope each Collection mount to its package root.
-- Ensure static Artifacts.
-- Refresh only stale catalogs.
-- Preserve user-local enablement and aliases.
-- Reject undeclared structural records.
-
-#### Define built-in update behavior
-
-Add tests and code for:
-
-- Package content change at stable member locator.
-- Package version change.
-- New member.
-- Removed member.
-- Failed publication.
-- Failed refresh.
-- Preserved local preference.
-- Static Artifact ID stability.
-- Registry and package mismatch.
-
-#### Complete installed-Skill projection
-
-Add typed list and get projections containing:
-
-- ArtifactRef and address.
-- Bundle reference.
-- Portable name and description.
-- Local alias.
-- Source labels and local tags.
-- Enabled state.
-- Availability.
-- Diagnostics.
-- Current Definition digest.
-- Runtime eligibility.
-- Pagination and filters.
-
-#### Complete same-name and allow-list behavior
-
-Coordinate application and upstream runtime work so that:
-
-- Runtime sessions retain allowed Artifact-backed Skills.
-- `skills-load` cannot load a Skill outside the allow-list.
-- Same-name ambiguity is consistently fail-closed.
-- Diagnostic output identifies all candidates.
-- No application-side shadow catalog is introduced.
-
-#### Remove the legacy package
-
-After parity verification:
-
-- Remove normal imports of `internal/skillstore`.
-- Remove legacy registration code.
-- Remove obsolete schemas and identity types.
-- Retain only a separate migration tool if product chose offline migration.
-- Add a repository test that normal application packages cannot import the legacy package.
-
-### Recommended implementation order
-
-The following transfer order is deferred. The schema-backed shareable-document
-consolidation remains the active architecture follow-up.
-
-- Finalize Artifact Store Content Closure types.
-- Implement shared Skill closure.
-- Add standalone Skill export.
-- Add Skill Bundle export.
-- Complete built-in package loading using the same reader.
-- Add standalone Skill import.
-- Add Skill Bundle import.
-- Define built-in upgrade behavior.
-- Complete management projection.
-- Complete same-name and session allow-list behavior.
-- Decide reset versus offline migration.
-- Remove `internal/skillstore`.
-- Add end-to-end round-trip and migration tests.
-
-### Required verification
-
-Detailed verification remains deferred outside this HLD status update and is
-not an outstanding implementation task for the current delivery.
-
-#### Managed lifecycle
-
-Verify failures after:
-
-- Pin creation.
-- Package staging.
-- Package publication.
-- Source metadata acknowledgement.
-- Collection refresh.
-- Final Artifact read.
-- Managed package deletion.
-- Local purge.
-- A pending managed Skill rebases after another package advances the same
-  managed Source and does not remain permanently tied to its first Source
-  revision.
-
-Retries must converge using the same Artifact ID and package digest.
-
-#### Runtime
-
-Verify:
-
-- Runtime re-reads Artifact Store before registration.
-- Workspace reconciliation cannot remove installed Skill partitions.
-- Installed reconciliation cannot remove Workspace partitions.
-- Source generation and `SKILL.md` digest are confirmed.
-- Runtime version changes when Artifact revision or package content changes.
-- Scripts remain disabled unless explicitly permitted.
-- No runtime selection accepts legacy identity.
-- MapStore-managed package payloads are accessed only through MapStore.
-- Feature services do not add a second link, symlink, path, permission, or
-  durability policy above the selected Source adapter or MapStore boundary.
-
-#### Built-ins
-
-Verify:
-
-- Fresh startup creates one protected Root and Source.
-- User Root creation creates no built-ins.
-- Static registry IDs are used.
-- Portable packages contain no local IDs.
-- Registry metadata does not duplicate Skill semantics.
-- Ordinary managed operations cannot mutate protected content.
-- Local preference behavior matches product policy.
-- Current catalogs are not republished on every startup.
-- Retiring a built-in Collection does not cause startup convergence to recreate
-  it or fail because a historical bootstrap marker remains reserved.
-- A manually contaminated canonical built-in topology fails with an explicit offline-repair conflict.
-
-#### Transfer
-
-Verify:
-
-- Standalone Skill round-trip.
-- Bundle round-trip.
-- Resources and scripts preserved.
-- New local IDs after import.
-- No local path or enablement in output.
-- Invalid package closure rejected.
-- Deterministic package output.
-- Built-in package accepted by the same portable package reader.
-
-#### Migration
-
-Verify:
-
-- `cmd/agentgo` does not initialize legacy Skill Store.
-- Presets, conversations, inference, Workspace, and runtime do not call it.
-- No dual write exists.
-- Legacy schemas are not silently accepted.
-- Reset or offline migration policy is explicit.
-- Legacy package removal does not alter normal runtime behavior.
-
-### Completion criteria
-
-Skill migration and portability are complete when:
-
-- All active Skill state is Artifact Store-backed.
-- Standalone Skills and Skill Bundles can round-trip portably.
-- Built-ins use the same portable package format.
-- Runtime remains derived and Artifact-backed.
-- Installed-Skill management reaches required product parity.
-- Same-name and session allow-list behavior is fail-closed and complete.
-- The old Skill Store is removed or isolated exclusively in an offline migration tool.
+Assistant, conversation, inference, and Workspace integrations must persist
+Artifact-backed selections. A persistent Skill selection may include local
+selection behavior, such as active or instruction use, but must not persist a
+native path, runtime provider registration ID, legacy Skill ID, or Bundle slug
+as local identity.
+
+## Protected built-in Skills
+
+Built-ins are application-owned embedded packages. The application registry
+owns:
+
+- Protected Root and Source IDs.
+- Static Skill Bundle Collection IDs.
+- Static Skill Artifact IDs.
+- Embedded package locations.
+- Artifact-to-package-member locator registration.
+- Installation defaults.
+
+Embedded `collection.json` owns portable Collection semantics and member
+references. The registry does not duplicate Skill instructions, descriptions,
+frontmatter, or native package bytes.
+
+Trusted startup hydration:
+
+1. Validates static IDs, registry declarations, package layout, and Collection
+   documents.
+2. Calculates raw member `SKILL.md` digests from embedded package bytes.
+3. Canonicalizes the Collection document.
+4. Builds a desired hydration fingerprint covering topology, registrations,
+   canonical documents, member digests, and every package file.
+5. Resets stale protected topology before rebuilding it.
+6. Publishes complete package directories into the shared protected managed
+   Source.
+7. Ensures static Bundle topology and pinned static Artifacts.
+8. Refreshes scoped built-in Catalogs and commits hydration state on success.
+
+One shared protected Source can hold multiple built-in Bundle package roots.
+Each Bundle Attachment scopes discovery to its own root.
+
+A current hydration fingerprint avoids unnecessary package publication and
+Catalog replacement. A stale fingerprint causes protected topology reset and
+rebuild rather than portable migration. There is no ordinary user preference
+mutation path for protected Bundle or Artifact state.
+
+Undeclared active Bundles in the protected Root, or undeclared Artifacts in a
+canonical built-in Bundle, are explicit conflicts. They are not silently
+adopted, renamed, or migrated.
+
+### Built-in semantic references
+
+Portable application-level references to built-ins use semantic Bundle and
+Skill names rather than local Root IDs, Artifact IDs, paths, or registry
+metadata. Local application state may resolve such a reference to an
+`ArtifactRef`, but that local resolution is not portable identity.
+
+## Legacy Skill Store cutover
+
+Artifact Store is the active Skill authority.
+
+Current policy is reset and recreate, not migration:
+
+- `internal/skillstore` is reference-only code.
+- Normal application startup does not initialize it as active state.
+- No runtime fallback, dual write, or legacy-ID resolver exists.
+- No offline importer is implemented.
+- No automatic startup migration is supported.
+- New durable selections use Artifact-backed references.
+
+A released compatibility migration, if ever needed, requires a separate design
+and must remain outside normal application startup.
+
+## Security and API boundaries
+
+Skill Bundle APIs own:
+
+- Bundle lifecycle.
+- Attachment role validation.
+- Discovery roots and expected member-digest policy.
+- External, library, managed, and built-in policy.
+- Managed Skill create, update, and typed deletion.
+- Typed Skill adoption, pinning, suppression, and purge.
+- Runtime projection for `skill.bundle` ownership.
+
+Artifact administration owns Source lifecycle and managed package mechanics.
+It does not expose private Source configuration through normal Source summary
+APIs.
+
+Skill runtime handoff uses trusted Source capabilities only after current
+Artifact and Catalog validation. Skill discovery does not execute scripts or
+other discovered content. Script execution remains disabled unless explicitly
+configured at runtime composition.
+
+## Current-scope requirements
+
+| ID       | Requirement                                                                                                                                        | Status                              |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `SK-C01` | Represent installed Skill Bundles as local `skill.bundle` Collections                                                                              | Implemented                         |
+| `SK-C02` | Represent every current Skill as an `agent.skill` Artifact                                                                                         | Implemented                         |
+| `SK-C03` | Treat `SKILL.md` as Skill semantic authority and derive one shared Definition                                                                      | Implemented                         |
+| `SK-C04` | Use the shared Skill decoder for Bundle and Workspace discovery                                                                                    | Implemented                         |
+| `SK-C05` | Support linked external and library filesystem Skills without package-tree copying                                                                 | Implemented                         |
+| `SK-C06` | Support Bundle-owned managed Skill creation, same-binding update, retry, and deletion                                                              | Implemented                         |
+| `SK-C07` | Preserve local Skill state during refresh and compatible source update                                                                             | Implemented                         |
+| `SK-C08` | Use `ArtifactRef` for durable Skill selection                                                                                                      | Implemented                         |
+| `SK-C09` | Project current verified Skills into ephemeral Agent Skills runtime definitions                                                                    | Implemented                         |
+| `SK-C10` | Fail closed on same-name runtime collisions and ambiguous allow-lists                                                                              | Implemented                         |
+| `SK-C11` | Keep installed Bundle ownership separate from Workspace Skill ownership                                                                            | Implemented                         |
+| `SK-C12` | Hydrate built-in packages into protected managed storage with static local topology                                                                | Implemented                         |
+| `SK-C13` | Validate built-in `collection.json` through the versioned schema registry                                                                          | Implemented                         |
+| `SK-C14` | Keep local IDs, paths, enablement, Source configuration, runtime state, and local operation data out of Skill Definitions and Collection documents | Implemented                         |
+| `SK-C15` | Reject imported Skill Attachment roles and all current transfer behavior                                                                           | Intentional current-scope exclusion |
+| `SK-C16` | Keep the legacy standalone Skill Store inactive in normal application composition                                                                  | Implemented policy                  |
+| `SK-C17` | Keep scripts disabled by default unless application composition explicitly enables them                                                            | Implemented policy                  |
+| `SK-C18` | Do not support direct Artifact move or general Source Binding rebinding                                                                            | Intentional current-scope exclusion |
+
+## Current implementation status
+
+### Implemented
+
+- `skill.bundle` Collections and `agent.skill` Artifacts.
+- Shared `SKILL.md` parsing and Definition validation.
+- External and library filesystem Skill discovery.
+- Managed Skill creation from raw Markdown, structured documents, or complete
+  package files.
+- Same-binding managed replacement, refresh, retry signaling, and typed
+  deletion.
+- Artifact-backed runtime routing for Bundle and Workspace ownership.
+- Raw `SKILL.md` digest and Source-generation verification before native
+  package-path handoff.
+- Fail-closed runtime collision and allow-list behavior.
+- Protected built-in hydration, static IDs, scoped package roots, and stale
+  topology reset.
+- Artifact-backed consumer integration and inactive legacy Skill Store.
+
+### Intentionally absent
+
+- Standalone and Bundle transfer.
+- Archive and closure support.
+- Imported role and provenance.
+- Public generic Skill import/export APIs.
+- Legacy data migration.
+
+## Implementation map
+
+| Responsibility                                                               | High-level implementation area    |
+| ---------------------------------------------------------------------------- | --------------------------------- |
+| Shared Skill decoder, Definition projection, and native package verification | `internal/skill/artifact`         |
+| Skill Bundle lifecycle, role policy, discovery, and managed authoring        | `internal/skill/bundle`           |
+| Workspace-owned Skill projection                                             | `internal/skill/workspaceadapter` |
+| Artifact-backed runtime router, collision handling, sessions, and tools      | `internal/skill/runtime`          |
+| Built-in Skill registry hydration and installer policy                       | `internal/skill/artifactbuiltin`  |
+| Embedded built-in package resources and topology registry                    | `internal/builtin`                |
+| Skill Collection schema and canonical model                                  | `internal/builtin/schema`         |
+| Application composition and Wails-facing Skill boundary                      | `cmd/agentgo`                     |
+
+The implementation map is a reading guide. It does not replace the ownership
+and invariant rules in this HLD.
+
+## Change gates
+
+This HLD must be amended before adding:
+
+- Standalone Skill import or export.
+- Skill Bundle import or export.
+- Closure generation, package manifests, archive support, or package CAS.
+- Imported Attachment roles or portable provenance.
+- Offline fallback for linked Skills.
+- Cross-Root Skill transfer.
+- Direct Artifact move or general Source Binding rebinding.
+- A user preference mutation surface for protected built-ins.
+- Legacy migration or compatibility adapters.
+- Runtime name precedence in place of fail-closed collision behavior.
+
+A future transfer design must define package ownership, closure contents,
+identity allocation, materialization, provenance, safety policy, and runtime
+semantics before implementation begins.
+
+## Prior-requirement transition
+
+The prior Skill requirement family is superseded as follows when this document
+is adopted:
+
+| Prior requirement family  | Disposition                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `SK-R01` through `SK-R09` | Retained by `SK-C01` through `SK-C09`                                                                              |
+| `SK-R10`                  | Narrowed to current schema-backed built-in Collection document validation in `SK-C13`; it is not a transfer format |
+| `SK-R11` through `SK-R13` | Retired from current scope because transfer and closures are unsupported                                           |
+| `SK-R14` and `SK-R15`     | Retained by `SK-C12` and `SK-C13`                                                                                  |
+| `SK-R16`                  | Retained by `SK-C10`                                                                                               |
+| `SK-R17` through `SK-R19` | Retained by `SK-C07`, `SK-C09`, `SK-C11`, and `SK-C14`                                                             |
+| `SK-R20`                  | Retained by `SK-C16`                                                                                               |
+
+The old IDs must not be reused with changed meanings. No prior transfer plan or
+legacy migration option remains an active requirement under this HLD.
