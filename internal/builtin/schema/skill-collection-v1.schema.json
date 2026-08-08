@@ -81,11 +81,6 @@
 					"minLength": 1,
 					"maxLength": 16384
 				},
-				"subresourceLocator": {
-					"type": "string",
-					"minLength": 1,
-					"maxLength": 4096
-				},
 				"digest": {
 					"type": "string",
 					"pattern": "^sha256:[a-f0-9]{64}$"
@@ -108,19 +103,6 @@
 					"required": ["uri"],
 					"not": {
 						"required": ["locator"]
-					}
-				},
-				{
-					"required": ["subresourceLocator"],
-					"not": {
-						"anyOf": [
-							{
-								"required": ["locator"]
-							},
-							{
-								"required": ["uri"]
-							}
-						]
 					}
 				}
 			]

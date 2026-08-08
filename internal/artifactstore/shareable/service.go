@@ -42,6 +42,20 @@ func NewService(
 	}, nil
 }
 
+// Canonicalize validates a shareable input document through the registered
+// schema codec and returns a canonical document with a calculated digest.
+//
+// It does not create a local binding or persist content.
+func (s *Service) Canonicalize(
+	ctx context.Context,
+	raw []byte,
+) (ParsedDocument, error) {
+	if err := s.check(ctx); err != nil {
+		return ParsedDocument{}, err
+	}
+	return s.registry.Canonicalize(ctx, raw)
+}
+
 func (s *Service) StoreCollection(
 	ctx context.Context,
 	ref collection.CollectionRef,

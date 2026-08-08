@@ -289,7 +289,7 @@ It must not contain:
 ### Current descriptor profile
 
 `.flexigpt/workspace.json` is currently parsed as
-`definition.CollectionDefinition` with schema ID `workspace.collection.v1` and
+`schema.SkillCollectionV1` with schema ID `workspace.collection.v1` and
 schema version `v1`. Its body contains Workspace discovery preferences.
 Current descriptor members support only relative locators and optional exact
 content digests from the primary Source.

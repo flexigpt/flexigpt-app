@@ -175,8 +175,8 @@ A member key is not a local Artifact ID.
 
 ### Current implemented portable profile
 
-The current codec uses `definition.CollectionDefinition` and generic
-`definition.ContentRef` members. Built-in package `collection.json` files use
+The current codec uses `schema.SkillCollectionV1` and generic
+`schema.ContentRef` members. Built-in package `collection.json` files use
 this profile. Member integrity is the digest of raw `SKILL.md` bytes, not an
 expected derived Definition digest or a closure digest.
 

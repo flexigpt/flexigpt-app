@@ -424,7 +424,7 @@ The initial release may support embedded and relative members while rejecting ex
 #### Current implemented Collection envelope
 
 The implemented generic portable Collection envelope is
-`definition.CollectionDefinition`:
+`schema.SkillCollectionV1`:
 
 ```text
 CollectionDefinition {

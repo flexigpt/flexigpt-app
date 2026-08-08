@@ -3,55 +3,15 @@ package shareable
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"sort"
-	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
-
-type HTTPURLLoader http.Client
-
-func (l *HTTPURLLoader) Load(url string) (any, error) {
-	client := (*http.Client)(l)
-
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request for %s: %w", url, err)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		_ = resp.Body.Close()
-		return nil, fmt.Errorf("%s returned status code %d", url, resp.StatusCode)
-	}
-	defer resp.Body.Close()
-
-	return jsonschema.UnmarshalJSON(resp.Body)
-}
-
-func newHTTPURLLoader(insecure bool) *HTTPURLLoader {
-	httpLoader := HTTPURLLoader(http.Client{
-		Timeout: 15 * time.Second,
-	})
-	if insecure {
-		httpLoader.Transport = &http.Transport{
-			//nolint:gosec // InsecureSkipVerify.
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-	}
-	return &httpLoader
-}
 
 type registeredCodec struct {
 	codec  Codec
@@ -186,10 +146,69 @@ func (r *Registry) Canonicalize(
 			basespec.ErrInvalid,
 		)
 	}
-	if err := value.Validate(); err != nil {
+	if err := validateJSONSchemaInstance(registered.schema, value.Raw); err != nil {
+		return ParsedDocument{}, err
+	}
+	if err := validateCodecOutput(key, value); err != nil {
 		return ParsedDocument{}, err
 	}
 	return value.Clone(), nil
+}
+
+func validateCodecOutput(
+	expected SchemaKey,
+	value ParsedDocument,
+) error {
+	if err := value.Validate(); err != nil {
+		return err
+	}
+	if value.Key != expected {
+		return fmt.Errorf(
+			"%w: shareable codec returned another schema key",
+			basespec.ErrInvalid,
+		)
+	}
+
+	canonical, err := jsonutil.CanonicalizeObject(
+		value.Raw,
+		basespec.MaxDefinitionBytes,
+	)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(canonical, value.Raw) {
+		return fmt.Errorf(
+			"%w: shareable codec returned non-canonical JSON",
+			basespec.ErrInvalid,
+		)
+	}
+
+	var header struct {
+		Kind          basespec.CollectionKind `json:"kind"`
+		SchemaID      basespec.SchemaID       `json:"schemaID"`
+		SchemaVersion string                  `json:"schemaVersion"`
+		Digest        string                  `json:"digest"`
+	}
+	if err := json.Unmarshal(canonical, &header); err != nil {
+		return fmt.Errorf(
+			"%w: decode canonical shareable document header: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	actual := SchemaKey{
+		Entity:        EntityCollection,
+		Kind:          header.Kind,
+		SchemaID:      header.SchemaID,
+		SchemaVersion: header.SchemaVersion,
+	}
+	if actual != expected || header.Digest != string(value.Digest) {
+		return fmt.Errorf(
+			"%w: shareable codec output does not match its metadata",
+			basespec.ErrDigestMismatch,
+		)
+	}
+	return nil
 }
 
 func compilePublishedJSONSchema(raw []byte) (*jsonschema.Schema, error) {
@@ -211,13 +230,7 @@ func compilePublishedJSONSchema(raw []byte) (*jsonschema.Schema, error) {
 		)
 	}
 
-	loader := jsonschema.SchemeURLLoader{
-		"file":  jsonschema.FileLoader{},
-		"https": newHTTPURLLoader(false),
-	}
-
 	compiler := jsonschema.NewCompiler()
-	compiler.UseLoader(loader)
 	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
 	if err != nil {
 		return nil, err

@@ -557,7 +557,17 @@ func (s *Service) requireMutable(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return err
+	}
 	if allowProtected {
+		if s.dependencies.Policy == nil ||
+			!s.dependencies.Policy.IsProtectedRoot(rootID) {
+			return fmt.Errorf(
+				"%w: managed protected operation requires a protected root",
+				basespec.ErrProtected,
+			)
+		}
 		return protection.RequirePrivilegedInstaller(ctx)
 	}
 	return protection.RequireMutableRoot(ctx, s.dependencies.Policy, rootID)

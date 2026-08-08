@@ -1,19 +1,13 @@
 package sqlite
 
-// schema is the base Artifact Store metadata schema installed at migration
-// version one. Forward changes are coordinated by the migration ledger in
-// store.go rather than by implicit schema inspection.
+// schema is the complete Artifact Store metadata schema for the unreleased
+// v1 format. There are intentionally no historical migrations.
 const schema = `
 CREATE TABLE artifact_store_v1 (
 	singleton INTEGER PRIMARY KEY CHECK (singleton = 1)
 );
 
 INSERT INTO artifact_store_v1(singleton) VALUES (1);
-
-CREATE TABLE artifact_schema_migrations (
-	version INTEGER PRIMARY KEY CHECK (version > 0),
-	applied_at INTEGER NOT NULL
-);
 
 CREATE TABLE artifact_roots (
 	id TEXT PRIMARY KEY,
@@ -23,6 +17,14 @@ CREATE TABLE artifact_roots (
 	created_at INTEGER NOT NULL,
 	modified_at INTEGER NOT NULL,
 	retired_at INTEGER
+);
+
+CREATE TABLE artifact_topology_hydrations (
+	installer_name TEXT PRIMARY KEY,
+	root_id TEXT NOT NULL,
+	source_id TEXT NOT NULL,
+	fingerprint TEXT NOT NULL,
+	updated_at INTEGER NOT NULL
 );
 
 CREATE TABLE artifact_sources (
@@ -52,6 +54,19 @@ CREATE TABLE artifact_collections (
 	modified_at INTEGER NOT NULL,
 	retired_at INTEGER,
 	UNIQUE (root_id, id)
+);
+
+CREATE TABLE artifact_collection_shareable_documents (
+	root_id TEXT NOT NULL,
+	collection_id TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	schema_id TEXT NOT NULL,
+	schema_version TEXT NOT NULL,
+	digest TEXT NOT NULL,
+	updated_at INTEGER NOT NULL,
+	PRIMARY KEY (root_id, collection_id),
+	FOREIGN KEY (root_id, collection_id)
+		REFERENCES artifact_collections(root_id, id) ON DELETE CASCADE
 );
 
 CREATE TABLE artifact_collection_attachments (
