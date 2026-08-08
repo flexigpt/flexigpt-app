@@ -26,10 +26,6 @@ export function CreateSkillSession(arg1) {
   return window['go']['main']['SkillBundleWrapper']['CreateSkillSession'](arg1);
 }
 
-export function GetLinkedPortableSkillBundleJSON(arg1) {
-  return window['go']['main']['SkillBundleWrapper']['GetLinkedPortableSkillBundleJSON'](arg1);
-}
-
 export function GetManagedSkillDocument(arg1) {
   return window['go']['main']['SkillBundleWrapper']['GetManagedSkillDocument'](arg1);
 }

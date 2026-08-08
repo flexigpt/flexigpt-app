@@ -61,54 +61,82 @@ func (c *Components) PutTopologyHydration(
 	return c.metadata.PutTopologyHydration(ctx, value)
 }
 
-// PrepareTopologyHydration reconciles persisted desired-state metadata before
-// a built-in installer creates local topology.
-//
-// The installer computes its own fingerprint because that is artifact-family
-// semantic knowledge. Artifact Store owns comparison, stale-root selection,
-// trusted reset, and retry-safe marker lifecycle.
-func (c *Components) PrepareTopologyHydration(
+// PrepareTopologyHydrations reconciles all installer desired states before
+// any installer creates topology. It must operate as one batch because
+// multiple artifact families can share one protected Root.
+func (c *Components) PrepareTopologyHydrations(
 	ctx context.Context,
-	desired topology.Hydration,
-) (bool, error) {
+	desiredValues []topology.Hydration,
+) (map[string]bool, error) {
 	if c == nil || c.metadata == nil {
-		return false, basespec.ErrClosed
+		return nil, basespec.ErrClosed
 	}
 	if ctx == nil {
-		return false, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: topology hydration context is nil",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return false, err
+		return nil, err
 	}
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
-		return false, err
-	}
-	if err := desired.Validate(); err != nil {
-		return false, err
+		return nil, err
 	}
 
-	previous, found, err := c.GetTopologyHydration(
-		ctx,
-		desired.InstallerName,
-	)
-	if err != nil {
-		return false, err
-	}
-	if found && equalTopologyHydration(previous, desired) {
-		return true, nil
+	currentByInstaller := make(map[string]bool, len(desiredValues))
+	seenInstallers := make(map[string]struct{}, len(desiredValues))
+	resetInstallerByRoot := make(map[basespec.RootID]string)
+
+	for _, desired := range desiredValues {
+		if err := desired.Validate(); err != nil {
+			return nil, err
+		}
+		if _, duplicate := seenInstallers[desired.InstallerName]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: duplicate topology hydration installer %q",
+				basespec.ErrInvalid,
+				desired.InstallerName,
+			)
+		}
+		seenInstallers[desired.InstallerName] = struct{}{}
+		if !c.isProtectedRoot(desired.RootID) {
+			return nil, fmt.Errorf(
+				"%w: topology hydration root %q is not protected",
+				basespec.ErrProtected,
+				desired.RootID,
+			)
+		}
+
+		previous, found, err := c.GetTopologyHydration(
+			ctx,
+			desired.InstallerName,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if found && equalTopologyHydration(previous, desired) {
+			currentByInstaller[desired.InstallerName] = true
+			continue
+		}
+
+		currentByInstaller[desired.InstallerName] = false
+		resetInstallerByRoot[desired.RootID] = desired.InstallerName
+		if found {
+			resetInstallerByRoot[previous.RootID] = desired.InstallerName
+		}
 	}
 
-	roots := map[basespec.RootID]struct{}{
-		desired.RootID: {},
+	// A reset invalidates every installer that uses the reset Root, including
+	// installers whose persisted hydration marker individually matched.
+	for _, desired := range desiredValues {
+		if _, reset := resetInstallerByRoot[desired.RootID]; reset {
+			currentByInstaller[desired.InstallerName] = false
+		}
 	}
-	if found {
-		roots[previous.RootID] = struct{}{}
-	}
-	orderedRoots := make([]basespec.RootID, 0, len(roots))
-	for rootID := range roots {
+
+	orderedRoots := make([]basespec.RootID, 0, len(resetInstallerByRoot))
+	for rootID := range resetInstallerByRoot {
 		orderedRoots = append(orderedRoots, rootID)
 	}
 	slices.Sort(orderedRoots)
@@ -116,17 +144,17 @@ func (c *Components) PrepareTopologyHydration(
 	for _, rootID := range orderedRoots {
 		if err := c.ResetTopologyHydration(
 			ctx,
-			desired.InstallerName,
+			resetInstallerByRoot[rootID],
 			rootID,
 		); err != nil {
-			return false, fmt.Errorf(
+			return nil, fmt.Errorf(
 				"reset stale topology hydration root %q: %w",
 				rootID,
 				err,
 			)
 		}
 	}
-	return false, nil
+	return currentByInstaller, nil
 }
 
 // CommitTopologyHydration records successful installation only after the

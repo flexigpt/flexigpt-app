@@ -9,8 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-// Definition is an immutable, content-addressed Artifact definition.
-// Portable collection descriptor documents use CollectionDefinition instead.
+// Definition is an immutable, content-addressed derived Artifact definition.
+// Shareable documents are owned by registered shareable schema codecs.
 type Definition struct {
 	Digest         cryptoutil.Digest       `json:"digest"`
 	Kind           basespec.ArtifactKind   `json:"kind"`

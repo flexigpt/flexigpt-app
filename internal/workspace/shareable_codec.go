@@ -1,4 +1,4 @@
-package bundle
+package workspace
 
 import (
 	"context"
@@ -9,34 +9,39 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
-type skillCollectionCodec struct{}
+type workspaceCollectionCodec struct{}
 
 func NewShareableCodec() shareable.Codec {
-	return skillCollectionCodec{}
+	return workspaceCollectionCodec{}
 }
 
-func (skillCollectionCodec) Key() shareable.SchemaKey {
+func workspaceShareableSchemaKey() shareable.SchemaKey {
 	return shareable.SchemaKey{
 		Entity:        shareable.EntityCollection,
-		Kind:          CollectionKind,
-		SchemaID:      basespec.SchemaID(builtinSchema.SkillCollectionV1SchemaID),
-		SchemaVersion: builtinSchema.SkillCollectionV1SchemaVersion,
+		Kind:          spec.CollectionKind,
+		SchemaID:      spec.WorkspaceDescriptorSchemaID,
+		SchemaVersion: spec.WorkspaceDescriptorSchemaVersion,
 	}
 }
 
-func (skillCollectionCodec) JSONSchema() []byte {
-	return builtinSchema.SkillCollectionV1JSONSchema()
+func (workspaceCollectionCodec) Key() shareable.SchemaKey {
+	return workspaceShareableSchemaKey()
 }
 
-func (c skillCollectionCodec) Canonicalize(
+func (workspaceCollectionCodec) JSONSchema() []byte {
+	return builtinSchema.WorkspaceCollectionV1JSONSchema()
+}
+
+func (workspaceCollectionCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (shareable.ParsedDocument, error) {
 	if ctx == nil {
 		return shareable.ParsedDocument{}, fmt.Errorf(
-			"%w: skill collection codec context is nil",
+			"%w: workspace collection codec context is nil",
 			basespec.ErrInvalid,
 		)
 	}
@@ -44,27 +49,27 @@ func (c skillCollectionCodec) Canonicalize(
 		return shareable.ParsedDocument{}, err
 	}
 
-	value, err := builtinSchema.ParseSkillCollectionV1(raw)
+	value, err := builtinSchema.ParseWorkspaceCollectionV1(raw)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}
-	canonical, err := builtinSchema.CanonicalizeSkillCollectionV1(value)
-	if err != nil {
-		return shareable.ParsedDocument{}, err
-	}
-	encoded, err := builtinSchema.MarshalSkillCollectionV1(canonical)
+	canonical, err := builtinSchema.CanonicalizeWorkspaceCollectionV1(value)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}
 	if canonical.Digest == nil {
 		return shareable.ParsedDocument{}, fmt.Errorf(
-			"%w: canonical skill collection has no digest",
+			"%w: canonical workspace collection has no digest",
 			basespec.ErrInvalid,
 		)
 	}
+	encoded, err := builtinSchema.MarshalWorkspaceCollectionV1(canonical)
+	if err != nil {
+		return shareable.ParsedDocument{}, err
+	}
 
 	return shareable.ParsedDocument{
-		Key:    c.Key(),
+		Key:    workspaceShareableSchemaKey(),
 		Digest: cryptoutil.Digest(*canonical.Digest),
 		Raw:    json.RawMessage(encoded),
 	}, nil

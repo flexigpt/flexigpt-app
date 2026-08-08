@@ -83,20 +83,6 @@ func initializeSchema(
 	}
 
 	if markerExists {
-		legacyLedger, err := tableExistsTx(
-			ctx,
-			tx,
-			"artifact_schema_migrations",
-		)
-		if err != nil {
-			return err
-		}
-		if legacyLedger {
-			return fmt.Errorf(
-				"%w: pre-release Artifact Store database uses the removed migration format; delete the development Artifact Store directory",
-				basespec.ErrUnsupported,
-			)
-		}
 		if err := verifySchemaV1Tx(ctx, tx); err != nil {
 			return err
 		}
@@ -142,7 +128,7 @@ func verifySchemaV1Tx(
 		}
 		if !exists {
 			return fmt.Errorf(
-				"%w: pre-release Artifact Store database is incomplete; delete the development Artifact Store directory",
+				"%w: Artifact Store database does not match schema v1; delete the development Artifact Store directory",
 				basespec.ErrUnsupported,
 			)
 		}

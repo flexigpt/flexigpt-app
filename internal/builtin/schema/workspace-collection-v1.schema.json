@@ -1,0 +1,165 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://raw.githubusercontent.com/flexigpt/flexigpt-app/refs/heads/main/internal/builtin/schema/workspace-collection-v1.schema.json",
+	"title": "FlexiGPT Workspace Collection",
+	"description": "Portable workspace.json manifest for a Workspace collection.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["kind", "schemaID", "schemaVersion", "logicalName", "body"],
+	"properties": {
+		"digest": {
+			"type": "string",
+			"pattern": "^sha256:[a-f0-9]{64}$"
+		},
+		"kind": {
+			"const": "workspace.collection"
+		},
+		"schemaID": {
+			"const": "workspace.collection.v1"
+		},
+		"schemaVersion": {
+			"const": "v1"
+		},
+		"logicalName": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"logicalVersion": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"displayName": {
+			"type": "string",
+			"maxLength": 256
+		},
+		"description": {
+			"type": "string",
+			"maxLength": 16384
+		},
+		"labels": {
+			"type": "object",
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 256
+			},
+			"maxProperties": 64
+		},
+		"body": {
+			"$ref": "#/$defs/body"
+		},
+		"members": {
+			"type": "array",
+			"maxItems": 100000,
+			"items": {
+				"$ref": "#/$defs/contentRef"
+			}
+		}
+	},
+	"$defs": {
+		"body": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["discovery"],
+			"properties": {
+				"discovery": {
+					"$ref": "#/$defs/discovery"
+				}
+			}
+		},
+		"discovery": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"additionalLocators": {
+					"type": "array",
+					"maxItems": 100000,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 4096
+					}
+				},
+				"additionalRoots": {
+					"type": "array",
+					"maxItems": 100000,
+					"items": {
+						"$ref": "#/$defs/directoryRoot"
+					}
+				},
+				"includeReadme": {
+					"type": "boolean"
+				}
+			}
+		},
+		"directoryRoot": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["root"],
+			"properties": {
+				"root": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 4096
+				},
+				"recursive": {
+					"type": "boolean"
+				},
+				"includePatterns": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 4096
+					}
+				}
+			}
+		},
+		"contentRef": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"locator": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 4096
+				},
+				"uri": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 16384
+				},
+				"digest": {
+					"type": "string",
+					"pattern": "^sha256:[a-f0-9]{64}$"
+				},
+				"mediaType": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 256
+				},
+				"role": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128
+				}
+			},
+			"oneOf": [
+				{
+					"required": ["locator"],
+					"not": {
+						"required": ["uri"]
+					}
+				},
+				{
+					"required": ["uri"],
+					"not": {
+						"required": ["locator"]
+					}
+				}
+			]
+		}
+	}
+}

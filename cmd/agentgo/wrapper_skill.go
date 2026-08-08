@@ -118,10 +118,11 @@ func InitSkillBundleWrapper(
 	}
 	builtIns, err := artifactbuiltin.NewInstaller(
 		artifactbuiltin.InstallerDependencies{
-			Skills:          api,
-			BuiltInTopology: builtInTopology,
-			SkillRegistry:   skillRegistry,
-			Packages:        packages,
+			Skills:                 api,
+			BuiltInTopology:        builtInTopology,
+			SkillRegistry:          skillRegistry,
+			Packages:               packages,
+			ShareableCanonicalizer: components.Shareables,
 		},
 	)
 	if err != nil {
@@ -298,21 +299,6 @@ func (w *SkillBundleWrapper) RefreshSkillBundle(
 			return err
 		}
 		return w.runtime.ResyncCollection(context.Background(), ref)
-	})
-}
-
-func (w *SkillBundleWrapper) GetLinkedPortableSkillBundleJSON(
-	ref collection.CollectionRef,
-) (string, error) {
-	return middleware.WithRecoveryResp(func() (string, error) {
-		value, err := w.api.BuildLinkedPortableBundleJSON(
-			context.Background(),
-			ref,
-		)
-		if err != nil {
-			return "", err
-		}
-		return string(value), nil
 	})
 }
 

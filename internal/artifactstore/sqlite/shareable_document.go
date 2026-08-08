@@ -44,7 +44,7 @@ func (s *Store) putCollectionDocumentBinding(
 		ctx,
 		`INSERT INTO artifact_collection_shareable_documents (
 			root_id, collection_id, kind, schema_id, schema_version, digest,
-			updated_at
+			bound_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(root_id, collection_id) DO NOTHING`,
 		string(value.Collection.RootID),

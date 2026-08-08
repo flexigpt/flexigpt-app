@@ -1563,7 +1563,6 @@ export namespace bundle {
 	    logicalVersion?: string;
 	    labels?: Record<string, string>;
 	    managedSourceID?: string;
-	    portableDefinitionDigest?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CollectionData(source);
@@ -1577,7 +1576,6 @@ export namespace bundle {
 	        this.logicalVersion = source["logicalVersion"];
 	        this.labels = source["labels"];
 	        this.managedSourceID = source["managedSourceID"];
-	        this.portableDefinitionDigest = source["portableDefinitionDigest"];
 	    }
 	}
 	export class Bundle {
@@ -1627,7 +1625,6 @@ export namespace bundle {
 	    LogicalName: string;
 	    LogicalVersion: string;
 	    Labels: Record<string, string>;
-	    PortableDefinitionDigest?: string;
 	    Attachments: AttachmentDraft[];
 	
 	    static createFrom(source: any = {}) {
@@ -1645,7 +1642,6 @@ export namespace bundle {
 	        this.LogicalName = source["LogicalName"];
 	        this.LogicalVersion = source["LogicalVersion"];
 	        this.Labels = source["Labels"];
-	        this.PortableDefinitionDigest = source["PortableDefinitionDigest"];
 	        this.Attachments = this.convertValues(source["Attachments"], AttachmentDraft);
 	    }
 	
@@ -13556,6 +13552,102 @@ export namespace workspace {
 		    return a;
 		}
 	}
+	export class GetShareableWorkspaceDocumentRequest {
+	    workspace: collection.CollectionRef;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetShareableWorkspaceDocumentRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class WorkspaceShareableDocumentView {
+	    workspace: collection.CollectionRef;
+	    schema: shareable.SchemaKey;
+	    digest: string;
+	    document: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceShareableDocumentView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
+	        this.schema = this.convertValues(source["schema"], shareable.SchemaKey);
+	        this.digest = source["digest"];
+	        this.document = source["document"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetShareableWorkspaceDocumentResponse {
+	    Body?: WorkspaceShareableDocumentView;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetShareableWorkspaceDocumentResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], WorkspaceShareableDocumentView);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class GetWorkspaceArtifactRequest {
 	    workspace: collection.CollectionRef;
 	    artifact: artifact.ArtifactRef;
@@ -15773,6 +15865,81 @@ export namespace workspace {
 		    return a;
 		}
 	}
+	export class StoreShareableWorkspaceDocumentRequestBody {
+	    document: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new StoreShareableWorkspaceDocumentRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.document = source["document"];
+	    }
+	}
+	export class StoreShareableWorkspaceDocumentRequest {
+	    workspace: collection.CollectionRef;
+	    Body?: StoreShareableWorkspaceDocumentRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new StoreShareableWorkspaceDocumentRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
+	        this.Body = this.convertValues(source["Body"], StoreShareableWorkspaceDocumentRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class StoreShareableWorkspaceDocumentResponse {
+	    Body?: WorkspaceShareableDocumentView;
+	
+	    static createFrom(source: any = {}) {
+	        return new StoreShareableWorkspaceDocumentResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], WorkspaceShareableDocumentView);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SuppressWorkspaceBindingRequestBody {
 	    expectedCollectionRevision: number;
 	    binding: artifact.SourceBinding;
@@ -16266,6 +16433,7 @@ export namespace workspace {
 		    return a;
 		}
 	}
+	
 	
 	
 	

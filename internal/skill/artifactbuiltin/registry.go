@@ -2,6 +2,7 @@ package artifactbuiltin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,11 +13,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
-	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
 
 const (
@@ -32,7 +33,7 @@ type HydratedRegistry struct {
 
 type HydratedCollection struct {
 	Registration          Collection
-	Definition            definition.CollectionDefinition
+	Definition            builtinSchema.SkillCollectionV1
 	SourceScope           basespec.Locator
 	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
 	Artifacts             []HydratedArtifact
@@ -40,7 +41,7 @@ type HydratedCollection struct {
 
 type HydratedArtifact struct {
 	Registration      Artifact
-	Member            definition.ContentRef
+	Member            builtinSchema.ContentRef
 	SkillDefinition   definition.Definition
 	EmbeddedDirectory basespec.Locator
 	SourceDirectory   basespec.Locator
@@ -226,11 +227,31 @@ func (r Registry) OrderedCollections() []Collection {
 	return output
 }
 
-// Hydrate converts embedded portable Collection source descriptors into
-// canonical, integrity-pinned Collection Definitions. The checked-in source
-// descriptor may omit digest fields; this function computes them exclusively
-// from the embedded package bytes before any local installation occurs.
-func (r Registry) Hydrate(packages fs.FS) (HydratedRegistry, error) {
+// Hydrate converts embedded portable collection descriptors into canonical,
+// integrity-pinned Skill collection documents. The checked-in descriptor may
+// omit digest fields. Member digests are enriched from embedded package bytes
+// and the final document is canonicalized through Artifact Store's registered
+// shareable codec before local installation begins.
+func (r Registry) Hydrate(
+	ctx context.Context,
+	canonicalizer shareable.Canonicalizer,
+	packages fs.FS,
+) (HydratedRegistry, error) {
+	if ctx == nil {
+		return HydratedRegistry{}, fmt.Errorf(
+			"%w: built-in skill hydration context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return HydratedRegistry{}, err
+	}
+	if canonicalizer == nil {
+		return HydratedRegistry{}, fmt.Errorf(
+			"%w: built-in skill shareable canonicalizer is nil",
+			basespec.ErrInvalid,
+		)
+	}
 	if packages == nil {
 		return HydratedRegistry{}, fmt.Errorf(
 			"%w: built-in package filesystem is nil",
@@ -246,7 +267,12 @@ func (r Registry) Hydrate(packages fs.FS) (HydratedRegistry, error) {
 		Collections: make([]HydratedCollection, 0, len(r.Collections)),
 	}
 	for index, registration := range r.OrderedCollections() {
-		value, err := hydrateCollection(packages, registration)
+		value, err := hydrateCollection(
+			ctx,
+			canonicalizer,
+			packages,
+			registration,
+		)
 		if err != nil {
 			return HydratedRegistry{}, fmt.Errorf(
 				"collections[%d]: %w",
@@ -269,6 +295,8 @@ func (r HydratedRegistry) OrderedCollections() []HydratedCollection {
 }
 
 func hydrateCollection(
+	ctx context.Context,
+	canonicalizer shareable.Canonicalizer,
 	packages fs.FS,
 	registration Collection,
 ) (HydratedCollection, error) {
@@ -295,14 +323,10 @@ func hydrateCollection(
 		len(payload.Members),
 	)
 	for index := range payload.Members {
-		member := payload.Members[index]
-		if err := member.Validate(); err != nil {
-			return HydratedCollection{}, fmt.Errorf(
-				"payload member %d: %w",
-				index,
-				err,
-			)
+		if err := ctx.Err(); err != nil {
+			return HydratedCollection{}, err
 		}
+		member := payload.Members[index]
 		if member.Locator == "" ||
 			member.URI != "" ||
 			member.SubresourceLocator != "" {
@@ -313,7 +337,8 @@ func hydrateCollection(
 			)
 		}
 
-		sourceLocator, err := scopedLocator(scope, member.Locator)
+		memberLocator := basespec.Locator(member.Locator)
+		sourceLocator, err := scopedLocator(scope, memberLocator)
 		if err != nil {
 			return HydratedCollection{}, err
 		}
@@ -334,7 +359,8 @@ func hydrateCollection(
 		}
 
 		actualDigest := cryptoutil.DigestBytes(content)
-		if member.Digest != nil && *member.Digest != actualDigest {
+		if member.Digest != nil &&
+			*member.Digest != string(actualDigest) {
 			return HydratedCollection{}, fmt.Errorf(
 				"%w: member %q supplied %q, calculated %q",
 				basespec.ErrDigestMismatch,
@@ -343,14 +369,30 @@ func hydrateCollection(
 				actualDigest,
 			)
 		}
-		member.Digest = &actualDigest
+		digest := string(actualDigest)
+		member.Digest = &digest
 		payload.Members[index] = member
-		memberContents[member.Locator] = append([]byte(nil), content...)
+		memberContents[memberLocator] = append([]byte(nil), content...)
 	}
 
-	canonical, err := skillBundle.CanonicalizePortableBundleDefinition(payload)
+	hydratedRaw, err := json.Marshal(payload)
 	if err != nil {
 		return HydratedCollection{}, err
+	}
+	parsed, err := canonicalizer.Canonicalize(ctx, hydratedRaw)
+	if err != nil {
+		return HydratedCollection{}, err
+	}
+	canonical, err := builtinSchema.ParseSkillCollectionV1(parsed.Raw)
+	if err != nil {
+		return HydratedCollection{}, err
+	}
+	if canonical.Digest == nil ||
+		cryptoutil.Digest(*canonical.Digest) != parsed.Digest {
+		return HydratedCollection{}, fmt.Errorf(
+			"%w: canonical built-in collection digest does not match codec output",
+			basespec.ErrDigestMismatch,
+		)
 	}
 
 	registered := make(
@@ -377,7 +419,8 @@ func hydrateCollection(
 		Artifacts:             make([]HydratedArtifact, 0, len(canonical.Members)),
 	}
 	for _, member := range canonical.Members {
-		registrationValue, found := registered[member.Locator]
+		memberLocator := basespec.Locator(member.Locator)
+		registrationValue, found := registered[memberLocator]
 		if !found {
 			return HydratedCollection{}, fmt.Errorf(
 				"%w: payload member %q has no static Artifact registration",
@@ -392,10 +435,11 @@ func hydrateCollection(
 				member.Locator,
 			)
 		}
+		memberDigest := cryptoutil.Digest(*member.Digest)
 
-		expectedName := path.Base(path.Dir(string(member.Locator)))
+		expectedName := path.Base(path.Dir(member.Locator))
 		skillDefinition, _, err := skillArtifact.DecodeSkillDocument(
-			memberContents[member.Locator],
+			memberContents[memberLocator],
 			expectedName,
 		)
 		if err != nil {
@@ -408,7 +452,7 @@ func hydrateCollection(
 
 		embeddedDirectory, err := scopedLocator(
 			scope,
-			basespec.Locator(path.Dir(string(member.Locator))),
+			basespec.Locator(path.Dir(member.Locator)),
 		)
 		if err != nil {
 			return HydratedCollection{}, err
@@ -425,7 +469,7 @@ func hydrateCollection(
 			)
 		}
 
-		output.ExpectedMemberDigests[member.Locator] = *member.Digest
+		output.ExpectedMemberDigests[memberLocator] = memberDigest
 		output.Artifacts = append(output.Artifacts, HydratedArtifact{
 			Registration:      registrationValue,
 			Member:            member,
@@ -439,30 +483,8 @@ func hydrateCollection(
 
 func decodeCollectionPayload(
 	raw []byte,
-) (definition.CollectionDefinition, error) {
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxDefinitionBytes,
-	)
-	if err != nil {
-		return definition.CollectionDefinition{}, err
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
-
-	var value definition.CollectionDefinition
-	if err := decoder.Decode(&value); err != nil {
-		return definition.CollectionDefinition{}, err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("portable Collection payload contains trailing JSON values")
-		}
-		return definition.CollectionDefinition{}, err
-	}
-	return value, nil
+) (builtinSchema.SkillCollectionV1, error) {
+	return builtinSchema.ParseSkillCollectionV1(raw)
 }
 
 func scopedLocator(

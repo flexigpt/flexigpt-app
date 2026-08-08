@@ -7,7 +7,7 @@ import (
 	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -22,16 +22,10 @@ type CollectionData struct {
 	// for this bundle. An empty value means attached Sources are externally
 	// administered and are not deleted with the bundle.
 	ManagedSourceID basespec.SourceID `json:"managedSourceID,omitempty"`
-
-	// PortableDefinitionDigest is local provenance only. It identifies the
-	// canonical portable Collection payload from which this local Collection
-	// was installed without embedding that portable payload in SQLite.
-	PortableDefinitionDigest *cryptoutil.Digest `json:"portableDefinitionDigest,omitempty"`
 }
 
 func (d CollectionData) Clone() CollectionData {
 	d.Labels = maps.Clone(d.Labels)
-	d.PortableDefinitionDigest = cryptoutil.CloneDigest(d.PortableDefinitionDigest)
 	return d
 }
 
@@ -76,12 +70,7 @@ func DecodeCollectionData(
 			err,
 		)
 	}
-	if value.SchemaVersion == "" {
-		value.SchemaVersion = CollectionSchemaVersion
-	}
-	if value.DiscoveryPolicyRevision == "" {
-		value.DiscoveryPolicyRevision = DiscoveryPolicyRevision
-	}
+
 	if err := ValidateCollectionData(value); err != nil {
 		return CollectionData{}, err
 	}
@@ -103,11 +92,13 @@ func ValidateCollectionData(value CollectionData) error {
 	); err != nil {
 		return err
 	}
-	if err := ValidatePortableBundleMetadata(PortableBundleMetadata{
-		LogicalName:    value.LogicalName,
-		LogicalVersion: value.LogicalVersion,
-		Labels:         value.Labels,
-	}); err != nil {
+	if err := builtinSchema.ValidateShareableCollectionMetadata(
+		string(value.LogicalName),
+		string(value.LogicalVersion),
+		"",
+		"",
+		value.Labels,
+	); err != nil {
 		return err
 	}
 	if value.ManagedSourceID != "" {
@@ -115,10 +106,6 @@ func ValidateCollectionData(value CollectionData) error {
 			return err
 		}
 	}
-	if value.PortableDefinitionDigest != nil {
-		if err := cryptoutil.ValidateDigest(*value.PortableDefinitionDigest); err != nil {
-			return err
-		}
-	}
+
 	return nil
 }

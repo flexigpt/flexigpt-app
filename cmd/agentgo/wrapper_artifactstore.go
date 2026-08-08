@@ -69,6 +69,7 @@ func InitArtifactStoreWrapper(
 	)
 	shareableCodecs := []shareable.Codec{
 		skillBundle.NewShareableCodec(),
+		workspace.NewShareableCodec(),
 	}
 
 	components, err := system.Open(
@@ -192,6 +193,19 @@ func (w *ArtifactStoreWrapper) GetShareableCollectionDocument(
 	return middleware.WithRecoveryResp(
 		func() (*artifactstore.GetShareableCollectionDocumentResponse, error) {
 			return w.api.GetShareableCollectionDocument(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *ArtifactStoreWrapper) StoreShareableCollectionDocument(
+	request *artifactstore.StoreShareableCollectionDocumentRequest,
+) (*artifactstore.StoreShareableCollectionDocumentResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactstore.StoreShareableCollectionDocumentResponse, error) {
+			return w.api.StoreShareableCollectionDocument(
 				context.Background(),
 				request,
 			)

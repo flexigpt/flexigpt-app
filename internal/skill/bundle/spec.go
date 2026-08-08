@@ -6,13 +6,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const (
-	CollectionKind basespec.CollectionKind = "skill.bundle"
+	CollectionKind basespec.CollectionKind = builtinSchema.SkillCollectionV1Kind
 
 	CollectionSchemaVersion = "v1"
 	DiscoveryPolicyRevision = "skill.bundle.discovery.v1"
@@ -24,34 +24,17 @@ const (
 	RoleLibrary  basespec.AttachmentRole = "library"
 )
 
-const (
-	PortableBundleSchemaVersion                   = "v1"
-	portableMemberFormat                          = "agent.skill-entrypoint/v1"
-	portableSkillMediaType                        = "text/markdown"
-	PortableCollectionFileName                    = "collection.json"
-	PortableBundleSchemaID      basespec.SchemaID = "skill.bundle.v1"
-)
-
-type PortableBundleMetadata struct {
-	LogicalName    basespec.LogicalName
-	LogicalVersion basespec.LogicalVersion
-	DisplayName    string
-	Description    string
-	Labels         map[string]string
-}
-
 type CreateBundleRequest struct {
-	RootID                   basespec.RootID
-	CollectionID             basespec.CollectionID
-	ManagedSourceID          basespec.SourceID
-	DisplayName              string
-	Description              string
-	Enabled                  bool
-	LogicalName              basespec.LogicalName
-	LogicalVersion           basespec.LogicalVersion
-	Labels                   map[string]string
-	PortableDefinitionDigest *cryptoutil.Digest
-	Attachments              []AttachmentDraft
+	RootID          basespec.RootID
+	CollectionID    basespec.CollectionID
+	ManagedSourceID basespec.SourceID
+	DisplayName     string
+	Description     string
+	Enabled         bool
+	LogicalName     basespec.LogicalName
+	LogicalVersion  basespec.LogicalVersion
+	Labels          map[string]string
+	Attachments     []AttachmentDraft
 }
 
 type UpdateBundleRequest struct {
@@ -121,13 +104,9 @@ type BuiltInBundleTopology struct {
 	DiscoveryRoot         basespec.Locator                       `json:"-"`
 	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest `json:"-"`
 
-	// Optional local provenance. Embedded package bytes and member digests
-	// remain independently verified during built-in installation.
-	PortableDefinitionDigest *cryptoutil.Digest `json:"-"`
-
 	// PortableDefinition is stored through Artifact Store's generic
 	// shareable-document service after local topology creation succeeds.
-	PortableDefinition *definition.CollectionDefinition `json:"-"`
+	PortableDefinition *builtinSchema.SkillCollectionV1 `json:"-"`
 }
 
 // ManagedSkillDocument is the editable projection for a managed Skill.

@@ -187,6 +187,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 
 	ctx = protection.WithPrivilegedInstaller(ctx)
 	prepared := make([]preparedHydration, 0, len(entries))
+
 	for _, entry := range entries {
 		installer, supported := entry.installer.(HydrationInstaller)
 		if !supported {
@@ -208,19 +209,38 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 				desired.InstallerName,
 			)
 		}
-		current, err := r.hydrator.PrepareTopologyHydration(ctx, desired)
-		if err != nil {
-			return fmt.Errorf(
-				"prepare topology hydration for installer %q: %w",
-				entry.name,
-				err,
-			)
-		}
 		prepared = append(prepared, preparedHydration{
 			installer: entry.name,
 			desired:   desired,
-			current:   current,
 		})
+	}
+
+	if len(prepared) != 0 {
+		desiredValues := make([]topology.Hydration, 0, len(prepared))
+		for _, value := range prepared {
+			desiredValues = append(desiredValues, value.desired)
+		}
+		currentByInstaller, err := r.hydrator.PrepareTopologyHydrations(
+			ctx,
+			desiredValues,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"prepare topology hydrations: %w",
+				err,
+			)
+		}
+		for index := range prepared {
+			current, found := currentByInstaller[prepared[index].installer]
+			if !found {
+				return fmt.Errorf(
+					"%w: hydration coordinator omitted installer %q",
+					basespec.ErrInvalid,
+					prepared[index].installer,
+				)
+			}
+			prepared[index].current = current
+		}
 	}
 
 	if _, err := r.configuration.EnsureTopology(ctx, r.topology); err != nil {

@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -21,6 +22,24 @@ import (
 // runtime registrations during application startup.
 type RootLister interface {
 	List(ctx context.Context) ([]root.Root, error)
+}
+
+// ShareableCollectionStore is the narrow Artifact Store capability Workspace
+// needs for parsing, explicitly binding, and retrieving workspace.json
+// documents. Workspace does not depend on system.Components directly.
+type ShareableCollectionStore interface {
+	shareable.Canonicalizer
+
+	StoreCollection(
+		ctx context.Context,
+		ref collection.CollectionRef,
+		raw []byte,
+	) (shareable.CollectionDocument, error)
+
+	GetCollection(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) (shareable.CollectionDocument, error)
 }
 
 // Dependencies is the application-composition boundary for Workspace.
@@ -34,6 +53,7 @@ type Dependencies struct {
 	Refresh            refresh.Runner
 	Catalogs           catalog.Reader
 	Definitions        definition.Reader
+	Shareables         ShareableCollectionStore
 	SourceRuntime      source.Runtime
 	HasDecoder         func(basespec.DecoderID) bool
 	DecoderFingerprint func() (cryptoutil.Digest, error)
@@ -48,6 +68,7 @@ func (d Dependencies) Validate() error {
 		d.Refresh == nil ||
 		d.Catalogs == nil ||
 		d.Definitions == nil ||
+		d.Shareables == nil ||
 		d.SourceRuntime == nil ||
 		d.HasDecoder == nil ||
 		d.DecoderFingerprint == nil ||

@@ -18,8 +18,6 @@ export function CreateSkillBundle(arg1:bundle.CreateBundleRequest):Promise<bundl
 
 export function CreateSkillSession(arg1:runtime.CreateSkillSessionRequest):Promise<runtime.CreateSkillSessionResponse>;
 
-export function GetLinkedPortableSkillBundleJSON(arg1:collection.CollectionRef):Promise<string>;
-
 export function GetManagedSkillDocument(arg1:artifact.ArtifactRef):Promise<bundle.ManagedSkillDocument>;
 
 export function GetSkillBundle(arg1:collection.CollectionRef):Promise<bundle.Bundle>;

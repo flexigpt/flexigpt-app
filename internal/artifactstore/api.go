@@ -208,6 +208,39 @@ func (a *API) GetShareableCollectionDocument(
 	return &GetShareableCollectionDocumentResponse{Body: &value}, nil
 }
 
+func (a *API) StoreShareableCollectionDocument(
+	ctx context.Context,
+	request *StoreShareableCollectionDocumentRequest,
+) (*StoreShareableCollectionDocumentResponse, error) {
+	if err := a.check(ctx); err != nil {
+		return nil, err
+	}
+	if err := requireRequest(request, "store shareable collection document request"); err != nil {
+		return nil, err
+	}
+	if err := requireBody(request.Body, "shareable collection document body"); err != nil {
+		return nil, err
+	}
+	if len(request.Body.Document) == 0 {
+		return nil, fmt.Errorf(
+			"%w: shareable collection document is required",
+			basespec.ErrInvalid,
+		)
+	}
+	value, err := a.components.Shareables.StoreCollection(
+		ctx,
+		collection.CollectionRef{
+			RootID:       request.RootID,
+			CollectionID: request.CollectionID,
+		},
+		append([]byte(nil), request.Body.Document...),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &StoreShareableCollectionDocumentResponse{Body: &value}, nil
+}
+
 func (a *API) CreateArtifactSource(
 	ctx context.Context,
 	request *CreateArtifactSourceRequest,

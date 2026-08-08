@@ -7,23 +7,23 @@ import (
 	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type DescriptorLoader struct {
-	runtime source.Runtime
+	runtime       source.Runtime
+	canonicalizer shareable.Canonicalizer
 }
 
 const descriptorLocator basespec.Locator = spec.WorkspaceMetadataDirectory + "/" + spec.WorkspaceDescriptorFileName
 
-// Descriptor is the portable Collection Definition stored at
-// .flexigpt/workspace.json. Its domain body contains Workspace discovery
-// policy while its generic Members field contains relative or external member
-// references.
-type Descriptor = definition.CollectionDefinition
+// Descriptor is the portable workspace.collection document stored at
+// .flexigpt/workspace.json.
+type Descriptor = builtinSchema.WorkspaceCollectionV1
 
 type DescriptorObservation struct {
 	Preferences            spec.DiscoveryPreferences
@@ -32,14 +32,20 @@ type DescriptorObservation struct {
 	ExpectedContentDigests map[basespec.Locator]cryptoutil.Digest
 }
 
-func NewDescriptorLoader(runtime source.Runtime) (*DescriptorLoader, error) {
-	if runtime == nil {
+func NewDescriptorLoader(
+	runtime source.Runtime,
+	canonicalizer shareable.Canonicalizer,
+) (*DescriptorLoader, error) {
+	if runtime == nil || canonicalizer == nil {
 		return nil, fmt.Errorf(
-			"%w: Workspace descriptor loader runtime is nil",
+			"%w: Workspace descriptor loader dependencies are incomplete",
 			spec.ErrInvalidWorkspace,
 		)
 	}
-	return &DescriptorLoader{runtime: runtime}, nil
+	return &DescriptorLoader{
+		runtime:       runtime,
+		canonicalizer: canonicalizer,
+	}, nil
 }
 
 func (l *DescriptorLoader) Load(
@@ -108,14 +114,14 @@ func (l *DescriptorLoader) Load(
 		)
 	}
 	if !entry.IsRegular ||
-		entry.SizeBytes > basespec.MaxDefinitionBodyBytes {
+		entry.SizeBytes > basespec.MaxDefinitionBytes {
 		return DescriptorObservation{}, spec.ErrWorkspaceDefinitionInvalid
 	}
 	content, err := source.ReadSnapshotEntry(
 		ctx,
 		snapshot,
 		entry,
-		int64(basespec.MaxDefinitionBodyBytes),
+		int64(basespec.MaxDefinitionBytes),
 	)
 	if err != nil {
 		return DescriptorObservation{}, err
@@ -124,37 +130,40 @@ func (l *DescriptorLoader) Load(
 		return DescriptorObservation{}, err
 	}
 
-	descriptor, err := definition.ParseCollectionDefinition(content)
+	document, err := l.canonicalizer.Canonicalize(ctx, content)
 	if err != nil {
 		return DescriptorObservation{}, fmt.Errorf(
-			"%w: parse Workspace descriptor: %w",
+			"%w: canonicalize Workspace descriptor: %w",
 			spec.ErrWorkspaceDefinitionInvalid,
 			err,
 		)
 	}
-	if descriptor.Kind != spec.CollectionKind {
+	expectedKey := shareable.SchemaKey{
+		Entity:        shareable.EntityCollection,
+		Kind:          spec.CollectionKind,
+		SchemaID:      spec.WorkspaceDescriptorSchemaID,
+		SchemaVersion: spec.WorkspaceDescriptorSchemaVersion,
+	}
+	if document.Key != expectedKey {
 		return DescriptorObservation{}, fmt.Errorf(
-			"%w: descriptor kind must be %q",
+			"%w: descriptor schema does not identify %q",
 			spec.ErrWorkspaceDefinitionInvalid,
 			spec.CollectionKind,
 		)
 	}
-	if descriptor.SchemaID != spec.WorkspaceDescriptorSchemaID {
+
+	descriptor, err := builtinSchema.ParseWorkspaceCollectionV1(document.Raw)
+	if err != nil {
 		return DescriptorObservation{}, fmt.Errorf(
-			"%w: descriptor schema ID must be %q",
+			"%w: decode canonical Workspace descriptor: %w",
 			spec.ErrWorkspaceDefinitionInvalid,
-			spec.WorkspaceDescriptorSchemaID,
-		)
-	}
-	if descriptor.SchemaVersion != spec.WorkspaceDescriptorSchemaVersion {
-		return DescriptorObservation{}, fmt.Errorf(
-			"%w: descriptor schema version must be %q",
-			spec.ErrWorkspaceDefinitionInvalid,
-			spec.WorkspaceDescriptorSchemaVersion,
+			err,
 		)
 	}
 
-	body, err := definition.DecodeBody[descriptorBody](descriptor.Body)
+	body, err := builtinSchema.DecodeWorkspaceCollectionV1Body(
+		descriptor.Body,
+	)
 	if err != nil {
 		return DescriptorObservation{}, fmt.Errorf(
 			"%w: %w",
@@ -191,9 +200,10 @@ func (l *DescriptorLoader) Load(
 	for index, member := range descriptor.Members {
 		switch {
 		case member.Locator != "":
+			memberLocator := basespec.Locator(member.Locator)
 			resolvedLocator, err := resolveRelativeLocator(
 				descriptorDirectory,
-				member.Locator,
+				memberLocator,
 				false,
 			)
 			if err != nil {
@@ -216,15 +226,16 @@ func (l *DescriptorLoader) Load(
 				resolvedLocator,
 			)
 			if member.Digest != nil {
-				if expected, exists := expectedContentDigests[resolvedLocator]; exists &&
-					expected != *member.Digest {
+				memberDigest := cryptoutil.Digest(*member.Digest)
+				if existing, exists := expectedContentDigests[resolvedLocator]; exists &&
+					existing != memberDigest {
 					return DescriptorObservation{}, fmt.Errorf(
 						"%w: descriptor members declare conflicting digests for %q",
 						spec.ErrWorkspaceDefinitionInvalid,
 						resolvedLocator,
 					)
 				}
-				expectedContentDigests[resolvedLocator] = *member.Digest
+				expectedContentDigests[resolvedLocator] = memberDigest
 			}
 
 		case member.URI != "":
@@ -258,19 +269,19 @@ func (l *DescriptorLoader) Load(
 	return observation, nil
 }
 
-type descriptorBody struct {
-	Discovery spec.DiscoveryPreferences `json:"discovery"`
-}
-
 func resolveDescriptorDiscoveryPreferences(
-	input spec.DiscoveryPreferences,
+	input builtinSchema.WorkspaceDiscoveryV1,
 	base basespec.Locator,
 ) (spec.DiscoveryPreferences, error) {
 	output := spec.DiscoveryPreferences{
 		IncludeReadme: input.IncludeReadme,
 	}
 	for index, locator := range input.AdditionalLocators {
-		resolved, err := resolveRelativeLocator(base, locator, false)
+		resolved, err := resolveRelativeLocator(
+			base,
+			basespec.Locator(locator),
+			false,
+		)
 		if err != nil {
 			return spec.DiscoveryPreferences{}, fmt.Errorf(
 				"additionalLocators[%d]: %w",
@@ -283,7 +294,7 @@ func resolveDescriptorDiscoveryPreferences(
 	for index, root := range input.AdditionalRoots {
 		resolved, err := resolveRelativeLocator(
 			base,
-			root.Root,
+			basespec.Locator(root.Root),
 			true,
 		)
 		if err != nil {

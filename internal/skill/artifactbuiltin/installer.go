@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
@@ -39,10 +40,11 @@ type skillInstaller interface {
 }
 
 type InstallerDependencies struct {
-	Skills          skillInstaller
-	BuiltInTopology builtin.Registry
-	SkillRegistry   Registry
-	Packages        fs.FS
+	Skills                 skillInstaller
+	BuiltInTopology        builtin.Registry
+	SkillRegistry          Registry
+	Packages               fs.FS
+	ShareableCanonicalizer shareable.Canonicalizer
 }
 
 type Installer struct {
@@ -56,7 +58,8 @@ func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
 	if dependencies.Skills == nil ||
-		dependencies.Packages == nil {
+		dependencies.Packages == nil ||
+		dependencies.ShareableCanonicalizer == nil {
 		return nil, fmt.Errorf("%w: built-in installer dependencies are incomplete", basespec.ErrInvalid)
 	}
 	if err := dependencies.BuiltInTopology.Validate(); err != nil {
@@ -73,6 +76,8 @@ func NewInstaller(
 		)
 	}
 	hydrated, err := dependencies.SkillRegistry.Hydrate(
+		context.Background(),
+		dependencies.ShareableCanonicalizer,
 		dependencies.Packages,
 	)
 	if err != nil {
@@ -131,24 +136,28 @@ func (i *Installer) EnsureBuiltInBundles(
 
 	output := make([]skillBundle.Bundle, 0, len(i.hydrated.Collections))
 	for _, value := range i.hydrated.OrderedCollections() {
+		if value.Definition.Digest == nil {
+			return nil, fmt.Errorf(
+				"%w: hydrated built-in collection has no digest",
+				basespec.ErrInvalid,
+			)
+		}
 		portableDefinition := value.Definition.Clone()
-		portableDigest := value.Definition.Digest
 		bundle, err := i.skills.EnsureBuiltInBundleTopology(
 			ctx,
 			skillBundle.BuiltInBundleTopology{
-				RootID:                   i.builtInTopology.Root.ID,
-				CollectionID:             value.Registration.ID,
-				SourceID:                 i.builtInTopology.Source.ID,
-				LogicalName:              value.Definition.LogicalName,
-				LogicalVersion:           value.Definition.LogicalVersion,
-				DisplayName:              value.Definition.DisplayName,
-				Description:              value.Definition.Description,
-				Labels:                   value.Definition.Labels,
-				Enabled:                  value.Registration.Enabled,
-				DiscoveryRoot:            value.SourceScope,
-				ExpectedMemberDigests:    value.ExpectedMemberDigests,
-				PortableDefinition:       &portableDefinition,
-				PortableDefinitionDigest: &portableDigest,
+				RootID:                i.builtInTopology.Root.ID,
+				CollectionID:          value.Registration.ID,
+				SourceID:              i.builtInTopology.Source.ID,
+				LogicalName:           basespec.LogicalName(value.Definition.LogicalName),
+				LogicalVersion:        basespec.LogicalVersion(value.Definition.LogicalVersion),
+				DisplayName:           value.Definition.DisplayName,
+				Description:           value.Definition.Description,
+				Labels:                value.Definition.Labels,
+				Enabled:               value.Registration.Enabled,
+				DiscoveryRoot:         value.SourceScope,
+				ExpectedMemberDigests: value.ExpectedMemberDigests,
+				PortableDefinition:    &portableDefinition,
 			},
 		)
 		if err != nil {
@@ -208,7 +217,7 @@ func (i *Installer) EnsureBuiltInArtifacts(
 		for _, skill := range value.Artifacts {
 			request.Skills = append(request.Skills, skillBundle.BuiltInCollectionSkill{
 				ArtifactID: skill.Registration.ID,
-				Member:     skill.Member.Locator,
+				Member:     basespec.Locator(skill.Member.Locator),
 				Enabled:    skill.Registration.Enabled,
 			})
 		}
@@ -309,7 +318,7 @@ func (i *Installer) rejectDynamicBuiltInBundles(
 		len(i.hydrated.Collections),
 	)
 	for _, value := range i.hydrated.Collections {
-		declared[value.Definition.LogicalName] = value.Registration.ID
+		declared[basespec.LogicalName(value.Definition.LogicalName)] = value.Registration.ID
 	}
 
 	for _, bundle := range bundles {

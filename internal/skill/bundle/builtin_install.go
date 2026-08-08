@@ -17,6 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
@@ -149,7 +150,7 @@ func (a *API) InstallBuiltInCollection(
 	hasCollectionFile := false
 	for _, file := range publication.Files {
 		filesByLocator[file.Locator] = append([]byte(nil), file.Content...)
-		if file.Locator == PortableCollectionFileName {
+		if file.Locator == builtinSchema.SkillCollectionV1FileName {
 			hasCollectionFile = true
 		}
 	}
@@ -157,7 +158,7 @@ func (a *API) InstallBuiltInCollection(
 		return nil, fmt.Errorf(
 			"%w: built-in Collection package lacks %q",
 			basespec.ErrInvalid,
-			PortableCollectionFileName,
+			builtinSchema.SkillCollectionV1FileName,
 		)
 	}
 
@@ -453,7 +454,9 @@ func (a *API) ensurePinnedManagedSkill(
 	}
 
 	intent, err := decodeManagedSkillArtifactData(pinned.Data)
-	if err != nil || intent.PackageSHA256 != packageSHA256 {
+	if err != nil ||
+		intent.PackageSHA256 != packageSHA256 ||
+		intent.Enabled == nil || *intent.Enabled != enabled {
 		localData, err := encodeManagedSkillArtifactData(
 			newManagedSkillArtifactData(packageSHA256, enabled),
 		)
@@ -471,6 +474,7 @@ func (a *API) ensurePinnedManagedSkill(
 		}
 		pinned = &updated
 	}
+
 	if pinned.Enabled != enabled {
 		updated, err := a.dependencies.Artifacts.SetEnabled(
 			ctx,

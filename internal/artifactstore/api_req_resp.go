@@ -71,6 +71,20 @@ type GetShareableCollectionDocumentResponse struct {
 	Body *shareable.CollectionDocument
 }
 
+type StoreShareableCollectionDocumentRequestBody struct {
+	Document json.RawMessage `json:"document" required:"true"`
+}
+
+type StoreShareableCollectionDocumentRequest struct {
+	RootID       basespec.RootID       `path:"rootID"       required:"true"`
+	CollectionID basespec.CollectionID `path:"collectionID" required:"true"`
+	Body         *StoreShareableCollectionDocumentRequestBody
+}
+
+type StoreShareableCollectionDocumentResponse struct {
+	Body *shareable.CollectionDocument
+}
+
 // ArtifactSourceDraft is write-only. Source configuration can contain local
 // filesystem paths or provider credentials and is not returned by the API.
 type ArtifactSourceDraft struct {

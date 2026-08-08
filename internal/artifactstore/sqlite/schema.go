@@ -63,7 +63,7 @@ CREATE TABLE artifact_collection_shareable_documents (
 	schema_id TEXT NOT NULL,
 	schema_version TEXT NOT NULL,
 	digest TEXT NOT NULL,
-	updated_at INTEGER NOT NULL,
+	bound_at INTEGER NOT NULL,
 	PRIMARY KEY (root_id, collection_id),
 	FOREIGN KEY (root_id, collection_id)
 		REFERENCES artifact_collections(root_id, id) ON DELETE CASCADE

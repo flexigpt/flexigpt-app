@@ -27,6 +27,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
@@ -345,19 +346,8 @@ func (a *API) AttachSource(
 			basespec.ErrInvalid,
 		)
 	}
-	current, err := a.GetBundle(ctx, bundle)
-	if err != nil {
+	if _, err := a.GetBundle(ctx, bundle); err != nil {
 		return Bundle{}, err
-	}
-	if draft.Role == RoleManaged {
-		for _, attachment := range current.Attachments {
-			if attachment.Role == RoleManaged {
-				return Bundle{}, fmt.Errorf(
-					"%w: skill bundle already has a managed attachment",
-					basespec.ErrConflict,
-				)
-			}
-		}
 	}
 	if err := a.validateAttachmentDraft(ctx, bundle.RootID, draft); err != nil {
 		return Bundle{}, err
@@ -437,40 +427,10 @@ func (a *API) EnsureBuiltInBundleCurrent(
 	return err
 }
 
-// BuildLinkedPortableBundleDefinition is intentionally unavailable.
-//
-// Previous implementations emitted current Source locators as portable member
-// locators. Managed Source locators can contain local Artifact UUIDs and are
-// therefore not shareable. A future exporter must construct a package-relative
-// closure with logical names and an externally supplied package SHA-256.
-func (a *API) BuildLinkedPortableBundleDefinition(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) (definition.CollectionDefinition, error) {
-	return definition.CollectionDefinition{}, fmt.Errorf(
-		"%w: linked Skill Bundle export is disabled until package-closure export is implemented",
-		basespec.ErrUnsupported,
-	)
-}
-
-// BuildLinkedPortableBundleJSON returns the canonical shareable linked bundle
-// descriptor. It deliberately does not claim to contain a package closure.
-func (a *API) BuildLinkedPortableBundleJSON(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) ([]byte, error) {
-	value, err := a.BuildLinkedPortableBundleDefinition(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-
-	return definition.MarshalCollectionDefinition(value)
-}
-
 func (a *API) StorePortableBundleDefinition(
 	ctx context.Context,
 	ref collection.CollectionRef,
-	input definition.CollectionDefinition,
+	input builtinSchema.SkillCollectionV1,
 ) error {
 	return a.storePortableBundleDefinition(ctx, ref, input, false)
 }
@@ -848,15 +808,14 @@ func (a *API) EnsureBuiltInBundleTopology(
 		return Bundle{}, err
 	}
 	bundle, err := a.createBundle(ctx, CreateBundleRequest{
-		RootID:                   request.RootID,
-		CollectionID:             request.CollectionID,
-		LogicalName:              request.LogicalName,
-		LogicalVersion:           request.LogicalVersion,
-		DisplayName:              request.DisplayName,
-		Description:              request.Description,
-		Labels:                   request.Labels,
-		Enabled:                  request.Enabled,
-		PortableDefinitionDigest: cryptoutil.CloneDigest(request.PortableDefinitionDigest),
+		RootID:         request.RootID,
+		CollectionID:   request.CollectionID,
+		LogicalName:    request.LogicalName,
+		LogicalVersion: request.LogicalVersion,
+		DisplayName:    request.DisplayName,
+		Description:    request.Description,
+		Labels:         request.Labels,
+		Enabled:        request.Enabled,
 		Attachments: []AttachmentDraft{{
 			SourceID:              request.SourceID,
 			Role:                  RoleBuiltIn,
@@ -870,12 +829,11 @@ func (a *API) EnsureBuiltInBundleTopology(
 	}
 	if !builtInBundleTopologyMatches(bundle, request) {
 		data, err := EncodeCollectionData(CollectionData{
-			SchemaVersion:            CollectionSchemaVersion,
-			DiscoveryPolicyRevision:  DiscoveryPolicyRevision,
-			LogicalName:              request.LogicalName,
-			LogicalVersion:           request.LogicalVersion,
-			Labels:                   request.Labels,
-			PortableDefinitionDigest: request.PortableDefinitionDigest,
+			SchemaVersion:           CollectionSchemaVersion,
+			DiscoveryPolicyRevision: DiscoveryPolicyRevision,
+			LogicalName:             request.LogicalName,
+			LogicalVersion:          request.LogicalVersion,
+			Labels:                  request.Labels,
 		})
 		if err != nil {
 			return Bundle{}, err
@@ -949,18 +907,11 @@ func (a *API) EnsureBuiltInBundleTopology(
 		}
 	}
 	if request.PortableDefinition != nil {
-		canonical, err := CanonicalizePortableBundleDefinition(
+		canonical, err := builtinSchema.CanonicalizeSkillCollectionV1(
 			*request.PortableDefinition,
 		)
 		if err != nil {
 			return Bundle{}, err
-		}
-		if request.PortableDefinitionDigest != nil &&
-			canonical.Digest != *request.PortableDefinitionDigest {
-			return Bundle{}, fmt.Errorf(
-				"%w: built-in portable definition digest differs from its document",
-				basespec.ErrDigestMismatch,
-			)
 		}
 		if err := a.storePortableBundleDefinition(
 			ctx,
@@ -993,7 +944,7 @@ func (a *API) InstallBuiltInSkill(
 func (a *API) storePortableBundleDefinition(
 	ctx context.Context,
 	ref collection.CollectionRef,
-	input definition.CollectionDefinition,
+	input builtinSchema.SkillCollectionV1,
 	allowProtected bool,
 ) error {
 	if err := a.Ready(); err != nil {
@@ -1002,26 +953,24 @@ func (a *API) storePortableBundleDefinition(
 	if err := a.requireBundleMutation(ctx, ref.RootID, allowProtected); err != nil {
 		return err
 	}
-	bundle, err := a.GetBundle(ctx, ref)
+	if _, err := a.GetBundle(ctx, ref); err != nil {
+		return err
+	}
+	canonical, err := builtinSchema.CanonicalizeSkillCollectionV1(input)
 	if err != nil {
 		return err
 	}
-	canonical, err := CanonicalizePortableBundleDefinition(input)
-	if err != nil {
-		return err
-	}
-	if bundle.Data.PortableDefinitionDigest != nil &&
-		*bundle.Data.PortableDefinitionDigest != canonical.Digest {
+	if canonical.Digest == nil {
 		return fmt.Errorf(
-			"%w: bundle provenance digest differs from the supplied portable document",
-			basespec.ErrConflict,
+			"%w: canonical skill collection has no digest",
+			basespec.ErrInvalid,
 		)
 	}
 
 	existing, err := a.dependencies.Shareables.GetCollection(ctx, ref)
 	switch {
 	case err == nil:
-		if existing.Binding.Digest != canonical.Digest {
+		if existing.Binding.Digest != cryptoutil.Digest(*canonical.Digest) {
 			return fmt.Errorf(
 				"%w: bundle already has a different stored portable document",
 				basespec.ErrConflict,
@@ -1032,7 +981,7 @@ func (a *API) storePortableBundleDefinition(
 		return err
 	}
 
-	raw, err := MarshalPortableBundleDefinition(canonical)
+	raw, err := builtinSchema.MarshalSkillCollectionV1(canonical)
 	if err != nil {
 		return err
 	}
@@ -1100,13 +1049,12 @@ func (a *API) createBundle(
 	}
 
 	data, err := EncodeCollectionData(CollectionData{
-		SchemaVersion:            CollectionSchemaVersion,
-		DiscoveryPolicyRevision:  DiscoveryPolicyRevision,
-		LogicalName:              request.LogicalName,
-		LogicalVersion:           request.LogicalVersion,
-		Labels:                   request.Labels,
-		ManagedSourceID:          request.ManagedSourceID,
-		PortableDefinitionDigest: cryptoutil.CloneDigest(request.PortableDefinitionDigest),
+		SchemaVersion:           CollectionSchemaVersion,
+		DiscoveryPolicyRevision: DiscoveryPolicyRevision,
+		LogicalName:             request.LogicalName,
+		LogicalVersion:          request.LogicalVersion,
+		Labels:                  request.Labels,
+		ManagedSourceID:         request.ManagedSourceID,
 	})
 	if err != nil {
 		return Bundle{}, err
@@ -1283,11 +1231,7 @@ func bundleCreationIntentMatches(
 		value.Data.LogicalName != request.LogicalName ||
 		value.Data.LogicalVersion != request.LogicalVersion ||
 		value.Data.ManagedSourceID != request.ManagedSourceID ||
-		!maps.Equal(value.Data.Labels, request.Labels) ||
-		!cryptoutil.IsDigestEqual(
-			value.Data.PortableDefinitionDigest,
-			request.PortableDefinitionDigest,
-		) {
+		!maps.Equal(value.Data.Labels, request.Labels) {
 		return false
 	}
 
@@ -1385,11 +1329,7 @@ func builtInBundleTopologyMatches(
 	if err != nil {
 		return false
 	}
-	return cryptoutil.IsDigestEqual(
-		value.Data.PortableDefinitionDigest,
-		request.PortableDefinitionDigest,
-	) &&
-		attachment.RootID == request.RootID &&
+	return attachment.RootID == request.RootID &&
 		attachment.CollectionID == request.CollectionID &&
 		attachment.SourceID == request.SourceID &&
 		attachment.Role == RoleBuiltIn &&
@@ -1709,8 +1649,7 @@ func (a *API) createManagedSkill(
 	intent, intentErr := decodeManagedSkillArtifactData(pinned.Data)
 	samePackageIntent := intentErr == nil &&
 		intent.PackageSHA256 == packageSHA256 &&
-		((intent.Enabled == nil && pinned.Enabled == request.Enabled) ||
-			(intent.Enabled != nil && *intent.Enabled == request.Enabled))
+		*intent.Enabled == request.Enabled
 
 	if request.ExpectedArtifactRevision == 0 {
 		// Zero is the initial-create token and an idempotent replay token.
@@ -2235,8 +2174,8 @@ func normalizeManagedSkillFiles(
 type managedSkillArtifactData struct {
 	PackageSHA256 cryptoutil.Digest `json:"packageSHA256"`
 
-	// Enabled is part of the durable managed-Skill operation intent. It is a
-	// pointer so records created before this field existed remain readable.
+	// Enabled is required durable operation intent. The pointer exists only to
+	// detect a missing JSON field during strict decoding.
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
@@ -2254,7 +2193,16 @@ func newManagedSkillArtifactData(
 func validateManagedSkillArtifactData(
 	value managedSkillArtifactData,
 ) error {
-	return cryptoutil.ValidateDigest(value.PackageSHA256)
+	if err := cryptoutil.ValidateDigest(value.PackageSHA256); err != nil {
+		return err
+	}
+	if value.Enabled == nil {
+		return fmt.Errorf(
+			"%w: managed Skill Artifact data requires enabled",
+			basespec.ErrInvalid,
+		)
+	}
+	return nil
 }
 
 func encodeManagedSkillArtifactData(
@@ -2398,7 +2346,7 @@ func pendingManagedSkillCreateError(
 
 func pendingManagedSkillPurgeError(ref artifact.ArtifactRef, cause error) error {
 	return fmt.Errorf(
-		"managed Skill create for Artifact %q remains pending; reload its current revision before retrying a replacement with the same artifactID: %w",
+		"managed Skill purge for Artifact %q remains pending; reload its current revision before retrying with the same artifactID: %w",
 		ref.ArtifactID,
 		cause,
 	)

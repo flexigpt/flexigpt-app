@@ -428,6 +428,8 @@ linters:
           alias: ${1}Consts
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/spec
           alias: ${1}Spec
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/schema
+          alias: ${1}Schema
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store
           alias: ${1}Store
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime

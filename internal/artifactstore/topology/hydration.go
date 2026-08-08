@@ -44,17 +44,17 @@ func (h Hydration) Validate() error {
 }
 
 // HydrationCoordinator reconciles binary-owned topology state before and
-// after artifact-family installation. The artifact family supplies only its
-// desired hydration identity and fingerprint.
+// after artifact-family installation. Preparation is batched so one stale
+// installer cannot invalidate another installer sharing the same protected
+// Root after that installer has already been marked current.
 //
-// PrepareTopologyHydration returns current=true when the persisted desired
-// state exactly matches the supplied value. When current=false it removes
-// stale topology state, but does not write the new marker until commit.
+// PrepareTopologyHydrations returns current state by installer name. A Root
+// reset marks every installer using that Root as non-current.
 type HydrationCoordinator interface {
-	PrepareTopologyHydration(
+	PrepareTopologyHydrations(
 		ctx context.Context,
-		desired Hydration,
-	) (current bool, err error)
+		desired []Hydration,
+	) (currentByInstaller map[string]bool, err error)
 
 	CommitTopologyHydration(
 		ctx context.Context,

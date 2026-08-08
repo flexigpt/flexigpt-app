@@ -112,9 +112,21 @@ func (i *Installer) desiredHydrationFingerprint(
 		if err != nil {
 			return "", err
 		}
+		if collectionValue.Definition.Digest == nil {
+			return "", fmt.Errorf(
+				"%w: hydrated built-in collection has no digest",
+				basespec.ErrInvalid,
+			)
+		}
+		definitionDigest := cryptoutil.Digest(
+			*collectionValue.Definition.Digest,
+		)
+		if err := cryptoutil.ValidateDigest(definitionDigest); err != nil {
+			return "", err
+		}
 		value := hydrationCollection{
 			Registration:          collectionValue.Registration,
-			DefinitionDigest:      collectionValue.Definition.Digest,
+			DefinitionDigest:      definitionDigest,
 			SourceScope:           collectionValue.SourceScope,
 			ExpectedMemberDigests: collectionValue.ExpectedMemberDigests,
 			Artifacts:             make([]hydrationArtifact, 0, len(collectionValue.Artifacts)),

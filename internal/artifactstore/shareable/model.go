@@ -107,6 +107,16 @@ type Codec interface {
 	) (ParsedDocument, error)
 }
 
+// Canonicalizer is the narrow capability needed by artifact-family hydration
+// code. It validates input through registered codecs and returns canonical
+// persisted-document bytes without binding them to a local Collection.
+type Canonicalizer interface {
+	Canonicalize(
+		ctx context.Context,
+		raw []byte,
+	) (ParsedDocument, error)
+}
+
 type DocumentRepository interface {
 	Put(
 		ctx context.Context,
