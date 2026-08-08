@@ -13,7 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -30,7 +29,6 @@ type Dependencies struct {
 	Refresh                refresh.Runner
 	Catalogs               catalog.Reader
 	Definitions            definition.Reader
-	Shareables             *shareable.Service
 	ManagedArtifacts       *managedartifact.Service
 	SourceRuntime          source.Runtime
 	HasDecoder             func(basespec.DecoderID) bool
@@ -47,7 +45,6 @@ func (d Dependencies) Validate() error {
 		d.Refresh == nil ||
 		d.Catalogs == nil ||
 		d.Definitions == nil ||
-		d.Shareables == nil ||
 		d.ManagedArtifacts == nil ||
 		d.SourceRuntime == nil ||
 		d.HasDecoder == nil ||

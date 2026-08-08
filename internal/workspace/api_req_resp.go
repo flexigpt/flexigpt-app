@@ -9,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -373,34 +372,6 @@ type ListWorkspacesResponseBody struct {
 
 type ListWorkspacesResponse struct {
 	Body *ListWorkspacesResponseBody
-}
-
-type WorkspaceShareableDocumentView struct {
-	Workspace WorkspaceRef        `json:"workspace"`
-	Schema    shareable.SchemaKey `json:"schema"`
-	Digest    cryptoutil.Digest   `json:"digest"`
-	Document  json.RawMessage     `json:"document"`
-}
-
-type GetShareableWorkspaceDocumentRequest struct {
-	Workspace WorkspaceRef `json:"workspace" required:"true"`
-}
-
-type GetShareableWorkspaceDocumentResponse struct {
-	Body *WorkspaceShareableDocumentView
-}
-
-type StoreShareableWorkspaceDocumentRequestBody struct {
-	Document json.RawMessage `json:"document" required:"true"`
-}
-
-type StoreShareableWorkspaceDocumentRequest struct {
-	Workspace WorkspaceRef `json:"workspace" required:"true"`
-	Body      *StoreShareableWorkspaceDocumentRequestBody
-}
-
-type StoreShareableWorkspaceDocumentResponse struct {
-	Body *WorkspaceShareableDocumentView
 }
 
 type UpdateWorkspaceRequestBody struct {

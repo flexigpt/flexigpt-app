@@ -9,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -22,10 +21,6 @@ type RootRepository struct {
 }
 
 type CollectionRepository struct {
-	store *Store
-}
-
-type ShareableDocumentRepository struct {
 	store *Store
 }
 
@@ -55,10 +50,6 @@ func (s *Store) Artifacts() *ArtifactRepository {
 
 func (s *Store) Catalogs() *CatalogRepository {
 	return &CatalogRepository{store: s}
-}
-
-func (s *Store) ShareableDocuments() *ShareableDocumentRepository {
-	return &ShareableDocumentRepository{store: s}
 }
 
 func (r *SourceRepository) Create(
@@ -294,20 +285,6 @@ func (r *CatalogRepository) GetCurrent(
 	ref collection.CollectionRef,
 ) (catalog.Snapshot, error) {
 	return r.store.getCurrentCatalog(ctx, ref)
-}
-
-func (r *ShareableDocumentRepository) PutCollectionDocument(
-	ctx context.Context,
-	value shareable.CollectionDocumentBinding,
-) error {
-	return r.store.putCollectionDocumentBinding(ctx, value)
-}
-
-func (r *ShareableDocumentRepository) GetCollectionDocument(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) (shareable.CollectionDocumentBinding, error) {
-	return r.store.getCollectionDocumentBinding(ctx, ref)
 }
 
 func (r *ArtifactRepository) Get(

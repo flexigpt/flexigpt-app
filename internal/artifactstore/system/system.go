@@ -46,13 +46,13 @@ type ManagedPackageResult struct {
 }
 
 type Components struct {
-	Roots       *root.Service
-	Sources     *source.Service
-	Collections *collection.Service
-	Artifacts   *artifact.Service
-	Refresh     *refresh.Service
+	Roots            *root.Service
+	Sources          *source.Service
+	Collections      *collection.Service
+	Artifacts        *artifact.Service
+	Refresh          *refresh.Service
+	ShareableSchemas *shareable.Registry
 
-	Shareables       *shareable.Service
 	ManagedArtifacts *managedartifact.Service
 	CollectionReader collection.Reader
 	ArtifactReader   artifact.Reader
@@ -64,7 +64,6 @@ type Components struct {
 	metadata           *sqlite.Store
 	content            *maprepo.Repository
 	managedSources     *source.Registry
-	shareableDocuments *shareable.FileRepository
 	decoderIDs         map[basespec.DecoderID]struct{}
 	rootMutationPolicy protection.RootPolicy
 }
@@ -115,17 +114,10 @@ func Open(
 		return nil, err
 	}
 
-	shareableDocuments, err := shareable.OpenFileRepository(
-		filepath.Join(base, "shareable-documents"),
+	shareableRegistry, err := shareable.NewRegistry(
+		config.ShareableCodecs...,
 	)
 	if err != nil {
-		_ = content.Close()
-		_ = metadata.Close()
-		return nil, err
-	}
-	shareableRegistry, err := shareable.NewRegistry(config.ShareableCodecs...)
-	if err != nil {
-		_ = shareableDocuments.Close()
 		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
@@ -135,7 +127,6 @@ func Open(
 		config.FilesystemTraversalPolicy,
 	)
 	if err != nil {
-		_ = shareableDocuments.Close()
 		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
@@ -145,7 +136,6 @@ func Open(
 		filepath.Join(base, "managed-sources"),
 	)
 	if err != nil {
-		_ = shareableDocuments.Close()
 		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
@@ -153,17 +143,10 @@ func Open(
 
 	embeddedAdapter, err := embedded.New(config.EmbeddedProviders)
 	if err != nil {
-		_ = shareableDocuments.Close()
 		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
-	openSucceeded := false
-	defer func() {
-		if !openSucceeded {
-			_ = shareableDocuments.Close()
-		}
-	}()
 
 	sourceAdapters := make([]source.Adapter, 0, 3+len(config.AdditionalSources))
 	sourceAdapters = append(
@@ -198,19 +181,6 @@ func Open(
 			_, err := rootRepository.Get(ctx, rootID)
 			return err
 		},
-	)
-	if err != nil {
-		_ = content.Close()
-		_ = metadata.Close()
-		return nil, err
-	}
-
-	shareableService, err := shareable.NewService(
-		shareableRegistry,
-		shareableDocuments,
-		metadata.ShareableDocuments(),
-		collectionRepository,
-		config.RootMutationPolicy,
 	)
 	if err != nil {
 		_ = content.Close()
@@ -318,8 +288,8 @@ func Open(
 		Collections:        collectionService,
 		Artifacts:          artifactService,
 		Refresh:            refreshService,
+		ShareableSchemas:   shareableRegistry,
 		CollectionReader:   collectionRepository,
-		Shareables:         shareableService,
 		ArtifactReader:     artifactRepository,
 		Catalogs:           catalogRepository,
 		Definitions:        definitions,
@@ -328,7 +298,6 @@ func Open(
 		metadata:           metadata,
 		content:            content,
 		managedSources:     sourceRegistry,
-		shareableDocuments: shareableDocuments,
 		decoderIDs:         decoderIDs,
 		rootMutationPolicy: config.RootMutationPolicy,
 	}
@@ -409,7 +378,6 @@ func Open(
 		return nil, err
 	}
 	components.ManagedArtifacts = managedArtifacts
-	openSucceeded = true
 	return components, nil
 }
 
@@ -605,9 +573,6 @@ func (c *Components) Close() error {
 		if err := c.content.Close(); err != nil {
 			closeErrors = append(closeErrors, err)
 		}
-	}
-	if c.shareableDocuments != nil {
-		closeErrors = append(closeErrors, c.shareableDocuments.Close())
 	}
 	if c.metadata != nil {
 		if err := c.metadata.Close(); err != nil {

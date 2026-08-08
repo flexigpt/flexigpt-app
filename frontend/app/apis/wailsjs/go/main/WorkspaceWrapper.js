@@ -30,10 +30,6 @@ export function DetachWorkspaceSource(arg1) {
   return window['go']['main']['WorkspaceWrapper']['DetachWorkspaceSource'](arg1);
 }
 
-export function GetShareableWorkspaceDocument(arg1) {
-  return window['go']['main']['WorkspaceWrapper']['GetShareableWorkspaceDocument'](arg1);
-}
-
 export function GetWorkspace(arg1) {
   return window['go']['main']['WorkspaceWrapper']['GetWorkspace'](arg1);
 }
@@ -112,10 +108,6 @@ export function SetWorkspaceArtifactRuntimeDisabled(arg1) {
 
 export function SetWorkspacePrimarySource(arg1) {
   return window['go']['main']['WorkspaceWrapper']['SetWorkspacePrimarySource'](arg1);
-}
-
-export function StoreShareableWorkspaceDocument(arg1) {
-  return window['go']['main']['WorkspaceWrapper']['StoreShareableWorkspaceDocument'](arg1);
 }
 
 export function SuppressWorkspaceBinding(arg1) {

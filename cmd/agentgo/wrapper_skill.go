@@ -56,7 +56,6 @@ func InitSkillBundleWrapper(
 		Refresh:                components.Refresh,
 		Catalogs:               components.Catalogs,
 		Definitions:            components.Definitions,
-		Shareables:             components.Shareables,
 		ManagedArtifacts:       components.ManagedArtifacts,
 		SourceRuntime:          components.SourceRuntime,
 		HasDecoder:             components.HasDecoder,
@@ -122,7 +121,7 @@ func InitSkillBundleWrapper(
 			BuiltInTopology:        builtInTopology,
 			SkillRegistry:          skillRegistry,
 			Packages:               packages,
-			ShareableCanonicalizer: components.Shareables,
+			ShareableCanonicalizer: components.ShareableSchemas,
 		},
 	)
 	if err != nil {

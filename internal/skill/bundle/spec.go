@@ -20,7 +20,6 @@ const (
 	RoleManaged  basespec.AttachmentRole = "managed"
 	RoleBuiltIn  basespec.AttachmentRole = "builtin"
 	RoleExternal basespec.AttachmentRole = "external"
-	RoleImported basespec.AttachmentRole = "imported"
 	RoleLibrary  basespec.AttachmentRole = "library"
 )
 
@@ -103,10 +102,6 @@ type BuiltInBundleTopology struct {
 	Enabled               bool                                   `json:"-"`
 	DiscoveryRoot         basespec.Locator                       `json:"-"`
 	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest `json:"-"`
-
-	// PortableDefinition is stored through Artifact Store's generic
-	// shareable-document service after local topology creation succeeds.
-	PortableDefinition *builtinSchema.SkillCollectionV1 `json:"-"`
 }
 
 // ManagedSkillDocument is the editable projection for a managed Skill.

@@ -27,7 +27,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
@@ -425,14 +424,6 @@ func (a *API) EnsureBuiltInBundleCurrent(
 
 	_, err = a.refreshBundle(ctx, ref, true)
 	return err
-}
-
-func (a *API) StorePortableBundleDefinition(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	input builtinSchema.SkillCollectionV1,
-) error {
-	return a.storePortableBundleDefinition(ctx, ref, input, false)
 }
 
 func (a *API) CreateManagedSkill(
@@ -906,22 +897,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 			)
 		}
 	}
-	if request.PortableDefinition != nil {
-		canonical, err := builtinSchema.CanonicalizeSkillCollectionV1(
-			*request.PortableDefinition,
-		)
-		if err != nil {
-			return Bundle{}, err
-		}
-		if err := a.storePortableBundleDefinition(
-			ctx,
-			bundle.Collection.Ref(),
-			canonical,
-			true,
-		); err != nil {
-			return Bundle{}, err
-		}
-	}
+
 	return bundle, nil
 }
 
@@ -939,54 +915,6 @@ func (a *API) InstallBuiltInSkill(
 		"%w: built-in Skills must be installed through InstallBuiltInCollection",
 		basespec.ErrUnsupported,
 	)
-}
-
-func (a *API) storePortableBundleDefinition(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	input builtinSchema.SkillCollectionV1,
-	allowProtected bool,
-) error {
-	if err := a.Ready(); err != nil {
-		return err
-	}
-	if err := a.requireBundleMutation(ctx, ref.RootID, allowProtected); err != nil {
-		return err
-	}
-	if _, err := a.GetBundle(ctx, ref); err != nil {
-		return err
-	}
-	canonical, err := builtinSchema.CanonicalizeSkillCollectionV1(input)
-	if err != nil {
-		return err
-	}
-	if canonical.Digest == nil {
-		return fmt.Errorf(
-			"%w: canonical skill collection has no digest",
-			basespec.ErrInvalid,
-		)
-	}
-
-	existing, err := a.dependencies.Shareables.GetCollection(ctx, ref)
-	switch {
-	case err == nil:
-		if existing.Binding.Digest != cryptoutil.Digest(*canonical.Digest) {
-			return fmt.Errorf(
-				"%w: bundle already has a different stored portable document",
-				basespec.ErrConflict,
-			)
-		}
-	case errors.Is(err, basespec.ErrShareableDocumentNotFound):
-	default:
-		return err
-	}
-
-	raw, err := builtinSchema.MarshalSkillCollectionV1(canonical)
-	if err != nil {
-		return err
-	}
-	_, err = a.dependencies.Shareables.StoreCollection(ctx, ref, raw)
-	return err
 }
 
 func (a *API) currentBundleCatalog(
@@ -1409,7 +1337,7 @@ func (a *API) refreshPolicy(
 	autoAdoptSources := make(map[basespec.SourceID]struct{})
 	for _, attachment := range bundle.Attachments {
 		switch attachment.Role {
-		case RoleExternal, RoleImported, RoleLibrary:
+		case RoleExternal, RoleLibrary:
 			autoAdoptSources[attachment.SourceID] = struct{}{}
 		}
 	}
@@ -1886,7 +1814,7 @@ func (a *API) validateAttachment(
 
 func validateRole(role basespec.AttachmentRole) error {
 	switch role {
-	case RoleManaged, RoleBuiltIn, RoleExternal, RoleImported, RoleLibrary:
+	case RoleManaged, RoleBuiltIn, RoleExternal, RoleLibrary:
 		return nil
 	default:
 		return fmt.Errorf(
@@ -1911,7 +1839,7 @@ func validateRoleSourceKind(
 				managed.Kind,
 			)
 		}
-	case RoleExternal, RoleImported, RoleLibrary:
+	case RoleExternal, RoleLibrary:
 		if kind != fsdir.Kind {
 			return fmt.Errorf(
 				"%w: skill bundle role %q requires source kind %q",

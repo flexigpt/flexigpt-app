@@ -81,7 +81,7 @@ func newComponents(
 	}
 	loader, err := discovery.NewDescriptorLoader(
 		dependencies.SourceRuntime,
-		dependencies.Shareables,
+		dependencies.ShareableCanonicalizer,
 	)
 	if err != nil {
 		return nil, err

@@ -196,8 +196,7 @@ func (c *Components) ResetTopologyHydration(
 	if c == nil ||
 		c.metadata == nil ||
 		c.content == nil ||
-		c.managedSources == nil ||
-		c.shareableDocuments == nil {
+		c.managedSources == nil {
 		return basespec.ErrClosed
 	}
 	if ctx == nil {
@@ -256,13 +255,6 @@ func (c *Components) ResetTopologyHydration(
 		)
 	}
 
-	if err := c.shareableDocuments.RemoveRoot(ctx, rootID); err != nil {
-		return fmt.Errorf(
-			"purge shareable documents for topology root %q: %w",
-			rootID,
-			err,
-		)
-	}
 	if err := c.content.RemoveRoot(ctx, rootID); err != nil {
 		return fmt.Errorf(
 			"purge immutable definitions for topology root %q: %w",

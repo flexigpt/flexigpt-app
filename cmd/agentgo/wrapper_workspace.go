@@ -29,18 +29,18 @@ func InitWorkspaceWrapper(
 	config.AutoAdoptionIDProvider = artifact.UUIDArtifactIDProvider()
 
 	api, err := workspace.New(workspace.Dependencies{
-		Roots:              artifacts.Roots,
-		Sources:            artifacts.Sources,
-		Collections:        artifacts.Collections,
-		Artifacts:          artifacts.Artifacts,
-		Refresh:            artifacts.Refresh,
-		Catalogs:           artifacts.Catalogs,
-		Definitions:        artifacts.Definitions,
-		Shareables:         artifacts.Shareables,
-		SourceRuntime:      artifacts.SourceRuntime,
-		HasDecoder:         artifacts.HasDecoder,
-		DecoderFingerprint: artifacts.DecoderFingerprint,
-		RootMutationPolicy: artifacts.RootMutationPolicy(),
+		Roots:                  artifacts.Roots,
+		Sources:                artifacts.Sources,
+		Collections:            artifacts.Collections,
+		Artifacts:              artifacts.Artifacts,
+		Refresh:                artifacts.Refresh,
+		Catalogs:               artifacts.Catalogs,
+		Definitions:            artifacts.Definitions,
+		ShareableCanonicalizer: artifacts.ShareableSchemas,
+		SourceRuntime:          artifacts.SourceRuntime,
+		HasDecoder:             artifacts.HasDecoder,
+		DecoderFingerprint:     artifacts.DecoderFingerprint,
+		RootMutationPolicy:     artifacts.RootMutationPolicy(),
 	}, config)
 	if err != nil {
 		return err
@@ -97,32 +97,6 @@ func (w *WorkspaceWrapper) ListWorkspaces(
 	return middleware.WithRecoveryResp(func() (*workspace.ListWorkspacesResponse, error) {
 		return w.api.ListWorkspaces(context.Background(), request)
 	})
-}
-
-func (w *WorkspaceWrapper) GetShareableWorkspaceDocument(
-	request *workspace.GetShareableWorkspaceDocumentRequest,
-) (*workspace.GetShareableWorkspaceDocumentResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*workspace.GetShareableWorkspaceDocumentResponse, error) {
-			return w.api.GetShareableWorkspaceDocument(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *WorkspaceWrapper) StoreShareableWorkspaceDocument(
-	request *workspace.StoreShareableWorkspaceDocumentRequest,
-) (*workspace.StoreShareableWorkspaceDocumentResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*workspace.StoreShareableWorkspaceDocumentResponse, error) {
-			return w.api.StoreShareableWorkspaceDocument(
-				context.Background(),
-				request,
-			)
-		},
-	)
 }
 
 func (w *WorkspaceWrapper) UpdateWorkspace(

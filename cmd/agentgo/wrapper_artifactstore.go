@@ -187,32 +187,6 @@ func (w *ArtifactStoreWrapper) PurgeArtifactRoot(
 	)
 }
 
-func (w *ArtifactStoreWrapper) GetShareableCollectionDocument(
-	request *artifactstore.GetShareableCollectionDocumentRequest,
-) (*artifactstore.GetShareableCollectionDocumentResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*artifactstore.GetShareableCollectionDocumentResponse, error) {
-			return w.api.GetShareableCollectionDocument(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *ArtifactStoreWrapper) StoreShareableCollectionDocument(
-	request *artifactstore.StoreShareableCollectionDocumentRequest,
-) (*artifactstore.StoreShareableCollectionDocumentResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*artifactstore.StoreShareableCollectionDocumentResponse, error) {
-			return w.api.StoreShareableCollectionDocument(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
 func (w *ArtifactStoreWrapper) CreateArtifactSource(
 	request *artifactstore.CreateArtifactSourceRequest,
 ) (*artifactstore.CreateArtifactSourceResponse, error) {

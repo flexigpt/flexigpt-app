@@ -56,19 +56,6 @@ CREATE TABLE artifact_collections (
 	UNIQUE (root_id, id)
 );
 
-CREATE TABLE artifact_collection_shareable_documents (
-	root_id TEXT NOT NULL,
-	collection_id TEXT NOT NULL,
-	kind TEXT NOT NULL,
-	schema_id TEXT NOT NULL,
-	schema_version TEXT NOT NULL,
-	digest TEXT NOT NULL,
-	bound_at INTEGER NOT NULL,
-	PRIMARY KEY (root_id, collection_id),
-	FOREIGN KEY (root_id, collection_id)
-		REFERENCES artifact_collections(root_id, id) ON DELETE CASCADE
-);
-
 CREATE TABLE artifact_collection_attachments (
 	root_id TEXT NOT NULL,
 	collection_id TEXT NOT NULL,

@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 )
@@ -25,10 +24,6 @@ func New(components *system.Components) (*API, error) {
 		components.Sources == nil {
 		return nil, errors.New("artifact store components are required")
 	}
-	if components.Shareables == nil {
-		return nil, errors.New("artifact store shareable documents are required")
-	}
-
 	return &API{
 		components: components,
 	}, nil
@@ -183,62 +178,6 @@ func (a *API) PurgeArtifactRoot(
 	return &PurgeArtifactRootResponse{
 		RootID: request.RootID,
 	}, nil
-}
-
-func (a *API) GetShareableCollectionDocument(
-	ctx context.Context,
-	request *GetShareableCollectionDocumentRequest,
-) (*GetShareableCollectionDocumentResponse, error) {
-	if err := a.check(ctx); err != nil {
-		return nil, err
-	}
-	if err := requireRequest(request, "get shareable collection document request"); err != nil {
-		return nil, err
-	}
-	value, err := a.components.Shareables.GetCollection(
-		ctx,
-		collection.CollectionRef{
-			RootID:       request.RootID,
-			CollectionID: request.CollectionID,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &GetShareableCollectionDocumentResponse{Body: &value}, nil
-}
-
-func (a *API) StoreShareableCollectionDocument(
-	ctx context.Context,
-	request *StoreShareableCollectionDocumentRequest,
-) (*StoreShareableCollectionDocumentResponse, error) {
-	if err := a.check(ctx); err != nil {
-		return nil, err
-	}
-	if err := requireRequest(request, "store shareable collection document request"); err != nil {
-		return nil, err
-	}
-	if err := requireBody(request.Body, "shareable collection document body"); err != nil {
-		return nil, err
-	}
-	if len(request.Body.Document) == 0 {
-		return nil, fmt.Errorf(
-			"%w: shareable collection document is required",
-			basespec.ErrInvalid,
-		)
-	}
-	value, err := a.components.Shareables.StoreCollection(
-		ctx,
-		collection.CollectionRef{
-			RootID:       request.RootID,
-			CollectionID: request.CollectionID,
-		},
-		append([]byte(nil), request.Body.Document...),
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &StoreShareableCollectionDocumentResponse{Body: &value}, nil
 }
 
 func (a *API) CreateArtifactSource(
@@ -528,8 +467,7 @@ func (a *API) check(ctx context.Context) error {
 	if a == nil ||
 		a.components == nil ||
 		a.components.Roots == nil ||
-		a.components.Sources == nil ||
-		a.components.Shareables == nil {
+		a.components.Sources == nil {
 		return basespec.ErrClosed
 	}
 	if ctx == nil {

@@ -418,50 +418,6 @@ export namespace artifactstore {
 		}
 	}
 	
-	export class GetShareableCollectionDocumentRequest {
-	    RootID: string;
-	    CollectionID: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new GetShareableCollectionDocumentRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.RootID = source["RootID"];
-	        this.CollectionID = source["CollectionID"];
-	    }
-	}
-	export class GetShareableCollectionDocumentResponse {
-	    Body?: shareable.CollectionDocument;
-	
-	    static createFrom(source: any = {}) {
-	        return new GetShareableCollectionDocumentResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], shareable.CollectionDocument);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class ListArtifactRootsRequest {
 	
 	
@@ -3368,96 +3324,6 @@ export namespace selection {
 		    return a;
 		}
 	}
-
-}
-
-export namespace shareable {
-	
-	export class SchemaKey {
-	    entity: string;
-	    kind: string;
-	    schemaID: string;
-	    schemaVersion: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SchemaKey(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.entity = source["entity"];
-	        this.kind = source["kind"];
-	        this.schemaID = source["schemaID"];
-	        this.schemaVersion = source["schemaVersion"];
-	    }
-	}
-	export class CollectionDocumentBinding {
-	    collection: collection.CollectionRef;
-	    schema: SchemaKey;
-	    digest: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new CollectionDocumentBinding(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], collection.CollectionRef);
-	        this.schema = this.convertValues(source["schema"], SchemaKey);
-	        this.digest = source["digest"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class CollectionDocument {
-	    binding: CollectionDocumentBinding;
-	    raw: number[];
-	
-	    static createFrom(source: any = {}) {
-	        return new CollectionDocument(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.binding = this.convertValues(source["binding"], CollectionDocumentBinding);
-	        this.raw = source["raw"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
 
 }
 
@@ -13552,102 +13418,6 @@ export namespace workspace {
 		    return a;
 		}
 	}
-	export class GetShareableWorkspaceDocumentRequest {
-	    workspace: collection.CollectionRef;
-	
-	    static createFrom(source: any = {}) {
-	        return new GetShareableWorkspaceDocumentRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class WorkspaceShareableDocumentView {
-	    workspace: collection.CollectionRef;
-	    schema: shareable.SchemaKey;
-	    digest: string;
-	    document: number[];
-	
-	    static createFrom(source: any = {}) {
-	        return new WorkspaceShareableDocumentView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
-	        this.schema = this.convertValues(source["schema"], shareable.SchemaKey);
-	        this.digest = source["digest"];
-	        this.document = source["document"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class GetShareableWorkspaceDocumentResponse {
-	    Body?: WorkspaceShareableDocumentView;
-	
-	    static createFrom(source: any = {}) {
-	        return new GetShareableWorkspaceDocumentResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], WorkspaceShareableDocumentView);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class GetWorkspaceArtifactRequest {
 	    workspace: collection.CollectionRef;
 	    artifact: artifact.ArtifactRef;
@@ -15865,81 +15635,6 @@ export namespace workspace {
 		    return a;
 		}
 	}
-	export class StoreShareableWorkspaceDocumentRequestBody {
-	    document: number[];
-	
-	    static createFrom(source: any = {}) {
-	        return new StoreShareableWorkspaceDocumentRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.document = source["document"];
-	    }
-	}
-	export class StoreShareableWorkspaceDocumentRequest {
-	    workspace: collection.CollectionRef;
-	    Body?: StoreShareableWorkspaceDocumentRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new StoreShareableWorkspaceDocumentRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
-	        this.Body = this.convertValues(source["Body"], StoreShareableWorkspaceDocumentRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class StoreShareableWorkspaceDocumentResponse {
-	    Body?: WorkspaceShareableDocumentView;
-	
-	    static createFrom(source: any = {}) {
-	        return new StoreShareableWorkspaceDocumentResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], WorkspaceShareableDocumentView);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class SuppressWorkspaceBindingRequestBody {
 	    expectedCollectionRevision: number;
 	    binding: artifact.SourceBinding;
@@ -16433,7 +16128,6 @@ export namespace workspace {
 		    return a;
 		}
 	}
-	
 	
 	
 	

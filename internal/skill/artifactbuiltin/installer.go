@@ -144,7 +144,6 @@ func (i *Installer) EnsureBuiltInBundles(
 				basespec.ErrInvalid,
 			)
 		}
-		portableDefinition := value.Definition.Clone()
 		bundle, err := i.skills.EnsureBuiltInBundleTopology(
 			ctx,
 			skillBundle.BuiltInBundleTopology{
@@ -159,7 +158,6 @@ func (i *Installer) EnsureBuiltInBundles(
 				Enabled:               value.Registration.Enabled,
 				DiscoveryRoot:         value.SourceScope,
 				ExpectedMemberDigests: value.ExpectedMemberDigests,
-				PortableDefinition:    &portableDefinition,
 			},
 		)
 		if err != nil {

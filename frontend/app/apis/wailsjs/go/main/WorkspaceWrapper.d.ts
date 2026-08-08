@@ -16,8 +16,6 @@ export function CreateFilesystemWorkspace(arg1:workspace.CreateFilesystemWorkspa
 
 export function DetachWorkspaceSource(arg1:workspace.DetachWorkspaceSourceRequest):Promise<workspace.DetachWorkspaceSourceResponse>;
 
-export function GetShareableWorkspaceDocument(arg1:workspace.GetShareableWorkspaceDocumentRequest):Promise<workspace.GetShareableWorkspaceDocumentResponse>;
-
 export function GetWorkspace(arg1:workspace.GetWorkspaceRequest):Promise<workspace.GetWorkspaceResponse>;
 
 export function GetWorkspaceArtifact(arg1:workspace.GetWorkspaceArtifactRequest):Promise<workspace.GetWorkspaceArtifactResponse>;
@@ -57,8 +55,6 @@ export function SetWorkspaceArtifactEnabled(arg1:workspace.SetWorkspaceArtifactE
 export function SetWorkspaceArtifactRuntimeDisabled(arg1:workspace.SetWorkspaceArtifactRuntimeDisabledRequest):Promise<workspace.SetWorkspaceArtifactRuntimeDisabledResponse>;
 
 export function SetWorkspacePrimarySource(arg1:workspace.SetWorkspacePrimarySourceRequest):Promise<workspace.SetWorkspacePrimarySourceResponse>;
-
-export function StoreShareableWorkspaceDocument(arg1:workspace.StoreShareableWorkspaceDocumentRequest):Promise<workspace.StoreShareableWorkspaceDocumentResponse>;
 
 export function SuppressWorkspaceBinding(arg1:workspace.SuppressWorkspaceBindingRequest):Promise<workspace.SuppressWorkspaceBindingResponse>;
 

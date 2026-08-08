@@ -24,7 +24,6 @@ var schemaV1RequiredTables = []string{
 	"artifact_topology_hydrations",
 	"artifact_sources",
 	"artifact_collections",
-	"artifact_collection_shareable_documents",
 	"artifact_collection_attachments",
 	"artifact_current_catalogs",
 	"artifact_current_occurrences",

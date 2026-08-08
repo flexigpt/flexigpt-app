@@ -24,40 +24,22 @@ type RootLister interface {
 	List(ctx context.Context) ([]root.Root, error)
 }
 
-// ShareableCollectionStore is the narrow Artifact Store capability Workspace
-// needs for parsing, explicitly binding, and retrieving workspace.json
-// documents. Workspace does not depend on system.Components directly.
-type ShareableCollectionStore interface {
-	shareable.Canonicalizer
-
-	StoreCollection(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		raw []byte,
-	) (shareable.CollectionDocument, error)
-
-	GetCollection(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (shareable.CollectionDocument, error)
-}
-
 // Dependencies is the application-composition boundary for Workspace.
 // Workspace deliberately depends on Artifact Store ports and services rather
 // than the concrete Artifact Store system container.
 type Dependencies struct {
-	Roots              RootLister
-	Sources            *source.Service
-	Collections        *collection.Service
-	Artifacts          *artifact.Service
-	Refresh            refresh.Runner
-	Catalogs           catalog.Reader
-	Definitions        definition.Reader
-	Shareables         ShareableCollectionStore
-	SourceRuntime      source.Runtime
-	HasDecoder         func(basespec.DecoderID) bool
-	DecoderFingerprint func() (cryptoutil.Digest, error)
-	RootMutationPolicy protection.RootPolicy
+	Roots                  RootLister
+	Sources                *source.Service
+	Collections            *collection.Service
+	Artifacts              *artifact.Service
+	Refresh                refresh.Runner
+	Catalogs               catalog.Reader
+	Definitions            definition.Reader
+	ShareableCanonicalizer shareable.Canonicalizer
+	SourceRuntime          source.Runtime
+	HasDecoder             func(basespec.DecoderID) bool
+	DecoderFingerprint     func() (cryptoutil.Digest, error)
+	RootMutationPolicy     protection.RootPolicy
 }
 
 func (d Dependencies) Validate() error {
@@ -68,7 +50,7 @@ func (d Dependencies) Validate() error {
 		d.Refresh == nil ||
 		d.Catalogs == nil ||
 		d.Definitions == nil ||
-		d.Shareables == nil ||
+		d.ShareableCanonicalizer == nil ||
 		d.SourceRuntime == nil ||
 		d.HasDecoder == nil ||
 		d.DecoderFingerprint == nil ||

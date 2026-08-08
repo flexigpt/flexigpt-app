@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -67,79 +66,24 @@ func (d ParsedDocument) Clone() ParsedDocument {
 	return output
 }
 
-type CollectionDocumentBinding struct {
-	Collection collection.CollectionRef `json:"collection"`
-	Key        SchemaKey                `json:"schema"`
-	Digest     cryptoutil.Digest        `json:"digest"`
-}
-
-func (b CollectionDocumentBinding) Validate() error {
-	if err := b.Collection.Validate(); err != nil {
-		return err
-	}
-	if err := b.Key.Validate(); err != nil {
-		return err
-	}
-	return cryptoutil.ValidateDigest(b.Digest)
-}
-
-type CollectionDocument struct {
-	Binding CollectionDocumentBinding `json:"binding"`
-	Raw     json.RawMessage           `json:"raw"`
-}
-
-func (d CollectionDocument) Clone() CollectionDocument {
-	output := d
-	output.Raw = append(json.RawMessage(nil), d.Raw...)
-	return output
-}
-
 type Codec interface {
 	Key() SchemaKey
 	JSONSchema() []byte
 
-	// Canonicalize must strictly decode, semantically validate, calculate or
-	// verify the portable digest, and return canonical JSON containing the
-	// resulting digest.
+	// Canonicalize strictly decodes, validates, calculates or verifies the
+	// optional supplied digest, and returns canonical JSON containing the
+	// calculated digest. It does not persist source content.
 	Canonicalize(
 		ctx context.Context,
 		raw []byte,
 	) (ParsedDocument, error)
 }
 
-// Canonicalizer is the narrow capability needed by artifact-family hydration
-// code. It validates input through registered codecs and returns canonical
-// persisted-document bytes without binding them to a local Collection.
+// Canonicalizer is the narrow validation capability needed by artifact-family
+// hydration and linked-source descriptor readers.
 type Canonicalizer interface {
 	Canonicalize(
 		ctx context.Context,
 		raw []byte,
 	) (ParsedDocument, error)
-}
-
-type DocumentRepository interface {
-	Put(
-		ctx context.Context,
-		rootID basespec.RootID,
-		digest cryptoutil.Digest,
-		raw json.RawMessage,
-	) error
-
-	Get(
-		ctx context.Context,
-		rootID basespec.RootID,
-		digest cryptoutil.Digest,
-	) (json.RawMessage, error)
-}
-
-type CollectionBindingRepository interface {
-	PutCollectionDocument(
-		ctx context.Context,
-		value CollectionDocumentBinding,
-	) error
-
-	GetCollectionDocument(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (CollectionDocumentBinding, error)
 }
