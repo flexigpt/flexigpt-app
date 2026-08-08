@@ -22,6 +22,10 @@ export function GetManagedSourceState(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['GetManagedSourceState'](arg1);
 }
 
+export function GetShareableCollectionDocument(arg1) {
+  return window['go']['main']['ArtifactStoreWrapper']['GetShareableCollectionDocument'](arg1);
+}
+
 export function ListArtifactRoots(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['ListArtifactRoots'](arg1);
 }

@@ -12,6 +12,8 @@ export function GetArtifactSource(arg1:artifactstore.GetArtifactSourceRequest):P
 
 export function GetManagedSourceState(arg1:artifactstore.GetManagedSourceStateRequest):Promise<artifactstore.GetManagedSourceStateResponse>;
 
+export function GetShareableCollectionDocument(arg1:artifactstore.GetShareableCollectionDocumentRequest):Promise<artifactstore.GetShareableCollectionDocumentResponse>;
+
 export function ListArtifactRoots(arg1:artifactstore.ListArtifactRootsRequest):Promise<artifactstore.ListArtifactRootsResponse>;
 
 export function ListArtifactSourceKinds(arg1:artifactstore.ListArtifactSourceKindsRequest):Promise<artifactstore.ListArtifactSourceKindsResponse>;

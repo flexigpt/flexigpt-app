@@ -46,7 +46,8 @@ func newHTTPURLLoader(insecure bool) *HTTPURLLoader {
 	})
 	if insecure {
 		httpLoader.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
+			//nolint:gosec // InsecureSkipVerify.
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 	}
 	return &httpLoader
@@ -217,7 +218,11 @@ func compilePublishedJSONSchema(raw []byte) (*jsonschema.Schema, error) {
 
 	compiler := jsonschema.NewCompiler()
 	compiler.UseLoader(loader)
-	if err := compiler.AddResource(value.ID, bytes.NewReader(raw)); err != nil {
+	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	if err := compiler.AddResource(value.ID, inst); err != nil {
 		return nil, fmt.Errorf(
 			"%w: register published JSON Schema %q: %w",
 			basespec.ErrInvalid,
@@ -241,10 +246,9 @@ func validateJSONSchemaInstance(
 	schema *jsonschema.Schema,
 	raw []byte,
 ) error {
-	var value any
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-	if err := decoder.Decode(&value); err != nil {
+	// Using jsonschema.UnmarshalJSON ensures proper float/integer typing alignment for v6.
+	value, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+	if err != nil {
 		return fmt.Errorf(
 			"%w: decode shareable JSON for schema validation: %w",
 			basespec.ErrInvalid,
