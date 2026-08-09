@@ -170,10 +170,13 @@ function useStreamingMarkdownSegments(text: string) {
 
 	const stateMatchesText = text.length >= state.committedLength;
 	const committedLength = stateMatchesText ? state.committedLength : 0;
+	const tailGeneration = stateMatchesText ? state.generation : state.generation + 1;
+	const tailKey = `${tailGeneration}:${committedLength}`;
 
 	return {
 		segments: stateMatchesText ? state.segments : [],
 		tail: text.slice(committedLength),
+		tailKey,
 	};
 }
 
@@ -183,7 +186,7 @@ function StreamingMarkdownContent(props: {
 	diffCandidatePaths?: string[];
 	defaultCodeBlockExpanded: boolean;
 }) {
-	const { segments, tail } = useStreamingMarkdownSegments(props.text);
+	const { segments, tail, tailKey } = useStreamingMarkdownSegments(props.text);
 
 	if (props.text.length === 0) {
 		return null;
@@ -205,6 +208,7 @@ function StreamingMarkdownContent(props: {
 			))}
 			{tail ? (
 				<EnhancedMarkdown
+					key={tailKey}
 					text={tail}
 					align={props.align}
 					isBusy={true}

@@ -281,8 +281,8 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 					);
 				}
 
-				// Streaming retains highlighted code, while CodeBlock suppresses
-				// copy, download, diff, expansion, and Mermaid controls.
+				// CodeBlock keeps changing fences on a stable plain-text path; highlighting
+				// and controls are enabled only after the stream settles.
 				return (
 					<CodeBlock
 						language={language}

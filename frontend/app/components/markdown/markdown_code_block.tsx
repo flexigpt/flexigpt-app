@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { FiAlertTriangle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
@@ -117,17 +117,20 @@ export function CodeBlock({
 	const defaultIsExpanded = isMermaid ? hasMermaidSyntaxError && !hideMermaidCode : defaultExpanded;
 	const isExpanded = expansionOverride?.key === codeBlockKey ? expansionOverride.isExpanded : defaultIsExpanded;
 
-	const highlightedValue = useDeferredValue(value);
-	const valueForHighlight = isBusy ? highlightedValue : value;
 	const { elementRef, activated: richCodeWorkActivated } = useNearViewport(!isMermaid || !isBusy);
-	const html = useHighlight(valueForHighlight, language, richCodeWorkActivated && isExpanded);
+	// Shiki replaces the complete code subtree whenever a result arrives.
+	// Deferring does not coalesce token updates, so keep its input stable and
+	// render the current raw value until the stream has settled.
+	const shouldHighlight = !isBusy && richCodeWorkActivated && isExpanded;
+	const valueForHighlight = isBusy ? '' : value;
+	const html = useHighlight(valueForHighlight, language, shouldHighlight);
 	const isDiffLike = useMemo(
 		() => richCodeWorkActivated && !disableControls && looksLikeUnifiedDiff(value, language),
 		[disableControls, language, richCodeWorkActivated, value]
 	);
 
 	const highlightedHtml = html ?? '';
-	const showFallback = !value.trim() || html === null || html === '';
+	const showFallback = isBusy || !value.trim() || html === null || html === '';
 
 	const headerLabel = hasMermaidSyntaxError
 		? 'Mermaid syntax error'
