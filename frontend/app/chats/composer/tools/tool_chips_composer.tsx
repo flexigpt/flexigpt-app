@@ -290,40 +290,36 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 	const title = titleLines.join('\n');
 
 	return (
-		// This composite control contains nested retry and remove buttons, which cannot be nested in a native button.
-		<button
-			type="button"
+		// Keep each action as a sibling native button. Nesting buttons produces
+		// invalid HTML and can cause the server and client DOM trees to differ.
+		<div
 			className={`flex min-w-48 shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors ${isError ? 'border-warning/70 bg-warning/10 text-warning-content border' : 'bg-base-200 text-base-content hover:bg-base-300/80'}`}
 			title={title}
-			tabIndex={0}
-			onClick={onOpen}
-			onKeyDown={e => {
-				if (e.key === 'Enter' || e.key === ' ') {
-					e.preventDefault();
-					onOpen();
-				}
-			}}
 			data-attachment-chip="tool-output"
 		>
-			<FiTool size={14} />
-			<span className={`text-[10px] uppercase ${isError ? 'font-semibold' : 'text-base-content/60'}`}>
-				{isError ? 'Error result' : 'Result'}
-			</span>
-			<span className="max-w-64 truncate">{truncatedLabel}</span>
+			<button
+				type="button"
+				className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+				onClick={onOpen}
+				aria-label={`Open tool output for ${label}`}
+			>
+				<FiTool size={14} className="shrink-0" />
+				<span className={`shrink-0 text-[10px] uppercase ${isError ? 'font-semibold' : 'text-base-content/60'}`}>
+					{isError ? 'Error result' : 'Result'}
+				</span>
+				<span className="max-w-64 truncate">{truncatedLabel}</span>
 
-			<div className="ml-auto flex items-center gap-1">
-				<span className="text-base-content/60">
+				<span className="text-base-content/60 ml-auto shrink-0">
 					<FiCode size={12} />
 				</span>
+			</button>
 
+			<div className="flex shrink-0 items-center gap-1">
 				{canRetry && (
 					<button
 						type="button"
 						className="btn btn-ghost btn-xs gap-0 px-1 py-0 shadow-none"
-						onClick={e => {
-							e.stopPropagation();
-							onRetry();
-						}}
+						onClick={onRetry}
 						title="Retry this tool"
 						aria-label="Retry this tool"
 					>
@@ -335,16 +331,13 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 				<button
 					type="button"
 					className="btn btn-ghost btn-xs text-error px-1 py-0 shadow-none"
-					onClick={e => {
-						e.stopPropagation();
-						onRemove();
-					}}
+					onClick={onRemove}
 					title="Discard this tool output"
 					aria-label="Discard tool output"
 				>
 					<FiX size={12} />
 				</button>
 			</div>
-		</button>
+		</div>
 	);
 }
