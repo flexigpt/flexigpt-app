@@ -479,6 +479,19 @@ codecs. The registry:
 - Canonicalizes JSON.
 - Calculates an omitted document digest or verifies a supplied one.
 
+Feature services that accept a known portable document must enter through the
+Artifact Store registry with an expected schema key. They must not invoke a
+domain parser or canonicalizer directly on untrusted source bytes after the
+registry has been composed.
+
+Domain codecs remain small Artifact Store hooks. They own domain-specific
+semantic validation and canonicalization, while Artifact Store owns registry
+dispatch, expected-schema enforcement, JSON Schema execution, canonical JSON
+verification, and validation of codec output. Feature code may project an
+already canonical `ParsedDocument` into typed domain values, immutable
+Definitions, local installation data, or runtime state. That projection is
+not a second portable-document validation entry point.
+
 Canonicalization is not persistence, import, export, acquisition, or package
 transfer. Current code supports Collection documents, not a generic shareable
 Artifact-document repository. Registered Artifact codecs validate and
@@ -521,6 +534,11 @@ The application-owned built-in registry declares protected local topology:
 - Embedded package locations.
 - Static Artifact-to-package-member mappings.
 - Installation defaults.
+
+An application may declare multiple independent protected topology Roots.
+Each Root has its own Source set, hydration markers, reset boundary, and
+feature-owned static registrations. Multiple installers may also share one
+protected Root when application composition prepares their hydration as a batch.
 
 Portable built-in `collection.json` documents own Collection semantics. The
 application registry owns local installation identity and topology only.
@@ -626,6 +644,7 @@ credential policy.
 | `AS-C18` | Treat the metadata layout as unreleased fresh v1 with no historical migration obligation                              | Implemented policy                   |
 | `AS-C19` | Do not provide import, export, closures, archives, package CAS, provenance, or network acquisition                    | Intentional current-scope exclusion  |
 | `AS-C20` | Do not support direct Artifact move                                                                                   | Intentional current-scope exclusion  |
+| `AS-C21` | Route known shareable document inputs through expected-schema registry canonicalization                               | Implemented                          |
 
 ## Current implementation status
 

@@ -167,7 +167,14 @@ func CanonicalizePolicy(
 	return value, raw, nil
 }
 
-func ServerFromBundle(
+// ServerFromCanonicalBundle projects one server from a Bundle that has
+// already been accepted and canonicalized by the Artifact Store shareable
+// schema registry.
+//
+// It deliberately does not call CanonicalizeServer. MCP lifecycle code must
+// not create a second portable-document validation path after registry
+// canonicalization.
+func ServerFromCanonicalBundle(
 	bundle BundleDocument,
 	name string,
 ) (ServerDocument, error) {
@@ -179,9 +186,15 @@ func ServerFromBundle(
 			name,
 		)
 	}
-	extension := bundle.BundleExtension.Servers[name]
-
-	value, _, err := CanonicalizeServer(ServerDocument{
+	extension, found := bundle.BundleExtension.Servers[name]
+	if !found {
+		return ServerDocument{}, fmt.Errorf(
+			"%w: canonical MCP Bundle has no extension for server %q",
+			basespec.ErrInvalid,
+			name,
+		)
+	}
+	return cloneJSON(ServerDocument{
 		Kind:           ServerKind,
 		SchemaID:       ServerSchemaID,
 		SchemaVersion:  SchemaVersion,
@@ -193,7 +206,6 @@ func ServerFromBundle(
 		MCPServer:      core,
 		Extension:      extension,
 	})
-	return value, err
 }
 
 func CanonicalizeServer(

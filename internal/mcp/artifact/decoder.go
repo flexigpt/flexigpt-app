@@ -14,7 +14,7 @@ import (
 )
 
 type Decoder struct {
-	schemas *shareable.Registry
+	documents shareable.ExpectedCanonicalizer
 }
 
 func NewDecoder() *Decoder {
@@ -41,7 +41,7 @@ func (d *Decoder) BindShareableSchemas(
 
 	expected := schema.NewBundleCodec().Key()
 	if slices.Contains(schemas.Keys(), expected) {
-		d.schemas = schemas
+		d.documents = schemas
 		return nil
 	}
 	return fmt.Errorf(
@@ -69,7 +69,7 @@ func (d *Decoder) Decode(
 		!schema.IsBundleDocumentLocator(candidate.Locator) {
 		return nil, nil
 	}
-	if d == nil || d.schemas == nil {
+	if d == nil || d.documents == nil {
 		return nil, decoderError(
 			candidate.Locator,
 			"bundle",
@@ -77,27 +77,16 @@ func (d *Decoder) Decode(
 		)
 	}
 
-	parsed, err := d.schemas.CanonicalizeEntity(
+	parsed, err := d.documents.CanonicalizeExpected(
 		ctx,
-		shareable.EntityCollection,
+		schema.BundleCodec{}.Key(),
 		candidate.Content,
 	)
 	if err != nil {
 		return nil, decoderError(candidate.Locator, "bundle", err)
 	}
-	if parsed.Key != schema.NewBundleCodec().Key() {
-		return nil, decoderError(
-			candidate.Locator,
-			"bundle",
-			fmt.Errorf("%w: MCP decoder received another shareable schema", basespec.ErrInvalid),
-		)
-	}
-
-	bundle, _, err := schema.ParseBundle(parsed.Raw)
-	if err != nil || bundle.Digest != parsed.Digest {
-		if err == nil {
-			err = fmt.Errorf("%w: MCP Bundle digest differs from registry output", basespec.ErrDigestMismatch)
-		}
+	bundle, err := schema.BundleFromParsedDocument(parsed)
+	if err != nil {
 		return nil, decoderError(candidate.Locator, "bundle", err)
 	}
 
@@ -124,11 +113,11 @@ func (d *Decoder) Decode(
 	)
 
 	for _, name := range serverNames {
-		serverDocument, err := schema.ServerFromBundle(bundle, name)
+		serverDocument, err := schema.ServerFromCanonicalBundle(bundle, name)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
-		definition, err := DefinitionForServer(serverDocument)
+		definition, err := DefinitionForCanonicalServer(serverDocument)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
@@ -141,7 +130,7 @@ func (d *Decoder) Decode(
 	}
 
 	for _, name := range policyNames {
-		definition, err := DefinitionForPolicy(
+		definition, err := DefinitionForCanonicalPolicy(
 			bundle.BundleExtension.Policies[name],
 		)
 		if err != nil {

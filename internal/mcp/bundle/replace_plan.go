@@ -67,7 +67,10 @@ func (a *API) prepareDocumentReplace(
 		return documentReplacePlan{}, basespec.ErrConflict
 	}
 
-	document, raw, err := schema.CanonicalizeBundle(request.Document)
+	document, raw, err := a.canonicalizeBundleDocument(
+		ctx,
+		request.Document,
+	)
 	if err != nil {
 		return documentReplacePlan{}, err
 	}

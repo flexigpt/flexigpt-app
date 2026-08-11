@@ -19,7 +19,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -46,16 +46,16 @@ func (noAutomaticAdoption) Derive(
 }
 
 type Dependencies struct {
-	Roots            *root.Service
 	Sources          *source.Service
 	Collections      *collection.Service
 	Artifacts        *artifact.Service
 	ManagedArtifacts *managedartifact.Service
 	Refresh          refresh.Runner
 
-	Catalogs      catalog.Reader
-	Definitions   definition.Reader
-	SourceRuntime source.Runtime
+	Catalogs           catalog.Reader
+	Definitions        definition.Reader
+	SourceRuntime      source.Runtime
+	ShareableDocuments shareable.ExpectedCanonicalizer
 
 	HasDecoder         func(basespec.DecoderID) bool
 	DecoderFingerprint func() (cryptoutil.Digest, error)
@@ -74,8 +74,7 @@ type API struct {
 }
 
 func New(dependencies Dependencies) (*API, error) {
-	if dependencies.Roots == nil ||
-		dependencies.Sources == nil ||
+	if dependencies.Sources == nil ||
 		dependencies.Collections == nil ||
 		dependencies.Artifacts == nil ||
 		dependencies.ManagedArtifacts == nil ||
@@ -83,6 +82,7 @@ func New(dependencies Dependencies) (*API, error) {
 		dependencies.Catalogs == nil ||
 		dependencies.Definitions == nil ||
 		dependencies.SourceRuntime == nil ||
+		dependencies.ShareableDocuments == nil ||
 		dependencies.HasDecoder == nil ||
 		dependencies.DecoderFingerprint == nil ||
 		dependencies.Runtime == nil ||
@@ -176,7 +176,7 @@ func (a *API) Create(
 		return Bundle{}, err
 	}
 
-	document, _, err := schema.CanonicalizeBundle(request.Document)
+	document, _, err := a.canonicalizeBundleDocument(ctx, request.Document)
 	if err != nil {
 		return Bundle{}, err
 	}
@@ -659,11 +659,11 @@ func definitionsForDocument(
 		len(document.MCPServers)+len(document.BundleExtension.Policies),
 	)
 	for name := range document.MCPServers {
-		serverDocument, err := schema.ServerFromBundle(document, name)
+		serverDocument, err := schema.ServerFromCanonicalBundle(document, name)
 		if err != nil {
 			return nil, err
 		}
-		value, err := mcpArtifact.DefinitionForServer(serverDocument)
+		value, err := mcpArtifact.DefinitionForCanonicalServer(serverDocument)
 		if err != nil {
 			return nil, err
 		}
@@ -672,7 +672,7 @@ func definitionsForDocument(
 		)] = value
 	}
 	for name, policyDocument := range document.BundleExtension.Policies {
-		value, err := mcpArtifact.DefinitionForPolicy(policyDocument)
+		value, err := mcpArtifact.DefinitionForCanonicalPolicy(policyDocument)
 		if err != nil {
 			return nil, err
 		}

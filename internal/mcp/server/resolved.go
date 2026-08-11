@@ -23,8 +23,8 @@ type RuntimeConfig struct {
 	DisplayName string
 
 	Transport                 mcpSpec.MCPTransportType
-	Stdio                     *mcpSpec.MCPStdioConfig
-	StreamableHTTP            *mcpSpec.MCPStreamableHTTPConfig
+	Stdio                     *mcpSpec.MCPRuntimeStdioConfig
+	StreamableHTTP            *mcpSpec.MCPRuntimeStreamableHTTPConfig
 	OAuthClientSecretRequired bool
 
 	TrustLevel    mcpSpec.MCPTrustLevel
@@ -186,7 +186,7 @@ func runtimeConfigFromMaterialized(
 	switch materialized.Core.Type {
 	case schema.ServerTypeStdio:
 		config.Transport = mcpSpec.MCPTransportStdio
-		config.Stdio = &mcpSpec.MCPStdioConfig{
+		config.Stdio = &mcpSpec.MCPRuntimeStdioConfig{
 			Command:          materialized.Core.Command,
 			Args:             append([]string(nil), materialized.Core.Args...),
 			Env:              maps.Clone(materialized.Core.Env),
@@ -195,7 +195,7 @@ func runtimeConfigFromMaterialized(
 
 	case schema.ServerTypeHTTP:
 		config.Transport = mcpSpec.MCPTransportStreamableHTTP
-		config.StreamableHTTP = &mcpSpec.MCPStreamableHTTPConfig{
+		config.StreamableHTTP = &mcpSpec.MCPRuntimeStreamableHTTPConfig{
 			URL:                         materialized.Core.URL,
 			TimeoutMS:                   materialized.TimeoutMS,
 			AuthMode:                    materialized.Auth.Mode,

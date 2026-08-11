@@ -59,7 +59,10 @@ func (a *API) EnsureBuiltIn(
 		)
 	}
 
-	document, _, err := schema.CanonicalizeBundle(request.Document)
+	document, _, err := a.canonicalizeBundleDocument(
+		ctx,
+		request.Document,
+	)
 	if err != nil {
 		return Bundle{}, err
 	}

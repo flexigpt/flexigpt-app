@@ -727,6 +727,29 @@ Therefore generic shareable Artifact codec support is part of this implementatio
 
 ## Connection and installation semantics
 
+## Canonical-document responsibility boundary
+
+All untrusted portable MCP document bytes must enter through Artifact Store's
+shareable schema registry with the expected MCP schema key:
+
+- `collection/mcp.bundle/mcp.bundle.v1/v1`
+- `artifact/mcp.server/mcp.server.v1/v1`
+- `artifact/mcp.policy/mcp.policy.v1/v1`
+
+MCP lifecycle services, decoders, and built-in installers must not directly
+call `ParseBundle`, `ParseServer`, `ParsePolicy`, `CanonicalizeBundle`,
+`CanonicalizeServer`, or `CanonicalizePolicy` on source bytes. Those functions
+are codec implementation hooks invoked by the Artifact Store registry.
+
+After registry canonicalization, MCP may project the returned
+`shareable.ParsedDocument` into typed MCP values and immutable Definitions.
+That projection verifies the expected schema key, canonical JSON invariant,
+and returned digest, but does not create a second schema-validation path.
+
+Runtime Definition reads may revalidate typed MCP semantics as an integrity
+check. They are not source-document ingress and do not replace registry
+validation.
+
 The shareable server document must contain enough information to determine:
 
 - How the server is started or contacted.
@@ -1757,6 +1780,10 @@ Completed:
 - Normal startup isolation from the legacy embedded MCP resource tree.
 - Legacy command wrapper, old assistant-preset wrapper, old inference MCP
   bridge, and old MCP context validator quarantined from normal builds.
+- Expected-schema Artifact Store canonicalization for all MCP Bundle document
+  ingress paths, including discovery, user lifecycle, and built-in hydration.
+- MCP-specific converted built-in asset loading detached from generic builtin
+  package exports.
 
 Pending:
 
@@ -1775,6 +1802,8 @@ Legacy source may remain only behind the `legacy_mcp_store` build tag during
 review. The normal build must not import, open, read, write, or migrate the
 legacy Store.
 
+The tag is a quarantine mechanism, not a supported alternate product build.
+
 The cutover includes:
 
 - Remove `mcpDirectoryName` as active MCP persistence.
@@ -1792,6 +1821,9 @@ The cutover includes:
   compile or bind old wrapper, inference, or assistant-preset MCP paths.
 - Fail startup when converted built-in MCP registry data is absent rather than
   reading or converting legacy user-state at runtime.
+- Keep legacy BundleID and ServerID wire types behind the same quarantine tag.
+- Use ArtifactRef-native runtime transport DTOs in normal builds so an old
+  `MCPServerConfig` cannot re-enter normal MCP composition accidentally.
 
 The old MCP Store must not be deleted from the source tree until all backend
 consumers have moved to the Artifact-backed resolver. It must be absent from
@@ -1901,31 +1933,32 @@ No secrets, OAuth tokens, overlays, assistant presets, conversations, or runtime
 
 ## Current-scope requirements
 
-| ID        | Requirement                                                                            |
-| --------- | -------------------------------------------------------------------------------------- |
-| `MCP-C01` | Represent MCP Bundles as `mcp.bundle` Collections                                      |
-| `MCP-C02` | Represent MCP Servers as `mcp.server` Artifacts                                        |
-| `MCP-C03` | Represent MCP Policies as `mcp.policy` Artifacts                                       |
-| `MCP-C04` | Use `CollectionRef` and `ArtifactRef` as all durable MCP identities                    |
-| `MCP-C05` | Use a Claude-compatible `mcpServers` core schema                                       |
-| `MCP-C06` | Keep FlexiGPT extensions additive and namespaced                                       |
-| `MCP-C07` | Support shareable connection profiles and installation requirements                    |
-| `MCP-C08` | Support no-auth, API-key, OAuth, and client-credentials semantics                      |
-| `MCP-C09` | Keep actual secret values and OAuth tokens application-local                           |
-| `MCP-C10` | Allow servers to reference required or optional shareable policies                     |
-| `MCP-C11` | Compose multiple policies using deterministic restrictive rules                        |
-| `MCP-C12` | Add generic shareable Artifact codec support to Artifact Store                         |
-| `MCP-C13` | Store server and policy Definitions in Artifact Store CAS                              |
-| `MCP-C14` | Use managed package publication for user and built-in MCP documents                    |
-| `MCP-C15` | Use one retained user Root and one protected built-in Root                             |
-| `MCP-C16` | Keep built-in setup overlays in MapStore-backed application settings                   |
-| `MCP-C17` | Verify current source bytes before runtime connection                                  |
-| `MCP-C18` | Keep runtime protocol discovery and sessions process-local                             |
-| `MCP-C19` | Update assistant, conversation, inference, and MCP Apps schemas to Artifact references |
-| `MCP-C20` | Remove the standalone MCP Store without compatibility or data migration                |
-| `MCP-C21` | Prohibit new direct filesystem and symlink handling in MCP layers                      |
-| `MCP-C22` | Defer import, export, URI acquisition, cross-Root transfer, and Artifact move          |
+| ID        | Requirement                                                                                                                  |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `MCP-C01` | Represent MCP Bundles as `mcp.bundle` Collections                                                                            |
+| `MCP-C02` | Represent MCP Servers as `mcp.server` Artifacts                                                                              |
+| `MCP-C03` | Represent MCP Policies as `mcp.policy` Artifacts                                                                             |
+| `MCP-C04` | Use `CollectionRef` and `ArtifactRef` as all durable MCP identities                                                          |
+| `MCP-C05` | Use a Claude-compatible `mcpServers` core schema                                                                             |
+| `MCP-C06` | Keep FlexiGPT extensions additive and namespaced                                                                             |
+| `MCP-C07` | Support shareable connection profiles and installation requirements                                                          |
+| `MCP-C08` | Support no-auth, API-key, OAuth, and client-credentials semantics                                                            |
+| `MCP-C09` | Keep actual secret values and OAuth tokens application-local                                                                 |
+| `MCP-C10` | Allow servers to reference required or optional shareable policies                                                           |
+| `MCP-C11` | Compose multiple policies using deterministic restrictive rules                                                              |
+| `MCP-C12` | Add generic shareable Artifact codec support to Artifact Store                                                               |
+| `MCP-C13` | Store server and policy Definitions in Artifact Store CAS                                                                    |
+| `MCP-C14` | Use managed package publication for user and built-in MCP documents                                                          |
+| `MCP-C15` | Use one retained user Root and one protected built-in Root                                                                   |
+| `MCP-C16` | Keep built-in setup overlays in MapStore-backed application settings                                                         |
+| `MCP-C17` | Verify current source bytes before runtime connection                                                                        |
+| `MCP-C18` | Keep runtime protocol discovery and sessions process-local                                                                   |
+| `MCP-C19` | Update assistant, conversation, inference, and MCP Apps schemas to Artifact references                                       |
+| `MCP-C20` | Remove the standalone MCP Store without compatibility or data migration                                                      |
+| `MCP-C21` | Prohibit new direct filesystem and symlink handling in MCP layers                                                            |
+| `MCP-C22` | Defer import, export, URI acquisition, cross-Root transfer, and Artifact move                                                |
 | `MCP-C23` | Publish strict source-controlled MCP JSON Schema resources and validate discovery through the Artifact Store schema registry |
+| `MCP-C24` | Route all MCP portable document ingress through Artifact Store expected-schema canonicalization                              |
 
 ## Implementation map
 

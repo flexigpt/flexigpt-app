@@ -5,54 +5,25 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 )
 
 const (
-	MCPSchemaVersion = "2026-05-30"
-
-	MCPStoreFileName            = "mcpservers.json"
-	MCPBuiltInOverlayDBFileName = "mcpbuiltin.overlay.sqlite"
-	DefaultConnectTimeoutMS     = 30_000
-	DefaultRequestTimeoutMS     = 60_000
-
-	MaxMCPServerPageSize = 256
-	DefaultMCPPageSize   = 25
-
 	MCPHostName    = "FlexiGPT"
 	MCPHostVersion = "dev"
 
-	// DefaultInteractiveOAuthTimeout bounds the connect step for the interactive
-	// OAuth 2.1 authorization-code flow, where a human may need to complete a
-	// browser login. Non-interactive flows (client_credentials, none, stdio) use
-	// the regular configured connect timeout.
-	DefaultInteractiveOAuthTimeout = 10 * time.Minute
-
 	NotificationRefreshDebounce = 1 * time.Second
-
-	BaseMCPBundleID          bundleitemutils.BundleID   = "019e785b-2b96-7ecc-a1c2-9b2bac90e08c"
-	BaseMCPBundleSlug        bundleitemutils.BundleSlug = "base"
-	BaseMCPBundleDisplayName                            = "Base MCP Servers"
-	BaseMCPBundleDescription                            = "Editable starter bundle for custom MCP servers."
+	MaxMCPServerPageSize        = 256
+	DefaultMCPPageSize          = 25
 )
 
 var (
-	ErrMCPBundleNotFound         = errors.New("mcp bundle not found")
-	ErrMCPBundleDisabled         = errors.New("mcp bundle is disabled")
-	ErrMCPBundleDeleting         = errors.New("mcp bundle is being deleted")
-	ErrMCPBundleNotEmpty         = errors.New("mcp bundle still contains servers")
-	ErrMCPReservedBundleReadOnly = errors.New("reserved mcp bundle metadata is read-only")
-	ErrMCPBuiltInReadOnly        = errors.New("built-in mcp resource is read-only")
-
 	ErrMCPInvalidRequest  = errors.New("invalid mcp request")
-	ErrMCPConflict        = errors.New("mcp resource already exists")
-	ErrMCPServerNotFound  = errors.New("mcp server not found")
-	ErrMCPServerDisabled  = errors.New("mcp server is disabled")
 	ErrMCPRuntimeNotReady = errors.New("mcp runtime is not ready")
 	ErrMCPAuthRequired    = errors.New("mcp authorization required")
 	ErrMCPPolicyDenied    = errors.New("mcp policy denied request")
 	ErrMCPApprovalNeeded  = errors.New("mcp approval required")
 	ErrMCPStaleReference  = errors.New("mcp stale reference")
+	ErrMCPServerDisabled  = errors.New("mcp server is disabled")
 )
 
 type MCPAuthHealthState string
@@ -69,7 +40,6 @@ const (
 )
 
 type (
-	MCPServerID   string
 	JSONRawString = string
 )
 
@@ -256,30 +226,6 @@ type MCPServerCapabilitiesSummary struct {
 	Completions          bool           `json:"completions,omitempty"`
 	Experimental         map[string]any `json:"experimental,omitempty"`
 	Extensions           map[string]any `json:"extensions,omitempty"`
-}
-
-type MCPPageToken struct {
-	PageSize        int                        `json:"s"`
-	BundleID        bundleitemutils.BundleID   `json:"bid"`
-	CursorID        MCPServerID                `json:"id,omitempty"`
-	CursorAt        string                     `json:"t,omitempty"`
-	Enabled         *bool                      `json:"e,omitempty"`
-	IncludeDisabled bool                       `json:"d,omitempty"`
-	IDs             []MCPServerID              `json:"ids,omitempty"`
-	BundleIDs       []bundleitemutils.BundleID `json:"bids,omitempty"`
-}
-
-type MCPBundlePageToken struct {
-	BundleIDs       []bundleitemutils.BundleID `json:"ids,omitempty"`
-	IncludeDisabled bool                       `json:"d,omitempty"`
-	PageSize        int                        `json:"s"`
-	CursorMod       string                     `json:"t,omitempty"`
-	CursorID        bundleitemutils.BundleID   `json:"id,omitempty"`
-}
-
-type TimeRange struct {
-	From *time.Time `json:"from,omitempty"`
-	To   *time.Time `json:"to,omitempty"`
 }
 
 type MCPOAuthAuthorization struct {

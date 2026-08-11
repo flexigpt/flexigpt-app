@@ -84,6 +84,40 @@ func (r *Registry) Canonicalize(
 	return r.CanonicalizeEntity(ctx, EntityCollection, raw)
 }
 
+// CanonicalizeExpected canonicalizes raw content through the Artifact Store
+// registry and requires the resulting schema key to match expected.
+//
+// Feature services use this boundary for known document inputs. The registry
+// remains the only owner of JSON Schema execution, codec selection, canonical
+// JSON enforcement, and canonical output validation.
+func (r *Registry) CanonicalizeExpected(
+	ctx context.Context,
+	expected SchemaKey,
+	raw []byte,
+) (ParsedDocument, error) {
+	if err := expected.Validate(); err != nil {
+		return ParsedDocument{}, err
+	}
+
+	value, err := r.CanonicalizeEntity(ctx, expected.Entity, raw)
+	if err != nil {
+		return ParsedDocument{}, err
+	}
+	if value.Key != expected {
+		return ParsedDocument{}, fmt.Errorf(
+			"%w: expected shareable schema %q/%q/%q, got %q/%q/%q",
+			basespec.ErrInvalid,
+			expected.Kind,
+			expected.SchemaID,
+			expected.SchemaVersion,
+			value.Key.Kind,
+			value.Key.SchemaID,
+			value.Key.SchemaVersion,
+		)
+	}
+	return value.Clone(), nil
+}
+
 func (r *Registry) CanonicalizeEntity(
 	ctx context.Context,
 	entity EntityType,

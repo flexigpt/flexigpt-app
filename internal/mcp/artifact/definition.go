@@ -14,38 +14,48 @@ const (
 	AuthModeLabelKey  = "mcp.auth-mode"
 )
 
-func DefinitionForServer(
+// DefinitionForCanonicalServer converts an MCP server projected from an
+// Artifact Store-canonicalized MCP Bundle into an immutable Definition.
+//
+// Portable document validation belongs to the Artifact Store shareable schema
+// registry. This function intentionally performs only MCP Definition
+// projection and generic Definition canonicalization.
+func DefinitionForCanonicalServer(
 	input schema.ServerDocument,
 ) (definition.Definition, error) {
-	value, _, err := schema.CanonicalizeServer(input)
-	if err != nil {
-		return definition.Definition{}, err
+	if input.Kind != schema.ServerKind ||
+		input.SchemaID != schema.ServerSchemaID ||
+		input.SchemaVersion != schema.SchemaVersion {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: canonical MCP server input has another schema identity",
+			basespec.ErrInvalid,
+		)
 	}
 
 	body, err := definition.EncodeBody(
 		schema.ServerDefinitionBody{
-			MCPServer: value.MCPServer,
-			Extension: value.Extension,
+			MCPServer: input.MCPServer,
+			Extension: input.Extension,
 		},
 	)
 	if err != nil {
 		return definition.Definition{}, err
 	}
 
-	labels := maps.Clone(value.Labels)
+	labels := maps.Clone(input.Labels)
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels[TransportLabelKey] = string(value.MCPServer.Type)
-	labels[AuthModeLabelKey] = string(value.Extension.Auth.Mode)
+	labels[TransportLabelKey] = string(input.MCPServer.Type)
+	labels[AuthModeLabelKey] = string(input.Extension.Auth.Mode)
 
 	dependencies := []definition.Selector(nil)
-	if value.Extension.Policy != nil {
+	if input.Extension.Policy != nil {
 		dependencies = append(
 			dependencies,
 			definition.Selector{
 				Kind:        schema.PolicyKind,
-				LogicalName: value.Extension.Policy.Ref,
+				LogicalName: input.Extension.Policy.Ref,
 			},
 		)
 	}
@@ -55,10 +65,10 @@ func DefinitionForServer(
 			Kind:           schema.ServerKind,
 			SchemaID:       schema.ServerSchemaID,
 			SchemaVersion:  schema.SchemaVersion,
-			LogicalName:    value.LogicalName,
-			LogicalVersion: value.LogicalVersion,
-			DisplayName:    value.DisplayName,
-			Description:    value.Description,
+			LogicalName:    input.LogicalName,
+			LogicalVersion: input.LogicalVersion,
+			DisplayName:    input.DisplayName,
+			Description:    input.Description,
 			Labels:         labels,
 			Body:           body,
 			Dependencies:   dependencies,
@@ -66,14 +76,20 @@ func DefinitionForServer(
 	)
 }
 
-func DefinitionForPolicy(
+// DefinitionForCanonicalPolicy converts an MCP policy projected from an
+// Artifact Store-canonicalized MCP Bundle into an immutable Definition.
+func DefinitionForCanonicalPolicy(
 	input schema.PolicyDocument,
 ) (definition.Definition, error) {
-	value, _, err := schema.CanonicalizePolicy(input)
-	if err != nil {
-		return definition.Definition{}, err
+	if input.Kind != schema.PolicyKind ||
+		input.SchemaID != schema.PolicySchemaID ||
+		input.SchemaVersion != schema.SchemaVersion {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: canonical MCP policy input has another schema identity",
+			basespec.ErrInvalid,
+		)
 	}
-	body, err := definition.EncodeBody(value.Body)
+	body, err := definition.EncodeBody(input.Body)
 	if err != nil {
 		return definition.Definition{}, err
 	}
@@ -82,11 +98,11 @@ func DefinitionForPolicy(
 			Kind:           schema.PolicyKind,
 			SchemaID:       schema.PolicySchemaID,
 			SchemaVersion:  schema.SchemaVersion,
-			LogicalName:    value.LogicalName,
-			LogicalVersion: value.LogicalVersion,
-			DisplayName:    value.DisplayName,
-			Description:    value.Description,
-			Labels:         maps.Clone(value.Labels),
+			LogicalName:    input.LogicalName,
+			LogicalVersion: input.LogicalVersion,
+			DisplayName:    input.DisplayName,
+			Description:    input.Description,
+			Labels:         maps.Clone(input.Labels),
 			Body:           body,
 		},
 	)

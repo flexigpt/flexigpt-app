@@ -103,6 +103,18 @@ type EntityCanonicalizer interface {
 	) (ParsedDocument, error)
 }
 
+// ExpectedCanonicalizer is the narrow Artifact Store boundary for consumers
+// that accept one known shareable schema. It ensures that callers do not
+// bypass registry dispatch and validate an arbitrary schema before checking
+// its expected identity.
+type ExpectedCanonicalizer interface {
+	CanonicalizeExpected(
+		ctx context.Context,
+		expected SchemaKey,
+		raw []byte,
+	) (ParsedDocument, error)
+}
+
 // Canonicalizer is the narrow validation capability needed by artifact-family
 // hydration and linked-source descriptor readers.
 type Canonicalizer interface {

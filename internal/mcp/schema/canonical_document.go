@@ -1,0 +1,109 @@
+package schema
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+)
+
+// BundleFromParsedDocument projects an Artifact Store-validated canonical MCP
+// Bundle document into the MCP domain model.
+//
+// It is intentionally not a second schema-validation entry point. Untrusted
+// bytes must first pass through shareable.ExpectedCanonicalizer with
+// BundleCodec{}.Key(). This helper verifies the registry output identity,
+// canonical-byte invariant, and document digest before MCP lifecycle code
+// consumes the typed projection.
+func BundleFromParsedDocument(
+	input shareable.ParsedDocument,
+) (BundleDocument, error) {
+	expected := BundleCodec{}.Key()
+	if input.Key != expected {
+		return BundleDocument{}, fmt.Errorf(
+			"%w: expected canonical MCP Bundle schema %q/%q/%q",
+			basespec.ErrInvalid,
+			expected.Kind,
+			expected.SchemaID,
+			expected.SchemaVersion,
+		)
+	}
+	if err := input.Validate(); err != nil {
+		return BundleDocument{}, fmt.Errorf(
+			"%w: invalid canonical MCP Bundle registry output: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+
+	var output BundleDocument
+	if err := decodeCanonicalDocument(input.Raw, &output); err != nil {
+		return BundleDocument{}, err
+	}
+	if output.Kind != BundleKind ||
+		output.SchemaID != BundleSchemaID ||
+		output.SchemaVersion != SchemaVersion {
+		return BundleDocument{}, fmt.Errorf(
+			"%w: canonical MCP Bundle output has another schema identity",
+			basespec.ErrInvalid,
+		)
+	}
+	if output.Digest != input.Digest {
+		return BundleDocument{}, fmt.Errorf(
+			"%w: canonical MCP Bundle digest does not match registry output",
+			basespec.ErrDigestMismatch,
+		)
+	}
+	return output, nil
+}
+
+func decodeCanonicalDocument(
+	raw json.RawMessage,
+	target any,
+) error {
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxDefinitionBytes,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"%w: canonical MCP document output is invalid: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	if !bytes.Equal(canonical, raw) {
+		return fmt.Errorf(
+			"%w: Artifact Store returned non-canonical MCP document JSON",
+			basespec.ErrInvalid,
+		)
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(canonical))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf(
+			"%w: decode canonical MCP document output: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("canonical MCP document contains trailing JSON")
+		}
+		return fmt.Errorf(
+			"%w: decode canonical MCP document output: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	return nil
+}

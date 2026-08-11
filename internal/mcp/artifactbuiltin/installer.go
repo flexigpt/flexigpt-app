@@ -1,9 +1,12 @@
 package artifactbuiltin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"path"
 	"slices"
@@ -25,6 +28,41 @@ import (
 
 const hydrationFingerprintSchemaVersion = "mcp.builtin-hydration/v1"
 
+// LoadEmbeddedRegistry loads only the source-controlled converted MCP
+// registry. It intentionally does not inspect or convert legacy runtime data,
+// overlays, secrets, or user state.
+func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
+	packages, err := builtin.EmbeddedMCPArtifactPackages()
+	if err != nil {
+		return Registry{}, nil, err
+	}
+
+	// The converted registry is intentionally mandatory. Normal startup never
+	// falls back to the legacy embedded MCP document tree.
+	decoder := json.NewDecoder(bytes.NewReader(builtin.MCPRegistryJSON))
+	decoder.DisallowUnknownFields()
+
+	var registry Registry
+	if err := decoder.Decode(&registry); err != nil {
+		return Registry{}, nil, fmt.Errorf(
+			"decode converted built-in MCP registry: %w",
+			err,
+		)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("converted built-in MCP registry has trailing JSON")
+		}
+		return Registry{}, nil, err
+	}
+	if err := registry.Validate(); err != nil {
+		return Registry{}, nil, err
+	}
+
+	return registry, packages, nil
+}
+
 type builtInBundleEnsurer interface {
 	EnsureBuiltIn(
 		ctx context.Context,
@@ -45,19 +83,19 @@ type rootOverlayPurger interface {
 }
 
 type InstallerDependencies struct {
-	Bundles                builtInBundleEnsurer
-	Registry               Registry
-	Packages               fs.FS
-	Overlays               installation.OverlayRepository
-	ShareableCanonicalizer shareable.Canonicalizer
+	Bundles            builtInBundleEnsurer
+	Registry           Registry
+	Packages           fs.FS
+	Overlays           installation.OverlayRepository
+	ShareableDocuments shareable.ExpectedCanonicalizer
 }
 
 type Installer struct {
-	bundles       builtInBundleEnsurer
-	registry      Registry
-	packages      fs.FS
-	overlays      installation.OverlayRepository
-	canonicalizer shareable.Canonicalizer
+	bundles   builtInBundleEnsurer
+	registry  Registry
+	packages  fs.FS
+	overlays  installation.OverlayRepository
+	documents shareable.ExpectedCanonicalizer
 }
 
 type preparedBundle struct {
@@ -77,9 +115,9 @@ func NewInstaller(
 			basespec.ErrInvalid,
 		)
 	}
-	if dependencies.ShareableCanonicalizer == nil {
+	if dependencies.ShareableDocuments == nil {
 		return nil, fmt.Errorf(
-			"%w: MCP built-in shareable canonicalizer is required",
+			"%w: MCP built-in Artifact Store document canonicalizer is required",
 			basespec.ErrInvalid,
 		)
 	}
@@ -88,11 +126,11 @@ func NewInstaller(
 	}
 
 	return &Installer{
-		bundles:       dependencies.Bundles,
-		registry:      dependencies.Registry,
-		packages:      dependencies.Packages,
-		overlays:      dependencies.Overlays,
-		canonicalizer: dependencies.ShareableCanonicalizer,
+		bundles:   dependencies.Bundles,
+		registry:  dependencies.Registry,
+		packages:  dependencies.Packages,
+		overlays:  dependencies.Overlays,
+		documents: dependencies.ShareableDocuments,
 	}, nil
 }
 
@@ -263,7 +301,11 @@ func (i *Installer) prepareBundles(
 			)
 		}
 
-		parsed, err := i.canonicalizer.Canonicalize(ctx, raw)
+		parsed, err := i.documents.CanonicalizeExpected(
+			ctx,
+			schema.BundleCodec{}.Key(),
+			raw,
+		)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"canonicalize built-in MCP document %q through the Artifact Store schema registry: %w",
@@ -271,26 +313,11 @@ func (i *Installer) prepareBundles(
 				err,
 			)
 		}
-		if parsed.Key != schema.NewBundleCodec().Key() {
-			return nil, fmt.Errorf(
-				"%w: built-in MCP document %q was canonicalized by another schema",
-				basespec.ErrInvalid,
-				registered.DocumentLocator,
-			)
-		}
-		packageFiles, packageDigest, err := i.canonicalPackageFiles(
-			ctx,
-			registered,
-			parsed.Raw,
-		)
-		if err != nil {
-			return nil, err
-		}
 
-		document, _, err := schema.ParseBundle(parsed.Raw)
+		document, err := schema.BundleFromParsedDocument(parsed)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"decode canonical built-in MCP document %q: %w",
+				"project canonical built-in MCP document %q: %w",
 				registered.DocumentLocator,
 				err,
 			)
@@ -301,6 +328,14 @@ func (i *Installer) prepareBundles(
 				basespec.ErrDigestMismatch,
 				registered.DocumentLocator,
 			)
+		}
+		packageFiles, packageDigest, err := i.canonicalPackageFiles(
+			ctx,
+			registered,
+			parsed.Raw,
+		)
+		if err != nil {
+			return nil, err
 		}
 
 		definitions, err := bundleDefinitions(document)

@@ -106,7 +106,6 @@ func InitMCPWrapper(
 
 	invalidator := newMCPRuntimeInvalidator()
 	bundleAPI, err := mcpBundle.New(mcpBundle.Dependencies{
-		Roots:              components.Roots,
 		Sources:            components.Sources,
 		Collections:        components.Collections,
 		Artifacts:          components.Artifacts,
@@ -115,6 +114,7 @@ func InitMCPWrapper(
 		Catalogs:           components.Catalogs,
 		Definitions:        components.Definitions,
 		SourceRuntime:      components.SourceRuntime,
+		ShareableDocuments: components.ShareableSchemas,
 		HasDecoder:         components.HasDecoder,
 		DecoderFingerprint: components.DecoderFingerprint,
 		RootPolicy:         components.RootMutationPolicy(),
@@ -196,11 +196,11 @@ func installMCPBuiltIns(
 
 	installer, err := artifactbuiltin.NewInstaller(
 		artifactbuiltin.InstallerDependencies{
-			Bundles:                bundles,
-			Registry:               registry,
-			Packages:               packages,
-			Overlays:               overlays,
-			ShareableCanonicalizer: components.ShareableSchemas,
+			Bundles:            bundles,
+			Registry:           registry,
+			Packages:           packages,
+			Overlays:           overlays,
+			ShareableDocuments: components.ShareableSchemas,
 		},
 	)
 	if err != nil {
