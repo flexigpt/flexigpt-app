@@ -61,6 +61,7 @@ type Dependencies struct {
 	DecoderFingerprint func() (cryptoutil.Digest, error)
 
 	RootPolicy    protection.RootPolicy
+	UserRootID    basespec.RootID
 	Runtime       RuntimeInvalidator
 	Overlays      installation.OverlayRepository
 	SecretCleaner installation.SecretCleaner
@@ -98,6 +99,11 @@ func New(dependencies Dependencies) (*API, error) {
 			basespec.ErrDecoderUnavailable,
 			mcpArtifact.DecoderID,
 		)
+	}
+	if dependencies.UserRootID != "" {
+		if err := basespec.ValidateRootID(dependencies.UserRootID); err != nil {
+			return nil, err
+		}
 	}
 	return &API{dependencies: dependencies}, nil
 }
@@ -138,6 +144,14 @@ func (a *API) Create(
 	}
 	if err := basespec.ValidateRootID(request.RootID); err != nil {
 		return Bundle{}, err
+	}
+	if a.dependencies.UserRootID != "" &&
+		request.RootID != a.dependencies.UserRootID {
+		return Bundle{}, fmt.Errorf(
+			"%w: user MCP Bundles must be created in Root %q",
+			basespec.ErrInvalid,
+			a.dependencies.UserRootID,
+		)
 	}
 	if err := a.requireBundleMutation(
 		ctx,

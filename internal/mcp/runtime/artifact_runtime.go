@@ -20,7 +20,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
-const runtimeSnapshotTTL = time.Hour
+const (
+	runtimeSnapshotTTL               = time.Hour
+	defaultMCPConnectTimeout         = 30 * time.Second
+	defaultInteractiveMCPAuthTimeout = 10 * time.Minute
+	defaultMCPRefreshTimeout         = time.Minute
+)
 
 type ClientSession interface {
 	Close(ctx context.Context) error
@@ -67,6 +72,7 @@ type sessionState struct {
 	server     artifact.ArtifactRef
 	collection collection.CollectionRef
 	version    cryptoutil.Digest
+	generation uint64
 	config     server.RuntimeConfig
 
 	status spec.MCPServerStatus
@@ -86,10 +92,11 @@ type MCPRuntimeManager struct {
 	authorizer  auth.ConnectionAuthorizer
 	factory     ClientFactory
 
-	mu       sync.RWMutex
-	sessions map[artifact.ArtifactRef]*sessionState
-	timers   map[artifact.ArtifactRef]*time.Timer
-	closed   bool
+	mu          sync.RWMutex
+	sessions    map[artifact.ArtifactRef]*sessionState
+	generations map[artifact.ArtifactRef]uint64
+	timers      map[artifact.ArtifactRef]*time.Timer
+	closed      bool
 }
 
 func NewMCPRuntimeManager(
@@ -114,8 +121,9 @@ func NewMCPRuntimeManager(
 		environment: environment,
 		authorizer:  authorizer,
 		factory:     factory,
-		sessions:    map[artifact.ArtifactRef]*sessionState{},
-		timers:      map[artifact.ArtifactRef]*time.Timer{},
+		sessions:    make(map[artifact.ArtifactRef]*sessionState),
+		generations: make(map[artifact.ArtifactRef]uint64),
+		timers:      make(map[artifact.ArtifactRef]*time.Timer),
 	}, nil
 }
 
@@ -132,77 +140,76 @@ func (m *MCPRuntimeManager) Connect(
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
-
-	resolved, config, authConn, err := m.resolveForConnection(ctx, ref)
+	generation, previous, timer, err := m.beginConnection(ref)
 	if err != nil {
 		return nil, err
 	}
+	if timer != nil {
+		timer.Stop()
+	}
+	if previous != nil && previous.client != nil {
+		_ = closeMCPClient(ctx, previous.client)
+	}
 
-	client, err := m.factory.Connect(ctx, config, authConn, m)
+	resolved, config, authConn, err := m.resolveForConnection(ctx, ref)
+	if err != nil {
+		m.setErrorIfCurrent(ref, generation, err)
+		return nil, err
+	}
+	m.setConnectingCollectionIfCurrent(ref, generation, resolved.Collection)
+	if !m.connectionCurrent(ref, generation) {
+		return nil, fmt.Errorf(
+			"%w: MCP connection was superseded",
+			spec.ErrMCPRuntimeNotReady,
+		)
+	}
+
+	connectCtx, cancel := withMCPConnectTimeout(ctx, config)
+	defer cancel()
+
+	client, err := m.factory.Connect(connectCtx, config, authConn, m)
 	if err != nil {
 		err = redactRuntimeError(
 			err,
 			config.SensitiveValues,
 			authConn.SensitiveValues,
 		)
-		m.authorizer.ConnectionFailed(
-			context.WithoutCancel(ctx),
-			config,
-			err,
-		)
-		m.setError(ref, err)
+		if m.setErrorIfCurrent(ref, generation, err) {
+			m.authorizer.ConnectionFailed(context.WithoutCancel(ctx), config, err)
+		}
 		return nil, err
 	}
 
-	snapshot, err := client.Discover(ctx, config)
+	snapshot, err := client.Discover(connectCtx, config)
 	if err != nil {
-		closeErr := client.Close(context.WithoutCancel(ctx))
+		closeErr := closeMCPClient(ctx, client)
 		err = redactRuntimeError(
 			errors.Join(err, closeErr),
 			config.SensitiveValues,
 			authConn.SensitiveValues,
 		)
-		m.authorizer.ConnectionFailed(
-			context.WithoutCancel(ctx),
-			config,
-			err,
-		)
-		m.setError(ref, err)
+		if m.setErrorIfCurrent(ref, generation, err) {
+			m.authorizer.ConnectionFailed(context.WithoutCancel(ctx), config, err)
+		}
 		return nil, err
 	}
 
 	now := time.Now().UTC()
 	normalizeSnapshot(&snapshot, ref, now)
-
-	var previous ClientSession
-
-	m.mu.Lock()
-	if m.closed {
-		m.mu.Unlock()
-		_ = client.Close(context.WithoutCancel(ctx))
-		return nil, basespec.ErrClosed
-	}
-
-	if current := m.sessions[ref]; current != nil {
-		previous = current.client
-	}
-
-	m.sessions[ref] = &sessionState{
-		server:            ref,
-		collection:        resolved.Collection,
-		version:           resolved.Version,
-		config:            cloneRuntimeConfig(config),
-		status:            spec.MCPServerStatusReady,
-		client:            client,
-		snapshot:          cloneSnapshot(snapshot),
-		lastConnectedAt:   now,
-		lastSyncedAt:      now,
-		snapshotExpiresAt: now.Add(runtimeSnapshotTTL),
-	}
-	m.mu.Unlock()
-
-	if previous != nil && previous != client {
-		_ = previous.Close(context.WithoutCancel(ctx))
+	if !m.commitConnection(
+		ref,
+		generation,
+		resolved,
+		config,
+		client,
+		snapshot,
+		now,
+	) {
+		_ = closeMCPClient(ctx, client)
+		return nil, fmt.Errorf(
+			"%w: MCP connection was superseded",
+			spec.ErrMCPRuntimeNotReady,
+		)
 	}
 
 	m.authorizer.ConnectionSucceeded(
@@ -557,15 +564,16 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 	m.closed = true
 
 	states := make([]*sessionState, 0, len(m.sessions))
-	for _, state := range m.sessions {
+	for ref, state := range m.sessions {
+		m.generations[ref]++
 		states = append(states, state)
 	}
 	timers := make([]*time.Timer, 0, len(m.timers))
 	for _, timer := range m.timers {
 		timers = append(timers, timer)
 	}
-	m.sessions = map[artifact.ArtifactRef]*sessionState{}
-	m.timers = map[artifact.ArtifactRef]*time.Timer{}
+	m.sessions = make(map[artifact.ArtifactRef]*sessionState)
+	m.timers = make(map[artifact.ArtifactRef]*time.Timer)
 	m.mu.Unlock()
 
 	for _, timer := range timers {
@@ -598,9 +606,12 @@ func (m *MCPRuntimeManager) Refresh(
 		)
 	}
 
-	resolved, config, _, err := m.resolveForConnection(ctx, ref)
+	refreshCtx, cancel := withMCPRefreshTimeout(ctx)
+	defer cancel()
+
+	resolved, config, _, err := m.resolveForConnection(refreshCtx, ref)
 	if err != nil {
-		m.setError(ref, err)
+		m.setErrorIfCurrent(ref, state.generation, err)
 		return nil, err
 	}
 	if resolved.Version != state.version {
@@ -611,10 +622,10 @@ func (m *MCPRuntimeManager) Refresh(
 		)
 	}
 
-	snapshot, err := state.client.Discover(ctx, config)
+	snapshot, err := state.client.Discover(refreshCtx, config)
 	if err != nil {
 		err = redactRuntimeError(err, config.SensitiveValues)
-		m.setError(ref, err)
+		m.setErrorIfCurrent(ref, state.generation, err)
 		return nil, err
 	}
 
@@ -624,6 +635,8 @@ func (m *MCPRuntimeManager) Refresh(
 	m.mu.Lock()
 	current := m.sessions[ref]
 	if current == nil ||
+		m.generations[ref] != state.generation ||
+		current.generation != state.generation ||
 		current.client != state.client ||
 		current.version != resolved.Version {
 		m.mu.Unlock()
@@ -764,10 +777,105 @@ func (m *MCPRuntimeManager) session(
 	return cloneSessionState(state), true
 }
 
+func (m *MCPRuntimeManager) beginConnection(
+	ref artifact.ArtifactRef,
+) (uint64, *sessionState, *time.Timer, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.closed {
+		return 0, nil, nil, basespec.ErrClosed
+	}
+	m.generations[ref]++
+	generation := m.generations[ref]
+	previous := m.sessions[ref]
+	timer := m.timers[ref]
+
+	delete(m.timers, ref)
+	m.sessions[ref] = &sessionState{
+		server:     ref,
+		generation: generation,
+		status:     spec.MCPServerStatusConnecting,
+	}
+	if previous != nil {
+		m.sessions[ref].collection = previous.collection
+	}
+	return generation, previous, timer, nil
+}
+
+func (m *MCPRuntimeManager) setConnectingCollectionIfCurrent(
+	ref artifact.ArtifactRef,
+	generation uint64,
+	collectionRef collection.CollectionRef,
+) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.closed || m.generations[ref] != generation {
+		return
+	}
+	state := m.sessions[ref]
+	if state == nil || state.generation != generation {
+		return
+	}
+	state.collection = collectionRef
+}
+
+func (m *MCPRuntimeManager) connectionCurrent(
+	ref artifact.ArtifactRef,
+	generation uint64,
+) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	state := m.sessions[ref]
+	return !m.closed &&
+		state != nil &&
+		state.generation == generation &&
+		m.generations[ref] == generation
+}
+
+func (m *MCPRuntimeManager) commitConnection(
+	ref artifact.ArtifactRef,
+	generation uint64,
+	resolved server.Resolved,
+	config server.RuntimeConfig,
+	client ClientSession,
+	snapshot spec.MCPDiscoverySnapshot,
+	now time.Time,
+) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state := m.sessions[ref]
+	if m.closed ||
+		state == nil ||
+		state.generation != generation ||
+		m.generations[ref] != generation {
+		return false
+	}
+
+	m.sessions[ref] = &sessionState{
+		server:            ref,
+		collection:        resolved.Collection,
+		version:           resolved.Version,
+		generation:        generation,
+		config:            cloneRuntimeConfig(config),
+		status:            spec.MCPServerStatusReady,
+		client:            client,
+		snapshot:          cloneSnapshot(snapshot),
+		lastConnectedAt:   now,
+		lastSyncedAt:      now,
+		snapshotExpiresAt: now.Add(runtimeSnapshotTTL),
+	}
+	return true
+}
+
 func (m *MCPRuntimeManager) removeSession(
 	ref artifact.ArtifactRef,
 ) (*sessionState, *time.Timer) {
 	m.mu.Lock()
+	m.generations[ref]++
 	state := m.sessions[ref]
 	timer := m.timers[ref]
 	delete(m.sessions, ref)
@@ -776,24 +884,70 @@ func (m *MCPRuntimeManager) removeSession(
 	return state, timer
 }
 
-func (m *MCPRuntimeManager) setError(
+func (m *MCPRuntimeManager) setErrorIfCurrent(
 	ref artifact.ArtifactRef,
+	generation uint64,
 	err error,
-) {
+) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if m.closed || m.generations[ref] != generation {
+		return false
+	}
 	state := m.sessions[ref]
 	if state == nil {
 		state = &sessionState{
-			server: ref,
+			server:     ref,
+			generation: generation,
 		}
 		m.sessions[ref] = state
+	}
+	if state.generation != generation {
+		return false
 	}
 	state.status = spec.MCPServerStatusError
 	if err != nil {
 		state.lastError = err.Error()
 	}
+	return true
+}
+
+func withMCPConnectTimeout(
+	ctx context.Context,
+	config server.RuntimeConfig,
+) (context.Context, context.CancelFunc) {
+	if _, hasDeadline := ctx.Deadline(); hasDeadline {
+		return ctx, func() {}
+	}
+
+	timeout := defaultMCPConnectTimeout
+	if config.StreamableHTTP != nil &&
+		config.StreamableHTTP.AuthMode == spec.MCPHTTPAuthOAuth {
+		timeout = defaultInteractiveMCPAuthTimeout
+	}
+	return context.WithTimeout(ctx, timeout)
+}
+
+func withMCPRefreshTimeout(
+	ctx context.Context,
+) (context.Context, context.CancelFunc) {
+	if _, hasDeadline := ctx.Deadline(); hasDeadline {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, defaultMCPRefreshTimeout)
+}
+
+func closeMCPClient(ctx context.Context, client ClientSession) error {
+	if client == nil {
+		return nil
+	}
+	closeCtx, cancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		5*time.Second,
+	)
+	defer cancel()
+	return client.Close(closeCtx)
 }
 
 func (m *MCPRuntimeManager) scheduleRefresh(

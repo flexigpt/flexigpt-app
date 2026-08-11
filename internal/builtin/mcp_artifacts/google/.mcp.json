@@ -1,0 +1,151 @@
+{
+	"kind": "mcp.bundle",
+	"schemaID": "mcp.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "google-mcp-servers",
+	"displayName": "Google MCP Servers",
+	"description": "Google managed remote MCP server definitions.",
+	"mcpServers": {
+		"bigquery": {
+			"type": "http",
+			"url": "https://bigquery.googleapis.com/mcp"
+		},
+		"calendar": {
+			"type": "http",
+			"url": "https://calendarmcp.googleapis.com/mcp/v1"
+		},
+		"compute": { "type": "http", "url": "https://compute.googleapis.com/mcp" },
+		"gke": { "type": "http", "url": "https://container.googleapis.com/mcp" },
+		"gmail": {
+			"type": "http",
+			"url": "https://gmailmcp.googleapis.com/mcp/v1"
+		},
+		"maps": { "type": "http", "url": "https://mapstools.googleapis.com/mcp" }
+	},
+	"bundleExtension": {
+		"servers": {
+			"bigquery": {
+				"displayName": "Google BigQuery",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "GOOGLE_OAUTH_CLIENT"
+				},
+				"install": {
+					"inputs": {
+						"GOOGLE_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Google OAuth Client",
+							"description": "OAuth client ID and client secret from Google Auth Platform.",
+							"required": true,
+							"clientSecretRequired": true
+						}
+					}
+				},
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"calendar": {
+				"displayName": "Google Calendar",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "GOOGLE_OAUTH_CLIENT"
+				},
+				"install": {
+					"inputs": {
+						"GOOGLE_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Google OAuth Client",
+							"description": "OAuth client ID and client secret from Google Auth Platform.",
+							"required": true,
+							"clientSecretRequired": true
+						}
+					}
+				},
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"compute": {
+				"displayName": "Google Compute Engine",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"gke": {
+				"displayName": "Google Kubernetes Engine",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"gmail": {
+				"displayName": "Google Gmail",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "GOOGLE_OAUTH_CLIENT"
+				},
+				"install": {
+					"inputs": {
+						"GOOGLE_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Google OAuth Client",
+							"description": "OAuth client ID and client secret from Google Auth Platform.",
+							"required": true,
+							"clientSecretRequired": true
+						}
+					}
+				},
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"maps": {
+				"displayName": "Google Maps",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			}
+		},
+		"policies": {
+			"manual-write": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-write",
+				"displayName": "Manual write policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"auto-read": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "auto-read",
+				"displayName": "Automatic read policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "auto",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": false,
+						"requireApprovalForDestructive": false
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			}
+		}
+	}
+}

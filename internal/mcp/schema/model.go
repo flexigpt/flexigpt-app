@@ -53,15 +53,18 @@ type CoreServer struct {
 }
 
 type InputDeclaration struct {
-	Kind        InputKind `json:"kind"`
-	Label       string    `json:"label,omitempty"`
-	Description string    `json:"description,omitempty"`
-	Placeholder string    `json:"placeholder,omitempty"`
-	Required    bool      `json:"required,omitempty"`
-	Default     *string   `json:"default,omitempty"`
+	Kind                 InputKind `json:"kind"`
+	Label                string    `json:"label,omitempty"`
+	Description          string    `json:"description,omitempty"`
+	Note                 string    `json:"note,omitempty"`
+	Placeholder          string    `json:"placeholder,omitempty"`
+	Required             bool      `json:"required,omitempty"`
+	Default              *string   `json:"default,omitempty"`
+	ClientSecretRequired bool      `json:"clientSecretRequired,omitempty"`
 }
 
 type InstallationDeclaration struct {
+	Note             string                      `json:"note,omitempty"`
 	Inputs           map[string]InputDeclaration `json:"inputs,omitempty"`
 	AllowEnvironment []string                    `json:"allowEnvironment,omitempty"`
 }
@@ -169,6 +172,18 @@ type ServerDocument struct {
 
 	MCPServer CoreServer      `json:"mcpServer"`
 	Extension ServerExtension `json:"extension"`
+}
+
+// OAuthClientSecretRequired reports whether the declared OAuth client input
+// must contain a confidential-client secret. Client-credentials flow always
+// requires a secret even if a document omitted the explicit declaration flag.
+func (d ServerDocument) OAuthClientSecretRequired() bool {
+	if d.Extension.Auth.Mode == mcpSpec.MCPHTTPAuthClientCredentials {
+		return true
+	}
+	input := d.Extension.Auth.ClientCredentialsInput
+	return input != "" &&
+		d.Extension.Install.Inputs[input].ClientSecretRequired
 }
 
 type ServerDefinitionBody struct {

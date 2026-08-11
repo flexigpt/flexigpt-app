@@ -58,8 +58,9 @@ type Installer struct {
 }
 
 type preparedBundle struct {
-	registration BundleRegistration
-	document     schema.BundleDocument
+	registration  BundleRegistration
+	document      schema.BundleDocument
+	packageDigest cryptoutil.Digest
 }
 
 func NewInstaller(
@@ -133,29 +134,24 @@ func (i *Installer) EnsureHydration(
 		return err
 	}
 	if current {
-		for _, registered := range i.registry.OrderedBundles() {
-			if err := i.bundles.EnsureBuiltInCurrent(
-				ctx,
-				collection.CollectionRef{
-					RootID:       i.registry.Topology.Root.ID,
-					CollectionID: registered.CollectionID,
-				},
-			); err != nil {
-				return err
-			}
+		if err := i.ensureCurrentBundles(ctx); err == nil {
+			return nil
+		} else if ctx.Err() != nil {
+			return err
 		}
-		return nil
 	}
 
-	if purger, supported := i.overlays.(rootOverlayPurger); supported {
-		if err := purger.PurgeRoot(
-			ctx,
-			i.registry.Topology.Root.ID,
-		); err != nil {
-			return fmt.Errorf(
-				"purge stale MCP protected installation overlays: %w",
-				err,
-			)
+	if !current {
+		if purger, supported := i.overlays.(rootOverlayPurger); supported {
+			if err := purger.PurgeRoot(
+				ctx,
+				i.registry.Topology.Root.ID,
+			); err != nil {
+				return fmt.Errorf(
+					"purge stale MCP protected installation overlays: %w",
+					err,
+				)
+			}
 		}
 	}
 
@@ -163,7 +159,6 @@ func (i *Installer) EnsureHydration(
 	if err != nil {
 		return err
 	}
-
 	for _, value := range prepared {
 		if _, err := i.bundles.EnsureBuiltIn(
 			ctx,
@@ -225,6 +220,21 @@ func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
 // calls EnsureHydration instead and supplies the current marker state.
 func (i *Installer) Ensure(ctx context.Context) error {
 	return i.EnsureHydration(ctx, false)
+}
+
+func (i *Installer) ensureCurrentBundles(ctx context.Context) error {
+	for _, registered := range i.registry.OrderedBundles() {
+		if err := i.bundles.EnsureBuiltInCurrent(
+			ctx,
+			collection.CollectionRef{
+				RootID:       i.registry.Topology.Root.ID,
+				CollectionID: registered.CollectionID,
+			},
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (i *Installer) prepareBundles(
@@ -306,8 +316,9 @@ func (i *Installer) prepareBundles(
 		}
 
 		output = append(output, preparedBundle{
-			registration: registered,
-			document:     document,
+			registration:  registered,
+			document:      document,
+			packageDigest: cryptoutil.DigestBytes(parsed.Raw),
 		})
 	}
 	return output, nil
@@ -326,6 +337,7 @@ func (i *Installer) hydrationFingerprint(
 		CollectionID     basespec.CollectionID `json:"collectionID"`
 		PackageDirectory basespec.Locator      `json:"packageDirectory"`
 		DocumentDigest   cryptoutil.Digest     `json:"documentDigest"`
+		PackageDigest    cryptoutil.Digest     `json:"packageDigest"`
 		Artifacts        []artifactFingerprint `json:"artifacts"`
 	}
 
@@ -346,6 +358,7 @@ func (i *Installer) hydrationFingerprint(
 			CollectionID:     value.registration.CollectionID,
 			PackageDirectory: value.registration.PackageDirectory,
 			DocumentDigest:   value.document.Digest,
+			PackageDigest:    value.packageDigest,
 			Artifacts:        artifacts,
 		})
 	}

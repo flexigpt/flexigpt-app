@@ -113,6 +113,7 @@ func InitMCPWrapper(
 		HasDecoder:         components.HasDecoder,
 		DecoderFingerprint: components.DecoderFingerprint,
 		RootPolicy:         components.RootMutationPolicy(),
+		UserRootID:         mcpUserRootID,
 		Runtime:            invalidator,
 		Overlays:           overlays,
 		SecretCleaner:      secrets,
@@ -670,7 +671,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			}
 			if err := auth.ValidateOAuthClientCredentialsSecret(
 				value,
-				mode == mcpSpec.MCPHTTPAuthClientCredentials,
+				resolved.Document.OAuthClientSecretRequired(),
 			); err != nil {
 				return MCPSecretWriteResult{}, err
 			}
@@ -751,13 +752,12 @@ func (w *MCPWrapper) GetMCPServerAuthHealth(
 			return mcpSpec.MCPAuthHealth{}, err
 		}
 
-		resolved, err := w.bundleAPI.ResolveMCPServer(context.Background(), ref)
+		resolved, err := w.bundleAPI.InspectMCPServer(context.Background(), ref)
 		if err != nil {
 			return mcpSpec.MCPAuthHealth{}, err
 		}
 		config, err := resolved.MaterializeForInspection(
 			context.Background(),
-			w.secrets,
 			mcpEnvironmentResolver{},
 		)
 		if err != nil {

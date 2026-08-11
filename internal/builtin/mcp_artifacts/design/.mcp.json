@@ -1,0 +1,98 @@
+{
+	"kind": "mcp.bundle",
+	"schemaID": "mcp.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "design-mcp-servers",
+	"displayName": "Design MCP Servers",
+	"description": "Built-in MCP server definitions for design workflows.",
+	"mcpServers": {
+		"canva": {
+			"type": "http",
+			"url": "https://mcp.canva.com/mcp"
+		},
+		"figma-remote": {
+			"type": "http",
+			"url": "https://mcp.figma.com/mcp"
+		}
+	},
+	"bundleExtension": {
+		"servers": {
+			"canva": {
+				"displayName": "Canva",
+				"auth": {
+					"mode": "oauth"
+				},
+				"install": {
+					"note": "Official Canva remote MCP server. Register FlexiGPT's OAuth redirect URL if the provider requires client registration."
+				},
+				"policy": {
+					"ref": "manual-write",
+					"required": true
+				}
+			},
+			"figma-remote": {
+				"displayName": "Figma",
+				"auth": {
+					"mode": "oauth"
+				},
+				"install": {
+					"note": "Official Figma remote MCP server. Figma canvas mutations remain manually approved."
+				},
+				"policy": {
+					"ref": "manual-write-no-destructive",
+					"required": true
+				}
+			}
+		},
+		"policies": {
+			"manual-write": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-write",
+				"displayName": "Manual write policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"manual-write-no-destructive": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-write-no-destructive",
+				"displayName": "Manual write policy without destructive approval profile",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": false
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			}
+		}
+	}
+}

@@ -40,7 +40,7 @@ It provides common mechanics for features such as Workspace and Skills:
 - Managed application-content publication.
 - Protected built-in topology hydration.
 - Schema registration, validation, and canonicalization for supported
-  source-owned Collection documents.
+  source-owned Collection and Artifact documents.
 
 Features own domain meaning, discovery policy, local policy, projections, and
 runtime behavior. Artifact Store must not become a second Workspace, Skill, or
@@ -468,11 +468,12 @@ closure digest, package digest, archive digest, or transport digest.
 
 ### Shareable schema documents
 
-Artifact Store hosts a registry of supported shareable Collection codecs. The
-registry:
+Artifact Store hosts a registry of supported shareable Collection and Artifact
+codecs. The registry:
 
-- Selects a codec by entity type, Collection kind, schema ID, and schema
-  version.
+- Selects a codec by entity type, entity kind, schema ID, and schema version.
+- Uses Collection-kind validation for Collection documents and Artifact-kind
+  validation for Artifact documents.
 - Validates the JSON Schema.
 - Strictly decodes and semantically validates the domain model.
 - Canonicalizes JSON.
@@ -480,8 +481,9 @@ registry:
 
 Canonicalization is not persistence, import, export, acquisition, or package
 transfer. Current code supports Collection documents, not a generic shareable
-Artifact-document repository. There is no generic SQLite relationship between
-a local Collection and a shareable document digest.
+Artifact-document repository. Registered Artifact codecs validate and
+canonicalize source-owned Artifact documents, but do not create local Artifact
+records or introduce generic shareable-document persistence.
 
 A URI may be schema-valid while still operationally unsupported. Current
 features must reject any reference form for which they have no explicit
@@ -638,6 +640,7 @@ credential policy.
   purge.
 - Managed complete-package publication and removal.
 - Registered Skill and Workspace Collection-document schema canonicalization.
+- Registered MCP Bundle, Server, and Policy shareable schema canonicalization.
 - Protected built-in topology hydration and stale-state reset.
 - Wails-facing Root and Source administration bindings.
 

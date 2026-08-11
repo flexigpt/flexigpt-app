@@ -622,6 +622,11 @@ Additional policies:
 
 ### Effective policy composition
 
+The resolved server policy is the primary policy when it is present. Additional
+local policy Artifact references may only tighten that primary policy. When a
+server has no resolved policy, the application baseline policy is used as the
+primary policy and additional policies may only tighten that baseline.
+
 Policy composition is deterministic and restrictive.
 
 - `untrusted` dominates `trusted`.
@@ -1314,6 +1319,12 @@ Only then may the MCP SDK client connect.
 
 ### Runtime verification frequency
 
+Read-only setup and auth-health projections validate Artifact, Collection,
+Catalog, Definition, installation-data, and policy state without reading
+secret values or rehashing source bytes. Secret values are resolved only while
+preparing an actual connection. Exact source-byte verification remains limited
+to connection establishment and explicit runtime refresh.
+
 Full Artifact, Catalog, Definition, policy, Source generation, and exact
 `.mcp.json` byte verification occurs at connection establishment and explicit
 runtime refresh.
@@ -1707,8 +1718,8 @@ Completed:
 - Strict installation-overlay decoding with non-conflicting nested
   `serverData` persistence and protected-overlay secret cleanup.
 - Source-controlled conversion, schema-registry canonicalization, generic
-  protected-topology bootstrap, and protected hydration registration for the
-  supplied Search MCP built-in package sample.
+  protected-topology bootstrap, and protected hydration registration for all
+  supplied built-in MCP package groups.
 - Normal startup isolation from the legacy embedded MCP resource tree.
 - Legacy command wrapper, old assistant-preset wrapper, old inference MCP
   bridge, and old MCP context validator quarantined from normal builds.
@@ -1721,8 +1732,6 @@ Pending:
   conversation turn before routing a later provider-tool invocation.
 - Add schema, decoder, lifecycle, retry, policy, secret-redaction, runtime
   invalidation, built-in hydration, mapped-invocation, and clean-cutover tests.
-- Convert additional embedded MCP examples only through reviewed,
-  source-controlled `.mcp.json` packages and static registrations.
 
 ## Clean cutover
 

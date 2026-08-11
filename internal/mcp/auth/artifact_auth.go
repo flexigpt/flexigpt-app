@@ -437,7 +437,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 			ctx,
 			m.secrets,
 			httpConfig.ClientCredentialRef,
-			false,
+			config.OAuthClientSecretRequired,
 		)
 		if err != nil {
 			output.Status.State = spec.MCPAuthStateError

@@ -1,0 +1,224 @@
+{
+	"kind": "mcp.bundle",
+	"schemaID": "mcp.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "microsoft-mcp-servers",
+	"displayName": "Microsoft MCP Servers",
+	"description": "Microsoft Work IQ and Microsoft 365 remote MCP server definitions.",
+	"mcpServers": {
+		"m365-copilot": {
+			"type": "http",
+			"url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_M365Copilot"
+		},
+		"onedrive": {
+			"type": "http",
+			"url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_OneDriveRemoteServer"
+		},
+		"sharepoint": {
+			"type": "http",
+			"url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_SharePointRemoteServer"
+		},
+		"teams": {
+			"type": "http",
+			"url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_TeamsServer"
+		},
+		"user": {
+			"type": "http",
+			"url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_MeServer"
+		}
+	},
+	"bundleExtension": {
+		"servers": {
+			"m365-copilot": {
+				"displayName": "Microsoft 365 Copilot",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT"
+				},
+				"install": {
+					"inputs": {
+						"MICROSOFT_TENANT_ID": {
+							"kind": "text",
+							"label": "Microsoft Entra Tenant ID",
+							"required": true
+						},
+						"MICROSOFT_ENTRA_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Microsoft Entra OAuth Client",
+							"description": "Client ID and optional client secret for a public PKCE or confidential Entra application.",
+							"required": true,
+							"clientSecretRequired": false
+						}
+					}
+				},
+				"policy": { "ref": "manual-read", "required": true }
+			},
+			"onedrive": {
+				"displayName": "Microsoft OneDrive",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT"
+				},
+				"install": {
+					"inputs": {
+						"MICROSOFT_TENANT_ID": {
+							"kind": "text",
+							"label": "Microsoft Entra Tenant ID",
+							"required": true
+						},
+						"MICROSOFT_ENTRA_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Microsoft Entra OAuth Client",
+							"required": true,
+							"clientSecretRequired": false
+						}
+					}
+				},
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"sharepoint": {
+				"displayName": "Microsoft SharePoint",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT"
+				},
+				"install": {
+					"inputs": {
+						"MICROSOFT_TENANT_ID": {
+							"kind": "text",
+							"label": "Microsoft Entra Tenant ID",
+							"required": true
+						},
+						"MICROSOFT_ENTRA_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Microsoft Entra OAuth Client",
+							"required": true,
+							"clientSecretRequired": false
+						}
+					}
+				},
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"teams": {
+				"displayName": "Microsoft Teams",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT"
+				},
+				"install": {
+					"inputs": {
+						"MICROSOFT_TENANT_ID": {
+							"kind": "text",
+							"label": "Microsoft Entra Tenant ID",
+							"required": true
+						},
+						"MICROSOFT_ENTRA_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Microsoft Entra OAuth Client",
+							"required": true,
+							"clientSecretRequired": false
+						}
+					}
+				},
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"user": {
+				"displayName": "Microsoft User Profile",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT"
+				},
+				"install": {
+					"inputs": {
+						"MICROSOFT_TENANT_ID": {
+							"kind": "text",
+							"label": "Microsoft Entra Tenant ID",
+							"required": true
+						},
+						"MICROSOFT_ENTRA_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Microsoft Entra OAuth Client",
+							"required": true,
+							"clientSecretRequired": false
+						}
+					}
+				},
+				"policy": { "ref": "auto-read", "required": true }
+			}
+		},
+		"policies": {
+			"manual-read": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-read",
+				"displayName": "Manual read policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": false,
+						"requireApprovalForDestructive": false
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"manual-write": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-write",
+				"displayName": "Manual write policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"auto-read": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "auto-read",
+				"displayName": "Automatic read policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "auto",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": false,
+						"requireApprovalForDestructive": false
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			}
+		}
+	}
+}

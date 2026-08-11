@@ -1,0 +1,133 @@
+{
+	"kind": "mcp.bundle",
+	"schemaID": "mcp.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "general-services-mcp-servers",
+	"displayName": "General Services MCP Servers",
+	"description": "Built-in MCP server definitions for Box, BGPT, and Indeed.",
+	"mcpServers": {
+		"bgpt": {
+			"type": "http",
+			"url": "https://bgpt.pro/mcp/stream",
+			"headers": {
+				"Authorization": "Bearer ${BGPT_API_KEY}"
+			}
+		},
+		"box": {
+			"type": "http",
+			"url": "https://mcp.box.com"
+		},
+		"indeed": {
+			"type": "http",
+			"url": "https://mcp.indeed.com/claude/mcp"
+		}
+	},
+	"bundleExtension": {
+		"servers": {
+			"bgpt": {
+				"displayName": "BGPT",
+				"auth": {
+					"mode": "none"
+				},
+				"install": {
+					"note": "The free BGPT tier does not require a key. A configured key is sent as a bearer token.",
+					"inputs": {
+						"BGPT_API_KEY": {
+							"kind": "secret",
+							"label": "BGPT API Key",
+							"description": "Optional paid BGPT subscription token.",
+							"required": false
+						}
+					}
+				},
+				"policy": {
+					"ref": "auto-read",
+					"required": true
+				}
+			},
+			"box": {
+				"displayName": "Box",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "BOX_OAUTH_CLIENT"
+				},
+				"install": {
+					"note": "Box requires Integration Credentials and a registered OAuth redirect URI.",
+					"inputs": {
+						"BOX_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Box OAuth Client",
+							"description": "Client ID and Client Secret from Box Integration Credentials.",
+							"required": true,
+							"clientSecretRequired": true
+						}
+					}
+				},
+				"policy": {
+					"ref": "manual-write",
+					"required": true
+				}
+			},
+			"indeed": {
+				"displayName": "Indeed",
+				"auth": {
+					"mode": "oauth"
+				},
+				"policy": {
+					"ref": "manual-write",
+					"required": true
+				}
+			}
+		},
+		"policies": {
+			"auto-read": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "auto-read",
+				"displayName": "Automatic read policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "auto",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": false,
+						"requireApprovalForDestructive": false
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"manual-write": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-write",
+				"displayName": "Manual write policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			}
+		}
+	}
+}

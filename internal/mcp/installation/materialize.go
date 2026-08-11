@@ -36,8 +36,9 @@ type Materialized struct {
 	Core schema.CoreServer
 	Auth schema.AuthenticationDeclaration
 
-	ClientCredentialRef string
-	SensitiveValues     []string
+	ClientCredentialRef            string
+	ClientCredentialSecretRequired bool
+	SensitiveValues                []string
 }
 
 func Materialize(
@@ -79,6 +80,39 @@ func MaterializeValidated(
 	secrets SecretResolver,
 	environment EnvironmentResolver,
 ) (Materialized, error) {
+	return materializeValidated(
+		ctx,
+		server,
+		document,
+		data,
+		secrets,
+		environment,
+		true,
+	)
+}
+
+// MaterializeInspectionValidated creates a sanitized materialization for
+// health and setup inspection. It validates installation shape and resolves
+// non-secret values, but it never loads a secret value from Setting Store.
+func MaterializeInspectionValidated(
+	ctx context.Context,
+	server artifact.ArtifactRef,
+	document schema.ServerDocument,
+	data ServerData,
+	environment EnvironmentResolver,
+) (Materialized, error) {
+	return materializeValidated(ctx, server, document, data, nil, environment, false)
+}
+
+func materializeValidated(
+	ctx context.Context,
+	server artifact.ArtifactRef,
+	document schema.ServerDocument,
+	data ServerData,
+	secrets SecretResolver,
+	environment EnvironmentResolver,
+	resolveSecrets bool,
+) (Materialized, error) {
 	if ctx == nil {
 		return Materialized{}, fmt.Errorf(
 			"%w: MCP materialization context is nil",
@@ -100,6 +134,7 @@ func MaterializeValidated(
 
 	values := make(map[string]string)
 	secretValues := make(map[string]struct{})
+	unboundOptional := make(map[string]struct{})
 	clientCredentialRef := ""
 
 	for name, declaration := range document.Extension.Install.Inputs {
@@ -115,6 +150,11 @@ func MaterializeValidated(
 						name,
 					)
 				}
+				unboundOptional[name] = struct{}{}
+				continue
+			}
+			if !resolveSecrets {
+				values[name] = "configured"
 				continue
 			}
 			if secrets == nil {
@@ -146,6 +186,13 @@ func MaterializeValidated(
 						name,
 					)
 				}
+				unboundOptional[name] = struct{}{}
+				continue
+			}
+			if document.Extension.Auth.ClientCredentialsInput == name {
+				clientCredentialRef = binding.SecretRef
+			}
+			if !resolveSecrets {
 				continue
 			}
 			if secrets == nil {
@@ -166,9 +213,6 @@ func MaterializeValidated(
 				)
 			}
 			secretValues[value] = struct{}{}
-			if document.Extension.Auth.ClientCredentialsInput == name {
-				clientCredentialRef = binding.SecretRef
-			}
 
 		case schema.InputText, schema.InputPath:
 			switch {
@@ -182,6 +226,8 @@ func MaterializeValidated(
 					basespec.ErrReferenceUnresolved,
 					name,
 				)
+			default:
+				unboundOptional[name] = struct{}{}
 			}
 
 		default:
@@ -206,17 +252,19 @@ func MaterializeValidated(
 		}
 		if found {
 			values[name] = value
+			delete(unboundOptional, name)
 		}
 	}
 
-	core, err = substituteCore(core, values)
+	core, err = substituteCore(core, values, unboundOptional)
 	if err != nil {
 		return Materialized{}, err
 	}
 	auth := document.Extension.Auth
-	auth.ClientIDMetadataDocumentURL, err = substitute(
+	auth.ClientIDMetadataDocumentURL, err = substituteOptionalScalar(
 		auth.ClientIDMetadataDocumentURL,
 		values,
+		unboundOptional,
 	)
 	if err != nil {
 		return Materialized{}, err
@@ -242,10 +290,11 @@ func MaterializeValidated(
 	slices.Sort(sensitive)
 
 	return Materialized{
-		Core:                core,
-		Auth:                auth,
-		ClientCredentialRef: clientCredentialRef,
-		SensitiveValues:     sensitive,
+		Core:                           core,
+		Auth:                           auth,
+		ClientCredentialRef:            clientCredentialRef,
+		ClientCredentialSecretRequired: document.OAuthClientSecretRequired(),
+		SensitiveValues:                sensitive,
 	}, nil
 }
 
@@ -383,46 +432,104 @@ func selectProfile(
 func substituteCore(
 	input schema.CoreServer,
 	values map[string]string,
+	optional map[string]struct{},
 ) (schema.CoreServer, error) {
 	output := cloneCore(input)
 	var err error
 
-	if output.Command, err = substitute(output.Command, values); err != nil {
+	if output.Command, err = substituteRequired(output.Command, values); err != nil {
 		return schema.CoreServer{}, err
 	}
-	for index := range output.Args {
-		output.Args[index], err = substitute(output.Args[index], values)
-		if err != nil {
-			return schema.CoreServer{}, err
-		}
-	}
-	for key, value := range output.Env {
-		output.Env[key], err = substitute(value, values)
-		if err != nil {
-			return schema.CoreServer{}, err
-		}
-	}
-	if output.URL, err = substitute(output.URL, values); err != nil {
+	if output.Args, err = substituteArguments(output.Args, values, optional); err != nil {
 		return schema.CoreServer{}, err
 	}
-	for key, value := range output.Headers {
-		output.Headers[key], err = substitute(value, values)
-		if err != nil {
-			return schema.CoreServer{}, err
-		}
+	if output.Env, err = substituteOptionalMap(output.Env, values, optional); err != nil {
+		return schema.CoreServer{}, err
+	}
+	if output.URL, err = substituteRequired(output.URL, values); err != nil {
+		return schema.CoreServer{}, err
+	}
+	if output.Headers, err = substituteOptionalMap(output.Headers, values, optional); err != nil {
+		return schema.CoreServer{}, err
 	}
 	return output, nil
 }
 
-func substitute(
+func substituteRequired(
 	input string,
 	values map[string]string,
 ) (string, error) {
-	if input == "" {
+	output, missing := substituteTemplate(input, values)
+	if len(missing) != 0 {
+		return "", unresolvedInputError(missing[0])
+	}
+	return output, nil
+}
+
+func substituteOptionalScalar(
+	input string,
+	values map[string]string,
+	optional map[string]struct{},
+) (string, error) {
+	output, missing := substituteTemplate(input, values)
+	if len(missing) == 0 {
+		return output, nil
+	}
+	if missingAreOptional(missing, optional) && placeholderOnly(input) {
 		return "", nil
 	}
-	var unresolved string
-	output := placeholderPattern.ReplaceAllStringFunc(
+	return "", unresolvedInputError(missing[0])
+}
+
+func substituteArguments(
+	input []string,
+	values map[string]string,
+	optional map[string]struct{},
+) ([]string, error) {
+	output := make([]string, 0, len(input))
+	for _, value := range input {
+		resolved, missing := substituteTemplate(value, values)
+		if len(missing) == 0 {
+			output = append(output, resolved)
+			continue
+		}
+		if missingAreOptional(missing, optional) && placeholderOnly(value) {
+			continue
+		}
+		return nil, unresolvedInputError(missing[0])
+	}
+	return output, nil
+}
+
+func substituteOptionalMap(
+	input map[string]string,
+	values map[string]string,
+	optional map[string]struct{},
+) (map[string]string, error) {
+	if len(input) == 0 {
+		return maps.Clone(input), nil
+	}
+
+	output := make(map[string]string, len(input))
+	for key, value := range input {
+		resolved, missing := substituteTemplate(value, values)
+		if len(missing) != 0 {
+			if missingAreOptional(missing, optional) {
+				continue
+			}
+			return nil, unresolvedInputError(missing[0])
+		}
+		output[key] = resolved
+	}
+	return output, nil
+}
+
+func substituteTemplate(
+	input string,
+	values map[string]string,
+) (output string, missing []string) {
+	missingSet := make(map[string]struct{})
+	output = placeholderPattern.ReplaceAllStringFunc(
 		input,
 		func(match string) string {
 			parts := placeholderPattern.FindStringSubmatch(match)
@@ -431,20 +538,46 @@ func substitute(
 			}
 			value, found := values[parts[1]]
 			if !found {
-				unresolved = parts[1]
+				missingSet[parts[1]] = struct{}{}
 				return match
 			}
 			return value
 		},
 	)
-	if unresolved != "" {
-		return "", fmt.Errorf(
-			"%w: MCP input %q is unresolved",
-			basespec.ErrReferenceUnresolved,
-			unresolved,
-		)
+	if len(missingSet) == 0 {
+		return output, nil
 	}
-	return output, nil
+	missing = make([]string, 0, len(missingSet))
+	for name := range missingSet {
+		missing = append(missing, name)
+	}
+	slices.Sort(missing)
+	return output, missing
+}
+
+func missingAreOptional(
+	missing []string,
+	optional map[string]struct{},
+) bool {
+	for _, name := range missing {
+		if _, found := optional[name]; !found {
+			return false
+		}
+	}
+	return len(missing) != 0
+}
+
+func placeholderOnly(value string) bool {
+	matches := placeholderPattern.FindAllString(value, -1)
+	return len(matches) != 0 && strings.Join(matches, "") == value
+}
+
+func unresolvedInputError(name string) error {
+	return fmt.Errorf(
+		"%w: MCP input %q is unresolved",
+		basespec.ErrReferenceUnresolved,
+		name,
+	)
 }
 
 func cloneCore(input schema.CoreServer) schema.CoreServer {

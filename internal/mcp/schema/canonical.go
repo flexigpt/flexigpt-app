@@ -551,6 +551,9 @@ func validateServerParts(
 				inputName,
 			)
 		}
+		if err := validateInputDeclaration(inputName, declaration); err != nil {
+			return err
+		}
 		switch declaration.Kind {
 		case InputText, InputSecret, InputPath,
 			InputOAuthClientCredentials:
@@ -575,10 +578,28 @@ func validateServerParts(
 	}
 
 	allowedEnvironment := make(map[string]struct{})
+	seenAllowedEnvironment := make(map[string]struct{})
 	for _, inputName := range extension.Install.AllowEnvironment {
 		if !placeholderInputNameValid(inputName) {
 			return fmt.Errorf(
 				"%w: invalid allowed environment input %q",
+				basespec.ErrInvalid,
+				inputName,
+			)
+		}
+		if _, duplicate := seenAllowedEnvironment[inputName]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate allowed environment input %q",
+				basespec.ErrInvalid,
+				inputName,
+			)
+		}
+		seenAllowedEnvironment[inputName] = struct{}{}
+		if declaration, declared := declared[inputName]; declared &&
+			(declaration.Kind == InputSecret ||
+				declaration.Kind == InputOAuthClientCredentials) {
+			return fmt.Errorf(
+				"%w: secret input %q cannot resolve from process environment",
 				basespec.ErrInvalid,
 				inputName,
 			)
@@ -629,9 +650,13 @@ func validateServerParts(
 				basespec.ErrInvalid,
 			)
 		}
-		if !coreUsesSecretInput(core, declared) {
+		if !coreUsesRequiredSecretInput(
+			core,
+			extension.ConnectionProfiles,
+			declared,
+		) {
 			return fmt.Errorf(
-				"%w: API-key authentication requires a secret header placeholder",
+				"%w: API-key authentication requires a required secret header placeholder",
 				basespec.ErrInvalid,
 			)
 		}
@@ -715,6 +740,58 @@ func validateServerParts(
 				)
 			}
 		}
+	}
+	return nil
+}
+
+func validateInputDeclaration(
+	name string,
+	value InputDeclaration,
+) error {
+	if err := basespec.ValidateOptionalText(
+		"MCP installation input label",
+		value.Label,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+	if err := basespec.ValidateOptionalText(
+		"MCP installation input description",
+		value.Description,
+		basespec.MaxDescriptionBytes,
+	); err != nil {
+		return err
+	}
+	if err := basespec.ValidateOptionalText(
+		"MCP installation input note",
+		value.Note,
+		basespec.MaxDescriptionBytes,
+	); err != nil {
+		return err
+	}
+	if err := basespec.ValidateOptionalText(
+		"MCP installation input placeholder",
+		value.Placeholder,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+	if value.Default != nil {
+		if err := basespec.ValidateOptionalText(
+			"MCP installation input default",
+			*value.Default,
+			basespec.MaxDescriptionBytes,
+		); err != nil {
+			return err
+		}
+	}
+	if value.ClientSecretRequired &&
+		value.Kind != InputOAuthClientCredentials {
+		return fmt.Errorf(
+			"%w: only oauthClientCredentials input %q may require clientSecret",
+			basespec.ErrInvalid,
+			name,
+		)
 	}
 	return nil
 }
@@ -1060,22 +1137,37 @@ func placeholdersInServer(
 	return output
 }
 
-func coreUsesSecretInput(
+func coreUsesRequiredSecretInput(
 	core CoreServer,
+	profiles map[string]ConnectionProfile,
 	inputs map[string]InputDeclaration,
 ) bool {
-	for _, value := range core.Headers {
-		for _, match := range placeholderPattern.FindAllStringSubmatch(
-			value,
-			-1,
-		) {
-			if len(match) != 2 {
-				continue
+	usesRequiredSecret := func(headers map[string]string) bool {
+		for _, value := range headers {
+			for _, match := range placeholderPattern.FindAllStringSubmatch(
+				value,
+				-1,
+			) {
+				if len(match) != 2 {
+					continue
+				}
+				if input, found := inputs[match[1]]; found &&
+					input.Kind == InputSecret &&
+					input.Required {
+					return true
+				}
 			}
-			if input, found := inputs[match[1]]; found &&
-				input.Kind == InputSecret {
-				return true
-			}
+		}
+		return false
+	}
+
+	if usesRequiredSecret(core.Headers) {
+		return true
+	}
+	for _, profile := range profiles {
+		if profile.HTTP != nil &&
+			usesRequiredSecret(profile.HTTP.Headers) {
+			return true
 		}
 	}
 	return false

@@ -1,0 +1,247 @@
+{
+	"kind": "mcp.bundle",
+	"schemaID": "mcp.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "cloudflare-mcp-servers",
+	"displayName": "Cloudflare MCP Servers",
+	"description": "Cloudflare managed remote MCP server definitions.",
+	"mcpServers": {
+		"agents-docs": {
+			"type": "http",
+			"url": "https://agents.cloudflare.com/mcp"
+		},
+		"ai-gateway": {
+			"type": "http",
+			"url": "https://ai-gateway.mcp.cloudflare.com/mcp"
+		},
+		"api": { "type": "http", "url": "https://mcp.cloudflare.com/mcp" },
+		"auditlogs": {
+			"type": "http",
+			"url": "https://auditlogs.mcp.cloudflare.com/mcp"
+		},
+		"autorag": {
+			"type": "http",
+			"url": "https://autorag.mcp.cloudflare.com/mcp"
+		},
+		"browser-run": {
+			"type": "http",
+			"url": "https://browser.mcp.cloudflare.com/mcp"
+		},
+		"builds": {
+			"type": "http",
+			"url": "https://builds.mcp.cloudflare.com/mcp"
+		},
+		"casb": { "type": "http", "url": "https://casb.mcp.cloudflare.com/mcp" },
+		"container": {
+			"type": "http",
+			"url": "https://containers.mcp.cloudflare.com/mcp"
+		},
+		"dex": { "type": "http", "url": "https://dex.mcp.cloudflare.com/mcp" },
+		"dns-analytics": {
+			"type": "http",
+			"url": "https://dns-analytics.mcp.cloudflare.com/mcp"
+		},
+		"docs": { "type": "http", "url": "https://docs.mcp.cloudflare.com/mcp" },
+		"graphql": {
+			"type": "http",
+			"url": "https://graphql.mcp.cloudflare.com/mcp"
+		},
+		"logs": { "type": "http", "url": "https://logs.mcp.cloudflare.com/mcp" },
+		"observability": {
+			"type": "http",
+			"url": "https://observability.mcp.cloudflare.com/mcp"
+		},
+		"radar": { "type": "http", "url": "https://radar.mcp.cloudflare.com/mcp" },
+		"workers": {
+			"type": "http",
+			"url": "https://bindings.mcp.cloudflare.com/mcp"
+		}
+	},
+	"bundleExtension": {
+		"servers": {
+			"agents-docs": {
+				"displayName": "Cloudflare Agents SDK Docs",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"ai-gateway": {
+				"displayName": "Cloudflare AI Gateway",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"api": {
+				"displayName": "Cloudflare API",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"auditlogs": {
+				"displayName": "Cloudflare Audit Logs",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"autorag": {
+				"displayName": "Cloudflare AI Search",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"browser-run": {
+				"displayName": "Cloudflare Browser Run",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"builds": {
+				"displayName": "Cloudflare Builds",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"casb": {
+				"displayName": "Cloudflare One CASB",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"container": {
+				"displayName": "Cloudflare Container",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "manual-write", "required": true }
+			},
+			"dex": {
+				"displayName": "Cloudflare Digital Experience Monitoring",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"dns-analytics": {
+				"displayName": "Cloudflare DNS Analytics",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"docs": {
+				"displayName": "Cloudflare Docs",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-write", "required": true }
+			},
+			"graphql": {
+				"displayName": "Cloudflare GraphQL",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"logs": {
+				"displayName": "Cloudflare Logs",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"observability": {
+				"displayName": "Cloudflare Observability",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "manual-read", "required": true }
+			},
+			"radar": {
+				"displayName": "Cloudflare Radar",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "auto-read", "required": true }
+			},
+			"workers": {
+				"displayName": "Cloudflare Workers and Bindings",
+				"auth": { "mode": "oauth" },
+				"policy": { "ref": "manual-write", "required": true }
+			}
+		},
+		"policies": {
+			"auto-read": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "auto-read",
+				"displayName": "Automatic read policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "auto",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": false,
+						"requireApprovalForDestructive": false
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"manual-read": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-read",
+				"displayName": "Manual read policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": false,
+						"requireApprovalForDestructive": false
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"manual-write": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-write",
+				"displayName": "Manual write policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"auto-write": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "auto-write",
+				"displayName": "Automatic write policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "auto",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			}
+		}
+	}
+}

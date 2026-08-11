@@ -22,9 +22,10 @@ type RuntimeConfig struct {
 	LogicalName string
 	DisplayName string
 
-	Transport      mcpSpec.MCPTransportType
-	Stdio          *mcpSpec.MCPStdioConfig
-	StreamableHTTP *mcpSpec.MCPStreamableHTTPConfig
+	Transport                 mcpSpec.MCPTransportType
+	Stdio                     *mcpSpec.MCPStdioConfig
+	StreamableHTTP            *mcpSpec.MCPStreamableHTTPConfig
+	OAuthClientSecretRequired bool
 
 	TrustLevel    mcpSpec.MCPTrustLevel
 	DefaultPolicy mcpSpec.MCPServerPolicy
@@ -75,21 +76,19 @@ func (r Resolved) Materialize(
 
 // MaterializeForInspection resolves local installation inputs without
 // requiring RuntimeEnabled. It is used only for sanitized auth-health
-// projection and never opens a client session or exposes secret values.
+// projection and never resolves or exposes a secret value.
 func (r Resolved) MaterializeForInspection(
 	ctx context.Context,
-	secrets installation.SecretResolver,
 	environment installation.EnvironmentResolver,
 ) (RuntimeConfig, error) {
 	if err := r.Validate(); err != nil {
 		return RuntimeConfig{}, err
 	}
-	materialized, err := installation.MaterializeValidated(
+	materialized, err := installation.MaterializeInspectionValidated(
 		ctx,
 		r.Server,
 		r.Document,
 		r.Installation,
-		secrets,
 		environment,
 	)
 	if err != nil {
@@ -113,7 +112,7 @@ func (r Resolved) MaterializeTrusted(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	return r.MaterializeForInspection(ctx, secrets, environment)
+	return r.MaterializeForInspection(ctx, environment)
 }
 
 func (r Resolved) Validate() error {
@@ -161,15 +160,16 @@ func runtimeConfigFromMaterialized(
 	materialized installation.Materialized,
 ) (RuntimeConfig, error) {
 	config := RuntimeConfig{
-		Server:          r.Server,
-		Collection:      r.Collection,
-		LogicalName:     string(r.Document.LogicalName),
-		DisplayName:     r.Document.DisplayName,
-		TrustLevel:      r.Policy.Body.TrustLevel,
-		DefaultPolicy:   r.Policy.Body.DefaultPolicy,
-		ToolPolicies:    r.Policy.Body.ToolPolicies,
-		AppsPolicy:      r.Policy.Body.AppsPolicy,
-		SensitiveValues: materialized.SensitiveValues,
+		Server:                    r.Server,
+		Collection:                r.Collection,
+		LogicalName:               string(r.Document.LogicalName),
+		DisplayName:               r.Document.DisplayName,
+		OAuthClientSecretRequired: materialized.ClientCredentialSecretRequired,
+		TrustLevel:                r.Policy.Body.TrustLevel,
+		DefaultPolicy:             r.Policy.Body.DefaultPolicy,
+		ToolPolicies:              r.Policy.Body.ToolPolicies,
+		AppsPolicy:                r.Policy.Body.AppsPolicy,
+		SensitiveValues:           materialized.SensitiveValues,
 	}
 
 	switch materialized.Core.Type {

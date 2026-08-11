@@ -1,0 +1,174 @@
+{
+	"kind": "mcp.bundle",
+	"schemaID": "mcp.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "software-dev-hosting-mcp-servers",
+	"displayName": "Software Development and Hosting MCP Servers",
+	"description": "Built-in MCP server definitions for GitHub, Vercel, Netlify, and Hugging Face.",
+	"mcpServers": {
+		"github-oauth": {
+			"type": "http",
+			"url": "https://api.githubcopilot.com/mcp/"
+		},
+		"github-pat": {
+			"type": "http",
+			"url": "https://api.githubcopilot.com/mcp/",
+			"headers": {
+				"Authorization": "Bearer ${GITHUB_PAT}",
+				"X-MCP-Insiders": "true"
+			}
+		},
+		"huggingface": {
+			"type": "http",
+			"url": "https://huggingface.co/mcp"
+		},
+		"netlify": {
+			"type": "http",
+			"url": "https://netlify-mcp.netlify.app/mcp"
+		},
+		"vercel": {
+			"type": "http",
+			"url": "https://mcp.vercel.com"
+		}
+	},
+	"bundleExtension": {
+		"servers": {
+			"github-oauth": {
+				"displayName": "GitHub",
+				"auth": {
+					"mode": "oauth"
+				},
+				"policy": {
+					"ref": "manual-write",
+					"required": true
+				}
+			},
+			"github-pat": {
+				"displayName": "GitHub (PAT)",
+				"auth": {
+					"mode": "apiKey"
+				},
+				"install": {
+					"note": "Use a minimally scoped GitHub personal access token. OAuth remains preferred when available.",
+					"inputs": {
+						"GITHUB_PAT": {
+							"kind": "secret",
+							"label": "GitHub Personal Access Token",
+							"description": "Sent as an Authorization bearer token.",
+							"placeholder": "github_pat_... or ghp_...",
+							"required": true
+						}
+					}
+				},
+				"policy": {
+					"ref": "auto-write-apps",
+					"required": true
+				}
+			},
+			"huggingface": {
+				"displayName": "Hugging Face",
+				"auth": {
+					"mode": "oauth"
+				},
+				"policy": {
+					"ref": "manual-write-no-destructive",
+					"required": true
+				}
+			},
+			"netlify": {
+				"displayName": "Netlify",
+				"auth": {
+					"mode": "oauth"
+				},
+				"policy": {
+					"ref": "manual-write",
+					"required": true
+				}
+			},
+			"vercel": {
+				"displayName": "Vercel",
+				"auth": {
+					"mode": "oauth"
+				},
+				"policy": {
+					"ref": "manual-write",
+					"required": true
+				}
+			}
+		},
+		"policies": {
+			"manual-write": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-write",
+				"displayName": "Manual write policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"manual-write-no-destructive": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-write-no-destructive",
+				"displayName": "Manual write policy without destructive approval profile",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": false
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"auto-write-apps": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "auto-write-apps",
+				"displayName": "Automatic write policy with MCP Apps",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "auto",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"appsPolicy": {
+						"enabled": true,
+						"allowAppInitiatedToolCalls": true,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			}
+		}
+	}
+}

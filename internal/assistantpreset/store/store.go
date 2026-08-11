@@ -427,19 +427,24 @@ func (s *AssistantPresetStore) ListAssistantPresetBundles(
 	)
 
 	if req != nil && req.PageToken != "" {
-		if tok, err := jsonutil.Base64JSONDecode[spec.BundlePageToken](req.PageToken); err == nil {
-			pageSize = tok.PageSize
-			if pageSize <= 0 || pageSize > maxPageSizeAssistantPresets {
-				pageSize = defaultPageSizeAssistantPresets
+		tok, err := jsonutil.Base64JSONDecode[spec.BundlePageToken](req.PageToken)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid bundle page token", spec.ErrInvalidRequest)
+		}
+		pageSize = tok.PageSize
+		if pageSize <= 0 || pageSize > maxPageSizeAssistantPresets {
+			pageSize = defaultPageSizeAssistantPresets
+		}
+		includeDisabled = tok.IncludeDisabled
+		if tok.CursorMod != "" {
+			cursorMod, err = time.Parse(time.RFC3339Nano, tok.CursorMod)
+			if err != nil {
+				return nil, fmt.Errorf("%w: invalid bundle cursor", spec.ErrInvalidRequest)
 			}
-			includeDisabled = tok.IncludeDisabled
-			if tok.CursorMod != "" {
-				cursorMod, _ = time.Parse(time.RFC3339Nano, tok.CursorMod)
-				cursorID = tok.CursorID
-			}
-			for _, id := range tok.BundleIDs {
-				wantIDs[id] = struct{}{}
-			}
+			cursorID = tok.CursorID
+		}
+		for _, id := range tok.BundleIDs {
+			wantIDs[id] = struct{}{}
 		}
 	} else if req != nil {
 		if req.PageSize > 0 && req.PageSize <= maxPageSizeAssistantPresets {
@@ -894,13 +899,19 @@ func (s *AssistantPresetStore) ListAssistantPresets(
 ) (*spec.ListAssistantPresetsResponse, error) {
 	tok := spec.AssistantPresetPageToken{}
 	if req != nil && req.PageToken != "" {
-		_ = func() error {
-			t, err := jsonutil.Base64JSONDecode[spec.AssistantPresetPageToken](req.PageToken)
-			if err == nil {
-				tok = t
-			}
-			return err
-		}()
+		value, err := jsonutil.Base64JSONDecode[spec.AssistantPresetPageToken](
+			req.PageToken,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"%w: invalid assistant preset page token",
+				spec.ErrInvalidRequest,
+			)
+		}
+		if value.BuiltInOffset < 0 {
+			return nil, fmt.Errorf("%w: invalid assistant preset cursor", spec.ErrInvalidRequest)
+		}
+		tok = value
 	}
 	if req != nil && req.PageToken == "" {
 		tok.RecommendedPageSize = req.RecommendedPageSize

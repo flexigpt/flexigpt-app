@@ -26,6 +26,26 @@ func (a *API) ResolveMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (server.Resolved, error) {
+	return a.resolveMCPServer(ctx, ref, true)
+}
+
+// InspectMCPServer establishes Artifact, Collection, Catalog, Definition,
+// installation, and policy validity without opening a Source snapshot or
+// resolving a secret. It is deliberately for read-only status and setup
+// projections. Connection and explicit runtime refresh must use
+// ResolveMCPServer, which verifies exact current source bytes.
+func (a *API) InspectMCPServer(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (server.Resolved, error) {
+	return a.resolveMCPServer(ctx, ref, false)
+}
+
+func (a *API) resolveMCPServer(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	verifySource bool,
+) (server.Resolved, error) {
 	if a == nil {
 		return server.Resolved{}, basespec.ErrClosed
 	}
@@ -101,31 +121,32 @@ func (a *API) ResolveMCPServer(
 			basespec.ErrCatalogStale,
 		)
 	}
-
-	sourceValue, err := a.dependencies.SourceRuntime.Get(
-		ctx,
-		record.RootID,
-		record.Binding.SourceID,
-	)
-	if err != nil {
-		return server.Resolved{}, err
-	}
-	if sourceValue.Revision != sourceRevision {
-		return server.Resolved{}, fmt.Errorf(
-			"%w: MCP Source changed after Catalog publication",
-			basespec.ErrCatalogStale,
+	if verifySource {
+		sourceValue, err := a.dependencies.SourceRuntime.Get(
+			ctx,
+			record.RootID,
+			record.Binding.SourceID,
 		)
-	}
-	if err := source.VerifySnapshotContentDigest(
-		ctx,
-		a.dependencies.SourceRuntime,
-		sourceValue,
-		record.Binding.Locator,
-		sourceGeneration,
-		*occurrence.SourceContentDigest,
-		basespec.MaxCandidateBytes,
-	); err != nil {
-		return server.Resolved{}, err
+		if err != nil {
+			return server.Resolved{}, err
+		}
+		if sourceValue.Revision != sourceRevision {
+			return server.Resolved{}, fmt.Errorf(
+				"%w: MCP Source changed after Catalog publication",
+				basespec.ErrCatalogStale,
+			)
+		}
+		if err := source.VerifySnapshotContentDigest(
+			ctx,
+			a.dependencies.SourceRuntime,
+			sourceValue,
+			record.Binding.Locator,
+			sourceGeneration,
+			*occurrence.SourceContentDigest,
+			basespec.MaxCandidateBytes,
+		); err != nil {
+			return server.Resolved{}, err
+		}
 	}
 
 	installationData, installationRevision, runtimeEnabled, err := a.effectiveInstallation(
@@ -337,6 +358,7 @@ func (a *API) effectivePolicy(
 	additional []artifact.ArtifactRef,
 ) (policy.Effective, error) {
 	values := make([]schema.PolicyBody, 0, 1+len(additional))
+	hasPrimaryPolicy := false
 
 	if reference := serverDocument.Extension.Policy; reference != nil {
 		matches, err := a.policyBodiesByLogicalName(
@@ -358,6 +380,7 @@ func (a *API) effectivePolicy(
 			}
 		case 1:
 			values = append(values, matches[0])
+			hasPrimaryPolicy = true
 		default:
 			return policy.Effective{}, fmt.Errorf(
 				"%w: MCP policy %q is ambiguous",
@@ -407,7 +430,12 @@ func (a *API) effectivePolicy(
 		values = append(values, body)
 	}
 
-	return policy.Compose(a.dependencies.BaselinePolicy, values...)
+	baseline := a.dependencies.BaselinePolicy
+	if hasPrimaryPolicy {
+		baseline = values[0]
+		values = values[1:]
+	}
+	return policy.Compose(baseline, values...)
 }
 
 func (a *API) policyBodiesByLogicalName(

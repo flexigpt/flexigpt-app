@@ -1,0 +1,95 @@
+{
+	"kind": "mcp.bundle",
+	"schemaID": "mcp.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "task-management-communication-mcp-servers",
+	"displayName": "Task Management and Communication MCP Servers",
+	"description": "Built-in MCP server definitions for Atlassian, Notion, and Slack.",
+	"mcpServers": {
+		"atlassian": {
+			"type": "http",
+			"url": "https://mcp.atlassian.com/v1/mcp/authv2"
+		},
+		"notion": {
+			"type": "http",
+			"url": "https://mcp.notion.com/mcp"
+		},
+		"slack": {
+			"type": "http",
+			"url": "https://mcp.slack.com/mcp"
+		}
+	},
+	"bundleExtension": {
+		"servers": {
+			"atlassian": {
+				"displayName": "Atlassian Rovo",
+				"auth": {
+					"mode": "oauth"
+				},
+				"policy": {
+					"ref": "manual-write",
+					"required": true
+				}
+			},
+			"notion": {
+				"displayName": "Notion",
+				"auth": {
+					"mode": "oauth"
+				},
+				"policy": {
+					"ref": "manual-write",
+					"required": true
+				}
+			},
+			"slack": {
+				"displayName": "Slack",
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "SLACK_OAUTH_CLIENT"
+				},
+				"install": {
+					"note": "Slack MCP requires a registered confidential OAuth client.",
+					"inputs": {
+						"SLACK_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Slack OAuth Client",
+							"description": "Client ID and Client Secret for the Slack app.",
+							"required": true,
+							"clientSecretRequired": true
+						}
+					}
+				},
+				"policy": {
+					"ref": "manual-write",
+					"required": true
+				}
+			}
+		},
+		"policies": {
+			"manual-write": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "manual-write",
+				"displayName": "Manual write policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			}
+		}
+	}
+}
