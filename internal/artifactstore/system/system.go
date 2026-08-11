@@ -40,6 +40,13 @@ type Config struct {
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 }
 
+// shareableSchemaBinder is optional so Artifact Store remains generic. A
+// decoder that emits shareable document-derived Definitions may require the
+// registered schema registry before it accepts source bytes.
+type shareableSchemaBinder interface {
+	BindShareableSchemas(r *shareable.Registry) error
+}
+
 type ManagedPackageResult struct {
 	Source     source.Summary
 	Generation string
@@ -118,6 +125,12 @@ func Open(
 		config.ShareableCodecs...,
 	)
 	if err != nil {
+		_ = content.Close()
+		_ = metadata.Close()
+		return nil, err
+	}
+
+	if err := bindShareableSchemas(config.Decoders, shareableRegistry); err != nil {
 		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
@@ -394,6 +407,26 @@ func (c *Components) RootMutationPolicy() protection.RootPolicy {
 		return nil
 	}
 	return c.rootMutationPolicy
+}
+
+func bindShareableSchemas(
+	decoders []discovery.Decoder,
+	registry *shareable.Registry,
+) error {
+	for index, decoder := range decoders {
+		binder, supported := decoder.(shareableSchemaBinder)
+		if !supported {
+			continue
+		}
+		if err := binder.BindShareableSchemas(registry); err != nil {
+			return fmt.Errorf(
+				"bind shareable schemas to decoder %d: %w",
+				index,
+				err,
+			)
+		}
+	}
+	return nil
 }
 
 // DecoderFingerprint returns the exact decoder capability fingerprint used by

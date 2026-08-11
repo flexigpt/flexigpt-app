@@ -1,0 +1,154 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+	"title": "FlexiGPT MCP Policy v1",
+	"description": "Portable MCP trust and invocation policy document.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["kind", "schemaID", "schemaVersion", "logicalName", "body"],
+	"properties": {
+		"kind": {
+			"const": "mcp.policy"
+		},
+		"schemaID": {
+			"const": "mcp.policy.v1"
+		},
+		"schemaVersion": {
+			"const": "v1"
+		},
+		"digest": {
+			"type": "string",
+			"pattern": "^sha256:[a-f0-9]{64}$"
+		},
+		"logicalName": {
+			"$ref": "#/$defs/name"
+		},
+		"logicalVersion": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"displayName": {
+			"type": "string",
+			"maxLength": 256
+		},
+		"description": {
+			"type": "string",
+			"maxLength": 16384
+		},
+		"labels": {
+			"$ref": "#/$defs/labels"
+		},
+		"body": {
+			"$ref": "#/$defs/policyBody"
+		}
+	},
+	"$defs": {
+		"name": {
+			"type": "string",
+			"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+		},
+		"labels": {
+			"type": "object",
+			"maxProperties": 64,
+			"propertyNames": {
+				"pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 256
+			}
+		},
+		"toolPolicyOverride": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"toolName": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 256
+				},
+				"approvalRule": {
+					"enum": ["allow", "ask", "deny"]
+				},
+				"executionMode": {
+					"enum": ["auto", "manual"]
+				},
+				"allowStaleDigest": {
+					"type": "boolean"
+				},
+				"expectedDigest": {
+					"type": "string",
+					"pattern": "^sha256:[a-f0-9]{64}$"
+				}
+			}
+		},
+		"defaultPolicy": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"defaultApprovalRule": {
+					"enum": ["allow", "ask", "deny"]
+				},
+				"defaultExecutionMode": {
+					"enum": ["auto", "manual"]
+				},
+				"requireApprovalForUnknownRisk": {
+					"type": "boolean"
+				},
+				"requireApprovalForWrite": {
+					"type": "boolean"
+				},
+				"requireApprovalForDestructive": {
+					"type": "boolean"
+				}
+			}
+		},
+		"appsPolicy": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"enabled": {
+					"type": "boolean"
+				},
+				"allowAppInitiatedToolCalls": {
+					"type": "boolean"
+				},
+				"requireApprovalForOpenLink": {
+					"type": "boolean"
+				},
+				"requireApprovalForContextUpdates": {
+					"type": "boolean"
+				}
+			}
+		},
+		"policyBody": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"trustLevel": {
+					"enum": ["trusted", "untrusted"]
+				},
+				"defaultPolicy": {
+					"$ref": "#/$defs/defaultPolicy"
+				},
+				"toolPolicies": {
+					"type": "object",
+					"maxProperties": 4096,
+					"propertyNames": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 256
+					},
+					"additionalProperties": {
+						"$ref": "#/$defs/toolPolicyOverride"
+					}
+				},
+				"appsPolicy": {
+					"$ref": "#/$defs/appsPolicy"
+				}
+			}
+		}
+	}
+}

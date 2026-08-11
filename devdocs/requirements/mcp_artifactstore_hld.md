@@ -230,6 +230,28 @@ All schemas:
 - Exclude runtime state.
 - Are versioned independently from the current legacy MCP schema version.
 
+### Published JSON Schema resources
+
+The authoritative source-controlled schema resources are:
+
+- `internal/mcp/schema/mcp-bundle-v1.schema.json`
+- `internal/mcp/schema/mcp-server-v1.schema.json`
+- `internal/mcp/schema/mcp-policy-v1.schema.json`
+
+Each codec returns the byte-identical embedded schema resource to the Artifact
+Store shareable-schema registry. The registry compiles and validates the
+appropriate document before MCP semantic canonicalization occurs.
+
+The `$schema` and `$id` fields belong to the published JSON Schema resources.
+They are not fields of canonical MCP document instances. Canonical instances
+use `kind`, `schemaID`, and `schemaVersion`, matching existing Skill and
+Workspace document conventions.
+
+JSON Schema validates document structure and unknown fields. MCP semantic
+canonicalization remains responsible for cross-field rules, URL safety,
+placeholder declarations, policy resolution constraints, digest calculation,
+and materialized connection validation.
+
 ## Claude-compatible MCP core
 
 The portable MCP Bundle uses a top-level `mcpServers` object compatible with the Claude-style `mcps.json` model.
@@ -1261,6 +1283,9 @@ protected installer operation.
 
 The runtime no longer depends on `mcp/store.Store`.
 
+MCP Bundle discovery binds to the registered Artifact Store shareable schema
+registry and rejects a document that cannot be canonicalized through it.
+
 It depends on an MCP feature port:
 
 ```go
@@ -1359,6 +1384,13 @@ The session version includes:
 - Effective policy digest.
 
 Runtime operations reject a session when its recorded version no longer matches current resolved state.
+
+A disconnected or errored process-local session may retain its last verified
+discovery snapshot until the bounded runtime snapshot TTL expires. This
+snapshot is read-only and may support capability display only. It cannot
+authorize tool invocation, resource reads, prompts, completions, or a new
+connection. Any known lifecycle, policy, installation, or secret-binding
+mutation invalidates the session and drops the snapshot.
 
 The following remain process-local:
 
@@ -1766,6 +1798,11 @@ consumers have moved to the Artifact-backed resolver. It must be absent from
 normal application composition throughout the cutover. No new code may read
 or write both stores.
 
+Built-in hydration fingerprints the complete normalized managed package
+inventory, including every relative file locator, content digest, and size.
+It must publish the same complete package inventory after canonicalizing the
+selected `mcps.json` document.
+
 The reconciliation implementation never deletes an MCP Artifact until the new
 source document has been published, the Collection Catalog has refreshed, and
 the previous binding is confirmed missing. This preserves retryability and
@@ -1888,6 +1925,7 @@ No secrets, OAuth tokens, overlays, assistant presets, conversations, or runtime
 | `MCP-C20` | Remove the standalone MCP Store without compatibility or data migration                |
 | `MCP-C21` | Prohibit new direct filesystem and symlink handling in MCP layers                      |
 | `MCP-C22` | Defer import, export, URI acquisition, cross-Root transfer, and Artifact move          |
+| `MCP-C23` | Publish strict source-controlled MCP JSON Schema resources and validate discovery through the Artifact Store schema registry |
 
 ## Implementation map
 

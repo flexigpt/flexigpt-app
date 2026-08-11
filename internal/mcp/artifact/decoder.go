@@ -3,15 +3,19 @@ package artifact
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 )
 
-type Decoder struct{}
+type Decoder struct {
+	schemas *shareable.Registry
+}
 
 func NewDecoder() *Decoder {
 	return &Decoder{}
@@ -25,7 +29,28 @@ func (*Decoder) Revision() string {
 	return DecoderRevision
 }
 
-func (*Decoder) Recognize(
+func (d *Decoder) BindShareableSchemas(
+	schemas *shareable.Registry,
+) error {
+	if d == nil || schemas == nil {
+		return fmt.Errorf(
+			"%w: MCP decoder requires a shareable schema registry",
+			basespec.ErrInvalid,
+		)
+	}
+
+	expected := schema.NewBundleCodec().Key()
+	if slices.Contains(schemas.Keys(), expected) {
+		d.schemas = schemas
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: MCP Bundle shareable schema is not registered",
+		basespec.ErrInvalid,
+	)
+}
+
+func (d *Decoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
@@ -36,25 +61,44 @@ func (*Decoder) Recognize(
 	return discovery.RecognitionNone
 }
 
-func (*Decoder) Decode(
-	_ context.Context,
+func (d *Decoder) Decode(
+	ctx context.Context,
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	if !candidate.RequestsDecoder(DecoderID) ||
 		!schema.IsBundleDocumentLocator(candidate.Locator) {
 		return nil, nil
 	}
+	if d == nil || d.schemas == nil {
+		return nil, decoderError(
+			candidate.Locator,
+			"bundle",
+			fmt.Errorf("%w: MCP decoder has no bound schema registry", basespec.ErrClosed),
+		)
+	}
 
-	bundle, _, err := schema.ParseBundle(candidate.Content)
+	parsed, err := d.schemas.CanonicalizeEntity(
+		ctx,
+		shareable.EntityCollection,
+		candidate.Content,
+	)
 	if err != nil {
-		return nil, []diagnostic.Diagnostic{{
-			Severity: diagnostic.DiagnosticError,
-			Code:     "mcp.bundle.invalid",
-			Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
-			Location: &diagnostic.DiagnosticLocation{
-				Locator: candidate.Locator,
-			},
-		}}
+		return nil, decoderError(candidate.Locator, "bundle", err)
+	}
+	if parsed.Key != schema.NewBundleCodec().Key() {
+		return nil, decoderError(
+			candidate.Locator,
+			"bundle",
+			fmt.Errorf("%w: MCP decoder received another shareable schema", basespec.ErrInvalid),
+		)
+	}
+
+	bundle, _, err := schema.ParseBundle(parsed.Raw)
+	if err != nil || bundle.Digest != parsed.Digest {
+		if err == nil {
+			err = fmt.Errorf("%w: MCP Bundle digest differs from registry output", basespec.ErrDigestMismatch)
+		}
+		return nil, decoderError(candidate.Locator, "bundle", err)
 	}
 
 	serverNames := make([]string, 0, len(bundle.MCPServers))

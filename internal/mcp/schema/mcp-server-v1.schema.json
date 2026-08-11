@@ -1,0 +1,382 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://schemas.flexigpt.dev/mcp/server/v1.json",
+	"title": "FlexiGPT MCP Server v1",
+	"description": "Portable standalone MCP Server document.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"kind",
+		"schemaID",
+		"schemaVersion",
+		"logicalName",
+		"mcpServer",
+		"extension"
+	],
+	"properties": {
+		"kind": {
+			"const": "mcp.server"
+		},
+		"schemaID": {
+			"const": "mcp.server.v1"
+		},
+		"schemaVersion": {
+			"const": "v1"
+		},
+		"digest": {
+			"type": "string",
+			"pattern": "^sha256:[a-f0-9]{64}$"
+		},
+		"logicalName": {
+			"$ref": "#/$defs/name"
+		},
+		"logicalVersion": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"displayName": {
+			"type": "string",
+			"maxLength": 256
+		},
+		"description": {
+			"type": "string",
+			"maxLength": 16384
+		},
+		"labels": {
+			"$ref": "#/$defs/labels"
+		},
+		"mcpServer": {
+			"$ref": "#/$defs/coreServer"
+		},
+		"extension": {
+			"$ref": "#/$defs/serverExtension"
+		}
+	},
+	"$defs": {
+		"name": {
+			"type": "string",
+			"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+		},
+		"inputName": {
+			"type": "string",
+			"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+		},
+		"labels": {
+			"type": "object",
+			"maxProperties": 64,
+			"propertyNames": {
+				"pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 256
+			}
+		},
+		"environmentMap": {
+			"type": "object",
+			"maxProperties": 4096,
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 4096
+			},
+			"additionalProperties": {
+				"type": "string",
+				"maxLength": 16384
+			}
+		},
+		"headerMap": {
+			"type": "object",
+			"maxProperties": 4096,
+			"propertyNames": {
+				"type": "string",
+				"pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+			},
+			"additionalProperties": {
+				"type": "string",
+				"maxLength": 16384
+			}
+		},
+		"coreServer": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"type": {
+					"enum": ["stdio", "http"]
+				},
+				"command": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 4096
+				},
+				"args": {
+					"type": "array",
+					"maxItems": 100000,
+					"items": {
+						"type": "string",
+						"maxLength": 16384
+					}
+				},
+				"env": {
+					"$ref": "#/$defs/environmentMap"
+				},
+				"url": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 16384
+				},
+				"headers": {
+					"$ref": "#/$defs/headerMap"
+				}
+			},
+			"oneOf": [
+				{
+					"properties": {
+						"type": {
+							"const": "stdio"
+						}
+					},
+					"required": ["type", "command"]
+				},
+				{
+					"required": ["command"],
+					"not": {
+						"required": ["type"]
+					}
+				},
+				{
+					"properties": {
+						"type": {
+							"const": "http"
+						}
+					},
+					"required": ["type", "url"]
+				}
+			]
+		},
+		"authentication": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"mode": {
+					"enum": ["none", "apiKey", "oauth", "clientCredentials"]
+				},
+				"clientCredentialsInput": {
+					"$ref": "#/$defs/inputName"
+				},
+				"clientIDMetadataDocumentURL": {
+					"type": "string",
+					"maxLength": 16384
+				}
+			}
+		},
+		"inputDeclaration": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["kind"],
+			"properties": {
+				"kind": {
+					"enum": ["text", "secret", "path", "oauthClientCredentials"]
+				},
+				"label": {
+					"type": "string",
+					"maxLength": 256
+				},
+				"description": {
+					"type": "string",
+					"maxLength": 16384
+				},
+				"note": {
+					"type": "string",
+					"maxLength": 16384
+				},
+				"placeholder": {
+					"type": "string",
+					"maxLength": 256
+				},
+				"required": {
+					"type": "boolean"
+				},
+				"default": {
+					"type": "string",
+					"maxLength": 16384
+				},
+				"clientSecretRequired": {
+					"type": "boolean"
+				}
+			}
+		},
+		"installation": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"note": {
+					"type": "string",
+					"maxLength": 16384
+				},
+				"inputs": {
+					"type": "object",
+					"maxProperties": 4096,
+					"propertyNames": {
+						"$ref": "#/$defs/inputName"
+					},
+					"additionalProperties": {
+						"$ref": "#/$defs/inputDeclaration"
+					}
+				},
+				"allowEnvironment": {
+					"type": "array",
+					"uniqueItems": true,
+					"maxItems": 4096,
+					"items": {
+						"$ref": "#/$defs/inputName"
+					}
+				}
+			}
+		},
+		"stdioProfile": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"command": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 4096
+				},
+				"args": {
+					"type": "array",
+					"maxItems": 100000,
+					"items": {
+						"type": "string",
+						"maxLength": 16384
+					}
+				},
+				"env": {
+					"$ref": "#/$defs/environmentMap"
+				},
+				"removeEnv": {
+					"type": "array",
+					"uniqueItems": true,
+					"maxItems": 4096,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 4096
+					}
+				}
+			}
+		},
+		"httpProfile": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"url": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 16384
+				},
+				"headers": {
+					"$ref": "#/$defs/headerMap"
+				},
+				"removeHeaders": {
+					"type": "array",
+					"uniqueItems": true,
+					"maxItems": 4096,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 256
+					}
+				}
+			}
+		},
+		"connectionProfile": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"platforms": {
+					"type": "array",
+					"uniqueItems": true,
+					"items": {
+						"enum": ["linux", "darwin", "windows"]
+					}
+				},
+				"stdio": {
+					"$ref": "#/$defs/stdioProfile"
+				},
+				"http": {
+					"$ref": "#/$defs/httpProfile"
+				}
+			},
+			"oneOf": [
+				{
+					"required": ["stdio"]
+				},
+				{
+					"required": ["http"]
+				}
+			]
+		},
+		"policyReference": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["ref"],
+			"properties": {
+				"ref": {
+					"$ref": "#/$defs/name"
+				},
+				"required": {
+					"type": "boolean"
+				}
+			}
+		},
+		"serverExtension": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"logicalVersion": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 256
+				},
+				"displayName": {
+					"type": "string",
+					"maxLength": 256
+				},
+				"description": {
+					"type": "string",
+					"maxLength": 16384
+				},
+				"timeoutMS": {
+					"type": "integer",
+					"minimum": 0,
+					"maximum": 600000
+				},
+				"labels": {
+					"$ref": "#/$defs/labels"
+				},
+				"auth": {
+					"$ref": "#/$defs/authentication"
+				},
+				"install": {
+					"$ref": "#/$defs/installation"
+				},
+				"connectionProfiles": {
+					"type": "object",
+					"maxProperties": 4096,
+					"propertyNames": {
+						"$ref": "#/$defs/name"
+					},
+					"additionalProperties": {
+						"$ref": "#/$defs/connectionProfile"
+					}
+				},
+				"policy": {
+					"$ref": "#/$defs/policyReference"
+				}
+			}
+		}
+	}
+}

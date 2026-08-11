@@ -23,7 +23,7 @@ const (
 	RoleBuiltIn basespec.AttachmentRole = "builtin"
 
 	PackageDirectory       basespec.Locator = "package"
-	DefaultDocumentLocator basespec.Locator = "package/.mcp.json"
+	DefaultDocumentLocator basespec.Locator = "package/mcps.json"
 )
 
 type CollectionData struct {
@@ -102,7 +102,7 @@ func EncodeAttachmentData(
 	return encodeStrict(value)
 }
 
-func PackageDirectoryForDocument(
+func packageDirectoryForDocument(
 	value basespec.Locator,
 ) (basespec.Locator, error) {
 	if err := ValidateDocumentLocator(value); err != nil {

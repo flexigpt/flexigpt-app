@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"path"
 	"slices"
 	"sort"
 
@@ -12,7 +13,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
+	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
@@ -60,6 +63,7 @@ type Installer struct {
 type preparedBundle struct {
 	registration  BundleRegistration
 	document      schema.BundleDocument
+	packageFiles  []source.ManagedPackageFile
 	packageDigest cryptoutil.Digest
 }
 
@@ -169,6 +173,7 @@ func (i *Installer) EnsureHydration(
 				DocumentLocator: value.registration.DocumentLocator,
 				Document:        value.document,
 				Registrations:   value.registration.ToBundleRegistrations(),
+				PackageFiles:    value.packageFiles,
 			},
 		); err != nil {
 			return fmt.Errorf(
@@ -273,6 +278,14 @@ func (i *Installer) prepareBundles(
 				registered.DocumentLocator,
 			)
 		}
+		packageFiles, packageDigest, err := i.canonicalPackageFiles(
+			ctx,
+			registered,
+			parsed.Raw,
+		)
+		if err != nil {
+			return nil, err
+		}
 
 		document, _, err := schema.ParseBundle(parsed.Raw)
 		if err != nil {
@@ -318,10 +331,87 @@ func (i *Installer) prepareBundles(
 		output = append(output, preparedBundle{
 			registration:  registered,
 			document:      document,
-			packageDigest: cryptoutil.DigestBytes(parsed.Raw),
+			packageFiles:  packageFiles,
+			packageDigest: packageDigest,
 		})
 	}
 	return output, nil
+}
+
+func (i *Installer) canonicalPackageFiles(
+	ctx context.Context,
+	registered BundleRegistration,
+	canonicalDocument json.RawMessage,
+) ([]source.ManagedPackageFile, cryptoutil.Digest, error) {
+	embeddedFiles, err := builtin.ReadPackageFiles(
+		ctx,
+		i.packages,
+		registered.PackageDirectory,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	documentFile := basespec.Locator(
+		path.Base(string(registered.DocumentLocator)),
+	)
+	files := make([]source.ManagedPackageFile, len(embeddedFiles))
+	foundDocument := false
+	for index, file := range embeddedFiles {
+		files[index] = source.ManagedPackageFile{
+			Locator: file.Locator,
+			Content: append([]byte(nil), file.Content...),
+		}
+		if file.Locator == documentFile {
+			files[index].Content = append([]byte(nil), canonicalDocument...)
+			foundDocument = true
+		}
+	}
+	if !foundDocument {
+		return nil, "", fmt.Errorf(
+			"%w: built-in MCP package %q lacks %q",
+			basespec.ErrInvalid,
+			registered.PackageDirectory,
+			documentFile,
+		)
+	}
+
+	publication, err := source.NormalizeManagedPackagePublication(
+		source.ManagedPackagePublication{
+			Directory: registered.PackageDirectory,
+			Files:     files,
+		},
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	type fingerprintFile struct {
+		Locator basespec.Locator  `json:"locator"`
+		Digest  cryptoutil.Digest `json:"digest"`
+		Size    int64             `json:"size"`
+	}
+	fingerprint := make(
+		[]fingerprintFile,
+		0,
+		len(publication.Files),
+	)
+	for _, file := range publication.Files {
+		fingerprint = append(fingerprint, fingerprintFile{
+			Locator: file.Locator,
+			Digest:  cryptoutil.DigestBytes(file.Content),
+			Size:    int64(len(file.Content)),
+		})
+	}
+	raw, err := json.Marshal(fingerprint)
+	if err != nil {
+		return nil, "", err
+	}
+	canonical, err := jsonutil.Canonicalize(raw)
+	if err != nil {
+		return nil, "", err
+	}
+	return publication.Files, cryptoutil.DigestBytes(canonical), nil
 }
 
 func (i *Installer) hydrationFingerprint(

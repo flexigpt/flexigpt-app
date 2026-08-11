@@ -28,11 +28,33 @@ type ReplaceDocumentRequest struct {
 	AllowProtected             bool
 }
 
+// ReplaceDocument publishes the canonical document-only package used by
+// user-managed MCP Bundles.
 func (a *API) ReplaceDocument(
 	ctx context.Context,
 	request ReplaceDocumentRequest,
 ) (Bundle, error) {
+	return a.replaceDocument(ctx, request, nil)
+}
+
+// replaceDocument is shared by user-managed Bundle updates and protected
+// hydration. Protected hydration can supply a complete package inventory;
+// user-facing operations deliberately publish only the canonical document.
+func (a *API) replaceDocument(
+	ctx context.Context,
+	request ReplaceDocumentRequest,
+	suppliedFiles []source.ManagedPackageFile,
+) (Bundle, error) {
 	plan, err := a.prepareDocumentReplace(ctx, request)
+	if err != nil {
+		return Bundle{}, err
+	}
+	files, err := documentPackageFiles(
+		plan.bundle.PackageDirectory,
+		basespec.Locator(path.Base(string(plan.bundle.DocumentLocator))),
+		plan.raw,
+		suppliedFiles,
+	)
 	if err != nil {
 		return Bundle{}, err
 	}
@@ -102,9 +124,6 @@ func (a *API) ReplaceDocument(
 	if err := ValidateDocumentLocator(plan.bundle.DocumentLocator); err != nil {
 		return Bundle{}, err
 	}
-	documentFile := basespec.Locator(
-		path.Base(string(plan.bundle.DocumentLocator)),
-	)
 
 	if _, err := a.dependencies.ManagedArtifacts.PublishCollection(
 		ctx,
@@ -113,10 +132,7 @@ func (a *API) ReplaceDocument(
 			SourceID:   plan.bundle.Source.ID,
 			Package: source.ManagedPackagePublication{
 				Directory: plan.bundle.PackageDirectory,
-				Files: []source.ManagedPackageFile{{
-					Locator: documentFile,
-					Content: append([]byte(nil), plan.raw...),
-				}},
+				Files:     files,
 			},
 			Plan:           a.discoveryPlan(plan.bundle),
 			RefreshPolicy:  noAutomaticAdoption{},
@@ -183,6 +199,55 @@ func (a *API) ReplaceDocument(
 	}
 
 	return a.Get(ctx, plan.bundle.Collection.Ref())
+}
+
+func documentPackageFiles(
+	directory basespec.Locator,
+	documentFile basespec.Locator,
+	canonicalDocument json.RawMessage,
+	supplied []source.ManagedPackageFile,
+) ([]source.ManagedPackageFile, error) {
+	if len(supplied) == 0 {
+		supplied = []source.ManagedPackageFile{{
+			Locator: documentFile,
+			Content: append([]byte(nil), canonicalDocument...),
+		}}
+	}
+
+	publication, err := source.NormalizeManagedPackagePublication(
+		source.ManagedPackagePublication{
+			Directory: directory,
+			Files:     supplied,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	foundDocument := false
+	for index := range publication.Files {
+		if publication.Files[index].Locator != documentFile {
+			continue
+		}
+		publication.Files[index].Content = append(
+			[]byte(nil),
+			canonicalDocument...,
+		)
+		foundDocument = true
+	}
+	if !foundDocument {
+		return nil, fmt.Errorf(
+			"%w: MCP package does not contain canonical document %q",
+			basespec.ErrInvalid,
+			documentFile,
+		)
+	}
+
+	publication, err = source.NormalizeManagedPackagePublication(publication)
+	if err != nil {
+		return nil, err
+	}
+	return publication.Files, nil
 }
 
 func (a *API) pinRegisteredArtifact(
@@ -674,7 +739,6 @@ func serverDocumentFromDefinition(
 		return schema.ServerDocument{}, err
 	}
 	return schema.ServerDocument{
-		SchemaURL:      schema.ServerSchemaURL,
 		Kind:           schema.ServerKind,
 		SchemaID:       schema.ServerSchemaID,
 		SchemaVersion:  schema.SchemaVersion,

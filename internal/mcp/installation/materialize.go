@@ -42,32 +42,6 @@ type Materialized struct {
 	SensitiveValues                []string
 }
 
-func Materialize(
-	ctx context.Context,
-	server artifact.ArtifactRef,
-	document schema.ServerDocument,
-	data ServerData,
-	secrets SecretResolver,
-	environment EnvironmentResolver,
-) (Materialized, error) {
-	if err := validateMaterializeInput(
-		ctx,
-		server,
-		document,
-		data,
-	); err != nil {
-		return Materialized{}, err
-	}
-	return MaterializeValidated(
-		ctx,
-		server,
-		document,
-		data,
-		secrets,
-		environment,
-	)
-}
-
 // MaterializeValidated is for the internal resolver-to-runtime path. Callers
 // must have already established that server, document, and data are valid.
 //
@@ -303,30 +277,6 @@ func materializeValidated(
 		TimeoutMS:                      timeoutMS,
 		SensitiveValues:                sensitive,
 	}, nil
-}
-
-func validateMaterializeInput(
-	ctx context.Context,
-	server artifact.ArtifactRef,
-	document schema.ServerDocument,
-	data ServerData,
-) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: MCP materialization context is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := server.Validate(); err != nil {
-		return err
-	}
-	if err := schema.ValidateServer(document); err != nil {
-		return err
-	}
-	return ValidateServerDataForDocument(server, document, data)
 }
 
 func selectProfile(

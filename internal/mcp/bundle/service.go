@@ -448,7 +448,7 @@ func (a *API) Get(
 	if err != nil {
 		return Bundle{}, err
 	}
-	packageDirectory, err := PackageDirectoryForDocument(
+	packageDirectory, err := packageDirectoryForDocument(
 		attachmentData.DocumentLocator,
 	)
 	if err != nil {

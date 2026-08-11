@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
@@ -20,6 +21,7 @@ type EnsureBuiltInRequest struct {
 	SourceID        basespec.SourceID
 	DocumentLocator basespec.Locator
 
+	PackageFiles  []source.ManagedPackageFile
 	Document      schema.BundleDocument
 	Registrations []Registration
 }
@@ -131,13 +133,17 @@ func (a *API) EnsureBuiltIn(
 		return Bundle{}, err
 	}
 
-	updated, err := a.ReplaceDocument(ctx, ReplaceDocumentRequest{
-		Bundle:                     bundle.Collection.Ref(),
-		ExpectedCollectionRevision: bundle.Collection.Revision,
-		Document:                   document,
-		Registrations:              request.Registrations,
-		AllowProtected:             true,
-	})
+	updated, err := a.replaceDocument(
+		ctx,
+		ReplaceDocumentRequest{
+			Bundle:                     bundle.Collection.Ref(),
+			ExpectedCollectionRevision: bundle.Collection.Revision,
+			Document:                   document,
+			Registrations:              request.Registrations,
+			AllowProtected:             true,
+		},
+		request.PackageFiles,
+	)
 	if err != nil {
 		return Bundle{}, err
 	}

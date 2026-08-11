@@ -114,7 +114,6 @@ func ServerBodyFromDefinition(
 	}
 
 	document := schema.ServerDocument{
-		SchemaURL:      schema.ServerSchemaURL,
 		Kind:           schema.ServerKind,
 		SchemaID:       schema.ServerSchemaID,
 		SchemaVersion:  schema.SchemaVersion,

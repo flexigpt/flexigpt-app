@@ -2,13 +2,21 @@ package schema
 
 import (
 	"context"
-	"encoding/json"
+	_ "embed"
 	"fmt"
-	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 )
+
+//go:embed mcp-bundle-v1.schema.json
+var bundleV1JSONSchema []byte
+
+//go:embed mcp-server-v1.schema.json
+var serverV1JSONSchema []byte
+
+//go:embed mcp-policy-v1.schema.json
+var policyV1JSONSchema []byte
 
 type (
 	BundleCodec struct{}
@@ -21,27 +29,7 @@ func NewBundleCodec() shareable.Codec {
 }
 
 func (BundleCodec) JSONSchema() []byte {
-	return publishedJSONSchema(
-		BundleSchemaURL,
-		string(BundleKind),
-		string(BundleSchemaID),
-		[]string{
-			"$schema",
-			"kind",
-			"schemaID",
-			"schemaVersion",
-			"logicalName",
-			"mcpServers",
-		},
-		map[string]any{
-			"mcpServers": map[string]any{
-				"type": "object",
-			},
-			"bundleExtension": map[string]any{
-				"type": "object",
-			},
-		},
-	)
+	return append([]byte(nil), bundleV1JSONSchema...)
 }
 
 func (BundleCodec) Canonicalize(
@@ -76,24 +64,7 @@ func NewPolicyCodec() shareable.Codec {
 }
 
 func (PolicyCodec) JSONSchema() []byte {
-	return publishedJSONSchema(
-		PolicySchemaURL,
-		string(PolicyKind),
-		string(PolicySchemaID),
-		[]string{
-			"$schema",
-			"kind",
-			"schemaID",
-			"schemaVersion",
-			"logicalName",
-			"body",
-		},
-		map[string]any{
-			"body": map[string]any{
-				"type": "object",
-			},
-		},
-	)
+	return append([]byte(nil), policyV1JSONSchema...)
 }
 
 func (PolicyCodec) Canonicalize(
@@ -128,28 +99,7 @@ func NewServerCodec() shareable.Codec {
 }
 
 func (ServerCodec) JSONSchema() []byte {
-	return publishedJSONSchema(
-		ServerSchemaURL,
-		string(ServerKind),
-		string(ServerSchemaID),
-		[]string{
-			"$schema",
-			"kind",
-			"schemaID",
-			"schemaVersion",
-			"logicalName",
-			"mcpServer",
-			"extension",
-		},
-		map[string]any{
-			"mcpServer": map[string]any{
-				"type": "object",
-			},
-			"extension": map[string]any{
-				"type": "object",
-			},
-		},
-	)
+	return append([]byte(nil), serverV1JSONSchema...)
 }
 
 func (ServerCodec) Canonicalize(
@@ -177,67 +127,6 @@ func (ServerCodec) Key() shareable.SchemaKey {
 		SchemaID:      ServerSchemaID,
 		SchemaVersion: SchemaVersion,
 	}
-}
-
-func publishedJSONSchema(
-	id string,
-	kind string,
-	schemaID string,
-	required []string,
-	additional map[string]any,
-) []byte {
-	properties := map[string]any{
-		"$schema": map[string]any{
-			"const": id,
-		},
-		"kind": map[string]any{
-			"const": kind,
-		},
-		"schemaID": map[string]any{
-			"const": schemaID,
-		},
-		"schemaVersion": map[string]any{
-			"const": SchemaVersion,
-		},
-		"digest": map[string]any{
-			"type":    "string",
-			"pattern": "^sha256:[a-f0-9]{64}$",
-		},
-		"logicalName": map[string]any{
-			"type":      "string",
-			"minLength": 1,
-			"maxLength": 256,
-		},
-		"logicalVersion": map[string]any{
-			"type":      "string",
-			"maxLength": 256,
-		},
-		"displayName": map[string]any{
-			"type":      "string",
-			"maxLength": 256,
-		},
-		"description": map[string]any{
-			"type":      "string",
-			"maxLength": basespec.MaxDescriptionBytes,
-		},
-		"labels": map[string]any{
-			"type":                 "object",
-			"additionalProperties": map[string]any{"type": "string"},
-		},
-	}
-	maps.Copy(properties, additional)
-	raw, err := json.Marshal(map[string]any{
-		"$schema":              "https://json-schema.org/draft/2020-12/schema",
-		"$id":                  id,
-		"type":                 "object",
-		"required":             required,
-		"properties":           properties,
-		"additionalProperties": false,
-	})
-	if err != nil {
-		panic(err)
-	}
-	return raw
 }
 
 func checkCodecContext(ctx context.Context) error {

@@ -182,7 +182,6 @@ func ServerFromBundle(
 	extension := bundle.BundleExtension.Servers[name]
 
 	value, _, err := CanonicalizeServer(ServerDocument{
-		SchemaURL:      ServerSchemaURL,
 		Kind:           ServerKind,
 		SchemaID:       ServerSchemaID,
 		SchemaVersion:  SchemaVersion,
@@ -239,8 +238,7 @@ func CanonicalizeServer(
 }
 
 func ValidateBundle(value BundleDocument) error {
-	if value.SchemaURL != BundleSchemaURL ||
-		value.Kind != BundleKind ||
+	if value.Kind != BundleKind ||
 		value.SchemaID != BundleSchemaID ||
 		value.SchemaVersion != SchemaVersion {
 		return fmt.Errorf(
@@ -314,8 +312,7 @@ func ValidateBundle(value BundleDocument) error {
 }
 
 func ValidateServer(value ServerDocument) error {
-	if value.SchemaURL != ServerSchemaURL ||
-		value.Kind != ServerKind ||
+	if value.Kind != ServerKind ||
 		value.SchemaID != ServerSchemaID ||
 		value.SchemaVersion != SchemaVersion {
 		return fmt.Errorf(
@@ -340,8 +337,7 @@ func ValidateServer(value ServerDocument) error {
 }
 
 func ValidatePolicy(value PolicyDocument) error {
-	if value.SchemaURL != PolicySchemaURL ||
-		value.Kind != PolicyKind ||
+	if value.Kind != PolicyKind ||
 		value.SchemaID != PolicySchemaID ||
 		value.SchemaVersion != SchemaVersion {
 		return fmt.Errorf(

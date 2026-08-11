@@ -57,6 +57,13 @@ func IsBundleDocumentLocator(value basespec.Locator) bool {
 	return IsBundleDocumentFileName(path.Base(string(value)))
 }
 
+// Published JSON Schema resources carry $schema and $id metadata. MCP document
+// instances deliberately use kind, schemaID, and schemaVersion instead.
+//
+// This matches the existing Skill and Workspace document conventions and
+// prevents schema-resource URLs from becoming semantic document content or
+// affecting canonical Definition digests.
+
 type ServerType string
 
 const (
@@ -154,7 +161,6 @@ type PolicyBody struct {
 }
 
 type PolicyDocument struct {
-	SchemaURL     string                `json:"$schema"`
 	Kind          basespec.ArtifactKind `json:"kind"`
 	SchemaID      basespec.SchemaID     `json:"schemaID"`
 	SchemaVersion string                `json:"schemaVersion"`
@@ -175,7 +181,6 @@ type BundleExtension struct {
 }
 
 type BundleDocument struct {
-	SchemaURL     string                  `json:"$schema"`
 	Kind          basespec.CollectionKind `json:"kind"`
 	SchemaID      basespec.SchemaID       `json:"schemaID"`
 	SchemaVersion string                  `json:"schemaVersion"`
@@ -192,7 +197,6 @@ type BundleDocument struct {
 }
 
 type ServerDocument struct {
-	SchemaURL     string                `json:"$schema"`
 	Kind          basespec.ArtifactKind `json:"kind"`
 	SchemaID      basespec.SchemaID     `json:"schemaID"`
 	SchemaVersion string                `json:"schemaVersion"`

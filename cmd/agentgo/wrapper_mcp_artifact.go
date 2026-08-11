@@ -968,7 +968,6 @@ func ensureDefaultMCPBundle(
 
 func defaultMCPBundleDocument() schema.BundleDocument {
 	return schema.BundleDocument{
-		SchemaURL:     schema.BundleSchemaURL,
 		Kind:          schema.BundleKind,
 		SchemaID:      schema.BundleSchemaID,
 		SchemaVersion: schema.SchemaVersion,

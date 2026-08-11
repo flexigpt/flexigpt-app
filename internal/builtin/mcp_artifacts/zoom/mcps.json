@@ -31,7 +31,22 @@
 		"servers": {
 			"docs": {
 				"displayName": "Zoom Docs",
-				"auth": { "mode": "oauth" },
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "ZOOM_OAUTH_CLIENT"
+				},
+				"install": {
+					"note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI.",
+					"inputs": {
+						"ZOOM_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Zoom OAuth Client",
+							"description": "Client ID and Client Secret from a Zoom Marketplace app.",
+							"required": true,
+							"clientSecretRequired": true
+						}
+					}
+				},
 				"policy": { "ref": "manual-write", "required": true }
 			},
 			"meetings": {
@@ -56,17 +71,62 @@
 			},
 			"team-chat": {
 				"displayName": "Zoom Team Chat",
-				"auth": { "mode": "oauth" },
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "ZOOM_OAUTH_CLIENT"
+				},
+				"install": {
+					"note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI.",
+					"inputs": {
+						"ZOOM_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Zoom OAuth Client",
+							"description": "Client ID and Client Secret from a Zoom Marketplace app.",
+							"required": true,
+							"clientSecretRequired": true
+						}
+					}
+				},
 				"policy": { "ref": "manual-write", "required": true }
 			},
 			"whiteboard": {
 				"displayName": "Zoom Whiteboard",
-				"auth": { "mode": "oauth" },
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "ZOOM_OAUTH_CLIENT"
+				},
+				"install": {
+					"note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI.",
+					"inputs": {
+						"ZOOM_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Zoom OAuth Client",
+							"description": "Client ID and Client Secret from a Zoom Marketplace app.",
+							"required": true,
+							"clientSecretRequired": true
+						}
+					}
+				},
 				"policy": { "ref": "manual-write", "required": true }
 			},
 			"workspace": {
 				"displayName": "Zoom Workspace",
-				"auth": { "mode": "oauth" },
+				"auth": {
+					"mode": "oauth",
+					"clientCredentialsInput": "ZOOM_OAUTH_CLIENT"
+				},
+				"install": {
+					"note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI.",
+					"inputs": {
+						"ZOOM_OAUTH_CLIENT": {
+							"kind": "oauthClientCredentials",
+							"label": "Zoom OAuth Client",
+							"description": "Client ID and Client Secret from a Zoom Marketplace app.",
+							"required": true,
+							"clientSecretRequired": true
+						}
+					}
+				},
 				"policy": { "ref": "manual-write", "required": true }
 			}
 		},

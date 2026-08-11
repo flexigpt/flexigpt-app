@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"sort"
 	"strings"
@@ -234,8 +235,8 @@ func (m *MCPRuntimeManager) Disconnect(
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return err
 	}
+	state, timer := m.disconnectSession(ref)
 
-	state, timer := m.removeSession(ref)
 	if timer != nil {
 		timer.Stop()
 	}
@@ -657,6 +658,21 @@ func (m *MCPRuntimeManager) OnClientNotification(
 		ClientNotificationResourceListChanged,
 		ClientNotificationPromptListChanged:
 		m.scheduleRefresh(ctx, event.Server)
+	case ClientNotificationResourceUpdated:
+		slog.Debug(
+			"MCP resource update notification received",
+			"server", event.Server,
+			"uri", event.ResourceURI,
+		)
+
+	case ClientNotificationProgress:
+		slog.Debug(
+			"MCP progress notification received",
+			"server", event.Server,
+			"progress", event.Progress,
+			"total", event.Total,
+			"message", event.Message,
+		)
 	default:
 	}
 }
@@ -853,11 +869,23 @@ func (m *MCPRuntimeManager) resolveForConnection(
 func (m *MCPRuntimeManager) currentSnapshot(
 	ref artifact.ArtifactRef,
 ) (spec.MCPDiscoverySnapshot, error) {
-	state, err := m.readySession(ref)
-	if err != nil {
-		return spec.MCPDiscoverySnapshot{}, err
+	state, found := m.session(ref)
+	if !found {
+		return spec.MCPDiscoverySnapshot{}, fmt.Errorf(
+			"%w: MCP server is not connected",
+			spec.ErrMCPRuntimeNotReady,
+		)
 	}
-	return cloneSnapshot(state.snapshot), nil
+	if state.status == spec.MCPServerStatusReady && state.client != nil {
+		return cloneSnapshot(state.snapshot), nil
+	}
+	if state.snapshotStillValid(time.Now().UTC()) {
+		return cloneSnapshot(state.snapshot), nil
+	}
+	return spec.MCPDiscoverySnapshot{}, fmt.Errorf(
+		"%w: MCP server has no current discovery snapshot",
+		spec.ErrMCPRuntimeNotReady,
+	)
 }
 
 func (m *MCPRuntimeManager) readySession(
@@ -902,15 +930,52 @@ func (m *MCPRuntimeManager) beginConnection(
 	timer := m.timers[ref]
 
 	delete(m.timers, ref)
-	m.sessions[ref] = &sessionState{
+	next := &sessionState{
 		server:     ref,
 		generation: generation,
 		status:     spec.MCPServerStatusConnecting,
 	}
 	if previous != nil {
-		m.sessions[ref].collection = previous.collection
+		next.collection = previous.collection
+		if previous.snapshotStillValid(time.Now().UTC()) {
+			next.snapshot = cloneSnapshot(previous.snapshot)
+			next.lastSyncedAt = previous.lastSyncedAt
+			next.snapshotExpiresAt = previous.snapshotExpiresAt
+		}
 	}
+	m.sessions[ref] = next
+
 	return generation, previous, timer, nil
+}
+
+// disconnectSession preserves a bounded process-local discovery snapshot for
+// read-only capability display. Lifecycle mutation uses removeSession through
+// Invalidate and therefore always drops the snapshot.
+func (m *MCPRuntimeManager) disconnectSession(
+	ref artifact.ArtifactRef,
+) (*sessionState, *time.Timer) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.generations[ref]++
+	state := m.sessions[ref]
+	timer := m.timers[ref]
+	delete(m.timers, ref)
+	if state == nil {
+		return nil, timer
+	}
+
+	closed := cloneSessionState(state)
+	state.client = nil
+	state.generation = m.generations[ref]
+	state.status = spec.MCPServerStatusDisconnected
+	state.lastError = ""
+	if !state.snapshotStillValid(time.Now().UTC()) {
+		state.snapshot = spec.MCPDiscoverySnapshot{Server: ref}
+		state.lastSyncedAt = time.Time{}
+		state.snapshotExpiresAt = time.Time{}
+	}
+	return closed, timer
 }
 
 func (m *MCPRuntimeManager) setConnectingCollectionIfCurrent(
@@ -1138,20 +1203,25 @@ func validateRuntimeCollectionRef(
 func runtimeSnapshot(
 	state *sessionState,
 ) *spec.MCPServerRuntimeSnapshot {
+	snapshot := state.snapshot
+	if state.status != spec.MCPServerStatusReady &&
+		!state.snapshotStillValid(time.Now().UTC()) {
+		snapshot = spec.MCPDiscoverySnapshot{Server: state.server}
+	}
 	output := &spec.MCPServerRuntimeSnapshot{
 		Server:                    state.server,
 		Collection:                state.collection,
 		Status:                    state.status,
 		LastError:                 state.lastError,
-		NegotiatedProtocolVersion: state.snapshot.NegotiatedProtocolVersion,
-		ServerInfo:                cloneImplementationInfo(state.snapshot.ServerInfo),
-		ServerCapabilities:        cloneCapabilities(state.snapshot.ServerCapabilities),
-		Instructions:              state.snapshot.Instructions,
-		ToolCount:                 len(state.snapshot.Tools),
-		ResourceCount:             len(state.snapshot.Resources),
-		ResourceTemplateCount:     len(state.snapshot.ResourceTemplates),
-		PromptCount:               len(state.snapshot.Prompts),
-		SnapshotDigest:            state.snapshot.Digest,
+		NegotiatedProtocolVersion: snapshot.NegotiatedProtocolVersion,
+		ServerInfo:                cloneImplementationInfo(snapshot.ServerInfo),
+		ServerCapabilities:        cloneCapabilities(snapshot.ServerCapabilities),
+		Instructions:              snapshot.Instructions,
+		ToolCount:                 len(snapshot.Tools),
+		ResourceCount:             len(snapshot.Resources),
+		ResourceTemplateCount:     len(snapshot.ResourceTemplates),
+		PromptCount:               len(snapshot.Prompts),
+		SnapshotDigest:            snapshot.Digest,
 	}
 	if !state.lastConnectedAt.IsZero() {
 		output.LastConnectedAt = state.lastConnectedAt.Format(time.RFC3339Nano)
@@ -1160,6 +1230,19 @@ func runtimeSnapshot(
 		output.LastSyncedAt = state.lastSyncedAt.Format(time.RFC3339Nano)
 	}
 	return output
+}
+
+func (s *sessionState) snapshotStillValid(now time.Time) bool {
+	if s == nil ||
+		s.snapshot.Server == (artifact.ArtifactRef{}) ||
+		s.snapshot.Digest == "" ||
+		s.snapshotExpiresAt.IsZero() {
+		return false
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	return now.Before(s.snapshotExpiresAt)
 }
 
 func normalizeSnapshot(

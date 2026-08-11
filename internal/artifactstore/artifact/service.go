@@ -615,14 +615,6 @@ func (s *Service) Unsuppress(
 	)
 }
 
-func (s *Service) Move(
-	ctx context.Context,
-	ref ArtifactRef,
-	c collection.CollectionRef,
-) error {
-	return basespec.ErrUnsupported
-}
-
 // Purge destructively removes one local Artifact Record.
 //
 // Unlike Unadopt, Purge never creates a suppression. It does not remove
