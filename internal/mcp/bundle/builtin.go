@@ -59,7 +59,7 @@ func (a *API) EnsureBuiltIn(
 		)
 	}
 
-	document, _, err := a.canonicalizeBundleDocument(
+	document, canonicalDocument, err := a.canonicalizeTrustedBundleDocument(
 		ctx,
 		request.Document,
 	)
@@ -141,7 +141,7 @@ func (a *API) EnsureBuiltIn(
 		ReplaceDocumentRequest{
 			Bundle:                     bundle.Collection.Ref(),
 			ExpectedCollectionRevision: bundle.Collection.Revision,
-			Document:                   document,
+			Document:                   canonicalDocument,
 			Registrations:              request.Registrations,
 			AllowProtected:             true,
 		},

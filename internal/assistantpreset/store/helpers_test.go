@@ -349,14 +349,6 @@ func mustGetAssistantPreset(
 	return *resp.Body
 }
 
-func collectBundleIDs(items []spec.AssistantPresetBundle) map[bundleitemutils.BundleID]struct{} {
-	out := make(map[bundleitemutils.BundleID]struct{}, len(items))
-	for _, item := range items {
-		out[item.ID] = struct{}{}
-	}
-	return out
-}
-
 func collectPresetKeys(items []spec.AssistantPresetListItem) map[string]struct{} {
 	out := make(map[string]struct{}, len(items))
 	for _, item := range items {

@@ -66,12 +66,45 @@ func EncodeCollectionData(
 	if err := basespec.ValidateLogicalName(value.LogicalName); err != nil {
 		return nil, err
 	}
+	if err := basespec.ValidateLogicalVersion(value.LogicalVersion, true); err != nil {
+		return nil, err
+	}
+	if err := validateCollectionLabels(value.Labels); err != nil {
+		return nil, err
+	}
 	if value.ManagedSourceID != "" {
 		if err := basespec.ValidateSourceID(value.ManagedSourceID); err != nil {
 			return nil, err
 		}
 	}
 	return encodeStrict(value)
+}
+
+func validateCollectionLabels(values map[string]string) error {
+	if len(values) > basespec.MaxLabels {
+		return fmt.Errorf(
+			"%w: MCP Bundle labels exceed %d entries",
+			basespec.ErrInvalid,
+			basespec.MaxLabels,
+		)
+	}
+	for key, value := range values {
+		if err := basespec.ValidateIdentifier(
+			"MCP Bundle label key",
+			key,
+			basespec.MaxKindBytes,
+		); err != nil {
+			return err
+		}
+		if err := basespec.ValidateRequiredText(
+			"MCP Bundle label value",
+			value,
+			basespec.MaxLabelValueBytes,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func DecodeAttachmentData(

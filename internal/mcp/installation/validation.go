@@ -33,6 +33,11 @@ func ValidateServerDataForDocument(
 		return err
 	}
 
+	secretTargets, err := schema.SecretInputTargets(document)
+	if err != nil {
+		return err
+	}
+
 	if data.SelectedConnectionProfile != "" {
 		if _, found := document.Extension.ConnectionProfiles[data.SelectedConnectionProfile]; !found {
 			return fmt.Errorf(
@@ -86,10 +91,18 @@ func ValidateServerDataForDocument(
 					name,
 				)
 			}
+			target, found := secretTargets[name]
+			if !found {
+				return fmt.Errorf(
+					"%w: MCP secret input %q is not used by a permitted connection target",
+					basespec.ErrInvalid,
+					name,
+				)
+			}
 			if err := validateSecretBinding(
 				server,
 				binding.SecretRef,
-				false,
+				target,
 			); err != nil {
 				return fmt.Errorf("MCP secret input %q: %w", name, err)
 			}
@@ -147,37 +160,28 @@ func ValidateServerDataForDocument(
 func validateSecretBinding(
 	server artifact.ArtifactRef,
 	raw string,
-	oauthClient bool,
+	target schema.SecretInputTarget,
 ) error {
-	parsed, err := secret.ParseMCPSecretRef(raw)
-	if err != nil {
-		return err
-	}
-	if parsed.Server != server {
-		return fmt.Errorf(
-			"%w: secret reference belongs to another MCP Server Artifact",
-			basespec.ErrInvalid,
+	switch target.Kind {
+	case schema.SecretInputTargetStdioEnv:
+		return secret.ValidateMCPSecretRef(
+			raw,
+			server,
+			spec.MCPSecretKindStdioEnv,
+			target.Slot,
 		)
-	}
-
-	if oauthClient {
-		if parsed.Kind != spec.MCPSecretKindOAuthClientCredentials {
-			return fmt.Errorf(
-				"%w: expected OAuth client credentials secret reference",
-				basespec.ErrInvalid,
-			)
-		}
-		return nil
-	}
-
-	switch parsed.Kind {
-	case spec.MCPSecretKindHTTPHeader, spec.MCPSecretKindStdioEnv:
-		return nil
+	case schema.SecretInputTargetHTTPHeader:
+		return secret.ValidateMCPSecretRef(
+			raw,
+			server,
+			spec.MCPSecretKindHTTPHeader,
+			target.Slot,
+		)
 	default:
 		return fmt.Errorf(
-			"%w: secret reference kind %q cannot bind a normal MCP secret input",
+			"%w: unsupported MCP secret input target %q",
 			basespec.ErrInvalid,
-			parsed.Kind,
+			target.Kind,
 		)
 	}
 }

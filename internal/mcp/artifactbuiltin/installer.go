@@ -378,7 +378,7 @@ func (i *Installer) canonicalPackageFiles(
 	registered BundleRegistration,
 	canonicalDocument json.RawMessage,
 ) ([]source.ManagedPackageFile, cryptoutil.Digest, error) {
-	embeddedFiles, err := builtin.ReadPackageFiles(
+	embeddedFiles, err := topology.ReadPackageFiles(
 		ctx,
 		i.packages,
 		registered.PackageDirectory,

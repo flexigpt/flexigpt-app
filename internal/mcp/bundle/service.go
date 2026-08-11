@@ -132,7 +132,9 @@ type CreateRequest struct {
 	SourceID        basespec.SourceID
 	DocumentLocator basespec.Locator
 
-	Document      schema.BundleDocument
+	// Document is raw portable JSON. It remains raw until the Artifact Store
+	// expected-schema registry validates and canonicalizes it.
+	Document      json.RawMessage
 	Registrations []Registration
 }
 
@@ -176,7 +178,7 @@ func (a *API) Create(
 		return Bundle{}, err
 	}
 
-	document, _, err := a.canonicalizeBundleDocument(ctx, request.Document)
+	document, canonicalDocument, err := a.canonicalizeBundleBytes(ctx, request.Document)
 	if err != nil {
 		return Bundle{}, err
 	}
@@ -275,7 +277,7 @@ func (a *API) Create(
 		ReplaceDocumentRequest{
 			Bundle:                     bundle.Collection.Ref(),
 			ExpectedCollectionRevision: bundle.Collection.Revision,
-			Document:                   document,
+			Document:                   canonicalDocument,
 			Registrations:              request.Registrations,
 			AllowProtected:             false,
 		},

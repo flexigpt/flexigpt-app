@@ -13,6 +13,13 @@ import (
 // ValidateMCPConversationContext validates durable MCP conversation selection
 // structure without requiring a live MCP runtime connection.
 func ValidateMCPConversationContext(value spec.MCPConversationContext) error {
+	if len(value.Servers) > basespec.MaxDiscoveryCandidates ||
+		len(value.Resources) > basespec.MaxDiscoveryCandidates ||
+		len(value.ResourceTemplates) > basespec.MaxDiscoveryCandidates ||
+		len(value.Prompts) > basespec.MaxDiscoveryCandidates {
+		return fmt.Errorf("%w: MCP conversation context exceeds entry limits", basespec.ErrInvalid)
+	}
+
 	servers := make(map[artifact.ArtifactRef]struct{}, len(value.Servers))
 	for index, selection := range value.Servers {
 		if err := validateMCPServerSelection(selection); err != nil {
@@ -32,6 +39,13 @@ func ValidateMCPConversationContext(value spec.MCPConversationContext) error {
 	for index, resource := range value.Resources {
 		if err := validateMCPResourceRef(resource); err != nil {
 			return fmt.Errorf("MCP resources[%d]: %w", index, err)
+		}
+		if _, selected := servers[resource.Server]; !selected {
+			return fmt.Errorf(
+				"%w: MCP resource %q belongs to a server not selected by the conversation",
+				basespec.ErrInvalid,
+				resource.URI,
+			)
 		}
 		key := mcpReferenceKey(resource.Server, resource.URI)
 		if _, duplicate := resources[key]; duplicate {
@@ -56,6 +70,13 @@ func ValidateMCPConversationContext(value spec.MCPConversationContext) error {
 				err,
 			)
 		}
+		if _, selected := servers[selection.Server]; !selected {
+			return fmt.Errorf(
+				"%w: MCP resource template %q belongs to a server not selected by the conversation",
+				basespec.ErrInvalid,
+				selection.URITemplate,
+			)
+		}
 		key := mcpReferenceKey(
 			selection.Server,
 			selection.URITemplate,
@@ -74,6 +95,13 @@ func ValidateMCPConversationContext(value spec.MCPConversationContext) error {
 	for index, selection := range value.Prompts {
 		if err := validateMCPPromptSelection(selection); err != nil {
 			return fmt.Errorf("MCP prompts[%d]: %w", index, err)
+		}
+		if _, selected := servers[selection.Server]; !selected {
+			return fmt.Errorf(
+				"%w: MCP prompt %q belongs to a server not selected by the conversation",
+				basespec.ErrInvalid,
+				selection.PromptName,
+			)
 		}
 		key := mcpReferenceKey(
 			selection.Server,

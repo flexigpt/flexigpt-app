@@ -39,7 +39,7 @@ func (BundleCodec) Canonicalize(
 	if err := checkCodecContext(ctx); err != nil {
 		return shareable.ParsedDocument{}, err
 	}
-	value, canonical, err := ParseBundle(raw)
+	value, canonical, err := parseBundle(raw)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}
@@ -74,7 +74,7 @@ func (PolicyCodec) Canonicalize(
 	if err := checkCodecContext(ctx); err != nil {
 		return shareable.ParsedDocument{}, err
 	}
-	value, canonical, err := ParsePolicy(raw)
+	value, canonical, err := parsePolicy(raw)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}
@@ -109,7 +109,7 @@ func (ServerCodec) Canonicalize(
 	if err := checkCodecContext(ctx); err != nil {
 		return shareable.ParsedDocument{}, err
 	}
-	value, canonical, err := ParseServer(raw)
+	value, canonical, err := parseServer(raw)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}

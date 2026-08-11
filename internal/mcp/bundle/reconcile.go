@@ -23,7 +23,7 @@ import (
 type ReplaceDocumentRequest struct {
 	Bundle                     collection.CollectionRef
 	ExpectedCollectionRevision uint64
-	Document                   schema.BundleDocument
+	Document                   json.RawMessage
 	Registrations              []Registration
 	AllowProtected             bool
 }

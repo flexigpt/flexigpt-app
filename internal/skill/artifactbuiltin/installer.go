@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 
@@ -46,7 +47,7 @@ type InstallerDependencies struct {
 	BuiltInTopology        builtin.Registry
 	SkillRegistry          Registry
 	Packages               fs.FS
-	ShareableCanonicalizer shareable.Canonicalizer
+	ShareableCanonicalizer shareable.ExpectedCanonicalizer
 }
 
 type Installer struct {
@@ -385,7 +386,7 @@ func (i *Installer) packageFiles(
 	packageRoot basespec.Locator,
 	document builtinSchema.SkillCollectionV1,
 ) ([]source.ManagedPackageFile, error) {
-	embeddedFiles, err := builtin.ReadPackageFiles(
+	embeddedFiles, err := topology.ReadPackageFiles(
 		ctx,
 		i.packages,
 		packageRoot,

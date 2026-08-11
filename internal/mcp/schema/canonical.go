@@ -28,37 +28,37 @@ var (
 	)
 )
 
-func ParseBundle(
+func parseBundle(
 	raw []byte,
 ) (BundleDocument, json.RawMessage, error) {
 	value, err := decodeStrict[BundleDocument](raw)
 	if err != nil {
 		return BundleDocument{}, nil, err
 	}
-	return CanonicalizeBundle(value)
+	return canonicalizeBundle(value)
 }
 
-func ParseServer(
+func parseServer(
 	raw []byte,
 ) (ServerDocument, json.RawMessage, error) {
 	value, err := decodeStrict[ServerDocument](raw)
 	if err != nil {
 		return ServerDocument{}, nil, err
 	}
-	return CanonicalizeServer(value)
+	return canonicalizeServer(value)
 }
 
-func ParsePolicy(
+func parsePolicy(
 	raw []byte,
 ) (PolicyDocument, json.RawMessage, error) {
 	value, err := decodeStrict[PolicyDocument](raw)
 	if err != nil {
 		return PolicyDocument{}, nil, err
 	}
-	return CanonicalizePolicy(value)
+	return canonicalizePolicy(value)
 }
 
-func CanonicalizeBundle(
+func canonicalizeBundle(
 	input BundleDocument,
 ) (BundleDocument, json.RawMessage, error) {
 	value, err := cloneJSON(input)
@@ -92,7 +92,7 @@ func CanonicalizeBundle(
 	}
 
 	for name, policyValue := range value.BundleExtension.Policies {
-		canonical, _, err := CanonicalizePolicy(policyValue)
+		canonical, _, err := canonicalizePolicy(policyValue)
 		if err != nil {
 			return BundleDocument{}, nil, fmt.Errorf(
 				"policy %q: %w",
@@ -130,7 +130,7 @@ func CanonicalizeBundle(
 	return value, raw, nil
 }
 
-func CanonicalizePolicy(
+func canonicalizePolicy(
 	input PolicyDocument,
 ) (PolicyDocument, json.RawMessage, error) {
 	value, err := cloneJSON(input)
@@ -208,7 +208,7 @@ func ServerFromCanonicalBundle(
 	})
 }
 
-func CanonicalizeServer(
+func canonicalizeServer(
 	input ServerDocument,
 ) (ServerDocument, json.RawMessage, error) {
 	value, err := cloneJSON(input)

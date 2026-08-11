@@ -102,7 +102,7 @@ func (i *Installer) desiredHydrationFingerprint(
 	}
 
 	for _, collectionValue := range i.hydrated.OrderedCollections() {
-		files, err := builtin.ReadPackageFiles(
+		files, err := topology.ReadPackageFiles(
 			ctx,
 			i.packages,
 			collectionValue.SourceScope,

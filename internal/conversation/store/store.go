@@ -13,7 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/validate"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 	"github.com/flexigpt/mapstore-go"
@@ -453,11 +452,19 @@ func validateConversationV1(value *spec.Conversation) error {
 				return fmt.Errorf("messages[%d].mcpContext: %w", index, err)
 			}
 		}
-		if err := validateConversationMCPToolMappings(
-			fmt.Sprintf("messages[%d].mcpToolMappings", index),
-			message.MCPToolMappings,
-		); err != nil {
-			return err
+		if len(message.MCPToolMappings) != 0 {
+			if message.MCPContext == nil {
+				return fmt.Errorf(
+					"messages[%d].mcpToolMappings require mcpContext",
+					index,
+				)
+			}
+			if err := validate.ValidateMCPProviderToolMappingsForContext(
+				*message.MCPContext,
+				message.MCPToolMappings,
+			); err != nil {
+				return fmt.Errorf("messages[%d].mcpToolMappings: %w", index, err)
+			}
 		}
 		if err := validate.ValidateMCPAppContextUpdates(message.MCPAppContextUpdates); err != nil {
 			return fmt.Errorf("messages[%d].mcpAppContextUpdates: %w", index, err)
@@ -512,39 +519,6 @@ func validateConversationArtifactRefs(
 			return fmt.Errorf("%s[%d]: duplicate ArtifactRef", field, index)
 		}
 		seen[key] = struct{}{}
-	}
-	return nil
-}
-
-func validateConversationMCPToolMappings(
-	field string,
-	mappings []mcpSpec.MCPProviderToolMapping,
-) error {
-	providerNames := make(map[string]struct{}, len(mappings))
-	choiceIDs := make(map[string]struct{}, len(mappings))
-
-	for index, mapping := range mappings {
-		if err := validate.ValidateMCPProviderToolMapping(mapping); err != nil {
-			return fmt.Errorf("%s[%d]: %w", field, index, err)
-		}
-		if _, duplicate := providerNames[mapping.ProviderToolName]; duplicate {
-			return fmt.Errorf(
-				"%s[%d]: duplicate MCP provider tool name %q",
-				field,
-				index,
-				mapping.ProviderToolName,
-			)
-		}
-		if _, duplicate := choiceIDs[mapping.ChoiceID]; duplicate {
-			return fmt.Errorf(
-				"%s[%d]: duplicate MCP provider choice ID %q",
-				field,
-				index,
-				mapping.ChoiceID,
-			)
-		}
-		providerNames[mapping.ProviderToolName] = struct{}{}
-		choiceIDs[mapping.ChoiceID] = struct{}{}
 	}
 	return nil
 }

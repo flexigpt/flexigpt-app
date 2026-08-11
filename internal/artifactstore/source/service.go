@@ -433,15 +433,21 @@ func (s *Service) Discard(
 	}
 
 	cleanupContext := context.WithoutCancel(ctx)
-	if err := s.discardManagedStorage(cleanupContext, current); err != nil {
-		return err
-	}
-	return s.repository.Discard(
+	if err := s.repository.Discard(
 		cleanupContext,
 		rootID,
 		id,
 		expectedRevision,
-	)
+	); err != nil {
+		return err
+	}
+	if err := s.discardManagedStorage(cleanupContext, current); err != nil {
+		return fmt.Errorf(
+			"Source metadata was discarded but managed bootstrap cleanup remains pending: %w",
+			err,
+		)
+	}
+	return nil
 }
 
 func (s *Service) Purge(

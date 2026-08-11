@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -954,11 +955,16 @@ func ensureDefaultMCPBundle(
 		return fmt.Errorf("read default MCP Bundle: %w", err)
 	}
 
+	document, err := json.Marshal(defaultMCPBundleDocument())
+	if err != nil {
+		return fmt.Errorf("encode default MCP Bundle document: %w", err)
+	}
+
 	_, err = api.Create(ctx, mcpBundle.CreateRequest{
 		RootID:       mcpUserRootID,
 		CollectionID: defaultMCPBundleCollectionID,
 		SourceID:     defaultMCPBundleSourceID,
-		Document:     defaultMCPBundleDocument(),
+		Document:     json.RawMessage(document),
 	})
 	if err != nil {
 		return fmt.Errorf("create default MCP Bundle: %w", err)

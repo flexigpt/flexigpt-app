@@ -109,7 +109,7 @@ func LoadRegistry() (Registry, error) {
 // shareable codec before local installation begins.
 func (r Registry) Hydrate(
 	ctx context.Context,
-	canonicalizer shareable.Canonicalizer,
+	canonicalizer shareable.ExpectedCanonicalizer,
 	packages fs.FS,
 ) (HydratedRegistry, error) {
 	if ctx == nil {
@@ -295,7 +295,7 @@ func (r HydratedRegistry) OrderedCollections() []HydratedCollection {
 
 func hydrateCollection(
 	ctx context.Context,
-	canonicalizer shareable.Canonicalizer,
+	canonicalizer shareable.ExpectedCanonicalizer,
 	packages fs.FS,
 	registration Collection,
 ) (HydratedCollection, error) {
@@ -378,7 +378,11 @@ func hydrateCollection(
 	if err != nil {
 		return HydratedCollection{}, err
 	}
-	parsed, err := canonicalizer.Canonicalize(ctx, hydratedRaw)
+	parsed, err := canonicalizer.CanonicalizeExpected(
+		ctx,
+		skillCollectionSchemaKey(),
+		hydratedRaw,
+	)
 	if err != nil {
 		return HydratedCollection{}, err
 	}
@@ -495,4 +499,13 @@ func scopedLocator(
 		return "", err
 	}
 	return value, nil
+}
+
+func skillCollectionSchemaKey() shareable.SchemaKey {
+	return shareable.SchemaKey{
+		Entity:        shareable.EntityCollection,
+		Kind:          basespec.CollectionKind(builtinSchema.SkillCollectionV1Kind),
+		SchemaID:      basespec.SchemaID(builtinSchema.SkillCollectionV1SchemaID),
+		SchemaVersion: builtinSchema.SkillCollectionV1SchemaVersion,
+	}
 }
