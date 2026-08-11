@@ -38,6 +38,7 @@ type Materialized struct {
 
 	ClientCredentialRef            string
 	ClientCredentialSecretRequired bool
+	TimeoutMS                      int
 	SensitiveValues                []string
 }
 
@@ -130,6 +131,11 @@ func materializeValidated(
 	)
 	if err != nil {
 		return Materialized{}, err
+	}
+
+	timeoutMS := document.Extension.TimeoutMS
+	if timeoutMS == 0 {
+		timeoutMS = schema.DefaultConnectionTimeoutMS
 	}
 
 	values := make(map[string]string)
@@ -294,6 +300,7 @@ func materializeValidated(
 		Auth:                           auth,
 		ClientCredentialRef:            clientCredentialRef,
 		ClientCredentialSecretRequired: document.OAuthClientSecretRequired(),
+		TimeoutMS:                      timeoutMS,
 		SensitiveValues:                sensitive,
 	}, nil
 }

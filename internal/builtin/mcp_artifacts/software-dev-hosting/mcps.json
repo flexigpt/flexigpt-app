@@ -3,7 +3,7 @@
 	"schemaID": "mcp.bundle.v1",
 	"schemaVersion": "v1",
 	"logicalName": "software-dev-hosting-mcp-servers",
-	"displayName": "Software Development and Hosting MCP Servers",
+	"displayName": "Software Dev and Hosting MCP Servers",
 	"description": "Built-in MCP server definitions for GitHub, Vercel, Netlify, and Hugging Face.",
 	"mcpServers": {
 		"github-oauth": {
@@ -98,7 +98,6 @@
 		},
 		"policies": {
 			"manual-write": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",
@@ -122,7 +121,6 @@
 				}
 			},
 			"manual-write-no-destructive": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",
@@ -146,7 +144,6 @@
 				}
 			},
 			"auto-write-apps": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",

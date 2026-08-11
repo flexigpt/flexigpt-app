@@ -24,6 +24,7 @@ type ArtifactRegistration struct {
 type BundleRegistration struct {
 	CollectionID     basespec.CollectionID  `json:"collectionID"`
 	PackageDirectory basespec.Locator       `json:"packageDirectory"`
+	DocumentLocator  basespec.Locator       `json:"documentLocator"`
 	Artifacts        []ArtifactRegistration `json:"artifacts"`
 }
 
@@ -70,6 +71,18 @@ func (r Registry) Validate() error {
 			false,
 		); err != nil {
 			return fmt.Errorf("bundles[%d]: %w", index, err)
+		}
+		if err := bundle.ValidateDocumentLocator(
+			registered.DocumentLocator,
+		); err != nil {
+			return fmt.Errorf("bundles[%d]: %w", index, err)
+		}
+		if path.Dir(string(registered.DocumentLocator)) !=
+			string(registered.PackageDirectory) {
+			return fmt.Errorf(
+				"%w: MCP built-in document locator must belong to its package directory",
+				basespec.ErrInvalid,
+			)
 		}
 		if _, duplicate := collections[registered.CollectionID]; duplicate {
 			return fmt.Errorf(
@@ -147,13 +160,6 @@ func (r Registry) OrderedBundles() []BundleRegistration {
 			output[right].PackageDirectory
 	})
 	return output
-}
-
-func (r BundleRegistration) DocumentLocator() basespec.Locator {
-	return basespec.Locator(path.Join(
-		string(r.PackageDirectory),
-		schema.BundleFileName,
-	))
 }
 
 func (r BundleRegistration) ToBundleRegistrations() []bundle.Registration {

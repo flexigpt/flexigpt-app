@@ -4,7 +4,7 @@
 	"schemaVersion": "v1",
 	"logicalName": "design-mcp-servers",
 	"displayName": "Design MCP Servers",
-	"description": "Built-in MCP server definitions for design workflows.",
+	"description": "Built-in MCP server definitions for design tools like Figma and Canva.",
 	"mcpServers": {
 		"canva": {
 			"type": "http",
@@ -19,6 +19,7 @@
 		"servers": {
 			"canva": {
 				"displayName": "Canva",
+				"timeoutMS": 60000,
 				"auth": {
 					"mode": "oauth"
 				},
@@ -31,7 +32,7 @@
 				}
 			},
 			"figma-remote": {
-				"displayName": "Figma",
+				"displayName": "Figma (Remote)",
 				"auth": {
 					"mode": "oauth"
 				},
@@ -46,7 +47,6 @@
 		},
 		"policies": {
 			"manual-write": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",
@@ -70,7 +70,6 @@
 				}
 			},
 			"manual-write-no-destructive": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",

@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"path"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
@@ -21,8 +23,39 @@ const (
 	ServerSchemaURL = "https://schemas.flexigpt.dev/mcp/server/v1.json"
 	PolicySchemaURL = "https://schemas.flexigpt.dev/mcp/policy/v1.json"
 
-	BundleFileName = "mcps.json"
+	// BundleFileName is the preferred filename for newly authored managed
+	// MCP Bundle packages. Existing source-controlled package registrations
+	// can explicitly select one of the accepted compatibility filenames.
+	BundleFileName          = "mcps.json"
+	AlternateBundleFileName = "mcp.json"
+	LegacyBundleFileName    = ".mcp.json"
+
+	DefaultConnectionTimeoutMS = 30_000
+	MaxConnectionTimeoutMS     = 10 * 60 * 1_000
 )
+
+var bundleDocumentFileNames = [...]string{
+	BundleFileName,
+	AlternateBundleFileName,
+	LegacyBundleFileName,
+}
+
+func BundleDocumentFileNames() []string {
+	return append([]string(nil), bundleDocumentFileNames[:]...)
+}
+
+func IsBundleDocumentFileName(value string) bool {
+	for _, candidate := range bundleDocumentFileNames {
+		if value == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+func IsBundleDocumentLocator(value basespec.Locator) bool {
+	return IsBundleDocumentFileName(path.Base(string(value)))
+}
 
 type ServerType string
 
@@ -104,6 +137,7 @@ type ServerExtension struct {
 	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
 	DisplayName    string                  `json:"displayName,omitempty"`
 	Description    string                  `json:"description,omitempty"`
+	TimeoutMS      int                     `json:"timeoutMS,omitempty"`
 	Labels         map[string]string       `json:"labels,omitempty"`
 
 	Auth               AuthenticationDeclaration    `json:"auth"`

@@ -10,6 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 )
 
 const (
@@ -21,8 +22,8 @@ const (
 	RoleManaged basespec.AttachmentRole = "managed"
 	RoleBuiltIn basespec.AttachmentRole = "builtin"
 
-	PackageDirectory basespec.Locator = "package"
-	DocumentLocator  basespec.Locator = "package/mcps.json"
+	PackageDirectory       basespec.Locator = "package"
+	DefaultDocumentLocator basespec.Locator = "package/.mcp.json"
 )
 
 type CollectionData struct {
@@ -110,17 +111,19 @@ func PackageDirectoryForDocument(
 	return basespec.Locator(path.Dir(string(value))), nil
 }
 
-// ValidateDocumentLocator accepts one portable, nested mcps.json location.
-// A nested path is required so a managed package always has a real package
-// directory and cannot claim the Source root.
+// ValidateDocumentLocator accepts one portable nested MCP Bundle document
+// locator. The filename must be one of schema.BundleDocumentFileNames.
+//
+// A nested path is required because managed package publication owns a
+// package directory, never the complete managed Source root.
 func ValidateDocumentLocator(value basespec.Locator) error {
 	if err := basespec.ValidatePortableLocator(value, false); err != nil {
 		return err
 	}
-	if path.Base(string(value)) != "mcps.json" ||
-		path.Dir(string(value)) == "." {
+	if path.Dir(string(value)) == "." ||
+		!schema.IsBundleDocumentLocator(value) {
 		return fmt.Errorf(
-			"%w: MCP document locator must be a nested mcps.json path",
+			"%w: MCP document locator must be nested and use a supported MCP Bundle filename",
 			basespec.ErrInvalid,
 		)
 	}

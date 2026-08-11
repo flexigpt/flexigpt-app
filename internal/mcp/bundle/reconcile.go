@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -98,6 +99,13 @@ func (a *API) ReplaceDocument(
 		plan.existingBySubresource[subresource] = current
 	}
 
+	if err := ValidateDocumentLocator(plan.bundle.DocumentLocator); err != nil {
+		return Bundle{}, err
+	}
+	documentFile := basespec.Locator(
+		path.Base(string(plan.bundle.DocumentLocator)),
+	)
+
 	if _, err := a.dependencies.ManagedArtifacts.PublishCollection(
 		ctx,
 		managedartifact.PublishCollectionRequest{
@@ -106,7 +114,7 @@ func (a *API) ReplaceDocument(
 			Package: source.ManagedPackagePublication{
 				Directory: plan.bundle.PackageDirectory,
 				Files: []source.ManagedPackageFile{{
-					Locator: schema.BundleFileName,
+					Locator: documentFile,
 					Content: append([]byte(nil), plan.raw...),
 				}},
 			},

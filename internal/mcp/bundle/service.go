@@ -127,9 +127,10 @@ type Registration struct {
 }
 
 type CreateRequest struct {
-	RootID       basespec.RootID
-	CollectionID basespec.CollectionID
-	SourceID     basespec.SourceID
+	RootID          basespec.RootID
+	CollectionID    basespec.CollectionID
+	SourceID        basespec.SourceID
+	DocumentLocator basespec.Locator
 
 	Document      schema.BundleDocument
 	Registrations []Registration
@@ -164,6 +165,14 @@ func (a *API) Create(
 		return Bundle{}, err
 	}
 	if err := basespec.ValidateSourceID(request.SourceID); err != nil {
+		return Bundle{}, err
+	}
+
+	documentLocator := request.DocumentLocator
+	if documentLocator == "" {
+		documentLocator = DefaultDocumentLocator
+	}
+	if err := ValidateDocumentLocator(documentLocator); err != nil {
 		return Bundle{}, err
 	}
 
@@ -221,7 +230,7 @@ func (a *API) Create(
 	}
 	attachmentData, err := EncodeAttachmentData(AttachmentData{
 		SchemaVersion:   AttachmentDataSchemaVersion,
-		DocumentLocator: DocumentLocator,
+		DocumentLocator: documentLocator,
 	})
 	if err != nil {
 		return Bundle{}, cleanupSource(err)
@@ -257,15 +266,19 @@ func (a *API) Create(
 		bundle,
 		request,
 		document,
+		documentLocator,
 	); err != nil {
 		return Bundle{}, cleanupSource(err)
 	}
-	if err := a.InstallDocument(
+	if _, err := a.ReplaceDocument(
 		ctx,
-		bundle,
-		document,
-		request.Registrations,
-		false,
+		ReplaceDocumentRequest{
+			Bundle:                     bundle.Collection.Ref(),
+			ExpectedCollectionRevision: bundle.Collection.Revision,
+			Document:                   document,
+			Registrations:              request.Registrations,
+			AllowProtected:             false,
+		},
 	); err != nil {
 		return Bundle{}, err
 	}
@@ -296,23 +309,6 @@ func (a *API) List(
 			output[right].Collection.ID
 	})
 	return output, nil
-}
-
-func (a *API) InstallDocument(
-	ctx context.Context,
-	bundle Bundle,
-	document schema.BundleDocument,
-	registrations []Registration,
-	allowProtected bool,
-) error {
-	_, err := a.ReplaceDocument(ctx, ReplaceDocumentRequest{
-		Bundle:                     bundle.Collection.Ref(),
-		ExpectedCollectionRevision: bundle.Collection.Revision,
-		Document:                   document,
-		Registrations:              registrations,
-		AllowProtected:             allowProtected,
-	})
-	return err
 }
 
 // Refresh performs an explicit MCP configuration refresh. The runtime session
@@ -691,11 +687,13 @@ func validateCreateBundleIntent(
 	value Bundle,
 	request CreateRequest,
 	document schema.BundleDocument,
+	documentLocator basespec.Locator,
 ) error {
 	if value.Collection.RootID != request.RootID ||
 		value.Collection.ID != request.CollectionID ||
 		value.Collection.Kind != schema.BundleKind ||
 		value.Source.ID != request.SourceID ||
+		value.DocumentLocator != documentLocator ||
 		value.Data.ManagedSourceID != request.SourceID ||
 		value.Data.LogicalName != document.LogicalName ||
 		value.Data.LogicalVersion != document.LogicalVersion ||

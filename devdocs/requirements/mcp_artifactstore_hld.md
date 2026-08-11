@@ -134,7 +134,7 @@ A server's logical name remains part of its shareable semantics, but is not its 
 | Local control plane      | Roots, Sources, Collections, Attachments, Catalogs, Artifacts, revisions, enablement | Artifact Store                 |
 | Shareable document plane | MCP Bundle, MCP Server, and MCP Policy documents                                     | MCP schema codecs              |
 | Definition plane         | Immutable canonical `mcp.server` and `mcp.policy` Definitions                        | Artifact Store Definition CAS  |
-| Managed content plane    | Canonical `.mcp.json` package files                                                  | Artifact Store managed Sources |
+| Managed content plane    | Selected supported MCP Bundle document package files                                 | Artifact Store managed Sources |
 | Installation plane       | Input bindings, selected profiles, local paths, secret references                    | MCP feature and Setting Store  |
 | Secret plane             | API keys, environment secrets, OAuth client credentials, OAuth tokens                | Setting Store secret storage   |
 | Runtime plane            | Clients, sessions, protocol snapshots, approvals                                     | MCP runtime                    |
@@ -157,6 +157,11 @@ It contains:
 The Root ID is application-owned and static.
 
 The Root cannot be retired or purged through ordinary application APIs.
+
+On a clean installation application composition creates one editable empty
+base MCP Bundle under this Root. Its Collection and managed Source IDs are new
+Artifact Store IDs and are not aliases for the old standalone MCP Store base
+Bundle ID.
 
 User Collections and Artifacts remain mutable through typed MCP feature APIs.
 
@@ -196,7 +201,7 @@ The Artifact Store Root policy must support sets of protected and retained Roots
 | MCP Policy                  | `mcp.policy` Artifact                                             |
 | User-authored bundle source | Bundle-owned `managed-directory` Source                           |
 | Built-in source             | Protected `managed-directory` Source                              |
-| Shareable MCP package       | Canonical `.mcp.json` in a managed Source package                 |
+| Shareable MCP package       | Canonical `mcps.json` in a managed Source package                 |
 | Server connection semantics | Immutable `mcp.server` Definition                                 |
 | Trust and invocation policy | Immutable `mcp.policy` Definition                                 |
 | User enablement             | Collection and Artifact enablement                                |
@@ -227,7 +232,7 @@ All schemas:
 
 ## Claude-compatible MCP core
 
-The portable MCP Bundle uses a top-level `mcpServers` object compatible with the Claude-style `.mcp.json` model.
+The portable MCP Bundle uses a top-level `mcpServers` object compatible with the Claude-style `mcps.json` model.
 
 The core server configuration uses:
 
@@ -256,17 +261,16 @@ A pure Claude-compatible projection is the `mcpServers` object without FlexiGPT 
 
 ## MCP Bundle document
 
-The canonical bundle file name is:
+The preferred filename for newly authored managed Bundles is:
 
 ```text
-.mcp.json
+mcps.json
 ```
 
 Example:
 
 ```json
 {
-  "$schema": "https://schemas.flexigpt.dev/mcp/bundle/v1.json",
   "kind": "mcp.bundle",
   "schemaID": "mcp.bundle.v1",
   "schemaVersion": "v1",
@@ -388,7 +392,7 @@ Example:
 
 ### Bundle decoding
 
-One `.mcp.json` candidate may emit multiple Artifact Store occurrences.
+One `mcps.json` candidate may emit multiple Artifact Store occurrences.
 
 Subresource identities are:
 
@@ -413,7 +417,6 @@ Example:
 
 ```json
 {
-  "$schema": "https://schemas.flexigpt.dev/mcp/server/v1.json",
   "kind": "mcp.server",
   "schemaID": "mcp.server.v1",
   "schemaVersion": "v1",
@@ -520,7 +523,6 @@ Example:
 
 ```json
 {
-  "$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
   "kind": "mcp.policy",
   "schemaID": "mcp.policy.v1",
   "schemaVersion": "v1",
@@ -1046,7 +1048,7 @@ Secret values are stored only through Setting Store secret APIs.
 
 No secret reference or value appears in:
 
-- `.mcp.json`.
+- `mcps.json`.
 - `mcp.server` Definitions.
 - `mcp.policy` Definitions.
 - Collection data.
@@ -1085,7 +1087,7 @@ Rules:
 ```json
 {
   "schemaVersion": "v1",
-  "documentLocator": "package/.mcp.json"
+  "documentLocator": "package/mcps.json"
 }
 ```
 
@@ -1100,13 +1102,13 @@ External and library attachment roles are not part of the current delivery becau
 
 ## Discovery and Catalog publication
 
-An MCP Bundle refresh processes one canonical `.mcp.json` document.
+An MCP Bundle refresh processes one canonical `mcps.json` document.
 
 ```mermaid
 flowchart TD
     A[MCP Bundle Collection] --> B[Read enabled Attachment and Source]
     B --> C[Open Source snapshot]
-    C --> D[Read package/.mcp.json]
+    C --> D[Read package/mcps.json]
     D --> E[Validate mcp.bundle.v1]
     E --> F[Canonicalize embedded server and policy documents]
     F --> G[Emit mcp.server and mcp.policy Definitions]
@@ -1117,7 +1119,7 @@ flowchart TD
 
 The Source plan is:
 
-- Explicitly scoped to `package/.mcp.json`.
+- Explicitly scoped to `package/mcps.json`.
 - Restricted to the MCP bundle decoder.
 - Authoritative.
 - Bounded by Artifact Store limits.
@@ -1136,7 +1138,7 @@ The managed package layout is:
 
 ```text
 package/
-  .mcp.json
+  mcps.json
 ```
 
 Creation of a user Bundle:
@@ -1144,7 +1146,7 @@ Creation of a user Bundle:
 1. Create the managed Source.
 2. Create the `mcp.bundle` Collection.
 3. Attach the Source using role `managed`.
-4. Publish an initial canonical `.mcp.json`.
+4. Publish an initial canonical `mcps.json`.
 5. Refresh the Collection.
 
 Creation of a server or policy:
@@ -1152,7 +1154,7 @@ Creation of a server or policy:
 1. Strictly validate the shareable document.
 2. Allocate or accept a caller-supplied UUIDv7 Artifact ID.
 3. Pin the expected subresource binding.
-4. Update the canonical `.mcp.json`.
+4. Update the canonical `mcps.json`.
 5. Publish the complete `package` directory.
 6. Refresh the Collection.
 7. Verify the pinned Artifact resolves to the expected Definition.
@@ -1169,7 +1171,7 @@ Updating a server or policy:
 Deleting a server or policy:
 
 1. Reject deletion when another required source Definition depends on it.
-2. Remove the entry from `.mcp.json`.
+2. Remove the entry from `mcps.json`.
 3. Publish the complete package.
 4. Refresh and confirm the Artifact becomes missing.
 5. Purge the local Artifact.
@@ -1189,12 +1191,12 @@ reference-only and is not opened, scanned, converted, or used as a runtime
 fallback by normal application composition.
 
 Each additional built-in Bundle must be added as a reviewed source-controlled
-`.mcp.json` package and static registration. Runtime conversion of a legacy
+`mcps.json` package and static registration. Runtime conversion of a legacy
 embedded JSON definition is prohibited.
 
 For each old built-in bundle:
 
-- Create one canonical `.mcp.json`.
+- Create one canonical `mcps.json`.
 - Move every portable server transport into `mcpServers`.
 - Move server metadata, auth mode, setup declarations, and connection profiles into `bundleExtension.servers`.
 - Convert current trust, default policy, tool policies, and Apps policy into one or more `mcp.policy` documents.
@@ -1203,7 +1205,7 @@ For each old built-in bundle:
 - Assign static Collection IDs.
 - Assign static server Artifact IDs.
 - Assign static policy Artifact IDs.
-- Register every static Artifact against its `.mcp.json` subresource.
+- Register every static Artifact against its `mcps.json` subresource.
 
 The static conversion does not copy:
 
@@ -1223,7 +1225,7 @@ Secret cleanup for old development data is external to this design.
 Built-in hydration:
 
 1. Validate static registrations.
-2. Canonicalize `.mcp.json`.
+2. Canonicalize `mcps.json`.
 3. Canonicalize every embedded server and policy Artifact document.
 4. Calculate the hydration fingerprint.
 5. Ensure the protected Root and Source.
@@ -1246,7 +1248,7 @@ Artifact Store owns generic protected topology hydration mechanics:
 MCP owns only feature hooks supplied to generic hydration:
 
 - Static MCP Bundle registrations.
-- Canonical `.mcp.json` package bytes.
+- Canonical `mcps.json` package bytes.
 - Static server and policy Artifact registrations.
 - MCP-specific installation-overlay cleanup for Artifact IDs removed by a
   changed static registry.
@@ -1312,7 +1314,7 @@ Before connecting, the resolver and runtime must verify:
 - Every referenced secret exists.
 - The Source revision matches the Catalog.
 - The Source generation matches the Catalog.
-- Exact `.mcp.json` source bytes match the Catalog source-content digest.
+- Exact `mcps.json` source bytes match the Catalog source-content digest.
 - The fully substituted effective connection configuration validates.
 
 Only then may the MCP SDK client connect.
@@ -1326,7 +1328,7 @@ preparing an actual connection. Exact source-byte verification remains limited
 to connection establishment and explicit runtime refresh.
 
 Full Artifact, Catalog, Definition, policy, Source generation, and exact
-`.mcp.json` byte verification occurs at connection establishment and explicit
+`mcps.json` byte verification occurs at connection establishment and explicit
 runtime refresh.
 
 The runtime stores the resulting resolved version with the live client session.
@@ -1656,13 +1658,13 @@ Completed:
 - Set-based protected and retained Root policy.
 - Canonical `mcp.bundle.v1`, `mcp.server.v1`, and `mcp.policy.v1` domain
   models and codecs.
-- `.mcp.json` discovery and heterogeneous server and policy Definition
+- `mcps.json` discovery and heterogeneous server and policy Definition
   projection.
 - Restrictive policy composition.
 - Artifact-scoped local installation data and secret-reference format.
 - `mcp.bundle` Collection creation over managed Sources.
 - Static server and policy Artifact pinning.
-- Managed `.mcp.json` publication and Catalog refresh.
+- Managed `mcps.json` publication and Catalog refresh.
 - Server resolution through `ArtifactRef`, current Collection membership,
   current Catalog state, immutable Definitions, Source revision, Source
   generation, and exact source-content digest verification.
@@ -1670,7 +1672,7 @@ Completed:
 - Server-installation validation against canonical `mcp.server` semantics.
 - Profile-overlay and fully materialized connection validation.
 - Source-document reconciliation that updates retained pinned Artifacts,
-  publishes one complete `.mcp.json`, confirms removed Artifacts become
+  publishes one complete `mcps.json`, confirms removed Artifacts become
   missing, and then purges their local metadata.
 - Replace-plan validation before any MCP document mutation.
 - ArtifactRef-native runtime manager implementation.
@@ -1687,7 +1689,7 @@ Completed:
 - Artifact-native OAuth authorization identity, pending loopback state, auth
   status, and auth-health model.
 - MCP Bundle document-location support so multiple protected Bundles can use
-  distinct `.mcp.json` package locations in one shared managed Source.
+  distinct `mcps.json` package locations in one shared managed Source.
 - Protected MCP Bundle installer framework, static registration model, and
   protected installation-overlay purge hook.
 - Revision-aware MCP installation-overlay repository contract for the existing
@@ -1804,7 +1806,7 @@ No secrets, OAuth tokens, overlays, assistant presets, conversations, or runtime
 ### User server
 
 - Created as a pinned `mcp.server` Artifact.
-- Portable connection changes update `.mcp.json`.
+- Portable connection changes update `mcps.json`.
 - Installation input values update Artifact local data.
 - Enablement uses Artifact enablement.
 - Deletion removes the shareable entry, refreshes, and purges the Artifact.
@@ -1830,7 +1832,7 @@ No secrets, OAuth tokens, overlays, assistant presets, conversations, or runtime
 - MCP Server identity is `ArtifactRef`.
 - MCP Policy identity is `ArtifactRef`.
 - Server and policy logical names are portable semantic names, not local identity.
-- `.mcp.json` is the source authority for portable MCP configuration.
+- `mcps.json` is the source authority for portable MCP configuration.
 - The core `mcpServers` object follows Claude-style configuration semantics.
 - FlexiGPT extensions are additive and live under `bundleExtension`.
 - Server Definitions contain connection and installation requirements.

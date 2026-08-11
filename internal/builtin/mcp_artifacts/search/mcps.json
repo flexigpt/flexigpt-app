@@ -4,7 +4,7 @@
 	"schemaVersion": "v1",
 	"logicalName": "search-mcp-servers",
 	"displayName": "Search MCP Servers",
-	"description": "Reviewed built-in MCP definitions for documentation and web search.",
+	"description": "Built-in MCP server definitions for web and document search.",
 	"labels": {
 		"category": "search"
 	},
@@ -15,7 +15,10 @@
 		},
 		"exa": {
 			"type": "http",
-			"url": "https://mcp.exa.ai/mcp"
+			"url": "https://mcp.exa.ai/mcp",
+			"headers": {
+				"x-api-key": "${EXA_API_KEY}"
+			}
 		},
 		"stack-overflow": {
 			"type": "http",
@@ -31,7 +34,7 @@
 					"mode": "oauth"
 				},
 				"policy": {
-					"ref": "safe-default",
+					"ref": "context7-default",
 					"required": true
 				}
 			},
@@ -41,8 +44,18 @@
 				"auth": {
 					"mode": "none"
 				},
+				"install": {
+					"inputs": {
+						"EXA_API_KEY": {
+							"kind": "secret",
+							"label": "Exa API Key",
+							"description": "Optional Exa API key for higher limits and Agent tools.",
+							"required": false
+						}
+					}
+				},
 				"policy": {
-					"ref": "safe-default",
+					"ref": "auto-read",
 					"required": true
 				}
 			},
@@ -53,28 +66,50 @@
 					"mode": "oauth"
 				},
 				"policy": {
-					"ref": "safe-default",
+					"ref": "auto-read",
 					"required": true
 				}
 			}
 		},
 		"policies": {
-			"safe-default": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+			"context7-default": {
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",
-				"logicalName": "safe-default",
-				"displayName": "Safe Default MCP Policy",
-				"description": "Requires user approval for uncertain and mutating MCP operations.",
+				"logicalName": "context7-default",
+				"displayName": "Context7 Default Policy",
 				"body": {
 					"trustLevel": "trusted",
 					"defaultPolicy": {
-						"defaultApprovalRule": "ask",
-						"defaultExecutionMode": "manual",
-						"requireApprovalForUnknownRisk": true,
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "auto",
+						"requireApprovalForUnknownRisk": false,
 						"requireApprovalForWrite": true,
 						"requireApprovalForDestructive": true
+					},
+					"toolPolicies": {},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			},
+			"auto-read": {
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "auto-read",
+				"displayName": "Automatic Read Policy",
+				"body": {
+					"trustLevel": "trusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "allow",
+						"defaultExecutionMode": "auto",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": false,
+						"requireApprovalForDestructive": false
 					},
 					"toolPolicies": {},
 					"appsPolicy": {

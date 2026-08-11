@@ -26,6 +26,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
+const (
+	defaultMCPBundleCollectionID basespec.CollectionID = "0198f097-0d5b-7000-8000-000000000020"
+	defaultMCPBundleSourceID     basespec.SourceID     = "0198f097-0d5b-7000-8000-000000000021"
+)
+
 type MCPWrapper struct {
 	bundleAPI  *mcpBundle.API
 	artifacts  *artifact.Service
@@ -120,6 +125,11 @@ func InitMCPWrapper(
 		BaselinePolicy:     policy.Baseline(),
 	})
 	if err != nil {
+		_ = oauthBroker.Close()
+		return err
+	}
+
+	if err := ensureDefaultMCPBundle(ctx, bundleAPI); err != nil {
 		_ = oauthBroker.Close()
 		return err
 	}
@@ -904,5 +914,71 @@ func (w *MCPWrapper) close() {
 		if err := broker.Close(); err != nil {
 			slog.Error("close MCP OAuth broker", "error", err)
 		}
+	}
+}
+
+func ensureDefaultMCPBundle(
+	ctx context.Context,
+	api *mcpBundle.API,
+) error {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: default MCP Bundle context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if api == nil {
+		return fmt.Errorf(
+			"%w: default MCP Bundle API is unavailable",
+			basespec.ErrClosed,
+		)
+	}
+
+	ref := collection.CollectionRef{
+		RootID:       mcpUserRootID,
+		CollectionID: defaultMCPBundleCollectionID,
+	}
+	existing, err := api.Get(ctx, ref)
+	switch {
+	case err == nil:
+		if existing.Data.ManagedSourceID != defaultMCPBundleSourceID ||
+			existing.Source.ID != defaultMCPBundleSourceID {
+			return fmt.Errorf(
+				"%w: default MCP Bundle identity conflicts with existing state",
+				basespec.ErrConflict,
+			)
+		}
+		return nil
+
+	case !errors.Is(err, basespec.ErrCollectionNotFound):
+		return fmt.Errorf("read default MCP Bundle: %w", err)
+	}
+
+	_, err = api.Create(ctx, mcpBundle.CreateRequest{
+		RootID:       mcpUserRootID,
+		CollectionID: defaultMCPBundleCollectionID,
+		SourceID:     defaultMCPBundleSourceID,
+		Document:     defaultMCPBundleDocument(),
+	})
+	if err != nil {
+		return fmt.Errorf("create default MCP Bundle: %w", err)
+	}
+	return nil
+}
+
+func defaultMCPBundleDocument() schema.BundleDocument {
+	return schema.BundleDocument{
+		SchemaURL:     schema.BundleSchemaURL,
+		Kind:          schema.BundleKind,
+		SchemaID:      schema.BundleSchemaID,
+		SchemaVersion: schema.SchemaVersion,
+		LogicalName:   "base",
+		DisplayName:   "Base MCP Servers",
+		Description:   "Editable starter bundle for user-managed MCP server definitions.",
+		MCPServers:    map[string]schema.CoreServer{},
+		BundleExtension: schema.BundleExtension{
+			Servers:  map[string]schema.ServerExtension{},
+			Policies: map[string]schema.PolicyDocument{},
+		},
 	}
 }

@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -27,9 +29,15 @@ const (
 	defaultMCPRefreshTimeout         = time.Minute
 )
 
+const (
+	artifactDiscoveryPageKindTools             = "tools"
+	artifactDiscoveryPageKindResources         = "resources"
+	artifactDiscoveryPageKindResourceTemplates = "resourceTemplates"
+	artifactDiscoveryPageKindPrompts           = "prompts"
+)
+
 type ClientSession interface {
 	Close(ctx context.Context) error
-	Ping(ctx context.Context) error
 
 	Discover(
 		ctx context.Context,
@@ -286,6 +294,36 @@ func (m *MCPRuntimeManager) ListTools(
 	return output, nil
 }
 
+func (m *MCPRuntimeManager) ListToolsPage(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	pageSize int,
+	pageToken string,
+) ([]spec.MCPToolCapability, *string, error) {
+	if err := validateRuntimeRef(ctx, ref); err != nil {
+		return nil, nil, err
+	}
+	snapshot, err := m.currentSnapshot(ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	values := make([]spec.MCPToolCapability, len(snapshot.Tools))
+	for index, value := range snapshot.Tools {
+		values[index] = cloneTool(value)
+	}
+	sort.Slice(values, func(left, right int) bool {
+		return values[left].ToolName < values[right].ToolName
+	})
+	return paginateArtifactDiscoveryItems(
+		ref,
+		snapshot.Digest,
+		artifactDiscoveryPageKindTools,
+		values,
+		pageSize,
+		pageToken,
+	)
+}
+
 func (m *MCPRuntimeManager) ListResources(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -302,6 +340,29 @@ func (m *MCPRuntimeManager) ListResources(
 		return output[left].URI < output[right].URI
 	})
 	return output, nil
+}
+
+func (m *MCPRuntimeManager) ListResourcesPage(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	pageSize int,
+	pageToken string,
+) ([]spec.MCPResourceRef, *string, error) {
+	if err := validateRuntimeRef(ctx, ref); err != nil {
+		return nil, nil, err
+	}
+	snapshot, err := m.currentSnapshot(ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	values := append([]spec.MCPResourceRef(nil), snapshot.Resources...)
+	sort.Slice(values, func(left, right int) bool {
+		return values[left].URI < values[right].URI
+	})
+	return paginateArtifactDiscoveryItems(
+		ref, snapshot.Digest, artifactDiscoveryPageKindResources,
+		values, pageSize, pageToken,
+	)
 }
 
 func (m *MCPRuntimeManager) ListResourceTemplates(
@@ -325,6 +386,32 @@ func (m *MCPRuntimeManager) ListResourceTemplates(
 	return output, nil
 }
 
+func (m *MCPRuntimeManager) ListResourceTemplatesPage(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	pageSize int,
+	pageToken string,
+) ([]spec.MCPResourceTemplateRef, *string, error) {
+	if err := validateRuntimeRef(ctx, ref); err != nil {
+		return nil, nil, err
+	}
+	snapshot, err := m.currentSnapshot(ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	values := append(
+		[]spec.MCPResourceTemplateRef(nil),
+		snapshot.ResourceTemplates...,
+	)
+	sort.Slice(values, func(left, right int) bool {
+		return values[left].URITemplate < values[right].URITemplate
+	})
+	return paginateArtifactDiscoveryItems(
+		ref, snapshot.Digest, artifactDiscoveryPageKindResourceTemplates,
+		values, pageSize, pageToken,
+	)
+}
+
 func (m *MCPRuntimeManager) ListPrompts(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -341,6 +428,29 @@ func (m *MCPRuntimeManager) ListPrompts(
 		return output[left].PromptName < output[right].PromptName
 	})
 	return output, nil
+}
+
+func (m *MCPRuntimeManager) ListPromptsPage(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	pageSize int,
+	pageToken string,
+) ([]spec.MCPPromptRef, *string, error) {
+	if err := validateRuntimeRef(ctx, ref); err != nil {
+		return nil, nil, err
+	}
+	snapshot, err := m.currentSnapshot(ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	values := append([]spec.MCPPromptRef(nil), snapshot.Prompts...)
+	sort.Slice(values, func(left, right int) bool {
+		return values[left].PromptName < values[right].PromptName
+	})
+	return paginateArtifactDiscoveryItems(
+		ref, snapshot.Digest, artifactDiscoveryPageKindPrompts,
+		values, pageSize, pageToken,
+	)
 }
 
 func (m *MCPRuntimeManager) ReadResource(
@@ -922,9 +1032,18 @@ func withMCPConnectTimeout(
 	}
 
 	timeout := defaultMCPConnectTimeout
+	if config.Stdio != nil && config.Stdio.StartupTimeoutMS > 0 {
+		timeout = time.Duration(config.Stdio.StartupTimeoutMS) *
+			time.Millisecond
+	}
+	if config.StreamableHTTP != nil &&
+		config.StreamableHTTP.TimeoutMS > 0 {
+		timeout = time.Duration(config.StreamableHTTP.TimeoutMS) *
+			time.Millisecond
+	}
 	if config.StreamableHTTP != nil &&
 		config.StreamableHTTP.AuthMode == spec.MCPHTTPAuthOAuth {
-		timeout = defaultInteractiveMCPAuthTimeout
+		timeout = max(timeout, defaultInteractiveMCPAuthTimeout)
 	}
 	return context.WithTimeout(ctx, timeout)
 }
@@ -1120,6 +1239,103 @@ func mergeSensitiveValues(groups ...[]string) []string {
 
 	sort.Strings(values)
 	return values
+}
+
+func paginateArtifactDiscoveryItems[T any](
+	srv artifact.ArtifactRef,
+	snapshotDigest string,
+	kind string,
+	items []T,
+	pageSize int,
+	pageToken string,
+) (out []T, next *string, err error) {
+	start := 0
+
+	if pageToken != "" {
+		token, err := decodeArtifactDiscoveryPageToken(pageToken)
+		if err != nil {
+			return nil, nil, fmt.Errorf(
+				"%w: invalid MCP discovery page token",
+				spec.ErrMCPInvalidRequest,
+			)
+		}
+		if token.Server != srv ||
+			token.SnapshotDigest != snapshotDigest ||
+			token.Kind != kind {
+			return nil, nil, fmt.Errorf(
+				"%w: stale MCP discovery page token",
+				spec.ErrMCPStaleReference,
+			)
+		}
+		if token.PageSize <= 0 ||
+			token.PageSize > spec.MaxMCPServerPageSize ||
+			token.Index < 0 ||
+			token.Index > len(items) {
+			return nil, nil, fmt.Errorf(
+				"%w: invalid MCP discovery page token",
+				spec.ErrMCPInvalidRequest,
+			)
+		}
+
+		start = token.Index
+		pageSize = token.PageSize
+	} else {
+		if pageSize <= 0 {
+			pageSize = spec.DefaultMCPPageSize
+		}
+		if pageSize > spec.MaxMCPServerPageSize {
+			pageSize = spec.MaxMCPServerPageSize
+		}
+	}
+
+	end := min(start+pageSize, len(items))
+	out = append([]T(nil), items[start:end]...)
+	if out == nil {
+		out = []T{}
+	}
+
+	if end < len(items) {
+		token, err := encodeArtifactDiscoveryPageToken(
+			spec.MCPDiscoveryPageToken{
+				Server:         srv,
+				SnapshotDigest: snapshotDigest,
+				Kind:           kind,
+				PageSize:       pageSize,
+				Index:          end,
+			},
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		next = &token
+	}
+
+	return out, next, nil
+}
+
+func encodeArtifactDiscoveryPageToken(
+	token spec.MCPDiscoveryPageToken,
+) (string, error) {
+	raw, err := json.Marshal(token)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+func decodeArtifactDiscoveryPageToken(
+	value string,
+) (spec.MCPDiscoveryPageToken, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return spec.MCPDiscoveryPageToken{}, err
+	}
+
+	var token spec.MCPDiscoveryPageToken
+	if err := json.Unmarshal(raw, &token); err != nil {
+		return spec.MCPDiscoveryPageToken{}, err
+	}
+	return token, nil
 }
 
 func cloneSessionState(input *sessionState) *sessionState {

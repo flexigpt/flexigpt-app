@@ -112,7 +112,18 @@ func (r Resolved) MaterializeTrusted(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	return r.MaterializeForInspection(ctx, environment)
+	materialized, err := installation.MaterializeValidated(
+		ctx,
+		r.Server,
+		r.Document,
+		r.Installation,
+		secrets,
+		environment,
+	)
+	if err != nil {
+		return RuntimeConfig{}, err
+	}
+	return runtimeConfigFromMaterialized(r, materialized)
 }
 
 func (r Resolved) Validate() error {
@@ -176,15 +187,17 @@ func runtimeConfigFromMaterialized(
 	case schema.ServerTypeStdio:
 		config.Transport = mcpSpec.MCPTransportStdio
 		config.Stdio = &mcpSpec.MCPStdioConfig{
-			Command: materialized.Core.Command,
-			Args:    append([]string(nil), materialized.Core.Args...),
-			Env:     maps.Clone(materialized.Core.Env),
+			Command:          materialized.Core.Command,
+			Args:             append([]string(nil), materialized.Core.Args...),
+			Env:              maps.Clone(materialized.Core.Env),
+			StartupTimeoutMS: materialized.TimeoutMS,
 		}
 
 	case schema.ServerTypeHTTP:
 		config.Transport = mcpSpec.MCPTransportStreamableHTTP
 		config.StreamableHTTP = &mcpSpec.MCPStreamableHTTPConfig{
 			URL:                         materialized.Core.URL,
+			TimeoutMS:                   materialized.TimeoutMS,
 			AuthMode:                    materialized.Auth.Mode,
 			Headers:                     maps.Clone(materialized.Core.Headers),
 			ClientCredentialRef:         materialized.ClientCredentialRef,

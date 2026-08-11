@@ -4,7 +4,7 @@
 	"schemaVersion": "v1",
 	"logicalName": "zoom-mcp-servers",
 	"displayName": "Zoom MCP Servers",
-	"description": "Official Zoom hosted remote MCP server definitions.",
+	"description": "Official Zoom-hosted remote MCP servers.",
 	"mcpServers": {
 		"docs": {
 			"type": "http",
@@ -72,7 +72,6 @@
 		},
 		"policies": {
 			"manual-write": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",

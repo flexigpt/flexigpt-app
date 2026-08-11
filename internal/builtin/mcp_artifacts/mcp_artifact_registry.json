@@ -20,6 +20,7 @@
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000005",
 			"packageDirectory": "search",
+			"documentLocator": "search/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000006",
@@ -41,7 +42,13 @@
 				},
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000009",
-					"subresource": "policies/safe-default",
+					"subresource": "policies/context7-default",
+					"kind": "mcp.policy",
+					"enabled": true
+				},
+				{
+					"id": "0198f097-0d5b-7000-8000-000000000010",
+					"subresource": "policies/auto-read",
 					"kind": "mcp.policy",
 					"enabled": true
 				}
@@ -50,6 +57,7 @@
     {
       "collectionID": "0198f097-0d5b-7000-8000-000000000100",
       "packageDirectory": "design",
+      "documentLocator": "design/mcps.json",
       "artifacts": [
         {
           "id": "0198f097-0d5b-7000-8000-000000000101",
@@ -80,6 +88,7 @@
     {
       "collectionID": "0198f097-0d5b-7000-8000-000000000110",
       "packageDirectory": "software-dev-hosting",
+      "documentLocator": "software-dev-hosting/mcps.json",
       "artifacts": [
         { "id": "0198f097-0d5b-7000-8000-000000000111", "subresource": "mcpServers/github-oauth", "kind": "mcp.server", "enabled": true },
         { "id": "0198f097-0d5b-7000-8000-000000000112", "subresource": "mcpServers/github-pat", "kind": "mcp.server", "enabled": true },
@@ -94,6 +103,7 @@
     {
       "collectionID": "0198f097-0d5b-7000-8000-000000000120",
       "packageDirectory": "task-management",
+      "documentLocator": "task-management/mcps.json",
       "artifacts": [
         { "id": "0198f097-0d5b-7000-8000-000000000121", "subresource": "mcpServers/atlassian", "kind": "mcp.server", "enabled": true },
         { "id": "0198f097-0d5b-7000-8000-000000000122", "subresource": "mcpServers/notion", "kind": "mcp.server", "enabled": true },
@@ -104,6 +114,7 @@
     {
       "collectionID": "0198f097-0d5b-7000-8000-000000000130",
       "packageDirectory": "general-services",
+      "documentLocator": "general-services/mcps.json",
       "artifacts": [
         { "id": "0198f097-0d5b-7000-8000-000000000131", "subresource": "mcpServers/bgpt", "kind": "mcp.server", "enabled": true },
         { "id": "0198f097-0d5b-7000-8000-000000000132", "subresource": "mcpServers/box", "kind": "mcp.server", "enabled": true },
@@ -115,6 +126,7 @@
     {
       "collectionID": "0198f097-0d5b-7000-8000-000000000140",
       "packageDirectory": "cloudflare",
+      "documentLocator": "cloudflare/mcps.json",
       "artifacts": [
         { "id": "0198f097-0d5b-7000-8000-000000000141", "subresource": "mcpServers/agents-docs", "kind": "mcp.server", "enabled": true },
         { "id": "0198f097-0d5b-7000-8000-000000000142", "subresource": "mcpServers/ai-gateway", "kind": "mcp.server", "enabled": true },
@@ -142,6 +154,7 @@
     {
       "collectionID": "0198f097-0d5b-7000-8000-000000000170",
       "packageDirectory": "google",
+      "documentLocator": "google/mcps.json",
       "artifacts": [
         { "id": "0198f097-0d5b-7000-8000-000000000171", "subresource": "mcpServers/bigquery", "kind": "mcp.server", "enabled": true },
         { "id": "0198f097-0d5b-7000-8000-000000000172", "subresource": "mcpServers/calendar", "kind": "mcp.server", "enabled": true },
@@ -156,6 +169,7 @@
     {
       "collectionID": "0198f097-0d5b-7000-8000-000000000180",
       "packageDirectory": "zoom",
+      "documentLocator": "zoom/mcps.json",
       "artifacts": [
         { "id": "0198f097-0d5b-7000-8000-000000000181", "subresource": "mcpServers/docs", "kind": "mcp.server", "enabled": true },
         { "id": "0198f097-0d5b-7000-8000-000000000182", "subresource": "mcpServers/meetings", "kind": "mcp.server", "enabled": true },
@@ -168,6 +182,7 @@
     {
       "collectionID": "0198f097-0d5b-7000-8000-000000000190",
       "packageDirectory": "microsoft",
+      "documentLocator": "microsoft/mcps.json",
       "artifacts": [
         { "id": "0198f097-0d5b-7000-8000-000000000191", "subresource": "mcpServers/m365-copilot", "kind": "mcp.server", "enabled": true },
         { "id": "0198f097-0d5b-7000-8000-000000000192", "subresource": "mcpServers/onedrive", "kind": "mcp.server", "enabled": true },

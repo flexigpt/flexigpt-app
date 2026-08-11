@@ -25,7 +25,7 @@
 	"bundleExtension": {
 		"servers": {
 			"bgpt": {
-				"displayName": "BGPT",
+				"displayName": "BGPT (Scientific Papers)",
 				"auth": {
 					"mode": "none"
 				},
@@ -81,7 +81,6 @@
 		},
 		"policies": {
 			"auto-read": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",
@@ -105,7 +104,6 @@
 				}
 			},
 			"manual-write": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",

@@ -4,7 +4,7 @@
 	"schemaVersion": "v1",
 	"logicalName": "google-mcp-servers",
 	"displayName": "Google MCP Servers",
-	"description": "Google managed remote MCP server definitions.",
+	"description": "Google's fully managed remote MCP servers for BigQuery, Compute Engine, GKE, and Maps.",
 	"mcpServers": {
 		"bigquery": {
 			"type": "http",
@@ -26,6 +26,7 @@
 		"servers": {
 			"bigquery": {
 				"displayName": "Google BigQuery",
+				"timeoutMS": 60000,
 				"auth": {
 					"mode": "oauth",
 					"clientCredentialsInput": "GOOGLE_OAUTH_CLIENT"
@@ -45,6 +46,7 @@
 			},
 			"calendar": {
 				"displayName": "Google Calendar",
+				"timeoutMS": 60000,
 				"auth": {
 					"mode": "oauth",
 					"clientCredentialsInput": "GOOGLE_OAUTH_CLIENT"
@@ -64,16 +66,19 @@
 			},
 			"compute": {
 				"displayName": "Google Compute Engine",
+				"timeoutMS": 60000,
 				"auth": { "mode": "oauth" },
 				"policy": { "ref": "manual-write", "required": true }
 			},
 			"gke": {
 				"displayName": "Google Kubernetes Engine",
+				"timeoutMS": 60000,
 				"auth": { "mode": "oauth" },
 				"policy": { "ref": "manual-write", "required": true }
 			},
 			"gmail": {
 				"displayName": "Google Gmail",
+				"timeoutMS": 60000,
 				"auth": {
 					"mode": "oauth",
 					"clientCredentialsInput": "GOOGLE_OAUTH_CLIENT"
@@ -99,7 +104,6 @@
 		},
 		"policies": {
 			"manual-write": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",
@@ -123,7 +127,6 @@
 				}
 			},
 			"auto-read": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",

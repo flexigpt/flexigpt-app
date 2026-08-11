@@ -166,7 +166,7 @@ func (i *Installer) EnsureHydration(
 				RootID:          i.registry.Topology.Root.ID,
 				CollectionID:    value.registration.CollectionID,
 				SourceID:        i.registry.Topology.Sources[0].ID,
-				DocumentLocator: value.registration.DocumentLocator(),
+				DocumentLocator: value.registration.DocumentLocator,
 				Document:        value.document,
 				Registrations:   value.registration.ToBundleRegistrations(),
 			},
@@ -248,12 +248,12 @@ func (i *Installer) prepareBundles(
 	for _, registered := range i.registry.OrderedBundles() {
 		raw, err := fs.ReadFile(
 			i.packages,
-			string(registered.DocumentLocator()),
+			string(registered.DocumentLocator),
 		)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"read built-in MCP document %q: %w",
-				registered.DocumentLocator(),
+				registered.DocumentLocator,
 				err,
 			)
 		}
@@ -262,7 +262,7 @@ func (i *Installer) prepareBundles(
 		if err != nil {
 			return nil, fmt.Errorf(
 				"canonicalize built-in MCP document %q through the Artifact Store schema registry: %w",
-				registered.DocumentLocator(),
+				registered.DocumentLocator,
 				err,
 			)
 		}
@@ -270,7 +270,7 @@ func (i *Installer) prepareBundles(
 			return nil, fmt.Errorf(
 				"%w: built-in MCP document %q was canonicalized by another schema",
 				basespec.ErrInvalid,
-				registered.DocumentLocator(),
+				registered.DocumentLocator,
 			)
 		}
 
@@ -278,7 +278,7 @@ func (i *Installer) prepareBundles(
 		if err != nil {
 			return nil, fmt.Errorf(
 				"decode canonical built-in MCP document %q: %w",
-				registered.DocumentLocator(),
+				registered.DocumentLocator,
 				err,
 			)
 		}
@@ -286,7 +286,7 @@ func (i *Installer) prepareBundles(
 			return nil, fmt.Errorf(
 				"%w: built-in MCP document %q digest differs from schema registry output",
 				basespec.ErrDigestMismatch,
-				registered.DocumentLocator(),
+				registered.DocumentLocator,
 			)
 		}
 
@@ -298,7 +298,7 @@ func (i *Installer) prepareBundles(
 			return nil, fmt.Errorf(
 				"%w: static MCP registration does not cover document %q",
 				basespec.ErrInvalid,
-				registered.DocumentLocator(),
+				registered.DocumentLocator,
 			)
 		}
 		for subresource, kind := range definitions {
@@ -336,6 +336,7 @@ func (i *Installer) hydrationFingerprint(
 	type bundleFingerprint struct {
 		CollectionID     basespec.CollectionID `json:"collectionID"`
 		PackageDirectory basespec.Locator      `json:"packageDirectory"`
+		DocumentLocator  basespec.Locator      `json:"documentLocator"`
 		DocumentDigest   cryptoutil.Digest     `json:"documentDigest"`
 		PackageDigest    cryptoutil.Digest     `json:"packageDigest"`
 		Artifacts        []artifactFingerprint `json:"artifacts"`
@@ -357,6 +358,7 @@ func (i *Installer) hydrationFingerprint(
 		values = append(values, bundleFingerprint{
 			CollectionID:     value.registration.CollectionID,
 			PackageDirectory: value.registration.PackageDirectory,
+			DocumentLocator:  value.registration.DocumentLocator,
 			DocumentDigest:   value.document.Digest,
 			PackageDigest:    value.packageDigest,
 			Artifacts:        artifacts,

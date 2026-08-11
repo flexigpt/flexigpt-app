@@ -46,13 +46,6 @@ func (s *Session) Close(ctx context.Context) error {
 	}
 }
 
-func (s *Session) Ping(ctx context.Context) error {
-	if s == nil || s.session == nil {
-		return fmt.Errorf("%w: nil session", spec.ErrMCPRuntimeNotReady)
-	}
-	return s.session.Ping(ctx, nil)
-}
-
 func (s *Session) Discover(
 	ctx context.Context,
 	config server.RuntimeConfig,

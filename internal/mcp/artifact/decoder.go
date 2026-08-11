@@ -3,7 +3,6 @@ package artifact
 import (
 	"context"
 	"fmt"
-	"path"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -31,7 +30,7 @@ func (*Decoder) Recognize(
 	candidate discovery.Candidate,
 ) discovery.Recognition {
 	if candidate.RequestsDecoder(DecoderID) &&
-		path.Base(string(candidate.Locator)) == schema.BundleFileName {
+		schema.IsBundleDocumentLocator(candidate.Locator) {
 		return discovery.RecognitionPreferred
 	}
 	return discovery.RecognitionNone
@@ -42,7 +41,7 @@ func (*Decoder) Decode(
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	if !candidate.RequestsDecoder(DecoderID) ||
-		path.Base(string(candidate.Locator)) != schema.BundleFileName {
+		!schema.IsBundleDocumentLocator(candidate.Locator) {
 		return nil, nil
 	}
 

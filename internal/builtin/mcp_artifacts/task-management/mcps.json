@@ -22,7 +22,7 @@
 	"bundleExtension": {
 		"servers": {
 			"atlassian": {
-				"displayName": "Atlassian Rovo",
+				"displayName": "Atlassian Rovo (Jira + Confluence)",
 				"auth": {
 					"mode": "oauth"
 				},
@@ -67,7 +67,6 @@
 		},
 		"policies": {
 			"manual-write": {
-				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
 				"kind": "mcp.policy",
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",

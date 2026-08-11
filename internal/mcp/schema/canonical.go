@@ -968,6 +968,17 @@ func validateCoreServer(value CoreServer) error {
 	return nil
 }
 
+func validateConnectionTimeoutMS(value int) error {
+	if value < 0 || value > MaxConnectionTimeoutMS {
+		return fmt.Errorf(
+			"%w: MCP connection timeout must be between zero and %d milliseconds",
+			basespec.ErrInvalid,
+			MaxConnectionTimeoutMS,
+		)
+	}
+	return nil
+}
+
 func validateExtension(
 	name string,
 	value ServerExtension,
@@ -991,6 +1002,9 @@ func validateExtension(
 		value.Description,
 		basespec.MaxDescriptionBytes,
 	); err != nil {
+		return err
+	}
+	if err := validateConnectionTimeoutMS(value.TimeoutMS); err != nil {
 		return err
 	}
 	if err := validateLabels(value.Labels); err != nil {
