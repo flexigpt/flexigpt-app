@@ -167,6 +167,23 @@ func (cc *ConversationCollection) PutConversation(
 		return nil, err
 	}
 
+	currentConversation := &spec.Conversation{
+		SchemaVersion: spec.ConversationSchemaVersion,
+		ID:            req.ID,
+		Title:         req.Body.Title,
+		CreatedAt:     req.Body.CreatedAt,
+		ModifiedAt:    req.Body.ModifiedAt,
+		Messages:      req.Body.Messages,
+		Meta:          req.Body.Meta,
+	}
+	if err := validateConversationV1(currentConversation); err != nil {
+		return nil, err
+	}
+	data, err := jsonencdec.StructWithJSONTagsToMap(currentConversation)
+	if err != nil {
+		return nil, err
+	}
+
 	// Check if there are files with same id as prefix
 	// We don't iterate as we expect only 1 file max with the id prefix of uuid.
 	fileEntries, _, err := cc.store.ListFiles(
@@ -180,38 +197,27 @@ func (cc *ConversationCollection) PutConversation(
 	if err != nil {
 		return nil, err
 	}
-	// If there is a file, that means its a replace of full conversation
-	// May be title has also changed
-	// Remove the current file and add new.
+
+	// Persist the valid replacement first. A title change can then remove the
+	// prior filename without risking loss of the previous conversation when
+	// validation or the replacement write fails.
+	if err := cc.store.SetFileData(
+		mapstore.FileKey{FileName: filename},
+		data,
+	); err != nil {
+		return nil, err
+	}
 	for idx := range fileEntries {
+		existing := filepath.Base(fileEntries[idx].BaseRelativePath)
+		if existing == filename {
+			continue
+		}
 		err := cc.store.DeleteFile(
-			mapstore.FileKey{FileName: filepath.Base(fileEntries[idx].BaseRelativePath)},
+			mapstore.FileKey{FileName: existing},
 		)
 		if err != nil {
 			slog.Warn("put conversation remove existing file", "error", err)
 		}
-	}
-
-	currentConversation := &spec.Conversation{}
-	currentConversation.SchemaVersion = spec.ConversationSchemaVersion
-	currentConversation.ID = req.ID
-	currentConversation.Title = req.Body.Title
-	currentConversation.CreatedAt = req.Body.CreatedAt
-	currentConversation.ModifiedAt = req.Body.ModifiedAt
-	currentConversation.Messages = req.Body.Messages
-	if req.Body.Meta != nil {
-		currentConversation.Meta = req.Body.Meta
-	}
-	if err := validateConversationV1(currentConversation); err != nil {
-		return nil, err
-	}
-
-	data, err := jsonencdec.StructWithJSONTagsToMap(currentConversation)
-	if err != nil {
-		return nil, err
-	}
-	if err := cc.store.SetFileData(mapstore.FileKey{FileName: filename}, data); err != nil {
-		return nil, err
 	}
 	return &spec.PutConversationResponse{}, nil
 }
@@ -466,8 +472,19 @@ func validateConversationV1(value *spec.Conversation) error {
 				return fmt.Errorf("messages[%d].mcpToolMappings: %w", index, err)
 			}
 		}
-		if err := validate.ValidateMCPAppContextUpdates(message.MCPAppContextUpdates); err != nil {
-			return fmt.Errorf("messages[%d].mcpAppContextUpdates: %w", index, err)
+		if len(message.MCPAppContextUpdates) != 0 {
+			if message.MCPContext == nil {
+				return fmt.Errorf(
+					"messages[%d].mcpAppContextUpdates require mcpContext",
+					index,
+				)
+			}
+			if err := validate.ValidateMCPAppContextUpdatesForContext(
+				*message.MCPContext,
+				message.MCPAppContextUpdates,
+			); err != nil {
+				return fmt.Errorf("messages[%d].mcpAppContextUpdates: %w", index, err)
+			}
 		}
 		if message.WorkspaceSelection == nil {
 			continue

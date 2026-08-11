@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -22,7 +23,7 @@ type EnsureBuiltInRequest struct {
 	DocumentLocator basespec.Locator
 
 	PackageFiles  []source.ManagedPackageFile
-	Document      schema.BundleDocument
+	Document      shareable.ParsedDocument
 	Registrations []Registration
 }
 
@@ -59,8 +60,7 @@ func (a *API) EnsureBuiltIn(
 		)
 	}
 
-	document, canonicalDocument, err := a.canonicalizeTrustedBundleDocument(
-		ctx,
+	document, err := schema.BundleFromParsedDocument(
 		request.Document,
 	)
 	if err != nil {
@@ -136,15 +136,16 @@ func (a *API) EnsureBuiltIn(
 		return Bundle{}, err
 	}
 
-	updated, err := a.replaceDocument(
+	updated, err := a.replaceCanonicalDocument(
 		ctx,
 		ReplaceDocumentRequest{
 			Bundle:                     bundle.Collection.Ref(),
 			ExpectedCollectionRevision: bundle.Collection.Revision,
-			Document:                   canonicalDocument,
+			Document:                   request.Document.Raw,
 			Registrations:              request.Registrations,
 			AllowProtected:             true,
 		},
+		request.Document,
 		request.PackageFiles,
 	)
 	if err != nil {

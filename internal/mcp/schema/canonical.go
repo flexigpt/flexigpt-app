@@ -641,6 +641,11 @@ func validateServerParts(
 			inputName,
 		)
 	}
+	if err := validateClientIDMetadataDocumentURLTemplate(
+		extension.Auth.ClientIDMetadataDocumentURL,
+	); err != nil {
+		return err
+	}
 
 	switch extension.Auth.Mode {
 	case mcpSpec.MCPHTTPAuthNone:
@@ -749,7 +754,11 @@ func validateServerParts(
 			}
 		}
 	}
-	return nil
+	_, err := secretInputTargets(
+		core,
+		extension,
+	)
+	return err
 }
 
 func validateInputDeclaration(
@@ -1232,6 +1241,26 @@ func validateURLTemplate(raw string) error {
 			basespec.ErrInvalid,
 		)
 	}
+}
+
+func validateClientIDMetadataDocumentURLTemplate(
+	raw string,
+) error {
+	if raw == "" {
+		return nil
+	}
+	if strings.TrimSpace(raw) != raw ||
+		len(raw) > basespec.MaxURIBytes {
+		return fmt.Errorf(
+			"%w: invalid OAuth client metadata URL template",
+			basespec.ErrInvalid,
+		)
+	}
+	probe := placeholderPattern.ReplaceAllString(
+		raw,
+		"example",
+	)
+	return validateClientIDMetadataDocumentURL(probe)
 }
 
 func validateClientIDMetadataDocumentURL(raw string) error {

@@ -255,6 +255,34 @@ func verificationSessionFromContext(
 	return value
 }
 
+func readSnapshotLocator(
+	ctx context.Context,
+	snapshot Snapshot,
+	locator basespec.Locator,
+	maximumBytes int64,
+) ([]byte, error) {
+	entry, err := snapshot.Stat(ctx, locator)
+	if err != nil {
+		return nil, err
+	}
+	if err := entry.Validate(); err != nil {
+		return nil, fmt.Errorf(
+			"%w: source snapshot returned an invalid entry: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	if entry.Locator != locator {
+		return nil, fmt.Errorf(
+			"%w: source snapshot stat for %q returned %q",
+			basespec.ErrInvalid,
+			locator,
+			entry.Locator,
+		)
+	}
+	return ReadSnapshotEntry(ctx, snapshot, entry, maximumBytes)
+}
+
 func verifySnapshotEntry(
 	ctx context.Context,
 	snapshot Snapshot,
@@ -262,29 +290,10 @@ func verifySnapshotEntry(
 	expectedDigest cryptoutil.Digest,
 	maximumBytes int64,
 ) error {
-	entry, err := snapshot.Stat(ctx, locator)
-	if err != nil {
-		return err
-	}
-	if err := entry.Validate(); err != nil {
-		return fmt.Errorf(
-			"%w: source snapshot returned an invalid entry: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if entry.Locator != locator {
-		return fmt.Errorf(
-			"%w: source snapshot stat for %q returned %q",
-			basespec.ErrInvalid,
-			locator,
-			entry.Locator,
-		)
-	}
-	content, err := ReadSnapshotEntry(
+	content, err := readSnapshotLocator(
 		ctx,
 		snapshot,
-		entry,
+		locator,
 		maximumBytes,
 	)
 	if err != nil {

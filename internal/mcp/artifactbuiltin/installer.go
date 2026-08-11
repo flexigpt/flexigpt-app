@@ -101,6 +101,7 @@ type Installer struct {
 type preparedBundle struct {
 	registration  BundleRegistration
 	document      schema.BundleDocument
+	parsed        shareable.ParsedDocument
 	packageFiles  []source.ManagedPackageFile
 	packageDigest cryptoutil.Digest
 }
@@ -209,7 +210,7 @@ func (i *Installer) EnsureHydration(
 				CollectionID:    value.registration.CollectionID,
 				SourceID:        i.registry.Topology.Sources[0].ID,
 				DocumentLocator: value.registration.DocumentLocator,
-				Document:        value.document,
+				Document:        value.parsed,
 				Registrations:   value.registration.ToBundleRegistrations(),
 				PackageFiles:    value.packageFiles,
 			},
@@ -289,15 +290,36 @@ func (i *Installer) prepareBundles(
 
 	output := make([]preparedBundle, 0, len(i.registry.Bundles))
 	for _, registered := range i.registry.OrderedBundles() {
-		raw, err := fs.ReadFile(
+		embeddedFiles, err := topology.ReadPackageFiles(
+			ctx,
 			i.packages,
-			string(registered.DocumentLocator),
+			registered.PackageDirectory,
 		)
 		if err != nil {
+			return nil, err
+		}
+
+		documentFile := basespec.Locator(
+			path.Base(string(registered.DocumentLocator)),
+		)
+		var (
+			raw           []byte
+			foundDocument bool
+		)
+		for _, file := range embeddedFiles {
+			if file.Locator != documentFile {
+				continue
+			}
+			raw = append([]byte(nil), file.Content...)
+			foundDocument = true
+			break
+		}
+		if !foundDocument {
 			return nil, fmt.Errorf(
-				"read built-in MCP document %q: %w",
+				"%w: built-in MCP package %q lacks document %q",
+				basespec.ErrInvalid,
+				registered.PackageDirectory,
 				registered.DocumentLocator,
-				err,
 			)
 		}
 
@@ -329,9 +351,9 @@ func (i *Installer) prepareBundles(
 				registered.DocumentLocator,
 			)
 		}
-		packageFiles, packageDigest, err := i.canonicalPackageFiles(
-			ctx,
+		packageFiles, packageDigest, err := canonicalPackageFiles(
 			registered,
+			embeddedFiles,
 			parsed.Raw,
 		)
 		if err != nil {
@@ -366,6 +388,7 @@ func (i *Installer) prepareBundles(
 		output = append(output, preparedBundle{
 			registration:  registered,
 			document:      document,
+			parsed:        parsed.Clone(),
 			packageFiles:  packageFiles,
 			packageDigest: packageDigest,
 		})
@@ -373,20 +396,11 @@ func (i *Installer) prepareBundles(
 	return output, nil
 }
 
-func (i *Installer) canonicalPackageFiles(
-	ctx context.Context,
+func canonicalPackageFiles(
 	registered BundleRegistration,
+	embeddedFiles []topology.PackageFile,
 	canonicalDocument json.RawMessage,
 ) ([]source.ManagedPackageFile, cryptoutil.Digest, error) {
-	embeddedFiles, err := topology.ReadPackageFiles(
-		ctx,
-		i.packages,
-		registered.PackageDirectory,
-	)
-	if err != nil {
-		return nil, "", err
-	}
-
 	documentFile := basespec.Locator(
 		path.Base(string(registered.DocumentLocator)),
 	)

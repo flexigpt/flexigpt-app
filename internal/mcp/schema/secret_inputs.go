@@ -47,6 +47,7 @@ func secretInputTargets(
 	extension ServerExtension,
 ) (map[string]SecretInputTarget, error) {
 	targets := make(map[string]SecretInputTarget)
+	targetOwners := make(map[string]string)
 	inputs := extension.Install.Inputs
 
 	record := func(
@@ -80,6 +81,19 @@ func secretInputTargets(
 			}
 			return nil
 		}
+
+		targetKey := string(kind) + "\x00" +
+			strings.ToLower(strings.TrimSpace(slot))
+		if owner, found := targetOwners[targetKey]; found &&
+			owner != inputName {
+			return fmt.Errorf(
+				"%w: secret inputs %q and %q use the same materialization target",
+				basespec.ErrInvalid,
+				owner,
+				inputName,
+			)
+		}
+		targetOwners[targetKey] = inputName
 		targets[inputName] = next
 		return nil
 	}
@@ -207,6 +221,19 @@ func secretInputTargets(
 			); err != nil {
 				return nil, err
 			}
+		}
+	}
+
+	for inputName, declaration := range inputs {
+		if declaration.Kind != InputSecret {
+			continue
+		}
+		if _, found := targets[inputName]; !found {
+			return nil, fmt.Errorf(
+				"%w: secret input %q has no permitted environment or HTTP header target",
+				basespec.ErrInvalid,
+				inputName,
+			)
 		}
 	}
 	return targets, nil

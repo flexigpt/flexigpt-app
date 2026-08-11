@@ -83,8 +83,13 @@ type CompletionRequest struct {
 type CompletionResponseBody struct {
 	InferenceResponse     *inferenceSpec.FetchCompletionResponse `json:"inferenceResponse,omitempty"`
 	HydratedCurrentInputs []inferenceSpec.InputUnion             `json:"hydratedCurrentInputs,omitempty"`
-	MCPToolMappings       []mcpSpec.MCPProviderToolMapping       `json:"mcpToolMappings,omitempty"`
-	WorkspaceUsage        *selection.ConversationUsage           `json:"workspaceUsage,omitempty"`
+
+	// MCPToolMappings must be persisted on the corresponding conversation
+	// user turn before a later provider-tool call is routed through
+	// InvokeMappedMCPTool. Conversation storage validates the mappings against
+	// that turn's MCPContext.
+	MCPToolMappings []mcpSpec.MCPProviderToolMapping `json:"mcpToolMappings,omitempty"`
+	WorkspaceUsage  *selection.ConversationUsage     `json:"workspaceUsage,omitempty"`
 }
 
 type CompletionResponse struct {

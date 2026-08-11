@@ -139,16 +139,18 @@ func (s *mcpSettingsAdapter) PutMCPInstallationValue(
 		return basespec.ErrConflict
 	}
 
-	if err := s.writeRawLocked(ctx, key, canonical); err != nil {
-		return err
-	}
-
 	index, err := s.readIndexLocked(ctx)
 	if err != nil {
 		return err
 	}
 	index.Keys[key] = mcpSettingsStorageKey(key)
-	return s.writeIndexLocked(ctx, index)
+	if err := s.writeIndexLocked(ctx, index); err != nil {
+		return err
+	}
+
+	// Index first. If the value write fails, prefix cleanup can still find the
+	// dangling key and a normal retry still observes the previous revision.
+	return s.writeRawLocked(ctx, key, canonical)
 }
 
 func (s *mcpSettingsAdapter) DeleteMCPInstallationValue(

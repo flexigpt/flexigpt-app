@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
@@ -34,18 +35,35 @@ func (a *API) ReplaceDocument(
 	ctx context.Context,
 	request ReplaceDocumentRequest,
 ) (Bundle, error) {
-	return a.replaceDocument(ctx, request, nil)
+	_, parsed, err := a.canonicalizeBundleBytes(
+		ctx,
+		request.Document,
+	)
+	if err != nil {
+		return Bundle{}, err
+	}
+	return a.replaceCanonicalDocument(
+		ctx,
+		request,
+		parsed,
+		nil,
+	)
 }
 
-// replaceDocument is shared by user-managed Bundle updates and protected
-// hydration. Protected hydration can supply a complete package inventory;
-// user-facing operations deliberately publish only the canonical document.
-func (a *API) replaceDocument(
+// replaceCanonicalDocument is shared by user-managed Bundle updates and
+// protected hydration after the portable document has passed through the
+// Artifact Store expected-schema registry exactly once.
+func (a *API) replaceCanonicalDocument(
 	ctx context.Context,
 	request ReplaceDocumentRequest,
+	parsed shareable.ParsedDocument,
 	suppliedFiles []source.ManagedPackageFile,
 ) (Bundle, error) {
-	plan, err := a.prepareDocumentReplace(ctx, request)
+	plan, err := a.prepareDocumentReplace(
+		ctx,
+		request,
+		parsed,
+	)
 	if err != nil {
 		return Bundle{}, err
 	}
@@ -577,11 +595,15 @@ func (a *API) UpdateServerInstallation(
 		return artifact.Artifact{}, err
 	}
 	if jsonutil.Equal(record.Data, encoded) {
-		return record, nil
-	}
-	before, err := installation.DecodeServerData(record.Data)
-	if err != nil {
-		return artifact.Artifact{}, err
+		if err := a.dependencies.Runtime.Invalidate(ctx, ref); err != nil {
+			return artifact.Artifact{}, err
+		}
+		return record, a.cleanupChangedServerInstallation(
+			ctx,
+			record,
+			document,
+			data,
+		)
 	}
 	if err := a.dependencies.Runtime.Invalidate(ctx, ref); err != nil {
 		return artifact.Artifact{}, err
@@ -598,7 +620,7 @@ func (a *API) UpdateServerInstallation(
 	if err := a.cleanupChangedServerInstallation(
 		ctx,
 		updated,
-		before,
+		document,
 		data,
 	); err != nil {
 		return updated, err
@@ -679,11 +701,6 @@ func (a *API) UpdateProtectedServerInstallation(
 		return basespec.ErrConflict
 	}
 
-	before := installation.DefaultServerData()
-	if found {
-		before = current.ServerData
-	}
-
 	nextRevision := uint64(1)
 	if found {
 		nextRevision = current.Revision + 1
@@ -705,22 +722,10 @@ func (a *API) UpdateProtectedServerInstallation(
 		return err
 	}
 
-	beforeRaw, err := installation.EncodeServerData(before)
-	if err != nil {
-		return err
-	}
-	afterRaw, err := installation.EncodeServerData(data)
-	if err != nil {
-		return err
-	}
-	if jsonutil.Equal(beforeRaw, afterRaw) {
-		return nil
-	}
-
 	if err := a.cleanupChangedServerInstallation(
 		ctx,
 		record,
-		before,
+		document,
 		data,
 	); err != nil {
 		return fmt.Errorf(

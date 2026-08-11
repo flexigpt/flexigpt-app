@@ -95,11 +95,8 @@ func (r *BootstrapRegistry) Register(installer Installer) error {
 	}
 
 	name := installer.BuiltInName()
-	if name == "" || name != strings.TrimSpace(name) {
-		return fmt.Errorf(
-			"%w: built-in installer name is required",
-			basespec.ErrInvalid,
-		)
+	if err := topology.ValidateHydrationInstallerName(name); err != nil {
+		return fmt.Errorf("built-in installer name: %w", err)
 	}
 	ids, err := normalizeIDs(installer.BuiltInIDs())
 	if err != nil {

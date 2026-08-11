@@ -345,7 +345,9 @@ func (a *API) effectiveInstallation(
 	}
 	return serverOverlay.ServerData,
 		serverOverlay.Revision,
-		serverOverlay.RuntimeEnabled &&
+		bundle.Collection.Enabled &&
+			record.Enabled &&
+			serverOverlay.RuntimeEnabled &&
 			bundleOverlay.RuntimeEnabled,
 		nil
 }

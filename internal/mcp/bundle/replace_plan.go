@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
@@ -38,6 +39,7 @@ type documentReplacePlan struct {
 func (a *API) prepareDocumentReplace(
 	ctx context.Context,
 	request ReplaceDocumentRequest,
+	parsed shareable.ParsedDocument,
 ) (documentReplacePlan, error) {
 	if a == nil {
 		return documentReplacePlan{}, basespec.ErrClosed
@@ -67,13 +69,11 @@ func (a *API) prepareDocumentReplace(
 		return documentReplacePlan{}, basespec.ErrConflict
 	}
 
-	document, raw, err := a.canonicalizeBundleBytes(
-		ctx,
-		request.Document,
-	)
+	document, err := schema.BundleFromParsedDocument(parsed)
 	if err != nil {
 		return documentReplacePlan{}, err
 	}
+	raw := append(json.RawMessage(nil), parsed.Raw...)
 	if bundle.Data.LogicalName != document.LogicalName {
 		return documentReplacePlan{}, fmt.Errorf(
 			"%w: MCP document logical name differs from Bundle identity",

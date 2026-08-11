@@ -23,6 +23,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/sdkclient"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
@@ -262,6 +263,93 @@ func (w *MCPWrapper) ListMCPBundles(
 		}
 		return w.bundleAPI.List(context.Background(), rootID)
 	})
+}
+
+func (w *MCPWrapper) GetMCPBundleDocument(
+	ref collection.CollectionRef,
+) (schema.BundleDocument, error) {
+	return middleware.WithRecoveryResp(func() (schema.BundleDocument, error) {
+		if err := w.ready(); err != nil {
+			return schema.BundleDocument{}, err
+		}
+		return w.bundleAPI.GetDocument(context.Background(), ref)
+	})
+}
+
+func (w *MCPWrapper) ListMCPBundleServers(
+	ref collection.CollectionRef,
+) ([]artifact.Artifact, error) {
+	return middleware.WithRecoveryResp(func() ([]artifact.Artifact, error) {
+		if err := w.ready(); err != nil {
+			return nil, err
+		}
+		return w.bundleAPI.ListServers(context.Background(), ref)
+	})
+}
+
+func (w *MCPWrapper) ListMCPBundlePolicies(
+	ref collection.CollectionRef,
+) ([]artifact.Artifact, error) {
+	return middleware.WithRecoveryResp(func() ([]artifact.Artifact, error) {
+		if err := w.ready(); err != nil {
+			return nil, err
+		}
+		return w.bundleAPI.ListPolicies(context.Background(), ref)
+	})
+}
+
+func (w *MCPWrapper) GetMCPServerInstallation(
+	ref artifact.ArtifactRef,
+) (mcpBundle.ServerInstallationView, error) {
+	return middleware.WithRecoveryResp(
+		func() (mcpBundle.ServerInstallationView, error) {
+			if err := w.ready(); err != nil {
+				return mcpBundle.ServerInstallationView{}, err
+			}
+			return w.bundleAPI.GetServerInstallation(
+				context.Background(),
+				ref,
+			)
+		},
+	)
+}
+
+func (w *MCPWrapper) InspectMCPServer(
+	ref artifact.ArtifactRef,
+) (server.Resolved, error) {
+	return middleware.WithRecoveryResp(func() (server.Resolved, error) {
+		if err := w.ready(); err != nil {
+			return server.Resolved{}, err
+		}
+		return w.bundleAPI.InspectMCPServer(context.Background(), ref)
+	})
+}
+
+func (w *MCPWrapper) InspectMCPPolicy(
+	ref artifact.ArtifactRef,
+) (mcpBundle.PolicyView, error) {
+	return middleware.WithRecoveryResp(func() (mcpBundle.PolicyView, error) {
+		if err := w.ready(); err != nil {
+			return mcpBundle.PolicyView{}, err
+		}
+		return w.bundleAPI.InspectMCPPolicy(context.Background(), ref)
+	})
+}
+
+func (w *MCPWrapper) GetMCPBundleInstallation(
+	ref collection.CollectionRef,
+) (mcpBundle.BundleInstallationView, error) {
+	return middleware.WithRecoveryResp(
+		func() (mcpBundle.BundleInstallationView, error) {
+			if err := w.ready(); err != nil {
+				return mcpBundle.BundleInstallationView{}, err
+			}
+			return w.bundleAPI.GetBundleInstallation(
+				context.Background(),
+				ref,
+			)
+		},
+	)
 }
 
 func (w *MCPWrapper) ReplaceMCPBundleDocument(
@@ -507,19 +595,19 @@ func (w *MCPWrapper) ListMCPServerPrompts(
 }
 
 func (w *MCPWrapper) ReadMCPResource(
-	server artifact.ArtifactRef,
+	srv artifact.ArtifactRef,
 	uri string,
 ) (*mcpSpec.MCPReadResourceResponseBody, error) {
 	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPReadResourceResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.ReadResource(context.Background(), server, uri)
+		return w.runtime.ReadResource(context.Background(), srv, uri)
 	})
 }
 
 func (w *MCPWrapper) GetMCPPrompt(
-	server artifact.ArtifactRef,
+	srv artifact.ArtifactRef,
 	name string,
 	arguments map[string]string,
 ) (*mcpSpec.MCPGetPromptResponseBody, error) {
@@ -529,7 +617,7 @@ func (w *MCPWrapper) GetMCPPrompt(
 		}
 		return w.runtime.GetPrompt(
 			context.Background(),
-			server,
+			srv,
 			name,
 			arguments,
 		)
@@ -537,19 +625,19 @@ func (w *MCPWrapper) GetMCPPrompt(
 }
 
 func (w *MCPWrapper) CompleteMCPArgument(
-	server artifact.ArtifactRef,
+	srv artifact.ArtifactRef,
 	request mcpSpec.MCPCompleteArgumentRequestBody,
 ) (*mcpSpec.MCPCompletionResult, error) {
 	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPCompletionResult, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.Complete(context.Background(), server, request)
+		return w.runtime.Complete(context.Background(), srv, request)
 	})
 }
 
 func (w *MCPWrapper) EvaluateMCPToolCall(
-	server artifact.ArtifactRef,
+	srv artifact.ArtifactRef,
 	request *mcpSpec.InvokeMCPToolRequestBody,
 ) (*mcpSpec.MCPApprovalEvaluation, error) {
 	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPApprovalEvaluation, error) {
@@ -559,7 +647,7 @@ func (w *MCPWrapper) EvaluateMCPToolCall(
 		if request == nil {
 			return nil, fmt.Errorf("%w: MCP tool request is required", mcpSpec.ErrMCPInvalidRequest)
 		}
-		return w.toolBridge.Evaluate(context.Background(), server, *request)
+		return w.toolBridge.Evaluate(context.Background(), srv, *request)
 	})
 }
 
@@ -602,7 +690,7 @@ func (w *MCPWrapper) ResolveMCPApproval(
 }
 
 func (w *MCPWrapper) InvokeMCPTool(
-	server artifact.ArtifactRef,
+	srv artifact.ArtifactRef,
 	request *mcpSpec.InvokeMCPToolRequestBody,
 ) (*mcpSpec.InvokeMCPToolResponseBody, error) {
 	return middleware.WithRecoveryResp(func() (*mcpSpec.InvokeMCPToolResponseBody, error) {
@@ -612,7 +700,7 @@ func (w *MCPWrapper) InvokeMCPTool(
 		if request == nil {
 			return nil, fmt.Errorf("%w: MCP tool request is required", mcpSpec.ErrMCPInvalidRequest)
 		}
-		return w.toolBridge.Invoke(context.Background(), server, *request)
+		return w.toolBridge.Invoke(context.Background(), srv, *request)
 	})
 }
 
@@ -639,7 +727,7 @@ func (w *MCPWrapper) InvokeMappedMCPTool(
 }
 
 func (w *MCPWrapper) PutMCPServerSecret(
-	server artifact.ArtifactRef,
+	srv artifact.ArtifactRef,
 	kind mcpSpec.MCPSecretKind,
 	slot string,
 	value string,
@@ -649,7 +737,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			return MCPSecretWriteResult{}, err
 		}
 		ctx := context.Background()
-		if err := w.requireServerArtifact(ctx, server); err != nil {
+		if err := w.requireServerArtifact(ctx, srv); err != nil {
 			return MCPSecretWriteResult{}, err
 		}
 		if kind == mcpSpec.MCPSecretKindOAuthToken {
@@ -659,12 +747,23 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			)
 		}
 
+		installationView, err := w.bundleAPI.GetServerInstallation(
+			ctx,
+			srv,
+		)
+		if err != nil {
+			return MCPSecretWriteResult{}, err
+		}
+		if err := validateMCPSecretTarget(
+			installationView.Document,
+			kind,
+			slot,
+		); err != nil {
+			return MCPSecretWriteResult{}, err
+		}
+
 		if kind == mcpSpec.MCPSecretKindOAuthClientCredentials {
-			resolved, err := w.bundleAPI.ResolveMCPServer(ctx, server)
-			if err != nil {
-				return MCPSecretWriteResult{}, err
-			}
-			mode := resolved.Document.Extension.Auth.Mode
+			mode := installationView.Document.Extension.Auth.Mode
 			switch mode {
 			case mcpSpec.MCPHTTPAuthOAuth,
 				mcpSpec.MCPHTTPAuthClientCredentials:
@@ -674,7 +773,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 					mcpSpec.ErrMCPInvalidRequest,
 				)
 			}
-			if resolved.Document.Extension.Auth.ClientCredentialsInput == "" {
+			if installationView.Document.Extension.Auth.ClientCredentialsInput == "" {
 				return MCPSecretWriteResult{}, fmt.Errorf(
 					"%w: MCP server does not declare an OAuth client credentials input",
 					mcpSpec.ErrMCPInvalidRequest,
@@ -682,7 +781,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			}
 			if err := auth.ValidateOAuthClientCredentialsSecret(
 				value,
-				resolved.Document.OAuthClientSecretRequired(),
+				installationView.Document.OAuthClientSecretRequired(),
 			); err != nil {
 				return MCPSecretWriteResult{}, err
 			}
@@ -696,11 +795,11 @@ func (w *MCPWrapper) PutMCPServerSecret(
 				mcpSpec.ErrMCPInvalidRequest,
 			)
 		}
-		if err := w.runtime.Invalidate(ctx, server); err != nil {
+		if err := w.runtime.Invalidate(ctx, srv); err != nil {
 			return MCPSecretWriteResult{}, err
 		}
 
-		ref, err := secret.NewMCPSecretRefString(server, kind, slot)
+		ref, err := secret.NewMCPSecretRefString(srv, kind, slot)
 		if err != nil {
 			return MCPSecretWriteResult{}, err
 		}
@@ -712,7 +811,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 		if err != nil {
 			return MCPSecretWriteResult{}, err
 		}
-		w.auth.ClearAuthStatus(server)
+		w.auth.ClearAuthStatus(srv)
 
 		return MCPSecretWriteResult{
 			SecretRef: ref,
@@ -723,7 +822,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 }
 
 func (w *MCPWrapper) DeleteMCPServerSecret(
-	server artifact.ArtifactRef,
+	srv artifact.ArtifactRef,
 	kind mcpSpec.MCPSecretKind,
 	slot string,
 ) error {
@@ -731,7 +830,7 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 		if err := w.ready(); err != nil {
 			return err
 		}
-		if err := w.requireServerArtifact(context.Background(), server); err != nil {
+		if err := w.requireServerArtifact(context.Background(), srv); err != nil {
 			return err
 		}
 		if kind == mcpSpec.MCPSecretKindOAuthToken {
@@ -740,17 +839,17 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 				mcpSpec.ErrMCPInvalidRequest,
 			)
 		}
-		if err := w.runtime.Invalidate(context.Background(), server); err != nil {
+		if err := w.runtime.Invalidate(context.Background(), srv); err != nil {
 			return err
 		}
-		ref, err := secret.NewMCPSecretRefString(server, kind, slot)
+		ref, err := secret.NewMCPSecretRefString(srv, kind, slot)
 		if err != nil {
 			return err
 		}
 		if err := w.secrets.DeleteSecret(context.Background(), ref); err != nil {
 			return err
 		}
-		w.auth.ClearAuthStatus(server)
+		w.auth.ClearAuthStatus(srv)
 		return nil
 	})
 }
@@ -797,12 +896,12 @@ func (w *MCPWrapper) ListPendingMCPOAuthAuthorizations() []mcpSpec.MCPOAuthAutho
 }
 
 func (w *MCPWrapper) CancelPendingMCPOAuthAuthorization(
-	server artifact.ArtifactRef,
+	srv artifact.ArtifactRef,
 ) bool {
 	if w == nil || w.oauthBroker == nil {
 		return false
 	}
-	return w.oauthBroker.Cancel(server)
+	return w.oauthBroker.Cancel(srv)
 }
 
 func (w *MCPWrapper) UpdateMCPGlobalSettings(
@@ -868,6 +967,61 @@ func (w *MCPWrapper) requireServerArtifact(
 		)
 	}
 	return nil
+}
+
+func validateMCPSecretTarget(
+	document schema.ServerDocument,
+	kind mcpSpec.MCPSecretKind,
+	slot string,
+) error {
+	switch kind {
+	case mcpSpec.MCPSecretKindOAuthClientCredentials:
+		input := document.Extension.Auth.ClientCredentialsInput
+		if input == "" {
+			return fmt.Errorf(
+				"%w: MCP Server does not declare OAuth client credentials",
+				mcpSpec.ErrMCPInvalidRequest,
+			)
+		}
+		declaration, found := document.Extension.Install.Inputs[input]
+		if !found ||
+			declaration.Kind != schema.InputOAuthClientCredentials ||
+			!strings.EqualFold(strings.TrimSpace(slot), "clientCredentials") {
+			return fmt.Errorf(
+				"%w: invalid OAuth client credentials secret target",
+				mcpSpec.ErrMCPInvalidRequest,
+			)
+		}
+		return nil
+
+	case mcpSpec.MCPSecretKindStdioEnv,
+		mcpSpec.MCPSecretKindHTTPHeader:
+		targets, err := schema.SecretInputTargets(document)
+		if err != nil {
+			return err
+		}
+		for _, target := range targets {
+			expectedKind := mcpSpec.MCPSecretKindStdioEnv
+			if target.Kind == schema.SecretInputTargetHTTPHeader {
+				expectedKind = mcpSpec.MCPSecretKindHTTPHeader
+			}
+			if kind == expectedKind &&
+				strings.EqualFold(target.Slot, strings.TrimSpace(slot)) {
+				return nil
+			}
+		}
+		return fmt.Errorf(
+			"%w: secret target is not declared by the MCP Server",
+			mcpSpec.ErrMCPInvalidRequest,
+		)
+
+	default:
+		return fmt.Errorf(
+			"%w: unsupported MCP secret kind %q",
+			mcpSpec.ErrMCPInvalidRequest,
+			kind,
+		)
+	}
 }
 
 func (w *MCPWrapper) ready() error {

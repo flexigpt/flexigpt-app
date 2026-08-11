@@ -2,10 +2,10 @@ package bundle
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 )
 
@@ -16,15 +16,15 @@ import (
 func (a *API) canonicalizeBundleBytes(
 	ctx context.Context,
 	raw []byte,
-) (schema.BundleDocument, json.RawMessage, error) {
+) (schema.BundleDocument, shareable.ParsedDocument, error) {
 	if a == nil || a.dependencies.ShareableDocuments == nil {
-		return schema.BundleDocument{}, nil, fmt.Errorf(
+		return schema.BundleDocument{}, shareable.ParsedDocument{}, fmt.Errorf(
 			"%w: Artifact Store shareable document canonicalizer is unavailable",
 			basespec.ErrClosed,
 		)
 	}
 	if len(raw) == 0 {
-		return schema.BundleDocument{}, nil, fmt.Errorf(
+		return schema.BundleDocument{}, shareable.ParsedDocument{}, fmt.Errorf(
 			"%w: MCP Bundle document is required",
 			basespec.ErrInvalid,
 		)
@@ -36,7 +36,7 @@ func (a *API) canonicalizeBundleBytes(
 		raw,
 	)
 	if err != nil {
-		return schema.BundleDocument{}, nil, fmt.Errorf(
+		return schema.BundleDocument{}, shareable.ParsedDocument{}, fmt.Errorf(
 			"canonicalize MCP Bundle through Artifact Store schema registry: %w",
 			err,
 		)
@@ -44,26 +44,7 @@ func (a *API) canonicalizeBundleBytes(
 
 	document, err := schema.BundleFromParsedDocument(parsed)
 	if err != nil {
-		return schema.BundleDocument{}, nil, err
+		return schema.BundleDocument{}, shareable.ParsedDocument{}, err
 	}
-	return document, append(json.RawMessage(nil), parsed.Raw...), nil
-}
-
-// canonicalizeTrustedBundleDocument is reserved for already typed,
-// application-owned installer input. It still enters the same Artifact Store
-// expected-schema boundary after encoding.
-//
-// It must not be used by transport handlers or source readers.
-func (a *API) canonicalizeTrustedBundleDocument(
-	ctx context.Context,
-	input schema.BundleDocument,
-) (schema.BundleDocument, json.RawMessage, error) {
-	raw, err := json.Marshal(input)
-	if err != nil {
-		return schema.BundleDocument{}, nil, fmt.Errorf(
-			"encode trusted MCP Bundle document: %w",
-			err,
-		)
-	}
-	return a.canonicalizeBundleBytes(ctx, raw)
+	return document, parsed.Clone(), nil
 }

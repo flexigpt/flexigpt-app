@@ -1,11 +1,10 @@
 package runtime
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -36,6 +35,5 @@ func computeDiscoverySnapshotDigest(snap spec.MCPDiscoverySnapshot) string {
 	if err != nil {
 		return ""
 	}
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	return string(cryptoutil.DigestBytes(raw))
 }

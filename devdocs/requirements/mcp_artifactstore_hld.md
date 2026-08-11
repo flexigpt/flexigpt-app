@@ -1784,13 +1784,30 @@ Completed:
   ingress paths, including discovery, user lifecycle, and built-in hydration.
 - MCP-specific converted built-in asset loading detached from generic builtin
   package exports.
+- Single-pass Artifact Store schema canonicalization for user and protected
+  Bundle lifecycle after ingress.
+- Generic Artifact Store verified source-document reads for typed MCP document
+  retrieval.
+- Typed backend reads for canonical Bundle documents, server installation
+  state, policy state, and protected Bundle overlay revisions.
+- Effective per-tool policy projection into runtime discovery and inference
+  mappings.
+- Fail-closed mapped invocation when a persisted mapping would weaken current
+  policy.
+- Runtime digest alignment with the `sha256:` format used by shareable policy
+  documents.
+- Conversation and inference validation binding MCP App context updates to the
+  selected Artifact-backed server context.
 
 Pending:
 
 - Regenerate Wails bindings and replace frontend BundleID/ServerID calls with
   Artifact-backed MCP wrapper methods.
-- Persist `CompletionResponseBody.MCPToolMappings` into the corresponding
-  conversation turn before routing a later provider-tool invocation.
+- Update frontend completion orchestration to copy
+  `CompletionResponseBody.MCPToolMappings` into the corresponding conversation
+  turn before calling the existing conversation persistence API.
+- Implement the frontend MCP Apps host UI for rendering, open-link approval,
+  and model-context-update approval.
 - Add schema, decoder, lifecycle, retry, policy, secret-redaction, runtime
   invalidation, built-in hydration, mapped-invocation, and clean-cutover tests.
 
@@ -1920,15 +1937,12 @@ No secrets, OAuth tokens, overlays, assistant presets, conversations, or runtime
 
 ## Next implementation steps
 
-1. Add the concrete Setting Store adapter for installation overlays and OAuth
-   token persistence, including compare-and-swap revision behavior.
-2. Convert and commit the embedded built-in MCP package and static registry.
-3. Wire the Artifact-native MCP services in application composition and remove
-   all normal imports of `internal/mcp/store`.
-4. Cut assistant presets, conversations, inference, and aggregate tool routing
-   to ArtifactRef-only MCP references.
-5. Regenerate Wails bindings and update the frontend.
-6. Add schema, decoder, lifecycle, retry, policy, secret-redaction, runtime
+1. Regenerate Wails bindings and update the frontend to use only the
+   Artifact-backed MCP wrapper.
+2. Persist returned provider-tool mappings on the corresponding conversation
+   turn before mapped invocation.
+3. Complete the frontend MCP Apps host and approval user experience.
+4. Add schema, decoder, lifecycle, retry, policy, secret-redaction, runtime
    invalidation, built-in hydration, and clean-cutover tests.
 
 ## Current-scope requirements

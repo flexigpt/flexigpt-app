@@ -166,13 +166,36 @@ func ValidateServerData(value ServerData) error {
 			value.SchemaVersion,
 		)
 	}
+	if err := basespec.ValidateOptionalText(
+		"selected MCP connection profile",
+		value.SelectedConnectionProfile,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+	if len(value.Inputs) > basespec.MaxDefinitionDependencies {
+		return fmt.Errorf(
+			"%w: MCP installation inputs exceed %d entries",
+			basespec.ErrInvalid,
+			basespec.MaxDefinitionDependencies,
+		)
+	}
+	if len(value.AdditionalPolicies) >
+		basespec.MaxDefinitionDependencies {
+		return fmt.Errorf(
+			"%w: additional MCP policies exceed %d entries",
+			basespec.ErrInvalid,
+			basespec.MaxDefinitionDependencies,
+		)
+	}
 
 	seen := make(map[artifact.ArtifactRef]struct{})
 	for name, binding := range value.Inputs {
-		if name == "" {
+		if !installationInputNamePattern.MatchString(name) {
 			return fmt.Errorf(
-				"%w: MCP installation input name is empty",
+				"%w: invalid MCP installation input name %q",
 				basespec.ErrInvalid,
+				name,
 			)
 		}
 		if binding.Value != nil && binding.SecretRef != "" {
@@ -181,6 +204,31 @@ func ValidateServerData(value ServerData) error {
 				basespec.ErrInvalid,
 				name,
 			)
+		}
+		if binding.Value == nil && binding.SecretRef == "" {
+			return fmt.Errorf(
+				"%w: MCP input %q has no value or secretRef",
+				basespec.ErrInvalid,
+				name,
+			)
+		}
+		if binding.Value != nil {
+			if err := basespec.ValidateOptionalText(
+				"MCP installation input value",
+				*binding.Value,
+				basespec.MaxDescriptionBytes,
+			); err != nil {
+				return fmt.Errorf("MCP input %q: %w", name, err)
+			}
+		}
+		if binding.SecretRef != "" {
+			if err := basespec.ValidateRequiredText(
+				"MCP installation secret reference",
+				binding.SecretRef,
+				basespec.MaxURIBytes,
+			); err != nil {
+				return fmt.Errorf("MCP input %q: %w", name, err)
+			}
 		}
 	}
 	for _, ref := range value.AdditionalPolicies {

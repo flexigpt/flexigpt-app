@@ -2,8 +2,6 @@ package sdkclient
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -13,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
@@ -264,15 +263,6 @@ func (s *Session) listAllTools(
 	ctx context.Context,
 	config server.RuntimeConfig,
 ) ([]spec.MCPToolCapability, error) {
-	defaultPolicy := config.DefaultPolicy
-	baseDefaultPolicy := spec.DefaultMCPServerPolicy()
-	if defaultPolicy.DefaultApprovalRule == "" {
-		defaultPolicy.DefaultApprovalRule = baseDefaultPolicy.DefaultApprovalRule
-	}
-	if defaultPolicy.DefaultExecutionMode == "" {
-		defaultPolicy.DefaultExecutionMode = baseDefaultPolicy.DefaultExecutionMode
-	}
-
 	out := make([]spec.MCPToolCapability, 0)
 	cursor := ""
 
@@ -293,6 +283,16 @@ func (s *Session) listAllTools(
 			}
 
 			taskSupport := taskSupportFromMeta(t.Meta)
+			approvalRule, executionMode, override, hasOverride := effectiveToolPolicy(config, t.Name)
+			toolDigest := digestAny(t)
+			enabled := taskSupport != spec.MCPTaskSupportRequired &&
+				approvalRule != spec.MCPApprovalRuleDeny
+			if hasOverride &&
+				override.ExpectedDigest != "" &&
+				override.ExpectedDigest != toolDigest &&
+				!override.AllowStaleDigest {
+				enabled = false
+			}
 
 			out = append(out, spec.MCPToolCapability{
 				Server:           s.server,
@@ -310,17 +310,15 @@ func (s *Session) listAllTools(
 				Annotations:  toolAnnotationsToSpec(t.Annotations),
 				InferredRisk: inferRisk(t.Annotations, config.TrustLevel),
 
-				ApprovalRule:  defaultPolicy.DefaultApprovalRule,
-				ExecutionMode: defaultPolicy.DefaultExecutionMode,
+				ApprovalRule:  approvalRule,
+				ExecutionMode: executionMode,
 
 				TaskSupport: taskSupport,
 
 				App: appInfoFromMeta(t.Meta),
 
-				Digest: digestAny(t),
-				// Task-required tools are surfaced as disabled because this app
-				// does not support MCP task augmentation.
-				Enabled: taskSupport != spec.MCPTaskSupportRequired,
+				Digest:  toolDigest,
+				Enabled: enabled,
 			})
 		}
 
@@ -503,6 +501,37 @@ func summarizeCapabilities(caps *mcpSDK.ServerCapabilities) *spec.MCPServerCapab
 	}
 
 	return out
+}
+
+func effectiveToolPolicy(
+	config server.RuntimeConfig,
+	toolName string,
+) (
+	spec.MCPApprovalRule,
+	spec.MCPExecutionMode,
+	spec.MCPToolPolicyOverride,
+	bool,
+) {
+	defaults := spec.DefaultMCPServerPolicy()
+	approvalRule := config.DefaultPolicy.DefaultApprovalRule
+	executionMode := config.DefaultPolicy.DefaultExecutionMode
+	if approvalRule == "" {
+		approvalRule = defaults.DefaultApprovalRule
+	}
+	if executionMode == "" {
+		executionMode = defaults.DefaultExecutionMode
+	}
+
+	override, found := config.ToolPolicies[toolName]
+	if found {
+		if override.ApprovalRule != nil {
+			approvalRule = *override.ApprovalRule
+		}
+		if override.ExecutionMode != nil {
+			executionMode = *override.ExecutionMode
+		}
+	}
+	return approvalRule, executionMode, override, found
 }
 
 func inferRisk(a *mcpSDK.ToolAnnotations, trustLevel spec.MCPTrustLevel) spec.MCPToolRisk {
@@ -898,8 +927,7 @@ func stringSliceFromAny(v any) []string {
 
 func digestAny(v any) string {
 	raw, _ := json.Marshal(v)
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	return string(cryptoutil.DigestBytes(raw))
 }
 
 func displayNameForTool(t *mcpSDK.Tool) string {

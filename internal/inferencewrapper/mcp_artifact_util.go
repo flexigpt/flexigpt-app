@@ -36,6 +36,21 @@ type MCPRuntime interface {
 		server artifact.ArtifactRef,
 	) ([]mcpSpec.MCPToolCapability, error)
 
+	ListResources(
+		ctx context.Context,
+		server artifact.ArtifactRef,
+	) ([]mcpSpec.MCPResourceRef, error)
+
+	ListResourceTemplates(
+		ctx context.Context,
+		server artifact.ArtifactRef,
+	) ([]mcpSpec.MCPResourceTemplateRef, error)
+
+	ListPrompts(
+		ctx context.Context,
+		server artifact.ArtifactRef,
+	) ([]mcpSpec.MCPPromptRef, error)
+
 	ReadResource(
 		ctx context.Context,
 		server artifact.ArtifactRef,
@@ -104,6 +119,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 		hydrated             []mcpHydratedContextSection
 	)
 
+	readyServers := make(map[artifact.ArtifactRef]bool)
 	choiceSeen := make(map[string]struct{})
 	for _, choice := range request.ExistingToolChoices {
 		if choice.ID != "" {
@@ -115,6 +131,27 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 	}
 
 	for _, selection := range request.Context.Servers {
+		status, statusErr := b.runtime.Status(
+			ctx,
+			selection.Server,
+		)
+		if statusErr != nil {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP server %s status is unavailable: %v",
+				selection.Server.ArtifactID,
+				statusErr,
+			))
+		} else if status != nil {
+			readyServers[selection.Server] = status.Status == mcpSpec.MCPServerStatusReady
+			if selection.SnapshotDigest != "" &&
+				status.SnapshotDigest != selection.SnapshotDigest {
+				warnings = append(warnings, fmt.Sprintf(
+					"MCP server %s discovery snapshot changed",
+					selection.Server.ArtifactID,
+				))
+			}
+		}
+
 		if selection.IncludeServerInstructions {
 			instructions, err := b.serverInstructions(
 				ctx,
@@ -208,7 +245,51 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 		}
 	}
 
+	resourceCache := make(
+		map[artifact.ArtifactRef]map[string]mcpSpec.MCPResourceRef,
+	)
 	for _, resource := range request.Context.Resources {
+		if !readyServers[resource.Server] {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource %q was skipped because its server is not connected",
+				resource.URI,
+			))
+			continue
+		}
+		byURI, cached := resourceCache[resource.Server]
+		if !cached {
+			values, err := b.runtime.ListResources(ctx, resource.Server)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf(
+					"MCP resources for server %s were skipped: %v",
+					resource.Server.ArtifactID,
+					err,
+				))
+				continue
+			}
+			byURI = make(map[string]mcpSpec.MCPResourceRef, len(values))
+			for _, value := range values {
+				byURI[value.URI] = value
+			}
+			resourceCache[resource.Server] = byURI
+		}
+		current, found := byURI[resource.URI]
+		if !found {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource %q no longer exists",
+				resource.URI,
+			))
+			continue
+		}
+		if resource.Digest != "" &&
+			resource.Digest != current.Digest {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource %q digest changed",
+				resource.URI,
+			))
+			continue
+		}
+
 		text, err := b.readResourceAsText(
 			ctx,
 			resource.Server,
@@ -243,9 +324,58 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 		})
 	}
 
+	templateCache := make(
+		map[artifact.ArtifactRef]map[string]mcpSpec.MCPResourceTemplateRef,
+	)
 	for _, selection := range request.Context.ResourceTemplates {
+		if !readyServers[selection.Server] {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource template %q was skipped because its server is not connected",
+				selection.URITemplate,
+			))
+			continue
+		}
+		byTemplate, cached := templateCache[selection.Server]
+		if !cached {
+			values, err := b.runtime.ListResourceTemplates(
+				ctx,
+				selection.Server,
+			)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf(
+					"MCP resource templates for server %s were skipped: %v",
+					selection.Server.ArtifactID,
+					err,
+				))
+				continue
+			}
+			byTemplate = make(
+				map[string]mcpSpec.MCPResourceTemplateRef,
+				len(values),
+			)
+			for _, value := range values {
+				byTemplate[value.URITemplate] = value
+			}
+			templateCache[selection.Server] = byTemplate
+		}
+		current, found := byTemplate[selection.URITemplate]
+		if !found {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource template %q no longer exists",
+				selection.URITemplate,
+			))
+			continue
+		}
+		if selection.Digest != "" &&
+			selection.Digest != current.Digest {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource template %q digest changed",
+				selection.URITemplate,
+			))
+			continue
+		}
 		if missing := missingRequiredMCPArguments(
-			selection.Arguments,
+			current.Arguments,
 			selection.ArgumentValues,
 		); len(missing) != 0 {
 			warnings = append(warnings, fmt.Sprintf(
@@ -303,9 +433,52 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 		})
 	}
 
+	promptCache := make(
+		map[artifact.ArtifactRef]map[string]mcpSpec.MCPPromptRef,
+	)
 	for _, selection := range request.Context.Prompts {
+		if !readyServers[selection.Server] {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP prompt %q was skipped because its server is not connected",
+				selection.PromptName,
+			))
+			continue
+		}
+		byName, cached := promptCache[selection.Server]
+		if !cached {
+			values, err := b.runtime.ListPrompts(ctx, selection.Server)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf(
+					"MCP prompts for server %s were skipped: %v",
+					selection.Server.ArtifactID,
+					err,
+				))
+				continue
+			}
+			byName = make(map[string]mcpSpec.MCPPromptRef, len(values))
+			for _, value := range values {
+				byName[value.PromptName] = value
+			}
+			promptCache[selection.Server] = byName
+		}
+		current, found := byName[selection.PromptName]
+		if !found {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP prompt %q no longer exists",
+				selection.PromptName,
+			))
+			continue
+		}
+		if selection.Digest != "" &&
+			selection.Digest != current.Digest {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP prompt %q digest changed",
+				selection.PromptName,
+			))
+			continue
+		}
 		if missing := missingRequiredMCPArguments(
-			selection.Arguments,
+			current.Arguments,
 			selection.ArgumentValues,
 		); len(missing) != 0 {
 			warnings = append(warnings, fmt.Sprintf(
@@ -410,6 +583,21 @@ func (b *MCPInferenceBridge) toolsForSelection(
 	ctx context.Context,
 	selection mcpSpec.MCPServerSelection,
 ) (toolList []mcpSpec.MCPToolCapability, warnings []string) {
+	status, err := b.runtime.Status(ctx, selection.Server)
+	if err != nil {
+		return nil, []string{fmt.Sprintf(
+			"MCP tools for server %s were skipped: %v",
+			selection.Server.ArtifactID,
+			err,
+		)}
+	}
+	if status == nil ||
+		status.Status != mcpSpec.MCPServerStatusReady {
+		return nil, []string{fmt.Sprintf(
+			"MCP tools for server %s were skipped because the server is not connected",
+			selection.Server.ArtifactID,
+		)}
+	}
 	tools, err := b.runtime.ListTools(ctx, selection.Server)
 	if err != nil {
 		return nil, []string{fmt.Sprintf(

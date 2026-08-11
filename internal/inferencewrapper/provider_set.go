@@ -335,10 +335,22 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}
 	}
 
-	if err := validate.ValidateMCPAppContextUpdates(
-		body.Current.MCPAppContextUpdates,
-	); err != nil {
-		return nil, err
+	mcpContext := body.MCPContext
+	if mcpContext == nil {
+		mcpContext = body.Current.MCPContext
+	}
+	if len(body.Current.MCPAppContextUpdates) != 0 {
+		if mcpContext == nil {
+			return nil, errors.New(
+				"MCP App context updates require an MCP conversation context",
+			)
+		}
+		if err := validate.ValidateMCPAppContextUpdatesForContext(
+			*mcpContext,
+			body.Current.MCPAppContextUpdates,
+		); err != nil {
+			return nil, err
+		}
 	}
 	if appCtxInput := buildMCPAppContextInput(body.Current.MCPAppContextUpdates); appCtxInput != nil {
 		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
@@ -511,11 +523,6 @@ func (ps *ProviderSetAPI) FetchCompletion(
 				"selected Workspace Skills could not enter the active Skill Runtime session",
 			), nil
 		}
-	}
-
-	mcpContext := body.MCPContext
-	if mcpContext == nil {
-		mcpContext = body.Current.MCPContext
 	}
 
 	var mcpDebugDetails map[string]any

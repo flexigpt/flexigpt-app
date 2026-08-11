@@ -452,15 +452,19 @@ func applyMappedPolicyConstraints(
 	tool spec.MCPToolCapability,
 	mapping spec.MCPProviderToolMapping,
 ) (server.RuntimeConfig, error) {
+	currentApproval, currentExecution := currentToolConstraints(
+		config,
+		tool,
+	)
 	if approvalRuleRank(mapping.ApprovalRule) <
-		approvalRuleRank(normalizedApprovalRule(tool.ApprovalRule)) {
+		approvalRuleRank(currentApproval) {
 		return server.RuntimeConfig{}, fmt.Errorf(
 			"%w: mapped approval rule weakens current MCP policy",
 			spec.ErrMCPPolicyDenied,
 		)
 	}
 	if executionModeRank(mapping.ExecutionMode) <
-		executionModeRank(normalizedExecutionMode(tool.ExecutionMode)) {
+		executionModeRank(currentExecution) {
 		return server.RuntimeConfig{}, fmt.Errorf(
 			"%w: mapped execution mode weakens current MCP policy",
 			spec.ErrMCPPolicyDenied,
@@ -481,6 +485,39 @@ func applyMappedPolicyConstraints(
 	override.ExecutionMode = &execution
 	output.ToolPolicies[tool.ToolName] = override
 	return output, nil
+}
+
+func currentToolConstraints(
+	config server.RuntimeConfig,
+	tool spec.MCPToolCapability,
+) (spec.MCPApprovalRule, spec.MCPExecutionMode) {
+	defaults := spec.DefaultMCPServerPolicy()
+	approval := config.DefaultPolicy.DefaultApprovalRule
+	execution := config.DefaultPolicy.DefaultExecutionMode
+	if approval == "" {
+		approval = defaults.DefaultApprovalRule
+	}
+	if execution == "" {
+		execution = defaults.DefaultExecutionMode
+	}
+	if override, found := config.ToolPolicies[tool.ToolName]; found {
+		if override.ApprovalRule != nil {
+			approval = *override.ApprovalRule
+		}
+		if override.ExecutionMode != nil {
+			execution = *override.ExecutionMode
+		}
+	}
+
+	toolApproval := normalizedApprovalRule(tool.ApprovalRule)
+	if approvalRuleRank(toolApproval) > approvalRuleRank(approval) {
+		approval = toolApproval
+	}
+	toolExecution := normalizedExecutionMode(tool.ExecutionMode)
+	if executionModeRank(toolExecution) > executionModeRank(execution) {
+		execution = toolExecution
+	}
+	return approval, execution
 }
 
 func approvalRuleRank(value spec.MCPApprovalRule) int {
@@ -611,6 +648,15 @@ func evaluateTool(
 				tool,
 				request,
 				"unknown-risk tool requires approval",
+			)
+		}
+	case spec.MCPToolRiskOpenWorld:
+		if policy.RequireApprovalForUnknownRisk {
+			return approvalRequiredEvaluation(
+				config,
+				tool,
+				request,
+				"open-world tool requires approval",
 			)
 		}
 	case spec.MCPToolRiskWrite:

@@ -178,7 +178,7 @@ func (a *API) Create(
 		return Bundle{}, err
 	}
 
-	document, canonicalDocument, err := a.canonicalizeBundleBytes(ctx, request.Document)
+	document, parsedDocument, err := a.canonicalizeBundleBytes(ctx, request.Document)
 	if err != nil {
 		return Bundle{}, err
 	}
@@ -272,15 +272,17 @@ func (a *API) Create(
 	); err != nil {
 		return Bundle{}, cleanupSource(err)
 	}
-	if _, err := a.ReplaceDocument(
+	if _, err := a.replaceCanonicalDocument(
 		ctx,
 		ReplaceDocumentRequest{
 			Bundle:                     bundle.Collection.Ref(),
 			ExpectedCollectionRevision: bundle.Collection.Revision,
-			Document:                   canonicalDocument,
+			Document:                   parsedDocument.Raw,
 			Registrations:              request.Registrations,
 			AllowProtected:             false,
 		},
+		parsedDocument,
+		nil,
 	); err != nil {
 		return Bundle{}, err
 	}
@@ -516,16 +518,16 @@ func (a *API) discoveryPlan(
 func (a *API) cleanupChangedServerInstallation(
 	ctx context.Context,
 	record artifact.Artifact,
-	before installation.ServerData,
+	document schema.ServerDocument,
 	after installation.ServerData,
 ) error {
 	if record.Kind != schema.ServerKind {
 		return nil
 	}
-	if err := installation.CleanupReplacedServerSecrets(
+	if err := installation.CleanupUnboundServerSecrets(
 		ctx,
 		record.Ref(),
-		before,
+		document,
 		after,
 		a.dependencies.SecretCleaner,
 	); err != nil {

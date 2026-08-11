@@ -91,6 +91,38 @@ func ValidateMCPProviderToolMappingsForContext(
 	return nil
 }
 
+// ValidateMCPAppContextUpdatesForContext binds App-originated model context
+// updates to the exact durable MCP server selection that authorized them.
+func ValidateMCPAppContextUpdatesForContext(
+	contextValue spec.MCPConversationContext,
+	updates []spec.MCPAppModelContextUpdate,
+) error {
+	if err := ValidateMCPConversationContext(contextValue); err != nil {
+		return err
+	}
+	if err := ValidateMCPAppContextUpdates(updates); err != nil {
+		return err
+	}
+
+	servers := make(
+		map[artifact.ArtifactRef]struct{},
+		len(contextValue.Servers),
+	)
+	for _, server := range contextValue.Servers {
+		servers[server.Server] = struct{}{}
+	}
+	for index, update := range updates {
+		if _, selected := servers[update.Server]; !selected {
+			return fmt.Errorf(
+				"%w: MCP App context update %d belongs to an unselected server",
+				basespec.ErrInvalid,
+				index,
+			)
+		}
+	}
+	return nil
+}
+
 func selectedTool(
 	values []spec.MCPToolSelection,
 	name string,

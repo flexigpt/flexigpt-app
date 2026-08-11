@@ -209,6 +209,85 @@ func ReadSnapshotEntry(
 	return content, nil
 }
 
+// ReadVerifiedSnapshotEntry reads one source entry from an exact Source
+// generation and confirms the snapshot before returning the owned bytes and
+// their digest.
+//
+// It is the generic Artifact Store boundary for feature code that needs the
+// canonical source document itself. Features must not reopen native paths or
+// duplicate snapshot generation, bounded-read, confirmation, and close rules.
+func ReadVerifiedSnapshotEntry(
+	ctx context.Context,
+	runtime Runtime,
+	value Source,
+	locator basespec.Locator,
+	expectedGeneration string,
+	maximumBytes int64,
+) (
+	content []byte,
+	digest cryptoutil.Digest,
+	returnErr error,
+) {
+	if ctx == nil {
+		return nil, "", fmt.Errorf(
+			"%w: verified source read context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	if runtime == nil {
+		return nil, "", fmt.Errorf(
+			"%w: verified source read runtime is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := value.Validate(); err != nil {
+		return nil, "", err
+	}
+	if err := basespec.ValidateLocator(locator, false); err != nil {
+		return nil, "", err
+	}
+	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
+		return nil, "", err
+	}
+	if maximumBytes <= 0 || maximumBytes > basespec.MaxScanBytes {
+		return nil, "", fmt.Errorf(
+			"%w: verified source read limit is invalid",
+			basespec.ErrInvalid,
+		)
+	}
+
+	snapshot, err := runtime.Open(ctx, value)
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() {
+		returnErr = errors.Join(returnErr, snapshot.Close())
+	}()
+
+	if snapshot.Generation() != expectedGeneration {
+		return nil, "", fmt.Errorf(
+			"%w: source generation changed since it was observed",
+			basespec.ErrConflict,
+		)
+	}
+	content, err = readSnapshotLocator(
+		ctx,
+		snapshot,
+		locator,
+		maximumBytes,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	if err := snapshot.Confirm(ctx); err != nil {
+		return nil, "", err
+	}
+	return content, cryptoutil.DigestBytes(content), nil
+}
+
 // VerifySnapshotContentDigest confirms both the Source generation and the
 // exact bytes of one catalogued Source entry through the Source runtime.
 //
@@ -222,7 +301,7 @@ func VerifySnapshotContentDigest(
 	expectedGeneration string,
 	expectedDigest cryptoutil.Digest,
 	maximumBytes int64,
-) (returnErr error) {
+) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: source digest verification context is nil",
@@ -257,30 +336,25 @@ func VerifySnapshotContentDigest(
 		)
 	}
 
-	snapshot, err := runtime.Open(ctx, value)
+	_, actualDigest, err := ReadVerifiedSnapshotEntry(
+		ctx,
+		runtime,
+		value,
+		locator,
+		expectedGeneration,
+		maximumBytes,
+	)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		returnErr = errors.Join(returnErr, snapshot.Close())
-	}()
-
-	if snapshot.Generation() != expectedGeneration {
+	if actualDigest != expectedDigest {
 		return fmt.Errorf(
-			"%w: source generation changed since it was observed",
+			"%w: source content for %q changed since catalog publication",
 			basespec.ErrConflict,
+			locator,
 		)
 	}
-	if err := verifySnapshotEntry(
-		ctx,
-		snapshot,
-		locator,
-		expectedDigest,
-		maximumBytes,
-	); err != nil {
-		return err
-	}
-	return snapshot.Confirm(ctx)
+	return nil
 }
 
 func (r *runtime) Get(

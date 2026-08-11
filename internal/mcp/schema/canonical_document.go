@@ -24,21 +24,12 @@ func BundleFromParsedDocument(
 	input shareable.ParsedDocument,
 ) (BundleDocument, error) {
 	expected := BundleCodec{}.Key()
-	if input.Key != expected {
-		return BundleDocument{}, fmt.Errorf(
-			"%w: expected canonical MCP Bundle schema %q/%q/%q",
-			basespec.ErrInvalid,
-			expected.Kind,
-			expected.SchemaID,
-			expected.SchemaVersion,
-		)
-	}
-	if err := input.Validate(); err != nil {
-		return BundleDocument{}, fmt.Errorf(
-			"%w: invalid canonical MCP Bundle registry output: %w",
-			basespec.ErrInvalid,
-			err,
-		)
+	if err := validateParsedMCPDocument(
+		input,
+		expected,
+		"MCP Bundle",
+	); err != nil {
+		return BundleDocument{}, err
 	}
 
 	var output BundleDocument
