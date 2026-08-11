@@ -21,31 +21,6 @@ type Plan struct {
 	Sources  []SourcePlan `json:"sources"`
 }
 
-func (p Plan) Validate() error {
-	if err := basespec.ValidateOptionalText(
-		"discovery plan revision",
-		p.Revision,
-		basespec.MaxVersionBytes,
-	); err != nil {
-		return err
-	}
-	seen := make(map[basespec.SourceID]struct{}, len(p.Sources))
-	for index, sourcePlan := range p.Sources {
-		if err := sourcePlan.Validate(); err != nil {
-			return fmt.Errorf("source plan %d: %w", index, err)
-		}
-		if _, duplicate := seen[sourcePlan.SourceID]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate source plan for %q",
-				basespec.ErrInvalid,
-				sourcePlan.SourceID,
-			)
-		}
-		seen[sourcePlan.SourceID] = struct{}{}
-	}
-	return nil
-}
-
 func (p Plan) BySource() map[basespec.SourceID]SourcePlan {
 	output := make(map[basespec.SourceID]SourcePlan, len(p.Sources))
 	for _, value := range p.Sources {
@@ -88,4 +63,29 @@ func (p Plan) Fingerprint() (cryptoutil.Digest, error) {
 		return "", err
 	}
 	return cryptoutil.DigestBytes(canonical), nil
+}
+
+func (p Plan) Validate() error {
+	if err := basespec.ValidateOptionalText(
+		"discovery plan revision",
+		p.Revision,
+		basespec.MaxVersionBytes,
+	); err != nil {
+		return err
+	}
+	seen := make(map[basespec.SourceID]struct{}, len(p.Sources))
+	for index, sourcePlan := range p.Sources {
+		if err := sourcePlan.Validate(); err != nil {
+			return fmt.Errorf("source plan %d: %w", index, err)
+		}
+		if _, duplicate := seen[sourcePlan.SourceID]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate source plan for %q",
+				basespec.ErrInvalid,
+				sourcePlan.SourceID,
+			)
+		}
+		seen[sourcePlan.SourceID] = struct{}{}
+	}
+	return nil
 }

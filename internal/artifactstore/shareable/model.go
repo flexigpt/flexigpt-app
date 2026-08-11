@@ -11,34 +11,19 @@ import (
 
 type EntityType string
 
-const EntityCollection EntityType = "collection"
+const (
+	EntityCollection EntityType = "collection"
+	EntityArtifact   EntityType = "artifact"
+)
 
 type SchemaKey struct {
-	Entity        EntityType              `json:"entity"`
+	Entity EntityType `json:"entity"`
+	// Kind retains the existing storage type to avoid breaking Collection
+	// codecs. For EntityArtifact it carries the string representation of an
+	// ArtifactKind and is validated accordingly.
 	Kind          basespec.CollectionKind `json:"kind"`
 	SchemaID      basespec.SchemaID       `json:"schemaID"`
 	SchemaVersion string                  `json:"schemaVersion"`
-}
-
-func (k SchemaKey) Validate() error {
-	if k.Entity != EntityCollection {
-		return fmt.Errorf(
-			"%w: unsupported shareable entity type %q",
-			basespec.ErrInvalid,
-			k.Entity,
-		)
-	}
-	if err := basespec.ValidateCollectionKind(k.Kind); err != nil {
-		return err
-	}
-	if err := basespec.ValidateSchemaID(k.SchemaID); err != nil {
-		return err
-	}
-	return basespec.ValidateRequiredText(
-		"shareable schema version",
-		k.SchemaVersion,
-		basespec.MaxVersionBytes,
-	)
 }
 
 type ParsedDocument struct {
@@ -66,6 +51,35 @@ func (d ParsedDocument) Clone() ParsedDocument {
 	return output
 }
 
+func (k SchemaKey) Validate() error {
+	switch k.Entity {
+	case EntityCollection:
+		if err := basespec.ValidateCollectionKind(k.Kind); err != nil {
+			return err
+		}
+	case EntityArtifact:
+		if err := basespec.ValidateArtifactKind(
+			basespec.ArtifactKind(k.Kind),
+		); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf(
+			"%w: unsupported shareable entity type %q",
+			basespec.ErrInvalid,
+			k.Entity,
+		)
+	}
+	if err := basespec.ValidateSchemaID(k.SchemaID); err != nil {
+		return err
+	}
+	return basespec.ValidateRequiredText(
+		"shareable schema version",
+		k.SchemaVersion,
+		basespec.MaxVersionBytes,
+	)
+}
+
 type Codec interface {
 	Key() SchemaKey
 	JSONSchema() []byte
@@ -75,6 +89,16 @@ type Codec interface {
 	// calculated digest. It does not persist source content.
 	Canonicalize(
 		ctx context.Context,
+		raw []byte,
+	) (ParsedDocument, error)
+}
+
+// EntityCanonicalizer supports both shareable Collection and Artifact
+// documents without implying local entity creation or persistence.
+type EntityCanonicalizer interface {
+	CanonicalizeEntity(
+		ctx context.Context,
+		entity EntityType,
 		raw []byte,
 	) (ParsedDocument, error)
 }

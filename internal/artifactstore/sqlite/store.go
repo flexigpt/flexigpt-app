@@ -102,24 +102,6 @@ func initializeSchema(
 	return tx.Commit()
 }
 
-func tableExistsTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	name string,
-) (bool, error) {
-	var exists int
-	err := tx.QueryRowContext(
-		ctx,
-		`SELECT EXISTS(
-			SELECT 1
-			FROM sqlite_master
-			WHERE type = 'table' AND name = ?
-		)`,
-		name,
-	).Scan(&exists)
-	return exists != 0, err
-}
-
 func verifySchemaV1Tx(
 	ctx context.Context,
 	tx *sql.Tx,
@@ -141,6 +123,24 @@ func verifySchemaV1Tx(
 		}
 	}
 	return nil
+}
+
+func tableExistsTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	name string,
+) (bool, error) {
+	var exists int
+	err := tx.QueryRowContext(
+		ctx,
+		`SELECT EXISTS(
+			SELECT 1
+			FROM sqlite_master
+			WHERE type = 'table' AND name = ?
+		)`,
+		name,
+	).Scan(&exists)
+	return exists != 0, err
 }
 
 func dataSourceName(path string) string {

@@ -12,9 +12,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -22,10 +23,9 @@ import (
 var uriTemplateVariableRE = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_.-]*)\}`)
 
 type Session struct {
-	bundleID bundleitemutils.BundleID
-	serverID spec.MCPServerID
-	session  *mcpSDK.ClientSession
-	logger   *slog.Logger
+	server  artifact.ArtifactRef
+	session *mcpSDK.ClientSession
+	logger  *slog.Logger
 }
 
 func (s *Session) Close(ctx context.Context) error {
@@ -55,21 +55,21 @@ func (s *Session) Ping(ctx context.Context) error {
 
 func (s *Session) Discover(
 	ctx context.Context,
-	serverID spec.MCPServerID,
-	defaultPolicy spec.MCPServerPolicy,
-	trustLevel spec.MCPTrustLevel,
+	config server.RuntimeConfig,
 ) (spec.MCPDiscoverySnapshot, error) {
 	if s == nil || s.session == nil {
 		return spec.MCPDiscoverySnapshot{}, fmt.Errorf("%w: nil session", spec.ErrMCPRuntimeNotReady)
 	}
 
-	if serverID == "" {
-		serverID = s.serverID
+	if config.Server != s.server {
+		return spec.MCPDiscoverySnapshot{}, fmt.Errorf(
+			"%w: SDK session belongs to another MCP Server Artifact",
+			spec.ErrMCPRuntimeNotReady,
+		)
 	}
 
 	out := spec.MCPDiscoverySnapshot{
-		BundleID: s.bundleID,
-		ServerID: serverID,
+		Server: s.server,
 	}
 
 	initResult := s.session.InitializeResult()
@@ -92,34 +92,34 @@ func (s *Session) Discover(
 	caps := initResultCapabilities(initResult)
 
 	if caps == nil || caps.Tools != nil {
-		tools, err := s.listAllTools(ctx, serverID, defaultPolicy, trustLevel)
+		tools, err := s.listAllTools(ctx, config)
 		if err != nil {
-			s.log().Warn("mcp tools discovery failed", "serverID", serverID, "err", err)
+			s.log().Warn("mcp tools discovery failed", "server", s.server, "err", err)
 		} else {
 			out.Tools = tools
 		}
 	}
 
 	if caps == nil || caps.Resources != nil {
-		resources, err := s.listAllResources(ctx, serverID)
+		resources, err := s.listAllResources(ctx)
 		if err != nil {
-			s.log().Warn("mcp resources discovery failed", "serverID", serverID, "err", err)
+			s.log().Warn("mcp resources discovery failed", "server", s.server, "err", err)
 		} else {
 			out.Resources = resources
 		}
 
-		templates, err := s.listAllResourceTemplates(ctx, serverID)
+		templates, err := s.listAllResourceTemplates(ctx)
 		if err != nil {
-			s.log().Warn("mcp resource templates discovery failed", "serverID", serverID, "err", err)
+			s.log().Warn("mcp resource templates discovery failed", "server", s.server, "err", err)
 		} else {
 			out.ResourceTemplates = templates
 		}
 	}
 
 	if caps == nil || caps.Prompts != nil {
-		prompts, err := s.listAllPrompts(ctx, serverID)
+		prompts, err := s.listAllPrompts(ctx)
 		if err != nil {
-			s.log().Warn("mcp prompts discovery failed", "serverID", serverID, "err", err)
+			s.log().Warn("mcp prompts discovery failed", "server", s.server, "err", err)
 		} else {
 			out.Prompts = prompts
 		}
@@ -152,8 +152,7 @@ func (s *Session) CallTool(
 	}
 
 	return &spec.InvokeMCPToolResponseBody{
-		BundleID:          s.bundleID,
-		ServerID:          s.serverID,
+		Server:            s.server,
 		ToolName:          toolName,
 		Content:           contentSliceToSpec(res.Content),
 		StructuredContent: res.StructuredContent,
@@ -188,8 +187,7 @@ func (s *Session) ReadResource(
 	}
 
 	return &spec.MCPReadResourceResponseBody{
-		BundleID: s.bundleID,
-		ServerID: s.serverID,
+		Server:   s.server,
 		URI:      uri,
 		Contents: contents,
 	}, nil
@@ -226,8 +224,7 @@ func (s *Session) GetPrompt(
 	}
 
 	return &spec.MCPGetPromptResponseBody{
-		BundleID:    s.bundleID,
-		ServerID:    s.serverID,
+		Server:      s.server,
 		PromptName:  name,
 		Description: res.Description,
 		Messages:    messages,
@@ -272,10 +269,9 @@ func (s *Session) Complete(
 
 func (s *Session) listAllTools(
 	ctx context.Context,
-	serverID spec.MCPServerID,
-	defaultPolicy spec.MCPServerPolicy,
-	trustLevel spec.MCPTrustLevel,
+	config server.RuntimeConfig,
 ) ([]spec.MCPToolCapability, error) {
+	defaultPolicy := config.DefaultPolicy
 	baseDefaultPolicy := spec.DefaultMCPServerPolicy()
 	if defaultPolicy.DefaultApprovalRule == "" {
 		defaultPolicy.DefaultApprovalRule = baseDefaultPolicy.DefaultApprovalRule
@@ -306,11 +302,10 @@ func (s *Session) listAllTools(
 			taskSupport := taskSupportFromMeta(t.Meta)
 
 			out = append(out, spec.MCPToolCapability{
-				BundleID:         s.bundleID,
-				ServerID:         serverID,
+				Server:           s.server,
 				ToolName:         t.Name,
-				ProviderToolName: runtime.ProviderToolName(serverID, t.Name),
-				ChoiceID:         runtime.ChoiceID(serverID, t.Name),
+				ProviderToolName: runtime.ProviderToolName(s.server, t.Name),
+				ChoiceID:         runtime.ChoiceID(s.server, t.Name),
 
 				Title:       t.Title,
 				DisplayName: displayNameForTool(t),
@@ -320,7 +315,7 @@ func (s *Session) listAllTools(
 				OutputSchema: optionalSchemaToMap(t.OutputSchema),
 
 				Annotations:  toolAnnotationsToSpec(t.Annotations),
-				InferredRisk: inferRisk(t.Annotations, trustLevel),
+				InferredRisk: inferRisk(t.Annotations, config.TrustLevel),
 
 				ApprovalRule:  defaultPolicy.DefaultApprovalRule,
 				ExecutionMode: defaultPolicy.DefaultExecutionMode,
@@ -347,7 +342,6 @@ func (s *Session) listAllTools(
 
 func (s *Session) listAllResources(
 	ctx context.Context,
-	serverID spec.MCPServerID,
 ) ([]spec.MCPResourceRef, error) {
 	out := make([]spec.MCPResourceRef, 0)
 	cursor := ""
@@ -368,8 +362,7 @@ func (s *Session) listAllResources(
 			}
 
 			out = append(out, spec.MCPResourceRef{
-				BundleID:    s.bundleID,
-				ServerID:    serverID,
+				Server:      s.server,
 				URI:         r.URI,
 				Name:        r.Name,
 				Title:       r.Title,
@@ -393,7 +386,6 @@ func (s *Session) listAllResources(
 
 func (s *Session) listAllResourceTemplates(
 	ctx context.Context,
-	serverID spec.MCPServerID,
 ) ([]spec.MCPResourceTemplateRef, error) {
 	out := make([]spec.MCPResourceTemplateRef, 0)
 	cursor := ""
@@ -414,8 +406,7 @@ func (s *Session) listAllResourceTemplates(
 			}
 
 			out = append(out, spec.MCPResourceTemplateRef{
-				BundleID:    s.bundleID,
-				ServerID:    serverID,
+				Server:      s.server,
 				URITemplate: rt.URITemplate,
 				Name:        rt.Name,
 				Title:       rt.Title,
@@ -440,7 +431,6 @@ func (s *Session) listAllResourceTemplates(
 
 func (s *Session) listAllPrompts(
 	ctx context.Context,
-	serverID spec.MCPServerID,
 ) ([]spec.MCPPromptRef, error) {
 	out := make([]spec.MCPPromptRef, 0)
 	cursor := ""
@@ -461,8 +451,7 @@ func (s *Session) listAllPrompts(
 			}
 
 			out = append(out, spec.MCPPromptRef{
-				BundleID:    s.bundleID,
-				ServerID:    serverID,
+				Server:      s.server,
 				PromptName:  p.Name,
 				Title:       p.Title,
 				DisplayName: displayNameFirstNonEmpty(p.Title, p.Name),

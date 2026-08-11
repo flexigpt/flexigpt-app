@@ -48,14 +48,6 @@ func WithPrivilegedInstaller(ctx context.Context) context.Context {
 	return context.WithValue(ctx, privilegedInstallerContextKey{}, true)
 }
 
-func IsPrivilegedInstaller(ctx context.Context) bool {
-	if ctx == nil {
-		return false
-	}
-	value, _ := ctx.Value(privilegedInstallerContextKey{}).(bool)
-	return value
-}
-
 func RequirePrivilegedInstaller(ctx context.Context) error {
 	if ctx == nil || !IsPrivilegedInstaller(ctx) {
 		return fmt.Errorf(
@@ -64,24 +56,6 @@ func RequirePrivilegedInstaller(ctx context.Context) error {
 		)
 	}
 	return nil
-}
-
-func RequireMutableRoot(
-	ctx context.Context,
-	policy RootPolicy,
-	rootID basespec.RootID,
-) error {
-	if policy == nil || !policy.IsProtectedRoot(rootID) {
-		return nil
-	}
-	if IsPrivilegedInstaller(ctx) {
-		return nil
-	}
-	return fmt.Errorf(
-		"%w: root %q may only be mutated by a trusted protected-topology installer",
-		basespec.ErrProtected,
-		rootID,
-	)
 }
 
 // RequireRootDeletion permits normal mutable-root checks and additionally
@@ -102,4 +76,30 @@ func RequireRootDeletion(
 		)
 	}
 	return RequireMutableRoot(ctx, policy, rootID)
+}
+
+func RequireMutableRoot(
+	ctx context.Context,
+	policy RootPolicy,
+	rootID basespec.RootID,
+) error {
+	if policy == nil || !policy.IsProtectedRoot(rootID) {
+		return nil
+	}
+	if IsPrivilegedInstaller(ctx) {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: root %q may only be mutated by a trusted protected-topology installer",
+		basespec.ErrProtected,
+		rootID,
+	)
+}
+
+func IsPrivilegedInstaller(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	value, _ := ctx.Value(privilegedInstallerContextKey{}).(bool)
+	return value
 }

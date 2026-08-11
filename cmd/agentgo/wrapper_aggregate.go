@@ -303,7 +303,7 @@ func (w *AggregrateWrapper) FetchCompletion(
 					// the stream has finished or failed.
 					return nil
 				}
-				//nolint:contextcheck // Need to pass app context here and not new context.
+
 				runtime.EventsEmit(w.appContext, textCallbackID, textData)
 				return nil
 			}
@@ -316,7 +316,7 @@ func (w *AggregrateWrapper) FetchCompletion(
 				if thinkingData == "" {
 					return nil
 				}
-				//nolint:contextcheck // Need to pass app context here and not new context.
+
 				runtime.EventsEmit(w.appContext, thinkingCallbackID, thinkingData)
 				return nil
 			}

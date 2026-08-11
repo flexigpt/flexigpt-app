@@ -126,46 +126,13 @@ func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
 	return output
 }
 
-func (i *Installer) EnsureBuiltInBundles(
+func (i *Installer) Ensure(
 	ctx context.Context,
-) ([]skillBundle.Bundle, error) {
+) error {
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
-		return nil, err
+		return err
 	}
-	if err := i.rejectDynamicBuiltInBundles(ctx); err != nil {
-		return nil, err
-	}
-
-	output := make([]skillBundle.Bundle, 0, len(i.hydrated.Collections))
-	for _, value := range i.hydrated.OrderedCollections() {
-		if value.Definition.Digest == nil {
-			return nil, fmt.Errorf(
-				"%w: hydrated built-in collection has no digest",
-				basespec.ErrInvalid,
-			)
-		}
-		bundle, err := i.skills.EnsureBuiltInBundleTopology(
-			ctx,
-			skillBundle.BuiltInBundleTopology{
-				RootID:                i.builtInTopology.Root.ID,
-				CollectionID:          value.Registration.ID,
-				SourceID:              i.builtInTopology.Source.ID,
-				LogicalName:           basespec.LogicalName(value.Definition.LogicalName),
-				LogicalVersion:        basespec.LogicalVersion(value.Definition.LogicalVersion),
-				DisplayName:           value.Definition.DisplayName,
-				Description:           value.Definition.Description,
-				Labels:                value.Definition.Labels,
-				Enabled:               value.Registration.Enabled,
-				DiscoveryRoot:         value.SourceScope,
-				ExpectedMemberDigests: value.ExpectedMemberDigests,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, bundle)
-	}
-	return output, nil
+	return i.EnsureBuiltInArtifacts(ctx)
 }
 
 func (i *Installer) EnsureBuiltInArtifacts(
@@ -276,13 +243,46 @@ func (i *Installer) EnsureBuiltInArtifacts(
 	return nil
 }
 
-func (i *Installer) Ensure(
+func (i *Installer) EnsureBuiltInBundles(
 	ctx context.Context,
-) error {
+) ([]skillBundle.Bundle, error) {
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
-		return err
+		return nil, err
 	}
-	return i.EnsureBuiltInArtifacts(ctx)
+	if err := i.rejectDynamicBuiltInBundles(ctx); err != nil {
+		return nil, err
+	}
+
+	output := make([]skillBundle.Bundle, 0, len(i.hydrated.Collections))
+	for _, value := range i.hydrated.OrderedCollections() {
+		if value.Definition.Digest == nil {
+			return nil, fmt.Errorf(
+				"%w: hydrated built-in collection has no digest",
+				basespec.ErrInvalid,
+			)
+		}
+		bundle, err := i.skills.EnsureBuiltInBundleTopology(
+			ctx,
+			skillBundle.BuiltInBundleTopology{
+				RootID:                i.builtInTopology.Root.ID,
+				CollectionID:          value.Registration.ID,
+				SourceID:              i.builtInTopology.Source.ID,
+				LogicalName:           basespec.LogicalName(value.Definition.LogicalName),
+				LogicalVersion:        basespec.LogicalVersion(value.Definition.LogicalVersion),
+				DisplayName:           value.Definition.DisplayName,
+				Description:           value.Definition.Description,
+				Labels:                value.Definition.Labels,
+				Enabled:               value.Registration.Enabled,
+				DiscoveryRoot:         value.SourceScope,
+				ExpectedMemberDigests: value.ExpectedMemberDigests,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, bundle)
+	}
+	return output, nil
 }
 
 func (i *Installer) ensureBuiltInCatalogsCurrent(

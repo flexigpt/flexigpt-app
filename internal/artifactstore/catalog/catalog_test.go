@@ -18,43 +18,6 @@ const (
 	catalogTestSourceID     basespec.SourceID     = "019d3150-6a18-7a6b-a34e-d9032342bc31"
 )
 
-func catalogTestOccurrence(locator basespec.Locator) Occurrence {
-	definitionDigest := cryptoutil.DigestBytes([]byte("definition:" + string(locator)))
-	contentDigest := cryptoutil.DigestBytes([]byte("content:" + string(locator)))
-	return Occurrence{
-		RootID:       catalogTestRootID,
-		CollectionID: catalogTestCollectionID,
-		Key: OccurrenceKey{
-			CollectionID: catalogTestCollectionID,
-			SourceID:     catalogTestSourceID,
-			Locator:      locator,
-		},
-		Kind:                "test.artifact",
-		LogicalName:         "example",
-		DefinitionDigest:    &definitionDigest,
-		SourceContentDigest: &contentDigest,
-		DecoderID:           "test.decoder",
-		State:               OccurrenceValid,
-		ObservedAt:          time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC),
-	}
-}
-
-func catalogTestSnapshot() Snapshot {
-	return Snapshot{
-		RootID:              catalogTestRootID,
-		CollectionID:        catalogTestCollectionID,
-		Revision:            1,
-		CollectionRevision:  1,
-		AttachmentRevisions: map[basespec.SourceID]uint64{catalogTestSourceID: 1},
-		SourceRevisions:     map[basespec.SourceID]uint64{catalogTestSourceID: 1},
-		SourceGenerations:   map[basespec.SourceID]string{catalogTestSourceID: "generation-1"},
-		PlanFingerprint:     cryptoutil.DigestBytes([]byte("plan")),
-		DecoderFingerprint:  cryptoutil.DigestBytes([]byte("decoder")),
-		PublishedAt:         time.Date(2026, 3, 25, 12, 1, 0, 0, time.UTC),
-		Occurrences:         []Occurrence{catalogTestOccurrence("one.json")},
-	}
-}
-
 func TestSnapshotCloneAndEqualityIgnoreOccurrenceOrder(t *testing.T) {
 	t.Parallel()
 
@@ -139,5 +102,42 @@ func TestReadCurrentValidatesOwnershipAndPreservesStaleCatalogs(t *testing.T) {
 		context.Canceled,
 	) {
 		t.Fatalf("cancelled read error=%v", err)
+	}
+}
+
+func catalogTestSnapshot() Snapshot {
+	return Snapshot{
+		RootID:              catalogTestRootID,
+		CollectionID:        catalogTestCollectionID,
+		Revision:            1,
+		CollectionRevision:  1,
+		AttachmentRevisions: map[basespec.SourceID]uint64{catalogTestSourceID: 1},
+		SourceRevisions:     map[basespec.SourceID]uint64{catalogTestSourceID: 1},
+		SourceGenerations:   map[basespec.SourceID]string{catalogTestSourceID: "generation-1"},
+		PlanFingerprint:     cryptoutil.DigestBytes([]byte("plan")),
+		DecoderFingerprint:  cryptoutil.DigestBytes([]byte("decoder")),
+		PublishedAt:         time.Date(2026, 3, 25, 12, 1, 0, 0, time.UTC),
+		Occurrences:         []Occurrence{catalogTestOccurrence("one.json")},
+	}
+}
+
+func catalogTestOccurrence(locator basespec.Locator) Occurrence {
+	definitionDigest := cryptoutil.DigestBytes([]byte("definition:" + string(locator)))
+	contentDigest := cryptoutil.DigestBytes([]byte("content:" + string(locator)))
+	return Occurrence{
+		RootID:       catalogTestRootID,
+		CollectionID: catalogTestCollectionID,
+		Key: OccurrenceKey{
+			CollectionID: catalogTestCollectionID,
+			SourceID:     catalogTestSourceID,
+			Locator:      locator,
+		},
+		Kind:                "test.artifact",
+		LogicalName:         "example",
+		DefinitionDigest:    &definitionDigest,
+		SourceContentDigest: &contentDigest,
+		DecoderID:           "test.decoder",
+		State:               OccurrenceValid,
+		ObservedAt:          time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC),
 	}
 }

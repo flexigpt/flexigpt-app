@@ -19,7 +19,6 @@ const (
 	conversationsDirectoryName    = "conversations_v1"
 	modelPresetsDirectoryName     = "model_presets_v1"
 	toolsDirectoryName            = "tools_v1"
-	mcpDirectoryName              = "mcp_servers_v1"
 	assistantPresetsDirectoryName = "assistant_presets_v1"
 	// Workspace Collections are stored by the shared artifact store. Do not
 	// add a second Workspace-owned persistence directory. This is deliberately
@@ -50,7 +49,6 @@ type App struct {
 	conversationsDirPath    string
 	modelPresetsDirPath     string
 	toolsDirPath            string
-	mcpsDirPath             string
 	assistantPresetsDirPath string
 	artifactStoreDirPath    string
 }
@@ -71,14 +69,13 @@ func NewApp() *App {
 	app.conversationsDirPath = filepath.Join(app.dataBasePath, conversationsDirectoryName)
 	app.modelPresetsDirPath = filepath.Join(app.dataBasePath, modelPresetsDirectoryName)
 	app.toolsDirPath = filepath.Join(app.dataBasePath, toolsDirectoryName)
-	app.mcpsDirPath = filepath.Join(app.dataBasePath, mcpDirectoryName)
 	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, assistantPresetsDirectoryName)
 	app.artifactStoreDirPath = filepath.Join(app.dataBasePath, artifactStoreDirectoryName)
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
 		app.modelPresetsDirPath == "" ||
 		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" ||
-		app.mcpsDirPath == "" || app.artifactStoreDirPath == "" {
+		app.artifactStoreDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"artifactStoreDirPath", app.artifactStoreDirPath,
@@ -87,7 +84,6 @@ func NewApp() *App {
 			"modelPresetsDirPath", app.modelPresetsDirPath,
 			"assistantPresetsDirPath", app.assistantPresetsDirPath,
 			"toolsDirPath", app.toolsDirPath,
-			"mcpsDirPath", app.mcpsDirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
 	}
@@ -150,16 +146,6 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create tools directory")
 	}
-	if err := ensureAppPrivateDirectory(app.mcpsDirPath); err != nil {
-
-		slog.Error(
-			"failed to create mcp directory",
-			"mcps path", app.mcpsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize app: could not create mcp server directory")
-
-	}
 	if err := ensureAppPrivateDirectory(app.assistantPresetsDirPath); err != nil {
 
 		slog.Error(
@@ -186,7 +172,6 @@ func NewApp() *App {
 		"conversationsDirPath", app.conversationsDirPath,
 		"modelPresetsDirPath", app.modelPresetsDirPath,
 		"toolsDirPath", app.toolsDirPath,
-		"mcpsDirPath", app.mcpsDirPath,
 		"assistantPresetsDirPath", app.assistantPresetsDirPath,
 		"artifactStoreDirPath", app.artifactStoreDirPath,
 	)
@@ -293,18 +278,18 @@ func (a *App) initManagers() {
 	err = InitMCPWrapper(
 		context.Background(),
 		a.mcpAPI,
-		a.mcpsDirPath,
-		newSettingSecretResolver(a.settingStoreAPI.store),
+		a.artifactStoreAPI.components,
+		a.settingStoreAPI.store,
 	)
 	if err != nil {
 		slog.Error(
 			"couldn't initialize mcp host",
-			"directory", a.mcpsDirPath,
+			"artifactStoreDirectory", a.artifactStoreDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: mcp store initialization failed\n" + err.Error())
+		panic("failed to initialize managers: artifact-backed mcp initialization failed\n" + err.Error())
 	}
-	slog.Info("mcp host initialized", "directory", a.mcpsDirPath)
+	slog.Info("artifact-backed mcp host initialized")
 
 	err = InitModelPresetStoreWrapper(
 		a.modelPresetStoreAPI,
@@ -326,7 +311,7 @@ func (a *App) initManagers() {
 		a.modelPresetStoreAPI.store,
 		a.toolStoreAPI.store,
 		a.skillBundleAPI.runtime,
-		a.mcpAPI.store,
+		a.mcpAPI.bundleAPI,
 		a.mcpAPI.runtime,
 	)
 	if err != nil {
@@ -367,9 +352,8 @@ func (a *App) startup(ctx context.Context) { //nolint:all
 	a.ctx = ctx
 
 	// Load the frontend.
-	runtime.WindowShow(a.ctx) //nolint:contextcheck // Use app context.
+	runtime.WindowShow(a.ctx)
 	if a.skillBundleAPI != nil {
-		//nolint:contextcheck // Use app context.
 		a.skillBundleAPI.startBackgroundWarmup(a.ctx)
 	}
 }
@@ -399,7 +383,6 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 		a.modelPresetStoreAPI.close()
 	}
 	if a.mcpAPI != nil {
-		//nolint:contextcheck // Need separate context in shutdown.
 		a.mcpAPI.close()
 	}
 	if a.settingStoreAPI != nil {
@@ -409,7 +392,6 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 		a.workspaceAPI.close()
 	}
 	if a.skillBundleAPI != nil {
-		//nolint:contextcheck // Need separate context in shutdown.
 		a.skillBundleAPI.close()
 	}
 	if a.artifactStoreAPI != nil {

@@ -8,33 +8,6 @@ import (
 	"strings"
 )
 
-// defaultSkippedDirectory reports directories that should not be traversed.
-// Dot-prefixed directories are also skipped, including VCS metadata such as .git.
-func defaultSkippedDirectory(name string) bool {
-	if strings.HasPrefix(name, ".") {
-		return true
-	}
-
-	switch strings.ToLower(name) {
-	case "node_modules",
-		"vendor",
-		"bower_components",
-		"__pycache__",
-		"venv",
-		"site-packages",
-		"build",
-		"dist",
-		"out",
-		"target",
-		"coverage",
-		"pods",
-		"deriveddata":
-		return true
-	default:
-		return false
-	}
-}
-
 // WalkDirectoryWithFiles implements:
 //
 //   - Pure BFS over the directory tree starting at dirPath.
@@ -292,4 +265,31 @@ func WalkDirectoryWithFiles(ctx context.Context, dirPath string, maxFiles int) (
 		TotalSize:    totalSize,
 		HasMore:      hasMore,
 	}, nil
+}
+
+// defaultSkippedDirectory reports directories that should not be traversed.
+// Dot-prefixed directories are also skipped, including VCS metadata such as .git.
+func defaultSkippedDirectory(name string) bool {
+	if strings.HasPrefix(name, ".") {
+		return true
+	}
+
+	switch strings.ToLower(name) {
+	case "node_modules",
+		"vendor",
+		"bower_components",
+		"__pycache__",
+		"venv",
+		"site-packages",
+		"build",
+		"dist",
+		"out",
+		"target",
+		"coverage",
+		"pods",
+		"deriveddata":
+		return true
+	default:
+		return false
+	}
 }

@@ -1,3 +1,6 @@
+//go:build legacy_mcp_store
+
+// Deprecated: reference-only implementation for the removed standalone MCP Store.
 package runtime
 
 import (
@@ -15,18 +18,17 @@ import (
 
 	"github.com/flexigpt/mapstore-go/uuidv7filename"
 
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 const defaultApprovalTTL = 5 * time.Minute
 
 type approvalDecisionKey struct {
-	BundleID   bundleitemutils.BundleID `json:"bundleID"`
-	ServerID   spec.MCPServerID         `json:"serverID"`
-	ToolName   string                   `json:"toolName"`
-	ToolDigest string                   `json:"toolDigest,omitempty"`
-	Risk       spec.MCPToolRisk         `json:"risk"`
+	Server     artifact.ArtifactRef `json:"server"`
+	ToolName   string               `json:"toolName"`
+	ToolDigest string               `json:"toolDigest,omitempty"`
+	Risk       spec.MCPToolRisk     `json:"risk"`
 }
 
 type pendingApproval struct {
@@ -196,8 +198,7 @@ func (m *ApprovalManager) verifyLocked(
 
 func getApprovalDecisionKey(summary spec.MCPApprovalSummary) string {
 	key := approvalDecisionKey{
-		BundleID:   summary.BundleID,
-		ServerID:   summary.ServerID,
+		Server:     summary.Server,
 		ToolName:   summary.ToolName,
 		ToolDigest: summary.ToolDigest,
 		Risk:       summary.Risk,
@@ -208,10 +209,7 @@ func getApprovalDecisionKey(summary spec.MCPApprovalSummary) string {
 }
 
 func summaryMatches(stored, expected spec.MCPApprovalSummary) bool {
-	if stored.BundleID != expected.BundleID {
-		return false
-	}
-	if stored.ServerID != expected.ServerID {
+	if stored.Server != expected.Server {
 		return false
 	}
 	if stored.ToolName != expected.ToolName {

@@ -163,10 +163,6 @@ func workspaceContextInputID(
 		string(workspaceRef.CollectionID)
 }
 
-func workspaceArtifactRefKey(ref artifact.ArtifactRef) string {
-	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
-}
-
 func stripGeneratedCurrentContextInputs(
 	all []inferenceSpec.InputUnion,
 	current []inferenceSpec.InputUnion,
@@ -336,4 +332,8 @@ func markWorkspaceSkillSessionUsage(
 	}
 
 	selection.ResolveConversationUsageStatus(usage)
+}
+
+func workspaceArtifactRefKey(ref artifact.ArtifactRef) string {
+	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -45,15 +46,18 @@ func NewFactoryWithLogger(logger *slog.Logger) *Factory {
 
 func (f *Factory) Connect(
 	ctx context.Context,
-	cfg spec.MCPServerConfig,
+	cfg server.RuntimeConfig,
 	resolved auth.ResolvedTransportAuth,
 	events runtime.ClientNotificationSink,
 ) (runtime.ClientSession, error) {
-	if cfg.BundleID == "" {
-		return nil, fmt.Errorf("%w: bundleID required", spec.ErrMCPInvalidRequest)
+	if err := cfg.Server.Validate(); err != nil {
+		return nil, err
 	}
-	if cfg.ID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if cfg.Collection.RootID != cfg.Server.RootID {
+		return nil, fmt.Errorf(
+			"%w: MCP runtime config has mismatched server and Collection roots",
+			spec.ErrMCPInvalidRequest,
+		)
 	}
 
 	logger := f.log()
@@ -74,32 +78,29 @@ func (f *Factory) Connect(
 			// A nil Capabilities value makes the SDK advertise its historical
 			// roots default. FlexiGPT must not advertise roots, sampling, or
 			// elicitation until the product has explicit UX and safety policy.
-			Capabilities: buildClientCapabilities(cfg),
+			Capabilities: buildClientCapabilities(cfg.AppsPolicy),
 
 			KeepAlive: defaultClientKeepAlive,
 
 			ToolListChangedHandler: func(ctx context.Context, req *mcpSDK.ToolListChangedRequest) {
 				logger.Info("mcp tools list changed", "sessionID", safeClientSessionID(req))
 				emit(ctx, runtime.ClientNotification{
-					BundleID: cfg.BundleID,
-					ServerID: cfg.ID,
-					Kind:     runtime.ClientNotificationToolListChanged,
+					Server: cfg.Server,
+					Kind:   runtime.ClientNotificationToolListChanged,
 				})
 			},
 			PromptListChangedHandler: func(ctx context.Context, req *mcpSDK.PromptListChangedRequest) {
 				logger.Info("mcp prompts list changed", "sessionID", safeClientSessionID(req))
 				emit(ctx, runtime.ClientNotification{
-					BundleID: cfg.BundleID,
-					ServerID: cfg.ID,
-					Kind:     runtime.ClientNotificationPromptListChanged,
+					Server: cfg.Server,
+					Kind:   runtime.ClientNotificationPromptListChanged,
 				})
 			},
 			ResourceListChangedHandler: func(ctx context.Context, req *mcpSDK.ResourceListChangedRequest) {
 				logger.Info("mcp resources list changed", "sessionID", safeClientSessionID(req))
 				emit(ctx, runtime.ClientNotification{
-					BundleID: cfg.BundleID,
-					ServerID: cfg.ID,
-					Kind:     runtime.ClientNotificationResourceListChanged,
+					Server: cfg.Server,
+					Kind:   runtime.ClientNotificationResourceListChanged,
 				})
 			},
 			ResourceUpdatedHandler: func(ctx context.Context, req *mcpSDK.ResourceUpdatedNotificationRequest) {
@@ -108,8 +109,7 @@ func (f *Factory) Connect(
 					uri = req.Params.URI
 				}
 				emit(ctx, runtime.ClientNotification{
-					BundleID:    cfg.BundleID,
-					ServerID:    cfg.ID,
+					Server:      cfg.Server,
 					Kind:        runtime.ClientNotificationResourceUpdated,
 					ResourceURI: uri,
 				})
@@ -119,8 +119,7 @@ func (f *Factory) Connect(
 					return
 				}
 				emit(ctx, runtime.ClientNotification{
-					BundleID: cfg.BundleID,
-					ServerID: cfg.ID,
+					Server:   cfg.Server,
 					Kind:     runtime.ClientNotificationProgress,
 					Progress: req.Params.Progress,
 					Total:    req.Params.Total,
@@ -141,32 +140,30 @@ func (f *Factory) Connect(
 	switch cfg.Transport {
 	case spec.MCPTransportStdio:
 		if cfg.Stdio == nil {
-			return nil, fmt.Errorf("%w: missing stdio config", spec.ErrMCPInvalidRequest)
+			return nil, fmt.Errorf(
+				"%w: missing stdio runtime config",
+				spec.ErrMCPInvalidRequest,
+			)
 		}
 
-		// Do not use exec.CommandContext here.
-		//
-		// The connect context is normally a startup timeout context. It is
-		// canceled immediately after Connect returns. If we used CommandContext,
-		// that cancellation would kill the long-lived MCP stdio server right after
-		// a successful connection.
-		//
-		// Process shutdown is instead owned by mcp.CommandTransport.Close.
 		//nolint:gosec,noctx // User-configured MCP stdio command is intentional.
 		cmd := exec.Command(cfg.Stdio.Command, cfg.Stdio.Args...)
-		if strings.TrimSpace(cfg.Stdio.WorkingDir) != "" {
-			cmd.Dir = cfg.Stdio.WorkingDir
-		}
+		cmd.Env = envMapToList(mergeStringMaps(
+			cfg.Stdio.Env,
+			resolved.Env,
+		))
 
-		// Do not inherit the full environment. The store/auth layer already
-		// resolved explicit env and secret env refs into resolved.Env.
-		cmd.Env = envMapToList(resolved.Env)
-
+		redactor := auth.NewSecretRedactor(auth.ResolvedTransportAuth{
+			SensitiveValues: append(
+				append([]string(nil), cfg.SensitiveValues...),
+				resolved.SensitiveValues...,
+			),
+		})
 		cmd.Stderr = newSlogLineWriter(
 			logger,
-			string(cfg.ID),
+			string(cfg.Server.ArtifactID),
 			"mcp stdio stderr",
-			auth.NewSecretRedactor(resolved),
+			redactor,
 		)
 
 		transport = &mcpSDK.CommandTransport{
@@ -176,25 +173,32 @@ func (f *Factory) Connect(
 
 	case spec.MCPTransportStreamableHTTP:
 		if cfg.StreamableHTTP == nil {
-			return nil, fmt.Errorf("%w: missing streamableHttp config", spec.ErrMCPInvalidRequest)
+			return nil, fmt.Errorf(
+				"%w: missing streamable HTTP runtime config",
+				spec.ErrMCPInvalidRequest,
+			)
 		}
 
-		// Do not set http.Client.Timeout here. Streamable HTTP may keep a
-		// standalone SSE GET open for the life of the session. Use per-operation
-		// contexts in the runtime layer for request bounds.
-		httpClient := newStreamableHTTPClient(resolved.Headers)
+		headers := mergeStringMaps(
+			cfg.StreamableHTTP.Headers,
+			resolved.Headers,
+		)
+		httpClient := newStreamableHTTPClient(headers)
 
 		transport = &mcpSDK.StreamableClientTransport{
-			Endpoint:   cfg.StreamableHTTP.URL,
-			HTTPClient: httpClient,
-			MaxRetries: defaultHTTPMaxRetries,
-			// This needs to be false for receiving server notifications.
+			Endpoint:             cfg.StreamableHTTP.URL,
+			HTTPClient:           httpClient,
+			MaxRetries:           defaultHTTPMaxRetries,
 			DisableStandaloneSSE: false,
 			OAuthHandler:         resolved.OAuthHandler,
 		}
 
 	default:
-		return nil, fmt.Errorf("%w: unsupported transport %s", spec.ErrMCPInvalidRequest, cfg.Transport)
+		return nil, fmt.Errorf(
+			"%w: unsupported MCP runtime transport %q",
+			spec.ErrMCPInvalidRequest,
+			cfg.Transport,
+		)
 	}
 
 	session, err := client.Connect(ctx, transport, nil)
@@ -203,11 +207,22 @@ func (f *Factory) Connect(
 	}
 
 	return &Session{
-		bundleID: cfg.BundleID,
-		serverID: cfg.ID,
-		session:  session,
-		logger:   logger,
+		server:  cfg.Server,
+		session: session,
+		logger:  logger,
 	}, nil
+}
+
+func mergeStringMaps(
+	base map[string]string,
+	overlay map[string]string,
+) map[string]string {
+	output := maps.Clone(base)
+	if output == nil {
+		output = map[string]string{}
+	}
+	maps.Copy(output, overlay)
+	return output
 }
 
 type headerRoundTripper struct {
@@ -249,11 +264,11 @@ func newStreamableHTTPClient(headers map[string]string) *http.Client {
 
 // buildClientCapabilities returns the client capability set advertised on
 // MCP initialize. FlexiGPT does not advertise roots, sampling, or elicitation.
-// It advertises the MCP Apps extension only when Apps are enabled for this
-// server config.
-func buildClientCapabilities(cfg spec.MCPServerConfig) *mcpSDK.ClientCapabilities {
+func buildClientCapabilities(
+	policy spec.MCPAppsPolicy,
+) *mcpSDK.ClientCapabilities {
 	c := &mcpSDK.ClientCapabilities{}
-	if apps.EffectiveAppsPolicy(cfg).Enabled {
+	if policy.Enabled {
 		c.AddExtension(apps.AppExtensionID, map[string]any{
 			"mimeTypes": []string{apps.AppMIMEType},
 			"host": map[string]any{

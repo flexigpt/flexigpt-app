@@ -21,45 +21,6 @@ const (
 	StateIncompatible State = "incompatible"
 )
 
-func validateSourceState(
-	state State,
-	resolvedDefinition *cryptoutil.Digest,
-) error {
-	if resolvedDefinition != nil {
-		if err := cryptoutil.ValidateDigest(*resolvedDefinition); err != nil {
-			return err
-		}
-	}
-
-	switch state {
-	case StateAvailable, StateIncompatible:
-		if resolvedDefinition == nil {
-			return fmt.Errorf(
-				"%w: artifact state %q requires a resolved definition",
-				basespec.ErrInvalid,
-				state,
-			)
-		}
-
-	case StateMissing, StateInvalid:
-		if resolvedDefinition != nil {
-			return fmt.Errorf(
-				"%w: artifact state %q cannot retain a resolved definition",
-				basespec.ErrInvalid,
-				state,
-			)
-		}
-
-	default:
-		return fmt.Errorf(
-			"%w: invalid artifact state %q",
-			basespec.ErrInvalid,
-			state,
-		)
-	}
-	return nil
-}
-
 type AdoptionMode string
 
 const (
@@ -104,19 +65,6 @@ type SourceBinding struct {
 	Locator            basespec.Locator            `json:"locator"`
 	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
 	ExpectedKind       basespec.ArtifactKind       `json:"expectedKind"`
-}
-
-func (b SourceBinding) Validate() error {
-	if err := basespec.ValidateSourceID(b.SourceID); err != nil {
-		return err
-	}
-	if err := basespec.ValidateLocator(b.Locator, true); err != nil {
-		return err
-	}
-	if err := basespec.ValidateSubresourceLocator(b.SubresourceLocator); err != nil {
-		return err
-	}
-	return basespec.ValidateArtifactKind(b.ExpectedKind)
 }
 
 type Artifact struct {
@@ -279,6 +227,58 @@ func (s Suppression) Validate() error {
 		return fmt.Errorf(
 			"%w: suppression modified time precedes creation",
 			basespec.ErrInvalid,
+		)
+	}
+	return nil
+}
+
+func (b SourceBinding) Validate() error {
+	if err := basespec.ValidateSourceID(b.SourceID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateLocator(b.Locator, true); err != nil {
+		return err
+	}
+	if err := basespec.ValidateSubresourceLocator(b.SubresourceLocator); err != nil {
+		return err
+	}
+	return basespec.ValidateArtifactKind(b.ExpectedKind)
+}
+
+func validateSourceState(
+	state State,
+	resolvedDefinition *cryptoutil.Digest,
+) error {
+	if resolvedDefinition != nil {
+		if err := cryptoutil.ValidateDigest(*resolvedDefinition); err != nil {
+			return err
+		}
+	}
+
+	switch state {
+	case StateAvailable, StateIncompatible:
+		if resolvedDefinition == nil {
+			return fmt.Errorf(
+				"%w: artifact state %q requires a resolved definition",
+				basespec.ErrInvalid,
+				state,
+			)
+		}
+
+	case StateMissing, StateInvalid:
+		if resolvedDefinition != nil {
+			return fmt.Errorf(
+				"%w: artifact state %q cannot retain a resolved definition",
+				basespec.ErrInvalid,
+				state,
+			)
+		}
+
+	default:
+		return fmt.Errorf(
+			"%w: invalid artifact state %q",
+			basespec.ErrInvalid,
+			state,
 		)
 	}
 	return nil

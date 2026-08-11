@@ -238,7 +238,7 @@ The core server configuration uses:
 - `url`
 - `headers`
 
-FlexiGPT additions are contained under `x-flexigpt`.
+FlexiGPT additions are contained under `bundleExtension`.
 
 The canonical portable transport names are:
 
@@ -297,7 +297,7 @@ Example:
       "env": {}
     }
   },
-  "x-flexigpt": {
+  "bundleExtension": {
     "servers": {
       "github": {
         "displayName": "GitHub",
@@ -375,7 +375,7 @@ Example:
 
 - `mcpServers` is the portable core.
 - Every `mcpServers` key is the corresponding server logical name.
-- `x-flexigpt.servers` keys must match existing `mcpServers` keys.
+- `bundleExtension.servers` keys must match existing `mcpServers` keys.
 - A server extension is optional.
 - A missing server extension receives safe application defaults.
 - Inline policy keys must match policy `logicalName`.
@@ -455,7 +455,7 @@ The standalone schema and the embedded bundle server schema use the same canonic
 The bundle codec constructs this logical server document from:
 
 - `mcpServers.<name>`
-- `x-flexigpt.servers.<name>`
+- `bundleExtension.servers.<name>`
 
 The resulting Definition is identical whether the server was decoded from a bundle or from a standalone server document.
 
@@ -1182,7 +1182,7 @@ For each old built-in bundle:
 
 - Create one canonical `.mcp.json`.
 - Move every portable server transport into `mcpServers`.
-- Move server metadata, auth mode, setup declarations, and connection profiles into `x-flexigpt.servers`.
+- Move server metadata, auth mode, setup declarations, and connection profiles into `bundleExtension.servers`.
 - Convert current trust, default policy, tool policies, and Apps policy into one or more `mcp.policy` documents.
 - Add explicit required or optional policy references to servers.
 - Convert setup fields into installation inputs and placeholders.
@@ -1218,6 +1218,28 @@ Built-in hydration:
 8. Pin static server and policy Artifacts.
 9. Refresh the built-in Catalogs.
 10. Commit hydration state.
+
+### Hydration responsibility boundary
+
+Artifact Store owns generic protected topology hydration mechanics:
+
+- Hydration markers.
+- Desired-fingerprint comparison.
+- Generic protected Root and Source topology.
+- Stale topology reset.
+- Protected metadata, managed-source storage, and Definition cleanup.
+
+MCP owns only feature hooks supplied to generic hydration:
+
+- Static MCP Bundle registrations.
+- Canonical `.mcp.json` package bytes.
+- Static server and policy Artifact registrations.
+- MCP-specific installation-overlay cleanup for Artifact IDs removed by a
+  changed static registry.
+
+MCP Bundle document reconciliation is not topology hydration. It is the normal
+feature lifecycle path for a user-managed Bundle and for an already-authorized
+protected installer operation.
 
 ## Runtime business boundary
 
@@ -1280,6 +1302,24 @@ Before connecting, the resolver and runtime must verify:
 - The fully substituted effective connection configuration validates.
 
 Only then may the MCP SDK client connect.
+
+### Runtime verification frequency
+
+Full Artifact, Catalog, Definition, policy, Source generation, and exact
+`.mcp.json` byte verification occurs at connection establishment and explicit
+runtime refresh.
+
+The runtime stores the resulting resolved version with the live client session.
+Ordinary tool calls, resource reads, prompt reads, and completions use that
+already-verified session and do not rehash source bytes for every request.
+
+Known MCP lifecycle mutations, policy changes, installation-overlay changes,
+and secret-binding changes explicitly invalidate the corresponding runtime
+session. A subsequent use reconnects through full verification.
+
+This avoids repeated filesystem and Definition work while preserving fail-closed
+behavior at connection and mutation boundaries. Artifact Store does not claim
+that an external linked Source cannot change after a successful verification.
 
 ## Runtime state
 
@@ -1582,9 +1622,88 @@ Source and file access rules:
 
 This preserves the existing hardened cross-platform boundaries used by the Wails application.
 
+## Implementation progress
+
+The backend migration is being delivered as a clean cutover with no legacy
+compatibility behavior. Legacy MCP Store source may remain temporarily as
+reference-only code, but it must not be opened, read, written, or imported by
+normal application composition.
+
+Completed:
+
+- Generic shareable Artifact entity support in the Artifact Store codec
+  registry.
+- Set-based protected and retained Root policy.
+- Canonical `mcp.bundle.v1`, `mcp.server.v1`, and `mcp.policy.v1` domain
+  models and codecs.
+- `.mcp.json` discovery and heterogeneous server and policy Definition
+  projection.
+- Restrictive policy composition.
+- Artifact-scoped local installation data and secret-reference format.
+- `mcp.bundle` Collection creation over managed Sources.
+- Static server and policy Artifact pinning.
+- Managed `.mcp.json` publication and Catalog refresh.
+- Server resolution through `ArtifactRef`, current Collection membership,
+  current Catalog state, immutable Definitions, Source revision, Source
+  generation, and exact source-content digest verification.
+- Installation overlay optimistic concurrency contract.
+- Server-installation validation against canonical `mcp.server` semantics.
+- Profile-overlay and fully materialized connection validation.
+- Source-document reconciliation that updates retained pinned Artifacts,
+  publishes one complete `.mcp.json`, confirms removed Artifacts become
+  missing, and then purges their local metadata.
+- Replace-plan validation before any MCP document mutation.
+- ArtifactRef-native runtime manager implementation.
+- Runtime session invalidation after known MCP lifecycle and installation
+  mutations.
+- ArtifactRef-native approval and MCP App policy enforcement.
+- ArtifactRef-native runtime response contracts for tools, resources, prompts,
+  completions, tool invocation, and MCP App context.
+- Artifact-native SDK client contract using `server.RuntimeConfig`,
+  `ArtifactRef` provider names, Artifact-owned notification routing, and
+  resolved transport authentication.
+- Artifact-native approval manager with single-use approval tokens and
+  ArtifactRef, tool-digest, risk, and canonical-argument binding.
+- Artifact-native OAuth authorization identity, pending loopback state, auth
+  status, and auth-health model.
+- MCP Bundle document-location support so multiple protected Bundles can use
+  distinct `.mcp.json` package locations in one shared managed Source.
+- Protected MCP Bundle installer framework, static registration model, and
+  protected installation-overlay purge hook.
+- Revision-aware MCP installation-overlay repository contract for the existing
+  application Setting Store.
+- Legacy standalone MCP Store source quarantined behind the
+  `legacy_mcp_store` build tag.
+- Concrete Artifact-native SDK client and runtime composition.
+- ArtifactRef-native application wrapper, approval routing, and runtime
+  invalidation wiring.
+- Setting Store-backed MCP installation-overlay adapter with in-process
+  compare-and-swap serialization, protected-root overlay cleanup, and
+  Artifact-scoped OAuth-token persistence.
+- Artifact-scoped secret writer, resolver, cleanup, and runtime invalidation.
+- Retained MCP user Root and protected MCP built-in Root composition.
+- Assistant preset lookup cutover from legacy Bundle/Server identity to
+  `ArtifactRef`.
+- Conversation and inference hydration cutover to ArtifactRef-native MCP
+  server, tool, prompt, resource, template, App-context, and provenance
+  structures.
+- Legacy command wrapper, old assistant-preset wrapper, old inference MCP
+  bridge, and old MCP context validator quarantined from normal builds.
+
+Pending:
+
+- Commit the source-controlled converted embedded MCP `.mcp.json` packages
+  and static `mcp_artifact_registry.json` registrations. This is a checked-in
+  source-data conversion, not a user-data migration or runtime fallback.
+- Frontend, Wails binding, and test updates.
+
 ## Clean cutover
 
 The old MCP Store is removed from normal composition.
+
+Legacy source may remain only behind the `legacy_mcp_store` build tag during
+review. The normal build must not import, open, read, write, or migrate the
+legacy Store.
 
 The cutover includes:
 
@@ -1599,6 +1718,29 @@ The cutover includes:
 - Remove old soft-delete cleanup for MCP bundles.
 - Remove legacy MCP settings persistence.
 - Remove all compatibility adapters.
+- Keep legacy source only behind `legacy_mcp_store`; normal builds must not
+  compile or bind old wrapper, inference, or assistant-preset MCP paths.
+- Fail startup when converted built-in MCP registry data is absent rather than
+  reading or converting legacy user-state at runtime.
+
+The old MCP Store must not be deleted from the source tree until all backend
+consumers have moved to the Artifact-backed resolver. It must be absent from
+normal application composition throughout the cutover. No new code may read
+or write both stores.
+
+The reconciliation implementation must never delete an MCP Artifact until the
+new source document has been published, the Collection Catalog has refreshed,
+and the previous binding is confirmed missing. This preserves retryability and
+prevents a local Artifact from being purged while its source definition is
+still current.
+
+The final removal gate is:
+
+- No production import of `internal/mcp/store`.
+- No call to `store.NewMCPStore`.
+- No startup creation of `mcp_servers_v1`.
+- No durable MCP reference containing the legacy Bundle and Server identity
+  pair.
 
 Development data may be deleted.
 
@@ -1655,7 +1797,7 @@ No secrets, OAuth tokens, overlays, assistant presets, conversations, or runtime
 - Server and policy logical names are portable semantic names, not local identity.
 - `.mcp.json` is the source authority for portable MCP configuration.
 - The core `mcpServers` object follows Claude-style configuration semantics.
-- FlexiGPT extensions are additive and live under `x-flexigpt`.
+- FlexiGPT extensions are additive and live under `bundleExtension`.
 - Server Definitions contain connection and installation requirements.
 - Policy Definitions contain trust and enforcement semantics.
 - Actual input values are installation-local.
@@ -1669,6 +1811,19 @@ No secrets, OAuth tokens, overlays, assistant presets, conversations, or runtime
 - Artifact Store Source adapters exclusively own native traversal and symlink behavior.
 - No compatibility behavior exists for the old MCP Store.
 - Import, export, move, and URI acquisition remain deferred.
+
+## Next implementation steps
+
+1. Add the concrete Setting Store adapter for installation overlays and OAuth
+   token persistence, including compare-and-swap revision behavior.
+2. Convert and commit the embedded built-in MCP package and static registry.
+3. Wire the Artifact-native MCP services in application composition and remove
+   all normal imports of `internal/mcp/store`.
+4. Cut assistant presets, conversations, inference, and aggregate tool routing
+   to ArtifactRef-only MCP references.
+5. Regenerate Wails bindings and update the frontend.
+6. Add schema, decoder, lifecycle, retry, policy, secret-redaction, runtime
+   invalidation, built-in hydration, and clean-cutover tests.
 
 ## Current-scope requirements
 

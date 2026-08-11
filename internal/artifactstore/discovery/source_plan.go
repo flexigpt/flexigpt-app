@@ -19,27 +19,6 @@ type DirectoryRoot struct {
 	IncludePatterns []string         `json:"includePatterns,omitempty"`
 }
 
-func (r DirectoryRoot) Validate() error {
-	if err := basespec.ValidateLocator(r.Root, true); err != nil {
-		return err
-	}
-	seenPatterns := make(map[string]struct{}, len(r.IncludePatterns))
-	for _, pattern := range r.IncludePatterns {
-		if err := basespec.ValidateIncludePattern(pattern); err != nil {
-			return err
-		}
-		if _, duplicate := seenPatterns[pattern]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate discovery pattern %q",
-				basespec.ErrInvalid,
-				pattern,
-			)
-		}
-		seenPatterns[pattern] = struct{}{}
-	}
-	return nil
-}
-
 type DecoderHint struct {
 	Locator    basespec.Locator     `json:"locator"`
 	Recursive  bool                 `json:"recursive"`
@@ -303,6 +282,27 @@ func (p SourcePlan) RequestedDecoderIDs(locator basespec.Locator) []basespec.Dec
 	}
 	slices.Sort(output)
 	return output
+}
+
+func (r DirectoryRoot) Validate() error {
+	if err := basespec.ValidateLocator(r.Root, true); err != nil {
+		return err
+	}
+	seenPatterns := make(map[string]struct{}, len(r.IncludePatterns))
+	for _, pattern := range r.IncludePatterns {
+		if err := basespec.ValidateIncludePattern(pattern); err != nil {
+			return err
+		}
+		if _, duplicate := seenPatterns[pattern]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate discovery pattern %q",
+				basespec.ErrInvalid,
+				pattern,
+			)
+		}
+		seenPatterns[pattern] = struct{}{}
+	}
+	return nil
 }
 
 func decoderHintMatchesLocator(

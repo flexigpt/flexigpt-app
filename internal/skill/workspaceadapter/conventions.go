@@ -22,12 +22,6 @@ type ConventionRegistry struct {
 	roots []SkillRootConvention
 }
 
-func DefaultSkillRoots() []basespec.Locator {
-	return []basespec.Locator{
-		DefaultWorkspaceSkillRoot,
-	}
-}
-
 func NewConventionRegistry(
 	roots ...basespec.Locator,
 ) (*ConventionRegistry, error) {
@@ -59,13 +53,6 @@ func NewConventionRegistry(
 	return &ConventionRegistry{roots: values}, nil
 }
 
-func (r *ConventionRegistry) Roots() []SkillRootConvention {
-	if r == nil {
-		return nil
-	}
-	return append([]SkillRootConvention(nil), r.roots...)
-}
-
 func (r *ConventionRegistry) DiscoveryProfile() spec.DiscoveryProfile {
 	var output spec.DiscoveryProfile
 	for _, root := range r.Roots() {
@@ -81,6 +68,15 @@ func (r *ConventionRegistry) DiscoveryProfile() spec.DiscoveryProfile {
 		)
 	}
 	return output
+}
+
+func (r *ConventionRegistry) ExpectedName(
+	locator basespec.Locator,
+) (string, bool) {
+	if _, found := r.Match(locator); !found {
+		return "", false
+	}
+	return path.Base(path.Dir(string(locator))), true
 }
 
 // Match accepts SKILL.md beneath any configured Skill root. The Skill can be
@@ -119,11 +115,15 @@ func (r *ConventionRegistry) Match(
 	return SkillRootConvention{}, false
 }
 
-func (r *ConventionRegistry) ExpectedName(
-	locator basespec.Locator,
-) (string, bool) {
-	if _, found := r.Match(locator); !found {
-		return "", false
+func (r *ConventionRegistry) Roots() []SkillRootConvention {
+	if r == nil {
+		return nil
 	}
-	return path.Base(path.Dir(string(locator))), true
+	return append([]SkillRootConvention(nil), r.roots...)
+}
+
+func DefaultSkillRoots() []basespec.Locator {
+	return []basespec.Locator{
+		DefaultWorkspaceSkillRoot,
+	}
 }

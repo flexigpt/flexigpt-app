@@ -8,14 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-func ValidateHydrationInstallerName(value string) error {
-	return basespec.ValidateIdentifier(
-		"topology hydration installer name",
-		value,
-		basespec.MaxKindBytes,
-	)
-}
-
 // Hydration records the successfully installed desired state for one
 // application-owned topology installer. It intentionally has no foreign keys:
 // the record must survive removal of an old Root until replacement hydration
@@ -74,4 +66,12 @@ type HydrationStore interface {
 		ctx context.Context,
 		value Hydration,
 	) error
+}
+
+func ValidateHydrationInstallerName(value string) error {
+	return basespec.ValidateIdentifier(
+		"topology hydration installer name",
+		value,
+		basespec.MaxKindBytes,
+	)
 }

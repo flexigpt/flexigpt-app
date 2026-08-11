@@ -43,6 +43,44 @@ func (s Source) Clone() Source {
 	return output
 }
 
+func (s Source) Validate() error {
+	if err := s.Summary().Validate(); err != nil {
+		return err
+	}
+	if err := basespec.ValidateSourceKind(s.Kind); err != nil {
+		return err
+	}
+	if err := basespec.ValidateRequiredText(
+		"source display name",
+		s.DisplayName,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+	if _, err := jsonutil.CanonicalizeObject(
+		s.Config,
+		basespec.MaxConfigBytes,
+	); err != nil {
+		return fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
+	}
+
+	return nil
+}
+
+func (s Source) Summary() Summary {
+	return Summary{
+		ID:          s.ID,
+		RootID:      s.RootID,
+		Kind:        s.Kind,
+		DisplayName: s.DisplayName,
+		Enabled:     s.Enabled,
+		Revision:    s.Revision,
+		CreatedAt:   s.CreatedAt,
+		ModifiedAt:  s.ModifiedAt,
+		RetiredAt:   cloneTime(s.RetiredAt),
+	}
+}
+
 func (s Summary) Validate() error {
 	if err := basespec.ValidateRootID(s.RootID); err != nil {
 		return err
@@ -83,50 +121,12 @@ func (s Summary) Validate() error {
 	return nil
 }
 
-func (s Source) Validate() error {
-	if err := s.Summary().Validate(); err != nil {
-		return err
-	}
-	if err := basespec.ValidateSourceKind(s.Kind); err != nil {
-		return err
-	}
-	if err := basespec.ValidateRequiredText(
-		"source display name",
-		s.DisplayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return err
-	}
-	if _, err := jsonutil.CanonicalizeObject(
-		s.Config,
-		basespec.MaxConfigBytes,
-	); err != nil {
-		return fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
-	}
-
-	return nil
-}
-
-func (s Source) Summary() Summary {
-	return Summary{
-		ID:          s.ID,
-		RootID:      s.RootID,
-		Kind:        s.Kind,
-		DisplayName: s.DisplayName,
-		Enabled:     s.Enabled,
-		Revision:    s.Revision,
-		CreatedAt:   s.CreatedAt,
-		ModifiedAt:  s.ModifiedAt,
-		RetiredAt:   cloneTime(s.RetiredAt),
-	}
-}
-
 type Draft struct {
-	ID          basespec.SourceID
-	Kind        basespec.SourceKind
-	DisplayName string
-	Enabled     bool
-	Config      json.RawMessage
+	ID          basespec.SourceID   `json:"id"`
+	Kind        basespec.SourceKind `json:"kind"`
+	DisplayName string              `json:"displayName"`
+	Enabled     bool                `json:"enabled"`
+	Config      json.RawMessage     `json:"config"`
 }
 
 type Update struct {

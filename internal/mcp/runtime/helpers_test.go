@@ -1,3 +1,6 @@
+//go:build legacy_mcp_store
+
+// Deprecated: reference-only implementation for the removed standalone MCP Store.
 package runtime
 
 import (

@@ -1,14 +1,16 @@
 package spec
 
-import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+)
 
 type MCPToolSelection struct {
-	BundleID         bundleitemutils.BundleID `json:"bundleID"`
-	ServerID         MCPServerID              `json:"serverID"`
-	ToolName         string                   `json:"toolName"`
-	ProviderToolName string                   `json:"providerToolName,omitempty"`
-	ChoiceID         string                   `json:"choiceID,omitempty"`
-	Digest           string                   `json:"digest,omitempty"`
+	Server           artifact.ArtifactRef `json:"server"`
+	ToolName         string               `json:"toolName"`
+	ProviderToolName string               `json:"providerToolName,omitempty"`
+	ChoiceID         string               `json:"choiceID,omitempty"`
+	Digest           string               `json:"digest,omitempty"`
 
 	ApprovalRule  *MCPApprovalRule  `json:"approvalRule,omitempty"`
 	ExecutionMode *MCPExecutionMode `json:"executionMode,omitempty"`
@@ -18,8 +20,7 @@ type MCPToolSelection struct {
 }
 
 type MCPProviderToolMapping struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID"`
-	ServerID MCPServerID              `json:"serverID"`
+	Server artifact.ArtifactRef `json:"server"`
 
 	ProviderToolName string `json:"providerToolName"`
 	ChoiceID         string `json:"choiceID"`
@@ -34,8 +35,7 @@ type MCPProviderToolMapping struct {
 }
 
 type MCPServerSelection struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID"`
-	ServerID MCPServerID              `json:"serverID"`
+	Server artifact.ArtifactRef `json:"server"`
 
 	SnapshotDigest string `json:"snapshotDigest,omitempty"`
 
@@ -64,8 +64,8 @@ type MCPConversationContext struct {
 	Prompts           []MCPPromptSelection           `json:"prompts,omitempty"`
 }
 type MCPToolCallProvenance struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID"`
-	ServerID MCPServerID              `json:"serverID"`
+	Server     artifact.ArtifactRef     `json:"server"`
+	Collection collection.CollectionRef `json:"collection"`
 
 	ServerDisplayName string `json:"serverDisplayName,omitempty"`
 

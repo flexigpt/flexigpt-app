@@ -364,15 +364,6 @@ func (r *runtime) Open(
 	return snapshot, nil
 }
 
-func (r *runtime) SupportsLocalPath(
-	kind basespec.SourceKind,
-) bool {
-	if r == nil || r.localKinds == nil {
-		return false
-	}
-	return r.localKinds.SupportsLocalPath(kind)
-}
-
 // ResolveLocalPath delegates only to adapters that explicitly support native
 // filesystem paths. Non-filesystem sources remain source-backed but do not
 // become path-backed implicitly.
@@ -409,6 +400,15 @@ func (r *runtime) ResolveLocalPath(
 		return "", err
 	}
 	return location, nil
+}
+
+func (r *runtime) SupportsLocalPath(
+	kind basespec.SourceKind,
+) bool {
+	if r == nil || r.localKinds == nil {
+		return false
+	}
+	return r.localKinds.SupportsLocalPath(kind)
 }
 
 func validateSnapshot(snapshot Snapshot) error {

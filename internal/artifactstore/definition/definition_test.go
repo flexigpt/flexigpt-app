@@ -11,28 +11,6 @@ import (
 
 const definitionTestRootID basespec.RootID = "019d3150-6a15-7a6b-a34e-d9032342bc31"
 
-func definitionTestValue() Definition {
-	return Definition{
-		Kind:           "test.artifact",
-		SchemaID:       "test.schema",
-		SchemaVersion:  "v1",
-		LogicalName:    "example",
-		LogicalVersion: "1",
-		DisplayName:    "Example",
-		Description:    "A canonical test definition",
-		Labels: map[string]string{
-			"z-label": "last",
-			"a-label": "first",
-		},
-		Body: []byte(`{"z":2,"a":1}`),
-		Dependencies: []Selector{{
-			Kind:        "test.dependency",
-			LogicalName: "dependency",
-			Labels:      map[string]string{"scope": "test"},
-		}},
-	}
-}
-
 func TestCanonicalizeIsDeterministicAndOwnsMutableFields(t *testing.T) {
 	t.Parallel()
 
@@ -190,5 +168,27 @@ func TestReadCanonicalAndRootScopedRepositoryEnforceIntegrity(t *testing.T) {
 	}
 	if deniedRepository.calls != 0 {
 		t.Fatalf("repository called despite root denial: %d", deniedRepository.calls)
+	}
+}
+
+func definitionTestValue() Definition {
+	return Definition{
+		Kind:           "test.artifact",
+		SchemaID:       "test.schema",
+		SchemaVersion:  "v1",
+		LogicalName:    "example",
+		LogicalVersion: "1",
+		DisplayName:    "Example",
+		Description:    "A canonical test definition",
+		Labels: map[string]string{
+			"z-label": "last",
+			"a-label": "first",
+		},
+		Body: []byte(`{"z":2,"a":1}`),
+		Dependencies: []Selector{{
+			Kind:        "test.dependency",
+			LogicalName: "dependency",
+			Labels:      map[string]string{"scope": "test"},
+		}},
 	}
 }

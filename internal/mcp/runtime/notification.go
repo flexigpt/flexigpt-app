@@ -3,8 +3,7 @@ package runtime
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 )
 
 type ClientNotificationKind string
@@ -18,9 +17,8 @@ const (
 )
 
 type ClientNotification struct {
-	BundleID bundleitemutils.BundleID
-	ServerID spec.MCPServerID
-	Kind     ClientNotificationKind
+	Server artifact.ArtifactRef
+	Kind   ClientNotificationKind
 
 	ResourceURI string
 

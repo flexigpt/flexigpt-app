@@ -1,6 +1,6 @@
 package spec
 
-import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+import "github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 
 type MCPUIResourceCSP struct {
 	ConnectDomains  []string `json:"connectDomains,omitempty"`
@@ -24,19 +24,17 @@ type MCPUIResourceMeta struct {
 }
 
 type MCPUIResourceContent struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID"`
-	ServerID MCPServerID              `json:"serverID"`
-	URI      string                   `json:"uri"`
-	MIMEType string                   `json:"mimeType"`
-	HTML     string                   `json:"html"`
-	Meta     *MCPUIResourceMeta       `json:"meta,omitempty"`
-	Digest   string                   `json:"digest,omitempty"`
+	Server   artifact.ArtifactRef `json:"server"`
+	URI      string               `json:"uri"`
+	MIMEType string               `json:"mimeType"`
+	HTML     string               `json:"html"`
+	Meta     *MCPUIResourceMeta   `json:"meta,omitempty"`
+	Digest   string               `json:"digest,omitempty"`
 }
 
 type MCPAppModelContextUpdate struct {
-	InstanceID string                   `json:"instanceID,omitempty"`
-	BundleID   bundleitemutils.BundleID `json:"bundleID,omitempty"`
-	ServerID   MCPServerID              `json:"serverID,omitempty"`
+	InstanceID string               `json:"instanceID,omitempty"`
+	Server     artifact.ArtifactRef `json:"server"`
 
 	ResourceURI string `json:"resourceUri,omitempty"`
 

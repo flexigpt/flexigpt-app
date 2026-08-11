@@ -41,19 +41,6 @@ func DefaultCompositionPolicy() CompositionPolicy {
 	}
 }
 
-func (p CompositionPolicy) Normalized() CompositionPolicy {
-	if p.MaxPromptBytes == 0 {
-		p.MaxPromptBytes = defaultMaxContextPromptBytes
-	}
-	if p.MaxDocumentBytes == 0 {
-		p.MaxDocumentBytes = defaultMaxContextDocumentBytes
-	}
-	if p.Overflow == "" {
-		p.Overflow = OverflowTruncate
-	}
-	return p
-}
-
 func (p CompositionPolicy) Validate() error {
 	p = p.Normalized()
 	if p.MaxPromptBytes <= 0 ||
@@ -80,6 +67,19 @@ func (p CompositionPolicy) Validate() error {
 			p.Overflow,
 		)
 	}
+}
+
+func (p CompositionPolicy) Normalized() CompositionPolicy {
+	if p.MaxPromptBytes == 0 {
+		p.MaxPromptBytes = defaultMaxContextPromptBytes
+	}
+	if p.MaxDocumentBytes == 0 {
+		p.MaxDocumentBytes = defaultMaxContextDocumentBytes
+	}
+	if p.Overflow == "" {
+		p.Overflow = OverflowTruncate
+	}
+	return p
 }
 
 type CompositionStatus string

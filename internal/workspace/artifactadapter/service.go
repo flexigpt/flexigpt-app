@@ -62,23 +62,6 @@ func NewService(
 	}, nil
 }
 
-// ValidateFilesystemCreate validates all Workspace-owned creation inputs that
-// can be checked before provisioning a filesystem Source.
-func (s *Service) ValidateFilesystemCreate(
-	request spec.FilesystemWorkspaceRequest,
-) error {
-	if err := s.validateWorkspaceCreate(
-		request.RootID,
-		request.CollectionID,
-		request.DisplayName,
-		request.Description,
-		request.Discovery,
-	); err != nil {
-		return err
-	}
-	return basespec.ValidateSourceID(request.PrimarySourceID)
-}
-
 func (s *Service) CreateEmpty(
 	ctx context.Context,
 	request spec.EmptyWorkspaceRequest,
@@ -205,6 +188,23 @@ func (s *Service) CreateFilesystem(
 		)
 	}
 	return value, nil
+}
+
+// ValidateFilesystemCreate validates all Workspace-owned creation inputs that
+// can be checked before provisioning a filesystem Source.
+func (s *Service) ValidateFilesystemCreate(
+	request spec.FilesystemWorkspaceRequest,
+) error {
+	if err := s.validateWorkspaceCreate(
+		request.RootID,
+		request.CollectionID,
+		request.DisplayName,
+		request.Description,
+		request.Discovery,
+	); err != nil {
+		return err
+	}
+	return basespec.ValidateSourceID(request.PrimarySourceID)
 }
 
 func (s *Service) List(
@@ -391,6 +391,19 @@ func (s *Service) UpdateAttachment(
 	return s.Get(ctx, request.Workspace)
 }
 
+func (s *Service) ReplacePrimary(
+	ctx context.Context,
+	request spec.ReplacePrimaryRequest,
+) (spec.Workspace, error) {
+	return s.SetPrimary(ctx, spec.SetPrimaryRequest{
+		Workspace:                  request.Workspace,
+		ExpectedCollectionRevision: request.ExpectedCollectionRevision,
+		PreviousSourceID:           request.PreviousSourceID,
+		PreviousAttachmentRevision: request.PreviousAttachmentRevision,
+		SourceID:                   request.SourceID,
+	})
+}
+
 // SetPrimary explicitly transitions a Workspace between empty and filesystem
 // modes, or replaces its existing primary Source. Generic attachment APIs
 // intentionally cannot mutate the primary relationship.
@@ -555,19 +568,6 @@ func (s *Service) SetPrimary(
 		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, request.Workspace)
-}
-
-func (s *Service) ReplacePrimary(
-	ctx context.Context,
-	request spec.ReplacePrimaryRequest,
-) (spec.Workspace, error) {
-	return s.SetPrimary(ctx, spec.SetPrimaryRequest{
-		Workspace:                  request.Workspace,
-		ExpectedCollectionRevision: request.ExpectedCollectionRevision,
-		PreviousSourceID:           request.PreviousSourceID,
-		PreviousAttachmentRevision: request.PreviousAttachmentRevision,
-		SourceID:                   request.SourceID,
-	})
 }
 
 func (s *Service) Detach(

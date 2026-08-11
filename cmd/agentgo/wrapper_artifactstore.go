@@ -13,6 +13,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
+	mcpSchema "github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
@@ -25,20 +27,18 @@ type ArtifactStoreWrapper struct {
 	builtInTopology builtin.Registry
 }
 
-const defaultWorkspaceRootID basespec.RootID = "0198f097-0d5b-7000-8000-000000000001"
+const (
+	defaultWorkspaceRootID basespec.RootID = "0198f097-0d5b-7000-8000-000000000001"
+	mcpUserRootID          basespec.RootID = "0198f097-0d5b-7000-8000-000000000002"
+	mcpBuiltInRootID       basespec.RootID = "0198f097-0d5b-7000-8000-000000000003"
+)
 
 const (
 	defaultWorkspaceRootDisplayName = "FlexiGPT Workspaces"
 	defaultWorkspaceRootDescription = "Local namespace for user Workspace collections."
+	mcpUserRootDisplayName          = "FlexiGPT MCP Bundles"
+	mcpUserRootDescription          = "Local namespace for user-managed MCP Bundles."
 )
-
-func defaultWorkspaceRootDraft() root.RootDraft {
-	return root.RootDraft{
-		ID:          defaultWorkspaceRootID,
-		DisplayName: defaultWorkspaceRootDisplayName,
-		Description: defaultWorkspaceRootDescription,
-	}
-}
 
 func InitArtifactStoreWrapper(
 	wrapper *ArtifactStoreWrapper,
@@ -66,34 +66,54 @@ func InitArtifactStoreWrapper(
 	decoders := append(
 		workspace.DefaultDecoders(),
 		skillDecoder,
+		mcpArtifact.NewDecoder(),
 	)
 	shareableCodecs := []shareable.Codec{
 		skillBundle.NewShareableCodec(),
 		workspace.NewShareableCodec(),
+		mcpSchema.NewBundleCodec(),
+		mcpSchema.NewServerCodec(),
+		mcpSchema.NewPolicyCodec(),
 	}
 
-	components, err := system.Open(
-		context.Background(),
-		system.Config{
-			BaseDirectory: baseDirectory,
-			Decoders:      decoders,
-			RootMutationPolicy: protection.StaticRootPolicy{
-				RootID:         registry.Root.ID,
-				RetainedRootID: defaultWorkspaceRootID,
-			},
-			ShareableCodecs: shareableCodecs,
+	rootPolicy, err := protection.NewSetRootPolicy(
+		[]basespec.RootID{
+			registry.Root.ID,
+			mcpBuiltInRootID,
+		},
+		[]basespec.RootID{
+			defaultWorkspaceRootID,
+			mcpUserRootID,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	if _, err := components.Roots.Create(
+	components, err := system.Open(
 		context.Background(),
+		system.Config{
+			BaseDirectory:      baseDirectory,
+			Decoders:           decoders,
+			RootMutationPolicy: rootPolicy,
+			ShareableCodecs:    shareableCodecs,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, draft := range []root.RootDraft{
 		defaultWorkspaceRootDraft(),
-	); err != nil {
-		_ = components.Close()
-		return fmt.Errorf("ensure default Workspace Root: %w", err)
+		defaultMCPUserRootDraft(),
+	} {
+		if _, err := components.Roots.Create(
+			context.Background(),
+			draft,
+		); err != nil {
+			_ = components.Close()
+			return fmt.Errorf("ensure retained application Root %q: %w", draft.ID, err)
+		}
 	}
 
 	api, err := artifactstore.New(components)
@@ -336,5 +356,21 @@ func (w *ArtifactStoreWrapper) close() {
 	}
 	if err := components.Close(); err != nil {
 		slog.Error("close artifact store", "error", err)
+	}
+}
+
+func defaultWorkspaceRootDraft() root.RootDraft {
+	return root.RootDraft{
+		ID:          defaultWorkspaceRootID,
+		DisplayName: defaultWorkspaceRootDisplayName,
+		Description: defaultWorkspaceRootDescription,
+	}
+}
+
+func defaultMCPUserRootDraft() root.RootDraft {
+	return root.RootDraft{
+		ID:          mcpUserRootID,
+		DisplayName: mcpUserRootDisplayName,
+		Description: mcpUserRootDescription,
 	}
 }

@@ -1,6 +1,6 @@
 package spec
 
-import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+import "github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 
 type MCPToolExposure string
 
@@ -29,10 +29,8 @@ type InvokeMCPToolRequestBody struct {
 }
 
 type InvokeMCPToolRequest struct {
-	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
-	ServerID MCPServerID              `path:"serverID" required:"true"`
-
-	Body *InvokeMCPToolRequestBody
+	Server artifact.ArtifactRef `json:"server" required:"true"`
+	Body   *InvokeMCPToolRequestBody
 }
 
 type MCPToolAppRenderInfo struct {
@@ -44,8 +42,7 @@ type MCPToolAppRenderInfo struct {
 }
 
 type InvokeMCPToolResponseBody struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID"`
-	ServerID MCPServerID              `json:"serverID"`
+	Server artifact.ArtifactRef `json:"server"`
 
 	ToolName         string `json:"toolName"`
 	ProviderToolName string `json:"providerToolName,omitempty"`

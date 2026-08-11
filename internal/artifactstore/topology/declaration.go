@@ -15,8 +15,8 @@ import (
 // not describe package bytes, collection kinds, artifact kinds, feature roles,
 // or any built-in product semantics.
 type Declaration struct {
-	Root    root.RootDraft
-	Sources []source.Draft
+	Root    root.RootDraft `json:"root"`
+	Sources []source.Draft `json:"sources"`
 }
 
 // Installed is the verified local protected topology created from a

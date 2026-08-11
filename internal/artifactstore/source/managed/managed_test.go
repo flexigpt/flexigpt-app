@@ -9,21 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-func managedTestSource() source.Source {
-	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	return source.Source{
-		ID:          "019d3150-6a20-7a6b-a34e-d9032342bc31",
-		RootID:      "019d3150-6a21-7a6b-a34e-d9032342bc31",
-		Kind:        Kind,
-		DisplayName: "Managed fixture",
-		Enabled:     true,
-		Config:      []byte(`{}`),
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
-	}
-}
-
 func TestManagedPackagePublicationRejectsReservedDirectory(t *testing.T) {
 	t.Parallel()
 
@@ -37,5 +22,20 @@ func TestManagedPackagePublicationRejectsReservedDirectory(t *testing.T) {
 	})
 	if !errors.Is(err, basespec.ErrInvalid) {
 		t.Fatalf("reserved directory error=%v, want ErrInvalid", err)
+	}
+}
+
+func managedTestSource() source.Source {
+	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
+	return source.Source{
+		ID:          "019d3150-6a20-7a6b-a34e-d9032342bc31",
+		RootID:      "019d3150-6a21-7a6b-a34e-d9032342bc31",
+		Kind:        Kind,
+		DisplayName: "Managed fixture",
+		Enabled:     true,
+		Config:      []byte(`{}`),
+		Revision:    1,
+		CreatedAt:   now,
+		ModifiedAt:  now,
 	}
 }

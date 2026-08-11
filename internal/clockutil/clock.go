@@ -16,14 +16,14 @@ func (System) Now() time.Time {
 	return time.Now().UTC()
 }
 
-// NowUTC reads a Clock and normalizes its result to UTC.
-func NowUTC(value Clock) time.Time {
-	return value.Now().UTC()
-}
-
 // Next reads a Clock and returns a timestamp strictly later than previous.
 func Next(value Clock, previous time.Time) time.Time {
 	return Advance(NowUTC(value), previous)
+}
+
+// NowUTC reads a Clock and normalizes its result to UTC.
+func NowUTC(value Clock) time.Time {
+	return value.Now().UTC()
 }
 
 // Advance returns candidate normalized to UTC when it is later than previous.

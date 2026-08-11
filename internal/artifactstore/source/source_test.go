@@ -18,21 +18,6 @@ const (
 	sourceTestID     basespec.SourceID = "019d3150-6a1b-7a6b-a34e-d9032342bc31"
 )
 
-func sourceTestValue() Source {
-	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	return Source{
-		ID:          sourceTestID,
-		RootID:      sourceTestRootID,
-		Kind:        "test.source",
-		DisplayName: "Test source",
-		Enabled:     true,
-		Config:      json.RawMessage(`{"a":1}`),
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
-	}
-}
-
 func TestSourceCloneAndManagedPublicationNormalizationOwnMutableData(t *testing.T) {
 	t.Parallel()
 
@@ -295,5 +280,20 @@ func TestRegistryAndRuntimeValidateCapabilitiesAndConcurrentOpens(t *testing.T) 
 	close(errorsSeen)
 	for err := range errorsSeen {
 		t.Fatalf("concurrent Registry.Open: %v", err)
+	}
+}
+
+func sourceTestValue() Source {
+	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
+	return Source{
+		ID:          sourceTestID,
+		RootID:      sourceTestRootID,
+		Kind:        "test.source",
+		DisplayName: "Test source",
+		Enabled:     true,
+		Config:      json.RawMessage(`{"a":1}`),
+		Revision:    1,
+		CreatedAt:   now,
+		ModifiedAt:  now,
 	}
 }

@@ -23,6 +23,13 @@ const (
 	RoleLibrary  basespec.AttachmentRole = "library"
 )
 
+type AttachmentDraft struct {
+	SourceID              basespec.SourceID
+	Role                  basespec.AttachmentRole
+	Enabled               bool
+	DiscoveryRoot         basespec.Locator
+	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
+}
 type CreateBundleRequest struct {
 	RootID          basespec.RootID
 	CollectionID    basespec.CollectionID
@@ -42,14 +49,6 @@ type UpdateBundleRequest struct {
 	DisplayName      string
 	Description      string
 	Enabled          bool
-}
-
-type AttachmentDraft struct {
-	SourceID              basespec.SourceID
-	Role                  basespec.AttachmentRole
-	Enabled               bool
-	DiscoveryRoot         basespec.Locator
-	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
 }
 
 type CreateManagedSkillRequest struct {

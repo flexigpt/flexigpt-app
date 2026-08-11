@@ -13,21 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-func embeddedTestSource(config json.RawMessage) source.Source {
-	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	return source.Source{
-		ID:          "019d3150-6a1e-7a6b-a34e-d9032342bc31",
-		RootID:      "019d3150-6a1f-7a6b-a34e-d9032342bc31",
-		Kind:        Kind,
-		DisplayName: "Embedded fixture",
-		Enabled:     true,
-		Config:      config,
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
-	}
-}
-
 func TestEmbeddedAdapterNormalizesAndReadsImmutableProvider(t *testing.T) {
 	provider := fstest.MapFS{
 		"assets/one.txt":     &fstest.MapFile{Data: []byte("one")},
@@ -101,5 +86,20 @@ func TestEmbeddedAdapterRejectsUnavailableProviders(t *testing.T) {
 		basespec.ErrSourceUnavailable,
 	) {
 		t.Fatalf("unavailable config error=%v", err)
+	}
+}
+
+func embeddedTestSource(config json.RawMessage) source.Source {
+	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
+	return source.Source{
+		ID:          "019d3150-6a1e-7a6b-a34e-d9032342bc31",
+		RootID:      "019d3150-6a1f-7a6b-a34e-d9032342bc31",
+		Kind:        Kind,
+		DisplayName: "Embedded fixture",
+		Enabled:     true,
+		Config:      config,
+		Revision:    1,
+		CreatedAt:   now,
+		ModifiedAt:  now,
 	}
 }

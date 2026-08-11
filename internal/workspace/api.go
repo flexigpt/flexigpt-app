@@ -1279,53 +1279,6 @@ func workspaceSourcePresentationDiagnostic(
 	}
 }
 
-func workspaceViewOf(value spec.Workspace) (WorkspaceView, error) {
-	output := WorkspaceView{
-		Workspace:       value.Collection.Ref(),
-		Revision:        value.Collection.Revision,
-		DisplayName:     value.Collection.DisplayName,
-		Description:     value.Collection.Description,
-		Enabled:         value.Collection.Enabled,
-		Mode:            value.Mode,
-		PrimarySourceID: value.PrimarySourceID,
-		Discovery:       workspaceDiscoveryOf(value.Data.Discovery),
-		Attachments:     make([]WorkspaceAttachmentView, 0, len(value.Attachments)),
-	}
-
-	for _, attachment := range value.Attachments {
-		settings, err := workspaceAttachmentSettingsOf(attachment.Data)
-		if err != nil {
-			return WorkspaceView{}, err
-		}
-		output.Attachments = append(output.Attachments, WorkspaceAttachmentView{
-			SourceID: attachment.SourceID,
-			Revision: attachment.Revision,
-			Role:     attachment.Role,
-			Enabled:  attachment.Enabled,
-			Settings: settings,
-		})
-	}
-	return output, nil
-}
-
-func workspaceDiscoveryOf(value spec.DiscoveryPreferences) WorkspaceDiscovery {
-	output := WorkspaceDiscovery{
-		AdditionalLocators: append(
-			[]basespec.Locator(nil),
-			value.AdditionalLocators...,
-		),
-		IncludeReadme: value.IncludeReadme,
-	}
-	for _, root := range value.AdditionalRoots {
-		output.AdditionalRoots = append(output.AdditionalRoots, WorkspaceDiscoveryRoot{
-			Root:            root.Root,
-			Recursive:       root.Recursive,
-			IncludePatterns: append([]string(nil), root.IncludePatterns...),
-		})
-	}
-	return output
-}
-
 func discoveryPreferencesOf(value WorkspaceDiscovery) spec.DiscoveryPreferences {
 	output := spec.DiscoveryPreferences{
 		AdditionalLocators: append(
@@ -1344,82 +1297,10 @@ func discoveryPreferencesOf(value WorkspaceDiscovery) spec.DiscoveryPreferences 
 	return output
 }
 
-func workspaceAttachmentSettingsOf(
-	raw json.RawMessage,
-) (WorkspaceAttachmentSettings, error) {
-	var value spec.AttachmentData
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return WorkspaceAttachmentSettings{}, fmt.Errorf(
-			"%w: decode workspace attachment settings: %w",
-			spec.ErrInvalidWorkspace,
-			err,
-		)
-	}
-	return WorkspaceAttachmentSettings{
-		Recursive:     cloneBool(value.Recursive),
-		Authoritative: cloneBool(value.Authoritative),
-	}, nil
-}
-
 func attachmentDataOf(value WorkspaceAttachmentSettings) spec.AttachmentData {
 	return spec.AttachmentData{
 		Recursive:     cloneBool(value.Recursive),
 		Authoritative: cloneBool(value.Authoritative),
-	}
-}
-
-func workspaceArtifactDataOf(
-	value WorkspaceArtifactSettings,
-) (json.RawMessage, error) {
-	return artifactadapter.EncodeArtifactData(spec.ArtifactData{
-		RuntimeDisabled: value.RuntimeDisabled,
-	})
-}
-
-func cloneBool(value *bool) *bool {
-	if value == nil {
-		return nil
-	}
-	copyValue := *value
-	return &copyValue
-}
-
-func workspaceArtifactViewOf(value artifact.Artifact) WorkspaceArtifactView {
-	var digest *cryptoutil.Digest
-	if value.ResolvedDefinition != nil {
-		copyValue := *value.ResolvedDefinition
-		digest = &copyValue
-	}
-	diagnostics := diagnostic.CloneDiagnostics(value.Diagnostics)
-	runtimeDisabled, dataErr := artifactadapter.ArtifactRuntimeDisabled(value)
-	if dataErr != nil {
-		diagnostics = diagnostic.AppendDiagnostics(
-			diagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.DiagnosticError,
-				Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
-				Message:  "the Workspace Artifact has invalid local runtime settings",
-				Location: &diagnostic.DiagnosticLocation{
-					Locator:            value.Binding.Locator,
-					SubresourceLocator: value.Binding.SubresourceLocator,
-				},
-			},
-		)
-	}
-	return WorkspaceArtifactView{
-		Artifact:           value.Ref(),
-		Revision:           value.Revision,
-		Name:               value.Name,
-		Kind:               value.Kind,
-		Enabled:            value.Enabled,
-		State:              value.State,
-		Adoption:           value.Adoption,
-		ResolvedDefinition: digest,
-		SourceID:           value.Binding.SourceID,
-		Locator:            value.Binding.Locator,
-		SubresourceLocator: value.Binding.SubresourceLocator,
-		RuntimeDisabled:    runtimeDisabled,
-		Diagnostics:        diagnostics,
 	}
 }
 
@@ -1556,16 +1437,68 @@ func workspaceCatalogViewOf(
 	return output, nil
 }
 
-func occurrenceViewKey(
-	sourceID basespec.SourceID,
-	locator basespec.Locator,
-	subresource basespec.SubresourceLocator,
-	kind basespec.ArtifactKind,
-) string {
-	return string(sourceID) + "\x00" +
-		string(locator) + "\x00" +
-		string(subresource) + "\x00" +
-		string(kind)
+func workspaceViewOf(value spec.Workspace) (WorkspaceView, error) {
+	output := WorkspaceView{
+		Workspace:       value.Collection.Ref(),
+		Revision:        value.Collection.Revision,
+		DisplayName:     value.Collection.DisplayName,
+		Description:     value.Collection.Description,
+		Enabled:         value.Collection.Enabled,
+		Mode:            value.Mode,
+		PrimarySourceID: value.PrimarySourceID,
+		Discovery:       workspaceDiscoveryOf(value.Data.Discovery),
+		Attachments:     make([]WorkspaceAttachmentView, 0, len(value.Attachments)),
+	}
+
+	for _, attachment := range value.Attachments {
+		settings, err := workspaceAttachmentSettingsOf(attachment.Data)
+		if err != nil {
+			return WorkspaceView{}, err
+		}
+		output.Attachments = append(output.Attachments, WorkspaceAttachmentView{
+			SourceID: attachment.SourceID,
+			Revision: attachment.Revision,
+			Role:     attachment.Role,
+			Enabled:  attachment.Enabled,
+			Settings: settings,
+		})
+	}
+	return output, nil
+}
+
+func workspaceAttachmentSettingsOf(
+	raw json.RawMessage,
+) (WorkspaceAttachmentSettings, error) {
+	var value spec.AttachmentData
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return WorkspaceAttachmentSettings{}, fmt.Errorf(
+			"%w: decode workspace attachment settings: %w",
+			spec.ErrInvalidWorkspace,
+			err,
+		)
+	}
+	return WorkspaceAttachmentSettings{
+		Recursive:     cloneBool(value.Recursive),
+		Authoritative: cloneBool(value.Authoritative),
+	}, nil
+}
+
+func workspaceDiscoveryOf(value spec.DiscoveryPreferences) WorkspaceDiscovery {
+	output := WorkspaceDiscovery{
+		AdditionalLocators: append(
+			[]basespec.Locator(nil),
+			value.AdditionalLocators...,
+		),
+		IncludeReadme: value.IncludeReadme,
+	}
+	for _, root := range value.AdditionalRoots {
+		output.AdditionalRoots = append(output.AdditionalRoots, WorkspaceDiscoveryRoot{
+			Root:            root.Root,
+			Recursive:       root.Recursive,
+			IncludePatterns: append([]string(nil), root.IncludePatterns...),
+		})
+	}
+	return output
 }
 
 func workspaceOccurrenceViewOf(
@@ -1595,32 +1528,6 @@ func workspaceOccurrenceViewOf(
 		output.Artifact = &artifactRef
 	}
 	return output
-}
-
-func workspaceDefinitionViewOf(
-	value definition.Definition,
-) WorkspaceDefinitionView {
-	dependencies := make(
-		[]definition.Selector,
-		len(value.Dependencies),
-	)
-	for index, selector := range value.Dependencies {
-		dependencies[index] = selector
-		dependencies[index].Labels = maps.Clone(selector.Labels)
-	}
-	return WorkspaceDefinitionView{
-		Digest:         value.Digest,
-		Kind:           value.Kind,
-		SchemaID:       value.SchemaID,
-		SchemaVersion:  value.SchemaVersion,
-		LogicalName:    value.LogicalName,
-		LogicalVersion: value.LogicalVersion,
-		DisplayName:    value.DisplayName,
-		Description:    value.Description,
-		Labels:         maps.Clone(value.Labels),
-		Body:           append(json.RawMessage(nil), value.Body...),
-		Dependencies:   dependencies,
-	}
 }
 
 func workspaceResourceViewOf(
@@ -1669,6 +1576,32 @@ func workspaceLoadPlanViewOf(
 		)
 	}
 	return output
+}
+
+func workspaceDefinitionViewOf(
+	value definition.Definition,
+) WorkspaceDefinitionView {
+	dependencies := make(
+		[]definition.Selector,
+		len(value.Dependencies),
+	)
+	for index, selector := range value.Dependencies {
+		dependencies[index] = selector
+		dependencies[index].Labels = maps.Clone(selector.Labels)
+	}
+	return WorkspaceDefinitionView{
+		Digest:         value.Digest,
+		Kind:           value.Kind,
+		SchemaID:       value.SchemaID,
+		SchemaVersion:  value.SchemaVersion,
+		LogicalName:    value.LogicalName,
+		LogicalVersion: value.LogicalVersion,
+		DisplayName:    value.DisplayName,
+		Description:    value.Description,
+		Labels:         maps.Clone(value.Labels),
+		Body:           append(json.RawMessage(nil), value.Body...),
+		Dependencies:   dependencies,
+	}
 }
 
 func contextLoadPlanViewOf(
@@ -1740,6 +1673,21 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 	}
 }
 
+func workspaceSkillLoadViewOf(
+	value workspaceadapter.SkillLoadPlan,
+) WorkspaceSkillLoadView {
+	output := WorkspaceSkillLoadView{
+		Workspace:       value.Workspace,
+		CatalogRevision: value.CatalogRevision,
+		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
+		Skills:          make([]WorkspaceSkillView, 0, len(value.Skills)),
+	}
+	for _, skill := range value.Skills {
+		output.Skills = append(output.Skills, workspaceSkillViewOf(skill))
+	}
+	return output
+}
+
 func workspaceSkillViewOf(value workspaceadapter.WorkspaceSkill) WorkspaceSkillView {
 	summary := WorkspaceSkillSummary{
 		SchemaVersion: value.Skill.SchemaVersion,
@@ -1779,17 +1727,69 @@ func workspaceSkillViewOf(value workspaceadapter.WorkspaceSkill) WorkspaceSkillV
 	}
 }
 
-func workspaceSkillLoadViewOf(
-	value workspaceadapter.SkillLoadPlan,
-) WorkspaceSkillLoadView {
-	output := WorkspaceSkillLoadView{
-		Workspace:       value.Workspace,
-		CatalogRevision: value.CatalogRevision,
-		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
-		Skills:          make([]WorkspaceSkillView, 0, len(value.Skills)),
+func workspaceArtifactDataOf(
+	value WorkspaceArtifactSettings,
+) (json.RawMessage, error) {
+	return artifactadapter.EncodeArtifactData(spec.ArtifactData{
+		RuntimeDisabled: value.RuntimeDisabled,
+	})
+}
+
+func workspaceArtifactViewOf(value artifact.Artifact) WorkspaceArtifactView {
+	var digest *cryptoutil.Digest
+	if value.ResolvedDefinition != nil {
+		copyValue := *value.ResolvedDefinition
+		digest = &copyValue
 	}
-	for _, skill := range value.Skills {
-		output.Skills = append(output.Skills, workspaceSkillViewOf(skill))
+	diagnostics := diagnostic.CloneDiagnostics(value.Diagnostics)
+	runtimeDisabled, dataErr := artifactadapter.ArtifactRuntimeDisabled(value)
+	if dataErr != nil {
+		diagnostics = diagnostic.AppendDiagnostics(
+			diagnostics,
+			diagnostic.Diagnostic{
+				Severity: diagnostic.DiagnosticError,
+				Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
+				Message:  "the Workspace Artifact has invalid local runtime settings",
+				Location: &diagnostic.DiagnosticLocation{
+					Locator:            value.Binding.Locator,
+					SubresourceLocator: value.Binding.SubresourceLocator,
+				},
+			},
+		)
 	}
-	return output
+	return WorkspaceArtifactView{
+		Artifact:           value.Ref(),
+		Revision:           value.Revision,
+		Name:               value.Name,
+		Kind:               value.Kind,
+		Enabled:            value.Enabled,
+		State:              value.State,
+		Adoption:           value.Adoption,
+		ResolvedDefinition: digest,
+		SourceID:           value.Binding.SourceID,
+		Locator:            value.Binding.Locator,
+		SubresourceLocator: value.Binding.SubresourceLocator,
+		RuntimeDisabled:    runtimeDisabled,
+		Diagnostics:        diagnostics,
+	}
+}
+
+func occurrenceViewKey(
+	sourceID basespec.SourceID,
+	locator basespec.Locator,
+	subresource basespec.SubresourceLocator,
+	kind basespec.ArtifactKind,
+) string {
+	return string(sourceID) + "\x00" +
+		string(locator) + "\x00" +
+		string(subresource) + "\x00" +
+		string(kind)
+}
+
+func cloneBool(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	copyValue := *value
+	return &copyValue
 }

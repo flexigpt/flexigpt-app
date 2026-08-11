@@ -9,17 +9,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 func NewMCPSecretRefString(
-	bundleID bundleitemutils.BundleID,
-	serverID spec.MCPServerID,
+	server artifact.ArtifactRef,
 	kind spec.MCPSecretKind,
 	slot string,
 ) (string, error) {
-	ref, err := NewMCPSecretRef(bundleID, serverID, kind, slot)
+	ref, err := NewMCPSecretRef(server, kind, slot)
 	if err != nil {
 		return "", err
 	}
@@ -31,24 +30,20 @@ func NewMCPSecretRefString(
 }
 
 func NewMCPSecretRef(
-	bundleID bundleitemutils.BundleID,
-	serverID spec.MCPServerID,
+	server artifact.ArtifactRef,
 	kind spec.MCPSecretKind,
 	slot string,
 ) (spec.MCPSecretRef, error) {
-	serverID = spec.MCPServerID(strings.TrimSpace(string(serverID)))
 	kind = normalizeSecretKind(kind)
-	bundleID = bundleitemutils.BundleID(strings.TrimSpace(string(bundleID)))
 	normalizedSlot, err := normalizeAndValidateSecretSlot(kind, slot)
 	if err != nil {
 		return spec.MCPSecretRef{}, err
 	}
 
 	ref := spec.MCPSecretRef{
-		BundleID: bundleID,
-		ServerID: serverID,
-		Kind:     kind,
-		Slot:     normalizedSlot,
+		Server: server,
+		Kind:   kind,
+		Slot:   normalizedSlot,
 	}
 	if err := validateSecret(ref); err != nil {
 		return spec.MCPSecretRef{}, err
@@ -58,8 +53,7 @@ func NewMCPSecretRef(
 
 func ValidateMCPSecretRef(
 	raw string,
-	bundleID bundleitemutils.BundleID,
-	serverID spec.MCPServerID,
+	server artifact.ArtifactRef,
 	kind spec.MCPSecretKind,
 	slot string,
 ) error {
@@ -67,15 +61,10 @@ func ValidateMCPSecretRef(
 	if err != nil {
 		return err
 	}
-	bundleID = bundleitemutils.BundleID(strings.TrimSpace(string(bundleID)))
-	serverID = spec.MCPServerID(strings.TrimSpace(string(serverID)))
 	kind = normalizeSecretKind(kind)
 	slot = normalizeSecretSlot(slot)
-	if ref.BundleID != bundleID {
-		return fmt.Errorf("secret ref bundleID %q does not match config bundleID %q", ref.BundleID, bundleID)
-	}
-	if ref.ServerID != serverID {
-		return fmt.Errorf("secret ref serverID %q does not match config serverID %q", ref.ServerID, serverID)
+	if ref.Server != server {
+		return errors.New("secret ref server does not match requested Artifact")
 	}
 	if ref.Kind != kind {
 		return fmt.Errorf("secret ref kind %q does not match expected kind %q", ref.Kind, kind)
@@ -102,20 +91,18 @@ func ParseMCPSecretRef(raw string) (spec.MCPSecretRef, error) {
 	}
 
 	var wire struct {
-		BundleID bundleitemutils.BundleID `json:"bundleID"`
-		ServerID spec.MCPServerID         `json:"serverID"`
-		Kind     spec.MCPSecretKind       `json:"kind"`
-		Slot     string                   `json:"slot"`
+		Server artifact.ArtifactRef `json:"server"`
+		Kind   spec.MCPSecretKind   `json:"kind"`
+		Slot   string               `json:"slot"`
 	}
 	if err := json.Unmarshal(b, &wire); err != nil {
 		return spec.MCPSecretRef{}, fmt.Errorf("secret ref %q is not valid json: %w", raw, err)
 	}
 
 	ref := spec.MCPSecretRef{
-		BundleID: bundleitemutils.BundleID(strings.TrimSpace(string(wire.BundleID))),
-		ServerID: spec.MCPServerID(strings.TrimSpace(string(wire.ServerID))),
-		Kind:     normalizeSecretKind(wire.Kind),
-		Slot:     normalizeSecretSlot(wire.Slot),
+		Server: wire.Server,
+		Kind:   normalizeSecretKind(wire.Kind),
+		Slot:   normalizeSecretSlot(wire.Slot),
 	}
 	if err := validateSecret(ref); err != nil {
 		return spec.MCPSecretRef{}, err
@@ -145,25 +132,20 @@ func canonicalSecret(r spec.MCPSecretRef) ([]byte, error) {
 		return nil, err
 	}
 	wire := struct {
-		BundleID bundleitemutils.BundleID `json:"bundleID"`
-		ServerID spec.MCPServerID         `json:"serverID"`
-		Kind     spec.MCPSecretKind       `json:"kind"`
-		Slot     string                   `json:"slot"`
+		Server artifact.ArtifactRef `json:"server"`
+		Kind   spec.MCPSecretKind   `json:"kind"`
+		Slot   string               `json:"slot"`
 	}{
-		BundleID: r.BundleID,
-		ServerID: r.ServerID,
-		Kind:     r.Kind,
-		Slot:     r.Slot,
+		Server: r.Server,
+		Kind:   r.Kind,
+		Slot:   r.Slot,
 	}
 	return json.Marshal(wire)
 }
 
 func validateSecret(r spec.MCPSecretRef) error {
-	if strings.TrimSpace(string(r.BundleID)) == "" {
-		return errors.New("secret ref bundleID is empty")
-	}
-	if strings.TrimSpace(string(r.ServerID)) == "" {
-		return errors.New("secret ref serverID is empty")
+	if err := r.Server.Validate(); err != nil {
+		return fmt.Errorf("secret ref server: %w", err)
 	}
 	switch r.Kind {
 	case spec.MCPSecretKindStdioEnv,

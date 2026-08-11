@@ -5,13 +5,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 type discoverySnapshotDigestPayload struct {
-	BundleID                  bundleitemutils.BundleID           `json:"bundleID"`
-	ServerID                  spec.MCPServerID                   `json:"serverID"`
+	Server                    artifact.ArtifactRef               `json:"server"`
 	NegotiatedProtocolVersion string                             `json:"negotiatedProtocolVersion,omitempty"`
 	ServerInfo                *spec.MCPImplementationInfo        `json:"serverInfo,omitempty"`
 	ServerCapabilities        *spec.MCPServerCapabilitiesSummary `json:"serverCapabilities,omitempty"`
@@ -24,8 +23,7 @@ type discoverySnapshotDigestPayload struct {
 
 func computeDiscoverySnapshotDigest(snap spec.MCPDiscoverySnapshot) string {
 	raw, err := json.Marshal(discoverySnapshotDigestPayload{
-		BundleID:                  snap.BundleID,
-		ServerID:                  snap.ServerID,
+		Server:                    snap.Server,
 		NegotiatedProtocolVersion: snap.NegotiatedProtocolVersion,
 		ServerInfo:                snap.ServerInfo,
 		ServerCapabilities:        snap.ServerCapabilities,

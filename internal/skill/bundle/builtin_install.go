@@ -39,6 +39,19 @@ func (builtInSkillArtifactPolicy) Derive(
 	return artifact.Draft{}, false, nil, nil
 }
 
+type BuiltInCollectionSkill struct {
+	ArtifactID basespec.ArtifactID
+	Member     basespec.Locator
+	Enabled    bool
+}
+type preparedBuiltInSkill struct {
+	request          BuiltInCollectionSkill
+	name             string
+	locator          basespec.Locator
+	definitionDigest cryptoutil.Digest
+	packageSHA256    cryptoutil.Digest
+}
+
 // BuiltInCollectionInstallRequest is trusted installer input. It materializes
 // exactly one complete portable Collection package in one managed Source
 // package directory, pins all static Artifacts, and then refreshes once.
@@ -48,20 +61,6 @@ type BuiltInCollectionInstallRequest struct {
 	PackageDirectory           basespec.Locator
 	PackageFiles               []source.ManagedPackageFile
 	Skills                     []BuiltInCollectionSkill
-}
-
-type BuiltInCollectionSkill struct {
-	ArtifactID basespec.ArtifactID
-	Member     basespec.Locator
-	Enabled    bool
-}
-
-type preparedBuiltInSkill struct {
-	request          BuiltInCollectionSkill
-	name             string
-	locator          basespec.Locator
-	definitionDigest cryptoutil.Digest
-	packageSHA256    cryptoutil.Digest
 }
 
 func (a *API) InstallBuiltInCollection(

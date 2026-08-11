@@ -52,20 +52,18 @@ type WorkspaceCollectionV1 struct {
 	Members        []ContentRef      `json:"members,omitempty"`
 }
 
-type WorkspaceCollectionV1Body struct {
-	Discovery WorkspaceDiscoveryV1 `json:"discovery"`
+type WorkspaceDirectoryRootV1 struct {
+	Root            string   `json:"root"`
+	Recursive       bool     `json:"recursive,omitempty"`
+	IncludePatterns []string `json:"includePatterns,omitempty"`
 }
-
 type WorkspaceDiscoveryV1 struct {
 	AdditionalLocators []string                   `json:"additionalLocators,omitempty"`
 	AdditionalRoots    []WorkspaceDirectoryRootV1 `json:"additionalRoots,omitempty"`
 	IncludeReadme      bool                       `json:"includeReadme,omitempty"`
 }
-
-type WorkspaceDirectoryRootV1 struct {
-	Root            string   `json:"root"`
-	Recursive       bool     `json:"recursive,omitempty"`
-	IncludePatterns []string `json:"includePatterns,omitempty"`
+type WorkspaceCollectionV1Body struct {
+	Discovery WorkspaceDiscoveryV1 `json:"discovery"`
 }
 
 func ParseWorkspaceCollectionV1(
@@ -146,6 +144,50 @@ func DecodeWorkspaceCollectionV1Body(
 ) (WorkspaceCollectionV1Body, error) {
 	value, _, err := decodeWorkspaceCollectionV1Body(raw)
 	return value, err
+}
+
+func CanonicalizeWorkspaceCollectionV1(
+	input WorkspaceCollectionV1,
+) (WorkspaceCollectionV1, error) {
+	output := input.Clone()
+
+	_, body, err := decodeWorkspaceCollectionV1Body(output.Body)
+	if err != nil {
+		return WorkspaceCollectionV1{}, err
+	}
+	output.Body = json.RawMessage(body)
+
+	sort.Slice(output.Members, func(left, right int) bool {
+		return workspaceCollectionV1MemberIdentity(output.Members[left]) <
+			workspaceCollectionV1MemberIdentity(output.Members[right])
+	})
+	if err := output.Validate(); err != nil {
+		return WorkspaceCollectionV1{}, err
+	}
+
+	supplied := ""
+	if output.Digest != nil {
+		supplied = *output.Digest
+	}
+	calculated, err := workspaceCollectionV1Digest(output)
+	if err != nil {
+		return WorkspaceCollectionV1{}, err
+	}
+	if supplied != "" && supplied != string(calculated) {
+		return WorkspaceCollectionV1{}, fmt.Errorf(
+			"%w: supplied workspace collection digest %q, calculated %q",
+			basespec.ErrDigestMismatch,
+			supplied,
+			calculated,
+		)
+	}
+
+	digest := string(calculated)
+	output.Digest = &digest
+	if err := output.Validate(); err != nil {
+		return WorkspaceCollectionV1{}, err
+	}
+	return output.Clone(), nil
 }
 
 func (v WorkspaceCollectionV1) Validate() error {
@@ -234,50 +276,6 @@ func (v WorkspaceCollectionV1) Clone() WorkspaceCollectionV1 {
 		}
 	}
 	return output
-}
-
-func CanonicalizeWorkspaceCollectionV1(
-	input WorkspaceCollectionV1,
-) (WorkspaceCollectionV1, error) {
-	output := input.Clone()
-
-	_, body, err := decodeWorkspaceCollectionV1Body(output.Body)
-	if err != nil {
-		return WorkspaceCollectionV1{}, err
-	}
-	output.Body = json.RawMessage(body)
-
-	sort.Slice(output.Members, func(left, right int) bool {
-		return workspaceCollectionV1MemberIdentity(output.Members[left]) <
-			workspaceCollectionV1MemberIdentity(output.Members[right])
-	})
-	if err := output.Validate(); err != nil {
-		return WorkspaceCollectionV1{}, err
-	}
-
-	supplied := ""
-	if output.Digest != nil {
-		supplied = *output.Digest
-	}
-	calculated, err := workspaceCollectionV1Digest(output)
-	if err != nil {
-		return WorkspaceCollectionV1{}, err
-	}
-	if supplied != "" && supplied != string(calculated) {
-		return WorkspaceCollectionV1{}, fmt.Errorf(
-			"%w: supplied workspace collection digest %q, calculated %q",
-			basespec.ErrDigestMismatch,
-			supplied,
-			calculated,
-		)
-	}
-
-	digest := string(calculated)
-	output.Digest = &digest
-	if err := output.Validate(); err != nil {
-		return WorkspaceCollectionV1{}, err
-	}
-	return output.Clone(), nil
 }
 
 func decodeWorkspaceCollectionV1Body(

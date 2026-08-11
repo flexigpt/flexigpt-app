@@ -18,15 +18,6 @@ func NewShareableCodec() shareable.Codec {
 	return workspaceCollectionCodec{}
 }
 
-func workspaceShareableSchemaKey() shareable.SchemaKey {
-	return shareable.SchemaKey{
-		Entity:        shareable.EntityCollection,
-		Kind:          spec.CollectionKind,
-		SchemaID:      spec.WorkspaceDescriptorSchemaID,
-		SchemaVersion: spec.WorkspaceDescriptorSchemaVersion,
-	}
-}
-
 func (workspaceCollectionCodec) Key() shareable.SchemaKey {
 	return workspaceShareableSchemaKey()
 }
@@ -73,4 +64,13 @@ func (workspaceCollectionCodec) Canonicalize(
 		Digest: cryptoutil.Digest(*canonical.Digest),
 		Raw:    json.RawMessage(encoded),
 	}, nil
+}
+
+func workspaceShareableSchemaKey() shareable.SchemaKey {
+	return shareable.SchemaKey{
+		Entity:        shareable.EntityCollection,
+		Kind:          spec.CollectionKind,
+		SchemaID:      spec.WorkspaceDescriptorSchemaID,
+		SchemaVersion: spec.WorkspaceDescriptorSchemaVersion,
+	}
 }

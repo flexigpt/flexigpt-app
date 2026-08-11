@@ -15,6 +15,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
+func ArtifactRuntimeDisabled(value artifact.Artifact) (bool, error) {
+	data, err := DecodeArtifactData(value.Data)
+	if err != nil {
+		return false, err
+	}
+	return data.RuntimeDisabled, nil
+}
+
 func EncodeArtifactData(
 	value spec.ArtifactData,
 ) (json.RawMessage, error) {
@@ -53,14 +61,6 @@ func DecodeArtifactData(
 		)
 	}
 	return value, nil
-}
-
-func ArtifactRuntimeDisabled(value artifact.Artifact) (bool, error) {
-	data, err := DecodeArtifactData(value.Data)
-	if err != nil {
-		return false, err
-	}
-	return data.RuntimeDisabled, nil
 }
 
 func validateWorkspaceState(

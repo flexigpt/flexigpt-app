@@ -24,11 +24,6 @@ type CollectionData struct {
 	ManagedSourceID basespec.SourceID `json:"managedSourceID,omitempty"`
 }
 
-func (d CollectionData) Clone() CollectionData {
-	d.Labels = maps.Clone(d.Labels)
-	return d
-}
-
 func EncodeCollectionData(value CollectionData) (json.RawMessage, error) {
 	value = value.Clone()
 	if err := ValidateCollectionData(value); err != nil {
@@ -108,4 +103,9 @@ func ValidateCollectionData(value CollectionData) error {
 	}
 
 	return nil
+}
+
+func (d CollectionData) Clone() CollectionData {
+	d.Labels = maps.Clone(d.Labels)
+	return d
 }

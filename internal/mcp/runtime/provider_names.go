@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 )
 
 var providerNameUnsafe = regexp.MustCompile(`[^A-Za-z0-9_]`)
@@ -17,11 +17,11 @@ const (
 	minToolPartLen         = 8
 )
 
-func ProviderToolName(serverID spec.MCPServerID, toolName string) string {
-	server := sanitizeName(string(serverID))
+func ProviderToolName(serverRef artifact.ArtifactRef, toolName string) string {
+	server := sanitizeName(string(serverRef.ArtifactID))
 	tool := sanitizeName(toolName)
 
-	sum := sha256.Sum256([]byte(string(serverID) + "\x00" + toolName))
+	sum := sha256.Sum256([]byte(artifactIdentity(serverRef) + "\x00" + toolName))
 	suffix := hex.EncodeToString(sum[:])[:8]
 
 	if len(server) > maxServerPartLen {
@@ -40,9 +40,15 @@ func ProviderToolName(serverID spec.MCPServerID, toolName string) string {
 	return "mcp__" + server + "__" + tool + "__" + suffix
 }
 
-func ChoiceID(serverID spec.MCPServerID, toolName string) string {
-	sum := sha256.Sum256([]byte(string(serverID) + "\x00" + toolName))
+func ChoiceID(serverRef artifact.ArtifactRef, toolName string) string {
+	sum := sha256.Sum256([]byte(artifactIdentity(serverRef) + "\x00" + toolName))
 	return "mcp-" + hex.EncodeToString(sum[:])[:16]
+}
+
+func artifactIdentity(ref artifact.ArtifactRef) string {
+	return string(ref.RootID) +
+		"\x00" +
+		string(ref.ArtifactID)
 }
 
 func sanitizeName(s string) string {

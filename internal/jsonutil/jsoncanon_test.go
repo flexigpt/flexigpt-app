@@ -6,6 +6,11 @@ import (
 	"testing"
 )
 
+type canonicalizationMismatchError struct {
+	got  string
+	want string
+}
+
 func TestCanonicalizeProducesStableJSONAndNumbers(t *testing.T) {
 	t.Parallel()
 
@@ -89,11 +94,6 @@ func TestCanonicalizeIsDeterministicForConcurrentCallers(t *testing.T) {
 	for err := range errorsSeen {
 		t.Fatalf("concurrent canonicalization failed: %v", err)
 	}
-}
-
-type canonicalizationMismatchError struct {
-	got  string
-	want string
 }
 
 func (e *canonicalizationMismatchError) Error() string {

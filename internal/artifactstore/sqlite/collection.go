@@ -855,37 +855,6 @@ func requireNoAttachmentBoundRecordsTx(
 	return nil
 }
 
-func getActiveCollectionTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	ref collection.CollectionRef,
-) (collection.Collection, error) {
-	if err := ref.Validate(); err != nil {
-		return collection.Collection{}, err
-	}
-	if _, err := getActiveRootTx(ctx, tx, ref.RootID); err != nil {
-		return collection.Collection{}, err
-	}
-
-	value, err := scanCollection(tx.QueryRowContext(
-		ctx,
-		`SELECT `+collectionColumns+`
-		 FROM artifact_collections
-		 WHERE id = ? AND root_id = ? AND retired_at IS NULL`,
-		string(ref.CollectionID),
-		string(ref.RootID),
-	))
-	if errors.Is(err, sql.ErrNoRows) {
-		return collection.Collection{}, fmt.Errorf(
-			"%w: collection %q in root %q",
-			basespec.ErrCollectionNotFound,
-			ref.CollectionID,
-			ref.RootID,
-		)
-	}
-	return value, err
-}
-
 // requireAttachedSourceTx verifies only structural membership and active
 // Source existence. It intentionally does not require either the Source or
 // attachment to be enabled because pinned Artifacts and suppressions can refer
@@ -932,6 +901,37 @@ func requireAttachedSourceTx(
 		)
 	}
 	return nil
+}
+
+func getActiveCollectionTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	ref collection.CollectionRef,
+) (collection.Collection, error) {
+	if err := ref.Validate(); err != nil {
+		return collection.Collection{}, err
+	}
+	if _, err := getActiveRootTx(ctx, tx, ref.RootID); err != nil {
+		return collection.Collection{}, err
+	}
+
+	value, err := scanCollection(tx.QueryRowContext(
+		ctx,
+		`SELECT `+collectionColumns+`
+		 FROM artifact_collections
+		 WHERE id = ? AND root_id = ? AND retired_at IS NULL`,
+		string(ref.CollectionID),
+		string(ref.RootID),
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return collection.Collection{}, fmt.Errorf(
+			"%w: collection %q in root %q",
+			basespec.ErrCollectionNotFound,
+			ref.CollectionID,
+			ref.RootID,
+		)
+	}
+	return value, err
 }
 
 func requireAttachableSourceTx(

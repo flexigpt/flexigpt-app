@@ -1,15 +1,14 @@
 package spec
 
-import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+import "github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 
 type MCPApprovalSummary struct {
-	BundleID          bundleitemutils.BundleID `json:"bundleID"`
-	ServerID          MCPServerID              `json:"serverID"`
-	ServerDisplayName string                   `json:"serverDisplayName,omitempty"`
-	ToolName          string                   `json:"toolName"`
-	ToolDigest        string                   `json:"toolDigest,omitempty"`
-	Risk              MCPToolRisk              `json:"risk"`
-	Arguments         JSONRawString            `json:"arguments,omitempty"`
+	Server            artifact.ArtifactRef `json:"server"`
+	ServerDisplayName string               `json:"serverDisplayName,omitempty"`
+	ToolName          string               `json:"toolName"`
+	ToolDigest        string               `json:"toolDigest,omitempty"`
+	Risk              MCPToolRisk          `json:"risk"`
+	Arguments         JSONRawString        `json:"arguments,omitempty"`
 }
 
 type MCPApprovalEvaluation struct {

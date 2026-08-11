@@ -129,34 +129,6 @@ func (f *Adapter) List(
 	return output, nil
 }
 
-func (f *Adapter) Load(
-	ctx context.Context,
-	workspace collection.CollectionRef,
-	artifactRefs []artifact.ArtifactRef,
-) (SkillLoadPlan, error) {
-	seen := make(map[artifact.ArtifactRef]struct{}, len(artifactRefs))
-	for _, ref := range artifactRefs {
-		if err := ref.Validate(); err != nil {
-			return SkillLoadPlan{}, err
-		}
-		if ref.RootID != workspace.RootID {
-			return SkillLoadPlan{}, fmt.Errorf(
-				"%w: Workspace Skill belongs to another Root",
-				spec.ErrReferenceUnresolved,
-			)
-		}
-		if _, duplicate := seen[ref]; duplicate {
-			return SkillLoadPlan{}, fmt.Errorf(
-				"%w: duplicate Workspace Skill Artifact %q",
-				spec.ErrInvalidWorkspace,
-				ref.ArtifactID,
-			)
-		}
-		seen[ref] = struct{}{}
-	}
-	return f.loadLocal(ctx, workspace, artifactRefs)
-}
-
 func (f *Adapter) LoadArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -186,6 +158,34 @@ func (f *Adapter) LoadArtifact(
 		)
 	}
 	return plan.Skills[0], nil
+}
+
+func (f *Adapter) Load(
+	ctx context.Context,
+	workspace collection.CollectionRef,
+	artifactRefs []artifact.ArtifactRef,
+) (SkillLoadPlan, error) {
+	seen := make(map[artifact.ArtifactRef]struct{}, len(artifactRefs))
+	for _, ref := range artifactRefs {
+		if err := ref.Validate(); err != nil {
+			return SkillLoadPlan{}, err
+		}
+		if ref.RootID != workspace.RootID {
+			return SkillLoadPlan{}, fmt.Errorf(
+				"%w: Workspace Skill belongs to another Root",
+				spec.ErrReferenceUnresolved,
+			)
+		}
+		if _, duplicate := seen[ref]; duplicate {
+			return SkillLoadPlan{}, fmt.Errorf(
+				"%w: duplicate Workspace Skill Artifact %q",
+				spec.ErrInvalidWorkspace,
+				ref.ArtifactID,
+			)
+		}
+		seen[ref] = struct{}{}
+	}
+	return f.loadLocal(ctx, workspace, artifactRefs)
 }
 
 func (f *Adapter) loadLocal(

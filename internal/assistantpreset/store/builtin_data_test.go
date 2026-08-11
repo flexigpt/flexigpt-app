@@ -16,6 +16,18 @@ import (
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
+type artifactSkillLookup func(
+	context.Context,
+	spec.ArtifactSkillSelection,
+) (SkillSummary, error)
+
+func (f artifactSkillLookup) GetSkillSummaryForSelection(
+	ctx context.Context,
+	selection spec.ArtifactSkillSelection,
+) (SkillSummary, error) {
+	return f(ctx, selection)
+}
+
 func TestNewBuiltInData_InvalidOverlayDir(t *testing.T) {
 	_, err := NewBuiltInData(
 		t.Context(),
@@ -345,18 +357,6 @@ func TestBuiltInData_Close_NilSafe(t *testing.T) {
 	if err := d.Close(); err != nil {
 		t.Fatalf("Close() error: %v", err)
 	}
-}
-
-type artifactSkillLookup func(
-	context.Context,
-	spec.ArtifactSkillSelection,
-) (SkillSummary, error)
-
-func (f artifactSkillLookup) GetSkillSummaryForSelection(
-	ctx context.Context,
-	selection spec.ArtifactSkillSelection,
-) (SkillSummary, error) {
-	return f(ctx, selection)
 }
 
 func artifactSkillSelectionForAssistantPresetTest() spec.ArtifactSkillSelection {

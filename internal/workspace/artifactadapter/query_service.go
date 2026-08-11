@@ -25,13 +25,6 @@ type occurrenceKindKey struct {
 	Kind       basespec.ArtifactKind
 }
 
-func occurrenceKindIdentity(
-	key catalog.OccurrenceKey,
-	kind basespec.ArtifactKind,
-) occurrenceKindKey {
-	return occurrenceKindKey{Occurrence: key, Kind: kind}
-}
-
 type QueryService struct {
 	workspaces              *Service
 	catalogs                catalogSnapshotReader
@@ -816,4 +809,11 @@ func groupCatalogResources(
 		return output[left].Kind < output[right].Kind
 	})
 	return output
+}
+
+func occurrenceKindIdentity(
+	key catalog.OccurrenceKey,
+	kind basespec.ArtifactKind,
+) occurrenceKindKey {
+	return occurrenceKindKey{Occurrence: key, Kind: kind}
 }

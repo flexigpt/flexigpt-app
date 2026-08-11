@@ -20,47 +20,6 @@ const (
 	refreshTestSourceID     basespec.SourceID     = "019d3150-6a46-7a6b-a34e-d9032342bc31"
 )
 
-func refreshTestPublication() Publication {
-	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	definitionDigest := cryptoutil.DigestBytes([]byte("definition"))
-	contentDigest := cryptoutil.DigestBytes([]byte("content"))
-	return Publication{
-		Ref: collection.CollectionRef{
-			RootID:       refreshTestRootID,
-			CollectionID: refreshTestCollectionID,
-		},
-		ExpectedCollectionRevision: 1,
-		ExpectedAttachmentRevisions: map[basespec.SourceID]uint64{
-			refreshTestSourceID: 1,
-		},
-		ExpectedSourceRevisions: map[basespec.SourceID]uint64{
-			refreshTestSourceID: 1,
-		},
-		SourceGenerations: map[basespec.SourceID]string{
-			refreshTestSourceID: "generation-1",
-		},
-		PlanFingerprint:    cryptoutil.DigestBytes([]byte("plan")),
-		DecoderFingerprint: cryptoutil.DigestBytes([]byte("decoder")),
-		Occurrences: []catalog.Occurrence{{
-			RootID:       refreshTestRootID,
-			CollectionID: refreshTestCollectionID,
-			Key: catalog.OccurrenceKey{
-				CollectionID: refreshTestCollectionID,
-				SourceID:     refreshTestSourceID,
-				Locator:      "artifact.json",
-			},
-			Kind:                "test.artifact",
-			LogicalName:         "artifact",
-			DefinitionDigest:    &definitionDigest,
-			SourceContentDigest: &contentDigest,
-			DecoderID:           "test.decoder",
-			State:               catalog.OccurrenceValid,
-			ObservedAt:          now,
-		}},
-		PublishedAt: now,
-	}
-}
-
 func TestPublicationValidationRejectsBrokenConcurrencyAndOwnership(t *testing.T) {
 	t.Parallel()
 
@@ -119,5 +78,46 @@ func TestCloseRefreshSnapshotsClosesEverySnapshotAndJoinsErrors(t *testing.T) {
 	}
 	if first.closed != 1 || second.closed != 1 {
 		t.Fatalf("close calls: first=%d second=%d", first.closed, second.closed)
+	}
+}
+
+func refreshTestPublication() Publication {
+	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
+	definitionDigest := cryptoutil.DigestBytes([]byte("definition"))
+	contentDigest := cryptoutil.DigestBytes([]byte("content"))
+	return Publication{
+		Ref: collection.CollectionRef{
+			RootID:       refreshTestRootID,
+			CollectionID: refreshTestCollectionID,
+		},
+		ExpectedCollectionRevision: 1,
+		ExpectedAttachmentRevisions: map[basespec.SourceID]uint64{
+			refreshTestSourceID: 1,
+		},
+		ExpectedSourceRevisions: map[basespec.SourceID]uint64{
+			refreshTestSourceID: 1,
+		},
+		SourceGenerations: map[basespec.SourceID]string{
+			refreshTestSourceID: "generation-1",
+		},
+		PlanFingerprint:    cryptoutil.DigestBytes([]byte("plan")),
+		DecoderFingerprint: cryptoutil.DigestBytes([]byte("decoder")),
+		Occurrences: []catalog.Occurrence{{
+			RootID:       refreshTestRootID,
+			CollectionID: refreshTestCollectionID,
+			Key: catalog.OccurrenceKey{
+				CollectionID: refreshTestCollectionID,
+				SourceID:     refreshTestSourceID,
+				Locator:      "artifact.json",
+			},
+			Kind:                "test.artifact",
+			LogicalName:         "artifact",
+			DefinitionDigest:    &definitionDigest,
+			SourceContentDigest: &contentDigest,
+			DecoderID:           "test.decoder",
+			State:               catalog.OccurrenceValid,
+			ObservedAt:          now,
+		}},
+		PublishedAt: now,
 	}
 }

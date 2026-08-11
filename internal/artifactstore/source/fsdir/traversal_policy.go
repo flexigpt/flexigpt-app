@@ -18,20 +18,6 @@ type normalizedTraversalPolicy struct {
 	skipGitSubmodules      bool
 }
 
-func DefaultTraversalPolicy() TraversalPolicy {
-	return TraversalPolicy{
-		ExcludedDirectoryNames: []string{
-			".git",
-			".hg",
-			".svn",
-			"node_modules",
-			"vendor",
-			"bower_components",
-		},
-		SkipGitSubmodules: true,
-	}
-}
-
 func normalizeTraversalPolicy(input *TraversalPolicy) (normalizedTraversalPolicy, error) {
 	value := DefaultTraversalPolicy()
 	if input != nil {
@@ -66,11 +52,6 @@ func normalizeTraversalPolicy(input *TraversalPolicy) (normalizedTraversalPolicy
 	return output, nil
 }
 
-func (p normalizedTraversalPolicy) shouldSkipDirectory(name string) bool {
-	_, found := p.excludedDirectoryNames[strings.ToLower(name)]
-	return found
-}
-
 func (p normalizedTraversalPolicy) excludesLocator(locator string) bool {
 	for segment := range strings.SplitSeq(locator, "/") {
 		if p.shouldSkipDirectory(segment) {
@@ -78,6 +59,11 @@ func (p normalizedTraversalPolicy) excludesLocator(locator string) bool {
 		}
 	}
 	return false
+}
+
+func (p normalizedTraversalPolicy) shouldSkipDirectory(name string) bool {
+	_, found := p.excludedDirectoryNames[strings.ToLower(name)]
+	return found
 }
 
 func (p normalizedTraversalPolicy) isGitSubmoduleDirectory(directory string) bool {
@@ -105,4 +91,18 @@ func (p normalizedTraversalPolicy) isGitSubmoduleDirectory(directory string) boo
 		strings.ToLower(strings.TrimSpace(string(content))),
 		"gitdir:",
 	)
+}
+
+func DefaultTraversalPolicy() TraversalPolicy {
+	return TraversalPolicy{
+		ExcludedDirectoryNames: []string{
+			".git",
+			".hg",
+			".svn",
+			"node_modules",
+			"vendor",
+			"bower_components",
+		},
+		SkipGitSubmodules: true,
+	}
 }

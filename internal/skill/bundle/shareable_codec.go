@@ -17,19 +17,6 @@ func NewShareableCodec() shareable.Codec {
 	return skillCollectionCodec{}
 }
 
-func (skillCollectionCodec) Key() shareable.SchemaKey {
-	return shareable.SchemaKey{
-		Entity:        shareable.EntityCollection,
-		Kind:          CollectionKind,
-		SchemaID:      basespec.SchemaID(builtinSchema.SkillCollectionV1SchemaID),
-		SchemaVersion: builtinSchema.SkillCollectionV1SchemaVersion,
-	}
-}
-
-func (skillCollectionCodec) JSONSchema() []byte {
-	return builtinSchema.SkillCollectionV1JSONSchema()
-}
-
 func (c skillCollectionCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
@@ -68,4 +55,17 @@ func (c skillCollectionCodec) Canonicalize(
 		Digest: cryptoutil.Digest(*canonical.Digest),
 		Raw:    json.RawMessage(encoded),
 	}, nil
+}
+
+func (skillCollectionCodec) Key() shareable.SchemaKey {
+	return shareable.SchemaKey{
+		Entity:        shareable.EntityCollection,
+		Kind:          CollectionKind,
+		SchemaID:      basespec.SchemaID(builtinSchema.SkillCollectionV1SchemaID),
+		SchemaVersion: builtinSchema.SkillCollectionV1SchemaVersion,
+	}
+}
+
+func (skillCollectionCodec) JSONSchema() []byte {
+	return builtinSchema.SkillCollectionV1JSONSchema()
 }

@@ -1,0 +1,339 @@
+//nolint:nilnil // Required.
+package runtime
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+)
+
+const defaultApprovalTTL = 5 * time.Minute
+
+type approvalDecisionKey struct {
+	Server     artifact.ArtifactRef `json:"server"`
+	ToolName   string               `json:"toolName"`
+	ToolDigest string               `json:"toolDigest,omitempty"`
+	Risk       spec.MCPToolRisk     `json:"risk"`
+}
+
+type pendingApproval struct {
+	ID        string
+	Token     string
+	Summary   spec.MCPApprovalSummary
+	ExpiresAt time.Time
+	Issued    bool
+	Consumed  bool
+}
+
+type ApprovalManager struct {
+	mu        sync.Mutex
+	ttl       time.Duration
+	pending   map[string]*pendingApproval
+	decisions map[string]spec.MCPApprovalResolution
+}
+
+func NewApprovalManager(ttl time.Duration) *ApprovalManager {
+	if ttl <= 0 {
+		ttl = defaultApprovalTTL
+	}
+	return &ApprovalManager{
+		ttl:       ttl,
+		pending:   make(map[string]*pendingApproval),
+		decisions: make(map[string]spec.MCPApprovalResolution),
+	}
+}
+
+func (m *ApprovalManager) Create(
+	ctx context.Context,
+	summary spec.MCPApprovalSummary,
+) (string, error) {
+	if err := validateApprovalContext(ctx); err != nil {
+		return "", err
+	}
+	if err := validateApprovalSummary(summary); err != nil {
+		return "", err
+	}
+
+	id, err := randomApprovalToken(24)
+	if err != nil {
+		return "", err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.purgeExpiredLocked(time.Now().UTC())
+	m.pending[id] = &pendingApproval{
+		ID:        id,
+		Summary:   cloneApprovalSummary(summary),
+		ExpiresAt: time.Now().UTC().Add(m.ttl),
+	}
+	return id, nil
+}
+
+func (m *ApprovalManager) Resolve(
+	ctx context.Context,
+	id string,
+	resolution spec.MCPApprovalResolution,
+) (*spec.MCPApprovalToken, error) {
+	if err := validateApprovalContext(ctx); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(id) == "" {
+		return nil, fmt.Errorf(
+			"%w: approval ID is required",
+			spec.ErrMCPInvalidRequest,
+		)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.purgeExpiredLocked(time.Now().UTC())
+
+	pending, found := m.pending[id]
+	if !found {
+		return nil, fmt.Errorf(
+			"%w: approval was not found",
+			spec.ErrMCPInvalidRequest,
+		)
+	}
+	if pending.Issued || pending.Consumed {
+		return nil, fmt.Errorf(
+			"%w: approval was already resolved",
+			spec.ErrMCPInvalidRequest,
+		)
+	}
+
+	switch resolution {
+	case spec.MCPApprovalResolutionDenyOnce:
+		delete(m.pending, id)
+		return nil, nil
+
+	case spec.MCPApprovalResolutionDenyAlways:
+		m.decisions[approvalDecisionKeyFor(pending.Summary)] = resolution
+		delete(m.pending, id)
+		return nil, nil
+
+	case spec.MCPApprovalResolutionAllowAlways:
+		m.decisions[approvalDecisionKeyFor(pending.Summary)] = resolution
+		delete(m.pending, id)
+		return nil, nil
+
+	case spec.MCPApprovalResolutionAllowOnce:
+		token, err := randomApprovalToken(32)
+		if err != nil {
+			return nil, err
+		}
+		pending.Token = token
+		pending.Issued = true
+
+		return &spec.MCPApprovalToken{
+			ApprovalID: pending.ID,
+			Token:      token,
+			ExpiresAt:  pending.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		}, nil
+
+	default:
+		return nil, fmt.Errorf(
+			"%w: unsupported approval resolution %q",
+			spec.ErrMCPInvalidRequest,
+			resolution,
+		)
+	}
+}
+
+func (m *ApprovalManager) LookupDecision(
+	summary spec.MCPApprovalSummary,
+) (spec.MCPApprovalResolution, bool) {
+	if m == nil {
+		return "", false
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.purgeExpiredLocked(time.Now().UTC())
+	value, found := m.decisions[approvalDecisionKeyFor(summary)]
+	return value, found
+}
+
+func (m *ApprovalManager) VerifyAndConsumeToken(
+	ctx context.Context,
+	token string,
+	expected spec.MCPApprovalSummary,
+) (string, error) {
+	if err := validateApprovalContext(ctx); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(token) == "" {
+		return "", fmt.Errorf(
+			"%w: approval token is required",
+			spec.ErrMCPApprovalNeeded,
+		)
+	}
+	if err := validateApprovalSummary(expected); err != nil {
+		return "", err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.purgeExpiredLocked(time.Now().UTC())
+
+	for _, pending := range m.pending {
+		if pending.Token == "" {
+			continue
+		}
+		if subtle.ConstantTimeCompare(
+			[]byte(pending.Token),
+			[]byte(token),
+		) != 1 {
+			continue
+		}
+		if pending.Consumed {
+			return "", fmt.Errorf(
+				"%w: approval token was already consumed",
+				spec.ErrMCPApprovalNeeded,
+			)
+		}
+		if !approvalSummaryMatches(pending.Summary, expected) {
+			return "", fmt.Errorf(
+				"%w: approval token does not match this MCP tool call",
+				spec.ErrMCPApprovalNeeded,
+			)
+		}
+
+		pending.Consumed = true
+		delete(m.pending, pending.ID)
+		return pending.ID, nil
+	}
+
+	return "", fmt.Errorf(
+		"%w: approval token was not found",
+		spec.ErrMCPApprovalNeeded,
+	)
+}
+
+func (m *ApprovalManager) purgeExpiredLocked(now time.Time) {
+	for id, pending := range m.pending {
+		if now.After(pending.ExpiresAt) {
+			delete(m.pending, id)
+		}
+	}
+}
+
+func approvalDecisionKeyFor(summary spec.MCPApprovalSummary) string {
+	raw, _ := json.Marshal(approvalDecisionKey{
+		Server:     summary.Server,
+		ToolName:   summary.ToolName,
+		ToolDigest: summary.ToolDigest,
+		Risk:       summary.Risk,
+	})
+	return string(cryptoutil.DigestBytes(raw))
+}
+
+func approvalSummaryMatches(
+	stored spec.MCPApprovalSummary,
+	expected spec.MCPApprovalSummary,
+) bool {
+	if stored.Server != expected.Server ||
+		stored.ToolName != expected.ToolName ||
+		stored.Risk != expected.Risk {
+		return false
+	}
+	if stored.ToolDigest != "" &&
+		expected.ToolDigest != "" &&
+		stored.ToolDigest != expected.ToolDigest {
+		return false
+	}
+
+	return normalizeApprovalArguments(stored.Arguments) ==
+		normalizeApprovalArguments(expected.Arguments)
+}
+
+func normalizeApprovalArguments(value spec.JSONRawString) spec.JSONRawString {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return spec.JSONRawString(`{}`)
+	}
+
+	var decoded any
+	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
+		return trimmed
+	}
+
+	normalized, err := json.Marshal(decoded)
+	if err != nil {
+		return trimmed
+	}
+	return spec.JSONRawString(normalized)
+}
+
+func validateApprovalContext(ctx context.Context) error {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: MCP approval context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	return ctx.Err()
+}
+
+func validateApprovalSummary(value spec.MCPApprovalSummary) error {
+	if err := value.Server.Validate(); err != nil {
+		return err
+	}
+	if err := basespec.ValidateRequiredText(
+		"MCP approval tool name",
+		value.ToolName,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+
+	switch value.Risk {
+	case spec.MCPToolRiskUnknown,
+		spec.MCPToolRiskRead,
+		spec.MCPToolRiskWrite,
+		spec.MCPToolRiskDestructive,
+		spec.MCPToolRiskOpenWorld:
+	default:
+		return fmt.Errorf(
+			"%w: invalid MCP approval risk %q",
+			basespec.ErrInvalid,
+			value.Risk,
+		)
+	}
+
+	return nil
+}
+
+func cloneApprovalSummary(
+	input spec.MCPApprovalSummary,
+) spec.MCPApprovalSummary {
+	output := input
+	output.Arguments = spec.JSONRawString(
+		append([]byte(nil), []byte(input.Arguments)...),
+	)
+	return output
+}
+
+func randomApprovalToken(bytes int) (string, error) {
+	raw := make([]byte, bytes)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}

@@ -16,17 +16,6 @@ type file struct {
 	Definition definition.Definition `json:"definition"`
 }
 
-func (f file) validate() error {
-	if f.Format != fileFormatV1 {
-		return fmt.Errorf(
-			"%w: unsupported definition file format %q",
-			basespec.ErrInvalid,
-			f.Format,
-		)
-	}
-	return f.Definition.Validate()
-}
-
 func encodeFile(
 	value definition.Definition,
 ) (map[string]any, error) {
@@ -64,4 +53,15 @@ func decodeFile(
 		)
 	}
 	return canonical, nil
+}
+
+func (f file) validate() error {
+	if f.Format != fileFormatV1 {
+		return fmt.Errorf(
+			"%w: unsupported definition file format %q",
+			basespec.ErrInvalid,
+			f.Format,
+		)
+	}
+	return f.Definition.Validate()
 }

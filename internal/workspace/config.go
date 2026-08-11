@@ -20,20 +20,11 @@ const (
 	markdownFilePattern            = "*.md"
 )
 
-func defaultDiscoveryProfiles() spec.DiscoveryProfiles {
-	return spec.DiscoveryProfiles{
-		Primary: spec.DiscoveryProfile{},
-		Attached: spec.DiscoveryProfile{
-			DirectoryRoots: []spec.DirectoryRoot{
-				{
-					Root:      spec.RepositoryRootLocator,
-					Recursive: true,
-					IncludePatterns: []string{
-						markdownFilePattern,
-					},
-				},
-			},
-		},
+// DefaultDecoders contains Workspace-owned decoders only. The shared
+// agent.skill decoder is registered exactly once by Artifact Store composition.
+func DefaultDecoders() []artifactstoreDiscovery.Decoder {
+	return []artifactstoreDiscovery.Decoder{
+		contextadapter.NewContextDecoder(),
 	}
 }
 
@@ -68,16 +59,6 @@ var defaultArtifactSupportMatrix = []defaultArtifactSupport{
 			Validator: skillArtifact.ValidateDefinition,
 		},
 	},
-}
-
-func DefaultConfig() Config {
-	return Config{
-		Supports:                DefaultArtifactSupports(),
-		DiscoveryPolicyRevision: defaultDiscoveryPolicyRevision,
-		SkillRoots:              workspaceadapter.DefaultSkillRoots(),
-		ContextComposition:      contextadapter.DefaultCompositionPolicy(),
-		SourceUsePolicy:         artifactadapter.NewArtifactRuntimePolicy(),
-	}
 }
 
 func (c Config) normalized() Config {
@@ -163,23 +144,6 @@ func DefaultArtifactSupports() []spec.ArtifactSupport {
 	return output
 }
 
-// DefaultDecoders contains Workspace-owned decoders only. The shared
-// agent.skill decoder is registered exactly once by Artifact Store composition.
-func DefaultDecoders() []artifactstoreDiscovery.Decoder {
-	return []artifactstoreDiscovery.Decoder{
-		contextadapter.NewContextDecoder(),
-	}
-}
-
-func DefaultDiscoveryProfiles() spec.DiscoveryProfiles {
-	config := DefaultConfig()
-	registry, err := config.skillConventions()
-	if err != nil {
-		panic(err)
-	}
-	return config.normalizedDiscoveryProfiles(registry)
-}
-
 func (c Config) skillConventions() (*workspaceadapter.ConventionRegistry, error) {
 	return workspaceadapter.NewConventionRegistry(c.SkillRoots...)
 }
@@ -212,4 +176,31 @@ func (c Config) runtimePolicy() artifactadapter.SourceUsePolicy {
 
 func (c Config) contextCompositionPolicy() contextadapter.CompositionPolicy {
 	return c.ContextComposition.Normalized()
+}
+
+func DefaultConfig() Config {
+	return Config{
+		Supports:                DefaultArtifactSupports(),
+		DiscoveryPolicyRevision: defaultDiscoveryPolicyRevision,
+		SkillRoots:              workspaceadapter.DefaultSkillRoots(),
+		ContextComposition:      contextadapter.DefaultCompositionPolicy(),
+		SourceUsePolicy:         artifactadapter.NewArtifactRuntimePolicy(),
+	}
+}
+
+func defaultDiscoveryProfiles() spec.DiscoveryProfiles {
+	return spec.DiscoveryProfiles{
+		Primary: spec.DiscoveryProfile{},
+		Attached: spec.DiscoveryProfile{
+			DirectoryRoots: []spec.DirectoryRoot{
+				{
+					Root:      spec.RepositoryRootLocator,
+					Recursive: true,
+					IncludePatterns: []string{
+						markdownFilePattern,
+					},
+				},
+			},
+		},
+	}
 }

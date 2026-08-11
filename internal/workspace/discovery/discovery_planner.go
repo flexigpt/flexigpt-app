@@ -322,20 +322,6 @@ func cloneDiscoveryProfiles(value spec.DiscoveryProfiles) spec.DiscoveryProfiles
 	}
 }
 
-func cloneDirectoryRoots(
-	values []spec.DirectoryRoot,
-) []spec.DirectoryRoot {
-	output := make([]spec.DirectoryRoot, len(values))
-	for index, value := range values {
-		output[index] = value
-		output[index].IncludePatterns = append(
-			[]string(nil),
-			value.IncludePatterns...,
-		)
-	}
-	return output
-}
-
 // MergeDiscoveryProfile merges feature-contributed conventions into a profile
 // without creating duplicate locators or directory roots. An empty pattern
 // list means all files and therefore dominates narrower include patterns.
@@ -429,6 +415,20 @@ func appendDirectoryRoots(
 			continue
 		}
 		output = append(output, addition)
+	}
+	return output
+}
+
+func cloneDirectoryRoots(
+	values []spec.DirectoryRoot,
+) []spec.DirectoryRoot {
+	output := make([]spec.DirectoryRoot, len(values))
+	for index, value := range values {
+		output[index] = value
+		output[index].IncludePatterns = append(
+			[]string(nil),
+			value.IncludePatterns...,
+		)
 	}
 	return output
 }

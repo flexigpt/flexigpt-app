@@ -1,6 +1,6 @@
 package spec
 
-import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+import "github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 
 type MCPGetPromptRequestBody struct {
 	PromptName string            `json:"promptName"          required:"true"`
@@ -8,18 +8,15 @@ type MCPGetPromptRequestBody struct {
 }
 
 type MCPGetPromptRequest struct {
-	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
-	ServerID MCPServerID              `path:"serverID" required:"true"`
-
-	Body *MCPGetPromptRequestBody
+	Server artifact.ArtifactRef `json:"server" required:"true"`
+	Body   *MCPGetPromptRequestBody
 }
 
 type MCPGetPromptResponseBody struct {
-	BundleID    bundleitemutils.BundleID `json:"bundleID"`
-	ServerID    MCPServerID              `json:"serverID"`
-	PromptName  string                   `json:"promptName"`
-	Description string                   `json:"description,omitempty"`
-	Messages    []MCPPromptMessage       `json:"messages,omitempty"`
+	Server      artifact.ArtifactRef `json:"server"`
+	PromptName  string               `json:"promptName"`
+	Description string               `json:"description,omitempty"`
+	Messages    []MCPPromptMessage   `json:"messages,omitempty"`
 }
 
 type MCPGetPromptResponse struct {
@@ -35,10 +32,8 @@ type MCPCompleteArgumentRequestBody struct {
 }
 
 type MCPCompleteArgumentRequest struct {
-	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
-	ServerID MCPServerID              `path:"serverID" required:"true"`
-
-	Body *MCPCompleteArgumentRequestBody
+	Server artifact.ArtifactRef `json:"server" required:"true"`
+	Body   *MCPCompleteArgumentRequestBody
 }
 
 type MCPCompletionResult struct {

@@ -509,7 +509,13 @@ linters:
       - text: "(slog|log)\\.\\w+"
         linters:
           - noctx
+      - path: "cmd/agentgo/*"
+        linters:
+          - contextcheck
       - path: '(.+)_test\.go'
+        linters:
+          - goconst
+      - path: "internal/mcp/schema/*"
         linters:
           - goconst
 

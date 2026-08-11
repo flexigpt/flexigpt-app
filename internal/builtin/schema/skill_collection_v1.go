@@ -117,6 +117,110 @@ func MarshalSkillCollectionV1(value SkillCollectionV1) ([]byte, error) {
 	return jsonutil.CanonicalizeObject(raw, basespec.MaxDefinitionBytes)
 }
 
+// CanonicalizeSkillCollectionV1 validates a shareable collection document,
+// deterministically orders its members, calculates its digest, and verifies a
+// supplied digest when one is present.
+//
+// Member digests intentionally remain optional. They can be supplied by a
+// sharer or enriched later by package hydration when member bytes exist.
+func CanonicalizeSkillCollectionV1(
+	input SkillCollectionV1,
+) (SkillCollectionV1, error) {
+	output := input.Clone()
+
+	body, err := canonicalSkillCollectionV1Body(output.Body)
+	if err != nil {
+		return SkillCollectionV1{}, err
+	}
+	output.Body = json.RawMessage(body)
+
+	sort.Slice(output.Members, func(left, right int) bool {
+		return skillCollectionV1MemberIdentity(output.Members[left]) <
+			skillCollectionV1MemberIdentity(output.Members[right])
+	})
+
+	if err := output.Validate(); err != nil {
+		return SkillCollectionV1{}, err
+	}
+
+	supplied := ""
+	if output.Digest != nil {
+		supplied = *output.Digest
+	}
+
+	calculated, err := skillCollectionV1Digest(output)
+	if err != nil {
+		return SkillCollectionV1{}, err
+	}
+	if supplied != "" && supplied != string(calculated) {
+		return SkillCollectionV1{}, fmt.Errorf(
+			"%w: supplied skill collection digest %q, calculated %q",
+			basespec.ErrDigestMismatch,
+			supplied,
+			calculated,
+		)
+	}
+
+	digest := string(calculated)
+	output.Digest = &digest
+	if err := output.Validate(); err != nil {
+		return SkillCollectionV1{}, err
+	}
+	return output.Clone(), nil
+}
+
+// Validate accepts both shareable input documents without a digest and
+// canonical documents with a digest. CanonicalizeSkillCollectionV1 additionally
+// calculates and verifies the digest.
+func (v SkillCollectionV1) Validate() error {
+	if err := v.ValidateEnvelope(); err != nil {
+		return err
+	}
+	if err := ValidateShareableCollectionMetadata(
+		v.LogicalName,
+		v.LogicalVersion,
+		v.DisplayName,
+		v.Description,
+		v.Labels,
+	); err != nil {
+		return err
+	}
+	if v.Digest != nil {
+		if err := cryptoutil.ValidateDigest(
+			cryptoutil.Digest(*v.Digest),
+		); err != nil {
+			return fmt.Errorf("skill collection digest: %w", err)
+		}
+	}
+	if _, err := canonicalSkillCollectionV1Body(v.Body); err != nil {
+		return err
+	}
+	if len(v.Members) > maxSkillCollectionV1Members {
+		return fmt.Errorf(
+			"%w: skill collection members exceed %d entries",
+			basespec.ErrInvalid,
+			maxSkillCollectionV1Members,
+		)
+	}
+
+	seen := make(map[string]struct{}, len(v.Members))
+	for index, member := range v.Members {
+		if err := validateSkillCollectionV1Member(member); err != nil {
+			return fmt.Errorf("skill collection members[%d]: %w", index, err)
+		}
+		identity := skillCollectionV1MemberIdentity(member)
+		if _, duplicate := seen[identity]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate skill collection member %d",
+				basespec.ErrInvalid,
+				index,
+			)
+		}
+		seen[identity] = struct{}{}
+	}
+	return nil
+}
+
 func (v SkillCollectionV1) ValidateEnvelope() error {
 	if v.Kind != SkillCollectionV1Kind {
 		return fmt.Errorf(
@@ -188,110 +292,6 @@ func (v SkillCollectionV1) Clone() SkillCollectionV1 {
 		}
 	}
 	return output
-}
-
-// Validate accepts both shareable input documents without a digest and
-// canonical documents with a digest. CanonicalizeSkillCollectionV1 additionally
-// calculates and verifies the digest.
-func (v SkillCollectionV1) Validate() error {
-	if err := v.ValidateEnvelope(); err != nil {
-		return err
-	}
-	if err := ValidateShareableCollectionMetadata(
-		v.LogicalName,
-		v.LogicalVersion,
-		v.DisplayName,
-		v.Description,
-		v.Labels,
-	); err != nil {
-		return err
-	}
-	if v.Digest != nil {
-		if err := cryptoutil.ValidateDigest(
-			cryptoutil.Digest(*v.Digest),
-		); err != nil {
-			return fmt.Errorf("skill collection digest: %w", err)
-		}
-	}
-	if _, err := canonicalSkillCollectionV1Body(v.Body); err != nil {
-		return err
-	}
-	if len(v.Members) > maxSkillCollectionV1Members {
-		return fmt.Errorf(
-			"%w: skill collection members exceed %d entries",
-			basespec.ErrInvalid,
-			maxSkillCollectionV1Members,
-		)
-	}
-
-	seen := make(map[string]struct{}, len(v.Members))
-	for index, member := range v.Members {
-		if err := validateSkillCollectionV1Member(member); err != nil {
-			return fmt.Errorf("skill collection members[%d]: %w", index, err)
-		}
-		identity := skillCollectionV1MemberIdentity(member)
-		if _, duplicate := seen[identity]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate skill collection member %d",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-		seen[identity] = struct{}{}
-	}
-	return nil
-}
-
-// CanonicalizeSkillCollectionV1 validates a shareable collection document,
-// deterministically orders its members, calculates its digest, and verifies a
-// supplied digest when one is present.
-//
-// Member digests intentionally remain optional. They can be supplied by a
-// sharer or enriched later by package hydration when member bytes exist.
-func CanonicalizeSkillCollectionV1(
-	input SkillCollectionV1,
-) (SkillCollectionV1, error) {
-	output := input.Clone()
-
-	body, err := canonicalSkillCollectionV1Body(output.Body)
-	if err != nil {
-		return SkillCollectionV1{}, err
-	}
-	output.Body = json.RawMessage(body)
-
-	sort.Slice(output.Members, func(left, right int) bool {
-		return skillCollectionV1MemberIdentity(output.Members[left]) <
-			skillCollectionV1MemberIdentity(output.Members[right])
-	})
-
-	if err := output.Validate(); err != nil {
-		return SkillCollectionV1{}, err
-	}
-
-	supplied := ""
-	if output.Digest != nil {
-		supplied = *output.Digest
-	}
-
-	calculated, err := skillCollectionV1Digest(output)
-	if err != nil {
-		return SkillCollectionV1{}, err
-	}
-	if supplied != "" && supplied != string(calculated) {
-		return SkillCollectionV1{}, fmt.Errorf(
-			"%w: supplied skill collection digest %q, calculated %q",
-			basespec.ErrDigestMismatch,
-			supplied,
-			calculated,
-		)
-	}
-
-	digest := string(calculated)
-	output.Digest = &digest
-	if err := output.Validate(); err != nil {
-		return SkillCollectionV1{}, err
-	}
-	return output.Clone(), nil
 }
 
 func canonicalSkillCollectionV1Body(

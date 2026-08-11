@@ -134,6 +134,41 @@ func BoundedDiagnosticMessage(value string) string {
 	return value + suffix
 }
 
+func AppendDiagnostics(
+	current []Diagnostic,
+	incoming ...Diagnostic,
+) []Diagnostic {
+	output := append(CloneDiagnostics(current), CloneDiagnostics(incoming)...)
+	if len(output) <= MaxDiagnostics {
+		return output
+	}
+
+	keep := make([]bool, len(output))
+	for index := range keep {
+		keep[index] = true
+	}
+	excess := len(output) - MaxDiagnostics
+	for index := len(output) - 1; index >= 0 && excess > 0; index-- {
+		if output[index].Severity == DiagnosticError {
+			continue
+		}
+		keep[index] = false
+		excess--
+	}
+	for index := len(output) - 1; index >= 0 && excess > 0; index-- {
+		keep[index] = false
+		excess--
+	}
+
+	trimmed := make([]Diagnostic, 0, MaxDiagnostics)
+	for index, value := range output {
+		if keep[index] {
+			trimmed = append(trimmed, value)
+		}
+	}
+	return trimmed
+}
+
 func CloneDiagnostics(values []Diagnostic) []Diagnostic {
 	if values == nil {
 		return nil
@@ -171,39 +206,4 @@ func EqualDiagnostics(left, right []Diagnostic) bool {
 		}
 	}
 	return true
-}
-
-func AppendDiagnostics(
-	current []Diagnostic,
-	incoming ...Diagnostic,
-) []Diagnostic {
-	output := append(CloneDiagnostics(current), CloneDiagnostics(incoming)...)
-	if len(output) <= MaxDiagnostics {
-		return output
-	}
-
-	keep := make([]bool, len(output))
-	for index := range keep {
-		keep[index] = true
-	}
-	excess := len(output) - MaxDiagnostics
-	for index := len(output) - 1; index >= 0 && excess > 0; index-- {
-		if output[index].Severity == DiagnosticError {
-			continue
-		}
-		keep[index] = false
-		excess--
-	}
-	for index := len(output) - 1; index >= 0 && excess > 0; index-- {
-		keep[index] = false
-		excess--
-	}
-
-	trimmed := make([]Diagnostic, 0, MaxDiagnostics)
-	for index, value := range output {
-		if keep[index] {
-			trimmed = append(trimmed, value)
-		}
-	}
-	return trimmed
 }

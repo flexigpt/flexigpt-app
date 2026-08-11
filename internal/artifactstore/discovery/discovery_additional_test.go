@@ -90,23 +90,6 @@ func (s discoveryTestSnapshot) Open(ctx context.Context, locator basespec.Locato
 func (discoveryTestSnapshot) Confirm(context.Context) error { return nil }
 func (discoveryTestSnapshot) Close() error                  { return nil }
 
-func discoveryTestDefinition() definition.Definition {
-	return definition.Definition{
-		Kind:          "test.artifact",
-		SchemaID:      "test.schema",
-		SchemaVersion: "v1",
-		LogicalName:   "example",
-		Body:          []byte(`{"value":true}`),
-	}
-}
-
-func discoveryTestPlan() SourcePlan {
-	return SourcePlan{
-		SourceID:         discoveryTestSourceID,
-		ExplicitLocators: []basespec.Locator{"example.json"},
-	}
-}
-
 func TestDiscoverCreatesCanonicalOccurrenceAndDefinition(t *testing.T) {
 	t.Parallel()
 
@@ -302,5 +285,22 @@ func TestDiscoverIsSafeForConcurrentReadOnlySnapshots(t *testing.T) {
 	close(errorsSeen)
 	for err := range errorsSeen {
 		t.Fatalf("concurrent discovery: %v", err)
+	}
+}
+
+func discoveryTestPlan() SourcePlan {
+	return SourcePlan{
+		SourceID:         discoveryTestSourceID,
+		ExplicitLocators: []basespec.Locator{"example.json"},
+	}
+}
+
+func discoveryTestDefinition() definition.Definition {
+	return definition.Definition{
+		Kind:          "test.artifact",
+		SchemaID:      "test.schema",
+		SchemaVersion: "v1",
+		LogicalName:   "example",
+		Body:          []byte(`{"value":true}`),
 	}
 }

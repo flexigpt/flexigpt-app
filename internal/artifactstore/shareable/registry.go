@@ -56,6 +56,9 @@ func NewRegistry(codecs ...Codec) (*Registry, error) {
 	}
 
 	sort.Slice(keys, func(left, right int) bool {
+		if keys[left].Entity != keys[right].Entity {
+			return keys[left].Entity < keys[right].Entity
+		}
 		if keys[left].Kind != keys[right].Kind {
 			return keys[left].Kind < keys[right].Kind
 		}
@@ -78,8 +81,19 @@ func (r *Registry) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (ParsedDocument, error) {
+	return r.CanonicalizeEntity(ctx, EntityCollection, raw)
+}
+
+func (r *Registry) CanonicalizeEntity(
+	ctx context.Context,
+	entity EntityType,
+	raw []byte,
+) (ParsedDocument, error) {
 	if r == nil {
 		return ParsedDocument{}, basespec.ErrClosed
+	}
+	if entity != EntityCollection && entity != EntityArtifact {
+		return ParsedDocument{}, fmt.Errorf("%w: unsupported shareable entity %q", basespec.ErrInvalid, entity)
 	}
 	if ctx == nil {
 		return ParsedDocument{}, fmt.Errorf(
@@ -100,9 +114,9 @@ func (r *Registry) Canonicalize(
 	}
 
 	var header struct {
-		Kind          basespec.CollectionKind `json:"kind"`
-		SchemaID      basespec.SchemaID       `json:"schemaID"`
-		SchemaVersion string                  `json:"schemaVersion"`
+		Kind          string            `json:"kind"`
+		SchemaID      basespec.SchemaID `json:"schemaID"`
+		SchemaVersion string            `json:"schemaVersion"`
 	}
 	if err := json.Unmarshal(canonical, &header); err != nil {
 		return ParsedDocument{}, fmt.Errorf(
@@ -113,8 +127,8 @@ func (r *Registry) Canonicalize(
 	}
 
 	key := SchemaKey{
-		Entity:        EntityCollection,
-		Kind:          header.Kind,
+		Entity:        entity,
+		Kind:          basespec.CollectionKind(header.Kind),
 		SchemaID:      header.SchemaID,
 		SchemaVersion: header.SchemaVersion,
 	}
@@ -124,8 +138,9 @@ func (r *Registry) Canonicalize(
 	registered, found := r.codecs[key]
 	if !found {
 		return ParsedDocument{}, fmt.Errorf(
-			"%w: shareable collection schema %q/%q/%q",
+			"%w: shareable %s schema %q/%q/%q",
 			basespec.ErrUnsupported,
+			entity,
 			key.Kind,
 			key.SchemaID,
 			key.SchemaVersion,
@@ -184,10 +199,10 @@ func validateCodecOutput(
 	}
 
 	var header struct {
-		Kind          basespec.CollectionKind `json:"kind"`
-		SchemaID      basespec.SchemaID       `json:"schemaID"`
-		SchemaVersion string                  `json:"schemaVersion"`
-		Digest        string                  `json:"digest"`
+		Kind          string            `json:"kind"`
+		SchemaID      basespec.SchemaID `json:"schemaID"`
+		SchemaVersion string            `json:"schemaVersion"`
+		Digest        string            `json:"digest"`
 	}
 	if err := json.Unmarshal(canonical, &header); err != nil {
 		return fmt.Errorf(
@@ -197,8 +212,8 @@ func validateCodecOutput(
 		)
 	}
 	actual := SchemaKey{
-		Entity:        EntityCollection,
-		Kind:          header.Kind,
+		Entity:        expected.Entity,
+		Kind:          basespec.CollectionKind(header.Kind),
 		SchemaID:      header.SchemaID,
 		SchemaVersion: header.SchemaVersion,
 	}

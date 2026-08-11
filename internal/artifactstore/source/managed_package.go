@@ -8,14 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
-// ValidateManagedPackageDirectory validates one managed package directory
-// relative to its managed Source root.
-func ValidateManagedPackageDirectory(
-	directory basespec.Locator,
-) error {
-	return basespec.ValidatePortableLocator(directory, false)
-}
-
 // NormalizeManagedPackagePublication validates and returns an independently
 // owned deterministic managed package publication.
 //
@@ -135,4 +127,12 @@ func NormalizeManagedPackagePublication(
 		return output.Files[left].Locator < output.Files[right].Locator
 	})
 	return output, nil
+}
+
+// ValidateManagedPackageDirectory validates one managed package directory
+// relative to its managed Source root.
+func ValidateManagedPackageDirectory(
+	directory basespec.Locator,
+) error {
+	return basespec.ValidatePortableLocator(directory, false)
 }

@@ -1,11 +1,14 @@
 package spec
 
-import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+)
 
 type MCPServerRuntimeSnapshot struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID"`
-	ServerID MCPServerID              `json:"serverID"`
-	Status   MCPServerStatus          `json:"status"`
+	Server     artifact.ArtifactRef     `json:"server"`
+	Collection collection.CollectionRef `json:"collection"`
+	Status     MCPServerStatus          `json:"status"`
 
 	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
 	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`
@@ -28,12 +31,11 @@ type MCPServerRuntimeSnapshot struct {
 // snapshots. It is encoded as base64(JSON) and should not be interpreted by
 // callers.
 type MCPDiscoveryPageToken struct {
-	BundleID       bundleitemutils.BundleID `json:"bid"`
-	ServerID       MCPServerID              `json:"sid"`
-	SnapshotDigest string                   `json:"dig"`
-	Kind           string                   `json:"k"`
-	PageSize       int                      `json:"ps"`
-	Index          int                      `json:"i"`
+	Server         artifact.ArtifactRef `json:"server"`
+	SnapshotDigest string               `json:"dig"`
+	Kind           string               `json:"k"`
+	PageSize       int                  `json:"ps"`
+	Index          int                  `json:"i"`
 }
 
 type MCPToolAppInfo struct {
@@ -42,11 +44,10 @@ type MCPToolAppInfo struct {
 }
 
 type MCPToolCapability struct {
-	BundleID         bundleitemutils.BundleID `json:"bundleID"`
-	ServerID         MCPServerID              `json:"serverID"`
-	ToolName         string                   `json:"toolName"`
-	ProviderToolName string                   `json:"providerToolName"`
-	ChoiceID         string                   `json:"choiceID"`
+	Server           artifact.ArtifactRef `json:"server"`
+	ToolName         string               `json:"toolName"`
+	ProviderToolName string               `json:"providerToolName"`
+	ChoiceID         string               `json:"choiceID"`
 
 	Title       string `json:"title,omitempty"`
 	DisplayName string `json:"displayName"`
@@ -78,22 +79,20 @@ type MCPArgumentDefinition struct {
 }
 
 type MCPResourceRef struct {
-	BundleID    bundleitemutils.BundleID `json:"bundleID"`
-	ServerID    MCPServerID              `json:"serverID"`
-	URI         string                   `json:"uri"`
-	Name        string                   `json:"name,omitempty"`
-	Title       string                   `json:"title,omitempty"`
-	DisplayName string                   `json:"displayName"`
-	Description string                   `json:"description,omitempty"`
-	MimeType    string                   `json:"mimeType,omitempty"`
-	Size        int64                    `json:"size,omitempty"`
-	Annotations map[string]any           `json:"annotations,omitempty"`
-	Digest      string                   `json:"digest,omitempty"`
+	Server      artifact.ArtifactRef `json:"server"`
+	URI         string               `json:"uri"`
+	Name        string               `json:"name,omitempty"`
+	Title       string               `json:"title,omitempty"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description,omitempty"`
+	MimeType    string               `json:"mimeType,omitempty"`
+	Size        int64                `json:"size,omitempty"`
+	Annotations map[string]any       `json:"annotations,omitempty"`
+	Digest      string               `json:"digest,omitempty"`
 }
 
 type MCPResourceTemplateRef struct {
-	BundleID    bundleitemutils.BundleID         `json:"bundleID"`
-	ServerID    MCPServerID                      `json:"serverID"`
+	Server      artifact.ArtifactRef             `json:"server"`
 	URITemplate string                           `json:"uriTemplate"`
 	Name        string                           `json:"name,omitempty"`
 	Title       string                           `json:"title,omitempty"`
@@ -106,8 +105,7 @@ type MCPResourceTemplateRef struct {
 }
 
 type MCPPromptRef struct {
-	BundleID    bundleitemutils.BundleID         `json:"bundleID"`
-	ServerID    MCPServerID                      `json:"serverID"`
+	Server      artifact.ArtifactRef             `json:"server"`
 	PromptName  string                           `json:"promptName"`
 	Title       string                           `json:"title,omitempty"`
 	DisplayName string                           `json:"displayName"`
@@ -117,8 +115,7 @@ type MCPPromptRef struct {
 }
 
 type MCPDiscoverySnapshot struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID"`
-	ServerID MCPServerID              `json:"serverID"`
+	Server artifact.ArtifactRef `json:"server"`
 
 	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
 	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`

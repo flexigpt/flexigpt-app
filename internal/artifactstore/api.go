@@ -29,20 +29,6 @@ func New(components *system.Components) (*API, error) {
 	}, nil
 }
 
-func requireRequest[T any](value *T, subject string) error {
-	if value != nil {
-		return nil
-	}
-	return fmt.Errorf("%w: %s is required", basespec.ErrInvalid, subject)
-}
-
-func requireBody[T any](value *T, subject string) error {
-	if value != nil {
-		return nil
-	}
-	return fmt.Errorf("%w: %s is required", basespec.ErrInvalid, subject)
-}
-
 func (a *API) CreateArtifactRoot(
 	ctx context.Context,
 	request *CreateArtifactRootRequest,
@@ -477,4 +463,18 @@ func (a *API) check(ctx context.Context) error {
 		)
 	}
 	return ctx.Err()
+}
+
+func requireRequest[T any](value *T, subject string) error {
+	if value != nil {
+		return nil
+	}
+	return fmt.Errorf("%w: %s is required", basespec.ErrInvalid, subject)
+}
+
+func requireBody[T any](value *T, subject string) error {
+	if value != nil {
+		return nil
+	}
+	return fmt.Errorf("%w: %s is required", basespec.ErrInvalid, subject)
 }

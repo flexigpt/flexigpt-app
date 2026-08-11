@@ -29,6 +29,8 @@ const (
 	stagingDirectoryName = ".artifactstore-staging"
 )
 
+var errPackageDifferent = errors.New("managed package content differs")
+
 type config struct{}
 
 // Adapter stores each managed Source beneath:
@@ -79,62 +81,6 @@ func New(base string) (*Adapter, error) {
 
 func (*Adapter) Kind() basespec.SourceKind {
 	return Kind
-}
-
-func (*Adapter) NormalizeConfig(
-	ctx context.Context,
-	raw json.RawMessage,
-) (json.RawMessage, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxConfigBytes,
-	)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"%w: managed Source config: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
-	var value config
-	if err := decoder.Decode(&value); err != nil {
-		return nil, fmt.Errorf(
-			"%w: managed Source config must be an empty object: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("managed Source config has trailing JSON")
-		}
-		return nil, fmt.Errorf("%w: %w", basespec.ErrInvalid, err)
-	}
-	return json.RawMessage(jsonutil.EmptyObject), nil
-}
-
-func (a *Adapter) Open(
-	ctx context.Context,
-	value source.Source,
-) (source.Snapshot, error) {
-	if err := a.validateSource(ctx, value); err != nil {
-		return nil, err
-	}
-	root, err := a.sourceRootPath(value, true)
-	if err != nil {
-		return nil, err
-	}
-	filesystemValue, err := a.filesystemSource(value, root)
-	if err != nil {
-		return nil, err
-	}
-	return a.filesystem.Open(ctx, filesystemValue)
 }
 
 func (a *Adapter) ResolveLocalPath(
@@ -510,6 +456,62 @@ func (a *Adapter) RemovePackage(
 	return nil
 }
 
+func (*Adapter) NormalizeConfig(
+	ctx context.Context,
+	raw json.RawMessage,
+) (json.RawMessage, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxConfigBytes,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"%w: managed Source config: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(canonical))
+	decoder.DisallowUnknownFields()
+	var value config
+	if err := decoder.Decode(&value); err != nil {
+		return nil, fmt.Errorf(
+			"%w: managed Source config must be an empty object: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("managed Source config has trailing JSON")
+		}
+		return nil, fmt.Errorf("%w: %w", basespec.ErrInvalid, err)
+	}
+	return json.RawMessage(jsonutil.EmptyObject), nil
+}
+
+func (a *Adapter) Open(
+	ctx context.Context,
+	value source.Source,
+) (source.Snapshot, error) {
+	if err := a.validateSource(ctx, value); err != nil {
+		return nil, err
+	}
+	root, err := a.sourceRootPath(value, true)
+	if err != nil {
+		return nil, err
+	}
+	filesystemValue, err := a.filesystemSource(value, root)
+	if err != nil {
+		return nil, err
+	}
+	return a.filesystem.Open(ctx, filesystemValue)
+}
+
 func (a *Adapter) validateSource(ctx context.Context, value source.Source) error {
 	if a == nil || a.filesystem == nil {
 		return basespec.ErrClosed
@@ -537,6 +539,27 @@ func (a *Adapter) validateSource(ctx context.Context, value source.Source) error
 	return nil
 }
 
+func (a *Adapter) sourceRootPath(
+	value source.Source,
+	create bool,
+) (string, error) {
+	if err := basespec.ValidateSourceID(value.ID); err != nil {
+		return "", err
+	}
+	root, err := a.managedRootPath(value.RootID)
+	if err != nil {
+		return "", err
+	}
+	root = filepath.Join(root, string(value.ID))
+	if !create {
+		return root, nil
+	}
+	if err := os.MkdirAll(root, directoryMode); err != nil {
+		return "", err
+	}
+	return root, nil
+}
+
 func (a *Adapter) managedRootPath(
 	rootID basespec.RootID,
 ) (string, error) {
@@ -557,27 +580,6 @@ func (a *Adapter) managedRootPath(
 			"%w: managed Root path escapes managed Source base",
 			basespec.ErrInvalid,
 		)
-	}
-	return root, nil
-}
-
-func (a *Adapter) sourceRootPath(
-	value source.Source,
-	create bool,
-) (string, error) {
-	if err := basespec.ValidateSourceID(value.ID); err != nil {
-		return "", err
-	}
-	root, err := a.managedRootPath(value.RootID)
-	if err != nil {
-		return "", err
-	}
-	root = filepath.Join(root, string(value.ID))
-	if !create {
-		return root, nil
-	}
-	if err := os.MkdirAll(root, directoryMode); err != nil {
-		return "", err
 	}
 	return root, nil
 }
@@ -650,31 +652,6 @@ func validatePublication(
 	return normalized.Files, nil
 }
 
-func validatePackageDirectory(directory basespec.Locator) error {
-	if err := basespec.ValidatePortableLocator(
-		directory,
-		false,
-	); err != nil {
-		return err
-	}
-	if containsReservedSegment(directory) {
-		return fmt.Errorf(
-			"%w: managed package uses a reserved directory",
-			basespec.ErrInvalid,
-		)
-	}
-	return source.ValidateManagedPackageDirectory(directory)
-}
-
-func containsReservedSegment(locator basespec.Locator) bool {
-	for segment := range strings.SplitSeq(string(locator), "/") {
-		if strings.EqualFold(segment, stagingDirectoryName) {
-			return true
-		}
-	}
-	return false
-}
-
 func managedPackagePath(
 	root string,
 	directory basespec.Locator,
@@ -700,6 +677,22 @@ func managedPackagePath(
 	), nil
 }
 
+func validatePackageDirectory(directory basespec.Locator) error {
+	if err := basespec.ValidatePortableLocator(
+		directory,
+		false,
+	); err != nil {
+		return err
+	}
+	if containsReservedSegment(directory) {
+		return fmt.Errorf(
+			"%w: managed package uses a reserved directory",
+			basespec.ErrInvalid,
+		)
+	}
+	return source.ValidateManagedPackageDirectory(directory)
+}
+
 func pruneEmptyManagedParents(root, start string) error {
 	root = filepath.Clean(root)
 	current := filepath.Clean(start)
@@ -722,6 +715,15 @@ func pruneEmptyManagedParents(root, start string) error {
 		current = parent
 	}
 	return nil
+}
+
+func containsReservedSegment(locator basespec.Locator) bool {
+	for segment := range strings.SplitSeq(string(locator), "/") {
+		if strings.EqualFold(segment, stagingDirectoryName) {
+			return true
+		}
+	}
+	return false
 }
 
 func equivalentPackage(
@@ -853,8 +855,6 @@ func readManagedPackageFile(
 	return content, nil
 }
 
-var errPackageDifferent = errors.New("managed package content differs")
-
 type packageFileKeyAttributes struct {
 	Locator basespec.Locator
 }
@@ -897,20 +897,6 @@ func (*packagePartitionProvider) ListPartitions(
 	_ int,
 ) (dirs []string, nextPageToken string, err error) {
 	return nil, "", basespec.ErrUnsupported
-}
-
-func managedPackageFileKey(
-	locator basespec.Locator,
-) (mapstore.FileKey, error) {
-	if err := basespec.ValidatePortableLocator(locator, false); err != nil {
-		return mapstore.FileKey{}, err
-	}
-	return mapstore.FileKey{
-		FileName: path.Base(string(locator)),
-		XAttr: packageFileKeyAttributes{
-			Locator: locator,
-		},
-	}, nil
 }
 
 func writeManagedPackageFiles(
@@ -980,6 +966,20 @@ func writeManagedPackageFiles(
 	}
 	storesClosed = true
 	return nil
+}
+
+func managedPackageFileKey(
+	locator basespec.Locator,
+) (mapstore.FileKey, error) {
+	if err := basespec.ValidatePortableLocator(locator, false); err != nil {
+		return mapstore.FileKey{}, err
+	}
+	return mapstore.FileKey{
+		FileName: path.Base(string(locator)),
+		XAttr: packageFileKeyAttributes{
+			Locator: locator,
+		},
+	}, nil
 }
 
 func managedSourceDirectoryDiscardable(location string) (bool, error) {

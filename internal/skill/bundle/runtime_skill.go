@@ -29,6 +29,62 @@ type RuntimeSkill struct {
 	Version  string
 }
 
+// ListRuntimeSkills is deliberately fail-closed. A collection reconciliation
+// must not retain a previous runtime definition when a current Artifact can no
+// longer be projected.
+func (a *API) ListRuntimeSkills(
+	ctx context.Context,
+	bundle collection.CollectionRef,
+) (output []RuntimeSkill, returnErr error) {
+	records, err := a.ListSkills(ctx, bundle)
+	if err != nil {
+		return nil, err
+	}
+
+	eligible := make([]artifact.ArtifactRef, 0, len(records))
+	for _, record := range records {
+		if !record.Enabled || record.State != artifact.StateAvailable {
+			continue
+		}
+		eligible = append(eligible, record.Ref())
+	}
+	if len(eligible) == 0 {
+		return []RuntimeSkill{}, nil
+	}
+
+	sessionCtx, session, err := source.NewVerificationSession(
+		ctx,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		returnErr = errors.Join(
+			returnErr,
+			session.Close(sessionCtx),
+		)
+	}()
+
+	output = make([]RuntimeSkill, 0, len(eligible))
+	for _, ref := range eligible {
+		value, err := a.LoadRuntimeSkill(sessionCtx, ref)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, value)
+	}
+
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].Name != output[right].Name {
+			return output[left].Name < output[right].Name
+		}
+		return output[left].Artifact.ArtifactID <
+			output[right].Artifact.ArtifactID
+	})
+	return output, nil
+}
+
 // LoadRuntimeSkill resolves one Artifact-backed Skill Bundle member.
 //
 // It verifies Artifact membership, Collection kind, Collection and Artifact
@@ -182,60 +238,4 @@ func currentSkillOccurrence(
 		"%w: Skill Artifact does not match the current catalog occurrence",
 		basespec.ErrCatalogStale,
 	)
-}
-
-// ListRuntimeSkills is deliberately fail-closed. A collection reconciliation
-// must not retain a previous runtime definition when a current Artifact can no
-// longer be projected.
-func (a *API) ListRuntimeSkills(
-	ctx context.Context,
-	bundle collection.CollectionRef,
-) (output []RuntimeSkill, returnErr error) {
-	records, err := a.ListSkills(ctx, bundle)
-	if err != nil {
-		return nil, err
-	}
-
-	eligible := make([]artifact.ArtifactRef, 0, len(records))
-	for _, record := range records {
-		if !record.Enabled || record.State != artifact.StateAvailable {
-			continue
-		}
-		eligible = append(eligible, record.Ref())
-	}
-	if len(eligible) == 0 {
-		return []RuntimeSkill{}, nil
-	}
-
-	sessionCtx, session, err := source.NewVerificationSession(
-		ctx,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		returnErr = errors.Join(
-			returnErr,
-			session.Close(sessionCtx),
-		)
-	}()
-
-	output = make([]RuntimeSkill, 0, len(eligible))
-	for _, ref := range eligible {
-		value, err := a.LoadRuntimeSkill(sessionCtx, ref)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, value)
-	}
-
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Name != output[right].Name {
-			return output[left].Name < output[right].Name
-		}
-		return output[left].Artifact.ArtifactID <
-			output[right].Artifact.ArtifactID
-	})
-	return output, nil
 }

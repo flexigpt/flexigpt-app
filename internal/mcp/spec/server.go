@@ -3,6 +3,7 @@ package spec
 import (
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 )
 
@@ -127,10 +128,9 @@ type MCPSettings struct {
 }
 
 type MCPAuthStatus struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID"`
-	ServerID MCPServerID              `json:"serverID"`
-	AuthMode MCPHTTPAuthMode          `json:"authMode"`
-	State    MCPAuthState             `json:"state"`
+	Server   artifact.ArtifactRef `json:"server"`
+	AuthMode MCPHTTPAuthMode      `json:"authMode"`
+	State    MCPAuthState         `json:"state"`
 
 	Scopes              []string   `json:"scopes,omitempty"`
 	ExpiresAt           *time.Time `json:"expiresAt,omitempty"`
@@ -164,11 +164,9 @@ type MCPServerConfig struct {
 }
 
 type MCPAuthHealth struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID,omitempty"`
-
-	ServerID MCPServerID        `json:"serverID"`
-	AuthMode MCPHTTPAuthMode    `json:"authMode"`
-	State    MCPAuthHealthState `json:"state"`
+	Server   artifact.ArtifactRef `json:"server"`
+	AuthMode MCPHTTPAuthMode      `json:"authMode"`
+	State    MCPAuthHealthState   `json:"state"`
 
 	Configured bool `json:"configured"`
 

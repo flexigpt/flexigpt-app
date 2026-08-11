@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -69,6 +70,47 @@ func ValidateAppToolInvocation(
 	}
 	if !ToolVisibleToApp(tool.App) {
 		return fmt.Errorf("%w: tool %q is not visible to apps", spec.ErrMCPPolicyDenied, tool.ToolName)
+	}
+	return nil
+}
+
+// ValidateArtifactAppToolInvocation is the Artifact-backed MCP App
+// authorization check. It is the target API used by the Artifact Store MCP
+// runtime. The legacy BundleID/ServerID variant remains reference-only until
+// the old MCP Store package is removed.
+func ValidateArtifactAppToolInvocation(
+	policy spec.MCPAppsPolicy,
+	tool spec.MCPToolCapability,
+	appServer artifact.ArtifactRef,
+) error {
+	if !policy.Enabled {
+		return fmt.Errorf(
+			"%w: MCP Apps is not enabled for server Artifact %q",
+			spec.ErrMCPPolicyDenied,
+			tool.Server.ArtifactID,
+		)
+	}
+	if !policy.AllowAppInitiatedToolCalls {
+		return fmt.Errorf(
+			"%w: app-initiated MCP tool calls are not allowed",
+			spec.ErrMCPPolicyDenied,
+		)
+	}
+	if err := tool.Server.Validate(); err != nil {
+		return err
+	}
+	if appServer != tool.Server {
+		return fmt.Errorf(
+			"%w: MCP App cannot call a tool owned by another Server Artifact",
+			spec.ErrMCPPolicyDenied,
+		)
+	}
+	if !ToolVisibleToApp(tool.App) {
+		return fmt.Errorf(
+			"%w: MCP tool %q is not visible to apps",
+			spec.ErrMCPPolicyDenied,
+			tool.ToolName,
+		)
 	}
 	return nil
 }

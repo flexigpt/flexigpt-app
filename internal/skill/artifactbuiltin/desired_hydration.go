@@ -16,22 +16,6 @@ import (
 
 const hydrationFingerprintSchemaVersion = "agent.skill.builtin-hydration/v1"
 
-type hydrationFingerprintDocument struct {
-	SchemaVersion string                `json:"schemaVersion"`
-	Topology      builtin.Registry      `json:"topology"`
-	Registry      Registry              `json:"registry"`
-	Collections   []hydrationCollection `json:"collections"`
-}
-
-type hydrationCollection struct {
-	Registration          Collection                             `json:"registration"`
-	DefinitionDigest      cryptoutil.Digest                      `json:"definitionDigest"`
-	SourceScope           basespec.Locator                       `json:"sourceScope"`
-	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest `json:"expectedMemberDigests"`
-	Artifacts             []hydrationArtifact                    `json:"artifacts"`
-	Files                 []hydrationPackageFile                 `json:"files"`
-}
-
 type hydrationArtifact struct {
 	Registration     Artifact          `json:"registration"`
 	DefinitionDigest cryptoutil.Digest `json:"definitionDigest"`
@@ -41,6 +25,20 @@ type hydrationPackageFile struct {
 	Locator basespec.Locator  `json:"locator"`
 	Digest  cryptoutil.Digest `json:"digest"`
 	Size    int64             `json:"size"`
+}
+type hydrationCollection struct {
+	Registration          Collection                             `json:"registration"`
+	DefinitionDigest      cryptoutil.Digest                      `json:"definitionDigest"`
+	SourceScope           basespec.Locator                       `json:"sourceScope"`
+	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest `json:"expectedMemberDigests"`
+	Artifacts             []hydrationArtifact                    `json:"artifacts"`
+	Files                 []hydrationPackageFile                 `json:"files"`
+}
+type hydrationFingerprintDocument struct {
+	SchemaVersion string                `json:"schemaVersion"`
+	Topology      builtin.Registry      `json:"topology"`
+	Registry      Registry              `json:"registry"`
+	Collections   []hydrationCollection `json:"collections"`
 }
 
 func (i *Installer) DesiredHydration(

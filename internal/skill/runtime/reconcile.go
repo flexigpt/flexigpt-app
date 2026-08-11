@@ -27,80 +27,6 @@ type runtimeDesiredView struct {
 	artifacts   map[agentskillsSpec.SkillDef]string
 }
 
-func newRuntimeDesiredView() runtimeDesiredView {
-	return runtimeDesiredView{
-		definitions: map[agentskillsSpec.SkillDef]string{},
-		artifacts:   map[agentskillsSpec.SkillDef]string{},
-	}
-}
-
-func (v *runtimeDesiredView) add(value ResolvedArtifactSkill) {
-	if v.definitions == nil {
-		v.definitions = map[agentskillsSpec.SkillDef]string{}
-	}
-	if v.artifacts == nil {
-		v.artifacts = map[agentskillsSpec.SkillDef]string{}
-	}
-	v.definitions[value.Definition] = value.Version
-	v.artifacts[value.Definition] = artifactRefKey(value.Artifact)
-}
-
-// mergeDesiredCollections deterministically fails closed on any same-name
-// collision. The Agent Skills runtime has global name semantics, so retaining
-// either arbitrary source would turn map or scheduling order into policy.
-func mergeDesiredCollections(
-	collections map[collection.CollectionRef]runtimeDesiredView,
-) (runtimeDesiredView, error) {
-	byName := map[string]map[string]struct{}{}
-	for _, view := range collections {
-		for definition := range view.definitions {
-			if byName[definition.Name] == nil {
-				byName[definition.Name] = map[string]struct{}{}
-			}
-			byName[definition.Name][view.artifacts[definition]] = struct{}{}
-		}
-	}
-
-	collided := map[string]struct{}{}
-	for name, artifacts := range byName {
-		if len(artifacts) > 1 {
-			collided[name] = struct{}{}
-			slog.Error(
-				"skill runtime same-name collision rejected",
-				"name",
-				name,
-				"artifacts",
-				len(artifacts),
-			)
-		}
-	}
-
-	output := newRuntimeDesiredView()
-	for _, view := range collections {
-		for definition, version := range view.definitions {
-			if _, collision := collided[definition.Name]; collision {
-				continue
-			}
-			output.definitions[definition] = version
-			output.artifacts[definition] = view.artifacts[definition]
-		}
-	}
-	if len(collided) == 0 {
-		return output, nil
-	}
-
-	names := make([]string, 0, len(collided))
-	for name := range collided {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return output, fmt.Errorf(
-		"%w: runtime Skill names are ambiguous across Collections: %s",
-		basespec.ErrConflict,
-		strings.Join(names, ", "),
-	)
-}
-
 func (s *SkillRuntime) ResyncCollection(
 	ctx context.Context,
 	ref collection.CollectionRef,
@@ -432,6 +358,62 @@ func (s *SkillRuntime) runtimeApplyDesired(
 	return present, nil
 }
 
+// mergeDesiredCollections deterministically fails closed on any same-name
+// collision. The Agent Skills runtime has global name semantics, so retaining
+// either arbitrary source would turn map or scheduling order into policy.
+func mergeDesiredCollections(
+	collections map[collection.CollectionRef]runtimeDesiredView,
+) (runtimeDesiredView, error) {
+	byName := map[string]map[string]struct{}{}
+	for _, view := range collections {
+		for definition := range view.definitions {
+			if byName[definition.Name] == nil {
+				byName[definition.Name] = map[string]struct{}{}
+			}
+			byName[definition.Name][view.artifacts[definition]] = struct{}{}
+		}
+	}
+
+	collided := map[string]struct{}{}
+	for name, artifacts := range byName {
+		if len(artifacts) > 1 {
+			collided[name] = struct{}{}
+			slog.Error(
+				"skill runtime same-name collision rejected",
+				"name",
+				name,
+				"artifacts",
+				len(artifacts),
+			)
+		}
+	}
+
+	output := newRuntimeDesiredView()
+	for _, view := range collections {
+		for definition, version := range view.definitions {
+			if _, collision := collided[definition.Name]; collision {
+				continue
+			}
+			output.definitions[definition] = version
+			output.artifacts[definition] = view.artifacts[definition]
+		}
+	}
+	if len(collided) == 0 {
+		return output, nil
+	}
+
+	names := make([]string, 0, len(collided))
+	for name := range collided {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return output, fmt.Errorf(
+		"%w: runtime Skill names are ambiguous across Collections: %s",
+		basespec.ErrConflict,
+		strings.Join(names, ", "),
+	)
+}
+
 func desiredCollectionView(
 	ref collection.CollectionRef,
 	values []ResolvedArtifactSkill,
@@ -461,6 +443,17 @@ func desiredCollectionView(
 		desired.add(value)
 	}
 	return desired, nil
+}
+
+func (v *runtimeDesiredView) add(value ResolvedArtifactSkill) {
+	if v.definitions == nil {
+		v.definitions = map[agentskillsSpec.SkillDef]string{}
+	}
+	if v.artifacts == nil {
+		v.artifacts = map[agentskillsSpec.SkillDef]string{}
+	}
+	v.definitions[value.Definition] = value.Version
+	v.artifacts[value.Definition] = artifactRefKey(value.Artifact)
 }
 
 func sortSkillDefs(values []agentskillsSpec.SkillDef) {
@@ -493,6 +486,13 @@ func cloneRuntimeDesiredView(input runtimeDesiredView) runtimeDesiredView {
 	maps.Copy(output.definitions, input.definitions)
 	maps.Copy(output.artifacts, input.artifacts)
 	return output
+}
+
+func newRuntimeDesiredView() runtimeDesiredView {
+	return runtimeDesiredView{
+		definitions: map[agentskillsSpec.SkillDef]string{},
+		artifacts:   map[agentskillsSpec.SkillDef]string{},
+	}
 }
 
 func artifactRefKey(ref artifact.ArtifactRef) string {

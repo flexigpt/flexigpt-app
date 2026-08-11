@@ -56,13 +56,6 @@ type Repository interface {
 	) error
 }
 
-type Opener interface {
-	Open(
-		ctx context.Context,
-		value Source,
-	) (Snapshot, error)
-}
-
 type Snapshot interface {
 	Generation() string
 
@@ -83,6 +76,13 @@ type Snapshot interface {
 
 	Confirm(ctx context.Context) error
 	Close() error
+}
+
+type Opener interface {
+	Open(
+		ctx context.Context,
+		value Source,
+	) (Snapshot, error)
 }
 
 // LocalPathResolver is an optional trusted internal capability exposed by a

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 )
 
@@ -282,8 +283,7 @@ type TimeRange struct {
 }
 
 type MCPOAuthAuthorization struct {
-	BundleID         bundleitemutils.BundleID `json:"bundleID"`
-	ServerID         MCPServerID              `json:"serverID"`
-	AuthorizationURL string                   `json:"authorizationURL"`
-	ExpiresAt        string                   `json:"expiresAt,omitempty"`
+	Server           artifact.ArtifactRef `json:"server"`
+	AuthorizationURL string               `json:"authorizationURL"`
+	ExpiresAt        string               `json:"expiresAt,omitempty"`
 }

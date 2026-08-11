@@ -1,3 +1,5 @@
+//go:build legacy_mcp_store
+
 package sdkclient
 
 import (

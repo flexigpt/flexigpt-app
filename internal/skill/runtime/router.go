@@ -18,36 +18,6 @@ type ResolvedArtifactSkill struct {
 	Version    string
 }
 
-func (s ResolvedArtifactSkill) Validate() error {
-	if err := s.Artifact.Validate(); err != nil {
-		return err
-	}
-	if err := s.Collection.Validate(); err != nil {
-		return err
-	}
-	if s.Artifact.RootID != s.Collection.RootID {
-		return fmt.Errorf(
-			"%w: skill Artifact and Collection belong to different roots",
-			basespec.ErrInvalid,
-		)
-	}
-	if s.Definition.Type == "" ||
-		s.Definition.Name == "" ||
-		s.Definition.Location == "" {
-		return fmt.Errorf(
-			"%w: runtime Skill definition is incomplete",
-			basespec.ErrInvalid,
-		)
-	}
-	if s.Version == "" {
-		return fmt.Errorf(
-			"%w: runtime Skill version is required",
-			basespec.ErrInvalid,
-		)
-	}
-	return nil
-}
-
 // ArtifactSkillLoader is implemented by feature adapters. It does not decide
 // ownership from a durable reference shape. ArtifactRouter resolves ownership
 // from the Artifact Record and its current Collection membership first.
@@ -208,6 +178,36 @@ func (r *ArtifactRouter) ListCollectionSkills(
 		seen[value.Artifact] = struct{}{}
 	}
 	return values, nil
+}
+
+func (s ResolvedArtifactSkill) Validate() error {
+	if err := s.Artifact.Validate(); err != nil {
+		return err
+	}
+	if err := s.Collection.Validate(); err != nil {
+		return err
+	}
+	if s.Artifact.RootID != s.Collection.RootID {
+		return fmt.Errorf(
+			"%w: skill Artifact and Collection belong to different roots",
+			basespec.ErrInvalid,
+		)
+	}
+	if s.Definition.Type == "" ||
+		s.Definition.Name == "" ||
+		s.Definition.Location == "" {
+		return fmt.Errorf(
+			"%w: runtime Skill definition is incomplete",
+			basespec.ErrInvalid,
+		)
+	}
+	if s.Version == "" {
+		return fmt.Errorf(
+			"%w: runtime Skill version is required",
+			basespec.ErrInvalid,
+		)
+	}
+	return nil
 }
 
 func (r *ArtifactRouter) loader(

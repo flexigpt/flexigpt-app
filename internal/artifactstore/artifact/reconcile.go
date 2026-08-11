@@ -31,24 +31,6 @@ type occurrenceIdentity struct {
 	SubresourceLocator basespec.SubresourceLocator
 }
 
-func occurrenceIdentityForBinding(
-	binding SourceBinding,
-) occurrenceIdentity {
-	return occurrenceIdentity{
-		SourceID:           binding.SourceID,
-		Locator:            binding.Locator,
-		SubresourceLocator: binding.SubresourceLocator,
-	}
-}
-
-func occurrenceIdentityForKey(key catalog.OccurrenceKey) occurrenceIdentity {
-	return occurrenceIdentity{
-		SourceID:           key.SourceID,
-		Locator:            key.Locator,
-		SubresourceLocator: key.SubresourceLocator,
-	}
-}
-
 type Reconciler struct {
 	clock clockutil.Clock
 }
@@ -63,75 +45,6 @@ func NewReconciler(
 		)
 	}
 	return &Reconciler{clock: timeClock}, nil
-}
-
-// DeriveSourceState derives only the source-owned fields of an existing
-// Artifact from its current Collection occurrence.
-//
-// It is shared by reconciliation and SQLite publication validation so a
-// Publisher cannot apply a source-derived state transition that the
-// Reconciler itself would never produce.
-func DeriveSourceState(
-	current Artifact,
-	occurrence *catalog.Occurrence,
-) (
-	*cryptoutil.Digest,
-	State,
-	[]diagnostic.Diagnostic,
-	error,
-) {
-	if occurrence == nil || occurrence.State == catalog.OccurrenceMissing {
-		return nil, StateMissing, []diagnostic.Diagnostic{{
-			Severity: diagnostic.DiagnosticWarning,
-			Code:     "artifact.source-missing",
-			Message:  "the artifact source binding is missing",
-		}}, nil
-	}
-
-	switch occurrence.State {
-	case catalog.OccurrenceInvalid:
-		return nil,
-			StateInvalid,
-			diagnostic.CloneDiagnostics(occurrence.Diagnostics),
-			nil
-
-	case catalog.OccurrenceValid:
-		if occurrence.DefinitionDigest == nil {
-			return nil, "", nil, fmt.Errorf(
-				"%w: valid source occurrence has no definition digest",
-				basespec.ErrInvalid,
-			)
-		}
-
-		resolved := cryptoutil.CloneDigest(occurrence.DefinitionDigest)
-		if occurrence.Kind == current.Kind {
-			return resolved,
-				StateAvailable,
-				diagnostic.CloneDiagnostics(occurrence.Diagnostics),
-				nil
-		}
-
-		diagnostics := diagnostic.AppendDiagnostics(
-			occurrence.Diagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.DiagnosticError,
-				Code:     "artifact.kind-incompatible",
-				Message:  "the source occurrence changed artifact kind",
-				Location: &diagnostic.DiagnosticLocation{
-					Locator:            current.Binding.Locator,
-					SubresourceLocator: current.Binding.SubresourceLocator,
-				},
-			},
-		)
-		return resolved, StateIncompatible, diagnostics, nil
-
-	default:
-		return nil, "", nil, fmt.Errorf(
-			"%w: unsupported occurrence state %q",
-			basespec.ErrInvalid,
-			occurrence.State,
-		)
-	}
 }
 
 func (r *Reconciler) Reconcile(
@@ -456,6 +369,93 @@ func (r *Reconciler) Reconcile(
 		seenArtifactIDs[created.ID] = struct{}{}
 	}
 	return result, nil
+}
+
+// DeriveSourceState derives only the source-owned fields of an existing
+// Artifact from its current Collection occurrence.
+//
+// It is shared by reconciliation and SQLite publication validation so a
+// Publisher cannot apply a source-derived state transition that the
+// Reconciler itself would never produce.
+func DeriveSourceState(
+	current Artifact,
+	occurrence *catalog.Occurrence,
+) (
+	*cryptoutil.Digest,
+	State,
+	[]diagnostic.Diagnostic,
+	error,
+) {
+	if occurrence == nil || occurrence.State == catalog.OccurrenceMissing {
+		return nil, StateMissing, []diagnostic.Diagnostic{{
+			Severity: diagnostic.DiagnosticWarning,
+			Code:     "artifact.source-missing",
+			Message:  "the artifact source binding is missing",
+		}}, nil
+	}
+
+	switch occurrence.State {
+	case catalog.OccurrenceInvalid:
+		return nil,
+			StateInvalid,
+			diagnostic.CloneDiagnostics(occurrence.Diagnostics),
+			nil
+
+	case catalog.OccurrenceValid:
+		if occurrence.DefinitionDigest == nil {
+			return nil, "", nil, fmt.Errorf(
+				"%w: valid source occurrence has no definition digest",
+				basespec.ErrInvalid,
+			)
+		}
+
+		resolved := cryptoutil.CloneDigest(occurrence.DefinitionDigest)
+		if occurrence.Kind == current.Kind {
+			return resolved,
+				StateAvailable,
+				diagnostic.CloneDiagnostics(occurrence.Diagnostics),
+				nil
+		}
+
+		diagnostics := diagnostic.AppendDiagnostics(
+			occurrence.Diagnostics,
+			diagnostic.Diagnostic{
+				Severity: diagnostic.DiagnosticError,
+				Code:     "artifact.kind-incompatible",
+				Message:  "the source occurrence changed artifact kind",
+				Location: &diagnostic.DiagnosticLocation{
+					Locator:            current.Binding.Locator,
+					SubresourceLocator: current.Binding.SubresourceLocator,
+				},
+			},
+		)
+		return resolved, StateIncompatible, diagnostics, nil
+
+	default:
+		return nil, "", nil, fmt.Errorf(
+			"%w: unsupported occurrence state %q",
+			basespec.ErrInvalid,
+			occurrence.State,
+		)
+	}
+}
+
+func occurrenceIdentityForBinding(
+	binding SourceBinding,
+) occurrenceIdentity {
+	return occurrenceIdentity{
+		SourceID:           binding.SourceID,
+		Locator:            binding.Locator,
+		SubresourceLocator: binding.SubresourceLocator,
+	}
+}
+
+func occurrenceIdentityForKey(key catalog.OccurrenceKey) occurrenceIdentity {
+	return occurrenceIdentity{
+		SourceID:           key.SourceID,
+		Locator:            key.Locator,
+		SubresourceLocator: key.SubresourceLocator,
+	}
 }
 
 func equivalentSourceState(left, right Artifact) bool {

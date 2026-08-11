@@ -26,17 +26,24 @@ const (
 	skillEntrypoint       = "SKILL.md"
 )
 
-type HydratedRegistry struct {
-	Registry    Registry
-	Collections []HydratedCollection
+type Artifact struct {
+	ID      basespec.ArtifactID `json:"id"`
+	Member  basespec.Locator    `json:"member"`
+	Enabled bool                `json:"enabled"`
 }
 
-type HydratedCollection struct {
-	Registration          Collection
-	Definition            builtinSchema.SkillCollectionV1
-	SourceScope           basespec.Locator
-	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
-	Artifacts             []HydratedArtifact
+type Collection struct {
+	ID        basespec.CollectionID `json:"id"`
+	Payload   basespec.Locator      `json:"payload"`
+	Enabled   bool                  `json:"enabled"`
+	Artifacts []Artifact            `json:"artifacts"`
+}
+
+// Registry is the non-portable registration manifest for embedded Agent
+// Skills. It is not a portable Skill Bundle definition and is never exported.
+type Registry struct {
+	SchemaVersion string       `json:"schemaVersion"`
+	Collections   []Collection `json:"collections"`
 }
 
 type HydratedArtifact struct {
@@ -47,24 +54,16 @@ type HydratedArtifact struct {
 	SourceDirectory   basespec.Locator
 }
 
-// Registry is the non-portable registration manifest for embedded Agent
-// Skills. It is not a portable Skill Bundle definition and is never exported.
-type Registry struct {
-	SchemaVersion string       `json:"schemaVersion"`
-	Collections   []Collection `json:"collections"`
+type HydratedCollection struct {
+	Registration          Collection
+	Definition            builtinSchema.SkillCollectionV1
+	SourceScope           basespec.Locator
+	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
+	Artifacts             []HydratedArtifact
 }
-
-type Collection struct {
-	ID        basespec.CollectionID `json:"id"`
-	Payload   basespec.Locator      `json:"payload"`
-	Enabled   bool                  `json:"enabled"`
-	Artifacts []Artifact            `json:"artifacts"`
-}
-
-type Artifact struct {
-	ID      basespec.ArtifactID `json:"id"`
-	Member  basespec.Locator    `json:"member"`
-	Enabled bool                `json:"enabled"`
+type HydratedRegistry struct {
+	Registry    Registry
+	Collections []HydratedCollection
 }
 
 // SkillReference is a portable semantic built-in reference. It deliberately
@@ -101,6 +100,64 @@ func LoadRegistry() (Registry, error) {
 		return Registry{}, err
 	}
 	return value, nil
+}
+
+// Hydrate converts embedded portable collection descriptors into canonical,
+// integrity-pinned Skill collection documents. The checked-in descriptor may
+// omit digest fields. Member digests are enriched from embedded package bytes
+// and the final document is canonicalized through Artifact Store's registered
+// shareable codec before local installation begins.
+func (r Registry) Hydrate(
+	ctx context.Context,
+	canonicalizer shareable.Canonicalizer,
+	packages fs.FS,
+) (HydratedRegistry, error) {
+	if ctx == nil {
+		return HydratedRegistry{}, fmt.Errorf(
+			"%w: built-in skill hydration context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return HydratedRegistry{}, err
+	}
+	if canonicalizer == nil {
+		return HydratedRegistry{}, fmt.Errorf(
+			"%w: built-in skill shareable canonicalizer is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if packages == nil {
+		return HydratedRegistry{}, fmt.Errorf(
+			"%w: built-in package filesystem is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := r.Validate(); err != nil {
+		return HydratedRegistry{}, err
+	}
+
+	output := HydratedRegistry{
+		Registry:    r,
+		Collections: make([]HydratedCollection, 0, len(r.Collections)),
+	}
+	for index, registration := range r.OrderedCollections() {
+		value, err := hydrateCollection(
+			ctx,
+			canonicalizer,
+			packages,
+			registration,
+		)
+		if err != nil {
+			return HydratedRegistry{}, fmt.Errorf(
+				"collections[%d]: %w",
+				index,
+				err,
+			)
+		}
+		output.Collections = append(output.Collections, value)
+	}
+	return output, nil
 }
 
 func (r Registry) Validate() error {
@@ -225,64 +282,6 @@ func (r Registry) OrderedCollections() []Collection {
 		return output[left].Payload < output[right].Payload
 	})
 	return output
-}
-
-// Hydrate converts embedded portable collection descriptors into canonical,
-// integrity-pinned Skill collection documents. The checked-in descriptor may
-// omit digest fields. Member digests are enriched from embedded package bytes
-// and the final document is canonicalized through Artifact Store's registered
-// shareable codec before local installation begins.
-func (r Registry) Hydrate(
-	ctx context.Context,
-	canonicalizer shareable.Canonicalizer,
-	packages fs.FS,
-) (HydratedRegistry, error) {
-	if ctx == nil {
-		return HydratedRegistry{}, fmt.Errorf(
-			"%w: built-in skill hydration context is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return HydratedRegistry{}, err
-	}
-	if canonicalizer == nil {
-		return HydratedRegistry{}, fmt.Errorf(
-			"%w: built-in skill shareable canonicalizer is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if packages == nil {
-		return HydratedRegistry{}, fmt.Errorf(
-			"%w: built-in package filesystem is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := r.Validate(); err != nil {
-		return HydratedRegistry{}, err
-	}
-
-	output := HydratedRegistry{
-		Registry:    r,
-		Collections: make([]HydratedCollection, 0, len(r.Collections)),
-	}
-	for index, registration := range r.OrderedCollections() {
-		value, err := hydrateCollection(
-			ctx,
-			canonicalizer,
-			packages,
-			registration,
-		)
-		if err != nil {
-			return HydratedRegistry{}, fmt.Errorf(
-				"collections[%d]: %w",
-				index,
-				err,
-			)
-		}
-		output.Collections = append(output.Collections, value)
-	}
-	return output, nil
 }
 
 func (r HydratedRegistry) OrderedCollections() []HydratedCollection {

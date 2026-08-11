@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -23,8 +23,7 @@ const (
 )
 
 type oauthPendingKey struct {
-	BundleID string
-	ServerID spec.MCPServerID
+	Server artifact.ArtifactRef
 }
 
 type oauthLoopbackResult struct {
@@ -32,9 +31,8 @@ type oauthLoopbackResult struct {
 	Err    error
 }
 type pendingOAuthAuthorization struct {
-	BundleID         string
+	Server           artifact.ArtifactRef
 	ID               string
-	ServerID         spec.MCPServerID
 	AuthorizationURL string
 	State            string
 	CreatedAt        time.Time
@@ -153,11 +151,8 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	if b == nil {
 		return nil, fmt.Errorf("%w: OAuth loopback broker is not configured", spec.ErrMCPAuthRequired)
 	}
-	if req.BundleID == "" {
-		return nil, fmt.Errorf("%w: OAuth bundleID required", spec.ErrMCPInvalidRequest)
-	}
-	if req.ServerID == "" {
-		return nil, fmt.Errorf("%w: OAuth serverID required", spec.ErrMCPInvalidRequest)
+	if err := req.Server.Validate(); err != nil {
+		return nil, err
 	}
 	if req.AuthorizationURL == "" {
 		return nil, fmt.Errorf("%w: OAuth authorization URL required", spec.ErrMCPAuthRequired)
@@ -172,9 +167,8 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	id := rand.Text()
 
 	p := &pendingOAuthAuthorization{
-		BundleID:         req.BundleID,
+		Server:           req.Server,
 		ID:               id,
-		ServerID:         req.ServerID,
 		AuthorizationURL: req.AuthorizationURL,
 		State:            state,
 		CreatedAt:        now,
@@ -185,7 +179,7 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	b.mu.Lock()
 	b.purgeExpiredLocked(now)
 
-	key := oauthPendingKey{BundleID: p.BundleID, ServerID: p.ServerID}
+	key := oauthPendingKey{Server: p.Server}
 	if old := b.pendingByServer[key]; old != nil {
 		b.completeLocked(old, nil, fmt.Errorf("%w: OAuth authorization superseded", spec.ErrMCPAuthRequired))
 	}
@@ -233,32 +227,32 @@ func (b *OAuthLoopbackBroker) Pending() []spec.MCPOAuthAuthorization {
 	out := make([]spec.MCPOAuthAuthorization, 0, len(b.pendingByServer))
 	for _, p := range b.pendingByServer {
 		out = append(out, spec.MCPOAuthAuthorization{
-			BundleID:         bundleitemutils.BundleID(p.BundleID),
-			ServerID:         p.ServerID,
+			Server:           p.Server,
 			AuthorizationURL: p.AuthorizationURL,
 			ExpiresAt:        p.ExpiresAt.Format(time.RFC3339Nano),
 		})
 	}
 
-	// One pending authorization per BundleID+ServerID by construction.
 	sort.Slice(out, func(i, j int) bool {
-		if out[i].BundleID == out[j].BundleID {
-			return out[i].ServerID < out[j].ServerID
+		if out[i].Server.RootID != out[j].Server.RootID {
+			return out[i].Server.RootID < out[j].Server.RootID
 		}
-		return out[i].BundleID < out[j].BundleID
+		return out[i].Server.ArtifactID < out[j].Server.ArtifactID
 	})
 	return out
 }
 
-func (b *OAuthLoopbackBroker) Cancel(bundleID bundleitemutils.BundleID, serverID spec.MCPServerID) bool {
-	if b == nil || bundleID == "" || serverID == "" {
+func (b *OAuthLoopbackBroker) Cancel(
+	server artifact.ArtifactRef,
+) bool {
+	if b == nil || server.Validate() != nil {
 		return false
 	}
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	p := b.pendingByServer[oauthPendingKey{BundleID: string(bundleID), ServerID: serverID}]
+	p := b.pendingByServer[oauthPendingKey{Server: server}]
 
 	if p == nil {
 		return false
@@ -430,7 +424,7 @@ func (b *OAuthLoopbackBroker) removeIfCurrent(p *pendingOAuthAuthorization) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if current := b.pendingByServer[oauthPendingKey{BundleID: p.BundleID, ServerID: p.ServerID}]; current == p {
+	if current := b.pendingByServer[oauthPendingKey{Server: p.Server}]; current == p {
 		b.removeLocked(p)
 	}
 }
@@ -461,8 +455,11 @@ func (b *OAuthLoopbackBroker) completeLocked(
 }
 
 func (b *OAuthLoopbackBroker) removeLocked(p *pendingOAuthAuthorization) {
-	delete(b.pendingByServer, oauthPendingKey{BundleID: p.BundleID, ServerID: p.ServerID})
+	if p == nil {
+		return
+	}
 
+	delete(b.pendingByServer, oauthPendingKey{Server: p.Server})
 	delete(b.pendingByState, p.State)
 }
 

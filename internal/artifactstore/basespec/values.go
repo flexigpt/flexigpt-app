@@ -176,36 +176,6 @@ func ValidateOptionalText(label, value string, maximum int) error {
 	return ValidateRequiredText(label, value, maximum)
 }
 
-func ValidateRequiredText(label, value string, maximum int) error {
-	if value == "" ||
-		!utf8.ValidString(value) ||
-		strings.TrimSpace(value) != value {
-		return fmt.Errorf(
-			"%w: %s must be non-empty, valid UTF-8, and trimmed",
-			ErrInvalid,
-			label,
-		)
-	}
-	if len(value) > maximum {
-		return fmt.Errorf(
-			"%w: %s exceeds %d bytes",
-			ErrInvalid,
-			label,
-			maximum,
-		)
-	}
-	for _, character := range value {
-		if unicode.IsControl(character) {
-			return fmt.Errorf(
-				"%w: %s contains a control character",
-				ErrInvalid,
-				label,
-			)
-		}
-	}
-	return nil
-}
-
 func ValidateLocator(value Locator, allowRoot bool) error {
 	return validateRelativePath("locator", string(value), allowRoot)
 }
@@ -215,6 +185,28 @@ func ValidateSubresourceLocator(value SubresourceLocator) error {
 		return nil
 	}
 	return validateRelativePath("subresource locator", string(value), false)
+}
+
+// PortableLocatorIdentity returns the case-insensitive portable identity used
+// to reject package entries that would collide on case-insensitive filesystems.
+func PortableLocatorIdentity(
+	value Locator,
+	allowRoot bool,
+) (string, error) {
+	if err := ValidatePortableLocator(value, allowRoot); err != nil {
+		return "", err
+	}
+	if value == "." {
+		return ".", nil
+	}
+	return strings.ToLower(string(value)), nil
+}
+
+func ValidatePortableSubresourceLocator(value SubresourceLocator) error {
+	if value == "" {
+		return nil
+	}
+	return ValidatePortableLocator(Locator(value), false)
 }
 
 // ValidatePortableLocator applies the platform-independent locator rules used
@@ -262,28 +254,6 @@ func ValidatePortableLocator(value Locator, allowRoot bool) error {
 	return nil
 }
 
-// PortableLocatorIdentity returns the case-insensitive portable identity used
-// to reject package entries that would collide on case-insensitive filesystems.
-func PortableLocatorIdentity(
-	value Locator,
-	allowRoot bool,
-) (string, error) {
-	if err := ValidatePortableLocator(value, allowRoot); err != nil {
-		return "", err
-	}
-	if value == "." {
-		return ".", nil
-	}
-	return strings.ToLower(string(value)), nil
-}
-
-func ValidatePortableSubresourceLocator(value SubresourceLocator) error {
-	if value == "" {
-		return nil
-	}
-	return ValidatePortableLocator(Locator(value), false)
-}
-
 // ValidateIncludePattern validates a source-relative glob. It deliberately
 // rejects path traversal and host-path syntax before passing the pattern to
 // path.Match.
@@ -317,6 +287,36 @@ func ValidateIncludePattern(pattern string) error {
 			pattern,
 			err,
 		)
+	}
+	return nil
+}
+
+func ValidateRequiredText(label, value string, maximum int) error {
+	if value == "" ||
+		!utf8.ValidString(value) ||
+		strings.TrimSpace(value) != value {
+		return fmt.Errorf(
+			"%w: %s must be non-empty, valid UTF-8, and trimmed",
+			ErrInvalid,
+			label,
+		)
+	}
+	if len(value) > maximum {
+		return fmt.Errorf(
+			"%w: %s exceeds %d bytes",
+			ErrInvalid,
+			label,
+			maximum,
+		)
+	}
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return fmt.Errorf(
+				"%w: %s contains a control character",
+				ErrInvalid,
+				label,
+			)
+		}
 	}
 	return nil
 }

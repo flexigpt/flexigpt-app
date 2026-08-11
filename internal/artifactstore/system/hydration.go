@@ -10,57 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 )
 
-func (c *Components) GetTopologyHydration(
-	ctx context.Context,
-	installerName string,
-) (topology.Hydration, bool, error) {
-	if c == nil || c.metadata == nil {
-		return topology.Hydration{}, false, basespec.ErrClosed
-	}
-	return c.metadata.GetTopologyHydration(ctx, installerName)
-}
-
-func (c *Components) PutTopologyHydration(
-	ctx context.Context,
-	value topology.Hydration,
-) error {
-	if c == nil ||
-		c.metadata == nil ||
-		c.Roots == nil ||
-		c.Sources == nil {
-		return basespec.ErrClosed
-	}
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: topology hydration context is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
-		return err
-	}
-	if err := value.Validate(); err != nil {
-		return err
-	}
-	if !c.isProtectedRoot(value.RootID) {
-		return fmt.Errorf(
-			"%w: topology hydration root %q is not currently protected",
-			basespec.ErrProtected,
-			value.RootID,
-		)
-	}
-	if _, err := c.Roots.Get(ctx, value.RootID); err != nil {
-		return err
-	}
-	if _, err := c.Sources.Get(ctx, value.RootID, value.SourceID); err != nil {
-		return err
-	}
-	return c.metadata.PutTopologyHydration(ctx, value)
-}
-
 // PrepareTopologyHydrations reconciles all installer desired states before
 // any installer creates topology. It must operate as one batch because
 // multiple artifact families can share one protected Root.
@@ -157,6 +106,16 @@ func (c *Components) PrepareTopologyHydrations(
 	return currentByInstaller, nil
 }
 
+func (c *Components) GetTopologyHydration(
+	ctx context.Context,
+	installerName string,
+) (topology.Hydration, bool, error) {
+	if c == nil || c.metadata == nil {
+		return topology.Hydration{}, false, basespec.ErrClosed
+	}
+	return c.metadata.GetTopologyHydration(ctx, installerName)
+}
+
 // CommitTopologyHydration records successful installation only after the
 // generic topology and artifact-family installation paths both complete.
 func (c *Components) CommitTopologyHydration(
@@ -167,6 +126,47 @@ func (c *Components) CommitTopologyHydration(
 		return err
 	}
 	return c.PutTopologyHydration(ctx, desired)
+}
+
+func (c *Components) PutTopologyHydration(
+	ctx context.Context,
+	value topology.Hydration,
+) error {
+	if c == nil ||
+		c.metadata == nil ||
+		c.Roots == nil ||
+		c.Sources == nil {
+		return basespec.ErrClosed
+	}
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: topology hydration context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return err
+	}
+	if err := value.Validate(); err != nil {
+		return err
+	}
+	if !c.isProtectedRoot(value.RootID) {
+		return fmt.Errorf(
+			"%w: topology hydration root %q is not currently protected",
+			basespec.ErrProtected,
+			value.RootID,
+		)
+	}
+	if _, err := c.Roots.Get(ctx, value.RootID); err != nil {
+		return err
+	}
+	if _, err := c.Sources.Get(ctx, value.RootID, value.SourceID); err != nil {
+		return err
+	}
+	return c.metadata.PutTopologyHydration(ctx, value)
 }
 
 func equalTopologyHydration(

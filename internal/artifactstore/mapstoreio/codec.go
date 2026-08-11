@@ -87,26 +87,6 @@ type RawEncoderDecoder struct {
 	MaximumBytes int64
 }
 
-func RawData(content []byte) map[string]any {
-	return map[string]any{
-		RawContentKey: string(append([]byte(nil), content...)),
-	}
-}
-
-func RawBytes(data map[string]any, maximum int64) ([]byte, error) {
-	if len(data) != 1 {
-		return nil, errors.New("raw mapstore data must contain exactly one field")
-	}
-	value, ok := data[RawContentKey].(string)
-	if !ok {
-		return nil, errors.New("raw mapstore content is not a string")
-	}
-	if maximum <= 0 || int64(len(value)) > maximum {
-		return nil, fmt.Errorf("raw mapstore content exceeds %d bytes", maximum)
-	}
-	return []byte(value), nil
-}
-
 func (c RawEncoderDecoder) Encode(
 	writer io.Writer,
 	value any,
@@ -145,6 +125,26 @@ func (c RawEncoderDecoder) Decode(
 	}
 	*target = RawData(content)
 	return nil
+}
+
+func RawData(content []byte) map[string]any {
+	return map[string]any{
+		RawContentKey: string(append([]byte(nil), content...)),
+	}
+}
+
+func RawBytes(data map[string]any, maximum int64) ([]byte, error) {
+	if len(data) != 1 {
+		return nil, errors.New("raw mapstore data must contain exactly one field")
+	}
+	value, ok := data[RawContentKey].(string)
+	if !ok {
+		return nil, errors.New("raw mapstore content is not a string")
+	}
+	if maximum <= 0 || int64(len(value)) > maximum {
+		return nil, fmt.Errorf("raw mapstore content exceeds %d bytes", maximum)
+	}
+	return []byte(value), nil
 }
 
 func readBounded(reader io.Reader, maximum int64) ([]byte, error) {

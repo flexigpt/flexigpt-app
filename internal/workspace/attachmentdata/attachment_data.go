@@ -11,6 +11,17 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
+type AttachmentOperation struct {
+	Role                                 basespec.AttachmentRole
+	CanAttach                            bool
+	IsPrimary                            bool
+	RequiredSourceKind                   basespec.SourceKind
+	DefaultAuthoritative                 bool
+	IncludeReadmeWhenRequested           bool
+	AppliesWorkspaceDiscoveryPreferences bool
+	AllowsAttachmentDiscoveryOverrides   bool
+}
+
 // attachmentOperationMatrix is the workspace attachment lifecycle and
 // discovery-operation matrix.
 //
@@ -42,17 +53,6 @@ var attachmentOperationMatrix = [...]AttachmentOperation{
 		DefaultAuthoritative:               true,
 		AllowsAttachmentDiscoveryOverrides: true,
 	},
-}
-
-type AttachmentOperation struct {
-	Role                                 basespec.AttachmentRole
-	CanAttach                            bool
-	IsPrimary                            bool
-	RequiredSourceKind                   basespec.SourceKind
-	DefaultAuthoritative                 bool
-	IncludeReadmeWhenRequested           bool
-	AppliesWorkspaceDiscoveryPreferences bool
-	AllowsAttachmentDiscoveryOverrides   bool
 }
 
 func ValidateAttachmentDataForRole(

@@ -38,16 +38,15 @@ const (
 	WorkspaceSkillInsertUserMessage  WorkspaceSkillInsert = "user-message"
 )
 
-type WorkspaceDiscovery struct {
-	AdditionalLocators []basespec.Locator       `json:"additionalLocators,omitempty"`
-	AdditionalRoots    []WorkspaceDiscoveryRoot `json:"additionalRoots,omitempty"`
-	IncludeReadme      bool                     `json:"includeReadme,omitempty"`
-}
-
 type WorkspaceDiscoveryRoot struct {
 	Root            basespec.Locator `json:"root"`
 	Recursive       bool             `json:"recursive"`
 	IncludePatterns []string         `json:"includePatterns,omitempty"`
+}
+type WorkspaceDiscovery struct {
+	AdditionalLocators []basespec.Locator       `json:"additionalLocators,omitempty"`
+	AdditionalRoots    []WorkspaceDiscoveryRoot `json:"additionalRoots,omitempty"`
+	IncludeReadme      bool                     `json:"includeReadme,omitempty"`
 }
 
 type WorkspaceAttachmentSettings struct {
@@ -63,6 +62,18 @@ type WorkspaceOccurrenceRef struct {
 	SourceID           basespec.SourceID           `json:"sourceID"`
 	Locator            basespec.Locator            `json:"locator"`
 	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
+}
+
+type WorkspaceAttachmentView struct {
+	SourceID          basespec.SourceID           `json:"sourceID"`
+	Revision          uint64                      `json:"revision"`
+	Role              basespec.AttachmentRole     `json:"role"`
+	Enabled           bool                        `json:"enabled"`
+	SourceDisplayName string                      `json:"sourceDisplayName,omitempty"`
+	SourceKind        string                      `json:"sourceKind,omitempty"`
+	Path              string                      `json:"path,omitempty"`
+	Settings          WorkspaceAttachmentSettings `json:"settings"`
+	Diagnostics       []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
 }
 
 // WorkspaceView is the API-safe representation of a workspace.
@@ -81,18 +92,6 @@ type WorkspaceView struct {
 	PrimaryPath     string                    `json:"primaryPath,omitempty"`
 	Discovery       WorkspaceDiscovery        `json:"discovery"`
 	Attachments     []WorkspaceAttachmentView `json:"attachments"`
-}
-
-type WorkspaceAttachmentView struct {
-	SourceID          basespec.SourceID           `json:"sourceID"`
-	Revision          uint64                      `json:"revision"`
-	Role              basespec.AttachmentRole     `json:"role"`
-	Enabled           bool                        `json:"enabled"`
-	SourceDisplayName string                      `json:"sourceDisplayName,omitempty"`
-	SourceKind        string                      `json:"sourceKind,omitempty"`
-	Path              string                      `json:"path,omitempty"`
-	Settings          WorkspaceAttachmentSettings `json:"settings"`
-	Diagnostics       []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceArtifactView struct {

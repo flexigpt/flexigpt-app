@@ -43,40 +43,6 @@ func NewAttachmentData(
 	return value, nil
 }
 
-func (d AttachmentData) Clone() AttachmentData {
-	output := d
-	output.ExpectedMemberDigests = maps.Clone(d.ExpectedMemberDigests)
-	return output
-}
-
-func (d AttachmentData) Validate() error {
-	if d.SchemaVersion != AttachmentDataSchemaVersion {
-		return fmt.Errorf(
-			"%w: unsupported Skill attachment data schema %q",
-			basespec.ErrInvalid,
-			d.SchemaVersion,
-		)
-	}
-	if err := basespec.ValidateLocator(d.DiscoveryRoot, true); err != nil {
-		return err
-	}
-	if len(d.ExpectedMemberDigests) > basespec.MaxDiscoveryCandidates {
-		return fmt.Errorf(
-			"%w: expected Skill member digest count exceeds limit",
-			basespec.ErrInvalid,
-		)
-	}
-	for member, digest := range d.ExpectedMemberDigests {
-		if err := basespec.ValidatePortableLocator(member, false); err != nil {
-			return err
-		}
-		if err := cryptoutil.ValidateDigest(digest); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func EncodeAttachmentData(
 	value AttachmentData,
 ) (json.RawMessage, error) {
@@ -155,4 +121,38 @@ func (d AttachmentData) SourceExpectedContentDigests() (
 		output[locator] = digest
 	}
 	return output, nil
+}
+
+func (d AttachmentData) Clone() AttachmentData {
+	output := d
+	output.ExpectedMemberDigests = maps.Clone(d.ExpectedMemberDigests)
+	return output
+}
+
+func (d AttachmentData) Validate() error {
+	if d.SchemaVersion != AttachmentDataSchemaVersion {
+		return fmt.Errorf(
+			"%w: unsupported Skill attachment data schema %q",
+			basespec.ErrInvalid,
+			d.SchemaVersion,
+		)
+	}
+	if err := basespec.ValidateLocator(d.DiscoveryRoot, true); err != nil {
+		return err
+	}
+	if len(d.ExpectedMemberDigests) > basespec.MaxDiscoveryCandidates {
+		return fmt.Errorf(
+			"%w: expected Skill member digest count exceeds limit",
+			basespec.ErrInvalid,
+		)
+	}
+	for member, digest := range d.ExpectedMemberDigests {
+		if err := basespec.ValidatePortableLocator(member, false); err != nil {
+			return err
+		}
+		if err := cryptoutil.ValidateDigest(digest); err != nil {
+			return err
+		}
+	}
+	return nil
 }

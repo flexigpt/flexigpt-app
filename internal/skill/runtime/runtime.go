@@ -753,16 +753,6 @@ func (s *SkillRuntime) resolveArtifactSkill(
 	return s.resolveArtifactSkillWithResync(ctx, ref, nil)
 }
 
-func (s *SkillRuntime) registrationMatches(
-	value ResolvedArtifactSkill,
-) bool {
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
-
-	version, found := s.managedRuntime[value.Definition]
-	return found && version == value.Version
-}
-
 // resolveArtifactSkillWithResync keeps request-local synchronization state
 // only. It is not a cache of Artifact Store state: every Artifact is resolved
 // again after its owning Collection has been reconciled.
@@ -804,6 +794,16 @@ func (s *SkillRuntime) resolveArtifactSkillWithResync(
 		return ResolvedArtifactSkill{}, false
 	}
 	return refreshed, true
+}
+
+func (s *SkillRuntime) registrationMatches(
+	value ResolvedArtifactSkill,
+) bool {
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
+
+	version, found := s.managedRuntime[value.Definition]
+	return found && version == value.Version
 }
 
 func unavailableArtifactSkillsError(

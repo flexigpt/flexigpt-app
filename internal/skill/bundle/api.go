@@ -32,6 +32,11 @@ import (
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
 
+type skillArtifactPolicy struct {
+	ids              artifact.ArtifactIDProvider
+	autoAdoptSources map[basespec.SourceID]struct{}
+}
+
 type API struct {
 	dependencies Dependencies
 	closed       atomic.Bool
@@ -58,83 +63,11 @@ func (a *API) Close() error {
 	return nil
 }
 
-func (a *API) Ready() error {
-	if a == nil || a.closed.Load() {
-		return basespec.ErrClosed
-	}
-	return a.dependencies.Validate()
-}
-
 func (a *API) CreateBundle(
 	ctx context.Context,
 	request CreateBundleRequest,
 ) (Bundle, error) {
 	return a.createBundle(ctx, request, false)
-}
-
-func (a *API) GetBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) (Bundle, error) {
-	if err := a.Ready(); err != nil {
-		return Bundle{}, err
-	}
-	if err := ref.Validate(); err != nil {
-		return Bundle{}, err
-	}
-
-	value, err := a.dependencies.Collections.Get(ctx, ref)
-	if err != nil {
-		return Bundle{}, err
-	}
-	if value.Kind != CollectionKind {
-		return Bundle{}, fmt.Errorf(
-			"%w: collection %q is not a skill bundle",
-			basespec.ErrNotFound,
-			ref.CollectionID,
-		)
-	}
-
-	data, err := DecodeCollectionData(value.Data)
-	if err != nil {
-		return Bundle{}, err
-	}
-	attachments, err := a.dependencies.Collections.ListAttachments(ctx, ref)
-	if err != nil {
-		return Bundle{}, err
-	}
-
-	sources := make([]source.Summary, 0, len(attachments))
-	for _, attachment := range attachments {
-		if err := a.validateAttachment(ctx, ref.RootID, attachment); err != nil {
-			return Bundle{}, err
-		}
-		value, err := a.dependencies.Sources.Get(
-			ctx,
-			ref.RootID,
-			attachment.SourceID,
-		)
-		if err != nil {
-			return Bundle{}, err
-		}
-		sources = append(sources, value)
-	}
-	if err := validateBundleAttachmentTopology(data, attachments); err != nil {
-		return Bundle{}, err
-	}
-	sort.Slice(attachments, func(left, right int) bool {
-		return attachments[left].SourceID < attachments[right].SourceID
-	})
-	sort.Slice(sources, func(left, right int) bool {
-		return sources[left].ID < sources[right].ID
-	})
-
-	return Bundle{
-		Collection:  value,
-		Data:        data,
-		Attachments: attachments,
-		Sources:     sources,
-	}, nil
 }
 
 func (a *API) ListBundles(
@@ -637,33 +570,6 @@ func (a *API) ListSkills(
 	return output, nil
 }
 
-func (a *API) GetSkill(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
-	if err := a.Ready(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	value, err := a.dependencies.Artifacts.Get(ctx, ref)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if value.Kind != skillArtifact.Kind {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: artifact %q is not an agent skill",
-			basespec.ErrNotFound,
-			ref.ArtifactID,
-		)
-	}
-	if _, err := a.GetBundle(ctx, collection.CollectionRef{
-		RootID:       value.RootID,
-		CollectionID: value.CollectionID,
-	}); err != nil {
-		return artifact.Artifact{}, err
-	}
-	return value, nil
-}
-
 func (a *API) SetSkillEnabled(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -791,6 +697,33 @@ func (a *API) PurgeSkill(
 	return nil
 }
 
+func (a *API) GetSkill(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (artifact.Artifact, error) {
+	if err := a.Ready(); err != nil {
+		return artifact.Artifact{}, err
+	}
+	value, err := a.dependencies.Artifacts.Get(ctx, ref)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if value.Kind != skillArtifact.Kind {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: artifact %q is not an agent skill",
+			basespec.ErrNotFound,
+			ref.ArtifactID,
+		)
+	}
+	if _, err := a.GetBundle(ctx, collection.CollectionRef{
+		RootID:       value.RootID,
+		CollectionID: value.CollectionID,
+	}); err != nil {
+		return artifact.Artifact{}, err
+	}
+	return value, nil
+}
+
 func (a *API) EnsureBuiltInBundleTopology(
 	ctx context.Context,
 	request BuiltInBundleTopology,
@@ -915,6 +848,78 @@ func (a *API) InstallBuiltInSkill(
 		"%w: built-in Skills must be installed through InstallBuiltInCollection",
 		basespec.ErrUnsupported,
 	)
+}
+
+func (a *API) GetBundle(
+	ctx context.Context,
+	ref collection.CollectionRef,
+) (Bundle, error) {
+	if err := a.Ready(); err != nil {
+		return Bundle{}, err
+	}
+	if err := ref.Validate(); err != nil {
+		return Bundle{}, err
+	}
+
+	value, err := a.dependencies.Collections.Get(ctx, ref)
+	if err != nil {
+		return Bundle{}, err
+	}
+	if value.Kind != CollectionKind {
+		return Bundle{}, fmt.Errorf(
+			"%w: collection %q is not a skill bundle",
+			basespec.ErrNotFound,
+			ref.CollectionID,
+		)
+	}
+
+	data, err := DecodeCollectionData(value.Data)
+	if err != nil {
+		return Bundle{}, err
+	}
+	attachments, err := a.dependencies.Collections.ListAttachments(ctx, ref)
+	if err != nil {
+		return Bundle{}, err
+	}
+
+	sources := make([]source.Summary, 0, len(attachments))
+	for _, attachment := range attachments {
+		if err := a.validateAttachment(ctx, ref.RootID, attachment); err != nil {
+			return Bundle{}, err
+		}
+		value, err := a.dependencies.Sources.Get(
+			ctx,
+			ref.RootID,
+			attachment.SourceID,
+		)
+		if err != nil {
+			return Bundle{}, err
+		}
+		sources = append(sources, value)
+	}
+	if err := validateBundleAttachmentTopology(data, attachments); err != nil {
+		return Bundle{}, err
+	}
+	sort.Slice(attachments, func(left, right int) bool {
+		return attachments[left].SourceID < attachments[right].SourceID
+	})
+	sort.Slice(sources, func(left, right int) bool {
+		return sources[left].ID < sources[right].ID
+	})
+
+	return Bundle{
+		Collection:  value,
+		Data:        data,
+		Attachments: attachments,
+		Sources:     sources,
+	}, nil
+}
+
+func (a *API) Ready() error {
+	if a == nil || a.closed.Load() {
+		return basespec.ErrClosed
+	}
+	return a.dependencies.Validate()
 }
 
 func (a *API) currentBundleCatalog(
@@ -1271,30 +1276,6 @@ func builtInBundleTopologyMatches(
 		)
 }
 
-func (a *API) requireBundleMutation(
-	ctx context.Context,
-	rootID basespec.RootID,
-	allowProtected bool,
-) error {
-	if err := a.Ready(); err != nil {
-		return err
-	}
-	if err := basespec.ValidateRootID(rootID); err != nil {
-		return err
-	}
-	if !a.dependencies.RootMutationPolicy.IsProtectedRoot(rootID) {
-		return nil
-	}
-	if !allowProtected {
-		return fmt.Errorf(
-			"%w: protected Root %q may only be changed through a trusted built-in installer or update path",
-			basespec.ErrProtected,
-			rootID,
-		)
-	}
-	return protection.RequirePrivilegedInstaller(ctx)
-}
-
 func (a *API) refreshBundle(
 	ctx context.Context,
 	ref collection.CollectionRef,
@@ -1325,26 +1306,6 @@ func (a *API) refreshBundle(
 	}
 	policy := a.refreshPolicy(bundle, allowProtected)
 	return a.dependencies.Refresh.Refresh(ctx, ref, plan, policy)
-}
-
-func (a *API) refreshPolicy(
-	bundle Bundle,
-	allowProtected bool,
-) artifact.Policy {
-	if allowProtected {
-		return builtInSkillArtifactPolicy{}
-	}
-	autoAdoptSources := make(map[basespec.SourceID]struct{})
-	for _, attachment := range bundle.Attachments {
-		switch attachment.Role {
-		case RoleExternal, RoleLibrary:
-			autoAdoptSources[attachment.SourceID] = struct{}{}
-		}
-	}
-	return skillArtifactPolicy{
-		ids:              a.dependencies.AutoAdoptionIDProvider,
-		autoAdoptSources: autoAdoptSources,
-	}
 }
 
 // createManagedSkill performs the managed package publication workflow.
@@ -1679,6 +1640,50 @@ func (a *API) createManagedSkill(
 	)
 }
 
+func (a *API) requireBundleMutation(
+	ctx context.Context,
+	rootID basespec.RootID,
+	allowProtected bool,
+) error {
+	if err := a.Ready(); err != nil {
+		return err
+	}
+	if err := basespec.ValidateRootID(rootID); err != nil {
+		return err
+	}
+	if !a.dependencies.RootMutationPolicy.IsProtectedRoot(rootID) {
+		return nil
+	}
+	if !allowProtected {
+		return fmt.Errorf(
+			"%w: protected Root %q may only be changed through a trusted built-in installer or update path",
+			basespec.ErrProtected,
+			rootID,
+		)
+	}
+	return protection.RequirePrivilegedInstaller(ctx)
+}
+
+func (a *API) refreshPolicy(
+	bundle Bundle,
+	allowProtected bool,
+) artifact.Policy {
+	if allowProtected {
+		return builtInSkillArtifactPolicy{}
+	}
+	autoAdoptSources := make(map[basespec.SourceID]struct{})
+	for _, attachment := range bundle.Attachments {
+		switch attachment.Role {
+		case RoleExternal, RoleLibrary:
+			autoAdoptSources[attachment.SourceID] = struct{}{}
+		}
+	}
+	return skillArtifactPolicy{
+		ids:              a.dependencies.AutoAdoptionIDProvider,
+		autoAdoptSources: autoAdoptSources,
+	}
+}
+
 func managedSkillCreateResult(
 	value artifact.Artifact,
 	sourceID basespec.SourceID,
@@ -1975,11 +1980,6 @@ func bundleAttachmentRole(
 	)
 }
 
-type skillArtifactPolicy struct {
-	ids              artifact.ArtifactIDProvider
-	autoAdoptSources map[basespec.SourceID]struct{}
-}
-
 func (p skillArtifactPolicy) Derive(
 	ctx context.Context,
 	_ collection.Collection,
@@ -2119,21 +2119,6 @@ func newManagedSkillArtifactData(
 	}
 }
 
-func validateManagedSkillArtifactData(
-	value managedSkillArtifactData,
-) error {
-	if err := cryptoutil.ValidateDigest(value.PackageSHA256); err != nil {
-		return err
-	}
-	if value.Enabled == nil {
-		return fmt.Errorf(
-			"%w: managed Skill Artifact data requires enabled",
-			basespec.ErrInvalid,
-		)
-	}
-	return nil
-}
-
 func encodeManagedSkillArtifactData(
 	value managedSkillArtifactData,
 ) (json.RawMessage, error) {
@@ -2181,6 +2166,21 @@ func decodeManagedSkillArtifactData(
 		return managedSkillArtifactData{}, err
 	}
 	return value, nil
+}
+
+func validateManagedSkillArtifactData(
+	value managedSkillArtifactData,
+) error {
+	if err := cryptoutil.ValidateDigest(value.PackageSHA256); err != nil {
+		return err
+	}
+	if value.Enabled == nil {
+		return fmt.Errorf(
+			"%w: managed Skill Artifact data requires enabled",
+			basespec.ErrInvalid,
+		)
+	}
+	return nil
 }
 
 func managedSkillPackageDirectory(

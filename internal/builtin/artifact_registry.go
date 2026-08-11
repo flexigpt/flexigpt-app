@@ -18,14 +18,6 @@ import (
 
 const artifactBuiltinSchemaVersion = "v1"
 
-// Registry describes application-owned protected topology only. Artifact
-// families own their own embedded package registries and installation logic.
-type Registry struct {
-	SchemaVersion string `json:"schemaVersion"`
-	Root          Root   `json:"root"`
-	Source        Source `json:"source"`
-}
-
 type Root struct {
 	ID          basespec.RootID `json:"id"`
 	DisplayName string          `json:"displayName"`
@@ -37,6 +29,14 @@ type Source struct {
 	Kind        basespec.SourceKind `json:"kind"`
 	DisplayName string              `json:"displayName"`
 	Enabled     bool                `json:"enabled"`
+}
+
+// Registry describes application-owned protected topology only. Artifact
+// families own their own embedded package registries and installation logic.
+type Registry struct {
+	SchemaVersion string `json:"schemaVersion"`
+	Root          Root   `json:"root"`
+	Source        Source `json:"source"`
 }
 
 func LoadRegistry() (Registry, error) {
@@ -58,6 +58,54 @@ func LoadRegistry() (Registry, error) {
 		return Registry{}, err
 	}
 	return value, nil
+}
+
+// EnsureTopology establishes only shared protected topology. Typed artifact
+// installers are run separately by builtin.BootstrapRegistry.
+func (r Registry) EnsureTopology(
+	ctx context.Context,
+	ensurer topology.Ensurer,
+) (topology.Installed, error) {
+	if ctx == nil {
+		return topology.Installed{}, fmt.Errorf(
+			"%w: built-in topology context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if ensurer == nil {
+		return topology.Installed{}, fmt.Errorf(
+			"%w: built-in topology ensurer is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return topology.Installed{}, err
+	}
+	declaration, err := r.TopologyDeclaration()
+	if err != nil {
+		return topology.Installed{}, err
+	}
+	return ensurer.EnsureProtectedTopology(ctx, declaration)
+}
+
+func (r Registry) TopologyDeclaration() (topology.Declaration, error) {
+	if err := r.Validate(); err != nil {
+		return topology.Declaration{}, err
+	}
+	return topology.Declaration{
+		Root: root.RootDraft{
+			ID:          r.Root.ID,
+			DisplayName: r.Root.DisplayName,
+			Description: r.Root.Description,
+		},
+		Sources: []source.Draft{{
+			ID:          r.Source.ID,
+			Kind:        r.Source.Kind,
+			DisplayName: r.Source.DisplayName,
+			Enabled:     r.Source.Enabled,
+			Config:      json.RawMessage(jsonutil.EmptyObject),
+		}},
+	}, nil
 }
 
 func (r Registry) Validate() error {
@@ -105,52 +153,4 @@ func (r Registry) Validate() error {
 		)
 	}
 	return nil
-}
-
-func (r Registry) TopologyDeclaration() (topology.Declaration, error) {
-	if err := r.Validate(); err != nil {
-		return topology.Declaration{}, err
-	}
-	return topology.Declaration{
-		Root: root.RootDraft{
-			ID:          r.Root.ID,
-			DisplayName: r.Root.DisplayName,
-			Description: r.Root.Description,
-		},
-		Sources: []source.Draft{{
-			ID:          r.Source.ID,
-			Kind:        r.Source.Kind,
-			DisplayName: r.Source.DisplayName,
-			Enabled:     r.Source.Enabled,
-			Config:      json.RawMessage(jsonutil.EmptyObject),
-		}},
-	}, nil
-}
-
-// EnsureTopology establishes only shared protected topology. Typed artifact
-// installers are run separately by builtin.BootstrapRegistry.
-func (r Registry) EnsureTopology(
-	ctx context.Context,
-	ensurer topology.Ensurer,
-) (topology.Installed, error) {
-	if ctx == nil {
-		return topology.Installed{}, fmt.Errorf(
-			"%w: built-in topology context is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if ensurer == nil {
-		return topology.Installed{}, fmt.Errorf(
-			"%w: built-in topology ensurer is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
-		return topology.Installed{}, err
-	}
-	declaration, err := r.TopologyDeclaration()
-	if err != nil {
-		return topology.Installed{}, err
-	}
-	return ensurer.EnsureProtectedTopology(ctx, declaration)
 }
