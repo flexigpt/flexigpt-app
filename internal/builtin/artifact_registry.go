@@ -108,6 +108,44 @@ func (r Registry) TopologyDeclaration() (topology.Declaration, error) {
 	}, nil
 }
 
+// RegistryFromTopologyDeclaration adapts one feature-owned protected topology
+// declaration to the generic bootstrap registry. It keeps generic topology
+// creation in Artifact Store composition while feature installers retain
+// ownership of package content and static Artifact registrations.
+func RegistryFromTopologyDeclaration(
+	declaration topology.Declaration,
+) (Registry, error) {
+	if err := declaration.Validate(); err != nil {
+		return Registry{}, err
+	}
+	if len(declaration.Sources) != 1 {
+		return Registry{}, fmt.Errorf(
+			"%w: built-in topology must declare exactly one shared Source",
+			basespec.ErrInvalid,
+		)
+	}
+
+	sourceDraft := declaration.Sources[0]
+	value := Registry{
+		SchemaVersion: artifactBuiltinSchemaVersion,
+		Root: Root{
+			ID:          declaration.Root.ID,
+			DisplayName: declaration.Root.DisplayName,
+			Description: declaration.Root.Description,
+		},
+		Source: Source{
+			ID:          sourceDraft.ID,
+			Kind:        sourceDraft.Kind,
+			DisplayName: sourceDraft.DisplayName,
+			Enabled:     sourceDraft.Enabled,
+		},
+	}
+	if err := value.Validate(); err != nil {
+		return Registry{}, err
+	}
+	return value, nil
+}
+
 func (r Registry) Validate() error {
 	if r.SchemaVersion != artifactBuiltinSchemaVersion {
 		return fmt.Errorf(

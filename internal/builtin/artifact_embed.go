@@ -21,13 +21,28 @@ var SkillRegistryJSON []byte
 //go:embed skills
 var embeddedSkillsPackagesFS embed.FS
 
+//go:embed all:mcp_artifacts
+var embeddedMCPArtifactPackagesFS embed.FS
+
 const embeddedSkillsPackagesRoot = "skills"
+
+const embeddedMCPArtifactPackagesRoot = "mcp_artifacts"
 
 // EmbeddedSkillsPackages returns the root containing Skill built-in package
 // directories. Generic built-in code validates the filesystem boundary but
 // does not own or inspect Skill package content.
 func EmbeddedSkillsPackages() (fs.FS, error) {
 	return openPackageFS(embeddedSkillsPackagesFS, embeddedSkillsPackagesRoot)
+}
+
+// EmbeddedMCPArtifactPackages returns only converted Artifact-backed MCP
+// packages. The older embedded MCP tree remains a reference-only source and
+// is deliberately not used by normal startup hydration.
+func EmbeddedMCPArtifactPackages() (fs.FS, error) {
+	return openPackageFS(
+		embeddedMCPArtifactPackagesFS,
+		embeddedMCPArtifactPackagesRoot,
+	)
 }
 
 // PackageFile is an immutable-by-convention copy of one regular embedded file

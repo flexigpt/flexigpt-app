@@ -19,7 +19,7 @@
 	"bundles": [
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000005",
-			"packageDirectory": "b27b7870-6a16-4d57-9de8-3850b15096f0_search-mcp-servers",
+			"packageDirectory": "search",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000006",

@@ -652,13 +652,15 @@ func (r *settingMCPSecretResolver) SetMCPSecret(
 	if err != nil {
 		return "", false, err
 	}
+
+	keyName := settingSpec.AuthKeyName(
+		secret.GetMCPSecretRefStorageKey(parsed),
+	)
 	_, err = r.store.SetAuthKey(
 		ctx,
 		&settingSpec.SetAuthKeyRequest{
-			Type: settingSpec.AuthKeyTypeMCP,
-			KeyName: settingSpec.AuthKeyName(
-				secret.GetMCPSecretRefStorageKey(parsed),
-			),
+			Type:    settingSpec.AuthKeyTypeMCP,
+			KeyName: keyName,
 			Body: &settingSpec.SetAuthKeyRequestBody{
 				Secret: value,
 			},
@@ -667,10 +669,28 @@ func (r *settingMCPSecretResolver) SetMCPSecret(
 	if err != nil {
 		return "", false, err
 	}
-	sum := sha256.Sum256([]byte(value))
-	return hex.EncodeToString(sum[:]),
-		strings.TrimSpace(value) != "",
-		nil
+
+	// SetAuthKey intentionally returns an empty response body. Read the
+	// persisted metadata back so this MCP API returns the Setting Store's
+	// actual SHA256 and NonEmpty semantics. In particular, the Setting Store
+	// treats a whitespace-only value as non-empty, while a local TrimSpace
+	// calculation would report a different result.
+	response, err := r.store.GetAuthKey(
+		ctx,
+		&settingSpec.GetAuthKeyRequest{
+			Type:    settingSpec.AuthKeyTypeMCP,
+			KeyName: keyName,
+		},
+	)
+	if err != nil {
+		return "", false, err
+	}
+	if response == nil || response.Body == nil {
+		return "", false, errors.New(
+			"MCP secret write returned no persisted metadata",
+		)
+	}
+	return response.Body.SHA256, response.Body.NonEmpty, nil
 }
 
 func (r *settingMCPSecretResolver) ResolveSecret(

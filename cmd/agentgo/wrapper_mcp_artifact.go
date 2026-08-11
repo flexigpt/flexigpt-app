@@ -11,9 +11,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
+	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	mcpBundle "github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
@@ -34,10 +33,12 @@ type MCPWrapper struct {
 	toolBridge *mcpRuntime.ToolBridge
 	auth       *auth.AuthManager
 
-	overlays    *installation.SettingsOverlayRepository
-	settings    *mcpSettingsAdapter
-	secrets     *settingMCPSecretResolver
-	oauthBroker *auth.OAuthLoopbackBroker
+	overlays *installation.SettingsOverlayRepository
+	settings *mcpSettingsAdapter
+	secrets  *settingMCPSecretResolver
+
+	oauthLoopbackListenAddrAtStart string
+	oauthBroker                    *auth.OAuthLoopbackBroker
 }
 
 type MCPSecretWriteResult struct {
@@ -51,6 +52,7 @@ type MCPGlobalSettingsView struct {
 	Revision                uint64              `json:"revision"`
 	OAuthRedirectURL        string              `json:"oauthRedirectURL,omitempty"`
 	OAuthLoopbackListenAddr string              `json:"oauthLoopbackListenAddr,omitempty"`
+	OAuthRestartRequired    bool                `json:"oauthRestartRequired"`
 }
 
 func InitMCPWrapper(
@@ -81,8 +83,9 @@ func InitMCPWrapper(
 		return err
 	}
 
+	configuredLoopback := strings.TrimSpace(global.OAuthLoopbackListenAddr)
 	brokerOptions := &auth.OAuthLoopbackBrokerOptions{
-		ListenAddr: strings.TrimSpace(global.OAuthLoopbackListenAddr),
+		ListenAddr: configuredLoopback,
 	}
 	oauthBroker, err := auth.NewOAuthLoopbackBroker(ctx, brokerOptions)
 	if err != nil {
@@ -138,11 +141,8 @@ func InitMCPWrapper(
 		mcpRuntime.NewApprovalManager(5*time.Minute),
 	)
 
-	bootstrapCtx := protection.WithPrivilegedInstaller(
-		context.WithoutCancel(ctx),
-	)
 	if err := installMCPBuiltIns(
-		bootstrapCtx,
+		context.WithoutCancel(ctx),
 		components,
 		bundleAPI,
 		overlays,
@@ -160,6 +160,7 @@ func InitMCPWrapper(
 	wrapper.overlays = overlays
 	wrapper.settings = settings
 	wrapper.secrets = secrets
+	wrapper.oauthLoopbackListenAddrAtStart = configuredLoopback
 	wrapper.oauthBroker = oauthBroker
 	return nil
 }
@@ -184,35 +185,35 @@ func installMCPBuiltIns(
 
 	installer, err := artifactbuiltin.NewInstaller(
 		artifactbuiltin.InstallerDependencies{
-			Topology: components,
-			Bundles:  bundles,
-			Registry: registry,
-			Packages: packages,
-			Overlays: overlays,
+			Bundles:                bundles,
+			Registry:               registry,
+			Packages:               packages,
+			Overlays:               overlays,
+			ShareableCanonicalizer: components.ShareableSchemas,
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	desired, err := installer.DesiredHydration(ctx)
-	if err != nil {
-		return err
-	}
-	current, err := components.PrepareTopologyHydrations(
-		ctx,
-		[]topology.Hydration{desired},
+	topologyRegistry, err := builtin.RegistryFromTopologyDeclaration(
+		registry.Topology,
 	)
 	if err != nil {
 		return err
 	}
-	if err := installer.EnsureHydration(
-		ctx,
-		current[desired.InstallerName],
-	); err != nil {
+	bootstrap, err := builtin.NewBootstrapRegistry(
+		topologyRegistry,
+		components,
+		components,
+	)
+	if err != nil {
 		return err
 	}
-	return components.CommitTopologyHydration(ctx, desired)
+	if err := bootstrap.Register(installer); err != nil {
+		return err
+	}
+	return bootstrap.Ensure(ctx)
 }
 
 func (w *MCPWrapper) CreateMCPBundle(
@@ -635,21 +636,46 @@ func (w *MCPWrapper) PutMCPServerSecret(
 		if err := w.ready(); err != nil {
 			return MCPSecretWriteResult{}, err
 		}
-		if err := w.requireServerArtifact(context.Background(), server); err != nil {
+		ctx := context.Background()
+		if err := w.requireServerArtifact(ctx, server); err != nil {
 			return MCPSecretWriteResult{}, err
 		}
-		w.auth.ClearAuthStatus(server)
 		if kind == mcpSpec.MCPSecretKindOAuthToken {
 			return MCPSecretWriteResult{}, fmt.Errorf(
 				"%w: OAuth token secrets are runtime-managed",
 				mcpSpec.ErrMCPInvalidRequest,
 			)
 		}
+
 		if kind == mcpSpec.MCPSecretKindOAuthClientCredentials {
-			if err := auth.ValidateOAuthClientCredentialsSecret(value, false); err != nil {
+			resolved, err := w.bundleAPI.ResolveMCPServer(ctx, server)
+			if err != nil {
+				return MCPSecretWriteResult{}, err
+			}
+			mode := resolved.Document.Extension.Auth.Mode
+			switch mode {
+			case mcpSpec.MCPHTTPAuthOAuth,
+				mcpSpec.MCPHTTPAuthClientCredentials:
+			default:
+				return MCPSecretWriteResult{}, fmt.Errorf(
+					"%w: MCP server does not declare OAuth client credentials",
+					mcpSpec.ErrMCPInvalidRequest,
+				)
+			}
+			if resolved.Document.Extension.Auth.ClientCredentialsInput == "" {
+				return MCPSecretWriteResult{}, fmt.Errorf(
+					"%w: MCP server does not declare an OAuth client credentials input",
+					mcpSpec.ErrMCPInvalidRequest,
+				)
+			}
+			if err := auth.ValidateOAuthClientCredentialsSecret(
+				value,
+				mode == mcpSpec.MCPHTTPAuthClientCredentials,
+			); err != nil {
 				return MCPSecretWriteResult{}, err
 			}
 		}
+
 		if kind == mcpSpec.MCPSecretKindHTTPHeader &&
 			(strings.TrimSpace(value) == "" ||
 				strings.ContainsAny(value, "\r\n\x00")) {
@@ -658,22 +684,24 @@ func (w *MCPWrapper) PutMCPServerSecret(
 				mcpSpec.ErrMCPInvalidRequest,
 			)
 		}
-
-		if err := w.runtime.Invalidate(context.Background(), server); err != nil {
+		if err := w.runtime.Invalidate(ctx, server); err != nil {
 			return MCPSecretWriteResult{}, err
 		}
+
 		ref, err := secret.NewMCPSecretRefString(server, kind, slot)
 		if err != nil {
 			return MCPSecretWriteResult{}, err
 		}
 		hash, nonEmpty, err := w.secrets.SetMCPSecret(
-			context.Background(),
+			ctx,
 			ref,
 			value,
 		)
 		if err != nil {
 			return MCPSecretWriteResult{}, err
 		}
+		w.auth.ClearAuthStatus(server)
+
 		return MCPSecretWriteResult{
 			SecretRef: ref,
 			SHA256:    hash,
@@ -700,7 +728,6 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 				mcpSpec.ErrMCPInvalidRequest,
 			)
 		}
-		w.auth.ClearAuthStatus(server)
 		if err := w.runtime.Invalidate(context.Background(), server); err != nil {
 			return err
 		}
@@ -711,6 +738,7 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 		if err := w.secrets.DeleteSecret(context.Background(), ref); err != nil {
 			return err
 		}
+		w.auth.ClearAuthStatus(server)
 		return nil
 	})
 }
@@ -803,6 +831,8 @@ func (w *MCPWrapper) GetMCPGlobalSettings() (
 		if w.oauthBroker != nil {
 			view.OAuthRedirectURL = w.oauthBroker.RedirectURL()
 			view.OAuthLoopbackListenAddr = w.oauthBroker.ListenAddr()
+			view.OAuthRestartRequired = strings.TrimSpace(settings.OAuthLoopbackListenAddr) !=
+				w.oauthLoopbackListenAddrAtStart
 		}
 		return view, nil
 	})
@@ -860,6 +890,7 @@ func (w *MCPWrapper) close() {
 	w.settings = nil
 	w.secrets = nil
 	w.oauthBroker = nil
+	w.oauthLoopbackListenAddrAtStart = ""
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

@@ -3,9 +3,8 @@
 	"schemaID": "mcp.bundle.v1",
 	"schemaVersion": "v1",
 	"logicalName": "search-mcp-servers",
-	"logicalVersion": "1.0.0",
 	"displayName": "Search MCP Servers",
-	"description": "Built-in MCP server definitions for web and document search.",
+	"description": "Reviewed built-in MCP definitions for documentation and web search.",
 	"labels": {
 		"category": "search"
 	},
@@ -27,11 +26,10 @@
 		"servers": {
 			"context7": {
 				"displayName": "Context7",
-				"description": "Context7 documentation and code-context MCP server.",
+				"description": "Context7 documentation MCP server.",
 				"auth": {
 					"mode": "oauth"
 				},
-				"install": {},
 				"policy": {
 					"ref": "safe-default",
 					"required": true
@@ -39,28 +37,9 @@
 			},
 			"exa": {
 				"displayName": "Exa Search",
-				"description": "Exa web and document search MCP server.",
+				"description": "Exa web and research search MCP server.",
 				"auth": {
 					"mode": "none"
-				},
-				"install": {
-					"inputs": {
-						"EXA_API_KEY": {
-							"kind": "secret",
-							"label": "Exa API Key",
-							"description": "Optional key for higher limits and Agent tools.",
-							"required": false
-						}
-					}
-				},
-				"connectionProfiles": {
-					"with-api-key": {
-						"http": {
-							"headers": {
-								"x-api-key": "${EXA_API_KEY}"
-							}
-						}
-					}
 				},
 				"policy": {
 					"ref": "safe-default",
@@ -69,11 +48,10 @@
 			},
 			"stack-overflow": {
 				"displayName": "Stack Overflow",
-				"description": "Official Stack Overflow MCP server.",
+				"description": "Stack Overflow MCP server.",
 				"auth": {
 					"mode": "oauth"
 				},
-				"install": {},
 				"policy": {
 					"ref": "safe-default",
 					"required": true
@@ -87,13 +65,10 @@
 				"schemaID": "mcp.policy.v1",
 				"schemaVersion": "v1",
 				"logicalName": "safe-default",
-				"displayName": "Safe default MCP policy",
-				"description": "Requires approval for uncertain or mutating MCP tool calls.",
-				"labels": {
-					"policy.profile": "safe"
-				},
+				"displayName": "Safe Default MCP Policy",
+				"description": "Requires user approval for uncertain and mutating MCP operations.",
 				"body": {
-					"trustLevel": "untrusted",
+					"trustLevel": "trusted",
 					"defaultPolicy": {
 						"defaultApprovalRule": "ask",
 						"defaultExecutionMode": "manual",

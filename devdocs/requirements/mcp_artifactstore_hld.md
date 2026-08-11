@@ -1178,6 +1178,15 @@ The old embedded built-in MCP data is converted statically into the new source-c
 
 This is a code and data conversion, not an application startup migration.
 
+Normal Artifact-backed MCP startup reads only the dedicated converted embedded
+package subtree. The historical `internal/builtin/mcp` tree remains
+reference-only and is not opened, scanned, converted, or used as a runtime
+fallback by normal application composition.
+
+Each additional built-in Bundle must be added as a reviewed source-controlled
+`.mcp.json` package and static registration. Runtime conversion of a legacy
+embedded JSON definition is prohibited.
+
 For each old built-in bundle:
 
 - Create one canonical `.mcp.json`.
@@ -1697,8 +1706,10 @@ Completed:
   prompts, completion, auth health, global settings, and mapped tool calls.
 - Strict installation-overlay decoding with non-conflicting nested
   `serverData` persistence and protected-overlay secret cleanup.
-- Source-controlled conversion and protected hydration registration for the
+- Source-controlled conversion, schema-registry canonicalization, generic
+  protected-topology bootstrap, and protected hydration registration for the
   supplied Search MCP built-in package sample.
+- Normal startup isolation from the legacy embedded MCP resource tree.
 - Legacy command wrapper, old assistant-preset wrapper, old inference MCP
   bridge, and old MCP context validator quarantined from normal builds.
 

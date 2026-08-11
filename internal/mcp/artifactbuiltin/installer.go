@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -19,13 +21,6 @@ import (
 )
 
 const hydrationFingerprintSchemaVersion = "mcp.builtin-hydration/v1"
-
-type protectedTopologyEnsurer interface {
-	EnsureProtectedTopology(
-		ctx context.Context,
-		declaration topology.Declaration,
-	) (topology.Installed, error)
-}
 
 type builtInBundleEnsurer interface {
 	EnsureBuiltIn(
@@ -47,19 +42,19 @@ type rootOverlayPurger interface {
 }
 
 type InstallerDependencies struct {
-	Topology protectedTopologyEnsurer
-	Bundles  builtInBundleEnsurer
-	Registry Registry
-	Packages fs.FS
-	Overlays installation.OverlayRepository
+	Bundles                builtInBundleEnsurer
+	Registry               Registry
+	Packages               fs.FS
+	Overlays               installation.OverlayRepository
+	ShareableCanonicalizer shareable.Canonicalizer
 }
 
 type Installer struct {
-	topology protectedTopologyEnsurer
-	bundles  builtInBundleEnsurer
-	registry Registry
-	packages fs.FS
-	overlays installation.OverlayRepository
+	bundles       builtInBundleEnsurer
+	registry      Registry
+	packages      fs.FS
+	overlays      installation.OverlayRepository
+	canonicalizer shareable.Canonicalizer
 }
 
 type preparedBundle struct {
@@ -70,11 +65,16 @@ type preparedBundle struct {
 func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
-	if dependencies.Topology == nil ||
-		dependencies.Bundles == nil ||
+	if dependencies.Bundles == nil ||
 		dependencies.Packages == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP built-in installer dependencies are incomplete",
+			basespec.ErrInvalid,
+		)
+	}
+	if dependencies.ShareableCanonicalizer == nil {
+		return nil, fmt.Errorf(
+			"%w: MCP built-in shareable canonicalizer is required",
 			basespec.ErrInvalid,
 		)
 	}
@@ -83,11 +83,11 @@ func NewInstaller(
 	}
 
 	return &Installer{
-		topology: dependencies.Topology,
-		bundles:  dependencies.Bundles,
-		registry: dependencies.Registry,
-		packages: dependencies.Packages,
-		overlays: dependencies.Overlays,
+		bundles:       dependencies.Bundles,
+		registry:      dependencies.Registry,
+		packages:      dependencies.Packages,
+		overlays:      dependencies.Overlays,
+		canonicalizer: dependencies.ShareableCanonicalizer,
 	}, nil
 }
 
@@ -164,23 +164,6 @@ func (i *Installer) EnsureHydration(
 		return err
 	}
 
-	installed, err := i.topology.EnsureProtectedTopology(
-		ctx,
-		i.registry.Topology,
-	)
-	if err != nil {
-		return err
-	}
-	if !containsInstalledSource(
-		installed,
-		i.registry.Topology.Sources[0].ID,
-	) {
-		return fmt.Errorf(
-			"%w: protected MCP topology did not install its managed Source",
-			basespec.ErrInvalid,
-		)
-	}
-
 	for _, value := range prepared {
 		if _, err := i.bundles.EnsureBuiltIn(
 			ctx,
@@ -207,6 +190,43 @@ func (*Installer) BuiltInName() string {
 	return "mcp.bundle"
 }
 
+// BuiltInIDs exposes only Collection and Artifact IDs. The generic bootstrap
+// registry reserves the protected Root and shared Source IDs itself.
+func (i *Installer) BuiltInIDs() []string {
+	if i == nil {
+		return nil
+	}
+
+	ids := make([]string, 0)
+	for _, registered := range i.registry.OrderedBundles() {
+		ids = append(ids, string(registered.CollectionID))
+		for _, value := range registered.Artifacts {
+			ids = append(ids, string(value.ID))
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
+	if i == nil {
+		return nil
+	}
+
+	scopes := make([]basespec.Locator, 0, len(i.registry.Bundles))
+	for _, registered := range i.registry.OrderedBundles() {
+		scopes = append(scopes, registered.PackageDirectory)
+	}
+	slices.Sort(scopes)
+	return scopes
+}
+
+// Ensure satisfies the generic installer contract. Hydration-aware bootstrap
+// calls EnsureHydration instead and supplies the current marker state.
+func (i *Installer) Ensure(ctx context.Context) error {
+	return i.EnsureHydration(ctx, false)
+}
+
 func (i *Installer) prepareBundles(
 	ctx context.Context,
 ) ([]preparedBundle, error) {
@@ -227,12 +247,36 @@ func (i *Installer) prepareBundles(
 				err,
 			)
 		}
-		document, _, err := schema.ParseBundle(raw)
+
+		parsed, err := i.canonicalizer.Canonicalize(ctx, raw)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"canonicalize built-in MCP document %q: %w",
+				"canonicalize built-in MCP document %q through the Artifact Store schema registry: %w",
 				registered.DocumentLocator(),
 				err,
+			)
+		}
+		if parsed.Key != schema.NewBundleCodec().Key() {
+			return nil, fmt.Errorf(
+				"%w: built-in MCP document %q was canonicalized by another schema",
+				basespec.ErrInvalid,
+				registered.DocumentLocator(),
+			)
+		}
+
+		document, _, err := schema.ParseBundle(parsed.Raw)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"decode canonical built-in MCP document %q: %w",
+				registered.DocumentLocator(),
+				err,
+			)
+		}
+		if document.Digest != parsed.Digest {
+			return nil, fmt.Errorf(
+				"%w: built-in MCP document %q digest differs from schema registry output",
+				basespec.ErrDigestMismatch,
+				registered.DocumentLocator(),
 			)
 		}
 
@@ -323,18 +367,6 @@ func (i *Installer) hydrationFingerprint(
 		return "", err
 	}
 	return cryptoutil.DigestBytes(canonical), nil
-}
-
-func containsInstalledSource(
-	installed topology.Installed,
-	sourceID basespec.SourceID,
-) bool {
-	for _, value := range installed.Sources {
-		if value.ID == sourceID {
-			return true
-		}
-	}
-	return false
 }
 
 func bundleDefinitions(

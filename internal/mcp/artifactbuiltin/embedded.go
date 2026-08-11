@@ -9,7 +9,6 @@ import (
 	"io/fs"
 
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 )
 
 const embeddedRegistryFile = "mcp_artifact_registry.json"
@@ -18,10 +17,7 @@ const embeddedRegistryFile = "mcp_artifact_registry.json"
 // registry. It intentionally does not inspect or convert legacy runtime data,
 // overlays, secrets, or user state.
 func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
-	packages, err := fsutil.ResolveFS(
-		builtin.BuiltInMCPBundlesFS,
-		builtin.BuiltInMCPBundlesRootDir,
-	)
+	packages, err := builtin.EmbeddedMCPArtifactPackages()
 	if err != nil {
 		return Registry{}, nil, err
 	}
@@ -37,6 +33,8 @@ func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
 		return Registry{}, nil, err
 	}
 
+	// The converted registry is intentionally mandatory. Normal startup never
+	// falls back to the legacy embedded MCP document tree.
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 

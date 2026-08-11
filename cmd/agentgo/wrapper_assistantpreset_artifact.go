@@ -19,158 +19,167 @@ type AssistantPresetStoreWrapper struct {
 }
 
 func InitAssistantPresetStoreWrapper(
-	wrapper *AssistantPresetStoreWrapper,
-	baseDirectory string,
-	modelPresets *modelpresetStore.ModelPresetStore,
-	tools *toolStore.ToolStore,
-	skills *skillRuntime.SkillRuntime,
+	w *AssistantPresetStoreWrapper,
+	baseDir string,
+	modelPresetSt *modelpresetStore.ModelPresetStore,
+	toolSt *toolStore.ToolStore,
+	skillRt *skillRuntime.SkillRuntime,
 	mcpResolver lookupimpl.MCPServerResolver,
 	mcpDiscovery lookupimpl.MCPDiscoveryLookup,
 ) error {
-	if wrapper == nil {
-		return errors.New("assistant preset store wrapper is required")
-	}
-	if modelPresets == nil ||
-		tools == nil ||
-		skills == nil ||
-		mcpResolver == nil ||
-		mcpDiscovery == nil {
+	if w == nil {
 		return errors.New(
-			"artifact-backed assistant preset dependencies are incomplete",
+			"initializing AssistantPresetStoreWrapper on nil receiver",
 		)
+	}
+	if modelPresetSt == nil {
+		return errors.New("model preset store is nil")
+	}
+	if toolSt == nil {
+		return errors.New("tool store is nil")
+	}
+	if skillRt == nil {
+		return errors.New("skill runtime is nil")
+	}
+	if mcpResolver == nil {
+		return errors.New("artifact-backed MCP resolver is nil")
+	}
+	if mcpDiscovery == nil {
+		return errors.New("artifact-backed MCP discovery runtime is nil")
 	}
 
 	lookups := lookupimpl.NewAssistantPresetReferenceLookups(
-		modelPresets,
-		tools,
-		skills,
+		modelPresetSt,
+		toolSt,
+		skillRt,
 		mcpResolver,
 		mcpDiscovery,
 	)
 
 	store, err := assistantpresetStore.NewAssistantPresetStore(
-		baseDirectory,
+		baseDir,
 		assistantpresetStore.WithReferenceLookups(lookups),
 	)
 	if err != nil {
 		return err
 	}
-	wrapper.store = store
+
+	w.store = store
 	return nil
 }
 
 func (w *AssistantPresetStoreWrapper) PutAssistantPresetBundle(
-	request *spec.PutAssistantPresetBundleRequest,
+	req *spec.PutAssistantPresetBundleRequest,
 ) (*spec.PutAssistantPresetBundleResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*spec.PutAssistantPresetBundleResponse, error) {
 			return w.store.PutAssistantPresetBundle(
 				context.Background(),
-				request,
+				req,
 			)
 		},
 	)
 }
 
 func (w *AssistantPresetStoreWrapper) PatchAssistantPresetBundle(
-	request *spec.PatchAssistantPresetBundleRequest,
+	req *spec.PatchAssistantPresetBundleRequest,
 ) (*spec.PatchAssistantPresetBundleResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*spec.PatchAssistantPresetBundleResponse, error) {
 			return w.store.PatchAssistantPresetBundle(
 				context.Background(),
-				request,
+				req,
 			)
 		},
 	)
 }
 
 func (w *AssistantPresetStoreWrapper) DeleteAssistantPresetBundle(
-	request *spec.DeleteAssistantPresetBundleRequest,
+	req *spec.DeleteAssistantPresetBundleRequest,
 ) (*spec.DeleteAssistantPresetBundleResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*spec.DeleteAssistantPresetBundleResponse, error) {
 			return w.store.DeleteAssistantPresetBundle(
 				context.Background(),
-				request,
+				req,
 			)
 		},
 	)
 }
 
 func (w *AssistantPresetStoreWrapper) ListAssistantPresetBundles(
-	request *spec.ListAssistantPresetBundlesRequest,
+	req *spec.ListAssistantPresetBundlesRequest,
 ) (*spec.ListAssistantPresetBundlesResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*spec.ListAssistantPresetBundlesResponse, error) {
 			return w.store.ListAssistantPresetBundles(
 				context.Background(),
-				request,
+				req,
 			)
 		},
 	)
 }
 
 func (w *AssistantPresetStoreWrapper) PutAssistantPreset(
-	request *spec.PutAssistantPresetRequest,
+	req *spec.PutAssistantPresetRequest,
 ) (*spec.PutAssistantPresetResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*spec.PutAssistantPresetResponse, error) {
 			return w.store.PutAssistantPreset(
 				context.Background(),
-				request,
+				req,
 			)
 		},
 	)
 }
 
 func (w *AssistantPresetStoreWrapper) PatchAssistantPreset(
-	request *spec.PatchAssistantPresetRequest,
+	req *spec.PatchAssistantPresetRequest,
 ) (*spec.PatchAssistantPresetResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*spec.PatchAssistantPresetResponse, error) {
 			return w.store.PatchAssistantPreset(
 				context.Background(),
-				request,
+				req,
 			)
 		},
 	)
 }
 
 func (w *AssistantPresetStoreWrapper) DeleteAssistantPreset(
-	request *spec.DeleteAssistantPresetRequest,
+	req *spec.DeleteAssistantPresetRequest,
 ) (*spec.DeleteAssistantPresetResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*spec.DeleteAssistantPresetResponse, error) {
 			return w.store.DeleteAssistantPreset(
 				context.Background(),
-				request,
+				req,
 			)
 		},
 	)
 }
 
 func (w *AssistantPresetStoreWrapper) GetAssistantPreset(
-	request *spec.GetAssistantPresetRequest,
+	req *spec.GetAssistantPresetRequest,
 ) (*spec.GetAssistantPresetResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*spec.GetAssistantPresetResponse, error) {
 			return w.store.GetAssistantPreset(
 				context.Background(),
-				request,
+				req,
 			)
 		},
 	)
 }
 
 func (w *AssistantPresetStoreWrapper) ListAssistantPresets(
-	request *spec.ListAssistantPresetsRequest,
+	req *spec.ListAssistantPresetsRequest,
 ) (*spec.ListAssistantPresetsResponse, error) {
 	return middleware.WithRecoveryResp(
 		func() (*spec.ListAssistantPresetsResponse, error) {
 			return w.store.ListAssistantPresets(
 				context.Background(),
-				request,
+				req,
 			)
 		},
 	)
@@ -181,7 +190,11 @@ func (w *AssistantPresetStoreWrapper) close() {
 		return
 	}
 	if err := w.store.Close(); err != nil {
-		slog.Error("close assistant preset store", "error", err)
+		slog.Error(
+			"failed to close artifact-backed assistant preset store",
+			"error",
+			err,
+		)
 	}
 	w.store = nil
 }

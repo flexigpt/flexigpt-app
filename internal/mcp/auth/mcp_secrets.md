@@ -1,49 +1,48 @@
-# MCP secrets
+# Artifact-backed MCP secrets
 
-MCP server configs must not contain raw secrets. They store deterministic secret
-refs, and the secret values are stored in the settings auth-key store under the
-`mcp` auth-key namespace.
+Artifact-backed MCP Server Definitions, MCP Bundle documents, Artifact local
+data, Catalogs, and runtime snapshots must never contain raw secret values.
+They contain only opaque Artifact-scoped secret references.
 
-OAuth access tokens and refresh tokens are not persisted. They live only in
-SDK token sources in the current process. Restarting the app forces OAuth
-authorization again.
+Secret values are stored through the existing Setting Store under the `mcp`
+auth-key namespace. OAuth access and refresh tokens are application-local
+secret values. They are never included in source documents, Definitions,
+Artifact data, Catalogs, conversation records, or general runtime projections.
 
 ## Storage model
 
 A secret ref is a string with this shape:
 
-    mcpv1:<base64url-canonical-json>
+    mcpv2:<base64url-canonical-json>
 
 The canonical JSON contains:
 
     {
-      "serverID": "server-id",
-      "kind": "stdioEnv",
-      "slot": "github_token"
+      "server": {
+        "rootID": "0198f097-0d5b-7000-8000-000000000002",
+        "artifactID": "0198f097-0d5b-7000-8000-000000000010"
+      },
+      "kind": "httpHeader",
+      "slot": "authorization"
     }
 
-or:
+The actual Setting Store key is not the ref itself. It is:
 
-    {
-      "serverID": "server-id",
-      "kind": "oauthClientCredentials",
-      "slot": "clientcredentials"
-    }
+    mcpv2:<sha256(canonical-secret-ref-json)>
 
-The actual stored setting key is not the ref itself. It is:
-
-    mcpv1:<sha256(canonical-secret-ref-json)>
-
-The setting store path is:
+The Setting Store namespace is:
 
     authKeys / mcp / <storage-key> / secret
 
-The setting store encrypts the `secret` value on disk.
+The Setting Store encrypts the `secret` value on disk. `SetAuthKey` returns an
+empty response body, so the MCP secret adapter reads the persisted metadata
+after writing and returns the Setting Store's exact `SHA256` and `NonEmpty`
+values. Callers must not recreate those values with different whitespace rules.
 
 ## Backend helper endpoints
 
-The frontend should call backend helper methods to create/delete MCP secrets. It
-must not construct `mcpv1:` refs manually.
+The frontend must call Artifact-backed MCP wrapper methods to create or delete
+MCP secrets. It must not construct `mcpv2:` references manually.
 
 ### Create or update a secret
 
@@ -55,44 +54,27 @@ Request body:
       "secret": "ghp_example"
     }
 
-Response body:
+The wrapper receives the target `ArtifactRef` separately and returns:
 
     {
-      "secretRef": "mcpv1:...",
+      "secretRef": "mcpv2:...",
       "sha256": "...",
       "nonEmpty": true
     }
 
 ### Delete a secret
 
-Delete by deterministic `serverID`, `kind`, and `slot`.
+Delete by target Server `ArtifactRef`, secret kind, and slot.
 
 ## Stdio env secrets
 
 Use `kind: "stdioEnv"` and `slot` equal to the environment variable name.
+The resolved value is substituted only into the materialized stdio environment.
+It is not persisted into the server Definition.
 
-Create secret request:
-
-    {
-      "kind": "stdioEnv",
-      "slot": "GITHUB_TOKEN",
-      "secret": "ghp_example"
-    }
-
-Server config:
-
-    {
-      "transport": "stdio",
-      "stdio": {
-        "command": "my-mcp-server",
-        "secretEnvRefs": {
-          "GITHUB_TOKEN": "mcpv1:..."
-        }
-      }
-    }
-
-At runtime, the backend resolves the secret ref and injects it into the child
-process environment. The process does not inherit the full host environment.
+The process receives only the materialized environment explicitly declared by
+the resolved MCP server configuration. It does not inherit the full host
+environment.
 
 ## OAuth authorization-code, public client
 
@@ -104,16 +86,11 @@ Secret value:
       "clientID": "public-client-id"
     }
 
-Server config:
+The opaque reference is stored in Artifact local installation data only when
+the server Definition declares an `oauthClientCredentials` installation input.
 
-    {
-      "transport": "streamableHttp",
-      "streamableHttp": {
-        "url": "https://example.com/mcp",
-        "authMode": "oauth",
-        "clientCredentialRef": "mcpv1:..."
-      }
-    }
+OAuth authorization-code flows may also use Dynamic Client Registration when
+the server Definition permits it and no client credential input is required.
 
 ## OAuth authorization-code, confidential client
 
@@ -126,34 +103,14 @@ Secret value:
       "clientSecret": "client-secret"
     }
 
-Server config:
-
-    {
-      "transport": "streamableHttp",
-      "streamableHttp": {
-        "url": "https://example.com/mcp",
-        "authMode": "oauth",
-        "clientCredentialRef": "mcpv1:..."
-      }
-    }
-
 ## OAuth dynamic client registration
 
-If no `clientCredentialRef` is configured for `authMode: "oauth"`, the backend
-uses the official MCP Go SDK dynamic client registration flow when the server's
-authorization server supports it.
+If a canonical Server Definition has OAuth mode but no required client
+credential input, the backend may use the MCP Go SDK dynamic client
+registration flow when the authorization server supports it.
 
-Server config:
-
-    {
-      "transport": "streamableHttp",
-      "streamableHttp": {
-        "url": "https://example.com/mcp",
-        "authMode": "oauth"
-      }
-    }
-
-Dynamically issued client credentials are not persisted by FlexiGPT.
+Dynamically issued client credentials are not written into portable MCP
+documents or Artifact local data.
 
 ## OAuth Client ID Metadata Document
 
@@ -175,7 +132,10 @@ dynamic client registration is available, the SDK can fall back to DCR.
 
 ## OAuth client credentials grant
 
-The client credentials grant requires a confidential client.
+The client-credentials grant requires a confidential
+`oauthClientCredentials` secret. The MCP wrapper validates that `clientSecret`
+is present before accepting the secret for a server using
+`auth.mode = "clientCredentials"`.
 
 Secret value:
 
@@ -184,29 +144,16 @@ Secret value:
       "clientSecret": "service-client-secret"
     }
 
-Server config:
-
-    {
-      "transport": "streamableHttp",
-      "streamableHttp": {
-        "url": "https://example.com/mcp",
-        "authMode": "clientCredentials",
-        "clientCredentialRef": "mcpv1:..."
-      }
-    }
-
-The SDK obtains access tokens using the standard client credentials grant and
-refreshes/replaces tokens in memory when they expire.
+The SDK obtains access tokens using the standard client-credentials grant.
 
 ## Prohibited patterns
 
 Do not:
 
-- Put secrets in `streamableHttp.url`.
+- Put secrets in a portable MCP URL.
 - Use URL userinfo in MCP HTTP URLs.
-- Store OAuth access tokens in server config.
-- Store OAuth refresh tokens in server config.
-- Hand-build `mcpv1:` refs in frontend code.
+- Store OAuth access tokens or refresh tokens in portable MCP configuration.
+- Hand-build `mcpv2:` refs in frontend code.
 - Log raw secret values.
 
 ## Redaction
@@ -214,6 +161,7 @@ Do not:
 The backend redacts configured sensitive values from:
 
 - MCP stdio server stderr lines.
-- OAuth auth-status errors emitted by token or authorization failures.
+- OAuth auth-status and runtime errors emitted by token or authorization
+  failures.
 
-OAuth tokens are not intentionally logged or persisted.
+OAuth tokens are never intentionally logged.

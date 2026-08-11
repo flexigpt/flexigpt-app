@@ -356,7 +356,7 @@ func (m *AuthManager) BuildAuthHealth(
 		Server:     config.Server,
 		AuthMode:   status.AuthMode,
 		State:      authHealthState(status.State),
-		Configured: authConfigured(config, status),
+		Configured: authConfigured(config, status, m),
 		Resource:   status.Resource,
 		Scopes:     append([]string(nil), status.Scopes...),
 		ExpiresAt:  cloneTime(status.ExpiresAt),
@@ -656,6 +656,7 @@ func mergeArtifactAuthStatus(
 func authConfigured(
 	config server.RuntimeConfig,
 	status spec.MCPAuthStatus,
+	manager *AuthManager,
 ) bool {
 	switch status.AuthMode {
 	case spec.MCPHTTPAuthNone:
@@ -668,7 +669,9 @@ func authConfigured(
 			config.StreamableHTTP.ClientCredentialRef != ""
 	case spec.MCPHTTPAuthOAuth:
 		return status.State == spec.MCPAuthStateAuthorized ||
-			status.State == spec.MCPAuthStateRequired
+			(manager != nil &&
+				manager.oauthBroker != nil &&
+				strings.TrimSpace(manager.oauthRedirectURL) != "")
 	default:
 		return false
 	}
