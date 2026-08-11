@@ -21,7 +21,7 @@ const (
 	ServerSchemaURL = "https://schemas.flexigpt.dev/mcp/server/v1.json"
 	PolicySchemaURL = "https://schemas.flexigpt.dev/mcp/policy/v1.json"
 
-	BundleFileName = ".mcp.json"
+	BundleFileName = "mcps.json"
 )
 
 type ServerType string

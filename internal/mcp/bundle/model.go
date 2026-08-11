@@ -22,7 +22,7 @@ const (
 	RoleBuiltIn basespec.AttachmentRole = "builtin"
 
 	PackageDirectory basespec.Locator = "package"
-	DocumentLocator  basespec.Locator = "package/.mcp.json"
+	DocumentLocator  basespec.Locator = "package/mcps.json"
 )
 
 type CollectionData struct {
@@ -110,17 +110,17 @@ func PackageDirectoryForDocument(
 	return basespec.Locator(path.Dir(string(value))), nil
 }
 
-// ValidateDocumentLocator accepts one portable, nested .mcp.json location.
+// ValidateDocumentLocator accepts one portable, nested mcps.json location.
 // A nested path is required so a managed package always has a real package
 // directory and cannot claim the Source root.
 func ValidateDocumentLocator(value basespec.Locator) error {
 	if err := basespec.ValidatePortableLocator(value, false); err != nil {
 		return err
 	}
-	if path.Base(string(value)) != ".mcp.json" ||
+	if path.Base(string(value)) != "mcps.json" ||
 		path.Dir(string(value)) == "." {
 		return fmt.Errorf(
-			"%w: MCP document locator must be a nested .mcp.json path",
+			"%w: MCP document locator must be a nested mcps.json path",
 			basespec.ErrInvalid,
 		)
 	}
