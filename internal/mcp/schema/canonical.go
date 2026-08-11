@@ -306,6 +306,10 @@ func ValidateBundle(value BundleDocument) error {
 			return fmt.Errorf("MCP policy %q: %w", name, err)
 		}
 	}
+	if err := validateRequiredBundlePolicyReferences(value); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -582,11 +586,20 @@ func validateServerParts(
 		allowedEnvironment[inputName] = struct{}{}
 	}
 
-	for inputName := range placeholdersInServer(
+	placeholders := placeholdersInServer(
 		core,
 		extension.Auth,
 		extension.ConnectionProfiles,
-	) {
+	)
+	for inputName := range placeholders {
+		if declaration, found := declared[inputName]; found &&
+			declaration.Kind == InputOAuthClientCredentials {
+			return fmt.Errorf(
+				"%w: OAuth client credentials input %q cannot be substituted into connection fields",
+				basespec.ErrInvalid,
+				inputName,
+			)
+		}
 		if _, found := declared[inputName]; found {
 			continue
 		}
@@ -702,6 +715,26 @@ func validateServerParts(
 				)
 			}
 		}
+	}
+	return nil
+}
+
+func validateRequiredBundlePolicyReferences(
+	value BundleDocument,
+) error {
+	for name, extension := range value.BundleExtension.Servers {
+		if extension.Policy == nil || !extension.Policy.Required {
+			continue
+		}
+		if _, found := value.BundleExtension.Policies[string(extension.Policy.Ref)]; found {
+			continue
+		}
+		return fmt.Errorf(
+			"%w: MCP server %q requires missing inline policy %q",
+			basespec.ErrReferenceUnresolved,
+			name,
+			extension.Policy.Ref,
+		)
 	}
 	return nil
 }

@@ -1,0 +1,115 @@
+{
+	"kind": "mcp.bundle",
+	"schemaID": "mcp.bundle.v1",
+	"schemaVersion": "v1",
+	"logicalName": "search-mcp-servers",
+	"logicalVersion": "1.0.0",
+	"displayName": "Search MCP Servers",
+	"description": "Built-in MCP server definitions for web and document search.",
+	"labels": {
+		"category": "search"
+	},
+	"mcpServers": {
+		"context7": {
+			"type": "http",
+			"url": "https://mcp.context7.com/mcp/oauth"
+		},
+		"exa": {
+			"type": "http",
+			"url": "https://mcp.exa.ai/mcp"
+		},
+		"stack-overflow": {
+			"type": "http",
+			"url": "https://mcp.stackoverflow.com"
+		}
+	},
+	"bundleExtension": {
+		"servers": {
+			"context7": {
+				"displayName": "Context7",
+				"description": "Context7 documentation and code-context MCP server.",
+				"auth": {
+					"mode": "oauth"
+				},
+				"install": {},
+				"policy": {
+					"ref": "safe-default",
+					"required": true
+				}
+			},
+			"exa": {
+				"displayName": "Exa Search",
+				"description": "Exa web and document search MCP server.",
+				"auth": {
+					"mode": "none"
+				},
+				"install": {
+					"inputs": {
+						"EXA_API_KEY": {
+							"kind": "secret",
+							"label": "Exa API Key",
+							"description": "Optional key for higher limits and Agent tools.",
+							"required": false
+						}
+					}
+				},
+				"connectionProfiles": {
+					"with-api-key": {
+						"http": {
+							"headers": {
+								"x-api-key": "${EXA_API_KEY}"
+							}
+						}
+					}
+				},
+				"policy": {
+					"ref": "safe-default",
+					"required": true
+				}
+			},
+			"stack-overflow": {
+				"displayName": "Stack Overflow",
+				"description": "Official Stack Overflow MCP server.",
+				"auth": {
+					"mode": "oauth"
+				},
+				"install": {},
+				"policy": {
+					"ref": "safe-default",
+					"required": true
+				}
+			}
+		},
+		"policies": {
+			"safe-default": {
+				"$schema": "https://schemas.flexigpt.dev/mcp/policy/v1.json",
+				"kind": "mcp.policy",
+				"schemaID": "mcp.policy.v1",
+				"schemaVersion": "v1",
+				"logicalName": "safe-default",
+				"displayName": "Safe default MCP policy",
+				"description": "Requires approval for uncertain or mutating MCP tool calls.",
+				"labels": {
+					"policy.profile": "safe"
+				},
+				"body": {
+					"trustLevel": "untrusted",
+					"defaultPolicy": {
+						"defaultApprovalRule": "ask",
+						"defaultExecutionMode": "manual",
+						"requireApprovalForUnknownRisk": true,
+						"requireApprovalForWrite": true,
+						"requireApprovalForDestructive": true
+					},
+					"toolPolicies": {},
+					"appsPolicy": {
+						"enabled": false,
+						"allowAppInitiatedToolCalls": false,
+						"requireApprovalForOpenLink": true,
+						"requireApprovalForContextUpdates": true
+					}
+				}
+			}
+		}
+	}
+}

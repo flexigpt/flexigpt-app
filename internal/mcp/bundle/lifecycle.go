@@ -265,6 +265,7 @@ func (a *API) UpdateProtectedBundleInstallation(
 	if err := a.dependencies.Runtime.InvalidateCollection(ctx, ref); err != nil {
 		return err
 	}
+
 	return a.dependencies.Overlays.PutBundleOverlay(
 		ctx,
 		ref.RootID,

@@ -52,6 +52,7 @@ type ConversationMessage struct {
 	ToolStoreChoices []toolSpec.ToolStoreChoice `json:"toolStoreChoices,omitempty"`
 
 	MCPContext           *mcpSpec.MCPConversationContext    `json:"mcpContext,omitempty"`
+	MCPToolMappings      []mcpSpec.MCPProviderToolMapping   `json:"mcpToolMappings,omitempty"`
 	MCPAppContextUpdates []mcpSpec.MCPAppModelContextUpdate `json:"mcpAppContextUpdates,omitempty"`
 
 	WorkspaceSelection *selection.ConversationSelection `json:"workspaceSelection,omitempty"`

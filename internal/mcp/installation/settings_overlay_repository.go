@@ -1,9 +1,12 @@
 package installation
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -346,7 +349,20 @@ func decodeOverlay(raw json.RawMessage, target any) error {
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(canonical, target); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(canonical))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf(
+			"%w: decode MCP installation overlay: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("MCP installation overlay has trailing JSON")
+		}
 		return fmt.Errorf(
 			"%w: decode MCP installation overlay: %w",
 			basespec.ErrInvalid,
@@ -358,21 +374,22 @@ func decodeOverlay(raw json.RawMessage, target any) error {
 
 func cloneServerOverlay(input ServerOverlay) ServerOverlay {
 	output := input
-	output.Inputs = make(
+	output.ServerData = input.ServerData
+	output.ServerData.Inputs = make(
 		map[string]InputBinding,
-		len(input.Inputs),
+		len(input.ServerData.Inputs),
 	)
-	for name, binding := range input.Inputs {
+	for name, binding := range input.ServerData.Inputs {
 		copyBinding := binding
 		if binding.Value != nil {
 			value := *binding.Value
 			copyBinding.Value = &value
 		}
-		output.Inputs[name] = copyBinding
+		output.ServerData.Inputs[name] = copyBinding
 	}
-	output.AdditionalPolicies = append(
+	output.ServerData.AdditionalPolicies = append(
 		[]artifact.ArtifactRef(nil),
-		input.AdditionalPolicies...,
+		input.ServerData.AdditionalPolicies...,
 	)
 	return output
 }

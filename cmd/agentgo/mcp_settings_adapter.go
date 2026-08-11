@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -257,7 +259,11 @@ func (s *mcpSettingsAdapter) GetMCPGlobalSettings(
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return mcpSpec.MCPSettings{}, 0, err
 	}
-	return value.Settings, value.Revision, nil
+	normalized, err := normalizeMCPGlobalSettings(value.Settings)
+	if err != nil {
+		return mcpSpec.MCPSettings{}, 0, err
+	}
+	return normalized, value.Revision, nil
 }
 
 func (s *mcpSettingsAdapter) PutMCPGlobalSettings(
@@ -265,6 +271,11 @@ func (s *mcpSettingsAdapter) PutMCPGlobalSettings(
 	expectedRevision uint64,
 	value mcpSpec.MCPSettings,
 ) (uint64, error) {
+	value, err := normalizeMCPGlobalSettings(value)
+	if err != nil {
+		return 0, err
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -518,6 +529,49 @@ func validateMCPSettingsKey(value string) error {
 	return nil
 }
 
+func normalizeMCPGlobalSettings(
+	value mcpSpec.MCPSettings,
+) (mcpSpec.MCPSettings, error) {
+	value.OAuthLoopbackListenAddr = strings.TrimSpace(
+		value.OAuthLoopbackListenAddr,
+	)
+	if value.OAuthLoopbackListenAddr == "" {
+		return value, nil
+	}
+
+	host, port, err := net.SplitHostPort(
+		value.OAuthLoopbackListenAddr,
+	)
+	if err != nil {
+		return mcpSpec.MCPSettings{}, fmt.Errorf(
+			"%w: OAuth loopback listen address must be host:port",
+			basespec.ErrInvalid,
+		)
+	}
+	if !isLoopbackMCPSettingsHost(host) {
+		return mcpSpec.MCPSettings{}, fmt.Errorf(
+			"%w: OAuth loopback listen host must be loopback",
+			basespec.ErrInvalid,
+		)
+	}
+	number, err := strconv.Atoi(port)
+	if err != nil || number <= 0 || number > 65535 {
+		return mcpSpec.MCPSettings{}, fmt.Errorf(
+			"%w: OAuth loopback listen port must be 1..65535",
+			basespec.ErrInvalid,
+		)
+	}
+	return value, nil
+}
+
+func isLoopbackMCPSettingsHost(host string) bool {
+	if strings.EqualFold(strings.TrimSpace(host), "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 type settingMCPSecretResolver struct {
 	store mcpAuthKeyStore
 }
@@ -613,8 +667,10 @@ func (r *settingMCPSecretResolver) SetMCPSecret(
 	if err != nil {
 		return "", false, err
 	}
-
-	return "", true, nil
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:]),
+		strings.TrimSpace(value) != "",
+		nil
 }
 
 func (r *settingMCPSecretResolver) ResolveSecret(

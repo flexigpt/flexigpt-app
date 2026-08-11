@@ -1,12 +1,14 @@
 package secret
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -95,8 +97,21 @@ func ParseMCPSecretRef(raw string) (spec.MCPSecretRef, error) {
 		Kind   spec.MCPSecretKind   `json:"kind"`
 		Slot   string               `json:"slot"`
 	}
-	if err := json.Unmarshal(b, &wire); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
 		return spec.MCPSecretRef{}, fmt.Errorf("secret ref %q is not valid json: %w", raw, err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("secret ref contains trailing JSON")
+		}
+		return spec.MCPSecretRef{}, fmt.Errorf(
+			"secret ref %q is not valid json: %w",
+			raw,
+			err,
+		)
 	}
 
 	ref := spec.MCPSecretRef{

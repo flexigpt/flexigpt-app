@@ -272,6 +272,33 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPTools(
 					selected.ToolName,
 				)
 			}
+			if selected.Digest != "" &&
+				selected.Digest != current.Digest {
+				return fmt.Errorf(
+					"servers[%d].selectedTools[%d]: MCP tool %q digest changed",
+					i,
+					j,
+					selected.ToolName,
+				)
+			}
+			if selected.ProviderToolName != "" &&
+				selected.ProviderToolName != current.ProviderToolName {
+				return fmt.Errorf(
+					"servers[%d].selectedTools[%d]: MCP tool %q provider identity changed",
+					i,
+					j,
+					selected.ToolName,
+				)
+			}
+			if selected.ChoiceID != "" &&
+				selected.ChoiceID != current.ChoiceID {
+				return fmt.Errorf(
+					"servers[%d].selectedTools[%d]: MCP tool %q choice identity changed",
+					i,
+					j,
+					selected.ToolName,
+				)
+			}
 			if !current.Enabled {
 				return fmt.Errorf(
 					"servers[%d].selectedTools[%d]: MCP tool %q is disabled",
@@ -306,7 +333,7 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPResources(
 	ctx context.Context,
 	mcpContext mcpSpec.MCPConversationContext,
 ) error {
-	cache := map[artifact.ArtifactRef]map[string]struct{}{}
+	cache := map[artifact.ArtifactRef]map[string]mcpSpec.MCPResourceRef{}
 
 	for i, selected := range mcpContext.Resources {
 		byURI, exists := cache[selected.Server]
@@ -318,18 +345,27 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPResources(
 				}
 				return fmt.Errorf("resources[%d]: %w", i, err)
 			}
-			byURI = make(map[string]struct{}, len(resources))
+			byURI = make(map[string]mcpSpec.MCPResourceRef, len(resources))
+
 			for _, resource := range resources {
 				if resource.URI != "" {
-					byURI[resource.URI] = struct{}{}
+					byURI[resource.URI] = resource
 				}
 			}
 			cache[selected.Server] = byURI
 		}
 
-		if _, ok := byURI[selected.URI]; !ok {
+		current, ok := byURI[selected.URI]
+		if !ok {
 			return fmt.Errorf(
 				"resources[%d]: MCP resource %q was not found in current discovery",
+				i,
+				selected.URI,
+			)
+		}
+		if selected.Digest != "" && selected.Digest != current.Digest {
+			return fmt.Errorf(
+				"resources[%d]: MCP resource %q digest changed",
 				i,
 				selected.URI,
 			)
@@ -372,6 +408,13 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPResourceTemplates(
 				ref.URITemplate,
 			)
 		}
+		if ref.Digest != "" && ref.Digest != current.Digest {
+			return fmt.Errorf(
+				"resourceTemplates[%d]: MCP resource template %q digest changed",
+				i,
+				ref.URITemplate,
+			)
+		}
 		if err := validateRequiredMCPArgumentsForLookup(current.Arguments, selected.ArgumentValues); err != nil {
 			return fmt.Errorf("resourceTemplates[%d].argumentValues: %w", i, err)
 		}
@@ -408,6 +451,13 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPPrompts(
 		if !ok {
 			return fmt.Errorf(
 				"prompts[%d]: MCP prompt %q was not found in current discovery",
+				i,
+				selected.PromptName,
+			)
+		}
+		if selected.Digest != "" && selected.Digest != current.Digest {
+			return fmt.Errorf(
+				"prompts[%d]: MCP prompt %q digest changed",
 				i,
 				selected.PromptName,
 			)

@@ -8,8 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/lookupimpl"
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
-	mcpBundle "github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
@@ -22,34 +20,36 @@ type AssistantPresetStoreWrapper struct {
 
 func InitAssistantPresetStoreWrapper(
 	wrapper *AssistantPresetStoreWrapper,
-	baseDir string,
+	baseDirectory string,
 	modelPresets *modelpresetStore.ModelPresetStore,
 	tools *toolStore.ToolStore,
 	skills *skillRuntime.SkillRuntime,
-	mcpBundles *mcpBundle.API,
-	mcpR *mcpRuntime.MCPRuntimeManager,
+	mcpResolver lookupimpl.MCPServerResolver,
+	mcpDiscovery lookupimpl.MCPDiscoveryLookup,
 ) error {
 	if wrapper == nil {
-		return errors.New("assistant preset wrapper is required")
+		return errors.New("assistant preset store wrapper is required")
 	}
 	if modelPresets == nil ||
 		tools == nil ||
 		skills == nil ||
-		mcpBundles == nil ||
-		mcpR == nil {
-		return errors.New("assistant preset wrapper dependencies are incomplete")
+		mcpResolver == nil ||
+		mcpDiscovery == nil {
+		return errors.New(
+			"artifact-backed assistant preset dependencies are incomplete",
+		)
 	}
 
 	lookups := lookupimpl.NewAssistantPresetReferenceLookups(
 		modelPresets,
 		tools,
 		skills,
-		mcpBundles,
-		mcpR,
+		mcpResolver,
+		mcpDiscovery,
 	)
 
 	store, err := assistantpresetStore.NewAssistantPresetStore(
-		baseDir,
+		baseDirectory,
 		assistantpresetStore.WithReferenceLookups(lookups),
 	)
 	if err != nil {
@@ -60,75 +60,120 @@ func InitAssistantPresetStoreWrapper(
 }
 
 func (w *AssistantPresetStoreWrapper) PutAssistantPresetBundle(
-	req *spec.PutAssistantPresetBundleRequest,
+	request *spec.PutAssistantPresetBundleRequest,
 ) (*spec.PutAssistantPresetBundleResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PutAssistantPresetBundleResponse, error) {
-		return w.store.PutAssistantPresetBundle(context.Background(), req)
-	})
+	return middleware.WithRecoveryResp(
+		func() (*spec.PutAssistantPresetBundleResponse, error) {
+			return w.store.PutAssistantPresetBundle(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *AssistantPresetStoreWrapper) PatchAssistantPresetBundle(
-	req *spec.PatchAssistantPresetBundleRequest,
+	request *spec.PatchAssistantPresetBundleRequest,
 ) (*spec.PatchAssistantPresetBundleResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PatchAssistantPresetBundleResponse, error) {
-		return w.store.PatchAssistantPresetBundle(context.Background(), req)
-	})
+	return middleware.WithRecoveryResp(
+		func() (*spec.PatchAssistantPresetBundleResponse, error) {
+			return w.store.PatchAssistantPresetBundle(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *AssistantPresetStoreWrapper) DeleteAssistantPresetBundle(
-	req *spec.DeleteAssistantPresetBundleRequest,
+	request *spec.DeleteAssistantPresetBundleRequest,
 ) (*spec.DeleteAssistantPresetBundleResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.DeleteAssistantPresetBundleResponse, error) {
-		return w.store.DeleteAssistantPresetBundle(context.Background(), req)
-	})
+	return middleware.WithRecoveryResp(
+		func() (*spec.DeleteAssistantPresetBundleResponse, error) {
+			return w.store.DeleteAssistantPresetBundle(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *AssistantPresetStoreWrapper) ListAssistantPresetBundles(
-	req *spec.ListAssistantPresetBundlesRequest,
+	request *spec.ListAssistantPresetBundlesRequest,
 ) (*spec.ListAssistantPresetBundlesResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.ListAssistantPresetBundlesResponse, error) {
-		return w.store.ListAssistantPresetBundles(context.Background(), req)
-	})
+	return middleware.WithRecoveryResp(
+		func() (*spec.ListAssistantPresetBundlesResponse, error) {
+			return w.store.ListAssistantPresetBundles(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *AssistantPresetStoreWrapper) PutAssistantPreset(
-	req *spec.PutAssistantPresetRequest,
+	request *spec.PutAssistantPresetRequest,
 ) (*spec.PutAssistantPresetResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PutAssistantPresetResponse, error) {
-		return w.store.PutAssistantPreset(context.Background(), req)
-	})
+	return middleware.WithRecoveryResp(
+		func() (*spec.PutAssistantPresetResponse, error) {
+			return w.store.PutAssistantPreset(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *AssistantPresetStoreWrapper) PatchAssistantPreset(
-	req *spec.PatchAssistantPresetRequest,
+	request *spec.PatchAssistantPresetRequest,
 ) (*spec.PatchAssistantPresetResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PatchAssistantPresetResponse, error) {
-		return w.store.PatchAssistantPreset(context.Background(), req)
-	})
+	return middleware.WithRecoveryResp(
+		func() (*spec.PatchAssistantPresetResponse, error) {
+			return w.store.PatchAssistantPreset(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *AssistantPresetStoreWrapper) DeleteAssistantPreset(
-	req *spec.DeleteAssistantPresetRequest,
+	request *spec.DeleteAssistantPresetRequest,
 ) (*spec.DeleteAssistantPresetResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.DeleteAssistantPresetResponse, error) {
-		return w.store.DeleteAssistantPreset(context.Background(), req)
-	})
+	return middleware.WithRecoveryResp(
+		func() (*spec.DeleteAssistantPresetResponse, error) {
+			return w.store.DeleteAssistantPreset(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *AssistantPresetStoreWrapper) GetAssistantPreset(
-	req *spec.GetAssistantPresetRequest,
+	request *spec.GetAssistantPresetRequest,
 ) (*spec.GetAssistantPresetResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.GetAssistantPresetResponse, error) {
-		return w.store.GetAssistantPreset(context.Background(), req)
-	})
+	return middleware.WithRecoveryResp(
+		func() (*spec.GetAssistantPresetResponse, error) {
+			return w.store.GetAssistantPreset(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *AssistantPresetStoreWrapper) ListAssistantPresets(
-	req *spec.ListAssistantPresetsRequest,
+	request *spec.ListAssistantPresetsRequest,
 ) (*spec.ListAssistantPresetsResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.ListAssistantPresetsResponse, error) {
-		return w.store.ListAssistantPresets(context.Background(), req)
-	})
+	return middleware.WithRecoveryResp(
+		func() (*spec.ListAssistantPresetsResponse, error) {
+			return w.store.ListAssistantPresets(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *AssistantPresetStoreWrapper) close() {

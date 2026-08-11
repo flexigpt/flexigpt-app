@@ -397,6 +397,9 @@ func (a *API) deleteProtectedOverlayIfPresent(
 	ctx context.Context,
 	record artifact.Artifact,
 ) error {
+	if record.Kind != schema.ServerKind {
+		return nil
+	}
 	if a.dependencies.Overlays == nil ||
 		!a.dependencies.RootPolicy.IsProtectedRoot(record.RootID) {
 		return nil
@@ -603,11 +606,19 @@ func (a *API) UpdateProtectedServerInstallation(
 		return basespec.ErrConflict
 	}
 
+	before := installation.DefaultServerData()
+	if found {
+		before = current.ServerData
+	}
+
 	nextRevision := uint64(1)
 	if found {
 		nextRevision = current.Revision + 1
 	}
-	return a.dependencies.Overlays.PutServerOverlay(
+	if err := a.dependencies.Runtime.Invalidate(ctx, ref); err != nil {
+		return err
+	}
+	if err := a.dependencies.Overlays.PutServerOverlay(
 		ctx,
 		ref,
 		expectedOverlayRevision,
@@ -617,7 +628,34 @@ func (a *API) UpdateProtectedServerInstallation(
 			RuntimeEnabled: runtimeEnabled,
 			ServerData:     data,
 		},
-	)
+	); err != nil {
+		return err
+	}
+
+	beforeRaw, err := installation.EncodeServerData(before)
+	if err != nil {
+		return err
+	}
+	afterRaw, err := installation.EncodeServerData(data)
+	if err != nil {
+		return err
+	}
+	if jsonutil.Equal(beforeRaw, afterRaw) {
+		return nil
+	}
+
+	if err := a.cleanupChangedServerInstallation(
+		ctx,
+		record,
+		before,
+		data,
+	); err != nil {
+		return fmt.Errorf(
+			"MCP protected server installation cleanup remains pending: %w",
+			err,
+		)
+	}
+	return nil
 }
 
 func serverDocumentFromDefinition(

@@ -20,6 +20,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/validate"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
@@ -333,6 +335,11 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}
 	}
 
+	if err := validate.ValidateMCPAppContextUpdates(
+		body.Current.MCPAppContextUpdates,
+	); err != nil {
+		return nil, err
+	}
 	if appCtxInput := buildMCPAppContextInput(body.Current.MCPAppContextUpdates); appCtxInput != nil {
 		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
 	}
@@ -512,6 +519,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	var mcpDebugDetails map[string]any
+	var mcpToolMappings []mcpSpec.MCPProviderToolMapping
 	if ps.mcpInferenceBridge != nil && mcpContext != nil {
 		hydrated, err := ps.mcpInferenceBridge.HydrateCompletion(ctx, MCPCompletionHydrationRequest{
 			Context:             mcpContext,
@@ -532,6 +540,12 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			}
 			if len(hydrated.ToolChoices) > 0 {
 				toolChoices = append(toolChoices, hydrated.ToolChoices...)
+			}
+			if len(hydrated.ToolMappings) > 0 {
+				mcpToolMappings = append(
+					mcpToolMappings,
+					hydrated.ToolMappings...,
+				)
 			}
 
 			mcpDebugDetails = hydrated.DebugDetails
@@ -594,6 +608,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	resp := &spec.CompletionResponse{Body: &spec.CompletionResponseBody{
 		InferenceResponse:     b,
 		HydratedCurrentInputs: currentInputs,
+		MCPToolMappings:       mcpToolMappings,
 		WorkspaceUsage:        workspaceUsage,
 	}}
 

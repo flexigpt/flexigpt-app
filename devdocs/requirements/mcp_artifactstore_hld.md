@@ -1687,15 +1687,31 @@ Completed:
 - Conversation and inference hydration cutover to ArtifactRef-native MCP
   server, tool, prompt, resource, template, App-context, and provenance
   structures.
+- Normal-build ArtifactRef-native assistant-preset validation and lookup
+  wiring, with legacy BundleID/ServerID validation retained only behind
+  `legacy_mcp_store`.
+- ArtifactRef-native inference hydration that emits durable provider-tool
+  mappings and enforces conversation policy tightening during mapped tool
+  invocation.
+- Artifact-backed Wails wrapper operations for discovery, resource reads,
+  prompts, completion, auth health, global settings, and mapped tool calls.
+- Strict installation-overlay decoding with non-conflicting nested
+  `serverData` persistence and protected-overlay secret cleanup.
+- Source-controlled conversion and protected hydration registration for the
+  supplied Search MCP built-in package sample.
 - Legacy command wrapper, old assistant-preset wrapper, old inference MCP
   bridge, and old MCP context validator quarantined from normal builds.
 
 Pending:
 
-- Commit the source-controlled converted embedded MCP `.mcp.json` packages
-  and static `mcp_artifact_registry.json` registrations. This is a checked-in
-  source-data conversion, not a user-data migration or runtime fallback.
-- Frontend, Wails binding, and test updates.
+- Regenerate Wails bindings and replace frontend BundleID/ServerID calls with
+  Artifact-backed MCP wrapper methods.
+- Persist `CompletionResponseBody.MCPToolMappings` into the corresponding
+  conversation turn before routing a later provider-tool invocation.
+- Add schema, decoder, lifecycle, retry, policy, secret-redaction, runtime
+  invalidation, built-in hydration, mapped-invocation, and clean-cutover tests.
+- Convert additional embedded MCP examples only through reviewed,
+  source-controlled `.mcp.json` packages and static registrations.
 
 ## Clean cutover
 
@@ -1728,11 +1744,10 @@ consumers have moved to the Artifact-backed resolver. It must be absent from
 normal application composition throughout the cutover. No new code may read
 or write both stores.
 
-The reconciliation implementation must never delete an MCP Artifact until the
-new source document has been published, the Collection Catalog has refreshed,
-and the previous binding is confirmed missing. This preserves retryability and
-prevents a local Artifact from being purged while its source definition is
-still current.
+The reconciliation implementation never deletes an MCP Artifact until the new
+source document has been published, the Collection Catalog has refreshed, and
+the previous binding is confirmed missing. This preserves retryability and
+prevents local metadata purge while a source definition remains current.
 
 The final removal gate is:
 

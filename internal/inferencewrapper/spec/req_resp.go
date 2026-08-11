@@ -83,6 +83,7 @@ type CompletionRequest struct {
 type CompletionResponseBody struct {
 	InferenceResponse     *inferenceSpec.FetchCompletionResponse `json:"inferenceResponse,omitempty"`
 	HydratedCurrentInputs []inferenceSpec.InputUnion             `json:"hydratedCurrentInputs,omitempty"`
+	MCPToolMappings       []mcpSpec.MCPProviderToolMapping       `json:"mcpToolMappings,omitempty"`
 	WorkspaceUsage        *selection.ConversationUsage           `json:"workspaceUsage,omitempty"`
 }
 

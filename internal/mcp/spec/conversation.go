@@ -72,6 +72,7 @@ type MCPToolCallProvenance struct {
 	ToolName         string `json:"toolName"`
 	ProviderToolName string `json:"providerToolName"`
 	ToolDigest       string `json:"toolDigest,omitempty"`
+	ChoiceID         string `json:"choiceID,omitempty"`
 
 	ToolUseID  string `json:"toolUseID,omitempty"`
 	ApprovalID string `json:"approvalID,omitempty"`

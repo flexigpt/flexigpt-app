@@ -29,12 +29,14 @@ type ServerData struct {
 	AdditionalPolicies        []artifact.ArtifactRef  `json:"additionalPolicies,omitempty"`
 }
 
+// ServerOverlay intentionally stores ServerData as a named nested value.
+// Anonymous embedding would produce two schemaVersion fields at JSON encoding
+// time and causes the embedded ServerData schemaVersion to decode as empty.
 type ServerOverlay struct {
-	ServerData
-
-	SchemaVersion  string `json:"schemaVersion"`
-	Revision       uint64 `json:"revision"`
-	RuntimeEnabled bool   `json:"runtimeEnabled"`
+	SchemaVersion  string     `json:"schemaVersion"`
+	Revision       uint64     `json:"revision"`
+	RuntimeEnabled bool       `json:"runtimeEnabled"`
+	ServerData     ServerData `json:"serverData"`
 }
 
 type BundleOverlay struct {

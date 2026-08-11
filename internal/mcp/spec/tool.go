@@ -14,6 +14,7 @@ type InvokeMCPToolRequestBody struct {
 	Source           MCPInvocationSource `json:"source"                     required:"true"`
 	ToolName         string              `json:"toolName"                   required:"true"`
 	ProviderToolName string              `json:"providerToolName,omitempty"`
+	ChoiceID         string              `json:"choiceID,omitempty"`
 	ToolDigest       string              `json:"toolDigest,omitempty"`
 
 	Arguments map[string]any `json:"arguments,omitempty"`

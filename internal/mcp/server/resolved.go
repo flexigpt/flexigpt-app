@@ -73,6 +73,31 @@ func (r Resolved) Materialize(
 	return r.MaterializeTrusted(ctx, secrets, environment)
 }
 
+// MaterializeForInspection resolves local installation inputs without
+// requiring RuntimeEnabled. It is used only for sanitized auth-health
+// projection and never opens a client session or exposes secret values.
+func (r Resolved) MaterializeForInspection(
+	ctx context.Context,
+	secrets installation.SecretResolver,
+	environment installation.EnvironmentResolver,
+) (RuntimeConfig, error) {
+	if err := r.Validate(); err != nil {
+		return RuntimeConfig{}, err
+	}
+	materialized, err := installation.MaterializeValidated(
+		ctx,
+		r.Server,
+		r.Document,
+		r.Installation,
+		secrets,
+		environment,
+	)
+	if err != nil {
+		return RuntimeConfig{}, err
+	}
+	return runtimeConfigFromMaterialized(r, materialized)
+}
+
 // MaterializeTrusted is the resolver-to-runtime fast path. Resolver output has
 // already passed full Artifact, Catalog, Definition, policy, and installation
 // validation. This method validates only values that do not exist until profile
@@ -88,19 +113,7 @@ func (r Resolved) MaterializeTrusted(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-
-	materialized, err := installation.MaterializeValidated(
-		ctx,
-		r.Server,
-		r.Document,
-		r.Installation,
-		secrets,
-		environment,
-	)
-	if err != nil {
-		return RuntimeConfig{}, err
-	}
-	return runtimeConfigFromMaterialized(r, materialized)
+	return r.MaterializeForInspection(ctx, secrets, environment)
 }
 
 func (r Resolved) Validate() error {

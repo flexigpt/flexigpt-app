@@ -1,3 +1,6 @@
+//go:build legacy_mcp_store
+
+// Deprecated: legacy BundleID/ServerID transport contracts.
 package spec
 
 import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"

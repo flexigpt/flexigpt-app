@@ -355,7 +355,8 @@ func (m *MCPRuntimeManager) ReadResource(
 	if err != nil {
 		return nil, err
 	}
-	return state.client.ReadResource(ctx, uri)
+	body, err := state.client.ReadResource(ctx, uri)
+	return body, redactRuntimeError(err, state.config.SensitiveValues)
 }
 
 func (m *MCPRuntimeManager) GetPrompt(
@@ -378,7 +379,12 @@ func (m *MCPRuntimeManager) GetPrompt(
 	if err != nil {
 		return nil, err
 	}
-	return state.client.GetPrompt(ctx, name, arguments)
+	body, err := state.client.GetPrompt(
+		ctx,
+		name,
+		arguments,
+	)
+	return body, redactRuntimeError(err, state.config.SensitiveValues)
 }
 
 func (m *MCPRuntimeManager) Complete(
@@ -394,7 +400,11 @@ func (m *MCPRuntimeManager) Complete(
 	if err != nil {
 		return nil, err
 	}
-	return state.client.Complete(ctx, request)
+	body, err := state.client.Complete(ctx, request)
+	return body, redactRuntimeError(
+		err,
+		state.config.SensitiveValues,
+	)
 }
 
 func (m *MCPRuntimeManager) CallToolDryRun(
@@ -476,7 +486,10 @@ func (m *MCPRuntimeManager) CallTool(
 		request.Arguments,
 	)
 	if err != nil {
-		return nil, err
+		return nil, redactRuntimeError(
+			err,
+			state.config.SensitiveValues,
+		)
 	}
 	if body == nil {
 		return nil, fmt.Errorf(
@@ -495,6 +508,7 @@ func (m *MCPRuntimeManager) CallTool(
 	body.Provenance.ProviderToolName = request.ProviderToolName
 	body.Provenance.ToolDigest = tool.Digest
 	body.Provenance.ToolUseID = request.ToolUseID
+	body.Provenance.ChoiceID = request.ChoiceID
 	body.Provenance.ApprovalID = request.ApprovalID
 	body.Provenance.AppInstanceID = request.AppInstanceID
 
@@ -502,8 +516,12 @@ func (m *MCPRuntimeManager) CallTool(
 		tool.App != nil &&
 		tool.App.ResourceURI != "" {
 		body.Provenance.AppResourceURI = tool.App.ResourceURI
-		body.App = &spec.MCPToolAppRenderInfo{
-			ResourceURI: tool.App.ResourceURI,
+		if body.App == nil {
+			body.App = &spec.MCPToolAppRenderInfo{
+				ResourceURI: tool.App.ResourceURI,
+			}
+		} else if body.App.ResourceURI == "" {
+			body.App.ResourceURI = tool.App.ResourceURI
 		}
 	}
 	return body, nil
@@ -595,6 +613,7 @@ func (m *MCPRuntimeManager) Refresh(
 
 	snapshot, err := state.client.Discover(ctx, config)
 	if err != nil {
+		err = redactRuntimeError(err, config.SensitiveValues)
 		m.setError(ref, err)
 		return nil, err
 	}

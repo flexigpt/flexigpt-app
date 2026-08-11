@@ -1,0 +1,51 @@
+{
+	"schemaVersion": "v1",
+	"topology": {
+		"root": {
+			"id": "0198f097-0d5b-7000-8000-000000000003",
+			"displayName": "FlexiGPT Built-in MCP Bundles",
+			"description": "Protected application-provided MCP package topology."
+		},
+		"sources": [
+			{
+				"id": "0198f097-0d5b-7000-8000-000000000004",
+				"kind": "managed-directory",
+				"displayName": "FlexiGPT Built-in MCP Packages",
+				"enabled": true,
+				"config": {}
+			}
+		]
+	},
+	"bundles": [
+		{
+			"collectionID": "0198f097-0d5b-7000-8000-000000000005",
+			"packageDirectory": "b27b7870-6a16-4d57-9de8-3850b15096f0_search-mcp-servers",
+			"artifacts": [
+				{
+					"id": "0198f097-0d5b-7000-8000-000000000006",
+					"subresource": "mcpServers/context7",
+					"kind": "mcp.server",
+					"enabled": true
+				},
+				{
+					"id": "0198f097-0d5b-7000-8000-000000000007",
+					"subresource": "mcpServers/exa",
+					"kind": "mcp.server",
+					"enabled": true
+				},
+				{
+					"id": "0198f097-0d5b-7000-8000-000000000008",
+					"subresource": "mcpServers/stack-overflow",
+					"kind": "mcp.server",
+					"enabled": true
+				},
+				{
+					"id": "0198f097-0d5b-7000-8000-000000000009",
+					"subresource": "policies/safe-default",
+					"kind": "mcp.policy",
+					"enabled": true
+				}
+			]
+		}
+	]
+}
