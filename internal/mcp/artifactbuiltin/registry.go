@@ -8,8 +8,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 )
 
 const RegistrySchemaVersion = "v1"

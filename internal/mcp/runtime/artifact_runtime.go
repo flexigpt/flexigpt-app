@@ -18,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
@@ -108,8 +107,8 @@ type sessionState struct {
 
 type MCPRuntimeManager struct {
 	resolver    server.Resolver
-	secrets     installation.SecretResolver
-	environment installation.EnvironmentResolver
+	secrets     server.SecretResolver
+	environment server.EnvironmentResolver
 	authorizer  auth.ConnectionAuthorizer
 	factory     ClientFactory
 
@@ -122,8 +121,8 @@ type MCPRuntimeManager struct {
 
 func NewMCPRuntimeManager(
 	resolver server.Resolver,
-	secrets installation.SecretResolver,
-	environment installation.EnvironmentResolver,
+	secrets server.SecretResolver,
+	environment server.EnvironmentResolver,
 	authorizer auth.ConnectionAuthorizer,
 	factory ClientFactory,
 ) (*MCPRuntimeManager, error) {
@@ -1119,7 +1118,7 @@ func withMCPConnectTimeout(
 			time.Millisecond
 	}
 	if config.StreamableHTTP != nil &&
-		config.StreamableHTTP.AuthMode == spec.MCPHTTPAuthOAuth {
+		config.StreamableHTTP.AuthMode == server.MCPHTTPAuthOAuth {
 		timeout = max(timeout, defaultInteractiveMCPAuthTimeout)
 	}
 	return context.WithTimeout(ctx, timeout)

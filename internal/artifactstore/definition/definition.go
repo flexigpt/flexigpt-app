@@ -62,7 +62,7 @@ func (d Definition) Validate() error {
 	); err != nil {
 		return err
 	}
-	if err := validateLabels("definition", d.Labels); err != nil {
+	if err := basespec.ValidateLabels("definition", d.Labels); err != nil {
 		return err
 	}
 	if len(d.Dependencies) > basespec.MaxDefinitionDependencies {

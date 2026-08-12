@@ -33,6 +33,30 @@ func DecodeJSONRaw[T any](raw json.RawMessage) (T, error) {
 	return v, nil
 }
 
+func CloneJSONInValue[T any](in T) T {
+	out, err := CloneJSON(in)
+	if err != nil {
+		return in
+	}
+	return out
+}
+
+// CloneJSON returns a copy of input produced by a JSON marshal/unmarshal
+// round trip. It intentionally does not use DecodeJSONRaw, because clone
+// semantics should match json.Unmarshal rather than reject unknown fields.
+func CloneJSON[T any](input T) (T, error) {
+	var output T
+
+	raw, err := EncodeToJSONRaw(input)
+	if err != nil {
+		return output, err
+	}
+	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		return output, fmt.Errorf("unmarshal JSON clone: %w", err)
+	}
+	return output, nil
+}
+
 // decodeBytes decodes JSON bytes into out with options:
 // - disallowUnknown: Disallow unknown fields if true.
 // - requireEOF: Reject trailing JSON after the first value if true.

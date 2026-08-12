@@ -1,8 +1,7 @@
-package installation
+package server
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,10 +10,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
-
-const SchemaVersion = "v1"
 
 type InputBinding struct {
 	Value     *string `json:"value,omitempty"`
@@ -29,66 +27,9 @@ type ServerData struct {
 	AdditionalPolicies        []artifact.ArtifactRef  `json:"additionalPolicies,omitempty"`
 }
 
-// ServerOverlay intentionally stores ServerData as a named nested value.
-// Anonymous embedding would produce two schemaVersion fields at JSON encoding
-// time and causes the embedded ServerData schemaVersion to decode as empty.
-type ServerOverlay struct {
-	SchemaVersion  string     `json:"schemaVersion"`
-	Revision       uint64     `json:"revision"`
-	RuntimeEnabled bool       `json:"runtimeEnabled"`
-	ServerData     ServerData `json:"serverData"`
-}
-
-type BundleOverlay struct {
-	SchemaVersion  string `json:"schemaVersion"`
-	Revision       uint64 `json:"revision"`
-	RuntimeEnabled bool   `json:"runtimeEnabled"`
-}
-
-type OverlayRepository interface {
-	GetServerOverlay(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (ServerOverlay, bool, error)
-
-	GetBundleOverlay(
-		ctx context.Context,
-		rootID basespec.RootID,
-		collectionID basespec.CollectionID,
-	) (BundleOverlay, bool, error)
-
-	PutServerOverlay(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-		expectedRevision uint64,
-		value ServerOverlay,
-	) error
-
-	PutBundleOverlay(
-		ctx context.Context,
-		rootID basespec.RootID,
-		collectionID basespec.CollectionID,
-		expectedRevision uint64,
-		value BundleOverlay,
-	) error
-
-	DeleteServerOverlay(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-		expectedRevision uint64,
-	) error
-
-	DeleteBundleOverlay(
-		ctx context.Context,
-		rootID basespec.RootID,
-		collectionID basespec.CollectionID,
-		expectedRevision uint64,
-	) error
-}
-
 func DefaultServerData() ServerData {
 	return ServerData{
-		SchemaVersion: SchemaVersion,
+		SchemaVersion: schema.MCPSchemaVersion,
 		Inputs:        map[string]InputBinding{},
 	}
 }
@@ -159,7 +100,7 @@ func DecodeServerData(
 }
 
 func ValidateServerData(value ServerData) error {
-	if value.SchemaVersion != SchemaVersion {
+	if value.SchemaVersion != schema.MCPSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP installation schema %q",
 			basespec.ErrInvalid,

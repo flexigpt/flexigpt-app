@@ -10,7 +10,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+
+	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
 
 type Decoder struct {
@@ -22,11 +26,11 @@ func NewDecoder() *Decoder {
 }
 
 func (*Decoder) ID() basespec.DecoderID {
-	return DecoderID
+	return schema.DecoderID
 }
 
 func (*Decoder) Revision() string {
-	return DecoderRevision
+	return schema.DecoderRevision
 }
 
 func (d *Decoder) BindShareableSchemas(
@@ -39,7 +43,7 @@ func (d *Decoder) BindShareableSchemas(
 		)
 	}
 
-	expected := schema.NewBundleCodec().Key()
+	expected := schema.MCPSchemaKey
 	if slices.Contains(schemas.Keys(), expected) {
 		d.documents = schemas
 		return nil
@@ -54,7 +58,7 @@ func (d *Decoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if candidate.RequestsDecoder(DecoderID) &&
+	if candidate.RequestsDecoder(schema.DecoderID) &&
 		schema.IsBundleDocumentLocator(candidate.Locator) {
 		return discovery.RecognitionPreferred
 	}
@@ -65,7 +69,7 @@ func (d *Decoder) Decode(
 	ctx context.Context,
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
-	if !candidate.RequestsDecoder(DecoderID) ||
+	if !candidate.RequestsDecoder(schema.DecoderID) ||
 		!schema.IsBundleDocumentLocator(candidate.Locator) {
 		return nil, nil
 	}
@@ -79,19 +83,19 @@ func (d *Decoder) Decode(
 
 	parsed, err := d.documents.CanonicalizeExpected(
 		ctx,
-		schema.BundleCodec{}.Key(),
+		schema.MCPSchemaKey,
 		candidate.Content,
 	)
 	if err != nil {
 		return nil, decoderError(candidate.Locator, "bundle", err)
 	}
-	bundle, err := schema.BundleFromParsedDocument(parsed)
+	b, err := bundle.BundleFromParsedDocument(parsed)
 	if err != nil {
 		return nil, decoderError(candidate.Locator, "bundle", err)
 	}
 
-	serverNames := make([]string, 0, len(bundle.MCPServers))
-	for name := range bundle.MCPServers {
+	serverNames := make([]string, 0, len(b.MCPServers))
+	for name := range b.MCPServers {
 		serverNames = append(serverNames, name)
 	}
 	sort.Strings(serverNames)
@@ -99,9 +103,9 @@ func (d *Decoder) Decode(
 	policyNames := make(
 		[]string,
 		0,
-		len(bundle.BundleExtension.Policies),
+		len(b.BundleExtension.Policies),
 	)
-	for name := range bundle.BundleExtension.Policies {
+	for name := range b.BundleExtension.Policies {
 		policyNames = append(policyNames, name)
 	}
 	sort.Strings(policyNames)
@@ -113,16 +117,16 @@ func (d *Decoder) Decode(
 	)
 
 	for _, name := range serverNames {
-		serverDocument, err := schema.ServerFromCanonicalBundle(bundle, name)
+		serverDocument, err := bundle.ServerFromCanonicalBundle(b, name)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
-		definition, err := DefinitionForCanonicalServer(serverDocument)
+		definition, err := server.DefinitionForCanonicalServer(serverDocument)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
 		output = append(output, discovery.Decoded{
-			SubresourceLocator: ServerSubresource(
+			SubresourceLocator: server.ServerSubresource(
 				basespec.LogicalName(name),
 			),
 			Definition: definition,
@@ -130,14 +134,14 @@ func (d *Decoder) Decode(
 	}
 
 	for _, name := range policyNames {
-		definition, err := DefinitionForCanonicalPolicy(
-			bundle.BundleExtension.Policies[name],
+		definition, err := policy.DefinitionForCanonicalPolicy(
+			b.BundleExtension.Policies[name],
 		)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
 		output = append(output, discovery.Decoded{
-			SubresourceLocator: PolicySubresource(
+			SubresourceLocator: policy.PolicySubresource(
 				basespec.LogicalName(name),
 			),
 			Definition: definition,

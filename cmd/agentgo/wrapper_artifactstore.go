@@ -14,7 +14,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
-	mcpSchema "github.com/flexigpt/flexigpt-app/internal/mcp/schema"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
@@ -71,9 +73,9 @@ func InitArtifactStoreWrapper(
 	shareableCodecs := []shareable.Codec{
 		skillBundle.NewShareableCodec(),
 		workspace.NewShareableCodec(),
-		mcpSchema.NewBundleCodec(),
-		mcpSchema.NewServerCodec(),
-		mcpSchema.NewPolicyCodec(),
+		bundle.NewBundleCodec(),
+		server.NewServerCodec(),
+		policy.NewPolicyCodec(),
 	}
 
 	rootPolicy, err := protection.NewSetRootPolicy(

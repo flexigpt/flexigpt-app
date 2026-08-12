@@ -1,10 +1,9 @@
 package store
 
 import (
-	"encoding/json"
-
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func cloneAllAssistantPresets(
@@ -27,26 +26,14 @@ func cloneAllAssistantPresets(
 func cloneAssistantPreset(in spec.AssistantPreset) spec.AssistantPreset {
 	out := in
 
-	out.StartingModelPresetRef = cloneJSONValue(in.StartingModelPresetRef)
+	out.StartingModelPresetRef = jsonutil.CloneJSONInValue(in.StartingModelPresetRef)
 	if in.StartingIncludeModelSystemPrompt != nil {
 		v := *in.StartingIncludeModelSystemPrompt
 		out.StartingIncludeModelSystemPrompt = &v
 	}
-	out.StartingToolSelections = cloneJSONValue(in.StartingToolSelections)
-	out.StartingSkillSelections = cloneJSONValue(in.StartingSkillSelections)
-	out.StartingMCPContext = cloneJSONValue(in.StartingMCPContext)
+	out.StartingToolSelections = jsonutil.CloneJSONInValue(in.StartingToolSelections)
+	out.StartingSkillSelections = jsonutil.CloneJSONInValue(in.StartingSkillSelections)
+	out.StartingMCPContext = jsonutil.CloneJSONInValue(in.StartingMCPContext)
 
-	return out
-}
-
-func cloneJSONValue[T any](in T) T {
-	raw, err := json.Marshal(in)
-	if err != nil {
-		return in
-	}
-	var out T
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return in
-	}
 	return out
 }

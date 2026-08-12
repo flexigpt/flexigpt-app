@@ -1,11 +1,8 @@
-package schema
+package server
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"net"
 	"net/url"
@@ -13,361 +10,158 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
-var (
-	portableNamePattern = regexp.MustCompile(
-		`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`,
-	)
-	placeholderPattern = regexp.MustCompile(
-		`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`,
-	)
+var installationInputNamePattern = regexp.MustCompile(
+	`^[A-Za-z_][A-Za-z0-9_]*$`,
 )
 
-func parseBundle(
-	raw []byte,
-) (BundleDocument, json.RawMessage, error) {
-	value, err := decodeStrict[BundleDocument](raw)
-	if err != nil {
-		return BundleDocument{}, nil, err
-	}
-	return canonicalizeBundle(value)
-}
-
-func parseServer(
-	raw []byte,
-) (ServerDocument, json.RawMessage, error) {
-	value, err := decodeStrict[ServerDocument](raw)
-	if err != nil {
-		return ServerDocument{}, nil, err
-	}
-	return canonicalizeServer(value)
-}
-
-func parsePolicy(
-	raw []byte,
-) (PolicyDocument, json.RawMessage, error) {
-	value, err := decodeStrict[PolicyDocument](raw)
-	if err != nil {
-		return PolicyDocument{}, nil, err
-	}
-	return canonicalizePolicy(value)
-}
-
-func canonicalizeBundle(
-	input BundleDocument,
-) (BundleDocument, json.RawMessage, error) {
-	value, err := cloneJSON(input)
-	if err != nil {
-		return BundleDocument{}, nil, err
-	}
-	value.MCPServers = maps.Clone(value.MCPServers)
-	value.BundleExtension.Servers = maps.Clone(value.BundleExtension.Servers)
-	value.BundleExtension.Policies = maps.Clone(value.BundleExtension.Policies)
-	value.Labels = maps.Clone(value.Labels)
-
-	if value.MCPServers == nil {
-		value.MCPServers = map[string]CoreServer{}
-	}
-	if value.BundleExtension.Servers == nil {
-		value.BundleExtension.Servers = map[string]ServerExtension{}
-	}
-	if value.BundleExtension.Policies == nil {
-		value.BundleExtension.Policies = map[string]PolicyDocument{}
-	}
-
-	for name, core := range value.MCPServers {
-		core = normalizeCoreServer(core)
-		value.MCPServers[name] = core
-
-		extension := normalizeServerExtension(
-			name,
-			value.BundleExtension.Servers[name],
-		)
-		value.BundleExtension.Servers[name] = extension
-	}
-
-	for name, policyValue := range value.BundleExtension.Policies {
-		canonical, _, err := canonicalizePolicy(policyValue)
-		if err != nil {
-			return BundleDocument{}, nil, fmt.Errorf(
-				"policy %q: %w",
-				name,
-				err,
-			)
-		}
-		value.BundleExtension.Policies[name] = canonical
-	}
-
-	if err := ValidateBundle(value); err != nil {
-		return BundleDocument{}, nil, err
-	}
-
-	supplied := value.Digest
-	value.Digest = ""
-	calculated, err := canonicalDigest(value)
-	if err != nil {
-		return BundleDocument{}, nil, err
-	}
-	if supplied != "" && supplied != calculated {
-		return BundleDocument{}, nil, fmt.Errorf(
-			"%w: supplied MCP Bundle digest %q, calculated %q",
-			basespec.ErrDigestMismatch,
-			supplied,
-			calculated,
-		)
-	}
-	value.Digest = calculated
-
-	raw, err := canonicalJSON(value)
-	if err != nil {
-		return BundleDocument{}, nil, err
-	}
-	return value, raw, nil
-}
-
-func canonicalizePolicy(
-	input PolicyDocument,
-) (PolicyDocument, json.RawMessage, error) {
-	value, err := cloneJSON(input)
-	if err != nil {
-		return PolicyDocument{}, nil, err
-	}
-	value.Labels = maps.Clone(value.Labels)
-	value.Body = policy.NormalizePolicyBody(value.Body)
-
-	if err := ValidatePolicy(value); err != nil {
-		return PolicyDocument{}, nil, err
-	}
-
-	supplied := value.Digest
-	value.Digest = ""
-	calculated, err := canonicalDigest(value)
-	if err != nil {
-		return PolicyDocument{}, nil, err
-	}
-	if supplied != "" && supplied != calculated {
-		return PolicyDocument{}, nil, fmt.Errorf(
-			"%w: supplied MCP Policy digest %q, calculated %q",
-			basespec.ErrDigestMismatch,
-			supplied,
-			calculated,
-		)
-	}
-	value.Digest = calculated
-
-	raw, err := canonicalJSON(value)
-	if err != nil {
-		return PolicyDocument{}, nil, err
-	}
-	return value, raw, nil
-}
-
-// ServerFromCanonicalBundle projects one server from a Bundle that has
-// already been accepted and canonicalized by the Artifact Store shareable
-// schema registry.
-//
-// It deliberately does not call CanonicalizeServer. MCP lifecycle code must
-// not create a second portable-document validation path after registry
-// canonicalization.
-func ServerFromCanonicalBundle(
-	bundle BundleDocument,
-	name string,
-) (ServerDocument, error) {
-	core, found := bundle.MCPServers[name]
-	if !found {
-		return ServerDocument{}, fmt.Errorf(
-			"%w: MCP server %q is not in the Bundle document",
-			basespec.ErrNotFound,
-			name,
-		)
-	}
-	extension, found := bundle.BundleExtension.Servers[name]
-	if !found {
-		return ServerDocument{}, fmt.Errorf(
-			"%w: canonical MCP Bundle has no extension for server %q",
-			basespec.ErrInvalid,
-			name,
-		)
-	}
-	return cloneJSON(ServerDocument{
-		Kind:           ServerKind,
-		SchemaID:       ServerSchemaID,
-		SchemaVersion:  SchemaVersion,
-		LogicalName:    basespec.LogicalName(name),
-		LogicalVersion: extension.LogicalVersion,
-		DisplayName:    extension.DisplayName,
-		Description:    extension.Description,
-		Labels:         maps.Clone(extension.Labels),
-		MCPServer:      core,
-		Extension:      extension,
-	})
-}
-
-func canonicalizeServer(
-	input ServerDocument,
-) (ServerDocument, json.RawMessage, error) {
-	value, err := cloneJSON(input)
-	if err != nil {
-		return ServerDocument{}, nil, err
-	}
-	value.Labels = maps.Clone(value.Labels)
-	value.MCPServer = normalizeCoreServer(value.MCPServer)
-	value.Extension = normalizeServerExtension(
-		string(value.LogicalName),
-		value.Extension,
-	)
-
-	if err := ValidateServer(value); err != nil {
-		return ServerDocument{}, nil, err
-	}
-
-	supplied := value.Digest
-	value.Digest = ""
-	calculated, err := canonicalDigest(value)
-	if err != nil {
-		return ServerDocument{}, nil, err
-	}
-	if supplied != "" && supplied != calculated {
-		return ServerDocument{}, nil, fmt.Errorf(
-			"%w: supplied MCP Server digest %q, calculated %q",
-			basespec.ErrDigestMismatch,
-			supplied,
-			calculated,
-		)
-	}
-	value.Digest = calculated
-
-	raw, err := canonicalJSON(value)
-	if err != nil {
-		return ServerDocument{}, nil, err
-	}
-	return value, raw, nil
-}
-
-func ValidateBundle(value BundleDocument) error {
-	if value.Kind != BundleKind ||
-		value.SchemaID != BundleSchemaID ||
-		value.SchemaVersion != SchemaVersion {
-		return fmt.Errorf(
-			"%w: unsupported MCP Bundle schema",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := validatePortableMetadata(
-		value.LogicalName,
-		value.LogicalVersion,
-		value.DisplayName,
-		value.Description,
-		value.Labels,
-	); err != nil {
+// ValidateServerDataForDocument validates local installation data against the
+// immutable canonical server semantics that own the input declarations.
+func ValidateServerDataForDocument(
+	server artifact.ArtifactRef,
+	document ServerDocument,
+	data ServerData,
+) error {
+	if err := server.Validate(); err != nil {
 		return err
 	}
-	if len(value.MCPServers) > basespec.MaxDiscoveryCandidates {
-		return fmt.Errorf(
-			"%w: MCP Bundle server count exceeds limit",
-			basespec.ErrInvalid,
-		)
+	if err := ValidateServer(document); err != nil {
+		return err
 	}
-	if len(value.BundleExtension.Policies) > basespec.MaxDiscoveryCandidates {
-		return fmt.Errorf(
-			"%w: MCP Bundle policy count exceeds limit",
-			basespec.ErrInvalid,
-		)
+	if err := ValidateServerData(data); err != nil {
+		return err
 	}
 
-	for name := range value.BundleExtension.Servers {
-		if _, found := value.MCPServers[name]; !found {
+	secretTargets, err := SecretInputTargets(document)
+	if err != nil {
+		return err
+	}
+
+	if data.SelectedConnectionProfile != "" {
+		if _, found := document.Extension.ConnectionProfiles[data.SelectedConnectionProfile]; !found {
 			return fmt.Errorf(
-				"%w: bundleExtension.servers[%q] has no mcpServers entry",
+				"%w: selected MCP connection profile %q does not exist",
+				basespec.ErrReferenceUnresolved,
+				data.SelectedConnectionProfile,
+			)
+		}
+	}
+
+	for name, binding := range data.Inputs {
+		if !installationInputNamePattern.MatchString(name) {
+			return fmt.Errorf(
+				"%w: invalid MCP installation input name %q",
 				basespec.ErrInvalid,
 				name,
 			)
 		}
-	}
 
-	for name, core := range value.MCPServers {
-		if err := validatePortableName("MCP server name", name); err != nil {
-			return err
-		}
-		extension := value.BundleExtension.Servers[name]
-		if err := validateServerParts(name, core, extension); err != nil {
-			return fmt.Errorf("MCP server %q: %w", name, err)
-		}
-	}
-
-	for name, policyValue := range value.BundleExtension.Policies {
-		if err := validatePortableName("MCP policy name", name); err != nil {
-			return err
-		}
-		if string(policyValue.LogicalName) != name {
+		declaration, declared := document.Extension.Install.Inputs[name]
+		if !declared {
 			return fmt.Errorf(
-				"%w: policy map key %q does not match logicalName %q",
+				"%w: MCP installation input %q is not declared by the server",
 				basespec.ErrInvalid,
 				name,
-				policyValue.LogicalName,
 			)
 		}
-		if err := ValidatePolicy(policyValue); err != nil {
-			return fmt.Errorf("MCP policy %q: %w", name, err)
+
+		switch declaration.Kind {
+		case InputText, InputPath:
+			if binding.SecretRef != "" {
+				return fmt.Errorf(
+					"%w: MCP input %q must use a local value, not a secret reference",
+					basespec.ErrInvalid,
+					name,
+				)
+			}
+			if binding.Value == nil {
+				return fmt.Errorf(
+					"%w: MCP input %q requires a local value",
+					basespec.ErrInvalid,
+					name,
+				)
+			}
+
+		case InputSecret:
+			if binding.Value != nil || strings.TrimSpace(binding.SecretRef) == "" {
+				return fmt.Errorf(
+					"%w: MCP secret input %q requires exactly one secret reference",
+					basespec.ErrInvalid,
+					name,
+				)
+			}
+			target, found := secretTargets[name]
+			if !found {
+				return fmt.Errorf(
+					"%w: MCP secret input %q is not used by a permitted connection target",
+					basespec.ErrInvalid,
+					name,
+				)
+			}
+			if err := validateSecretBinding(
+				server,
+				binding.SecretRef,
+				target,
+			); err != nil {
+				return fmt.Errorf("MCP secret input %q: %w", name, err)
+			}
+
+		case InputOAuthClientCredentials:
+			if binding.Value != nil || strings.TrimSpace(binding.SecretRef) == "" {
+				return fmt.Errorf(
+					"%w: MCP OAuth client input %q requires exactly one secret reference",
+					basespec.ErrInvalid,
+					name,
+				)
+			}
+			if err := secret.ValidateMCPSecretRef(
+				binding.SecretRef,
+				server,
+				spec.MCPSecretKindOAuthClientCredentials,
+				"clientCredentials",
+			); err != nil {
+				return fmt.Errorf("MCP OAuth client input %q: %w", name, err)
+			}
+
+		default:
+			return fmt.Errorf(
+				"%w: MCP input %q has unsupported kind %q",
+				basespec.ErrInvalid,
+				name,
+				declaration.Kind,
+			)
 		}
 	}
-	if err := validateRequiredBundlePolicyReferences(value); err != nil {
-		return err
+
+	seen := make(map[artifact.ArtifactRef]struct{}, len(data.AdditionalPolicies))
+	for _, ref := range data.AdditionalPolicies {
+		if err := ref.Validate(); err != nil {
+			return err
+		}
+		if ref.RootID != server.RootID {
+			return fmt.Errorf(
+				"%w: additional MCP policy belongs to another Root",
+				basespec.ErrInvalid,
+			)
+		}
+		if _, duplicate := seen[ref]; duplicate {
+			return fmt.Errorf(
+				"%w: duplicate additional MCP policy Artifact",
+				basespec.ErrInvalid,
+			)
+		}
+		seen[ref] = struct{}{}
 	}
 
 	return nil
-}
-
-func ValidateServer(value ServerDocument) error {
-	if value.Kind != ServerKind ||
-		value.SchemaID != ServerSchemaID ||
-		value.SchemaVersion != SchemaVersion {
-		return fmt.Errorf(
-			"%w: unsupported MCP Server schema",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := validatePortableMetadata(
-		value.LogicalName,
-		value.LogicalVersion,
-		value.DisplayName,
-		value.Description,
-		value.Labels,
-	); err != nil {
-		return err
-	}
-	return validateServerParts(
-		string(value.LogicalName),
-		value.MCPServer,
-		value.Extension,
-	)
-}
-
-func ValidatePolicy(value PolicyDocument) error {
-	if value.Kind != PolicyKind ||
-		value.SchemaID != PolicySchemaID ||
-		value.SchemaVersion != SchemaVersion {
-		return fmt.Errorf(
-			"%w: unsupported MCP Policy schema",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := validatePortableMetadata(
-		value.LogicalName,
-		value.LogicalVersion,
-		value.DisplayName,
-		value.Description,
-		value.Labels,
-	); err != nil {
-		return err
-	}
-	return policy.ValidatePolicyBody(value.Body)
 }
 
 func ValidateMaterializedServer(
@@ -393,7 +187,48 @@ func ValidateMaterializedServer(
 	return nil
 }
 
-func normalizeCoreServer(value CoreServer) CoreServer {
+func CanonicalizeServer(
+	input ServerDocument,
+) (ServerDocument, json.RawMessage, error) {
+	value, err := jsonutil.CloneJSON(input)
+	if err != nil {
+		return ServerDocument{}, nil, err
+	}
+	value.Labels = maps.Clone(value.Labels)
+	value.MCPServer = NormalizeCoreServer(value.MCPServer)
+	value.Extension = NormalizeServerExtension(
+		string(value.LogicalName),
+		value.Extension,
+	)
+
+	if err := ValidateServer(value); err != nil {
+		return ServerDocument{}, nil, err
+	}
+
+	supplied := value.Digest
+	value.Digest = ""
+	calculated, err := cryptoutil.CanonicalDigest(value)
+	if err != nil {
+		return ServerDocument{}, nil, err
+	}
+	if supplied != "" && supplied != calculated {
+		return ServerDocument{}, nil, fmt.Errorf(
+			"%w: supplied MCP Server digest %q, calculated %q",
+			basespec.ErrDigestMismatch,
+			supplied,
+			calculated,
+		)
+	}
+	value.Digest = calculated
+
+	raw, err := jsonutil.MarshalCanonicalObject(value, basespec.MaxDefinitionBytes)
+	if err != nil {
+		return ServerDocument{}, nil, err
+	}
+	return value, raw, nil
+}
+
+func NormalizeCoreServer(value CoreServer) CoreServer {
 	value.Args = slices.Clone(value.Args)
 	value.Env = maps.Clone(value.Env)
 	value.Headers = maps.Clone(value.Headers)
@@ -403,7 +238,7 @@ func normalizeCoreServer(value CoreServer) CoreServer {
 	return value
 }
 
-func normalizeServerExtension(
+func NormalizeServerExtension(
 	name string,
 	value ServerExtension,
 ) ServerExtension {
@@ -424,12 +259,37 @@ func normalizeAuthentication(
 	value AuthenticationDeclaration,
 ) AuthenticationDeclaration {
 	if value.Mode == "" {
-		value.Mode = mcpSpec.MCPHTTPAuthNone
+		value.Mode = MCPHTTPAuthNone
 	}
 	return value
 }
 
-func validateServerParts(
+func ValidateServer(value ServerDocument) error {
+	if value.Kind != schema.ServerKind ||
+		value.SchemaID != schema.ServerSchemaID ||
+		value.SchemaVersion != schema.MCPSchemaVersion {
+		return fmt.Errorf(
+			"%w: unsupported MCP Server schema",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := basespec.ValidatePortableMetadata(
+		value.LogicalName,
+		value.LogicalVersion,
+		value.DisplayName,
+		value.Description,
+		value.Labels,
+	); err != nil {
+		return err
+	}
+	return ValidateServerParts(
+		string(value.LogicalName),
+		value.MCPServer,
+		value.Extension,
+	)
+}
+
+func ValidateServerParts(
 	name string,
 	core CoreServer,
 	extension ServerExtension,
@@ -542,7 +402,7 @@ func validateServerParts(
 	}
 
 	switch extension.Auth.Mode {
-	case mcpSpec.MCPHTTPAuthNone:
+	case MCPHTTPAuthNone:
 		if extension.Auth.ClientCredentialsInput != "" {
 			return fmt.Errorf(
 				"%w: no-auth server cannot declare OAuth credentials",
@@ -550,7 +410,7 @@ func validateServerParts(
 			)
 		}
 
-	case mcpSpec.MCPHTTPAuthAPIKey:
+	case MCPHTTPAuthAPIKey:
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: API-key authentication requires HTTP transport",
@@ -568,7 +428,7 @@ func validateServerParts(
 			)
 		}
 
-	case mcpSpec.MCPHTTPAuthOAuth:
+	case MCPHTTPAuthOAuth:
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: OAuth requires HTTP transport",
@@ -587,7 +447,7 @@ func validateServerParts(
 			}
 		}
 
-	case mcpSpec.MCPHTTPAuthClientCredentials:
+	case MCPHTTPAuthClientCredentials:
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: client credentials requires HTTP transport",
@@ -615,7 +475,7 @@ func validateServerParts(
 	}
 
 	if extension.Policy != nil {
-		if err := validatePortableName(
+		if err := basespec.ValidatePortableName(
 			"MCP policy reference",
 			string(extension.Policy.Ref),
 		); err != nil {
@@ -624,7 +484,7 @@ func validateServerParts(
 	}
 
 	for profileName, profile := range extension.ConnectionProfiles {
-		if err := validatePortableName(
+		if err := basespec.ValidatePortableName(
 			"MCP connection profile",
 			profileName,
 		); err != nil {
@@ -707,24 +567,33 @@ func validateInputDeclaration(
 	return nil
 }
 
-func validateRequiredBundlePolicyReferences(
-	value BundleDocument,
+func validateSecretBinding(
+	server artifact.ArtifactRef,
+	raw string,
+	target SecretInputTarget,
 ) error {
-	for name, extension := range value.BundleExtension.Servers {
-		if extension.Policy == nil || !extension.Policy.Required {
-			continue
-		}
-		if _, found := value.BundleExtension.Policies[string(extension.Policy.Ref)]; found {
-			continue
-		}
+	switch target.Kind {
+	case SecretInputTargetStdioEnv:
+		return secret.ValidateMCPSecretRef(
+			raw,
+			server,
+			spec.MCPSecretKindStdioEnv,
+			target.Slot,
+		)
+	case SecretInputTargetHTTPHeader:
+		return secret.ValidateMCPSecretRef(
+			raw,
+			server,
+			spec.MCPSecretKindHTTPHeader,
+			target.Slot,
+		)
+	default:
 		return fmt.Errorf(
-			"%w: MCP server %q requires missing inline policy %q",
-			basespec.ErrReferenceUnresolved,
-			name,
-			extension.Policy.Ref,
+			"%w: unsupported MCP secret input target %q",
+			basespec.ErrInvalid,
+			target.Kind,
 		)
 	}
-	return nil
 }
 
 func validateConnectionProfile(
@@ -918,7 +787,7 @@ func validateExtension(
 	if err := validateConnectionTimeoutMS(value.TimeoutMS); err != nil {
 		return err
 	}
-	if err := validateLabels(value.Labels); err != nil {
+	if err := basespec.ValidateLabels("", value.Labels); err != nil {
 		return err
 	}
 	if value.DisplayName == "" {
@@ -926,81 +795,6 @@ func validateExtension(
 			"%w: MCP server %q has no display name",
 			basespec.ErrInvalid,
 			name,
-		)
-	}
-	return nil
-}
-
-func validatePortableMetadata(
-	logicalName basespec.LogicalName,
-	logicalVersion basespec.LogicalVersion,
-	displayName string,
-	description string,
-	labels map[string]string,
-) error {
-	if err := validatePortableName(
-		"logical name",
-		string(logicalName),
-	); err != nil {
-		return err
-	}
-	if err := basespec.ValidateLogicalVersion(
-		logicalVersion,
-		true,
-	); err != nil {
-		return err
-	}
-	if err := basespec.ValidateOptionalText(
-		"display name",
-		displayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return err
-	}
-	if err := basespec.ValidateOptionalText(
-		"description",
-		description,
-		basespec.MaxDescriptionBytes,
-	); err != nil {
-		return err
-	}
-	return validateLabels(labels)
-}
-
-func validateLabels(values map[string]string) error {
-	if len(values) > basespec.MaxLabels {
-		return fmt.Errorf(
-			"%w: labels exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxLabels,
-		)
-	}
-	for key, value := range values {
-		if err := basespec.ValidateIdentifier(
-			"MCP label key",
-			key,
-			basespec.MaxKindBytes,
-		); err != nil {
-			return err
-		}
-		if err := basespec.ValidateRequiredText(
-			"MCP label value",
-			value,
-			basespec.MaxLabelValueBytes,
-		); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func validatePortableName(label, value string) error {
-	if !portableNamePattern.MatchString(value) {
-		return fmt.Errorf(
-			"%w: %s %q is not a portable MCP name",
-			basespec.ErrInvalid,
-			label,
-			value,
 		)
 	}
 	return nil
@@ -1250,77 +1044,4 @@ func isLoopback(host string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
-}
-
-func canonicalDigest(value any) (cryptoutil.Digest, error) {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return "", err
-	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return "", err
-	}
-	if len(canonical) > basespec.MaxDefinitionBytes {
-		return "", fmt.Errorf(
-			"%w: canonical MCP document exceeds byte limit",
-			basespec.ErrInvalid,
-		)
-	}
-	return cryptoutil.DigestBytes(canonical), nil
-}
-
-func canonicalJSON(value any) (json.RawMessage, error) {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return nil, err
-	}
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxDefinitionBytes,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return json.RawMessage(canonical), nil
-}
-
-func decodeStrict[T any](raw []byte) (T, error) {
-	var output T
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxDefinitionBytes,
-	)
-	if err != nil {
-		return output, err
-	}
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&output); err != nil {
-		return output, fmt.Errorf(
-			"%w: decode MCP document: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("MCP document has trailing JSON values")
-		}
-		return output, fmt.Errorf("%w: %w", basespec.ErrInvalid, err)
-	}
-	return output, nil
-}
-
-func cloneJSON[T any](input T) (T, error) {
-	var output T
-	raw, err := json.Marshal(input)
-	if err != nil {
-		return output, err
-	}
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return output, err
-	}
-	return output, nil
 }

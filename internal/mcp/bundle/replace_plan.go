@@ -12,15 +12,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
 
 type documentReplacePlan struct {
 	bundle Bundle
 
-	document schema.BundleDocument
+	document BundleDocument
 	raw      json.RawMessage
 
 	collectionData json.RawMessage
@@ -69,7 +69,7 @@ func (a *API) prepareDocumentReplace(
 		return documentReplacePlan{}, basespec.ErrConflict
 	}
 
-	document, err := schema.BundleFromParsedDocument(parsed)
+	document, err := BundleFromParsedDocument(parsed)
 	if err != nil {
 		return documentReplacePlan{}, err
 	}
@@ -192,7 +192,7 @@ func (a *API) prepareDocumentReplace(
 }
 
 func validateRequiredPolicyReferences(
-	document schema.BundleDocument,
+	document BundleDocument,
 ) error {
 	for name, extension := range document.BundleExtension.Servers {
 		if extension.Policy == nil || !extension.Policy.Required {
@@ -241,11 +241,11 @@ func preparedRegistrationData(
 		RootID:     bundle.Collection.RootID,
 		ArtifactID: registration.ArtifactID,
 	}
-	serverData, err := installation.DecodeServerData(data)
+	serverData, err := server.DecodeServerData(data)
 	if err != nil {
 		return nil, err
 	}
-	if err := installation.ValidateServerDataForDocument(
+	if err := server.ValidateServerDataForDocument(
 		serverRef,
 		document,
 		serverData,
@@ -257,7 +257,7 @@ func preparedRegistrationData(
 
 func replaceCollectionMetadataNeeded(
 	bundle Bundle,
-	document schema.BundleDocument,
+	document BundleDocument,
 	collectionData json.RawMessage,
 ) bool {
 	return bundle.Collection.DisplayName != displayName(document) ||

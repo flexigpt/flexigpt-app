@@ -1,40 +1,20 @@
-package installation
+package server
 
 import (
 	"context"
 	"fmt"
 	"maps"
-	"regexp"
 	"runtime"
 	"slices"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 )
-
-var placeholderPattern = regexp.MustCompile(
-	`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`,
-)
-
-type SecretResolver interface {
-	ResolveSecret(
-		ctx context.Context,
-		ref string,
-	) (string, error)
-}
-
-type EnvironmentResolver interface {
-	ResolveEnvironment(
-		ctx context.Context,
-		name string,
-	) (string, bool, error)
-}
 
 type Materialized struct {
-	Core schema.CoreServer
-	Auth schema.AuthenticationDeclaration
+	Core CoreServer
+	Auth AuthenticationDeclaration
 
 	ClientCredentialRef            string
 	ClientCredentialSecretRequired bool
@@ -50,7 +30,7 @@ type Materialized struct {
 func MaterializeValidated(
 	ctx context.Context,
 	server artifact.ArtifactRef,
-	document schema.ServerDocument,
+	document ServerDocument,
 	data ServerData,
 	secrets SecretResolver,
 	environment EnvironmentResolver,
@@ -72,7 +52,7 @@ func MaterializeValidated(
 func MaterializeInspectionValidated(
 	ctx context.Context,
 	server artifact.ArtifactRef,
-	document schema.ServerDocument,
+	document ServerDocument,
 	data ServerData,
 	environment EnvironmentResolver,
 ) (Materialized, error) {
@@ -82,7 +62,7 @@ func MaterializeInspectionValidated(
 func materializeValidated(
 	ctx context.Context,
 	server artifact.ArtifactRef,
-	document schema.ServerDocument,
+	document ServerDocument,
 	data ServerData,
 	secrets SecretResolver,
 	environment EnvironmentResolver,
@@ -109,7 +89,7 @@ func materializeValidated(
 
 	timeoutMS := document.Extension.TimeoutMS
 	if timeoutMS == 0 {
-		timeoutMS = schema.DefaultConnectionTimeoutMS
+		timeoutMS = DefaultConnectionTimeoutMS
 	}
 
 	values := make(map[string]string)
@@ -121,7 +101,7 @@ func materializeValidated(
 		binding, bound := data.Inputs[name]
 
 		switch declaration.Kind {
-		case schema.InputSecret:
+		case InputSecret:
 			if !bound || strings.TrimSpace(binding.SecretRef) == "" {
 				if declaration.Required {
 					return Materialized{}, fmt.Errorf(
@@ -157,7 +137,7 @@ func materializeValidated(
 			values[name] = value
 			secretValues[value] = struct{}{}
 
-		case schema.InputOAuthClientCredentials:
+		case InputOAuthClientCredentials:
 			if !bound || strings.TrimSpace(binding.SecretRef) == "" {
 				if declaration.Required {
 					return Materialized{}, fmt.Errorf(
@@ -194,7 +174,7 @@ func materializeValidated(
 			}
 			secretValues[value] = struct{}{}
 
-		case schema.InputText, schema.InputPath:
+		case InputText, InputPath:
 			switch {
 			case bound && binding.Value != nil:
 				values[name] = *binding.Value
@@ -259,7 +239,7 @@ func materializeValidated(
 		)
 	}
 
-	if err := schema.ValidateMaterializedServer(core, auth); err != nil {
+	if err := ValidateMaterializedServer(core, auth); err != nil {
 		return Materialized{}, err
 	}
 
@@ -280,10 +260,10 @@ func materializeValidated(
 }
 
 func selectProfile(
-	base schema.CoreServer,
-	profiles map[string]schema.ConnectionProfile,
+	base CoreServer,
+	profiles map[string]ConnectionProfile,
 	selected string,
-) (schema.CoreServer, error) {
+) (CoreServer, error) {
 	if selected == "" {
 		matches := make([]string, 0)
 		for name, profile := range profiles {
@@ -292,7 +272,7 @@ func selectProfile(
 			}
 		}
 		if len(matches) > 1 {
-			return schema.CoreServer{}, fmt.Errorf(
+			return CoreServer{}, fmt.Errorf(
 				"%w: multiple MCP connection profiles match platform %q",
 				basespec.ErrConflict,
 				runtime.GOOS,
@@ -308,7 +288,7 @@ func selectProfile(
 
 	profile, found := profiles[selected]
 	if !found {
-		return schema.CoreServer{}, fmt.Errorf(
+		return CoreServer{}, fmt.Errorf(
 			"%w: MCP connection profile %q does not exist",
 			basespec.ErrReferenceUnresolved,
 			selected,
@@ -316,7 +296,7 @@ func selectProfile(
 	}
 	if len(profile.Platforms) != 0 &&
 		!slices.Contains(profile.Platforms, runtime.GOOS) {
-		return schema.CoreServer{}, fmt.Errorf(
+		return CoreServer{}, fmt.Errorf(
 			"%w: MCP connection profile %q does not support %q",
 			basespec.ErrInvalid,
 			selected,
@@ -327,15 +307,15 @@ func selectProfile(
 	output := cloneCore(base)
 	switch {
 	case profile.Stdio != nil:
-		if output.Type != schema.ServerTypeStdio {
+		if output.Type != ServerTypeStdio {
 			if profile.Stdio.Command == nil {
-				return schema.CoreServer{}, fmt.Errorf(
+				return CoreServer{}, fmt.Errorf(
 					"%w: transport-changing stdio profile requires command",
 					basespec.ErrInvalid,
 				)
 			}
-			output = schema.CoreServer{
-				Type: schema.ServerTypeStdio,
+			output = CoreServer{
+				Type: ServerTypeStdio,
 				Env:  map[string]string{},
 			}
 		}
@@ -354,15 +334,15 @@ func selectProfile(
 		}
 
 	case profile.HTTP != nil:
-		if output.Type != schema.ServerTypeHTTP {
+		if output.Type != ServerTypeHTTP {
 			if profile.HTTP.URL == nil {
-				return schema.CoreServer{}, fmt.Errorf(
+				return CoreServer{}, fmt.Errorf(
 					"%w: transport-changing HTTP profile requires URL",
 					basespec.ErrInvalid,
 				)
 			}
-			output = schema.CoreServer{
-				Type:    schema.ServerTypeHTTP,
+			output = CoreServer{
+				Type:    ServerTypeHTTP,
 				Headers: map[string]string{},
 			}
 		}
@@ -378,7 +358,7 @@ func selectProfile(
 		}
 
 	default:
-		return schema.CoreServer{}, fmt.Errorf(
+		return CoreServer{}, fmt.Errorf(
 			"%w: MCP profile has no connection overlay",
 			basespec.ErrInvalid,
 		)
@@ -387,27 +367,27 @@ func selectProfile(
 }
 
 func substituteCore(
-	input schema.CoreServer,
+	input CoreServer,
 	values map[string]string,
 	optional map[string]struct{},
-) (schema.CoreServer, error) {
+) (CoreServer, error) {
 	output := cloneCore(input)
 	var err error
 
 	if output.Command, err = substituteRequired(output.Command, values); err != nil {
-		return schema.CoreServer{}, err
+		return CoreServer{}, err
 	}
 	if output.Args, err = substituteArguments(output.Args, values, optional); err != nil {
-		return schema.CoreServer{}, err
+		return CoreServer{}, err
 	}
 	if output.Env, err = substituteOptionalMap(output.Env, values, optional); err != nil {
-		return schema.CoreServer{}, err
+		return CoreServer{}, err
 	}
 	if output.URL, err = substituteRequired(output.URL, values); err != nil {
-		return schema.CoreServer{}, err
+		return CoreServer{}, err
 	}
 	if output.Headers, err = substituteOptionalMap(output.Headers, values, optional); err != nil {
-		return schema.CoreServer{}, err
+		return CoreServer{}, err
 	}
 	return output, nil
 }
@@ -537,7 +517,7 @@ func unresolvedInputError(name string) error {
 	)
 }
 
-func cloneCore(input schema.CoreServer) schema.CoreServer {
+func cloneCore(input CoreServer) CoreServer {
 	output := input
 	output.Args = slices.Clone(input.Args)
 	output.Env = maps.Clone(input.Env)

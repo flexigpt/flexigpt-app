@@ -1,4 +1,4 @@
-package installation
+package server
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
@@ -106,7 +105,7 @@ func CleanupReplacedServerSecrets(
 func CleanupUnboundServerSecrets(
 	ctx context.Context,
 	server artifact.ArtifactRef,
-	document schema.ServerDocument,
+	document ServerDocument,
 	data ServerData,
 	cleaner SecretCleaner,
 ) error {
@@ -136,7 +135,7 @@ func CleanupUnboundServerSecrets(
 		retained[value] = struct{}{}
 	}
 
-	targets, err := schema.SecretInputTargets(document)
+	targets, err := SecretInputTargets(document)
 	if err != nil {
 		return err
 	}
@@ -144,9 +143,9 @@ func CleanupUnboundServerSecrets(
 	for _, target := range targets {
 		var kind spec.MCPSecretKind
 		switch target.Kind {
-		case schema.SecretInputTargetStdioEnv:
+		case SecretInputTargetStdioEnv:
 			kind = spec.MCPSecretKindStdioEnv
-		case schema.SecretInputTargetHTTPHeader:
+		case SecretInputTargetHTTPHeader:
 			kind = spec.MCPSecretKindHTTPHeader
 		default:
 			return fmt.Errorf(
@@ -166,7 +165,7 @@ func CleanupUnboundServerSecrets(
 		candidates[ref] = struct{}{}
 	}
 	for _, declaration := range document.Extension.Install.Inputs {
-		if declaration.Kind != schema.InputOAuthClientCredentials {
+		if declaration.Kind != InputOAuthClientCredentials {
 			continue
 		}
 		ref, err := secret.NewMCPSecretRefString(

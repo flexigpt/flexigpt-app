@@ -18,8 +18,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	"golang.org/x/oauth2"
@@ -62,8 +63,8 @@ type mcpSettingsIndex struct {
 }
 
 type mcpGlobalSettingsRecord struct {
-	Revision uint64              `json:"revision"`
-	Settings mcpSpec.MCPSettings `json:"settings"`
+	Revision uint64               `json:"revision"`
+	Settings auth.MCPAuthSettings `json:"settings"`
 }
 
 func newMCPSettingsAdapter(
@@ -245,25 +246,25 @@ func (s *mcpSettingsAdapter) DeleteMCPInstallationPrefix(
 
 func (s *mcpSettingsAdapter) GetMCPGlobalSettings(
 	ctx context.Context,
-) (mcpSpec.MCPSettings, uint64, error) {
+) (auth.MCPAuthSettings, uint64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	raw, found, err := s.readRawLocked(ctx, mcpGlobalSettingsLogicalKey)
 	if err != nil {
-		return mcpSpec.MCPSettings{}, 0, err
+		return auth.MCPAuthSettings{}, 0, err
 	}
 	if !found {
-		return mcpSpec.MCPSettings{}, 0, nil
+		return auth.MCPAuthSettings{}, 0, nil
 	}
 
 	var value mcpGlobalSettingsRecord
 	if err := json.Unmarshal(raw, &value); err != nil {
-		return mcpSpec.MCPSettings{}, 0, err
+		return auth.MCPAuthSettings{}, 0, err
 	}
 	normalized, err := normalizeMCPGlobalSettings(value.Settings)
 	if err != nil {
-		return mcpSpec.MCPSettings{}, 0, err
+		return auth.MCPAuthSettings{}, 0, err
 	}
 	return normalized, value.Revision, nil
 }
@@ -271,7 +272,7 @@ func (s *mcpSettingsAdapter) GetMCPGlobalSettings(
 func (s *mcpSettingsAdapter) PutMCPGlobalSettings(
 	ctx context.Context,
 	expectedRevision uint64,
-	value mcpSpec.MCPSettings,
+	value auth.MCPAuthSettings,
 ) (uint64, error) {
 	value, err := normalizeMCPGlobalSettings(value)
 	if err != nil {
@@ -443,12 +444,12 @@ func (s *mcpSettingsAdapter) deleteOverlaySecretsLocked(
 		return nil
 	}
 
-	var overlay installation.ServerOverlay
-	if err := json.Unmarshal(raw, &overlay); err != nil {
+	var ovr overlay.ServerOverlay
+	if err := json.Unmarshal(raw, &ovr); err != nil {
 		return err
 	}
 
-	refs, err := installation.SecretReferences(overlay.ServerData)
+	refs, err := server.SecretReferences(ovr.ServerData)
 	if err != nil {
 		return err
 	}
@@ -465,16 +466,16 @@ func (s *mcpSettingsAdapter) deleteOverlaySecretsLocked(
 	if len(parts) != 4 {
 		return output
 	}
-	server := artifact.ArtifactRef{
+	srv := artifact.ArtifactRef{
 		RootID:     basespec.RootID(parts[1]),
 		ArtifactID: basespec.ArtifactID(parts[3]),
 	}
-	if err := server.Validate(); err != nil {
+	if err := srv.Validate(); err != nil {
 		return errors.Join(output, err)
 	}
 
 	tokenRef, err := secret.NewMCPSecretRefString(
-		server,
+		srv,
 		mcpSpec.MCPSecretKindOAuthToken,
 		"token",
 	)
@@ -532,8 +533,8 @@ func validateMCPSettingsKey(value string) error {
 }
 
 func normalizeMCPGlobalSettings(
-	value mcpSpec.MCPSettings,
-) (mcpSpec.MCPSettings, error) {
+	value auth.MCPAuthSettings,
+) (auth.MCPAuthSettings, error) {
 	value.OAuthLoopbackListenAddr = strings.TrimSpace(
 		value.OAuthLoopbackListenAddr,
 	)
@@ -545,20 +546,20 @@ func normalizeMCPGlobalSettings(
 		value.OAuthLoopbackListenAddr,
 	)
 	if err != nil {
-		return mcpSpec.MCPSettings{}, fmt.Errorf(
+		return auth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen address must be host:port",
 			basespec.ErrInvalid,
 		)
 	}
 	if !isLoopbackMCPSettingsHost(host) {
-		return mcpSpec.MCPSettings{}, fmt.Errorf(
+		return auth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen host must be loopback",
 			basespec.ErrInvalid,
 		)
 	}
 	number, err := strconv.Atoi(port)
 	if err != nil || number <= 0 || number > 65535 {
-		return mcpSpec.MCPSettings{}, fmt.Errorf(
+		return auth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen port must be 1..65535",
 			basespec.ErrInvalid,
 		)
@@ -586,7 +587,7 @@ func newSettingMCPSecretResolver(
 
 func (r *settingMCPSecretResolver) LoadOAuthToken(
 	ctx context.Context,
-	status mcpSpec.MCPAuthStatus,
+	status auth.MCPAuthStatus,
 ) (*oauth2.Token, error) {
 	ref, err := oauthTokenSecretRef(status.Server)
 	if err != nil {
@@ -611,7 +612,7 @@ func (r *settingMCPSecretResolver) LoadOAuthToken(
 
 func (r *settingMCPSecretResolver) SaveOAuthToken(
 	ctx context.Context,
-	status mcpSpec.MCPAuthStatus,
+	status auth.MCPAuthStatus,
 	token *oauth2.Token,
 ) error {
 	if token == nil || !token.Valid() {
@@ -632,7 +633,7 @@ func (r *settingMCPSecretResolver) SaveOAuthToken(
 
 func (r *settingMCPSecretResolver) DeleteOAuthToken(
 	ctx context.Context,
-	status mcpSpec.MCPAuthStatus,
+	status auth.MCPAuthStatus,
 ) error {
 	ref, err := oauthTokenSecretRef(status.Server)
 	if err != nil {
@@ -766,10 +767,10 @@ func isMissingMCPSetting(err error) bool {
 }
 
 func oauthTokenSecretRef(
-	server artifact.ArtifactRef,
+	srv artifact.ArtifactRef,
 ) (string, error) {
 	return secret.NewMCPSecretRefString(
-		server,
+		srv,
 		mcpSpec.MCPSecretKindOAuthToken,
 		"token",
 	)

@@ -7,53 +7,22 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
-type RuntimeConfig struct {
-	Server     artifact.ArtifactRef
-	Collection collection.CollectionRef
-
-	LogicalName string
-	DisplayName string
-
-	Transport                 mcpSpec.MCPTransportType
-	Stdio                     *mcpSpec.MCPRuntimeStdioConfig
-	StreamableHTTP            *mcpSpec.MCPRuntimeStreamableHTTPConfig
-	OAuthClientSecretRequired bool
-
-	TrustLevel    policy.MCPTrustLevel
-	DefaultPolicy policy.MCPServerPolicy
-	ToolPolicies  map[string]policy.MCPToolPolicyOverride
-	AppsPolicy    policy.MCPAppsPolicy
-
-	SensitiveValues []string
+type SecretResolver interface {
+	ResolveSecret(
+		ctx context.Context,
+		ref string,
+	) (string, error)
 }
 
-type Resolved struct {
-	Server     artifact.ArtifactRef
-	Collection collection.CollectionRef
-
-	ArtifactRevision uint64
-	CatalogRevision  uint64
-
-	DefinitionDigest    cryptoutil.Digest
-	SourceContentDigest cryptoutil.Digest
-	SourceGeneration    string
-
-	Document     schema.ServerDocument
-	Installation installation.ServerData
-	Policy       policy.Effective
-
-	InstallationRevision uint64
-	RuntimeEnabled       bool
-	BuiltIn              bool
-	Version              cryptoutil.Digest
+type EnvironmentResolver interface {
+	ResolveEnvironment(
+		ctx context.Context,
+		name string,
+	) (string, bool, error)
 }
 
 type Resolver interface {
@@ -65,8 +34,8 @@ type Resolver interface {
 
 func (r Resolved) Materialize(
 	ctx context.Context,
-	secrets installation.SecretResolver,
-	environment installation.EnvironmentResolver,
+	secrets SecretResolver,
+	environment EnvironmentResolver,
 ) (RuntimeConfig, error) {
 	if err := r.Validate(); err != nil {
 		return RuntimeConfig{}, err
@@ -79,12 +48,12 @@ func (r Resolved) Materialize(
 // projection and never resolves or exposes a secret value.
 func (r Resolved) MaterializeForInspection(
 	ctx context.Context,
-	environment installation.EnvironmentResolver,
+	environment EnvironmentResolver,
 ) (RuntimeConfig, error) {
 	if err := r.Validate(); err != nil {
 		return RuntimeConfig{}, err
 	}
-	materialized, err := installation.MaterializeInspectionValidated(
+	materialized, err := MaterializeInspectionValidated(
 		ctx,
 		r.Server,
 		r.Document,
@@ -103,8 +72,8 @@ func (r Resolved) MaterializeForInspection(
 // application and local substitution occur.
 func (r Resolved) MaterializeTrusted(
 	ctx context.Context,
-	secrets installation.SecretResolver,
-	environment installation.EnvironmentResolver,
+	secrets SecretResolver,
+	environment EnvironmentResolver,
 ) (RuntimeConfig, error) {
 	if !r.RuntimeEnabled {
 		return RuntimeConfig{}, fmt.Errorf(
@@ -112,7 +81,7 @@ func (r Resolved) MaterializeTrusted(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	materialized, err := installation.MaterializeValidated(
+	materialized, err := MaterializeValidated(
 		ctx,
 		r.Server,
 		r.Document,
@@ -154,10 +123,10 @@ func (r Resolved) Validate() error {
 	if err := basespec.ValidateSourceGeneration(r.SourceGeneration); err != nil {
 		return err
 	}
-	if err := schema.ValidateServer(r.Document); err != nil {
+	if err := ValidateServer(r.Document); err != nil {
 		return err
 	}
-	if err := installation.ValidateServerData(r.Installation); err != nil {
+	if err := ValidateServerData(r.Installation); err != nil {
 		return err
 	}
 	if err := r.Policy.Validate(); err != nil {
@@ -168,7 +137,7 @@ func (r Resolved) Validate() error {
 
 func runtimeConfigFromMaterialized(
 	r Resolved,
-	materialized installation.Materialized,
+	materialized Materialized,
 ) (RuntimeConfig, error) {
 	config := RuntimeConfig{
 		Server:                    r.Server,
@@ -184,18 +153,18 @@ func runtimeConfigFromMaterialized(
 	}
 
 	switch materialized.Core.Type {
-	case schema.ServerTypeStdio:
+	case ServerTypeStdio:
 		config.Transport = mcpSpec.MCPTransportStdio
-		config.Stdio = &mcpSpec.MCPRuntimeStdioConfig{
+		config.Stdio = &MCPRuntimeStdioConfig{
 			Command:          materialized.Core.Command,
 			Args:             append([]string(nil), materialized.Core.Args...),
 			Env:              maps.Clone(materialized.Core.Env),
 			StartupTimeoutMS: materialized.TimeoutMS,
 		}
 
-	case schema.ServerTypeHTTP:
+	case ServerTypeHTTP:
 		config.Transport = mcpSpec.MCPTransportStreamableHTTP
-		config.StreamableHTTP = &mcpSpec.MCPRuntimeStreamableHTTPConfig{
+		config.StreamableHTTP = &MCPRuntimeStreamableHTTPConfig{
 			URL:                         materialized.Core.URL,
 			TimeoutMS:                   materialized.TimeoutMS,
 			AuthMode:                    materialized.Auth.Mode,

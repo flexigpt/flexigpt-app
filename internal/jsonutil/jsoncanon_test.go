@@ -1,6 +1,7 @@
 package jsonutil
 
 import (
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -9,6 +10,63 @@ import (
 type canonicalizationMismatchError struct {
 	got  string
 	want string
+}
+
+type invalidJSONValue struct {
+	N int
+}
+
+func (invalidJSONValue) MarshalJSON() ([]byte, error) {
+	return []byte("{"), nil
+}
+
+func TestCloneJSONValue(t *testing.T) {
+	t.Run("deep copy on marshalable value", func(t *testing.T) {
+		type sample struct {
+			Values  []int
+			Enabled *bool
+		}
+
+		flag := true
+		in := sample{
+			Values:  []int{1, 2, 3},
+			Enabled: &flag,
+		}
+
+		got := CloneJSONInValue(in)
+
+		in.Values[0] = 99
+		*in.Enabled = false
+
+		if got.Values[0] != 1 {
+			t.Fatalf("got.Values[0] = %d, want 1", got.Values[0])
+		}
+		if got.Enabled == nil || *got.Enabled != true {
+			t.Fatalf("got.Enabled = %v, want true", got.Enabled)
+		}
+	})
+
+	t.Run("returns input when marshal fails", func(t *testing.T) {
+		type sample struct {
+			C chan int
+		}
+
+		in := sample{C: make(chan int)}
+		got := CloneJSONInValue(in)
+
+		if got.C != in.C {
+			t.Fatal("expected original value to be returned on marshal error")
+		}
+	})
+
+	t.Run("returns input when unmarshal fails", func(t *testing.T) {
+		in := invalidJSONValue{N: 42}
+		got := CloneJSONInValue(in)
+
+		if !reflect.DeepEqual(got, in) {
+			t.Fatalf("got %#v, want %#v", got, in)
+		}
+	})
 }
 
 func TestCanonicalizeProducesStableJSONAndNumbers(t *testing.T) {

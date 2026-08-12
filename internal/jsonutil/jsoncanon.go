@@ -17,6 +17,39 @@ const (
 	maximumDepth = 256
 )
 
+// MarshalCanonicalObject marshals value as a canonical JSON object.
+// The maximum applies to the marshaled JSON before canonicalization.
+func MarshalCanonicalObject(value any, maximumBytes int) (json.RawMessage, error) {
+	raw, err := EncodeToJSONRaw(value)
+	if err != nil {
+		return nil, err
+	}
+
+	canonical, err := CanonicalizeObject([]byte(raw), maximumBytes)
+	if err != nil {
+		return nil, fmt.Errorf("canonicalize JSON object: %w", err)
+	}
+	return json.RawMessage(canonical), nil
+}
+
+// DecodeCanonicalObject validates raw as one JSON object, canonicalizes it,
+// and strictly decodes it into T. It rejects duplicate keys, unknown struct
+// fields, and trailing JSON values.
+//
+// As with CanonicalizeObject, an empty raw value is treated as {}.
+func DecodeCanonicalObject[T any](raw []byte, maximumBytes int) (T, error) {
+	var output T
+
+	canonical, err := CanonicalizeObject(raw, maximumBytes)
+	if err != nil {
+		return output, fmt.Errorf("canonicalize JSON object: %w", err)
+	}
+	if err := decodeBytes(canonical, &output, true, true); err != nil {
+		return output, fmt.Errorf("decode canonical JSON object: %w", err)
+	}
+	return output, nil
+}
+
 func CanonicalizeObject(raw []byte, maximum int) ([]byte, error) {
 	if len(raw) == 0 {
 		raw = []byte(EmptyObject)

@@ -906,7 +906,7 @@ func resolveMCPResourceTemplateURI(
 }
 
 func buildMCPAppContextInput(
-	updates []spec.MCPAppModelContextUpdate,
+	updates []runtime.MCPAppModelContextUpdate,
 ) *inferenceSpec.InputUnion {
 	if len(updates) == 0 {
 		return nil

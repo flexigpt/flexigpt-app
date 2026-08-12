@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 	"sort"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -158,84 +157,6 @@ func (e Effective) Validate() error {
 			"%w: effective MCP policy digest mismatch",
 			basespec.ErrDigestMismatch,
 		)
-	}
-	return nil
-}
-
-func ValidatePolicyBody(body MCPPolicy) error {
-	switch body.TrustLevel {
-	case MCPTrustLevelTrusted, MCPTrustLevelUntrusted:
-	default:
-		return fmt.Errorf(
-			"%w: invalid MCP trust level %q",
-			basespec.ErrInvalid,
-			body.TrustLevel,
-		)
-	}
-
-	switch body.DefaultPolicy.DefaultApprovalRule {
-	case MCPApprovalRuleAllow,
-		MCPApprovalRuleAsk,
-		MCPApprovalRuleDeny:
-	default:
-		return fmt.Errorf(
-			"%w: invalid MCP approval rule",
-			basespec.ErrInvalid,
-		)
-	}
-	switch body.DefaultPolicy.DefaultExecutionMode {
-	case MCPExecutionModeAuto,
-		MCPExecutionModeManual:
-	default:
-		return fmt.Errorf(
-			"%w: invalid MCP execution mode",
-			basespec.ErrInvalid,
-		)
-	}
-
-	for name, override := range body.ToolPolicies {
-		if strings.TrimSpace(name) == "" {
-			return fmt.Errorf(
-				"%w: empty MCP tool policy name",
-				basespec.ErrInvalid,
-			)
-		}
-		if override.ToolName != name {
-			return fmt.Errorf(
-				"%w: MCP tool policy key and toolName differ",
-				basespec.ErrInvalid,
-			)
-		}
-		if override.ApprovalRule != nil {
-			switch *override.ApprovalRule {
-			case MCPApprovalRuleAllow,
-				MCPApprovalRuleAsk,
-				MCPApprovalRuleDeny:
-			default:
-				return fmt.Errorf(
-					"%w: invalid tool approval rule",
-					basespec.ErrInvalid,
-				)
-			}
-		}
-		if override.ExecutionMode != nil {
-			switch *override.ExecutionMode {
-			case MCPExecutionModeAuto,
-				MCPExecutionModeManual:
-			default:
-				return fmt.Errorf(
-					"%w: invalid tool execution mode",
-					basespec.ErrInvalid,
-				)
-			}
-		}
-		if override.ExpectedDigest != "" {
-			if err := cryptoutil.ValidateDigest(
-				cryptoutil.Digest(override.ExpectedDigest),
-			); err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }

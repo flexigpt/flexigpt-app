@@ -9,8 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 )
 
 type RuntimeInvalidator interface {
@@ -271,8 +271,8 @@ func (a *API) UpdateProtectedBundleInstallation(
 		ref.RootID,
 		ref.CollectionID,
 		expectedOverlayRevision,
-		installation.BundleOverlay{
-			SchemaVersion:  installation.SchemaVersion,
+		overlay.BundleOverlay{
+			SchemaVersion:  schema.MCPSchemaVersion,
 			Revision:       nextRevision,
 			RuntimeEnabled: runtimeEnabled,
 		},

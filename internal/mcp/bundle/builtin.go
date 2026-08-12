@@ -12,8 +12,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 )
 
 type EnsureBuiltInRequest struct {
@@ -60,7 +60,7 @@ func (a *API) EnsureBuiltIn(
 		)
 	}
 
-	document, err := schema.BundleFromParsedDocument(
+	document, err := BundleFromParsedDocument(
 		request.Document,
 	)
 	if err != nil {
@@ -157,7 +157,7 @@ func (a *API) EnsureBuiltIn(
 func ensureBuiltInTopologyMatches(
 	bundle Bundle,
 	request EnsureBuiltInRequest,
-	document schema.BundleDocument,
+	document BundleDocument,
 	collectionData json.RawMessage,
 	attachmentData json.RawMessage,
 ) error {
@@ -186,4 +186,8 @@ func ensureBuiltInTopologyMatches(
 	}
 
 	return nil
+}
+
+func isMCPKind(kind basespec.ArtifactKind) bool {
+	return kind == schema.ServerKind || kind == schema.PolicyKind
 }

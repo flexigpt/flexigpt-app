@@ -6,7 +6,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
@@ -54,7 +53,7 @@ type ConversationMessage struct {
 
 	MCPContext           *runtime.MCPConversationContext    `json:"mcpContext,omitempty"`
 	MCPToolMappings      []runtime.MCPProviderToolMapping   `json:"mcpToolMappings,omitempty"`
-	MCPAppContextUpdates []mcpSpec.MCPAppModelContextUpdate `json:"mcpAppContextUpdates,omitempty"`
+	MCPAppContextUpdates []runtime.MCPAppModelContextUpdate `json:"mcpAppContextUpdates,omitempty"`
 
 	WorkspaceSelection *selection.ConversationSelection `json:"workspaceSelection,omitempty"`
 	WorkspaceUsage     *selection.ConversationUsage     `json:"workspaceUsage,omitempty"`

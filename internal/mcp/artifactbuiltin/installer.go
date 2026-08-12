@@ -19,14 +19,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 )
-
-const hydrationFingerprintSchemaVersion = "mcp.builtin-hydration/v1"
 
 // LoadEmbeddedRegistry loads only the source-controlled converted MCP
 // registry. It intentionally does not inspect or convert legacy runtime data,
@@ -86,7 +84,7 @@ type InstallerDependencies struct {
 	Bundles            builtInBundleEnsurer
 	Registry           Registry
 	Packages           fs.FS
-	Overlays           installation.OverlayRepository
+	Overlays           overlay.OverlayRepository
 	ShareableDocuments shareable.ExpectedCanonicalizer
 }
 
@@ -94,13 +92,13 @@ type Installer struct {
 	bundles   builtInBundleEnsurer
 	registry  Registry
 	packages  fs.FS
-	overlays  installation.OverlayRepository
+	overlays  overlay.OverlayRepository
 	documents shareable.ExpectedCanonicalizer
 }
 
 type preparedBundle struct {
 	registration  BundleRegistration
-	document      schema.BundleDocument
+	document      bundle.BundleDocument
 	parsed        shareable.ParsedDocument
 	packageFiles  []source.ManagedPackageFile
 	packageDigest cryptoutil.Digest
@@ -325,7 +323,7 @@ func (i *Installer) prepareBundles(
 
 		parsed, err := i.documents.CanonicalizeExpected(
 			ctx,
-			schema.BundleCodec{}.Key(),
+			bundle.BundleCodec{}.Key(),
 			raw,
 		)
 		if err != nil {
@@ -336,7 +334,7 @@ func (i *Installer) prepareBundles(
 			)
 		}
 
-		document, err := schema.BundleFromParsedDocument(parsed)
+		document, err := bundle.BundleFromParsedDocument(parsed)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"project canonical built-in MCP document %q: %w",
@@ -509,7 +507,7 @@ func (i *Installer) hydrationFingerprint(
 		Topology      topology.Declaration `json:"topology"`
 		Bundles       []bundleFingerprint  `json:"bundles"`
 	}{
-		SchemaVersion: hydrationFingerprintSchemaVersion,
+		SchemaVersion: schema.HydrationFingerprintSchemaVersion,
 		Topology:      i.registry.Topology,
 		Bundles:       values,
 	})
@@ -524,7 +522,7 @@ func (i *Installer) hydrationFingerprint(
 }
 
 func bundleDefinitions(
-	document schema.BundleDocument,
+	document bundle.BundleDocument,
 ) (map[basespec.SubresourceLocator]basespec.ArtifactKind, error) {
 	output := make(
 		map[basespec.SubresourceLocator]basespec.ArtifactKind,

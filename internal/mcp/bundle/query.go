@@ -12,10 +12,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
 
 type BundleInstallationView struct {
@@ -30,8 +29,8 @@ type ServerInstallationView struct {
 	Artifact             artifact.Artifact        `json:"artifact"`
 	Collection           collection.CollectionRef `json:"collection"`
 	CatalogRevision      uint64                   `json:"catalogRevision"`
-	Document             schema.ServerDocument    `json:"document"`
-	Installation         installation.ServerData  `json:"installation"`
+	Document             server.ServerDocument    `json:"document"`
+	Installation         server.ServerData        `json:"installation"`
 	InstallationRevision uint64                   `json:"installationRevision"`
 	RuntimeEnabled       bool                     `json:"runtimeEnabled"`
 	BuiltIn              bool                     `json:"builtIn"`
@@ -56,24 +55,24 @@ type PolicyView struct {
 func (a *API) GetDocument(
 	ctx context.Context,
 	ref collection.CollectionRef,
-) (schema.BundleDocument, error) {
+) (BundleDocument, error) {
 	if a == nil {
-		return schema.BundleDocument{}, basespec.ErrClosed
+		return BundleDocument{}, basespec.ErrClosed
 	}
 
 	bundle, err := a.Get(ctx, ref)
 	if err != nil {
-		return schema.BundleDocument{}, err
+		return BundleDocument{}, err
 	}
 	snapshot, err := a.currentCatalog(ctx, bundle)
 	if err != nil {
-		return schema.BundleDocument{}, err
+		return BundleDocument{}, err
 	}
 
 	sourceRevision := snapshot.SourceRevisions[bundle.Source.ID]
 	sourceGeneration := snapshot.SourceGenerations[bundle.Source.ID]
 	if sourceRevision == 0 || sourceGeneration == "" {
-		return schema.BundleDocument{}, fmt.Errorf(
+		return BundleDocument{}, fmt.Errorf(
 			"%w: MCP Bundle Source has no current Catalog state",
 			basespec.ErrCatalogStale,
 		)
@@ -85,10 +84,10 @@ func (a *API) GetDocument(
 		bundle.Source.ID,
 	)
 	if err != nil {
-		return schema.BundleDocument{}, err
+		return BundleDocument{}, err
 	}
 	if sourceValue.Revision != sourceRevision {
-		return schema.BundleDocument{}, fmt.Errorf(
+		return BundleDocument{}, fmt.Errorf(
 			"%w: MCP Bundle Source changed after Catalog publication",
 			basespec.ErrCatalogStale,
 		)
@@ -103,19 +102,19 @@ func (a *API) GetDocument(
 		basespec.MaxCandidateBytes,
 	)
 	if err != nil {
-		return schema.BundleDocument{}, err
+		return BundleDocument{}, err
 	}
 
 	document, _, err := a.canonicalizeBundleBytes(ctx, content)
 	if err != nil {
-		return schema.BundleDocument{}, err
+		return BundleDocument{}, err
 	}
 	if document.LogicalName != bundle.Data.LogicalName ||
 		document.LogicalVersion != bundle.Data.LogicalVersion ||
 		!maps.Equal(document.Labels, bundle.Data.Labels) ||
 		displayName(document) != bundle.Collection.DisplayName ||
 		document.Description != bundle.Collection.Description {
-		return schema.BundleDocument{}, fmt.Errorf(
+		return BundleDocument{}, fmt.Errorf(
 			"%w: MCP Bundle document and Collection metadata differ",
 			basespec.ErrCatalogStale,
 		)
@@ -123,7 +122,7 @@ func (a *API) GetDocument(
 
 	expected, err := definitionsForDocument(document)
 	if err != nil {
-		return schema.BundleDocument{}, err
+		return BundleDocument{}, err
 	}
 	seen := make(map[basespec.SubresourceLocator]struct{}, len(expected))
 
@@ -136,7 +135,7 @@ func (a *API) GetDocument(
 
 		expectedDefinition, wanted := expected[occurrence.Key.SubresourceLocator]
 		if !wanted {
-			return schema.BundleDocument{}, fmt.Errorf(
+			return BundleDocument{}, fmt.Errorf(
 				"%w: Catalog contains an unexpected valid MCP subresource %q",
 				basespec.ErrCatalogStale,
 				occurrence.Key.SubresourceLocator,
@@ -147,7 +146,7 @@ func (a *API) GetDocument(
 			*occurrence.DefinitionDigest != expectedDefinition.Digest ||
 			occurrence.SourceContentDigest == nil ||
 			*occurrence.SourceContentDigest != sourceDigest {
-			return schema.BundleDocument{}, fmt.Errorf(
+			return BundleDocument{}, fmt.Errorf(
 				"%w: MCP subresource %q differs from the current document",
 				basespec.ErrCatalogStale,
 				occurrence.Key.SubresourceLocator,
@@ -157,7 +156,7 @@ func (a *API) GetDocument(
 	}
 
 	if len(seen) != len(expected) {
-		return schema.BundleDocument{}, fmt.Errorf(
+		return BundleDocument{}, fmt.Errorf(
 			"%w: Catalog does not cover every current MCP document subresource",
 			basespec.ErrCatalogStale,
 		)
@@ -304,7 +303,7 @@ func (a *API) InspectMCPPolicy(
 	if err != nil {
 		return PolicyView{}, err
 	}
-	body, err := mcpArtifact.PolicyBodyFromDefinition(definitionValue)
+	body, err := policy.PolicyBodyFromDefinition(definitionValue)
 	if err != nil {
 		return PolicyView{}, err
 	}
@@ -387,7 +386,7 @@ func (a *API) listArtifactsByKind(
 	}
 	output := make([]artifact.Artifact, 0, len(records))
 	for _, record := range records {
-		if !mcpArtifact.IsMCPKind(record.Kind) {
+		if !isMCPKind(record.Kind) {
 			return nil, fmt.Errorf(
 				"%w: non-MCP Artifact %q exists in MCP Bundle %q",
 				basespec.ErrConflict,

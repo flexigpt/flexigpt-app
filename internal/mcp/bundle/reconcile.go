@@ -15,10 +15,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
 
 type ReplaceDocumentRequest struct {
@@ -428,7 +428,7 @@ func mcpArtifactsBySubresource(
 ) (map[basespec.SubresourceLocator]artifact.Artifact, error) {
 	output := make(map[basespec.SubresourceLocator]artifact.Artifact)
 	for _, value := range values {
-		if !mcpArtifact.IsMCPKind(value.Kind) {
+		if !isMCPKind(value.Kind) {
 			return nil, fmt.Errorf(
 				"%w: non-MCP Artifact %q exists in MCP Bundle %q",
 				basespec.ErrConflict,
@@ -470,8 +470,8 @@ func registrationData(value Registration) (json.RawMessage, error) {
 
 	switch value.Kind {
 	case schema.ServerKind:
-		return installation.EncodeServerData(
-			installation.DefaultServerData(),
+		return server.EncodeServerData(
+			server.DefaultServerData(),
 		)
 	case schema.PolicyKind:
 		return json.RawMessage(jsonutil.EmptyObject), nil
@@ -496,7 +496,7 @@ func (a *API) deleteProtectedOverlayIfPresent(
 		return nil
 	}
 
-	overlay, found, err := a.dependencies.Overlays.GetServerOverlay(
+	ovr, found, err := a.dependencies.Overlays.GetServerOverlay(
 		ctx,
 		record.Ref(),
 	)
@@ -506,7 +506,7 @@ func (a *API) deleteProtectedOverlayIfPresent(
 	return a.dependencies.Overlays.DeleteServerOverlay(
 		ctx,
 		record.Ref(),
-		overlay.Revision,
+		ovr.Revision,
 	)
 }
 
@@ -538,7 +538,7 @@ func (a *API) UpdateServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedArtifactRevision uint64,
-	data installation.ServerData,
+	data server.ServerData,
 ) (artifact.Artifact, error) {
 	if a == nil {
 		return artifact.Artifact{}, basespec.ErrClosed
@@ -582,7 +582,7 @@ func (a *API) UpdateServerInstallation(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if err := installation.ValidateServerDataForDocument(
+	if err := server.ValidateServerDataForDocument(
 		ref,
 		document,
 		data,
@@ -590,7 +590,7 @@ func (a *API) UpdateServerInstallation(
 		return artifact.Artifact{}, err
 	}
 
-	encoded, err := installation.EncodeServerData(data)
+	encoded, err := server.EncodeServerData(data)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -633,7 +633,7 @@ func (a *API) UpdateProtectedServerInstallation(
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
 	runtimeEnabled bool,
-	data installation.ServerData,
+	data server.ServerData,
 ) error {
 	if a == nil {
 		return basespec.ErrClosed
@@ -679,7 +679,7 @@ func (a *API) UpdateProtectedServerInstallation(
 	if err != nil {
 		return err
 	}
-	if err := installation.ValidateServerDataForDocument(
+	if err := server.ValidateServerDataForDocument(
 		ref,
 		document,
 		data,
@@ -712,8 +712,8 @@ func (a *API) UpdateProtectedServerInstallation(
 		ctx,
 		ref,
 		expectedOverlayRevision,
-		installation.ServerOverlay{
-			SchemaVersion:  installation.SchemaVersion,
+		overlay.ServerOverlay{
+			SchemaVersion:  schema.MCPSchemaVersion,
 			Revision:       nextRevision,
 			RuntimeEnabled: runtimeEnabled,
 			ServerData:     data,
@@ -738,15 +738,15 @@ func (a *API) UpdateProtectedServerInstallation(
 
 func serverDocumentFromDefinition(
 	value definition.Definition,
-) (schema.ServerDocument, error) {
-	body, err := mcpArtifact.ServerBodyFromDefinition(value)
+) (server.ServerDocument, error) {
+	body, err := server.ServerBodyFromDefinition(value)
 	if err != nil {
-		return schema.ServerDocument{}, err
+		return server.ServerDocument{}, err
 	}
-	return schema.ServerDocument{
+	return server.ServerDocument{
 		Kind:           schema.ServerKind,
 		SchemaID:       schema.ServerSchemaID,
-		SchemaVersion:  schema.SchemaVersion,
+		SchemaVersion:  schema.MCPSchemaVersion,
 		LogicalName:    value.LogicalName,
 		LogicalVersion: value.LogicalVersion,
 		DisplayName:    value.DisplayName,

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	mcpAuth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 	"golang.org/x/oauth2"
@@ -18,9 +17,9 @@ import (
 var ErrOAuthTokenNotFound = errors.New("oauth token not found")
 
 type OAuthTokenStore interface {
-	LoadOAuthToken(ctx context.Context, base spec.MCPAuthStatus) (*oauth2.Token, error)
-	SaveOAuthToken(ctx context.Context, base spec.MCPAuthStatus, tok *oauth2.Token) error
-	DeleteOAuthToken(ctx context.Context, base spec.MCPAuthStatus) error
+	LoadOAuthToken(ctx context.Context, base MCPAuthStatus) (*oauth2.Token, error)
+	SaveOAuthToken(ctx context.Context, base MCPAuthStatus, tok *oauth2.Token) error
+	DeleteOAuthToken(ctx context.Context, base MCPAuthStatus) error
 }
 
 // trackingTokenSource wraps an oauth2.TokenSource and pushes status updates to
@@ -29,7 +28,7 @@ type OAuthTokenStore interface {
 type trackingTokenSource struct {
 	source          oauth2.TokenSource
 	sink            AuthStatusSink
-	status          spec.MCPAuthStatus
+	status          MCPAuthStatus
 	sensitiveValues []string
 	tokenStore      OAuthTokenStore
 }
@@ -76,7 +75,7 @@ func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
 type trackedOAuthHandler struct {
 	inner           mcpAuth.OAuthHandler
 	sink            AuthStatusSink
-	status          spec.MCPAuthStatus
+	status          MCPAuthStatus
 	sensitiveValues []string
 	tokenStore      OAuthTokenStore
 
@@ -202,13 +201,13 @@ func (h *trackedOAuthHandler) resetPersistedTokenSource() {
 	h.persistedMu.Unlock()
 }
 
-func (h *trackedOAuthHandler) currentTokenStatus(ctx context.Context) (spec.MCPAuthStatus, bool) {
+func (h *trackedOAuthHandler) currentTokenStatus(ctx context.Context) (MCPAuthStatus, bool) {
 	ts, err := h.inner.TokenSource(ctx)
 	if err != nil {
 		return authStatusFromTokenError(h.status, err), true
 	}
 	if ts == nil {
-		return spec.MCPAuthStatus{}, false
+		return MCPAuthStatus{}, false
 	}
 	tok, err := ts.Token()
 	if err != nil {
@@ -224,14 +223,14 @@ func (h *trackedOAuthHandler) currentTokenStatus(ctx context.Context) (spec.MCPA
 	return authStatusFromToken(h.status, tok), true
 }
 
-func (h *trackedOAuthHandler) publish(ctx context.Context, st spec.MCPAuthStatus) {
+func (h *trackedOAuthHandler) publish(ctx context.Context, st MCPAuthStatus) {
 	if h == nil || h.sink == nil {
 		return
 	}
 	_ = h.sink.SaveAuthStatus(context.WithoutCancel(ctx), redactAuthStatus(st, h.sensitiveValues))
 }
 
-func authStatusFromToken(base spec.MCPAuthStatus, tok *oauth2.Token) spec.MCPAuthStatus {
+func authStatusFromToken(base MCPAuthStatus, tok *oauth2.Token) MCPAuthStatus {
 	st := base
 	st.LastError = ""
 
@@ -246,40 +245,40 @@ func authStatusFromToken(base spec.MCPAuthStatus, tok *oauth2.Token) spec.MCPAut
 		st.ExpiresAt = &expiresAt
 	}
 	if strings.TrimSpace(tok.AccessToken) == "" {
-		st.State = spec.MCPAuthStateError
+		st.State = MCPAuthStateError
 		st.LastError = "OAuth token is missing an access token"
 		return st
 	}
 	if st.ExpiresAt != nil && !time.Now().UTC().Before(st.ExpiresAt.UTC()) {
-		st.State = spec.MCPAuthStateExpired
+		st.State = MCPAuthStateExpired
 		st.LastError = "OAuth token is expired"
 		return st
 	}
-	st.State = spec.MCPAuthStateAuthorized
+	st.State = MCPAuthStateAuthorized
 	return st
 }
 
-func authStatusFromTokenError(base spec.MCPAuthStatus, err error) spec.MCPAuthStatus {
+func authStatusFromTokenError(base MCPAuthStatus, err error) MCPAuthStatus {
 	st := base
-	st.State = spec.MCPAuthStateError
+	st.State = MCPAuthStateError
 	st.Scopes = nil
 	st.ExpiresAt = nil
 	if err != nil {
 		st.LastError = err.Error()
 	}
 	if isExpiredOAuthTokenError(err) {
-		st.State = spec.MCPAuthStateExpired
+		st.State = MCPAuthStateExpired
 	}
 	return st
 }
 
 func authStatusFromHTTPFailure(
-	base spec.MCPAuthStatus,
+	base MCPAuthStatus,
 	resp *http.Response,
 	err error,
-) spec.MCPAuthStatus {
+) MCPAuthStatus {
 	st := base
-	st.State = spec.MCPAuthStateError
+	st.State = MCPAuthStateError
 	if err != nil {
 		st.LastError = err.Error()
 	}
@@ -293,15 +292,15 @@ func authStatusFromHTTPFailure(
 	retrieveErrCode := oauthRetrieveErrorCode(err)
 	switch {
 	case challengeErr == "insufficient_scope":
-		st.State = spec.MCPAuthStateInsufficientScope
+		st.State = MCPAuthStateInsufficientScope
 	case challengeErr == "invalid_token" || isExpiredOAuthTokenError(err):
-		st.State = spec.MCPAuthStateExpired
+		st.State = MCPAuthStateExpired
 	case retrieveErrCode != "":
-		st.State = spec.MCPAuthStateError
+		st.State = MCPAuthStateError
 	case resp.StatusCode == http.StatusUnauthorized:
-		st.State = spec.MCPAuthStateRequired
+		st.State = MCPAuthStateRequired
 	case resp.StatusCode == http.StatusForbidden:
-		st.State = spec.MCPAuthStateError
+		st.State = MCPAuthStateError
 	}
 	return st
 }
@@ -369,7 +368,7 @@ func oauthRetrieveErrorCode(err error) string {
 	return ""
 }
 
-func redactAuthStatus(st spec.MCPAuthStatus, sensitiveValues []string) spec.MCPAuthStatus {
+func redactAuthStatus(st MCPAuthStatus, sensitiveValues []string) MCPAuthStatus {
 	st.LastError = redactSensitive(st.LastError, sensitiveValues)
 	return st
 }

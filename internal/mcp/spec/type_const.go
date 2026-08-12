@@ -26,19 +26,6 @@ var (
 	ErrMCPServerDisabled  = errors.New("mcp server is disabled")
 )
 
-type MCPAuthHealthState string
-
-const (
-	MCPAuthHealthStateNotRequired          MCPAuthHealthState = "notRequired"
-	MCPAuthHealthStateNotConfigured        MCPAuthHealthState = "notConfigured"
-	MCPAuthHealthStateAuthorizationNeeded  MCPAuthHealthState = "authorizationNeeded"
-	MCPAuthHealthStateAuthorizationPending MCPAuthHealthState = "authorizationPending"
-	MCPAuthHealthStateAuthorized           MCPAuthHealthState = "authorized"
-	MCPAuthHealthStateExpired              MCPAuthHealthState = "expired"
-	MCPAuthHealthStateInsufficientScope    MCPAuthHealthState = "insufficientScope"
-	MCPAuthHealthStateError                MCPAuthHealthState = "error"
-)
-
 type (
 	JSONRawString = string
 )
@@ -50,54 +37,11 @@ const (
 	MCPTransportStdio          MCPTransportType = "stdio"
 )
 
-type MCPTrustLevel string
-
-const (
-	MCPTrustLevelUntrusted MCPTrustLevel = "untrusted"
-	MCPTrustLevelTrusted   MCPTrustLevel = "trusted"
-)
-
-type MCPHTTPAuthMode string
-
-const (
-	MCPHTTPAuthNone              MCPHTTPAuthMode = "none"
-	MCPHTTPAuthAPIKey            MCPHTTPAuthMode = "apiKey"
-	MCPHTTPAuthOAuth             MCPHTTPAuthMode = "oauth"
-	MCPHTTPAuthClientCredentials MCPHTTPAuthMode = "clientCredentials"
-)
-
 type GrantType string
 
 const (
 	GrantTypeAuthorizationCode GrantType = "authorization_code"
 	GrantTypeRefreshToken      GrantType = "refresh_token"
-)
-
-type MCPAuthState string
-
-const (
-	MCPAuthStateNotRequired       MCPAuthState = "notRequired"
-	MCPAuthStateRequired          MCPAuthState = "required"
-	MCPAuthStateAuthorized        MCPAuthState = "authorized"
-	MCPAuthStateExpired           MCPAuthState = "expired"
-	MCPAuthStateInsufficientScope MCPAuthState = "insufficientScope"
-	MCPAuthStateError             MCPAuthState = "error"
-)
-
-type MCPTaskSupport string
-
-const (
-	MCPTaskSupportForbidden MCPTaskSupport = "forbidden"
-	MCPTaskSupportOptional  MCPTaskSupport = "optional"
-	MCPTaskSupportRequired  MCPTaskSupport = "required"
-)
-
-type MCPInvocationSource string
-
-const (
-	MCPInvocationSourceModel MCPInvocationSource = "model"
-	MCPInvocationSourceUser  MCPInvocationSource = "user"
-	MCPInvocationSourceApp   MCPInvocationSource = "app"
 )
 
 type MCPContentType string

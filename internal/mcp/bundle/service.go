@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 	"sort"
 
@@ -22,12 +23,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
 
 type noAutomaticAdoption struct{}
@@ -64,8 +65,8 @@ type Dependencies struct {
 	RootPolicy    protection.RootPolicy
 	UserRootID    basespec.RootID
 	Runtime       RuntimeInvalidator
-	Overlays      installation.OverlayRepository
-	SecretCleaner installation.SecretCleaner
+	Overlays      overlay.OverlayRepository
+	SecretCleaner server.SecretCleaner
 
 	BaselinePolicy policy.MCPPolicy
 }
@@ -94,11 +95,11 @@ func New(dependencies Dependencies) (*API, error) {
 			basespec.ErrInvalid,
 		)
 	}
-	if !dependencies.HasDecoder(mcpArtifact.DecoderID) {
+	if !dependencies.HasDecoder(schema.DecoderID) {
 		return nil, fmt.Errorf(
 			"%w: MCP decoder %q is not registered",
 			basespec.ErrDecoderUnavailable,
-			mcpArtifact.DecoderID,
+			schema.DecoderID,
 		)
 	}
 	if dependencies.UserRootID != "" {
@@ -502,11 +503,11 @@ func (a *API) discoveryPlan(
 			Locator:   bundle.DocumentLocator,
 			Recursive: false,
 			DecoderIDs: []basespec.DecoderID{
-				mcpArtifact.DecoderID,
+				schema.DecoderID,
 			},
 		}},
 		AllowedDecoderIDs: []basespec.DecoderID{
-			mcpArtifact.DecoderID,
+			schema.DecoderID,
 		},
 		Authoritative: true,
 	}.Normalized()
@@ -519,13 +520,13 @@ func (a *API) discoveryPlan(
 func (a *API) cleanupChangedServerInstallation(
 	ctx context.Context,
 	record artifact.Artifact,
-	document schema.ServerDocument,
-	after installation.ServerData,
+	document server.ServerDocument,
+	after server.ServerData,
 ) error {
 	if record.Kind != schema.ServerKind {
 		return nil
 	}
-	if err := installation.CleanupUnboundServerSecrets(
+	if err := server.CleanupUnboundServerSecrets(
 		ctx,
 		record.Ref(),
 		document,
@@ -552,7 +553,7 @@ func (a *API) cleanupRemovedServerInstallation(
 	if err != nil {
 		return err
 	}
-	if err := installation.CleanupRemovedServerSecrets(
+	if err := server.CleanupRemovedServerSecrets(
 		ctx,
 		record.Ref(),
 		data,
@@ -569,39 +570,39 @@ func (a *API) cleanupRemovedServerInstallation(
 func (a *API) serverInstallationDataForCleanup(
 	ctx context.Context,
 	record artifact.Artifact,
-) (installation.ServerData, error) {
+) (server.ServerData, error) {
 	if record.Kind != schema.ServerKind {
-		return installation.DefaultServerData(), nil
+		return server.DefaultServerData(), nil
 	}
 
 	if !a.dependencies.RootPolicy.IsProtectedRoot(record.RootID) {
-		return installation.DecodeServerData(record.Data)
+		return server.DecodeServerData(record.Data)
 	}
 	if a.dependencies.Overlays == nil {
-		return installation.ServerData{}, fmt.Errorf(
+		return server.ServerData{}, fmt.Errorf(
 			"%w: protected MCP overlay store is unavailable",
 			basespec.ErrReferenceUnresolved,
 		)
 	}
 
-	overlay, found, err := a.dependencies.Overlays.GetServerOverlay(
+	ovr, found, err := a.dependencies.Overlays.GetServerOverlay(
 		ctx,
 		record.Ref(),
 	)
 	if err != nil {
-		return installation.ServerData{}, err
+		return server.ServerData{}, err
 	}
 	if !found {
-		return installation.DefaultServerData(), nil
+		return server.DefaultServerData(), nil
 	}
-	return overlay.ServerData, nil
+	return ovr.ServerData, nil
 }
 
 // validateCreateRegistrations establishes all request-derived valid state
 // before source or Collection mutation begins.
 func validateCreateRegistrations(
 	rootID basespec.RootID,
-	document schema.BundleDocument,
+	document BundleDocument,
 	registrations []Registration,
 ) error {
 	definitions, err := definitionsForDocument(document)
@@ -635,11 +636,11 @@ func validateCreateRegistrations(
 		if err != nil {
 			return err
 		}
-		serverData, err := installation.DecodeServerData(data)
+		serverData, err := server.DecodeServerData(data)
 		if err != nil {
 			return err
 		}
-		if err := installation.ValidateServerDataForDocument(
+		if err := server.ValidateServerDataForDocument(
 			artifact.ArtifactRef{
 				RootID:     rootID,
 				ArtifactID: registration.ArtifactID,
@@ -654,7 +655,7 @@ func validateCreateRegistrations(
 }
 
 func definitionsForDocument(
-	document schema.BundleDocument,
+	document BundleDocument,
 ) (
 	map[basespec.SubresourceLocator]definition.Definition,
 	error,
@@ -664,24 +665,24 @@ func definitionsForDocument(
 		len(document.MCPServers)+len(document.BundleExtension.Policies),
 	)
 	for name := range document.MCPServers {
-		serverDocument, err := schema.ServerFromCanonicalBundle(document, name)
+		serverDocument, err := ServerFromCanonicalBundle(document, name)
 		if err != nil {
 			return nil, err
 		}
-		value, err := mcpArtifact.DefinitionForCanonicalServer(serverDocument)
+		value, err := server.DefinitionForCanonicalServer(serverDocument)
 		if err != nil {
 			return nil, err
 		}
-		output[mcpArtifact.ServerSubresource(
+		output[server.ServerSubresource(
 			basespec.LogicalName(name),
 		)] = value
 	}
 	for name, policyDocument := range document.BundleExtension.Policies {
-		value, err := mcpArtifact.DefinitionForCanonicalPolicy(policyDocument)
+		value, err := policy.DefinitionForCanonicalPolicy(policyDocument)
 		if err != nil {
 			return nil, err
 		}
-		output[mcpArtifact.PolicySubresource(
+		output[policy.PolicySubresource(
 			basespec.LogicalName(name),
 		)] = value
 	}
@@ -691,7 +692,7 @@ func definitionsForDocument(
 func validateCreateBundleIntent(
 	value Bundle,
 	request CreateRequest,
-	document schema.BundleDocument,
+	document BundleDocument,
 	documentLocator basespec.Locator,
 ) error {
 	if value.Collection.RootID != request.RootID ||
@@ -711,7 +712,16 @@ func validateCreateBundleIntent(
 	return nil
 }
 
-func displayName(document schema.BundleDocument) string {
+func packageDirectoryForDocument(
+	value basespec.Locator,
+) (basespec.Locator, error) {
+	if err := ValidateDocumentLocator(value); err != nil {
+		return "", err
+	}
+	return basespec.Locator(path.Dir(string(value))), nil
+}
+
+func displayName(document BundleDocument) string {
 	if document.DisplayName != "" {
 		return document.DisplayName
 	}

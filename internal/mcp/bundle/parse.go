@@ -1,4 +1,4 @@
-package schema
+package bundle
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -23,7 +24,7 @@ import (
 func BundleFromParsedDocument(
 	input shareable.ParsedDocument,
 ) (BundleDocument, error) {
-	expected := BundleCodec{}.Key()
+	expected := schema.MCPSchemaKey
 	if err := validateParsedMCPDocument(
 		input,
 		expected,
@@ -36,9 +37,9 @@ func BundleFromParsedDocument(
 	if err := decodeCanonicalDocument(input.Raw, &output); err != nil {
 		return BundleDocument{}, err
 	}
-	if output.Kind != BundleKind ||
-		output.SchemaID != BundleSchemaID ||
-		output.SchemaVersion != SchemaVersion {
+	if output.Kind != schema.BundleKind ||
+		output.SchemaID != schema.BundleSchemaID ||
+		output.SchemaVersion != schema.MCPSchemaVersion {
 		return BundleDocument{}, fmt.Errorf(
 			"%w: canonical MCP Bundle output has another schema identity",
 			basespec.ErrInvalid,
@@ -93,6 +94,32 @@ func decodeCanonicalDocument(
 		return fmt.Errorf(
 			"%w: decode canonical MCP document output: %w",
 			basespec.ErrInvalid,
+			err,
+		)
+	}
+	return nil
+}
+
+func validateParsedMCPDocument(
+	input shareable.ParsedDocument,
+	expected shareable.SchemaKey,
+	subject string,
+) error {
+	if input.Key != expected {
+		return fmt.Errorf(
+			"%w: expected canonical %s schema %q/%q/%q",
+			basespec.ErrInvalid,
+			subject,
+			expected.Kind,
+			expected.SchemaID,
+			expected.SchemaVersion,
+		)
+	}
+	if err := input.Validate(); err != nil {
+		return fmt.Errorf(
+			"%w: invalid canonical %s registry output: %w",
+			basespec.ErrInvalid,
+			subject,
 			err,
 		)
 	}

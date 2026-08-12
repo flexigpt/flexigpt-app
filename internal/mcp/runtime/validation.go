@@ -8,7 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 // ValidateMCPProviderToolMappingsForContext validates durable provider-tool
@@ -97,7 +96,7 @@ func ValidateMCPProviderToolMappingsForContext(
 // updates to the exact durable MCP server selection that authorized them.
 func ValidateMCPAppContextUpdatesForContext(
 	contextValue MCPConversationContext,
-	updates []spec.MCPAppModelContextUpdate,
+	updates []MCPAppModelContextUpdate,
 ) error {
 	if err := ValidateMCPConversationContext(contextValue); err != nil {
 		return err
@@ -331,7 +330,7 @@ func ValidateMCPConversationContext(value MCPConversationContext) error {
 // ValidateMCPAppContextUpdates validates application-originated MCP App
 // context updates before they are inserted into model input.
 func ValidateMCPAppContextUpdates(
-	values []spec.MCPAppModelContextUpdate,
+	values []MCPAppModelContextUpdate,
 ) error {
 	for index, value := range values {
 		if err := value.Server.Validate(); err != nil {

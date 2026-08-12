@@ -1,0 +1,70 @@
+package auth
+
+import (
+	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
+)
+
+type MCPAuthState string
+
+const (
+	MCPAuthStateNotRequired       MCPAuthState = "notRequired"
+	MCPAuthStateRequired          MCPAuthState = "required"
+	MCPAuthStateAuthorized        MCPAuthState = "authorized"
+	MCPAuthStateExpired           MCPAuthState = "expired"
+	MCPAuthStateInsufficientScope MCPAuthState = "insufficientScope"
+	MCPAuthStateError             MCPAuthState = "error"
+)
+
+type MCPAuthHealthState string
+
+const (
+	MCPAuthHealthStateNotRequired          MCPAuthHealthState = "notRequired"
+	MCPAuthHealthStateNotConfigured        MCPAuthHealthState = "notConfigured"
+	MCPAuthHealthStateAuthorizationNeeded  MCPAuthHealthState = "authorizationNeeded"
+	MCPAuthHealthStateAuthorizationPending MCPAuthHealthState = "authorizationPending"
+	MCPAuthHealthStateAuthorized           MCPAuthHealthState = "authorized"
+	MCPAuthHealthStateExpired              MCPAuthHealthState = "expired"
+	MCPAuthHealthStateInsufficientScope    MCPAuthHealthState = "insufficientScope"
+	MCPAuthHealthStateError                MCPAuthHealthState = "error"
+)
+
+type MCPAuthSettings struct {
+	// Empty means a random loopback port is used for the current process.
+	OAuthLoopbackListenAddr string `json:"oauthLoopbackListenAddr,omitempty"`
+}
+
+type MCPAuthStatus struct {
+	Server   artifact.ArtifactRef   `json:"server"`
+	AuthMode server.MCPHTTPAuthMode `json:"authMode"`
+	State    MCPAuthState           `json:"state"`
+
+	Scopes              []string   `json:"scopes,omitempty"`
+	ExpiresAt           *time.Time `json:"expiresAt,omitempty"`
+	LastError           string     `json:"lastError,omitempty"`
+	AuthorizationServer string     `json:"authorizationServer,omitempty"`
+	Resource            string     `json:"resource,omitempty"`
+}
+
+type MCPAuthHealth struct {
+	Server   artifact.ArtifactRef   `json:"server"`
+	AuthMode server.MCPHTTPAuthMode `json:"authMode"`
+	State    MCPAuthHealthState     `json:"state"`
+
+	Configured bool `json:"configured"`
+
+	Resource  string     `json:"resource,omitempty"`
+	Scopes    []string   `json:"scopes,omitempty"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+
+	AuthorizationPending   bool   `json:"authorizationPending,omitempty"`
+	AuthorizationURL       string `json:"authorizationURL,omitempty"`
+	AuthorizationExpiresAt string `json:"authorizationExpiresAt,omitempty"`
+
+	OAuthRedirectURL        string `json:"oauthRedirectURL,omitempty"`
+	OAuthLoopbackListenAddr string `json:"oauthLoopbackListenAddr,omitempty"`
+
+	LastError string `json:"lastError,omitempty"`
+}

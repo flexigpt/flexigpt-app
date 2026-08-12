@@ -14,13 +14,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
-	mcpBundle "github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/sdkclient"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
@@ -34,13 +34,13 @@ const (
 )
 
 type MCPWrapper struct {
-	bundleAPI  *mcpBundle.API
+	bundleAPI  *bundle.API
 	artifacts  *artifact.Service
 	runtime    *mcpRuntime.MCPRuntimeManager
 	toolBridge *mcpRuntime.ToolBridge
 	auth       *auth.AuthManager
 
-	overlays *installation.SettingsOverlayRepository
+	overlays *overlay.SettingsOverlayRepository
 	settings *mcpSettingsAdapter
 	secrets  *settingMCPSecretResolver
 
@@ -55,11 +55,11 @@ type MCPSecretWriteResult struct {
 }
 
 type MCPGlobalSettingsView struct {
-	Settings                mcpSpec.MCPSettings `json:"settings"`
-	Revision                uint64              `json:"revision"`
-	OAuthRedirectURL        string              `json:"oauthRedirectURL,omitempty"`
-	OAuthLoopbackListenAddr string              `json:"oauthLoopbackListenAddr,omitempty"`
-	OAuthRestartRequired    bool                `json:"oauthRestartRequired"`
+	Settings                auth.MCPAuthSettings `json:"settings"`
+	Revision                uint64               `json:"revision"`
+	OAuthRedirectURL        string               `json:"oauthRedirectURL,omitempty"`
+	OAuthLoopbackListenAddr string               `json:"oauthLoopbackListenAddr,omitempty"`
+	OAuthRestartRequired    bool                 `json:"oauthRestartRequired"`
 }
 
 func InitMCPWrapper(
@@ -79,7 +79,7 @@ func InitMCPWrapper(
 	if err != nil {
 		return err
 	}
-	overlays, err := installation.NewSettingsOverlayRepository(settings)
+	overlays, err := overlay.NewSettingsOverlayRepository(settings)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func InitMCPWrapper(
 	)
 
 	invalidator := newMCPRuntimeInvalidator()
-	bundleAPI, err := mcpBundle.New(mcpBundle.Dependencies{
+	bundleAPI, err := bundle.New(bundle.Dependencies{
 		Sources:            components.Sources,
 		Collections:        components.Collections,
 		Artifacts:          components.Artifacts,
@@ -181,8 +181,8 @@ func InitMCPWrapper(
 func installMCPBuiltIns(
 	ctx context.Context,
 	components *system.Components,
-	bundles *mcpBundle.API,
-	overlays installation.OverlayRepository,
+	bundles *bundle.API,
+	overlays overlay.OverlayRepository,
 ) error {
 	registry, packages, err := artifactbuiltin.LoadEmbeddedRegistry()
 	if err != nil {
@@ -230,14 +230,14 @@ func installMCPBuiltIns(
 }
 
 func (w *MCPWrapper) CreateMCPBundle(
-	request *mcpBundle.CreateRequest,
-) (mcpBundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpBundle.Bundle, error) {
+	request *bundle.CreateRequest,
+) (bundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (bundle.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpBundle.Bundle{}, err
+			return bundle.Bundle{}, err
 		}
 		if request == nil {
-			return mcpBundle.Bundle{}, errors.New("MCP Bundle create request is required")
+			return bundle.Bundle{}, errors.New("MCP Bundle create request is required")
 		}
 		return w.bundleAPI.Create(context.Background(), *request)
 	})
@@ -245,10 +245,10 @@ func (w *MCPWrapper) CreateMCPBundle(
 
 func (w *MCPWrapper) GetMCPBundle(
 	ref collection.CollectionRef,
-) (mcpBundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpBundle.Bundle, error) {
+) (bundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (bundle.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpBundle.Bundle{}, err
+			return bundle.Bundle{}, err
 		}
 		return w.bundleAPI.Get(context.Background(), ref)
 	})
@@ -256,8 +256,8 @@ func (w *MCPWrapper) GetMCPBundle(
 
 func (w *MCPWrapper) ListMCPBundles(
 	rootID basespec.RootID,
-) ([]mcpBundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpBundle.Bundle, error) {
+) ([]bundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() ([]bundle.Bundle, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -267,10 +267,10 @@ func (w *MCPWrapper) ListMCPBundles(
 
 func (w *MCPWrapper) GetMCPBundleDocument(
 	ref collection.CollectionRef,
-) (schema.BundleDocument, error) {
-	return middleware.WithRecoveryResp(func() (schema.BundleDocument, error) {
+) (bundle.BundleDocument, error) {
+	return middleware.WithRecoveryResp(func() (bundle.BundleDocument, error) {
 		if err := w.ready(); err != nil {
-			return schema.BundleDocument{}, err
+			return bundle.BundleDocument{}, err
 		}
 		return w.bundleAPI.GetDocument(context.Background(), ref)
 	})
@@ -300,11 +300,11 @@ func (w *MCPWrapper) ListMCPBundlePolicies(
 
 func (w *MCPWrapper) GetMCPServerInstallation(
 	ref artifact.ArtifactRef,
-) (mcpBundle.ServerInstallationView, error) {
+) (bundle.ServerInstallationView, error) {
 	return middleware.WithRecoveryResp(
-		func() (mcpBundle.ServerInstallationView, error) {
+		func() (bundle.ServerInstallationView, error) {
 			if err := w.ready(); err != nil {
-				return mcpBundle.ServerInstallationView{}, err
+				return bundle.ServerInstallationView{}, err
 			}
 			return w.bundleAPI.GetServerInstallation(
 				context.Background(),
@@ -327,10 +327,10 @@ func (w *MCPWrapper) InspectMCPServer(
 
 func (w *MCPWrapper) InspectMCPPolicy(
 	ref artifact.ArtifactRef,
-) (mcpBundle.PolicyView, error) {
-	return middleware.WithRecoveryResp(func() (mcpBundle.PolicyView, error) {
+) (bundle.PolicyView, error) {
+	return middleware.WithRecoveryResp(func() (bundle.PolicyView, error) {
 		if err := w.ready(); err != nil {
-			return mcpBundle.PolicyView{}, err
+			return bundle.PolicyView{}, err
 		}
 		return w.bundleAPI.InspectMCPPolicy(context.Background(), ref)
 	})
@@ -338,11 +338,11 @@ func (w *MCPWrapper) InspectMCPPolicy(
 
 func (w *MCPWrapper) GetMCPBundleInstallation(
 	ref collection.CollectionRef,
-) (mcpBundle.BundleInstallationView, error) {
+) (bundle.BundleInstallationView, error) {
 	return middleware.WithRecoveryResp(
-		func() (mcpBundle.BundleInstallationView, error) {
+		func() (bundle.BundleInstallationView, error) {
 			if err := w.ready(); err != nil {
-				return mcpBundle.BundleInstallationView{}, err
+				return bundle.BundleInstallationView{}, err
 			}
 			return w.bundleAPI.GetBundleInstallation(
 				context.Background(),
@@ -353,14 +353,14 @@ func (w *MCPWrapper) GetMCPBundleInstallation(
 }
 
 func (w *MCPWrapper) ReplaceMCPBundleDocument(
-	request *mcpBundle.ReplaceDocumentRequest,
-) (mcpBundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpBundle.Bundle, error) {
+	request *bundle.ReplaceDocumentRequest,
+) (bundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (bundle.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpBundle.Bundle{}, err
+			return bundle.Bundle{}, err
 		}
 		if request == nil {
-			return mcpBundle.Bundle{}, errors.New("MCP document replacement request is required")
+			return bundle.Bundle{}, errors.New("MCP document replacement request is required")
 		}
 
 		before, _ := w.artifacts.ListByCollection(
@@ -372,7 +372,7 @@ func (w *MCPWrapper) ReplaceMCPBundleDocument(
 			*request,
 		)
 		if err != nil {
-			return mcpBundle.Bundle{}, err
+			return bundle.Bundle{}, err
 		}
 		for _, record := range before {
 			w.auth.ClearAuthStatus(record.Ref())
@@ -383,10 +383,10 @@ func (w *MCPWrapper) ReplaceMCPBundleDocument(
 
 func (w *MCPWrapper) RefreshMCPBundle(
 	ref collection.CollectionRef,
-) (mcpBundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpBundle.Bundle, error) {
+) (bundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (bundle.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpBundle.Bundle{}, err
+			return bundle.Bundle{}, err
 		}
 		return w.bundleAPI.Refresh(context.Background(), ref, false)
 	})
@@ -396,10 +396,10 @@ func (w *MCPWrapper) UpdateMCPBundleEnabled(
 	ref collection.CollectionRef,
 	expectedRevision uint64,
 	enabled bool,
-) (mcpBundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpBundle.Bundle, error) {
+) (bundle.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (bundle.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpBundle.Bundle{}, err
+			return bundle.Bundle{}, err
 		}
 		return w.bundleAPI.UpdateBundleEnabled(
 			context.Background(),
@@ -445,7 +445,7 @@ func (w *MCPWrapper) PurgeMCPBundle(
 func (w *MCPWrapper) UpdateMCPServerInstallation(
 	ref artifact.ArtifactRef,
 	expectedArtifactRevision uint64,
-	data installation.ServerData,
+	data server.ServerData,
 ) (artifact.Artifact, error) {
 	return middleware.WithRecoveryResp(func() (artifact.Artifact, error) {
 		if err := w.ready(); err != nil {
@@ -468,7 +468,7 @@ func (w *MCPWrapper) UpdateProtectedMCPServerInstallation(
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
 	runtimeEnabled bool,
-	data installation.ServerData,
+	data server.ServerData,
 ) error {
 	return middleware.WithRecovery(func() error {
 		if err := w.ready(); err != nil {
@@ -765,8 +765,8 @@ func (w *MCPWrapper) PutMCPServerSecret(
 		if kind == mcpSpec.MCPSecretKindOAuthClientCredentials {
 			mode := installationView.Document.Extension.Auth.Mode
 			switch mode {
-			case mcpSpec.MCPHTTPAuthOAuth,
-				mcpSpec.MCPHTTPAuthClientCredentials:
+			case server.MCPHTTPAuthOAuth,
+				server.MCPHTTPAuthClientCredentials:
 			default:
 				return MCPSecretWriteResult{}, fmt.Errorf(
 					"%w: MCP server does not declare OAuth client credentials",
@@ -856,15 +856,15 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 
 func (w *MCPWrapper) GetMCPServerAuthHealth(
 	ref artifact.ArtifactRef,
-) (mcpSpec.MCPAuthHealth, error) {
-	return middleware.WithRecoveryResp(func() (mcpSpec.MCPAuthHealth, error) {
+) (auth.MCPAuthHealth, error) {
+	return middleware.WithRecoveryResp(func() (auth.MCPAuthHealth, error) {
 		if err := w.ready(); err != nil {
-			return mcpSpec.MCPAuthHealth{}, err
+			return auth.MCPAuthHealth{}, err
 		}
 
 		resolved, err := w.bundleAPI.InspectMCPServer(context.Background(), ref)
 		if err != nil {
-			return mcpSpec.MCPAuthHealth{}, err
+			return auth.MCPAuthHealth{}, err
 		}
 		config, err := resolved.MaterializeForInspection(
 			context.Background(),
@@ -872,10 +872,10 @@ func (w *MCPWrapper) GetMCPServerAuthHealth(
 		)
 		if err != nil {
 			//nolint:nilerr // Explicit value.
-			return mcpSpec.MCPAuthHealth{
+			return auth.MCPAuthHealth{
 				Server:     ref,
 				AuthMode:   resolved.Document.Extension.Auth.Mode,
-				State:      mcpSpec.MCPAuthHealthStateNotConfigured,
+				State:      auth.MCPAuthHealthStateNotConfigured,
 				Configured: false,
 				LastError:  "required MCP installation input is not configured",
 			}, nil
@@ -906,7 +906,7 @@ func (w *MCPWrapper) CancelPendingMCPOAuthAuthorization(
 
 func (w *MCPWrapper) UpdateMCPGlobalSettings(
 	expectedRevision uint64,
-	settings mcpSpec.MCPSettings,
+	settings auth.MCPAuthSettings,
 ) (uint64, error) {
 	return middleware.WithRecoveryResp(func() (uint64, error) {
 		if err := w.ready(); err != nil {
@@ -970,7 +970,7 @@ func (w *MCPWrapper) requireServerArtifact(
 }
 
 func validateMCPSecretTarget(
-	document schema.ServerDocument,
+	document server.ServerDocument,
 	kind mcpSpec.MCPSecretKind,
 	slot string,
 ) error {
@@ -985,7 +985,7 @@ func validateMCPSecretTarget(
 		}
 		declaration, found := document.Extension.Install.Inputs[input]
 		if !found ||
-			declaration.Kind != schema.InputOAuthClientCredentials ||
+			declaration.Kind != server.InputOAuthClientCredentials ||
 			!strings.EqualFold(strings.TrimSpace(slot), "clientCredentials") {
 			return fmt.Errorf(
 				"%w: invalid OAuth client credentials secret target",
@@ -996,13 +996,13 @@ func validateMCPSecretTarget(
 
 	case mcpSpec.MCPSecretKindStdioEnv,
 		mcpSpec.MCPSecretKindHTTPHeader:
-		targets, err := schema.SecretInputTargets(document)
+		targets, err := server.SecretInputTargets(document)
 		if err != nil {
 			return err
 		}
 		for _, target := range targets {
 			expectedKind := mcpSpec.MCPSecretKindStdioEnv
-			if target.Kind == schema.SecretInputTargetHTTPHeader {
+			if target.Kind == server.SecretInputTargetHTTPHeader {
 				expectedKind = mcpSpec.MCPSecretKindHTTPHeader
 			}
 			if kind == expectedKind &&
@@ -1074,7 +1074,7 @@ func (w *MCPWrapper) close() {
 
 func ensureDefaultMCPBundle(
 	ctx context.Context,
-	api *mcpBundle.API,
+	api *bundle.API,
 ) error {
 	if ctx == nil {
 		return fmt.Errorf(
@@ -1114,7 +1114,7 @@ func ensureDefaultMCPBundle(
 		return fmt.Errorf("encode default MCP Bundle document: %w", err)
 	}
 
-	_, err = api.Create(ctx, mcpBundle.CreateRequest{
+	_, err = api.Create(ctx, bundle.CreateRequest{
 		RootID:       mcpUserRootID,
 		CollectionID: defaultMCPBundleCollectionID,
 		SourceID:     defaultMCPBundleSourceID,
@@ -1126,18 +1126,18 @@ func ensureDefaultMCPBundle(
 	return nil
 }
 
-func defaultMCPBundleDocument() schema.BundleDocument {
-	return schema.BundleDocument{
+func defaultMCPBundleDocument() bundle.BundleDocument {
+	return bundle.BundleDocument{
 		Kind:          schema.BundleKind,
 		SchemaID:      schema.BundleSchemaID,
-		SchemaVersion: schema.SchemaVersion,
+		SchemaVersion: schema.MCPSchemaVersion,
 		LogicalName:   "base",
 		DisplayName:   "Base MCP Servers",
 		Description:   "Editable starter bundle for user-managed MCP server definitions.",
-		MCPServers:    map[string]schema.CoreServer{},
-		BundleExtension: schema.BundleExtension{
-			Servers:  map[string]schema.ServerExtension{},
-			Policies: map[string]schema.PolicyDocument{},
+		MCPServers:    map[string]server.CoreServer{},
+		BundleExtension: bundle.BundleExtension{
+			Servers:  map[string]server.ServerExtension{},
+			Policies: map[string]policy.PolicyDocument{},
 		},
 	}
 }

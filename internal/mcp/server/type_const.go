@@ -1,85 +1,30 @@
-package schema
+package server
 
 import (
-	"path"
+	"regexp"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
+var placeholderPattern = regexp.MustCompile(
+	`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`,
+)
+
 const (
-	BundleKind basespec.CollectionKind = "mcp.bundle"
-	ServerKind basespec.ArtifactKind   = "mcp.server"
-	PolicyKind basespec.ArtifactKind   = "mcp.policy"
-
-	BundleSchemaID basespec.SchemaID = "mcp.bundle.v1"
-	ServerSchemaID basespec.SchemaID = "mcp.server.v1"
-	PolicySchemaID basespec.SchemaID = "mcp.policy.v1"
-
-	SchemaVersion = "v1"
-
-	BundleSchemaURL = "https://schemas.flexigpt.dev/mcp/bundle/v1.json"
-	ServerSchemaURL = "https://schemas.flexigpt.dev/mcp/server/v1.json"
-	PolicySchemaURL = "https://schemas.flexigpt.dev/mcp/policy/v1.json"
-
-	// BundleFileName is the preferred filename for newly authored managed
-	// MCP Bundle packages. Existing source-controlled package registrations
-	// can explicitly select one of the accepted compatibility filenames.
-	BundleFileName          = "mcps.json"
-	AlternateBundleFileName = "mcp.json"
-	LegacyBundleFileName    = ".mcp.json"
-
 	DefaultConnectionTimeoutMS = 30_000
 	MaxConnectionTimeoutMS     = 10 * 60 * 1_000
 )
-
-var bundleDocumentFileNames = [...]string{
-	BundleFileName,
-	AlternateBundleFileName,
-	LegacyBundleFileName,
-}
-
-func BundleDocumentFileNames() []string {
-	return append([]string(nil), bundleDocumentFileNames[:]...)
-}
-
-func IsBundleDocumentFileName(value string) bool {
-	for _, candidate := range bundleDocumentFileNames {
-		if value == candidate {
-			return true
-		}
-	}
-	return false
-}
-
-func IsBundleDocumentLocator(value basespec.Locator) bool {
-	return IsBundleDocumentFileName(path.Base(string(value)))
-}
-
-// Published JSON Schema resources carry $schema and $id metadata. MCP document
-// instances deliberately use kind, schemaID, and schemaVersion instead.
-//
-// This matches the existing Skill and Workspace document conventions and
-// prevents schema-resource URLs from becoming semantic document content or
-// affecting canonical Definition digests.
 
 type ServerType string
 
 const (
 	ServerTypeStdio ServerType = "stdio"
 	ServerTypeHTTP  ServerType = "http"
-)
-
-type InputKind string
-
-const (
-	InputText   InputKind = "text"
-	InputSecret InputKind = "secret"
-	InputPath   InputKind = "path"
-	//nolint:gosec // Cred enum.
-	InputOAuthClientCredentials InputKind = "oauthClientCredentials"
 )
 
 type CoreServer struct {
@@ -92,6 +37,70 @@ type CoreServer struct {
 	URL     string            `json:"url,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
 }
+
+type MCPHTTPAuthMode string
+
+const (
+	MCPHTTPAuthNone              MCPHTTPAuthMode = "none"
+	MCPHTTPAuthAPIKey            MCPHTTPAuthMode = "apiKey"
+	MCPHTTPAuthOAuth             MCPHTTPAuthMode = "oauth"
+	MCPHTTPAuthClientCredentials MCPHTTPAuthMode = "clientCredentials"
+)
+
+// MCPRuntimeStdioConfig is the materialized process-local stdio transport
+// configuration. Secret values have already been resolved into Env only at
+// connection preparation time and are never persisted in an MCP document.
+type MCPRuntimeStdioConfig struct {
+	Command          string            `json:"command"`
+	Args             []string          `json:"args,omitempty"`
+	Env              map[string]string `json:"env,omitempty"`
+	StartupTimeoutMS int               `json:"startupTimeoutMS,omitempty"`
+}
+
+// MCPRuntimeStreamableHTTPConfig is the materialized process-local HTTP
+// transport configuration. ClientCredentialRef remains an opaque
+// Artifact-scoped Setting Store reference. Secret HTTP values are materialized
+// only immediately before opening a runtime connection.
+type MCPRuntimeStreamableHTTPConfig struct {
+	URL       string          `json:"url"`
+	TimeoutMS int             `json:"timeoutMS,omitempty"`
+	AuthMode  MCPHTTPAuthMode `json:"authMode"`
+
+	Headers map[string]string `json:"headers,omitempty"`
+
+	ClientCredentialRef         string `json:"clientCredentialRef,omitempty"`
+	ClientIDMetadataDocumentURL string `json:"clientIDMetadataDocumentURL,omitempty"`
+}
+
+type RuntimeConfig struct {
+	Server     artifact.ArtifactRef
+	Collection collection.CollectionRef
+
+	LogicalName string
+	DisplayName string
+
+	Transport                 mcpSpec.MCPTransportType
+	Stdio                     *MCPRuntimeStdioConfig
+	StreamableHTTP            *MCPRuntimeStreamableHTTPConfig
+	OAuthClientSecretRequired bool
+
+	TrustLevel    policy.MCPTrustLevel
+	DefaultPolicy policy.MCPServerPolicy
+	ToolPolicies  map[string]policy.MCPToolPolicyOverride
+	AppsPolicy    policy.MCPAppsPolicy
+
+	SensitiveValues []string
+}
+
+type InputKind string
+
+const (
+	InputText   InputKind = "text"
+	InputSecret InputKind = "secret"
+	InputPath   InputKind = "path"
+	//nolint:gosec // Cred enum.
+	InputOAuthClientCredentials InputKind = "oauthClientCredentials"
+)
 
 type InputDeclaration struct {
 	Kind                 InputKind `json:"kind"`
@@ -111,15 +120,10 @@ type InstallationDeclaration struct {
 }
 
 type AuthenticationDeclaration struct {
-	Mode mcpSpec.MCPHTTPAuthMode `json:"mode"`
+	Mode MCPHTTPAuthMode `json:"mode"`
 
 	ClientCredentialsInput      string `json:"clientCredentialsInput,omitempty"`
 	ClientIDMetadataDocumentURL string `json:"clientIDMetadataDocumentURL,omitempty"`
-}
-
-type PolicyReference struct {
-	Ref      basespec.LogicalName `json:"ref"`
-	Required bool                 `json:"required"`
 }
 
 type StdioProfile struct {
@@ -141,6 +145,11 @@ type ConnectionProfile struct {
 	HTTP      *HTTPProfile  `json:"http,omitempty"`
 }
 
+type PolicyReference struct {
+	Ref      basespec.LogicalName `json:"ref"`
+	Required bool                 `json:"required"`
+}
+
 type ServerExtension struct {
 	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
 	DisplayName    string                  `json:"displayName,omitempty"`
@@ -152,42 +161,6 @@ type ServerExtension struct {
 	Install            InstallationDeclaration      `json:"install"`
 	ConnectionProfiles map[string]ConnectionProfile `json:"connectionProfiles,omitempty"`
 	Policy             *PolicyReference             `json:"policy,omitempty"`
-}
-
-type PolicyDocument struct {
-	Kind          basespec.ArtifactKind `json:"kind"`
-	SchemaID      basespec.SchemaID     `json:"schemaID"`
-	SchemaVersion string                `json:"schemaVersion"`
-	Digest        cryptoutil.Digest     `json:"digest,omitempty"`
-
-	LogicalName    basespec.LogicalName    `json:"logicalName"`
-	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
-	DisplayName    string                  `json:"displayName,omitempty"`
-	Description    string                  `json:"description,omitempty"`
-	Labels         map[string]string       `json:"labels,omitempty"`
-
-	Body policy.MCPPolicy `json:"body"`
-}
-
-type BundleExtension struct {
-	Servers  map[string]ServerExtension `json:"servers,omitempty"`
-	Policies map[string]PolicyDocument  `json:"policies,omitempty"`
-}
-
-type BundleDocument struct {
-	Kind          basespec.CollectionKind `json:"kind"`
-	SchemaID      basespec.SchemaID       `json:"schemaID"`
-	SchemaVersion string                  `json:"schemaVersion"`
-	Digest        cryptoutil.Digest       `json:"digest,omitempty"`
-
-	LogicalName    basespec.LogicalName    `json:"logicalName"`
-	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
-	DisplayName    string                  `json:"displayName,omitempty"`
-	Description    string                  `json:"description,omitempty"`
-	Labels         map[string]string       `json:"labels,omitempty"`
-
-	MCPServers      map[string]CoreServer `json:"mcpServers"`
-	BundleExtension BundleExtension       `json:"bundleExtension"`
 }
 
 type ServerDocument struct {
@@ -210,7 +183,7 @@ type ServerDocument struct {
 // must contain a confidential-client secret. Client-credentials flow always
 // requires a secret even if a document omitted the explicit declaration flag.
 func (d ServerDocument) OAuthClientSecretRequired() bool {
-	if d.Extension.Auth.Mode == mcpSpec.MCPHTTPAuthClientCredentials {
+	if d.Extension.Auth.Mode == MCPHTTPAuthClientCredentials {
 		return true
 	}
 	input := d.Extension.Auth.ClientCredentialsInput
@@ -221,4 +194,25 @@ func (d ServerDocument) OAuthClientSecretRequired() bool {
 type ServerDefinitionBody struct {
 	MCPServer CoreServer      `json:"mcpServer"`
 	Extension ServerExtension `json:"extension"`
+}
+
+type Resolved struct {
+	Server     artifact.ArtifactRef
+	Collection collection.CollectionRef
+
+	ArtifactRevision uint64
+	CatalogRevision  uint64
+
+	DefinitionDigest    cryptoutil.Digest
+	SourceContentDigest cryptoutil.Digest
+	SourceGeneration    string
+
+	Document     ServerDocument
+	Installation ServerData
+	Policy       policy.Effective
+
+	InstallationRevision uint64
+	RuntimeEnabled       bool
+	BuiltIn              bool
+	Version              cryptoutil.Digest
 }

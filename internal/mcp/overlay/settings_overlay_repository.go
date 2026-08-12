@@ -1,4 +1,4 @@
-package installation
+package overlay
 
 import (
 	"bytes"
@@ -11,44 +11,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
-
-const settingsOverlayPrefix = "mcp.installation.v1/"
-
-// SettingsValueStore is the narrow application-settings port required by MCP
-// installation overlays. The application adapter must persist values through
-// the existing Setting Store and implement compare-and-swap atomically.
-type SettingsValueStore interface {
-	GetMCPInstallationValue(
-		ctx context.Context,
-		key string,
-	) (json.RawMessage, bool, error)
-
-	PutMCPInstallationValue(
-		ctx context.Context,
-		key string,
-		expectedRevision uint64,
-		value json.RawMessage,
-	) error
-
-	DeleteMCPInstallationValue(
-		ctx context.Context,
-		key string,
-		expectedRevision uint64,
-	) error
-}
-
-// SettingsPrefixValueStore is optional. It is used by protected hydration to
-// remove stale installation overlays for a reset protected Root.
-type SettingsPrefixValueStore interface {
-	SettingsValueStore
-
-	DeleteMCPInstallationPrefix(
-		ctx context.Context,
-		prefix string,
-	) error
-}
 
 // SettingsOverlayRepository implements OverlayRepository over application
 // settings. It contains only installation metadata and opaque secret refs.
@@ -252,7 +218,7 @@ func (r *SettingsOverlayRepository) PurgeRoot(
 }
 
 func ValidateServerOverlay(value ServerOverlay) error {
-	if value.SchemaVersion != SchemaVersion {
+	if value.SchemaVersion != schema.MCPSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP server overlay schema %q",
 			basespec.ErrInvalid,
@@ -265,11 +231,11 @@ func ValidateServerOverlay(value ServerOverlay) error {
 			basespec.ErrInvalid,
 		)
 	}
-	return ValidateServerData(value.ServerData)
+	return server.ValidateServerData(value.ServerData)
 }
 
 func ValidateBundleOverlay(value BundleOverlay) error {
-	if value.SchemaVersion != SchemaVersion {
+	if value.SchemaVersion != schema.MCPSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP bundle overlay schema %q",
 			basespec.ErrInvalid,
@@ -376,7 +342,7 @@ func cloneServerOverlay(input ServerOverlay) ServerOverlay {
 	output := input
 	output.ServerData = input.ServerData
 	output.ServerData.Inputs = make(
-		map[string]InputBinding,
+		map[string]server.InputBinding,
 		len(input.ServerData.Inputs),
 	)
 	for name, binding := range input.ServerData.Inputs {

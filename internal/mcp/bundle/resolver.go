@@ -13,12 +13,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
 
@@ -92,16 +90,16 @@ func (a *API) resolveMCPServer(
 	if err != nil {
 		return server.Resolved{}, err
 	}
-	body, err := mcpArtifact.ServerBodyFromDefinition(
+	body, err := server.ServerBodyFromDefinition(
 		definitionValue,
 	)
 	if err != nil {
 		return server.Resolved{}, err
 	}
-	document := schema.ServerDocument{
+	document := server.ServerDocument{
 		Kind:           schema.ServerKind,
 		SchemaID:       schema.ServerSchemaID,
-		SchemaVersion:  schema.SchemaVersion,
+		SchemaVersion:  schema.MCPSchemaVersion,
 		LogicalName:    definitionValue.LogicalName,
 		LogicalVersion: definitionValue.LogicalVersion,
 		DisplayName:    definitionValue.DisplayName,
@@ -281,20 +279,20 @@ func (a *API) effectiveInstallation(
 	ctx context.Context,
 	bundle Bundle,
 	record artifact.Artifact,
-	document schema.ServerDocument,
+	document server.ServerDocument,
 ) (
-	installationData installation.ServerData,
+	installationData server.ServerData,
 	installationRevision uint64,
 	runtimeEnabled bool,
 	err error,
 ) {
 	if !a.dependencies.RootPolicy.IsProtectedRoot(record.RootID) {
-		data, err := installation.DecodeServerData(record.Data)
+		data, err := server.DecodeServerData(record.Data)
 		if err != nil {
-			return installation.ServerData{}, 0, false, err
+			return server.ServerData{}, 0, false, err
 		}
-		if err := installation.ValidateServerDataForDocument(record.Ref(), document, data); err != nil {
-			return installation.ServerData{}, 0, false, err
+		if err := server.ValidateServerDataForDocument(record.Ref(), document, data); err != nil {
+			return server.ServerData{}, 0, false, err
 		}
 		return data,
 			record.Revision,
@@ -303,7 +301,7 @@ func (a *API) effectiveInstallation(
 	}
 
 	if a.dependencies.Overlays == nil {
-		return installation.ServerData{},
+		return server.ServerData{},
 			0,
 			false,
 			fmt.Errorf(
@@ -317,17 +315,17 @@ func (a *API) effectiveInstallation(
 		record.Ref(),
 	)
 	if err != nil {
-		return installation.ServerData{}, 0, false, err
+		return server.ServerData{}, 0, false, err
 	}
 	if !found {
-		return installation.DefaultServerData(), 0, false, nil
+		return server.DefaultServerData(), 0, false, nil
 	}
-	if err := installation.ValidateServerDataForDocument(
+	if err := server.ValidateServerDataForDocument(
 		record.Ref(),
 		document,
 		serverOverlay.ServerData,
 	); err != nil {
-		return installation.ServerData{}, 0, false, err
+		return server.ServerData{}, 0, false, err
 	}
 	bundleOverlay, bundleFound, err := a.dependencies.Overlays.GetBundleOverlay(
 		ctx,
@@ -335,7 +333,7 @@ func (a *API) effectiveInstallation(
 		record.CollectionID,
 	)
 	if err != nil {
-		return installation.ServerData{}, 0, false, err
+		return server.ServerData{}, 0, false, err
 	}
 	if !bundleFound {
 		return serverOverlay.ServerData,
@@ -355,7 +353,7 @@ func (a *API) effectiveInstallation(
 func (a *API) effectivePolicy(
 	ctx context.Context,
 	bundle Bundle,
-	serverDocument schema.ServerDocument,
+	serverDocument server.ServerDocument,
 	additional []artifact.ArtifactRef,
 ) (policy.Effective, error) {
 	values := make([]policy.MCPPolicy, 0, 1+len(additional))
@@ -422,7 +420,7 @@ func (a *API) effectivePolicy(
 		if err != nil {
 			return policy.Effective{}, err
 		}
-		body, err := mcpArtifact.PolicyBodyFromDefinition(
+		body, err := policy.PolicyBodyFromDefinition(
 			definitionValue,
 		)
 		if err != nil {
@@ -468,7 +466,7 @@ func (a *API) policyBodiesByLogicalName(
 		if definitionValue.LogicalName != name {
 			continue
 		}
-		body, err := mcpArtifact.PolicyBodyFromDefinition(
+		body, err := policy.PolicyBodyFromDefinition(
 			definitionValue,
 		)
 		if err != nil {

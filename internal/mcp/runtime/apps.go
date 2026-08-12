@@ -21,6 +21,18 @@ const (
 	VisibilityApp   = "app"
 )
 
+type MCPAppModelContextUpdate struct {
+	InstanceID string               `json:"instanceID,omitempty"`
+	Server     artifact.ArtifactRef `json:"server"`
+
+	ResourceURI string `json:"resourceUri,omitempty"`
+
+	Content           []spec.MCPContent `json:"content,omitempty"`
+	StructuredContent any               `json:"structuredContent,omitempty"`
+
+	UpdatedAt string `json:"updatedAt,omitempty"`
+}
+
 // IsAppMIMEType returns true if mime is a valid MCP Apps MIME type,
 // tolerating whitespace and additional parameters after the profile.
 func IsAppMIMEType(mime string) bool {

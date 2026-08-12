@@ -29,7 +29,7 @@ func (s Selector) Validate() error {
 	); err != nil {
 		return err
 	}
-	if err := validateLabels("selector", s.Labels); err != nil {
+	if err := basespec.ValidateLabels("selector", s.Labels); err != nil {
 		return err
 	}
 	return nil
