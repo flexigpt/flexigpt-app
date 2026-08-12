@@ -5,25 +5,24 @@ import (
 	"fmt"
 	"maps"
 	"sort"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 type Effective struct {
-	Body      schema.PolicyBody `json:"body"`
+	Body      MCPPolicy         `json:"body"`
 	Conflicts map[string]string `json:"conflicts,omitempty"`
 	Digest    cryptoutil.Digest `json:"digest"`
 }
 
-func Baseline() schema.PolicyBody {
-	return schema.NormalizePolicyBody(schema.PolicyBody{
-		TrustLevel:    mcpSpec.MCPTrustLevelUntrusted,
-		DefaultPolicy: mcpSpec.DefaultMCPServerPolicy(),
-		AppsPolicy: mcpSpec.MCPAppsPolicy{
+func Baseline() MCPPolicy {
+	return NormalizePolicyBody(MCPPolicy{
+		TrustLevel:    MCPTrustLevelUntrusted,
+		DefaultPolicy: DefaultMCPServerPolicy(),
+		AppsPolicy: MCPAppsPolicy{
 			Enabled:                          false,
 			AllowAppInitiatedToolCalls:       false,
 			RequireApprovalForOpenLink:       true,
@@ -33,18 +32,18 @@ func Baseline() schema.PolicyBody {
 }
 
 func Compose(
-	baseline schema.PolicyBody,
-	policies ...schema.PolicyBody,
+	baseline MCPPolicy,
+	policies ...MCPPolicy,
 ) (Effective, error) {
-	result := schema.NormalizePolicyBody(baseline)
-	if err := schema.ValidatePolicyBody(result); err != nil {
+	result := NormalizePolicyBody(baseline)
+	if err := ValidatePolicyBody(result); err != nil {
 		return Effective{}, err
 	}
 
 	conflicts := map[string]string{}
 	for index, candidate := range policies {
-		candidate = schema.NormalizePolicyBody(candidate)
-		if err := schema.ValidatePolicyBody(candidate); err != nil {
+		candidate = NormalizePolicyBody(candidate)
+		if err := ValidatePolicyBody(candidate); err != nil {
 			return Effective{}, fmt.Errorf(
 				"policy %d: %w",
 				index,
@@ -81,7 +80,7 @@ func Compose(
 			candidate.AppsPolicy.RequireApprovalForContextUpdates
 
 		if result.ToolPolicies == nil {
-			result.ToolPolicies = map[string]mcpSpec.MCPToolPolicyOverride{}
+			result.ToolPolicies = map[string]MCPToolPolicyOverride{}
 		}
 		names := make([]string, 0, len(candidate.ToolPolicies))
 		for name := range candidate.ToolPolicies {
@@ -114,8 +113,37 @@ func Compose(
 	}, nil
 }
 
+func NormalizePolicyBody(input MCPPolicy) MCPPolicy {
+	output := input
+	output.ToolPolicies = maps.Clone(input.ToolPolicies)
+	if output.TrustLevel == "" {
+		output.TrustLevel = MCPTrustLevelUntrusted
+	}
+	if output.DefaultPolicy == (MCPServerPolicy{}) {
+		output.DefaultPolicy = DefaultMCPServerPolicy()
+	}
+	if output.ToolPolicies == nil {
+		output.ToolPolicies = map[string]MCPToolPolicyOverride{}
+	}
+	for name, override := range output.ToolPolicies {
+		if override.ToolName == "" {
+			override.ToolName = name
+		}
+		output.ToolPolicies[name] = override
+	}
+	if output.AppsPolicy == (MCPAppsPolicy{}) {
+		output.AppsPolicy = MCPAppsPolicy{
+			Enabled:                          false,
+			AllowAppInitiatedToolCalls:       false,
+			RequireApprovalForOpenLink:       true,
+			RequireApprovalForContextUpdates: true,
+		}
+	}
+	return output
+}
+
 func (e Effective) Validate() error {
-	if err := schema.ValidatePolicyBody(e.Body); err != nil {
+	if err := ValidatePolicyBody(e.Body); err != nil {
 		return err
 	}
 	if err := cryptoutil.ValidateDigest(e.Digest); err != nil {
@@ -134,10 +162,88 @@ func (e Effective) Validate() error {
 	return nil
 }
 
+func ValidatePolicyBody(body MCPPolicy) error {
+	switch body.TrustLevel {
+	case MCPTrustLevelTrusted, MCPTrustLevelUntrusted:
+	default:
+		return fmt.Errorf(
+			"%w: invalid MCP trust level %q",
+			basespec.ErrInvalid,
+			body.TrustLevel,
+		)
+	}
+
+	switch body.DefaultPolicy.DefaultApprovalRule {
+	case MCPApprovalRuleAllow,
+		MCPApprovalRuleAsk,
+		MCPApprovalRuleDeny:
+	default:
+		return fmt.Errorf(
+			"%w: invalid MCP approval rule",
+			basespec.ErrInvalid,
+		)
+	}
+	switch body.DefaultPolicy.DefaultExecutionMode {
+	case MCPExecutionModeAuto,
+		MCPExecutionModeManual:
+	default:
+		return fmt.Errorf(
+			"%w: invalid MCP execution mode",
+			basespec.ErrInvalid,
+		)
+	}
+
+	for name, override := range body.ToolPolicies {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf(
+				"%w: empty MCP tool policy name",
+				basespec.ErrInvalid,
+			)
+		}
+		if override.ToolName != name {
+			return fmt.Errorf(
+				"%w: MCP tool policy key and toolName differ",
+				basespec.ErrInvalid,
+			)
+		}
+		if override.ApprovalRule != nil {
+			switch *override.ApprovalRule {
+			case MCPApprovalRuleAllow,
+				MCPApprovalRuleAsk,
+				MCPApprovalRuleDeny:
+			default:
+				return fmt.Errorf(
+					"%w: invalid tool approval rule",
+					basespec.ErrInvalid,
+				)
+			}
+		}
+		if override.ExecutionMode != nil {
+			switch *override.ExecutionMode {
+			case MCPExecutionModeAuto,
+				MCPExecutionModeManual:
+			default:
+				return fmt.Errorf(
+					"%w: invalid tool execution mode",
+					basespec.ErrInvalid,
+				)
+			}
+		}
+		if override.ExpectedDigest != "" {
+			if err := cryptoutil.ValidateDigest(
+				cryptoutil.Digest(override.ExpectedDigest),
+			); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func mergeOverride(
-	left mcpSpec.MCPToolPolicyOverride,
-	right mcpSpec.MCPToolPolicyOverride,
-) (merged mcpSpec.MCPToolPolicyOverride, conflict string) {
+	left MCPToolPolicyOverride,
+	right MCPToolPolicyOverride,
+) (merged MCPToolPolicyOverride, conflict string) {
 	output := cloneOverride(left)
 	if output.ToolName == "" {
 		output.ToolName = right.ToolName
@@ -166,7 +272,7 @@ func mergeOverride(
 	case right.ExpectedDigest == "":
 	case output.ExpectedDigest != right.ExpectedDigest:
 		conflict = "conflicting expected tool digests"
-		deny := mcpSpec.MCPApprovalRuleDeny
+		deny := MCPApprovalRuleDeny
 		output.ApprovalRule = &deny
 		output.AllowStaleDigest = false
 	}
@@ -174,25 +280,25 @@ func mergeOverride(
 }
 
 func restrictiveTrust(
-	left mcpSpec.MCPTrustLevel,
-	right mcpSpec.MCPTrustLevel,
-) mcpSpec.MCPTrustLevel {
-	if left == mcpSpec.MCPTrustLevelUntrusted ||
-		right == mcpSpec.MCPTrustLevelUntrusted {
-		return mcpSpec.MCPTrustLevelUntrusted
+	left MCPTrustLevel,
+	right MCPTrustLevel,
+) MCPTrustLevel {
+	if left == MCPTrustLevelUntrusted ||
+		right == MCPTrustLevelUntrusted {
+		return MCPTrustLevelUntrusted
 	}
-	return mcpSpec.MCPTrustLevelTrusted
+	return MCPTrustLevelTrusted
 }
 
 func restrictiveApproval(
-	left mcpSpec.MCPApprovalRule,
-	right mcpSpec.MCPApprovalRule,
-) mcpSpec.MCPApprovalRule {
-	rank := func(value mcpSpec.MCPApprovalRule) int {
+	left MCPApprovalRule,
+	right MCPApprovalRule,
+) MCPApprovalRule {
+	rank := func(value MCPApprovalRule) int {
 		switch value {
-		case mcpSpec.MCPApprovalRuleDeny:
+		case MCPApprovalRuleDeny:
 			return 3
-		case mcpSpec.MCPApprovalRuleAsk:
+		case MCPApprovalRuleAsk:
 			return 2
 		default:
 			return 1
@@ -205,19 +311,19 @@ func restrictiveApproval(
 }
 
 func restrictiveExecution(
-	left mcpSpec.MCPExecutionMode,
-	right mcpSpec.MCPExecutionMode,
-) mcpSpec.MCPExecutionMode {
-	if left == mcpSpec.MCPExecutionModeManual ||
-		right == mcpSpec.MCPExecutionModeManual {
-		return mcpSpec.MCPExecutionModeManual
+	left MCPExecutionMode,
+	right MCPExecutionMode,
+) MCPExecutionMode {
+	if left == MCPExecutionModeManual ||
+		right == MCPExecutionModeManual {
+		return MCPExecutionModeManual
 	}
-	return mcpSpec.MCPExecutionModeAuto
+	return MCPExecutionModeAuto
 }
 
 func cloneOverride(
-	input mcpSpec.MCPToolPolicyOverride,
-) mcpSpec.MCPToolPolicyOverride {
+	input MCPToolPolicyOverride,
+) MCPToolPolicyOverride {
 	output := input
 	if input.ApprovalRule != nil {
 		value := *input.ApprovalRule
@@ -231,11 +337,11 @@ func cloneOverride(
 }
 
 func effectiveDigest(
-	body schema.PolicyBody,
+	body MCPPolicy,
 	conflicts map[string]string,
 ) (cryptoutil.Digest, error) {
 	raw, err := json.Marshal(struct {
-		Body      schema.PolicyBody `json:"body"`
+		Body      MCPPolicy         `json:"body"`
 		Conflicts map[string]string `json:"conflicts,omitempty"`
 	}{
 		Body:      body,

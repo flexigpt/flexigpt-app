@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 )
 
@@ -41,7 +42,7 @@ type PolicyView struct {
 	Collection       collection.CollectionRef `json:"collection"`
 	CatalogRevision  uint64                   `json:"catalogRevision"`
 	Definition       definition.Definition    `json:"definition"`
-	Body             schema.PolicyBody        `json:"body"`
+	Body             policy.MCPPolicy         `json:"body"`
 	EffectiveEnabled bool                     `json:"effectiveEnabled"`
 	BuiltIn          bool                     `json:"builtIn"`
 }

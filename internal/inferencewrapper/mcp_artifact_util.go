@@ -14,9 +14,9 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/validate"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 const mcpContextInputID = "mcp-context"
@@ -29,40 +29,40 @@ type MCPRuntime interface {
 	Status(
 		ctx context.Context,
 		server artifact.ArtifactRef,
-	) (*mcpSpec.MCPServerRuntimeSnapshot, error)
+	) (*runtime.MCPServerRuntimeSnapshot, error)
 
 	ListTools(
 		ctx context.Context,
 		server artifact.ArtifactRef,
-	) ([]mcpSpec.MCPToolCapability, error)
+	) ([]runtime.MCPToolCapability, error)
 
 	ListResources(
 		ctx context.Context,
 		server artifact.ArtifactRef,
-	) ([]mcpSpec.MCPResourceRef, error)
+	) ([]runtime.MCPResourceRef, error)
 
 	ListResourceTemplates(
 		ctx context.Context,
 		server artifact.ArtifactRef,
-	) ([]mcpSpec.MCPResourceTemplateRef, error)
+	) ([]runtime.MCPResourceTemplateRef, error)
 
 	ListPrompts(
 		ctx context.Context,
 		server artifact.ArtifactRef,
-	) ([]mcpSpec.MCPPromptRef, error)
+	) ([]runtime.MCPPromptRef, error)
 
 	ReadResource(
 		ctx context.Context,
 		server artifact.ArtifactRef,
 		uri string,
-	) (*mcpSpec.MCPReadResourceResponseBody, error)
+	) (*spec.MCPReadResourceResponseBody, error)
 
 	GetPrompt(
 		ctx context.Context,
 		server artifact.ArtifactRef,
 		name string,
 		arguments map[string]string,
-	) (*mcpSpec.MCPGetPromptResponseBody, error)
+	) (*spec.MCPGetPromptResponseBody, error)
 }
 
 type MCPInferenceBridge struct {
@@ -74,7 +74,7 @@ func NewMCPInferenceBridge(rt MCPRuntime) *MCPInferenceBridge {
 }
 
 type MCPCompletionHydrationRequest struct {
-	Context *mcpSpec.MCPConversationContext
+	Context *runtime.MCPConversationContext
 
 	// ExistingToolChoices are parent-created choices. MCP hydration uses them
 	// only to reject duplicate provider names and choice IDs.
@@ -85,7 +85,7 @@ type MCPCompletionHydrationResult struct {
 	SystemPromptParts []string
 	CurrentInputs     []inferenceSpec.InputUnion
 	ToolChoices       []inferenceSpec.ToolChoice
-	ToolMappings      []mcpSpec.MCPProviderToolMapping
+	ToolMappings      []runtime.MCPProviderToolMapping
 
 	DebugDetails map[string]any
 }
@@ -108,7 +108,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 		output.DebugDetails = nil
 		return output, nil
 	}
-	if err := validate.ValidateMCPConversationContext(*request.Context); err != nil {
+	if err := runtime.ValidateMCPConversationContext(*request.Context); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +142,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				statusErr,
 			))
 		} else if status != nil {
-			readyServers[selection.Server] = status.Status == mcpSpec.MCPServerStatusReady
+			readyServers[selection.Server] = status.Status == runtime.MCPServerStatusReady
 			if selection.SnapshotDigest != "" &&
 				status.SnapshotDigest != selection.SnapshotDigest {
 				warnings = append(warnings, fmt.Sprintf(
@@ -180,7 +180,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 			}
 		}
 
-		if selection.ToolExposure == mcpSpec.MCPToolExposureNone {
+		if selection.ToolExposure == runtime.MCPToolExposureNone {
 			continue
 		}
 
@@ -213,7 +213,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				continue
 			}
 
-			mapping := mcpSpec.MCPProviderToolMapping{
+			mapping := runtime.MCPProviderToolMapping{
 				Server:           tool.Server,
 				ProviderToolName: tool.ProviderToolName,
 				ChoiceID:         tool.ChoiceID,
@@ -229,7 +229,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 					tool.App.Visibility...,
 				)
 			}
-			if err := validate.ValidateMCPProviderToolMapping(mapping); err != nil {
+			if err := runtime.ValidateMCPProviderToolMapping(mapping); err != nil {
 				warnings = append(warnings, fmt.Sprintf(
 					"MCP tool %q was skipped because its invocation mapping is invalid: %v",
 					tool.ToolName,
@@ -246,7 +246,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 	}
 
 	resourceCache := make(
-		map[artifact.ArtifactRef]map[string]mcpSpec.MCPResourceRef,
+		map[artifact.ArtifactRef]map[string]runtime.MCPResourceRef,
 	)
 	for _, resource := range request.Context.Resources {
 		if !readyServers[resource.Server] {
@@ -267,7 +267,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				))
 				continue
 			}
-			byURI = make(map[string]mcpSpec.MCPResourceRef, len(values))
+			byURI = make(map[string]runtime.MCPResourceRef, len(values))
 			for _, value := range values {
 				byURI[value.URI] = value
 			}
@@ -325,7 +325,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 	}
 
 	templateCache := make(
-		map[artifact.ArtifactRef]map[string]mcpSpec.MCPResourceTemplateRef,
+		map[artifact.ArtifactRef]map[string]runtime.MCPResourceTemplateRef,
 	)
 	for _, selection := range request.Context.ResourceTemplates {
 		if !readyServers[selection.Server] {
@@ -350,7 +350,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				continue
 			}
 			byTemplate = make(
-				map[string]mcpSpec.MCPResourceTemplateRef,
+				map[string]runtime.MCPResourceTemplateRef,
 				len(values),
 			)
 			for _, value := range values {
@@ -434,7 +434,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 	}
 
 	promptCache := make(
-		map[artifact.ArtifactRef]map[string]mcpSpec.MCPPromptRef,
+		map[artifact.ArtifactRef]map[string]runtime.MCPPromptRef,
 	)
 	for _, selection := range request.Context.Prompts {
 		if !readyServers[selection.Server] {
@@ -455,7 +455,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				))
 				continue
 			}
-			byName = make(map[string]mcpSpec.MCPPromptRef, len(values))
+			byName = make(map[string]runtime.MCPPromptRef, len(values))
 			for _, value := range values {
 				byName[value.PromptName] = value
 			}
@@ -544,7 +544,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 
 	if len(output.ToolMappings) != 0 {
 		output.DebugDetails["toolMappings"] = append(
-			[]mcpSpec.MCPProviderToolMapping(nil),
+			[]runtime.MCPProviderToolMapping(nil),
 			output.ToolMappings...,
 		)
 	}
@@ -570,10 +570,10 @@ func (b *MCPInferenceBridge) serverInstructions(
 		return "", err
 	}
 	if response == nil ||
-		response.Status != mcpSpec.MCPServerStatusReady {
+		response.Status != runtime.MCPServerStatusReady {
 		return "", fmt.Errorf(
 			"%w: MCP server is not connected",
-			mcpSpec.ErrMCPRuntimeNotReady,
+			spec.ErrMCPRuntimeNotReady,
 		)
 	}
 	return response.Instructions, nil
@@ -581,8 +581,8 @@ func (b *MCPInferenceBridge) serverInstructions(
 
 func (b *MCPInferenceBridge) toolsForSelection(
 	ctx context.Context,
-	selection mcpSpec.MCPServerSelection,
-) (toolList []mcpSpec.MCPToolCapability, warnings []string) {
+	selection runtime.MCPServerSelection,
+) (toolList []runtime.MCPToolCapability, warnings []string) {
 	status, err := b.runtime.Status(ctx, selection.Server)
 	if err != nil {
 		return nil, []string{fmt.Sprintf(
@@ -592,7 +592,7 @@ func (b *MCPInferenceBridge) toolsForSelection(
 		)}
 	}
 	if status == nil ||
-		status.Status != mcpSpec.MCPServerStatusReady {
+		status.Status != runtime.MCPServerStatusReady {
 		return nil, []string{fmt.Sprintf(
 			"MCP tools for server %s were skipped because the server is not connected",
 			selection.Server.ArtifactID,
@@ -607,27 +607,27 @@ func (b *MCPInferenceBridge) toolsForSelection(
 		)}
 	}
 
-	byName := make(map[string]mcpSpec.MCPToolCapability, len(tools))
+	byName := make(map[string]runtime.MCPToolCapability, len(tools))
 	for _, tool := range tools {
 		byName[tool.ToolName] = tool
 	}
 
 	switch selection.ToolExposure {
-	case mcpSpec.MCPToolExposureAll:
-		output := make([]mcpSpec.MCPToolCapability, 0, len(tools))
+	case runtime.MCPToolExposureAll:
+		output := make([]runtime.MCPToolCapability, 0, len(tools))
 		for _, tool := range tools {
 			if !tool.Enabled ||
-				tool.TaskSupport == mcpSpec.MCPTaskSupportRequired ||
-				!apps.ToolVisibleToModel(tool.App) {
+				tool.TaskSupport == runtime.MCPTaskSupportRequired ||
+				!runtime.ToolVisibleToModel(tool.App) {
 				continue
 			}
 			output = append(output, tool)
 		}
 		return output, nil
 
-	case mcpSpec.MCPToolExposureSelected:
+	case runtime.MCPToolExposureSelected:
 		output := make(
-			[]mcpSpec.MCPToolCapability,
+			[]runtime.MCPToolCapability,
 			0,
 			len(selection.SelectedTools),
 		)
@@ -668,8 +668,8 @@ func (b *MCPInferenceBridge) toolsForSelection(
 				continue
 			}
 			if !tool.Enabled ||
-				tool.TaskSupport == mcpSpec.MCPTaskSupportRequired ||
-				!apps.ToolVisibleToModel(tool.App) {
+				tool.TaskSupport == runtime.MCPTaskSupportRequired ||
+				!runtime.ToolVisibleToModel(tool.App) {
 				continue
 			}
 
@@ -692,15 +692,15 @@ func (b *MCPInferenceBridge) toolsForSelection(
 }
 
 func constrainSelectedTool(
-	tool mcpSpec.MCPToolCapability,
-	selection mcpSpec.MCPToolSelection,
-) (mcpSpec.MCPToolCapability, error) {
+	tool runtime.MCPToolCapability,
+	selection runtime.MCPToolSelection,
+) (runtime.MCPToolCapability, error) {
 	output := tool
 
 	if selection.ApprovalRule != nil {
-		if approvalRuleRank(*selection.ApprovalRule) <
-			approvalRuleRank(normalizedApprovalRule(tool.ApprovalRule)) {
-			return mcpSpec.MCPToolCapability{}, errors.New(
+		if policy.ApprovalRuleRank(*selection.ApprovalRule) <
+			policy.ApprovalRuleRank(policy.NormalizedApprovalRule(tool.ApprovalRule)) {
+			return runtime.MCPToolCapability{}, errors.New(
 				"conversation approval override weakens effective policy",
 			)
 		}
@@ -708,9 +708,9 @@ func constrainSelectedTool(
 	}
 
 	if selection.ExecutionMode != nil {
-		if executionModeRank(*selection.ExecutionMode) <
-			executionModeRank(normalizedExecutionMode(tool.ExecutionMode)) {
-			return mcpSpec.MCPToolCapability{}, errors.New(
+		if policy.ExecutionModeRank(*selection.ExecutionMode) <
+			policy.ExecutionModeRank(policy.NormalizedExecutionMode(tool.ExecutionMode)) {
+			return runtime.MCPToolCapability{}, errors.New(
 				"conversation execution override weakens effective policy",
 			)
 		}
@@ -718,42 +718,6 @@ func constrainSelectedTool(
 	}
 
 	return output, nil
-}
-
-func approvalRuleRank(value mcpSpec.MCPApprovalRule) int {
-	switch value {
-	case mcpSpec.MCPApprovalRuleDeny:
-		return 3
-	case mcpSpec.MCPApprovalRuleAsk:
-		return 2
-	default:
-		return 1
-	}
-}
-
-func executionModeRank(value mcpSpec.MCPExecutionMode) int {
-	if value == mcpSpec.MCPExecutionModeManual {
-		return 2
-	}
-	return 1
-}
-
-func normalizedApprovalRule(
-	value mcpSpec.MCPApprovalRule,
-) mcpSpec.MCPApprovalRule {
-	if value == "" {
-		return mcpSpec.MCPApprovalRuleAsk
-	}
-	return value
-}
-
-func normalizedExecutionMode(
-	value mcpSpec.MCPExecutionMode,
-) mcpSpec.MCPExecutionMode {
-	if value == "" {
-		return mcpSpec.MCPExecutionModeManual
-	}
-	return value
 }
 
 func (b *MCPInferenceBridge) readResourceAsText(
@@ -817,7 +781,7 @@ func (b *MCPInferenceBridge) getPromptAsText(
 }
 
 func missingRequiredMCPArguments(
-	definitions map[string]mcpSpec.MCPArgumentDefinition,
+	definitions map[string]runtime.MCPArgumentDefinition,
 	values map[string]string,
 ) []string {
 	missing := make([]string, 0)
@@ -838,7 +802,7 @@ func missingRequiredMCPArguments(
 }
 
 func toolChoiceFromMCPTool(
-	tool mcpSpec.MCPToolCapability,
+	tool runtime.MCPToolCapability,
 ) inferenceSpec.ToolChoice {
 	arguments := maps.Clone(tool.InputSchema)
 	if len(arguments) == 0 {
@@ -900,7 +864,7 @@ func resolveMCPResourceTemplateURI(
 	if raw == "" {
 		return "", fmt.Errorf(
 			"%w: empty MCP resource URI template",
-			mcpSpec.ErrMCPInvalidRequest,
+			spec.ErrMCPInvalidRequest,
 		)
 	}
 
@@ -928,21 +892,21 @@ func resolveMCPResourceTemplateURI(
 		slices.Sort(names)
 		return "", fmt.Errorf(
 			"%w: missing MCP resource template arguments: %s",
-			mcpSpec.ErrMCPInvalidRequest,
+			spec.ErrMCPInvalidRequest,
 			strings.Join(names, ", "),
 		)
 	}
 	if strings.ContainsAny(resolved, "{}") {
 		return "", fmt.Errorf(
 			"%w: unsupported MCP resource URI template syntax",
-			mcpSpec.ErrMCPInvalidRequest,
+			spec.ErrMCPInvalidRequest,
 		)
 	}
 	return resolved, nil
 }
 
 func buildMCPAppContextInput(
-	updates []mcpSpec.MCPAppModelContextUpdate,
+	updates []spec.MCPAppModelContextUpdate,
 ) *inferenceSpec.InputUnion {
 	if len(updates) == 0 {
 		return nil
@@ -1030,12 +994,12 @@ func buildMCPContextInputWithIntro(
 	}
 }
 
-func mcpContentToText(content mcpSpec.MCPContent) string {
+func mcpContentToText(content spec.MCPContent) string {
 	switch content.Type {
-	case mcpSpec.MCPContentTypeText:
+	case spec.MCPContentTypeText:
 		return content.Text
 
-	case mcpSpec.MCPContentTypeResource:
+	case spec.MCPContentTypeResource:
 		if content.Resource == nil {
 			return ""
 		}
@@ -1052,7 +1016,7 @@ func mcpContentToText(content mcpSpec.MCPContent) string {
 		}
 		return ""
 
-	case mcpSpec.MCPContentTypeResourceLink:
+	case spec.MCPContentTypeResourceLink:
 		return strings.Join(getNonEmptyStrings(
 			content.Title,
 			content.Name,
@@ -1060,14 +1024,14 @@ func mcpContentToText(content mcpSpec.MCPContent) string {
 			content.URI,
 		), "\n")
 
-	case mcpSpec.MCPContentTypeImage:
+	case spec.MCPContentTypeImage:
 		return fmt.Sprintf(
 			"[MCP image content omitted: mime=%s bytes=%d]",
 			content.MIMEType,
 			len(content.Data),
 		)
 
-	case mcpSpec.MCPContentTypeAudio:
+	case spec.MCPContentTypeAudio:
 		return fmt.Sprintf(
 			"[MCP audio content omitted: mime=%s bytes=%d]",
 			content.MIMEType,

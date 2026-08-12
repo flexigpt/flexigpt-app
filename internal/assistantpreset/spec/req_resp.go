@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -75,7 +75,7 @@ type PutAssistantPresetRequestBody struct {
 	StartingIncludeModelSystemPrompt *bool                           `json:"startingIncludeModelSystemPrompt,omitempty"`
 	StartingToolSelections           []toolSpec.ToolSelection        `json:"startingToolSelections,omitempty"`
 	StartingSkillSelections          []ArtifactSkillSelection        `json:"startingSkillSelections,omitempty"`
-	StartingMCPContext               *mcpSpec.MCPConversationContext `json:"startingMCPContext,omitempty"`
+	StartingMCPContext               *runtime.MCPConversationContext `json:"startingMCPContext,omitempty"`
 }
 
 type PutAssistantPresetRequest struct {

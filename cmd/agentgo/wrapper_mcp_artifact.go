@@ -508,8 +508,8 @@ func (w *MCPWrapper) UpdateProtectedMCPBundleInstallation(
 
 func (w *MCPWrapper) ConnectMCPServer(
 	ref artifact.ArtifactRef,
-) (*mcpSpec.MCPServerRuntimeSnapshot, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPServerRuntimeSnapshot, error) {
+) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -530,8 +530,8 @@ func (w *MCPWrapper) DisconnectMCPServer(
 
 func (w *MCPWrapper) RefreshMCPServer(
 	ref artifact.ArtifactRef,
-) (*mcpSpec.MCPServerRuntimeSnapshot, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPServerRuntimeSnapshot, error) {
+) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -541,8 +541,8 @@ func (w *MCPWrapper) RefreshMCPServer(
 
 func (w *MCPWrapper) GetMCPServerStatus(
 	ref artifact.ArtifactRef,
-) (*mcpSpec.MCPServerRuntimeSnapshot, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPServerRuntimeSnapshot, error) {
+) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -552,8 +552,8 @@ func (w *MCPWrapper) GetMCPServerStatus(
 
 func (w *MCPWrapper) ListMCPServerTools(
 	ref artifact.ArtifactRef,
-) ([]mcpSpec.MCPToolCapability, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpSpec.MCPToolCapability, error) {
+) ([]mcpRuntime.MCPToolCapability, error) {
+	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPToolCapability, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -563,8 +563,8 @@ func (w *MCPWrapper) ListMCPServerTools(
 
 func (w *MCPWrapper) ListMCPServerResources(
 	ref artifact.ArtifactRef,
-) ([]mcpSpec.MCPResourceRef, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpSpec.MCPResourceRef, error) {
+) ([]mcpRuntime.MCPResourceRef, error) {
+	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPResourceRef, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -574,8 +574,8 @@ func (w *MCPWrapper) ListMCPServerResources(
 
 func (w *MCPWrapper) ListMCPServerResourceTemplates(
 	ref artifact.ArtifactRef,
-) ([]mcpSpec.MCPResourceTemplateRef, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpSpec.MCPResourceTemplateRef, error) {
+) ([]mcpRuntime.MCPResourceTemplateRef, error) {
+	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPResourceTemplateRef, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -585,8 +585,8 @@ func (w *MCPWrapper) ListMCPServerResourceTemplates(
 
 func (w *MCPWrapper) ListMCPServerPrompts(
 	ref artifact.ArtifactRef,
-) ([]mcpSpec.MCPPromptRef, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpSpec.MCPPromptRef, error) {
+) ([]mcpRuntime.MCPPromptRef, error) {
+	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPPromptRef, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -638,9 +638,9 @@ func (w *MCPWrapper) CompleteMCPArgument(
 
 func (w *MCPWrapper) EvaluateMCPToolCall(
 	srv artifact.ArtifactRef,
-	request *mcpSpec.InvokeMCPToolRequestBody,
-) (*mcpSpec.MCPApprovalEvaluation, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPApprovalEvaluation, error) {
+	request *mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.MCPApprovalEvaluation, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPApprovalEvaluation, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -652,10 +652,10 @@ func (w *MCPWrapper) EvaluateMCPToolCall(
 }
 
 func (w *MCPWrapper) EvaluateMappedMCPToolCall(
-	mapping mcpSpec.MCPProviderToolMapping,
-	request *mcpSpec.InvokeMCPToolRequestBody,
-) (*mcpSpec.MCPApprovalEvaluation, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPApprovalEvaluation, error) {
+	mapping mcpRuntime.MCPProviderToolMapping,
+	request *mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.MCPApprovalEvaluation, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPApprovalEvaluation, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -675,9 +675,9 @@ func (w *MCPWrapper) EvaluateMappedMCPToolCall(
 
 func (w *MCPWrapper) ResolveMCPApproval(
 	approvalID string,
-	resolution mcpSpec.MCPApprovalResolution,
-) (*mcpSpec.MCPApprovalToken, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPApprovalToken, error) {
+	resolution mcpRuntime.MCPApprovalResolution,
+) (*mcpRuntime.MCPApprovalToken, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPApprovalToken, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -691,9 +691,9 @@ func (w *MCPWrapper) ResolveMCPApproval(
 
 func (w *MCPWrapper) InvokeMCPTool(
 	srv artifact.ArtifactRef,
-	request *mcpSpec.InvokeMCPToolRequestBody,
-) (*mcpSpec.InvokeMCPToolResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.InvokeMCPToolResponseBody, error) {
+	request *mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.InvokeMCPToolResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -705,10 +705,10 @@ func (w *MCPWrapper) InvokeMCPTool(
 }
 
 func (w *MCPWrapper) InvokeMappedMCPTool(
-	mapping mcpSpec.MCPProviderToolMapping,
-	request *mcpSpec.InvokeMCPToolRequestBody,
-) (*mcpSpec.InvokeMCPToolResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.InvokeMCPToolResponseBody, error) {
+	mapping mcpRuntime.MCPProviderToolMapping,
+	request *mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.InvokeMCPToolResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}

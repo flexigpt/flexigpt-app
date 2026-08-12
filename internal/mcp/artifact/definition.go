@@ -6,6 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 )
 
@@ -149,28 +150,28 @@ func ServerBodyFromDefinition(
 
 func PolicyBodyFromDefinition(
 	input definition.Definition,
-) (schema.PolicyBody, error) {
+) (policy.MCPPolicy, error) {
 	value, err := definition.Canonicalize(input)
 	if err != nil {
-		return schema.PolicyBody{}, err
+		return policy.MCPPolicy{}, err
 	}
 	if value.Kind != schema.PolicyKind ||
 		value.SchemaID != schema.PolicySchemaID ||
 		value.SchemaVersion != schema.SchemaVersion {
-		return schema.PolicyBody{}, fmt.Errorf(
+		return policy.MCPPolicy{}, fmt.Errorf(
 			"%w: Definition is not an MCP Policy",
 			basespec.ErrInvalid,
 		)
 	}
-	body, err := definition.DecodeBody[schema.PolicyBody](
+	body, err := definition.DecodeBody[policy.MCPPolicy](
 		value.Body,
 	)
 	if err != nil {
-		return schema.PolicyBody{}, err
+		return policy.MCPPolicy{}, err
 	}
-	body = schema.NormalizePolicyBody(body)
-	if err := schema.ValidatePolicyBody(body); err != nil {
-		return schema.PolicyBody{}, err
+	body = policy.NormalizePolicyBody(body)
+	if err := policy.ValidatePolicyBody(body); err != nil {
+		return policy.MCPPolicy{}, err
 	}
 	return body, nil
 }

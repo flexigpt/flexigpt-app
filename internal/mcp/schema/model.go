@@ -5,6 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -153,13 +154,6 @@ type ServerExtension struct {
 	Policy             *PolicyReference             `json:"policy,omitempty"`
 }
 
-type PolicyBody struct {
-	TrustLevel    mcpSpec.MCPTrustLevel                    `json:"trustLevel"`
-	DefaultPolicy mcpSpec.MCPServerPolicy                  `json:"defaultPolicy"`
-	ToolPolicies  map[string]mcpSpec.MCPToolPolicyOverride `json:"toolPolicies,omitempty"`
-	AppsPolicy    mcpSpec.MCPAppsPolicy                    `json:"appsPolicy"`
-}
-
 type PolicyDocument struct {
 	Kind          basespec.ArtifactKind `json:"kind"`
 	SchemaID      basespec.SchemaID     `json:"schemaID"`
@@ -172,7 +166,7 @@ type PolicyDocument struct {
 	Description    string                  `json:"description,omitempty"`
 	Labels         map[string]string       `json:"labels,omitempty"`
 
-	Body PolicyBody `json:"body"`
+	Body policy.MCPPolicy `json:"body"`
 }
 
 type BundleExtension struct {

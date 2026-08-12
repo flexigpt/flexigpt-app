@@ -27,10 +27,10 @@ type RuntimeConfig struct {
 	StreamableHTTP            *mcpSpec.MCPRuntimeStreamableHTTPConfig
 	OAuthClientSecretRequired bool
 
-	TrustLevel    mcpSpec.MCPTrustLevel
-	DefaultPolicy mcpSpec.MCPServerPolicy
-	ToolPolicies  map[string]mcpSpec.MCPToolPolicyOverride
-	AppsPolicy    mcpSpec.MCPAppsPolicy
+	TrustLevel    policy.MCPTrustLevel
+	DefaultPolicy policy.MCPServerPolicy
+	ToolPolicies  map[string]policy.MCPToolPolicyOverride
+	AppsPolicy    policy.MCPAppsPolicy
 
 	SensitiveValues []string
 }

@@ -24,13 +24,13 @@ type approvalDecisionKey struct {
 	Server     artifact.ArtifactRef `json:"server"`
 	ToolName   string               `json:"toolName"`
 	ToolDigest string               `json:"toolDigest,omitempty"`
-	Risk       spec.MCPToolRisk     `json:"risk"`
+	Risk       MCPToolRisk          `json:"risk"`
 }
 
 type pendingApproval struct {
 	ID        string
 	Token     string
-	Summary   spec.MCPApprovalSummary
+	Summary   MCPApprovalSummary
 	ExpiresAt time.Time
 	Issued    bool
 	Consumed  bool
@@ -40,7 +40,7 @@ type ApprovalManager struct {
 	mu        sync.Mutex
 	ttl       time.Duration
 	pending   map[string]*pendingApproval
-	decisions map[string]spec.MCPApprovalResolution
+	decisions map[string]MCPApprovalResolution
 }
 
 func NewApprovalManager(ttl time.Duration) *ApprovalManager {
@@ -50,13 +50,13 @@ func NewApprovalManager(ttl time.Duration) *ApprovalManager {
 	return &ApprovalManager{
 		ttl:       ttl,
 		pending:   make(map[string]*pendingApproval),
-		decisions: make(map[string]spec.MCPApprovalResolution),
+		decisions: make(map[string]MCPApprovalResolution),
 	}
 }
 
 func (m *ApprovalManager) Create(
 	ctx context.Context,
-	summary spec.MCPApprovalSummary,
+	summary MCPApprovalSummary,
 ) (string, error) {
 	if err := validateApprovalContext(ctx); err != nil {
 		return "", err
@@ -85,8 +85,8 @@ func (m *ApprovalManager) Create(
 func (m *ApprovalManager) Resolve(
 	ctx context.Context,
 	id string,
-	resolution spec.MCPApprovalResolution,
-) (*spec.MCPApprovalToken, error) {
+	resolution MCPApprovalResolution,
+) (*MCPApprovalToken, error) {
 	if err := validateApprovalContext(ctx); err != nil {
 		return nil, err
 	}
@@ -117,21 +117,21 @@ func (m *ApprovalManager) Resolve(
 	}
 
 	switch resolution {
-	case spec.MCPApprovalResolutionDenyOnce:
+	case MCPApprovalResolutionDenyOnce:
 		delete(m.pending, id)
 		return nil, nil
 
-	case spec.MCPApprovalResolutionDenyAlways:
+	case MCPApprovalResolutionDenyAlways:
 		m.decisions[approvalDecisionKeyFor(pending.Summary)] = resolution
 		delete(m.pending, id)
 		return nil, nil
 
-	case spec.MCPApprovalResolutionAllowAlways:
+	case MCPApprovalResolutionAllowAlways:
 		m.decisions[approvalDecisionKeyFor(pending.Summary)] = resolution
 		delete(m.pending, id)
 		return nil, nil
 
-	case spec.MCPApprovalResolutionAllowOnce:
+	case MCPApprovalResolutionAllowOnce:
 		token, err := randomApprovalToken(32)
 		if err != nil {
 			return nil, err
@@ -139,7 +139,7 @@ func (m *ApprovalManager) Resolve(
 		pending.Token = token
 		pending.Issued = true
 
-		return &spec.MCPApprovalToken{
+		return &MCPApprovalToken{
 			ApprovalID: pending.ID,
 			Token:      token,
 			ExpiresAt:  pending.ExpiresAt.UTC().Format(time.RFC3339Nano),
@@ -155,8 +155,8 @@ func (m *ApprovalManager) Resolve(
 }
 
 func (m *ApprovalManager) LookupDecision(
-	summary spec.MCPApprovalSummary,
-) (spec.MCPApprovalResolution, bool) {
+	summary MCPApprovalSummary,
+) (MCPApprovalResolution, bool) {
 	if m == nil {
 		return "", false
 	}
@@ -172,7 +172,7 @@ func (m *ApprovalManager) LookupDecision(
 func (m *ApprovalManager) VerifyAndConsumeToken(
 	ctx context.Context,
 	token string,
-	expected spec.MCPApprovalSummary,
+	expected MCPApprovalSummary,
 ) (string, error) {
 	if err := validateApprovalContext(ctx); err != nil {
 		return "", err
@@ -234,7 +234,7 @@ func (m *ApprovalManager) purgeExpiredLocked(now time.Time) {
 	}
 }
 
-func approvalDecisionKeyFor(summary spec.MCPApprovalSummary) string {
+func approvalDecisionKeyFor(summary MCPApprovalSummary) string {
 	raw, _ := json.Marshal(approvalDecisionKey{
 		Server:     summary.Server,
 		ToolName:   summary.ToolName,
@@ -245,8 +245,8 @@ func approvalDecisionKeyFor(summary spec.MCPApprovalSummary) string {
 }
 
 func approvalSummaryMatches(
-	stored spec.MCPApprovalSummary,
-	expected spec.MCPApprovalSummary,
+	stored MCPApprovalSummary,
+	expected MCPApprovalSummary,
 ) bool {
 	if stored.Server != expected.Server ||
 		stored.ToolName != expected.ToolName ||
@@ -291,7 +291,7 @@ func validateApprovalContext(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func validateApprovalSummary(value spec.MCPApprovalSummary) error {
+func validateApprovalSummary(value MCPApprovalSummary) error {
 	if err := value.Server.Validate(); err != nil {
 		return err
 	}
@@ -304,11 +304,11 @@ func validateApprovalSummary(value spec.MCPApprovalSummary) error {
 	}
 
 	switch value.Risk {
-	case spec.MCPToolRiskUnknown,
-		spec.MCPToolRiskRead,
-		spec.MCPToolRiskWrite,
-		spec.MCPToolRiskDestructive,
-		spec.MCPToolRiskOpenWorld:
+	case MCPToolRiskUnknown,
+		MCPToolRiskRead,
+		MCPToolRiskWrite,
+		MCPToolRiskDestructive,
+		MCPToolRiskOpenWorld:
 	default:
 		return fmt.Errorf(
 			"%w: invalid MCP approval risk %q",
@@ -321,8 +321,8 @@ func validateApprovalSummary(value spec.MCPApprovalSummary) error {
 }
 
 func cloneApprovalSummary(
-	input spec.MCPApprovalSummary,
-) spec.MCPApprovalSummary {
+	input MCPApprovalSummary,
+) MCPApprovalSummary {
 	output := input
 	output.Arguments = spec.JSONRawString(
 		append([]byte(nil), []byte(input.Arguments)...),

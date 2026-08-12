@@ -37,19 +37,31 @@ const (
 	artifactDiscoveryPageKindPrompts           = "prompts"
 )
 
+type discoverySnapshotDigestPayload struct {
+	Server                    artifact.ArtifactRef          `json:"server"`
+	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
+	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`
+	ServerCapabilities        *MCPServerCapabilitiesSummary `json:"serverCapabilities,omitempty"`
+	Instructions              string                        `json:"instructions,omitempty"`
+	Tools                     []MCPToolCapability           `json:"tools,omitempty"`
+	Resources                 []MCPResourceRef              `json:"resources,omitempty"`
+	ResourceTemplates         []MCPResourceTemplateRef      `json:"resourceTemplates,omitempty"`
+	Prompts                   []MCPPromptRef                `json:"prompts,omitempty"`
+}
+
 type ClientSession interface {
 	Close(ctx context.Context) error
 
 	Discover(
 		ctx context.Context,
 		config server.RuntimeConfig,
-	) (spec.MCPDiscoverySnapshot, error)
+	) (MCPDiscoverySnapshot, error)
 
 	CallTool(
 		ctx context.Context,
 		toolName string,
 		arguments map[string]any,
-	) (*spec.InvokeMCPToolResponseBody, error)
+	) (*InvokeMCPToolResponseBody, error)
 
 	ReadResource(
 		ctx context.Context,
@@ -84,10 +96,10 @@ type sessionState struct {
 	generation uint64
 	config     server.RuntimeConfig
 
-	status spec.MCPServerStatus
+	status MCPServerStatus
 	client ClientSession
 
-	snapshot          spec.MCPDiscoverySnapshot
+	snapshot          MCPDiscoverySnapshot
 	lastError         string
 	lastConnectedAt   time.Time
 	lastSyncedAt      time.Time
@@ -145,7 +157,7 @@ func NewMCPRuntimeManager(
 func (m *MCPRuntimeManager) Connect(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (*spec.MCPServerRuntimeSnapshot, error) {
+) (*MCPServerRuntimeSnapshot, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -280,7 +292,7 @@ func (m *MCPRuntimeManager) InvalidateCollection(
 func (m *MCPRuntimeManager) ListTools(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) ([]spec.MCPToolCapability, error) {
+) ([]MCPToolCapability, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -288,7 +300,7 @@ func (m *MCPRuntimeManager) ListTools(
 	if err != nil {
 		return nil, err
 	}
-	output := append([]spec.MCPToolCapability(nil), snapshot.Tools...)
+	output := append([]MCPToolCapability(nil), snapshot.Tools...)
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].ToolName < output[right].ToolName
 	})
@@ -300,7 +312,7 @@ func (m *MCPRuntimeManager) ListToolsPage(
 	ref artifact.ArtifactRef,
 	pageSize int,
 	pageToken string,
-) ([]spec.MCPToolCapability, *string, error) {
+) ([]MCPToolCapability, *string, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, nil, err
 	}
@@ -308,7 +320,7 @@ func (m *MCPRuntimeManager) ListToolsPage(
 	if err != nil {
 		return nil, nil, err
 	}
-	values := make([]spec.MCPToolCapability, len(snapshot.Tools))
+	values := make([]MCPToolCapability, len(snapshot.Tools))
 	for index, value := range snapshot.Tools {
 		values[index] = cloneTool(value)
 	}
@@ -328,7 +340,7 @@ func (m *MCPRuntimeManager) ListToolsPage(
 func (m *MCPRuntimeManager) ListResources(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) ([]spec.MCPResourceRef, error) {
+) ([]MCPResourceRef, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -336,7 +348,7 @@ func (m *MCPRuntimeManager) ListResources(
 	if err != nil {
 		return nil, err
 	}
-	output := append([]spec.MCPResourceRef(nil), snapshot.Resources...)
+	output := append([]MCPResourceRef(nil), snapshot.Resources...)
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].URI < output[right].URI
 	})
@@ -348,7 +360,7 @@ func (m *MCPRuntimeManager) ListResourcesPage(
 	ref artifact.ArtifactRef,
 	pageSize int,
 	pageToken string,
-) ([]spec.MCPResourceRef, *string, error) {
+) ([]MCPResourceRef, *string, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, nil, err
 	}
@@ -356,7 +368,7 @@ func (m *MCPRuntimeManager) ListResourcesPage(
 	if err != nil {
 		return nil, nil, err
 	}
-	values := append([]spec.MCPResourceRef(nil), snapshot.Resources...)
+	values := append([]MCPResourceRef(nil), snapshot.Resources...)
 	sort.Slice(values, func(left, right int) bool {
 		return values[left].URI < values[right].URI
 	})
@@ -369,7 +381,7 @@ func (m *MCPRuntimeManager) ListResourcesPage(
 func (m *MCPRuntimeManager) ListResourceTemplates(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) ([]spec.MCPResourceTemplateRef, error) {
+) ([]MCPResourceTemplateRef, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -378,7 +390,7 @@ func (m *MCPRuntimeManager) ListResourceTemplates(
 		return nil, err
 	}
 	output := append(
-		[]spec.MCPResourceTemplateRef(nil),
+		[]MCPResourceTemplateRef(nil),
 		snapshot.ResourceTemplates...,
 	)
 	sort.Slice(output, func(left, right int) bool {
@@ -392,7 +404,7 @@ func (m *MCPRuntimeManager) ListResourceTemplatesPage(
 	ref artifact.ArtifactRef,
 	pageSize int,
 	pageToken string,
-) ([]spec.MCPResourceTemplateRef, *string, error) {
+) ([]MCPResourceTemplateRef, *string, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, nil, err
 	}
@@ -401,7 +413,7 @@ func (m *MCPRuntimeManager) ListResourceTemplatesPage(
 		return nil, nil, err
 	}
 	values := append(
-		[]spec.MCPResourceTemplateRef(nil),
+		[]MCPResourceTemplateRef(nil),
 		snapshot.ResourceTemplates...,
 	)
 	sort.Slice(values, func(left, right int) bool {
@@ -416,7 +428,7 @@ func (m *MCPRuntimeManager) ListResourceTemplatesPage(
 func (m *MCPRuntimeManager) ListPrompts(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) ([]spec.MCPPromptRef, error) {
+) ([]MCPPromptRef, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -424,7 +436,7 @@ func (m *MCPRuntimeManager) ListPrompts(
 	if err != nil {
 		return nil, err
 	}
-	output := append([]spec.MCPPromptRef(nil), snapshot.Prompts...)
+	output := append([]MCPPromptRef(nil), snapshot.Prompts...)
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].PromptName < output[right].PromptName
 	})
@@ -436,7 +448,7 @@ func (m *MCPRuntimeManager) ListPromptsPage(
 	ref artifact.ArtifactRef,
 	pageSize int,
 	pageToken string,
-) ([]spec.MCPPromptRef, *string, error) {
+) ([]MCPPromptRef, *string, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, nil, err
 	}
@@ -444,7 +456,7 @@ func (m *MCPRuntimeManager) ListPromptsPage(
 	if err != nil {
 		return nil, nil, err
 	}
-	values := append([]spec.MCPPromptRef(nil), snapshot.Prompts...)
+	values := append([]MCPPromptRef(nil), snapshot.Prompts...)
 	sort.Slice(values, func(left, right int) bool {
 		return values[left].PromptName < values[right].PromptName
 	})
@@ -528,32 +540,32 @@ func (m *MCPRuntimeManager) Complete(
 func (m *MCPRuntimeManager) CallToolDryRun(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	request spec.InvokeMCPToolRequestBody,
-) (server.RuntimeConfig, spec.MCPToolCapability, error) {
+	request InvokeMCPToolRequestBody,
+) (server.RuntimeConfig, MCPToolCapability, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
-		return server.RuntimeConfig{}, spec.MCPToolCapability{}, err
+		return server.RuntimeConfig{}, MCPToolCapability{}, err
 	}
 	if request.ToolName == "" {
 		return server.RuntimeConfig{},
-			spec.MCPToolCapability{},
+			MCPToolCapability{},
 			fmt.Errorf("%w: MCP tool name is required", spec.ErrMCPInvalidRequest)
 	}
 
 	state, err := m.readySession(ref)
 	if err != nil {
-		return server.RuntimeConfig{}, spec.MCPToolCapability{}, err
+		return server.RuntimeConfig{}, MCPToolCapability{}, err
 	}
 
 	tool, err := toolByName(state.snapshot, request.ToolName)
 	if err != nil {
-		return server.RuntimeConfig{}, spec.MCPToolCapability{}, err
+		return server.RuntimeConfig{}, MCPToolCapability{}, err
 	}
 	if request.ToolDigest != "" &&
 		request.ToolDigest != tool.Digest {
 		override := state.config.ToolPolicies[tool.ToolName]
 		if !override.AllowStaleDigest {
 			return server.RuntimeConfig{},
-				spec.MCPToolCapability{},
+				MCPToolCapability{},
 				fmt.Errorf(
 					"%w: MCP tool digest changed",
 					spec.ErrMCPStaleReference,
@@ -567,8 +579,8 @@ func (m *MCPRuntimeManager) CallToolDryRun(
 func (m *MCPRuntimeManager) CallTool(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	request spec.InvokeMCPToolRequestBody,
-) (*spec.InvokeMCPToolResponseBody, error) {
+	request InvokeMCPToolRequestBody,
+) (*InvokeMCPToolResponseBody, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -581,7 +593,7 @@ func (m *MCPRuntimeManager) CallTool(
 	if err != nil {
 		return nil, err
 	}
-	if !tool.Enabled || tool.TaskSupport == spec.MCPTaskSupportRequired {
+	if !tool.Enabled || tool.TaskSupport == MCPTaskSupportRequired {
 		return nil, fmt.Errorf(
 			"%w: MCP tool %q is disabled or unsupported",
 			spec.ErrMCPPolicyDenied,
@@ -635,7 +647,7 @@ func (m *MCPRuntimeManager) CallTool(
 		tool.App.ResourceURI != "" {
 		body.Provenance.AppResourceURI = tool.App.ResourceURI
 		if body.App == nil {
-			body.App = &spec.MCPToolAppRenderInfo{
+			body.App = &MCPToolAppRenderInfo{
 				ResourceURI: tool.App.ResourceURI,
 			}
 		} else if body.App.ResourceURI == "" {
@@ -719,7 +731,7 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 func (m *MCPRuntimeManager) Refresh(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (*spec.MCPServerRuntimeSnapshot, error) {
+) (*MCPServerRuntimeSnapshot, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -773,7 +785,7 @@ func (m *MCPRuntimeManager) Refresh(
 	}
 	current.config = cloneRuntimeConfig(config)
 	current.snapshot = cloneSnapshot(snapshot)
-	current.status = spec.MCPServerStatusReady
+	current.status = MCPServerStatusReady
 	current.lastError = ""
 	current.lastSyncedAt = now
 	current.snapshotExpiresAt = now.Add(runtimeSnapshotTTL)
@@ -814,16 +826,16 @@ func (m *MCPRuntimeManager) Invalidate(
 func (m *MCPRuntimeManager) Status(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (*spec.MCPServerRuntimeSnapshot, error) {
+) (*MCPServerRuntimeSnapshot, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
 
 	state, found := m.session(ref)
 	if !found {
-		return &spec.MCPServerRuntimeSnapshot{
+		return &MCPServerRuntimeSnapshot{
 			Server: ref,
-			Status: spec.MCPServerStatusDisconnected,
+			Status: MCPServerStatusDisconnected,
 		}, nil
 	}
 
@@ -868,21 +880,21 @@ func (m *MCPRuntimeManager) resolveForConnection(
 
 func (m *MCPRuntimeManager) currentSnapshot(
 	ref artifact.ArtifactRef,
-) (spec.MCPDiscoverySnapshot, error) {
+) (MCPDiscoverySnapshot, error) {
 	state, found := m.session(ref)
 	if !found {
-		return spec.MCPDiscoverySnapshot{}, fmt.Errorf(
+		return MCPDiscoverySnapshot{}, fmt.Errorf(
 			"%w: MCP server is not connected",
 			spec.ErrMCPRuntimeNotReady,
 		)
 	}
-	if state.status == spec.MCPServerStatusReady && state.client != nil {
+	if state.status == MCPServerStatusReady && state.client != nil {
 		return cloneSnapshot(state.snapshot), nil
 	}
 	if state.snapshotStillValid(time.Now().UTC()) {
 		return cloneSnapshot(state.snapshot), nil
 	}
-	return spec.MCPDiscoverySnapshot{}, fmt.Errorf(
+	return MCPDiscoverySnapshot{}, fmt.Errorf(
 		"%w: MCP server has no current discovery snapshot",
 		spec.ErrMCPRuntimeNotReady,
 	)
@@ -893,7 +905,7 @@ func (m *MCPRuntimeManager) readySession(
 ) (*sessionState, error) {
 	state, found := m.session(ref)
 	if !found ||
-		state.status != spec.MCPServerStatusReady ||
+		state.status != MCPServerStatusReady ||
 		state.client == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP server is not connected",
@@ -933,7 +945,7 @@ func (m *MCPRuntimeManager) beginConnection(
 	next := &sessionState{
 		server:     ref,
 		generation: generation,
-		status:     spec.MCPServerStatusConnecting,
+		status:     MCPServerStatusConnecting,
 	}
 	if previous != nil {
 		next.collection = previous.collection
@@ -968,10 +980,10 @@ func (m *MCPRuntimeManager) disconnectSession(
 	closed := cloneSessionState(state)
 	state.client = nil
 	state.generation = m.generations[ref]
-	state.status = spec.MCPServerStatusDisconnected
+	state.status = MCPServerStatusDisconnected
 	state.lastError = ""
 	if !state.snapshotStillValid(time.Now().UTC()) {
-		state.snapshot = spec.MCPDiscoverySnapshot{Server: ref}
+		state.snapshot = MCPDiscoverySnapshot{Server: ref}
 		state.lastSyncedAt = time.Time{}
 		state.snapshotExpiresAt = time.Time{}
 	}
@@ -1016,7 +1028,7 @@ func (m *MCPRuntimeManager) commitConnection(
 	resolved server.Resolved,
 	config server.RuntimeConfig,
 	client ClientSession,
-	snapshot spec.MCPDiscoverySnapshot,
+	snapshot MCPDiscoverySnapshot,
 	now time.Time,
 ) bool {
 	m.mu.Lock()
@@ -1036,7 +1048,7 @@ func (m *MCPRuntimeManager) commitConnection(
 		version:           resolved.Version,
 		generation:        generation,
 		config:            cloneRuntimeConfig(config),
-		status:            spec.MCPServerStatusReady,
+		status:            MCPServerStatusReady,
 		client:            client,
 		snapshot:          cloneSnapshot(snapshot),
 		lastConnectedAt:   now,
@@ -1081,7 +1093,7 @@ func (m *MCPRuntimeManager) setErrorIfCurrent(
 	if state.generation != generation {
 		return false
 	}
-	state.status = spec.MCPServerStatusError
+	state.status = MCPServerStatusError
 	if err != nil {
 		state.lastError = err.Error()
 	}
@@ -1202,13 +1214,13 @@ func validateRuntimeCollectionRef(
 
 func runtimeSnapshot(
 	state *sessionState,
-) *spec.MCPServerRuntimeSnapshot {
+) *MCPServerRuntimeSnapshot {
 	snapshot := state.snapshot
-	if state.status != spec.MCPServerStatusReady &&
+	if state.status != MCPServerStatusReady &&
 		!state.snapshotStillValid(time.Now().UTC()) {
-		snapshot = spec.MCPDiscoverySnapshot{Server: state.server}
+		snapshot = MCPDiscoverySnapshot{Server: state.server}
 	}
-	output := &spec.MCPServerRuntimeSnapshot{
+	output := &MCPServerRuntimeSnapshot{
 		Server:                    state.server,
 		Collection:                state.collection,
 		Status:                    state.status,
@@ -1246,7 +1258,7 @@ func (s *sessionState) snapshotStillValid(now time.Time) bool {
 }
 
 func normalizeSnapshot(
-	snapshot *spec.MCPDiscoverySnapshot,
+	snapshot *MCPDiscoverySnapshot,
 	ref artifact.ArtifactRef,
 	now time.Time,
 ) {
@@ -1283,16 +1295,34 @@ func normalizeSnapshot(
 	snapshot.SyncedAt = now.UTC().Format(time.RFC3339Nano)
 }
 
+func computeDiscoverySnapshotDigest(snap MCPDiscoverySnapshot) string {
+	raw, err := json.Marshal(discoverySnapshotDigestPayload{
+		Server:                    snap.Server,
+		NegotiatedProtocolVersion: snap.NegotiatedProtocolVersion,
+		ServerInfo:                snap.ServerInfo,
+		ServerCapabilities:        snap.ServerCapabilities,
+		Instructions:              snap.Instructions,
+		Tools:                     snap.Tools,
+		Resources:                 snap.Resources,
+		ResourceTemplates:         snap.ResourceTemplates,
+		Prompts:                   snap.Prompts,
+	})
+	if err != nil {
+		return ""
+	}
+	return string(cryptoutil.DigestBytes(raw))
+}
+
 func toolByName(
-	snapshot spec.MCPDiscoverySnapshot,
+	snapshot MCPDiscoverySnapshot,
 	name string,
-) (spec.MCPToolCapability, error) {
+) (MCPToolCapability, error) {
 	for _, tool := range snapshot.Tools {
 		if tool.ToolName == name {
 			return cloneTool(tool), nil
 		}
 	}
-	return spec.MCPToolCapability{}, fmt.Errorf(
+	return MCPToolCapability{}, fmt.Errorf(
 		"%w: MCP tool %q was not found",
 		spec.ErrMCPInvalidRequest,
 		name,
@@ -1379,7 +1409,7 @@ func paginateArtifactDiscoveryItems[T any](
 
 	if end < len(items) {
 		token, err := encodeArtifactDiscoveryPageToken(
-			spec.MCPDiscoveryPageToken{
+			MCPDiscoveryPageToken{
 				Server:         srv,
 				SnapshotDigest: snapshotDigest,
 				Kind:           kind,
@@ -1397,7 +1427,7 @@ func paginateArtifactDiscoveryItems[T any](
 }
 
 func encodeArtifactDiscoveryPageToken(
-	token spec.MCPDiscoveryPageToken,
+	token MCPDiscoveryPageToken,
 ) (string, error) {
 	raw, err := json.Marshal(token)
 	if err != nil {
@@ -1408,15 +1438,15 @@ func encodeArtifactDiscoveryPageToken(
 
 func decodeArtifactDiscoveryPageToken(
 	value string,
-) (spec.MCPDiscoveryPageToken, error) {
+) (MCPDiscoveryPageToken, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(value)
 	if err != nil {
-		return spec.MCPDiscoveryPageToken{}, err
+		return MCPDiscoveryPageToken{}, err
 	}
 
-	var token spec.MCPDiscoveryPageToken
+	var token MCPDiscoveryPageToken
 	if err := json.Unmarshal(raw, &token); err != nil {
-		return spec.MCPDiscoveryPageToken{}, err
+		return MCPDiscoveryPageToken{}, err
 	}
 	return token, nil
 }
@@ -1450,18 +1480,18 @@ func cloneRuntimeConfig(input server.RuntimeConfig) server.RuntimeConfig {
 }
 
 func cloneSnapshot(
-	input spec.MCPDiscoverySnapshot,
-) spec.MCPDiscoverySnapshot {
+	input MCPDiscoverySnapshot,
+) MCPDiscoverySnapshot {
 	output := input
 	output.ServerInfo = cloneImplementationInfo(input.ServerInfo)
 	output.ServerCapabilities = cloneCapabilities(input.ServerCapabilities)
 
-	output.Tools = make([]spec.MCPToolCapability, len(input.Tools))
+	output.Tools = make([]MCPToolCapability, len(input.Tools))
 	for index, value := range input.Tools {
 		output.Tools[index] = cloneTool(value)
 	}
 
-	output.Resources = append([]spec.MCPResourceRef(nil), input.Resources...)
+	output.Resources = append([]MCPResourceRef(nil), input.Resources...)
 	for index := range output.Resources {
 		output.Resources[index].Annotations = maps.Clone(
 			input.Resources[index].Annotations,
@@ -1469,7 +1499,7 @@ func cloneSnapshot(
 	}
 
 	output.ResourceTemplates = append(
-		[]spec.MCPResourceTemplateRef(nil),
+		[]MCPResourceTemplateRef(nil),
 		input.ResourceTemplates...,
 	)
 	for index := range output.ResourceTemplates {
@@ -1481,7 +1511,7 @@ func cloneSnapshot(
 		)
 	}
 
-	output.Prompts = append([]spec.MCPPromptRef(nil), input.Prompts...)
+	output.Prompts = append([]MCPPromptRef(nil), input.Prompts...)
 	for index := range output.Prompts {
 		output.Prompts[index].Arguments = maps.Clone(
 			input.Prompts[index].Arguments,
@@ -1490,7 +1520,7 @@ func cloneSnapshot(
 	return output
 }
 
-func cloneTool(input spec.MCPToolCapability) spec.MCPToolCapability {
+func cloneTool(input MCPToolCapability) MCPToolCapability {
 	output := input
 	output.InputSchema = maps.Clone(input.InputSchema)
 	output.OutputSchema = maps.Clone(input.OutputSchema)
@@ -1507,8 +1537,8 @@ func cloneTool(input spec.MCPToolCapability) spec.MCPToolCapability {
 }
 
 func cloneImplementationInfo(
-	input *spec.MCPImplementationInfo,
-) *spec.MCPImplementationInfo {
+	input *MCPImplementationInfo,
+) *MCPImplementationInfo {
 	if input == nil {
 		return nil
 	}
@@ -1517,8 +1547,8 @@ func cloneImplementationInfo(
 }
 
 func cloneCapabilities(
-	input *spec.MCPServerCapabilitiesSummary,
-) *spec.MCPServerCapabilitiesSummary {
+	input *MCPServerCapabilitiesSummary,
+) *MCPServerCapabilitiesSummary {
 	if input == nil {
 		return nil
 	}

@@ -57,16 +57,6 @@ const (
 	MCPTrustLevelTrusted   MCPTrustLevel = "trusted"
 )
 
-type MCPServerStatus string
-
-const (
-	MCPServerStatusDisabled     MCPServerStatus = "disabled"
-	MCPServerStatusDisconnected MCPServerStatus = "disconnected"
-	MCPServerStatusConnecting   MCPServerStatus = "connecting"
-	MCPServerStatusReady        MCPServerStatus = "ready"
-	MCPServerStatusError        MCPServerStatus = "error"
-)
-
 type MCPHTTPAuthMode string
 
 const (
@@ -94,31 +84,6 @@ const (
 	MCPAuthStateError             MCPAuthState = "error"
 )
 
-type MCPApprovalRule string
-
-const (
-	MCPApprovalRuleAsk   MCPApprovalRule = "ask"
-	MCPApprovalRuleAllow MCPApprovalRule = "allow"
-	MCPApprovalRuleDeny  MCPApprovalRule = "deny"
-)
-
-type MCPExecutionMode string
-
-const (
-	MCPExecutionModeManual MCPExecutionMode = "manual"
-	MCPExecutionModeAuto   MCPExecutionMode = "auto"
-)
-
-type MCPToolRisk string
-
-const (
-	MCPToolRiskUnknown     MCPToolRisk = "unknown"
-	MCPToolRiskRead        MCPToolRisk = "read"
-	MCPToolRiskWrite       MCPToolRisk = "write"
-	MCPToolRiskDestructive MCPToolRisk = "destructive"
-	MCPToolRiskOpenWorld   MCPToolRisk = "openWorld"
-)
-
 type MCPTaskSupport string
 
 const (
@@ -133,23 +98,6 @@ const (
 	MCPInvocationSourceModel MCPInvocationSource = "model"
 	MCPInvocationSourceUser  MCPInvocationSource = "user"
 	MCPInvocationSourceApp   MCPInvocationSource = "app"
-)
-
-type MCPApprovalDecision string
-
-const (
-	MCPApprovalDecisionAllowed          MCPApprovalDecision = "allowed"
-	MCPApprovalDecisionDenied           MCPApprovalDecision = "denied"
-	MCPApprovalDecisionApprovalRequired MCPApprovalDecision = "approvalRequired"
-)
-
-type MCPApprovalResolution string
-
-const (
-	MCPApprovalResolutionAllowOnce   MCPApprovalResolution = "allowOnce"
-	MCPApprovalResolutionAllowAlways MCPApprovalResolution = "allowAlways"
-	MCPApprovalResolutionDenyOnce    MCPApprovalResolution = "denyOnce"
-	MCPApprovalResolutionDenyAlways  MCPApprovalResolution = "denyAlways"
 )
 
 type MCPContentType string
@@ -200,32 +148,6 @@ type MCPContent struct {
 type MCPPromptMessage struct {
 	Role    string     `json:"role"`
 	Content MCPContent `json:"content"`
-}
-
-type MCPToolAnnotations struct {
-	DestructiveHint *bool  `json:"destructiveHint,omitempty"`
-	IdempotentHint  bool   `json:"idempotentHint"`
-	OpenWorldHint   *bool  `json:"openWorldHint,omitempty"`
-	ReadOnlyHint    bool   `json:"readOnlyHint"`
-	Title           string `json:"title,omitempty"`
-}
-
-type MCPImplementationInfo struct {
-	Name    string `json:"name,omitempty"`
-	Version string `json:"version,omitempty"`
-}
-
-type MCPServerCapabilitiesSummary struct {
-	Tools                bool           `json:"tools,omitempty"`
-	ToolsListChanged     bool           `json:"toolsListChanged,omitempty"`
-	Resources            bool           `json:"resources,omitempty"`
-	ResourcesSubscribe   bool           `json:"resourcesSubscribe,omitempty"`
-	ResourcesListChanged bool           `json:"resourcesListChanged,omitempty"`
-	Prompts              bool           `json:"prompts,omitempty"`
-	PromptsListChanged   bool           `json:"promptsListChanged,omitempty"`
-	Completions          bool           `json:"completions,omitempty"`
-	Experimental         map[string]any `json:"experimental,omitempty"`
-	Extensions           map[string]any `json:"extensions,omitempty"`
 }
 
 type MCPOAuthAuthorization struct {

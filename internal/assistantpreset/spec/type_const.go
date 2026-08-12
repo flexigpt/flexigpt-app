@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -81,7 +81,7 @@ type AssistantPreset struct {
 	StartingSkillSelections []ArtifactSkillSelection `json:"startingSkillSelections,omitempty"`
 
 	// StartingMCPContext is copied into the first user turn when this preset is applied.
-	StartingMCPContext *mcpSpec.MCPConversationContext `json:"startingMCPContext,omitempty"`
+	StartingMCPContext *runtime.MCPConversationContext `json:"startingMCPContext,omitempty"`
 
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`

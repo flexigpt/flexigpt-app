@@ -358,7 +358,7 @@ func (a *API) effectivePolicy(
 	serverDocument schema.ServerDocument,
 	additional []artifact.ArtifactRef,
 ) (policy.Effective, error) {
-	values := make([]schema.PolicyBody, 0, 1+len(additional))
+	values := make([]policy.MCPPolicy, 0, 1+len(additional))
 	hasPrimaryPolicy := false
 
 	if reference := serverDocument.Extension.Policy; reference != nil {
@@ -443,12 +443,12 @@ func (a *API) policyBodiesByLogicalName(
 	ctx context.Context,
 	ref collection.CollectionRef,
 	name basespec.LogicalName,
-) ([]schema.PolicyBody, error) {
+) ([]policy.MCPPolicy, error) {
 	records, err := a.dependencies.Artifacts.ListByCollection(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	output := make([]schema.PolicyBody, 0)
+	output := make([]policy.MCPPolicy, 0)
 	for _, record := range records {
 		if record.Kind != schema.PolicyKind ||
 			!record.Enabled ||

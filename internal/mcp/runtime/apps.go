@@ -1,10 +1,12 @@
-package apps
+package runtime
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -30,7 +32,7 @@ func IsAppMIMEType(mime string) bool {
 // ToolVisibleToModel reports whether the tool can be exposed to the LLM.
 // A nil/empty visibility list defaults to model+app, so unknown servers
 // don't accidentally hide tools.
-func ToolVisibleToModel(info *spec.MCPToolAppInfo) bool {
+func ToolVisibleToModel(info *MCPToolAppInfo) bool {
 	if info == nil || len(info.Visibility) == 0 {
 		return true
 	}
@@ -46,18 +48,18 @@ func ToolVisibleToModel(info *spec.MCPToolAppInfo) bool {
 // authorization check. It is the target API used by the Artifact Store MCP
 // runtime.
 func ValidateArtifactAppToolInvocation(
-	policy spec.MCPAppsPolicy,
-	tool spec.MCPToolCapability,
+	p policy.MCPAppsPolicy,
+	tool MCPToolCapability,
 	appServer artifact.ArtifactRef,
 ) error {
-	if !policy.Enabled {
+	if !p.Enabled {
 		return fmt.Errorf(
 			"%w: MCP Apps is not enabled for server Artifact %q",
 			spec.ErrMCPPolicyDenied,
 			tool.Server.ArtifactID,
 		)
 	}
-	if !policy.AllowAppInitiatedToolCalls {
+	if !p.AllowAppInitiatedToolCalls {
 		return fmt.Errorf(
 			"%w: app-initiated MCP tool calls are not allowed",
 			spec.ErrMCPPolicyDenied,
@@ -83,7 +85,7 @@ func ValidateArtifactAppToolInvocation(
 }
 
 // ToolVisibleToApp reports whether the tool may be called by an MCP App.
-func ToolVisibleToApp(info *spec.MCPToolAppInfo) bool {
+func ToolVisibleToApp(info *MCPToolAppInfo) bool {
 	if info == nil || len(info.Visibility) == 0 {
 		return true
 	}

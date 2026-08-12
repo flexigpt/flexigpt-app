@@ -1,8 +1,9 @@
-package spec
+package runtime
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 )
 
 type MCPToolSelection struct {
@@ -12,8 +13,8 @@ type MCPToolSelection struct {
 	ChoiceID         string               `json:"choiceID,omitempty"`
 	Digest           string               `json:"digest,omitempty"`
 
-	ApprovalRule  *MCPApprovalRule  `json:"approvalRule,omitempty"`
-	ExecutionMode *MCPExecutionMode `json:"executionMode,omitempty"`
+	ApprovalRule  *policy.MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode *policy.MCPExecutionMode `json:"executionMode,omitempty"`
 
 	AppResourceURI string   `json:"appResourceUri,omitempty"`
 	Visibility     []string `json:"visibility,omitempty"`
@@ -28,11 +29,19 @@ type MCPProviderToolMapping struct {
 	ToolName   string `json:"toolName"`
 	ToolDigest string `json:"toolDigest"`
 
-	ApprovalRule   MCPApprovalRule  `json:"approvalRule,omitempty"`
-	ExecutionMode  MCPExecutionMode `json:"executionMode,omitempty"`
-	AppResourceURI string           `json:"appResourceUri,omitempty"`
-	Visibility     []string         `json:"visibility,omitempty"`
+	ApprovalRule   policy.MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode  policy.MCPExecutionMode `json:"executionMode,omitempty"`
+	AppResourceURI string                  `json:"appResourceUri,omitempty"`
+	Visibility     []string                `json:"visibility,omitempty"`
 }
+
+type MCPToolExposure string
+
+const (
+	MCPToolExposureNone     MCPToolExposure = "none"
+	MCPToolExposureAll      MCPToolExposure = "all"
+	MCPToolExposureSelected MCPToolExposure = "selected"
+)
 
 type MCPServerSelection struct {
 	Server artifact.ArtifactRef `json:"server"`

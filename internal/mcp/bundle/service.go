@@ -26,6 +26,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/installation"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schema"
 )
 
@@ -66,7 +67,7 @@ type Dependencies struct {
 	Overlays      installation.OverlayRepository
 	SecretCleaner installation.SecretCleaner
 
-	BaselinePolicy schema.PolicyBody
+	BaselinePolicy policy.MCPPolicy
 }
 
 type API struct {

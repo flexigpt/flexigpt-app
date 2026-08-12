@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/validate"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/dirpartition"
@@ -452,7 +452,7 @@ func validateConversationV1(value *spec.Conversation) error {
 			return err
 		}
 		if message.MCPContext != nil {
-			if err := validate.ValidateMCPConversationContext(
+			if err := runtime.ValidateMCPConversationContext(
 				*message.MCPContext,
 			); err != nil {
 				return fmt.Errorf("messages[%d].mcpContext: %w", index, err)
@@ -465,7 +465,7 @@ func validateConversationV1(value *spec.Conversation) error {
 					index,
 				)
 			}
-			if err := validate.ValidateMCPProviderToolMappingsForContext(
+			if err := runtime.ValidateMCPProviderToolMappingsForContext(
 				*message.MCPContext,
 				message.MCPToolMappings,
 			); err != nil {
@@ -479,7 +479,7 @@ func validateConversationV1(value *spec.Conversation) error {
 					index,
 				)
 			}
-			if err := validate.ValidateMCPAppContextUpdatesForContext(
+			if err := runtime.ValidateMCPAppContextUpdatesForContext(
 				*message.MCPContext,
 				message.MCPAppContextUpdates,
 			); err != nil {

@@ -1,4 +1,4 @@
-package runtime
+package sdkclient
 
 import (
 	"crypto/sha256"
@@ -17,7 +17,7 @@ const (
 	minToolPartLen         = 8
 )
 
-func ProviderToolName(serverRef artifact.ArtifactRef, toolName string) string {
+func providerToolName(serverRef artifact.ArtifactRef, toolName string) string {
 	server := sanitizeName(string(serverRef.ArtifactID))
 	tool := sanitizeName(toolName)
 
@@ -40,7 +40,7 @@ func ProviderToolName(serverRef artifact.ArtifactRef, toolName string) string {
 	return "mcp__" + server + "__" + tool + "__" + suffix
 }
 
-func ChoiceID(serverRef artifact.ArtifactRef, toolName string) string {
+func choiceID(serverRef artifact.ArtifactRef, toolName string) string {
 	sum := sha256.Sum256([]byte(artifactIdentity(serverRef) + "\x00" + toolName))
 	return "mcp-" + hex.EncodeToString(sum[:])[:16]
 }

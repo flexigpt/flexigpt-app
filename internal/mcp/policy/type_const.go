@@ -1,4 +1,19 @@
-package spec
+package policy
+
+type MCPApprovalRule string
+
+const (
+	MCPApprovalRuleAsk   MCPApprovalRule = "ask"
+	MCPApprovalRuleAllow MCPApprovalRule = "allow"
+	MCPApprovalRuleDeny  MCPApprovalRule = "deny"
+)
+
+type MCPExecutionMode string
+
+const (
+	MCPExecutionModeManual MCPExecutionMode = "manual"
+	MCPExecutionModeAuto   MCPExecutionMode = "auto"
+)
 
 type MCPServerPolicy struct {
 	DefaultApprovalRule  MCPApprovalRule  `json:"defaultApprovalRule"`
@@ -24,6 +39,19 @@ type MCPAppsPolicy struct {
 	AllowAppInitiatedToolCalls       bool `json:"allowAppInitiatedToolCalls"`
 	RequireApprovalForOpenLink       bool `json:"requireApprovalForOpenLink"`
 	RequireApprovalForContextUpdates bool `json:"requireApprovalForContextUpdates"`
+}
+type MCPTrustLevel string
+
+const (
+	MCPTrustLevelUntrusted MCPTrustLevel = "untrusted"
+	MCPTrustLevelTrusted   MCPTrustLevel = "trusted"
+)
+
+type MCPPolicy struct {
+	TrustLevel    MCPTrustLevel                    `json:"trustLevel"`
+	DefaultPolicy MCPServerPolicy                  `json:"defaultPolicy"`
+	ToolPolicies  map[string]MCPToolPolicyOverride `json:"toolPolicies,omitempty"`
+	AppsPolicy    MCPAppsPolicy                    `json:"appsPolicy"`
 }
 
 func DefaultMCPServerPolicy() MCPServerPolicy {

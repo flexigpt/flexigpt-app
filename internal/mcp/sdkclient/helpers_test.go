@@ -8,7 +8,8 @@ import (
 
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -127,7 +128,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		info := appInfoFromMeta(mcpSDK.Meta{
 			"ui": map[string]any{
 				"resourceUri": "ui://demo",
-				"visibility":  []any{apps.VisibilityModel, apps.VisibilityApp, ""},
+				"visibility":  []any{runtime.VisibilityModel, runtime.VisibilityApp, ""},
 			},
 		})
 		if info == nil {
@@ -136,7 +137,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		if info.ResourceURI != "ui://demo" {
 			t.Fatalf("ResourceURI = %q, want %q", info.ResourceURI, "ui://demo")
 		}
-		if !slices.Equal(info.Visibility, []string{apps.VisibilityModel, apps.VisibilityApp}) {
+		if !slices.Equal(info.Visibility, []string{runtime.VisibilityModel, runtime.VisibilityApp}) {
 			t.Fatalf("Visibility = %#v, want [model app]", info.Visibility)
 		}
 
@@ -145,19 +146,19 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 				"resourceUri": "ui://fallback",
 			},
 		})
-		if !slices.Equal(info2.Visibility, []string{apps.VisibilityModel, apps.VisibilityApp}) {
+		if !slices.Equal(info2.Visibility, []string{runtime.VisibilityModel, runtime.VisibilityApp}) {
 			t.Fatalf("default Visibility = %#v, want [model app]", info2.Visibility)
 		}
 
 		if got := taskSupportFromMeta(mcpSDK.Meta{
 			"execution": map[string]any{
-				"taskSupport": string(spec.MCPTaskSupportRequired),
+				"taskSupport": string(runtime.MCPTaskSupportRequired),
 			},
-		}); got != spec.MCPTaskSupportRequired {
-			t.Fatalf("taskSupportFromMeta = %q, want %q", got, spec.MCPTaskSupportRequired)
+		}); got != runtime.MCPTaskSupportRequired {
+			t.Fatalf("taskSupportFromMeta = %q, want %q", got, runtime.MCPTaskSupportRequired)
 		}
 
-		if got := taskSupportFromMeta(nil); got != spec.MCPTaskSupportForbidden {
+		if got := taskSupportFromMeta(nil); got != runtime.MCPTaskSupportForbidden {
 			t.Fatalf("taskSupportFromMeta(nil) = %q, want forbidden", got)
 		}
 	})
@@ -181,37 +182,37 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			t.Fatalf("toolAnnotationsToSpec = %#v", gotAnn)
 		}
 
-		if got := inferRisk(nil, spec.MCPTrustLevelUntrusted); got != spec.MCPToolRiskUnknown {
+		if got := inferRisk(nil, policy.MCPTrustLevelUntrusted); got != runtime.MCPToolRiskUnknown {
 			t.Fatalf("inferRisk(nil) = %q, want unknown", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{ReadOnlyHint: true},
-			spec.MCPTrustLevelTrusted,
-		); got != spec.MCPToolRiskRead {
+			policy.MCPTrustLevelTrusted,
+		); got != runtime.MCPToolRiskRead {
 			t.Fatalf("inferRisk(read-only, trusted) = %q, want read", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{ReadOnlyHint: true},
-			spec.MCPTrustLevelUntrusted,
-		); got != spec.MCPToolRiskUnknown {
+			policy.MCPTrustLevelUntrusted,
+		); got != runtime.MCPToolRiskUnknown {
 			t.Fatalf("inferRisk(read-only, untrusted) = %q, want unknown", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{OpenWorldHint: &openWorld},
-			spec.MCPTrustLevelUntrusted,
-		); got != spec.MCPToolRiskOpenWorld {
+			policy.MCPTrustLevelUntrusted,
+		); got != runtime.MCPToolRiskOpenWorld {
 			t.Fatalf("inferRisk(open-world) = %q, want openWorld", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{DestructiveHint: &destructive},
-			spec.MCPTrustLevelTrusted,
-		); got != spec.MCPToolRiskDestructive {
+			policy.MCPTrustLevelTrusted,
+		); got != runtime.MCPToolRiskDestructive {
 			t.Fatalf("inferRisk(destructive) = %q, want destructive", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{DestructiveHint: new(false)},
-			spec.MCPTrustLevelTrusted,
-		); got != spec.MCPToolRiskWrite {
+			policy.MCPTrustLevelTrusted,
+		); got != runtime.MCPToolRiskWrite {
 			t.Fatalf("inferRisk(non-destructive, trusted) = %q, want write", got)
 		}
 	})

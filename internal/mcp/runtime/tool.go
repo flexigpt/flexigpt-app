@@ -1,13 +1,16 @@
-package spec
+package runtime
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+)
 
-type MCPToolExposure string
+type MCPInvocationSource string
 
 const (
-	MCPToolExposureNone     MCPToolExposure = "none"
-	MCPToolExposureAll      MCPToolExposure = "all"
-	MCPToolExposureSelected MCPToolExposure = "selected"
+	MCPInvocationSourceModel MCPInvocationSource = "model"
+	MCPInvocationSourceUser  MCPInvocationSource = "user"
+	MCPInvocationSourceApp   MCPInvocationSource = "app"
 )
 
 type InvokeMCPToolRequestBody struct {
@@ -35,11 +38,11 @@ type InvokeMCPToolRequest struct {
 }
 
 type MCPToolAppRenderInfo struct {
-	ResourceURI       string       `json:"resourceUri,omitempty"`
-	MimeType          string       `json:"mimeType,omitempty"`
-	Content           []MCPContent `json:"content,omitempty"`
-	StructuredContent any          `json:"structuredContent,omitempty"`
-	IsError           bool         `json:"isError,omitempty"`
+	ResourceURI       string            `json:"resourceUri,omitempty"`
+	MimeType          string            `json:"mimeType,omitempty"`
+	Content           []spec.MCPContent `json:"content,omitempty"`
+	StructuredContent any               `json:"structuredContent,omitempty"`
+	IsError           bool              `json:"isError,omitempty"`
 }
 
 type InvokeMCPToolResponseBody struct {
@@ -48,9 +51,9 @@ type InvokeMCPToolResponseBody struct {
 	ToolName         string `json:"toolName"`
 	ProviderToolName string `json:"providerToolName,omitempty"`
 
-	Content           []MCPContent `json:"content,omitempty"`
-	StructuredContent any          `json:"structuredContent,omitempty"`
-	IsError           bool         `json:"isError,omitempty"`
+	Content           []spec.MCPContent `json:"content,omitempty"`
+	StructuredContent any               `json:"structuredContent,omitempty"`
+	IsError           bool              `json:"isError,omitempty"`
 
 	Provenance MCPToolCallProvenance `json:"provenance"`
 	App        *MCPToolAppRenderInfo `json:"app,omitempty"`

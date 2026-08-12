@@ -16,6 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -138,7 +139,7 @@ func canonicalizePolicy(
 		return PolicyDocument{}, nil, err
 	}
 	value.Labels = maps.Clone(value.Labels)
-	value.Body = NormalizePolicyBody(value.Body)
+	value.Body = policy.NormalizePolicyBody(value.Body)
 
 	if err := ValidatePolicy(value); err != nil {
 		return PolicyDocument{}, nil, err
@@ -366,85 +367,7 @@ func ValidatePolicy(value PolicyDocument) error {
 	); err != nil {
 		return err
 	}
-	return ValidatePolicyBody(value.Body)
-}
-
-func ValidatePolicyBody(body PolicyBody) error {
-	switch body.TrustLevel {
-	case mcpSpec.MCPTrustLevelTrusted, mcpSpec.MCPTrustLevelUntrusted:
-	default:
-		return fmt.Errorf(
-			"%w: invalid MCP trust level %q",
-			basespec.ErrInvalid,
-			body.TrustLevel,
-		)
-	}
-
-	switch body.DefaultPolicy.DefaultApprovalRule {
-	case mcpSpec.MCPApprovalRuleAllow,
-		mcpSpec.MCPApprovalRuleAsk,
-		mcpSpec.MCPApprovalRuleDeny:
-	default:
-		return fmt.Errorf(
-			"%w: invalid MCP approval rule",
-			basespec.ErrInvalid,
-		)
-	}
-	switch body.DefaultPolicy.DefaultExecutionMode {
-	case mcpSpec.MCPExecutionModeAuto,
-		mcpSpec.MCPExecutionModeManual:
-	default:
-		return fmt.Errorf(
-			"%w: invalid MCP execution mode",
-			basespec.ErrInvalid,
-		)
-	}
-
-	for name, override := range body.ToolPolicies {
-		if strings.TrimSpace(name) == "" {
-			return fmt.Errorf(
-				"%w: empty MCP tool policy name",
-				basespec.ErrInvalid,
-			)
-		}
-		if override.ToolName != name {
-			return fmt.Errorf(
-				"%w: MCP tool policy key and toolName differ",
-				basespec.ErrInvalid,
-			)
-		}
-		if override.ApprovalRule != nil {
-			switch *override.ApprovalRule {
-			case mcpSpec.MCPApprovalRuleAllow,
-				mcpSpec.MCPApprovalRuleAsk,
-				mcpSpec.MCPApprovalRuleDeny:
-			default:
-				return fmt.Errorf(
-					"%w: invalid tool approval rule",
-					basespec.ErrInvalid,
-				)
-			}
-		}
-		if override.ExecutionMode != nil {
-			switch *override.ExecutionMode {
-			case mcpSpec.MCPExecutionModeAuto,
-				mcpSpec.MCPExecutionModeManual:
-			default:
-				return fmt.Errorf(
-					"%w: invalid tool execution mode",
-					basespec.ErrInvalid,
-				)
-			}
-		}
-		if override.ExpectedDigest != "" {
-			if err := cryptoutil.ValidateDigest(
-				cryptoutil.Digest(override.ExpectedDigest),
-			); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return policy.ValidatePolicyBody(value.Body)
 }
 
 func ValidateMaterializedServer(
@@ -468,35 +391,6 @@ func ValidateMaterializedServer(
 		}
 	}
 	return nil
-}
-
-func NormalizePolicyBody(input PolicyBody) PolicyBody {
-	output := input
-	output.ToolPolicies = maps.Clone(input.ToolPolicies)
-	if output.TrustLevel == "" {
-		output.TrustLevel = mcpSpec.MCPTrustLevelUntrusted
-	}
-	if output.DefaultPolicy == (mcpSpec.MCPServerPolicy{}) {
-		output.DefaultPolicy = mcpSpec.DefaultMCPServerPolicy()
-	}
-	if output.ToolPolicies == nil {
-		output.ToolPolicies = map[string]mcpSpec.MCPToolPolicyOverride{}
-	}
-	for name, override := range output.ToolPolicies {
-		if override.ToolName == "" {
-			override.ToolName = name
-		}
-		output.ToolPolicies[name] = override
-	}
-	if output.AppsPolicy == (mcpSpec.MCPAppsPolicy{}) {
-		output.AppsPolicy = mcpSpec.MCPAppsPolicy{
-			Enabled:                          false,
-			AllowAppInitiatedToolCalls:       false,
-			RequireApprovalForOpenLink:       true,
-			RequireApprovalForContextUpdates: true,
-		}
-	}
-	return output
 }
 
 func normalizeCoreServer(value CoreServer) CoreServer {
