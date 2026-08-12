@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 const (
@@ -149,13 +148,13 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	req OAuthAuthorizationRequest,
 ) (*OAuthAuthorizationResult, error) {
 	if b == nil {
-		return nil, fmt.Errorf("%w: OAuth loopback broker is not configured", spec.ErrMCPAuthRequired)
+		return nil, fmt.Errorf("%w: OAuth loopback broker is not configured", ErrMCPAuthRequired)
 	}
 	if err := req.Server.Validate(); err != nil {
 		return nil, err
 	}
 	if req.AuthorizationURL == "" {
-		return nil, fmt.Errorf("%w: OAuth authorization URL required", spec.ErrMCPAuthRequired)
+		return nil, fmt.Errorf("%w: OAuth authorization URL required", ErrMCPAuthRequired)
 	}
 
 	state, err := authorizationState(req.AuthorizationURL)
@@ -181,10 +180,10 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 
 	key := oauthPendingKey{Server: p.Server}
 	if old := b.pendingByServer[key]; old != nil {
-		b.completeLocked(old, nil, fmt.Errorf("%w: OAuth authorization superseded", spec.ErrMCPAuthRequired))
+		b.completeLocked(old, nil, fmt.Errorf("%w: OAuth authorization superseded", ErrMCPAuthRequired))
 	}
 	if old := b.pendingByState[p.State]; old != nil {
-		b.completeLocked(old, nil, fmt.Errorf("%w: OAuth authorization state superseded", spec.ErrMCPAuthRequired))
+		b.completeLocked(old, nil, fmt.Errorf("%w: OAuth authorization state superseded", ErrMCPAuthRequired))
 	}
 
 	b.pendingByServer[key] = p
@@ -202,7 +201,7 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 
 	case <-timer.C:
 		b.removeIfCurrent(p)
-		return nil, fmt.Errorf("%w: OAuth authorization expired", spec.ErrMCPAuthRequired)
+		return nil, fmt.Errorf("%w: OAuth authorization expired", ErrMCPAuthRequired)
 
 	case result := <-p.ResultCh:
 		if result.Err != nil {
@@ -258,7 +257,7 @@ func (b *OAuthLoopbackBroker) Cancel(
 		return false
 	}
 
-	b.completeLocked(p, nil, fmt.Errorf("%w: OAuth authorization cancelled", spec.ErrMCPAuthRequired))
+	b.completeLocked(p, nil, fmt.Errorf("%w: OAuth authorization cancelled", ErrMCPAuthRequired))
 	return true
 }
 
@@ -269,7 +268,7 @@ func (b *OAuthLoopbackBroker) Close() error {
 
 	b.mu.Lock()
 	for _, p := range b.pendingByServer {
-		b.completeLocked(p, nil, fmt.Errorf("%w: OAuth broker closed", spec.ErrMCPAuthRequired))
+		b.completeLocked(p, nil, fmt.Errorf("%w: OAuth broker closed", ErrMCPAuthRequired))
 	}
 	b.mu.Unlock()
 
@@ -313,7 +312,7 @@ func (b *OAuthLoopbackBroker) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if time.Now().UTC().After(p.ExpiresAt) {
-		err := fmt.Errorf("%w: OAuth authorization expired", spec.ErrMCPAuthRequired)
+		err := fmt.Errorf("%w: OAuth authorization expired", ErrMCPAuthRequired)
 		b.completeLocked(p, nil, err)
 		b.mu.Unlock()
 		http.Error(w, "expired OAuth state", http.StatusBadRequest)
@@ -323,7 +322,7 @@ func (b *OAuthLoopbackBroker) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	if authErr := q.Get("error"); authErr != "" {
 		desc := q.Get("error_description")
 		err := fmt.Errorf("%w: authorization server returned %s%s",
-			spec.ErrMCPAuthRequired,
+			ErrMCPAuthRequired,
 			authErr,
 			formatOAuthErrorDescription(desc),
 		)
@@ -432,7 +431,7 @@ func (b *OAuthLoopbackBroker) removeIfCurrent(p *pendingOAuthAuthorization) {
 func (b *OAuthLoopbackBroker) purgeExpiredLocked(now time.Time) {
 	for _, p := range b.pendingByServer {
 		if now.After(p.ExpiresAt) {
-			b.completeLocked(p, nil, fmt.Errorf("%w: OAuth authorization expired", spec.ErrMCPAuthRequired))
+			b.completeLocked(p, nil, fmt.Errorf("%w: OAuth authorization expired", ErrMCPAuthRequired))
 		}
 	}
 }
@@ -466,12 +465,12 @@ func (b *OAuthLoopbackBroker) removeLocked(p *pendingOAuthAuthorization) {
 func authorizationState(rawURL string) (string, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return "", fmt.Errorf("%w: invalid OAuth authorization URL", spec.ErrMCPAuthRequired)
+		return "", fmt.Errorf("%w: invalid OAuth authorization URL", ErrMCPAuthRequired)
 	}
 
 	state := u.Query().Get("state")
 	if state == "" {
-		return "", fmt.Errorf("%w: OAuth authorization URL missing state", spec.ErrMCPAuthRequired)
+		return "", fmt.Errorf("%w: OAuth authorization URL missing state", ErrMCPAuthRequired)
 	}
 	return state, nil
 }

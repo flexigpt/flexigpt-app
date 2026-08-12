@@ -2,11 +2,20 @@ package runtime
 
 import (
 	"context"
+	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+)
+
+var (
+	ErrMCPInvalidRuntimeRequest = errors.New("invalid mcp runtime request")
+	ErrMCPRuntimeNotReady       = errors.New("mcp runtime is not ready")
+	ErrMCPPolicyDenied          = errors.New("mcp policy denied request")
+	ErrMCPApprovalNeeded        = errors.New("mcp approval required")
+	ErrMCPStaleReference        = errors.New("mcp stale reference")
 )
 
 type ClientNotificationKind string

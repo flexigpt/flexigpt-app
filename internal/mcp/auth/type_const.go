@@ -1,10 +1,16 @@
 package auth
 
 import (
+	"errors"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
+)
+
+var (
+	ErrMCPAuthRequired       = errors.New("mcp authorization required")
+	ErrMCPInvalidAuthRequest = errors.New("invalid mcp auth request")
 )
 
 type GrantType string

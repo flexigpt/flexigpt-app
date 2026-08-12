@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 const mcpContextInputID = "mcp-context"
@@ -55,14 +54,14 @@ type MCPRuntime interface {
 		ctx context.Context,
 		server artifact.ArtifactRef,
 		uri string,
-	) (*spec.MCPReadResourceResponseBody, error)
+	) (*runtime.MCPReadResourceResponseBody, error)
 
 	GetPrompt(
 		ctx context.Context,
 		server artifact.ArtifactRef,
 		name string,
 		arguments map[string]string,
-	) (*spec.MCPGetPromptResponseBody, error)
+	) (*runtime.MCPGetPromptResponseBody, error)
 }
 
 type MCPInferenceBridge struct {
@@ -573,7 +572,7 @@ func (b *MCPInferenceBridge) serverInstructions(
 		response.Status != runtime.MCPServerStatusReady {
 		return "", fmt.Errorf(
 			"%w: MCP server is not connected",
-			spec.ErrMCPRuntimeNotReady,
+			runtime.ErrMCPRuntimeNotReady,
 		)
 	}
 	return response.Instructions, nil
@@ -864,7 +863,7 @@ func resolveMCPResourceTemplateURI(
 	if raw == "" {
 		return "", fmt.Errorf(
 			"%w: empty MCP resource URI template",
-			spec.ErrMCPInvalidRequest,
+			runtime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
@@ -892,14 +891,14 @@ func resolveMCPResourceTemplateURI(
 		slices.Sort(names)
 		return "", fmt.Errorf(
 			"%w: missing MCP resource template arguments: %s",
-			spec.ErrMCPInvalidRequest,
+			runtime.ErrMCPInvalidRuntimeRequest,
 			strings.Join(names, ", "),
 		)
 	}
 	if strings.ContainsAny(resolved, "{}") {
 		return "", fmt.Errorf(
 			"%w: unsupported MCP resource URI template syntax",
-			spec.ErrMCPInvalidRequest,
+			runtime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 	return resolved, nil
@@ -994,12 +993,12 @@ func buildMCPContextInputWithIntro(
 	}
 }
 
-func mcpContentToText(content spec.MCPContent) string {
+func mcpContentToText(content runtime.MCPContent) string {
 	switch content.Type {
-	case spec.MCPContentTypeText:
+	case runtime.MCPContentTypeText:
 		return content.Text
 
-	case spec.MCPContentTypeResource:
+	case runtime.MCPContentTypeResource:
 		if content.Resource == nil {
 			return ""
 		}
@@ -1016,7 +1015,7 @@ func mcpContentToText(content spec.MCPContent) string {
 		}
 		return ""
 
-	case spec.MCPContentTypeResourceLink:
+	case runtime.MCPContentTypeResourceLink:
 		return strings.Join(getNonEmptyStrings(
 			content.Title,
 			content.Name,
@@ -1024,14 +1023,14 @@ func mcpContentToText(content spec.MCPContent) string {
 			content.URI,
 		), "\n")
 
-	case spec.MCPContentTypeImage:
+	case runtime.MCPContentTypeImage:
 		return fmt.Sprintf(
 			"[MCP image content omitted: mime=%s bytes=%d]",
 			content.MIMEType,
 			len(content.Data),
 		)
 
-	case spec.MCPContentTypeAudio:
+	case runtime.MCPContentTypeAudio:
 		return fmt.Sprintf(
 			"[MCP audio content omitted: mime=%s bytes=%d]",
 			content.MIMEType,

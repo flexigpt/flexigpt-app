@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -57,7 +56,7 @@ func (f *Factory) Connect(
 	if cfg.Collection.RootID != cfg.Server.RootID {
 		return nil, fmt.Errorf(
 			"%w: MCP runtime config has mismatched server and Collection roots",
-			spec.ErrMCPInvalidRequest,
+			runtime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
@@ -143,7 +142,7 @@ func (f *Factory) Connect(
 		if cfg.Stdio == nil {
 			return nil, fmt.Errorf(
 				"%w: missing stdio runtime config",
-				spec.ErrMCPInvalidRequest,
+				runtime.ErrMCPInvalidRuntimeRequest,
 			)
 		}
 
@@ -176,7 +175,7 @@ func (f *Factory) Connect(
 		if cfg.StreamableHTTP == nil {
 			return nil, fmt.Errorf(
 				"%w: missing streamable HTTP runtime config",
-				spec.ErrMCPInvalidRequest,
+				runtime.ErrMCPInvalidRuntimeRequest,
 			)
 		}
 
@@ -197,7 +196,7 @@ func (f *Factory) Connect(
 	default:
 		return nil, fmt.Errorf(
 			"%w: unsupported MCP runtime transport %q",
-			spec.ErrMCPInvalidRequest,
+			runtime.ErrMCPInvalidRuntimeRequest,
 			cfg.Transport,
 		)
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 )
 
@@ -22,10 +21,10 @@ func resolveOAuthClientCredentials(
 ) (*oauthex.ClientCredentials, []string, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
-		return nil, nil, fmt.Errorf("%w: clientCredentialRef is required", spec.ErrMCPInvalidRequest)
+		return nil, nil, fmt.Errorf("%w: clientCredentialRef is required", ErrMCPInvalidAuthRequest)
 	}
 	if secrets == nil {
-		return nil, nil, fmt.Errorf("%w: secret resolver is not configured", spec.ErrMCPAuthRequired)
+		return nil, nil, fmt.Errorf("%w: secret resolver is not configured", ErrMCPAuthRequired)
 	}
 
 	raw, err := secrets.ResolveSecret(ctx, ref)

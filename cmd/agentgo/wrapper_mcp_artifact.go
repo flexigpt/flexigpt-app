@@ -19,12 +19,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schemaadapter"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/sdkclient"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
@@ -36,8 +35,8 @@ const (
 type MCPWrapper struct {
 	bundleAPI  *bundle.API
 	artifacts  *artifact.Service
-	runtime    *mcpRuntime.MCPRuntimeManager
-	toolBridge *mcpRuntime.ToolBridge
+	runtime    *runtime.MCPRuntimeManager
+	toolBridge *runtime.ToolBridge
 	auth       *auth.AuthManager
 
 	overlays *overlay.SettingsOverlayRepository
@@ -136,7 +135,7 @@ func InitMCPWrapper(
 		return err
 	}
 
-	runtime, err := mcpRuntime.NewMCPRuntimeManager(
+	rt, err := runtime.NewMCPRuntimeManager(
 		bundleAPI,
 		secrets,
 		mcpEnvironmentResolver{},
@@ -147,11 +146,11 @@ func InitMCPWrapper(
 		_ = oauthBroker.Close()
 		return err
 	}
-	invalidator.Set(runtime)
+	invalidator.Set(rt)
 
-	toolBridge := mcpRuntime.NewToolBridge(
-		runtime,
-		mcpRuntime.NewApprovalManager(5*time.Minute),
+	toolBridge := runtime.NewToolBridge(
+		rt,
+		runtime.NewApprovalManager(5*time.Minute),
 	)
 
 	if err := installMCPBuiltIns(
@@ -160,14 +159,14 @@ func InitMCPWrapper(
 		bundleAPI,
 		overlays,
 	); err != nil {
-		_ = runtime.Close(context.Background())
+		_ = rt.Close(context.Background())
 		_ = oauthBroker.Close()
 		return err
 	}
 
 	wrapper.bundleAPI = bundleAPI
 	wrapper.artifacts = components.Artifacts
-	wrapper.runtime = runtime
+	wrapper.runtime = rt
 	wrapper.toolBridge = toolBridge
 	wrapper.auth = authManager
 	wrapper.overlays = overlays
@@ -508,8 +507,8 @@ func (w *MCPWrapper) UpdateProtectedMCPBundleInstallation(
 
 func (w *MCPWrapper) ConnectMCPServer(
 	ref artifact.ArtifactRef,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+) (*runtime.MCPServerRuntimeSnapshot, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.MCPServerRuntimeSnapshot, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -530,8 +529,8 @@ func (w *MCPWrapper) DisconnectMCPServer(
 
 func (w *MCPWrapper) RefreshMCPServer(
 	ref artifact.ArtifactRef,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+) (*runtime.MCPServerRuntimeSnapshot, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.MCPServerRuntimeSnapshot, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -541,8 +540,8 @@ func (w *MCPWrapper) RefreshMCPServer(
 
 func (w *MCPWrapper) GetMCPServerStatus(
 	ref artifact.ArtifactRef,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+) (*runtime.MCPServerRuntimeSnapshot, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.MCPServerRuntimeSnapshot, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -552,8 +551,8 @@ func (w *MCPWrapper) GetMCPServerStatus(
 
 func (w *MCPWrapper) ListMCPServerTools(
 	ref artifact.ArtifactRef,
-) ([]mcpRuntime.MCPToolCapability, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPToolCapability, error) {
+) ([]runtime.MCPToolCapability, error) {
+	return middleware.WithRecoveryResp(func() ([]runtime.MCPToolCapability, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -563,8 +562,8 @@ func (w *MCPWrapper) ListMCPServerTools(
 
 func (w *MCPWrapper) ListMCPServerResources(
 	ref artifact.ArtifactRef,
-) ([]mcpRuntime.MCPResourceRef, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPResourceRef, error) {
+) ([]runtime.MCPResourceRef, error) {
+	return middleware.WithRecoveryResp(func() ([]runtime.MCPResourceRef, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -574,8 +573,8 @@ func (w *MCPWrapper) ListMCPServerResources(
 
 func (w *MCPWrapper) ListMCPServerResourceTemplates(
 	ref artifact.ArtifactRef,
-) ([]mcpRuntime.MCPResourceTemplateRef, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPResourceTemplateRef, error) {
+) ([]runtime.MCPResourceTemplateRef, error) {
+	return middleware.WithRecoveryResp(func() ([]runtime.MCPResourceTemplateRef, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -585,8 +584,8 @@ func (w *MCPWrapper) ListMCPServerResourceTemplates(
 
 func (w *MCPWrapper) ListMCPServerPrompts(
 	ref artifact.ArtifactRef,
-) ([]mcpRuntime.MCPPromptRef, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPPromptRef, error) {
+) ([]runtime.MCPPromptRef, error) {
+	return middleware.WithRecoveryResp(func() ([]runtime.MCPPromptRef, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -597,8 +596,8 @@ func (w *MCPWrapper) ListMCPServerPrompts(
 func (w *MCPWrapper) ReadMCPResource(
 	srv artifact.ArtifactRef,
 	uri string,
-) (*mcpSpec.MCPReadResourceResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPReadResourceResponseBody, error) {
+) (*runtime.MCPReadResourceResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.MCPReadResourceResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -610,8 +609,8 @@ func (w *MCPWrapper) GetMCPPrompt(
 	srv artifact.ArtifactRef,
 	name string,
 	arguments map[string]string,
-) (*mcpSpec.MCPGetPromptResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPGetPromptResponseBody, error) {
+) (*runtime.MCPGetPromptResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.MCPGetPromptResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -626,9 +625,9 @@ func (w *MCPWrapper) GetMCPPrompt(
 
 func (w *MCPWrapper) CompleteMCPArgument(
 	srv artifact.ArtifactRef,
-	request mcpSpec.MCPCompleteArgumentRequestBody,
-) (*mcpSpec.MCPCompletionResult, error) {
-	return middleware.WithRecoveryResp(func() (*mcpSpec.MCPCompletionResult, error) {
+	request runtime.MCPCompleteArgumentRequestBody,
+) (*runtime.MCPCompletionResult, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.MCPCompletionResult, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -638,31 +637,31 @@ func (w *MCPWrapper) CompleteMCPArgument(
 
 func (w *MCPWrapper) EvaluateMCPToolCall(
 	srv artifact.ArtifactRef,
-	request *mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.MCPApprovalEvaluation, error) {
-	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPApprovalEvaluation, error) {
+	request *runtime.InvokeMCPToolRequestBody,
+) (*runtime.MCPApprovalEvaluation, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.MCPApprovalEvaluation, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
 		if request == nil {
-			return nil, fmt.Errorf("%w: MCP tool request is required", mcpSpec.ErrMCPInvalidRequest)
+			return nil, fmt.Errorf("%w: MCP tool request is required", runtime.ErrMCPInvalidRuntimeRequest)
 		}
 		return w.toolBridge.Evaluate(context.Background(), srv, *request)
 	})
 }
 
 func (w *MCPWrapper) EvaluateMappedMCPToolCall(
-	mapping mcpRuntime.MCPProviderToolMapping,
-	request *mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.MCPApprovalEvaluation, error) {
-	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPApprovalEvaluation, error) {
+	mapping runtime.MCPProviderToolMapping,
+	request *runtime.InvokeMCPToolRequestBody,
+) (*runtime.MCPApprovalEvaluation, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.MCPApprovalEvaluation, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
 		if request == nil {
 			return nil, fmt.Errorf(
 				"%w: mapped MCP tool request is required",
-				mcpSpec.ErrMCPInvalidRequest,
+				runtime.ErrMCPInvalidRuntimeRequest,
 			)
 		}
 		return w.toolBridge.EvaluateMapped(
@@ -675,9 +674,9 @@ func (w *MCPWrapper) EvaluateMappedMCPToolCall(
 
 func (w *MCPWrapper) ResolveMCPApproval(
 	approvalID string,
-	resolution mcpRuntime.MCPApprovalResolution,
-) (*mcpRuntime.MCPApprovalToken, error) {
-	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPApprovalToken, error) {
+	resolution runtime.MCPApprovalResolution,
+) (*runtime.MCPApprovalToken, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.MCPApprovalToken, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
@@ -691,31 +690,31 @@ func (w *MCPWrapper) ResolveMCPApproval(
 
 func (w *MCPWrapper) InvokeMCPTool(
 	srv artifact.ArtifactRef,
-	request *mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*mcpRuntime.InvokeMCPToolResponseBody, error) {
+	request *runtime.InvokeMCPToolRequestBody,
+) (*runtime.InvokeMCPToolResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.InvokeMCPToolResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
 		if request == nil {
-			return nil, fmt.Errorf("%w: MCP tool request is required", mcpSpec.ErrMCPInvalidRequest)
+			return nil, fmt.Errorf("%w: MCP tool request is required", runtime.ErrMCPInvalidRuntimeRequest)
 		}
 		return w.toolBridge.Invoke(context.Background(), srv, *request)
 	})
 }
 
 func (w *MCPWrapper) InvokeMappedMCPTool(
-	mapping mcpRuntime.MCPProviderToolMapping,
-	request *mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*mcpRuntime.InvokeMCPToolResponseBody, error) {
+	mapping runtime.MCPProviderToolMapping,
+	request *runtime.InvokeMCPToolRequestBody,
+) (*runtime.InvokeMCPToolResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*runtime.InvokeMCPToolResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
 		if request == nil {
 			return nil, fmt.Errorf(
 				"%w: mapped MCP tool request is required",
-				mcpSpec.ErrMCPInvalidRequest,
+				runtime.ErrMCPInvalidRuntimeRequest,
 			)
 		}
 		return w.toolBridge.InvokeMapped(
@@ -743,7 +742,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 		if kind == secret.MCPSecretKindOAuthToken {
 			return MCPSecretWriteResult{}, fmt.Errorf(
 				"%w: OAuth token secrets are runtime-managed",
-				mcpSpec.ErrMCPInvalidRequest,
+				auth.ErrMCPInvalidAuthRequest,
 			)
 		}
 
@@ -770,13 +769,13 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			default:
 				return MCPSecretWriteResult{}, fmt.Errorf(
 					"%w: MCP server does not declare OAuth client credentials",
-					mcpSpec.ErrMCPInvalidRequest,
+					auth.ErrMCPInvalidAuthRequest,
 				)
 			}
 			if installationView.Document.Extension.Auth.ClientCredentialsInput == "" {
 				return MCPSecretWriteResult{}, fmt.Errorf(
 					"%w: MCP server does not declare an OAuth client credentials input",
-					mcpSpec.ErrMCPInvalidRequest,
+					auth.ErrMCPInvalidAuthRequest,
 				)
 			}
 			if err := auth.ValidateOAuthClientCredentialsSecret(
@@ -792,7 +791,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 				strings.ContainsAny(value, "\r\n\x00")) {
 			return MCPSecretWriteResult{}, fmt.Errorf(
 				"%w: invalid HTTP header secret value",
-				mcpSpec.ErrMCPInvalidRequest,
+				auth.ErrMCPInvalidAuthRequest,
 			)
 		}
 		if err := w.runtime.Invalidate(ctx, srv); err != nil {
@@ -836,7 +835,7 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 		if kind == secret.MCPSecretKindOAuthToken {
 			return fmt.Errorf(
 				"%w: OAuth token secrets are runtime-managed",
-				mcpSpec.ErrMCPInvalidRequest,
+				auth.ErrMCPInvalidAuthRequest,
 			)
 		}
 		if err := w.runtime.Invalidate(context.Background(), srv); err != nil {
@@ -980,7 +979,7 @@ func validateMCPSecretTarget(
 		if input == "" {
 			return fmt.Errorf(
 				"%w: MCP Server does not declare OAuth client credentials",
-				mcpSpec.ErrMCPInvalidRequest,
+				auth.ErrMCPInvalidAuthRequest,
 			)
 		}
 		declaration, found := document.Extension.Install.Inputs[input]
@@ -989,7 +988,7 @@ func validateMCPSecretTarget(
 			!strings.EqualFold(strings.TrimSpace(slot), "clientCredentials") {
 			return fmt.Errorf(
 				"%w: invalid OAuth client credentials secret target",
-				mcpSpec.ErrMCPInvalidRequest,
+				auth.ErrMCPInvalidAuthRequest,
 			)
 		}
 		return nil
@@ -1012,13 +1011,13 @@ func validateMCPSecretTarget(
 		}
 		return fmt.Errorf(
 			"%w: secret target is not declared by the MCP Server",
-			mcpSpec.ErrMCPInvalidRequest,
+			auth.ErrMCPInvalidAuthRequest,
 		)
 
 	default:
 		return fmt.Errorf(
 			"%w: unsupported MCP secret kind %q",
-			mcpSpec.ErrMCPInvalidRequest,
+			auth.ErrMCPInvalidAuthRequest,
 			kind,
 		)
 	}
@@ -1043,7 +1042,7 @@ func (w *MCPWrapper) close() {
 		return
 	}
 
-	runtime := w.runtime
+	rt := w.runtime
 	broker := w.oauthBroker
 
 	w.bundleAPI = nil
@@ -1060,8 +1059,8 @@ func (w *MCPWrapper) close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if runtime != nil {
-		if err := runtime.Close(ctx); err != nil {
+	if rt != nil {
+		if err := rt.Close(ctx); err != nil {
 			slog.Error("close artifact-backed MCP runtime", "error", err)
 		}
 	}

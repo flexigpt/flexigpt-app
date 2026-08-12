@@ -1,7 +1,6 @@
-package spec
+package runtime
 
 import (
-	"errors"
 	"time"
 )
 
@@ -9,16 +8,6 @@ const (
 	NotificationRefreshDebounce = 1 * time.Second
 	MaxMCPServerPageSize        = 256
 	DefaultMCPPageSize          = 25
-)
-
-var (
-	ErrMCPInvalidRequest  = errors.New("invalid mcp request")
-	ErrMCPRuntimeNotReady = errors.New("mcp runtime is not ready")
-	ErrMCPAuthRequired    = errors.New("mcp authorization required")
-	ErrMCPPolicyDenied    = errors.New("mcp policy denied request")
-	ErrMCPApprovalNeeded  = errors.New("mcp approval required")
-	ErrMCPStaleReference  = errors.New("mcp stale reference")
-	ErrMCPServerDisabled  = errors.New("mcp server is disabled")
 )
 
 type MCPContentType string

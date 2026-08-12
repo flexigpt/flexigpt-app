@@ -1,4 +1,4 @@
-package spec
+package runtime
 
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 

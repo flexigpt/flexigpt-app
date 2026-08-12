@@ -10,7 +10,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 func TestEnvMapAndDisplayHelpers(t *testing.T) {
@@ -223,7 +222,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			Meta: map[string]any{"kind": "text"},
 		}
 		gotText := contentToSpec(text)
-		if gotText.Type != spec.MCPContentTypeText || gotText.Text != "hello" {
+		if gotText.Type != runtime.MCPContentTypeText || gotText.Text != "hello" {
 			t.Fatalf("text content = %#v", gotText)
 		}
 		if gotText.Meta["kind"] != "text" {
@@ -235,7 +234,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			MIMEType: "image/png",
 		}
 		gotImg := contentToSpec(img)
-		if gotImg.Type != spec.MCPContentTypeImage || gotImg.MIMEType != "image/png" {
+		if gotImg.Type != runtime.MCPContentTypeImage || gotImg.MIMEType != "image/png" {
 			t.Fatalf("image content = %#v", gotImg)
 		}
 		img.Data[0] = 9
@@ -248,7 +247,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			MIMEType: "audio/mpeg",
 		}
 		gotAudio := contentToSpec(audio)
-		if gotAudio.Type != spec.MCPContentTypeAudio || gotAudio.MIMEType != "audio/mpeg" {
+		if gotAudio.Type != runtime.MCPContentTypeAudio || gotAudio.MIMEType != "audio/mpeg" {
 			t.Fatalf("audio content = %#v", gotAudio)
 		}
 
@@ -270,7 +269,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			},
 		}
 		gotLink := contentToSpec(link)
-		if gotLink.Type != spec.MCPContentTypeResourceLink || gotLink.URI != link.URI || gotLink.Name != "demo" {
+		if gotLink.Type != runtime.MCPContentTypeResourceLink || gotLink.URI != link.URI || gotLink.Name != "demo" {
 			t.Fatalf("resource link = %#v", gotLink)
 		}
 		if len(gotLink.Icons) != 1 || gotLink.Icons[0].Source != "https://example.test/icon.png" {
@@ -295,7 +294,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 
 		embedded := &mcpSDK.EmbeddedResource{Resource: rc}
 		gotEmbedded := contentToSpec(embedded)
-		if gotEmbedded.Type != spec.MCPContentTypeResource || gotEmbedded.Resource == nil {
+		if gotEmbedded.Type != runtime.MCPContentTypeResource || gotEmbedded.Resource == nil {
 			t.Fatalf("embedded resource = %#v", gotEmbedded)
 		}
 
@@ -303,7 +302,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		if len(gotSlice) != 2 {
 			t.Fatalf("contentSliceToSpec len = %d, want 2", len(gotSlice))
 		}
-		if gotSlice[0].Type != spec.MCPContentTypeText || gotSlice[1].Type != spec.MCPContentTypeImage {
+		if gotSlice[0].Type != runtime.MCPContentTypeText || gotSlice[1].Type != runtime.MCPContentTypeImage {
 			t.Fatalf("contentSliceToSpec = %#v", gotSlice)
 		}
 
@@ -326,7 +325,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 	t.Run("completionReference", func(t *testing.T) {
 		tests := []struct {
 			name            string
-			req             spec.MCPCompleteArgumentRequestBody
+			req             runtime.MCPCompleteArgumentRequestBody
 			wantType        string
 			wantName        string
 			wantURI         string
@@ -334,7 +333,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		}{
 			{
 				name: "prompt",
-				req: spec.MCPCompleteArgumentRequestBody{
+				req: runtime.MCPCompleteArgumentRequestBody{
 					RefType: " prompt ",
 					Name:    "greet",
 				},
@@ -344,21 +343,21 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 
 			{
 				name: "missing prompt name",
-				req: spec.MCPCompleteArgumentRequestBody{
+				req: runtime.MCPCompleteArgumentRequestBody{
 					RefType: "prompt",
 				},
 				wantErrContains: "completion prompt name required",
 			},
 			{
 				name: "missing resource uri",
-				req: spec.MCPCompleteArgumentRequestBody{
+				req: runtime.MCPCompleteArgumentRequestBody{
 					RefType: "resource",
 				},
 				wantErrContains: "completion resource uri required",
 			},
 			{
 				name: "invalid ref type",
-				req: spec.MCPCompleteArgumentRequestBody{
+				req: runtime.MCPCompleteArgumentRequestBody{
 					RefType: "bogus",
 				},
 				wantErrContains: "invalid completion refType",

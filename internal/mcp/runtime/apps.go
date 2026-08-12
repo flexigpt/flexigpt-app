@@ -7,7 +7,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 const (
@@ -27,8 +26,8 @@ type MCPAppModelContextUpdate struct {
 
 	ResourceURI string `json:"resourceUri,omitempty"`
 
-	Content           []spec.MCPContent `json:"content,omitempty"`
-	StructuredContent any               `json:"structuredContent,omitempty"`
+	Content           []MCPContent `json:"content,omitempty"`
+	StructuredContent any          `json:"structuredContent,omitempty"`
 
 	UpdatedAt string `json:"updatedAt,omitempty"`
 }
@@ -67,14 +66,14 @@ func ValidateArtifactAppToolInvocation(
 	if !p.Enabled {
 		return fmt.Errorf(
 			"%w: MCP Apps is not enabled for server Artifact %q",
-			spec.ErrMCPPolicyDenied,
+			ErrMCPPolicyDenied,
 			tool.Server.ArtifactID,
 		)
 	}
 	if !p.AllowAppInitiatedToolCalls {
 		return fmt.Errorf(
 			"%w: app-initiated MCP tool calls are not allowed",
-			spec.ErrMCPPolicyDenied,
+			ErrMCPPolicyDenied,
 		)
 	}
 	if err := tool.Server.Validate(); err != nil {
@@ -83,13 +82,13 @@ func ValidateArtifactAppToolInvocation(
 	if appServer != tool.Server {
 		return fmt.Errorf(
 			"%w: MCP App cannot call a tool owned by another Server Artifact",
-			spec.ErrMCPPolicyDenied,
+			ErrMCPPolicyDenied,
 		)
 	}
 	if !ToolVisibleToApp(tool.App) {
 		return fmt.Errorf(
 			"%w: MCP tool %q is not visible to apps",
-			spec.ErrMCPPolicyDenied,
+			ErrMCPPolicyDenied,
 			tool.ToolName,
 		)
 	}

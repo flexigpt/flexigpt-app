@@ -10,10 +10,10 @@ import (
 	assistantpresetSpec "github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
@@ -526,9 +526,8 @@ func validateRequiredMCPArgumentsForLookup(
 }
 
 func isOptionalMCPDiscoveryError(err error) bool {
-	return errors.Is(err, mcpSpec.ErrMCPRuntimeNotReady) ||
-		errors.Is(err, mcpSpec.ErrMCPAuthRequired) ||
-		errors.Is(err, mcpSpec.ErrMCPServerDisabled)
+	return errors.Is(err, runtime.ErrMCPRuntimeNotReady) ||
+		errors.Is(err, auth.ErrMCPAuthRequired)
 }
 
 func getToolBundleEnabled(

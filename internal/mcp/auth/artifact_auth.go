@@ -18,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 const (
@@ -183,7 +182,7 @@ func (m *AuthManager) PrepareConnection(
 			output.Status.LastError = "missing streamable HTTP runtime config"
 			return output, fmt.Errorf(
 				"%w: %s",
-				spec.ErrMCPInvalidRequest,
+				ErrMCPInvalidAuthRequest,
 				output.Status.LastError,
 			)
 		}
@@ -203,7 +202,7 @@ func (m *AuthManager) PrepareConnection(
 				output.Status.LastError = "API-key MCP server has no materialized secret header"
 				return output, fmt.Errorf(
 					"%w: %s",
-					spec.ErrMCPAuthRequired,
+					ErrMCPAuthRequired,
 					output.Status.LastError,
 				)
 			}
@@ -231,7 +230,7 @@ func (m *AuthManager) PrepareConnection(
 			output.Status.LastError = "unsupported MCP HTTP authentication mode"
 			return output, fmt.Errorf(
 				"%w: %s",
-				spec.ErrMCPInvalidRequest,
+				ErrMCPInvalidAuthRequest,
 				output.Status.LastError,
 			)
 		}
@@ -239,7 +238,7 @@ func (m *AuthManager) PrepareConnection(
 	default:
 		return output, fmt.Errorf(
 			"%w: unsupported MCP runtime transport %q",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidAuthRequest,
 			config.Transport,
 		)
 	}
@@ -416,7 +415,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		output.Status.LastError = errStrOAuthNotConfigured
 		return fmt.Errorf(
 			"%w: %s",
-			spec.ErrMCPAuthRequired,
+			ErrMCPAuthRequired,
 			errStrOAuthNotConfigured,
 		)
 	}
@@ -485,7 +484,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 				if args == nil || args.URL == "" {
 					return nil, fmt.Errorf(
 						"%w: OAuth authorization URL is unavailable",
-						spec.ErrMCPAuthRequired,
+						ErrMCPAuthRequired,
 					)
 				}
 				result, err := m.oauthBroker.FetchAuthorizationCode(
@@ -501,7 +500,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 				if result == nil || result.Code == "" {
 					return nil, fmt.Errorf(
 						"%w: OAuth authorization code was not returned",
-						spec.ErrMCPAuthRequired,
+						ErrMCPAuthRequired,
 					)
 				}
 				return &mcpAuth.AuthorizationResult{
@@ -550,7 +549,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 		output.Status.LastError = "clientCredentials requires clientCredentialRef"
 		return fmt.Errorf(
 			"%w: %s",
-			spec.ErrMCPAuthRequired,
+			ErrMCPAuthRequired,
 			output.Status.LastError,
 		)
 	}
@@ -778,27 +777,27 @@ func parseOAuthClientCredentialsSecret(
 	if err := decoder.Decode(&wire); err != nil {
 		return nil, nil, fmt.Errorf(
 			"%w: OAuth client credentials must be one JSON object",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidAuthRequest,
 		)
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		return nil, nil, fmt.Errorf(
 			"%w: OAuth client credentials contain trailing JSON",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidAuthRequest,
 		)
 	}
 	if strings.TrimSpace(wire.ClientID) == "" ||
 		strings.TrimSpace(wire.ClientID) != wire.ClientID {
 		return nil, nil, fmt.Errorf(
 			"%w: OAuth client credentials require a trimmed clientID",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidAuthRequest,
 		)
 	}
 	if requireClientSecret &&
 		strings.TrimSpace(wire.ClientSecret) == "" {
 		return nil, nil, fmt.Errorf(
 			"%w: OAuth client credentials require clientSecret",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidAuthRequest,
 		)
 	}
 
@@ -815,7 +814,7 @@ func parseOAuthClientCredentialsSecret(
 	if err := credentials.Validate(); err != nil {
 		return nil, nil, fmt.Errorf(
 			"%w: %w",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidAuthRequest,
 			err,
 		)
 	}

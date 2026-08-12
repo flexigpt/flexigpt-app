@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 const defaultApprovalTTL = 5 * time.Minute
@@ -94,7 +93,7 @@ func (m *ApprovalManager) Resolve(
 	if strings.TrimSpace(id) == "" {
 		return nil, fmt.Errorf(
 			"%w: approval ID is required",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
@@ -107,13 +106,13 @@ func (m *ApprovalManager) Resolve(
 	if !found {
 		return nil, fmt.Errorf(
 			"%w: approval was not found",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidRuntimeRequest,
 		)
 	}
 	if pending.Issued || pending.Consumed {
 		return nil, fmt.Errorf(
 			"%w: approval was already resolved",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
@@ -149,7 +148,7 @@ func (m *ApprovalManager) Resolve(
 	default:
 		return nil, fmt.Errorf(
 			"%w: unsupported approval resolution %q",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidRuntimeRequest,
 			resolution,
 		)
 	}
@@ -181,7 +180,7 @@ func (m *ApprovalManager) VerifyAndConsumeToken(
 	if strings.TrimSpace(token) == "" {
 		return "", fmt.Errorf(
 			"%w: approval token is required",
-			spec.ErrMCPApprovalNeeded,
+			ErrMCPApprovalNeeded,
 		)
 	}
 	if err := validateApprovalSummary(expected); err != nil {
@@ -206,13 +205,13 @@ func (m *ApprovalManager) VerifyAndConsumeToken(
 		if pending.Consumed {
 			return "", fmt.Errorf(
 				"%w: approval token was already consumed",
-				spec.ErrMCPApprovalNeeded,
+				ErrMCPApprovalNeeded,
 			)
 		}
 		if !approvalSummaryMatches(pending.Summary, expected) {
 			return "", fmt.Errorf(
 				"%w: approval token does not match this MCP tool call",
-				spec.ErrMCPApprovalNeeded,
+				ErrMCPApprovalNeeded,
 			)
 		}
 
@@ -223,7 +222,7 @@ func (m *ApprovalManager) VerifyAndConsumeToken(
 
 	return "", fmt.Errorf(
 		"%w: approval token was not found",
-		spec.ErrMCPApprovalNeeded,
+		ErrMCPApprovalNeeded,
 	)
 }
 

@@ -19,7 +19,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 const (
@@ -65,18 +64,18 @@ type ClientSession interface {
 	ReadResource(
 		ctx context.Context,
 		uri string,
-	) (*spec.MCPReadResourceResponseBody, error)
+	) (*MCPReadResourceResponseBody, error)
 
 	GetPrompt(
 		ctx context.Context,
 		name string,
 		arguments map[string]string,
-	) (*spec.MCPGetPromptResponseBody, error)
+	) (*MCPGetPromptResponseBody, error)
 
 	Complete(
 		ctx context.Context,
-		request spec.MCPCompleteArgumentRequestBody,
-	) (*spec.MCPCompletionResult, error)
+		request MCPCompleteArgumentRequestBody,
+	) (*MCPCompletionResult, error)
 }
 
 type ClientFactory interface {
@@ -180,7 +179,7 @@ func (m *MCPRuntimeManager) Connect(
 	if !m.connectionCurrent(ref, generation) {
 		return nil, fmt.Errorf(
 			"%w: MCP connection was superseded",
-			spec.ErrMCPRuntimeNotReady,
+			ErrMCPRuntimeNotReady,
 		)
 	}
 
@@ -228,7 +227,7 @@ func (m *MCPRuntimeManager) Connect(
 		_ = closeMCPClient(ctx, client)
 		return nil, fmt.Errorf(
 			"%w: MCP connection was superseded",
-			spec.ErrMCPRuntimeNotReady,
+			ErrMCPRuntimeNotReady,
 		)
 	}
 
@@ -469,14 +468,14 @@ func (m *MCPRuntimeManager) ReadResource(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	uri string,
-) (*spec.MCPReadResourceResponseBody, error) {
+) (*MCPReadResourceResponseBody, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
 	if uri == "" {
 		return nil, fmt.Errorf(
 			"%w: MCP resource URI is required",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
@@ -493,14 +492,14 @@ func (m *MCPRuntimeManager) GetPrompt(
 	ref artifact.ArtifactRef,
 	name string,
 	arguments map[string]string,
-) (*spec.MCPGetPromptResponseBody, error) {
+) (*MCPGetPromptResponseBody, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
 	if name == "" {
 		return nil, fmt.Errorf(
 			"%w: MCP prompt name is required",
-			spec.ErrMCPInvalidRequest,
+			ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
@@ -519,8 +518,8 @@ func (m *MCPRuntimeManager) GetPrompt(
 func (m *MCPRuntimeManager) Complete(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	request spec.MCPCompleteArgumentRequestBody,
-) (*spec.MCPCompletionResult, error) {
+	request MCPCompleteArgumentRequestBody,
+) (*MCPCompletionResult, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -547,7 +546,7 @@ func (m *MCPRuntimeManager) CallToolDryRun(
 	if request.ToolName == "" {
 		return server.RuntimeConfig{},
 			MCPToolCapability{},
-			fmt.Errorf("%w: MCP tool name is required", spec.ErrMCPInvalidRequest)
+			fmt.Errorf("%w: MCP tool name is required", ErrMCPInvalidRuntimeRequest)
 	}
 
 	state, err := m.readySession(ref)
@@ -567,7 +566,7 @@ func (m *MCPRuntimeManager) CallToolDryRun(
 				MCPToolCapability{},
 				fmt.Errorf(
 					"%w: MCP tool digest changed",
-					spec.ErrMCPStaleReference,
+					ErrMCPStaleReference,
 				)
 		}
 	}
@@ -595,7 +594,7 @@ func (m *MCPRuntimeManager) CallTool(
 	if !tool.Enabled || tool.TaskSupport == MCPTaskSupportRequired {
 		return nil, fmt.Errorf(
 			"%w: MCP tool %q is disabled or unsupported",
-			spec.ErrMCPPolicyDenied,
+			ErrMCPPolicyDenied,
 			tool.ToolName,
 		)
 	}
@@ -604,7 +603,7 @@ func (m *MCPRuntimeManager) CallTool(
 		if !override.AllowStaleDigest {
 			return nil, fmt.Errorf(
 				"%w: MCP tool digest changed",
-				spec.ErrMCPStaleReference,
+				ErrMCPStaleReference,
 			)
 		}
 	}
@@ -623,7 +622,7 @@ func (m *MCPRuntimeManager) CallTool(
 	if body == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP tool call returned no response",
-			spec.ErrMCPRuntimeNotReady,
+			ErrMCPRuntimeNotReady,
 		)
 	}
 
@@ -739,7 +738,7 @@ func (m *MCPRuntimeManager) Refresh(
 	if !found || state.client == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP server is not connected",
-			spec.ErrMCPRuntimeNotReady,
+			ErrMCPRuntimeNotReady,
 		)
 	}
 
@@ -755,7 +754,7 @@ func (m *MCPRuntimeManager) Refresh(
 		_ = m.Invalidate(context.WithoutCancel(ctx), ref)
 		return nil, fmt.Errorf(
 			"%w: MCP server version changed; reconnect is required",
-			spec.ErrMCPStaleReference,
+			ErrMCPStaleReference,
 		)
 	}
 
@@ -779,7 +778,7 @@ func (m *MCPRuntimeManager) Refresh(
 		m.mu.Unlock()
 		return nil, fmt.Errorf(
 			"%w: MCP session changed during refresh",
-			spec.ErrMCPRuntimeNotReady,
+			ErrMCPRuntimeNotReady,
 		)
 	}
 	current.config = cloneRuntimeConfig(config)
@@ -884,7 +883,7 @@ func (m *MCPRuntimeManager) currentSnapshot(
 	if !found {
 		return MCPDiscoverySnapshot{}, fmt.Errorf(
 			"%w: MCP server is not connected",
-			spec.ErrMCPRuntimeNotReady,
+			ErrMCPRuntimeNotReady,
 		)
 	}
 	if state.status == MCPServerStatusReady && state.client != nil {
@@ -895,7 +894,7 @@ func (m *MCPRuntimeManager) currentSnapshot(
 	}
 	return MCPDiscoverySnapshot{}, fmt.Errorf(
 		"%w: MCP server has no current discovery snapshot",
-		spec.ErrMCPRuntimeNotReady,
+		ErrMCPRuntimeNotReady,
 	)
 }
 
@@ -908,7 +907,7 @@ func (m *MCPRuntimeManager) readySession(
 		state.client == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP server is not connected",
-			spec.ErrMCPRuntimeNotReady,
+			ErrMCPRuntimeNotReady,
 		)
 	}
 	return state, nil
@@ -1156,12 +1155,12 @@ func (m *MCPRuntimeManager) scheduleRefresh(
 		return
 	}
 	if timer := m.timers[ref]; timer != nil {
-		timer.Reset(spec.NotificationRefreshDebounce)
+		timer.Reset(NotificationRefreshDebounce)
 		return
 	}
 
 	var timer *time.Timer
-	timer = time.AfterFunc(spec.NotificationRefreshDebounce, func() {
+	timer = time.AfterFunc(NotificationRefreshDebounce, func() {
 		refreshCtx, cancel := context.WithTimeout(
 			context.WithoutCancel(ctx),
 			time.Minute,
@@ -1323,7 +1322,7 @@ func toolByName(
 	}
 	return MCPToolCapability{}, fmt.Errorf(
 		"%w: MCP tool %q was not found",
-		spec.ErrMCPInvalidRequest,
+		ErrMCPInvalidRuntimeRequest,
 		name,
 	)
 }
@@ -1368,7 +1367,7 @@ func paginateArtifactDiscoveryItems[T any](
 		if err != nil {
 			return nil, nil, fmt.Errorf(
 				"%w: invalid MCP discovery page token",
-				spec.ErrMCPInvalidRequest,
+				ErrMCPInvalidRuntimeRequest,
 			)
 		}
 		if token.Server != srv ||
@@ -1376,16 +1375,16 @@ func paginateArtifactDiscoveryItems[T any](
 			token.Kind != kind {
 			return nil, nil, fmt.Errorf(
 				"%w: stale MCP discovery page token",
-				spec.ErrMCPStaleReference,
+				ErrMCPStaleReference,
 			)
 		}
 		if token.PageSize <= 0 ||
-			token.PageSize > spec.MaxMCPServerPageSize ||
+			token.PageSize > MaxMCPServerPageSize ||
 			token.Index < 0 ||
 			token.Index > len(items) {
 			return nil, nil, fmt.Errorf(
 				"%w: invalid MCP discovery page token",
-				spec.ErrMCPInvalidRequest,
+				ErrMCPInvalidRuntimeRequest,
 			)
 		}
 
@@ -1393,10 +1392,10 @@ func paginateArtifactDiscoveryItems[T any](
 		pageSize = token.PageSize
 	} else {
 		if pageSize <= 0 {
-			pageSize = spec.DefaultMCPPageSize
+			pageSize = DefaultMCPPageSize
 		}
-		if pageSize > spec.MaxMCPServerPageSize {
-			pageSize = spec.MaxMCPServerPageSize
+		if pageSize > MaxMCPServerPageSize {
+			pageSize = MaxMCPServerPageSize
 		}
 	}
 
