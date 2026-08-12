@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	EmptyObject  = "{}"
-	maximumDepth = 256
+	EmptyObject               = "{}"
+	maximumDepth              = 256
+	maximumPlainIntegerDigits = 20
 )
 
 // MarshalCanonicalObject marshals value as a canonical JSON object.
@@ -302,6 +303,20 @@ func canonicalNumber(input string) (string, error) {
 	for len(digits) > 1 && digits[len(digits)-1] == '0' {
 		digits = digits[:len(digits)-1]
 		scale++
+	}
+
+	// "encoding/json" only accepts plain decimal notation when decoding into Go integer fields. Emit every integer that
+	// could fit a built-in Go integer without exponent notation. Twenty digits covers uint64.
+	if scale >= 0 &&
+		len(digits) <= maximumPlainIntegerDigits &&
+		scale <= int64(maximumPlainIntegerDigits-len(digits)) {
+		var output strings.Builder
+		if negative {
+			output.WriteByte('-')
+		}
+		output.WriteString(digits)
+		output.WriteString(strings.Repeat("0", int(scale)))
+		return output.String(), nil
 	}
 
 	exponent10 := scale + int64(len(digits)-1)

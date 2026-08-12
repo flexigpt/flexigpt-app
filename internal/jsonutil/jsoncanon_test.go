@@ -76,7 +76,7 @@ func TestCanonicalizeProducesStableJSONAndNumbers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Canonicalize: %v", err)
 	}
-	const want = `{"a":[true,1e2,0,1e-2],"b":1}`
+	const want = `{"a":[true,100,0,1e-2],"b":1}`
 	if string(canonical) != want {
 		t.Fatalf("canonical=%s, want %s", canonical, want)
 	}
@@ -131,7 +131,7 @@ func TestCanonicalizeIsDeterministicForConcurrentCallers(t *testing.T) {
 	const (
 		workers = 48
 		input   = `{"z":{"b":2,"a":1},"n":1.2300e+2}`
-		want    = `{"n":1.23e2,"z":{"a":1,"b":2}}`
+		want    = `{"n":123,"z":{"a":1,"b":2}}`
 	)
 	var group sync.WaitGroup
 	errorsSeen := make(chan error, workers)
