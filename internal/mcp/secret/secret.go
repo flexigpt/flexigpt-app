@@ -12,12 +12,11 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 func NewMCPSecretRefString(
 	server artifact.ArtifactRef,
-	kind spec.MCPSecretKind,
+	kind MCPSecretKind,
 	slot string,
 ) (string, error) {
 	ref, err := NewMCPSecretRef(server, kind, slot)
@@ -33,22 +32,22 @@ func NewMCPSecretRefString(
 
 func NewMCPSecretRef(
 	server artifact.ArtifactRef,
-	kind spec.MCPSecretKind,
+	kind MCPSecretKind,
 	slot string,
-) (spec.MCPSecretRef, error) {
+) (MCPSecretRef, error) {
 	kind = normalizeSecretKind(kind)
 	normalizedSlot, err := normalizeAndValidateSecretSlot(kind, slot)
 	if err != nil {
-		return spec.MCPSecretRef{}, err
+		return MCPSecretRef{}, err
 	}
 
-	ref := spec.MCPSecretRef{
+	ref := MCPSecretRef{
 		Server: server,
 		Kind:   kind,
 		Slot:   normalizedSlot,
 	}
 	if err := validateSecret(ref); err != nil {
-		return spec.MCPSecretRef{}, err
+		return MCPSecretRef{}, err
 	}
 	return ref, nil
 }
@@ -56,7 +55,7 @@ func NewMCPSecretRef(
 func ValidateMCPSecretRef(
 	raw string,
 	server artifact.ArtifactRef,
-	kind spec.MCPSecretKind,
+	kind MCPSecretKind,
 	slot string,
 ) error {
 	ref, err := ParseMCPSecretRef(raw)
@@ -77,78 +76,78 @@ func ValidateMCPSecretRef(
 	return nil
 }
 
-func ParseMCPSecretRef(raw string) (spec.MCPSecretRef, error) {
+func ParseMCPSecretRef(raw string) (MCPSecretRef, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return spec.MCPSecretRef{}, errors.New("secret ref is empty")
+		return MCPSecretRef{}, errors.New("secret ref is empty")
 	}
-	if !strings.HasPrefix(raw, spec.SecretRefVersion+":") {
-		return spec.MCPSecretRef{}, fmt.Errorf("secret ref %q is not a %s ref", raw, spec.SecretRefVersion)
+	if !strings.HasPrefix(raw, SecretRefVersion+":") {
+		return MCPSecretRef{}, fmt.Errorf("secret ref %q is not a %s ref", raw, SecretRefVersion)
 	}
 
-	encoded := strings.TrimPrefix(raw, spec.SecretRefVersion+":")
+	encoded := strings.TrimPrefix(raw, SecretRefVersion+":")
 	b, err := base64.RawURLEncoding.DecodeString(encoded)
 	if err != nil {
-		return spec.MCPSecretRef{}, fmt.Errorf("secret ref %q is not valid base64: %w", raw, err)
+		return MCPSecretRef{}, fmt.Errorf("secret ref %q is not valid base64: %w", raw, err)
 	}
 
 	var wire struct {
 		Server artifact.ArtifactRef `json:"server"`
-		Kind   spec.MCPSecretKind   `json:"kind"`
+		Kind   MCPSecretKind        `json:"kind"`
 		Slot   string               `json:"slot"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(b))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&wire); err != nil {
-		return spec.MCPSecretRef{}, fmt.Errorf("secret ref %q is not valid json: %w", raw, err)
+		return MCPSecretRef{}, fmt.Errorf("secret ref %q is not valid json: %w", raw, err)
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		if err == nil {
 			err = errors.New("secret ref contains trailing JSON")
 		}
-		return spec.MCPSecretRef{}, fmt.Errorf(
+		return MCPSecretRef{}, fmt.Errorf(
 			"secret ref %q is not valid json: %w",
 			raw,
 			err,
 		)
 	}
 
-	ref := spec.MCPSecretRef{
+	ref := MCPSecretRef{
 		Server: wire.Server,
 		Kind:   normalizeSecretKind(wire.Kind),
 		Slot:   normalizeSecretSlot(wire.Slot),
 	}
 	if err := validateSecret(ref); err != nil {
-		return spec.MCPSecretRef{}, err
+		return MCPSecretRef{}, err
 	}
 	return ref, nil
 }
 
-func GetMCPSecretRefStorageKey(r spec.MCPSecretRef) string {
+func GetMCPSecretRefStorageKey(r MCPSecretRef) string {
 	raw, err := canonicalSecret(r)
 	if err != nil {
 		return ""
 	}
 	sum := sha256.Sum256(raw)
-	return spec.SecretRefVersion + ":" + hex.EncodeToString(sum[:])
+	return SecretRefVersion + ":" + hex.EncodeToString(sum[:])
 }
 
-func GetMCPSecretRefString(r spec.MCPSecretRef) string {
+func GetMCPSecretRefString(r MCPSecretRef) string {
 	raw, err := canonicalSecret(r)
 	if err != nil {
 		return ""
 	}
-	return spec.SecretRefVersion + ":" + base64.RawURLEncoding.EncodeToString(raw)
+	return SecretRefVersion + ":" + base64.RawURLEncoding.EncodeToString(raw)
 }
 
-func canonicalSecret(r spec.MCPSecretRef) ([]byte, error) {
+func canonicalSecret(r MCPSecretRef) ([]byte, error) {
 	if err := validateSecret(r); err != nil {
 		return nil, err
 	}
 	wire := struct {
 		Server artifact.ArtifactRef `json:"server"`
-		Kind   spec.MCPSecretKind   `json:"kind"`
+		Kind   MCPSecretKind        `json:"kind"`
 		Slot   string               `json:"slot"`
 	}{
 		Server: r.Server,
@@ -158,15 +157,15 @@ func canonicalSecret(r spec.MCPSecretRef) ([]byte, error) {
 	return json.Marshal(wire)
 }
 
-func validateSecret(r spec.MCPSecretRef) error {
+func validateSecret(r MCPSecretRef) error {
 	if err := r.Server.Validate(); err != nil {
 		return fmt.Errorf("secret ref server: %w", err)
 	}
 	switch r.Kind {
-	case spec.MCPSecretKindStdioEnv,
-		spec.MCPSecretKindHTTPHeader,
-		spec.MCPSecretKindOAuthClientCredentials,
-		spec.MCPSecretKindOAuthToken:
+	case MCPSecretKindStdioEnv,
+		MCPSecretKindHTTPHeader,
+		MCPSecretKindOAuthClientCredentials,
+		MCPSecretKindOAuthToken:
 	default:
 		return fmt.Errorf("secret ref kind %q is invalid", r.Kind)
 	}
@@ -174,7 +173,7 @@ func validateSecret(r spec.MCPSecretRef) error {
 		return errors.New("secret ref slot is empty")
 	}
 	switch r.Kind {
-	case spec.MCPSecretKindOAuthClientCredentials:
+	case MCPSecretKindOAuthClientCredentials:
 		if r.Slot != normalizeSecretSlot("clientCredentials") {
 			return fmt.Errorf(
 				"secret ref slot %q is invalid for kind %q",
@@ -182,7 +181,7 @@ func validateSecret(r spec.MCPSecretRef) error {
 				r.Kind,
 			)
 		}
-	case spec.MCPSecretKindOAuthToken:
+	case MCPSecretKindOAuthToken:
 		if r.Slot != normalizeSecretSlot("token") {
 			return fmt.Errorf(
 				"secret ref slot %q is invalid for kind %q",
@@ -190,11 +189,11 @@ func validateSecret(r spec.MCPSecretRef) error {
 				r.Kind,
 			)
 		}
-	case spec.MCPSecretKindStdioEnv:
+	case MCPSecretKindStdioEnv:
 		if err := validateEnvSecretSlot(r.Slot); err != nil {
 			return err
 		}
-	case spec.MCPSecretKindHTTPHeader:
+	case MCPSecretKindHTTPHeader:
 		if err := validateHTTPHeaderSecretSlot(r.Slot); err != nil {
 			return err
 		}
@@ -202,24 +201,24 @@ func validateSecret(r spec.MCPSecretRef) error {
 	return nil
 }
 
-func normalizeAndValidateSecretSlot(kind spec.MCPSecretKind, slot string) (string, error) {
+func normalizeAndValidateSecretSlot(kind MCPSecretKind, slot string) (string, error) {
 	raw := strings.TrimSpace(slot)
 	if raw == "" {
 		return "", errors.New("secret ref slot is empty")
 	}
 
 	switch kind {
-	case spec.MCPSecretKindStdioEnv:
+	case MCPSecretKindStdioEnv:
 		if err := validateEnvSecretSlot(raw); err != nil {
 			return "", err
 		}
 		return normalizeSecretSlot(raw), nil
-	case spec.MCPSecretKindHTTPHeader:
+	case MCPSecretKindHTTPHeader:
 		if err := validateHTTPHeaderSecretSlot(raw); err != nil {
 			return "", err
 		}
 		return normalizeSecretSlot(raw), nil
-	case spec.MCPSecretKindOAuthClientCredentials:
+	case MCPSecretKindOAuthClientCredentials:
 		if !strings.EqualFold(raw, "clientCredentials") {
 			return "", fmt.Errorf(
 				"secret ref slot %q is invalid for kind %q; expected clientCredentials",
@@ -228,7 +227,7 @@ func normalizeAndValidateSecretSlot(kind spec.MCPSecretKind, slot string) (strin
 			)
 		}
 		return normalizeSecretSlot("clientCredentials"), nil
-	case spec.MCPSecretKindOAuthToken:
+	case MCPSecretKindOAuthToken:
 		if !strings.EqualFold(raw, "token") {
 			return "", fmt.Errorf(
 				"secret ref slot %q is invalid for kind %q; expected token",
@@ -293,8 +292,8 @@ func validateEnvSecretSlot(key string) error {
 	return nil
 }
 
-func normalizeSecretKind(kind spec.MCPSecretKind) spec.MCPSecretKind {
-	return spec.MCPSecretKind(strings.TrimSpace(string(kind)))
+func normalizeSecretKind(kind MCPSecretKind) MCPSecretKind {
+	return MCPSecretKind(strings.TrimSpace(string(kind)))
 }
 
 func normalizeSecretSlot(slot string) string {

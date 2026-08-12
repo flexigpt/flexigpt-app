@@ -7,6 +7,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
 
+type GrantType string
+
+const (
+	GrantTypeAuthorizationCode GrantType = "authorization_code"
+	GrantTypeRefreshToken      GrantType = "refresh_token"
+)
+
 type MCPAuthState string
 
 const (
@@ -67,4 +74,10 @@ type MCPAuthHealth struct {
 	OAuthLoopbackListenAddr string `json:"oauthLoopbackListenAddr,omitempty"`
 
 	LastError string `json:"lastError,omitempty"`
+}
+
+type MCPOAuthAuthorization struct {
+	Server           artifact.ArtifactRef `json:"server"`
+	AuthorizationURL string               `json:"authorizationURL"`
+	ExpiresAt        string               `json:"expiresAt,omitempty"`
 }

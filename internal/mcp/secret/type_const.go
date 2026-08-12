@@ -1,4 +1,4 @@
-package spec
+package secret
 
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 

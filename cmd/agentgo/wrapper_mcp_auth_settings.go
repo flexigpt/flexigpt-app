@@ -21,7 +21,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	"golang.org/x/oauth2"
 )
@@ -476,7 +475,7 @@ func (s *mcpSettingsAdapter) deleteOverlaySecretsLocked(
 
 	tokenRef, err := secret.NewMCPSecretRefString(
 		srv,
-		mcpSpec.MCPSecretKindOAuthToken,
+		secret.MCPSecretKindOAuthToken,
 		"token",
 	)
 	if err != nil {
@@ -771,7 +770,7 @@ func oauthTokenSecretRef(
 ) (string, error) {
 	return secret.NewMCPSecretRefString(
 		srv,
-		mcpSpec.MCPSecretKindOAuthToken,
+		secret.MCPSecretKindOAuthToken,
 		"token",
 	)
 }

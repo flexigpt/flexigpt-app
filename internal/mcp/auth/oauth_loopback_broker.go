@@ -212,7 +212,7 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	}
 }
 
-func (b *OAuthLoopbackBroker) Pending() []spec.MCPOAuthAuthorization {
+func (b *OAuthLoopbackBroker) Pending() []MCPOAuthAuthorization {
 	if b == nil {
 		return nil
 	}
@@ -224,9 +224,9 @@ func (b *OAuthLoopbackBroker) Pending() []spec.MCPOAuthAuthorization {
 
 	b.purgeExpiredLocked(now)
 
-	out := make([]spec.MCPOAuthAuthorization, 0, len(b.pendingByServer))
+	out := make([]MCPOAuthAuthorization, 0, len(b.pendingByServer))
 	for _, p := range b.pendingByServer {
-		out = append(out, spec.MCPOAuthAuthorization{
+		out = append(out, MCPOAuthAuthorization{
 			Server:           p.Server,
 			AuthorizationURL: p.AuthorizationURL,
 			ExpiresAt:        p.ExpiresAt.Format(time.RFC3339Nano),

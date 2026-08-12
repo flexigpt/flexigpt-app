@@ -728,7 +728,7 @@ func (w *MCPWrapper) InvokeMappedMCPTool(
 
 func (w *MCPWrapper) PutMCPServerSecret(
 	srv artifact.ArtifactRef,
-	kind mcpSpec.MCPSecretKind,
+	kind secret.MCPSecretKind,
 	slot string,
 	value string,
 ) (MCPSecretWriteResult, error) {
@@ -740,7 +740,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 		if err := w.requireServerArtifact(ctx, srv); err != nil {
 			return MCPSecretWriteResult{}, err
 		}
-		if kind == mcpSpec.MCPSecretKindOAuthToken {
+		if kind == secret.MCPSecretKindOAuthToken {
 			return MCPSecretWriteResult{}, fmt.Errorf(
 				"%w: OAuth token secrets are runtime-managed",
 				mcpSpec.ErrMCPInvalidRequest,
@@ -762,7 +762,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			return MCPSecretWriteResult{}, err
 		}
 
-		if kind == mcpSpec.MCPSecretKindOAuthClientCredentials {
+		if kind == secret.MCPSecretKindOAuthClientCredentials {
 			mode := installationView.Document.Extension.Auth.Mode
 			switch mode {
 			case server.MCPHTTPAuthOAuth,
@@ -787,7 +787,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			}
 		}
 
-		if kind == mcpSpec.MCPSecretKindHTTPHeader &&
+		if kind == secret.MCPSecretKindHTTPHeader &&
 			(strings.TrimSpace(value) == "" ||
 				strings.ContainsAny(value, "\r\n\x00")) {
 			return MCPSecretWriteResult{}, fmt.Errorf(
@@ -823,7 +823,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 
 func (w *MCPWrapper) DeleteMCPServerSecret(
 	srv artifact.ArtifactRef,
-	kind mcpSpec.MCPSecretKind,
+	kind secret.MCPSecretKind,
 	slot string,
 ) error {
 	return middleware.WithRecovery(func() error {
@@ -833,7 +833,7 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 		if err := w.requireServerArtifact(context.Background(), srv); err != nil {
 			return err
 		}
-		if kind == mcpSpec.MCPSecretKindOAuthToken {
+		if kind == secret.MCPSecretKindOAuthToken {
 			return fmt.Errorf(
 				"%w: OAuth token secrets are runtime-managed",
 				mcpSpec.ErrMCPInvalidRequest,
@@ -884,13 +884,13 @@ func (w *MCPWrapper) GetMCPServerAuthHealth(
 	})
 }
 
-func (w *MCPWrapper) ListPendingMCPOAuthAuthorizations() []mcpSpec.MCPOAuthAuthorization {
+func (w *MCPWrapper) ListPendingMCPOAuthAuthorizations() []auth.MCPOAuthAuthorization {
 	if w == nil || w.oauthBroker == nil {
-		return []mcpSpec.MCPOAuthAuthorization{}
+		return []auth.MCPOAuthAuthorization{}
 	}
 	values := w.oauthBroker.Pending()
 	if values == nil {
-		return []mcpSpec.MCPOAuthAuthorization{}
+		return []auth.MCPOAuthAuthorization{}
 	}
 	return values
 }
@@ -971,11 +971,11 @@ func (w *MCPWrapper) requireServerArtifact(
 
 func validateMCPSecretTarget(
 	document server.ServerDocument,
-	kind mcpSpec.MCPSecretKind,
+	kind secret.MCPSecretKind,
 	slot string,
 ) error {
 	switch kind {
-	case mcpSpec.MCPSecretKindOAuthClientCredentials:
+	case secret.MCPSecretKindOAuthClientCredentials:
 		input := document.Extension.Auth.ClientCredentialsInput
 		if input == "" {
 			return fmt.Errorf(
@@ -994,16 +994,16 @@ func validateMCPSecretTarget(
 		}
 		return nil
 
-	case mcpSpec.MCPSecretKindStdioEnv,
-		mcpSpec.MCPSecretKindHTTPHeader:
+	case secret.MCPSecretKindStdioEnv,
+		secret.MCPSecretKindHTTPHeader:
 		targets, err := server.SecretInputTargets(document)
 		if err != nil {
 			return err
 		}
 		for _, target := range targets {
-			expectedKind := mcpSpec.MCPSecretKindStdioEnv
+			expectedKind := secret.MCPSecretKindStdioEnv
 			if target.Kind == server.SecretInputTargetHTTPHeader {
-				expectedKind = mcpSpec.MCPSecretKindHTTPHeader
+				expectedKind = secret.MCPSecretKindHTTPHeader
 			}
 			if kind == expectedKind &&
 				strings.EqualFold(target.Slot, strings.TrimSpace(slot)) {

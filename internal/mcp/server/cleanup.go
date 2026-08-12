@@ -9,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 // SecretCleaner removes an opaque installation-local secret reference.
@@ -84,7 +83,7 @@ func CleanupReplacedServerSecrets(
 
 	tokenRef, err := secret.NewMCPSecretRefString(
 		server,
-		spec.MCPSecretKindOAuthToken,
+		secret.MCPSecretKindOAuthToken,
 		"token",
 	)
 	if err != nil {
@@ -141,12 +140,12 @@ func CleanupUnboundServerSecrets(
 	}
 	candidates := make(map[string]struct{})
 	for _, target := range targets {
-		var kind spec.MCPSecretKind
+		var kind secret.MCPSecretKind
 		switch target.Kind {
 		case SecretInputTargetStdioEnv:
-			kind = spec.MCPSecretKindStdioEnv
+			kind = secret.MCPSecretKindStdioEnv
 		case SecretInputTargetHTTPHeader:
-			kind = spec.MCPSecretKindHTTPHeader
+			kind = secret.MCPSecretKindHTTPHeader
 		default:
 			return fmt.Errorf(
 				"%w: unsupported MCP secret target %q",
@@ -170,7 +169,7 @@ func CleanupUnboundServerSecrets(
 		}
 		ref, err := secret.NewMCPSecretRefString(
 			server,
-			spec.MCPSecretKindOAuthClientCredentials,
+			secret.MCPSecretKindOAuthClientCredentials,
 			"clientCredentials",
 		)
 		if err != nil {
@@ -195,7 +194,7 @@ func CleanupUnboundServerSecrets(
 
 	tokenRef, err := secret.NewMCPSecretRefString(
 		server,
-		spec.MCPSecretKindOAuthToken,
+		secret.MCPSecretKindOAuthToken,
 		"token",
 	)
 	if err != nil {

@@ -3,8 +3,6 @@ package spec
 import (
 	"errors"
 	"time"
-
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 )
 
 const (
@@ -35,13 +33,6 @@ type MCPTransportType string
 const (
 	MCPTransportStreamableHTTP MCPTransportType = "streamableHttp"
 	MCPTransportStdio          MCPTransportType = "stdio"
-)
-
-type GrantType string
-
-const (
-	GrantTypeAuthorizationCode GrantType = "authorization_code"
-	GrantTypeRefreshToken      GrantType = "refresh_token"
 )
 
 type MCPContentType string
@@ -92,10 +83,4 @@ type MCPContent struct {
 type MCPPromptMessage struct {
 	Role    string     `json:"role"`
 	Content MCPContent `json:"content"`
-}
-
-type MCPOAuthAuthorization struct {
-	Server           artifact.ArtifactRef `json:"server"`
-	AuthorizationURL string               `json:"authorizationURL"`
-	ExpiresAt        string               `json:"expiresAt,omitempty"`
 }

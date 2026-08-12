@@ -370,7 +370,7 @@ func (m *AuthManager) BuildAuthHealth(
 			health.OAuthRedirectURL = broker.RedirectURL()
 		}
 		if broker, ok := m.oauthBroker.(interface {
-			Pending() []spec.MCPOAuthAuthorization
+			Pending() []MCPOAuthAuthorization
 		}); ok {
 			for _, pending := range broker.Pending() {
 				if pending.Server != config.Server {
@@ -462,8 +462,8 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 				),
 				ResponseTypes: []string{"code"},
 				GrantTypes: []string{
-					string(spec.GrantTypeAuthorizationCode),
-					string(spec.GrantTypeRefreshToken),
+					string(GrantTypeAuthorizationCode),
+					string(GrantTypeRefreshToken),
 				},
 			},
 		}

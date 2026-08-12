@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 var installationInputNamePattern = regexp.MustCompile(
@@ -125,7 +124,7 @@ func ValidateServerDataForDocument(
 			if err := secret.ValidateMCPSecretRef(
 				binding.SecretRef,
 				server,
-				spec.MCPSecretKindOAuthClientCredentials,
+				secret.MCPSecretKindOAuthClientCredentials,
 				"clientCredentials",
 			); err != nil {
 				return fmt.Errorf("MCP OAuth client input %q: %w", name, err)
@@ -577,14 +576,14 @@ func validateSecretBinding(
 		return secret.ValidateMCPSecretRef(
 			raw,
 			server,
-			spec.MCPSecretKindStdioEnv,
+			secret.MCPSecretKindStdioEnv,
 			target.Slot,
 		)
 	case SecretInputTargetHTTPHeader:
 		return secret.ValidateMCPSecretRef(
 			raw,
 			server,
-			spec.MCPSecretKindHTTPHeader,
+			secret.MCPSecretKindHTTPHeader,
 			target.Slot,
 		)
 	default:
