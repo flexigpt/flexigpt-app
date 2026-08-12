@@ -16,6 +16,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
@@ -171,12 +172,12 @@ func (m *AuthManager) PrepareConnection(
 	}()
 
 	switch config.Transport {
-	case spec.MCPTransportStdio:
+	case server.MCPTransportStdio:
 		output.Status.AuthMode = server.MCPHTTPAuthNone
 		output.Status.State = MCPAuthStateNotRequired
 		return output, nil
 
-	case spec.MCPTransportStreamableHTTP:
+	case server.MCPTransportStreamableHTTP:
 		if config.StreamableHTTP == nil {
 			output.Status.State = MCPAuthStateError
 			output.Status.LastError = "missing streamable HTTP runtime config"
@@ -454,9 +455,9 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		dynamic = &mcpAuth.DynamicClientRegistrationConfig{
 			Metadata: &oauthex.ClientRegistrationMetadata{
 				RedirectURIs:    []string{m.oauthRedirectURL},
-				ClientName:      spec.MCPHostName,
+				ClientName:      schema.MCPHostName,
 				SoftwareID:      "flexigpt",
-				SoftwareVersion: spec.MCPHostVersion,
+				SoftwareVersion: schema.MCPHostVersion,
 				TokenEndpointAuthMethod: string(
 					server.MCPHTTPAuthNone,
 				),

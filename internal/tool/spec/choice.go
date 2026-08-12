@@ -1,6 +1,9 @@
 package spec
 
-import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+import (
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+)
 
 type ToolStoreChoiceType string
 
@@ -11,8 +14,8 @@ const (
 )
 
 type ToolChoicePatch struct {
-	AutoExecute           *bool         `json:"autoExecute,omitempty"`
-	UserArgSchemaInstance JSONRawString `json:"userArgSchemaInstance,omitempty"`
+	AutoExecute           *bool                  `json:"autoExecute,omitempty"`
+	UserArgSchemaInstance jsonutil.JSONRawString `json:"userArgSchemaInstance,omitempty"`
 }
 
 type ToolSelection struct {
@@ -43,5 +46,5 @@ type ToolStoreChoice struct {
 	// For SDK-backed tools (Tool.Type == "sdk"), this typically contains provider-specific options validated against
 	// Tool.UserArgSchema. The inferencewrapper interprets this JSON and maps it into the appropriate inference-go
 	// ToolChoice fields (e.g. WebSearchToolChoiceItem).
-	UserArgSchemaInstance JSONRawString `json:"userArgSchemaInstance,omitempty"`
+	UserArgSchemaInstance jsonutil.JSONRawString `json:"userArgSchemaInstance,omitempty"`
 }

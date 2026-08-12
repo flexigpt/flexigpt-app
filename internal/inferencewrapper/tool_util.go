@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -164,7 +165,7 @@ func hydrateToolChoice(
 	return tc, nil
 }
 
-func decodeToolArgSchema(raw toolSpec.JSONRawString) (map[string]any, error) {
+func decodeToolArgSchema(raw jsonutil.JSONRawString) (map[string]any, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
 		return getEmptySchema(), nil

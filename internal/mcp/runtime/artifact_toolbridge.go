@@ -9,6 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
@@ -732,7 +733,7 @@ func approvalSummary(
 		ToolName:          tool.ToolName,
 		ToolDigest:        tool.Digest,
 		Risk:              tool.InferredRisk,
-		Arguments:         spec.JSONRawString(arguments),
+		Arguments:         jsonutil.JSONRawString(arguments),
 	}
 }
 

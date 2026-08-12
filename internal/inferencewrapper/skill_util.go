@@ -2,17 +2,16 @@ package inferencewrapper
 
 import (
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
-
-	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
 func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.ToolChoice, error) {
 	mk := func(choiceID, toolName string, t llmtoolsSpec.Tool) (inferenceSpec.ToolChoice, error) {
-		schema, err := decodeToolArgSchema(toolSpec.JSONRawString(t.ArgSchema))
+		schema, err := decodeToolArgSchema(jsonutil.JSONRawString(t.ArgSchema))
 		if err != nil {
 			return inferenceSpec.ToolChoice{}, err
 		}

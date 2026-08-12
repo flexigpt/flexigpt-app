@@ -8,7 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 var placeholderPattern = regexp.MustCompile(
@@ -47,6 +46,13 @@ const (
 	MCPHTTPAuthClientCredentials MCPHTTPAuthMode = "clientCredentials"
 )
 
+type MCPTransportType string
+
+const (
+	MCPTransportStreamableHTTP MCPTransportType = "streamableHttp"
+	MCPTransportStdio          MCPTransportType = "stdio"
+)
+
 // MCPRuntimeStdioConfig is the materialized process-local stdio transport
 // configuration. Secret values have already been resolved into Env only at
 // connection preparation time and are never persisted in an MCP document.
@@ -79,7 +85,7 @@ type RuntimeConfig struct {
 	LogicalName string
 	DisplayName string
 
-	Transport                 mcpSpec.MCPTransportType
+	Transport                 MCPTransportType
 	Stdio                     *MCPRuntimeStdioConfig
 	StreamableHTTP            *MCPRuntimeStreamableHTTPConfig
 	OAuthClientSecretRequired bool

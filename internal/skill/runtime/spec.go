@@ -5,6 +5,7 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
 
@@ -14,9 +15,6 @@ var (
 )
 
 const maxSkillToolArgsBytes = 1 << 20
-
-// JSONRawString mirrors the ToolRuntime API style; it's a raw JSON string.
-type JSONRawString = string
 
 type RuntimeSkillFilter struct {
 	Types          []string                      `json:"types,omitempty"`
@@ -151,7 +149,7 @@ type ListRuntimeSkillsResponse struct {
 type InvokeSkillToolRequestBody struct {
 	SessionID agentskillsSpec.SessionID `json:"sessionID"      required:"true"`
 	ToolName  string                    `json:"toolName"       required:"true"` // "skills-load" | "skills-unload" | "skills-readresource" | "skills-runscript"
-	Args      JSONRawString             `json:"args,omitempty"`                 // JSON object string
+	Args      jsonutil.JSONRawString    `json:"args,omitempty"`                 // JSON object string
 }
 
 type InvokeSkillToolRequest struct {

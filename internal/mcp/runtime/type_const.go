@@ -5,8 +5,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 type ClientNotificationKind string
@@ -236,12 +236,12 @@ const (
 )
 
 type MCPApprovalSummary struct {
-	Server            artifact.ArtifactRef `json:"server"`
-	ServerDisplayName string               `json:"serverDisplayName,omitempty"`
-	ToolName          string               `json:"toolName"`
-	ToolDigest        string               `json:"toolDigest,omitempty"`
-	Risk              MCPToolRisk          `json:"risk"`
-	Arguments         spec.JSONRawString   `json:"arguments,omitempty"`
+	Server            artifact.ArtifactRef   `json:"server"`
+	ServerDisplayName string                 `json:"serverDisplayName,omitempty"`
+	ToolName          string                 `json:"toolName"`
+	ToolDigest        string                 `json:"toolDigest,omitempty"`
+	Risk              MCPToolRisk            `json:"risk"`
+	Arguments         jsonutil.JSONRawString `json:"arguments,omitempty"`
 }
 
 type MCPApprovalEvaluation struct {

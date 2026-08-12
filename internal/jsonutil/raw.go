@@ -8,6 +8,11 @@ import (
 	"io"
 )
 
+type (
+	JSONRawString = string
+	JSONSchema    = json.RawMessage
+)
+
 // EncodeToJSONRaw encodes any value to json.RawMessage.
 // No typed method here as value being of a type doesnt really affect its functionality.
 func EncodeToJSONRaw(value any) (json.RawMessage, error) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
@@ -68,8 +69,8 @@ func (f *Factory) Connect(
 	}
 	client := mcpSDK.NewClient(
 		&mcpSDK.Implementation{
-			Name:    spec.MCPHostName,
-			Version: spec.MCPHostVersion,
+			Name:    schema.MCPHostName,
+			Version: schema.MCPHostVersion,
 		},
 		&mcpSDK.ClientOptions{
 			Logger: logger,
@@ -138,7 +139,7 @@ func (f *Factory) Connect(
 	var transport mcpSDK.Transport
 
 	switch cfg.Transport {
-	case spec.MCPTransportStdio:
+	case server.MCPTransportStdio:
 		if cfg.Stdio == nil {
 			return nil, fmt.Errorf(
 				"%w: missing stdio runtime config",
@@ -171,7 +172,7 @@ func (f *Factory) Connect(
 			TerminateDuration: defaultStdioTerminateDuration,
 		}
 
-	case spec.MCPTransportStreamableHTTP:
+	case server.MCPTransportStreamableHTTP:
 		if cfg.StreamableHTTP == nil {
 			return nil, fmt.Errorf(
 				"%w: missing streamable HTTP runtime config",

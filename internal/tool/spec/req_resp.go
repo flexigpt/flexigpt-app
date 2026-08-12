@@ -2,6 +2,7 @@ package spec
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type PutToolBundleRequestBody struct {
@@ -70,7 +71,7 @@ type PutToolRequestBody struct {
 	AutoExecReco bool `json:"autoExecReco" required:"true"`
 
 	// Take inputs as strings that we can then validate as a json object and put a tool.
-	ArgSchema JSONRawString `json:"argSchema" required:"true"`
+	ArgSchema jsonutil.JSONRawString `json:"argSchema" required:"true"`
 
 	Type     ToolImplType  `json:"type"               required:"true"`
 	HTTPImpl *HTTPToolImpl `json:"httpImpl,omitempty" required:"true"`

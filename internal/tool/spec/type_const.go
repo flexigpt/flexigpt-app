@@ -1,10 +1,10 @@
 package spec
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -22,11 +22,7 @@ const (
 	SchemaVersion = "2025-07-01"
 )
 
-type (
-	ToolImplType  string
-	JSONRawString = string
-	JSONSchema    = json.RawMessage
-)
+type ToolImplType string
 
 const (
 	ToolTypeGo   ToolImplType = "go"
@@ -117,12 +113,12 @@ type Tool struct {
 
 	// ArgSchema describes the JSON arguments that are passed when the tool is invoked (by the LLM or via InvokeTool).
 	// This is primarily used for Go/HTTP tools.
-	ArgSchema JSONSchema `json:"argSchema"`
+	ArgSchema jsonutil.JSONSchema `json:"argSchema"`
 
 	// UserArgSchema, if present, describes an additional per-choice configuration object that the UI may collect when
 	// enabling the tool for a model.
 	// For SDK-backed server tools this typically encodes provider-specific options (e.g., web-search settings).
-	UserArgSchema JSONSchema `json:"userArgSchema,omitempty"`
+	UserArgSchema jsonutil.JSONSchema `json:"userArgSchema,omitempty"`
 
 	// LLMToolType captures the semantic kind of this tool from the model's point of view, e.g. "function", "custom",
 	// "webSearch".

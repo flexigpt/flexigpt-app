@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -263,10 +264,10 @@ func approvalSummaryMatches(
 		normalizeApprovalArguments(expected.Arguments)
 }
 
-func normalizeApprovalArguments(value spec.JSONRawString) spec.JSONRawString {
+func normalizeApprovalArguments(value jsonutil.JSONRawString) jsonutil.JSONRawString {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return spec.JSONRawString(`{}`)
+		return jsonutil.JSONRawString(`{}`)
 	}
 
 	var decoded any
@@ -278,7 +279,7 @@ func normalizeApprovalArguments(value spec.JSONRawString) spec.JSONRawString {
 	if err != nil {
 		return trimmed
 	}
-	return spec.JSONRawString(normalized)
+	return jsonutil.JSONRawString(normalized)
 }
 
 func validateApprovalContext(ctx context.Context) error {
@@ -324,7 +325,7 @@ func cloneApprovalSummary(
 	input MCPApprovalSummary,
 ) MCPApprovalSummary {
 	output := input
-	output.Arguments = spec.JSONRawString(
+	output.Arguments = jsonutil.JSONRawString(
 		append([]byte(nil), []byte(input.Arguments)...),
 	)
 	return output

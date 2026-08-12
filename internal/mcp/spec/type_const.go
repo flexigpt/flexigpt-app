@@ -6,9 +6,6 @@ import (
 )
 
 const (
-	MCPHostName    = "FlexiGPT"
-	MCPHostVersion = "dev"
-
 	NotificationRefreshDebounce = 1 * time.Second
 	MaxMCPServerPageSize        = 256
 	DefaultMCPPageSize          = 25
@@ -22,17 +19,6 @@ var (
 	ErrMCPApprovalNeeded  = errors.New("mcp approval required")
 	ErrMCPStaleReference  = errors.New("mcp stale reference")
 	ErrMCPServerDisabled  = errors.New("mcp server is disabled")
-)
-
-type (
-	JSONRawString = string
-)
-
-type MCPTransportType string
-
-const (
-	MCPTransportStreamableHTTP MCPTransportType = "streamableHttp"
-	MCPTransportStdio          MCPTransportType = "stdio"
 )
 
 type MCPContentType string

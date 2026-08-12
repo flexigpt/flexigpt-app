@@ -21,6 +21,9 @@ var ServerV1JSONSchema []byte
 var PolicyV1JSONSchema []byte
 
 const (
+	MCPHostName    = "FlexiGPT"
+	MCPHostVersion = "dev"
+
 	BundleKind basespec.CollectionKind = "mcp.bundle"
 	ServerKind basespec.ArtifactKind   = "mcp.server"
 	PolicyKind basespec.ArtifactKind   = "mcp.policy"

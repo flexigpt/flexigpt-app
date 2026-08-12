@@ -8,7 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 type SecretResolver interface {
@@ -154,7 +153,7 @@ func runtimeConfigFromMaterialized(
 
 	switch materialized.Core.Type {
 	case ServerTypeStdio:
-		config.Transport = mcpSpec.MCPTransportStdio
+		config.Transport = MCPTransportStdio
 		config.Stdio = &MCPRuntimeStdioConfig{
 			Command:          materialized.Core.Command,
 			Args:             append([]string(nil), materialized.Core.Args...),
@@ -163,7 +162,7 @@ func runtimeConfigFromMaterialized(
 		}
 
 	case ServerTypeHTTP:
-		config.Transport = mcpSpec.MCPTransportStreamableHTTP
+		config.Transport = MCPTransportStreamableHTTP
 		config.StreamableHTTP = &MCPRuntimeStreamableHTTPConfig{
 			URL:                         materialized.Core.URL,
 			TimeoutMS:                   materialized.TimeoutMS,
