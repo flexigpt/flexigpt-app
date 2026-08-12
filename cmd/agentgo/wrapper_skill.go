@@ -13,9 +13,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	"github.com/flexigpt/flexigpt-app/internal/skill/artifactbuiltin"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/skill/schemaadapter"
 	"github.com/flexigpt/flexigpt-app/internal/skill/workspaceadapter"
 	workspaceSpec "github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -105,7 +105,7 @@ func InitSkillBundleWrapper(
 	wrapper.api = api
 	wrapper.runtime = runtime
 
-	skillRegistry, err := artifactbuiltin.LoadRegistry()
+	skillRegistry, err := schemaadapter.LoadRegistry()
 	if err != nil {
 		wrapper.close()
 		return err
@@ -115,8 +115,8 @@ func InitSkillBundleWrapper(
 		wrapper.close()
 		return err
 	}
-	builtIns, err := artifactbuiltin.NewInstaller(
-		artifactbuiltin.InstallerDependencies{
+	builtIns, err := schemaadapter.NewInstaller(
+		schemaadapter.InstallerDependencies{
 			Skills:                 api,
 			BuiltInTopology:        builtInTopology,
 			SkillRegistry:          skillRegistry,

@@ -1,4 +1,4 @@
-package artifactbuiltin
+package schemaadapter
 
 import (
 	"context"
@@ -14,28 +14,27 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
-
-	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
+	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+	"github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
 
 type skillInstaller interface {
 	ListBundles(
 		ctx context.Context,
 		rootID basespec.RootID,
-	) ([]skillBundle.Bundle, error)
+	) ([]bundle.Bundle, error)
 	ListSkills(
 		ctx context.Context,
 		ref collection.CollectionRef,
 	) ([]artifact.Artifact, error)
 	EnsureBuiltInBundleTopology(
 		ctx context.Context,
-		t skillBundle.BuiltInBundleTopology,
-	) (skillBundle.Bundle, error)
+		t bundle.BuiltInBundleTopology,
+	) (bundle.Bundle, error)
 	InstallBuiltInCollection(
 		ctx context.Context,
-		c skillBundle.BuiltInCollectionInstallRequest,
-	) ([]skillBundle.CreateManagedSkillResponse, error)
+		c bundle.BuiltInCollectionInstallRequest,
+	) ([]bundle.CreateManagedSkillResponse, error)
 	EnsureBuiltInBundleCurrent(
 		ctx context.Context,
 		ref collection.CollectionRef,
@@ -146,7 +145,7 @@ func (i *Installer) EnsureBuiltInArtifacts(
 	if err != nil {
 		return err
 	}
-	byCollectionID := make(map[basespec.CollectionID]skillBundle.Bundle, len(bundles))
+	byCollectionID := make(map[basespec.CollectionID]bundle.Bundle, len(bundles))
 	for _, bundle := range bundles {
 		byCollectionID[bundle.Collection.ID] = bundle
 	}
@@ -176,19 +175,19 @@ func (i *Installer) EnsureBuiltInArtifacts(
 			return err
 		}
 
-		request := skillBundle.BuiltInCollectionInstallRequest{
+		request := bundle.BuiltInCollectionInstallRequest{
 			Bundle:                     current.Collection.Ref(),
 			ExpectedCollectionRevision: current.Collection.Revision,
 			PackageDirectory:           value.SourceScope,
 			PackageFiles:               files,
 			Skills: make(
-				[]skillBundle.BuiltInCollectionSkill,
+				[]bundle.BuiltInCollectionSkill,
 				0,
 				len(value.Artifacts),
 			),
 		}
 		for _, skill := range value.Artifacts {
-			request.Skills = append(request.Skills, skillBundle.BuiltInCollectionSkill{
+			request.Skills = append(request.Skills, bundle.BuiltInCollectionSkill{
 				ArtifactID: skill.Registration.ID,
 				Member:     basespec.Locator(skill.Member.Locator),
 				Enabled:    skill.Registration.Enabled,
@@ -246,7 +245,7 @@ func (i *Installer) EnsureBuiltInArtifacts(
 
 func (i *Installer) EnsureBuiltInBundles(
 	ctx context.Context,
-) ([]skillBundle.Bundle, error) {
+) ([]bundle.Bundle, error) {
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
 		return nil, err
 	}
@@ -254,7 +253,7 @@ func (i *Installer) EnsureBuiltInBundles(
 		return nil, err
 	}
 
-	output := make([]skillBundle.Bundle, 0, len(i.hydrated.Collections))
+	output := make([]bundle.Bundle, 0, len(i.hydrated.Collections))
 	for _, value := range i.hydrated.OrderedCollections() {
 		if value.Definition.Digest == nil {
 			return nil, fmt.Errorf(
@@ -262,9 +261,9 @@ func (i *Installer) EnsureBuiltInBundles(
 				basespec.ErrInvalid,
 			)
 		}
-		bundle, err := i.skills.EnsureBuiltInBundleTopology(
+		b, err := i.skills.EnsureBuiltInBundleTopology(
 			ctx,
-			skillBundle.BuiltInBundleTopology{
+			bundle.BuiltInBundleTopology{
 				RootID:                i.builtInTopology.Root.ID,
 				CollectionID:          value.Registration.ID,
 				SourceID:              i.builtInTopology.Source.ID,
@@ -281,7 +280,7 @@ func (i *Installer) EnsureBuiltInBundles(
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, bundle)
+		output = append(output, b)
 	}
 	return output, nil
 }
@@ -351,7 +350,7 @@ func (i *Installer) rejectDynamicBuiltInBundles(
 
 func (i *Installer) rejectDynamicBuiltInArtifacts(
 	ctx context.Context,
-	current skillBundle.Bundle,
+	current bundle.Bundle,
 	declaredCollection HydratedCollection,
 ) error {
 	artifacts, err := i.skills.ListSkills(ctx, current.Collection.Ref())
@@ -384,7 +383,7 @@ func (i *Installer) rejectDynamicBuiltInArtifacts(
 func (i *Installer) packageFiles(
 	ctx context.Context,
 	packageRoot basespec.Locator,
-	document builtinSchema.SkillCollectionV1,
+	document schema.SkillCollectionV1,
 ) ([]source.ManagedPackageFile, error) {
 	embeddedFiles, err := topology.ReadPackageFiles(
 		ctx,
@@ -395,7 +394,7 @@ func (i *Installer) packageFiles(
 		return nil, err
 	}
 
-	canonicalDocument, err := builtinSchema.MarshalSkillCollectionV1(document)
+	canonicalDocument, err := schema.MarshalSkillCollectionV1(document)
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +403,7 @@ func (i *Installer) packageFiles(
 	foundDocument := false
 	for _, file := range embeddedFiles {
 		content := append([]byte(nil), file.Content...)
-		if file.Locator == builtinSchema.SkillCollectionV1FileName {
+		if file.Locator == schema.SkillCollectionV1FileName {
 			content = append([]byte(nil), canonicalDocument...)
 			foundDocument = true
 		}
@@ -417,7 +416,7 @@ func (i *Installer) packageFiles(
 		return nil, fmt.Errorf(
 			"%w: built-in package lacks %q",
 			basespec.ErrInvalid,
-			builtinSchema.SkillCollectionV1FileName,
+			schema.SkillCollectionV1FileName,
 		)
 	}
 

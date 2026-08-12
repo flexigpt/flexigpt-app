@@ -15,12 +15,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/schemaadapter"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/sdkclient"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
@@ -184,7 +184,7 @@ func installMCPBuiltIns(
 	bundles *bundle.API,
 	overlays overlay.OverlayRepository,
 ) error {
-	registry, packages, err := artifactbuiltin.LoadEmbeddedRegistry()
+	registry, packages, err := schemaadapter.LoadEmbeddedRegistry()
 	if err != nil {
 		return err
 	}
@@ -196,8 +196,8 @@ func installMCPBuiltIns(
 		)
 	}
 
-	installer, err := artifactbuiltin.NewInstaller(
-		artifactbuiltin.InstallerDependencies{
+	installer, err := schemaadapter.NewInstaller(
+		schemaadapter.InstallerDependencies{
 			Bundles:            bundles,
 			Registry:           registry,
 			Packages:           packages,

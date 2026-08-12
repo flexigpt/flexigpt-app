@@ -13,9 +13,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/schemaadapter"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
@@ -68,7 +68,7 @@ func InitArtifactStoreWrapper(
 	decoders := append(
 		workspace.DefaultDecoders(),
 		skillDecoder,
-		mcpArtifact.NewDecoder(),
+		schemaadapter.NewDecoder(),
 	)
 	shareableCodecs := []shareable.Codec{
 		skillBundle.NewShareableCodec(),

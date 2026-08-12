@@ -1,4 +1,4 @@
-package artifactbuiltin
+package schemaadapter
 
 import (
 	"bytes"

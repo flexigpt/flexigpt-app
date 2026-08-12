@@ -1,4 +1,4 @@
-package artifact
+package schemaadapter
 
 import (
 	"context"
