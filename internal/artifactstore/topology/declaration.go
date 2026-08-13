@@ -39,6 +39,9 @@ func (d Declaration) Validate() error {
 	if err := basespec.ValidateRootID(d.Root.ID); err != nil {
 		return err
 	}
+	if err := basespec.ValidateStorageKey(d.Root.StorageKey); err != nil {
+		return err
+	}
 	if err := basespec.ValidateRequiredText(
 		"protected Root display name",
 		d.Root.DisplayName,
@@ -63,6 +66,9 @@ func (d Declaration) Validate() error {
 	seen := make(map[basespec.SourceID]struct{}, len(d.Sources))
 	for index, draft := range d.Sources {
 		if err := basespec.ValidateSourceID(draft.ID); err != nil {
+			return fmt.Errorf("protected Sources[%d]: %w", index, err)
+		}
+		if err := basespec.ValidateStorageKey(draft.StorageKey); err != nil {
 			return fmt.Errorf("protected Sources[%d]: %w", index, err)
 		}
 		if err := basespec.ValidateSourceKind(draft.Kind); err != nil {

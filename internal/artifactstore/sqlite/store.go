@@ -17,9 +17,9 @@ type Store struct {
 	db *sql.DB
 }
 
-const schemaMarkerTable = "artifact_store_v1"
+const schemaMarkerTable = "artifact_store_v2"
 
-var schemaV1RequiredTables = []string{
+var schemaV2RequiredTables = []string{
 	"artifact_roots",
 	"artifact_topology_hydrations",
 	"artifact_sources",
@@ -90,7 +90,7 @@ func initializeSchema(
 	}
 
 	if markerExists {
-		if err := verifySchemaV1Tx(ctx, tx); err != nil {
+		if err := verifySchemaV2Tx(ctx, tx); err != nil {
 			return err
 		}
 		return tx.Commit()
@@ -102,11 +102,11 @@ func initializeSchema(
 	return tx.Commit()
 }
 
-func verifySchemaV1Tx(
+func verifySchemaV2Tx(
 	ctx context.Context,
 	tx *sql.Tx,
 ) error {
-	for _, table := range schemaV1RequiredTables {
+	for _, table := range schemaV2RequiredTables {
 		exists, err := tableExistsTx(ctx, tx, table)
 		if err != nil {
 			return fmt.Errorf(
@@ -117,7 +117,7 @@ func verifySchemaV1Tx(
 		}
 		if !exists {
 			return fmt.Errorf(
-				"%w: Artifact Store database does not match schema v1; delete the development Artifact Store directory",
+				"%w: Artifact Store database does not match schema v2; use a fresh Artifact Store base directory",
 				basespec.ErrUnsupported,
 			)
 		}

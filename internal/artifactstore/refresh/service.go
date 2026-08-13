@@ -5,20 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Service struct {
@@ -27,7 +24,6 @@ type Service struct {
 	sources     source.Runtime
 	artifacts   ArtifactReader
 	discovery   *discovery.Engine
-	definitions definition.Repository
 	reconciler  *artifact.Reconciler
 	publisher   Publisher
 	clock       clockutil.Clock
@@ -40,7 +36,6 @@ func NewService(
 	sources source.Runtime,
 	artifacts ArtifactReader,
 	discoveryEngine *discovery.Engine,
-	definitions definition.Repository,
 	reconciler *artifact.Reconciler,
 	publisher Publisher,
 	timeClock clockutil.Clock,
@@ -51,7 +46,6 @@ func NewService(
 		sources == nil ||
 		artifacts == nil ||
 		discoveryEngine == nil ||
-		definitions == nil ||
 		reconciler == nil ||
 		publisher == nil ||
 		timeClock == nil {
@@ -66,7 +60,6 @@ func NewService(
 		sources:     sources,
 		artifacts:   artifacts,
 		discovery:   discoveryEngine,
-		definitions: definitions,
 		reconciler:  reconciler,
 		publisher:   publisher,
 		clock:       timeClock,
@@ -154,8 +147,6 @@ func (s *Service) Refresh(
 	sourceGenerations := make(map[basespec.SourceID]string)
 	finalOccurrences := make([]catalog.Occurrence, 0)
 	allDiagnostics := make([]diagnostic.Diagnostic, 0)
-	discoveredDefinitions := make(map[cryptoutil.Digest]definition.Definition)
-
 	snapshots := make([]source.Snapshot, 0)
 	candidates := 0
 
@@ -263,7 +254,6 @@ func (s *Service) Refresh(
 			discovered.Diagnostics...,
 		)
 		candidates += discovered.Candidates
-		maps.Copy(discoveredDefinitions, discovered.Definitions)
 	}
 
 	for sourceID := range plansBySource {
@@ -277,33 +267,6 @@ func (s *Service) Refresh(
 	}
 
 	catalog.SortOccurrences(finalOccurrences)
-
-	digests := make([]cryptoutil.Digest, 0, len(discoveredDefinitions))
-	for digest := range discoveredDefinitions {
-		digests = append(digests, digest)
-	}
-	slices.Sort(digests)
-	for _, digest := range digests {
-		stored, err := s.definitions.Put(
-			ctx,
-			ref.RootID,
-			discoveredDefinitions[digest],
-		)
-		if err != nil {
-			return Result{}, err
-		}
-		canonicalStored, err := definition.Canonicalize(stored)
-		if err != nil {
-			return Result{}, fmt.Errorf(
-				"%w: definition repository returned an invalid definition: %w",
-				basespec.ErrInvalid,
-				err,
-			)
-		}
-		if canonicalStored.Digest != digest {
-			return Result{}, fmt.Errorf("%w: definition repository changed digest", basespec.ErrDigestMismatch)
-		}
-	}
 
 	existingArtifacts, err := s.artifacts.ListByCollection(ctx, ref)
 	if err != nil {
@@ -320,7 +283,6 @@ func (s *Service) Refresh(
 		finalOccurrences,
 		existingArtifacts,
 		suppressions,
-		s.definitions,
 		policy,
 	)
 	if err != nil {

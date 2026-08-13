@@ -68,6 +68,7 @@ func protectedSourceIntentMatches(
 ) bool {
 	return value.ID == draft.ID &&
 		value.RootID == rootID &&
+		value.StorageKey == draft.StorageKey &&
 		value.Kind == draft.Kind &&
 		value.DisplayName == draft.DisplayName &&
 		value.Enabled == draft.Enabled

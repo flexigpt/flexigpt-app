@@ -11,12 +11,14 @@ import (
 )
 
 type Source struct {
-	ID          basespec.SourceID   `json:"id"`
-	RootID      basespec.RootID     `json:"rootID"`
-	Kind        basespec.SourceKind `json:"kind"`
-	DisplayName string              `json:"displayName"`
-	Enabled     bool                `json:"enabled"`
-	Config      json.RawMessage     `json:"-"`
+	ID             basespec.SourceID   `json:"id"`
+	RootID         basespec.RootID     `json:"rootID"`
+	RootStorageKey basespec.StorageKey `json:"rootStorageKey"`
+	StorageKey     basespec.StorageKey `json:"storageKey"`
+	Kind           basespec.SourceKind `json:"kind"`
+	DisplayName    string              `json:"displayName"`
+	Enabled        bool                `json:"enabled"`
+	Config         json.RawMessage     `json:"-"`
 
 	Revision   uint64     `json:"revision"`
 	CreatedAt  time.Time  `json:"createdAt"`
@@ -25,15 +27,17 @@ type Source struct {
 }
 
 type Summary struct {
-	ID          basespec.SourceID   `json:"id"`
-	RootID      basespec.RootID     `json:"rootID"`
-	Kind        basespec.SourceKind `json:"kind"`
-	DisplayName string              `json:"displayName"`
-	Enabled     bool                `json:"enabled"`
-	Revision    uint64              `json:"revision"`
-	CreatedAt   time.Time           `json:"createdAt"`
-	ModifiedAt  time.Time           `json:"modifiedAt"`
-	RetiredAt   *time.Time          `json:"retiredAt,omitempty"`
+	ID             basespec.SourceID   `json:"id"`
+	RootID         basespec.RootID     `json:"rootID"`
+	RootStorageKey basespec.StorageKey `json:"rootStorageKey"`
+	StorageKey     basespec.StorageKey `json:"storageKey"`
+	Kind           basespec.SourceKind `json:"kind"`
+	DisplayName    string              `json:"displayName"`
+	Enabled        bool                `json:"enabled"`
+	Revision       uint64              `json:"revision"`
+	CreatedAt      time.Time           `json:"createdAt"`
+	ModifiedAt     time.Time           `json:"modifiedAt"`
+	RetiredAt      *time.Time          `json:"retiredAt,omitempty"`
 }
 
 func (s Source) Clone() Source {
@@ -69,15 +73,17 @@ func (s Source) Validate() error {
 
 func (s Source) Summary() Summary {
 	return Summary{
-		ID:          s.ID,
-		RootID:      s.RootID,
-		Kind:        s.Kind,
-		DisplayName: s.DisplayName,
-		Enabled:     s.Enabled,
-		Revision:    s.Revision,
-		CreatedAt:   s.CreatedAt,
-		ModifiedAt:  s.ModifiedAt,
-		RetiredAt:   cloneTime(s.RetiredAt),
+		ID:             s.ID,
+		RootID:         s.RootID,
+		RootStorageKey: s.RootStorageKey,
+		StorageKey:     s.StorageKey,
+		Kind:           s.Kind,
+		DisplayName:    s.DisplayName,
+		Enabled:        s.Enabled,
+		Revision:       s.Revision,
+		CreatedAt:      s.CreatedAt,
+		ModifiedAt:     s.ModifiedAt,
+		RetiredAt:      cloneTime(s.RetiredAt),
 	}
 }
 
@@ -85,7 +91,13 @@ func (s Summary) Validate() error {
 	if err := basespec.ValidateRootID(s.RootID); err != nil {
 		return err
 	}
+	if err := basespec.ValidateStorageKey(s.RootStorageKey); err != nil {
+		return err
+	}
 	if err := basespec.ValidateSourceID(s.ID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateStorageKey(s.StorageKey); err != nil {
 		return err
 	}
 
@@ -123,6 +135,7 @@ func (s Summary) Validate() error {
 
 type Draft struct {
 	ID          basespec.SourceID   `json:"id"`
+	StorageKey  basespec.StorageKey `json:"storageKey"`
 	Kind        basespec.SourceKind `json:"kind"`
 	DisplayName string              `json:"displayName"`
 	Enabled     bool                `json:"enabled"`

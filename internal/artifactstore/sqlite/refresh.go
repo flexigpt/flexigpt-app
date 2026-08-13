@@ -183,14 +183,21 @@ func (p *Publisher) Publish(
 		if err != nil {
 			return catalog.Snapshot{}, err
 		}
+		var definitionRaw any
+		if occurrence.Definition != nil {
+			definitionRaw, err = encodeJSON(occurrence.Definition)
+			if err != nil {
+				return catalog.Snapshot{}, err
+			}
+		}
 		if _, err := tx.ExecContext(
 			ctx,
 			`INSERT INTO artifact_current_occurrences (
 				root_id, collection_id, source_id, locator, subresource_locator,
 				kind, logical_name, logical_version,
-				definition_digest, source_content_digest, decoder_id,
+				definition_digest, definition_json, source_content_digest, decoder_id,
 				state, diagnostics_json, observed_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			string(publication.Ref.RootID),
 			string(publication.Ref.CollectionID),
 			string(occurrence.Key.SourceID),
@@ -200,6 +207,7 @@ func (p *Publisher) Publish(
 			string(occurrence.LogicalName),
 			string(occurrence.LogicalVersion),
 			nullableDigest(occurrence.DefinitionDigest),
+			definitionRaw,
 			nullableDigest(occurrence.SourceContentDigest),
 			string(occurrence.DecoderID),
 			string(occurrence.State),

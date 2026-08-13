@@ -8,6 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -122,7 +123,8 @@ func catalogTestSnapshot() Snapshot {
 }
 
 func catalogTestOccurrence(locator basespec.Locator) Occurrence {
-	definitionDigest := cryptoutil.DigestBytes([]byte("definition:" + string(locator)))
+	definitionValue := catalogTestDefinition()
+	definitionDigest := definitionValue.Digest
 	contentDigest := cryptoutil.DigestBytes([]byte("content:" + string(locator)))
 	return Occurrence{
 		RootID:       catalogTestRootID,
@@ -135,9 +137,25 @@ func catalogTestOccurrence(locator basespec.Locator) Occurrence {
 		Kind:                "test.artifact",
 		LogicalName:         "example",
 		DefinitionDigest:    &definitionDigest,
+		Definition:          &definitionValue,
 		SourceContentDigest: &contentDigest,
 		DecoderID:           "test.decoder",
 		State:               OccurrenceValid,
 		ObservedAt:          time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC),
 	}
+}
+
+func catalogTestDefinition() definition.Definition {
+	value, err := definition.Canonicalize(definition.Definition{
+		Kind:           "test.artifact",
+		SchemaID:       "test.schema",
+		SchemaVersion:  "v1",
+		LogicalName:    "example",
+		LogicalVersion: "v1",
+		Body:           []byte(`{"value":true}`),
+	})
+	if err != nil {
+		panic(err)
+	}
+	return value
 }

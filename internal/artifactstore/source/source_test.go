@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"path/filepath"
 	"sync"
@@ -37,7 +38,7 @@ func TestSourceCloneAndManagedPublicationNormalizationOwnMutableData(t *testing.
 	}
 
 	publication := ManagedPackagePublication{
-		Directory:          "packages/example",
+		Address:            sourceTestPackageAddress(),
 		ExpectedGeneration: "generation-1",
 		Files: []ManagedPackageFile{
 			{Locator: "z.txt", Content: []byte("z")},
@@ -60,6 +61,12 @@ func TestSourceCloneAndManagedPublicationNormalizationOwnMutableData(t *testing.
 	collision.Files = []ManagedPackageFile{
 		{Locator: "Readme.md", Content: []byte("one")},
 		{Locator: "README.md", Content: []byte("two")},
+	}
+	if _, err := NormalizeManagedPackagePublication(collision); !errors.Is(
+		err,
+		basespec.ErrInvalid,
+	) {
+		t.Fatalf("case-insensitive collision error=%v, want ErrInvalid", err)
 	}
 }
 
@@ -162,7 +169,7 @@ func (a *sourceTestAdapter) PublishPackage(
 func (a *sourceTestAdapter) RemovePackage(
 	ctx context.Context,
 	_ Source,
-	_ basespec.Locator,
+	_ ManagedPackageAddress,
 	_ string,
 ) error {
 	if err := ctx.Err(); err != nil {
@@ -216,7 +223,7 @@ func TestRegistryAndRuntimeValidateCapabilitiesAndConcurrentOpens(t *testing.T) 
 	}
 
 	publication := ManagedPackagePublication{
-		Directory: "packages/example",
+		Address: sourceTestPackageAddress(),
 		Files: []ManagedPackageFile{
 			{Locator: "z.txt", Content: []byte("z")},
 			{Locator: "a.txt", Content: []byte("a")},
@@ -229,7 +236,12 @@ func TestRegistryAndRuntimeValidateCapabilitiesAndConcurrentOpens(t *testing.T) 
 	if generation != "generation-2" {
 		t.Fatalf("published generation=%q", generation)
 	}
-	if err := registry.RemovePackage(t.Context(), value, "packages/example", generation); err != nil {
+	if err := registry.RemovePackage(
+		t.Context(),
+		value,
+		sourceTestPackageAddress(),
+		generation,
+	); err != nil {
 		t.Fatalf("RemovePackage: %v", err)
 	}
 	adapter.mu.Lock()
@@ -286,14 +298,24 @@ func TestRegistryAndRuntimeValidateCapabilitiesAndConcurrentOpens(t *testing.T) 
 func sourceTestValue() Source {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
 	return Source{
-		ID:          sourceTestID,
-		RootID:      sourceTestRootID,
-		Kind:        "test.source",
-		DisplayName: "Test source",
-		Enabled:     true,
-		Config:      json.RawMessage(`{"a":1}`),
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
+		ID:             sourceTestID,
+		RootID:         sourceTestRootID,
+		RootStorageKey: "test-root",
+		StorageKey:     "test-source",
+		Kind:           "test.source",
+		DisplayName:    "Test source",
+		Enabled:        true,
+		Config:         json.RawMessage(`{"a":1}`),
+		Revision:       1,
+		CreatedAt:      now,
+		ModifiedAt:     now,
+	}
+}
+
+func sourceTestPackageAddress() ManagedPackageAddress {
+	return ManagedPackageAddress{
+		Kind:    "test.package",
+		Name:    "example",
+		Version: "v1",
 	}
 }

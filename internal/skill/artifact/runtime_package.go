@@ -28,7 +28,7 @@ func ResolveRuntimePackage(
 			basespec.ErrUnsupported,
 		)
 	}
-	if path.Base(string(locator)) != DefinitionFileName {
+	if basespec.Locator(path.Base(string(locator))) != DefinitionFileName {
 		return "", fmt.Errorf(
 			"%w: Agent Skill locator %q is not %q",
 			basespec.ErrInvalid,

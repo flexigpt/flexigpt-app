@@ -29,7 +29,6 @@ type QueryService struct {
 	workspaces              *Service
 	catalogs                catalogSnapshotReader
 	artifacts               artifactLookup
-	definitions             definitionLookup
 	decoderFingerprint      func() (cryptoutil.Digest, error)
 	discoveryPolicyRevision string
 	validators              map[basespec.ArtifactKind]spec.DefinitionValidator
@@ -39,7 +38,6 @@ func NewQueryService(
 	workspaces *Service,
 	catalogs catalogSnapshotReader,
 	artifacts artifactLookup,
-	definitions definitionLookup,
 	decoderFingerprint func() (cryptoutil.Digest, error),
 	discoveryPolicyRevision string,
 	supports ...spec.ArtifactSupport,
@@ -47,7 +45,6 @@ func NewQueryService(
 	if workspaces == nil ||
 		catalogs == nil ||
 		artifacts == nil ||
-		definitions == nil ||
 		decoderFingerprint == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace query dependencies are incomplete",
@@ -88,7 +85,6 @@ func NewQueryService(
 		workspaces:              workspaces,
 		catalogs:                catalogs,
 		artifacts:               artifacts,
-		definitions:             definitions,
 		decoderFingerprint:      decoderFingerprint,
 		discoveryPolicyRevision: discoveryPolicyRevision,
 		validators:              validators,
@@ -494,18 +490,29 @@ func (q *QueryService) Catalog(
 			continue
 		}
 
-		if localArtifact.ResolvedDefinition == nil {
+		occurrence, found := occurrencesByKey[key]
+		if !found {
 			view.UnresolvedArtifacts = append(
 				view.UnresolvedArtifacts,
-				localArtifact,
+				recordWithDiagnostic(
+					localArtifact,
+					recordDefinitionUnavailableDiagnostic(
+						localArtifact,
+						errors.New("current catalog has no matching occurrence"),
+					),
+				),
 			)
 			continue
 		}
-		definitionValue, err := definition.ReadCanonical(
-			ctx,
-			q.definitions,
-			workspace.RootID,
-			*localArtifact.ResolvedDefinition,
+
+		if localArtifact.ResolvedDefinition == nil {
+			view.UnresolvedArtifacts = append(view.UnresolvedArtifacts, localArtifact)
+			continue
+		}
+
+		definitionValue, err := catalog.DefinitionForOccurrence(
+			snapshot,
+			occurrence.Key,
 		)
 		if err != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
@@ -520,6 +527,20 @@ func (q *QueryService) Catalog(
 			)
 			continue
 		}
+		if definitionValue.Digest != *localArtifact.ResolvedDefinition {
+			view.UnresolvedArtifacts = append(
+				view.UnresolvedArtifacts,
+				recordWithDiagnostic(
+					localArtifact,
+					recordDefinitionUnavailableDiagnostic(
+						localArtifact,
+						errors.New("catalog definition fingerprint differs from artifact state"),
+					),
+				),
+			)
+			continue
+		}
+
 		projectionValid := true
 		projectionDiagnostics := make([]diagnostic.Diagnostic, 0)
 		if _, dataErr := DecodeArtifactData(localArtifact.Data); dataErr != nil {
@@ -563,14 +584,9 @@ func (q *QueryService) Catalog(
 				projectionDiagnostic(localArtifact, err),
 			)
 		}
-		var occurrencePointer *catalog.Occurrence
-		occurrence, found := occurrencesByKey[key]
-		if found {
-			copyValue := occurrence
-			occurrencePointer = &copyValue
-		}
+		occurrenceCopy := catalog.CloneOccurrence(occurrence)
+		occurrencePointer := &occurrenceCopy
 		current := catalogCurrent &&
-			occurrencePointer != nil &&
 			occurrencePointer.State == catalog.OccurrenceValid &&
 			occurrencePointer.DefinitionDigest != nil &&
 			*occurrencePointer.DefinitionDigest ==

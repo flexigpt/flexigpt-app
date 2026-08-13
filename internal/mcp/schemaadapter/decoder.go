@@ -59,7 +59,7 @@ func (d *Decoder) Recognize(
 	candidate discovery.Candidate,
 ) discovery.Recognition {
 	if candidate.RequestsDecoder(schema.DecoderID) &&
-		schema.IsBundleDocumentLocator(candidate.Locator) {
+		bundle.IsBundleDocumentLocator(candidate.Locator) {
 		return discovery.RecognitionPreferred
 	}
 	return discovery.RecognitionNone
@@ -70,7 +70,7 @@ func (d *Decoder) Decode(
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	if !candidate.RequestsDecoder(schema.DecoderID) ||
-		!schema.IsBundleDocumentLocator(candidate.Locator) {
+		!bundle.IsBundleDocumentLocator(candidate.Locator) {
 		return nil, nil
 	}
 	if d == nil || d.documents == nil {

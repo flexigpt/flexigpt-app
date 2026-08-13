@@ -65,6 +65,7 @@ type PurgeArtifactRootResponse struct {
 // filesystem paths or provider credentials and is not returned by the API.
 type ArtifactSourceDraft struct {
 	ID          basespec.SourceID   `json:"id"          required:"true"`
+	StorageKey  basespec.StorageKey `json:"storageKey"  required:"true"`
 	Kind        basespec.SourceKind `json:"kind"        required:"true"`
 	DisplayName string              `json:"displayName" required:"true"`
 	Enabled     bool                `json:"enabled"`
@@ -164,10 +165,10 @@ type GetManagedSourceStateResponse struct {
 }
 
 type PublishManagedSourcePackageRequestBody struct {
-	ExpectedSourceRevision uint64                      `json:"expectedSourceRevision"       required:"true"`
-	Directory              basespec.Locator            `json:"directory"                    required:"true"`
-	ExpectedGeneration     string                      `json:"expectedGeneration,omitempty"`
-	Files                  []source.ManagedPackageFile `json:"files"                        required:"true"`
+	ExpectedSourceRevision uint64                       `json:"expectedSourceRevision"       required:"true"`
+	Address                source.ManagedPackageAddress `json:"address"                      required:"true"`
+	ExpectedGeneration     string                       `json:"expectedGeneration,omitempty"`
+	Files                  []source.ManagedPackageFile  `json:"files"                        required:"true"`
 }
 
 type PublishManagedSourcePackageRequest struct {
@@ -186,11 +187,11 @@ type PublishManagedSourcePackageResponse struct {
 }
 
 type RemoveManagedSourcePackageRequest struct {
-	RootID                 basespec.RootID   `json:"rootID"                 required:"true"`
-	SourceID               basespec.SourceID `json:"sourceID"               required:"true"`
-	ExpectedSourceRevision uint64            `json:"expectedSourceRevision" required:"true"`
-	Directory              basespec.Locator  `json:"directory"              required:"true"`
-	ExpectedGeneration     string            `json:"expectedGeneration"     required:"true"`
+	RootID                 basespec.RootID              `json:"rootID"                 required:"true"`
+	SourceID               basespec.SourceID            `json:"sourceID"               required:"true"`
+	ExpectedSourceRevision uint64                       `json:"expectedSourceRevision" required:"true"`
+	Address                source.ManagedPackageAddress `json:"address"                required:"true"`
+	ExpectedGeneration     string                       `json:"expectedGeneration"     required:"true"`
 }
 
 type RemoveManagedSourcePackageResponseBody struct {

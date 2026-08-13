@@ -108,27 +108,6 @@ type LocalPathCapability interface {
 	) bool
 }
 
-// ManagedPackageFile is one regular file relative to a managed package
-// directory. Empty directories are deliberately not part of the managed
-// package contract.
-type ManagedPackageFile struct {
-	Locator basespec.Locator `json:"locator"`
-	Content []byte           `json:"content"`
-}
-
-// ManagedPackagePublication atomically publishes one new package directory
-// inside a managed Source.
-//
-// ExpectedGeneration is optional. When supplied, it prevents publication
-// against a Source snapshot other than the one observed by the caller.
-// Repeating an already completed, byte-identical publication is idempotent
-// even when ExpectedGeneration names the generation before that publication.
-type ManagedPackagePublication struct {
-	Directory          basespec.Locator     `json:"directory"`
-	ExpectedGeneration string               `json:"expectedGeneration,omitempty"`
-	Files              []ManagedPackageFile `json:"files"`
-}
-
 // ManagedPackageWriter is the optional writable capability for an
 // application-managed Source adapter.
 //
@@ -146,7 +125,7 @@ type ManagedPackageWriter interface {
 	RemovePackage(
 		ctx context.Context,
 		value Source,
-		directory basespec.Locator,
+		address ManagedPackageAddress,
 		expectedGeneration string,
 	) error
 }
@@ -180,7 +159,7 @@ type ManagedSourceBootstrapper interface {
 type ManagedRootRemover interface {
 	RemoveManagedRoot(
 		ctx context.Context,
-		rootID basespec.RootID,
+		rootStorageKey basespec.StorageKey,
 	) error
 }
 

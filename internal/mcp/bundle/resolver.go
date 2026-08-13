@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -81,12 +80,7 @@ func (a *API) resolveMCPServer(
 		return server.Resolved{}, err
 	}
 
-	definitionValue, err := definition.ReadCanonical(
-		ctx,
-		a.dependencies.Definitions,
-		record.RootID,
-		*record.ResolvedDefinition,
-	)
+	definitionValue, err := definitionForArtifact(snapshot, record)
 	if err != nil {
 		return server.Resolved{}, err
 	}
@@ -411,12 +405,7 @@ func (a *API) effectivePolicy(
 				ref.ArtifactID,
 			)
 		}
-		definitionValue, err := definition.ReadCanonical(
-			ctx,
-			a.dependencies.Definitions,
-			record.RootID,
-			*record.ResolvedDefinition,
-		)
+		definitionValue, err := a.currentDefinitionForArtifact(ctx, record)
 		if err != nil {
 			return policy.Effective{}, err
 		}
@@ -454,12 +443,7 @@ func (a *API) policyBodiesByLogicalName(
 			record.ResolvedDefinition == nil {
 			continue
 		}
-		definitionValue, err := definition.ReadCanonical(
-			ctx,
-			a.dependencies.Definitions,
-			record.RootID,
-			*record.ResolvedDefinition,
-		)
+		definitionValue, err := a.currentDefinitionForArtifact(ctx, record)
 		if err != nil {
 			return nil, err
 		}

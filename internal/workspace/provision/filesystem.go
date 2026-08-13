@@ -60,13 +60,14 @@ func NewService(
 }
 
 type Request struct {
-	RootID       basespec.RootID
-	CollectionID basespec.CollectionID
-	SourceID     basespec.SourceID
-	DisplayName  string
-	Description  string
-	RootPath     string
-	Discovery    spec.DiscoveryPreferences
+	RootID           basespec.RootID
+	CollectionID     basespec.CollectionID
+	SourceID         basespec.SourceID
+	SourceStorageKey basespec.StorageKey
+	DisplayName      string
+	Description      string
+	RootPath         string
+	Discovery        spec.DiscoveryPreferences
 }
 
 func (s *Service) CreateFilesystem(
@@ -96,6 +97,7 @@ func (s *Service) CreateFilesystem(
 		request.RootID,
 		source.Draft{
 			ID:          request.SourceID,
+			StorageKey:  request.SourceStorageKey,
 			Kind:        fsdir.Kind,
 			DisplayName: request.DisplayName,
 			Enabled:     true,

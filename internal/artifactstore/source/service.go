@@ -8,13 +8,22 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+type rootReader interface {
+	Get(
+		ctx context.Context,
+		id basespec.RootID,
+	) (root.Root, error)
+}
+
 type Service struct {
 	repository Repository
 	registry   *Registry
+	roots      rootReader
 	clock      clockutil.Clock
 	policy     protection.RootPolicy
 }
@@ -22,10 +31,11 @@ type Service struct {
 func NewService(
 	repository Repository,
 	registry *Registry,
+	roots rootReader,
 	timeClock clockutil.Clock,
 	policy protection.RootPolicy,
 ) (*Service, error) {
-	if repository == nil || registry == nil || timeClock == nil {
+	if repository == nil || registry == nil || roots == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: source service dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -34,6 +44,7 @@ func NewService(
 	return &Service{
 		repository: repository,
 		registry:   registry,
+		roots:      roots,
 		clock:      timeClock,
 		policy:     policy,
 	}, nil
@@ -71,10 +82,17 @@ func (s *Service) CreateWithStatus(
 	if err := basespec.ValidateRootID(rootID); err != nil {
 		return Summary{}, false, err
 	}
+	rootValue, err := s.roots.Get(ctx, rootID)
+	if err != nil {
+		return Summary{}, false, err
+	}
 	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return Summary{}, false, err
 	}
 	if err := basespec.ValidateSourceID(draft.ID); err != nil {
+		return Summary{}, false, err
+	}
+	if err := basespec.ValidateStorageKey(draft.StorageKey); err != nil {
 		return Summary{}, false, err
 	}
 	if err := basespec.ValidateSourceKind(draft.Kind); err != nil {
@@ -109,15 +127,17 @@ func (s *Service) CreateWithStatus(
 
 	now := clockutil.NowUTC(s.clock)
 	value := Source{
-		ID:          draft.ID,
-		RootID:      rootID,
-		Kind:        draft.Kind,
-		DisplayName: draft.DisplayName,
-		Enabled:     draft.Enabled,
-		Config:      config,
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
+		ID:             draft.ID,
+		RootID:         rootID,
+		RootStorageKey: rootValue.StorageKey,
+		StorageKey:     draft.StorageKey,
+		Kind:           draft.Kind,
+		DisplayName:    draft.DisplayName,
+		Enabled:        draft.Enabled,
+		Config:         config,
+		Revision:       1,
+		CreatedAt:      now,
+		ModifiedAt:     now,
 	}
 	if err := value.Validate(); err != nil {
 		return Summary{}, false, err
@@ -211,6 +231,8 @@ func sourceCreationIntentMatches(
 ) bool {
 	return existing.ID == requested.ID &&
 		existing.RootID == requested.RootID &&
+		existing.RootStorageKey == requested.RootStorageKey &&
+		existing.StorageKey == requested.StorageKey &&
 		existing.Kind == requested.Kind &&
 		existing.DisplayName == requested.DisplayName &&
 		existing.Enabled == requested.Enabled &&

@@ -6,6 +6,7 @@ import (
 
 const (
 	MaxKindBytes             = 128
+	MaxStorageKeyBytes       = 128
 	MaxFingerprintBytes      = 128
 	MaxSchemaIDBytes         = 256
 	MaxDisplayNameBytes      = 256
@@ -69,6 +70,8 @@ type (
 	SourceID           string
 	CollectionID       string
 	ArtifactID         string
+	StorageKey         string
+	PackageKind        string
 	SourceKind         string
 	CollectionKind     string
 	ArtifactKind       string

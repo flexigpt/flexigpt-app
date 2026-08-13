@@ -14,11 +14,4 @@ const (
 	RoleLibrary         basespec.AttachmentRole = "library"
 	RoleAttachedPackage basespec.AttachmentRole = "attached-package"
 	RoleOverlay         basespec.AttachmentRole = "overlay"
-
-	WorkspaceMetadataDirectory                  = ".flexigpt"
-	WorkspaceMetadataLocator   basespec.Locator = WorkspaceMetadataDirectory
-	RepositoryRootLocator      basespec.Locator = "."
-
-	WorkspaceDescriptorFileName                  = builtinSchema.WorkspaceCollectionV1FileName
-	DescriptorLocator           basespec.Locator = WorkspaceMetadataDirectory + "/" + WorkspaceDescriptorFileName
 )

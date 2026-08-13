@@ -9,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -53,10 +52,9 @@ func (r *Reconciler) Reconcile(
 	occurrences []catalog.Occurrence,
 	existing []Artifact,
 	suppressions []Suppression,
-	definitions definition.Reader,
 	policy Policy,
 ) (Reconciliation, error) {
-	if definitions == nil || policy == nil {
+	if policy == nil {
 		return Reconciliation{}, fmt.Errorf(
 			"%w: artifact reconciliation dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -274,7 +272,8 @@ func (r *Reconciler) Reconcile(
 	for _, identity := range orderedOccurrenceBindings {
 		occurrence := occurrencesByBinding[identity]
 		if occurrence.State != catalog.OccurrenceValid ||
-			occurrence.DefinitionDigest == nil {
+			occurrence.DefinitionDigest == nil ||
+			occurrence.Definition == nil {
 			continue
 		}
 		if _, exists := existingByBinding[identity]; exists {
@@ -289,21 +288,11 @@ func (r *Reconciler) Reconcile(
 			continue
 		}
 
-		value, err := definition.ReadCanonical(
-			ctx,
-			definitions,
-			collectionValue.RootID,
-			*occurrence.DefinitionDigest,
-		)
-		if err != nil {
-			return Reconciliation{}, err
-		}
-
 		draft, create, diagnostics, err := policy.Derive(
 			ctx,
 			collectionValue,
 			occurrence,
-			value,
+			occurrence.Definition.Clone(),
 		)
 		if err := diagnostic.ValidateDiagnostics(diagnostics); err != nil {
 			return Reconciliation{}, err

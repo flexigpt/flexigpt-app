@@ -38,7 +38,7 @@ type RemovePackageFunc func(
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
 	expectedSourceRevision uint64,
-	directory basespec.Locator,
+	address source.ManagedPackageAddress,
 	expectedGeneration string,
 ) (SourceState, error)
 
@@ -395,7 +395,7 @@ func (s *Service) Publish(
 
 type RemoveRequest struct {
 	Artifact       artifact.Artifact
-	Package        basespec.Locator
+	Package        source.ManagedPackageAddress
 	Plan           discovery.Plan
 	RefreshPolicy  artifact.Policy
 	AllowProtected bool
@@ -564,7 +564,7 @@ func (s *Service) validateRemoveRequest(
 	if err := request.Artifact.Validate(); err != nil {
 		return err
 	}
-	if err := source.ValidateManagedPackageDirectory(request.Package); err != nil {
+	if err := request.Package.Validate(); err != nil {
 		return err
 	}
 	if request.RefreshPolicy == nil {

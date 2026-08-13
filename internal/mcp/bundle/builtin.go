@@ -17,10 +17,10 @@ import (
 )
 
 type EnsureBuiltInRequest struct {
-	RootID          basespec.RootID
-	CollectionID    basespec.CollectionID
-	SourceID        basespec.SourceID
-	DocumentLocator basespec.Locator
+	RootID         basespec.RootID
+	CollectionID   basespec.CollectionID
+	SourceID       basespec.SourceID
+	PackageAddress source.ManagedPackageAddress
 
 	PackageFiles  []source.ManagedPackageFile
 	Document      shareable.ParsedDocument
@@ -49,7 +49,7 @@ func (a *API) EnsureBuiltIn(
 	if err := basespec.ValidateSourceID(request.SourceID); err != nil {
 		return Bundle{}, err
 	}
-	if err := ValidateDocumentLocator(request.DocumentLocator); err != nil {
+	if err := validateBundlePackageAddress(request.PackageAddress); err != nil {
 		return Bundle{}, err
 	}
 	if !a.dependencies.RootPolicy.IsProtectedRoot(request.RootID) {
@@ -65,6 +65,20 @@ func (a *API) EnsureBuiltIn(
 	)
 	if err != nil {
 		return Bundle{}, err
+	}
+
+	expectedAddress, err := PackageAddressForBundle(
+		document.LogicalName,
+		document.LogicalVersion,
+	)
+	if err != nil {
+		return Bundle{}, err
+	}
+	if expectedAddress != request.PackageAddress {
+		return Bundle{}, fmt.Errorf(
+			"%w: MCP built-in package address differs from document identity",
+			basespec.ErrConflict,
+		)
 	}
 
 	sourceValue, err := a.dependencies.Sources.Get(
@@ -93,8 +107,8 @@ func (a *API) EnsureBuiltIn(
 		return Bundle{}, err
 	}
 	attachmentData, err := EncodeAttachmentData(AttachmentData{
-		SchemaVersion:   AttachmentDataSchemaVersion,
-		DocumentLocator: request.DocumentLocator,
+		SchemaVersion:  AttachmentDataSchemaVersion,
+		PackageAddress: request.PackageAddress,
 	})
 	if err != nil {
 		return Bundle{}, err
@@ -178,7 +192,7 @@ func ensureBuiltInTopologyMatches(
 		bundle.Attachment.Role != RoleBuiltIn ||
 		!bundle.Attachment.Enabled ||
 		!jsonutil.Equal(bundle.Attachment.Data, attachmentData) ||
-		bundle.DocumentLocator != request.DocumentLocator {
+		bundle.PackageAddress != request.PackageAddress {
 		return fmt.Errorf(
 			"%w: protected MCP Bundle attachment differs from its static registry",
 			basespec.ErrConflict,

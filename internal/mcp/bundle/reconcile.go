@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -67,9 +66,21 @@ func (a *API) replaceCanonicalDocument(
 	if err != nil {
 		return Bundle{}, err
 	}
+	packageAddress, err := PackageAddressForBundle(
+		plan.document.LogicalName,
+		plan.document.LogicalVersion,
+	)
+	if err != nil {
+		return Bundle{}, err
+	}
+	if packageAddress != plan.bundle.PackageAddress {
+		return Bundle{}, fmt.Errorf(
+			"%w: MCP Bundle document identity would move package content",
+			basespec.ErrConflict,
+		)
+	}
 	files, err := documentPackageFiles(
-		plan.bundle.PackageDirectory,
-		basespec.Locator(path.Base(string(plan.bundle.DocumentLocator))),
+		packageAddress,
 		plan.raw,
 		suppliedFiles,
 	)
@@ -149,8 +160,8 @@ func (a *API) replaceCanonicalDocument(
 			Collection: plan.bundle.Collection.Ref(),
 			SourceID:   plan.bundle.Source.ID,
 			Package: source.ManagedPackagePublication{
-				Directory: plan.bundle.PackageDirectory,
-				Files:     files,
+				Address: packageAddress,
+				Files:   files,
 			},
 			Plan:           a.discoveryPlan(plan.bundle),
 			RefreshPolicy:  noAutomaticAdoption{},
@@ -220,22 +231,21 @@ func (a *API) replaceCanonicalDocument(
 }
 
 func documentPackageFiles(
-	directory basespec.Locator,
-	documentFile basespec.Locator,
+	address source.ManagedPackageAddress,
 	canonicalDocument json.RawMessage,
 	supplied []source.ManagedPackageFile,
 ) ([]source.ManagedPackageFile, error) {
 	if len(supplied) == 0 {
 		supplied = []source.ManagedPackageFile{{
-			Locator: documentFile,
+			Locator: ManagedDocumentFileName,
 			Content: append([]byte(nil), canonicalDocument...),
 		}}
 	}
 
 	publication, err := source.NormalizeManagedPackagePublication(
 		source.ManagedPackagePublication{
-			Directory: directory,
-			Files:     supplied,
+			Address: address,
+			Files:   supplied,
 		},
 	)
 	if err != nil {
@@ -244,7 +254,7 @@ func documentPackageFiles(
 
 	foundDocument := false
 	for index := range publication.Files {
-		if publication.Files[index].Locator != documentFile {
+		if publication.Files[index].Locator != ManagedDocumentFileName {
 			continue
 		}
 		publication.Files[index].Content = append(
@@ -257,7 +267,7 @@ func documentPackageFiles(
 		return nil, fmt.Errorf(
 			"%w: MCP package does not contain canonical document %q",
 			basespec.ErrInvalid,
-			documentFile,
+			ManagedDocumentFileName,
 		)
 	}
 
@@ -569,12 +579,7 @@ func (a *API) UpdateServerInstallation(
 		return artifact.Artifact{}, basespec.ErrConflict
 	}
 
-	definitionValue, err := definition.ReadCanonical(
-		ctx,
-		a.dependencies.Definitions,
-		record.RootID,
-		*record.ResolvedDefinition,
-	)
+	definitionValue, err := a.currentDefinitionForArtifact(ctx, record)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -666,12 +671,7 @@ func (a *API) UpdateProtectedServerInstallation(
 		)
 	}
 
-	definitionValue, err := definition.ReadCanonical(
-		ctx,
-		a.dependencies.Definitions,
-		record.RootID,
-		*record.ResolvedDefinition,
-	)
+	definitionValue, err := a.currentDefinitionForArtifact(ctx, record)
 	if err != nil {
 		return err
 	}
@@ -755,4 +755,23 @@ func serverDocumentFromDefinition(
 		MCPServer:      body.MCPServer,
 		Extension:      body.Extension,
 	}, nil
+}
+
+func (a *API) currentDefinitionForArtifact(
+	ctx context.Context,
+	record artifact.Artifact,
+) (definition.Definition, error) {
+	bundle, err := a.Get(ctx, collection.CollectionRef{
+		RootID:       record.RootID,
+		CollectionID: record.CollectionID,
+	})
+	if err != nil {
+		return definition.Definition{}, err
+	}
+
+	snapshot, err := a.currentCatalog(ctx, bundle)
+	if err != nil {
+		return definition.Definition{}, err
+	}
+	return definitionForArtifact(snapshot, record)
 }

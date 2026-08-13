@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"path"
 	"slices"
 	"sort"
 
@@ -55,7 +54,6 @@ type Dependencies struct {
 	Refresh          refresh.Runner
 
 	Catalogs           catalog.Reader
-	Definitions        definition.Reader
 	SourceRuntime      source.Runtime
 	ShareableDocuments shareable.ExpectedCanonicalizer
 
@@ -82,7 +80,6 @@ func New(dependencies Dependencies) (*API, error) {
 		dependencies.ManagedArtifacts == nil ||
 		dependencies.Refresh == nil ||
 		dependencies.Catalogs == nil ||
-		dependencies.Definitions == nil ||
 		dependencies.SourceRuntime == nil ||
 		dependencies.ShareableDocuments == nil ||
 		dependencies.HasDecoder == nil ||
@@ -116,8 +113,8 @@ type Bundle struct {
 	Attachment collection.Attachment
 	Source     source.Summary
 
-	DocumentLocator  basespec.Locator
-	PackageDirectory basespec.Locator
+	PackageAddress  source.ManagedPackageAddress
+	DocumentLocator basespec.Locator
 }
 
 type Registration struct {
@@ -129,10 +126,10 @@ type Registration struct {
 }
 
 type CreateRequest struct {
-	RootID          basespec.RootID
-	CollectionID    basespec.CollectionID
-	SourceID        basespec.SourceID
-	DocumentLocator basespec.Locator
+	RootID           basespec.RootID
+	CollectionID     basespec.CollectionID
+	SourceID         basespec.SourceID
+	SourceStorageKey basespec.StorageKey
 
 	// Document is raw portable JSON. It remains raw until the Artifact Store
 	// expected-schema registry validates and canonicalizes it.
@@ -172,14 +169,6 @@ func (a *API) Create(
 		return Bundle{}, err
 	}
 
-	documentLocator := request.DocumentLocator
-	if documentLocator == "" {
-		documentLocator = DefaultDocumentLocator
-	}
-	if err := ValidateDocumentLocator(documentLocator); err != nil {
-		return Bundle{}, err
-	}
-
 	document, parsedDocument, err := a.canonicalizeBundleBytes(ctx, request.Document)
 	if err != nil {
 		return Bundle{}, err
@@ -192,11 +181,19 @@ func (a *API) Create(
 		return Bundle{}, err
 	}
 
+	packageAddress, err := PackageAddressForBundle(
+		document.LogicalName,
+		document.LogicalVersion,
+	)
+	if err != nil {
+		return Bundle{}, err
+	}
 	sourceValue, createdSource, err := a.dependencies.Sources.CreateWithStatus(
 		ctx,
 		request.RootID,
 		source.Draft{
 			ID:          request.SourceID,
+			StorageKey:  request.SourceStorageKey,
 			Kind:        managed.Kind,
 			DisplayName: displayName(document),
 			Enabled:     true,
@@ -233,8 +230,8 @@ func (a *API) Create(
 		return Bundle{}, cleanupSource(err)
 	}
 	attachmentData, err := EncodeAttachmentData(AttachmentData{
-		SchemaVersion:   AttachmentDataSchemaVersion,
-		DocumentLocator: documentLocator,
+		SchemaVersion:  AttachmentDataSchemaVersion,
+		PackageAddress: packageAddress,
 	})
 	if err != nil {
 		return Bundle{}, cleanupSource(err)
@@ -270,7 +267,7 @@ func (a *API) Create(
 		bundle,
 		request,
 		document,
-		documentLocator,
+		packageAddress,
 	); err != nil {
 		return Bundle{}, cleanupSource(err)
 	}
@@ -454,12 +451,14 @@ func (a *API) Get(
 	if err != nil {
 		return Bundle{}, err
 	}
-	packageDirectory, err := packageDirectoryForDocument(
-		attachmentData.DocumentLocator,
-	)
+	documentLocator, err := attachmentData.DocumentLocator()
 	if err != nil {
 		return Bundle{}, err
 	}
+	if err := validateBundlePackageAddress(attachmentData.PackageAddress); err != nil {
+		return Bundle{}, err
+	}
+
 	sourceValue, err := a.dependencies.Sources.Get(
 		ctx,
 		ref.RootID,
@@ -488,8 +487,8 @@ func (a *API) Get(
 		Attachment: attachment,
 		Source:     sourceValue,
 
-		DocumentLocator:  attachmentData.DocumentLocator,
-		PackageDirectory: packageDirectory,
+		PackageAddress:  attachmentData.PackageAddress,
+		DocumentLocator: documentLocator,
 	}, nil
 }
 
@@ -693,13 +692,13 @@ func validateCreateBundleIntent(
 	value Bundle,
 	request CreateRequest,
 	document BundleDocument,
-	documentLocator basespec.Locator,
+	packageAddress source.ManagedPackageAddress,
 ) error {
 	if value.Collection.RootID != request.RootID ||
 		value.Collection.ID != request.CollectionID ||
 		value.Collection.Kind != schema.BundleKind ||
 		value.Source.ID != request.SourceID ||
-		value.DocumentLocator != documentLocator ||
+		value.PackageAddress != packageAddress ||
 		value.Data.ManagedSourceID != request.SourceID ||
 		value.Data.LogicalName != document.LogicalName ||
 		value.Data.LogicalVersion != document.LogicalVersion ||
@@ -710,15 +709,6 @@ func validateCreateBundleIntent(
 		)
 	}
 	return nil
-}
-
-func packageDirectoryForDocument(
-	value basespec.Locator,
-) (basespec.Locator, error) {
-	if err := ValidateDocumentLocator(value); err != nil {
-		return "", err
-	}
-	return basespec.Locator(path.Dir(string(value))), nil
 }
 
 func displayName(document BundleDocument) string {

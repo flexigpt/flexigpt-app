@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 
@@ -149,12 +148,7 @@ func (a *API) LoadRuntimeSkill(
 		)
 	}
 
-	value, err := definition.ReadCanonical(
-		ctx,
-		a.dependencies.Definitions,
-		record.RootID,
-		*record.ResolvedDefinition,
-	)
+	value, err := a.currentDefinitionForArtifact(ctx, record)
 	if err != nil {
 		return RuntimeSkill{}, err
 	}

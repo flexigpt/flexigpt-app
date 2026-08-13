@@ -126,7 +126,7 @@ func TestDiscoverCreatesCanonicalOccurrenceAndDefinition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
-	if result.Candidates != 1 || len(result.Occurrences) != 1 || len(result.Definitions) != 1 {
+	if result.Candidates != 1 || len(result.Occurrences) != 1 {
 		t.Fatalf("result=%#v", result)
 	}
 	occurrence := result.Occurrences[0]
@@ -134,11 +134,15 @@ func TestDiscoverCreatesCanonicalOccurrenceAndDefinition(t *testing.T) {
 		occurrence.ObservedAt != now {
 		t.Fatalf("occurrence=%#v", occurrence)
 	}
-	if occurrence.DefinitionDigest == nil {
-		t.Fatal("valid occurrence has no definition digest")
+	if occurrence.DefinitionDigest == nil || occurrence.Definition == nil {
+		t.Fatal("valid occurrence has no cached canonical definition")
 	}
-	if _, found := result.Definitions[*occurrence.DefinitionDigest]; !found {
-		t.Fatalf("definition %q was not returned", *occurrence.DefinitionDigest)
+	if occurrence.Definition.Digest != *occurrence.DefinitionDigest {
+		t.Fatalf(
+			"cached definition fingerprint=%q, occurrence fingerprint=%q",
+			occurrence.Definition.Digest,
+			*occurrence.DefinitionDigest,
+		)
 	}
 }
 

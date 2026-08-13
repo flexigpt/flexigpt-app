@@ -30,6 +30,7 @@ import (
 const (
 	defaultMCPBundleCollectionID basespec.CollectionID = "0198f097-0d5b-7000-8000-000000000020"
 	defaultMCPBundleSourceID     basespec.SourceID     = "0198f097-0d5b-7000-8000-000000000021"
+	defaultMCPBundleSourceKey    basespec.StorageKey   = "base"
 )
 
 type MCPWrapper struct {
@@ -113,7 +114,6 @@ func InitMCPWrapper(
 		ManagedArtifacts:   components.ManagedArtifacts,
 		Refresh:            components.Refresh,
 		Catalogs:           components.Catalogs,
-		Definitions:        components.Definitions,
 		SourceRuntime:      components.SourceRuntime,
 		ShareableDocuments: components.ShareableSchemas,
 		HasDecoder:         components.HasDecoder,
@@ -1114,10 +1114,11 @@ func ensureDefaultMCPBundle(
 	}
 
 	_, err = api.Create(ctx, bundle.CreateRequest{
-		RootID:       mcpUserRootID,
-		CollectionID: defaultMCPBundleCollectionID,
-		SourceID:     defaultMCPBundleSourceID,
-		Document:     json.RawMessage(document),
+		RootID:           mcpUserRootID,
+		CollectionID:     defaultMCPBundleCollectionID,
+		SourceID:         defaultMCPBundleSourceID,
+		SourceStorageKey: defaultMCPBundleSourceKey,
+		Document:         json.RawMessage(document),
 	})
 	if err != nil {
 		return fmt.Errorf("create default MCP Bundle: %w", err)

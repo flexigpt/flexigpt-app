@@ -93,13 +93,14 @@ func (a *API) CreateFilesystemWorkspace(
 	// is not a client-controlled part of Workspace creation.
 	rootID := a.workspace.workspaceRootID
 	value, err := a.provisioner.CreateFilesystem(ctx, provision.Request{
-		DisplayName:  request.Body.DisplayName,
-		Description:  request.Body.Description,
-		RootPath:     request.Body.RootPath,
-		CollectionID: request.Body.WorkspaceID,
-		SourceID:     request.Body.SourceID,
-		RootID:       rootID,
-		Discovery:    discoveryPreferencesOf(request.Body.Discovery),
+		DisplayName:      request.Body.DisplayName,
+		Description:      request.Body.Description,
+		RootPath:         request.Body.RootPath,
+		CollectionID:     request.Body.WorkspaceID,
+		SourceID:         request.Body.SourceID,
+		SourceStorageKey: request.Body.SourceStorageKey,
+		RootID:           rootID,
+		Discovery:        discoveryPreferencesOf(request.Body.Discovery),
 	})
 	if err != nil {
 		return nil, err

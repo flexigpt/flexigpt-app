@@ -97,11 +97,12 @@ type Installer struct {
 }
 
 type preparedBundle struct {
-	registration  BundleRegistration
-	document      bundle.BundleDocument
-	parsed        shareable.ParsedDocument
-	packageFiles  []source.ManagedPackageFile
-	packageDigest cryptoutil.Digest
+	registration   BundleRegistration
+	document       bundle.BundleDocument
+	parsed         shareable.ParsedDocument
+	packageAddress source.ManagedPackageAddress
+	packageFiles   []source.ManagedPackageFile
+	packageDigest  cryptoutil.Digest
 }
 
 func NewInstaller(
@@ -204,13 +205,13 @@ func (i *Installer) EnsureHydration(
 		if _, err := i.bundles.EnsureBuiltIn(
 			ctx,
 			bundle.EnsureBuiltInRequest{
-				RootID:          i.registry.Topology.Root.ID,
-				CollectionID:    value.registration.CollectionID,
-				SourceID:        i.registry.Topology.Sources[0].ID,
-				DocumentLocator: value.registration.DocumentLocator,
-				Document:        value.parsed,
-				Registrations:   value.registration.ToBundleRegistrations(),
-				PackageFiles:    value.packageFiles,
+				RootID:         i.registry.Topology.Root.ID,
+				CollectionID:   value.registration.CollectionID,
+				SourceID:       i.registry.Topology.Sources[0].ID,
+				PackageAddress: value.packageAddress,
+				Document:       value.parsed,
+				Registrations:  value.registration.ToBundleRegistrations(),
+				PackageFiles:   value.packageFiles,
 			},
 		); err != nil {
 			return fmt.Errorf(
@@ -349,8 +350,16 @@ func (i *Installer) prepareBundles(
 				registered.DocumentLocator,
 			)
 		}
+		packageAddress, err := bundle.PackageAddressForBundle(
+			document.LogicalName,
+			document.LogicalVersion,
+		)
+		if err != nil {
+			return nil, err
+		}
 		packageFiles, packageDigest, err := canonicalPackageFiles(
 			registered,
+			packageAddress,
 			embeddedFiles,
 			parsed.Raw,
 		)
@@ -384,11 +393,12 @@ func (i *Installer) prepareBundles(
 		}
 
 		output = append(output, preparedBundle{
-			registration:  registered,
-			document:      document,
-			parsed:        parsed.Clone(),
-			packageFiles:  packageFiles,
-			packageDigest: packageDigest,
+			registration:   registered,
+			document:       document,
+			parsed:         parsed.Clone(),
+			packageAddress: packageAddress,
+			packageFiles:   packageFiles,
+			packageDigest:  packageDigest,
 		})
 	}
 	return output, nil
@@ -396,6 +406,7 @@ func (i *Installer) prepareBundles(
 
 func canonicalPackageFiles(
 	registered BundleRegistration,
+	address source.ManagedPackageAddress,
 	embeddedFiles []topology.PackageFile,
 	canonicalDocument json.RawMessage,
 ) ([]source.ManagedPackageFile, cryptoutil.Digest, error) {
@@ -425,8 +436,8 @@ func canonicalPackageFiles(
 
 	publication, err := source.NormalizeManagedPackagePublication(
 		source.ManagedPackagePublication{
-			Directory: registered.PackageDirectory,
-			Files:     files,
+			Address: address,
+			Files:   files,
 		},
 	)
 	if err != nil {
@@ -471,12 +482,12 @@ func (i *Installer) hydrationFingerprint(
 		Enabled     bool                        `json:"enabled"`
 	}
 	type bundleFingerprint struct {
-		CollectionID     basespec.CollectionID `json:"collectionID"`
-		PackageDirectory basespec.Locator      `json:"packageDirectory"`
-		DocumentLocator  basespec.Locator      `json:"documentLocator"`
-		DocumentDigest   cryptoutil.Digest     `json:"documentDigest"`
-		PackageDigest    cryptoutil.Digest     `json:"packageDigest"`
-		Artifacts        []artifactFingerprint `json:"artifacts"`
+		CollectionID    basespec.CollectionID        `json:"collectionID"`
+		PackageAddress  source.ManagedPackageAddress `json:"packageAddress"`
+		DocumentLocator basespec.Locator             `json:"embeddedDocumentLocator"`
+		DocumentDigest  cryptoutil.Digest            `json:"documentDigest"`
+		PackageDigest   cryptoutil.Digest            `json:"packageDigest"`
+		Artifacts       []artifactFingerprint        `json:"artifacts"`
 	}
 
 	values := make([]bundleFingerprint, 0, len(prepared))
@@ -493,12 +504,12 @@ func (i *Installer) hydrationFingerprint(
 			return artifacts[left].ID < artifacts[right].ID
 		})
 		values = append(values, bundleFingerprint{
-			CollectionID:     value.registration.CollectionID,
-			PackageDirectory: value.registration.PackageDirectory,
-			DocumentLocator:  value.registration.DocumentLocator,
-			DocumentDigest:   value.document.Digest,
-			PackageDigest:    value.packageDigest,
-			Artifacts:        artifacts,
+			CollectionID:    value.registration.CollectionID,
+			PackageAddress:  value.packageAddress,
+			DocumentLocator: value.registration.DocumentLocator,
+			DocumentDigest:  value.document.Digest,
+			PackageDigest:   value.packageDigest,
+			Artifacts:       artifacts,
 		})
 	}
 

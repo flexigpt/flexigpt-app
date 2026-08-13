@@ -126,6 +126,26 @@ func ValidateArtifactKind(value ArtifactKind) error {
 	return ValidateIdentifier("artifact kind", string(value), MaxKindBytes)
 }
 
+func ValidatePackageKind(value PackageKind) error {
+	return ValidateIdentifier("package kind", string(value), MaxKindBytes)
+}
+
+func ValidateStorageKey(value StorageKey) error {
+	return ValidateIdentifier(
+		"storage key",
+		string(value),
+		MaxStorageKeyBytes,
+	)
+}
+
+func ValidatePackageName(value LogicalName) error {
+	return ValidatePortableName("package name", string(value))
+}
+
+func ValidatePackageVersion(value LogicalVersion) error {
+	return ValidatePortableName("package version", string(value))
+}
+
 func ValidateSchemaID(value SchemaID) error {
 	return ValidateIdentifier("schema ID", string(value), MaxSchemaIDBytes)
 }

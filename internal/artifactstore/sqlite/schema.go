@@ -3,14 +3,15 @@ package sqlite
 // schema is the complete Artifact Store metadata schema for the unreleased
 // v1 format. There are intentionally no historical migrations.
 const schema = `
-CREATE TABLE artifact_store_v1 (
+CREATE TABLE artifact_store_v2 (
 	singleton INTEGER PRIMARY KEY CHECK (singleton = 1)
 );
 
-INSERT INTO artifact_store_v1(singleton) VALUES (1);
+INSERT INTO artifact_store_v2(singleton) VALUES (1);
 
 CREATE TABLE artifact_roots (
 	id TEXT PRIMARY KEY,
+	storage_key TEXT NOT NULL UNIQUE,
 	display_name TEXT NOT NULL,
 	description TEXT NOT NULL,
 	revision INTEGER NOT NULL CHECK (revision > 0),
@@ -30,6 +31,8 @@ CREATE TABLE artifact_topology_hydrations (
 CREATE TABLE artifact_sources (
 	id TEXT PRIMARY KEY,
 	root_id TEXT NOT NULL REFERENCES artifact_roots(id) ON DELETE CASCADE,
+	root_storage_key TEXT NOT NULL,
+	storage_key TEXT NOT NULL,
 	kind TEXT NOT NULL,
 	display_name TEXT NOT NULL,
 	enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
@@ -38,7 +41,8 @@ CREATE TABLE artifact_sources (
 	created_at INTEGER NOT NULL,
 	modified_at INTEGER NOT NULL,
 	retired_at INTEGER,
-	UNIQUE (root_id, id)
+	UNIQUE (root_id, id),
+	UNIQUE (root_id, storage_key)
 );
 
 CREATE TABLE artifact_collections (
@@ -100,6 +104,7 @@ CREATE TABLE artifact_current_occurrences (
 	logical_name TEXT NOT NULL,
 	logical_version TEXT NOT NULL,
 	definition_digest TEXT,
+	definition_json BLOB,
 	source_content_digest TEXT,
 	decoder_id TEXT NOT NULL,
 	state TEXT NOT NULL CHECK (state IN ('valid', 'invalid', 'missing')),

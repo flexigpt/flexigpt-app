@@ -217,12 +217,7 @@ func (a *API) GetServerInstallation(
 		return ServerInstallationView{}, err
 	}
 
-	definitionValue, err := definition.ReadCanonical(
-		ctx,
-		a.dependencies.Definitions,
-		record.RootID,
-		*record.ResolvedDefinition,
-	)
+	definitionValue, err := definitionForArtifact(snapshot, record)
 	if err != nil {
 		return ServerInstallationView{}, err
 	}
@@ -294,12 +289,7 @@ func (a *API) InspectMCPPolicy(
 		return PolicyView{}, err
 	}
 
-	definitionValue, err := definition.ReadCanonical(
-		ctx,
-		a.dependencies.Definitions,
-		record.RootID,
-		*record.ResolvedDefinition,
-	)
+	definitionValue, err := definitionForArtifact(snapshot, record)
 	if err != nil {
 		return PolicyView{}, err
 	}
@@ -431,4 +421,38 @@ func requireCurrentPolicyOccurrence(
 		"%w: MCP Policy does not match its current Catalog occurrence",
 		basespec.ErrCatalogStale,
 	)
+}
+
+func definitionForArtifact(
+	snapshot catalog.Snapshot,
+	record artifact.Artifact,
+) (definition.Definition, error) {
+	if record.ResolvedDefinition == nil {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: MCP Artifact %q has no resolved definition fingerprint",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+
+	value, err := catalog.DefinitionForOccurrence(
+		snapshot,
+		catalog.OccurrenceKey{
+			CollectionID:       record.CollectionID,
+			SourceID:           record.Binding.SourceID,
+			Locator:            record.Binding.Locator,
+			SubresourceLocator: record.Binding.SubresourceLocator,
+		},
+	)
+	if err != nil {
+		return definition.Definition{}, err
+	}
+	if value.Digest != *record.ResolvedDefinition {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: MCP Artifact %q does not match its current catalog definition",
+			basespec.ErrCatalogStale,
+			record.ID,
+		)
+	}
+	return value, nil
 }

@@ -4,6 +4,14 @@ import (
 	"maps"
 )
 
+func (d Definition) Clone() Definition {
+	output := d
+	output.Labels = cloneLabels(d.Labels)
+	output.Dependencies = cloneSelectors(d.Dependencies)
+	output.Body = append([]byte(nil), d.Body...)
+	return output
+}
+
 func cloneSelectors(input []Selector) []Selector {
 	if input == nil {
 		return nil

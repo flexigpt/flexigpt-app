@@ -107,7 +107,6 @@ func newComponents(
 		service,
 		dependencies.Catalogs,
 		dependencies.Artifacts,
-		dependencies.Definitions,
 		dependencies.DecoderFingerprint,
 		discoveryPolicyRevision,
 		supports...,

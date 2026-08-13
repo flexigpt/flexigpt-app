@@ -32,7 +32,7 @@ func (d *Decoder) Recognize(
 	candidate discovery.Candidate,
 ) discovery.Recognition {
 	if candidate.RequestsDecoder(DecoderID) &&
-		path.Base(string(candidate.Locator)) == DefinitionFileName {
+		basespec.Locator(path.Base(string(candidate.Locator))) == DefinitionFileName {
 		return discovery.RecognitionPreferred
 	}
 	return discovery.RecognitionNone
@@ -43,7 +43,7 @@ func (d *Decoder) Decode(
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	if !candidate.RequestsDecoder(DecoderID) ||
-		path.Base(string(candidate.Locator)) != DefinitionFileName {
+		basespec.Locator(path.Base(string(candidate.Locator))) != DefinitionFileName {
 		return nil, nil
 	}
 

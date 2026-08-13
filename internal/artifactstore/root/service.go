@@ -196,6 +196,7 @@ func (s *Service) create(
 	now := clockutil.NowUTC(s.clock)
 	value := Root{
 		ID:          draft.ID,
+		StorageKey:  draft.StorageKey,
 		DisplayName: draft.DisplayName,
 		Description: draft.Description,
 		Revision:    1,
@@ -218,6 +219,7 @@ func (s *Service) create(
 		return Root{}, createErr
 	}
 	if existing.DisplayName != draft.DisplayName ||
+		existing.StorageKey != draft.StorageKey ||
 		existing.Description != draft.Description {
 		return Root{}, fmt.Errorf(
 			"%w: root %q creation intent differs",

@@ -19,8 +19,6 @@ type DescriptorLoader struct {
 	canonicalizer shareable.Canonicalizer
 }
 
-const descriptorLocator basespec.Locator = spec.WorkspaceMetadataDirectory + "/" + spec.WorkspaceDescriptorFileName
-
 // Descriptor is the portable workspace.collection document stored at
 // .flexigpt/workspace.json.
 type Descriptor = builtinSchema.WorkspaceCollectionV1
@@ -84,7 +82,7 @@ func (l *DescriptorLoader) Load(
 		SourceID:   sourceValue.ID,
 		Generation: snapshot.Generation(),
 	}
-	entry, err := snapshot.Stat(ctx, descriptorLocator)
+	entry, err := snapshot.Stat(ctx, spec.DescriptorLocator)
 
 	// A missing descriptor is valid. Its source generation remains a refresh
 	// precondition so a descriptor cannot appear or disappear between bootstrap
@@ -105,7 +103,7 @@ func (l *DescriptorLoader) Load(
 			err,
 		)
 	}
-	if entry.Locator != descriptorLocator {
+	if entry.Locator != spec.DescriptorLocator {
 		return DescriptorObservation{}, fmt.Errorf(
 			"%w: Source returned %q for Workspace descriptor %q",
 			spec.ErrWorkspaceDefinitionInvalid,

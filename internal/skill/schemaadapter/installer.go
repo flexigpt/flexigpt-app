@@ -165,11 +165,18 @@ func (i *Installer) EnsureBuiltInArtifacts(
 		if !current.Collection.Enabled {
 			continue
 		}
-
+		packageAddress, err := bundle.BuiltInCollectionPackageAddress(
+			basespec.LogicalName(value.Definition.LogicalName),
+			basespec.LogicalVersion(value.Definition.LogicalVersion),
+		)
+		if err != nil {
+			return err
+		}
 		files, err := i.packageFiles(
 			ctx,
 			value.SourceScope,
 			value.Definition,
+			packageAddress,
 		)
 		if err != nil {
 			return err
@@ -178,7 +185,7 @@ func (i *Installer) EnsureBuiltInArtifacts(
 		request := bundle.BuiltInCollectionInstallRequest{
 			Bundle:                     current.Collection.Ref(),
 			ExpectedCollectionRevision: current.Collection.Revision,
-			PackageDirectory:           value.SourceScope,
+			PackageAddress:             packageAddress,
 			PackageFiles:               files,
 			Skills: make(
 				[]bundle.BuiltInCollectionSkill,
@@ -261,6 +268,17 @@ func (i *Installer) EnsureBuiltInBundles(
 				basespec.ErrInvalid,
 			)
 		}
+		packageAddress, err := bundle.BuiltInCollectionPackageAddress(
+			basespec.LogicalName(value.Definition.LogicalName),
+			basespec.LogicalVersion(value.Definition.LogicalVersion),
+		)
+		if err != nil {
+			return nil, err
+		}
+		discoveryRoot, err := packageAddress.Directory()
+		if err != nil {
+			return nil, err
+		}
 		b, err := i.skills.EnsureBuiltInBundleTopology(
 			ctx,
 			bundle.BuiltInBundleTopology{
@@ -273,7 +291,7 @@ func (i *Installer) EnsureBuiltInBundles(
 				Description:           value.Definition.Description,
 				Labels:                value.Definition.Labels,
 				Enabled:               value.Registration.Enabled,
-				DiscoveryRoot:         value.SourceScope,
+				DiscoveryRoot:         discoveryRoot,
 				ExpectedMemberDigests: value.ExpectedMemberDigests,
 			},
 		)
@@ -384,6 +402,7 @@ func (i *Installer) packageFiles(
 	ctx context.Context,
 	packageRoot basespec.Locator,
 	document schema.SkillCollectionV1,
+	address source.ManagedPackageAddress,
 ) ([]source.ManagedPackageFile, error) {
 	embeddedFiles, err := topology.ReadPackageFiles(
 		ctx,
@@ -422,8 +441,8 @@ func (i *Installer) packageFiles(
 
 	publication, err := source.NormalizeManagedPackagePublication(
 		source.ManagedPackagePublication{
-			Directory: packageRoot,
-			Files:     files,
+			Address: address,
+			Files:   files,
 		},
 	)
 	if err != nil {

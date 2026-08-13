@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -17,7 +18,7 @@ import (
 const occurrenceColumns = `
 	root_id, collection_id, source_id, locator, subresource_locator,
 	kind, logical_name, logical_version,
-	definition_digest, source_content_digest, decoder_id,
+	definition_digest, definition_json, source_content_digest, decoder_id,
 	state, diagnostics_json, observed_at`
 
 func (s *Store) getCurrentCatalog(
@@ -178,6 +179,7 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 		rootID, collectionID, sourceID, locator, subresource string
 		kind, logicalName, logicalVersion                    string
 		definitionDigest, sourceDigest                       sql.NullString
+		definitionRaw                                        []byte
 		decoderID, state                                     string
 		diagnosticsRaw                                       []byte
 		observedAt                                           int64
@@ -192,6 +194,7 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 		&logicalName,
 		&logicalVersion,
 		&definitionDigest,
+		&definitionRaw,
 		&sourceDigest,
 		&decoderID,
 		&state,
@@ -203,6 +206,14 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 	diagnostics := []diagnostic.Diagnostic{}
 	if err := decodeJSON(diagnosticsRaw, &diagnostics); err != nil {
 		return catalog.Occurrence{}, err
+	}
+	var cachedDefinition *definition.Definition
+	if len(definitionRaw) != 0 {
+		var value definition.Definition
+		if err := decodeJSON(definitionRaw, &value); err != nil {
+			return catalog.Occurrence{}, err
+		}
+		cachedDefinition = &value
 	}
 	value := catalog.Occurrence{
 		RootID:       basespec.RootID(rootID),
@@ -217,6 +228,7 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 		LogicalName:         basespec.LogicalName(logicalName),
 		LogicalVersion:      basespec.LogicalVersion(logicalVersion),
 		DefinitionDigest:    parseDigest(definitionDigest),
+		Definition:          cachedDefinition,
 		SourceContentDigest: parseDigest(sourceDigest),
 		DecoderID:           basespec.DecoderID(decoderID),
 		State:               catalog.OccurrenceState(state),

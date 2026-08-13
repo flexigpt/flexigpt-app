@@ -9,8 +9,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-// Definition is an immutable, content-addressed derived Artifact definition.
-// Shareable documents are owned by registered shareable schema codecs.
+// Definition is a canonical derived Artifact definition.
+//
+// Digest is a canonical content fingerprint used for integrity, comparison,
+// and source-state reconciliation. It is not a storage address. Persisted
+// definitions are keyed by their current catalog occurrence.
 type Definition struct {
 	Digest         cryptoutil.Digest       `json:"digest"`
 	Kind           basespec.ArtifactKind   `json:"kind"`

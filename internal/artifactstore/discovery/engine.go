@@ -21,7 +21,6 @@ import (
 
 type Result struct {
 	Occurrences []catalog.Occurrence
-	Definitions map[cryptoutil.Digest]definition.Definition
 	Diagnostics []diagnostic.Diagnostic
 	Candidates  int
 }
@@ -209,9 +208,7 @@ func (e *Engine) Discover(
 		occurrences[value.Key] = catalog.CloneOccurrence(value)
 	}
 
-	result := Result{
-		Definitions: make(map[cryptoutil.Digest]definition.Definition),
-	}
+	result := Result{}
 	seenKeys := make(map[catalog.OccurrenceKey]struct{})
 	var consumed int64
 	now := clockutil.NowUTC(e.clock)
@@ -496,6 +493,7 @@ func (e *Engine) Discover(
 				)
 				if previous, found := occurrences[key]; found {
 					previous.DefinitionDigest = nil
+					previous.Definition = nil
 					previous.SourceContentDigest = &sourceDigest
 					previous.DecoderID = decoder.ID()
 					previous.State = catalog.OccurrenceInvalid
@@ -527,6 +525,7 @@ func (e *Engine) Discover(
 			}
 
 			definitionDigest := canonical.Digest
+			definitionValue := canonical.Clone()
 			occurrences[key] = catalog.Occurrence{
 				RootID:              rootID,
 				Key:                 key,
@@ -535,13 +534,13 @@ func (e *Engine) Discover(
 				LogicalName:         canonical.LogicalName,
 				LogicalVersion:      canonical.LogicalVersion,
 				DefinitionDigest:    &definitionDigest,
+				Definition:          &definitionValue,
 				SourceContentDigest: &sourceDigest,
 				DecoderID:           decoder.ID(),
 				State:               catalog.OccurrenceValid,
 				Diagnostics:         diagnostic.CloneDiagnostics(itemDiagnostics),
 				ObservedAt:          now,
 			}
-			result.Definitions[canonical.Digest] = canonical
 		}
 
 		for key, previousValue := range occurrences {
@@ -554,6 +553,8 @@ func (e *Engine) Discover(
 			}
 			seenKeys[key] = struct{}{}
 			previousValue.State = catalog.OccurrenceMissing
+			previousValue.DefinitionDigest = nil
+			previousValue.Definition = nil
 			previousValue.Diagnostics = []diagnostic.Diagnostic{{
 				Severity: diagnostic.DiagnosticWarning,
 				Code:     DiagnosticCodeSubresourceMissing,
@@ -580,6 +581,8 @@ func (e *Engine) Discover(
 				continue
 			}
 			previousValue.State = catalog.OccurrenceMissing
+			previousValue.DefinitionDigest = nil
+			previousValue.Definition = nil
 			previousValue.Diagnostics = []diagnostic.Diagnostic{{
 				Severity: diagnostic.DiagnosticWarning,
 				Code:     DiagnosticCodeResourceMissing,
@@ -968,6 +971,7 @@ func applyInvalidForLocator(
 		matched = true
 		previous.SourceContentDigest = cryptoutil.CloneDigest(sourceDigest)
 		previous.DefinitionDigest = nil
+		previous.Definition = nil
 		previous.DecoderID = decoderID
 		previous.State = catalog.OccurrenceInvalid
 		previous.Diagnostics = diagnostic.CloneDiagnostics(diagnostics)
@@ -1047,6 +1051,8 @@ func markUnrecognizedForLocator(
 			},
 		}
 		previous.State = catalog.OccurrenceMissing
+		previous.DefinitionDigest = nil
+		previous.Definition = nil
 		previous.Diagnostics = []diagnostic.Diagnostic{d}
 		previous.ObservedAt = now
 		values[key] = previous

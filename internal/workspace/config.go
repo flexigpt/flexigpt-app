@@ -15,10 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
-const (
-	defaultDiscoveryPolicyRevision = "workspace.discovery.v1"
-	markdownFilePattern            = "*.md"
-)
+const defaultDiscoveryPolicyRevision = "workspace.discovery.v1"
 
 // DefaultDecoders contains Workspace-owned decoders only. The shared
 // agent.skill decoder is registered exactly once by Artifact Store composition.
@@ -197,7 +194,7 @@ func defaultDiscoveryProfiles() spec.DiscoveryProfiles {
 					Root:      spec.RepositoryRootLocator,
 					Recursive: true,
 					IncludePatterns: []string{
-						markdownFilePattern,
+						spec.DefaultMarkdownIncludePattern,
 					},
 				},
 			},

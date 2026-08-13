@@ -24,9 +24,6 @@ import (
 
 const (
 	Kind basespec.SourceKind = "managed-directory"
-
-	directoryMode        = 0o700
-	stagingDirectoryName = ".artifactstore-staging"
 )
 
 var errPackageDifferent = errors.New("managed package content differs")
@@ -35,11 +32,14 @@ type config struct{}
 
 // Adapter stores each managed Source beneath:
 //
-//	<base>/<root-id>/<source-id>
+//	<base>/<root-storage-key>/<source-storage-key>
 //
-// The physical path remains private Source configuration derived by the
-// adapter. It is never placed in Source.Config, portable definitions, or API
-// projections.
+// A package below that source root is addressed generically as:
+//
+//	<package-kind>/<name>/<version>
+//
+// Artifact families own package-kind values and all package-internal file
+// conventions. This adapter owns no artifact-family directory or filename.
 type Adapter struct {
 	base       string
 	filesystem *fsdir.Adapter
@@ -126,7 +126,7 @@ func (a *Adapter) BootstrapManagedSource(
 // authorizes this operation before it reaches the adapter.
 func (a *Adapter) RemoveManagedRoot(
 	ctx context.Context,
-	rootID basespec.RootID,
+	rootStorageKey basespec.StorageKey,
 ) error {
 	if a == nil {
 		return basespec.ErrClosed
@@ -144,7 +144,7 @@ func (a *Adapter) RemoveManagedRoot(
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	root, err := a.managedRootPath(rootID)
+	root, err := a.managedRootPath(rootStorageKey)
 	if err != nil {
 		return err
 	}
@@ -221,6 +221,10 @@ func (a *Adapter) PublishPackage(
 	if err != nil {
 		return "", err
 	}
+	directory, err := publication.Address.Directory()
+	if err != nil {
+		return "", err
+	}
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -231,7 +235,7 @@ func (a *Adapter) PublishPackage(
 	}
 	target, err := managedPackagePath(
 		root,
-		publication.Directory,
+		directory,
 		false,
 	)
 	if err != nil {
@@ -247,9 +251,9 @@ func (a *Adapter) PublishPackage(
 
 	if exists && publication.ExpectedGeneration == "" {
 		return "", fmt.Errorf(
-			"%w: replacing managed package %q requires an expected generation",
+			"%w: replacing managed package %v requires an expected generation",
 			basespec.ErrConflict,
-			publication.Directory,
+			publication.Address,
 		)
 	}
 
@@ -272,7 +276,7 @@ func (a *Adapter) PublishPackage(
 	}
 	target, err = managedPackagePath(
 		root,
-		publication.Directory,
+		directory,
 		true,
 	)
 	if err != nil {
@@ -280,11 +284,11 @@ func (a *Adapter) PublishPackage(
 	}
 
 	stagingRoot := filepath.Join(root, stagingDirectoryName)
-	if err := os.MkdirAll(stagingRoot, directoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, managedDirectoryMode); err != nil {
 		return "", err
 	}
 
-	temporary, err := os.MkdirTemp(stagingRoot, "package-*")
+	temporary, err := os.MkdirTemp(stagingRoot, stagingTemporaryNamePrefix)
 	if err != nil {
 		return "", err
 	}
@@ -296,7 +300,7 @@ func (a *Adapter) PublishPackage(
 	}()
 
 	packageRoot := filepath.Join(temporary, "content")
-	if err := os.Mkdir(packageRoot, directoryMode); err != nil {
+	if err := os.Mkdir(packageRoot, managedDirectoryMode); err != nil {
 		return "", err
 	}
 	if err := writeManagedPackageFiles(
@@ -374,7 +378,7 @@ func (a *Adapter) PublishPackage(
 func (a *Adapter) RemovePackage(
 	ctx context.Context,
 	value source.Source,
-	directory basespec.Locator,
+	address source.ManagedPackageAddress,
 	expectedGeneration string,
 ) error {
 	if err := ctx.Err(); err != nil {
@@ -383,7 +387,11 @@ func (a *Adapter) RemovePackage(
 	if err := a.validateSource(ctx, value); err != nil {
 		return err
 	}
-	if err := validatePackageDirectory(directory); err != nil {
+	if err := address.Validate(); err != nil {
+		return err
+	}
+	directory, err := address.Directory()
+	if err != nil {
 		return err
 	}
 	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
@@ -430,7 +438,7 @@ func (a *Adapter) RemovePackage(
 	}
 
 	stagingRoot := filepath.Join(root, stagingDirectoryName)
-	if err := os.MkdirAll(stagingRoot, directoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, managedDirectoryMode); err != nil {
 		return err
 	}
 
@@ -546,29 +554,32 @@ func (a *Adapter) sourceRootPath(
 	if err := basespec.ValidateSourceID(value.ID); err != nil {
 		return "", err
 	}
-	root, err := a.managedRootPath(value.RootID)
+	if err := basespec.ValidateStorageKey(value.StorageKey); err != nil {
+		return "", err
+	}
+	root, err := a.managedRootPath(value.RootStorageKey)
 	if err != nil {
 		return "", err
 	}
-	root = filepath.Join(root, string(value.ID))
+	root = filepath.Join(root, string(value.StorageKey))
 	if !create {
 		return root, nil
 	}
-	if err := os.MkdirAll(root, directoryMode); err != nil {
+	if err := os.MkdirAll(root, managedDirectoryMode); err != nil {
 		return "", err
 	}
 	return root, nil
 }
 
 func (a *Adapter) managedRootPath(
-	rootID basespec.RootID,
+	rootStorageKey basespec.StorageKey,
 ) (string, error) {
-	if err := basespec.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateStorageKey(rootStorageKey); err != nil {
 		return "", err
 	}
 
 	base := filepath.Clean(a.base)
-	root := filepath.Join(base, string(rootID))
+	root := filepath.Join(base, string(rootStorageKey))
 	relative, err := filepath.Rel(base, root)
 	if err != nil {
 		return "", err
@@ -634,7 +645,11 @@ func validatePublication(
 		return nil, err
 	}
 
-	if containsReservedSegment(normalized.Directory) {
+	directory, err := normalized.Address.Directory()
+	if err != nil {
+		return nil, err
+	}
+	if containsReservedSegment(directory) {
 		return nil, fmt.Errorf(
 			"%w: managed package uses a reserved directory",
 			basespec.ErrInvalid,
@@ -666,7 +681,7 @@ func managedPackagePath(
 	if parent != "." {
 		parentPath = filepath.Join(root, filepath.FromSlash(parent))
 		if createParent {
-			if err := os.MkdirAll(parentPath, directoryMode); err != nil {
+			if err := os.MkdirAll(parentPath, managedDirectoryMode); err != nil {
 				return "", err
 			}
 		}
@@ -678,10 +693,7 @@ func managedPackagePath(
 }
 
 func validatePackageDirectory(directory basespec.Locator) error {
-	if err := basespec.ValidatePortableLocator(
-		directory,
-		false,
-	); err != nil {
+	if err := basespec.ValidatePortableLocator(directory, false); err != nil {
 		return err
 	}
 	if containsReservedSegment(directory) {
@@ -690,7 +702,7 @@ func validatePackageDirectory(directory basespec.Locator) error {
 			basespec.ErrInvalid,
 		)
 	}
-	return source.ValidateManagedPackageDirectory(directory)
+	return nil
 }
 
 func pruneEmptyManagedParents(root, start string) error {

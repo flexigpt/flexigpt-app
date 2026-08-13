@@ -314,12 +314,13 @@ type WorkspaceSkillLoadView struct {
 }
 
 type CreateFilesystemWorkspaceRequestBody struct {
-	WorkspaceID basespec.CollectionID `json:"workspaceID"           required:"true"`
-	SourceID    basespec.SourceID     `json:"sourceID"              required:"true"`
-	DisplayName string                `json:"displayName"           required:"true"`
-	Description string                `json:"description,omitempty"`
-	RootPath    string                `json:"rootPath"              required:"true"`
-	Discovery   WorkspaceDiscovery    `json:"discovery"`
+	WorkspaceID      basespec.CollectionID `json:"workspaceID"           required:"true"`
+	SourceID         basespec.SourceID     `json:"sourceID"              required:"true"`
+	SourceStorageKey basespec.StorageKey   `json:"sourceStorageKey"      required:"true"`
+	DisplayName      string                `json:"displayName"           required:"true"`
+	Description      string                `json:"description,omitempty"`
+	RootPath         string                `json:"rootPath"              required:"true"`
+	Discovery        WorkspaceDiscovery    `json:"discovery"`
 }
 
 type CreateFilesystemWorkspaceRequest struct {

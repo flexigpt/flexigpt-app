@@ -19,13 +19,15 @@ import (
 const artifactBuiltinSchemaVersion = "v1"
 
 type Root struct {
-	ID          basespec.RootID `json:"id"`
-	DisplayName string          `json:"displayName"`
-	Description string          `json:"description,omitempty"`
+	ID          basespec.RootID     `json:"id"`
+	StorageKey  basespec.StorageKey `json:"storageKey"`
+	DisplayName string              `json:"displayName"`
+	Description string              `json:"description,omitempty"`
 }
 
 type Source struct {
 	ID          basespec.SourceID   `json:"id"`
+	StorageKey  basespec.StorageKey `json:"storageKey"`
 	Kind        basespec.SourceKind `json:"kind"`
 	DisplayName string              `json:"displayName"`
 	Enabled     bool                `json:"enabled"`
@@ -95,11 +97,13 @@ func (r Registry) TopologyDeclaration() (topology.Declaration, error) {
 	return topology.Declaration{
 		Root: root.RootDraft{
 			ID:          r.Root.ID,
+			StorageKey:  r.Root.StorageKey,
 			DisplayName: r.Root.DisplayName,
 			Description: r.Root.Description,
 		},
 		Sources: []source.Draft{{
 			ID:          r.Source.ID,
+			StorageKey:  r.Source.StorageKey,
 			Kind:        r.Source.Kind,
 			DisplayName: r.Source.DisplayName,
 			Enabled:     r.Source.Enabled,
@@ -130,11 +134,13 @@ func RegistryFromTopologyDeclaration(
 		SchemaVersion: artifactBuiltinSchemaVersion,
 		Root: Root{
 			ID:          declaration.Root.ID,
+			StorageKey:  declaration.Root.StorageKey,
 			DisplayName: declaration.Root.DisplayName,
 			Description: declaration.Root.Description,
 		},
 		Source: Source{
 			ID:          sourceDraft.ID,
+			StorageKey:  sourceDraft.StorageKey,
 			Kind:        sourceDraft.Kind,
 			DisplayName: sourceDraft.DisplayName,
 			Enabled:     sourceDraft.Enabled,
@@ -157,6 +163,9 @@ func (r Registry) Validate() error {
 	if err := basespec.ValidateRootID(r.Root.ID); err != nil {
 		return err
 	}
+	if err := basespec.ValidateStorageKey(r.Root.StorageKey); err != nil {
+		return err
+	}
 	if err := basespec.ValidateRequiredText(
 		"built-in root display name",
 		r.Root.DisplayName,
@@ -172,6 +181,9 @@ func (r Registry) Validate() error {
 		return err
 	}
 	if err := basespec.ValidateSourceID(r.Source.ID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateStorageKey(r.Source.StorageKey); err != nil {
 		return err
 	}
 	if err := basespec.ValidateSourceKind(r.Source.Kind); err != nil {

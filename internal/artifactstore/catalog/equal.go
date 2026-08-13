@@ -52,6 +52,14 @@ func EqualOccurrences(left, right []Occurrence) bool {
 }
 
 func equalOccurrence(left, right Occurrence) bool {
+	if left.Definition == nil || right.Definition == nil {
+		if left.Definition != nil || right.Definition != nil {
+			return false
+		}
+	} else if left.Definition.Digest != right.Definition.Digest {
+		return false
+	}
+
 	return left.RootID == right.RootID &&
 		left.CollectionID == right.CollectionID &&
 		left.Key == right.Key &&

@@ -40,6 +40,10 @@ func CloneOccurrence(input Occurrence) Occurrence {
 	output := input
 	output.DefinitionDigest = cryptoutil.CloneDigest(input.DefinitionDigest)
 	output.SourceContentDigest = cryptoutil.CloneDigest(input.SourceContentDigest)
+	if input.Definition != nil {
+		value := input.Definition.Clone()
+		output.Definition = &value
+	}
 	output.Diagnostics = diagnostic.CloneDiagnostics(input.Diagnostics)
 	return output
 }

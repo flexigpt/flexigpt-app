@@ -11,7 +11,7 @@ import (
 )
 
 const rootColumns = `
-	id, display_name, description, revision,
+	id, storage_key, display_name, description, revision,
 	created_at, modified_at, retired_at`
 
 func (s *Store) createRoot(
@@ -24,10 +24,11 @@ func (s *Store) createRoot(
 	_, err := s.db.ExecContext(
 		ctx,
 		`INSERT INTO artifact_roots (
-			id, display_name, description, revision,
+			id, storage_key, display_name, description, revision,
 			created_at, modified_at, retired_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(value.ID),
+		string(value.StorageKey),
 		value.DisplayName,
 		value.Description,
 		value.Revision,
@@ -280,13 +281,14 @@ func rootHasActiveChildrenTx(
 
 func scanRoot(row scanner) (root.Root, error) {
 	var (
-		id, displayName, description string
-		revision                     uint64
-		createdAt, modifiedAt        int64
-		retiredAt                    sql.NullInt64
+		id, storageKey, displayName, description string
+		revision                                 uint64
+		createdAt, modifiedAt                    int64
+		retiredAt                                sql.NullInt64
 	)
 	if err := row.Scan(
 		&id,
+		&storageKey,
 		&displayName,
 		&description,
 		&revision,
@@ -298,6 +300,7 @@ func scanRoot(row scanner) (root.Root, error) {
 	}
 	value := root.Root{
 		ID:          basespec.RootID(id),
+		StorageKey:  basespec.StorageKey(storageKey),
 		DisplayName: displayName,
 		Description: description,
 		Revision:    revision,

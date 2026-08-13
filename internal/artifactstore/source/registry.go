@@ -204,7 +204,7 @@ func (r *Registry) PublishPackage(
 func (r *Registry) RemovePackage(
 	ctx context.Context,
 	value Source,
-	directory basespec.Locator,
+	address ManagedPackageAddress,
 	expectedGeneration string,
 ) error {
 	if ctx == nil {
@@ -219,7 +219,7 @@ func (r *Registry) RemovePackage(
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	if err := ValidateManagedPackageDirectory(directory); err != nil {
+	if err := address.Validate(); err != nil {
 		return err
 	}
 	if err := basespec.ValidateSourceGeneration(
@@ -247,7 +247,7 @@ func (r *Registry) RemovePackage(
 	return writer.RemovePackage(
 		ctx,
 		value.Clone(),
-		directory,
+		address,
 		expectedGeneration,
 	)
 }
@@ -257,7 +257,7 @@ func (r *Registry) RemovePackage(
 // exposed by source.Service.
 func (r *Registry) RemoveManagedRoot(
 	ctx context.Context,
-	rootID basespec.RootID,
+	rootStorageKey basespec.StorageKey,
 ) error {
 	if r == nil {
 		return basespec.ErrClosed
@@ -271,7 +271,7 @@ func (r *Registry) RemoveManagedRoot(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRootID(rootID); err != nil {
+	if err := basespec.ValidateStorageKey(rootStorageKey); err != nil {
 		return err
 	}
 
@@ -281,10 +281,10 @@ func (r *Registry) RemoveManagedRoot(
 		if !supported {
 			continue
 		}
-		if err := remover.RemoveManagedRoot(ctx, rootID); err != nil {
+		if err := remover.RemoveManagedRoot(ctx, rootStorageKey); err != nil {
 			return fmt.Errorf(
-				"remove managed storage for root %q through adapter %q: %w",
-				rootID,
+				"remove managed storage for root storage key %q through adapter %q: %w",
+				rootStorageKey,
 				kind,
 				err,
 			)

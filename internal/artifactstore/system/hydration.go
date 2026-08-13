@@ -195,7 +195,7 @@ func (c *Components) ResetTopologyHydration(
 ) error {
 	if c == nil ||
 		c.metadata == nil ||
-		c.content == nil ||
+		c.Roots == nil ||
 		c.managedSources == nil {
 		return basespec.ErrClosed
 	}
@@ -239,7 +239,18 @@ func (c *Components) ResetTopologyHydration(
 
 	// Remove source-side package data first. If this fails, metadata remains
 	// intact and the next startup can retry safely.
-	if err := c.managedSources.RemoveManagedRoot(ctx, rootID); err != nil {
+	rootValue, err := c.Roots.Get(ctx, rootID)
+	if err != nil {
+		return fmt.Errorf(
+			"read topology root %q before content reset: %w",
+			rootID,
+			err,
+		)
+	}
+	if err := c.managedSources.RemoveManagedRoot(
+		ctx,
+		rootValue.StorageKey,
+	); err != nil {
 		return fmt.Errorf(
 			"remove managed source storage for topology root %q: %w",
 			rootID,
@@ -250,14 +261,6 @@ func (c *Components) ResetTopologyHydration(
 	if err := c.metadata.PurgeTopologyRoot(ctx, rootID); err != nil {
 		return fmt.Errorf(
 			"purge metadata for topology root %q: %w",
-			rootID,
-			err,
-		)
-	}
-
-	if err := c.content.RemoveRoot(ctx, rootID); err != nil {
-		return fmt.Errorf(
-			"purge immutable definitions for topology root %q: %w",
 			rootID,
 			err,
 		)

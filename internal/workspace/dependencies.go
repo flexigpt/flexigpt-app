@@ -8,7 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
@@ -34,7 +33,6 @@ type Dependencies struct {
 	Artifacts              *artifact.Service
 	Refresh                refresh.Runner
 	Catalogs               catalog.Reader
-	Definitions            definition.Reader
 	ShareableCanonicalizer shareable.Canonicalizer
 	SourceRuntime          source.Runtime
 	HasDecoder             func(basespec.DecoderID) bool
@@ -49,7 +47,6 @@ func (d Dependencies) Validate() error {
 		d.Artifacts == nil ||
 		d.Refresh == nil ||
 		d.Catalogs == nil ||
-		d.Definitions == nil ||
 		d.ShareableCanonicalizer == nil ||
 		d.SourceRuntime == nil ||
 		d.HasDecoder == nil ||

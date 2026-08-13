@@ -7,9 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type sourceSummaryLookup interface {
@@ -30,14 +28,6 @@ type artifactLookup interface {
 		ctx context.Context,
 		ref collection.CollectionRef,
 	) ([]artifact.Artifact, error)
-}
-
-type definitionLookup interface {
-	Get(
-		ctx context.Context,
-		rootID basespec.RootID,
-		digest cryptoutil.Digest,
-	) (definition.Definition, error)
 }
 
 type workspaceCollectionStore interface {

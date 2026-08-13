@@ -10,6 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -125,7 +126,8 @@ func TestDiscoverMarksPreviouslyObservedCandidateMissingWhenUnrecognized(
 		t.Fatalf("create engine: %v", err)
 	}
 
-	definitionDigest := cryptoutil.DigestBytes([]byte("definition"))
+	definitionValue := unrecognizedTestDefinition()
+	definitionDigest := definitionValue.Digest
 	contentDigest := cryptoutil.DigestBytes([]byte("previous content"))
 	previous := catalog.Occurrence{
 		RootID:       unrecognizedTestRootID,
@@ -138,6 +140,7 @@ func TestDiscoverMarksPreviouslyObservedCandidateMissingWhenUnrecognized(
 		Kind:                "test.artifact",
 		LogicalName:         "candidate",
 		DefinitionDigest:    &definitionDigest,
+		Definition:          &definitionValue,
 		SourceContentDigest: &contentDigest,
 		DecoderID:           "test.decoder",
 		State:               catalog.OccurrenceValid,
@@ -167,6 +170,13 @@ func TestDiscoverMarksPreviouslyObservedCandidateMissingWhenUnrecognized(
 	if result.Occurrences[0].State != catalog.OccurrenceMissing {
 		t.Fatalf("state=%q, want %q", result.Occurrences[0].State, catalog.OccurrenceMissing)
 	}
+	if result.Occurrences[0].Definition != nil ||
+		result.Occurrences[0].DefinitionDigest != nil {
+		t.Fatalf(
+			"missing occurrence retained cached definition: %#v",
+			result.Occurrences[0],
+		)
+	}
 	if len(result.Occurrences[0].Diagnostics) != 1 ||
 		result.Occurrences[0].Diagnostics[0].Code != DiagnosticCodeDecoderNoLongerRecognizes {
 		t.Fatalf("unexpected occurrence diagnostics: %#v", result.Occurrences[0].Diagnostics)
@@ -175,4 +185,19 @@ func TestDiscoverMarksPreviouslyObservedCandidateMissingWhenUnrecognized(
 		result.Diagnostics[0].Code != DiagnosticCodeDecoderNoLongerRecognizes {
 		t.Fatalf("unexpected result diagnostics: %#v", result.Diagnostics)
 	}
+}
+
+func unrecognizedTestDefinition() definition.Definition {
+	value, err := definition.Canonicalize(definition.Definition{
+		Kind:           "test.artifact",
+		SchemaID:       "test.schema",
+		SchemaVersion:  "v1",
+		LogicalName:    "candidate",
+		LogicalVersion: "v1",
+		Body:           []byte(`{"value":true}`),
+	})
+	if err != nil {
+		panic(err)
+	}
+	return value
 }

@@ -11,8 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
-const DefaultWorkspaceSkillRoot basespec.Locator = ".flexigpt/skills"
-
 type SkillRootConvention struct {
 	Root      basespec.Locator
 	Recursive bool
@@ -62,7 +60,7 @@ func (r *ConventionRegistry) DiscoveryProfile() spec.DiscoveryProfile {
 				Root:      root.Root,
 				Recursive: root.Recursive,
 				IncludePatterns: []string{
-					skillArtifact.DefinitionFileName,
+					string(skillArtifact.DefinitionFileName),
 				},
 			},
 		)
@@ -86,7 +84,7 @@ func (r *ConventionRegistry) Match(
 	locator basespec.Locator,
 ) (SkillRootConvention, bool) {
 	value := string(locator)
-	if path.Base(value) != skillArtifact.DefinitionFileName {
+	if path.Base(value) != string(skillArtifact.DefinitionFileName) {
 		return SkillRootConvention{}, false
 	}
 	for _, root := range r.Roots() {
@@ -100,7 +98,7 @@ func (r *ConventionRegistry) Match(
 				continue
 			}
 		}
-		if relative == skillArtifact.DefinitionFileName {
+		if relative == string(skillArtifact.DefinitionFileName) {
 			continue
 		}
 		parent := path.Dir(relative)

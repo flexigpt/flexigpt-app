@@ -11,7 +11,8 @@ import (
 )
 
 const sourceColumns = `
-	id, root_id, kind, display_name, enabled, config_json,
+	id, root_id, root_storage_key, storage_key,
+	kind, display_name, enabled, config_json,
 	revision, created_at, modified_at, retired_at`
 
 func (s *Store) createSource(
@@ -27,17 +28,27 @@ func (s *Store) createSource(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := getActiveRootTx(ctx, tx, value.RootID); err != nil {
+	rootValue, err := getActiveRootTx(ctx, tx, value.RootID)
+	if err != nil {
 		return err
+	}
+	if rootValue.StorageKey != value.RootStorageKey {
+		return fmt.Errorf(
+			"%w: source root storage key does not match root metadata",
+			basespec.ErrInvalid,
+		)
 	}
 	_, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO artifact_sources (
-			id, root_id, kind, display_name, enabled, config_json,
+			id, root_id, root_storage_key, storage_key,
+			kind, display_name, enabled, config_json,
 			revision, created_at, modified_at, retired_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(value.ID),
 		string(value.RootID),
+		string(value.RootStorageKey),
+		string(value.StorageKey),
 		string(value.Kind),
 		value.DisplayName,
 		boolInt(value.Enabled),
@@ -355,16 +366,18 @@ type scanner interface {
 
 func scanSource(row scanner) (source.Source, error) {
 	var (
-		id, rootID, kind, displayName string
-		enabled                       int
-		config                        []byte
-		revision                      uint64
-		createdAt, modifiedAt         int64
-		retiredAt                     sql.NullInt64
+		id, rootID, rootStorageKey, storageKey, kind, displayName string
+		enabled                                                   int
+		config                                                    []byte
+		revision                                                  uint64
+		createdAt, modifiedAt                                     int64
+		retiredAt                                                 sql.NullInt64
 	)
 	if err := row.Scan(
 		&id,
 		&rootID,
+		&rootStorageKey,
+		&storageKey,
 		&kind,
 		&displayName,
 		&enabled,
@@ -377,16 +390,18 @@ func scanSource(row scanner) (source.Source, error) {
 		return source.Source{}, err
 	}
 	value := source.Source{
-		ID:          basespec.SourceID(id),
-		RootID:      basespec.RootID(rootID),
-		Kind:        basespec.SourceKind(kind),
-		DisplayName: displayName,
-		Enabled:     enabled != 0,
-		Config:      append([]byte(nil), config...),
-		Revision:    revision,
-		CreatedAt:   parseTime(createdAt),
-		ModifiedAt:  parseTime(modifiedAt),
-		RetiredAt:   parseNullableTime(retiredAt),
+		ID:             basespec.SourceID(id),
+		RootID:         basespec.RootID(rootID),
+		RootStorageKey: basespec.StorageKey(rootStorageKey),
+		StorageKey:     basespec.StorageKey(storageKey),
+		Kind:           basespec.SourceKind(kind),
+		DisplayName:    displayName,
+		Enabled:        enabled != 0,
+		Config:         append([]byte(nil), config...),
+		Revision:       revision,
+		CreatedAt:      parseTime(createdAt),
+		ModifiedAt:     parseTime(modifiedAt),
+		RetiredAt:      parseNullableTime(retiredAt),
 	}
 	if err := value.Validate(); err != nil {
 		return source.Source{}, fmt.Errorf(

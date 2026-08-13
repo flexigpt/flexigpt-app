@@ -3,7 +3,6 @@ package schema
 import (
 	"context"
 	"fmt"
-	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
@@ -40,45 +39,15 @@ const (
 	ServerSchemaURL = "https://schemas.flexigpt.dev/mcp/server/v1.json"
 	PolicySchemaURL = "https://schemas.flexigpt.dev/mcp/policy/v1.json"
 
-	// BundleFileName is the preferred filename for newly authored managed
-	// MCP Bundle packages. Existing source-controlled package registrations
-	// can explicitly select one of the accepted compatibility filenames.
-	BundleFileName          = "mcps.json"
-	AlternateBundleFileName = "mcp.json"
-	LegacyBundleFileName    = ".mcp.json"
-
 	DecoderRevision                    = "mcp.bundle.discovery.v1"
 	DecoderID       basespec.DecoderID = "mcp.bundle-json"
 )
-
-var bundleDocumentFileNames = [...]string{
-	BundleFileName,
-	AlternateBundleFileName,
-	LegacyBundleFileName,
-}
 
 var MCPSchemaKey = shareable.SchemaKey{
 	Entity:        shareable.EntityCollection,
 	Kind:          BundleKind,
 	SchemaID:      BundleSchemaID,
 	SchemaVersion: MCPSchemaVersion,
-}
-
-func BundleDocumentFileNames() []string {
-	return append([]string(nil), bundleDocumentFileNames[:]...)
-}
-
-func IsBundleDocumentFileName(value string) bool {
-	for _, candidate := range bundleDocumentFileNames {
-		if value == candidate {
-			return true
-		}
-	}
-	return false
-}
-
-func IsBundleDocumentLocator(value basespec.Locator) bool {
-	return IsBundleDocumentFileName(path.Base(string(value)))
 }
 
 func CheckCodecContext(ctx context.Context) error {

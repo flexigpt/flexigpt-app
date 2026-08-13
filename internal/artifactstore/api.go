@@ -184,6 +184,7 @@ func (a *API) CreateArtifactSource(
 		request.RootID,
 		source.Draft{
 			ID:          request.Body.ID,
+			StorageKey:  request.Body.StorageKey,
 			Kind:        request.Body.Kind,
 			DisplayName: request.Body.DisplayName,
 			Enabled:     request.Body.Enabled,
@@ -398,7 +399,7 @@ func (a *API) PublishManagedSourcePackage(
 		request.SourceID,
 		request.Body.ExpectedSourceRevision,
 		source.ManagedPackagePublication{
-			Directory:          request.Body.Directory,
+			Address:            request.Body.Address,
 			ExpectedGeneration: request.Body.ExpectedGeneration,
 			Files:              request.Body.Files,
 		},
@@ -430,7 +431,7 @@ func (a *API) RemoveManagedSourcePackage(
 		request.RootID,
 		request.SourceID,
 		request.ExpectedSourceRevision,
-		request.Directory,
+		request.Address,
 		request.ExpectedGeneration,
 	)
 	if err != nil {

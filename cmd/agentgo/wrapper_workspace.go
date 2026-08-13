@@ -35,7 +35,6 @@ func InitWorkspaceWrapper(
 		Artifacts:              artifacts.Artifacts,
 		Refresh:                artifacts.Refresh,
 		Catalogs:               artifacts.Catalogs,
-		Definitions:            artifacts.Definitions,
 		ShareableCanonicalizer: artifacts.ShareableSchemas,
 		SourceRuntime:          artifacts.SourceRuntime,
 		HasDecoder:             artifacts.HasDecoder,

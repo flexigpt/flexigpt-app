@@ -29,19 +29,6 @@ type ArtifactStoreWrapper struct {
 	builtInTopology builtin.Registry
 }
 
-const (
-	defaultWorkspaceRootID basespec.RootID = "0198f097-0d5b-7000-8000-000000000001"
-	mcpUserRootID          basespec.RootID = "0198f097-0d5b-7000-8000-000000000002"
-	mcpBuiltInRootID       basespec.RootID = "0198f097-0d5b-7000-8000-000000000003"
-)
-
-const (
-	defaultWorkspaceRootDisplayName = "FlexiGPT Workspaces"
-	defaultWorkspaceRootDescription = "Local namespace for user Workspace collections."
-	mcpUserRootDisplayName          = "FlexiGPT MCP Bundles"
-	mcpUserRootDescription          = "Local namespace for user-managed MCP Bundles."
-)
-
 func InitArtifactStoreWrapper(
 	wrapper *ArtifactStoreWrapper,
 	baseDirectory string,
@@ -358,21 +345,5 @@ func (w *ArtifactStoreWrapper) close() {
 	}
 	if err := components.Close(); err != nil {
 		slog.Error("close artifact store", "error", err)
-	}
-}
-
-func defaultWorkspaceRootDraft() root.RootDraft {
-	return root.RootDraft{
-		ID:          defaultWorkspaceRootID,
-		DisplayName: defaultWorkspaceRootDisplayName,
-		Description: defaultWorkspaceRootDescription,
-	}
-}
-
-func defaultMCPUserRootDraft() root.RootDraft {
-	return root.RootDraft{
-		ID:          mcpUserRootID,
-		DisplayName: mcpUserRootDisplayName,
-		Description: mcpUserRootDescription,
 	}
 }

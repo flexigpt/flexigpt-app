@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -83,7 +84,8 @@ func TestCloseRefreshSnapshotsClosesEverySnapshotAndJoinsErrors(t *testing.T) {
 
 func refreshTestPublication() Publication {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	definitionDigest := cryptoutil.DigestBytes([]byte("definition"))
+	definitionValue := refreshTestDefinition()
+	definitionDigest := definitionValue.Digest
 	contentDigest := cryptoutil.DigestBytes([]byte("content"))
 	return Publication{
 		Ref: collection.CollectionRef{
@@ -113,6 +115,7 @@ func refreshTestPublication() Publication {
 			Kind:                "test.artifact",
 			LogicalName:         "artifact",
 			DefinitionDigest:    &definitionDigest,
+			Definition:          &definitionValue,
 			SourceContentDigest: &contentDigest,
 			DecoderID:           "test.decoder",
 			State:               catalog.OccurrenceValid,
@@ -120,4 +123,19 @@ func refreshTestPublication() Publication {
 		}},
 		PublishedAt: now,
 	}
+}
+
+func refreshTestDefinition() definition.Definition {
+	value, err := definition.Canonicalize(definition.Definition{
+		Kind:           "test.artifact",
+		SchemaID:       "test.schema",
+		SchemaVersion:  "v1",
+		LogicalName:    "artifact",
+		LogicalVersion: "v1",
+		Body:           []byte(`{"value":true}`),
+	})
+	if err != nil {
+		panic(err)
+	}
+	return value
 }

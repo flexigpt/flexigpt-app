@@ -55,7 +55,6 @@ func InitSkillBundleWrapper(
 		Artifacts:              components.Artifacts,
 		Refresh:                components.Refresh,
 		Catalogs:               components.Catalogs,
-		Definitions:            components.Definitions,
 		ManagedArtifacts:       components.ManagedArtifacts,
 		SourceRuntime:          components.SourceRuntime,
 		HasDecoder:             components.HasDecoder,

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"path"
 	"sort"
 	"sync/atomic"
 
@@ -409,7 +408,7 @@ func (a *API) GetManagedSkillDocument(
 			basespec.ErrUnsupported,
 		)
 	}
-	if _, err := managedSkillPackageDirectoryOf(value.Binding); err != nil {
+	if _, err := managedSkillPackageAddressOf(value.Binding); err != nil {
 		return ManagedSkillDocument{}, err
 	}
 	if value.ResolvedDefinition == nil {
@@ -419,9 +418,7 @@ func (a *API) GetManagedSkillDocument(
 		)
 	}
 
-	definitionValue, err := definition.ReadCanonical(
-		ctx, a.dependencies.Definitions, value.RootID, *value.ResolvedDefinition,
-	)
+	definitionValue, err := a.currentDefinitionForArtifact(ctx, value)
 	if err != nil {
 		return ManagedSkillDocument{}, err
 	}
@@ -674,7 +671,7 @@ func (a *API) PurgeSkill(
 		return a.dependencies.Artifacts.PurgeAndSuppress(ctx, ref, expectedRevision)
 	}
 
-	directory, err := managedSkillPackageDirectoryOf(value.Binding)
+	packageAddress, err := managedSkillPackageAddressOf(value.Binding)
 	if err != nil {
 		return err
 	}
@@ -686,7 +683,7 @@ func (a *API) PurgeSkill(
 		ctx,
 		managedartifact.RemoveRequest{
 			Artifact:       value,
-			Package:        directory,
+			Package:        packageAddress,
 			Plan:           plan,
 			RefreshPolicy:  a.refreshPolicy(bundle, false),
 			AllowProtected: false,
@@ -957,6 +954,49 @@ func (a *API) currentBundleCatalog(
 	return snapshot, nil
 }
 
+func (a *API) currentDefinitionForArtifact(
+	ctx context.Context,
+	record artifact.Artifact,
+) (definition.Definition, error) {
+	if record.ResolvedDefinition == nil {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: Skill Artifact %q has no current definition",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+
+	snapshot, err := catalog.ReadCurrent(
+		ctx,
+		a.dependencies.Catalogs,
+		collection.CollectionRef{
+			RootID:       record.RootID,
+			CollectionID: record.CollectionID,
+		},
+	)
+	if err != nil {
+		return definition.Definition{}, err
+	}
+
+	value, err := catalog.DefinitionForOccurrence(snapshot, catalog.OccurrenceKey{
+		CollectionID:       record.CollectionID,
+		SourceID:           record.Binding.SourceID,
+		Locator:            record.Binding.Locator,
+		SubresourceLocator: record.Binding.SubresourceLocator,
+	})
+	if err != nil {
+		return definition.Definition{}, err
+	}
+	if value.Digest != *record.ResolvedDefinition {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: Skill Artifact %q catalog definition changed",
+			basespec.ErrConflict,
+			record.ID,
+		)
+	}
+	return value, nil
+}
+
 // createBundle keeps the built-in attachment role inside trusted bootstrap
 // composition. Public bundle creation must not mint built-in provenance.
 func (a *API) createBundle(
@@ -979,6 +1019,12 @@ func (a *API) createBundle(
 		allowBuiltInAttachment,
 	); err != nil {
 		return Bundle{}, err
+	}
+
+	if request.ManagedSourceID != "" {
+		if err := basespec.ValidateStorageKey(request.ManagedSourceStorageKey); err != nil {
+			return Bundle{}, err
+		}
 	}
 
 	data, err := EncodeCollectionData(CollectionData{
@@ -1060,6 +1106,7 @@ func (a *API) createBundle(
 			request.RootID,
 			source.Draft{
 				ID:          request.ManagedSourceID,
+				StorageKey:  request.ManagedSourceStorageKey,
 				Kind:        managed.Kind,
 				DisplayName: request.DisplayName,
 				Enabled:     true,
@@ -1432,17 +1479,15 @@ func (a *API) createManagedSkill(
 			basespec.ErrConflict,
 		)
 	}
-	directory, err := managedSkillPackageDirectory(
-		request.ArtifactID,
-		request.SkillName,
+	packageAddress, err := skillArtifact.ManagedPackageAddressForSkill(
+		definitionValue.LogicalName,
+		definitionValue.LogicalVersion,
 	)
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	skillLocator := basespec.Locator(
-		path.Join(string(directory), skillArtifact.DefinitionFileName),
-	)
-	if err := source.ValidateManagedPackageDirectory(directory); err != nil {
+	skillLocator, err := skillArtifact.ManagedPackageLocatorForSkill(packageAddress)
+	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
 	if err := basespec.ValidatePortableLocator(skillLocator, false); err != nil {
@@ -1450,8 +1495,8 @@ func (a *API) createManagedSkill(
 	}
 	if err := managed.ValidatePackagePublication(
 		source.ManagedPackagePublication{
-			Directory: directory,
-			Files:     files,
+			Address: packageAddress,
+			Files:   files,
 		},
 	); err != nil {
 		return CreateManagedSkillResponse{}, err
@@ -1605,8 +1650,8 @@ func (a *API) createManagedSkill(
 			Artifact:           *pinned,
 			ExpectedDefinition: definitionValue.Digest,
 			Package: source.ManagedPackagePublication{
-				Directory: directory,
-				Files:     files,
+				Address: packageAddress,
+				Files:   files,
 			},
 			Plan:           plan,
 			RefreshPolicy:  a.refreshPolicy(bundle, allowBuiltInAttachment),
@@ -1885,7 +1930,7 @@ func (a *API) discoveryPlan(value Bundle) (discovery.Plan, error) {
 			DirectoryRoots: []discovery.DirectoryRoot{{
 				Root:            attachmentData.DiscoveryRoot,
 				Recursive:       true,
-				IncludePatterns: []string{skillArtifact.DefinitionFileName},
+				IncludePatterns: []string{string(skillArtifact.DefinitionFileName)},
 			}},
 			DecoderHints: []discovery.DecoderHint{{
 				Locator:    attachmentData.DiscoveryRoot,
@@ -2028,25 +2073,16 @@ func (p skillArtifactPolicy) Derive(
 	}, true, nil, nil
 }
 
-func managedSkillPackageDirectoryOf(
+func managedSkillPackageAddressOf(
 	binding artifact.SourceBinding,
-) (basespec.Locator, error) {
-	if binding.SubresourceLocator != "" ||
-		path.Base(string(binding.Locator)) != skillArtifact.DefinitionFileName {
-		return "", fmt.Errorf(
-			"%w: managed Skill binding does not identify a package %q",
-			basespec.ErrInvalid,
-			skillArtifact.DefinitionFileName,
-		)
-	}
-	directory := basespec.Locator(path.Dir(string(binding.Locator)))
-	if directory == "." {
-		return "", fmt.Errorf(
-			"%w: managed Skill package cannot be the Source root",
+) (source.ManagedPackageAddress, error) {
+	if binding.SubresourceLocator != "" {
+		return source.ManagedPackageAddress{}, fmt.Errorf(
+			"%w: managed Skill cannot target a subresource",
 			basespec.ErrInvalid,
 		)
 	}
-	return directory, source.ValidateManagedPackageDirectory(directory)
+	return skillArtifact.ManagedPackageAddressFromSkillLocator(binding.Locator)
 }
 
 func normalizeManagedSkillFiles(
@@ -2061,23 +2097,18 @@ func normalizeManagedSkillFiles(
 			)
 		}
 		return []source.ManagedPackageFile{{
-			Locator: basespec.Locator(skillArtifact.DefinitionFileName),
+			Locator: skillArtifact.DefinitionFileName,
 			Content: append([]byte(nil), skillMD...),
 		}}, append([]byte(nil), skillMD...), nil
 	}
 
-	normalized, err := source.NormalizeManagedPackagePublication(
-		source.ManagedPackagePublication{
-			Directory: locatorPackage,
-			Files:     input,
-		},
-	)
+	normalized, err := source.NormalizeManagedPackageFiles(input)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var found []byte
-	for _, file := range normalized.Files {
+	for _, file := range normalized {
 		if file.Locator != skillArtifact.DefinitionFileName {
 			continue
 		}
@@ -2097,7 +2128,7 @@ func normalizeManagedSkillFiles(
 			basespec.ErrInvalid,
 		)
 	}
-	return normalized.Files, found, nil
+	return normalized, found, nil
 }
 
 type managedSkillArtifactData struct {
@@ -2183,18 +2214,6 @@ func validateManagedSkillArtifactData(
 	return nil
 }
 
-func managedSkillPackageDirectory(
-	artifactID basespec.ArtifactID,
-	skillName string,
-) (basespec.Locator, error) {
-	if err := basespec.ValidateArtifactID(artifactID); err != nil {
-		return "", err
-	}
-	return basespec.Locator(
-		path.Join("packages", string(artifactID), skillName),
-	), nil
-}
-
 func validateManagedSkillOperationIntent(
 	value artifact.Artifact,
 	bundle collection.CollectionRef,
@@ -2222,16 +2241,11 @@ func validateManagedSkillOperationIntent(
 func managedSkillPackageDigest(
 	files []source.ManagedPackageFile,
 ) (cryptoutil.Digest, error) {
-	normalized, err := source.NormalizeManagedPackagePublication(
-		source.ManagedPackagePublication{
-			Directory: locatorPackage,
-			Files:     files,
-		},
-	)
+	normalized, err := source.NormalizeManagedPackageFiles(files)
 	if err != nil {
 		return "", err
 	}
-	raw, err := json.Marshal(normalized.Files)
+	raw, err := json.Marshal(normalized)
 	if err != nil {
 		return "", err
 	}

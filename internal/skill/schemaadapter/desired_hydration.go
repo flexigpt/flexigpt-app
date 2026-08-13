@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	"github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
 
 const hydrationFingerprintSchemaVersion = "agent.skill.builtin-hydration/v1"
@@ -110,6 +111,17 @@ func (i *Installer) desiredHydrationFingerprint(
 		if err != nil {
 			return "", err
 		}
+		packageAddress, err := bundle.BuiltInCollectionPackageAddress(
+			basespec.LogicalName(collectionValue.Definition.LogicalName),
+			basespec.LogicalVersion(collectionValue.Definition.LogicalVersion),
+		)
+		if err != nil {
+			return "", err
+		}
+		sourceScope, err := packageAddress.Directory()
+		if err != nil {
+			return "", err
+		}
 		if collectionValue.Definition.Digest == nil {
 			return "", fmt.Errorf(
 				"%w: hydrated built-in collection has no digest",
@@ -125,7 +137,7 @@ func (i *Installer) desiredHydrationFingerprint(
 		value := hydrationCollection{
 			Registration:          collectionValue.Registration,
 			DefinitionDigest:      definitionDigest,
-			SourceScope:           collectionValue.SourceScope,
+			SourceScope:           sourceScope,
 			ExpectedMemberDigests: collectionValue.ExpectedMemberDigests,
 			Artifacts:             make([]hydrationArtifact, 0, len(collectionValue.Artifacts)),
 			Files:                 make([]hydrationPackageFile, 0, len(files)),

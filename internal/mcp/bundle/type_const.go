@@ -29,11 +29,6 @@ type CollectionData struct {
 	ManagedSourceID         basespec.SourceID       `json:"managedSourceID,omitempty"`
 }
 
-type AttachmentData struct {
-	SchemaVersion   string           `json:"schemaVersion"`
-	DocumentLocator basespec.Locator `json:"documentLocator"`
-}
-
 type BundleExtension struct {
 	Servers  map[string]server.ServerExtension `json:"servers,omitempty"`
 	Policies map[string]policy.PolicyDocument  `json:"policies,omitempty"`

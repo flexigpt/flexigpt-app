@@ -74,9 +74,10 @@ func (a *API) prepareDocumentReplace(
 		return documentReplacePlan{}, err
 	}
 	raw := append(json.RawMessage(nil), parsed.Raw...)
-	if bundle.Data.LogicalName != document.LogicalName {
+	if bundle.Data.LogicalName != document.LogicalName ||
+		bundle.Data.LogicalVersion != document.LogicalVersion {
 		return documentReplacePlan{}, fmt.Errorf(
-			"%w: MCP document logical name differs from Bundle identity",
+			"%w: MCP document identity differs from Bundle identity",
 			basespec.ErrConflict,
 		)
 	}

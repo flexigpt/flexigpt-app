@@ -103,14 +103,16 @@ func TestFilesystemAdapterRejectsUnportableConfigurationAndPolicy(t *testing.T) 
 func fsdirTestSource(root string, config json.RawMessage) source.Source {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
 	return source.Source{
-		ID:          "019d3150-6a1c-7a6b-a34e-d9032342bc31",
-		RootID:      "019d3150-6a1d-7a6b-a34e-d9032342bc31",
-		Kind:        Kind,
-		DisplayName: "Filesystem fixture",
-		Enabled:     true,
-		Config:      config,
-		Revision:    1,
-		CreatedAt:   now,
-		ModifiedAt:  now,
+		ID:             "019d3150-6a1c-7a6b-a34e-d9032342bc31",
+		RootID:         "019d3150-6a1d-7a6b-a34e-d9032342bc31",
+		RootStorageKey: "test-root",
+		StorageKey:     "filesystem-fixture",
+		Kind:           Kind,
+		DisplayName:    "Filesystem fixture",
+		Enabled:        true,
+		Config:         config,
+		Revision:       1,
+		CreatedAt:      now,
+		ModifiedAt:     now,
 	}
 }

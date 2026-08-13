@@ -22,8 +22,6 @@ import (
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
 
-const locatorPackage basespec.Locator = "package"
-
 // builtInSkillArtifactPolicy deliberately creates no observed Artifacts.
 // Protected topology has one declared static Artifact ID for every member.
 // Unknown source content may remain visible as a catalog occurrence, but it
@@ -58,7 +56,7 @@ type preparedBuiltInSkill struct {
 type BuiltInCollectionInstallRequest struct {
 	Bundle                     collection.CollectionRef
 	ExpectedCollectionRevision uint64
-	PackageDirectory           basespec.Locator
+	PackageAddress             source.ManagedPackageAddress
 	PackageFiles               []source.ManagedPackageFile
 	Skills                     []BuiltInCollectionSkill
 }
@@ -82,10 +80,15 @@ func (a *API) InstallBuiltInCollection(
 			basespec.ErrInvalid,
 		)
 	}
-	if err := source.ValidateManagedPackageDirectory(
-		request.PackageDirectory,
-	); err != nil {
+	if err := request.PackageAddress.Validate(); err != nil {
 		return nil, err
+	}
+	if request.PackageAddress.Kind != BuiltInCollectionPackageKind {
+		return nil, fmt.Errorf(
+			"%w: built-in Skill collection package kind must be %q",
+			basespec.ErrInvalid,
+			BuiltInCollectionPackageKind,
+		)
 	}
 	if err := a.requireBundleMutation(ctx, request.Bundle.RootID, true); err != nil {
 		return nil, err
@@ -115,7 +118,11 @@ func (a *API) InstallBuiltInCollection(
 	if err != nil {
 		return nil, err
 	}
-	if attachmentData.DiscoveryRoot != request.PackageDirectory {
+	packageDirectory, err := request.PackageAddress.Directory()
+	if err != nil {
+		return nil, err
+	}
+	if attachmentData.DiscoveryRoot != packageDirectory {
 		return nil, fmt.Errorf(
 			"%w: built-in package directory does not match attachment discovery root",
 			basespec.ErrInvalid,
@@ -131,8 +138,8 @@ func (a *API) InstallBuiltInCollection(
 
 	publication, err := source.NormalizeManagedPackagePublication(
 		source.ManagedPackagePublication{
-			Directory: request.PackageDirectory,
-			Files:     request.PackageFiles,
+			Address: request.PackageAddress,
+			Files:   request.PackageFiles,
 		},
 	)
 	if err != nil {
@@ -172,7 +179,7 @@ func (a *API) InstallBuiltInCollection(
 		if err := basespec.ValidatePortableLocator(skill.Member, false); err != nil {
 			return nil, fmt.Errorf("skills[%d]: %w", index, err)
 		}
-		if path.Base(string(skill.Member)) != skillArtifact.DefinitionFileName ||
+		if basespec.Locator(path.Base(string(skill.Member))) != skillArtifact.DefinitionFileName ||
 			path.Dir(string(skill.Member)) == "." {
 			return nil, fmt.Errorf(
 				"%w: built-in member %q is not a packaged %q",
@@ -252,11 +259,8 @@ func (a *API) InstallBuiltInCollection(
 		if name == "" {
 			name = string(definitionValue.LogicalName)
 		}
-		locator := basespec.Locator(path.Join(
-			string(request.PackageDirectory),
-			string(skill.Member),
-		))
-		if err := basespec.ValidateLocator(locator, false); err != nil {
+		locator, err := request.PackageAddress.FileLocator(skill.Member)
+		if err != nil {
 			return nil, err
 		}
 
@@ -368,16 +372,11 @@ func filesForBuiltInMember(
 			member,
 		)
 	}
-	normalized, err := source.NormalizeManagedPackagePublication(
-		source.ManagedPackagePublication{
-			Directory: locatorPackage,
-			Files:     output,
-		},
-	)
+	normalized, err := source.NormalizeManagedPackageFiles(output)
 	if err != nil {
 		return nil, err
 	}
-	return normalized.Files, nil
+	return normalized, nil
 }
 
 func (a *API) ensurePinnedManagedSkill(

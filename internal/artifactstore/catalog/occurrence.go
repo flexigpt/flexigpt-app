@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -38,6 +39,12 @@ type Occurrence struct {
 	State               OccurrenceState         `json:"state"`
 	Diagnostics         []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 	ObservedAt          time.Time               `json:"observedAt"`
+
+	// Definition is the current parsed definition cache. The portable source
+	// package remains authoritative. SQLite persists this field with the
+	// current catalog occurrence, but it is intentionally not part of the
+	// public catalog JSON projection.
+	Definition *definition.Definition `json:"-"`
 }
 
 func (o Occurrence) Validate() error {
@@ -81,6 +88,26 @@ func (o Occurrence) Validate() error {
 			return err
 		}
 	}
+	if o.Definition != nil {
+		canonical, err := definition.Canonicalize(*o.Definition)
+		if err != nil {
+			return fmt.Errorf("occurrence definition: %w", err)
+		}
+		if canonical.Digest != o.Definition.Digest {
+			return fmt.Errorf(
+				"%w: occurrence definition is not canonical",
+				basespec.ErrInvalid,
+			)
+		}
+		if o.DefinitionDigest == nil ||
+			canonical.Digest != *o.DefinitionDigest {
+			return fmt.Errorf(
+				"%w: occurrence definition does not match fingerprint",
+				basespec.ErrDigestMismatch,
+			)
+		}
+	}
+
 	switch o.State {
 	case OccurrenceValid:
 		if err := basespec.ValidateArtifactKind(o.Kind); err != nil {
@@ -92,23 +119,26 @@ func (o Occurrence) Validate() error {
 		if err := basespec.ValidateLogicalVersion(o.LogicalVersion, true); err != nil {
 			return err
 		}
-		if o.DefinitionDigest == nil || o.SourceContentDigest == nil {
+		if o.DefinitionDigest == nil ||
+			o.SourceContentDigest == nil ||
+			o.Definition == nil {
 			return fmt.Errorf(
-				"%w: valid occurrence requires definition and source content digests",
+				"%w: valid occurrence requires definition, definition fingerprint, and source content fingerprint",
 				basespec.ErrInvalid,
 			)
-		}
-		if err := cryptoutil.ValidateDigest(*o.DefinitionDigest); err != nil {
-			return err
-		}
-		if err := cryptoutil.ValidateDigest(*o.SourceContentDigest); err != nil {
-			return err
 		}
 		if err := basespec.ValidateDecoderID(o.DecoderID); err != nil {
 			return err
 		}
 
 	case OccurrenceInvalid, OccurrenceMissing:
+		if o.Definition != nil {
+			return fmt.Errorf(
+				"%w: non-valid occurrence cannot retain a parsed definition",
+				basespec.ErrInvalid,
+			)
+		}
+
 	default:
 		return fmt.Errorf(
 			"%w: invalid occurrence state %q",

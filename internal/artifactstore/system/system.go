@@ -5,15 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition/maprepo"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
@@ -64,12 +61,10 @@ type Components struct {
 	CollectionReader collection.Reader
 	ArtifactReader   artifact.Reader
 	Catalogs         catalog.Reader
-	Definitions      definition.Reader
 	SourceRuntime    source.Runtime
 	discovery        *discovery.Engine
 
 	metadata           *sqlite.Store
-	content            *maprepo.Repository
 	managedSources     *source.Registry
 	decoderIDs         map[basespec.DecoderID]struct{}
 	rootMutationPolicy protection.RootPolicy
@@ -94,30 +89,15 @@ func Open(
 		return nil, err
 	}
 	base = filepath.Clean(base)
-	info, err := os.Stat(base)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"%w: artifact system base directory is unavailable: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("%w: artifact system base is not a directory", basespec.ErrInvalid)
-	}
-	metadata, err := sqlite.Open(
-		ctx,
-		filepath.Join(base, "artifact-metadata.sqlite"),
-	)
-	if err != nil {
+	if err := ensureStoreLayout(base); err != nil {
 		return nil, err
 	}
 
-	content, err := maprepo.Open(
-		filepath.Join(base, "definitions"),
+	metadata, err := sqlite.Open(
+		ctx,
+		filepath.Join(base, StoreMetadataFileName),
 	)
 	if err != nil {
-		_ = metadata.Close()
 		return nil, err
 	}
 
@@ -125,13 +105,11 @@ func Open(
 		config.ShareableCodecs...,
 	)
 	if err != nil {
-		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
 
 	if err := bindShareableSchemas(config.Decoders, shareableRegistry); err != nil {
-		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -140,23 +118,20 @@ func Open(
 		config.FilesystemTraversalPolicy,
 	)
 	if err != nil {
-		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
 
 	managedAdapter, err := managed.New(
-		filepath.Join(base, "managed-sources"),
+		filepath.Join(base, StoreContentDirectoryName),
 	)
 	if err != nil {
-		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
 
 	embeddedAdapter, err := embedded.New(config.EmbeddedProviders)
 	if err != nil {
-		_ = content.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -172,13 +147,13 @@ func Open(
 
 	sourceRegistry, err := source.NewRegistry(sourceAdapters...)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
 	decoderRegistry, err := discovery.NewDecoderRegistry(config.Decoders...)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -188,25 +163,12 @@ func Open(
 	collectionRepository := metadata.Collections()
 	catalogRepository := metadata.Catalogs()
 	artifactRepository := metadata.Artifacts()
-	definitions, err := definition.NewRootScopedRepository(
-		content,
-		func(ctx context.Context, rootID basespec.RootID) error {
-			_, err := rootRepository.Get(ctx, rootID)
-			return err
-		},
-	)
-	if err != nil {
-		_ = content.Close()
-		_ = metadata.Close()
-		return nil, err
-	}
-
 	sourceRuntime, err := source.NewRuntime(
 		sourceRepository,
 		sourceRegistry,
 	)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -214,11 +176,12 @@ func Open(
 	sourceService, err := source.NewService(
 		sourceRepository,
 		sourceRegistry,
+		rootRepository,
 		config.Clock,
 		config.RootMutationPolicy,
 	)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -228,7 +191,7 @@ func Open(
 		config.RootMutationPolicy,
 	)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -239,7 +202,7 @@ func Open(
 		config.RootMutationPolicy,
 	)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -251,7 +214,7 @@ func Open(
 		config.RootMutationPolicy,
 	)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -260,7 +223,7 @@ func Open(
 		config.Clock,
 	)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -268,7 +231,7 @@ func Open(
 		config.Clock,
 	)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -283,14 +246,13 @@ func Open(
 		sourceRuntime,
 		artifactRepository,
 		discoveryEngine,
-		definitions,
 		reconciler,
 		metadata.Publisher(),
 		config.Clock,
 		config.RootMutationPolicy,
 	)
 	if err != nil {
-		_ = content.Close()
+
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -305,11 +267,9 @@ func Open(
 		CollectionReader:   collectionRepository,
 		ArtifactReader:     artifactRepository,
 		Catalogs:           catalogRepository,
-		Definitions:        definitions,
 		SourceRuntime:      sourceRuntime,
 		discovery:          discoveryEngine,
 		metadata:           metadata,
-		content:            content,
 		managedSources:     sourceRegistry,
 		decoderIDs:         decoderIDs,
 		rootMutationPolicy: config.RootMutationPolicy,
@@ -552,7 +512,7 @@ func (c *Components) RemoveManagedPackage(
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
 	expectedSourceRevision uint64,
-	directory basespec.Locator,
+	address source.ManagedPackageAddress,
 	expectedGeneration string,
 ) (ManagedPackageResult, error) {
 	return c.removeManagedPackage(
@@ -560,7 +520,7 @@ func (c *Components) RemoveManagedPackage(
 		rootID,
 		sourceID,
 		expectedSourceRevision,
-		directory,
+		address,
 		expectedGeneration,
 		false,
 	)
@@ -573,7 +533,7 @@ func (c *Components) RemoveProtectedManagedPackage(
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
 	expectedSourceRevision uint64,
-	directory basespec.Locator,
+	address source.ManagedPackageAddress,
 	expectedGeneration string,
 ) (ManagedPackageResult, error) {
 	if c == nil || !c.isProtectedRoot(rootID) {
@@ -591,7 +551,7 @@ func (c *Components) RemoveProtectedManagedPackage(
 		rootID,
 		sourceID,
 		expectedSourceRevision,
-		directory,
+		address,
 		expectedGeneration,
 		true,
 	)
@@ -602,11 +562,6 @@ func (c *Components) Close() error {
 		return nil
 	}
 	var closeErrors []error
-	if c.content != nil {
-		if err := c.content.Close(); err != nil {
-			closeErrors = append(closeErrors, err)
-		}
-	}
 	if c.metadata != nil {
 		if err := c.metadata.Close(); err != nil {
 			closeErrors = append(closeErrors, err)
@@ -704,7 +659,7 @@ func (c *Components) removeManagedPackage(
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
 	expectedSourceRevision uint64,
-	directory basespec.Locator,
+	address source.ManagedPackageAddress,
 	expectedGeneration string,
 	allowProtected bool,
 ) (ManagedPackageResult, error) {
@@ -721,7 +676,7 @@ func (c *Components) removeManagedPackage(
 	if err := protection.RequireMutableRoot(ctx, c.rootMutationPolicy, rootID); err != nil {
 		return ManagedPackageResult{}, err
 	}
-	if err := source.ValidateManagedPackageDirectory(directory); err != nil {
+	if err := address.Validate(); err != nil {
 		return ManagedPackageResult{}, err
 	}
 	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
@@ -751,7 +706,7 @@ func (c *Components) removeManagedPackage(
 			ctx,
 			c.SourceRuntime,
 			value,
-			directory,
+			address,
 		)
 		if err != nil {
 			return ManagedPackageResult{}, err
@@ -780,7 +735,7 @@ func (c *Components) removeManagedPackage(
 	if err := c.managedSources.RemovePackage(
 		ctx,
 		value,
-		directory,
+		address,
 		expectedGeneration,
 	); err != nil {
 		return ManagedPackageResult{}, err
@@ -816,14 +771,17 @@ func managedPackageExists(
 	ctx context.Context,
 	runtime source.Runtime,
 	value source.Source,
-	directory basespec.Locator,
+	address source.ManagedPackageAddress,
 ) (bool, error) {
 	snapshot, err := runtime.Open(ctx, value)
 	if err != nil {
 		return false, err
 	}
-
-	entry, statErr := snapshot.Stat(ctx, directory)
+	dir, err := address.Directory()
+	if err != nil {
+		return false, err
+	}
+	entry, statErr := snapshot.Stat(ctx, dir)
 	confirmErr := snapshot.Confirm(ctx)
 	closeErr := snapshot.Close()
 	if confirmErr != nil || closeErr != nil {
@@ -839,7 +797,7 @@ func managedPackageExists(
 		return false, fmt.Errorf(
 			"%w: managed package %q is not a directory",
 			basespec.ErrInvalid,
-			directory,
+			address,
 		)
 	}
 	return true, nil
@@ -920,7 +878,7 @@ func (c *Components) removeManagedArtifactPackage(
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
 	expectedRevision uint64,
-	directory basespec.Locator,
+	address source.ManagedPackageAddress,
 	expectedGeneration string,
 ) (managedartifact.SourceState, error) {
 	result, err := c.RemoveManagedPackage(
@@ -928,7 +886,7 @@ func (c *Components) removeManagedArtifactPackage(
 		rootID,
 		sourceID,
 		expectedRevision,
-		directory,
+		address,
 		expectedGeneration,
 	)
 	if err != nil {
@@ -945,7 +903,7 @@ func (c *Components) removeProtectedManagedArtifactPackage(
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
 	expectedRevision uint64,
-	directory basespec.Locator,
+	address source.ManagedPackageAddress,
 	expectedGeneration string,
 ) (managedartifact.SourceState, error) {
 	result, err := c.RemoveProtectedManagedPackage(
@@ -953,7 +911,7 @@ func (c *Components) removeProtectedManagedArtifactPackage(
 		rootID,
 		sourceID,
 		expectedRevision,
-		directory,
+		address,
 		expectedGeneration,
 	)
 	if err != nil {

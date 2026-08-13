@@ -31,16 +31,17 @@ type AttachmentDraft struct {
 	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
 }
 type CreateBundleRequest struct {
-	RootID          basespec.RootID
-	CollectionID    basespec.CollectionID
-	ManagedSourceID basespec.SourceID
-	DisplayName     string
-	Description     string
-	Enabled         bool
-	LogicalName     basespec.LogicalName
-	LogicalVersion  basespec.LogicalVersion
-	Labels          map[string]string
-	Attachments     []AttachmentDraft
+	RootID                  basespec.RootID
+	CollectionID            basespec.CollectionID
+	ManagedSourceID         basespec.SourceID
+	ManagedSourceStorageKey basespec.StorageKey
+	DisplayName             string
+	Description             string
+	Enabled                 bool
+	LogicalName             basespec.LogicalName
+	LogicalVersion          basespec.LogicalVersion
+	Labels                  map[string]string
+	Attachments             []AttachmentDraft
 }
 
 type UpdateBundleRequest struct {

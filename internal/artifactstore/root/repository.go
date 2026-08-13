@@ -7,9 +7,10 @@ import (
 )
 
 type RootDraft struct {
-	ID          basespec.RootID `json:"id"                    required:"true"`
-	DisplayName string          `json:"displayName"           required:"true"`
-	Description string          `json:"description,omitempty"`
+	ID          basespec.RootID     `json:"id"                    required:"true"`
+	StorageKey  basespec.StorageKey `json:"storageKey"            required:"true"`
+	DisplayName string              `json:"displayName"           required:"true"`
+	Description string              `json:"description,omitempty"`
 }
 
 type RootUpdate struct {

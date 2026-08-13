@@ -8,17 +8,21 @@ import (
 )
 
 type Root struct {
-	ID          basespec.RootID `json:"id"`
-	DisplayName string          `json:"displayName"`
-	Description string          `json:"description,omitempty"`
-	Revision    uint64          `json:"revision"`
-	CreatedAt   time.Time       `json:"createdAt"`
-	ModifiedAt  time.Time       `json:"modifiedAt"`
-	RetiredAt   *time.Time      `json:"retiredAt,omitempty"`
+	ID          basespec.RootID     `json:"id"`
+	StorageKey  basespec.StorageKey `json:"storageKey"`
+	DisplayName string              `json:"displayName"`
+	Description string              `json:"description,omitempty"`
+	Revision    uint64              `json:"revision"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	ModifiedAt  time.Time           `json:"modifiedAt"`
+	RetiredAt   *time.Time          `json:"retiredAt,omitempty"`
 }
 
 func (r Root) Validate() error {
 	if err := basespec.ValidateRootID(r.ID); err != nil {
+		return err
+	}
+	if err := basespec.ValidateStorageKey(r.StorageKey); err != nil {
 		return err
 	}
 	if err := basespec.ValidateRequiredText(
