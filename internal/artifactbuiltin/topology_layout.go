@@ -1,4 +1,4 @@
-package schema
+package artifactbuiltin
 
 import (
 	"encoding/json"

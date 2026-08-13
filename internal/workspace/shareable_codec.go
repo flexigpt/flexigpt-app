@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -23,7 +23,7 @@ func (workspaceCollectionCodec) Key() shareable.SchemaKey {
 }
 
 func (workspaceCollectionCodec) JSONSchema() []byte {
-	return builtinSchema.WorkspaceCollectionV1JSONSchema()
+	return artifactbuiltin.WorkspaceCollectionV1JSONSchema()
 }
 
 func (workspaceCollectionCodec) Canonicalize(
@@ -40,11 +40,11 @@ func (workspaceCollectionCodec) Canonicalize(
 		return shareable.ParsedDocument{}, err
 	}
 
-	value, err := builtinSchema.ParseWorkspaceCollectionV1(raw)
+	value, err := artifactbuiltin.ParseWorkspaceCollectionV1(raw)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}
-	canonical, err := builtinSchema.CanonicalizeWorkspaceCollectionV1(value)
+	canonical, err := artifactbuiltin.CanonicalizeWorkspaceCollectionV1(value)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}
@@ -54,7 +54,7 @@ func (workspaceCollectionCodec) Canonicalize(
 			basespec.ErrInvalid,
 		)
 	}
-	encoded, err := builtinSchema.MarshalWorkspaceCollectionV1(canonical)
+	encoded, err := artifactbuiltin.MarshalWorkspaceCollectionV1(canonical)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}

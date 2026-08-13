@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
@@ -23,7 +23,7 @@ import (
 type SkillBundleWrapper struct {
 	api              *skillBundle.API
 	runtime          *skillRuntime.SkillRuntime
-	builtInInstaller builtinSchema.HydrationInstaller
+	builtInInstaller artifactbuiltin.HydrationInstaller
 
 	warmupMu     sync.Mutex
 	warmupCancel context.CancelFunc
@@ -106,7 +106,7 @@ func InitSkillBundleWrapper(
 		return err
 	}
 
-	packages, err := builtinSchema.EmbeddedSkillPackages()
+	packages, err := artifactbuiltin.EmbeddedSkillPackages()
 	if err != nil {
 		wrapper.close()
 		return err

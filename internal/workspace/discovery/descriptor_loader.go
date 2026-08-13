@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -21,7 +21,7 @@ type DescriptorLoader struct {
 
 // Descriptor is the portable workspace.collection document stored at the
 // direct workspace-root locator workspace.json.
-type Descriptor = builtinSchema.WorkspaceCollectionV1
+type Descriptor = artifactbuiltin.WorkspaceCollectionV1
 
 type DescriptorObservation struct {
 	Preferences            spec.DiscoveryPreferences
@@ -150,7 +150,7 @@ func (l *DescriptorLoader) Load(
 		)
 	}
 
-	descriptor, err := builtinSchema.ParseWorkspaceCollectionV1(document.Raw)
+	descriptor, err := artifactbuiltin.ParseWorkspaceCollectionV1(document.Raw)
 	if err != nil {
 		return DescriptorObservation{}, fmt.Errorf(
 			"%w: decode canonical Workspace descriptor: %w",
@@ -159,7 +159,7 @@ func (l *DescriptorLoader) Load(
 		)
 	}
 
-	body, err := builtinSchema.DecodeWorkspaceCollectionV1Body(
+	body, err := artifactbuiltin.DecodeWorkspaceCollectionV1Body(
 		descriptor.Body,
 	)
 	if err != nil {
@@ -268,7 +268,7 @@ func (l *DescriptorLoader) Load(
 }
 
 func resolveDescriptorDiscoveryPreferences(
-	input builtinSchema.WorkspaceDiscoveryV1,
+	input artifactbuiltin.WorkspaceDiscoveryV1,
 	base basespec.Locator,
 ) (spec.DiscoveryPreferences, error) {
 	output := spec.DiscoveryPreferences{

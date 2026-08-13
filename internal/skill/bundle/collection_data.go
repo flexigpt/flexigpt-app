@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -87,7 +87,7 @@ func ValidateCollectionData(value CollectionData) error {
 	); err != nil {
 		return err
 	}
-	if err := builtinSchema.ValidateShareableCollectionMetadata(
+	if err := artifactbuiltin.ValidateShareableCollectionMetadata(
 		string(value.LogicalName),
 		string(value.LogicalVersion),
 		"",

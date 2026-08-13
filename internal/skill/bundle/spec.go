@@ -2,17 +2,17 @@ package bundle
 
 import (
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const (
-	CollectionKind basespec.CollectionKind = builtinSchema.SkillCollectionV1Kind
+	CollectionKind basespec.CollectionKind = artifactbuiltin.SkillCollectionV1Kind
 
 	CollectionSchemaVersion = "v1"
 	DiscoveryPolicyRevision = "skill.bundle.discovery.v1"

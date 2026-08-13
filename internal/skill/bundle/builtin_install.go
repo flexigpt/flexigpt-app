@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -17,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
@@ -156,7 +156,7 @@ func (a *API) InstallBuiltInCollection(
 	hasCollectionFile := false
 	for _, file := range publication.Files {
 		filesByLocator[file.Locator] = append([]byte(nil), file.Content...)
-		if file.Locator == builtinSchema.SkillCollectionV1FileName {
+		if file.Locator == artifactbuiltin.SkillCollectionV1FileName {
 			hasCollectionFile = true
 		}
 	}
@@ -164,7 +164,7 @@ func (a *API) InstallBuiltInCollection(
 		return nil, fmt.Errorf(
 			"%w: built-in Collection package lacks %q",
 			basespec.ErrInvalid,
-			builtinSchema.SkillCollectionV1FileName,
+			artifactbuiltin.SkillCollectionV1FileName,
 		)
 	}
 

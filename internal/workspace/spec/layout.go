@@ -1,16 +1,16 @@
 package spec
 
 import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 const (
-	RepositoryRootLocator basespec.Locator = builtinSchema.RepositoryRootLocator
+	RepositoryRootLocator basespec.Locator = artifactbuiltin.RepositoryRootLocator
 
-	WorkspaceDescriptorFileName basespec.Locator = builtinSchema.WorkspaceDescriptorFileName
+	WorkspaceDescriptorFileName basespec.Locator = artifactbuiltin.WorkspaceDescriptorFileName
 
-	DescriptorLocator basespec.Locator = builtinSchema.WorkspaceDescriptorLocator
+	DescriptorLocator basespec.Locator = artifactbuiltin.WorkspaceDescriptorLocator
 
-	DefaultMarkdownIncludePattern = builtinSchema.WorkspaceMarkdownPattern
+	DefaultMarkdownIncludePattern = artifactbuiltin.WorkspaceMarkdownPattern
 )

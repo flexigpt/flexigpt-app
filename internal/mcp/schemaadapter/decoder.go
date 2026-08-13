@@ -6,11 +6,11 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
@@ -26,11 +26,11 @@ func NewDecoder() *Decoder {
 }
 
 func (*Decoder) ID() basespec.DecoderID {
-	return schema.DecoderID
+	return artifactbuiltin.DecoderID
 }
 
 func (*Decoder) Revision() string {
-	return schema.DecoderRevision
+	return artifactbuiltin.DecoderRevision
 }
 
 func (d *Decoder) BindShareableSchemas(
@@ -43,7 +43,7 @@ func (d *Decoder) BindShareableSchemas(
 		)
 	}
 
-	expected := schema.MCPSchemaKey
+	expected := artifactbuiltin.MCPSchemaKey
 	if slices.Contains(schemas.Keys(), expected) {
 		d.documents = schemas
 		return nil
@@ -58,7 +58,7 @@ func (d *Decoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if candidate.RequestsDecoder(schema.DecoderID) &&
+	if candidate.RequestsDecoder(artifactbuiltin.DecoderID) &&
 		bundle.IsBundleDocumentLocator(candidate.Locator) {
 		return discovery.RecognitionPreferred
 	}
@@ -69,7 +69,7 @@ func (d *Decoder) Decode(
 	ctx context.Context,
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
-	if !candidate.RequestsDecoder(schema.DecoderID) ||
+	if !candidate.RequestsDecoder(artifactbuiltin.DecoderID) ||
 		!bundle.IsBundleDocumentLocator(candidate.Locator) {
 		return nil, nil
 	}
@@ -83,7 +83,7 @@ func (d *Decoder) Decode(
 
 	parsed, err := d.documents.CanonicalizeExpected(
 		ctx,
-		schema.MCPSchemaKey,
+		artifactbuiltin.MCPSchemaKey,
 		candidate.Content,
 	)
 	if err != nil {

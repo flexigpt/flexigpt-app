@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
@@ -43,9 +43,9 @@ func ServerFromCanonicalBundle(
 		)
 	}
 	return jsonutil.CloneJSON(server.ServerDocument{
-		Kind:           schema.ServerKind,
-		SchemaID:       schema.ServerSchemaID,
-		SchemaVersion:  schema.MCPSchemaVersion,
+		Kind:           artifactbuiltin.ServerKind,
+		SchemaID:       artifactbuiltin.ServerSchemaID,
+		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
 		LogicalName:    basespec.LogicalName(name),
 		LogicalVersion: extension.LogicalVersion,
 		DisplayName:    extension.DisplayName,
@@ -57,9 +57,9 @@ func ServerFromCanonicalBundle(
 }
 
 func ValidateBundle(value BundleDocument) error {
-	if value.Kind != schema.BundleKind ||
-		value.SchemaID != schema.BundleSchemaID ||
-		value.SchemaVersion != schema.MCPSchemaVersion {
+	if value.Kind != artifactbuiltin.BundleKind ||
+		value.SchemaID != artifactbuiltin.BundleSchemaID ||
+		value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP Bundle schema",
 			basespec.ErrInvalid,
@@ -245,7 +245,7 @@ func (a *API) canonicalizeBundleBytes(
 
 	parsed, err := a.dependencies.ShareableDocuments.CanonicalizeExpected(
 		ctx,
-		schema.MCPSchemaKey,
+		artifactbuiltin.MCPSchemaKey,
 		raw,
 	)
 	if err != nil {

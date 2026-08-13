@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -24,7 +24,7 @@ import (
 func BundleFromParsedDocument(
 	input shareable.ParsedDocument,
 ) (BundleDocument, error) {
-	expected := schema.MCPSchemaKey
+	expected := artifactbuiltin.MCPSchemaKey
 	if err := validateParsedMCPDocument(
 		input,
 		expected,
@@ -37,9 +37,9 @@ func BundleFromParsedDocument(
 	if err := decodeCanonicalDocument(input.Raw, &output); err != nil {
 		return BundleDocument{}, err
 	}
-	if output.Kind != schema.BundleKind ||
-		output.SchemaID != schema.BundleSchemaID ||
-		output.SchemaVersion != schema.MCPSchemaVersion {
+	if output.Kind != artifactbuiltin.BundleKind ||
+		output.SchemaID != artifactbuiltin.BundleSchemaID ||
+		output.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
 		return BundleDocument{}, fmt.Errorf(
 			"%w: canonical MCP Bundle output has another schema identity",
 			basespec.ErrInvalid,

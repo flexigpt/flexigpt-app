@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 func EnsureBuiltinArtifactTopology(
@@ -21,12 +21,12 @@ func EnsureBuiltinArtifactTopology(
 		mcp.builtInInstaller == nil {
 		return errors.New("built-in topology dependencies are incomplete")
 	}
-	if err := builtinSchema.ValidateApplicationTopology(); err != nil {
+	if err := artifactbuiltin.ValidateApplicationTopology(); err != nil {
 		return err
 	}
 
-	bootstrap, err := builtinSchema.NewBootstrapRegistry(
-		builtinSchema.BuiltinTopologyDeclaration(),
+	bootstrap, err := artifactbuiltin.NewBootstrapRegistry(
+		artifactbuiltin.BuiltinTopologyDeclaration(),
 		components,
 		components,
 	)

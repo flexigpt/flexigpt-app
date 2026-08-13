@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schemaadapter"
@@ -33,7 +33,7 @@ func InitArtifactStoreWrapper(
 	if wrapper == nil {
 		return errors.New("artifact store wrapper is required")
 	}
-	if err := builtinSchema.ValidateApplicationTopology(); err != nil {
+	if err := artifactbuiltin.ValidateApplicationTopology(); err != nil {
 		return err
 	}
 
@@ -55,8 +55,8 @@ func InitArtifactStoreWrapper(
 	}
 
 	rootPolicy, err := protection.NewSetRootPolicy(
-		builtinSchema.ProtectedRootIDs(),
-		builtinSchema.RetainedRootIDs(),
+		artifactbuiltin.ProtectedRootIDs(),
+		artifactbuiltin.RetainedRootIDs(),
 	)
 	if err != nil {
 		return err
@@ -75,7 +75,7 @@ func InitArtifactStoreWrapper(
 		return err
 	}
 
-	for _, draft := range builtinSchema.RetainedRootDrafts() {
+	for _, draft := range artifactbuiltin.RetainedRootDrafts() {
 		if _, err := components.Roots.Create(
 			context.Background(),
 			draft,

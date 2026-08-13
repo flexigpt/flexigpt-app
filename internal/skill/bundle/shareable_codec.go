@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -31,15 +31,15 @@ func (c skillCollectionCodec) Canonicalize(
 		return shareable.ParsedDocument{}, err
 	}
 
-	value, err := builtinSchema.ParseSkillCollectionV1(raw)
+	value, err := artifactbuiltin.ParseSkillCollectionV1(raw)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}
-	canonical, err := builtinSchema.CanonicalizeSkillCollectionV1(value)
+	canonical, err := artifactbuiltin.CanonicalizeSkillCollectionV1(value)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}
-	encoded, err := builtinSchema.MarshalSkillCollectionV1(canonical)
+	encoded, err := artifactbuiltin.MarshalSkillCollectionV1(canonical)
 	if err != nil {
 		return shareable.ParsedDocument{}, err
 	}
@@ -61,11 +61,11 @@ func (skillCollectionCodec) Key() shareable.SchemaKey {
 	return shareable.SchemaKey{
 		Entity:        shareable.EntityCollection,
 		Kind:          CollectionKind,
-		SchemaID:      basespec.SchemaID(builtinSchema.SkillCollectionV1SchemaID),
-		SchemaVersion: builtinSchema.SkillCollectionV1SchemaVersion,
+		SchemaID:      basespec.SchemaID(artifactbuiltin.SkillCollectionV1SchemaID),
+		SchemaVersion: artifactbuiltin.SkillCollectionV1SchemaVersion,
 	}
 }
 
 func (skillCollectionCodec) JSONSchema() []byte {
-	return builtinSchema.SkillCollectionV1JSONSchema()
+	return artifactbuiltin.SkillCollectionV1JSONSchema()
 }

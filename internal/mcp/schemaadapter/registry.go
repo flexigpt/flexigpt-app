@@ -5,8 +5,8 @@ import (
 	"path"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 )
 
@@ -111,8 +111,8 @@ func (r Registry) Validate() error {
 					err,
 				)
 			}
-			if value.Kind != schema.ServerKind &&
-				value.Kind != schema.PolicyKind {
+			if value.Kind != artifactbuiltin.ServerKind &&
+				value.Kind != artifactbuiltin.PolicyKind {
 				return fmt.Errorf(
 					"%w: unsupported MCP built-in Artifact kind %q",
 					basespec.ErrInvalid,

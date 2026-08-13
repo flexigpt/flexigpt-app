@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
@@ -68,8 +68,8 @@ func (f *Factory) Connect(
 	}
 	client := mcpSDK.NewClient(
 		&mcpSDK.Implementation{
-			Name:    schema.MCPHostName,
-			Version: schema.MCPHostVersion,
+			Name:    artifactbuiltin.MCPHostName,
+			Version: artifactbuiltin.MCPHostVersion,
 		},
 		&mcpSDK.ClientOptions{
 			Logger: logger,

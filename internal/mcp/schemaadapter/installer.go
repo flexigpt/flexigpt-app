@@ -12,13 +12,13 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
@@ -29,11 +29,11 @@ import (
 // registry. It intentionally does not inspect or convert legacy runtime data,
 // overlays, secrets, or user state.
 func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
-	packages, err := schema.EmbeddedMCPArtifactPackages()
+	packages, err := artifactbuiltin.EmbeddedMCPArtifactPackages()
 	if err != nil {
 		return Registry{}, nil, err
 	}
-	raw, err := schema.ReadEmbeddedMCPRegistry()
+	raw, err := artifactbuiltin.ReadEmbeddedMCPRegistry()
 	if err != nil {
 		return Registry{}, nil, err
 	}
@@ -126,7 +126,7 @@ func NewInstaller(
 	if err := dependencies.Registry.Validate(); err != nil {
 		return nil, err
 	}
-	builtInTopology := schema.BuiltinTopologyDeclaration()
+	builtInTopology := artifactbuiltin.BuiltinTopologyDeclaration()
 	if err := builtInTopology.Validate(); err != nil {
 		return nil, err
 	}
@@ -525,7 +525,7 @@ func (i *Installer) hydrationFingerprint(
 		Topology      topology.Declaration `json:"topology"`
 		Bundles       []bundleFingerprint  `json:"bundles"`
 	}{
-		SchemaVersion: schema.HydrationFingerprintSchemaVersion,
+		SchemaVersion: artifactbuiltin.HydrationFingerprintSchemaVersion,
 		Topology:      i.builtInTopology,
 		Bundles:       values,
 	})
@@ -549,12 +549,12 @@ func bundleDefinitions(
 	for name := range document.MCPServers {
 		output[basespec.SubresourceLocator(
 			"mcpServers/"+name,
-		)] = schema.ServerKind
+		)] = artifactbuiltin.ServerKind
 	}
 	for name := range document.BundleExtension.Policies {
 		output[basespec.SubresourceLocator(
 			"policies/"+name,
-		)] = schema.PolicyKind
+		)] = artifactbuiltin.PolicyKind
 	}
 	return output, nil
 }

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"path/filepath"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -22,7 +23,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/sqlite"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -98,7 +98,7 @@ func Open(
 		ctx,
 		filepath.Join(
 			base,
-			builtinSchema.ArtifactStoreMetadataFileName,
+			artifactbuiltin.ArtifactStoreMetadataFileName,
 		),
 	)
 	if err != nil {
@@ -129,11 +129,11 @@ func Open(
 	managedAdapter, err := managed.New(
 		filepath.Join(
 			base,
-			builtinSchema.ArtifactStoreContentDirectoryName,
+			artifactbuiltin.ArtifactStoreContentDirectoryName,
 		),
 		filepath.Join(
 			base,
-			builtinSchema.ArtifactStoreStagingDirectoryName,
+			artifactbuiltin.ArtifactStoreStagingDirectoryName,
 		),
 	)
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 )
 
 type TraversalPolicy struct {
@@ -75,7 +75,7 @@ func (p normalizedTraversalPolicy) isGitSubmoduleDirectory(directory string) boo
 
 	gitFile := filepath.Join(
 		directory,
-		builtinSchema.ExternalGitMetadataDirectoryName,
+		artifactbuiltin.ExternalGitMetadataDirectoryName,
 	)
 	info, err := os.Stat(gitFile)
 	if err != nil || !info.Mode().IsRegular() {
@@ -100,7 +100,7 @@ func (p normalizedTraversalPolicy) isGitSubmoduleDirectory(directory string) boo
 
 func DefaultTraversalPolicy() TraversalPolicy {
 	return TraversalPolicy{
-		ExcludedDirectoryNames: builtinSchema.
+		ExcludedDirectoryNames: artifactbuiltin.
 			ExternalTraversalExcludedDirectoryNames(),
 		SkipGitSubmodules: true,
 	}

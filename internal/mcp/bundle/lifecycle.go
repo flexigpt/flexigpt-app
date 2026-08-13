@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 )
 
@@ -161,7 +161,7 @@ func (a *API) Purge(
 	if err != nil {
 		return err
 	}
-	if retired.Kind != schema.BundleKind {
+	if retired.Kind != artifactbuiltin.BundleKind {
 		return fmt.Errorf(
 			"%w: Collection %q is not a retired MCP Bundle",
 			basespec.ErrCollectionNotFound,
@@ -272,7 +272,7 @@ func (a *API) UpdateProtectedBundleInstallation(
 		ref.CollectionID,
 		expectedOverlayRevision,
 		overlay.BundleOverlay{
-			SchemaVersion:  schema.MCPSchemaVersion,
+			SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
 			Revision:       nextRevision,
 			RuntimeEnabled: runtimeEnabled,
 		},

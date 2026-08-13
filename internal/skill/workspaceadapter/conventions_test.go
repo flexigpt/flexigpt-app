@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -41,7 +41,7 @@ func TestConventionRegistryNormalizesAndOwnsRoots(t *testing.T) {
 
 	defaults, err := NewConventionRegistry()
 	if err != nil || len(defaults.Roots()) != 1 ||
-		defaults.Roots()[0].Root != builtinSchema.WorkspaceSkillRootLocator {
+		defaults.Roots()[0].Root != artifactbuiltin.WorkspaceSkillRootLocator {
 		t.Fatalf("default registry=%#v err=%v", defaults, err)
 	}
 
@@ -57,7 +57,7 @@ func TestConventionRegistryMatchAndExpectedNameBoundaries(t *testing.T) {
 	t.Parallel()
 
 	registry, err := NewConventionRegistry(
-		builtinSchema.WorkspaceSkillRootLocator,
+		artifactbuiltin.WorkspaceSkillRootLocator,
 	)
 	if err != nil {
 		t.Fatalf("NewConventionRegistry: %v", err)

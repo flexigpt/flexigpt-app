@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -14,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
@@ -479,11 +479,11 @@ func registrationData(value Registration) (json.RawMessage, error) {
 	}
 
 	switch value.Kind {
-	case schema.ServerKind:
+	case artifactbuiltin.ServerKind:
 		return server.EncodeServerData(
 			server.DefaultServerData(),
 		)
-	case schema.PolicyKind:
+	case artifactbuiltin.PolicyKind:
 		return json.RawMessage(jsonutil.EmptyObject), nil
 	default:
 		return nil, fmt.Errorf(
@@ -498,7 +498,7 @@ func (a *API) deleteProtectedOverlayIfPresent(
 	ctx context.Context,
 	record artifact.Artifact,
 ) error {
-	if record.Kind != schema.ServerKind {
+	if record.Kind != artifactbuiltin.ServerKind {
 		return nil
 	}
 	if a.dependencies.Overlays == nil ||
@@ -574,7 +574,7 @@ func (a *API) UpdateServerInstallation(
 		)
 	}
 	if record.Revision != expectedArtifactRevision ||
-		record.Kind != schema.ServerKind ||
+		record.Kind != artifactbuiltin.ServerKind ||
 		record.ResolvedDefinition == nil {
 		return artifact.Artifact{}, basespec.ErrConflict
 	}
@@ -663,7 +663,7 @@ func (a *API) UpdateProtectedServerInstallation(
 	if err != nil {
 		return err
 	}
-	if record.Kind != schema.ServerKind ||
+	if record.Kind != artifactbuiltin.ServerKind ||
 		record.ResolvedDefinition == nil {
 		return fmt.Errorf(
 			"%w: Artifact is not an available MCP Server",
@@ -713,7 +713,7 @@ func (a *API) UpdateProtectedServerInstallation(
 		ref,
 		expectedOverlayRevision,
 		overlay.ServerOverlay{
-			SchemaVersion:  schema.MCPSchemaVersion,
+			SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
 			Revision:       nextRevision,
 			RuntimeEnabled: runtimeEnabled,
 			ServerData:     data,
@@ -744,9 +744,9 @@ func serverDocumentFromDefinition(
 		return server.ServerDocument{}, err
 	}
 	return server.ServerDocument{
-		Kind:           schema.ServerKind,
-		SchemaID:       schema.ServerSchemaID,
-		SchemaVersion:  schema.MCPSchemaVersion,
+		Kind:           artifactbuiltin.ServerKind,
+		SchemaID:       artifactbuiltin.ServerSchemaID,
+		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
 		LogicalName:    value.LogicalName,
 		LogicalVersion: value.LogicalVersion,
 		DisplayName:    value.DisplayName,

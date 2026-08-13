@@ -1,19 +1,19 @@
 package bundle
 
 import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
-const BuiltInCollectionPackageKind = builtinSchema.SkillBundlePackageKind
+const BuiltInCollectionPackageKind = artifactbuiltin.SkillBundlePackageKind
 
 func BuiltInCollectionPackageAddress(
 	name basespec.LogicalName,
 	version basespec.LogicalVersion,
 ) (source.ManagedPackageAddress, error) {
 	if version == "" {
-		version = builtinSchema.UnversionedPackageVersion
+		version = artifactbuiltin.UnversionedPackageVersion
 	}
 	return source.NewManagedPackageAddress(
 		BuiltInCollectionPackageKind,

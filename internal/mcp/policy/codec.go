@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -17,14 +17,14 @@ func NewPolicyCodec() shareable.Codec {
 }
 
 func (PolicyCodec) JSONSchema() []byte {
-	return append([]byte(nil), schema.PolicyV1JSONSchema...)
+	return append([]byte(nil), artifactbuiltin.PolicyV1JSONSchema...)
 }
 
 func (PolicyCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (shareable.ParsedDocument, error) {
-	if err := schema.CheckCodecContext(ctx); err != nil {
+	if err := artifactbuiltin.CheckCodecContext(ctx); err != nil {
 		return shareable.ParsedDocument{}, err
 	}
 	value, canonical, err := parsePolicy(raw)
@@ -41,9 +41,9 @@ func (PolicyCodec) Canonicalize(
 func (PolicyCodec) Key() shareable.SchemaKey {
 	return shareable.SchemaKey{
 		Entity:        shareable.EntityArtifact,
-		Kind:          basespec.CollectionKind(schema.PolicyKind),
-		SchemaID:      schema.PolicySchemaID,
-		SchemaVersion: schema.MCPSchemaVersion,
+		Kind:          basespec.CollectionKind(artifactbuiltin.PolicyKind),
+		SchemaID:      artifactbuiltin.PolicySchemaID,
+		SchemaVersion: artifactbuiltin.MCPSchemaVersion,
 	}
 }
 

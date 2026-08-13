@@ -11,10 +11,10 @@ import (
 	"path"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
@@ -45,7 +45,7 @@ type Registry struct {
 
 type HydratedArtifact struct {
 	Registration      Artifact
-	Member            builtinSchema.ContentRef
+	Member            artifactbuiltin.ContentRef
 	SkillDefinition   definition.Definition
 	EmbeddedDirectory basespec.Locator
 	SourceDirectory   basespec.Locator
@@ -53,7 +53,7 @@ type HydratedArtifact struct {
 
 type HydratedCollection struct {
 	Registration          Collection
-	Definition            builtinSchema.SkillCollectionV1
+	Definition            artifactbuiltin.SkillCollectionV1
 	SourceScope           basespec.Locator
 	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
 	Artifacts             []HydratedArtifact
@@ -79,7 +79,7 @@ func (r SkillReference) Validate() error {
 }
 
 func LoadRegistry() (Registry, error) {
-	raw, err := builtinSchema.ReadEmbeddedSkillRegistry()
+	raw, err := artifactbuiltin.ReadEmbeddedSkillRegistry()
 	if err != nil {
 		return Registry{}, err
 	}
@@ -188,13 +188,13 @@ func (r Registry) Validate() error {
 			return fmt.Errorf("collections[%d]: %w", collectionIndex, err)
 		}
 		if path.Base(string(collection.Payload)) !=
-			string(builtinSchema.SkillCollectionFileName) ||
+			string(artifactbuiltin.SkillCollectionFileName) ||
 			path.Dir(string(collection.Payload)) == "." {
 			return fmt.Errorf(
 				"%w: collections[%d] payload must be a nested %q",
 				basespec.ErrInvalid,
 				collectionIndex,
-				builtinSchema.SkillCollectionFileName,
+				artifactbuiltin.SkillCollectionFileName,
 			)
 		}
 		if len(collection.Artifacts) == 0 {
@@ -240,14 +240,14 @@ func (r Registry) Validate() error {
 				)
 			}
 			if path.Base(string(value.Member)) !=
-				string(builtinSchema.AgentSkillDefinitionFileName) ||
+				string(artifactbuiltin.AgentSkillDefinitionFileName) ||
 				path.Dir(string(value.Member)) == "." {
 				return fmt.Errorf(
 					"%w: collections[%d].artifacts[%d] must reference a packaged %s",
 					basespec.ErrInvalid,
 					collectionIndex,
 					artifactIndex,
-					builtinSchema.AgentSkillDefinitionFileName,
+					artifactbuiltin.AgentSkillDefinitionFileName,
 				)
 			}
 			if _, duplicate := members[value.Member]; duplicate {
@@ -389,7 +389,7 @@ func hydrateCollection(
 	if err != nil {
 		return HydratedCollection{}, err
 	}
-	canonical, err := builtinSchema.ParseSkillCollectionV1(parsed.Raw)
+	canonical, err := artifactbuiltin.ParseSkillCollectionV1(parsed.Raw)
 	if err != nil {
 		return HydratedCollection{}, err
 	}
@@ -489,8 +489,8 @@ func hydrateCollection(
 
 func decodeCollectionPayload(
 	raw []byte,
-) (builtinSchema.SkillCollectionV1, error) {
-	return builtinSchema.ParseSkillCollectionV1(raw)
+) (artifactbuiltin.SkillCollectionV1, error) {
+	return artifactbuiltin.ParseSkillCollectionV1(raw)
 }
 
 func scopedLocator(
@@ -507,8 +507,8 @@ func scopedLocator(
 func skillCollectionSchemaKey() shareable.SchemaKey {
 	return shareable.SchemaKey{
 		Entity:        shareable.EntityCollection,
-		Kind:          basespec.CollectionKind(builtinSchema.SkillCollectionV1Kind),
-		SchemaID:      basespec.SchemaID(builtinSchema.SkillCollectionV1SchemaID),
-		SchemaVersion: builtinSchema.SkillCollectionV1SchemaVersion,
+		Kind:          basespec.CollectionKind(artifactbuiltin.SkillCollectionV1Kind),
+		SchemaID:      basespec.SchemaID(artifactbuiltin.SkillCollectionV1SchemaID),
+		SchemaVersion: artifactbuiltin.SkillCollectionV1SchemaVersion,
 	}
 }

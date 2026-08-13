@@ -3,7 +3,7 @@ package bundle
 import (
 	"testing"
 
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 )
 
 func TestMCPPackageLayoutUsesCallerOwnedConvention(t *testing.T) {
@@ -19,8 +19,8 @@ func TestMCPPackageLayoutUsesCallerOwnedConvention(t *testing.T) {
 		t.Fatalf("Directory: %v", err)
 	}
 	if string(directory) != string(
-		builtinSchema.MCPBundlePackageKind,
-	)+"/base/"+string(builtinSchema.UnversionedPackageVersion) {
+		artifactbuiltin.MCPBundlePackageKind,
+	)+"/base/"+string(artifactbuiltin.UnversionedPackageVersion) {
 		t.Fatalf("directory=%q", directory)
 	}
 
@@ -28,7 +28,7 @@ func TestMCPPackageLayoutUsesCallerOwnedConvention(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DocumentLocatorForPackage: %v", err)
 	}
-	if string(locator) != string(directory)+"/"+string(builtinSchema.MCPBundleDocumentFileName) {
+	if string(locator) != string(directory)+"/"+string(artifactbuiltin.MCPBundleDocumentFileName) {
 		t.Fatalf("locator=%q", locator)
 	}
 

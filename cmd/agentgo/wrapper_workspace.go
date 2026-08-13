@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
@@ -26,7 +26,7 @@ func InitWorkspaceWrapper(
 		return errors.New("artifact store components are nil")
 	}
 	config := workspace.DefaultConfig()
-	config.WorkspaceRootID = builtinSchema.WorkspaceRootID
+	config.WorkspaceRootID = artifactbuiltin.WorkspaceRootID
 	config.AutoAdoptionIDProvider = artifact.UUIDArtifactIDProvider()
 
 	api, err := workspace.New(workspace.Dependencies{

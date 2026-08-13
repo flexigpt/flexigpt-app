@@ -5,9 +5,9 @@ import (
 	"maps"
 	"path"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 func PolicySubresource(
@@ -25,9 +25,9 @@ func PolicyBodyFromDefinition(
 	if err != nil {
 		return MCPPolicy{}, err
 	}
-	if value.Kind != schema.PolicyKind ||
-		value.SchemaID != schema.PolicySchemaID ||
-		value.SchemaVersion != schema.MCPSchemaVersion {
+	if value.Kind != artifactbuiltin.PolicyKind ||
+		value.SchemaID != artifactbuiltin.PolicySchemaID ||
+		value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
 		return MCPPolicy{}, fmt.Errorf(
 			"%w: Definition is not an MCP Policy",
 			basespec.ErrInvalid,
@@ -51,9 +51,9 @@ func PolicyBodyFromDefinition(
 func DefinitionForCanonicalPolicy(
 	input PolicyDocument,
 ) (definition.Definition, error) {
-	if input.Kind != schema.PolicyKind ||
-		input.SchemaID != schema.PolicySchemaID ||
-		input.SchemaVersion != schema.MCPSchemaVersion {
+	if input.Kind != artifactbuiltin.PolicyKind ||
+		input.SchemaID != artifactbuiltin.PolicySchemaID ||
+		input.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: canonical MCP policy input has another schema identity",
 			basespec.ErrInvalid,
@@ -65,9 +65,9 @@ func DefinitionForCanonicalPolicy(
 	}
 	return definition.Canonicalize(
 		definition.Definition{
-			Kind:           schema.PolicyKind,
-			SchemaID:       schema.PolicySchemaID,
-			SchemaVersion:  schema.MCPSchemaVersion,
+			Kind:           artifactbuiltin.PolicyKind,
+			SchemaID:       artifactbuiltin.PolicySchemaID,
+			SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
 			LogicalName:    input.LogicalName,
 			LogicalVersion: input.LogicalVersion,
 			DisplayName:    input.DisplayName,

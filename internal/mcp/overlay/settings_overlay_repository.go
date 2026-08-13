@@ -9,9 +9,9 @@ import (
 	"io"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
@@ -218,7 +218,7 @@ func (r *SettingsOverlayRepository) PurgeRoot(
 }
 
 func ValidateServerOverlay(value ServerOverlay) error {
-	if value.SchemaVersion != schema.MCPSchemaVersion {
+	if value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP server overlay schema %q",
 			basespec.ErrInvalid,
@@ -235,7 +235,7 @@ func ValidateServerOverlay(value ServerOverlay) error {
 }
 
 func ValidateBundleOverlay(value BundleOverlay) error {
-	if value.SchemaVersion != schema.MCPSchemaVersion {
+	if value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP bundle overlay schema %q",
 			basespec.ErrInvalid,

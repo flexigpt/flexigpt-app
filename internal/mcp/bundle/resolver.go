@@ -7,12 +7,12 @@ import (
 	"maps"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
@@ -54,7 +54,7 @@ func (a *API) resolveMCPServer(
 	if err != nil {
 		return server.Resolved{}, err
 	}
-	if record.Kind != schema.ServerKind ||
+	if record.Kind != artifactbuiltin.ServerKind ||
 		record.State != artifact.StateAvailable ||
 		record.ResolvedDefinition == nil {
 		return server.Resolved{}, fmt.Errorf(
@@ -91,9 +91,9 @@ func (a *API) resolveMCPServer(
 		return server.Resolved{}, err
 	}
 	document := server.ServerDocument{
-		Kind:           schema.ServerKind,
-		SchemaID:       schema.ServerSchemaID,
-		SchemaVersion:  schema.MCPSchemaVersion,
+		Kind:           artifactbuiltin.ServerKind,
+		SchemaID:       artifactbuiltin.ServerSchemaID,
+		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
 		LogicalName:    definitionValue.LogicalName,
 		LogicalVersion: definitionValue.LogicalVersion,
 		DisplayName:    definitionValue.DisplayName,
@@ -254,7 +254,7 @@ func currentServerOccurrence(
 			continue
 		}
 		if occurrence.State != catalog.OccurrenceValid ||
-			occurrence.Kind != schema.ServerKind ||
+			occurrence.Kind != artifactbuiltin.ServerKind ||
 			occurrence.DefinitionDigest == nil ||
 			occurrence.SourceContentDigest == nil ||
 			record.ResolvedDefinition == nil ||
@@ -394,7 +394,7 @@ func (a *API) effectivePolicy(
 		if err != nil {
 			return policy.Effective{}, err
 		}
-		if record.Kind != schema.PolicyKind ||
+		if record.Kind != artifactbuiltin.PolicyKind ||
 			record.CollectionID != bundle.Collection.ID ||
 			!record.Enabled ||
 			record.State != artifact.StateAvailable ||
@@ -437,7 +437,7 @@ func (a *API) policyBodiesByLogicalName(
 	}
 	output := make([]policy.MCPPolicy, 0)
 	for _, record := range records {
-		if record.Kind != schema.PolicyKind ||
+		if record.Kind != artifactbuiltin.PolicyKind ||
 			!record.Enabled ||
 			record.State != artifact.StateAvailable ||
 			record.ResolvedDefinition == nil {

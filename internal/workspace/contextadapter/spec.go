@@ -3,8 +3,8 @@ package contextadapter
 import (
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -17,15 +17,15 @@ const (
 )
 
 const (
-	contextRoleAgentInstructions     = builtinSchema.WorkspaceContextRoleAgentInstructions
-	contextRoleAssistantInstructions = builtinSchema.WorkspaceContextRoleAssistantInstructions
-	contextRoleProjectReadme         = builtinSchema.WorkspaceContextRoleProjectReadme
+	contextRoleAgentInstructions     = artifactbuiltin.WorkspaceContextRoleAgentInstructions
+	contextRoleAssistantInstructions = artifactbuiltin.WorkspaceContextRoleAssistantInstructions
+	contextRoleProjectReadme         = artifactbuiltin.WorkspaceContextRoleProjectReadme
 	contextRoleProjectContext        = "project-context"
 	contextRoleLabelKey              = "context.role"
 	contextMarkdownMediaType         = "text/markdown"
 
 	contextPreferenceNone          = ""
-	contextPreferenceIncludeReadme = builtinSchema.WorkspaceContextPreferenceIncludeReadme
+	contextPreferenceIncludeReadme = artifactbuiltin.WorkspaceContextPreferenceIncludeReadme
 
 	contextPromptSeparator   = "\n\n"
 	contextPromptStartFormat = "<<<WORKSPACE_CONTEXT name=%q role=%q source=%q>>>\n"
@@ -41,7 +41,7 @@ type contextFileSupport struct {
 }
 
 var contextConventionRegistry = func() []contextFileSupport {
-	input := builtinSchema.WorkspaceContextFileConventions()
+	input := artifactbuiltin.WorkspaceContextFileConventions()
 	output := make([]contextFileSupport, 0, len(input))
 	for _, value := range input {
 		output = append(output, contextFileSupport{

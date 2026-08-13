@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 )
 
 func TestEnsureStoreLayoutCreatesOnlyGenericStoreRoots(t *testing.T) {
@@ -18,9 +18,9 @@ func TestEnsureStoreLayoutCreatesOnlyGenericStoreRoots(t *testing.T) {
 	}
 
 	for _, location := range []string{
-		filepath.Join(base, builtinSchema.ArtifactStoreManifestFileName),
-		filepath.Join(base, builtinSchema.ArtifactStoreContentDirectoryName),
-		filepath.Join(base, builtinSchema.ArtifactStoreStagingDirectoryName),
+		filepath.Join(base, artifactbuiltin.ArtifactStoreManifestFileName),
+		filepath.Join(base, artifactbuiltin.ArtifactStoreContentDirectoryName),
+		filepath.Join(base, artifactbuiltin.ArtifactStoreStagingDirectoryName),
 	} {
 		if _, err := os.Stat(location); err != nil {
 			t.Fatalf("missing %q: %v", location, err)

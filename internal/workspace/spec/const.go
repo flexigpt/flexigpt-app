@@ -1,14 +1,14 @@
 package spec
 
 import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 const (
-	CollectionKind                   basespec.CollectionKind = builtinSchema.WorkspaceCollectionV1Kind
-	WorkspaceDescriptorSchemaID      basespec.SchemaID       = builtinSchema.WorkspaceCollectionV1SchemaID
-	WorkspaceDescriptorSchemaVersion                         = builtinSchema.WorkspaceCollectionV1SchemaVersion
+	CollectionKind                   basespec.CollectionKind = artifactbuiltin.WorkspaceCollectionV1Kind
+	WorkspaceDescriptorSchemaID      basespec.SchemaID       = artifactbuiltin.WorkspaceCollectionV1SchemaID
+	WorkspaceDescriptorSchemaVersion                         = artifactbuiltin.WorkspaceCollectionV1SchemaVersion
 
 	RolePrimary         basespec.AttachmentRole = "primary"
 	RoleLibrary         basespec.AttachmentRole = "library"

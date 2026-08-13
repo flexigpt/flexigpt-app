@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 const (
@@ -53,32 +53,32 @@ func NewApp() *App {
 	app := &App{}
 	app.dataBasePath = filepath.Join(
 		xdg.DataHome,
-		builtinSchema.ApplicationDataDirectoryName,
+		artifactbuiltin.ApplicationDataDirectoryName,
 	)
 
 	app.settingsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtinSchema.SettingsDirectoryName,
+		artifactbuiltin.SettingsDirectoryName,
 	)
 	app.conversationsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtinSchema.ConversationsDirectoryName,
+		artifactbuiltin.ConversationsDirectoryName,
 	)
 	app.modelPresetsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtinSchema.ModelPresetsDirectoryName,
+		artifactbuiltin.ModelPresetsDirectoryName,
 	)
 	app.toolsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtinSchema.ToolsDirectoryName,
+		artifactbuiltin.ToolsDirectoryName,
 	)
 	app.assistantPresetsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtinSchema.AssistantPresetsDirectoryName,
+		artifactbuiltin.AssistantPresetsDirectoryName,
 	)
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
-		builtinSchema.ArtifactStoreDirectoryName,
+		artifactbuiltin.ArtifactStoreDirectoryName,
 	)
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
@@ -198,7 +198,7 @@ func (a *App) GetAppVersion() string {
 func ensureAppPrivateDirectory(location string) error {
 	return os.MkdirAll(
 		location,
-		os.FileMode(builtinSchema.ApplicationDirectoryMode),
+		os.FileMode(artifactbuiltin.ApplicationDirectoryMode),
 	)
 }
 

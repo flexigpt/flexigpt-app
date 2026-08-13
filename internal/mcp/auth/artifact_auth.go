@@ -14,9 +14,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/auth/extauth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
 
@@ -454,9 +454,9 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		dynamic = &mcpAuth.DynamicClientRegistrationConfig{
 			Metadata: &oauthex.ClientRegistrationMetadata{
 				RedirectURIs:    []string{m.oauthRedirectURL},
-				ClientName:      schema.MCPHostName,
+				ClientName:      artifactbuiltin.MCPHostName,
 				SoftwareID:      "flexigpt",
-				SoftwareVersion: schema.MCPHostVersion,
+				SoftwareVersion: artifactbuiltin.MCPHostVersion,
 				TokenEndpointAuthMethod: string(
 					server.MCPHTTPAuthNone,
 				),

@@ -15,18 +15,17 @@ import (
 
 	"github.com/flexigpt/mapstore-go"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/mapstoreio"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 const (
-	Kind                 basespec.SourceKind = builtinSchema.ManagedDirectorySourceKind
-	managedDirectoryMode                     = builtinSchema.ArtifactStoreDirectoryMode
+	Kind                 basespec.SourceKind = artifactbuiltin.ManagedDirectorySourceKind
+	managedDirectoryMode                     = artifactbuiltin.ArtifactStoreDirectoryMode
 )
 
 var errPackageDifferent = errors.New("managed package content differs")
@@ -325,7 +324,7 @@ func (a *Adapter) PublishPackage(
 
 	temporary, err := os.MkdirTemp(
 		stagingRoot,
-		builtinSchema.ManagedPackageTemporaryPrefix,
+		artifactbuiltin.ManagedPackageTemporaryPrefix,
 	)
 	if err != nil {
 		return "", err
@@ -349,7 +348,7 @@ func (a *Adapter) PublishPackage(
 	if exists {
 		previousPackage, err = os.MkdirTemp(
 			stagingRoot,
-			builtinSchema.ManagedPackagePreviousPrefix,
+			artifactbuiltin.ManagedPackagePreviousPrefix,
 		)
 		if err != nil {
 			return "", err
@@ -481,7 +480,7 @@ func (a *Adapter) RemovePackage(
 
 	tombstone, err := os.MkdirTemp(
 		stagingRoot,
-		builtinSchema.ManagedPackageRemovalPrefix,
+		artifactbuiltin.ManagedPackageRemovalPrefix,
 	)
 	if err != nil {
 		return err

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
@@ -39,7 +39,7 @@ type MCPWrapper struct {
 
 	oauthLoopbackListenAddrAtStart string
 	oauthBroker                    *auth.OAuthLoopbackBroker
-	builtInInstaller               schema.HydrationInstaller
+	builtInInstaller               artifactbuiltin.HydrationInstaller
 }
 
 type MCPSecretWriteResult struct {
@@ -65,7 +65,7 @@ func InitMCPWrapper(
 	if wrapper == nil || components == nil {
 		return errors.New("MCP wrapper dependencies are incomplete")
 	}
-	if _, err := components.Roots.Get(ctx, schema.MCPUserRootID); err != nil {
+	if _, err := components.Roots.Get(ctx, artifactbuiltin.MCPUserRootID); err != nil {
 		return fmt.Errorf("ensure retained MCP user Root: %w", err)
 	}
 
@@ -113,7 +113,7 @@ func InitMCPWrapper(
 		HasDecoder:         components.HasDecoder,
 		DecoderFingerprint: components.DecoderFingerprint,
 		RootPolicy:         components.RootMutationPolicy(),
-		UserRootID:         schema.MCPUserRootID,
+		UserRootID:         artifactbuiltin.MCPUserRootID,
 		Runtime:            invalidator,
 		Overlays:           overlays,
 		SecretCleaner:      secrets,
@@ -176,7 +176,7 @@ func newMCPBuiltInInstaller(
 	components *system.Components,
 	bundles *bundle.API,
 	overlays overlay.OverlayRepository,
-) (schema.HydrationInstaller, error) {
+) (artifactbuiltin.HydrationInstaller, error) {
 	registry, packages, err := schemaadapter.LoadEmbeddedRegistry()
 	if err != nil {
 		return nil, err
@@ -927,7 +927,7 @@ func (w *MCPWrapper) requireServerArtifact(
 	if err != nil {
 		return err
 	}
-	if record.Kind != schema.ServerKind {
+	if record.Kind != artifactbuiltin.ServerKind {
 		return fmt.Errorf(
 			"%w: Artifact %q is not an MCP Server",
 			basespec.ErrReferenceUnresolved,
@@ -1059,14 +1059,14 @@ func ensureDefaultMCPBundle(
 	}
 
 	ref := collection.CollectionRef{
-		RootID:       schema.MCPUserRootID,
-		CollectionID: schema.DefaultMCPBundleCollectionID,
+		RootID:       artifactbuiltin.MCPUserRootID,
+		CollectionID: artifactbuiltin.DefaultMCPBundleCollectionID,
 	}
 	existing, err := api.Get(ctx, ref)
 	switch {
 	case err == nil:
-		if existing.Data.ManagedSourceID != schema.DefaultMCPBundleSourceID ||
-			existing.Source.ID != schema.DefaultMCPBundleSourceID {
+		if existing.Data.ManagedSourceID != artifactbuiltin.DefaultMCPBundleSourceID ||
+			existing.Source.ID != artifactbuiltin.DefaultMCPBundleSourceID {
 			return fmt.Errorf(
 				"%w: default MCP Bundle identity conflicts with existing state",
 				basespec.ErrConflict,
@@ -1084,10 +1084,10 @@ func ensureDefaultMCPBundle(
 	}
 
 	_, err = api.Create(ctx, bundle.CreateRequest{
-		RootID:           schema.MCPUserRootID,
-		CollectionID:     schema.DefaultMCPBundleCollectionID,
-		SourceID:         schema.DefaultMCPBundleSourceID,
-		SourceStorageKey: schema.DefaultMCPBundleSourceKey,
+		RootID:           artifactbuiltin.MCPUserRootID,
+		CollectionID:     artifactbuiltin.DefaultMCPBundleCollectionID,
+		SourceID:         artifactbuiltin.DefaultMCPBundleSourceID,
+		SourceStorageKey: artifactbuiltin.DefaultMCPBundleSourceKey,
 		Document:         json.RawMessage(document),
 	})
 	if err != nil {
@@ -1098,12 +1098,12 @@ func ensureDefaultMCPBundle(
 
 func defaultMCPBundleDocument() bundle.BundleDocument {
 	return bundle.BundleDocument{
-		Kind:          schema.BundleKind,
-		SchemaID:      schema.BundleSchemaID,
-		SchemaVersion: schema.MCPSchemaVersion,
-		LogicalName:   schema.DefaultMCPBundleLogicalName,
-		DisplayName:   schema.DefaultMCPBundleDisplayName,
-		Description:   schema.DefaultMCPBundleDescription,
+		Kind:          artifactbuiltin.BundleKind,
+		SchemaID:      artifactbuiltin.BundleSchemaID,
+		SchemaVersion: artifactbuiltin.MCPSchemaVersion,
+		LogicalName:   artifactbuiltin.DefaultMCPBundleLogicalName,
+		DisplayName:   artifactbuiltin.DefaultMCPBundleDisplayName,
+		Description:   artifactbuiltin.DefaultMCPBundleDescription,
 		MCPServers:    map[string]server.CoreServer{},
 		BundleExtension: bundle.BundleExtension{
 			Servers:  map[string]server.ServerExtension{},

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -22,7 +23,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
@@ -92,11 +92,11 @@ func New(dependencies Dependencies) (*API, error) {
 			basespec.ErrInvalid,
 		)
 	}
-	if !dependencies.HasDecoder(schema.DecoderID) {
+	if !dependencies.HasDecoder(artifactbuiltin.DecoderID) {
 		return nil, fmt.Errorf(
 			"%w: MCP decoder %q is not registered",
 			basespec.ErrDecoderUnavailable,
-			schema.DecoderID,
+			artifactbuiltin.DecoderID,
 		)
 	}
 	if dependencies.UserRootID != "" {
@@ -242,7 +242,7 @@ func (a *API) Create(
 		request.RootID,
 		collection.Draft{
 			ID:          request.CollectionID,
-			Kind:        schema.BundleKind,
+			Kind:        artifactbuiltin.BundleKind,
 			DisplayName: displayName(document),
 			Description: document.Description,
 			Enabled:     true,
@@ -298,7 +298,7 @@ func (a *API) List(
 	}
 	output := make([]Bundle, 0)
 	for _, value := range values {
-		if value.Kind != schema.BundleKind {
+		if value.Kind != artifactbuiltin.BundleKind {
 			continue
 		}
 		bundle, err := a.Get(ctx, value.Ref())
@@ -413,7 +413,7 @@ func (a *API) Get(
 	if err != nil {
 		return Bundle{}, err
 	}
-	if value.Kind != schema.BundleKind {
+	if value.Kind != artifactbuiltin.BundleKind {
 		return Bundle{}, fmt.Errorf(
 			"%w: Collection %q is not an MCP Bundle",
 			basespec.ErrCollectionNotFound,
@@ -502,11 +502,11 @@ func (a *API) discoveryPlan(
 			Locator:   bundle.DocumentLocator,
 			Recursive: false,
 			DecoderIDs: []basespec.DecoderID{
-				schema.DecoderID,
+				artifactbuiltin.DecoderID,
 			},
 		}},
 		AllowedDecoderIDs: []basespec.DecoderID{
-			schema.DecoderID,
+			artifactbuiltin.DecoderID,
 		},
 		Authoritative: true,
 	}.Normalized()
@@ -522,7 +522,7 @@ func (a *API) cleanupChangedServerInstallation(
 	document server.ServerDocument,
 	after server.ServerData,
 ) error {
-	if record.Kind != schema.ServerKind {
+	if record.Kind != artifactbuiltin.ServerKind {
 		return nil
 	}
 	if err := server.CleanupUnboundServerSecrets(
@@ -544,7 +544,7 @@ func (a *API) cleanupRemovedServerInstallation(
 	ctx context.Context,
 	record artifact.Artifact,
 ) error {
-	if record.Kind != schema.ServerKind {
+	if record.Kind != artifactbuiltin.ServerKind {
 		return nil
 	}
 
@@ -570,7 +570,7 @@ func (a *API) serverInstallationDataForCleanup(
 	ctx context.Context,
 	record artifact.Artifact,
 ) (server.ServerData, error) {
-	if record.Kind != schema.ServerKind {
+	if record.Kind != artifactbuiltin.ServerKind {
 		return server.DefaultServerData(), nil
 	}
 
@@ -621,7 +621,7 @@ func validateCreateRegistrations(
 
 	for _, subresource := range subresources {
 		registration := values[subresource]
-		if registration.Kind != schema.ServerKind {
+		if registration.Kind != artifactbuiltin.ServerKind {
 			continue
 		}
 
@@ -696,7 +696,7 @@ func validateCreateBundleIntent(
 ) error {
 	if value.Collection.RootID != request.RootID ||
 		value.Collection.ID != request.CollectionID ||
-		value.Collection.Kind != schema.BundleKind ||
+		value.Collection.Kind != artifactbuiltin.BundleKind ||
 		value.Source.ID != request.SourceID ||
 		value.PackageAddress != packageAddress ||
 		value.Data.ManagedSourceID != request.SourceID ||

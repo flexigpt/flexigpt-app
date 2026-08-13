@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -13,7 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
 
@@ -62,7 +62,7 @@ func NewInstaller(
 		dependencies.ShareableCanonicalizer == nil {
 		return nil, fmt.Errorf("%w: built-in installer dependencies are incomplete", basespec.ErrInvalid)
 	}
-	builtInTopology := schema.BuiltinTopologyDeclaration()
+	builtInTopology := artifactbuiltin.BuiltinTopologyDeclaration()
 	if err := builtInTopology.Validate(); err != nil {
 		return nil, err
 	}
@@ -401,7 +401,7 @@ func (i *Installer) rejectDynamicBuiltInArtifacts(
 func (i *Installer) packageFiles(
 	ctx context.Context,
 	packageRoot basespec.Locator,
-	document schema.SkillCollectionV1,
+	document artifactbuiltin.SkillCollectionV1,
 	address source.ManagedPackageAddress,
 ) ([]source.ManagedPackageFile, error) {
 	embeddedFiles, err := topology.ReadPackageFiles(
@@ -413,7 +413,7 @@ func (i *Installer) packageFiles(
 		return nil, err
 	}
 
-	canonicalDocument, err := schema.MarshalSkillCollectionV1(document)
+	canonicalDocument, err := artifactbuiltin.MarshalSkillCollectionV1(document)
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +422,7 @@ func (i *Installer) packageFiles(
 	foundDocument := false
 	for _, file := range embeddedFiles {
 		content := append([]byte(nil), file.Content...)
-		if file.Locator == schema.SkillCollectionV1FileName {
+		if file.Locator == artifactbuiltin.SkillCollectionV1FileName {
 			content = append([]byte(nil), canonicalDocument...)
 			foundDocument = true
 		}
@@ -435,7 +435,7 @@ func (i *Installer) packageFiles(
 		return nil, fmt.Errorf(
 			"%w: built-in package lacks %q",
 			basespec.ErrInvalid,
-			schema.SkillCollectionV1FileName,
+			artifactbuiltin.SkillCollectionV1FileName,
 		)
 	}
 

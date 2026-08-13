@@ -3,7 +3,7 @@ package artifact
 import (
 	"testing"
 
-	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 )
 
 func TestManagedSkillPackageLayout(t *testing.T) {
@@ -18,8 +18,8 @@ func TestManagedSkillPackageLayout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Directory: %v", err)
 	}
-	if string(directory) != string(builtinSchema.AgentSkillPackageKind)+
-		"/summarize/"+string(builtinSchema.UnversionedPackageVersion) {
+	if string(directory) != string(artifactbuiltin.AgentSkillPackageKind)+
+		"/summarize/"+string(artifactbuiltin.UnversionedPackageVersion) {
 		t.Fatalf("directory=%q", directory)
 	}
 
@@ -27,7 +27,7 @@ func TestManagedSkillPackageLayout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ManagedPackageLocatorForSkill: %v", err)
 	}
-	if string(locator) != string(directory)+"/"+string(builtinSchema.AgentSkillDefinitionFileName) {
+	if string(locator) != string(directory)+"/"+string(artifactbuiltin.AgentSkillDefinitionFileName) {
 		t.Fatalf("locator=%q", locator)
 	}
 

@@ -6,13 +6,13 @@ import (
 	"maps"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
@@ -168,14 +168,14 @@ func (a *API) ListServers(
 	ctx context.Context,
 	ref collection.CollectionRef,
 ) ([]artifact.Artifact, error) {
-	return a.listArtifactsByKind(ctx, ref, schema.ServerKind)
+	return a.listArtifactsByKind(ctx, ref, artifactbuiltin.ServerKind)
 }
 
 func (a *API) ListPolicies(
 	ctx context.Context,
 	ref collection.CollectionRef,
 ) ([]artifact.Artifact, error) {
-	return a.listArtifactsByKind(ctx, ref, schema.PolicyKind)
+	return a.listArtifactsByKind(ctx, ref, artifactbuiltin.PolicyKind)
 }
 
 func (a *API) GetServerInstallation(
@@ -193,7 +193,7 @@ func (a *API) GetServerInstallation(
 	if err != nil {
 		return ServerInstallationView{}, err
 	}
-	if record.Kind != schema.ServerKind ||
+	if record.Kind != artifactbuiltin.ServerKind ||
 		record.State != artifact.StateAvailable ||
 		record.ResolvedDefinition == nil {
 		return ServerInstallationView{}, fmt.Errorf(
@@ -265,7 +265,7 @@ func (a *API) InspectMCPPolicy(
 	if err != nil {
 		return PolicyView{}, err
 	}
-	if record.Kind != schema.PolicyKind ||
+	if record.Kind != artifactbuiltin.PolicyKind ||
 		record.State != artifact.StateAvailable ||
 		record.ResolvedDefinition == nil {
 		return PolicyView{}, fmt.Errorf(
@@ -409,7 +409,7 @@ func requireCurrentPolicyOccurrence(
 			continue
 		}
 		if occurrence.State == catalog.OccurrenceValid &&
-			occurrence.Kind == schema.PolicyKind &&
+			occurrence.Kind == artifactbuiltin.PolicyKind &&
 			occurrence.DefinitionDigest != nil &&
 			record.ResolvedDefinition != nil &&
 			*occurrence.DefinitionDigest == *record.ResolvedDefinition {

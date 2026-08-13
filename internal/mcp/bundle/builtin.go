@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -119,7 +119,7 @@ func (a *API) EnsureBuiltIn(
 		request.RootID,
 		collection.Draft{
 			ID:          request.CollectionID,
-			Kind:        schema.BundleKind,
+			Kind:        artifactbuiltin.BundleKind,
 			DisplayName: displayName(document),
 			Description: document.Description,
 			Enabled:     true,
@@ -177,7 +177,7 @@ func ensureBuiltInTopologyMatches(
 ) error {
 	if bundle.Collection.RootID != request.RootID ||
 		bundle.Collection.ID != request.CollectionID ||
-		bundle.Collection.Kind != schema.BundleKind ||
+		bundle.Collection.Kind != artifactbuiltin.BundleKind ||
 		bundle.Collection.DisplayName != displayName(document) ||
 		bundle.Collection.Description != document.Description ||
 		!bundle.Collection.Enabled ||
@@ -203,5 +203,5 @@ func ensureBuiltInTopologyMatches(
 }
 
 func isMCPKind(kind basespec.ArtifactKind) bool {
-	return kind == schema.ServerKind || kind == schema.PolicyKind
+	return kind == artifactbuiltin.ServerKind || kind == artifactbuiltin.PolicyKind
 }

@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -19,14 +19,14 @@ func NewBundleCodec() shareable.Codec {
 }
 
 func (BundleCodec) JSONSchema() []byte {
-	return append([]byte(nil), schema.BundleV1JSONSchema...)
+	return append([]byte(nil), artifactbuiltin.BundleV1JSONSchema...)
 }
 
 func (BundleCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (shareable.ParsedDocument, error) {
-	if err := schema.CheckCodecContext(ctx); err != nil {
+	if err := artifactbuiltin.CheckCodecContext(ctx); err != nil {
 		return shareable.ParsedDocument{}, err
 	}
 	value, canonical, err := parseBundle(raw)
@@ -41,7 +41,7 @@ func (BundleCodec) Canonicalize(
 }
 
 func (BundleCodec) Key() shareable.SchemaKey {
-	return schema.MCPSchemaKey
+	return artifactbuiltin.MCPSchemaKey
 }
 
 func parseBundle(

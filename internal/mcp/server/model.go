@@ -8,9 +8,9 @@ import (
 	"io"
 	"maps"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -29,7 +29,7 @@ type ServerData struct {
 
 func DefaultServerData() ServerData {
 	return ServerData{
-		SchemaVersion: schema.MCPSchemaVersion,
+		SchemaVersion: artifactbuiltin.MCPSchemaVersion,
 		Inputs:        map[string]InputBinding{},
 	}
 }
@@ -100,7 +100,7 @@ func DecodeServerData(
 }
 
 func ValidateServerData(value ServerData) error {
-	if value.SchemaVersion != schema.MCPSchemaVersion {
+	if value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP installation schema %q",
 			basespec.ErrInvalid,
