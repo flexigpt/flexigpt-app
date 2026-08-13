@@ -552,8 +552,16 @@ func (s *SkillRuntime) DescribeArtifactSkill(
 
 	resolved, found := s.resolveArtifactSkill(ctx, ref)
 	if !found {
+		if _, resolveErr := s.resolver.ResolveArtifactSkill(ctx, ref); resolveErr != nil {
+			return ArtifactSkillSummary{}, fmt.Errorf(
+				"%w: skill Artifact %q is unavailable: %w",
+				basespec.ErrReferenceUnresolved,
+				ref.ArtifactID,
+				resolveErr,
+			)
+		}
 		return ArtifactSkillSummary{}, fmt.Errorf(
-			"%w: skill Artifact %q is unavailable",
+			"%w: skill Artifact %q could not be registered in the Skill runtime",
 			basespec.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)

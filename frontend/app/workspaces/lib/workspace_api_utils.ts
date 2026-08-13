@@ -1,7 +1,8 @@
 import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
+import { newArtifactStorageKey } from '@/spec/artifact';
 import type {
-	CreateEmptyWorkspaceBody,
-	CreateFilesystemWorkspaceBody,
+	CreateEmptyWorkspaceInput,
+	CreateFilesystemWorkspaceInput,
 	WorkspaceRef,
 	WorkspaceView,
 } from '@/spec/workspace';
@@ -13,8 +14,7 @@ import { workspaceAPI } from '@/apis/baseapi';
 
 import { sortWorkspaces } from '@/workspaces/lib/workspace_utils';
 
-export type CreateFilesystemWorkspaceInput = Omit<CreateFilesystemWorkspaceBody, 'workspaceID' | 'sourceID'>;
-export type CreateEmptyWorkspaceInput = Omit<CreateEmptyWorkspaceBody, 'workspaceID'>;
+export type { CreateEmptyWorkspaceInput, CreateFilesystemWorkspaceInput };
 
 export function workspaceRefKey(workspace: WorkspaceRef): string {
 	return `${workspace.rootID}:${workspace.collectionID}`;
@@ -52,6 +52,7 @@ export async function createFilesystemWorkspaceCollection(
 			...body,
 			workspaceID: getUUIDv7(),
 			sourceID: getUUIDv7(),
+			sourceStorageKey: newArtifactStorageKey(),
 		})
 	);
 }

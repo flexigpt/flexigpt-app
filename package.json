@@ -25,7 +25,6 @@
 	"devDependencies": {
 		"fs-extra": "^11.4.0",
 		"oxlint": "^1.78.0",
-		"oxlint-tsgolint": "^7.0.2001",
-		"tailwindcss": "^4.3.3"
+		"oxlint-tsgolint": "^7.0.2001"
 	}
 }

@@ -527,6 +527,7 @@ export default defineConfig({
 		'eslint-plugin-better-tailwindcss': {
 			detectComponentClasses: true,
 			entryPoint: './app/globals.css',
+			cwd: '.',
 		},
 	},
 });

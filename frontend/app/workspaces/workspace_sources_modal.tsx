@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFolder, FiLink, FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type { ArtifactSourceKind, ArtifactSourceSummary } from '@/spec/artifact';
+import { newArtifactStorageKey } from '@/spec/artifact';
 import type {
 	UpdateWorkspaceAttachmentBody,
 	WorkspaceAttachmentSettings,
@@ -631,6 +632,7 @@ function WorkspaceSourcesModalContent({
 				created = await artifactStoreAPI.createArtifactSource(currentWorkspace.workspace.rootID, {
 					id: getUUIDv7(),
 					kind: effectiveNewSourceKind,
+					storageKey: newArtifactStorageKey(),
 					displayName,
 					enabled: newSourceEnabled,
 					config,

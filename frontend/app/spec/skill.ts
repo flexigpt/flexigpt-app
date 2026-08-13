@@ -12,6 +12,7 @@ import type {
 	ArtifactSourceBinding,
 	ArtifactSourceID,
 	ArtifactState,
+	ArtifactStorageKey,
 	ManagedSourcePackageFile,
 } from '@/spec/artifact';
 import type { ToolOutputUnion } from '@/spec/tool';
@@ -119,8 +120,12 @@ export interface CreateSkillBundleBody {
 	labels?: Record<string, string>;
 
 	// Requests Artifact Store to provision and exclusively assign a managed
-	// source to this bundle. It must not also appear in `attachments`.
+	// Source to this bundle. It must not also appear in `attachments`.
 	managedSourceID?: ArtifactSourceID;
+
+	// Required whenever managedSourceID is supplied. This is an opaque,
+	// storage-safe identity and must not be derived from a filesystem path.
+	managedSourceStorageKey?: ArtifactStorageKey;
 
 	attachments?: SkillBundleAttachmentDraft[];
 }

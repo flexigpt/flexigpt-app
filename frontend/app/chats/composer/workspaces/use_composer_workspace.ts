@@ -5,7 +5,7 @@ import { ArtifactState } from '@/spec/artifact';
 import type { SkillRef } from '@/spec/skill';
 import { SkillSessionSyncMode } from '@/spec/skill';
 import type {
-	CreateFilesystemWorkspaceBody,
+	CreateFilesystemWorkspaceInput,
 	WorkspaceContextView,
 	WorkspaceConversationResourceSelectionRef,
 	WorkspaceConversationSelection,
@@ -78,7 +78,7 @@ export interface ComposerWorkspaceController {
 	removeContextRef: (artifact: ArtifactRef) => void;
 	removeSkillRef: (artifact: ArtifactRef) => Promise<void>;
 	refreshSelectedWorkspace: () => Promise<void>;
-	createFilesystemWorkspace: (payload: CreateFilesystemWorkspaceBody) => Promise<void>;
+	createFilesystemWorkspace: (payload: CreateFilesystemWorkspaceInput) => Promise<void>;
 	getSelectionSnapshot: () => WorkspaceConversationSelection | undefined;
 }
 
@@ -598,7 +598,7 @@ export function useComposerWorkspace({
 	}, [loadSelection, refreshWorkspaces]);
 
 	const createFilesystemWorkspace = useCallback(
-		async (payload: CreateFilesystemWorkspaceBody) => {
+		async (payload: CreateFilesystemWorkspaceInput) => {
 			const normalizePath = (value: string) => value.trim().replaceAll('\\', '/').replaceAll(/\/+$/g, '').toLowerCase();
 			const requestedPath = normalizePath(payload.rootPath);
 			const existing = workspaces.find(

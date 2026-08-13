@@ -10,6 +10,7 @@ import type {
 	ArtifactRootID,
 	ArtifactSourceID,
 	ArtifactSourceSummary,
+	ArtifactStorageKey,
 } from '@/spec/artifact';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
@@ -320,10 +321,8 @@ interface MCPBundleData {
 export interface MCPBundle {
 	collection: ArtifactCollection;
 	data: MCPBundleData;
-	attachment: ArtifactCollectionAttachment;
-	source: ArtifactSourceSummary;
-	documentLocator: string;
-	packageDirectory: string;
+	attachments: ArtifactCollectionAttachment[];
+	sources: ArtifactSourceSummary[];
 	builtIn: boolean;
 }
 
@@ -339,7 +338,7 @@ export interface MCPCreateBundleInput {
 	rootID: ArtifactRootID;
 	collectionID: string;
 	sourceID: ArtifactSourceID;
-	documentLocator?: string;
+	sourceStorageKey: ArtifactStorageKey;
 	document: MCPBundleDocument;
 	registrations: MCPArtifactRegistration[];
 }

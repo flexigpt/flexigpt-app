@@ -16,6 +16,8 @@ export function MCPBundleDetailsModal({ isOpen, onClose, bundle, serverCount }: 
 		return null;
 	}
 
+	const sourcesByID = new Map(bundle.bundle.sources.map(source => [source.id, source] as const));
+
 	return (
 		<ManagementDetailsModal
 			isOpen={isOpen}
@@ -40,11 +42,27 @@ export function MCPBundleDetailsModal({ isOpen, onClose, bundle, serverCount }: 
 				<ManagementInfoRow label="Managed Source ID" mono>
 					{bundle.bundle.data.managedSourceID || '—'}
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Document Locator" mono>
-					{bundle.bundle.documentLocator}
-				</ManagementInfoRow>
-				<ManagementInfoRow label="Package Directory" mono>
-					{bundle.bundle.packageDirectory}
+				<ManagementInfoRow label="Attached Sources">
+					{bundle.bundle.attachments.length > 0 ? (
+						<div className="space-y-2">
+							{bundle.bundle.attachments.map(attachment => {
+								const source = sourcesByID.get(attachment.sourceID);
+
+								return (
+									<div key={attachment.sourceID} className="bg-base-100 rounded-xl p-2 text-xs">
+										<div className="font-medium">{source?.displayName || attachment.sourceID}</div>
+										<div className="text-base-content/60 mt-1">
+											{attachment.role}
+											{source?.kind ? ` · ${source.kind}` : ''}
+										</div>
+										<div className="text-base-content/60 mt-1 font-mono break-all">{attachment.sourceID}</div>
+									</div>
+								);
+							})}
+						</div>
+					) : (
+						'—'
+					)}
 				</ManagementInfoRow>
 				<ManagementInfoRow label="Built-in">{bundle.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Runtime Enabled">{bundle.enabled ? 'Yes' : 'No'}</ManagementInfoRow>

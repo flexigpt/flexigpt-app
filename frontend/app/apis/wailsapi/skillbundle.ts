@@ -213,6 +213,13 @@ function renderSkillFromWails(response: wailsSkillRuntime.RenderSkillResponseBod
 
 export class WailsSkillBundleAPI implements ISkillBundleAPI {
 	async createSkillBundle(rootID: ArtifactRootID, body: CreateSkillBundleBody): Promise<SkillBundleView> {
+		const managedSourceID = body.managedSourceID?.trim() || undefined;
+		const managedSourceStorageKey = body.managedSourceStorageKey?.trim() || undefined;
+
+		if (Boolean(managedSourceID) !== Boolean(managedSourceStorageKey)) {
+			throw new Error('Managed Source ID and managed Source storage key must be supplied together.');
+		}
+
 		const bundle = await CreateSkillBundle({
 			RootID: rootID,
 			CollectionID: body.collectionID,
@@ -222,7 +229,8 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 			LogicalName: body.logicalName,
 			LogicalVersion: body.logicalVersion ?? '',
 			Labels: body.labels ?? {},
-			ManagedSourceID: body.managedSourceID ?? '',
+			ManagedSourceID: managedSourceID ?? '',
+			ManagedSourceStorageKey: managedSourceStorageKey ?? '',
 			Attachments: (body.attachments ?? []).map(attachment => ({
 				SourceID: attachment.sourceID,
 				Role: attachment.role,

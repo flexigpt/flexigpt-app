@@ -69,6 +69,7 @@ import {
 	optionalWailsString,
 	rawJSONFromWails,
 	rawJSONObjectToWails,
+	requireNonBlankString,
 	requireWailsArray,
 	requireWailsBoolean,
 	requireWailsNumber,
@@ -242,6 +243,8 @@ function sourceFromWails(value: unknown, field: string): ArtifactSourceSummary {
 	return {
 		id: requireWailsString(source.id, `${field}.id`),
 		rootID: requireWailsString(source.rootID, `${field}.rootID`),
+		rootStorageKey: requireWailsString(source.rootStorageKey, `${field}.rootStorageKey`),
+		storageKey: requireWailsString(source.storageKey, `${field}.storageKey`),
 		kind: requireWailsString(source.kind, `${field}.kind`),
 		displayName: requireWailsString(source.displayName, `${field}.displayName`),
 		enabled: requireWailsBoolean(source.enabled, `${field}.enabled`),
@@ -444,7 +447,12 @@ function bundleFromWails(value: unknown, field: string): MCPBundle {
 	const bundle = requireWailsObject(value, field);
 	const collection = collectionFromWails(bundle.Collection, `${field}.Collection`);
 	const data = requireWailsObject(bundle.Data, `${field}.Data`);
-	const attachment = attachmentFromWails(bundle.Attachment, `${field}.Attachment`);
+	const attachments = requireWailsArray(bundle.Attachments, `${field}.Attachments`).map((item, index) =>
+		attachmentFromWails(item, `${field}.Attachments[${index}]`)
+	);
+	const sources = requireWailsArray(bundle.Sources, `${field}.Sources`).map((item, index) =>
+		sourceFromWails(item, `${field}.Sources[${index}]`)
+	);
 
 	return {
 		collection,
@@ -459,11 +467,9 @@ function bundleFromWails(value: unknown, field: string): MCPBundle {
 			labels: data.labels as Record<string, string> | undefined,
 			managedSourceID: optionalWailsString(data.managedSourceID, `${field}.Data.managedSourceID`),
 		},
-		attachment,
-		source: sourceFromWails(bundle.Source, `${field}.Source`),
-		documentLocator: requireWailsString(bundle.DocumentLocator, `${field}.DocumentLocator`),
-		packageDirectory: requireWailsString(bundle.PackageDirectory, `${field}.PackageDirectory`),
-		builtIn: attachment.role === 'builtin',
+		attachments,
+		sources,
+		builtIn: attachments.some(attachment => attachment.role === 'builtin'),
 	};
 }
 
@@ -556,7 +562,7 @@ export class WailsMCPArtifactAPI implements IMCPAPI {
 			RootID: input.rootID,
 			CollectionID: input.collectionID,
 			SourceID: input.sourceID,
-			DocumentLocator: input.documentLocator ?? '',
+			SourceStorageKey: requireNonBlankString(input.sourceStorageKey, 'CreateMCPBundle.sourceStorageKey'),
 			Document: documentToWails(input.document, 'CreateMCPBundle.document'),
 			Registrations: input.registrations.map((item, index) =>
 				registrationToWails(item, `CreateMCPBundle.registrations[${index}]`)

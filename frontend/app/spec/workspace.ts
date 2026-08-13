@@ -12,6 +12,7 @@ import type {
 	ArtifactSourceBinding,
 	ArtifactSourceID,
 	ArtifactState,
+	ArtifactStorageKey,
 } from '@/spec/artifact';
 import { SkillInsert as WorkspaceSkillInsert } from '@/spec/skill';
 
@@ -325,6 +326,7 @@ export interface WorkspaceSkillLoadView {
 export interface CreateFilesystemWorkspaceBody {
 	workspaceID: string;
 	sourceID: ArtifactSourceID;
+	sourceStorageKey: ArtifactStorageKey;
 	displayName: string;
 	description?: string;
 	rootPath: string;
@@ -337,6 +339,13 @@ export interface CreateEmptyWorkspaceBody {
 	description?: string;
 	discovery: WorkspaceDiscovery;
 }
+
+export type CreateFilesystemWorkspaceInput = Omit<
+	CreateFilesystemWorkspaceBody,
+	'workspaceID' | 'sourceID' | 'sourceStorageKey'
+>;
+
+export type CreateEmptyWorkspaceInput = Omit<CreateEmptyWorkspaceBody, 'workspaceID'>;
 
 export interface UpdateWorkspaceBody {
 	expectedRevision: number;

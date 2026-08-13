@@ -274,7 +274,8 @@ func (i *Installer) EnsureBuiltInArtifacts(
 			return err
 		}
 	}
-	return nil
+
+	return i.ensureBuiltInStateCurrent(ctx)
 }
 
 func (i *Installer) EnsureBuiltInBundles(
@@ -351,6 +352,122 @@ func (i *Installer) ensureBuiltInCatalogsCurrent(
 				err,
 			)
 		}
+	}
+	return nil
+}
+
+// ensureBuiltInStateCurrent verifies both catalog freshness and the static
+// Artifact records required by the built-in registry. A hydration marker alone
+// cannot prove that a prior interrupted install, manual metadata repair, or
+// older buggy build retained every pinned Artifact.
+func (i *Installer) ensureBuiltInStateCurrent(
+	ctx context.Context,
+) error {
+	if err := i.ensureBuiltInCatalogsCurrent(ctx); err != nil {
+		return err
+	}
+	for _, declared := range i.hydrated.OrderedCollections() {
+		if !declared.Registration.Enabled {
+			continue
+		}
+		if err := i.verifyBuiltInCollectionArtifacts(ctx, declared); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *Installer) verifyBuiltInCollectionArtifacts(
+	ctx context.Context,
+	declared HydratedCollection,
+) error {
+	ref := collection.CollectionRef{
+		RootID:       i.builtInTopology.Root.ID,
+		CollectionID: declared.Registration.ID,
+	}
+	records, err := i.skills.ListSkills(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	address, err := bundle.BuiltInCollectionPackageAddress(
+		basespec.LogicalName(declared.Definition.LogicalName),
+		basespec.LogicalVersion(declared.Definition.LogicalVersion),
+	)
+	if err != nil {
+		return err
+	}
+
+	expectedByID := make(
+		map[basespec.ArtifactID]HydratedArtifact,
+		len(declared.Artifacts),
+	)
+	for _, expected := range declared.Artifacts {
+		expectedByID[expected.Registration.ID] = expected
+	}
+	if len(records) != len(expectedByID) {
+		return fmt.Errorf(
+			"%w: built-in Collection %q has %d Skill Artifacts, expected %d",
+			basespec.ErrConflict,
+			declared.Definition.LogicalName,
+			len(records),
+			len(expectedByID),
+		)
+	}
+
+	seen := make(map[basespec.ArtifactID]struct{}, len(records))
+	for _, record := range records {
+		expected, found := expectedByID[record.ID]
+		if !found {
+			return fmt.Errorf(
+				"%w: built-in Collection %q contains undeclared Skill Artifact %q",
+				basespec.ErrConflict,
+				declared.Definition.LogicalName,
+				record.ID,
+			)
+		}
+		seen[record.ID] = struct{}{}
+
+		locator, err := address.FileLocator(expected.Registration.Member)
+		if err != nil {
+			return err
+		}
+		expectedName := expected.SkillDefinition.DisplayName
+		if expectedName == "" {
+			expectedName = string(expected.SkillDefinition.LogicalName)
+		}
+
+		if record.RootID != ref.RootID ||
+			record.CollectionID != ref.CollectionID ||
+			record.Kind != artifactbuiltin.AgentSkillArtifactKind ||
+			record.Adoption != artifact.AdoptionPinned ||
+			record.Name != expectedName ||
+			record.Enabled != expected.Registration.Enabled ||
+			record.Binding.SourceID != i.builtInTopology.Sources[0].ID ||
+			record.Binding.Locator != locator ||
+			record.Binding.SubresourceLocator != "" ||
+			record.Binding.ExpectedKind != artifactbuiltin.AgentSkillArtifactKind ||
+			record.State != artifact.StateAvailable ||
+			record.ResolvedDefinition == nil ||
+			*record.ResolvedDefinition != expected.SkillDefinition.Digest {
+			return fmt.Errorf(
+				"%w: built-in Skill Artifact %q does not match its static registry",
+				basespec.ErrReferenceUnresolved,
+				record.ID,
+			)
+		}
+	}
+
+	for artifactID := range expectedByID {
+		if _, found := seen[artifactID]; found {
+			continue
+		}
+		return fmt.Errorf(
+			"%w: built-in Collection %q is missing Skill Artifact %q",
+			basespec.ErrReferenceUnresolved,
+			declared.Definition.LogicalName,
+			artifactID,
+		)
 	}
 	return nil
 }

@@ -31,7 +31,15 @@ type HydrationInstaller interface {
 
 	DesiredHydration(ctx context.Context) (topology.Hydration, error)
 
+	// EnsureHydration creates or repairs this artifact family's desired
+	// topology and package state. It may publish managed Source content.
 	EnsureHydration(ctx context.Context, current bool) error
+
+	// FinalizeHydration runs after every hydration installer has completed its
+	// package publication. It must reconcile source-derived state, such as
+	// catalogs, against the final shared Source generation. It must not mutate
+	// managed package content or topology.
+	FinalizeHydration(ctx context.Context) error
 }
 
 type preparedHydration struct {
@@ -283,6 +291,25 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 			)
 		}
 	}
+
+	// Installers can share a protected managed Source. A later installer may
+	// advance the shared Source revision after an earlier installer refreshed
+	// its own catalog. Reconcile every hydration-aware installer only after
+	// all package publication has completed.
+	for _, entry := range entries {
+		hydrated, supported := entry.installer.(HydrationInstaller)
+		if !supported {
+			continue
+		}
+		if err := hydrated.FinalizeHydration(ctx); err != nil {
+			return fmt.Errorf(
+				"finalize built-in installer %q: %w",
+				entry.name,
+				err,
+			)
+		}
+	}
+
 	for _, value := range prepared {
 		if value.current {
 			continue

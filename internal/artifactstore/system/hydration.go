@@ -243,7 +243,12 @@ func (c *Components) ResetTopologyHydration(
 	rootValue, err := c.Roots.Get(ctx, rootID)
 	if errors.Is(err, basespec.ErrRootNotFound) {
 		// Preparation runs before EnsureProtectedTopology. Therefore, a
-		// missing protected Root is the normal first-install state.
+		// missing protected Root is the normal first-install state. It is
+		// also valid after a clean hydration reset completed and a process
+		// stopped before topology creation and hydration-marker commit.
+		//
+		// Do not create topology here. EnsureProtectedTopology owns that
+		// step after all stale roots have been reset as one batch.
 		//
 		// It can also occur after a prior reset completed metadata purging
 		// but the process stopped before the replacement topology was

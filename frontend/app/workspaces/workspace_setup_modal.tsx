@@ -4,15 +4,13 @@ import { useId, useMemo, useState } from 'react';
 import { FiAlertCircle, FiFolder, FiPlus, FiTrash2, FiUpload } from 'react-icons/fi';
 
 import type {
-	CreateEmptyWorkspaceBody,
-	CreateFilesystemWorkspaceBody,
+	CreateEmptyWorkspaceInput,
+	CreateFilesystemWorkspaceInput,
 	UpdateWorkspaceBody,
 	WorkspaceDiscovery,
 	WorkspaceView,
 } from '@/spec/workspace';
 import { WorkspaceMode } from '@/spec/workspace';
-
-import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -35,11 +33,11 @@ import {
 export type WorkspaceSetupSubmission =
 	| {
 			kind: 'filesystem';
-			payload: CreateFilesystemWorkspaceBody;
+			payload: CreateFilesystemWorkspaceInput;
 	  }
 	| {
 			kind: 'empty';
-			payload: CreateEmptyWorkspaceBody;
+			payload: CreateEmptyWorkspaceInput;
 	  }
 	| {
 			kind: 'update';
@@ -354,7 +352,6 @@ function WorkspaceSetupModalContent({
 				? {
 						kind: 'empty',
 						payload: {
-							workspaceID: getUUIDv7(),
 							displayName: form.displayName.trim(),
 							description,
 							discovery: {},
@@ -363,8 +360,6 @@ function WorkspaceSetupModalContent({
 				: {
 						kind: 'filesystem',
 						payload: {
-							workspaceID: getUUIDv7(),
-							sourceID: getUUIDv7(),
 							displayName: form.displayName.trim(),
 							description,
 							rootPath: form.rootPath.trim(),

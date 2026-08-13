@@ -1,9 +1,20 @@
 import type { JSONRawString } from '@/lib/jsonschema_utils';
+import { getUUIDv7 } from '@/lib/uuid_utils';
 
 export type ArtifactRootID = string;
 export type ArtifactSourceID = string;
 export type ArtifactCollectionID = string;
 export type ArtifactID = string;
+export type ArtifactStorageKey = string;
+
+/**
+ * Creates an opaque, storage-safe local key for a newly allocated Artifact
+ * Store Root or Source. This is intentionally not a user-facing identifier,
+ * bundle key, filesystem path, or portable package address.
+ */
+export function newArtifactStorageKey(): ArtifactStorageKey {
+	return `s${getUUIDv7().replaceAll('-', '').toLowerCase()}`;
+}
 
 /**
  * Artifact kinds and Source kinds are registry-extensible backend identifiers.
@@ -86,6 +97,7 @@ export interface ArtifactDiagnostic {
 
 export interface ArtifactRoot {
 	id: ArtifactRootID;
+	storageKey: ArtifactStorageKey;
 	displayName: string;
 	description?: string;
 	revision: number;
@@ -137,6 +149,7 @@ export interface ArtifactRecord {
 
 export interface CreateArtifactRootBody {
 	id: ArtifactRootID;
+	storageKey: ArtifactStorageKey;
 	displayName: string;
 	description?: string;
 }
@@ -150,6 +163,8 @@ export interface UpdateArtifactRootBody {
 export interface ArtifactSourceSummary {
 	id: ArtifactSourceID;
 	rootID: ArtifactRootID;
+	rootStorageKey: ArtifactStorageKey;
+	storageKey: ArtifactStorageKey;
 	kind: ArtifactSourceKind;
 	displayName: string;
 	enabled: boolean;
@@ -161,6 +176,7 @@ export interface ArtifactSourceSummary {
 
 export interface CreateArtifactSourceBody {
 	id: ArtifactSourceID;
+	storageKey: ArtifactStorageKey;
 	kind: ArtifactSourceKind;
 	displayName: string;
 	enabled: boolean;
@@ -179,6 +195,16 @@ export interface UpdateArtifactSourceBody {
 	config?: ArtifactSourceConfig;
 }
 
+/**
+ * Semantic identity of a managed package. This replaces physical managed
+ * source directory addressing at the API boundary.
+ */
+export interface ManagedPackageAddress {
+	kind: string;
+	name: string;
+	version: string;
+}
+
 export interface ManagedSourcePackageFile {
 	locator: ArtifactLocator;
 	content: Uint8Array;
@@ -186,14 +212,14 @@ export interface ManagedSourcePackageFile {
 
 export interface PublishManagedSourcePackageBody {
 	expectedSourceRevision: number;
-	directory: ArtifactLocator;
+	address: ManagedPackageAddress;
 	expectedGeneration?: ArtifactSourceGeneration;
 	files: ManagedSourcePackageFile[];
 }
 
 export interface RemoveManagedSourcePackageBody {
 	expectedSourceRevision: number;
-	directory: ArtifactLocator;
+	address: ManagedPackageAddress;
 	expectedGeneration: ArtifactSourceGeneration;
 }
 

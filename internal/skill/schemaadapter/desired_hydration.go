@@ -83,11 +83,30 @@ func (i *Installer) EnsureHydration(
 		return err
 	}
 	if current {
-		if err := i.ensureBuiltInCatalogsCurrent(ctx); err == nil {
+		if err := i.FinalizeHydration(ctx); err == nil {
 			return nil
+		} else if ctx.Err() != nil {
+			return err
 		}
 	}
 	return i.EnsureBuiltInArtifacts(ctx)
+}
+
+// FinalizeHydration refreshes built-in Skill catalogs after all artifact
+// families sharing the protected managed Source have finished publication.
+//
+// It does not publish packages. Bootstrap invokes this after the primary
+// installer pass so Skill catalogs record the final shared Source revision.
+func (i *Installer) FinalizeHydration(
+	ctx context.Context,
+) error {
+	if i == nil {
+		return basespec.ErrClosed
+	}
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return err
+	}
+	return i.ensureBuiltInCatalogsCurrent(ctx)
 }
 
 func (i *Installer) desiredHydrationFingerprint(

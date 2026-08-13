@@ -111,8 +111,13 @@ func (a *skillLookupAdapter) GetSkillSummaryForSelection(
 
 	summary, err := a.runtime.DescribeArtifactSkill(ctx, selection.Artifact)
 	if err != nil {
-		return assistantpresetStore.SkillSummary{}, err
+		return assistantpresetStore.SkillSummary{}, fmt.Errorf(
+			"artifact skill %q: %w",
+			selection.Artifact.ArtifactID,
+			err,
+		)
 	}
+
 	return assistantpresetStore.SkillSummary{
 		IsEnabled:    summary.IsEnabled,
 		Insert:       summary.Insert,

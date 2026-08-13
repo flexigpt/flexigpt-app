@@ -1,5 +1,6 @@
 import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
 import { ArtifactAdoptionMode, ArtifactState } from '@/spec/artifact';
+import { newArtifactStorageKey } from '@/spec/artifact';
 import type {
 	ManagedSkillDocumentView,
 	RenderSkillResponse,
@@ -22,6 +23,7 @@ import type { IArtifactStoreAPI, ISkillBundleAPI } from '@/apis/interface';
 const DEFAULT_SKILL_ROOT_DISPLAY_NAME = 'FlexiGPT Skills';
 const DEFAULT_SKILL_ROOT_DESCRIPTION = 'Artifact Store namespace for user-managed Skill Bundles.';
 const FILESYSTEM_SOURCE_KIND = 'fs-directory';
+const DEFAULT_SKILL_ROOT_STORAGE_KEY = 'skills';
 const DEFAULT_SKILL_ROOT_ID: ArtifactRootID = '0198f097-0d5c-7000-8000-000000000001';
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -252,13 +254,16 @@ export class SkillManagementAPI {
 		description?: string
 	): Promise<void> {
 		const rootID = await this.resolveCreationRoot();
+		const managedSourceID = getUUIDv7();
+
 		await this.skills.createSkillBundle(rootID, {
 			collectionID: bundleID,
 			displayName,
 			description,
 			enabled: isEnabled,
 			logicalName: slug,
-			managedSourceID: getUUIDv7(),
+			managedSourceID,
+			managedSourceStorageKey: newArtifactStorageKey(),
 		});
 	}
 
@@ -357,6 +362,7 @@ export class SkillManagementAPI {
 			const source = await this.artifacts.createArtifactSource(bundle.bundle.rootID, {
 				id: sourceID,
 				kind: FILESYSTEM_SOURCE_KIND,
+				storageKey: newArtifactStorageKey(),
 				displayName: sourceDisplayName,
 				enabled: true,
 				config: JSON.stringify({ rootPath }),
@@ -523,6 +529,7 @@ export class SkillManagementAPI {
 
 		const created = await this.artifacts.createArtifactRoot({
 			id: DEFAULT_SKILL_ROOT_ID,
+			storageKey: DEFAULT_SKILL_ROOT_STORAGE_KEY,
 			displayName: DEFAULT_SKILL_ROOT_DISPLAY_NAME,
 			description: DEFAULT_SKILL_ROOT_DESCRIPTION,
 		});

@@ -115,6 +115,7 @@ export namespace artifactstore {
 	
 	export class ArtifactSourceDraft {
 	    id: string;
+	    storageKey: string;
 	    kind: string;
 	    displayName: string;
 	    enabled: boolean;
@@ -127,6 +128,7 @@ export namespace artifactstore {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.storageKey = source["storageKey"];
 	        this.kind = source["kind"];
 	        this.displayName = source["displayName"];
 	        this.enabled = source["enabled"];
@@ -621,7 +623,7 @@ export namespace artifactstore {
 	
 	export class PublishManagedSourcePackageRequestBody {
 	    expectedSourceRevision: number;
-	    directory: string;
+	    address: source.ManagedPackageAddress;
 	    expectedGeneration?: string;
 	    files: source.ManagedPackageFile[];
 	
@@ -632,7 +634,7 @@ export namespace artifactstore {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.expectedSourceRevision = source["expectedSourceRevision"];
-	        this.directory = source["directory"];
+	        this.address = this.convertValues(source["address"], source.ManagedPackageAddress);
 	        this.expectedGeneration = source["expectedGeneration"];
 	        this.files = this.convertValues(source["files"], source.ManagedPackageFile);
 	    }
@@ -813,7 +815,7 @@ export namespace artifactstore {
 	    rootID: string;
 	    sourceID: string;
 	    expectedSourceRevision: number;
-	    directory: string;
+	    address: source.ManagedPackageAddress;
 	    expectedGeneration: string;
 	
 	    static createFrom(source: any = {}) {
@@ -825,9 +827,27 @@ export namespace artifactstore {
 	        this.rootID = source["rootID"];
 	        this.sourceID = source["sourceID"];
 	        this.expectedSourceRevision = source["expectedSourceRevision"];
-	        this.directory = source["directory"];
+	        this.address = this.convertValues(source["address"], source.ManagedPackageAddress);
 	        this.expectedGeneration = source["expectedGeneration"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class RemoveManagedSourcePackageResponseBody {
 	    generation: string;
@@ -1802,6 +1822,7 @@ export namespace bundle {
 	    RootID: string;
 	    CollectionID: string;
 	    ManagedSourceID: string;
+	    ManagedSourceStorageKey: string;
 	    DisplayName: string;
 	    Description: string;
 	    Enabled: boolean;
@@ -1819,6 +1840,7 @@ export namespace bundle {
 	        this.RootID = source["RootID"];
 	        this.CollectionID = source["CollectionID"];
 	        this.ManagedSourceID = source["ManagedSourceID"];
+	        this.ManagedSourceStorageKey = source["ManagedSourceStorageKey"];
 	        this.DisplayName = source["DisplayName"];
 	        this.Description = source["Description"];
 	        this.Enabled = source["Enabled"];
@@ -1948,7 +1970,7 @@ export namespace bundle {
 	    RootID: string;
 	    CollectionID: string;
 	    SourceID: string;
-	    DocumentLocator: string;
+	    SourceStorageKey: string;
 	    Document: number[];
 	    Registrations: Registration[];
 	
@@ -1961,7 +1983,7 @@ export namespace bundle {
 	        this.RootID = source["RootID"];
 	        this.CollectionID = source["CollectionID"];
 	        this.SourceID = source["SourceID"];
-	        this.DocumentLocator = source["DocumentLocator"];
+	        this.SourceStorageKey = source["SourceStorageKey"];
 	        this.Document = source["Document"];
 	        this.Registrations = this.convertValues(source["Registrations"], Registration);
 	    }
@@ -2980,6 +3002,7 @@ export namespace root {
 	
 	export class Root {
 	    id: string;
+	    storageKey: string;
 	    displayName: string;
 	    description?: string;
 	    revision: number;
@@ -2997,6 +3020,7 @@ export namespace root {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.storageKey = source["storageKey"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
 	        this.revision = source["revision"];
@@ -3025,6 +3049,7 @@ export namespace root {
 	}
 	export class RootDraft {
 	    id: string;
+	    storageKey: string;
 	    displayName: string;
 	    description?: string;
 	
@@ -3035,6 +3060,7 @@ export namespace root {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.storageKey = source["storageKey"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
 	    }
@@ -5582,6 +5608,22 @@ export namespace server {
 
 export namespace source {
 	
+	export class ManagedPackageAddress {
+	    kind: string;
+	    name: string;
+	    version: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ManagedPackageAddress(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.name = source["name"];
+	        this.version = source["version"];
+	    }
+	}
 	export class ManagedPackageFile {
 	    locator: string;
 	    content: number[];
@@ -5599,6 +5641,8 @@ export namespace source {
 	export class Summary {
 	    id: string;
 	    rootID: string;
+	    rootStorageKey: string;
+	    storageKey: string;
 	    kind: string;
 	    displayName: string;
 	    enabled: boolean;
@@ -5618,6 +5662,8 @@ export namespace source {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.rootID = source["rootID"];
+	        this.rootStorageKey = source["rootStorageKey"];
+	        this.storageKey = source["storageKey"];
 	        this.kind = source["kind"];
 	        this.displayName = source["displayName"];
 	        this.enabled = source["enabled"];
@@ -11839,6 +11885,7 @@ export namespace workspace {
 	export class CreateFilesystemWorkspaceRequestBody {
 	    workspaceID: string;
 	    sourceID: string;
+	    sourceStorageKey: string;
 	    displayName: string;
 	    description?: string;
 	    rootPath: string;
@@ -11852,6 +11899,7 @@ export namespace workspace {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.workspaceID = source["workspaceID"];
 	        this.sourceID = source["sourceID"];
+	        this.sourceStorageKey = source["sourceStorageKey"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
 	        this.rootPath = source["rootPath"];

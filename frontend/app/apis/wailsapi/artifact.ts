@@ -6,6 +6,7 @@ import type {
 	ArtifactSourceSummary,
 	CreateArtifactRootBody,
 	CreateArtifactSourceBody,
+	ManagedPackageAddress,
 	ManagedSourcePackageResult,
 	ManagedSourceState,
 	PublishManagedSourcePackageBody,
@@ -20,6 +21,7 @@ import type { IArtifactStoreAPI } from '@/apis/interface';
 import {
 	byteArrayToWails,
 	rawJSONObjectToWails,
+	requireNonBlankString,
 	requireWailsArray,
 	requireWailsBody,
 	requireWailsObject,
@@ -50,6 +52,7 @@ function artifactRootFromWails(value: unknown): ArtifactRoot {
 
 	return {
 		id: root.id as ArtifactRootID,
+		storageKey: requireWailsString(root.storageKey, 'ArtifactRoot.storageKey'),
 		displayName: root.displayName as string,
 		description: root.description ?? undefined,
 		revision: root.revision as number,
@@ -65,6 +68,8 @@ function artifactSourceFromWails(value: unknown): ArtifactSourceSummary {
 	return {
 		id: source.id as ArtifactSourceID,
 		rootID: source.rootID as ArtifactRootID,
+		rootStorageKey: requireWailsString(source.rootStorageKey, 'ArtifactSourceSummary.rootStorageKey'),
+		storageKey: requireWailsString(source.storageKey, 'ArtifactSourceSummary.storageKey'),
 		kind: source.kind as ArtifactSourceKind,
 		displayName: source.displayName as string,
 		enabled: source.enabled as boolean,
@@ -75,13 +80,31 @@ function artifactSourceFromWails(value: unknown): ArtifactSourceSummary {
 	};
 }
 
+function createArtifactRootBodyToWails(body: CreateArtifactRootBody): unknown {
+	return {
+		id: requireNonBlankString(body.id, 'artifact root id'),
+		storageKey: requireNonBlankString(body.storageKey, 'artifact root storage key'),
+		displayName: body.displayName,
+		...(body.description === undefined ? {} : { description: body.description }),
+	};
+}
+
 function createSourceBodyToWails(body: CreateArtifactSourceBody): unknown {
 	return {
 		id: body.id,
+		storageKey: requireNonBlankString(body.storageKey, 'artifact source storage key'),
 		kind: body.kind,
 		displayName: body.displayName,
 		enabled: body.enabled,
 		config: rawJSONObjectToWails(body.config, 'artifact source config'),
+	};
+}
+
+function managedPackageAddressToWails(address: ManagedPackageAddress, field: string): Record<string, string> {
+	return {
+		kind: requireNonBlankString(address.kind, `${field}.kind`),
+		name: requireNonBlankString(address.name, `${field}.name`),
+		version: requireNonBlankString(address.version, `${field}.version`),
 	};
 }
 
@@ -97,8 +120,8 @@ function updateSourceBodyToWails(body: UpdateArtifactSourceBody): unknown {
 function publishManagedPackageBodyToWails(body: PublishManagedSourcePackageBody): unknown {
 	return {
 		expectedSourceRevision: body.expectedSourceRevision,
-		directory: body.directory,
-		expectedGeneration: body.expectedGeneration,
+		address: managedPackageAddressToWails(body.address, 'PublishManagedSourcePackage.address'),
+		...(body.expectedGeneration === undefined ? {} : { expectedGeneration: body.expectedGeneration }),
 		files: body.files.map(file => ({
 			locator: file.locator,
 			content: byteArrayToWails(file.content),
@@ -109,7 +132,7 @@ function publishManagedPackageBodyToWails(body: PublishManagedSourcePackageBody)
 export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 	async createArtifactRoot(body: CreateArtifactRootBody): Promise<ArtifactRoot> {
 		const response = await CreateArtifactRoot({
-			Body: body,
+			Body: createArtifactRootBodyToWails(body),
 		} as Parameters<typeof CreateArtifactRoot>[0]);
 
 		return artifactRootFromWails(requireWailsBody(response.Body, 'CreateArtifactRoot'));
@@ -295,7 +318,7 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 			rootID,
 			sourceID,
 			expectedSourceRevision: body.expectedSourceRevision,
-			directory: body.directory,
+			address: body.address,
 			expectedGeneration: body.expectedGeneration,
 		} as Parameters<typeof RemoveManagedSourcePackage>[0]);
 

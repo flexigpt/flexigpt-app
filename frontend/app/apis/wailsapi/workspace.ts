@@ -299,7 +299,15 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 	async createFilesystemWorkspace(rootID: ArtifactRootID, body: CreateFilesystemWorkspaceBody): Promise<WorkspaceView> {
 		const response = await CreateFilesystemWorkspace({
 			rootID,
-			Body: body,
+			Body: {
+				workspaceID: body.workspaceID,
+				sourceID: body.sourceID,
+				sourceStorageKey: body.sourceStorageKey,
+				displayName: body.displayName,
+				description: body.description,
+				rootPath: body.rootPath,
+				discovery: body.discovery,
+			},
 		} as Parameters<typeof CreateFilesystemWorkspace>[0]);
 
 		return workspaceViewFromWails(

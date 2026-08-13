@@ -13,6 +13,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
@@ -74,6 +75,21 @@ type builtInBundleEnsurer interface {
 		ctx context.Context,
 		ref collection.CollectionRef,
 	) error
+
+	Get(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) (bundle.Bundle, error)
+
+	ListServers(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) ([]artifact.Artifact, error)
+
+	ListPolicies(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) ([]artifact.Artifact, error)
 }
 
 type rootOverlayPurger interface {
@@ -199,7 +215,7 @@ func (i *Installer) EnsureHydration(
 		return err
 	}
 	if current {
-		if err := i.ensureCurrentBundles(ctx); err == nil {
+		if err := i.FinalizeHydration(ctx); err == nil {
 			return nil
 		} else if ctx.Err() != nil {
 			return err
@@ -244,7 +260,26 @@ func (i *Installer) EnsureHydration(
 			)
 		}
 	}
-	return nil
+
+	return i.ensureCurrentBundles(ctx)
+}
+
+// FinalizeHydration reconciles MCP catalogs after all installers sharing the
+// protected managed Source have completed package publication.
+//
+// It intentionally does not write MCP packages. The generic bootstrap calls
+// this after the primary install pass, which lets MCP and Skill catalogs
+// converge on the same final Source revision and generation.
+func (i *Installer) FinalizeHydration(
+	ctx context.Context,
+) error {
+	if i == nil {
+		return basespec.ErrClosed
+	}
+	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
+		return err
+	}
+	return i.ensureCurrentBundles(ctx)
 }
 
 func (*Installer) BuiltInName() string {
@@ -301,16 +336,131 @@ func (i *Installer) Ensure(ctx context.Context) error {
 }
 
 func (i *Installer) ensureCurrentBundles(ctx context.Context) error {
-	for _, registered := range i.registry.OrderedBundles() {
+	prepared, err := i.prepareBundles(ctx)
+	if err != nil {
+		return err
+	}
+	for _, expected := range prepared {
 		if err := i.bundles.EnsureBuiltInCurrent(
 			ctx,
 			collection.CollectionRef{
 				RootID:       i.builtInTopology.Root.ID,
-				CollectionID: registered.CollectionID,
+				CollectionID: expected.registration.CollectionID,
 			},
 		); err != nil {
 			return err
 		}
+		if err := i.verifyCurrentBundle(ctx, expected); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// verifyCurrentBundle proves that the current catalog is backed by the static
+// Artifact registrations expected by the embedded MCP registry. Catalog
+// freshness alone does not prove that a previous interrupted install retained
+// every pinned server and policy Artifact.
+func (i *Installer) verifyCurrentBundle(
+	ctx context.Context,
+	expected preparedBundle,
+) error {
+	ref := collection.CollectionRef{
+		RootID:       i.builtInTopology.Root.ID,
+		CollectionID: expected.registration.CollectionID,
+	}
+	current, err := i.bundles.Get(ctx, ref)
+	if err != nil {
+		return err
+	}
+	documentLocator, err := bundle.DocumentLocatorForPackage(
+		expected.packageAddress,
+	)
+	if err != nil {
+		return err
+	}
+	if current.Collection.RootID != ref.RootID ||
+		current.Collection.ID != ref.CollectionID ||
+		current.Source.ID != i.builtInTopology.Sources[0].ID ||
+		current.PackageAddress != expected.packageAddress ||
+		current.DocumentLocator != documentLocator {
+		return fmt.Errorf(
+			"%w: built-in MCP Bundle %q does not match static topology",
+			basespec.ErrConflict,
+			expected.registration.CollectionID,
+		)
+	}
+
+	servers, err := i.bundles.ListServers(ctx, ref)
+	if err != nil {
+		return err
+	}
+	policies, err := i.bundles.ListPolicies(ctx, ref)
+	if err != nil {
+		return err
+	}
+	//nolint:gocritic // Need all records.
+	records := append(servers, policies...)
+
+	expectedByID := make(
+		map[basespec.ArtifactID]ArtifactRegistration,
+		len(expected.registration.Artifacts),
+	)
+	for _, registration := range expected.registration.Artifacts {
+		expectedByID[registration.ID] = registration
+	}
+	if len(records) != len(expectedByID) {
+		return fmt.Errorf(
+			"%w: built-in MCP Bundle %q has %d Artifacts, expected %d",
+			basespec.ErrConflict,
+			expected.registration.CollectionID,
+			len(records),
+			len(expectedByID),
+		)
+	}
+
+	seen := make(map[basespec.ArtifactID]struct{}, len(records))
+	for _, record := range records {
+		registration, found := expectedByID[record.ID]
+		if !found {
+			return fmt.Errorf(
+				"%w: built-in MCP Bundle %q contains undeclared Artifact %q",
+				basespec.ErrConflict,
+				expected.registration.CollectionID,
+				record.ID,
+			)
+		}
+		seen[record.ID] = struct{}{}
+
+		if record.RootID != ref.RootID ||
+			record.CollectionID != ref.CollectionID ||
+			record.Kind != registration.Kind ||
+			record.Adoption != artifact.AdoptionPinned ||
+			record.Enabled != registration.Enabled ||
+			record.Binding.SourceID != current.Source.ID ||
+			record.Binding.Locator != current.DocumentLocator ||
+			record.Binding.SubresourceLocator != registration.Subresource ||
+			record.Binding.ExpectedKind != registration.Kind ||
+			record.State != artifact.StateAvailable ||
+			record.ResolvedDefinition == nil {
+			return fmt.Errorf(
+				"%w: built-in MCP Artifact %q does not match static registry state",
+				basespec.ErrReferenceUnresolved,
+				record.ID,
+			)
+		}
+	}
+
+	for artifactID := range expectedByID {
+		if _, found := seen[artifactID]; found {
+			continue
+		}
+		return fmt.Errorf(
+			"%w: built-in MCP Bundle %q is missing Artifact %q",
+			basespec.ErrReferenceUnresolved,
+			expected.registration.CollectionID,
+			artifactID,
+		)
 	}
 	return nil
 }

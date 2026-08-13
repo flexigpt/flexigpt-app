@@ -1,5 +1,6 @@
 import type { ArtifactCollectionRef, ArtifactKind, ArtifactRecord, ArtifactRef, ArtifactRootID } from '@/spec/artifact';
 import { ArtifactState } from '@/spec/artifact';
+import { newArtifactStorageKey } from '@/spec/artifact';
 import type {
 	MCPAppsPolicy,
 	MCPArtifactRegistration,
@@ -1113,6 +1114,7 @@ export async function createMCPBundle(
 
 	const collectionID = getUUIDv7();
 	const sourceID = getUUIDv7();
+	const sourceStorageKey = newArtifactStorageKey();
 	const document: MCPBundleDocument = {
 		...cloneJSON(template),
 		digest: undefined,
@@ -1131,6 +1133,7 @@ export async function createMCPBundle(
 		rootID: MCP_USER_ROOT_ID,
 		collectionID,
 		sourceID,
+		sourceStorageKey,
 		document,
 		registrations: [],
 	});
