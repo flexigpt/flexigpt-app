@@ -35,12 +35,11 @@ const (
 //go:embed skill-collection-v1.schema.json
 var skillCollectionV1JSONSchema []byte
 
-var SkillCollectionV1SchemaKey = shareable.SchemaKey{
-	Entity:        shareable.EntityCollection,
-	Kind:          SkillCollectionV1Kind,
-	SchemaID:      SkillCollectionV1SchemaID,
-	SchemaVersion: SkillCollectionV1SchemaVersion,
-}
+var SkillCollectionV1SchemaKey = shareable.CollectionSchemaKey(
+	SkillCollectionV1Kind,
+	SkillCollectionV1SchemaID,
+	SkillCollectionV1SchemaVersion,
+)
 
 func SkillCollectionV1JSONSchema() []byte {
 	return append([]byte(nil), skillCollectionV1JSONSchema...)

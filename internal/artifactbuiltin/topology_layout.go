@@ -12,11 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-type (
-	WorkspaceContextRole      string
-	WorkspaceContextMediaType string
-)
-
 const (
 	ApplicationDataDirectoryName = "flexigpt"
 
@@ -49,12 +44,13 @@ const (
 
 	UnversionedPackageVersion basespec.LogicalVersion = "unversioned"
 
-	AgentSkillPackageKind        basespec.PackageKind = "agent.skill"
-	SkillBundlePackageKind       basespec.PackageKind = "skill.bundle"
-	MCPBundlePackageKind         basespec.PackageKind = "mcp.bundle"
-	AgentSkillDefinitionFileName basespec.Locator     = "SKILL.md"
-	SkillCollectionFileName      basespec.Locator     = "collection.json"
-	MCPBundleDocumentFileName    basespec.Locator     = "mcps.json"
+	AgentSkillPackageKind  basespec.PackageKind = "agent.skill"
+	SkillBundlePackageKind basespec.PackageKind = "skill.bundle"
+	MCPBundlePackageKind   basespec.PackageKind = "mcp.bundle"
+
+	AgentSkillDefinitionFileName basespec.Locator = "SKILL.md"
+	SkillCollectionFileName      basespec.Locator = "collection.json"
+	MCPBundleDocumentFileName    basespec.Locator = "mcps.json"
 
 	RepositoryRootLocator       basespec.Locator = "."
 	WorkspaceDescriptorFileName basespec.Locator = "workspace.json"
@@ -65,17 +61,13 @@ const (
 	WorkspaceClaudeFileName basespec.Locator = "CLAUDE.md"
 	WorkspaceReadmeFileName basespec.Locator = "README.md"
 
-	WorkspaceContextRoleAgentInstructions     WorkspaceContextRole      = "agent-instructions"
-	WorkspaceContextRoleAssistantInstructions WorkspaceContextRole      = "assistant-instructions"
-	WorkspaceContextRoleProjectReadme         WorkspaceContextRole      = "project-readme"
-	WorkspaceContextRoleProjectContext        WorkspaceContextRole      = "project-context"
-	WorkspaceContextMediaTypeMarkdown         WorkspaceContextMediaType = "text/markdown"
-	WorkspaceContextPreferenceIncludeReadme                             = "include-readme"
+	EmbeddedSkillRegistryFileName                  = "skill-registry.json"
+	EmbeddedMCPRegistryFileName                    = "mcp_artifact_registry.json"
+	EmbeddedSkillDataRoot         basespec.Locator = "skills"
+	EmbeddedMCPDataRoot           basespec.Locator = "mcps"
+	EmbeddedSkillRegistryLocator  basespec.Locator = "skills/skill-registry.json"
+	EmbeddedMCPRegistryLocator    basespec.Locator = "mcps/mcp_artifact_registry.json"
 
-	EmbeddedSkillRegistryFileName    = "skill-registry.json"
-	EmbeddedMCPRegistryFileName      = "mcp_artifact_registry.json"
-	EmbeddedSkillDataRoot            = "skills"
-	EmbeddedMCPDataRoot              = "mcps"
 	ExternalGitMetadataDirectoryName = ".git"
 )
 
@@ -107,12 +99,50 @@ const (
 	DefaultMCPBundleDescription                        = "Editable starter bundle for user-managed MCP server definitions."
 )
 
+type (
+	WorkspaceContextRole       string
+	WorkspaceContextMediaType  string
+	WorkspaceContextPreference string
+)
+
+const (
+	ManagedAttachmentRole basespec.AttachmentRole = "managed"
+	BuiltInAttachmentRole basespec.AttachmentRole = "builtin"
+
+	AgentSkillArtifactKind   basespec.ArtifactKind = "agent.skill"
+	AgentSkillSchemaID       basespec.SchemaID     = "agent.skill.v1"
+	AgentSkillDecoderID      basespec.DecoderID    = "agent.skill-markdown"
+	AgentSkillSchemaVersion                        = "v1"
+	AgentSkillInsertLabelKey                       = "skill.insert"
+
+	// AgentSkillBuiltInInstallerName is stable across built-in hydration
+	// revisions so prior hydration records remain discoverable.
+	AgentSkillBuiltInInstallerName = "agent.skill"
+
+	AgentSkillHydrationFingerprintSchemaVersion = "agent.skill.builtin-hydration/v1"
+
+	WorkspaceContextArtifactKind  basespec.ArtifactKind = "workspace.context"
+	WorkspaceContextSchemaID      basespec.SchemaID     = "workspace.context.v1"
+	WorkspaceContextDecoderID     basespec.DecoderID    = "workspace.context-markdown"
+	WorkspaceContextSchemaVersion                       = "v1"
+	WorkspaceContextRoleLabelKey                        = "context.role"
+
+	WorkspaceContextRoleAgentInstructions     WorkspaceContextRole = "agent-instructions"
+	WorkspaceContextRoleAssistantInstructions WorkspaceContextRole = "assistant-instructions"
+	WorkspaceContextRoleProjectReadme         WorkspaceContextRole = "project-readme"
+	WorkspaceContextRoleProjectContext        WorkspaceContextRole = "project-context"
+
+	WorkspaceContextMediaTypeMarkdown WorkspaceContextMediaType = "text/markdown"
+
+	WorkspaceContextPreferenceIncludeReadme WorkspaceContextPreference = "include-readme"
+)
+
 type WorkspaceContextFileConvention struct {
-	FileName         basespec.Locator
-	Role             WorkspaceContextRole
-	DefaultDiscovery bool
-	Preference       string
-	RuntimeOrder     int
+	FileName         basespec.Locator           `json:"fileName"`
+	Role             WorkspaceContextRole       `json:"role"`
+	DefaultDiscovery bool                       `json:"defaultDiscovery"`
+	Preference       WorkspaceContextPreference `json:"preference,omitempty"`
+	RuntimeOrder     int                        `json:"runtimeOrder"`
 }
 
 var externalTraversalExcludedDirectoryNames = []string{

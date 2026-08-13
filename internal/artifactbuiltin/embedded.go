@@ -4,6 +4,8 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 //go:embed skills
@@ -15,14 +17,14 @@ var embeddedMCPFS embed.FS
 func ReadEmbeddedSkillRegistry() ([]byte, error) {
 	return readEmbeddedFile(
 		embeddedSkillsFS,
-		EmbeddedSkillDataRoot+"/"+EmbeddedSkillRegistryFileName,
+		EmbeddedSkillRegistryLocator,
 	)
 }
 
 func ReadEmbeddedMCPRegistry() ([]byte, error) {
 	return readEmbeddedFile(
 		embeddedMCPFS,
-		EmbeddedMCPDataRoot+"/"+EmbeddedMCPRegistryFileName,
+		EmbeddedMCPRegistryLocator,
 	)
 }
 
@@ -30,18 +32,18 @@ func EmbeddedSkillPackages() (fs.FS, error) {
 	return embeddedSubtree(embeddedSkillsFS, EmbeddedSkillDataRoot)
 }
 
-func EmbeddedMCPArtifactPackages() (fs.FS, error) {
+func EmbeddedMCPPackages() (fs.FS, error) {
 	return embeddedSubtree(embeddedMCPFS, EmbeddedMCPDataRoot)
 }
 
 func readEmbeddedFile(
 	embedded fs.FS,
-	location string,
+	location basespec.Locator,
 ) ([]byte, error) {
-	if embedded == nil || !fs.ValidPath(location) {
+	if embedded == nil || !fs.ValidPath(string(location)) {
 		return nil, fmt.Errorf("invalid embedded built-in file %q", location)
 	}
-	value, err := fs.ReadFile(embedded, location)
+	value, err := fs.ReadFile(embedded, string(location))
 	if err != nil {
 		return nil, fmt.Errorf("read embedded built-in file %q: %w", location, err)
 	}
@@ -50,12 +52,12 @@ func readEmbeddedFile(
 
 func embeddedSubtree(
 	embedded fs.FS,
-	root string,
+	root basespec.Locator,
 ) (fs.FS, error) {
-	if embedded == nil || !fs.ValidPath(root) {
+	if embedded == nil || !fs.ValidPath(string(root)) {
 		return nil, fmt.Errorf("invalid embedded built-in root %q", root)
 	}
-	info, err := fs.Stat(embedded, root)
+	info, err := fs.Stat(embedded, string(root))
 	if err != nil {
 		return nil, fmt.Errorf("stat embedded built-in root %q: %w", root, err)
 	}
@@ -65,5 +67,5 @@ func embeddedSubtree(
 			root,
 		)
 	}
-	return fs.Sub(embedded, root)
+	return fs.Sub(embedded, string(root))
 }

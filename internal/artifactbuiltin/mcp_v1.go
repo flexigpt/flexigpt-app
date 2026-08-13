@@ -31,7 +31,9 @@ const (
 	ServerSchemaID basespec.SchemaID = "mcp.server.v1"
 	PolicySchemaID basespec.SchemaID = "mcp.policy.v1"
 
-	HydrationFingerprintSchemaVersion = "mcp.builtin-hydration/v1"
+	MCPBuiltInInstallerName = "mcp.bundle"
+
+	MCPBundleHydrationFingerprintSchemaVersion = "mcp.builtin-hydration/v1"
 
 	MCPSchemaVersion = "v1"
 
@@ -39,29 +41,29 @@ const (
 	ServerSchemaURL = "https://schemas.flexigpt.dev/mcp/server/v1.json"
 	PolicySchemaURL = "https://schemas.flexigpt.dev/mcp/policy/v1.json"
 
+	MCPServerSubresourceDirectory basespec.SubresourceLocator = "mcpServers"
+	MCPPolicySubresourceDirectory basespec.SubresourceLocator = "policies"
+
 	DecoderRevision                    = "mcp.bundle.discovery.v1"
 	DecoderID       basespec.DecoderID = "mcp.bundle-json"
 )
 
 var (
-	MCPBundleSchemaKey = shareable.SchemaKey{
-		Entity:        shareable.EntityCollection,
-		Kind:          BundleKind,
-		SchemaID:      BundleSchemaID,
-		SchemaVersion: MCPSchemaVersion,
-	}
-	MCPServerSchemaKey = shareable.SchemaKey{
-		Entity:        shareable.EntityArtifact,
-		Kind:          basespec.CollectionKind(ServerKind),
-		SchemaID:      ServerSchemaID,
-		SchemaVersion: MCPSchemaVersion,
-	}
-	MCPPolicySchemaKey = shareable.SchemaKey{
-		Entity:        shareable.EntityArtifact,
-		Kind:          basespec.CollectionKind(PolicyKind),
-		SchemaID:      PolicySchemaID,
-		SchemaVersion: MCPSchemaVersion,
-	}
+	MCPBundleSchemaKey = shareable.CollectionSchemaKey(
+		BundleKind,
+		BundleSchemaID,
+		MCPSchemaVersion,
+	)
+	MCPServerSchemaKey = shareable.ArtifactSchemaKey(
+		ServerKind,
+		ServerSchemaID,
+		MCPSchemaVersion,
+	)
+	MCPPolicySchemaKey = shareable.ArtifactSchemaKey(
+		PolicyKind,
+		PolicySchemaID,
+		MCPSchemaVersion,
+	)
 )
 
 func CheckCodecContext(ctx context.Context) error {

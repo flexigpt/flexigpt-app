@@ -18,10 +18,10 @@ type ArtifactRegistration struct {
 }
 
 type BundleRegistration struct {
-	CollectionID     basespec.CollectionID  `json:"collectionID"`
-	PackageDirectory basespec.Locator       `json:"packageDirectory"`
-	DocumentLocator  basespec.Locator       `json:"documentLocator"`
-	Artifacts        []ArtifactRegistration `json:"artifacts"`
+	CollectionID            basespec.CollectionID  `json:"collectionID"`
+	EmbeddedPackageRoot     basespec.Locator       `json:"embeddedPackageRoot"`
+	EmbeddedDocumentLocator basespec.Locator       `json:"embeddedDocumentLocator"`
+	Artifacts               []ArtifactRegistration `json:"artifacts"`
 }
 
 type Registry struct {
@@ -52,18 +52,18 @@ func (r Registry) Validate() error {
 			return fmt.Errorf("bundles[%d]: %w", index, err)
 		}
 		if err := basespec.ValidatePortableLocator(
-			registered.PackageDirectory,
+			registered.EmbeddedPackageRoot,
 			false,
 		); err != nil {
 			return fmt.Errorf("bundles[%d]: %w", index, err)
 		}
 		if err := bundle.ValidateDocumentLocator(
-			registered.DocumentLocator,
+			registered.EmbeddedDocumentLocator,
 		); err != nil {
 			return fmt.Errorf("bundles[%d]: %w", index, err)
 		}
-		if path.Dir(string(registered.DocumentLocator)) !=
-			string(registered.PackageDirectory) {
+		if path.Dir(string(registered.EmbeddedDocumentLocator)) !=
+			string(registered.EmbeddedPackageRoot) {
 			return fmt.Errorf(
 				"%w: MCP built-in document locator must belong to its package directory",
 				basespec.ErrInvalid,
@@ -112,9 +112,9 @@ func (r Registry) Validate() error {
 			var expectedParent string
 			switch value.Kind {
 			case artifactbuiltin.ServerKind:
-				expectedParent = "mcpServers"
+				expectedParent = string(artifactbuiltin.MCPServerSubresourceDirectory)
 			case artifactbuiltin.PolicyKind:
-				expectedParent = "policies"
+				expectedParent = string(artifactbuiltin.MCPPolicySubresourceDirectory)
 			default:
 				return fmt.Errorf(
 					"%w: unsupported MCP built-in Artifact kind %q",
@@ -165,8 +165,8 @@ func (r Registry) Validate() error {
 func (r Registry) OrderedBundles() []BundleRegistration {
 	output := append([]BundleRegistration(nil), r.Bundles...)
 	sort.Slice(output, func(left, right int) bool {
-		return output[left].PackageDirectory <
-			output[right].PackageDirectory
+		return output[left].EmbeddedPackageRoot <
+			output[right].EmbeddedPackageRoot
 	})
 	return output
 }

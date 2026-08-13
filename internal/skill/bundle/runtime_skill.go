@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -120,7 +121,7 @@ func (a *API) LoadRuntimeSkill(
 			bundleRef.CollectionID,
 		)
 	}
-	if record.Kind != skillArtifact.Kind ||
+	if record.Kind != artifactbuiltin.AgentSkillArtifactKind ||
 		!record.Enabled ||
 		record.State != artifact.StateAvailable ||
 		record.ResolvedDefinition == nil {
@@ -220,7 +221,7 @@ func currentSkillOccurrence(
 			continue
 		}
 		if occurrence.State != catalog.OccurrenceValid ||
-			occurrence.Kind != skillArtifact.Kind ||
+			occurrence.Kind != artifactbuiltin.AgentSkillArtifactKind ||
 			occurrence.DefinitionDigest == nil ||
 			occurrence.SourceContentDigest == nil ||
 			*occurrence.DefinitionDigest != *record.ResolvedDefinition {

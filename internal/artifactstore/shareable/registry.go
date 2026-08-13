@@ -162,7 +162,7 @@ func (r *Registry) CanonicalizeEntity(
 
 	key := SchemaKey{
 		Entity:        entity,
-		Kind:          basespec.CollectionKind(header.Kind),
+		Kind:          SchemaKind(header.Kind),
 		SchemaID:      header.SchemaID,
 		SchemaVersion: header.SchemaVersion,
 	}
@@ -247,7 +247,7 @@ func validateCodecOutput(
 	}
 	actual := SchemaKey{
 		Entity:        expected.Entity,
-		Kind:          basespec.CollectionKind(header.Kind),
+		Kind:          SchemaKind(header.Kind),
 		SchemaID:      header.SchemaID,
 		SchemaVersion: header.SchemaVersion,
 	}

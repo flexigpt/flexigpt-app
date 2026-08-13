@@ -8,6 +8,7 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -106,8 +107,8 @@ func (f *Adapter) List(
 	}
 	output := make([]WorkspaceSkill, 0)
 	for _, resourceValue := range view.Resources {
-		if resourceValue.Definition.Kind != skillArtifact.Kind ||
-			resourceValue.Definition.SchemaID != skillArtifact.SchemaID {
+		if resourceValue.Definition.Kind != artifactbuiltin.AgentSkillArtifactKind ||
+			resourceValue.Definition.SchemaID != artifactbuiltin.AgentSkillSchemaID {
 			continue
 		}
 		value, err := projectWorkspaceSkill(
@@ -138,8 +139,8 @@ func (f *Adapter) LoadArtifact(
 		return WorkspaceSkill{}, err
 	}
 	workspace := workspaceValue.Collection.Ref()
-	if resourceValue.Definition.Kind != skillArtifact.Kind ||
-		resourceValue.Definition.SchemaID != skillArtifact.SchemaID {
+	if resourceValue.Definition.Kind != artifactbuiltin.AgentSkillArtifactKind ||
+		resourceValue.Definition.SchemaID != artifactbuiltin.AgentSkillSchemaID {
 		return WorkspaceSkill{}, fmt.Errorf(
 			"%w: Artifact %q is not an Agent Skill",
 			spec.ErrReferenceUnresolved,
@@ -346,7 +347,7 @@ func skillSummary(
 		})
 	}
 	return SkillSummary{
-		SchemaVersion: skillArtifact.SchemaVersion,
+		SchemaVersion: artifactbuiltin.AgentSkillSchemaVersion,
 		ID:            artifactValue.ID,
 		Slug:          value.Name,
 		Name:          value.Name,

@@ -2,15 +2,6 @@ package artifact
 
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 
-const (
-	Kind      basespec.ArtifactKind = "agent.skill"
-	SchemaID  basespec.SchemaID     = "agent.skill.v1"
-	DecoderID basespec.DecoderID    = "agent.skill-markdown"
-
-	SchemaVersion  = "v1"
-	InsertLabelKey = "skill.insert"
-)
-
 type Argument struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -51,6 +52,7 @@ type Installer struct {
 	builtInTopology topology.Declaration
 	hydrated        HydratedRegistry
 	packages        fs.FS
+	packageScopes   []basespec.Locator
 }
 
 func NewInstaller(
@@ -84,16 +86,21 @@ func NewInstaller(
 	if err != nil {
 		return nil, err
 	}
+	packageScopes, err := builtInPackageScopes(hydrated)
+	if err != nil {
+		return nil, err
+	}
 	return &Installer{
 		skills:          dependencies.Skills,
 		builtInTopology: builtInTopology,
 		hydrated:        hydrated,
 		packages:        dependencies.Packages,
+		packageScopes:   packageScopes,
 	}, nil
 }
 
 func (*Installer) BuiltInName() string {
-	return string(artifactbuiltin.AgentSkillPackageKind)
+	return artifactbuiltin.AgentSkillBuiltInInstallerName
 }
 
 func (i *Installer) BuiltInIDs() []string {
@@ -118,11 +125,32 @@ func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
 	if i == nil {
 		return nil
 	}
-	output := make([]basespec.Locator, 0, len(i.hydrated.Collections))
-	for _, value := range i.hydrated.OrderedCollections() {
-		output = append(output, value.EmbeddedPackageRoot)
+	return append([]basespec.Locator(nil), i.packageScopes...)
+}
+
+// builtInPackageScopes returns managed-source package roots, not embedded
+// source-tree locations. Bootstrap collision checks must use the locations
+// that installers actually publish into the shared managed Source.
+func builtInPackageScopes(
+	registry HydratedRegistry,
+) ([]basespec.Locator, error) {
+	output := make([]basespec.Locator, 0, len(registry.Collections))
+	for _, value := range registry.OrderedCollections() {
+		address, err := bundle.BuiltInCollectionPackageAddress(
+			basespec.LogicalName(value.Definition.LogicalName),
+			basespec.LogicalVersion(value.Definition.LogicalVersion),
+		)
+		if err != nil {
+			return nil, err
+		}
+		scope, err := address.Directory()
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, scope)
 	}
-	return output
+	slices.Sort(output)
+	return output, nil
 }
 
 func (i *Installer) Ensure(

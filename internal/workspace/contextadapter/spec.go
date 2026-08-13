@@ -8,17 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
-const workspaceContextSchemaVersionV1 = "v1"
-
 const (
-	contextKind      basespec.ArtifactKind = "workspace.context"
-	contextSchemaID  basespec.SchemaID     = "workspace.context.v1"
-	contextDecoderID basespec.DecoderID    = "workspace.context-markdown"
-)
-
-const (
-	contextRoleLabelKey = "context.role"
-
 	contextPromptSeparator   = "\n\n"
 	contextPromptStartFormat = "<<<WORKSPACE_CONTEXT name=%q role=%q source=%q>>>\n"
 	contextPromptEndMarker   = "\n<<<END_WORKSPACE_CONTEXT>>>"
@@ -28,7 +18,7 @@ type contextFileSupport struct {
 	FileName         string
 	Role             artifactbuiltin.WorkspaceContextRole
 	DefaultDiscovery bool
-	Preference       string
+	Preference       artifactbuiltin.WorkspaceContextPreference
 	RuntimeOrder     int
 }
 
@@ -59,8 +49,8 @@ func contextConventionFor(
 	return contextFileSupport{}, false
 }
 
-func supportedContextRole(role string) bool {
-	switch artifactbuiltin.WorkspaceContextRole(role) {
+func supportedContextRole(role artifactbuiltin.WorkspaceContextRole) bool {
+	switch role {
 	case artifactbuiltin.WorkspaceContextRoleAgentInstructions,
 		artifactbuiltin.WorkspaceContextRoleAssistantInstructions,
 		artifactbuiltin.WorkspaceContextRoleProjectReadme,
@@ -72,15 +62,15 @@ func supportedContextRole(role string) bool {
 }
 
 var artifactSupport = spec.ArtifactSupport{
-	Kind:      contextKind,
-	SchemaID:  contextSchemaID,
-	DecoderID: contextDecoderID,
+	Kind:      artifactbuiltin.WorkspaceContextArtifactKind,
+	SchemaID:  artifactbuiltin.WorkspaceContextSchemaID,
+	DecoderID: artifactbuiltin.WorkspaceContextDecoderID,
 	Validator: ValidateContextDefinition,
 }
 
 type contextDefinition struct {
-	Name      string `json:"name"`
-	Role      string `json:"role"`
-	MediaType string `json:"mediaType"`
-	Content   string `json:"content"`
+	Name      string                                    `json:"name"`
+	Role      artifactbuiltin.WorkspaceContextRole      `json:"role"`
+	MediaType artifactbuiltin.WorkspaceContextMediaType `json:"mediaType"`
+	Content   string                                    `json:"content"`
 }

@@ -51,9 +51,9 @@ var defaultArtifactSupportMatrix = []defaultArtifactSupport{
 	},
 	{
 		support: spec.ArtifactSupport{
-			Kind:      skillArtifact.Kind,
-			SchemaID:  skillArtifact.SchemaID,
-			DecoderID: skillArtifact.DecoderID,
+			Kind:      artifactbuiltin.AgentSkillArtifactKind,
+			SchemaID:  artifactbuiltin.AgentSkillSchemaID,
+			DecoderID: artifactbuiltin.AgentSkillDecoderID,
 			Validator: skillArtifact.ValidateDefinition,
 		},
 	},

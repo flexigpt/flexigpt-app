@@ -26,11 +26,11 @@ func NewContextDecoder() *ContextDecoder {
 }
 
 func (*ContextDecoder) ID() basespec.DecoderID {
-	return contextDecoderID
+	return artifactbuiltin.WorkspaceContextDecoderID
 }
 
 func (*ContextDecoder) Revision() string {
-	return workspaceContextSchemaVersionV1
+	return artifactbuiltin.WorkspaceContextSchemaVersion
 }
 
 func DiscoveryProfile() spec.DiscoveryProfile {
@@ -59,7 +59,7 @@ func (*ContextDecoder) Recognize(
 	candidate discovery.Candidate,
 ) discovery.Recognition {
 	if _, supported := contextConventionFor(candidate.Locator); !supported {
-		if candidate.RequestsDecoder(contextDecoderID) &&
+		if candidate.RequestsDecoder(artifactbuiltin.WorkspaceContextDecoderID) &&
 			strings.EqualFold(path.Ext(string(candidate.Locator)), ".md") {
 			return discovery.RecognitionPossible
 		}
@@ -90,7 +90,7 @@ func (*ContextDecoder) Decode(
 	name := path.Base(string(candidate.Locator))
 	convention, supported := contextConventionFor(candidate.Locator)
 	if !supported {
-		if !candidate.RequestsDecoder(contextDecoderID) ||
+		if !candidate.RequestsDecoder(artifactbuiltin.WorkspaceContextDecoderID) ||
 			!strings.EqualFold(path.Ext(string(candidate.Locator)), ".md") {
 			return nil, nil
 		}
@@ -101,8 +101,8 @@ func (*ContextDecoder) Decode(
 
 	document := contextDefinition{
 		Name:      name,
-		Role:      string(convention.Role),
-		MediaType: string(artifactbuiltin.WorkspaceContextMediaTypeMarkdown),
+		Role:      convention.Role,
+		MediaType: artifactbuiltin.WorkspaceContextMediaTypeMarkdown,
 		Content: strings.ReplaceAll(
 			strings.ReplaceAll(string(candidate.Content), "\r\n", "\n"),
 			"\r",
@@ -122,13 +122,13 @@ func (*ContextDecoder) Decode(
 	}
 
 	value := definition.Definition{
-		Kind:          contextKind,
-		SchemaID:      contextSchemaID,
-		SchemaVersion: workspaceContextSchemaVersionV1,
+		Kind:          artifactbuiltin.WorkspaceContextArtifactKind,
+		SchemaID:      artifactbuiltin.WorkspaceContextSchemaID,
+		SchemaVersion: artifactbuiltin.WorkspaceContextSchemaVersion,
 		LogicalName:   contextLogicalName(name),
 		DisplayName:   name,
 		Labels: map[string]string{
-			contextRoleLabelKey: string(convention.Role),
+			artifactbuiltin.WorkspaceContextRoleLabelKey: string(convention.Role),
 		},
 		Body: raw,
 	}

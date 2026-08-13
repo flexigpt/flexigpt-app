@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -16,19 +17,19 @@ import (
 )
 
 type ContextContribution struct {
-	Artifact         artifact.ArtifactRef `json:"artifact"`
-	ArtifactRevision uint64               `json:"artifactRevision"`
-	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest"`
-	SourceID         basespec.SourceID    `json:"sourceID"`
-	Locator          basespec.Locator     `json:"locator"`
-	Name             string               `json:"name"`
-	Role             string               `json:"role"`
-	MediaType        string               `json:"mediaType"`
-	Content          string               `json:"content"`
-	ConventionOrder  int                  `json:"conventionOrder"`
-	OriginalBytes    int                  `json:"originalBytes"`
-	IncludedBytes    int                  `json:"includedBytes"`
-	Truncated        bool                 `json:"truncated"`
+	Artifact         artifact.ArtifactRef                      `json:"artifact"`
+	ArtifactRevision uint64                                    `json:"artifactRevision"`
+	DefinitionDigest cryptoutil.Digest                         `json:"definitionDigest"`
+	SourceID         basespec.SourceID                         `json:"sourceID"`
+	Locator          basespec.Locator                          `json:"locator"`
+	Name             string                                    `json:"name"`
+	Role             artifactbuiltin.WorkspaceContextRole      `json:"role"`
+	MediaType        artifactbuiltin.WorkspaceContextMediaType `json:"mediaType"`
+	Content          string                                    `json:"content"`
+	ConventionOrder  int                                       `json:"conventionOrder"`
+	OriginalBytes    int                                       `json:"originalBytes"`
+	IncludedBytes    int                                       `json:"includedBytes"`
+	Truncated        bool                                      `json:"truncated"`
 }
 
 type ContextLoadPlan struct {
@@ -42,20 +43,20 @@ type ContextLoadPlan struct {
 }
 
 type ContextDocument struct {
-	Artifact         artifact.ArtifactRef    `json:"artifact"`
-	ArtifactRevision uint64                  `json:"artifactRevision"`
-	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
-	SourceID         basespec.SourceID       `json:"sourceID"`
-	Locator          basespec.Locator        `json:"locator"`
-	Name             string                  `json:"name"`
-	Role             string                  `json:"role"`
-	MediaType        string                  `json:"mediaType"`
-	Enabled          bool                    `json:"enabled"`
-	State            artifact.State          `json:"state"`
-	CatalogCurrent   bool                    `json:"catalogCurrent"`
-	ProjectionValid  bool                    `json:"projectionValid"`
-	RuntimeDisabled  bool                    `json:"runtimeDisabled"`
-	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Artifact         artifact.ArtifactRef                      `json:"artifact"`
+	ArtifactRevision uint64                                    `json:"artifactRevision"`
+	DefinitionDigest cryptoutil.Digest                         `json:"definitionDigest"`
+	SourceID         basespec.SourceID                         `json:"sourceID"`
+	Locator          basespec.Locator                          `json:"locator"`
+	Name             string                                    `json:"name"`
+	Role             artifactbuiltin.WorkspaceContextRole      `json:"role"`
+	MediaType        artifactbuiltin.WorkspaceContextMediaType `json:"mediaType"`
+	Enabled          bool                                      `json:"enabled"`
+	State            artifact.State                            `json:"state"`
+	CatalogCurrent   bool                                      `json:"catalogCurrent"`
+	ProjectionValid  bool                                      `json:"projectionValid"`
+	RuntimeDisabled  bool                                      `json:"runtimeDisabled"`
+	Diagnostics      []diagnostic.Diagnostic                   `json:"diagnostics,omitempty"`
 }
 
 type ContextInspection struct {
@@ -237,8 +238,8 @@ func (p *Adapter) List(
 	}
 	output := make([]ContextDocument, 0)
 	for _, resourceValue := range view.Resources {
-		if resourceValue.Definition.Kind != contextKind ||
-			resourceValue.Definition.SchemaID != contextSchemaID {
+		if resourceValue.Definition.Kind != artifactbuiltin.WorkspaceContextArtifactKind ||
+			resourceValue.Definition.SchemaID != artifactbuiltin.WorkspaceContextSchemaID {
 			continue
 		}
 		value, err := projectContextDocument(resourceValue)
@@ -298,8 +299,8 @@ func (p *Adapter) Load(
 		CatalogRevision: view.Catalog.Revision,
 	}
 	for _, resourceValue := range view.Resources {
-		if resourceValue.Definition.Kind != contextKind ||
-			resourceValue.Definition.SchemaID != contextSchemaID {
+		if resourceValue.Definition.Kind != artifactbuiltin.WorkspaceContextArtifactKind ||
+			resourceValue.Definition.SchemaID != artifactbuiltin.WorkspaceContextSchemaID {
 			continue
 		}
 		if len(requested) != 0 {

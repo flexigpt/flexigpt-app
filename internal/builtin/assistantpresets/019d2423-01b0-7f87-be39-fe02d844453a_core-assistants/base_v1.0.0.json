@@ -4,7 +4,7 @@
 	"slug": "base",
 	"version": "v1.0.0",
 	"displayName": "Base Assistant",
-	"description": "Empty built-in default assistant preset. No pre-selections.",
+	"description": "Built-in default assistant preset with plain Markdown response formatting.",
 	"isEnabled": true,
 	"isBuiltIn": true,
 	"startingIncludeModelSystemPrompt": true,
@@ -18,5 +18,5 @@
 		}
 	],
 	"createdAt": "2026-03-25T00:00:00Z",
-	"modifiedAt": "2026-03-25T00:00:00Z"
+	"modifiedAt": "2026-06-19T00:00:00Z"
 }

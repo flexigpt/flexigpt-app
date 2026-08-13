@@ -8,7 +8,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -1646,8 +1646,8 @@ func contextContributionViewOf(
 		SourceID:         value.SourceID,
 		Locator:          value.Locator,
 		Name:             value.Name,
-		Role:             artifactbuiltin.WorkspaceContextRole(value.Role),
-		MediaType:        artifactbuiltin.WorkspaceContextMediaType(value.MediaType),
+		Role:             value.Role,
+		MediaType:        value.MediaType,
 		Content:          value.Content,
 		ConventionOrder:  value.ConventionOrder,
 		OriginalBytes:    value.OriginalBytes,
@@ -1664,8 +1664,8 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 		SourceID:         value.SourceID,
 		Locator:          value.Locator,
 		Name:             value.Name,
-		Role:             artifactbuiltin.WorkspaceContextRole(value.Role),
-		MediaType:        artifactbuiltin.WorkspaceContextMediaType(value.MediaType),
+		Role:             value.Role,
+		MediaType:        value.MediaType,
 		Enabled:          value.Enabled,
 		State:            value.State,
 		CatalogCurrent:   value.CatalogCurrent,
@@ -1699,7 +1699,7 @@ func workspaceSkillViewOf(value workspaceadapter.WorkspaceSkill) WorkspaceSkillV
 		DisplayName:   value.Skill.DisplayName,
 		Description:   value.Skill.Description,
 		Tags:          append([]string(nil), value.Skill.Tags...),
-		Insert:        WorkspaceSkillInsert(value.Skill.Insert),
+		Insert:        agentskillsSpec.SkillInsert(value.Skill.Insert),
 		IsEnabled:     value.Skill.IsEnabled,
 		CreatedAt:     value.Skill.CreatedAt,
 		ModifiedAt:    value.Skill.ModifiedAt,

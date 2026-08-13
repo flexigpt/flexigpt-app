@@ -17,25 +17,25 @@ const maxWorkspaceContextContentBytes = 2 << 20
 func ValidateContextDefinition(
 	value definition.Definition,
 ) error {
-	if value.Kind != contextKind {
+	if value.Kind != artifactbuiltin.WorkspaceContextArtifactKind {
 		return fmt.Errorf(
 			"%w: Context definition kind must be %q",
 			spec.ErrInvalidWorkspace,
-			contextKind,
+			artifactbuiltin.WorkspaceContextArtifactKind,
 		)
 	}
-	if value.SchemaID != contextSchemaID {
+	if value.SchemaID != artifactbuiltin.WorkspaceContextSchemaID {
 		return fmt.Errorf(
 			"%w: Context definition schema must be %q",
 			spec.ErrInvalidWorkspace,
-			contextSchemaID,
+			artifactbuiltin.WorkspaceContextSchemaID,
 		)
 	}
-	if value.SchemaVersion != workspaceContextSchemaVersionV1 {
+	if value.SchemaVersion != artifactbuiltin.WorkspaceContextSchemaVersion {
 		return fmt.Errorf(
 			"%w: Context definition schema version must be %q",
 			spec.ErrInvalidWorkspace,
-			workspaceContextSchemaVersionV1,
+			artifactbuiltin.WorkspaceContextSchemaVersion,
 		)
 	}
 	if len(value.Dependencies) != 0 {
@@ -63,7 +63,7 @@ func ValidateContextDefinition(
 			body.Role,
 		)
 	}
-	if body.MediaType != string(artifactbuiltin.WorkspaceContextMediaTypeMarkdown) {
+	if body.MediaType != artifactbuiltin.WorkspaceContextMediaTypeMarkdown {
 		return fmt.Errorf(
 			"%w: unsupported Context media type %q",
 			spec.ErrInvalidWorkspace,
@@ -107,7 +107,7 @@ func ValidateContextDefinition(
 			spec.ErrInvalidWorkspace,
 		)
 	}
-	if value.Labels[contextRoleLabelKey] != body.Role {
+	if value.Labels[artifactbuiltin.WorkspaceContextRoleLabelKey] != string(body.Role) {
 		return fmt.Errorf(
 			"%w: Context role label does not match body.role",
 			spec.ErrInvalidWorkspace,

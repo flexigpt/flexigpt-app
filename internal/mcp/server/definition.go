@@ -19,7 +19,7 @@ func ServerSubresource(
 	name basespec.LogicalName,
 ) basespec.SubresourceLocator {
 	return basespec.SubresourceLocator(
-		path.Join("mcpServers", string(name)),
+		path.Join(string(artifactbuiltin.MCPServerSubresourceDirectory), string(name)),
 	)
 }
 

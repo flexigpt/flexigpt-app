@@ -30,6 +30,13 @@
 				"artifactID": "0192c4c0-0200-7000-8000-000000000003"
 			},
 			"preLoadAsActive": true
+		},
+		{
+			"artifact": {
+				"rootID": "0192c4c0-0000-7000-8000-000000000001",
+				"artifactID": "0192c4c0-0100-7000-8000-000000000003"
+			},
+			"useAsInstructions": true
 		}
 	],
 	"startingToolSelections": [
@@ -95,5 +102,5 @@
 		}
 	],
 	"createdAt": "2026-04-08T00:00:00Z",
-	"modifiedAt": "2026-05-26T00:00:00Z"
+	"modifiedAt": "2026-06-19T00:00:00Z"
 }

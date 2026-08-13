@@ -232,7 +232,7 @@ func materializeValidated(
 
 	if auth.ClientCredentialsInput != "" &&
 		clientCredentialRef == "" &&
-		auth.Mode == "clientCredentials" {
+		auth.Mode == MCPHTTPAuthClientCredentials {
 		return Materialized{}, fmt.Errorf(
 			"%w: required OAuth client credentials are not configured",
 			basespec.ErrReferenceUnresolved,

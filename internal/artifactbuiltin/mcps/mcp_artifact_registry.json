@@ -3,8 +3,8 @@
 	"bundles": [
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000005",
-			"packageDirectory": "search",
-			"documentLocator": "search/mcps.json",
+			"embeddedPackageRoot": "search",
+			"embeddedDocumentLocator": "search/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000006",
@@ -40,8 +40,8 @@
 		},
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000100",
-			"packageDirectory": "design",
-			"documentLocator": "design/mcps.json",
+			"embeddedPackageRoot": "design",
+			"embeddedDocumentLocator": "design/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000101",
@@ -71,8 +71,8 @@
 		},
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000110",
-			"packageDirectory": "software-dev-hosting",
-			"documentLocator": "software-dev-hosting/mcps.json",
+			"embeddedPackageRoot": "software-dev-hosting",
+			"embeddedDocumentLocator": "software-dev-hosting/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000111",
@@ -126,8 +126,8 @@
 		},
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000120",
-			"packageDirectory": "task-management",
-			"documentLocator": "task-management/mcps.json",
+			"embeddedPackageRoot": "task-management",
+			"embeddedDocumentLocator": "task-management/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000121",
@@ -157,8 +157,8 @@
 		},
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000130",
-			"packageDirectory": "general-services",
-			"documentLocator": "general-services/mcps.json",
+			"embeddedPackageRoot": "general-services",
+			"embeddedDocumentLocator": "general-services/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000131",
@@ -194,8 +194,8 @@
 		},
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000140",
-			"packageDirectory": "cloudflare",
-			"documentLocator": "cloudflare/mcps.json",
+			"embeddedPackageRoot": "cloudflare",
+			"embeddedDocumentLocator": "cloudflare/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000141",
@@ -327,8 +327,8 @@
 		},
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000170",
-			"packageDirectory": "google",
-			"documentLocator": "google/mcps.json",
+			"embeddedPackageRoot": "google",
+			"embeddedDocumentLocator": "google/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000171",
@@ -382,8 +382,8 @@
 		},
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000180",
-			"packageDirectory": "zoom",
-			"documentLocator": "zoom/mcps.json",
+			"embeddedPackageRoot": "zoom",
+			"embeddedDocumentLocator": "zoom/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000181",
@@ -425,8 +425,8 @@
 		},
 		{
 			"collectionID": "0198f097-0d5b-7000-8000-000000000190",
-			"packageDirectory": "microsoft",
-			"documentLocator": "microsoft/mcps.json",
+			"embeddedPackageRoot": "microsoft",
+			"embeddedDocumentLocator": "microsoft/mcps.json",
 			"artifacts": [
 				{
 					"id": "0198f097-0d5b-7000-8000-000000000191",

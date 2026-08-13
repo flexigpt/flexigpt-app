@@ -21,18 +21,18 @@ func NewDecoder() (*Decoder, error) {
 }
 
 func (*Decoder) ID() basespec.DecoderID {
-	return DecoderID
+	return artifactbuiltin.AgentSkillDecoderID
 }
 
 func (*Decoder) Revision() string {
-	return SchemaVersion
+	return artifactbuiltin.AgentSkillSchemaVersion
 }
 
 func (d *Decoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if candidate.RequestsDecoder(DecoderID) && basespec.Locator(path.Base(
+	if candidate.RequestsDecoder(artifactbuiltin.AgentSkillDecoderID) && basespec.Locator(path.Base(
 		string(candidate.Locator))) == artifactbuiltin.AgentSkillDefinitionFileName {
 		return discovery.RecognitionPreferred
 	}
@@ -43,7 +43,7 @@ func (d *Decoder) Decode(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
-	if !candidate.RequestsDecoder(DecoderID) ||
+	if !candidate.RequestsDecoder(artifactbuiltin.AgentSkillDecoderID) ||
 		basespec.Locator(path.Base(string(candidate.Locator))) != artifactbuiltin.AgentSkillDefinitionFileName {
 		return nil, nil
 	}
@@ -121,14 +121,16 @@ func definitionForDocument(
 		return definition.Definition{}, err
 	}
 	return definition.Definition{
-		Kind:          Kind,
-		SchemaID:      SchemaID,
-		SchemaVersion: SchemaVersion,
+		Kind:          artifactbuiltin.AgentSkillArtifactKind,
+		SchemaID:      artifactbuiltin.AgentSkillSchemaID,
+		SchemaVersion: artifactbuiltin.AgentSkillSchemaVersion,
 		LogicalName:   basespec.LogicalName(document.Name),
 		DisplayName:   document.DisplayName,
 		Description:   document.Description,
-		Labels:        map[string]string{InsertLabelKey: string(document.Insert)},
-		Body:          raw,
+		Labels: map[string]string{
+			artifactbuiltin.AgentSkillInsertLabelKey: string(document.Insert),
+		},
+		Body: raw,
 	}, nil
 }
 

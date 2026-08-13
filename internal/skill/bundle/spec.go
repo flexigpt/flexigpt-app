@@ -13,8 +13,6 @@ import (
 const (
 	DiscoveryPolicyRevision = "skill.bundle.discovery.v1"
 
-	RoleManaged  basespec.AttachmentRole = "managed"
-	RoleBuiltIn  basespec.AttachmentRole = "builtin"
 	RoleExternal basespec.AttachmentRole = "external"
 	RoleLibrary  basespec.AttachmentRole = "library"
 )

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
@@ -13,8 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
-
-const hydrationFingerprintSchemaVersion = "agent.skill.builtin-hydration/v1"
 
 type hydrationArtifact struct {
 	Registration     Artifact          `json:"registration"`
@@ -95,7 +94,7 @@ func (i *Installer) desiredHydrationFingerprint(
 	ctx context.Context,
 ) (cryptoutil.Digest, error) {
 	input := hydrationFingerprintDocument{
-		SchemaVersion: hydrationFingerprintSchemaVersion,
+		SchemaVersion: artifactbuiltin.AgentSkillHydrationFingerprintSchemaVersion,
 		Topology:      i.builtInTopology,
 		Registry:      i.hydrated.Registry,
 		Collections:   make([]hydrationCollection, 0, len(i.hydrated.Collections)),

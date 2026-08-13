@@ -26,10 +26,10 @@ type Artifact struct {
 }
 
 type Collection struct {
-	ID        basespec.CollectionID `json:"id"`
-	Payload   basespec.Locator      `json:"payload"`
-	Enabled   bool                  `json:"enabled"`
-	Artifacts []Artifact            `json:"artifacts"`
+	ID                        basespec.CollectionID `json:"id"`
+	EmbeddedCollectionLocator basespec.Locator      `json:"embeddedCollectionLocator"`
+	Enabled                   bool                  `json:"enabled"`
+	Artifacts                 []Artifact            `json:"artifacts"`
 }
 
 // Registry is the non-portable registration manifest for embedded Agent
@@ -178,14 +178,14 @@ func (r Registry) Validate() error {
 		if err := basespec.ValidateCollectionID(collection.ID); err != nil {
 			return fmt.Errorf("collections[%d]: %w", collectionIndex, err)
 		}
-		if err := basespec.ValidatePortableLocator(collection.Payload, false); err != nil {
+		if err := basespec.ValidatePortableLocator(collection.EmbeddedCollectionLocator, false); err != nil {
 			return fmt.Errorf("collections[%d]: %w", collectionIndex, err)
 		}
-		if path.Base(string(collection.Payload)) !=
+		if path.Base(string(collection.EmbeddedCollectionLocator)) !=
 			string(artifactbuiltin.SkillCollectionFileName) ||
-			path.Dir(string(collection.Payload)) == "." {
+			path.Dir(string(collection.EmbeddedCollectionLocator)) == "." {
 			return fmt.Errorf(
-				"%w: collections[%d] payload must be a nested %q",
+				"%w: collections[%d] embedded collection locator must be a nested %q",
 				basespec.ErrInvalid,
 				collectionIndex,
 				artifactbuiltin.SkillCollectionFileName,
@@ -276,7 +276,8 @@ func (r Registry) Validate() error {
 func (r Registry) OrderedCollections() []Collection {
 	output := append([]Collection(nil), r.Collections...)
 	sort.Slice(output, func(left, right int) bool {
-		return output[left].Payload < output[right].Payload
+		return output[left].EmbeddedCollectionLocator <
+			output[right].EmbeddedCollectionLocator
 	})
 	return output
 }
@@ -296,11 +297,11 @@ func hydrateCollection(
 	packages fs.FS,
 	registration Collection,
 ) (HydratedCollection, error) {
-	raw, err := fs.ReadFile(packages, string(registration.Payload))
+	raw, err := fs.ReadFile(packages, string(registration.EmbeddedCollectionLocator))
 	if err != nil {
 		return HydratedCollection{}, fmt.Errorf(
-			"read portable Collection payload %q: %w",
-			registration.Payload,
+			"read embedded Collection document %q: %w",
+			registration.EmbeddedCollectionLocator,
 			err,
 		)
 	}
@@ -309,7 +310,7 @@ func hydrateCollection(
 		return HydratedCollection{}, err
 	}
 
-	scope := basespec.Locator(path.Dir(string(registration.Payload)))
+	scope := basespec.Locator(path.Dir(string(registration.EmbeddedCollectionLocator)))
 	if err := basespec.ValidatePortableLocator(scope, false); err != nil {
 		return HydratedCollection{}, err
 	}

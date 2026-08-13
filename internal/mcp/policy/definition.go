@@ -14,7 +14,7 @@ func PolicySubresource(
 	name basespec.LogicalName,
 ) basespec.SubresourceLocator {
 	return basespec.SubresourceLocator(
-		path.Join("policies", string(name)),
+		path.Join(string(artifactbuiltin.MCPPolicySubresourceDirectory), string(name)),
 	)
 }
 

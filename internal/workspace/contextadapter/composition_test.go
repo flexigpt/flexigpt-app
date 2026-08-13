@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -163,7 +164,11 @@ func TestApplyCompositionPolicyEnforcesAggregateBudgetAndExclusion(t *testing.T)
 	}
 }
 
-func testContribution(locator basespec.Locator, role, content string) ContextContribution {
+func testContribution(
+	locator basespec.Locator,
+	role artifactbuiltin.WorkspaceContextRole,
+	content string,
+) ContextContribution {
 	return ContextContribution{
 		Artifact: artifact.ArtifactRef{
 			RootID:     "019d3150-6c01-7a6b-a34e-d9032342bc31",

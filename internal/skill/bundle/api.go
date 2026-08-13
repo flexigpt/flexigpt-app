@@ -46,11 +46,11 @@ func New(dependencies Dependencies) (*API, error) {
 	if err := dependencies.Validate(); err != nil {
 		return nil, err
 	}
-	if !dependencies.HasDecoder(skillArtifact.DecoderID) {
+	if !dependencies.HasDecoder(artifactbuiltin.AgentSkillDecoderID) {
 		return nil, fmt.Errorf(
 			"%w: shared agent skill decoder %q is not registered",
 			basespec.ErrDecoderUnavailable,
-			skillArtifact.DecoderID,
+			artifactbuiltin.AgentSkillDecoderID,
 		)
 	}
 	return &API{dependencies: dependencies}, nil
@@ -266,13 +266,13 @@ func (a *API) AttachSource(
 	if err := a.requireBundleMutation(ctx, bundle.RootID, false); err != nil {
 		return Bundle{}, err
 	}
-	if draft.Role == RoleBuiltIn {
+	if draft.Role == artifactbuiltin.BuiltInAttachmentRole {
 		return Bundle{}, fmt.Errorf(
 			"%w: skill bundle built-in attachment role is reserved for bootstrap",
 			basespec.ErrInvalid,
 		)
 	}
-	if draft.Role == RoleManaged {
+	if draft.Role == artifactbuiltin.ManagedAttachmentRole {
 		return Bundle{}, fmt.Errorf(
 			"%w: managed attachments must be provisioned through managedSourceID when the bundle is created",
 			basespec.ErrInvalid,
@@ -396,7 +396,7 @@ func (a *API) GetManagedSkillDocument(
 	if err != nil {
 		return ManagedSkillDocument{}, err
 	}
-	attachment, _, err := managedAttachmentForRole(bundle, RoleManaged)
+	attachment, _, err := managedAttachmentForRole(bundle, artifactbuiltin.ManagedAttachmentRole)
 	if err != nil {
 		return ManagedSkillDocument{}, err
 	}
@@ -451,7 +451,7 @@ func (a *API) AdoptSkill(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if role == RoleManaged || role == RoleBuiltIn {
+	if role == artifactbuiltin.ManagedAttachmentRole || role == artifactbuiltin.BuiltInAttachmentRole {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: managed and built-in Skill occurrences require their dedicated installation flow",
 			basespec.ErrUnsupported,
@@ -476,13 +476,13 @@ func (a *API) AdoptSkill(
 		if occurrence.Key != request.Occurrence {
 			continue
 		}
-		if occurrence.Kind != skillArtifact.Kind ||
+		if occurrence.Kind != artifactbuiltin.AgentSkillArtifactKind ||
 			occurrence.State != catalog.OccurrenceValid ||
 			occurrence.DefinitionDigest == nil {
 			return artifact.Artifact{}, fmt.Errorf(
 				"%w: requested occurrence is not an adoptable %q Skill",
 				basespec.ErrReferenceUnresolved,
-				skillArtifact.Kind,
+				artifactbuiltin.AgentSkillArtifactKind,
 			)
 		}
 		found = true
@@ -520,18 +520,19 @@ func (a *API) PinSkill(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if request.Binding.ExpectedKind != skillArtifact.Kind {
+	if request.Binding.ExpectedKind != artifactbuiltin.AgentSkillArtifactKind {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: skill bundle pins only support %q",
 			basespec.ErrInvalid,
-			skillArtifact.Kind,
+			artifactbuiltin.AgentSkillArtifactKind,
 		)
 	}
 	role, err := bundleAttachmentRole(bundle, request.Binding.SourceID)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if role == RoleManaged || role == RoleBuiltIn {
+	if role == artifactbuiltin.ManagedAttachmentRole ||
+		role == artifactbuiltin.BuiltInAttachmentRole {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: managed and built-in attachments require their dedicated pinning flow",
 			basespec.ErrUnsupported,
@@ -561,7 +562,7 @@ func (a *API) ListSkills(
 	}
 	output := make([]artifact.Artifact, 0, len(values))
 	for _, value := range values {
-		if value.Kind == skillArtifact.Kind {
+		if value.Kind == artifactbuiltin.AgentSkillArtifactKind {
 			output = append(output, value)
 		}
 	}
@@ -645,12 +646,12 @@ func (a *API) PurgeSkill(
 		}
 	}
 	switch role {
-	case RoleBuiltIn:
+	case artifactbuiltin.BuiltInAttachmentRole:
 		return fmt.Errorf(
 			"%w: built-in Skill packages are protected and read-only",
 			basespec.ErrProtected,
 		)
-	case RoleManaged:
+	case artifactbuiltin.ManagedAttachmentRole:
 		if value.Adoption != artifact.AdoptionPinned {
 			return fmt.Errorf(
 				"%w: managed Skill Artifact must remain pinned until purged",
@@ -706,7 +707,7 @@ func (a *API) GetSkill(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if value.Kind != skillArtifact.Kind {
+	if value.Kind != artifactbuiltin.AgentSkillArtifactKind {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: artifact %q is not an agent skill",
 			basespec.ErrNotFound,
@@ -740,7 +741,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 		Enabled:        request.Enabled,
 		Attachments: []AttachmentDraft{{
 			SourceID:              request.SourceID,
-			Role:                  RoleBuiltIn,
+			Role:                  artifactbuiltin.BuiltInAttachmentRole,
 			Enabled:               true,
 			DiscoveryRoot:         request.DiscoveryRoot,
 			ExpectedMemberDigests: request.ExpectedMemberDigests,
@@ -793,7 +794,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 			if err != nil {
 				return Bundle{}, err
 			}
-			if attachment.Role != RoleBuiltIn || !attachment.Enabled ||
+			if attachment.Role != artifactbuiltin.BuiltInAttachmentRole || !attachment.Enabled ||
 				!bytes.Equal(attachment.Data, encodedAttachmentData) {
 				currentColl, err := a.dependencies.Collections.Get(ctx, bundle.Collection.Ref())
 				if err != nil {
@@ -806,7 +807,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 					collection.AttachmentUpdate{
 						ExpectedCollectionRevision: currentColl.Revision,
 						ExpectedAttachmentRevision: attachment.Revision,
-						Role:                       RoleBuiltIn,
+						Role:                       artifactbuiltin.BuiltInAttachmentRole,
 						Enabled:                    true,
 						Data:                       encodedAttachmentData,
 					},
@@ -1043,13 +1044,14 @@ func (a *API) createBundle(
 	attachments := make([]collection.AttachmentDraft, 0, len(request.Attachments))
 	roleCounts := make(map[basespec.AttachmentRole]int)
 	for _, draft := range request.Attachments {
-		if draft.Role == RoleBuiltIn && !allowBuiltInAttachment {
+		if draft.Role == artifactbuiltin.BuiltInAttachmentRole &&
+			!allowBuiltInAttachment {
 			return Bundle{}, fmt.Errorf(
 				"%w: skill bundle built-in attachment role is reserved for bootstrap",
 				basespec.ErrInvalid,
 			)
 		}
-		if draft.Role == RoleManaged {
+		if draft.Role == artifactbuiltin.ManagedAttachmentRole {
 			return Bundle{}, fmt.Errorf(
 				"%w: managed attachments must be provisioned through managedSourceID",
 				basespec.ErrInvalid,
@@ -1063,7 +1065,8 @@ func (a *API) createBundle(
 			)
 		}
 		roleCounts[draft.Role]++
-		if (draft.Role == RoleManaged || draft.Role == RoleBuiltIn) &&
+		if (draft.Role == artifactbuiltin.ManagedAttachmentRole ||
+			draft.Role == artifactbuiltin.BuiltInAttachmentRole) &&
 			roleCounts[draft.Role] > 1 {
 			return Bundle{}, fmt.Errorf(
 				"%w: skill bundle can have only one %q attachment",
@@ -1131,7 +1134,7 @@ func (a *API) createBundle(
 		}
 		attachments = append(attachments, collection.AttachmentDraft{
 			SourceID: request.ManagedSourceID,
-			Role:     RoleManaged,
+			Role:     artifactbuiltin.ManagedAttachmentRole,
 			Enabled:  true,
 			Data:     encodedAttachmentData,
 		})
@@ -1174,7 +1177,7 @@ func (a *API) createBundle(
 		attached := false
 		for _, attachment := range bundle.Attachments {
 			if attachment.SourceID == provisionedSource.ID &&
-				attachment.Role == RoleManaged {
+				attachment.Role == artifactbuiltin.ManagedAttachmentRole {
 				attached = true
 				break
 			}
@@ -1229,7 +1232,7 @@ func bundleCreationIntentMatches(
 		}
 		expected[request.ManagedSourceID] = AttachmentDraft{
 			SourceID:      request.ManagedSourceID,
-			Role:          RoleManaged,
+			Role:          artifactbuiltin.ManagedAttachmentRole,
 			Enabled:       true,
 			DiscoveryRoot: ".",
 		}
@@ -1314,7 +1317,7 @@ func builtInBundleTopologyMatches(
 	return attachment.RootID == request.RootID &&
 		attachment.CollectionID == request.CollectionID &&
 		attachment.SourceID == request.SourceID &&
-		attachment.Role == RoleBuiltIn &&
+		attachment.Role == artifactbuiltin.BuiltInAttachmentRole &&
 		attachment.Enabled &&
 		actualAttachment.DiscoveryRoot ==
 			expectedAttachment.DiscoveryRoot &&
@@ -1458,9 +1461,9 @@ func (a *API) createManagedSkill(
 		)
 	}
 
-	targetRole := RoleManaged
+	targetRole := artifactbuiltin.ManagedAttachmentRole
 	if allowBuiltInAttachment {
-		targetRole = RoleBuiltIn
+		targetRole = artifactbuiltin.BuiltInAttachmentRole
 	}
 	attachment, sourceValue, err := managedAttachmentForRole(
 		bundle,
@@ -1469,7 +1472,7 @@ func (a *API) createManagedSkill(
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	if targetRole == RoleManaged {
+	if targetRole == artifactbuiltin.ManagedAttachmentRole {
 		if err := requireBundleOwnedManagedSource(bundle, sourceValue.ID); err != nil {
 			return CreateManagedSkillResponse{}, err
 		}
@@ -1534,7 +1537,7 @@ func (a *API) createManagedSkill(
 			Binding: artifact.SourceBinding{
 				SourceID:     sourceValue.ID,
 				Locator:      skillLocator,
-				ExpectedKind: skillArtifact.Kind,
+				ExpectedKind: artifactbuiltin.AgentSkillArtifactKind,
 			},
 			Name:    artifactName,
 			Enabled: request.Enabled,
@@ -1743,7 +1746,7 @@ func managedSkillCreateResult(
 		value.Adoption != artifact.AdoptionPinned ||
 		value.Binding.SourceID != sourceID ||
 		value.Binding.Locator != skillLocator ||
-		value.Binding.ExpectedKind != skillArtifact.Kind ||
+		value.Binding.ExpectedKind != artifactbuiltin.AgentSkillArtifactKind ||
 		value.State != artifact.StateAvailable ||
 		value.ResolvedDefinition == nil ||
 		*value.ResolvedDefinition != expectedDefinition {
@@ -1766,10 +1769,10 @@ func validateBundleAttachmentTopology(
 	)
 	for _, attachment := range attachments {
 		switch attachment.Role {
-		case RoleManaged:
+		case artifactbuiltin.ManagedAttachmentRole:
 			managedAttachmentCount++
 			managedAttachmentID = attachment.SourceID
-		case RoleBuiltIn:
+		case artifactbuiltin.BuiltInAttachmentRole:
 			builtInAttachmentCount++
 		}
 	}
@@ -1865,7 +1868,7 @@ func (a *API) validateAttachment(
 
 func validateRole(role basespec.AttachmentRole) error {
 	switch role {
-	case RoleManaged, RoleBuiltIn, RoleExternal, RoleLibrary:
+	case artifactbuiltin.ManagedAttachmentRole, artifactbuiltin.BuiltInAttachmentRole, RoleExternal, RoleLibrary:
 		return nil
 	default:
 		return fmt.Errorf(
@@ -1881,7 +1884,7 @@ func validateRoleSourceKind(
 	kind basespec.SourceKind,
 ) error {
 	switch role {
-	case RoleManaged, RoleBuiltIn:
+	case artifactbuiltin.ManagedAttachmentRole, artifactbuiltin.BuiltInAttachmentRole:
 		if kind != artifactbuiltin.ManagedDirectorySourceKind {
 			return fmt.Errorf(
 				"%w: skill bundle role %q requires source kind %q",
@@ -1936,10 +1939,10 @@ func (a *API) discoveryPlan(value Bundle) (discovery.Plan, error) {
 			DecoderHints: []discovery.DecoderHint{{
 				Locator:    attachmentData.DiscoveryRoot,
 				Recursive:  true,
-				DecoderIDs: []basespec.DecoderID{skillArtifact.DecoderID},
+				DecoderIDs: []basespec.DecoderID{artifactbuiltin.AgentSkillDecoderID},
 			}},
 			ExpectedContentDigests: expectedContentDigests,
-			AllowedDecoderIDs:      []basespec.DecoderID{skillArtifact.DecoderID},
+			AllowedDecoderIDs:      []basespec.DecoderID{artifactbuiltin.AgentSkillDecoderID},
 			Authoritative:          true,
 		}.Normalized())
 	}
@@ -1969,7 +1972,7 @@ func managedAttachmentForRole(
 		found       bool
 	)
 	switch role {
-	case RoleManaged, RoleBuiltIn:
+	case artifactbuiltin.ManagedAttachmentRole, artifactbuiltin.BuiltInAttachmentRole:
 	default:
 		return collection.Attachment{}, source.Summary{}, fmt.Errorf(
 			"%w: unsupported managed Skill attachment role %q",
@@ -2032,7 +2035,7 @@ func (p skillArtifactPolicy) Derive(
 	occurrence catalog.Occurrence,
 	value definition.Definition,
 ) (artifact.Draft, bool, []diagnostic.Diagnostic, error) {
-	if occurrence.Kind != skillArtifact.Kind {
+	if occurrence.Kind != artifactbuiltin.AgentSkillArtifactKind {
 		return artifact.Draft{}, false, nil, nil
 	}
 	if _, allowed := p.autoAdoptSources[occurrence.Key.SourceID]; !allowed {
@@ -2225,11 +2228,11 @@ func validateManagedSkillOperationIntent(
 	if value.ID != artifactID ||
 		value.RootID != bundle.RootID ||
 		value.CollectionID != bundle.CollectionID ||
-		value.Kind != skillArtifact.Kind ||
+		value.Kind != artifactbuiltin.AgentSkillArtifactKind ||
 		value.Adoption != artifact.AdoptionPinned ||
 		value.Binding.SourceID != sourceID ||
 		value.Binding.Locator != skillLocator ||
-		value.Binding.ExpectedKind != skillArtifact.Kind {
+		value.Binding.ExpectedKind != artifactbuiltin.AgentSkillArtifactKind {
 		return fmt.Errorf(
 			"%w: managed Skill Artifact %q conflicts with its existing creation intent",
 			basespec.ErrConflict,

@@ -30,12 +30,11 @@ const (
 //go:embed workspace-collection-v1.schema.json
 var workspaceCollectionV1JSONSchema []byte
 
-var WorkspaceCollectionV1SchemaKey = shareable.SchemaKey{
-	Entity:        shareable.EntityCollection,
-	Kind:          WorkspaceCollectionV1Kind,
-	SchemaID:      WorkspaceCollectionV1SchemaID,
-	SchemaVersion: WorkspaceCollectionV1SchemaVersion,
-}
+var WorkspaceCollectionV1SchemaKey = shareable.CollectionSchemaKey(
+	WorkspaceCollectionV1Kind,
+	WorkspaceCollectionV1SchemaID,
+	WorkspaceCollectionV1SchemaVersion,
+)
 
 func WorkspaceCollectionV1JSONSchema() []byte {
 	return append([]byte(nil), workspaceCollectionV1JSONSchema...)

@@ -249,7 +249,7 @@ func (a *API) Create(
 		},
 		[]collection.AttachmentDraft{{
 			SourceID: request.SourceID,
-			Role:     RoleManaged,
+			Role:     artifactbuiltin.ManagedAttachmentRole,
 			Enabled:  true,
 			Data:     attachmentData,
 		}},
@@ -438,8 +438,8 @@ func (a *API) Get(
 		)
 	}
 	attachment := attachments[0]
-	if attachment.Role != RoleManaged &&
-		attachment.Role != RoleBuiltIn {
+	if attachment.Role != artifactbuiltin.ManagedAttachmentRole &&
+		attachment.Role != artifactbuiltin.BuiltInAttachmentRole {
 		return Bundle{}, fmt.Errorf(
 			"%w: unsupported MCP Attachment role %q",
 			basespec.ErrInvalid,

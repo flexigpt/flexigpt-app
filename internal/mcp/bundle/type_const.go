@@ -7,11 +7,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
 
-const (
-	RoleManaged basespec.AttachmentRole = "managed"
-	RoleBuiltIn basespec.AttachmentRole = "builtin"
-)
-
 type CollectionData struct {
 	SchemaVersion           string                  `json:"schemaVersion"`
 	DiscoveryPolicyRevision string                  `json:"discoveryPolicyRevision"`

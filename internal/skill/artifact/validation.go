@@ -5,6 +5,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 )
@@ -23,25 +24,25 @@ func ValidateDefinition(value definition.Definition) error {
 func DocumentFromDefinition(
 	value definition.Definition,
 ) (agentskillsSpec.SkillDocument, error) {
-	if value.Kind != Kind {
+	if value.Kind != artifactbuiltin.AgentSkillArtifactKind {
 		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill definition kind must be %q",
 			basespec.ErrInvalid,
-			Kind,
+			artifactbuiltin.AgentSkillArtifactKind,
 		)
 	}
-	if value.SchemaID != SchemaID {
+	if value.SchemaID != artifactbuiltin.AgentSkillSchemaID {
 		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill definition schema must be %q",
 			basespec.ErrInvalid,
-			SchemaID,
+			artifactbuiltin.AgentSkillSchemaID,
 		)
 	}
-	if value.SchemaVersion != SchemaVersion {
+	if value.SchemaVersion != artifactbuiltin.AgentSkillSchemaVersion {
 		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill definition schema version must be %q",
 			basespec.ErrInvalid,
-			SchemaVersion,
+			artifactbuiltin.AgentSkillSchemaVersion,
 		)
 	}
 	if len(value.Dependencies) != 0 {
@@ -80,7 +81,7 @@ func DocumentFromDefinition(
 			basespec.ErrInvalid,
 		)
 	}
-	if value.Labels[InsertLabelKey] != body.Insert {
+	if value.Labels[artifactbuiltin.AgentSkillInsertLabelKey] != body.Insert {
 		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
 			"%w: Skill insert label does not match body.insert",
 			basespec.ErrInvalid,

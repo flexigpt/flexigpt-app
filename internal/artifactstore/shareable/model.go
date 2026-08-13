@@ -16,14 +16,44 @@ const (
 	EntityArtifact   EntityType = "artifact"
 )
 
+// SchemaKind is the entity-neutral kind portion of a shareable schema key.
+//
+// It intentionally is not a CollectionKind. Artifact schema keys must not
+// require a misleading ArtifactKind-to-CollectionKind conversion merely to
+// participate in one schema registry.
+type SchemaKind string
+
 type SchemaKey struct {
-	Entity EntityType `json:"entity"`
-	// Kind retains the existing storage type to avoid breaking Collection
-	// codecs. For EntityArtifact it carries the string representation of an
-	// ArtifactKind and is validated accordingly.
-	Kind          basespec.CollectionKind `json:"kind"`
-	SchemaID      basespec.SchemaID       `json:"schemaID"`
-	SchemaVersion string                  `json:"schemaVersion"`
+	Entity        EntityType        `json:"entity"`
+	Kind          SchemaKind        `json:"kind"`
+	SchemaID      basespec.SchemaID `json:"schemaID"`
+	SchemaVersion string            `json:"schemaVersion"`
+}
+
+func CollectionSchemaKey(
+	kind basespec.CollectionKind,
+	schemaID basespec.SchemaID,
+	schemaVersion string,
+) SchemaKey {
+	return SchemaKey{
+		Entity:        EntityCollection,
+		Kind:          SchemaKind(kind),
+		SchemaID:      schemaID,
+		SchemaVersion: schemaVersion,
+	}
+}
+
+func ArtifactSchemaKey(
+	kind basespec.ArtifactKind,
+	schemaID basespec.SchemaID,
+	schemaVersion string,
+) SchemaKey {
+	return SchemaKey{
+		Entity:        EntityArtifact,
+		Kind:          SchemaKind(kind),
+		SchemaID:      schemaID,
+		SchemaVersion: schemaVersion,
+	}
 }
 
 type ParsedDocument struct {
@@ -54,7 +84,7 @@ func (d ParsedDocument) Clone() ParsedDocument {
 func (k SchemaKey) Validate() error {
 	switch k.Entity {
 	case EntityCollection:
-		if err := basespec.ValidateCollectionKind(k.Kind); err != nil {
+		if err := basespec.ValidateCollectionKind(basespec.CollectionKind(k.Kind)); err != nil {
 			return err
 		}
 	case EntityArtifact:

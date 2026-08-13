@@ -59,7 +59,7 @@ func (workspaceCollectionCodec) Canonicalize(
 	}
 
 	return shareable.ParsedDocument{
-		Key:    workspaceShareableSchemaKey(),
+		Key:    artifactbuiltin.WorkspaceCollectionV1SchemaKey,
 		Digest: cryptoutil.Digest(*canonical.Digest),
 		Raw:    json.RawMessage(encoded),
 	}, nil

@@ -117,7 +117,7 @@
 			"docs": {
 				"displayName": "Cloudflare Docs",
 				"auth": { "mode": "oauth" },
-				"policy": { "ref": "auto-write", "required": true }
+					"policy": { "ref": "auto-read", "required": true }
 			},
 			"graphql": {
 				"displayName": "Cloudflare GraphQL",

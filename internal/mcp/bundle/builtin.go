@@ -127,7 +127,7 @@ func (a *API) EnsureBuiltIn(
 		},
 		[]collection.AttachmentDraft{{
 			SourceID: request.SourceID,
-			Role:     RoleBuiltIn,
+			Role:     artifactbuiltin.BuiltInAttachmentRole,
 			Enabled:  true,
 			Data:     attachmentData,
 		}},
@@ -189,7 +189,7 @@ func ensureBuiltInTopologyMatches(
 	}
 
 	if bundle.Attachment.SourceID != request.SourceID ||
-		bundle.Attachment.Role != RoleBuiltIn ||
+		bundle.Attachment.Role != artifactbuiltin.BuiltInAttachmentRole ||
 		!bundle.Attachment.Enabled ||
 		!jsonutil.Equal(bundle.Attachment.Data, attachmentData) ||
 		bundle.PackageAddress != request.PackageAddress {

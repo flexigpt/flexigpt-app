@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -16,13 +18,6 @@ import (
 )
 
 type WorkspaceRef = collection.CollectionRef
-
-type WorkspaceSkillInsert string
-
-const (
-	WorkspaceSkillInsertInstructions WorkspaceSkillInsert = "instructions"
-	WorkspaceSkillInsertUserMessage  WorkspaceSkillInsert = "user-message"
-)
 
 type WorkspaceDiscoveryRoot struct {
 	Root            basespec.Locator `json:"root"`
@@ -262,18 +257,18 @@ type WorkspaceSkillArgument struct {
 }
 
 type WorkspaceSkillSummary struct {
-	SchemaVersion string                   `json:"schemaVersion"`
-	ID            basespec.ArtifactID      `json:"id"`
-	Slug          string                   `json:"slug"`
-	Name          string                   `json:"name"`
-	DisplayName   string                   `json:"displayName"`
-	Description   string                   `json:"description"`
-	Tags          []string                 `json:"tags,omitempty"`
-	Insert        WorkspaceSkillInsert     `json:"insert"`
-	Arguments     []WorkspaceSkillArgument `json:"arguments,omitempty"`
-	IsEnabled     bool                     `json:"isEnabled"`
-	CreatedAt     time.Time                `json:"createdAt"`
-	ModifiedAt    time.Time                `json:"modifiedAt"`
+	SchemaVersion string                      `json:"schemaVersion"`
+	ID            basespec.ArtifactID         `json:"id"`
+	Slug          string                      `json:"slug"`
+	Name          string                      `json:"name"`
+	DisplayName   string                      `json:"displayName"`
+	Description   string                      `json:"description"`
+	Tags          []string                    `json:"tags,omitempty"`
+	Insert        agentskillsSpec.SkillInsert `json:"insert"`
+	Arguments     []WorkspaceSkillArgument    `json:"arguments,omitempty"`
+	IsEnabled     bool                        `json:"isEnabled"`
+	CreatedAt     time.Time                   `json:"createdAt"`
+	ModifiedAt    time.Time                   `json:"modifiedAt"`
 }
 
 type WorkspaceSkillView struct {

@@ -103,7 +103,7 @@ func (a *API) InstallBuiltInCollection(
 	}
 	attachment, sourceValue, err := managedAttachmentForRole(
 		bundle,
-		RoleBuiltIn,
+		artifactbuiltin.BuiltInAttachmentRole,
 	)
 	if err != nil {
 		return nil, err
@@ -408,7 +408,7 @@ func (a *API) ensurePinnedManagedSkill(
 			Binding: artifact.SourceBinding{
 				SourceID:     sourceID,
 				Locator:      skillLocator,
-				ExpectedKind: skillArtifact.Kind,
+				ExpectedKind: artifactbuiltin.AgentSkillArtifactKind,
 			},
 			Name:    name,
 			Enabled: enabled,
