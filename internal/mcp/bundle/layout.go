@@ -6,14 +6,12 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 const (
-	ManagedPackageKind basespec.PackageKind = "mcp.bundle"
-
-	ManagedDocumentFileName basespec.Locator = "mcps.json"
-
-	unversionedPackageVersion basespec.LogicalVersion = "unversioned"
+	ManagedPackageKind      = builtinSchema.MCPBundlePackageKind
+	ManagedDocumentFileName = builtinSchema.MCPBundleDocumentFileName
 )
 
 func PackageAddressForBundle(
@@ -21,7 +19,7 @@ func PackageAddressForBundle(
 	logicalVersion basespec.LogicalVersion,
 ) (source.ManagedPackageAddress, error) {
 	if logicalVersion == "" {
-		logicalVersion = unversionedPackageVersion
+		logicalVersion = builtinSchema.UnversionedPackageVersion
 	}
 	return source.NewManagedPackageAddress(
 		ManagedPackageKind,

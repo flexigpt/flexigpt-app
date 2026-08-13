@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
@@ -21,8 +21,9 @@ import (
 )
 
 type SkillBundleWrapper struct {
-	api     *skillBundle.API
-	runtime *skillRuntime.SkillRuntime
+	api              *skillBundle.API
+	runtime          *skillRuntime.SkillRuntime
+	builtInInstaller builtinSchema.HydrationInstaller
 
 	warmupMu     sync.Mutex
 	warmupCancel context.CancelFunc
@@ -38,15 +39,10 @@ func InitSkillBundleWrapper(
 	wrapper *SkillBundleWrapper,
 	components *system.Components,
 	workspaceSkills *workspaceadapter.Adapter,
-	builtInTopology builtin.Registry,
 ) error {
 	if wrapper == nil || components == nil || workspaceSkills == nil {
 		return errors.New("skill bundle wrapper dependencies are incomplete")
 	}
-	if err := builtInTopology.Validate(); err != nil {
-		return err
-	}
-
 	autoAdoptionIDProvider := artifact.UUIDArtifactIDProvider()
 	api, err := skillBundle.New(skillBundle.Dependencies{
 		Roots:                  components.Roots,
@@ -109,7 +105,8 @@ func InitSkillBundleWrapper(
 		wrapper.close()
 		return err
 	}
-	packages, err := builtin.EmbeddedSkillsPackages()
+
+	packages, err := builtinSchema.EmbeddedSkillPackages()
 	if err != nil {
 		wrapper.close()
 		return err
@@ -117,7 +114,6 @@ func InitSkillBundleWrapper(
 	builtIns, err := schemaadapter.NewInstaller(
 		schemaadapter.InstallerDependencies{
 			Skills:                 api,
-			BuiltInTopology:        builtInTopology,
 			SkillRegistry:          skillRegistry,
 			Packages:               packages,
 			ShareableCanonicalizer: components.ShareableSchemas,
@@ -127,23 +123,7 @@ func InitSkillBundleWrapper(
 		wrapper.close()
 		return err
 	}
-	bootstrap, err := builtin.NewBootstrapRegistry(
-		builtInTopology,
-		components,
-		components,
-	)
-	if err != nil {
-		wrapper.close()
-		return err
-	}
-	if err := bootstrap.Register(builtIns); err != nil {
-		wrapper.close()
-		return err
-	}
-	if err := bootstrap.Ensure(context.Background()); err != nil {
-		wrapper.close()
-		return err
-	}
+	wrapper.builtInInstaller = builtIns
 
 	// Runtime registrations are process-local derived state. Artifact-facing
 	// Skill Runtime calls reconcile the owning Collection on first use, so
@@ -607,6 +587,7 @@ func (w *SkillBundleWrapper) close() {
 
 	runtime := w.runtime
 	api := w.api
+	w.builtInInstaller = nil
 	w.runtime = nil
 	w.api = nil
 

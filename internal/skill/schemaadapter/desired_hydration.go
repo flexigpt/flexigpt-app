@@ -9,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/bundle"
@@ -37,7 +36,7 @@ type hydrationCollection struct {
 }
 type hydrationFingerprintDocument struct {
 	SchemaVersion string                `json:"schemaVersion"`
-	Topology      builtin.Registry      `json:"topology"`
+	Topology      topology.Declaration  `json:"topology"`
 	Registry      Registry              `json:"registry"`
 	Collections   []hydrationCollection `json:"collections"`
 }
@@ -68,7 +67,7 @@ func (i *Installer) DesiredHydration(
 	value := topology.Hydration{
 		InstallerName: i.BuiltInName(),
 		RootID:        i.builtInTopology.Root.ID,
-		SourceID:      i.builtInTopology.Source.ID,
+		SourceID:      i.builtInTopology.Sources[0].ID,
 		Fingerprint:   fingerprint,
 	}
 	if err := value.Validate(); err != nil {

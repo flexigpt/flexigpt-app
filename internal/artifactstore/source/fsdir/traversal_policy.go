@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 type TraversalPolicy struct {
@@ -71,7 +73,10 @@ func (p normalizedTraversalPolicy) isGitSubmoduleDirectory(directory string) boo
 		return false
 	}
 
-	gitFile := filepath.Join(directory, ".git")
+	gitFile := filepath.Join(
+		directory,
+		builtinSchema.ExternalGitMetadataDirectoryName,
+	)
 	info, err := os.Stat(gitFile)
 	if err != nil || !info.Mode().IsRegular() {
 		return false
@@ -95,14 +100,8 @@ func (p normalizedTraversalPolicy) isGitSubmoduleDirectory(directory string) boo
 
 func DefaultTraversalPolicy() TraversalPolicy {
 	return TraversalPolicy{
-		ExcludedDirectoryNames: []string{
-			".git",
-			".hg",
-			".svn",
-			"node_modules",
-			"vendor",
-			"bower_components",
-		},
+		ExcludedDirectoryNames: builtinSchema.
+			ExternalTraversalExcludedDirectoryNames(),
 		SkipGitSubmodules: true,
 	}
 }

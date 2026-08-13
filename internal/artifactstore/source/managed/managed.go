@@ -20,10 +20,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 const (
-	Kind basespec.SourceKind = "managed-directory"
+	Kind                 basespec.SourceKind = builtinSchema.ManagedDirectorySourceKind
+	managedDirectoryMode                     = builtinSchema.ArtifactStoreDirectoryMode
 )
 
 var errPackageDifferent = errors.New("managed package content differs")
@@ -41,12 +44,16 @@ type config struct{}
 // Artifact families own package-kind values and all package-internal file
 // conventions. This adapter owns no artifact-family directory or filename.
 type Adapter struct {
-	base       string
-	filesystem *fsdir.Adapter
-	mu         sync.Mutex
+	base        string
+	stagingBase string
+	filesystem  *fsdir.Adapter
+	mu          sync.Mutex
 }
 
-func New(base string) (*Adapter, error) {
+func New(
+	base string,
+	stagingBase string,
+) (*Adapter, error) {
 	if strings.TrimSpace(base) == "" {
 		return nil, fmt.Errorf(
 			"%w: managed Source base directory is empty",
@@ -57,16 +64,20 @@ func New(base string) (*Adapter, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Managed packages are application-owned immutable payloads. Their source
-	// generation must cover every published package file, including ordinary
-	// directories such as vendor, node_modules, resources, and scripts.
-	//
-	// The external-filesystem traversal defaults intentionally omit expensive
-	// project directories. Those defaults are not appropriate here. Only the
-	// adapter's private staging directory is excluded.
+	stagingAbsolute, err := filepath.Abs(stagingBase)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(stagingBase) == "" {
+		return nil, fmt.Errorf(
+			"%w: managed Source staging directory is empty",
+			basespec.ErrInvalid,
+		)
+	}
+	// Staging is outside the portable Source tree. Managed package generation
+	// must therefore include every regular file below the content root.
 	policy := fsdir.TraversalPolicy{
-		ExcludedDirectoryNames: []string{stagingDirectoryName},
+		ExcludedDirectoryNames: []string{},
 		SkipGitSubmodules:      false,
 	}
 	filesystem, err := fsdir.NewWithTraversalPolicy(&policy)
@@ -74,8 +85,9 @@ func New(base string) (*Adapter, error) {
 		return nil, err
 	}
 	return &Adapter{
-		base:       filepath.Clean(absolute),
-		filesystem: filesystem,
+		base:        filepath.Clean(absolute),
+		stagingBase: filepath.Clean(stagingAbsolute),
+		filesystem:  filesystem,
 	}, nil
 }
 
@@ -148,7 +160,14 @@ func (a *Adapter) RemoveManagedRoot(
 	if err != nil {
 		return err
 	}
-	return os.RemoveAll(root)
+	stagingRoot, err := a.managedStagingRootPath(rootStorageKey)
+	if err != nil {
+		return err
+	}
+	return errors.Join(
+		os.RemoveAll(root),
+		os.RemoveAll(stagingRoot),
+	)
 }
 
 func (a *Adapter) DiscardBootstrappedManagedSource(
@@ -182,11 +201,11 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 			basespec.ErrInvalid,
 		)
 	}
-	discardable, err := managedSourceDirectoryDiscardable(root)
+	empty, err := managedDirectoryEmpty(root)
 	if err != nil {
 		return err
 	}
-	if !discardable {
+	if !empty {
 		return fmt.Errorf(
 			"%w: refusing to discard a managed Source with published package content",
 			basespec.ErrConflict,
@@ -195,13 +214,26 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	if err := os.Remove(root); err != nil {
 		return err
 	}
+	stagingRoot, err := a.sourceStagingPath(value, false)
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(stagingRoot); err != nil {
+		return err
+	}
 	parent := filepath.Dir(root)
-	empty, err := managedDirectoryEmpty(parent)
+	empty, err = managedDirectoryEmpty(parent)
 	if err != nil {
 		return err
 	}
 	if empty {
-		return os.Remove(parent)
+		if err := os.Remove(parent); err != nil {
+			return err
+		}
+	}
+	stagingParent := filepath.Dir(stagingRoot)
+	if empty, err := managedDirectoryEmpty(stagingParent); err == nil && empty {
+		_ = os.Remove(stagingParent)
 	}
 	return nil
 }
@@ -283,12 +315,18 @@ func (a *Adapter) PublishPackage(
 		return "", err
 	}
 
-	stagingRoot := filepath.Join(root, stagingDirectoryName)
+	stagingRoot, err := a.sourceStagingPath(value, true)
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(stagingRoot, managedDirectoryMode); err != nil {
 		return "", err
 	}
 
-	temporary, err := os.MkdirTemp(stagingRoot, stagingTemporaryNamePrefix)
+	temporary, err := os.MkdirTemp(
+		stagingRoot,
+		builtinSchema.ManagedPackageTemporaryPrefix,
+	)
 	if err != nil {
 		return "", err
 	}
@@ -299,13 +337,9 @@ func (a *Adapter) PublishPackage(
 		}
 	}()
 
-	packageRoot := filepath.Join(temporary, "content")
-	if err := os.Mkdir(packageRoot, managedDirectoryMode); err != nil {
-		return "", err
-	}
 	if err := writeManagedPackageFiles(
 		ctx,
-		packageRoot,
+		temporary,
 		files,
 	); err != nil {
 		return "", err
@@ -315,7 +349,7 @@ func (a *Adapter) PublishPackage(
 	if exists {
 		previousPackage, err = os.MkdirTemp(
 			stagingRoot,
-			"previous-package-*",
+			builtinSchema.ManagedPackagePreviousPrefix,
 		)
 		if err != nil {
 			return "", err
@@ -344,14 +378,14 @@ func (a *Adapter) PublishPackage(
 	// Renaming the fully staged package is the source-side publication
 	// boundary. For replacement, the previous complete package is retained in
 	// staging until the new package has been installed successfully.
-	if err := os.Rename(packageRoot, target); err != nil {
+	if err := os.Rename(temporary, target); err != nil {
 		targetExists, targetEquivalent, verifyErr := equivalentPackage(
 			target,
 			files,
 		)
 		if verifyErr == nil && targetExists && targetEquivalent {
 			committed = true
-			_ = os.RemoveAll(temporary)
+
 			if previousPackage != "" {
 				_ = os.RemoveAll(previousPackage)
 			}
@@ -363,7 +397,7 @@ func (a *Adapter) PublishPackage(
 	}
 
 	committed = true
-	_ = os.RemoveAll(temporary)
+
 	if previousPackage != "" {
 		if err := os.RemoveAll(previousPackage); err != nil {
 			return "", fmt.Errorf(
@@ -437,12 +471,18 @@ func (a *Adapter) RemovePackage(
 		)
 	}
 
-	stagingRoot := filepath.Join(root, stagingDirectoryName)
+	stagingRoot, err := a.sourceStagingPath(value, true)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(stagingRoot, managedDirectoryMode); err != nil {
 		return err
 	}
 
-	tombstone, err := os.MkdirTemp(stagingRoot, "remove-*")
+	tombstone, err := os.MkdirTemp(
+		stagingRoot,
+		builtinSchema.ManagedPackageRemovalPrefix,
+	)
 	if err != nil {
 		return err
 	}
@@ -509,7 +549,7 @@ func (a *Adapter) Open(
 	if err := a.validateSource(ctx, value); err != nil {
 		return nil, err
 	}
-	root, err := a.sourceRootPath(value, true)
+	root, err := a.sourceRootPath(value, false)
 	if err != nil {
 		return nil, err
 	}
@@ -571,6 +611,30 @@ func (a *Adapter) sourceRootPath(
 	return root, nil
 }
 
+func (a *Adapter) sourceStagingPath(
+	value source.Source,
+	create bool,
+) (string, error) {
+	if err := basespec.ValidateSourceID(value.ID); err != nil {
+		return "", err
+	}
+	if err := basespec.ValidateStorageKey(value.StorageKey); err != nil {
+		return "", err
+	}
+	root, err := a.managedStagingRootPath(value.RootStorageKey)
+	if err != nil {
+		return "", err
+	}
+	root = filepath.Join(root, string(value.StorageKey))
+	if !create {
+		return root, nil
+	}
+	if err := os.MkdirAll(root, managedDirectoryMode); err != nil {
+		return "", err
+	}
+	return root, nil
+}
+
 func (a *Adapter) managedRootPath(
 	rootStorageKey basespec.StorageKey,
 ) (string, error) {
@@ -589,6 +653,30 @@ func (a *Adapter) managedRootPath(
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: managed Root path escapes managed Source base",
+			basespec.ErrInvalid,
+		)
+	}
+	return root, nil
+}
+
+func (a *Adapter) managedStagingRootPath(
+	rootStorageKey basespec.StorageKey,
+) (string, error) {
+	if err := basespec.ValidateStorageKey(rootStorageKey); err != nil {
+		return "", err
+	}
+
+	base := filepath.Clean(a.stagingBase)
+	root := filepath.Join(base, string(rootStorageKey))
+	relative, err := filepath.Rel(base, root)
+	if err != nil {
+		return "", err
+	}
+	if relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
+		filepath.IsAbs(relative) {
+		return "", fmt.Errorf(
+			"%w: managed Source staging path escapes staging base",
 			basespec.ErrInvalid,
 		)
 	}
@@ -645,25 +733,6 @@ func validatePublication(
 		return nil, err
 	}
 
-	directory, err := normalized.Address.Directory()
-	if err != nil {
-		return nil, err
-	}
-	if containsReservedSegment(directory) {
-		return nil, fmt.Errorf(
-			"%w: managed package uses a reserved directory",
-			basespec.ErrInvalid,
-		)
-	}
-	for index, file := range normalized.Files {
-		if containsReservedSegment(file.Locator) {
-			return nil, fmt.Errorf(
-				"%w: managed package files[%d] use a reserved directory",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-	}
 	return normalized.Files, nil
 }
 
@@ -696,12 +765,7 @@ func validatePackageDirectory(directory basespec.Locator) error {
 	if err := basespec.ValidatePortableLocator(directory, false); err != nil {
 		return err
 	}
-	if containsReservedSegment(directory) {
-		return fmt.Errorf(
-			"%w: managed package uses a reserved directory",
-			basespec.ErrInvalid,
-		)
-	}
+
 	return nil
 }
 
@@ -727,15 +791,6 @@ func pruneEmptyManagedParents(root, start string) error {
 		current = parent
 	}
 	return nil
-}
-
-func containsReservedSegment(locator basespec.Locator) bool {
-	for segment := range strings.SplitSeq(string(locator), "/") {
-		if strings.EqualFold(segment, stagingDirectoryName) {
-			return true
-		}
-	}
-	return false
 }
 
 func equivalentPackage(
@@ -992,22 +1047,6 @@ func managedPackageFileKey(
 			Locator: locator,
 		},
 	}, nil
-}
-
-func managedSourceDirectoryDiscardable(location string) (bool, error) {
-	entries, err := os.ReadDir(location)
-	if err != nil {
-		return false, err
-	}
-	for _, entry := range entries {
-		if entry.Name() != stagingDirectoryName || !entry.IsDir() {
-			return false, nil
-		}
-		if err := os.RemoveAll(filepath.Join(location, entry.Name())); err != nil {
-			return false, err
-		}
-	}
-	return true, nil
 }
 
 func managedDirectoryEmpty(location string) (bool, error) {

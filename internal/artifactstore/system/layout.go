@@ -8,18 +8,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-)
-
-const (
-	StoreManifestFileName     = "store.json"
-	StoreMetadataFileName     = "app.sqlite"
-	StoreContentDirectoryName = "content"
-	storeFormat               = "flexigpt-artifactstore/v1"
-	contentLayout             = "semantic-packages/v1"
-	storeBaseDirectoryMode    = 0o750
-	storeManifestFileMode     = 0o600
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 type storeManifest struct {
@@ -28,57 +20,44 @@ type storeManifest struct {
 }
 
 func ensureStoreLayout(base string) error {
-	if err := os.MkdirAll(base, storeBaseDirectoryMode); err != nil {
+	if err := os.MkdirAll(
+		base,
+		os.FileMode(builtinSchema.ArtifactStoreDirectoryMode),
+	); err != nil {
 		return err
 	}
 
-	manifestPath := filepath.Join(base, StoreManifestFileName)
+	manifestPath := filepath.Join(
+		base,
+		builtinSchema.ArtifactStoreManifestFileName,
+	)
 	raw, err := os.ReadFile(manifestPath)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		entries, readErr := os.ReadDir(base)
-		if readErr != nil {
-			return readErr
+		if err := removeStaleManifestTemporaryFiles(base); err != nil {
+			return err
+		}
+		entries, err := os.ReadDir(base)
+		if err != nil {
+			return err
 		}
 		if len(entries) != 0 {
 			return fmt.Errorf(
 				"%w: Artifact Store base directory is non-empty but has no %s",
 				basespec.ErrUnsupported,
-				StoreManifestFileName,
+				builtinSchema.ArtifactStoreManifestFileName,
 			)
 		}
 
 		raw, err = json.Marshal(storeManifest{
-			Format:        storeFormat,
-			ContentLayout: contentLayout,
+			Format:        builtinSchema.ArtifactStoreFormat,
+			ContentLayout: builtinSchema.ArtifactStoreContentLayout,
 		})
 		if err != nil {
 			return err
 		}
 		raw = append(raw, '\n')
-
-		temporary, err := os.CreateTemp(base, ".store.json-*")
-		if err != nil {
-			return err
-		}
-		temporaryName := temporary.Name()
-
-		if err := temporary.Chmod(storeManifestFileMode); err != nil {
-			_ = temporary.Close()
-			_ = os.Remove(temporaryName)
-			return err
-		}
-		if _, err := temporary.Write(raw); err != nil {
-			_ = temporary.Close()
-			_ = os.Remove(temporaryName)
-			return err
-		}
-		if err := temporary.Close(); err != nil {
-			_ = os.Remove(temporaryName)
-			return err
-		}
-		if err := os.Rename(temporaryName, manifestPath); err != nil {
-			_ = os.Remove(temporaryName)
+		if err := writeNewStoreManifest(manifestPath, raw); err != nil {
 			return err
 		}
 
@@ -86,28 +65,12 @@ func ensureStoreLayout(base string) error {
 		return err
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-
-	var manifest storeManifest
-	if err := decoder.Decode(&manifest); err != nil {
-		return fmt.Errorf(
-			"%w: decode Artifact Store layout manifest: %w",
-			basespec.ErrInvalid,
-			err,
-		)
+	manifest, err := decodeStoreManifest(raw)
+	if err != nil {
+		return err
 	}
-
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("artifact store layout manifest has trailing JSON")
-		}
-		return fmt.Errorf("%w: %w", basespec.ErrInvalid, err)
-	}
-
-	if manifest.Format != storeFormat ||
-		manifest.ContentLayout != contentLayout {
+	if manifest.Format != builtinSchema.ArtifactStoreFormat ||
+		manifest.ContentLayout != builtinSchema.ArtifactStoreContentLayout {
 		return fmt.Errorf(
 			"%w: unsupported Artifact Store layout %q/%q",
 			basespec.ErrUnsupported,
@@ -116,8 +79,109 @@ func ensureStoreLayout(base string) error {
 		)
 	}
 
-	return os.MkdirAll(
-		filepath.Join(base, StoreContentDirectoryName),
-		storeBaseDirectoryMode,
+	for _, directory := range []string{
+		builtinSchema.ArtifactStoreContentDirectoryName,
+		builtinSchema.ArtifactStoreStagingDirectoryName,
+	} {
+		if err := os.MkdirAll(
+			filepath.Join(base, directory),
+			os.FileMode(builtinSchema.ArtifactStoreDirectoryMode),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeStaleManifestTemporaryFiles(base string) error {
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !strings.HasPrefix(
+			entry.Name(),
+			builtinSchema.ArtifactStoreManifestTemporaryName,
+		) {
+			continue
+		}
+		if entry.IsDir() {
+			return fmt.Errorf(
+				"%w: invalid Artifact Store manifest temporary directory %q",
+				basespec.ErrInvalid,
+				entry.Name(),
+			)
+		}
+		if err := os.Remove(filepath.Join(base, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeNewStoreManifest(
+	manifestPath string,
+	raw []byte,
+) error {
+	base := filepath.Dir(manifestPath)
+	temporary, err := os.CreateTemp(
+		base,
+		builtinSchema.ArtifactStoreManifestTemporaryName,
 	)
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+
+	cleanup := func(cause error) error {
+		_ = temporary.Close()
+		_ = os.Remove(temporaryPath)
+		return cause
+	}
+
+	if err := temporary.Chmod(
+		os.FileMode(builtinSchema.ArtifactStoreManifestMode),
+	); err != nil {
+		return cleanup(err)
+	}
+	if _, err := temporary.Write(raw); err != nil {
+		return cleanup(err)
+	}
+	if err := temporary.Close(); err != nil {
+		_ = os.Remove(temporaryPath)
+		return err
+	}
+	if err := os.Rename(temporaryPath, manifestPath); err != nil {
+		_ = os.Remove(temporaryPath)
+		return err
+	}
+	return nil
+}
+
+func decodeStoreManifest(raw []byte) (storeManifest, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+
+	var manifest storeManifest
+	if err := decoder.Decode(&manifest); err != nil {
+		return storeManifest{}, fmt.Errorf(
+			"%w: decode artifact store layout manifest: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New(
+				"artifact store layout manifest has trailing JSON",
+			)
+		}
+		return storeManifest{}, fmt.Errorf(
+			"%w: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	return manifest, nil
 }

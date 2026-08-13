@@ -19,8 +19,8 @@ type DescriptorLoader struct {
 	canonicalizer shareable.Canonicalizer
 }
 
-// Descriptor is the portable workspace.collection document stored at
-// .flexigpt/workspace.json.
+// Descriptor is the portable workspace.collection document stored at the
+// direct workspace-root locator workspace.json.
 type Descriptor = builtinSchema.WorkspaceCollectionV1
 
 type DescriptorObservation struct {

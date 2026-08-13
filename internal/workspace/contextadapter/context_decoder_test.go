@@ -9,6 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 func TestContextDecoderRecognitionAndDecode(t *testing.T) {
@@ -21,7 +23,9 @@ func TestContextDecoderRecognitionAndDecode(t *testing.T) {
 
 	if got := decoder.Recognize(
 		t.Context(),
-		discovery.Candidate{Locator: agentsFileName},
+		discovery.Candidate{
+			Locator: builtinSchema.WorkspaceAgentsFileName,
+		},
 	); got != discovery.RecognitionPreferred {
 		t.Fatalf("AGENTS recognition=%v", got)
 	}
@@ -39,7 +43,7 @@ func TestContextDecoderRecognitionAndDecode(t *testing.T) {
 	}
 
 	decoded, diagnostics := decoder.Decode(t.Context(), discovery.Candidate{
-		Locator: agentsFileName,
+		Locator: builtinSchema.WorkspaceAgentsFileName,
 		Content: []byte("first\r\nsecond\rthird\n"),
 	})
 	if len(diagnostics) != 0 || len(decoded) != 1 {
@@ -48,7 +52,8 @@ func TestContextDecoderRecognitionAndDecode(t *testing.T) {
 	value := decoded[0].Definition
 	if value.Kind != contextKind || value.SchemaID != contextSchemaID ||
 		value.SchemaVersion != workspaceContextSchemaVersionV1 ||
-		value.LogicalName != "agents" || value.DisplayName != agentsFileName ||
+		value.LogicalName != "agents" ||
+		value.DisplayName != string(builtinSchema.WorkspaceAgentsFileName) ||
 		value.Labels[contextRoleLabelKey] != contextRoleAgentInstructions {
 		t.Fatalf("definition=%#v", value)
 	}
@@ -92,7 +97,7 @@ func TestContextDecoderRejectsUnsafeContentAndProfileIsStable(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			decoded, diagnostics := decoder.Decode(t.Context(), discovery.Candidate{
-				Locator: agentsFileName,
+				Locator: builtinSchema.WorkspaceAgentsFileName,
 				Content: test.data,
 			})
 			if len(decoded) != 0 || len(diagnostics) != 1 || diagnostics[0].Code != test.code {
@@ -102,20 +107,22 @@ func TestContextDecoderRejectsUnsafeContentAndProfileIsStable(t *testing.T) {
 	}
 
 	profile := DiscoveryProfile()
-	if len(profile.ExplicitLocators) != 2 || profile.ExplicitLocators[0] != agentsFileName ||
-		profile.ExplicitLocators[1] != claudeFileName || profile.ReadmeLocator != readmeFileName {
+	if len(profile.ExplicitLocators) != 2 ||
+		profile.ExplicitLocators[0] != builtinSchema.WorkspaceAgentsFileName ||
+		profile.ExplicitLocators[1] != builtinSchema.WorkspaceClaudeFileName ||
+		profile.ReadmeLocator != builtinSchema.WorkspaceReadmeFileName {
 		t.Fatalf("DiscoveryProfile=%#v", profile)
 	}
 	profile.ExplicitLocators[0] = "changed.md"
 	fresh := DiscoveryProfile()
-	if fresh.ExplicitLocators[0] != agentsFileName {
+	if fresh.ExplicitLocators[0] != builtinSchema.WorkspaceAgentsFileName {
 		t.Fatalf("DiscoveryProfile leaked mutable backing storage: %#v", fresh)
 	}
 }
 
 func TestValidateContextDefinitionAndLogicalNames(t *testing.T) {
 	valid := makeContextDefinition(t, contextDefinition{
-		Name:      agentsFileName,
+		Name:      string(builtinSchema.WorkspaceAgentsFileName),
 		Role:      contextRoleAgentInstructions,
 		MediaType: contextMarkdownMediaType,
 		Content:   "instructions",
@@ -144,7 +151,7 @@ func TestValidateContextDefinitionAndLogicalNames(t *testing.T) {
 			value.Body = contextBodyJSON(
 				t,
 				contextDefinition{
-					Name:      agentsFileName,
+					Name:      string(builtinSchema.WorkspaceAgentsFileName),
 					Role:      contextRoleAgentInstructions,
 					MediaType: contextMarkdownMediaType,
 					Content:   " \t",
@@ -155,7 +162,7 @@ func TestValidateContextDefinitionAndLogicalNames(t *testing.T) {
 			value.Body = contextBodyJSON(
 				t,
 				contextDefinition{
-					Name:      agentsFileName,
+					Name:      string(builtinSchema.WorkspaceAgentsFileName),
 					Role:      "other",
 					MediaType: contextMarkdownMediaType,
 					Content:   "x",

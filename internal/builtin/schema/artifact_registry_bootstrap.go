@@ -1,4 +1,4 @@
-package builtin
+package schema
 
 import (
 	"context"
@@ -49,9 +49,9 @@ type registeredInstaller struct {
 // shared topology. It is intentionally unaware of Skills, MCPs, or any other
 // artifact format.
 type BootstrapRegistry struct {
-	configuration Registry
-	topology      topology.Ensurer
-	hydrator      topology.HydrationCoordinator
+	declaration topology.Declaration
+	topology    topology.Ensurer
+	hydrator    topology.HydrationCoordinator
 
 	mu         sync.RWMutex
 	installers map[string]Installer
@@ -60,7 +60,7 @@ type BootstrapRegistry struct {
 }
 
 func NewBootstrapRegistry(
-	configuration Registry,
+	declaration topology.Declaration,
 	ensurer topology.Ensurer,
 	hydrator topology.HydrationCoordinator,
 ) (*BootstrapRegistry, error) {
@@ -70,19 +70,29 @@ func NewBootstrapRegistry(
 			basespec.ErrInvalid,
 		)
 	}
-	if err := configuration.Validate(); err != nil {
+	if err := declaration.Validate(); err != nil {
 		return nil, err
 	}
+	ids := map[string]string{
+		string(declaration.Root.ID): "protected built-in Root",
+	}
+	for _, value := range declaration.Sources {
+		if _, duplicate := ids[string(value.ID)]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: built-in topology reuses static ID %q",
+				basespec.ErrConflict,
+				value.ID,
+			)
+		}
+		ids[string(value.ID)] = "protected built-in Source"
+	}
 	return &BootstrapRegistry{
-		configuration: configuration,
-		topology:      ensurer,
-		hydrator:      hydrator,
-		installers:    map[string]Installer{},
-		ids: map[string]string{
-			string(configuration.Root.ID):   "protected built-in Root",
-			string(configuration.Source.ID): "protected built-in Source",
-		},
-		scopes: map[basespec.Locator]string{},
+		declaration: declaration,
+		topology:    ensurer,
+		hydrator:    hydrator,
+		installers:  map[string]Installer{},
+		ids:         ids,
+		scopes:      map[basespec.Locator]string{},
 	}, nil
 }
 
@@ -240,7 +250,10 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		}
 	}
 
-	if _, err := r.configuration.EnsureTopology(ctx, r.topology); err != nil {
+	if _, err := r.topology.EnsureProtectedTopology(
+		ctx,
+		r.declaration,
+	); err != nil {
 		return fmt.Errorf("ensure built-in topology: %w", err)
 	}
 	for _, entry := range entries {

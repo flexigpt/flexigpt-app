@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -24,7 +25,7 @@ func NewConventionRegistry(
 	roots ...basespec.Locator,
 ) (*ConventionRegistry, error) {
 	if len(roots) == 0 {
-		roots = DefaultSkillRoots()
+		roots = builtinSchema.WorkspaceSkillRoots()
 	}
 	seen := make(map[basespec.Locator]struct{}, len(roots))
 	values := make([]SkillRootConvention, 0, len(roots))
@@ -121,7 +122,5 @@ func (r *ConventionRegistry) Roots() []SkillRootConvention {
 }
 
 func DefaultSkillRoots() []basespec.Locator {
-	return []basespec.Locator{
-		DefaultWorkspaceSkillRoot,
-	}
+	return builtinSchema.WorkspaceSkillRoots()
 }

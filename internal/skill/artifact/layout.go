@@ -6,14 +6,12 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 const (
-	ManagedPackageKind basespec.PackageKind = "agent.skill"
-
-	DefinitionFileName basespec.Locator = "SKILL.md"
-
-	unversionedManagedPackageVersion basespec.LogicalVersion = "unversioned"
+	ManagedPackageKind = builtinSchema.AgentSkillPackageKind
+	DefinitionFileName = builtinSchema.AgentSkillDefinitionFileName
 )
 
 func ManagedPackageAddressForSkill(
@@ -21,7 +19,7 @@ func ManagedPackageAddressForSkill(
 	version basespec.LogicalVersion,
 ) (source.ManagedPackageAddress, error) {
 	if version == "" {
-		version = unversionedManagedPackageVersion
+		version = builtinSchema.UnversionedPackageVersion
 	}
 	return source.NewManagedPackageAddress(
 		ManagedPackageKind,

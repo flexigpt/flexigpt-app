@@ -36,16 +36,19 @@ func ValidateShareableCollectionMetadata(
 	description string,
 	labels map[string]string,
 ) error {
-	if err := basespec.ValidateLogicalName(
-		basespec.LogicalName(logicalName),
+	if err := basespec.ValidatePortableName(
+		"logical name",
+		logicalName,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateLogicalVersion(
-		basespec.LogicalVersion(logicalVersion),
-		true,
-	); err != nil {
-		return err
+	if logicalVersion != "" {
+		if err := basespec.ValidatePortableName(
+			"logical version",
+			logicalVersion,
+		); err != nil {
+			return err
+		}
 	}
 	if err := basespec.ValidateOptionalText(
 		"skill collection display name",

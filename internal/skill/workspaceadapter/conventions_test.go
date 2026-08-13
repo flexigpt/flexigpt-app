@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -39,7 +40,8 @@ func TestConventionRegistryNormalizesAndOwnsRoots(t *testing.T) {
 	}
 
 	defaults, err := NewConventionRegistry()
-	if err != nil || len(defaults.Roots()) != 1 || defaults.Roots()[0].Root != DefaultWorkspaceSkillRoot {
+	if err != nil || len(defaults.Roots()) != 1 ||
+		defaults.Roots()[0].Root != builtinSchema.WorkspaceSkillRootLocator {
 		t.Fatalf("default registry=%#v err=%v", defaults, err)
 	}
 
@@ -54,7 +56,9 @@ func TestConventionRegistryNormalizesAndOwnsRoots(t *testing.T) {
 func TestConventionRegistryMatchAndExpectedNameBoundaries(t *testing.T) {
 	t.Parallel()
 
-	registry, err := NewConventionRegistry(".flexigpt/skills")
+	registry, err := NewConventionRegistry(
+		builtinSchema.WorkspaceSkillRootLocator,
+	)
 	if err != nil {
 		t.Fatalf("NewConventionRegistry: %v", err)
 	}
@@ -63,10 +67,10 @@ func TestConventionRegistryMatchAndExpectedNameBoundaries(t *testing.T) {
 		want    bool
 		name    string
 	}{
-		{locator: ".flexigpt/skills/weather/SKILL.md", want: true, name: "weather"},
-		{locator: ".flexigpt/skills/nested/weather/SKILL.md", want: true, name: "weather"},
-		{locator: ".flexigpt/skills/SKILL.md", want: false},
-		{locator: ".flexigpt/skills/weather/skill.md", want: false},
+		{locator: "skills/weather/SKILL.md", want: true, name: "weather"},
+		{locator: "skills/nested/weather/SKILL.md", want: true, name: "weather"},
+		{locator: "skills/SKILL.md", want: false},
+		{locator: "skills/weather/skill.md", want: false},
 		{locator: "other/weather/SKILL.md", want: false},
 	} {
 		root, matched := registry.Match(test.locator)

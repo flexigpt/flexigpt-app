@@ -28,11 +28,13 @@ func ValidatePortableMetadata(
 	); err != nil {
 		return err
 	}
-	if err := ValidateLogicalVersion(
-		logicalVersion,
-		true,
-	); err != nil {
-		return err
+	if logicalVersion != "" {
+		if err := ValidatePortableName(
+			"logical version",
+			string(logicalVersion),
+		); err != nil {
+			return err
+		}
 	}
 	if err := ValidateOptionalText(
 		"display name",

@@ -1,6 +1,10 @@
 package bundle
 
-import "testing"
+import (
+	"testing"
+
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+)
 
 func TestMCPPackageLayoutUsesCallerOwnedConvention(t *testing.T) {
 	t.Parallel()
@@ -14,7 +18,9 @@ func TestMCPPackageLayoutUsesCallerOwnedConvention(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Directory: %v", err)
 	}
-	if directory != "mcp.bundle/base/unversioned" {
+	if string(directory) != string(
+		builtinSchema.MCPBundlePackageKind,
+	)+"/base/"+string(builtinSchema.UnversionedPackageVersion) {
 		t.Fatalf("directory=%q", directory)
 	}
 
@@ -22,7 +28,7 @@ func TestMCPPackageLayoutUsesCallerOwnedConvention(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DocumentLocatorForPackage: %v", err)
 	}
-	if locator != "mcp.bundle/base/unversioned/mcps.json" {
+	if string(locator) != string(directory)+"/"+string(builtinSchema.MCPBundleDocumentFileName) {
 		t.Fatalf("locator=%q", locator)
 	}
 

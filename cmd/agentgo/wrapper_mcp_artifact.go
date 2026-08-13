@@ -13,7 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
@@ -25,12 +24,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-)
-
-const (
-	defaultMCPBundleCollectionID basespec.CollectionID = "0198f097-0d5b-7000-8000-000000000020"
-	defaultMCPBundleSourceID     basespec.SourceID     = "0198f097-0d5b-7000-8000-000000000021"
-	defaultMCPBundleSourceKey    basespec.StorageKey   = "base"
 )
 
 type MCPWrapper struct {
@@ -46,6 +39,7 @@ type MCPWrapper struct {
 
 	oauthLoopbackListenAddrAtStart string
 	oauthBroker                    *auth.OAuthLoopbackBroker
+	builtInInstaller               schema.HydrationInstaller
 }
 
 type MCPSecretWriteResult struct {
@@ -71,7 +65,7 @@ func InitMCPWrapper(
 	if wrapper == nil || components == nil {
 		return errors.New("MCP wrapper dependencies are incomplete")
 	}
-	if _, err := components.Roots.Get(ctx, mcpUserRootID); err != nil {
+	if _, err := components.Roots.Get(ctx, schema.MCPUserRootID); err != nil {
 		return fmt.Errorf("ensure retained MCP user Root: %w", err)
 	}
 
@@ -119,7 +113,7 @@ func InitMCPWrapper(
 		HasDecoder:         components.HasDecoder,
 		DecoderFingerprint: components.DecoderFingerprint,
 		RootPolicy:         components.RootMutationPolicy(),
-		UserRootID:         mcpUserRootID,
+		UserRootID:         schema.MCPUserRootID,
 		Runtime:            invalidator,
 		Overlays:           overlays,
 		SecretCleaner:      secrets,
@@ -153,12 +147,12 @@ func InitMCPWrapper(
 		runtime.NewApprovalManager(5*time.Minute),
 	)
 
-	if err := installMCPBuiltIns(
-		context.WithoutCancel(ctx),
+	builtIns, err := newMCPBuiltInInstaller(
 		components,
 		bundleAPI,
 		overlays,
-	); err != nil {
+	)
+	if err != nil {
 		_ = rt.Close(context.Background())
 		_ = oauthBroker.Close()
 		return err
@@ -174,25 +168,18 @@ func InitMCPWrapper(
 	wrapper.secrets = secrets
 	wrapper.oauthLoopbackListenAddrAtStart = configuredLoopback
 	wrapper.oauthBroker = oauthBroker
+	wrapper.builtInInstaller = builtIns
 	return nil
 }
 
-func installMCPBuiltIns(
-	ctx context.Context,
+func newMCPBuiltInInstaller(
 	components *system.Components,
 	bundles *bundle.API,
 	overlays overlay.OverlayRepository,
-) error {
+) (schema.HydrationInstaller, error) {
 	registry, packages, err := schemaadapter.LoadEmbeddedRegistry()
 	if err != nil {
-		return err
-	}
-	if registry.Topology.Root.ID != mcpBuiltInRootID {
-		return fmt.Errorf(
-			"%w: converted MCP built-in registry uses unexpected Root %q",
-			basespec.ErrInvalid,
-			registry.Topology.Root.ID,
-		)
+		return nil, err
 	}
 
 	installer, err := schemaadapter.NewInstaller(
@@ -205,27 +192,9 @@ func installMCPBuiltIns(
 		},
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	topologyRegistry, err := builtin.RegistryFromTopologyDeclaration(
-		registry.Topology,
-	)
-	if err != nil {
-		return err
-	}
-	bootstrap, err := builtin.NewBootstrapRegistry(
-		topologyRegistry,
-		components,
-		components,
-	)
-	if err != nil {
-		return err
-	}
-	if err := bootstrap.Register(installer); err != nil {
-		return err
-	}
-	return bootstrap.Ensure(ctx)
+	return installer, nil
 }
 
 func (w *MCPWrapper) CreateMCPBundle(
@@ -1055,6 +1024,7 @@ func (w *MCPWrapper) close() {
 	w.secrets = nil
 	w.oauthBroker = nil
 	w.oauthLoopbackListenAddrAtStart = ""
+	w.builtInInstaller = nil
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -1089,14 +1059,14 @@ func ensureDefaultMCPBundle(
 	}
 
 	ref := collection.CollectionRef{
-		RootID:       mcpUserRootID,
-		CollectionID: defaultMCPBundleCollectionID,
+		RootID:       schema.MCPUserRootID,
+		CollectionID: schema.DefaultMCPBundleCollectionID,
 	}
 	existing, err := api.Get(ctx, ref)
 	switch {
 	case err == nil:
-		if existing.Data.ManagedSourceID != defaultMCPBundleSourceID ||
-			existing.Source.ID != defaultMCPBundleSourceID {
+		if existing.Data.ManagedSourceID != schema.DefaultMCPBundleSourceID ||
+			existing.Source.ID != schema.DefaultMCPBundleSourceID {
 			return fmt.Errorf(
 				"%w: default MCP Bundle identity conflicts with existing state",
 				basespec.ErrConflict,
@@ -1114,10 +1084,10 @@ func ensureDefaultMCPBundle(
 	}
 
 	_, err = api.Create(ctx, bundle.CreateRequest{
-		RootID:           mcpUserRootID,
-		CollectionID:     defaultMCPBundleCollectionID,
-		SourceID:         defaultMCPBundleSourceID,
-		SourceStorageKey: defaultMCPBundleSourceKey,
+		RootID:           schema.MCPUserRootID,
+		CollectionID:     schema.DefaultMCPBundleCollectionID,
+		SourceID:         schema.DefaultMCPBundleSourceID,
+		SourceStorageKey: schema.DefaultMCPBundleSourceKey,
 		Document:         json.RawMessage(document),
 	})
 	if err != nil {
@@ -1131,9 +1101,9 @@ func defaultMCPBundleDocument() bundle.BundleDocument {
 		Kind:          schema.BundleKind,
 		SchemaID:      schema.BundleSchemaID,
 		SchemaVersion: schema.MCPSchemaVersion,
-		LogicalName:   "base",
-		DisplayName:   "Base MCP Servers",
-		Description:   "Editable starter bundle for user-managed MCP server definitions.",
+		LogicalName:   schema.DefaultMCPBundleLogicalName,
+		DisplayName:   schema.DefaultMCPBundleDisplayName,
+		Description:   schema.DefaultMCPBundleDescription,
 		MCPServers:    map[string]server.CoreServer{},
 		BundleExtension: bundle.BundleExtension{
 			Servers:  map[string]server.ServerExtension{},

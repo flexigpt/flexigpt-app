@@ -1,6 +1,10 @@
 package artifact
 
-import "testing"
+import (
+	"testing"
+
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
+)
 
 func TestManagedSkillPackageLayout(t *testing.T) {
 	t.Parallel()
@@ -14,7 +18,8 @@ func TestManagedSkillPackageLayout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Directory: %v", err)
 	}
-	if directory != "agent.skill/summarize/unversioned" {
+	if string(directory) != string(builtinSchema.AgentSkillPackageKind)+
+		"/summarize/"+string(builtinSchema.UnversionedPackageVersion) {
 		t.Fatalf("directory=%q", directory)
 	}
 
@@ -22,7 +27,7 @@ func TestManagedSkillPackageLayout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ManagedPackageLocatorForSkill: %v", err)
 	}
-	if locator != "agent.skill/summarize/unversioned/SKILL.md" {
+	if string(locator) != string(directory)+"/"+string(builtinSchema.AgentSkillDefinitionFileName) {
 		t.Fatalf("locator=%q", locator)
 	}
 

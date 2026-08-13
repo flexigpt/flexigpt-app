@@ -15,9 +15,6 @@ const (
 
 	RoleManaged basespec.AttachmentRole = "managed"
 	RoleBuiltIn basespec.AttachmentRole = "builtin"
-
-	PackageDirectory       basespec.Locator = "package"
-	DefaultDocumentLocator basespec.Locator = "package/mcps.json"
 )
 
 type CollectionData struct {

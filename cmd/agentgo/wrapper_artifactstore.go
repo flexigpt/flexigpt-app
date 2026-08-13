@@ -7,12 +7,10 @@ import (
 	"log/slog"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/schemaadapter"
@@ -24,9 +22,8 @@ import (
 )
 
 type ArtifactStoreWrapper struct {
-	api             *artifactstore.API
-	components      *system.Components
-	builtInTopology builtin.Registry
+	api        *artifactstore.API
+	components *system.Components
 }
 
 func InitArtifactStoreWrapper(
@@ -36,16 +33,8 @@ func InitArtifactStoreWrapper(
 	if wrapper == nil {
 		return errors.New("artifact store wrapper is required")
 	}
-	registry, err := builtin.LoadRegistry()
-	if err != nil {
+	if err := builtinSchema.ValidateApplicationTopology(); err != nil {
 		return err
-	}
-	if registry.Root.ID == defaultWorkspaceRootID {
-		return fmt.Errorf(
-			"%w: protected built-in Root %q and retained Workspace Root must use distinct IDs",
-			basespec.ErrInvalid,
-			registry.Root.ID,
-		)
 	}
 
 	skillDecoder, err := skillArtifact.NewDecoder()
@@ -66,14 +55,8 @@ func InitArtifactStoreWrapper(
 	}
 
 	rootPolicy, err := protection.NewSetRootPolicy(
-		[]basespec.RootID{
-			registry.Root.ID,
-			mcpBuiltInRootID,
-		},
-		[]basespec.RootID{
-			defaultWorkspaceRootID,
-			mcpUserRootID,
-		},
+		builtinSchema.ProtectedRootIDs(),
+		builtinSchema.RetainedRootIDs(),
 	)
 	if err != nil {
 		return err
@@ -92,10 +75,7 @@ func InitArtifactStoreWrapper(
 		return err
 	}
 
-	for _, draft := range []root.RootDraft{
-		defaultWorkspaceRootDraft(),
-		defaultMCPUserRootDraft(),
-	} {
+	for _, draft := range builtinSchema.RetainedRootDrafts() {
 		if _, err := components.Roots.Create(
 			context.Background(),
 			draft,
@@ -113,7 +93,6 @@ func InitArtifactStoreWrapper(
 
 	wrapper.components = components
 	wrapper.api = api
-	wrapper.builtInTopology = registry
 
 	return nil
 }
@@ -333,7 +312,6 @@ func (w *ArtifactStoreWrapper) close() {
 
 	api := w.api
 	components := w.components
-	w.builtInTopology = builtin.Registry{}
 	w.api = nil
 	w.components = nil
 

@@ -13,7 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
@@ -43,7 +42,6 @@ type skillInstaller interface {
 
 type InstallerDependencies struct {
 	Skills                 skillInstaller
-	BuiltInTopology        builtin.Registry
 	SkillRegistry          Registry
 	Packages               fs.FS
 	ShareableCanonicalizer shareable.ExpectedCanonicalizer
@@ -51,7 +49,7 @@ type InstallerDependencies struct {
 
 type Installer struct {
 	skills          skillInstaller
-	builtInTopology builtin.Registry
+	builtInTopology topology.Declaration
 	hydrated        HydratedRegistry
 	packages        fs.FS
 }
@@ -64,13 +62,15 @@ func NewInstaller(
 		dependencies.ShareableCanonicalizer == nil {
 		return nil, fmt.Errorf("%w: built-in installer dependencies are incomplete", basespec.ErrInvalid)
 	}
-	if err := dependencies.BuiltInTopology.Validate(); err != nil {
+	builtInTopology := schema.BuiltinTopologyDeclaration()
+	if err := builtInTopology.Validate(); err != nil {
 		return nil, err
 	}
 	if err := dependencies.SkillRegistry.Validate(); err != nil {
 		return nil, err
 	}
-	if dependencies.BuiltInTopology.Source.Kind != managed.Kind {
+	if len(builtInTopology.Sources) != 1 ||
+		builtInTopology.Sources[0].Kind != managed.Kind {
 		return nil, fmt.Errorf(
 			"%w: built-in Source kind must be %q",
 			basespec.ErrInvalid,
@@ -87,7 +87,7 @@ func NewInstaller(
 	}
 	return &Installer{
 		skills:          dependencies.Skills,
-		builtInTopology: dependencies.BuiltInTopology,
+		builtInTopology: builtInTopology,
 		hydrated:        hydrated,
 		packages:        dependencies.Packages,
 	}, nil
@@ -284,7 +284,7 @@ func (i *Installer) EnsureBuiltInBundles(
 			bundle.BuiltInBundleTopology{
 				RootID:                i.builtInTopology.Root.ID,
 				CollectionID:          value.Registration.ID,
-				SourceID:              i.builtInTopology.Source.ID,
+				SourceID:              i.builtInTopology.Sources[0].ID,
 				LogicalName:           basespec.LogicalName(value.Definition.LogicalName),
 				LogicalVersion:        basespec.LogicalVersion(value.Definition.LogicalVersion),
 				DisplayName:           value.Definition.DisplayName,

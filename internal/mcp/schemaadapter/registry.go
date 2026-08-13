@@ -6,8 +6,6 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 )
@@ -30,7 +28,6 @@ type BundleRegistration struct {
 
 type Registry struct {
 	SchemaVersion string               `json:"schemaVersion"`
-	Topology      topology.Declaration `json:"topology"`
 	Bundles       []BundleRegistration `json:"bundles"`
 }
 
@@ -40,16 +37,6 @@ func (r Registry) Validate() error {
 			"%w: unsupported MCP built-in registry schema %q",
 			basespec.ErrInvalid,
 			r.SchemaVersion,
-		)
-	}
-	if err := r.Topology.Validate(); err != nil {
-		return err
-	}
-	if len(r.Topology.Sources) != 1 ||
-		r.Topology.Sources[0].Kind != managed.Kind {
-		return fmt.Errorf(
-			"%w: MCP built-in registry requires exactly one managed Source",
-			basespec.ErrInvalid,
 		)
 	}
 	if len(r.Bundles) == 0 {

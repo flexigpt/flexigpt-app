@@ -5,27 +5,15 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 )
 
 const (
 	AppTitle = "FlexiGPT"
-
-	settingsDirectoryName         = "settings_v1"
-	conversationsDirectoryName    = "conversations_v1"
-	modelPresetsDirectoryName     = "model_presets_v1"
-	toolsDirectoryName            = "tools_v1"
-	assistantPresetsDirectoryName = "assistant_presets_v1"
-	// Workspace Collections are stored by the shared artifact store. Do not
-	// add a second Workspace-owned persistence directory. This is deliberately
-	// a clean namespace: startup must not locate, import, copy, or migrate any
-	// legacy Workspace or Artifact Store directory into it.
-	artifactStoreDirectoryName = "artifacts_v1"
-	appDirectoryMode           = 0o700
 )
 
 type App struct {
@@ -63,14 +51,35 @@ func NewApp() *App {
 	}
 
 	app := &App{}
-	app.dataBasePath = filepath.Join(xdg.DataHome, strings.ToLower(AppTitle))
+	app.dataBasePath = filepath.Join(
+		xdg.DataHome,
+		builtinSchema.ApplicationDataDirectoryName,
+	)
 
-	app.settingsDirPath = filepath.Join(app.dataBasePath, settingsDirectoryName)
-	app.conversationsDirPath = filepath.Join(app.dataBasePath, conversationsDirectoryName)
-	app.modelPresetsDirPath = filepath.Join(app.dataBasePath, modelPresetsDirectoryName)
-	app.toolsDirPath = filepath.Join(app.dataBasePath, toolsDirectoryName)
-	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, assistantPresetsDirectoryName)
-	app.artifactStoreDirPath = filepath.Join(app.dataBasePath, artifactStoreDirectoryName)
+	app.settingsDirPath = filepath.Join(
+		app.dataBasePath,
+		builtinSchema.SettingsDirectoryName,
+	)
+	app.conversationsDirPath = filepath.Join(
+		app.dataBasePath,
+		builtinSchema.ConversationsDirectoryName,
+	)
+	app.modelPresetsDirPath = filepath.Join(
+		app.dataBasePath,
+		builtinSchema.ModelPresetsDirectoryName,
+	)
+	app.toolsDirPath = filepath.Join(
+		app.dataBasePath,
+		builtinSchema.ToolsDirectoryName,
+	)
+	app.assistantPresetsDirPath = filepath.Join(
+		app.dataBasePath,
+		builtinSchema.AssistantPresetsDirectoryName,
+	)
+	app.artifactStoreDirPath = filepath.Join(
+		app.dataBasePath,
+		builtinSchema.ArtifactStoreDirectoryName,
+	)
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
 		app.modelPresetsDirPath == "" ||
@@ -187,7 +196,10 @@ func (a *App) GetAppVersion() string {
 }
 
 func ensureAppPrivateDirectory(location string) error {
-	return os.MkdirAll(location, os.FileMode(appDirectoryMode))
+	return os.MkdirAll(
+		location,
+		os.FileMode(builtinSchema.ApplicationDirectoryMode),
+	)
 }
 
 func (a *App) initManagers() {
@@ -253,7 +265,6 @@ func (a *App) initManagers() {
 		a.skillBundleAPI,
 		a.artifactStoreAPI.components,
 		a.workspaceAPI.api.SkillAdapter(),
-		a.artifactStoreAPI.builtInTopology,
 	)
 	if err != nil {
 		slog.Error(
@@ -290,6 +301,25 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: artifact-backed mcp initialization failed\n" + err.Error())
 	}
 	slog.Info("artifact-backed mcp host initialized")
+
+	err = EnsureBuiltinArtifactTopology(
+		context.Background(),
+		a.artifactStoreAPI.components,
+		a.skillBundleAPI,
+		a.mcpAPI,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize shared built-in topology",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: built-in topology initialization failed\n" +
+				err.Error(),
+		)
+	}
+	slog.Info("shared built-in artifact topology initialized")
 
 	err = InitModelPresetStoreWrapper(
 		a.modelPresetStoreAPI,

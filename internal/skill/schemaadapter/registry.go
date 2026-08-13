@@ -14,7 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
@@ -22,8 +21,6 @@ import (
 
 const (
 	RegistrySchemaVersion = "v1"
-	collectionEntrypoint  = "collection.json"
-	skillEntrypoint       = "SKILL.md"
 )
 
 type Artifact struct {
@@ -82,7 +79,11 @@ func (r SkillReference) Validate() error {
 }
 
 func LoadRegistry() (Registry, error) {
-	decoder := json.NewDecoder(bytes.NewReader(builtin.SkillRegistryJSON))
+	raw, err := builtinSchema.ReadEmbeddedSkillRegistry()
+	if err != nil {
+		return Registry{}, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 
 	var value Registry
@@ -186,13 +187,14 @@ func (r Registry) Validate() error {
 		if err := basespec.ValidatePortableLocator(collection.Payload, false); err != nil {
 			return fmt.Errorf("collections[%d]: %w", collectionIndex, err)
 		}
-		if path.Base(string(collection.Payload)) != collectionEntrypoint ||
+		if path.Base(string(collection.Payload)) !=
+			string(builtinSchema.SkillCollectionFileName) ||
 			path.Dir(string(collection.Payload)) == "." {
 			return fmt.Errorf(
 				"%w: collections[%d] payload must be a nested %q",
 				basespec.ErrInvalid,
 				collectionIndex,
-				collectionEntrypoint,
+				builtinSchema.SkillCollectionFileName,
 			)
 		}
 		if len(collection.Artifacts) == 0 {
@@ -237,14 +239,15 @@ func (r Registry) Validate() error {
 					err,
 				)
 			}
-			if path.Base(string(value.Member)) != skillEntrypoint ||
+			if path.Base(string(value.Member)) !=
+				string(builtinSchema.AgentSkillDefinitionFileName) ||
 				path.Dir(string(value.Member)) == "." {
 				return fmt.Errorf(
 					"%w: collections[%d].artifacts[%d] must reference a packaged %s",
 					basespec.ErrInvalid,
 					collectionIndex,
 					artifactIndex,
-					skillEntrypoint,
+					builtinSchema.AgentSkillDefinitionFileName,
 				)
 			}
 			if _, duplicate := members[value.Member]; duplicate {

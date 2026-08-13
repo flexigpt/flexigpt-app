@@ -18,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -30,14 +29,16 @@ import (
 // registry. It intentionally does not inspect or convert legacy runtime data,
 // overlays, secrets, or user state.
 func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
-	packages, err := builtin.EmbeddedMCPArtifactPackages()
+	packages, err := schema.EmbeddedMCPArtifactPackages()
+	if err != nil {
+		return Registry{}, nil, err
+	}
+	raw, err := schema.ReadEmbeddedMCPRegistry()
 	if err != nil {
 		return Registry{}, nil, err
 	}
 
-	// The converted registry is intentionally mandatory. Normal startup never
-	// falls back to the legacy embedded MCP document tree.
-	decoder := json.NewDecoder(bytes.NewReader(builtin.MCPRegistryJSON))
+	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 
 	var registry Registry
@@ -89,11 +90,12 @@ type InstallerDependencies struct {
 }
 
 type Installer struct {
-	bundles   builtInBundleEnsurer
-	registry  Registry
-	packages  fs.FS
-	overlays  overlay.OverlayRepository
-	documents shareable.ExpectedCanonicalizer
+	bundles         builtInBundleEnsurer
+	registry        Registry
+	builtInTopology topology.Declaration
+	packages        fs.FS
+	overlays        overlay.OverlayRepository
+	documents       shareable.ExpectedCanonicalizer
 }
 
 type preparedBundle struct {
@@ -124,13 +126,18 @@ func NewInstaller(
 	if err := dependencies.Registry.Validate(); err != nil {
 		return nil, err
 	}
+	builtInTopology := schema.BuiltinTopologyDeclaration()
+	if err := builtInTopology.Validate(); err != nil {
+		return nil, err
+	}
 
 	return &Installer{
-		bundles:   dependencies.Bundles,
-		registry:  dependencies.Registry,
-		packages:  dependencies.Packages,
-		overlays:  dependencies.Overlays,
-		documents: dependencies.ShareableDocuments,
+		bundles:         dependencies.Bundles,
+		registry:        dependencies.Registry,
+		builtInTopology: builtInTopology,
+		packages:        dependencies.Packages,
+		overlays:        dependencies.Overlays,
+		documents:       dependencies.ShareableDocuments,
 	}, nil
 }
 
@@ -155,8 +162,8 @@ func (i *Installer) DesiredHydration(
 
 	return topology.Hydration{
 		InstallerName: i.BuiltInName(),
-		RootID:        i.registry.Topology.Root.ID,
-		SourceID:      i.registry.Topology.Sources[0].ID,
+		RootID:        i.builtInTopology.Root.ID,
+		SourceID:      i.builtInTopology.Sources[0].ID,
 		Fingerprint:   fingerprint,
 	}, nil
 }
@@ -187,7 +194,7 @@ func (i *Installer) EnsureHydration(
 		if purger, supported := i.overlays.(rootOverlayPurger); supported {
 			if err := purger.PurgeRoot(
 				ctx,
-				i.registry.Topology.Root.ID,
+				i.builtInTopology.Root.ID,
 			); err != nil {
 				return fmt.Errorf(
 					"purge stale MCP protected installation overlays: %w",
@@ -205,9 +212,9 @@ func (i *Installer) EnsureHydration(
 		if _, err := i.bundles.EnsureBuiltIn(
 			ctx,
 			bundle.EnsureBuiltInRequest{
-				RootID:         i.registry.Topology.Root.ID,
+				RootID:         i.builtInTopology.Root.ID,
 				CollectionID:   value.registration.CollectionID,
-				SourceID:       i.registry.Topology.Sources[0].ID,
+				SourceID:       i.builtInTopology.Sources[0].ID,
 				PackageAddress: value.packageAddress,
 				Document:       value.parsed,
 				Registrations:  value.registration.ToBundleRegistrations(),
@@ -270,7 +277,7 @@ func (i *Installer) ensureCurrentBundles(ctx context.Context) error {
 		if err := i.bundles.EnsureBuiltInCurrent(
 			ctx,
 			collection.CollectionRef{
-				RootID:       i.registry.Topology.Root.ID,
+				RootID:       i.builtInTopology.Root.ID,
 				CollectionID: registered.CollectionID,
 			},
 		); err != nil {
@@ -519,7 +526,7 @@ func (i *Installer) hydrationFingerprint(
 		Bundles       []bundleFingerprint  `json:"bundles"`
 	}{
 		SchemaVersion: schema.HydrationFingerprintSchemaVersion,
-		Topology:      i.registry.Topology,
+		Topology:      i.builtInTopology,
 		Bundles:       values,
 	})
 	if err != nil {

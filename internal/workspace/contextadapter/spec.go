@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	builtinSchema "github.com/flexigpt/flexigpt-app/internal/builtin/schema"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -16,21 +17,15 @@ const (
 )
 
 const (
-	agentsFileName = "AGENTS.md"
-	claudeFileName = "CLAUDE.md"
-	readmeFileName = "README.md"
-)
-
-const (
-	contextRoleAgentInstructions     = "agent-instructions"
-	contextRoleAssistantInstructions = "assistant-instructions"
-	contextRoleProjectReadme         = "project-readme"
+	contextRoleAgentInstructions     = builtinSchema.WorkspaceContextRoleAgentInstructions
+	contextRoleAssistantInstructions = builtinSchema.WorkspaceContextRoleAssistantInstructions
+	contextRoleProjectReadme         = builtinSchema.WorkspaceContextRoleProjectReadme
 	contextRoleProjectContext        = "project-context"
 	contextRoleLabelKey              = "context.role"
 	contextMarkdownMediaType         = "text/markdown"
 
 	contextPreferenceNone          = ""
-	contextPreferenceIncludeReadme = "include-readme"
+	contextPreferenceIncludeReadme = builtinSchema.WorkspaceContextPreferenceIncludeReadme
 
 	contextPromptSeparator   = "\n\n"
 	contextPromptStartFormat = "<<<WORKSPACE_CONTEXT name=%q role=%q source=%q>>>\n"
@@ -45,26 +40,20 @@ type contextFileSupport struct {
 	RuntimeOrder     int
 }
 
-var contextConventionRegistry = []contextFileSupport{
-	{
-		FileName:         agentsFileName,
-		Role:             contextRoleAgentInstructions,
-		DefaultDiscovery: true,
-		RuntimeOrder:     100,
-	},
-	{
-		FileName:         claudeFileName,
-		Role:             contextRoleAssistantInstructions,
-		DefaultDiscovery: true,
-		RuntimeOrder:     200,
-	},
-	{
-		FileName:     readmeFileName,
-		Role:         contextRoleProjectReadme,
-		Preference:   contextPreferenceIncludeReadme,
-		RuntimeOrder: 300,
-	},
-}
+var contextConventionRegistry = func() []contextFileSupport {
+	input := builtinSchema.WorkspaceContextFileConventions()
+	output := make([]contextFileSupport, 0, len(input))
+	for _, value := range input {
+		output = append(output, contextFileSupport{
+			FileName:         string(value.FileName),
+			Role:             value.Role,
+			DefaultDiscovery: value.DefaultDiscovery,
+			Preference:       value.Preference,
+			RuntimeOrder:     value.RuntimeOrder,
+		})
+	}
+	return output
+}()
 
 func contextConventionFor(
 	locator basespec.Locator,
