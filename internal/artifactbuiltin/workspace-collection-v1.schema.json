@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://raw.githubusercontent.com/flexigpt/flexigpt-app/refs/heads/main/internal/builtin/schema/workspace-collection-v1.schema.json",
+	"$id": "https://raw.githubusercontent.com/flexigpt/flexigpt-app/refs/heads/main/internal/artifactbuiltin/workspace-collection-v1.schema.json",
 	"title": "FlexiGPT Workspace Collection",
 	"description": "Portable workspace.json manifest for a Workspace collection.",
 	"type": "object",

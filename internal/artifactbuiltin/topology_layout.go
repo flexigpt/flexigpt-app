@@ -72,8 +72,8 @@ const (
 	EmbeddedMCPDirectoryName         = "mcps"
 	EmbeddedSkillRegistryFileName    = "skill-registry.json"
 	EmbeddedMCPRegistryFileName      = "mcp_artifact_registry.json"
-	EmbeddedSkillDataRoot            = "data/skills"
-	EmbeddedMCPDataRoot              = "data/mcps"
+	EmbeddedSkillDataRoot            = "skills"
+	EmbeddedMCPDataRoot              = "mcps"
 	ExternalGitMetadataDirectoryName = ".git"
 )
 
