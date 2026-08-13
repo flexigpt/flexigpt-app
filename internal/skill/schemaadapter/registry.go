@@ -19,10 +19,6 @@ import (
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 )
 
-const (
-	RegistrySchemaVersion = "v1"
-)
-
 type Artifact struct {
 	ID      basespec.ArtifactID `json:"id"`
 	Member  basespec.Locator    `json:"member"`
@@ -44,17 +40,15 @@ type Registry struct {
 }
 
 type HydratedArtifact struct {
-	Registration      Artifact
-	Member            artifactbuiltin.ContentRef
-	SkillDefinition   definition.Definition
-	EmbeddedDirectory basespec.Locator
-	SourceDirectory   basespec.Locator
+	Registration    Artifact
+	Member          artifactbuiltin.ContentRef
+	SkillDefinition definition.Definition
 }
 
 type HydratedCollection struct {
 	Registration          Collection
 	Definition            artifactbuiltin.SkillCollectionV1
-	SourceScope           basespec.Locator
+	EmbeddedPackageRoot   basespec.Locator
 	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
 	Artifacts             []HydratedArtifact
 }
@@ -162,7 +156,7 @@ func (r Registry) Hydrate(
 }
 
 func (r Registry) Validate() error {
-	if r.SchemaVersion != RegistrySchemaVersion {
+	if r.SchemaVersion != artifactbuiltin.SkillCollectionV1SchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported built-in Skill registry schema %q",
 			basespec.ErrInvalid,
@@ -383,7 +377,7 @@ func hydrateCollection(
 	}
 	parsed, err := canonicalizer.CanonicalizeExpected(
 		ctx,
-		skillCollectionSchemaKey(),
+		artifactbuiltin.SkillCollectionV1SchemaKey,
 		hydratedRaw,
 	)
 	if err != nil {
@@ -420,7 +414,7 @@ func hydrateCollection(
 	output := HydratedCollection{
 		Registration:          registration,
 		Definition:            canonical,
-		SourceScope:           scope,
+		EmbeddedPackageRoot:   scope,
 		ExpectedMemberDigests: make(map[basespec.Locator]cryptoutil.Digest),
 		Artifacts:             make([]HydratedArtifact, 0, len(canonical.Members)),
 	}
@@ -477,11 +471,9 @@ func hydrateCollection(
 
 		output.ExpectedMemberDigests[memberLocator] = memberDigest
 		output.Artifacts = append(output.Artifacts, HydratedArtifact{
-			Registration:      registrationValue,
-			Member:            member,
-			SkillDefinition:   skillDefinition,
-			EmbeddedDirectory: embeddedDirectory,
-			SourceDirectory:   embeddedDirectory,
+			Registration:    registrationValue,
+			Member:          member,
+			SkillDefinition: skillDefinition,
 		})
 	}
 	return output, nil
@@ -502,13 +494,4 @@ func scopedLocator(
 		return "", err
 	}
 	return value, nil
-}
-
-func skillCollectionSchemaKey() shareable.SchemaKey {
-	return shareable.SchemaKey{
-		Entity:        shareable.EntityCollection,
-		Kind:          basespec.CollectionKind(artifactbuiltin.SkillCollectionV1Kind),
-		SchemaID:      basespec.SchemaID(artifactbuiltin.SkillCollectionV1SchemaID),
-		SchemaVersion: artifactbuiltin.SkillCollectionV1SchemaVersion,
-	}
 }

@@ -14,17 +14,17 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
-	SkillCollectionV1FileName      = "collection.json"
-	SkillCollectionV1Kind          = "skill.bundle"
-	SkillCollectionV1SchemaID      = "skill.bundle.v1"
-	SkillCollectionV1SchemaVersion = "v1"
-	SkillCollectionV1MemberFormat  = "agent.skill-entrypoint/v1"
-	SkillCollectionV1MemberRole    = "agent.skill"
+	SkillCollectionV1Kind          basespec.CollectionKind = "skill.bundle"
+	SkillCollectionV1SchemaID      basespec.SchemaID       = "skill.bundle.v1"
+	SkillCollectionV1SchemaVersion                         = "v1"
+	SkillCollectionV1MemberFormat                          = "agent.skill-entrypoint/v1"
+	SkillCollectionV1MemberRole                            = "agent.skill"
 )
 
 const (
@@ -34,6 +34,13 @@ const (
 
 //go:embed skill-collection-v1.schema.json
 var skillCollectionV1JSONSchema []byte
+
+var SkillCollectionV1SchemaKey = shareable.SchemaKey{
+	Entity:        shareable.EntityCollection,
+	Kind:          SkillCollectionV1Kind,
+	SchemaID:      SkillCollectionV1SchemaID,
+	SchemaVersion: SkillCollectionV1SchemaVersion,
+}
 
 func SkillCollectionV1JSONSchema() []byte {
 	return append([]byte(nil), skillCollectionV1JSONSchema...)
@@ -176,9 +183,9 @@ func (v SkillCollectionV1) Validate() error {
 	if err := v.ValidateEnvelope(); err != nil {
 		return err
 	}
-	if err := ValidateShareableCollectionMetadata(
-		v.LogicalName,
-		v.LogicalVersion,
+	if err := basespec.ValidatePortableMetadata(
+		basespec.LogicalName(v.LogicalName),
+		basespec.LogicalVersion(v.LogicalVersion),
 		v.DisplayName,
 		v.Description,
 		v.Labels,
@@ -222,14 +229,14 @@ func (v SkillCollectionV1) Validate() error {
 }
 
 func (v SkillCollectionV1) ValidateEnvelope() error {
-	if v.Kind != SkillCollectionV1Kind {
+	if v.Kind != string(SkillCollectionV1Kind) {
 		return fmt.Errorf(
 			"%w: skill collection kind must be %q",
 			basespec.ErrInvalid,
 			SkillCollectionV1Kind,
 		)
 	}
-	if v.SchemaID != SkillCollectionV1SchemaID {
+	if v.SchemaID != string(SkillCollectionV1SchemaID) {
 		return fmt.Errorf(
 			"%w: skill collection schema ID must be %q",
 			basespec.ErrInvalid,

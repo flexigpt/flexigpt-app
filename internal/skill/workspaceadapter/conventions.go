@@ -8,7 +8,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -61,7 +60,7 @@ func (r *ConventionRegistry) DiscoveryProfile() spec.DiscoveryProfile {
 				Root:      root.Root,
 				Recursive: root.Recursive,
 				IncludePatterns: []string{
-					string(skillArtifact.DefinitionFileName),
+					string(artifactbuiltin.AgentSkillDefinitionFileName),
 				},
 			},
 		)
@@ -85,7 +84,7 @@ func (r *ConventionRegistry) Match(
 	locator basespec.Locator,
 ) (SkillRootConvention, bool) {
 	value := string(locator)
-	if path.Base(value) != string(skillArtifact.DefinitionFileName) {
+	if path.Base(value) != string(artifactbuiltin.AgentSkillDefinitionFileName) {
 		return SkillRootConvention{}, false
 	}
 	for _, root := range r.Roots() {
@@ -99,7 +98,7 @@ func (r *ConventionRegistry) Match(
 				continue
 			}
 		}
-		if relative == string(skillArtifact.DefinitionFileName) {
+		if relative == string(artifactbuiltin.AgentSkillDefinitionFileName) {
 			continue
 		}
 		parent := path.Dir(relative)

@@ -237,7 +237,7 @@ func documentPackageFiles(
 ) ([]source.ManagedPackageFile, error) {
 	if len(supplied) == 0 {
 		supplied = []source.ManagedPackageFile{{
-			Locator: ManagedDocumentFileName,
+			Locator: artifactbuiltin.MCPBundleDocumentFileName,
 			Content: append([]byte(nil), canonicalDocument...),
 		}}
 	}
@@ -254,7 +254,7 @@ func documentPackageFiles(
 
 	foundDocument := false
 	for index := range publication.Files {
-		if publication.Files[index].Locator != ManagedDocumentFileName {
+		if publication.Files[index].Locator != artifactbuiltin.MCPBundleDocumentFileName {
 			continue
 		}
 		publication.Files[index].Content = append(
@@ -267,7 +267,7 @@ func documentPackageFiles(
 		return nil, fmt.Errorf(
 			"%w: MCP package does not contain canonical document %q",
 			basespec.ErrInvalid,
-			ManagedDocumentFileName,
+			artifactbuiltin.MCPBundleDocumentFileName,
 		)
 	}
 

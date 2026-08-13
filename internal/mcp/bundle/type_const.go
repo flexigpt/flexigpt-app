@@ -8,11 +8,6 @@ import (
 )
 
 const (
-	CollectionDataSchemaVersion = "v1"
-	AttachmentDataSchemaVersion = "v1"
-
-	DiscoveryPolicyRevision = "mcp.bundle.discovery.v1"
-
 	RoleManaged basespec.AttachmentRole = "managed"
 	RoleBuiltIn basespec.AttachmentRole = "builtin"
 )

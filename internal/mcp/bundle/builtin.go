@@ -12,7 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -89,7 +88,8 @@ func (a *API) EnsureBuiltIn(
 	if err != nil {
 		return Bundle{}, err
 	}
-	if sourceValue.Kind != managed.Kind || !sourceValue.Enabled {
+	if sourceValue.Kind != artifactbuiltin.ManagedDirectorySourceKind ||
+		!sourceValue.Enabled {
 		return Bundle{}, fmt.Errorf(
 			"%w: protected MCP Bundle requires an enabled managed Source",
 			basespec.ErrConflict,
@@ -97,8 +97,8 @@ func (a *API) EnsureBuiltIn(
 	}
 
 	collectionData, err := EncodeCollectionData(CollectionData{
-		SchemaVersion:           CollectionDataSchemaVersion,
-		DiscoveryPolicyRevision: DiscoveryPolicyRevision,
+		SchemaVersion:           artifactbuiltin.MCPSchemaVersion,
+		DiscoveryPolicyRevision: artifactbuiltin.DecoderRevision,
 		LogicalName:             document.LogicalName,
 		LogicalVersion:          document.LogicalVersion,
 		Labels:                  maps.Clone(document.Labels),
@@ -107,7 +107,7 @@ func (a *API) EnsureBuiltIn(
 		return Bundle{}, err
 	}
 	attachmentData, err := EncodeAttachmentData(AttachmentData{
-		SchemaVersion:  AttachmentDataSchemaVersion,
+		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
 		PackageAddress: request.PackageAddress,
 	})
 	if err != nil {

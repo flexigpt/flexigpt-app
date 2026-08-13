@@ -60,8 +60,8 @@ func (c skillCollectionCodec) Canonicalize(
 func (skillCollectionCodec) Key() shareable.SchemaKey {
 	return shareable.SchemaKey{
 		Entity:        shareable.EntityCollection,
-		Kind:          CollectionKind,
-		SchemaID:      basespec.SchemaID(artifactbuiltin.SkillCollectionV1SchemaID),
+		Kind:          artifactbuiltin.SkillCollectionV1Kind,
+		SchemaID:      artifactbuiltin.SkillCollectionV1SchemaID,
 		SchemaVersion: artifactbuiltin.SkillCollectionV1SchemaVersion,
 	}
 }

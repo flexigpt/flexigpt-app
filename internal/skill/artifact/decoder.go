@@ -7,6 +7,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
@@ -31,8 +32,8 @@ func (d *Decoder) Recognize(
 	_ context.Context,
 	candidate discovery.Candidate,
 ) discovery.Recognition {
-	if candidate.RequestsDecoder(DecoderID) &&
-		basespec.Locator(path.Base(string(candidate.Locator))) == DefinitionFileName {
+	if candidate.RequestsDecoder(DecoderID) && basespec.Locator(path.Base(
+		string(candidate.Locator))) == artifactbuiltin.AgentSkillDefinitionFileName {
 		return discovery.RecognitionPreferred
 	}
 	return discovery.RecognitionNone
@@ -43,7 +44,7 @@ func (d *Decoder) Decode(
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	if !candidate.RequestsDecoder(DecoderID) ||
-		basespec.Locator(path.Base(string(candidate.Locator))) != DefinitionFileName {
+		basespec.Locator(path.Base(string(candidate.Locator))) != artifactbuiltin.AgentSkillDefinitionFileName {
 		return nil, nil
 	}
 

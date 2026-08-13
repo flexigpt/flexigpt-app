@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -72,7 +73,7 @@ func managedTestSource() source.Source {
 		RootID:         "019d3150-6a21-7a6b-a34e-d9032342bc31",
 		RootStorageKey: "test-root",
 		StorageKey:     "managed-fixture",
-		Kind:           Kind,
+		Kind:           artifactbuiltin.ManagedDirectorySourceKind,
 		DisplayName:    "Managed fixture",
 		Enabled:        true,
 		Config:         []byte(`{}`),

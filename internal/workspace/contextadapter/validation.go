@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -62,7 +63,7 @@ func ValidateContextDefinition(
 			body.Role,
 		)
 	}
-	if body.MediaType != contextMarkdownMediaType {
+	if body.MediaType != string(artifactbuiltin.WorkspaceContextMediaTypeMarkdown) {
 		return fmt.Errorf(
 			"%w: unsupported Context media type %q",
 			spec.ErrInvalidWorkspace,

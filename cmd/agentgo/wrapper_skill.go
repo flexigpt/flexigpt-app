@@ -17,7 +17,6 @@ import (
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/skill/schemaadapter"
 	"github.com/flexigpt/flexigpt-app/internal/skill/workspaceadapter"
-	workspaceSpec "github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type SkillBundleWrapper struct {
@@ -78,13 +77,13 @@ func InitSkillBundleWrapper(
 		return err
 	}
 	if err := router.Register(
-		workspaceSpec.CollectionKind,
+		artifactbuiltin.WorkspaceCollectionV1Kind,
 		workspaceResolver,
 	); err != nil {
 		return err
 	}
 	if err := router.Register(
-		skillBundle.CollectionKind,
+		artifactbuiltin.SkillCollectionV1Kind,
 		bundleResolver,
 	); err != nil {
 		return err

@@ -23,11 +23,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-const (
-	Kind                 basespec.SourceKind = artifactbuiltin.ManagedDirectorySourceKind
-	managedDirectoryMode                     = artifactbuiltin.ArtifactStoreDirectoryMode
-)
-
 var errPackageDifferent = errors.New("managed package content differs")
 
 type config struct{}
@@ -91,7 +86,7 @@ func New(
 }
 
 func (*Adapter) Kind() basespec.SourceKind {
-	return Kind
+	return artifactbuiltin.ManagedDirectorySourceKind
 }
 
 func (a *Adapter) ResolveLocalPath(
@@ -318,7 +313,7 @@ func (a *Adapter) PublishPackage(
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(stagingRoot, managedDirectoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
 		return "", err
 	}
 
@@ -474,7 +469,7 @@ func (a *Adapter) RemovePackage(
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(stagingRoot, managedDirectoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
 		return err
 	}
 
@@ -566,7 +561,7 @@ func (a *Adapter) validateSource(ctx context.Context, value source.Source) error
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	if value.Kind != Kind {
+	if value.Kind != artifactbuiltin.ManagedDirectorySourceKind {
 		return fmt.Errorf(
 			"%w: managed adapter received source kind %q",
 			basespec.ErrInvalid,
@@ -604,7 +599,7 @@ func (a *Adapter) sourceRootPath(
 	if !create {
 		return root, nil
 	}
-	if err := os.MkdirAll(root, managedDirectoryMode); err != nil {
+	if err := os.MkdirAll(root, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
 		return "", err
 	}
 	return root, nil
@@ -628,7 +623,7 @@ func (a *Adapter) sourceStagingPath(
 	if !create {
 		return root, nil
 	}
-	if err := os.MkdirAll(root, managedDirectoryMode); err != nil {
+	if err := os.MkdirAll(root, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
 		return "", err
 	}
 	return root, nil
@@ -749,7 +744,7 @@ func managedPackagePath(
 	if parent != "." {
 		parentPath = filepath.Join(root, filepath.FromSlash(parent))
 		if createParent {
-			if err := os.MkdirAll(parentPath, managedDirectoryMode); err != nil {
+			if err := os.MkdirAll(parentPath, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
 				return "", err
 			}
 		}

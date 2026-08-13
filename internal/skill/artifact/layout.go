@@ -9,11 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-const (
-	ManagedPackageKind = artifactbuiltin.AgentSkillPackageKind
-	DefinitionFileName = artifactbuiltin.AgentSkillDefinitionFileName
-)
-
 func ManagedPackageAddressForSkill(
 	name basespec.LogicalName,
 	version basespec.LogicalVersion,
@@ -22,7 +17,7 @@ func ManagedPackageAddressForSkill(
 		version = artifactbuiltin.UnversionedPackageVersion
 	}
 	return source.NewManagedPackageAddress(
-		ManagedPackageKind,
+		artifactbuiltin.AgentSkillPackageKind,
 		name,
 		version,
 	)
@@ -34,7 +29,7 @@ func ManagedPackageLocatorForSkill(
 	if err := validateManagedSkillPackageAddress(address); err != nil {
 		return "", err
 	}
-	return address.FileLocator(DefinitionFileName)
+	return address.FileLocator(artifactbuiltin.AgentSkillDefinitionFileName)
 }
 
 func ManagedPackageAddressFromSkillLocator(
@@ -43,12 +38,12 @@ func ManagedPackageAddressFromSkillLocator(
 	if err := basespec.ValidatePortableLocator(locator, false); err != nil {
 		return source.ManagedPackageAddress{}, err
 	}
-	if path.Base(string(locator)) != string(DefinitionFileName) {
+	if path.Base(string(locator)) != string(artifactbuiltin.AgentSkillDefinitionFileName) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: Skill locator %q is not %q",
 			basespec.ErrInvalid,
 			locator,
-			DefinitionFileName,
+			artifactbuiltin.AgentSkillDefinitionFileName,
 		)
 	}
 
@@ -70,11 +65,11 @@ func validateManagedSkillPackageAddress(
 	if err := address.Validate(); err != nil {
 		return err
 	}
-	if address.Kind != ManagedPackageKind {
+	if address.Kind != artifactbuiltin.AgentSkillPackageKind {
 		return fmt.Errorf(
 			"%w: Skill package kind must be %q",
 			basespec.ErrInvalid,
-			ManagedPackageKind,
+			artifactbuiltin.AgentSkillPackageKind,
 		)
 	}
 	return nil

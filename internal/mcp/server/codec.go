@@ -39,12 +39,7 @@ func (ServerCodec) Canonicalize(
 }
 
 func (ServerCodec) Key() shareable.SchemaKey {
-	return shareable.SchemaKey{
-		Entity:        shareable.EntityArtifact,
-		Kind:          basespec.CollectionKind(artifactbuiltin.ServerKind),
-		SchemaID:      artifactbuiltin.ServerSchemaID,
-		SchemaVersion: artifactbuiltin.MCPSchemaVersion,
-	}
+	return artifactbuiltin.MCPServerSchemaKey
 }
 
 func parseServer(

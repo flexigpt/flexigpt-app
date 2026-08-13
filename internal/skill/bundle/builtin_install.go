@@ -83,11 +83,11 @@ func (a *API) InstallBuiltInCollection(
 	if err := request.PackageAddress.Validate(); err != nil {
 		return nil, err
 	}
-	if request.PackageAddress.Kind != BuiltInCollectionPackageKind {
+	if request.PackageAddress.Kind != artifactbuiltin.SkillBundlePackageKind {
 		return nil, fmt.Errorf(
 			"%w: built-in Skill collection package kind must be %q",
 			basespec.ErrInvalid,
-			BuiltInCollectionPackageKind,
+			artifactbuiltin.SkillBundlePackageKind,
 		)
 	}
 	if err := a.requireBundleMutation(ctx, request.Bundle.RootID, true); err != nil {
@@ -156,7 +156,7 @@ func (a *API) InstallBuiltInCollection(
 	hasCollectionFile := false
 	for _, file := range publication.Files {
 		filesByLocator[file.Locator] = append([]byte(nil), file.Content...)
-		if file.Locator == artifactbuiltin.SkillCollectionV1FileName {
+		if file.Locator == artifactbuiltin.SkillCollectionFileName {
 			hasCollectionFile = true
 		}
 	}
@@ -164,7 +164,7 @@ func (a *API) InstallBuiltInCollection(
 		return nil, fmt.Errorf(
 			"%w: built-in Collection package lacks %q",
 			basespec.ErrInvalid,
-			artifactbuiltin.SkillCollectionV1FileName,
+			artifactbuiltin.SkillCollectionFileName,
 		)
 	}
 
@@ -179,13 +179,13 @@ func (a *API) InstallBuiltInCollection(
 		if err := basespec.ValidatePortableLocator(skill.Member, false); err != nil {
 			return nil, fmt.Errorf("skills[%d]: %w", index, err)
 		}
-		if basespec.Locator(path.Base(string(skill.Member))) != skillArtifact.DefinitionFileName ||
+		if basespec.Locator(path.Base(string(skill.Member))) != artifactbuiltin.AgentSkillDefinitionFileName ||
 			path.Dir(string(skill.Member)) == "." {
 			return nil, fmt.Errorf(
 				"%w: built-in member %q is not a packaged %q",
 				basespec.ErrInvalid,
 				skill.Member,
-				skillArtifact.DefinitionFileName,
+				artifactbuiltin.AgentSkillDefinitionFileName,
 			)
 		}
 		if _, duplicate := seenArtifactIDs[skill.ArtifactID]; duplicate {

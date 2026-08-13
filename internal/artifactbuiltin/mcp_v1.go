@@ -43,12 +43,26 @@ const (
 	DecoderID       basespec.DecoderID = "mcp.bundle-json"
 )
 
-var MCPSchemaKey = shareable.SchemaKey{
-	Entity:        shareable.EntityCollection,
-	Kind:          BundleKind,
-	SchemaID:      BundleSchemaID,
-	SchemaVersion: MCPSchemaVersion,
-}
+var (
+	MCPBundleSchemaKey = shareable.SchemaKey{
+		Entity:        shareable.EntityCollection,
+		Kind:          BundleKind,
+		SchemaID:      BundleSchemaID,
+		SchemaVersion: MCPSchemaVersion,
+	}
+	MCPServerSchemaKey = shareable.SchemaKey{
+		Entity:        shareable.EntityArtifact,
+		Kind:          basespec.CollectionKind(ServerKind),
+		SchemaID:      ServerSchemaID,
+		SchemaVersion: MCPSchemaVersion,
+	}
+	MCPPolicySchemaKey = shareable.SchemaKey{
+		Entity:        shareable.EntityArtifact,
+		Kind:          basespec.CollectionKind(PolicyKind),
+		SchemaID:      PolicySchemaID,
+		SchemaVersion: MCPSchemaVersion,
+	}
+)
 
 func CheckCodecContext(ctx context.Context) error {
 	if ctx == nil {

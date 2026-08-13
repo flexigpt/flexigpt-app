@@ -8,6 +8,7 @@ import (
 	"sort"
 	"sync/atomic"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -1645,8 +1646,8 @@ func contextContributionViewOf(
 		SourceID:         value.SourceID,
 		Locator:          value.Locator,
 		Name:             value.Name,
-		Role:             WorkspaceContextRole(value.Role),
-		MediaType:        WorkspaceContextMediaType(value.MediaType),
+		Role:             artifactbuiltin.WorkspaceContextRole(value.Role),
+		MediaType:        artifactbuiltin.WorkspaceContextMediaType(value.MediaType),
 		Content:          value.Content,
 		ConventionOrder:  value.ConventionOrder,
 		OriginalBytes:    value.OriginalBytes,
@@ -1663,8 +1664,8 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 		SourceID:         value.SourceID,
 		Locator:          value.Locator,
 		Name:             value.Name,
-		Role:             WorkspaceContextRole(value.Role),
-		MediaType:        WorkspaceContextMediaType(value.MediaType),
+		Role:             artifactbuiltin.WorkspaceContextRole(value.Role),
+		MediaType:        artifactbuiltin.WorkspaceContextMediaType(value.MediaType),
 		Enabled:          value.Enabled,
 		State:            value.State,
 		CatalogCurrent:   value.CatalogCurrent,

@@ -232,7 +232,7 @@ func (i *Installer) EnsureHydration(
 }
 
 func (*Installer) BuiltInName() string {
-	return "mcp.bundle"
+	return string(artifactbuiltin.BundleKind)
 }
 
 // BuiltInIDs exposes only Collection and Artifact IDs. The generic bootstrap
@@ -331,7 +331,7 @@ func (i *Installer) prepareBundles(
 
 		parsed, err := i.documents.CanonicalizeExpected(
 			ctx,
-			bundle.BundleCodec{}.Key(),
+			artifactbuiltin.MCPBundleSchemaKey,
 			raw,
 		)
 		if err != nil {

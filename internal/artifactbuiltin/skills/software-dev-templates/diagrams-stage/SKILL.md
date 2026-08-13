@@ -22,5 +22,5 @@ Return _exactly one_ Mermaid fenced block followed by <= 3 bullets
 - Emphasize critical paths using `stroke="orange"`
 
 - Diagram scope={{diagramScope}}
-- Scenario="{{Scenario}}"
-- DetailLevel="{{detailLevel}}
+- Scenario="{{scenario}}"
+- DetailLevel="{{detailLevel}}"

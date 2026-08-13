@@ -9,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 type workspaceCollectionCodec struct{}
@@ -67,10 +66,5 @@ func (workspaceCollectionCodec) Canonicalize(
 }
 
 func workspaceShareableSchemaKey() shareable.SchemaKey {
-	return shareable.SchemaKey{
-		Entity:        shareable.EntityCollection,
-		Kind:          spec.CollectionKind,
-		SchemaID:      spec.WorkspaceDescriptorSchemaID,
-		SchemaVersion: spec.WorkspaceDescriptorSchemaVersion,
-	}
+	return artifactbuiltin.WorkspaceCollectionV1SchemaKey
 }

@@ -12,6 +12,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+type (
+	WorkspaceContextRole      string
+	WorkspaceContextMediaType string
+)
+
 const (
 	ApplicationDataDirectoryName = "flexigpt"
 
@@ -53,7 +58,6 @@ const (
 
 	RepositoryRootLocator       basespec.Locator = "."
 	WorkspaceDescriptorFileName basespec.Locator = "workspace.json"
-	WorkspaceDescriptorLocator  basespec.Locator = "workspace.json"
 	WorkspaceSkillRootLocator   basespec.Locator = "skills"
 	WorkspaceMarkdownPattern                     = "*.md"
 
@@ -61,15 +65,13 @@ const (
 	WorkspaceClaudeFileName basespec.Locator = "CLAUDE.md"
 	WorkspaceReadmeFileName basespec.Locator = "README.md"
 
-	WorkspaceContextRoleAgentInstructions     = "agent-instructions"
-	WorkspaceContextRoleAssistantInstructions = "assistant-instructions"
-	WorkspaceContextRoleProjectReadme         = "project-readme"
-	WorkspaceContextRoleProjectContext        = "project-context"
-	WorkspaceContextPreferenceIncludeReadme   = "include-readme"
+	WorkspaceContextRoleAgentInstructions     WorkspaceContextRole      = "agent-instructions"
+	WorkspaceContextRoleAssistantInstructions WorkspaceContextRole      = "assistant-instructions"
+	WorkspaceContextRoleProjectReadme         WorkspaceContextRole      = "project-readme"
+	WorkspaceContextRoleProjectContext        WorkspaceContextRole      = "project-context"
+	WorkspaceContextMediaTypeMarkdown         WorkspaceContextMediaType = "text/markdown"
+	WorkspaceContextPreferenceIncludeReadme                             = "include-readme"
 
-	EmbeddedDataDirectoryName        = "data"
-	EmbeddedSkillsDirectoryName      = "skills"
-	EmbeddedMCPDirectoryName         = "mcps"
 	EmbeddedSkillRegistryFileName    = "skill-registry.json"
 	EmbeddedMCPRegistryFileName      = "mcp_artifact_registry.json"
 	EmbeddedSkillDataRoot            = "skills"
@@ -107,7 +109,7 @@ const (
 
 type WorkspaceContextFileConvention struct {
 	FileName         basespec.Locator
-	Role             string
+	Role             WorkspaceContextRole
 	DefaultDiscovery bool
 	Preference       string
 	RuntimeOrder     int

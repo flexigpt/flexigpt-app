@@ -82,7 +82,7 @@ func (l *DescriptorLoader) Load(
 		SourceID:   sourceValue.ID,
 		Generation: snapshot.Generation(),
 	}
-	entry, err := snapshot.Stat(ctx, spec.DescriptorLocator)
+	entry, err := snapshot.Stat(ctx, artifactbuiltin.WorkspaceDescriptorFileName)
 
 	// A missing descriptor is valid. Its source generation remains a refresh
 	// precondition so a descriptor cannot appear or disappear between bootstrap
@@ -103,12 +103,12 @@ func (l *DescriptorLoader) Load(
 			err,
 		)
 	}
-	if entry.Locator != spec.DescriptorLocator {
+	if entry.Locator != artifactbuiltin.WorkspaceDescriptorFileName {
 		return DescriptorObservation{}, fmt.Errorf(
 			"%w: Source returned %q for Workspace descriptor %q",
 			spec.ErrWorkspaceDefinitionInvalid,
 			entry.Locator,
-			spec.DescriptorLocator,
+			artifactbuiltin.WorkspaceDescriptorFileName,
 		)
 	}
 	if !entry.IsRegular ||
@@ -136,17 +136,12 @@ func (l *DescriptorLoader) Load(
 			err,
 		)
 	}
-	expectedKey := shareable.SchemaKey{
-		Entity:        shareable.EntityCollection,
-		Kind:          spec.CollectionKind,
-		SchemaID:      spec.WorkspaceDescriptorSchemaID,
-		SchemaVersion: spec.WorkspaceDescriptorSchemaVersion,
-	}
+	expectedKey := artifactbuiltin.WorkspaceCollectionV1SchemaKey
 	if document.Key != expectedKey {
 		return DescriptorObservation{}, fmt.Errorf(
 			"%w: descriptor schema does not identify %q",
 			spec.ErrWorkspaceDefinitionInvalid,
-			spec.CollectionKind,
+			artifactbuiltin.WorkspaceCollectionV1Kind,
 		)
 	}
 
@@ -171,7 +166,7 @@ func (l *DescriptorLoader) Load(
 	}
 
 	descriptorDirectory, err := documentBaseLocator(
-		spec.DescriptorLocator,
+		artifactbuiltin.WorkspaceDescriptorFileName,
 	)
 	if err != nil {
 		return DescriptorObservation{}, fmt.Errorf(

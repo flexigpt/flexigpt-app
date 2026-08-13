@@ -22,7 +22,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
@@ -194,7 +193,7 @@ func (a *API) Create(
 		source.Draft{
 			ID:          request.SourceID,
 			StorageKey:  request.SourceStorageKey,
-			Kind:        managed.Kind,
+			Kind:        artifactbuiltin.ManagedDirectorySourceKind,
 			DisplayName: displayName(document),
 			Enabled:     true,
 			Config:      json.RawMessage(jsonutil.EmptyObject),
@@ -219,8 +218,8 @@ func (a *API) Create(
 	}
 
 	collectionData, err := EncodeCollectionData(CollectionData{
-		SchemaVersion:           CollectionDataSchemaVersion,
-		DiscoveryPolicyRevision: DiscoveryPolicyRevision,
+		SchemaVersion:           artifactbuiltin.MCPSchemaVersion,
+		DiscoveryPolicyRevision: artifactbuiltin.DecoderRevision,
 		LogicalName:             document.LogicalName,
 		LogicalVersion:          document.LogicalVersion,
 		Labels:                  maps.Clone(document.Labels),
@@ -230,7 +229,7 @@ func (a *API) Create(
 		return Bundle{}, cleanupSource(err)
 	}
 	attachmentData, err := EncodeAttachmentData(AttachmentData{
-		SchemaVersion:  AttachmentDataSchemaVersion,
+		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
 		PackageAddress: packageAddress,
 	})
 	if err != nil {
@@ -467,7 +466,7 @@ func (a *API) Get(
 	if err != nil {
 		return Bundle{}, err
 	}
-	if sourceValue.Kind != managed.Kind {
+	if sourceValue.Kind != artifactbuiltin.ManagedDirectorySourceKind {
 		return Bundle{}, fmt.Errorf(
 			"%w: MCP Bundle requires a managed Source",
 			basespec.ErrInvalid,
@@ -511,7 +510,7 @@ func (a *API) discoveryPlan(
 		Authoritative: true,
 	}.Normalized()
 	return discovery.Plan{
-		Revision: DiscoveryPolicyRevision,
+		Revision: artifactbuiltin.DecoderRevision,
 		Sources:  []discovery.SourcePlan{p},
 	}
 }

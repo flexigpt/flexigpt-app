@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -15,21 +16,6 @@ import (
 )
 
 type WorkspaceRef = collection.CollectionRef
-
-type WorkspaceContextRole string
-
-const (
-	WorkspaceContextRoleAgentInstructions     WorkspaceContextRole = "agent-instructions"
-	WorkspaceContextRoleAssistantInstructions WorkspaceContextRole = "assistant-instructions"
-	WorkspaceContextRoleProjectReadme         WorkspaceContextRole = "project-readme"
-	WorkspaceContextRoleProjectContext        WorkspaceContextRole = "project-context"
-)
-
-type WorkspaceContextMediaType string
-
-const (
-	WorkspaceContextMediaTypeMarkdown WorkspaceContextMediaType = "text/markdown"
-)
 
 type WorkspaceSkillInsert string
 
@@ -212,19 +198,19 @@ type WorkspaceRefreshResult struct {
 }
 
 type WorkspaceContextContribution struct {
-	Artifact         artifact.ArtifactRef      `json:"artifact"`
-	RecordRevision   uint64                    `json:"recordRevision"`
-	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
-	SourceID         basespec.SourceID         `json:"sourceID"`
-	Locator          basespec.Locator          `json:"locator"`
-	Name             string                    `json:"name"`
-	Role             WorkspaceContextRole      `json:"role"`
-	MediaType        WorkspaceContextMediaType `json:"mediaType"`
-	Content          string                    `json:"content"`
-	ConventionOrder  int                       `json:"conventionOrder"`
-	OriginalBytes    int                       `json:"originalBytes"`
-	IncludedBytes    int                       `json:"includedBytes"`
-	Truncated        bool                      `json:"truncated"`
+	Artifact         artifact.ArtifactRef                      `json:"artifact"`
+	RecordRevision   uint64                                    `json:"recordRevision"`
+	DefinitionDigest cryptoutil.Digest                         `json:"definitionDigest"`
+	SourceID         basespec.SourceID                         `json:"sourceID"`
+	Locator          basespec.Locator                          `json:"locator"`
+	Name             string                                    `json:"name"`
+	Role             artifactbuiltin.WorkspaceContextRole      `json:"role"`
+	MediaType        artifactbuiltin.WorkspaceContextMediaType `json:"mediaType"`
+	Content          string                                    `json:"content"`
+	ConventionOrder  int                                       `json:"conventionOrder"`
+	OriginalBytes    int                                       `json:"originalBytes"`
+	IncludedBytes    int                                       `json:"includedBytes"`
+	Truncated        bool                                      `json:"truncated"`
 }
 
 type WorkspaceContextDecision struct {
@@ -246,20 +232,20 @@ type WorkspaceContextLoadPlan struct {
 }
 
 type WorkspaceContextView struct {
-	Artifact         artifact.ArtifactRef      `json:"artifact"`
-	RecordRevision   uint64                    `json:"recordRevision"`
-	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
-	SourceID         basespec.SourceID         `json:"sourceID"`
-	Locator          basespec.Locator          `json:"locator"`
-	Name             string                    `json:"name"`
-	Role             WorkspaceContextRole      `json:"role"`
-	MediaType        WorkspaceContextMediaType `json:"mediaType"`
-	Enabled          bool                      `json:"enabled"`
-	State            artifact.State            `json:"state"`
-	CatalogCurrent   bool                      `json:"catalogCurrent"`
-	ProjectionValid  bool                      `json:"projectionValid"`
-	RuntimeDisabled  bool                      `json:"runtimeDisabled"`
-	Diagnostics      []diagnostic.Diagnostic   `json:"diagnostics,omitempty"`
+	Artifact         artifact.ArtifactRef                      `json:"artifact"`
+	RecordRevision   uint64                                    `json:"recordRevision"`
+	DefinitionDigest cryptoutil.Digest                         `json:"definitionDigest"`
+	SourceID         basespec.SourceID                         `json:"sourceID"`
+	Locator          basespec.Locator                          `json:"locator"`
+	Name             string                                    `json:"name"`
+	Role             artifactbuiltin.WorkspaceContextRole      `json:"role"`
+	MediaType        artifactbuiltin.WorkspaceContextMediaType `json:"mediaType"`
+	Enabled          bool                                      `json:"enabled"`
+	State            artifact.State                            `json:"state"`
+	CatalogCurrent   bool                                      `json:"catalogCurrent"`
+	ProjectionValid  bool                                      `json:"projectionValid"`
+	RuntimeDisabled  bool                                      `json:"runtimeDisabled"`
+	Diagnostics      []diagnostic.Diagnostic                   `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceContextInspectionView struct {

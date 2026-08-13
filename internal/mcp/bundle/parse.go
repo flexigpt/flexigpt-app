@@ -24,7 +24,7 @@ import (
 func BundleFromParsedDocument(
 	input shareable.ParsedDocument,
 ) (BundleDocument, error) {
-	expected := artifactbuiltin.MCPSchemaKey
+	expected := artifactbuiltin.MCPBundleSchemaKey
 	if err := validateParsedMCPDocument(
 		input,
 		expected,

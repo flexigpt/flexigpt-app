@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
@@ -218,7 +219,7 @@ func plannerTestWorkspace(t *testing.T) spec.Workspace {
 		Collection: collection.Collection{
 			ID:          collectionID,
 			RootID:      rootID,
-			Kind:        spec.CollectionKind,
+			Kind:        artifactbuiltin.WorkspaceCollectionV1Kind,
 			DisplayName: "Workspace",
 			Enabled:     true,
 			Data:        collectionData,

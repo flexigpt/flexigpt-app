@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
@@ -42,7 +43,7 @@ func DiscoveryProfile() spec.DiscoveryProfile {
 				profile.ExplicitLocators,
 				locator,
 			)
-		case convention.Preference == contextPreferenceIncludeReadme:
+		case convention.Preference == artifactbuiltin.WorkspaceContextPreferenceIncludeReadme:
 			profile.ReadmeLocator = locator
 		}
 	}
@@ -94,14 +95,14 @@ func (*ContextDecoder) Decode(
 			return nil, nil
 		}
 		convention = contextFileSupport{
-			Role: contextRoleProjectContext,
+			Role: artifactbuiltin.WorkspaceContextRoleProjectContext,
 		}
 	}
 
 	document := contextDefinition{
 		Name:      name,
-		Role:      convention.Role,
-		MediaType: contextMarkdownMediaType,
+		Role:      string(convention.Role),
+		MediaType: string(artifactbuiltin.WorkspaceContextMediaTypeMarkdown),
 		Content: strings.ReplaceAll(
 			strings.ReplaceAll(string(candidate.Content), "\r\n", "\n"),
 			"\r",
@@ -127,7 +128,7 @@ func (*ContextDecoder) Decode(
 		LogicalName:   contextLogicalName(name),
 		DisplayName:   name,
 		Labels: map[string]string{
-			contextRoleLabelKey: convention.Role,
+			contextRoleLabelKey: string(convention.Role),
 		},
 		Body: raw,
 	}

@@ -2,7 +2,6 @@ package bundle
 
 import (
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -12,9 +11,6 @@ import (
 )
 
 const (
-	CollectionKind basespec.CollectionKind = artifactbuiltin.SkillCollectionV1Kind
-
-	CollectionSchemaVersion = "v1"
 	DiscoveryPolicyRevision = "skill.bundle.discovery.v1"
 
 	RoleManaged  basespec.AttachmentRole = "managed"

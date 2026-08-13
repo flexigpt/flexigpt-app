@@ -335,9 +335,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"logicalVersion": {
-					"type": "string",
-					"minLength": 1,
-					"maxLength": 256
+					"$ref": "#/$defs/name"
 				},
 				"displayName": {
 					"type": "string",

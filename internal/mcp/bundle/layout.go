@@ -9,11 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-const (
-	ManagedPackageKind      = artifactbuiltin.MCPBundlePackageKind
-	ManagedDocumentFileName = artifactbuiltin.MCPBundleDocumentFileName
-)
-
 func PackageAddressForBundle(
 	logicalName basespec.LogicalName,
 	logicalVersion basespec.LogicalVersion,
@@ -22,7 +17,7 @@ func PackageAddressForBundle(
 		logicalVersion = artifactbuiltin.UnversionedPackageVersion
 	}
 	return source.NewManagedPackageAddress(
-		ManagedPackageKind,
+		artifactbuiltin.MCPBundlePackageKind,
 		logicalName,
 		logicalVersion,
 	)
@@ -34,26 +29,26 @@ func DocumentLocatorForPackage(
 	if err := validateBundlePackageAddress(address); err != nil {
 		return "", err
 	}
-	return address.FileLocator(ManagedDocumentFileName)
+	return address.FileLocator(artifactbuiltin.MCPBundleDocumentFileName)
 }
 
 func ValidateDocumentLocator(value basespec.Locator) error {
 	if err := basespec.ValidatePortableLocator(value, false); err != nil {
 		return err
 	}
-	if path.Base(string(value)) != string(ManagedDocumentFileName) ||
+	if path.Base(string(value)) != string(artifactbuiltin.MCPBundleDocumentFileName) ||
 		path.Dir(string(value)) == "." {
 		return fmt.Errorf(
 			"%w: MCP Bundle document locator must be nested and named %q",
 			basespec.ErrInvalid,
-			ManagedDocumentFileName,
+			artifactbuiltin.MCPBundleDocumentFileName,
 		)
 	}
 	return nil
 }
 
 func IsBundleDocumentLocator(value basespec.Locator) bool {
-	return path.Base(string(value)) == string(ManagedDocumentFileName)
+	return path.Base(string(value)) == string(artifactbuiltin.MCPBundleDocumentFileName)
 }
 
 func validateBundlePackageAddress(
@@ -62,11 +57,11 @@ func validateBundlePackageAddress(
 	if err := address.Validate(); err != nil {
 		return err
 	}
-	if address.Kind != ManagedPackageKind {
+	if address.Kind != artifactbuiltin.MCPBundlePackageKind {
 		return fmt.Errorf(
 			"%w: MCP Bundle package kind must be %q",
 			basespec.ErrInvalid,
-			ManagedPackageKind,
+			artifactbuiltin.MCPBundlePackageKind,
 		)
 	}
 	return nil

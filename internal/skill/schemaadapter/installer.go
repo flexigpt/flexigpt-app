@@ -12,7 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/skill/bundle"
 )
@@ -70,11 +69,11 @@ func NewInstaller(
 		return nil, err
 	}
 	if len(builtInTopology.Sources) != 1 ||
-		builtInTopology.Sources[0].Kind != managed.Kind {
+		builtInTopology.Sources[0].Kind != artifactbuiltin.ManagedDirectorySourceKind {
 		return nil, fmt.Errorf(
 			"%w: built-in Source kind must be %q",
 			basespec.ErrInvalid,
-			managed.Kind,
+			artifactbuiltin.ManagedDirectorySourceKind,
 		)
 	}
 	hydrated, err := dependencies.SkillRegistry.Hydrate(
@@ -94,7 +93,7 @@ func NewInstaller(
 }
 
 func (*Installer) BuiltInName() string {
-	return "agent.skill"
+	return string(artifactbuiltin.AgentSkillPackageKind)
 }
 
 func (i *Installer) BuiltInIDs() []string {
@@ -121,7 +120,7 @@ func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
 	}
 	output := make([]basespec.Locator, 0, len(i.hydrated.Collections))
 	for _, value := range i.hydrated.OrderedCollections() {
-		output = append(output, value.SourceScope)
+		output = append(output, value.EmbeddedPackageRoot)
 	}
 	return output
 }
@@ -174,7 +173,7 @@ func (i *Installer) EnsureBuiltInArtifacts(
 		}
 		files, err := i.packageFiles(
 			ctx,
-			value.SourceScope,
+			value.EmbeddedPackageRoot,
 			value.Definition,
 			packageAddress,
 		)
@@ -422,7 +421,7 @@ func (i *Installer) packageFiles(
 	foundDocument := false
 	for _, file := range embeddedFiles {
 		content := append([]byte(nil), file.Content...)
-		if file.Locator == artifactbuiltin.SkillCollectionV1FileName {
+		if file.Locator == artifactbuiltin.SkillCollectionFileName {
 			content = append([]byte(nil), canonicalDocument...)
 			foundDocument = true
 		}
@@ -435,7 +434,7 @@ func (i *Installer) packageFiles(
 		return nil, fmt.Errorf(
 			"%w: built-in package lacks %q",
 			basespec.ErrInvalid,
-			artifactbuiltin.SkillCollectionV1FileName,
+			artifactbuiltin.SkillCollectionFileName,
 		)
 	}
 

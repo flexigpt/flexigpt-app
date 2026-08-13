@@ -6,7 +6,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -29,12 +28,12 @@ func TestConventionRegistryNormalizesAndOwnsRoots(t *testing.T) {
 
 	profile := registry.DiscoveryProfile()
 	if len(profile.DirectoryRoots) != 2 ||
-		profile.DirectoryRoots[0].IncludePatterns[0] != string(skillArtifact.DefinitionFileName) {
+		profile.DirectoryRoots[0].IncludePatterns[0] != string(artifactbuiltin.AgentSkillDefinitionFileName) {
 		t.Fatalf("DiscoveryProfile=%#v", profile)
 	}
 	profile.DirectoryRoots[0].IncludePatterns[0] = "changed"
 	if fresh := registry.DiscoveryProfile(); fresh.DirectoryRoots[0].IncludePatterns[0] != string(
-		skillArtifact.DefinitionFileName,
+		artifactbuiltin.AgentSkillDefinitionFileName,
 	) {
 		t.Fatalf("DiscoveryProfile leaked mutable state: %#v", fresh)
 	}

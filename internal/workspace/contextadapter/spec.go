@@ -17,15 +17,7 @@ const (
 )
 
 const (
-	contextRoleAgentInstructions     = artifactbuiltin.WorkspaceContextRoleAgentInstructions
-	contextRoleAssistantInstructions = artifactbuiltin.WorkspaceContextRoleAssistantInstructions
-	contextRoleProjectReadme         = artifactbuiltin.WorkspaceContextRoleProjectReadme
-	contextRoleProjectContext        = "project-context"
-	contextRoleLabelKey              = "context.role"
-	contextMarkdownMediaType         = "text/markdown"
-
-	contextPreferenceNone          = ""
-	contextPreferenceIncludeReadme = artifactbuiltin.WorkspaceContextPreferenceIncludeReadme
+	contextRoleLabelKey = "context.role"
 
 	contextPromptSeparator   = "\n\n"
 	contextPromptStartFormat = "<<<WORKSPACE_CONTEXT name=%q role=%q source=%q>>>\n"
@@ -34,7 +26,7 @@ const (
 
 type contextFileSupport struct {
 	FileName         string
-	Role             string
+	Role             artifactbuiltin.WorkspaceContextRole
 	DefaultDiscovery bool
 	Preference       string
 	RuntimeOrder     int
@@ -68,11 +60,11 @@ func contextConventionFor(
 }
 
 func supportedContextRole(role string) bool {
-	switch role {
-	case contextRoleAgentInstructions,
-		contextRoleAssistantInstructions,
-		contextRoleProjectReadme,
-		contextRoleProjectContext:
+	switch artifactbuiltin.WorkspaceContextRole(role) {
+	case artifactbuiltin.WorkspaceContextRoleAgentInstructions,
+		artifactbuiltin.WorkspaceContextRoleAssistantInstructions,
+		artifactbuiltin.WorkspaceContextRoleProjectReadme,
+		artifactbuiltin.WorkspaceContextRoleProjectContext:
 		return true
 	default:
 		return false

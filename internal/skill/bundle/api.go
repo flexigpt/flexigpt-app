@@ -13,6 +13,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -83,7 +84,7 @@ func (a *API) ListBundles(
 
 	output := make([]Bundle, 0)
 	for _, value := range values {
-		if value.Kind != CollectionKind {
+		if value.Kind != artifactbuiltin.SkillCollectionV1Kind {
 			continue
 		}
 		bundle, err := a.GetBundle(ctx, value.Ref())
@@ -205,7 +206,7 @@ func (a *API) PurgeBundle(
 	if err != nil {
 		return err
 	}
-	if value.Kind != CollectionKind {
+	if value.Kind != artifactbuiltin.SkillCollectionV1Kind {
 		return fmt.Errorf(
 			"%w: collection %q is not a retired skill bundle",
 			basespec.ErrNotFound,
@@ -227,13 +228,13 @@ func (a *API) PurgeBundle(
 		if err != nil {
 			return err
 		}
-		if ownedSource.Kind != managed.Kind {
+		if ownedSource.Kind != artifactbuiltin.ManagedDirectorySourceKind {
 			return fmt.Errorf(
 				"%w: bundle-owned managed Source %q has kind %q, not %q",
 				basespec.ErrInvalid,
 				data.ManagedSourceID,
 				ownedSource.Kind,
-				managed.Kind,
+				artifactbuiltin.ManagedDirectorySourceKind,
 			)
 		}
 	}
@@ -750,7 +751,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 	}
 	if !builtInBundleTopologyMatches(bundle, request) {
 		data, err := EncodeCollectionData(CollectionData{
-			SchemaVersion:           CollectionSchemaVersion,
+			SchemaVersion:           artifactbuiltin.SkillCollectionV1SchemaVersion,
 			DiscoveryPolicyRevision: DiscoveryPolicyRevision,
 			LogicalName:             request.LogicalName,
 			LogicalVersion:          request.LogicalVersion,
@@ -862,7 +863,7 @@ func (a *API) GetBundle(
 	if err != nil {
 		return Bundle{}, err
 	}
-	if value.Kind != CollectionKind {
+	if value.Kind != artifactbuiltin.SkillCollectionV1Kind {
 		return Bundle{}, fmt.Errorf(
 			"%w: collection %q is not a skill bundle",
 			basespec.ErrNotFound,
@@ -1028,7 +1029,7 @@ func (a *API) createBundle(
 	}
 
 	data, err := EncodeCollectionData(CollectionData{
-		SchemaVersion:           CollectionSchemaVersion,
+		SchemaVersion:           artifactbuiltin.SkillCollectionV1SchemaVersion,
 		DiscoveryPolicyRevision: DiscoveryPolicyRevision,
 		LogicalName:             request.LogicalName,
 		LogicalVersion:          request.LogicalVersion,
@@ -1107,7 +1108,7 @@ func (a *API) createBundle(
 			source.Draft{
 				ID:          request.ManagedSourceID,
 				StorageKey:  request.ManagedSourceStorageKey,
-				Kind:        managed.Kind,
+				Kind:        artifactbuiltin.ManagedDirectorySourceKind,
 				DisplayName: request.DisplayName,
 				Enabled:     true,
 				Config:      json.RawMessage(jsonutil.EmptyObject),
@@ -1154,7 +1155,7 @@ func (a *API) createBundle(
 		request.RootID,
 		collection.Draft{
 			ID:          request.CollectionID,
-			Kind:        CollectionKind,
+			Kind:        artifactbuiltin.SkillCollectionV1Kind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
 			Enabled:     request.Enabled,
@@ -1201,7 +1202,7 @@ func bundleCreationIntentMatches(
 ) bool {
 	if value.Collection.RootID != request.RootID ||
 		value.Collection.ID != request.CollectionID ||
-		value.Collection.Kind != CollectionKind {
+		value.Collection.Kind != artifactbuiltin.SkillCollectionV1Kind {
 		return false
 	}
 	if value.Collection.ID != request.CollectionID ||
@@ -1269,7 +1270,7 @@ func bundleCreationIntentMatches(
 				continue
 			}
 			found = sourceValue.RootID == request.RootID &&
-				sourceValue.Kind == managed.Kind &&
+				sourceValue.Kind == artifactbuiltin.ManagedDirectorySourceKind &&
 				sourceValue.DisplayName == request.DisplayName &&
 				sourceValue.Enabled
 			break
@@ -1881,12 +1882,12 @@ func validateRoleSourceKind(
 ) error {
 	switch role {
 	case RoleManaged, RoleBuiltIn:
-		if kind != managed.Kind {
+		if kind != artifactbuiltin.ManagedDirectorySourceKind {
 			return fmt.Errorf(
 				"%w: skill bundle role %q requires source kind %q",
 				basespec.ErrInvalid,
 				role,
-				managed.Kind,
+				artifactbuiltin.ManagedDirectorySourceKind,
 			)
 		}
 	case RoleExternal, RoleLibrary:
@@ -1930,7 +1931,7 @@ func (a *API) discoveryPlan(value Bundle) (discovery.Plan, error) {
 			DirectoryRoots: []discovery.DirectoryRoot{{
 				Root:            attachmentData.DiscoveryRoot,
 				Recursive:       true,
-				IncludePatterns: []string{string(skillArtifact.DefinitionFileName)},
+				IncludePatterns: []string{string(artifactbuiltin.AgentSkillDefinitionFileName)},
 			}},
 			DecoderHints: []discovery.DecoderHint{{
 				Locator:    attachmentData.DiscoveryRoot,
@@ -2097,7 +2098,7 @@ func normalizeManagedSkillFiles(
 			)
 		}
 		return []source.ManagedPackageFile{{
-			Locator: skillArtifact.DefinitionFileName,
+			Locator: artifactbuiltin.AgentSkillDefinitionFileName,
 			Content: append([]byte(nil), skillMD...),
 		}}, append([]byte(nil), skillMD...), nil
 	}
@@ -2109,7 +2110,7 @@ func normalizeManagedSkillFiles(
 
 	var found []byte
 	for _, file := range normalized {
-		if file.Locator != skillArtifact.DefinitionFileName {
+		if file.Locator != artifactbuiltin.AgentSkillDefinitionFileName {
 			continue
 		}
 		found = append([]byte(nil), file.Content...)
@@ -2119,7 +2120,7 @@ func normalizeManagedSkillFiles(
 		return nil, nil, fmt.Errorf(
 			"%w: managed skill package must contain %q",
 			basespec.ErrInvalid,
-			skillArtifact.DefinitionFileName,
+			artifactbuiltin.AgentSkillDefinitionFileName,
 		)
 	}
 	if len(skillMD) != 0 && !bytes.Equal(skillMD, found) {

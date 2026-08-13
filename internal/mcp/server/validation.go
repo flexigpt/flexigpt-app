@@ -762,12 +762,13 @@ func validateExtension(
 	name string,
 	value ServerExtension,
 ) error {
-	if err := basespec.ValidateOptionalText(
-		"MCP server logical version",
-		string(value.LogicalVersion),
-		basespec.MaxVersionBytes,
-	); err != nil {
-		return err
+	if value.LogicalVersion != "" {
+		if err := basespec.ValidatePortableName(
+			"MCP server logical version",
+			string(value.LogicalVersion),
+		); err != nil {
+			return err
+		}
 	}
 	if err := basespec.ValidateRequiredText(
 		"MCP server display name",

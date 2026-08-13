@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -33,7 +34,7 @@ func DecodeAttachmentData(
 func EncodeAttachmentData(
 	value AttachmentData,
 ) (json.RawMessage, error) {
-	if value.SchemaVersion != AttachmentDataSchemaVersion {
+	if value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
 		return nil, fmt.Errorf(
 			"%w: invalid MCP Bundle attachment data schema",
 			basespec.ErrInvalid,

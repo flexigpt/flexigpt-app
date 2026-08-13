@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -28,12 +29,12 @@ func ResolveRuntimePackage(
 			basespec.ErrUnsupported,
 		)
 	}
-	if basespec.Locator(path.Base(string(locator))) != DefinitionFileName {
+	if basespec.Locator(path.Base(string(locator))) != artifactbuiltin.AgentSkillDefinitionFileName {
 		return "", fmt.Errorf(
 			"%w: Agent Skill locator %q is not %q",
 			basespec.ErrInvalid,
 			locator,
-			DefinitionFileName,
+			artifactbuiltin.AgentSkillDefinitionFileName,
 		)
 	}
 

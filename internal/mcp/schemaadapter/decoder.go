@@ -43,7 +43,7 @@ func (d *Decoder) BindShareableSchemas(
 		)
 	}
 
-	expected := artifactbuiltin.MCPSchemaKey
+	expected := artifactbuiltin.MCPBundleSchemaKey
 	if slices.Contains(schemas.Keys(), expected) {
 		d.documents = schemas
 		return nil
@@ -83,7 +83,7 @@ func (d *Decoder) Decode(
 
 	parsed, err := d.documents.CanonicalizeExpected(
 		ctx,
-		artifactbuiltin.MCPSchemaKey,
+		artifactbuiltin.MCPBundleSchemaKey,
 		candidate.Content,
 	)
 	if err != nil {

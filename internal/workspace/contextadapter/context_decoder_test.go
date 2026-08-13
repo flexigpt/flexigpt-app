@@ -53,15 +53,16 @@ func TestContextDecoderRecognitionAndDecode(t *testing.T) {
 		value.SchemaVersion != workspaceContextSchemaVersionV1 ||
 		value.LogicalName != "agents" ||
 		value.DisplayName != string(artifactbuiltin.WorkspaceAgentsFileName) ||
-		value.Labels[contextRoleLabelKey] != contextRoleAgentInstructions {
+		value.Labels[contextRoleLabelKey] != string(artifactbuiltin.WorkspaceContextRoleAgentInstructions) {
 		t.Fatalf("definition=%#v", value)
 	}
 	var body contextDefinition
 	if err := json.Unmarshal(value.Body, &body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if body.Content != "first\nsecond\nthird\n" || body.Role != contextRoleAgentInstructions ||
-		body.MediaType != contextMarkdownMediaType {
+	if body.Content != "first\nsecond\nthird\n" ||
+		body.Role != string(artifactbuiltin.WorkspaceContextRoleAgentInstructions) ||
+		body.MediaType != string(artifactbuiltin.WorkspaceContextMediaTypeMarkdown) {
 		t.Fatalf("body=%#v", body)
 	}
 	if err := ValidateContextDefinition(value); err != nil {
@@ -79,7 +80,8 @@ func TestContextDecoderRecognitionAndDecode(t *testing.T) {
 	if err := json.Unmarshal(decoded[0].Definition.Body, &body); err != nil {
 		t.Fatalf("decode requested body: %v", err)
 	}
-	if body.Role != contextRoleProjectContext || body.Name != "notes.md" {
+	if body.Role != string(artifactbuiltin.WorkspaceContextRoleProjectContext) ||
+		body.Name != "notes.md" {
 		t.Fatalf("requested body=%#v", body)
 	}
 }
@@ -122,8 +124,8 @@ func TestContextDecoderRejectsUnsafeContentAndProfileIsStable(t *testing.T) {
 func TestValidateContextDefinitionAndLogicalNames(t *testing.T) {
 	valid := makeContextDefinition(t, contextDefinition{
 		Name:      string(artifactbuiltin.WorkspaceAgentsFileName),
-		Role:      contextRoleAgentInstructions,
-		MediaType: contextMarkdownMediaType,
+		Role:      string(artifactbuiltin.WorkspaceContextRoleAgentInstructions),
+		MediaType: string(artifactbuiltin.WorkspaceContextMediaTypeMarkdown),
 		Content:   "instructions",
 	})
 	if err := ValidateContextDefinition(valid); err != nil {
@@ -151,8 +153,8 @@ func TestValidateContextDefinitionAndLogicalNames(t *testing.T) {
 				t,
 				contextDefinition{
 					Name:      string(artifactbuiltin.WorkspaceAgentsFileName),
-					Role:      contextRoleAgentInstructions,
-					MediaType: contextMarkdownMediaType,
+					Role:      string(artifactbuiltin.WorkspaceContextRoleAgentInstructions),
+					MediaType: string(artifactbuiltin.WorkspaceContextMediaTypeMarkdown),
 					Content:   " \t",
 				},
 			)
@@ -163,7 +165,7 @@ func TestValidateContextDefinitionAndLogicalNames(t *testing.T) {
 				contextDefinition{
 					Name:      string(artifactbuiltin.WorkspaceAgentsFileName),
 					Role:      "other",
-					MediaType: contextMarkdownMediaType,
+					MediaType: string(artifactbuiltin.WorkspaceContextMediaTypeMarkdown),
 					Content:   "x",
 				},
 			)
@@ -171,8 +173,10 @@ func TestValidateContextDefinitionAndLogicalNames(t *testing.T) {
 		{name: "mismatched name", mutate: func(value *definition.Definition) { value.DisplayName = "other.md" }},
 		{name: "mismatched logical name", mutate: func(value *definition.Definition) { value.LogicalName = "other" }},
 		{
-			name:   "mismatched role label",
-			mutate: func(value *definition.Definition) { value.Labels[contextRoleLabelKey] = contextRoleProjectReadme },
+			name: "mismatched role label",
+			mutate: func(value *definition.Definition) {
+				value.Labels[contextRoleLabelKey] = string(artifactbuiltin.WorkspaceContextRoleProjectReadme)
+			},
 		},
 	}
 	for _, test := range cases {

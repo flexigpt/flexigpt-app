@@ -10,8 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
 )
 
-const RegistrySchemaVersion = "v1"
-
 type ArtifactRegistration struct {
 	ID          basespec.ArtifactID         `json:"id"`
 	Subresource basespec.SubresourceLocator `json:"subresource"`
@@ -32,7 +30,7 @@ type Registry struct {
 }
 
 func (r Registry) Validate() error {
-	if r.SchemaVersion != RegistrySchemaVersion {
+	if r.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP built-in registry schema %q",
 			basespec.ErrInvalid,
@@ -111,12 +109,36 @@ func (r Registry) Validate() error {
 					err,
 				)
 			}
-			if value.Kind != artifactbuiltin.ServerKind &&
-				value.Kind != artifactbuiltin.PolicyKind {
+			var expectedParent string
+			switch value.Kind {
+			case artifactbuiltin.ServerKind:
+				expectedParent = "mcpServers"
+			case artifactbuiltin.PolicyKind:
+				expectedParent = "policies"
+			default:
 				return fmt.Errorf(
 					"%w: unsupported MCP built-in Artifact kind %q",
 					basespec.ErrInvalid,
 					value.Kind,
+				)
+			}
+			if path.Dir(string(value.Subresource)) != expectedParent {
+				return fmt.Errorf(
+					"%w: MCP built-in subresource %q must be directly below %q",
+					basespec.ErrInvalid,
+					value.Subresource,
+					expectedParent,
+				)
+			}
+			if err := basespec.ValidatePortableName(
+				"MCP built-in subresource name",
+				path.Base(string(value.Subresource)),
+			); err != nil {
+				return fmt.Errorf(
+					"bundles[%d].artifacts[%d]: %w",
+					index,
+					artifactIndex,
+					err,
 				)
 			}
 			if _, duplicate := artifacts[value.ID]; duplicate {

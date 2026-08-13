@@ -6,8 +6,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
-const BuiltInCollectionPackageKind = artifactbuiltin.SkillBundlePackageKind
-
 func BuiltInCollectionPackageAddress(
 	name basespec.LogicalName,
 	version basespec.LogicalVersion,
@@ -16,7 +14,7 @@ func BuiltInCollectionPackageAddress(
 		version = artifactbuiltin.UnversionedPackageVersion
 	}
 	return source.NewManagedPackageAddress(
-		BuiltInCollectionPackageKind,
+		artifactbuiltin.SkillBundlePackageKind,
 		name,
 		version,
 	)

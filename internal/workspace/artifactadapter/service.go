@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
@@ -88,7 +89,7 @@ func (s *Service) CreateEmpty(
 		request.RootID,
 		collection.Draft{
 			ID:          request.CollectionID,
-			Kind:        spec.CollectionKind,
+			Kind:        artifactbuiltin.WorkspaceCollectionV1Kind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
 			Enabled:     true,
@@ -159,7 +160,7 @@ func (s *Service) CreateFilesystem(
 		request.RootID,
 		collection.Draft{
 			ID:          request.CollectionID,
-			Kind:        spec.CollectionKind,
+			Kind:        artifactbuiltin.WorkspaceCollectionV1Kind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
 			Enabled:     true,
@@ -220,7 +221,7 @@ func (s *Service) List(
 	}
 	output := make([]spec.Workspace, 0)
 	for _, value := range collections {
-		if value.Kind != spec.CollectionKind {
+		if value.Kind != artifactbuiltin.WorkspaceCollectionV1Kind {
 			continue
 		}
 		workspaceValue, err := s.Get(ctx, value.Ref())
@@ -642,7 +643,7 @@ func (s *Service) Purge(
 	if err != nil {
 		return err
 	}
-	if value.Kind != spec.CollectionKind {
+	if value.Kind != artifactbuiltin.WorkspaceCollectionV1Kind {
 		return fmt.Errorf("%w: collection %q", spec.ErrNotWorkspace, ref.CollectionID)
 	}
 	if value.Revision != expectedRevision {
@@ -717,7 +718,7 @@ func (s *Service) Get(
 			spec.ErrInvalidWorkspace,
 		)
 	}
-	if value.Kind != spec.CollectionKind {
+	if value.Kind != artifactbuiltin.WorkspaceCollectionV1Kind {
 		return spec.Workspace{}, fmt.Errorf(
 			"%w: collection %q has kind %q",
 			spec.ErrNotWorkspace,

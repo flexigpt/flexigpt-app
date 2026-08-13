@@ -41,7 +41,7 @@ func (BundleCodec) Canonicalize(
 }
 
 func (BundleCodec) Key() shareable.SchemaKey {
-	return artifactbuiltin.MCPSchemaKey
+	return artifactbuiltin.MCPBundleSchemaKey
 }
 
 func parseBundle(

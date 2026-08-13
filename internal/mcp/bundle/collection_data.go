@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -24,8 +25,8 @@ func DecodeCollectionData(
 func EncodeCollectionData(
 	value CollectionData,
 ) (json.RawMessage, error) {
-	if value.SchemaVersion != CollectionDataSchemaVersion ||
-		value.DiscoveryPolicyRevision != DiscoveryPolicyRevision {
+	if value.SchemaVersion != artifactbuiltin.MCPSchemaVersion ||
+		value.DiscoveryPolicyRevision != artifactbuiltin.DecoderRevision {
 		return nil, fmt.Errorf(
 			"%w: invalid MCP Bundle Collection data",
 			basespec.ErrInvalid,

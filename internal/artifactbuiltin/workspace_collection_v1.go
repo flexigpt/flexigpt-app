@@ -13,15 +13,15 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
-	WorkspaceCollectionV1FileName      = "workspace.json"
-	WorkspaceCollectionV1Kind          = "workspace.collection"
-	WorkspaceCollectionV1SchemaID      = "workspace.collection.v1"
-	WorkspaceCollectionV1SchemaVersion = "v1"
+	WorkspaceCollectionV1Kind          basespec.CollectionKind = "workspace.collection"
+	WorkspaceCollectionV1SchemaID      basespec.SchemaID       = "workspace.collection.v1"
+	WorkspaceCollectionV1SchemaVersion                         = "v1"
 
 	maxWorkspaceCollectionV1Members      = 100_000
 	maxWorkspaceCollectionV1MediaTypeLen = 256
@@ -29,6 +29,13 @@ const (
 
 //go:embed workspace-collection-v1.schema.json
 var workspaceCollectionV1JSONSchema []byte
+
+var WorkspaceCollectionV1SchemaKey = shareable.SchemaKey{
+	Entity:        shareable.EntityCollection,
+	Kind:          WorkspaceCollectionV1Kind,
+	SchemaID:      WorkspaceCollectionV1SchemaID,
+	SchemaVersion: WorkspaceCollectionV1SchemaVersion,
+}
 
 func WorkspaceCollectionV1JSONSchema() []byte {
 	return append([]byte(nil), workspaceCollectionV1JSONSchema...)
@@ -191,14 +198,14 @@ func CanonicalizeWorkspaceCollectionV1(
 }
 
 func (v WorkspaceCollectionV1) Validate() error {
-	if v.Kind != WorkspaceCollectionV1Kind {
+	if v.Kind != string(WorkspaceCollectionV1Kind) {
 		return fmt.Errorf(
 			"%w: workspace collection kind must be %q",
 			basespec.ErrInvalid,
 			WorkspaceCollectionV1Kind,
 		)
 	}
-	if v.SchemaID != WorkspaceCollectionV1SchemaID {
+	if v.SchemaID != string(WorkspaceCollectionV1SchemaID) {
 		return fmt.Errorf(
 			"%w: workspace collection schema ID must be %q",
 			basespec.ErrInvalid,
@@ -212,9 +219,9 @@ func (v WorkspaceCollectionV1) Validate() error {
 			WorkspaceCollectionV1SchemaVersion,
 		)
 	}
-	if err := ValidateShareableCollectionMetadata(
-		v.LogicalName,
-		v.LogicalVersion,
+	if err := basespec.ValidatePortableMetadata(
+		basespec.LogicalName(v.LogicalName),
+		basespec.LogicalVersion(v.LogicalVersion),
 		v.DisplayName,
 		v.Description,
 		v.Labels,
@@ -263,7 +270,7 @@ func (v WorkspaceCollectionV1) Validate() error {
 
 func (v WorkspaceCollectionV1) Clone() WorkspaceCollectionV1 {
 	output := v
-	output.Labels = mapsClone(v.Labels)
+	output.Labels = maps.Clone(v.Labels)
 	output.Body = append(json.RawMessage(nil), v.Body...)
 	if v.Digest != nil {
 		digest := *v.Digest
@@ -526,13 +533,4 @@ func workspaceCollectionV1Digest(
 		)
 	}
 	return cryptoutil.DigestBytes(canonical), nil
-}
-
-func mapsClone(input map[string]string) map[string]string {
-	if input == nil {
-		return nil
-	}
-	output := make(map[string]string, len(input))
-	maps.Copy(output, input)
-	return output
 }

@@ -245,7 +245,7 @@ func (a *API) canonicalizeBundleBytes(
 
 	parsed, err := a.dependencies.ShareableDocuments.CanonicalizeExpected(
 		ctx,
-		artifactbuiltin.MCPSchemaKey,
+		artifactbuiltin.MCPBundleSchemaKey,
 		raw,
 	)
 	if err != nil {

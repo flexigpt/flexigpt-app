@@ -73,7 +73,7 @@ func DecodeCollectionData(
 }
 
 func ValidateCollectionData(value CollectionData) error {
-	if value.SchemaVersion != CollectionSchemaVersion {
+	if value.SchemaVersion != artifactbuiltin.SkillCollectionV1SchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported skill bundle schema version %q",
 			basespec.ErrInvalid,
@@ -87,9 +87,9 @@ func ValidateCollectionData(value CollectionData) error {
 	); err != nil {
 		return err
 	}
-	if err := artifactbuiltin.ValidateShareableCollectionMetadata(
-		string(value.LogicalName),
-		string(value.LogicalVersion),
+	if err := basespec.ValidatePortableMetadata(
+		value.LogicalName,
+		value.LogicalVersion,
 		"",
 		"",
 		value.Labels,

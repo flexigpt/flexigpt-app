@@ -3,6 +3,7 @@ package workspace
 import (
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
@@ -191,10 +192,10 @@ func defaultDiscoveryProfiles() spec.DiscoveryProfiles {
 		Attached: spec.DiscoveryProfile{
 			DirectoryRoots: []spec.DirectoryRoot{
 				{
-					Root:      spec.RepositoryRootLocator,
+					Root:      artifactbuiltin.RepositoryRootLocator,
 					Recursive: true,
 					IncludePatterns: []string{
-						spec.DefaultMarkdownIncludePattern,
+						artifactbuiltin.WorkspaceMarkdownPattern,
 					},
 				},
 			},

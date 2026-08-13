@@ -86,8 +86,8 @@ func (a *API) prepareDocumentReplace(
 	}
 
 	collectionData, err := EncodeCollectionData(CollectionData{
-		SchemaVersion:           CollectionDataSchemaVersion,
-		DiscoveryPolicyRevision: DiscoveryPolicyRevision,
+		SchemaVersion:           artifactbuiltin.MCPSchemaVersion,
+		DiscoveryPolicyRevision: artifactbuiltin.DecoderRevision,
 		LogicalName:             document.LogicalName,
 		LogicalVersion:          document.LogicalVersion,
 		Labels:                  maps.Clone(document.Labels),

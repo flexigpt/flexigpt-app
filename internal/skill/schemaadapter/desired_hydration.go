@@ -29,7 +29,7 @@ type hydrationPackageFile struct {
 type hydrationCollection struct {
 	Registration          Collection                             `json:"registration"`
 	DefinitionDigest      cryptoutil.Digest                      `json:"definitionDigest"`
-	SourceScope           basespec.Locator                       `json:"sourceScope"`
+	ManagedPackageRoot    basespec.Locator                       `json:"managedPackageRoot"`
 	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest `json:"expectedMemberDigests"`
 	Artifacts             []hydrationArtifact                    `json:"artifacts"`
 	Files                 []hydrationPackageFile                 `json:"files"`
@@ -105,7 +105,7 @@ func (i *Installer) desiredHydrationFingerprint(
 		files, err := topology.ReadPackageFiles(
 			ctx,
 			i.packages,
-			collectionValue.SourceScope,
+			collectionValue.EmbeddedPackageRoot,
 		)
 		if err != nil {
 			return "", err
@@ -117,7 +117,7 @@ func (i *Installer) desiredHydrationFingerprint(
 		if err != nil {
 			return "", err
 		}
-		sourceScope, err := packageAddress.Directory()
+		managedPackageRoot, err := packageAddress.Directory()
 		if err != nil {
 			return "", err
 		}
@@ -136,7 +136,7 @@ func (i *Installer) desiredHydrationFingerprint(
 		value := hydrationCollection{
 			Registration:          collectionValue.Registration,
 			DefinitionDigest:      definitionDigest,
-			SourceScope:           sourceScope,
+			ManagedPackageRoot:    managedPackageRoot,
 			ExpectedMemberDigests: collectionValue.ExpectedMemberDigests,
 			Artifacts:             make([]hydrationArtifact, 0, len(collectionValue.Artifacts)),
 			Files:                 make([]hydrationPackageFile, 0, len(files)),

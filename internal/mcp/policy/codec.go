@@ -39,12 +39,7 @@ func (PolicyCodec) Canonicalize(
 }
 
 func (PolicyCodec) Key() shareable.SchemaKey {
-	return shareable.SchemaKey{
-		Entity:        shareable.EntityArtifact,
-		Kind:          basespec.CollectionKind(artifactbuiltin.PolicyKind),
-		SchemaID:      artifactbuiltin.PolicySchemaID,
-		SchemaVersion: artifactbuiltin.MCPSchemaVersion,
-	}
+	return artifactbuiltin.MCPPolicySchemaKey
 }
 
 func parsePolicy(
