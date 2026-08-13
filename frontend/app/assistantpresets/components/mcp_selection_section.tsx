@@ -2,11 +2,11 @@ import { memo, useMemo, useState } from 'react';
 
 import { FiExternalLink, FiPlus, FiRefreshCw, FiTrash2, FiWifi, FiWifiOff, FiX } from 'react-icons/fi';
 
-import { MCPAuthHealthState, MCPServerStatus, MCPToolExposure } from '@/spec/mcp';
+import { MCPAuthHealthState, MCPServerStatus, MCPToolExposure } from '@/spec/mcp_artifact';
 
 import { Dropdown } from '@/components/dropdown';
 
-import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
+import type { MCPComposerServerOption, UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import {
 	mcpPromptKey,
 	mcpResourceKey,
@@ -15,35 +15,46 @@ import {
 	mcpToolKey,
 	normalizeMCPArgumentDefinitions,
 } from '@/chats/composer/mcp/mcp_composer_types';
+import { getServerAuthHealthState, isServerOperational } from '@/mcpservers/lib/mcp_management';
 import {
-	getEffectiveMCPAuthHealthState,
 	getEffectiveMCPServerStatus,
 	getMCPServerAuthHealthBadgeClass,
 	getMCPServerAuthHealthLabel,
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 	isMCPAuthActionable,
-	isMCPToolModelSelectable,
+	isMCPToolVisibleToModel,
 } from '@/mcpservers/lib/mcp_server_utils';
 import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
 
-const TOOL_EXPOSURE_OPTIONS = [
-	MCPToolExposure.MCPToolExposureNone,
-	MCPToolExposure.MCPToolExposureAll,
-	MCPToolExposure.MCPToolExposureSelected,
-];
+const TOOL_EXPOSURE_OPTIONS = [MCPToolExposure.None, MCPToolExposure.All, MCPToolExposure.Selected];
 
 function getToolExposureLabel(exposure: MCPToolExposure): string {
 	switch (exposure) {
-		case MCPToolExposure.MCPToolExposureNone:
+		case MCPToolExposure.None:
 			return 'No tools';
-		case MCPToolExposure.MCPToolExposureAll:
+		case MCPToolExposure.All:
 			return 'All tools';
-		case MCPToolExposure.MCPToolExposureSelected:
+		case MCPToolExposure.Selected:
 			return 'Selected tools';
 		default:
 			return String(exposure);
 	}
+}
+
+function isSelectableServerOption(option: MCPComposerServerOption): boolean {
+	return (
+		option.bundle.enabled &&
+		option.server.runtimeEnabled &&
+		option.server.artifact.enabled &&
+		isServerOperational(option.server)
+	);
+}
+
+function getOptionStatus(option: MCPComposerServerOption): MCPServerStatus {
+	return isSelectableServerOption(option)
+		? getEffectiveMCPServerStatus(option.server, option.runtime?.status)
+		: MCPServerStatus.Disabled;
 }
 
 interface MCPSelectionSectionProps {
@@ -58,28 +69,26 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 		if (!manualOAuthModalKey) {
 			return null;
 		}
-		const option = mcpState.options.find(o => mcpServerKey(o.bundle.id, o.server.id) === manualOAuthModalKey);
+		const option = mcpState.options.find(o => mcpServerKey(o.server.ref) === manualOAuthModalKey);
 		return option ?? null;
 	}, [manualOAuthModalKey, mcpState.options]);
 
 	const availableServerOptions = useMemo(() => {
-		return mcpState.options.filter(
-			option => !mcpState.selectedByServerKey[mcpServerKey(option.bundle.id, option.server.id)]
-		);
+		return mcpState.options.filter(option => !mcpState.selectedByServerKey[mcpServerKey(option.server.ref)]);
 	}, [mcpState.options, mcpState.selectedByServerKey]);
 
 	const dropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(() => {
 		const items: Record<string, { isEnabled: boolean }> = {};
 		for (const option of availableServerOptions) {
-			items[mcpServerKey(option.bundle.id, option.server.id)] = {
-				isEnabled: option.bundle.isEnabled && option.server.enabled,
+			items[mcpServerKey(option.server.ref)] = {
+				isEnabled: isSelectableServerOption(option),
 			};
 		}
 		return items;
 	}, [availableServerOptions]);
 
 	const orderedKeys = useMemo(
-		() => availableServerOptions.map(option => mcpServerKey(option.bundle.id, option.server.id)),
+		() => availableServerOptions.map(option => mcpServerKey(option.server.ref)),
 		[availableServerOptions]
 	);
 
@@ -92,18 +101,16 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 			: '';
 
 	const handleAdd = () => {
-		const option = availableServerOptions.find(o => mcpServerKey(o.bundle.id, o.server.id) === effectiveNextServerKey);
+		const option = availableServerOptions.find(o => mcpServerKey(o.server.ref) === effectiveNextServerKey);
 		if (option) {
 			mcpState.setServerSelected(option, true);
-			void mcpState.ensureDiscoveryLoaded(option.bundle.id, option.server.id);
+			void mcpState.ensureDiscoveryLoaded(option.server.ref);
 			setNextServerKey('');
 		}
 	};
 
 	const selectedOptions = useMemo(() => {
-		return mcpState.options.filter(
-			option => mcpState.selectedByServerKey[mcpServerKey(option.bundle.id, option.server.id)]
-		);
+		return mcpState.options.filter(option => mcpState.selectedByServerKey[mcpServerKey(option.server.ref)]);
 	}, [mcpState.options, mcpState.selectedByServerKey]);
 
 	return (
@@ -133,15 +140,11 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 						}
 						title="Select an MCP server to add"
 						getDisplayName={key => {
-							const option = availableServerOptions.find(o => mcpServerKey(o.bundle.id, o.server.id) === key);
+							const option = availableServerOptions.find(o => mcpServerKey(o.server.ref) === key);
 							if (option) {
-								const status = getEffectiveMCPServerStatus(
-									option.server.enabled,
-									option.bundle.isEnabled,
-									option.runtime
-								);
-								const isReady = status === MCPServerStatus.MCPServerStatusReady;
-								const label = `${option.server.displayName} (${option.bundle.slug}/${option.server.id})`;
+								const status = getOptionStatus(option);
+								const isReady = status === MCPServerStatus.Ready;
+								const label = `${option.server.displayName} (${option.bundle.logicalName}/${option.server.logicalName})`;
 								return isReady ? label : `${label} — Not ready`;
 							}
 							return key;
@@ -163,7 +166,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 
 			<div className="mt-4 space-y-3">
 				{selectedOptions.map(option => {
-					const serverKey = mcpServerKey(option.bundle.id, option.server.id);
+					const serverKey = mcpServerKey(option.server.ref);
 					const selection = mcpState.selectedByServerKey[serverKey];
 					if (!selection) {
 						return null;
@@ -173,7 +176,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 					const selectedResourceKeys = new Set(selection.selectedResources.map(mcpResourceKey));
 					const selectedTemplateKeys = new Set(selection.selectedResourceTemplates.map(mcpResourceTemplateKey));
 					const selectedPromptKeys = new Set(selection.selectedPrompts.map(mcpPromptKey));
-					const modelSelectableTools = option.tools.filter(isMCPToolModelSelectable);
+					const modelSelectableTools = option.tools.filter(tool => tool.enabled && isMCPToolVisibleToModel(tool));
 					const modelSelectableToolKeys = new Set(
 						modelSelectableTools.map(m => {
 							return mcpToolKey(m);
@@ -185,18 +188,18 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 					const canUseSelectedToolExposure =
 						selectedModelToolCount > 0 || (option.discoveryLoaded && modelSelectableTools.length > 0);
 					const toolExposureDropdownItems: Record<MCPToolExposure, { isEnabled: boolean }> = {
-						[MCPToolExposure.MCPToolExposureNone]: { isEnabled: true },
-						[MCPToolExposure.MCPToolExposureAll]: { isEnabled: true },
-						[MCPToolExposure.MCPToolExposureSelected]: {
+						[MCPToolExposure.None]: { isEnabled: true },
+						[MCPToolExposure.All]: { isEnabled: true },
+						[MCPToolExposure.Selected]: {
 							isEnabled: canUseSelectedToolExposure,
 						},
 					};
 
-					const status = getEffectiveMCPServerStatus(option.server.enabled, option.bundle.isEnabled, option.runtime);
-					const isReady = status === MCPServerStatus.MCPServerStatusReady;
-					const authState = getEffectiveMCPAuthHealthState(option.server, option.authHealth);
-					const authActionable = isMCPAuthActionable(option.authHealth, option.server);
-					const authPending = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
+					const status = getOptionStatus(option);
+					const isReady = status === MCPServerStatus.Ready;
+					const authState = getServerAuthHealthState(option.server, option.authHealth);
+					const authActionable = isMCPAuthActionable(option.server, option.authHealth);
+					const authPending = authState === MCPAuthHealthState.AuthorizationPending;
 
 					const discoveryText = option.discoveryLoading
 						? 'Loading discovery...'
@@ -225,7 +228,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 										</span>
 									</div>
 									<div className="text-base-content/70 mt-1 truncate text-xs">
-										{option.bundle.slug}/{option.server.id}
+										{option.bundle.logicalName}/{option.server.logicalName}
 									</div>
 									{option.runtime?.lastError ? (
 										<div className="text-error mt-1 text-xs">{option.runtime.lastError}</div>
@@ -257,7 +260,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 											title="Cancel authorization"
 											onClick={e => {
 												e.stopPropagation();
-												void mcpState.cancelOAuth(option.bundle.id, option.server.id);
+												void mcpState.cancelOAuth(option.server.ref);
 											}}
 										>
 											<FiX size={12} />
@@ -271,12 +274,12 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 										onClick={e => {
 											e.stopPropagation();
 											if (isReady) {
-												void mcpState.disconnectServer(option.bundle.id, option.server.id).catch(console.error);
+												void mcpState.disconnectServer(option.server.ref).catch(console.error);
 											} else {
-												void mcpState.connectServer(option.bundle.id, option.server.id).catch(console.error);
+												void mcpState.connectServer(option.server.ref).catch(console.error);
 											}
 										}}
-										disabled={!option.bundle.isEnabled || !option.server.enabled}
+										disabled={!isSelectableServerOption(option)}
 									>
 										{isReady ? <FiWifiOff size={12} /> : <FiWifi size={12} />}
 									</button>
@@ -289,8 +292,8 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 										onClick={e => {
 											e.stopPropagation();
 											void mcpState
-												.refreshServer(option.bundle.id, option.server.id)
-												.then(() => mcpState.ensureDiscoveryLoaded(option.bundle.id, option.server.id))
+												.refreshServer(option.server.ref)
+												.then(() => mcpState.ensureDiscoveryLoaded(option.server.ref))
 												.catch(console.error);
 										}}
 									>
@@ -322,7 +325,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 											className="toggle toggle-accent"
 											checked={Boolean(selection.includeServerInstructions)}
 											onChange={e => {
-												mcpState.setIncludeServerInstructions(option.bundle.id, option.server.id, e.target.checked);
+												mcpState.setIncludeServerInstructions(option.server.ref, e.target.checked);
 											}}
 										/>
 									</div>
@@ -336,10 +339,10 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 										orderedKeys={TOOL_EXPOSURE_OPTIONS}
 										selectedKey={selection.toolExposure}
 										onChange={value => {
-											if (value === MCPToolExposure.MCPToolExposureSelected && !canUseSelectedToolExposure) {
+											if (value === MCPToolExposure.Selected && !canUseSelectedToolExposure) {
 												return;
 											}
-											mcpState.setToolExposure(option.bundle.id, option.server.id, value);
+											mcpState.setToolExposure(option.server.ref, value);
 										}}
 										getDisplayName={getToolExposureLabel}
 										title="Tool Exposure"
@@ -347,7 +350,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 								</div>
 							</div>
 
-							{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected && !canUseSelectedToolExposure ? (
+							{selection.toolExposure === MCPToolExposure.Selected && !canUseSelectedToolExposure ? (
 								<div className="text-warning mt-3 text-xs">
 									Load discovery and select at least one enabled, model-visible tool, or switch Tool Exposure to No
 									tools or All tools before saving.
@@ -358,30 +361,29 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 
 							{!discoveryText && (
 								<div className="mt-4 space-y-4">
-									{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected &&
-										modelSelectableTools.length > 0 && (
-											<div>
-												<div className="mb-2 text-sm font-semibold">Selected Tools</div>
-												<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-													{modelSelectableTools.map(tool => (
-														<label
-															key={mcpToolKey(tool)}
-															className="hover:bg-base-200 flex cursor-pointer items-center gap-2 rounded-lg p-1 text-sm"
-														>
-															<input
-																type="checkbox"
-																className="checkbox checkbox-sm rounded-sm"
-																checked={selectedToolKeys.has(mcpToolKey(tool))}
-																onChange={e => {
-																	mcpState.toggleTool(tool, e.target.checked);
-																}}
-															/>
-															<span className="truncate">{tool.displayName || tool.toolName}</span>
-														</label>
-													))}
-												</div>
+									{selection.toolExposure === MCPToolExposure.Selected && modelSelectableTools.length > 0 && (
+										<div>
+											<div className="mb-2 text-sm font-semibold">Selected Tools</div>
+											<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+												{modelSelectableTools.map(tool => (
+													<label
+														key={mcpToolKey(tool)}
+														className="hover:bg-base-200 flex cursor-pointer items-center gap-2 rounded-lg p-1 text-sm"
+													>
+														<input
+															type="checkbox"
+															className="checkbox checkbox-sm rounded-sm"
+															checked={selectedToolKeys.has(mcpToolKey(tool))}
+															onChange={e => {
+																mcpState.toggleTool(tool, e.target.checked);
+															}}
+														/>
+														<span className="truncate">{tool.displayName || tool.toolName}</span>
+													</label>
+												))}
 											</div>
-										)}
+										</div>
+									)}
 
 									{option.resources.length > 0 && (
 										<div>
@@ -450,8 +452,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 																					value={val}
 																					onChange={e => {
 																						mcpState.setResourceTemplateArgumentValue(
-																							template.bundleID,
-																							template.serverID,
+																							template.server,
 																							template.uriTemplate,
 																							arg.name,
 																							e.target.value
@@ -511,8 +512,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 																					value={val}
 																					onChange={e => {
 																						mcpState.setPromptArgumentValue(
-																							prompt.bundleID,
-																							prompt.serverID,
+																							prompt.server,
 																							prompt.promptName,
 																							arg.name,
 																							e.target.value
@@ -551,7 +551,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 					if (!manualOAuthModalOption) {
 						return;
 					}
-					await mcpState.cancelOAuth(manualOAuthModalOption.bundle.id, manualOAuthModalOption.server.id);
+					await mcpState.cancelOAuth(manualOAuthModalOption.server.ref);
 					setManualOAuthModalKey(null);
 				}}
 			/>

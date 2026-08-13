@@ -1,3 +1,4 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type { ConversationMessage } from '@/spec/conversation';
 import type {
 	CompletionResponseBody,
@@ -15,8 +16,8 @@ import type {
 	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
 import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
-import type { MCPConversationContext, MCPProviderToolMapping, MCPToolSelection } from '@/spec/mcp';
-import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
+import type { MCPConversationContext, MCPProviderToolMapping, MCPToolSelection } from '@/spec/mcp_artifact';
+import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp_artifact';
 import type { ModelPresetID } from '@/spec/modelpreset';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
@@ -251,7 +252,8 @@ export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string 
 
 export function buildMCPToolSelectionMap(
 	mcpContext?: MCPConversationContext,
-	debugDetails?: any
+	debugDetails?: any,
+	responseMappings?: MCPProviderToolMapping[]
 ): Map<string, MCPToolSelection> | undefined {
 	const map = new Map<string, MCPToolSelection>();
 
@@ -259,14 +261,13 @@ export function buildMCPToolSelectionMap(
 		for (const tool of server.selectedTools ?? []) {
 			const normalized: MCPToolSelection = {
 				...tool,
-				bundleID: tool.bundleID || server.bundleID,
-				serverID: tool.serverID || server.serverID,
+				server: tool.server ?? server.server,
 			};
 
 			addMCPToolSelectionToMap(map, normalized);
 		}
 	}
-	for (const mapping of extractMCPToolMappings(debugDetails)) {
+	for (const mapping of [...(responseMappings ?? []), ...extractMCPToolMappings(debugDetails)]) {
 		const selection = mappingToMCPToolSelection(mapping);
 		if (selection) {
 			addMCPToolSelectionToMap(map, selection);
@@ -303,8 +304,7 @@ function mergeMCPToolSelections(existing: MCPToolSelection, incoming: MCPToolSel
 	return {
 		...existing,
 		...incoming,
-		bundleID: incoming.bundleID || existing.bundleID,
-		serverID: incoming.serverID || existing.serverID,
+		server: incoming.server ?? existing.server,
 		toolName: incoming.toolName || existing.toolName,
 		providerToolName: incoming.providerToolName || existing.providerToolName,
 		choiceID: incoming.choiceID || existing.choiceID,
@@ -332,13 +332,23 @@ function addMCPToolSelectionToMap(map: Map<string, MCPToolSelection>, selection:
 	}
 }
 
+function asArtifactRef(value: unknown): ArtifactRef | undefined {
+	const ref = asRecord(value);
+	if (!ref) {
+		return undefined;
+	}
+
+	return typeof ref.rootID === 'string' && typeof ref.artifactID === 'string' && ref.rootID && ref.artifactID
+		? { rootID: ref.rootID, artifactID: ref.artifactID }
+		: undefined;
+}
+
 function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefined {
 	const obj = asRecord(mapping);
 	if (!obj) {
 		return undefined;
 	}
-	const bundleID = obj.bundleID;
-	const serverID = obj.serverID;
+	const server = asArtifactRef(obj.server);
 	const toolName = obj.toolName;
 	const providerToolName = obj.providerToolName;
 	const choiceID = obj.choiceID;
@@ -348,18 +358,14 @@ function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefin
 	const appResourceUri = obj.appResourceUri;
 	const visibility = obj.visibility;
 
-	if (typeof bundleID !== 'string' || !bundleID) {
-		return undefined;
-	}
-	if (typeof serverID !== 'string' || !serverID) {
+	if (!server) {
 		return undefined;
 	}
 	if (typeof toolName !== 'string' || !toolName) {
 		return undefined;
 	}
 	return {
-		bundleID,
-		serverID,
+		server,
 		toolName,
 		providerToolName: typeof providerToolName === 'string' ? providerToolName : undefined,
 		choiceID: typeof choiceID === 'string' ? choiceID : undefined,
@@ -439,7 +445,7 @@ function buildAssistantMessageFromResponse(
 	const { uiContent, uiReasoningContents, uiToolCalls, uiToolOutputs, uiCitations } = deriveUIFieldsFromOutputUnion(
 		outputs,
 		choiceMap,
-		buildMCPToolSelectionMap(mcpContext, inf.debugDetails)
+		buildMCPToolSelectionMap(mcpContext, inf.debugDetails, resp.mcpToolMappings)
 	);
 	const debugDetails = inf.debugDetails;
 	const s = error ? Status.Failed : Status.Completed;
@@ -453,6 +459,7 @@ function buildAssistantMessageFromResponse(
 		usage,
 		error,
 		debugDetails,
+		mcpToolMappings: resp.mcpToolMappings,
 		uiContent,
 		uiReasoningContents,
 		uiToolCalls,

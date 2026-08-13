@@ -2,7 +2,7 @@ import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import { UIToolCallStatus } from '@/spec/inference';
-import { MCPExecutionMode } from '@/spec/mcp';
+import { MCPExecutionMode } from '@/spec/mcp_artifact';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
@@ -172,7 +172,7 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 	const isRunnableType = isRunnableComposerToolCall(toolCall);
 	const isAutoExecute =
 		Boolean(toolCall.toolStoreChoice?.autoExecute) ||
-		toolCall.mcpToolSelection?.executionMode === MCPExecutionMode.MCPExecutionModeAuto;
+		toolCall.mcpToolSelection?.executionMode === MCPExecutionMode.Auto;
 
 	const canRun = isRunnableType && (isPending || isFailed) && !isBusy;
 
@@ -186,7 +186,7 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 		titleLines.push('Auto-execute: enabled');
 	}
 	if (toolCall.mcpToolSelection) {
-		titleLines.push(`MCP: ${toolCall.mcpToolSelection.serverID}/${toolCall.mcpToolSelection.toolName}`);
+		titleLines.push(`MCP: ${toolCall.mcpToolSelection.server.artifactID}/${toolCall.mcpToolSelection.toolName}`);
 	}
 	const title = titleLines.join('\n');
 

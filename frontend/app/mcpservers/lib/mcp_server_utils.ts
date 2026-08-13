@@ -1,298 +1,105 @@
 import type {
-	MCPAppsPolicy,
 	MCPAuthHealth,
-	MCPServerConfig,
-	MCPServerPolicy,
-	MCPServerRuntimeSnapshot,
-	MCPServerSetupInput,
+	MCPHTTPAuthMode,
+	MCPServerStatus,
 	MCPToolCapability,
-	PutMCPServerPayload,
-} from '@/spec/mcp';
+	MCPToolRisk,
+	MCPTransportType,
+} from '@/spec/mcp_artifact';
 import {
 	MCPApprovalRule,
 	MCPAppVisibility,
-	MCPAuthHealthState,
+	MCPAuthHealthState as MCPAuthHealthStateEnum,
 	MCPExecutionMode,
-	MCPHTTPAuthMode,
-	MCPServerSetupInputKind,
-	MCPServerStatus,
-	MCPToolRisk,
-	MCPTransportType,
+	MCPHTTPAuthMode as MCPHTTPAuthModeEnum,
+	MCPServerStatus as MCPServerStatusEnum,
+	MCPToolRisk as MCPToolRiskEnum,
+	MCPTransportType as MCPTransportTypeEnum,
 	MCPTrustLevel,
-} from '@/spec/mcp';
+} from '@/spec/mcp_artifact';
 
-import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
+import type { MCPServerView } from '@/mcpservers/lib/mcp_management';
+import { getAuthMode, getServerAuthHealthState } from '@/mcpservers/lib/mcp_management';
 
-export const MCP_OAUTH_CLIENT_CREDENTIALS_SLOT = 'clientCredentials';
-
-interface MCPStdioSecretEnvInput {
-	envName: string;
-	slot: string;
-	deleteSlot?: string;
-	existingSecretRef?: string;
-	secretValue?: string;
-	deleteExisting?: boolean;
-}
-
-interface MCPOAuthClientCredentialsInput {
-	slot: string;
-	existingSecretRef?: string;
-	secretValue?: string;
-	deleteExisting?: boolean;
-}
-
-interface MCPHTTPHeaderSecretInput {
-	headerName: string;
-	slot: string;
-	deleteSlot?: string;
-	existingSecretRef?: string;
-	secretValue?: string;
-	deleteExisting?: boolean;
-}
-
-export interface MCPServerUpsertInput {
-	serverID: string;
-	/**
-	 * Optional first-pass payload used when the final payload cannot be
-	 * validated until secrets are created. Example: new HTTP
-	 * clientCredentials servers need a clientCredentialRef, but the secret
-	 * endpoint requires the server to already exist.
-	 */
-	initialPayload?: PutMCPServerPayload;
-
-	payload: PutMCPServerPayload;
-	stdioSecretEnv: MCPStdioSecretEnvInput[];
-	oauthClientCredentials?: MCPOAuthClientCredentialsInput;
-	httpHeaderSecret?: MCPHTTPHeaderSecretInput;
-}
-
-export function getDefaultMCPServerPolicy(): MCPServerPolicy {
-	return {
-		defaultApprovalRule: MCPApprovalRule.MCPApprovalRuleAsk,
-		defaultExecutionMode: MCPExecutionMode.MCPExecutionModeManual,
-		requireApprovalForUnknownRisk: true,
-		requireApprovalForWrite: true,
-		requireApprovalForDestructive: true,
-	};
-}
-
-export function getDefaultMCPAppsPolicy(): MCPAppsPolicy {
-	return {
-		enabled: false,
-		allowAppInitiatedToolCalls: false,
-		requireApprovalForOpenLink: true,
-		requireApprovalForContextUpdates: true,
-	};
-}
-
-function isMCPAppVisibilityAllowed(visibility: string[] | undefined, target: 'model' | 'app'): boolean {
-	if (!visibility || visibility.length === 0) {
-		return true;
-	}
-
-	return visibility.some(item => item.trim().toLowerCase() === target);
-}
-
-export function isMCPToolVisibleToModel(tool: Pick<MCPToolCapability, 'app'>): boolean {
-	return isMCPAppVisibilityAllowed(tool.app?.visibility, MCPAppVisibility.MCPAppVisibilityModel);
-}
-
-export function isMCPToolModelSelectable(tool: Pick<MCPToolCapability, 'app' | 'enabled'>): boolean {
-	return tool.enabled && isMCPToolVisibleToModel(tool);
-}
-
-export function getMCPTransportLabel(transport: MCPTransportType): string {
-	switch (transport) {
-		case MCPTransportType.MCPTransportTypeStreamableHTTP:
-			return 'Streamable HTTP';
-		case MCPTransportType.MCPTransportTypeStdio:
+export function getMCPTransportLabel(value: MCPTransportType): string {
+	switch (value) {
+		case MCPTransportTypeEnum.Stdio:
 			return 'Stdio';
+		case MCPTransportTypeEnum.StreamableHTTP:
+			return 'Streamable HTTP';
 		default:
-			return String(transport);
+			return String(value);
 	}
 }
 
-export function getMCPTrustLevelLabel(trustLevel: MCPTrustLevel): string {
-	switch (trustLevel) {
-		case MCPTrustLevel.MCPTrustLevelTrusted:
-			return 'Trusted';
-		case MCPTrustLevel.MCPTrustLevelUntrusted:
-			return 'Untrusted';
-		default:
-			return String(trustLevel);
-	}
+export function getMCPTrustLevelLabel(value: MCPTrustLevel): string {
+	return value === MCPTrustLevel.Trusted ? 'Trusted' : 'Untrusted';
 }
 
-export function getMCPApprovalRuleLabel(rule: MCPApprovalRule): string {
-	switch (rule) {
-		case MCPApprovalRule.MCPApprovalRuleAllow:
-			return 'Allow';
-		case MCPApprovalRule.MCPApprovalRuleAsk:
-			return 'Ask';
-		case MCPApprovalRule.MCPApprovalRuleDeny:
-			return 'Deny';
-		default:
-			return String(rule);
-	}
-}
-
-export function getMCPExecutionModeLabel(mode: MCPExecutionMode): string {
-	switch (mode) {
-		case MCPExecutionMode.MCPExecutionModeAuto:
-			return 'Auto';
-		case MCPExecutionMode.MCPExecutionModeManual:
-			return 'Manual';
-		default:
-			return String(mode);
-	}
-}
-
-export function getMCPHTTPAuthModeLabel(mode: MCPHTTPAuthMode): string {
-	switch (mode) {
-		case MCPHTTPAuthMode.MCPHTTPAuthNone:
+export function getMCPHTTPAuthModeLabel(value: MCPHTTPAuthMode): string {
+	switch (value) {
+		case MCPHTTPAuthModeEnum.None:
 			return 'None';
-		case MCPHTTPAuthMode.MCPHTTPAuthAPIKey:
+		case MCPHTTPAuthModeEnum.APIKey:
 			return 'API Key';
-		case MCPHTTPAuthMode.MCPHTTPAuthOAuth:
+		case MCPHTTPAuthModeEnum.OAuth:
 			return 'OAuth';
-		case MCPHTTPAuthMode.MCPHTTPAuthClientCredentials:
+		case MCPHTTPAuthModeEnum.ClientCredentials:
 			return 'Client Credentials';
 		default:
-			return String(mode);
+			return String(value);
 	}
 }
 
-export type MCPAuthDisplayServer = Pick<MCPServerConfig, 'transport' | 'streamableHttp'>;
-
-const MCP_AUTH_HEALTH_STATE_VALUES = new Set<string>(Object.values(MCPAuthHealthState));
-
-function hasRecordEntries(record?: Record<string, string>): boolean {
-	return Boolean(record && Object.keys(record).length > 0);
-}
-
-function getMCPServerAuthMode(
-	server?: MCPAuthDisplayServer,
-	authHealth?: Pick<MCPAuthHealth, 'authMode'>
-): MCPHTTPAuthMode {
-	if (server?.transport === MCPTransportType.MCPTransportTypeStdio) {
-		return MCPHTTPAuthMode.MCPHTTPAuthNone;
-	}
-
-	return server?.streamableHttp?.authMode ?? authHealth?.authMode ?? MCPHTTPAuthMode.MCPHTTPAuthNone;
-}
-
-function isNonInteractiveMCPAuthConfigured(
-	server: MCPAuthDisplayServer | undefined,
-	authMode: MCPHTTPAuthMode
-): boolean {
-	if (!server?.streamableHttp) {
-		return false;
-	}
-
-	switch (authMode) {
-		case MCPHTTPAuthMode.MCPHTTPAuthAPIKey:
-			// apiKey auth requires an explicit secret header ref. Plain headers
-			// may be harmless metadata and must not make a server appear
-			// authenticated.
-			return hasRecordEntries(server.streamableHttp.secretHeaderRefs);
-		case MCPHTTPAuthMode.MCPHTTPAuthClientCredentials:
-			return Boolean(server.streamableHttp.clientCredentialRef?.trim());
+export function getMCPApprovalRuleLabel(value: MCPApprovalRule): string {
+	switch (value) {
+		case MCPApprovalRule.Allow:
+			return 'Allow';
+		case MCPApprovalRule.Deny:
+			return 'Deny';
 		default:
-			return false;
+			return 'Ask';
 	}
 }
 
-export function getEffectiveMCPAuthHealthState(
-	server?: MCPAuthDisplayServer,
-	authHealth?: MCPAuthHealth
-): MCPAuthHealthState | undefined {
-	const authMode = getMCPServerAuthMode(server, authHealth);
-
-	if (server?.transport === MCPTransportType.MCPTransportTypeStdio || authMode === MCPHTTPAuthMode.MCPHTTPAuthNone) {
-		return MCPAuthHealthState.MCPAuthHealthStateNotRequired;
-	}
-
-	const state = normalizeMCPAuthHealthState(authHealth?.state);
-
-	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey || authMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) {
-		const configuredByServer = isNonInteractiveMCPAuthConfigured(server, authMode);
-		const nonInteractiveConfigured = server ? configuredByServer : authHealth?.configured === true;
-
-		// Config is authoritative for non-interactive auth. Do not let a stale
-		// "authorized" health response make an unconfigured server look ready.
-		if (!configuredByServer && authHealth?.configured !== true) {
-			return MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
-		}
-
-		if (
-			state === MCPAuthHealthState.MCPAuthHealthStateError ||
-			state === MCPAuthHealthState.MCPAuthHealthStateExpired ||
-			state === MCPAuthHealthState.MCPAuthHealthStateInsufficientScope
-		) {
-			return state;
-		}
-
-		return nonInteractiveConfigured
-			? MCPAuthHealthState.MCPAuthHealthStateAuthorized
-			: MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
-	}
-
-	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth && !authHealth) {
-		return MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded;
-	}
-
-	if (
-		authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth &&
-		authHealth &&
-		!authHealth.configured &&
-		state === MCPAuthHealthState.MCPAuthHealthStateAuthorized
-	) {
-		return MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded;
-	}
-
-	if (
-		authHealth?.authorizationPending &&
-		state !== MCPAuthHealthState.MCPAuthHealthStateAuthorized &&
-		state !== MCPAuthHealthState.MCPAuthHealthStateNotRequired
-	) {
-		return MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
-	}
-
-	if (authHealth && !authHealth.configured && !state) {
-		return MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
-	}
-
-	return state;
+export function getMCPExecutionModeLabel(value: MCPExecutionMode): string {
+	return value === MCPExecutionMode.Auto ? 'Auto' : 'Manual';
 }
 
-function normalizeMCPAuthHealthState(state?: MCPAuthHealthState | string): MCPAuthHealthState | undefined {
-	if (!state) {
-		return undefined;
-	}
-
-	if (MCP_AUTH_HEALTH_STATE_VALUES.has(state)) {
-		return state as MCPAuthHealthState;
-	}
-
-	switch (state) {
-		case 'required':
-			return MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded;
+export function getMCPToolRiskLabel(value: MCPToolRisk): string {
+	switch (value) {
+		case MCPToolRiskEnum.Read:
+			return 'Read';
+		case MCPToolRiskEnum.Write:
+			return 'Write';
+		case MCPToolRiskEnum.Destructive:
+			return 'Destructive';
+		case MCPToolRiskEnum.OpenWorld:
+			return 'Open World';
 		default:
-			return undefined;
+			return 'Unknown';
 	}
 }
 
-export function getMCPStatusLabel(status?: MCPServerStatus): string {
-	switch (status) {
-		case MCPServerStatus.MCPServerStatusDisabled:
+export function getEffectiveMCPServerStatus(server: MCPServerView, runtimeStatus?: MCPServerStatus): MCPServerStatus {
+	if (!server.runtimeEnabled) {
+		return MCPServerStatusEnum.Disabled;
+	}
+
+	return runtimeStatus ?? MCPServerStatusEnum.Disconnected;
+}
+
+export function getMCPStatusLabel(value: MCPServerStatus): string {
+	switch (value) {
+		case MCPServerStatusEnum.Disabled:
 			return 'Disabled';
-		case MCPServerStatus.MCPServerStatusDisconnected:
+		case MCPServerStatusEnum.Disconnected:
 			return 'Disconnected';
-		case MCPServerStatus.MCPServerStatusConnecting:
+		case MCPServerStatusEnum.Connecting:
 			return 'Connecting';
-		case MCPServerStatus.MCPServerStatusReady:
+		case MCPServerStatusEnum.Ready:
 			return 'Ready';
-		case MCPServerStatus.MCPServerStatusError:
+		case MCPServerStatusEnum.Error:
 			return 'Error';
 		default:
 			return 'Unknown';
@@ -301,293 +108,102 @@ export function getMCPStatusLabel(status?: MCPServerStatus): string {
 
 const STATUS_BADGE_LAYOUT = 'h-auto max-w-full whitespace-normal break-words px-2 py-1 text-center leading-tight';
 
-export function getMCPStatusBadgeClass(status?: MCPServerStatus): string {
-	switch (status) {
-		case MCPServerStatus.MCPServerStatusReady:
+export function getMCPStatusBadgeClass(value: MCPServerStatus): string {
+	switch (value) {
+		case MCPServerStatusEnum.Ready:
 			return `${STATUS_BADGE_LAYOUT} badge-success`;
-		case MCPServerStatus.MCPServerStatusConnecting:
+		case MCPServerStatusEnum.Connecting:
 			return `${STATUS_BADGE_LAYOUT} badge-info`;
-		case MCPServerStatus.MCPServerStatusError:
+		case MCPServerStatusEnum.Error:
 			return `${STATUS_BADGE_LAYOUT} badge-error`;
-		case MCPServerStatus.MCPServerStatusDisabled:
+		case MCPServerStatusEnum.Disabled:
 			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
 		default:
 			return `${STATUS_BADGE_LAYOUT} badge-warning`;
 	}
 }
 
-function getMCPAuthHealthLabel(state?: MCPAuthHealthState | string): string {
-	const normalizedState = normalizeMCPAuthHealthState(state);
+export function getMCPServerAuthHealthLabel(server: MCPServerView, authHealth?: MCPAuthHealth): string {
+	const authMode = getAuthMode(server);
+	const state = getServerAuthHealthState(server, authHealth);
 
-	switch (normalizedState) {
-		case MCPAuthHealthState.MCPAuthHealthStateNotRequired:
-			return 'Auth: not required';
-		case MCPAuthHealthState.MCPAuthHealthStateNotConfigured:
+	if (authMode === MCPHTTPAuthModeEnum.None) {
+		return 'Auth: not required';
+	}
+
+	if (
+		(authMode === MCPHTTPAuthModeEnum.APIKey || authMode === MCPHTTPAuthModeEnum.ClientCredentials) &&
+		authHealth?.configured
+	) {
+		return state === MCPAuthHealthStateEnum.Error ? 'Auth: error' : 'Auth: configured';
+	}
+
+	switch (state) {
+		case MCPAuthHealthStateEnum.NotConfigured:
 			return 'Auth: config needed';
-		case MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded:
-			return 'Auth: required';
-		case MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending:
-			return 'Auth: pending';
-		case MCPAuthHealthState.MCPAuthHealthStateAuthorized:
-			return 'Auth: authorized';
-		case MCPAuthHealthState.MCPAuthHealthStateExpired:
-			return 'Auth: expired';
-		case MCPAuthHealthState.MCPAuthHealthStateInsufficientScope:
+		case MCPAuthHealthStateEnum.AuthorizationNeeded:
+			return 'OAuth: required';
+		case MCPAuthHealthStateEnum.AuthorizationPending:
+			return 'OAuth: pending';
+		case MCPAuthHealthStateEnum.Authorized:
+			return 'OAuth: authorized';
+		case MCPAuthHealthStateEnum.Expired:
+			return 'OAuth: expired';
+		case MCPAuthHealthStateEnum.InsufficientScope:
 			return 'Auth: insufficient scope';
-		case MCPAuthHealthState.MCPAuthHealthStateError:
+		case MCPAuthHealthStateEnum.Error:
 			return 'Auth: error';
 		default:
 			return 'Auth: unknown';
 	}
 }
 
-function getMCPAuthHealthBadgeClass(state?: MCPAuthHealthState | string): string {
-	const normalizedState = normalizeMCPAuthHealthState(state);
+export function getMCPServerAuthHealthBadgeClass(server: MCPServerView, authHealth?: MCPAuthHealth): string {
+	const state = getServerAuthHealthState(server, authHealth);
 
-	switch (normalizedState) {
-		case MCPAuthHealthState.MCPAuthHealthStateNotRequired:
+	switch (state) {
+		case MCPAuthHealthStateEnum.NotRequired:
 			return `${STATUS_BADGE_LAYOUT} badge-ghost`;
-		case MCPAuthHealthState.MCPAuthHealthStateAuthorized:
+		case MCPAuthHealthStateEnum.Authorized:
 			return `${STATUS_BADGE_LAYOUT} badge-success`;
-		case MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending:
+		case MCPAuthHealthStateEnum.AuthorizationPending:
 			return `${STATUS_BADGE_LAYOUT} badge-info`;
-		case MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded:
-		case MCPAuthHealthState.MCPAuthHealthStateExpired:
-		case MCPAuthHealthState.MCPAuthHealthStateNotConfigured:
+		case MCPAuthHealthStateEnum.AuthorizationNeeded:
+		case MCPAuthHealthStateEnum.NotConfigured:
+		case MCPAuthHealthStateEnum.Expired:
 			return `${STATUS_BADGE_LAYOUT} badge-warning`;
-		case MCPAuthHealthState.MCPAuthHealthStateInsufficientScope:
-		case MCPAuthHealthState.MCPAuthHealthStateError:
+		case MCPAuthHealthStateEnum.Error:
+		case MCPAuthHealthStateEnum.InsufficientScope:
 			return `${STATUS_BADGE_LAYOUT} badge-error`;
 		default:
 			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
 	}
 }
 
-export function getMCPServerAuthHealthLabel(server?: MCPAuthDisplayServer, authHealth?: MCPAuthHealth): string {
-	const authMode = getMCPServerAuthMode(server, authHealth);
-	const state = getEffectiveMCPAuthHealthState(server, authHealth);
-
-	if (
-		(authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey || authMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) &&
-		state === MCPAuthHealthState.MCPAuthHealthStateAuthorized
-	) {
-		return 'Auth: configured';
-	}
-
-	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth && state === MCPAuthHealthState.MCPAuthHealthStateAuthorized) {
-		return 'OAuth: authorized';
-	}
-
-	return getMCPAuthHealthLabel(state);
-}
-
-export function getMCPServerAuthHealthBadgeClass(server?: MCPAuthDisplayServer, authHealth?: MCPAuthHealth): string {
-	const authMode = getMCPServerAuthMode(server, authHealth);
-	const state = getEffectiveMCPAuthHealthState(server, authHealth);
-
-	if (
-		(authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey || authMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) &&
-		state === MCPAuthHealthState.MCPAuthHealthStateAuthorized
-	) {
-		return `${STATUS_BADGE_LAYOUT} badge-ghost`;
-	}
-
-	return getMCPAuthHealthBadgeClass(state);
-}
-
-export function getMCPToolRiskLabel(risk: MCPToolRisk): string {
-	switch (risk) {
-		case MCPToolRisk.MCPToolRiskRead:
-			return 'Read';
-		case MCPToolRisk.MCPToolRiskWrite:
-			return 'Write';
-		case MCPToolRisk.MCPToolRiskDestructive:
-			return 'Destructive';
-		case MCPToolRisk.MCPToolRiskOpenWorld:
-			return 'Open World';
-		default:
-			return 'Unknown';
-	}
-}
-
-export function getEffectiveMCPServerStatus(
-	serverEnabled: boolean,
-	bundleEnabled: boolean,
-	runtime?: MCPServerRuntimeSnapshot
-): MCPServerStatus {
-	if (!bundleEnabled || !serverEnabled) {
-		return MCPServerStatus.MCPServerStatusDisabled;
-	}
-
-	return runtime?.status ?? MCPServerStatus.MCPServerStatusDisconnected;
-}
-
-export function isMCPAuthActionable(authHealth?: MCPAuthHealth, server?: MCPAuthDisplayServer): boolean {
-	const authorizationURL = authHealth?.authorizationURL?.trim();
-	if (!authorizationURL) {
+export function isMCPAuthActionable(server: MCPServerView, authHealth?: MCPAuthHealth): boolean {
+	if (getAuthMode(server) !== MCPHTTPAuthModeEnum.OAuth) {
 		return false;
 	}
 
-	if (validateHTTPURLSecurity(authorizationURL, 'OAuth authorization URL')) {
+	if (!authHealth?.authorizationURL?.trim()) {
 		return false;
 	}
-
-	if (getMCPServerAuthMode(server, authHealth) !== MCPHTTPAuthMode.MCPHTTPAuthOAuth) {
-		return false;
-	}
-
-	const state = getEffectiveMCPAuthHealthState(server, authHealth);
 
 	return (
-		state !== MCPAuthHealthState.MCPAuthHealthStateNotRequired &&
-		state !== MCPAuthHealthState.MCPAuthHealthStateAuthorized
+		authHealth.state !== MCPAuthHealthStateEnum.Authorized && authHealth.state !== MCPAuthHealthStateEnum.NotRequired
 	);
 }
 
-export function serverHasSetupInputs(server: Pick<MCPServerConfig, 'setup'>): boolean {
-	return (server.setup?.inputs?.length ?? 0) > 0;
+export function isMCPToolVisibleToModel(tool: Pick<MCPToolCapability, 'app'>): boolean {
+	const visibility = tool.app?.visibility;
+
+	if (!visibility || visibility.length === 0) {
+		return true;
+	}
+
+	return visibility.includes(MCPAppVisibility.Model);
 }
 
-export function getMCPSetupInputKindLabel(kind: MCPServerSetupInputKind): string {
-	switch (kind) {
-		case MCPServerSetupInputKind.OAuthClientCredentials:
-			return 'OAuth client credentials';
-		case MCPServerSetupInputKind.HTTPHeader:
-			return 'HTTP header';
-		case MCPServerSetupInputKind.StdioEnv:
-			return 'Environment variable';
-		case MCPServerSetupInputKind.StreamableHTTPURL:
-			return 'Server URL';
-		case MCPServerSetupInputKind.ClientIDMetadataDocumentURL:
-			return 'Client ID metadata URL';
-		default:
-			return String(kind);
-	}
-}
-
-function hasMapKeyFold(map: Record<string, string> | undefined, key: string): boolean {
-	if (!map) {
-		return false;
-	}
-	const target = key.trim().toLowerCase();
-	return Object.keys(map).some(existing => existing.trim().toLowerCase() === target);
-}
-
-export function isMCPSetupInputConfigured(server: MCPServerConfig, input: MCPServerSetupInput): boolean {
-	switch (input.kind) {
-		case MCPServerSetupInputKind.OAuthClientCredentials:
-			return Boolean(server.streamableHttp?.clientCredentialRef?.trim());
-		case MCPServerSetupInputKind.HTTPHeader: {
-			const name = input.httpHeader?.headerName ?? '';
-			if (!name) {
-				return false;
-			}
-			return input.httpHeader?.secret
-				? hasMapKeyFold(server.streamableHttp?.secretHeaderRefs, name)
-				: hasMapKeyFold(server.streamableHttp?.headers, name);
-		}
-		case MCPServerSetupInputKind.StdioEnv: {
-			const env = input.stdioEnv?.envName ?? '';
-			if (!env) {
-				return false;
-			}
-			return input.stdioEnv?.secret ? Boolean(server.stdio?.secretEnvRefs?.[env]) : Boolean(server.stdio?.env?.[env]);
-		}
-		case MCPServerSetupInputKind.StreamableHTTPURL:
-			return Boolean(server.streamableHttp?.url?.trim());
-		case MCPServerSetupInputKind.ClientIDMetadataDocumentURL:
-			return Boolean(server.streamableHttp?.clientIDMetadataDocumentURL?.trim());
-		default:
-			return false;
-	}
-}
-
-export interface MCPServerSetupStatus {
-	hasInputs: boolean;
-	requiredTotal: number;
-	requiredConfigured: number;
-	firstUnconfiguredRequired?: MCPServerSetupInput;
-	complete: boolean;
-}
-
-/**
- * Summarizes setup readiness purely from the persisted server config. This is
- * intentionally distinct from auth health: setup covers user-supplied config
- * inputs (URLs, env, headers, OAuth client credentials), while auth health
- * covers the live OAuth/token state.
- */
-export function getMCPServerSetupStatus(server: MCPServerConfig): MCPServerSetupStatus {
-	const inputs = server.setup?.inputs ?? [];
-	const required = inputs.filter(input => Boolean(input.required));
-	const firstUnconfiguredRequired = required.find(input => !isMCPSetupInputConfigured(server, input));
-
-	return {
-		hasInputs: inputs.length > 0,
-		requiredTotal: required.length,
-		requiredConfigured: required.filter(input => isMCPSetupInputConfigured(server, input)).length,
-		firstUnconfiguredRequired,
-		complete: !firstUnconfiguredRequired,
-	};
-}
-
-export function parseMCPStringRecordJSON(raw: string, fieldLabel: string): Record<string, string> | undefined {
-	const value = raw.trim();
-
-	if (!value) {
-		return undefined;
-	}
-
-	let parsed: unknown;
-
-	try {
-		parsed = JSON.parse(value);
-	} catch {
-		throw new Error(`${fieldLabel} must be valid JSON.`);
-	}
-
-	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-		throw new Error(`${fieldLabel} must be a JSON object.`);
-	}
-
-	const result: Record<string, string> = {};
-
-	for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
-		if (typeof val !== 'string') {
-			throw new TypeError(`${fieldLabel} values must all be strings.`);
-		}
-
-		result[key] = val;
-	}
-
-	return Object.keys(result).length > 0 ? result : undefined;
-}
-
-export function parseMCPObjectJSON(raw: string, fieldLabel: string): Record<string, unknown> | undefined {
-	const value = raw.trim();
-
-	if (!value) {
-		return undefined;
-	}
-
-	let parsed: unknown;
-
-	try {
-		parsed = JSON.parse(value);
-	} catch {
-		throw new Error(`${fieldLabel} must be valid JSON.`);
-	}
-
-	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-		throw new Error(`${fieldLabel} must be a JSON object.`);
-	}
-
-	return parsed as Record<string, unknown>;
-}
-
-export function stringifyMCPJSON(value: unknown): string {
-	if (!value || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)) {
-		return '';
-	}
-
-	return JSON.stringify(value, null, 2);
+export function isMCPToolModelSelectable(tool: Pick<MCPToolCapability, 'enabled' | 'app'>): boolean {
+	return tool.enabled && isMCPToolVisibleToModel(tool);
 }

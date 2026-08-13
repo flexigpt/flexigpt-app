@@ -1,6 +1,6 @@
 import type { UIToolCall } from '@/spec/inference';
 import { UIToolCallStatus } from '@/spec/inference';
-import { MCPExecutionMode } from '@/spec/mcp';
+import { MCPExecutionMode } from '@/spec/mcp_artifact';
 import { SKILLS_AUTOEXEC_TOOL_CHOICES } from '@/spec/skill';
 
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
@@ -28,7 +28,7 @@ export function isAutoSubmitEligibleToolCall(toolCall: UIToolCall): boolean {
 		!toolCall.suppressAutoExecute &&
 		isRunnableComposerToolCall(toolCall) &&
 		(Boolean(toolCall.toolStoreChoice?.autoExecute) ||
-			toolCall.mcpToolSelection?.executionMode === MCPExecutionMode.MCPExecutionModeAuto ||
+			toolCall.mcpToolSelection?.executionMode === MCPExecutionMode.Auto ||
 			SKILLS_AUTOEXEC_TOOL_CHOICES.has(toolCall.choiceID))
 	);
 }

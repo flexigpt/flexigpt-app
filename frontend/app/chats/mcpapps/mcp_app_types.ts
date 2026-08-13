@@ -1,5 +1,6 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPToolSelection } from '@/spec/mcp';
+import type { MCPToolSelection } from '@/spec/mcp_artifact';
 
 /**
  * Runtime-only handle for one MCP App view. Apps are never persisted; this
@@ -7,8 +8,7 @@ import type { MCPToolSelection } from '@/spec/mcp';
  */
 export interface MCPAppInstance {
 	instanceID: string;
-	bundleID: string;
-	serverID: string;
+	server: ArtifactRef;
 	resourceUri: string;
 	mimeType?: string;
 	toolName: string;
@@ -77,16 +77,15 @@ export function isJSONRPCNotification(value: unknown): value is JSONRPCNotificat
 export function buildAppInstanceFromToolOutput(output: UIToolOutput): MCPAppInstance | undefined {
 	const app = output.mcpApp;
 	const sel: MCPToolSelection | undefined = output.mcpToolSelection;
-	if (!app?.resourceUri || !sel?.bundleID || !sel.serverID) {
+	if (!app?.resourceUri || !sel?.server) {
 		return undefined;
 	}
 
 	const resourceUri = app.resourceUri;
-	const instanceID = `mcpapp-${sel.serverID}-${output.callID || output.id}`;
+	const instanceID = `mcpapp-${sel.server.rootID}-${sel.server.artifactID}-${output.callID || output.id}`;
 	return {
 		instanceID,
-		bundleID: sel.bundleID,
-		serverID: sel.serverID,
+		server: sel.server,
 		resourceUri,
 		mimeType: app.mimeType,
 		toolName: sel.toolName || output.name,

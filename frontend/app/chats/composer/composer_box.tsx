@@ -4,7 +4,7 @@ import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { UIToolCall } from '@/spec/inference';
-import type { MCPAppModelContextUpdate } from '@/spec/mcp';
+import type { MCPAppModelContextUpdate } from '@/spec/mcp_artifact';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import { SkillSessionSyncMode } from '@/spec/skill';

@@ -1,5 +1,5 @@
 import type { AssistantPreset } from '@/spec/assistantpreset';
-import type { MCPConversationContext } from '@/spec/mcp';
+import type { MCPConversationContext } from '@/spec/mcp_artifact';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import type { ToolRef } from '@/spec/tool';

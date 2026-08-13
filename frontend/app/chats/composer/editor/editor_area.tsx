@@ -25,11 +25,12 @@ import {
 import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
 import { UIToolCallStatus } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/mcp';
-import { MCPExecutionMode } from '@/spec/mcp';
+import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/mcp_artifact';
+import { MCPExecutionMode } from '@/spec/mcp_artifact';
 import type { SkillRef } from '@/spec/skill';
 import { SkillSessionSyncMode } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolStoreChoice } from '@/spec/tool';
@@ -152,8 +153,7 @@ function getMCPContextToolSelections(context?: MCPConversationContext): MCPToolS
 		for (const tool of server.selectedTools ?? []) {
 			out.push({
 				...tool,
-				bundleID: tool.bundleID || server.bundleID,
-				serverID: tool.serverID || server.serverID,
+				server: tool.server ?? server.server,
 			});
 		}
 	}
@@ -162,17 +162,14 @@ function getMCPContextToolSelections(context?: MCPConversationContext): MCPToolS
 }
 
 function countAutoExecutableMCPTools(context?: MCPConversationContext): number {
-	return getMCPContextToolSelections(context).filter(
-		tool => tool.executionMode === MCPExecutionMode.MCPExecutionModeAuto
-	).length;
+	return getMCPContextToolSelections(context).filter(tool => tool.executionMode === MCPExecutionMode.Auto).length;
 }
 
 function mergeMCPToolSelection(selection: MCPToolSelection, contextSelection: MCPToolSelection): MCPToolSelection {
 	return {
 		...contextSelection,
 		...selection,
-		bundleID: selection.bundleID || contextSelection.bundleID,
-		serverID: selection.serverID || contextSelection.serverID,
+		server: selection.server ?? contextSelection.server,
 		toolName: selection.toolName || contextSelection.toolName,
 		providerToolName: selection.providerToolName || contextSelection.providerToolName,
 		choiceID: selection.choiceID || contextSelection.choiceID,
@@ -182,6 +179,10 @@ function mergeMCPToolSelection(selection: MCPToolSelection, contextSelection: MC
 		appResourceUri: selection.appResourceUri || contextSelection.appResourceUri,
 		visibility: selection.visibility ?? contextSelection.visibility,
 	};
+}
+
+function sameArtifactRef(left: ArtifactRef | undefined, right: ArtifactRef | undefined): boolean {
+	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
 }
 
 function findMCPToolSelectionForCall(
@@ -214,12 +215,9 @@ function findMCPToolSelectionForCall(
 	}
 
 	return contextSelections.find(candidate => {
-		const bundleMatches = !selection.bundleID || selection.bundleID === candidate.bundleID;
-		const serverMatches = !selection.serverID || selection.serverID === candidate.serverID;
-		if (!bundleMatches || !serverMatches) {
+		if (!sameArtifactRef(selection.server, candidate.server)) {
 			return false;
 		}
-
 		if (selection.toolName && selection.toolName === candidate.toolName) {
 			return true;
 		}

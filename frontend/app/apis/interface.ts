@@ -1,5 +1,8 @@
 import type {
+	ArtifactCollection,
+	ArtifactCollectionRef,
 	ArtifactDefinitionSelector,
+	ArtifactRecord,
 	ArtifactRef,
 	ArtifactRoot,
 	ArtifactRootID,
@@ -39,29 +42,32 @@ import type {
 	MCPApprovalResolution,
 	MCPApprovalToken,
 	MCPAuthHealth,
-	MCPAuthStatus,
 	MCPBundle,
+	MCPBundleDocument,
+	MCPBundleInstallation,
+	MCPCompletionRefType,
 	MCPCompletionResult,
 	MCPConversationContext,
+	MCPCreateBundleInput,
 	MCPGetPromptResponseBody,
+	MCPGlobalSettings,
 	InvokeMCPToolResponseBody as MCPInvokeToolResponseBody,
 	MCPOAuthAuthorization,
+	MCPPolicyView,
 	MCPPromptRef,
+	MCPProviderToolMapping,
 	MCPReadResourceResponseBody,
-	MCPRefType,
+	MCPReplaceBundleDocumentInput,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPSecretKind,
-	MCPServerConfig,
-	MCPServerID,
+	MCPSecretWriteResult,
+	MCPServerData,
+	MCPServerInstallation,
+	MCPServerResolved,
 	MCPServerRuntimeSnapshot,
-	MCPServerSetupInputValue,
-	MCPSettingsView,
 	MCPToolCapability,
-	PatchMCPServerPolicyPayload,
-	PutMCPServerPayload,
-	PutMCPServerSecretResponseBody,
-} from '@/spec/mcp';
+} from '@/spec/mcp_artifact';
 import type {
 	ModelPresetID,
 	PatchModelPresetPayload,
@@ -591,140 +597,87 @@ export interface IAssistantPresetStoreAPI {
 	): Promise<AssistantPreset | undefined>;
 }
 
-/**
- * Flattened frontend-facing MCP bridge.
- * Heavy structured payloads stay as objects, while simple requests stay flattened.
- */
 export interface IMCPAPI {
-	listMCPBundles(
-		bundleIDs?: string[],
-		includeDisabled?: boolean,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ bundles: MCPBundle[]; nextPageToken?: string }>;
+	createMCPBundle(input: MCPCreateBundleInput): Promise<MCPBundle>;
+	getMCPBundle(bundle: ArtifactCollectionRef): Promise<MCPBundle>;
+	listMCPBundles(rootID: ArtifactRootID): Promise<MCPBundle[]>;
+	getMCPBundleDocument(bundle: ArtifactCollectionRef): Promise<MCPBundleDocument>;
+	listMCPBundleServers(bundle: ArtifactCollectionRef): Promise<ArtifactRecord[]>;
+	listMCPBundlePolicies(bundle: ArtifactCollectionRef): Promise<ArtifactRecord[]>;
+	getMCPBundleInstallation(bundle: ArtifactCollectionRef): Promise<MCPBundleInstallation>;
+	replaceMCPBundleDocument(input: MCPReplaceBundleDocumentInput): Promise<MCPBundle>;
+	refreshMCPBundle(bundle: ArtifactCollectionRef): Promise<MCPBundle>;
+	updateMCPBundleEnabled(bundle: ArtifactCollectionRef, expectedRevision: number, enabled: boolean): Promise<MCPBundle>;
+	updateProtectedMCPBundleInstallation(
+		bundle: ArtifactCollectionRef,
+		expectedOverlayRevision: number,
+		runtimeEnabled: boolean
+	): Promise<void>;
+	retireMCPBundle(bundle: ArtifactCollectionRef, expectedRevision: number): Promise<ArtifactCollection>;
+	purgeMCPBundle(bundle: ArtifactCollectionRef, expectedRevision: number): Promise<void>;
 
-	putMCPBundle(
-		bundleID: string,
-		slug: string,
-		displayName: string,
-		isEnabled: boolean,
-		description?: string
+	getMCPServerInstallation(server: ArtifactRef): Promise<MCPServerInstallation>;
+	inspectMCPServer(server: ArtifactRef): Promise<MCPServerResolved>;
+	inspectMCPPolicy(policy: ArtifactRef): Promise<MCPPolicyView>;
+	updateMCPServerInstallation(
+		server: ArtifactRef,
+		expectedArtifactRevision: number,
+		data: MCPServerData
+	): Promise<ArtifactRecord>;
+	updateProtectedMCPServerInstallation(
+		server: ArtifactRef,
+		expectedOverlayRevision: number,
+		runtimeEnabled: boolean,
+		data: MCPServerData
 	): Promise<void>;
 
-	patchMCPBundle(bundleID: string, isEnabled: boolean): Promise<void>;
+	connectMCPServer(server: ArtifactRef): Promise<MCPServerRuntimeSnapshot>;
+	disconnectMCPServer(server: ArtifactRef): Promise<void>;
+	refreshMCPServer(server: ArtifactRef): Promise<MCPServerRuntimeSnapshot>;
+	getMCPServerStatus(server: ArtifactRef): Promise<MCPServerRuntimeSnapshot>;
+	listMCPServerTools(server: ArtifactRef): Promise<MCPToolCapability[]>;
+	listMCPServerResources(server: ArtifactRef): Promise<MCPResourceRef[]>;
+	listMCPServerResourceTemplates(server: ArtifactRef): Promise<MCPResourceTemplateRef[]>;
+	listMCPServerPrompts(server: ArtifactRef): Promise<MCPPromptRef[]>;
 
-	deleteMCPBundle(bundleID: string): Promise<void>;
-
-	listMCPServers(
-		bundleID: string,
-		serverIDs?: MCPServerID[],
-		enabled?: boolean,
-		includeDisabled?: boolean,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ servers: MCPServerConfig[]; nextPageToken?: string }>;
-
-	putMCPServer(bundleID: string, serverID: MCPServerID, payload: PutMCPServerPayload): Promise<void>;
-
-	getMCPServer(bundleID: string, serverID: MCPServerID): Promise<MCPServerConfig | undefined>;
-
-	patchMCPServerEnabled(bundleID: string, serverID: MCPServerID, enabled: boolean): Promise<void>;
-
-	patchMCPServerPolicy(bundleID: string, serverID: MCPServerID, payload: PatchMCPServerPolicyPayload): Promise<void>;
-
-	patchMCPServerSetup(
-		bundleID: string,
-		serverID: MCPServerID,
-		inputValues: Record<string, MCPServerSetupInputValue>,
-		reset?: boolean
-	): Promise<MCPServerConfig | undefined>;
-
-	patchMCPSettings(oauthLoopbackListenAddr?: string): Promise<MCPSettingsView | undefined>;
-
-	getMCPSettings(): Promise<MCPSettingsView | undefined>;
-
-	deleteMCPServer(bundleID: string, serverID: MCPServerID): Promise<void>;
-
-	connectMCPServer(bundleID: string, serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
-
-	disconnectMCPServer(bundleID: string, serverID: MCPServerID): Promise<void>;
-
-	refreshMCPServer(bundleID: string, serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
-
-	getMCPServerStatus(bundleID: string, serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
-
-	listMCPServerTools(
-		bundleID: string,
-		serverID: MCPServerID,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ tools: MCPToolCapability[]; nextPageToken?: string }>;
-
-	listMCPServerResources(
-		bundleID: string,
-		serverID: MCPServerID,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ resources: MCPResourceRef[]; nextPageToken?: string }>;
-
-	listMCPServerResourceTemplates(
-		bundleID: string,
-		serverID: MCPServerID,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ resourceTemplates: MCPResourceTemplateRef[]; nextPageToken?: string }>;
-
-	listMCPServerPrompts(
-		bundleID: string,
-		serverID: MCPServerID,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ prompts: MCPPromptRef[]; nextPageToken?: string }>;
-
-	readMCPResource(
-		bundleID: string,
-		serverID: MCPServerID,
-		uri: string
-	): Promise<MCPReadResourceResponseBody | undefined>;
-
+	readMCPResource(server: ArtifactRef, uri: string): Promise<MCPReadResourceResponseBody>;
 	getMCPPrompt(
-		bundleID: string,
-		serverID: MCPServerID,
+		server: ArtifactRef,
 		promptName: string,
 		promptArguments?: Record<string, string>
-	): Promise<MCPGetPromptResponseBody | undefined>;
-
+	): Promise<MCPGetPromptResponseBody>;
 	completeMCPArgument(
-		bundleID: string,
-		serverID: MCPServerID,
-		refType: MCPRefType,
+		server: ArtifactRef,
+		refType: MCPCompletionRefType,
 		name: string,
 		argumentName: string,
 		argumentValue?: string,
 		context?: Record<string, string>
 	): Promise<MCPCompletionResult>;
 
-	evaluateMCPToolCall(bundleID: string, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation | undefined>;
+	evaluateMCPToolCall(server: ArtifactRef, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation>;
+	evaluateMappedMCPToolCall(
+		mapping: MCPProviderToolMapping,
+		request: InvokeMCPToolRequestBody
+	): Promise<MCPApprovalEvaluation>;
+	invokeMCPTool(server: ArtifactRef, request: InvokeMCPToolRequestBody): Promise<MCPInvokeToolResponseBody>;
+	invokeMappedMCPTool(
+		mapping: MCPProviderToolMapping,
+		request: InvokeMCPToolRequestBody
+	): Promise<MCPInvokeToolResponseBody>;
+	resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalToken>;
 
-	invokeMCPTool(bundleID: string, request: InvokeMCPToolRequestBody): Promise<MCPInvokeToolResponseBody | undefined>;
-
-	resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalToken | undefined>;
-
+	getMCPServerAuthHealth(server: ArtifactRef): Promise<MCPAuthHealth>;
 	listPendingMCPOAuthAuthorizations(): Promise<MCPOAuthAuthorization[]>;
-
-	cancelPendingMCPOAuthAuthorization(bundleID: string, serverID: MCPServerID): Promise<void>;
-
-	getMCPServerAuthStatus(bundleID: string, serverID: MCPServerID): Promise<MCPAuthStatus | undefined>;
-
-	getMCPServerAuthHealth(bundleID: string, serverID: MCPServerID): Promise<MCPAuthHealth | undefined>;
-
+	cancelPendingMCPOAuthAuthorization(server: ArtifactRef): Promise<boolean>;
 	putMCPServerSecret(
-		bundleID: string,
-		serverID: MCPServerID,
+		server: ArtifactRef,
 		kind: MCPSecretKind,
 		slot: string,
 		secret: string
-	): Promise<PutMCPServerSecretResponseBody | undefined>;
+	): Promise<MCPSecretWriteResult>;
+	deleteMCPServerSecret(server: ArtifactRef, kind: MCPSecretKind, slot: string): Promise<void>;
 
-	deleteMCPServerSecret(bundleID: string, serverID: MCPServerID, kind: MCPSecretKind, slot: string): Promise<void>;
+	getMCPGlobalSettings(): Promise<MCPGlobalSettings>;
+	updateMCPGlobalSettings(expectedRevision: number, oauthLoopbackListenAddr?: string): Promise<number>;
 }

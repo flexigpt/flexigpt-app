@@ -20,8 +20,8 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 import type { Attachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
-import { MCPExecutionMode } from '@/spec/mcp';
+import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp_artifact';
+import { MCPExecutionMode } from '@/spec/mcp_artifact';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
@@ -339,11 +339,10 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 
 	const statusLabel = call.status ? ` (${call.status})` : '';
 	const isAutoExecute =
-		Boolean(call.toolStoreChoice?.autoExecute) ||
-		call.mcpToolSelection?.executionMode === MCPExecutionMode.MCPExecutionModeAuto;
+		Boolean(call.toolStoreChoice?.autoExecute) || call.mcpToolSelection?.executionMode === MCPExecutionMode.Auto;
 	const autoLabel = isAutoExecute ? ' • Auto-execute: enabled' : '';
 	const mcpLabel = call.mcpToolSelection
-		? `\nMCP: ${call.mcpToolSelection.serverID}/${call.mcpToolSelection.toolName}`
+		? `\nMCP: ${call.mcpToolSelection.server.artifactID}/${call.mcpToolSelection.toolName}`
 		: '';
 	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}${mcpLabel}`;
 	return (
@@ -380,7 +379,7 @@ function MessageToolOutputChip({ output, fullWidth = false, onClick }: MessageTo
 	const label = output.summary || `Result: ${prettyName}`;
 	const titleLines = [label, `Tool: ${output.name}`, `Call ID: ${output.callID}`];
 	if (output.mcpToolSelection) {
-		titleLines.push(`MCP: ${output.mcpToolSelection.serverID}/${output.mcpToolSelection.toolName}`);
+		titleLines.push(`MCP: ${output.mcpToolSelection.server.artifactID}/${output.mcpToolSelection.toolName}`);
 	}
 	const title = titleLines.join('\n');
 

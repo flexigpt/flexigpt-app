@@ -1,15 +1,15 @@
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPContent, MCPServerSelection } from '@/spec/mcp';
-import { MCPContentType, MCPToolExposure } from '@/spec/mcp';
+import type { MCPContent, MCPServerSelection } from '@/spec/mcp_artifact';
+import { MCPContentType, MCPToolExposure } from '@/spec/mcp_artifact';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
 export function toolExposureLabel(server: MCPServerSelection): string {
-	if (server.toolExposure === MCPToolExposure.MCPToolExposureAll) {
+	if (server.toolExposure === MCPToolExposure.All) {
 		const count = server.selectedTools?.length ?? 0;
 		return count > 0 ? `All tools (${count})` : 'All tools';
 	}
-	if (server.toolExposure === MCPToolExposure.MCPToolExposureSelected) {
+	if (server.toolExposure === MCPToolExposure.Selected) {
 		return `${server.selectedTools?.length ?? 0} tools`;
 	}
 	return 'No tools';
@@ -39,7 +39,7 @@ export function getMCPAppToolResultContent(output: UIToolOutput): MCPContent[] |
 
 	return [
 		{
-			type: MCPContentType.MCPContentTypeText,
+			type: MCPContentType.Text,
 			text,
 		},
 	];

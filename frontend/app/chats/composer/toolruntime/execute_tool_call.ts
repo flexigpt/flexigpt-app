@@ -1,6 +1,6 @@
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { InvokeMCPToolRequestBody, MCPContent, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp';
-import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp';
+import type { InvokeMCPToolRequestBody, MCPContent, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp_artifact';
+import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp_artifact';
 import { ToolOutputKind } from '@/spec/tool';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
@@ -47,24 +47,24 @@ function parseToolArguments(raw?: string): Record<string, any> | undefined {
 
 function mcpContentToText(content: MCPContent): string {
 	switch (content.type) {
-		case MCPContentType.MCPContentTypeText:
+		case MCPContentType.Text:
 			return content.text ?? '';
 
-		case MCPContentType.MCPContentTypeResource:
+		case MCPContentType.Resource:
 			if (content.resource?.text) {
 				return content.resource.text;
 			}
 			return JSON.stringify(content.resource ?? content, null, 2);
 
-		case MCPContentType.MCPContentTypeResourceLink:
+		case MCPContentType.ResourceLink:
 			return [content.title || content.name || content.uri, content.description, content.uri]
 				.filter(Boolean)
 				.join('\n');
 
-		case MCPContentType.MCPContentTypeImage:
+		case MCPContentType.Image:
 			return `[MCP image content${content.mimeType ? `: ${content.mimeType}` : ''}]`;
 
-		case MCPContentType.MCPContentTypeAudio:
+		case MCPContentType.Audio:
 			return `[MCP audio content${content.mimeType ? `: ${content.mimeType}` : ''}]`;
 
 		default:
@@ -122,8 +122,7 @@ async function executeMCPToolCall(
 	selection: MCPToolSelection,
 	requestMCPApproval?: RequestMCPApproval
 ): Promise<ExecuteComposerToolCallResult> {
-	const bundleID = selection.bundleID;
-	if (!bundleID || !selection.serverID || !selection.toolName) {
+	if (!selection.server || !selection.toolName) {
 		return {
 			ok: false,
 			errorMessage: 'Cannot resolve MCP tool identity for this call.',
@@ -147,16 +146,16 @@ async function executeMCPToolCall(
 	}
 
 	const req: InvokeMCPToolRequestBody = {
-		source: MCPInvocationSource.MCPInvocationSourceModel,
-		serverID: selection.serverID,
+		source: MCPInvocationSource.Model,
 		toolName: selection.toolName,
 		providerToolName: selection.providerToolName || toolCall.name,
+		choiceID: selection.choiceID,
 		toolDigest: selection.digest,
 		arguments: parsedArgs,
 		toolUseID: toolCall.callID || toolCall.id,
 	};
 
-	const evaluation = await mcpAPI.evaluateMCPToolCall(bundleID, req);
+	const evaluation = await mcpAPI.evaluateMCPToolCall(selection.server, req);
 
 	if (!evaluation) {
 		const message = 'MCP approval evaluation did not return a decision.';
@@ -172,7 +171,7 @@ async function executeMCPToolCall(
 		};
 	}
 
-	if (evaluation.decision === MCPApprovalDecision.MCPApprovalDecisionDenied) {
+	if (evaluation.decision === MCPApprovalDecision.Denied) {
 		const message = evaluation.reason || 'MCP policy denied this tool call.';
 		return {
 			ok: true,
@@ -186,7 +185,7 @@ async function executeMCPToolCall(
 		};
 	}
 
-	if (evaluation.decision === MCPApprovalDecision.MCPApprovalDecisionApprovalRequired) {
+	if (evaluation.decision === MCPApprovalDecision.ApprovalRequired) {
 		if (!evaluation.approvalID) {
 			const message = 'MCP approval was required but no approval ID was returned.';
 			return {
@@ -211,17 +210,14 @@ async function executeMCPToolCall(
 							summary: evaluation.summary,
 							reason: evaluation.reason,
 						})
-					: MCPApprovalResolution.MCPApprovalResolutionDenyOnce;
+					: MCPApprovalResolution.DenyOnce;
 		} catch {
-			resolution = MCPApprovalResolution.MCPApprovalResolutionDenyOnce;
+			resolution = MCPApprovalResolution.DenyOnce;
 		}
 
 		const token = await mcpAPI.resolveMCPApproval(evaluation.approvalID, resolution);
 
-		if (
-			resolution !== MCPApprovalResolution.MCPApprovalResolutionAllowOnce &&
-			resolution !== MCPApprovalResolution.MCPApprovalResolutionAllowAlways
-		) {
+		if (resolution !== MCPApprovalResolution.AllowOnce && resolution !== MCPApprovalResolution.AllowAlways) {
 			const message = evaluation.reason
 				? `MCP tool call denied by user. ${evaluation.reason}`
 				: 'MCP tool call denied by user.';
@@ -253,7 +249,7 @@ async function executeMCPToolCall(
 
 		req.approvalID = token.approvalID;
 		req.approvalToken = token.token;
-	} else if (evaluation.decision !== MCPApprovalDecision.MCPApprovalDecisionAllowed) {
+	} else if (evaluation.decision !== MCPApprovalDecision.Allowed) {
 		const message = `Unsupported MCP approval decision: ${String(evaluation.decision)}`;
 		return {
 			ok: true,
@@ -269,7 +265,7 @@ async function executeMCPToolCall(
 
 	try {
 		const resp = await withTimeout(
-			mcpAPI.invokeMCPTool(bundleID, req),
+			mcpAPI.invokeMCPTool(selection.server, req),
 			TOOL_CALL_TIMEOUT_MS,
 			`MCP tool call "${selection.toolName}" timed out after ${Math.round(TOOL_CALL_TIMEOUT_MS / 1000)} seconds.`
 		);

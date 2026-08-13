@@ -1,17 +1,12 @@
-import type {
-	InvokeMCPToolRequestBody,
-	InvokeMCPToolResponseBody,
-	MCPAppModelContextUpdate,
-	MCPContent,
-} from '@/spec/mcp';
-import { MCPApprovalDecision, MCPApprovalResolution, MCPInvocationSource } from '@/spec/mcp';
+import type { InvokeMCPToolRequestBody, InvokeMCPToolResponseBody, MCPContent } from '@/spec/mcp_artifact';
+import { MCPApprovalDecision, MCPApprovalResolution, MCPInvocationSource } from '@/spec/mcp_artifact';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
 import { mcpAPI } from '@/apis/baseapi';
 
 import type { MCPApprovalRequest } from '@/chats/composer/mcp/use_mcp_approval';
-import type { MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
+import type { MCPAppModelContextUpdatePayload, MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import type { JSONRPCRequest, JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 import {
 	JSONRPC_ERR_BLOCKED_BY_POLICY,
@@ -54,12 +49,8 @@ export interface MCPAppRouterDeps {
 	requestMCPApproval?: (request: MCPApprovalRequest) => Promise<MCPApprovalResolution>;
 	requestUIMessageApproval?: (message: MCPAppUIMessage) => Promise<boolean>;
 	onUIMessage?: (message: MCPAppUIMessage) => void;
-	requestModelContextUpdateApproval?: (
-		update: Omit<MCPAppModelContextUpdate, 'instanceID' | 'bundleID' | 'serverID' | 'resourceUri' | 'updatedAt'>
-	) => Promise<boolean>;
-	onModelContextUpdate?: (
-		update: Omit<MCPAppModelContextUpdate, 'instanceID' | 'bundleID' | 'serverID' | 'resourceUri' | 'updatedAt'>
-	) => void;
+	requestModelContextUpdateApproval?: (update: MCPAppModelContextUpdatePayload) => Promise<boolean>;
+	onModelContextUpdate?: (update: MCPAppModelContextUpdatePayload) => void;
 	/** Routes a "log" notification from the app for the diagnostics surface. */
 	onAppLog?: (level: string, data: unknown) => void;
 }
@@ -123,26 +114,25 @@ export class MCPAppRPCRouter {
 			}
 			args = params.arguments;
 		}
-		const { bundleID, serverID, instanceID } = this.deps.instance;
+		const { server, instanceID } = this.deps.instance;
 		const callReq: InvokeMCPToolRequestBody = {
-			source: MCPInvocationSource.MCPInvocationSourceApp,
-			serverID,
+			source: MCPInvocationSource.App,
 			toolName: name,
 			providerToolName: name,
 			arguments: args,
 			appInstanceID: instanceID,
 		};
 
-		// Backend enforces appsPolicy + cross-server. Frontend only needs to
-		// route via the same bundle/server the app belongs to.
-		const evaluation = await mcpAPI.evaluateMCPToolCall(bundleID, callReq);
+		// The ArtifactRef identifies the app's server. The backend remains the
+		// final authority for app policy and cross-server restrictions.
+		const evaluation = await mcpAPI.evaluateMCPToolCall(server, callReq);
 		if (!evaluation) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP could not evaluate this tool call');
 		}
-		if (evaluation.decision === MCPApprovalDecision.MCPApprovalDecisionDenied) {
+		if (evaluation.decision === MCPApprovalDecision.Denied) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Denied by policy');
 		}
-		if (evaluation.decision === MCPApprovalDecision.MCPApprovalDecisionApprovalRequired) {
+		if (evaluation.decision === MCPApprovalDecision.ApprovalRequired) {
 			if (!evaluation.approvalID || !evaluation.summary || !this.deps.requestMCPApproval) {
 				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Approval required');
 			}
@@ -155,10 +145,7 @@ export class MCPAppRPCRouter {
 
 			const token = await mcpAPI.resolveMCPApproval(evaluation.approvalID, resolution);
 
-			if (
-				resolution !== MCPApprovalResolution.MCPApprovalResolutionAllowOnce &&
-				resolution !== MCPApprovalResolution.MCPApprovalResolutionAllowAlways
-			) {
+			if (resolution !== MCPApprovalResolution.AllowOnce && resolution !== MCPApprovalResolution.AllowAlways) {
 				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied this tool call');
 			}
 
@@ -171,7 +158,7 @@ export class MCPAppRPCRouter {
 		}
 		// Allowed.
 		try {
-			const resp = await mcpAPI.invokeMCPTool(bundleID, callReq);
+			const resp = await mcpAPI.invokeMCPTool(server, callReq);
 			return { jsonrpc: '2.0', id: req.id, result: normalizeToolCallResultForApp(resp) };
 		} catch (err) {
 			return errorResp(
@@ -190,9 +177,9 @@ export class MCPAppRPCRouter {
 			return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'resources/read requires uri');
 		}
 
-		const { bundleID, serverID } = this.deps.instance;
+		const { server } = this.deps.instance;
 		try {
-			const resp = await mcpAPI.readMCPResource(bundleID, serverID, uri);
+			const resp = await mcpAPI.readMCPResource(server, uri);
 			return { jsonrpc: '2.0', id: req.id, result: resp };
 		} catch (err) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, err instanceof Error ? err.message : 'Read failed');
@@ -259,10 +246,10 @@ export class MCPAppRPCRouter {
 			}
 			structuredContent = params.structuredContent;
 		}
-		const update = {
+		const update: MCPAppModelContextUpdatePayload = {
 			content,
 			...(structuredContent !== undefined ? { structuredContent } : {}),
-		} satisfies Omit<MCPAppModelContextUpdate, 'instanceID' | 'bundleID' | 'serverID' | 'resourceUri' | 'updatedAt'>;
+		};
 
 		if (!content && structuredContent === undefined) {
 			return errorResp(

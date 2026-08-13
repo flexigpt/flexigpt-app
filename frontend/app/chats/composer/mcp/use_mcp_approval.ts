@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { MCPApprovalSummary } from '@/spec/mcp';
-import { MCPApprovalResolution } from '@/spec/mcp';
+import type { MCPApprovalSummary } from '@/spec/mcp_artifact';
+import { MCPApprovalResolution } from '@/spec/mcp_artifact';
 
 export interface MCPApprovalRequest {
 	approvalID: string;
@@ -103,11 +103,11 @@ export function useMCPApproval() {
 			clearAdvanceTimer();
 
 			activeApprovalRef.current = null;
-			active?.resolve(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+			active?.resolve(MCPApprovalResolution.DenyOnce);
 
 			const queued = queuedCurrent.splice(0);
 			for (const item of queued) {
-				item.resolve(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+				item.resolve(MCPApprovalResolution.DenyOnce);
 			}
 		};
 	}, [clearAdvanceTimer]);
@@ -117,7 +117,7 @@ export function useMCPApproval() {
 		requestMCPApproval,
 		resolveMCPApproval,
 		clearMCPApproval: () => {
-			resolveMCPApproval(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+			resolveMCPApproval(MCPApprovalResolution.DenyOnce);
 		},
 	};
 }

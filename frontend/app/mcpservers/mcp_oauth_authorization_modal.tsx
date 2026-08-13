@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 import { FiAlertCircle, FiExternalLink } from 'react-icons/fi';
 
-import type { MCPAuthHealth, MCPServerConfig } from '@/spec/mcp';
-import { MCPAuthHealthState } from '@/spec/mcp';
+import type { MCPAuthHealth } from '@/spec/mcp_artifact';
+import { MCPAuthHealthState } from '@/spec/mcp_artifact';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -12,8 +12,8 @@ import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
+import type { MCPServerView } from '@/mcpservers/lib/mcp_management';
 import {
-	getEffectiveMCPAuthHealthState,
 	getMCPServerAuthHealthBadgeClass,
 	getMCPServerAuthHealthLabel,
 	isMCPAuthActionable,
@@ -21,7 +21,7 @@ import {
 
 interface MCPOAuthAuthorizationModalProps {
 	isOpen: boolean;
-	server: MCPServerConfig | null;
+	server: MCPServerView | null;
 	authHealth?: MCPAuthHealth;
 	onClose: () => void;
 	onOpenURL: (url: string) => void;
@@ -36,27 +36,25 @@ function MCPOAuthAuthorizationModalContent({
 	isCancelling,
 	setIsCancelling,
 }: MCPOAuthAuthorizationModalProps & {
+	server: MCPServerView;
 	isCancelling: boolean;
-	setIsCancelling: (next: boolean) => void;
+	setIsCancelling: (value: boolean) => void;
 }) {
 	const [cancelError, setCancelError] = useState('');
-
 	const { requestClose, unmountingRef } = useModalDialogController();
 
-	const authState = getEffectiveMCPAuthHealthState(server ?? undefined, authHealth);
-	const authorizationURL = isMCPAuthActionable(authHealth, server ?? undefined)
-		? (authHealth?.authorizationURL ?? '')
-		: '';
-	const isPending = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
-	const isAuthorized = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorized;
+	const authorizationURL = isMCPAuthActionable(server, authHealth) ? (authHealth?.authorizationURL?.trim() ?? '') : '';
+	const isPending = authHealth?.state === MCPAuthHealthState.AuthorizationPending;
+	const isAuthorized = authHealth?.state === MCPAuthHealthState.Authorized;
 
-	const handleAuthorizationCancel = async () => {
+	const handleCancel = async () => {
 		if (!onCancel || isCancelling) {
 			return;
 		}
 
 		setCancelError('');
 		setIsCancelling(true);
+
 		try {
 			await onCancel();
 			if (!unmountingRef.current) {
@@ -65,7 +63,7 @@ function MCPOAuthAuthorizationModalContent({
 		} catch (error) {
 			if (!unmountingRef.current) {
 				setCancelError(
-					error instanceof Error && error.message.trim() ? error.message : 'Failed to cancel authorization.'
+					error instanceof Error && error.message.trim() ? error.message : 'Failed to cancel OAuth authorization.'
 				);
 			}
 		} finally {
@@ -81,20 +79,20 @@ function MCPOAuthAuthorizationModalContent({
 				<div className="app-scrollbar-thin p-4 sm:p-6">
 					<ModalHeader
 						title="OAuth authorization required"
-						description={`${server?.displayName ?? server?.id ?? 'This MCP server'} needs browser authorization before FlexiGPT can connect.`}
+						description={`${server.displayName} needs browser authorization before FlexiGPT can connect.`}
 						onClose={() => {
 							requestClose();
 						}}
 						closeDisabled={isCancelling}
 					/>
 
-					<div className="mb-4 flex items-center gap-2">
-						<span className={`badge rounded-xl ${getMCPServerAuthHealthBadgeClass(server ?? undefined, authHealth)}`}>
-							{getMCPServerAuthHealthLabel(server ?? undefined, authHealth)}
+					<div className="mb-4 flex flex-wrap items-center gap-2">
+						<span className={`badge rounded-xl ${getMCPServerAuthHealthBadgeClass(server, authHealth)}`}>
+							{getMCPServerAuthHealthLabel(server, authHealth)}
 						</span>
-						{authHealth?.authorizationExpiresAt && (
+						{authHealth?.authorizationExpiresAt ? (
 							<span className="text-base-content/60 text-xs">Expires at {authHealth.authorizationExpiresAt}</span>
-						)}
+						) : null}
 					</div>
 
 					{isAuthorized ? (
@@ -105,12 +103,10 @@ function MCPOAuthAuthorizationModalContent({
 						<div className="space-y-4">
 							<div className="bg-base-100 rounded-2xl p-4 text-sm">
 								<ol className="list-decimal space-y-2 pl-5">
-									<li>Click “Open authorization page”.</li>
+									<li>Open the authorization page.</li>
 									<li>Complete login and consent in your browser.</li>
-									<li>
-										Your browser will return to a local FlexiGPT callback URL. Keep this app open while that happens.
-									</li>
-									<li>After the callback is received, FlexiGPT will finish connecting automatically.</li>
+									<li>Keep FlexiGPT open while the browser returns to its loopback callback.</li>
+									<li>FlexiGPT finishes the authorization flow automatically.</li>
 								</ol>
 							</div>
 
@@ -123,46 +119,40 @@ function MCPOAuthAuthorizationModalContent({
 								</div>
 							) : (
 								<div className="alert alert-warning rounded-2xl text-sm">
-									<div className="flex items-center gap-2">
-										<FiAlertCircle size={14} />
-										<span>The authorization URL is not available yet. Wait a moment and try again.</span>
-									</div>
+									<FiAlertCircle size={14} />
+									<span>The authorization URL is not available yet. Wait briefly and try again.</span>
 								</div>
 							)}
 
-							{authHealth?.lastError && (
+							{authHealth?.lastError ? (
 								<div className="alert alert-error rounded-2xl text-sm">
-									<div className="flex items-center gap-2">
-										<FiAlertCircle size={14} />
-										<span>{authHealth.lastError}</span>
-									</div>
+									<FiAlertCircle size={14} />
+									<span>{authHealth.lastError}</span>
 								</div>
-							)}
+							) : null}
 
-							{cancelError && (
+							{cancelError ? (
 								<div className="alert alert-error rounded-2xl text-sm">
-									<div className="flex items-center gap-2">
-										<FiAlertCircle size={14} />
-										<span>{cancelError}</span>
-									</div>
+									<FiAlertCircle size={14} />
+									<span>{cancelError}</span>
 								</div>
-							)}
+							) : null}
 						</div>
 					)}
 
 					<ModalActions className="-mx-4 mt-6 -mb-4 sm:-mx-6 sm:-mb-6">
-						{isPending && onCancel && (
+						{isPending && onCancel ? (
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
 								disabled={isCancelling}
 								onClick={() => {
-									void handleAuthorizationCancel();
+									void handleCancel();
 								}}
 							>
 								Cancel authorization
 							</button>
-						)}
+						) : null}
 
 						<button
 							type="button"
@@ -181,10 +171,10 @@ function MCPOAuthAuthorizationModalContent({
 						<button
 							type="button"
 							className="btn bg-base-300 rounded-xl"
+							disabled={isCancelling}
 							onClick={() => {
 								requestClose();
 							}}
-							disabled={isCancelling}
 						>
 							Close
 						</button>
@@ -196,25 +186,20 @@ function MCPOAuthAuthorizationModalContent({
 	);
 }
 
-function MCPOAuthAuthorizationModalSession(props: MCPOAuthAuthorizationModalProps) {
+function MCPOAuthAuthorizationModalSession(props: MCPOAuthAuthorizationModalProps & { server: MCPServerView }) {
 	const [isCancelling, setIsCancelling] = useState(false);
 
 	return (
 		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} isBusy={isCancelling}>
-			<MCPOAuthAuthorizationModalContent
-				key="mcp-oauth-authorization-modal"
-				{...props}
-				isCancelling={isCancelling}
-				setIsCancelling={setIsCancelling}
-			/>
+			<MCPOAuthAuthorizationModalContent {...props} isCancelling={isCancelling} setIsCancelling={setIsCancelling} />
 		</ModalDialog>
 	);
 }
 
 export function MCPOAuthAuthorizationModal(props: MCPOAuthAuthorizationModalProps) {
-	if (!props.isOpen) {
+	if (!props.isOpen || !props.server) {
 		return null;
 	}
 
-	return <MCPOAuthAuthorizationModalSession {...props} />;
+	return <MCPOAuthAuthorizationModalSession {...props} server={props.server} />;
 }

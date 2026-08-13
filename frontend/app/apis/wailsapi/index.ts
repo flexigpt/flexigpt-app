@@ -6,7 +6,7 @@ export * from './assistantpresetstore';
 export * from './attachmentsdrop';
 export * from './backend';
 export * from './conversationstore';
-export * from './mcp';
+export * from './mcp_artifact';
 export * from './modelpresetstore';
 export * from './settingstore';
 export * from './skillbundle';

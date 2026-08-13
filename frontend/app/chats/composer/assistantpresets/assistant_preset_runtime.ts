@@ -1,11 +1,12 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import {
 	BASE_ASSISTANT_PRESET_BUNDLEID,
 	BASE_ASSISTANT_PRESET_SLUG,
 	BASE_ASSISTANT_PRESET_VERSION,
 } from '@/spec/assistantpreset';
-import type { MCPAppVisibility, MCPConversationContext } from '@/spec/mcp';
-import { isMCPAppVisibility } from '@/spec/mcp';
+import type { MCPAppVisibility, MCPConversationContext } from '@/spec/mcp_artifact';
+import { isMCPAppVisibility } from '@/spec/mcp_artifact';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
@@ -236,6 +237,10 @@ function compareStrings(a: string, b: string): number {
 	return a.localeCompare(b);
 }
 
+function artifactRefSortKey(ref: ArtifactRef): string {
+	return `${ref.rootID}/${ref.artifactID}`;
+}
+
 /**
  * Normalizes MCP context for assistant preset comparison.
  *
@@ -258,7 +263,7 @@ export function normalizeAssistantPresetMCPContext(
 	type MCPPrompt = NonNullable<MCPConversationContext['prompts']>[number];
 
 	const servers: MCPConversationContext['servers'] = (context.servers ?? [])
-		.filter(server => server.bundleID?.trim() && server.serverID?.trim())
+		.filter(server => server.server?.rootID?.trim() && server.server?.artifactID?.trim())
 		.map(server => {
 			const selectedTools: MCPSelectedTool[] = (server.selectedTools ?? [])
 				.filter(tool => tool.toolName?.trim())
@@ -266,8 +271,7 @@ export function normalizeAssistantPresetMCPContext(
 					const visibility = normalizeMCPAppVisibility(tool.visibility);
 
 					const selectedTool: MCPSelectedTool = {
-						bundleID: tool.bundleID || server.bundleID,
-						serverID: tool.serverID || server.serverID,
+						server: tool.server ?? server.server,
 						toolName: tool.toolName,
 					};
 
@@ -296,12 +300,14 @@ export function normalizeAssistantPresetMCPContext(
 					return selectedTool;
 				})
 				.toSorted((a, b) =>
-					compareStrings(`${a.bundleID}/${a.serverID}/${a.toolName}`, `${b.bundleID}/${b.serverID}/${b.toolName}`)
+					compareStrings(
+						`${artifactRefSortKey(a.server)}/${a.toolName}`,
+						`${artifactRefSortKey(b.server)}/${b.toolName}`
+					)
 				);
 
 			const normalizedServer: MCPServer = {
-				bundleID: server.bundleID,
-				serverID: server.serverID,
+				server: server.server,
 				toolExposure: server.toolExposure,
 			};
 
@@ -317,14 +323,13 @@ export function normalizeAssistantPresetMCPContext(
 
 			return normalizedServer;
 		})
-		.toSorted((a, b) => compareStrings(`${a.bundleID}/${a.serverID}`, `${b.bundleID}/${b.serverID}`));
+		.toSorted((a, b) => compareStrings(artifactRefSortKey(a.server), artifactRefSortKey(b.server)));
 
 	const resources: NonNullable<MCPConversationContext['resources']> = (context.resources ?? [])
-		.filter(resource => resource.bundleID?.trim() && resource.serverID?.trim() && resource.uri?.trim())
+		.filter(resource => resource.server?.rootID?.trim() && resource.server?.artifactID?.trim() && resource.uri?.trim())
 		.map(resource => {
 			const normalizedResource: MCPResource = {
-				bundleID: resource.bundleID,
-				serverID: resource.serverID,
+				server: resource.server,
 				uri: resource.uri,
 				displayName: resource.uri,
 			};
@@ -335,16 +340,19 @@ export function normalizeAssistantPresetMCPContext(
 
 			return normalizedResource;
 		})
-		.toSorted((a, b) => compareStrings(`${a.bundleID}/${a.serverID}/${a.uri}`, `${b.bundleID}/${b.serverID}/${b.uri}`));
+		.toSorted((a, b) =>
+			compareStrings(`${artifactRefSortKey(a.server)}/${a.uri}`, `${artifactRefSortKey(b.server)}/${b.uri}`)
+		);
 
 	const resourceTemplates: NonNullable<MCPConversationContext['resourceTemplates']> = (context.resourceTemplates ?? [])
-		.filter(template => template.bundleID?.trim() && template.serverID?.trim() && template.uriTemplate?.trim())
+		.filter(
+			template => template.server?.rootID?.trim() && template.server?.artifactID?.trim() && template.uriTemplate?.trim()
+		)
 		.map(template => {
 			const argumentValues = normalizeComparableArgumentValues(template.argumentValues);
 
 			const normalizedTemplate: MCPResourceTemplate = {
-				bundleID: template.bundleID,
-				serverID: template.serverID,
+				server: template.server,
 				uriTemplate: template.uriTemplate,
 				displayName: template.uriTemplate,
 			};
@@ -359,17 +367,19 @@ export function normalizeAssistantPresetMCPContext(
 			return normalizedTemplate;
 		})
 		.toSorted((a, b) =>
-			compareStrings(`${a.bundleID}/${a.serverID}/${a.uriTemplate}`, `${b.bundleID}/${b.serverID}/${b.uriTemplate}`)
+			compareStrings(
+				`${artifactRefSortKey(a.server)}/${a.uriTemplate}`,
+				`${artifactRefSortKey(b.server)}/${b.uriTemplate}`
+			)
 		);
 
 	const prompts: NonNullable<MCPConversationContext['prompts']> = (context.prompts ?? [])
-		.filter(prompt => prompt.bundleID?.trim() && prompt.serverID?.trim() && prompt.promptName?.trim())
+		.filter(prompt => prompt.server?.rootID?.trim() && prompt.server?.artifactID?.trim() && prompt.promptName?.trim())
 		.map(prompt => {
 			const argumentValues = normalizeComparableArgumentValues(prompt.argumentValues);
 
 			const normalizedPrompt: MCPPrompt = {
-				bundleID: prompt.bundleID,
-				serverID: prompt.serverID,
+				server: prompt.server,
 				promptName: prompt.promptName,
 				displayName: prompt.promptName,
 			};
@@ -384,8 +394,12 @@ export function normalizeAssistantPresetMCPContext(
 			return normalizedPrompt;
 		})
 		.toSorted((a, b) =>
-			compareStrings(`${a.bundleID}/${a.serverID}/${a.promptName}`, `${b.bundleID}/${b.serverID}/${b.promptName}`)
+			compareStrings(
+				`${artifactRefSortKey(a.server)}/${a.promptName}`,
+				`${artifactRefSortKey(b.server)}/${b.promptName}`
+			)
 		);
+
 	if (servers.length === 0 && resources.length === 0 && resourceTemplates.length === 0 && prompts.length === 0) {
 		return undefined;
 	}

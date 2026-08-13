@@ -6,60 +6,88 @@ export function CancelPendingMCPOAuthAuthorization(arg1) {
   return window['go']['main']['MCPWrapper']['CancelPendingMCPOAuthAuthorization'](arg1);
 }
 
-export function CompleteMCPArgument(arg1) {
-  return window['go']['main']['MCPWrapper']['CompleteMCPArgument'](arg1);
+export function CompleteMCPArgument(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['CompleteMCPArgument'](arg1, arg2);
 }
 
 export function ConnectMCPServer(arg1) {
   return window['go']['main']['MCPWrapper']['ConnectMCPServer'](arg1);
 }
 
-export function DeleteMCPBundle(arg1) {
-  return window['go']['main']['MCPWrapper']['DeleteMCPBundle'](arg1);
+export function CreateMCPBundle(arg1) {
+  return window['go']['main']['MCPWrapper']['CreateMCPBundle'](arg1);
 }
 
-export function DeleteMCPServer(arg1) {
-  return window['go']['main']['MCPWrapper']['DeleteMCPServer'](arg1);
-}
-
-export function DeleteMCPServerSecret(arg1) {
-  return window['go']['main']['MCPWrapper']['DeleteMCPServerSecret'](arg1);
+export function DeleteMCPServerSecret(arg1, arg2, arg3) {
+  return window['go']['main']['MCPWrapper']['DeleteMCPServerSecret'](arg1, arg2, arg3);
 }
 
 export function DisconnectMCPServer(arg1) {
   return window['go']['main']['MCPWrapper']['DisconnectMCPServer'](arg1);
 }
 
-export function EvaluateMCPToolCall(arg1) {
-  return window['go']['main']['MCPWrapper']['EvaluateMCPToolCall'](arg1);
+export function EvaluateMCPToolCall(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['EvaluateMCPToolCall'](arg1, arg2);
 }
 
-export function GetMCPPrompt(arg1) {
-  return window['go']['main']['MCPWrapper']['GetMCPPrompt'](arg1);
+export function EvaluateMappedMCPToolCall(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['EvaluateMappedMCPToolCall'](arg1, arg2);
 }
 
-export function GetMCPServer(arg1) {
-  return window['go']['main']['MCPWrapper']['GetMCPServer'](arg1);
+export function GetMCPBundle(arg1) {
+  return window['go']['main']['MCPWrapper']['GetMCPBundle'](arg1);
+}
+
+export function GetMCPBundleDocument(arg1) {
+  return window['go']['main']['MCPWrapper']['GetMCPBundleDocument'](arg1);
+}
+
+export function GetMCPBundleInstallation(arg1) {
+  return window['go']['main']['MCPWrapper']['GetMCPBundleInstallation'](arg1);
+}
+
+export function GetMCPGlobalSettings() {
+  return window['go']['main']['MCPWrapper']['GetMCPGlobalSettings']();
+}
+
+export function GetMCPPrompt(arg1, arg2, arg3) {
+  return window['go']['main']['MCPWrapper']['GetMCPPrompt'](arg1, arg2, arg3);
 }
 
 export function GetMCPServerAuthHealth(arg1) {
   return window['go']['main']['MCPWrapper']['GetMCPServerAuthHealth'](arg1);
 }
 
-export function GetMCPServerAuthStatus(arg1) {
-  return window['go']['main']['MCPWrapper']['GetMCPServerAuthStatus'](arg1);
+export function GetMCPServerInstallation(arg1) {
+  return window['go']['main']['MCPWrapper']['GetMCPServerInstallation'](arg1);
 }
 
 export function GetMCPServerStatus(arg1) {
   return window['go']['main']['MCPWrapper']['GetMCPServerStatus'](arg1);
 }
 
-export function GetMCPSettings(arg1) {
-  return window['go']['main']['MCPWrapper']['GetMCPSettings'](arg1);
+export function InspectMCPPolicy(arg1) {
+  return window['go']['main']['MCPWrapper']['InspectMCPPolicy'](arg1);
 }
 
-export function InvokeMCPTool(arg1) {
-  return window['go']['main']['MCPWrapper']['InvokeMCPTool'](arg1);
+export function InspectMCPServer(arg1) {
+  return window['go']['main']['MCPWrapper']['InspectMCPServer'](arg1);
+}
+
+export function InvokeMCPTool(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['InvokeMCPTool'](arg1, arg2);
+}
+
+export function InvokeMappedMCPTool(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['InvokeMappedMCPTool'](arg1, arg2);
+}
+
+export function ListMCPBundlePolicies(arg1) {
+  return window['go']['main']['MCPWrapper']['ListMCPBundlePolicies'](arg1);
+}
+
+export function ListMCPBundleServers(arg1) {
+  return window['go']['main']['MCPWrapper']['ListMCPBundleServers'](arg1);
 }
 
 export function ListMCPBundles(arg1) {
@@ -82,54 +110,58 @@ export function ListMCPServerTools(arg1) {
   return window['go']['main']['MCPWrapper']['ListMCPServerTools'](arg1);
 }
 
-export function ListMCPServers(arg1) {
-  return window['go']['main']['MCPWrapper']['ListMCPServers'](arg1);
+export function ListPendingMCPOAuthAuthorizations() {
+  return window['go']['main']['MCPWrapper']['ListPendingMCPOAuthAuthorizations']();
 }
 
-export function ListPendingMCPOAuthAuthorizations(arg1) {
-  return window['go']['main']['MCPWrapper']['ListPendingMCPOAuthAuthorizations'](arg1);
+export function PurgeMCPBundle(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['PurgeMCPBundle'](arg1, arg2);
 }
 
-export function PatchMCPBundle(arg1) {
-  return window['go']['main']['MCPWrapper']['PatchMCPBundle'](arg1);
+export function PutMCPServerSecret(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['MCPWrapper']['PutMCPServerSecret'](arg1, arg2, arg3, arg4);
 }
 
-export function PatchMCPServerEnabled(arg1) {
-  return window['go']['main']['MCPWrapper']['PatchMCPServerEnabled'](arg1);
+export function ReadMCPResource(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['ReadMCPResource'](arg1, arg2);
 }
 
-export function PatchMCPServerPolicy(arg1) {
-  return window['go']['main']['MCPWrapper']['PatchMCPServerPolicy'](arg1);
-}
-
-export function PatchMCPServerSetup(arg1) {
-  return window['go']['main']['MCPWrapper']['PatchMCPServerSetup'](arg1);
-}
-
-export function PatchMCPSettings(arg1) {
-  return window['go']['main']['MCPWrapper']['PatchMCPSettings'](arg1);
-}
-
-export function PutMCPBundle(arg1) {
-  return window['go']['main']['MCPWrapper']['PutMCPBundle'](arg1);
-}
-
-export function PutMCPServer(arg1) {
-  return window['go']['main']['MCPWrapper']['PutMCPServer'](arg1);
-}
-
-export function PutMCPServerSecret(arg1) {
-  return window['go']['main']['MCPWrapper']['PutMCPServerSecret'](arg1);
-}
-
-export function ReadMCPResource(arg1) {
-  return window['go']['main']['MCPWrapper']['ReadMCPResource'](arg1);
+export function RefreshMCPBundle(arg1) {
+  return window['go']['main']['MCPWrapper']['RefreshMCPBundle'](arg1);
 }
 
 export function RefreshMCPServer(arg1) {
   return window['go']['main']['MCPWrapper']['RefreshMCPServer'](arg1);
 }
 
-export function ResolveMCPApproval(arg1) {
-  return window['go']['main']['MCPWrapper']['ResolveMCPApproval'](arg1);
+export function ReplaceMCPBundleDocument(arg1) {
+  return window['go']['main']['MCPWrapper']['ReplaceMCPBundleDocument'](arg1);
+}
+
+export function ResolveMCPApproval(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['ResolveMCPApproval'](arg1, arg2);
+}
+
+export function RetireMCPBundle(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['RetireMCPBundle'](arg1, arg2);
+}
+
+export function UpdateMCPBundleEnabled(arg1, arg2, arg3) {
+  return window['go']['main']['MCPWrapper']['UpdateMCPBundleEnabled'](arg1, arg2, arg3);
+}
+
+export function UpdateMCPGlobalSettings(arg1, arg2) {
+  return window['go']['main']['MCPWrapper']['UpdateMCPGlobalSettings'](arg1, arg2);
+}
+
+export function UpdateMCPServerInstallation(arg1, arg2, arg3) {
+  return window['go']['main']['MCPWrapper']['UpdateMCPServerInstallation'](arg1, arg2, arg3);
+}
+
+export function UpdateProtectedMCPBundleInstallation(arg1, arg2, arg3) {
+  return window['go']['main']['MCPWrapper']['UpdateProtectedMCPBundleInstallation'](arg1, arg2, arg3);
+}
+
+export function UpdateProtectedMCPServerInstallation(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['MCPWrapper']['UpdateProtectedMCPServerInstallation'](arg1, arg2, arg3, arg4);
 }

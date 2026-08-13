@@ -41,7 +41,7 @@ export function requireWailsArray<T = unknown>(value: unknown, field: string): T
 	return value as T[];
 }
 
-function optionalWailsArray(value: unknown, field: string): unknown[] | undefined {
+export function optionalWailsArray(value: unknown, field: string): unknown[] | undefined {
 	if (value === undefined || value === null) {
 		return undefined;
 	}
@@ -57,7 +57,7 @@ export function requireWailsString(value: unknown, field: string): string {
 	return value;
 }
 
-function optionalWailsString(value: unknown, field: string): string | undefined {
+export function optionalWailsString(value: unknown, field: string): string | undefined {
 	if (value === undefined || value === null) {
 		return undefined;
 	}
@@ -65,7 +65,7 @@ function optionalWailsString(value: unknown, field: string): string | undefined 
 	return requireWailsString(value, field);
 }
 
-function requireWailsBoolean(value: unknown, field: string): boolean {
+export function requireWailsBoolean(value: unknown, field: string): boolean {
 	if (typeof value !== 'boolean') {
 		throw new TypeError(`${field} returned an invalid boolean.`);
 	}
@@ -73,7 +73,7 @@ function requireWailsBoolean(value: unknown, field: string): boolean {
 	return value;
 }
 
-function requireWailsNumber(value: unknown, field: string): number {
+export function requireWailsNumber(value: unknown, field: string): number {
 	if (typeof value !== 'number' || !Number.isFinite(value)) {
 		throw new TypeError(`${field} returned an invalid number.`);
 	}
@@ -91,23 +91,6 @@ export function requireNonBlankString(value: string, field: string): string {
 
 export function omitUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {
 	return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as Partial<T>;
-}
-
-export function normalizePageSize(
-	value: number | undefined,
-	defaultValue: number,
-	maxValue: number,
-	field = 'pageSize'
-): number {
-	if (value === undefined) {
-		return defaultValue;
-	}
-
-	if (!Number.isSafeInteger(value) || value <= 0) {
-		throw new Error(`${field} must be a positive integer.`);
-	}
-
-	return Math.min(value, maxValue);
 }
 
 export async function collectAllPages<T>(

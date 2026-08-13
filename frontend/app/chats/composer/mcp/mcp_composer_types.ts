@@ -1,24 +1,27 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPArgumentDefinition,
 	MCPAuthHealth,
-	MCPBundle,
 	MCPConversationContext,
 	MCPPromptRef,
 	MCPPromptSelection,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPResourceTemplateSelection,
-	MCPServerConfig,
 	MCPServerRuntimeSnapshot,
 	MCPServerSelection,
 	MCPToolCapability,
 	MCPToolSelection,
-} from '@/spec/mcp';
-import { MCPToolExposure } from '@/spec/mcp';
+	MCPTransportType,
+} from '@/spec/mcp_artifact';
+import { MCPToolExposure } from '@/spec/mcp_artifact';
+
+import type { MCPBundleView, MCPServerView } from '@/mcpservers/lib/mcp_management';
 
 export interface MCPComposerServerOption {
-	bundle: MCPBundle;
-	server: MCPServerConfig;
+	bundle: MCPBundleView;
+	server: MCPServerView;
+	transport: MCPTransportType;
 	runtime?: MCPServerRuntimeSnapshot;
 	authHealth?: MCPAuthHealth;
 
@@ -33,8 +36,7 @@ export interface MCPComposerServerOption {
 }
 
 export interface MCPComposerServerSelection {
-	bundleID: string;
-	serverID: string;
+	server: ArtifactRef;
 	snapshotDigest?: string;
 	toolExposure: MCPToolExposure;
 	selectedTools: MCPToolSelection[];
@@ -58,62 +60,51 @@ export interface UseComposerMCPResult {
 	argumentsBlocked: boolean;
 
 	refreshAll: () => Promise<void>;
-	refreshServer: (bundleID: string, serverID: string) => Promise<void>;
-	ensureDiscoveryLoaded: (bundleID: string, serverID: string) => Promise<void>;
+	refreshServer: (server: ArtifactRef) => Promise<void>;
+	ensureDiscoveryLoaded: (server: ArtifactRef) => Promise<void>;
 	prepareForSubmit: () => Promise<MCPConversationContext | undefined>;
 
-	connectServer: (bundleID: string, serverID: string) => Promise<void>;
-	disconnectServer: (bundleID: string, serverID: string) => Promise<void>;
-	cancelOAuth: (bundleID: string, serverID: string) => Promise<void>;
+	connectServer: (server: ArtifactRef) => Promise<void>;
+	disconnectServer: (server: ArtifactRef) => Promise<void>;
+	cancelOAuth: (server: ArtifactRef) => Promise<void>;
 	openAuthURL: (url: string) => void;
 
 	setServerSelected: (option: MCPComposerServerOption, selected: boolean) => void;
-	setToolExposure: (bundleID: string, serverID: string, exposure: MCPToolExposure) => void;
-	setIncludeServerInstructions: (bundleID: string, serverID: string, include: boolean) => void;
+	setToolExposure: (server: ArtifactRef, exposure: MCPToolExposure) => void;
+	setIncludeServerInstructions: (server: ArtifactRef, include: boolean) => void;
 	toggleTool: (tool: MCPToolCapability, selected: boolean) => void;
 	toggleResource: (resource: MCPResourceRef, selected: boolean) => void;
 	toggleResourceTemplate: (template: MCPResourceTemplateRef, selected: boolean) => void;
 	togglePrompt: (prompt: MCPPromptRef, selected: boolean) => void;
 	setResourceTemplateArgumentValue: (
-		bundleID: string,
-		serverID: string,
+		server: ArtifactRef,
 		uriTemplate: string,
 		argumentName: string,
 		value: string
 	) => void;
-	setPromptArgumentValue: (
-		bundleID: string,
-		serverID: string,
-		promptName: string,
-		argumentName: string,
-		value: string
-	) => void;
+	setPromptArgumentValue: (server: ArtifactRef, promptName: string, argumentName: string, value: string) => void;
 	clear: () => void;
 	restoreContext: (context?: MCPConversationContext) => void;
 }
 
-export function mcpServerKey(bundleID: string, serverID: string): string {
-	return `${bundleID}::${serverID}`;
+export function mcpServerKey(server: ArtifactRef): string {
+	return `${server.rootID}::${server.artifactID}`;
 }
 
-export function mcpToolKey(
-	tool: Pick<MCPToolCapability | MCPToolSelection, 'serverID' | 'toolName'> & { bundleID?: string }
-): string {
-	return `${tool.bundleID ?? ''}::${tool.serverID}::${tool.toolName}`;
+export function mcpToolKey(tool: Pick<MCPToolCapability | MCPToolSelection, 'server' | 'toolName'>): string {
+	return `${mcpServerKey(tool.server)}::${tool.toolName}`;
 }
 
-export function mcpResourceKey(resource: Pick<MCPResourceRef, 'bundleID' | 'serverID' | 'uri'>): string {
-	return `${resource.bundleID}::${resource.serverID}::${resource.uri}`;
+export function mcpResourceKey(resource: Pick<MCPResourceRef, 'server' | 'uri'>): string {
+	return `${mcpServerKey(resource.server)}::${resource.uri}`;
 }
 
-export function mcpResourceTemplateKey(
-	template: Pick<MCPResourceTemplateRef, 'bundleID' | 'serverID' | 'uriTemplate'>
-): string {
-	return `${template.bundleID}::${template.serverID}::${template.uriTemplate}`;
+export function mcpResourceTemplateKey(template: Pick<MCPResourceTemplateRef, 'server' | 'uriTemplate'>): string {
+	return `${mcpServerKey(template.server)}::${template.uriTemplate}`;
 }
 
-export function mcpPromptKey(prompt: Pick<MCPPromptRef, 'bundleID' | 'serverID' | 'promptName'>): string {
-	return `${prompt.bundleID}::${prompt.serverID}::${prompt.promptName}`;
+export function mcpPromptKey(prompt: Pick<MCPPromptRef, 'server' | 'promptName'>): string {
+	return `${mcpServerKey(prompt.server)}::${prompt.promptName}`;
 }
 
 export function normalizeMCPArgumentDefinitions(
@@ -173,16 +164,14 @@ export function mcpSelectionToContext(
 	}
 
 	const servers: MCPServerSelection[] = selections.map(selection => ({
-		bundleID: selection.bundleID,
-		serverID: selection.serverID,
+		server: selection.server,
 		snapshotDigest: selection.snapshotDigest,
 		toolExposure: selection.toolExposure,
 		selectedTools:
-			selection.toolExposure !== MCPToolExposure.MCPToolExposureNone && selection.selectedTools.length > 0
+			selection.toolExposure !== MCPToolExposure.None && selection.selectedTools.length > 0
 				? selection.selectedTools.map(tool =>
 						Object.assign({}, tool, {
-							bundleID: tool.bundleID ?? selection.bundleID,
-							serverID: tool.serverID || selection.serverID,
+							server: tool.server ?? selection.server,
 						})
 					)
 				: undefined,
@@ -209,16 +198,14 @@ export function mcpContextToSelectionMap(context?: MCPConversationContext): Reco
 	const out: Record<string, MCPComposerServerSelection> = {};
 
 	for (const server of context.servers ?? []) {
-		const key = mcpServerKey(server.bundleID, server.serverID);
+		const key = mcpServerKey(server.server);
 		out[key] = {
-			bundleID: server.bundleID,
-			serverID: server.serverID,
+			server: server.server,
 			snapshotDigest: server.snapshotDigest,
 			toolExposure: server.toolExposure,
 			selectedTools: (server.selectedTools ?? []).map(tool =>
 				Object.assign({}, tool, {
-					bundleID: tool.bundleID ?? server.bundleID,
-					serverID: tool.serverID || server.serverID,
+					server: tool.server ?? server.server,
 				})
 			),
 			selectedResources: [],
@@ -229,12 +216,12 @@ export function mcpContextToSelectionMap(context?: MCPConversationContext): Reco
 	}
 
 	for (const resource of context.resources ?? []) {
-		const key = mcpServerKey(resource.bundleID, resource.serverID);
+		const key = mcpServerKey(resource.server);
+
 		if (!out[key]) {
 			out[key] = {
-				bundleID: resource.bundleID,
-				serverID: resource.serverID,
-				toolExposure: MCPToolExposure.MCPToolExposureNone,
+				server: resource.server,
+				toolExposure: MCPToolExposure.None,
 				selectedTools: [],
 				selectedResources: [],
 				selectedResourceTemplates: [],
@@ -245,12 +232,11 @@ export function mcpContextToSelectionMap(context?: MCPConversationContext): Reco
 	}
 
 	for (const template of context.resourceTemplates ?? []) {
-		const key = mcpServerKey(template.bundleID, template.serverID);
+		const key = mcpServerKey(template.server);
 		if (!out[key]) {
 			out[key] = {
-				bundleID: template.bundleID,
-				serverID: template.serverID,
-				toolExposure: MCPToolExposure.MCPToolExposureNone,
+				server: template.server,
+				toolExposure: MCPToolExposure.None,
 				selectedTools: [],
 				selectedResources: [],
 				selectedResourceTemplates: [],
@@ -261,12 +247,11 @@ export function mcpContextToSelectionMap(context?: MCPConversationContext): Reco
 	}
 
 	for (const prompt of context.prompts ?? []) {
-		const key = mcpServerKey(prompt.bundleID, prompt.serverID);
+		const key = mcpServerKey(prompt.server);
 		if (!out[key]) {
 			out[key] = {
-				bundleID: prompt.bundleID,
-				serverID: prompt.serverID,
-				toolExposure: MCPToolExposure.MCPToolExposureNone,
+				server: prompt.server,
+				toolExposure: MCPToolExposure.None,
 				selectedTools: [],
 				selectedResources: [],
 				selectedResourceTemplates: [],

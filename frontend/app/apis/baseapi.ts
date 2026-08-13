@@ -21,6 +21,7 @@ import type {
 import { SkillManagementAPI } from '@/apis/skill_management';
 // oxlint-disable-next-line import/no-namespace
 import * as wailsImpl from '@/apis/wailsapi';
+import { WailsMCPArtifactAPI } from '@/apis/wailsapi/mcp_artifact';
 import { WailsSkillBundleAPI } from '@/apis/wailsapi/skillbundle';
 
 export let log: ILogger;
@@ -54,7 +55,7 @@ if (IS_WAILS_PLATFORM) {
 	aggregateAPI = new wailsImpl.WailsAggregateAPI();
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
 	modelPresetStoreAPI = new wailsImpl.WailsModelPresetStoreAPI();
-	mcpAPI = new wailsImpl.WailsMCPAPI();
+	mcpAPI = new WailsMCPArtifactAPI();
 	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
 	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
 	skillBundleAPI = new WailsSkillBundleAPI();

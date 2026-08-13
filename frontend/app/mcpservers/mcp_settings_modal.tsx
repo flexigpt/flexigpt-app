@@ -20,20 +20,28 @@ interface MCPSettingsModalProps {
 }
 
 function isLoopbackHost(host: string): boolean {
-	const h = host.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
-	if (h === 'localhost' || h === '::1' || h === '0:0:0:0:0:0:0:1') {
+	const normalized = host.trim().toLocaleLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+
+	if (normalized === 'localhost' || normalized === '::1' || normalized === '0:0:0:0:0:0:0:1') {
 		return true;
 	}
-	const parts = h.split('.').map(Number);
-	return parts.length === 4 && parts.every(p => Number.isInteger(p) && p >= 0 && p <= 255) && parts[0] === 127;
+
+	const octets = normalized.split('.').map(Number);
+	return (
+		octets.length === 4 &&
+		octets.every(octet => Number.isInteger(octet) && octet >= 0 && octet <= 255) &&
+		octets[0] === 127
+	);
 }
 
-function splitListenAddr(value: string): { host: string; port: string } | undefined {
+function splitListenAddress(value: string): { host: string; port: string } | undefined {
 	if (value.startsWith('[')) {
 		const end = value.indexOf(']');
+
 		if (end <= 1 || value[end + 1] !== ':') {
 			return undefined;
 		}
+
 		return {
 			host: value.slice(1, end),
 			port: value.slice(end + 2),
@@ -41,28 +49,40 @@ function splitListenAddr(value: string): { host: string; port: string } | undefi
 	}
 
 	const parts = value.split(':');
+
 	if (parts.length !== 2) {
 		return undefined;
 	}
-	return { host: parts[0], port: parts[1] };
+
+	return {
+		host: parts[0],
+		port: parts[1],
+	};
 }
 
-function validateListenAddr(raw: string): string {
+function validateListenAddress(raw: string): string {
 	const value = raw.trim();
+
 	if (!value) {
 		return '';
 	}
-	const parsed = splitListenAddr(value);
+
+	const parsed = splitListenAddress(value);
+
 	if (!parsed) {
-		return 'Use host:port, for IPv6 use [::1]:37645.';
+		return 'Use host:port. For IPv6, use [::1]:37645.';
 	}
+
 	const port = Number(parsed.port);
+
 	if (!isLoopbackHost(parsed.host)) {
-		return 'Host must be loopback (localhost, 127.0.0.1, or ::1).';
+		return 'Host must be localhost, 127.0.0.1, or ::1.';
 	}
+
 	if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-		return 'Port must be 1..65535.';
+		return 'Port must be between 1 and 65535.';
 	}
+
 	return '';
 }
 
@@ -72,38 +92,39 @@ function MCPSettingsModalContent({
 	oauthRedirectURL,
 	onSubmit,
 }: Omit<MCPSettingsModalProps, 'isOpen' | 'onClose'>) {
-	const [listenAddr, setListenAddr] = useState(initialListenAddr ?? '');
-	const [errorState, setErrorState] = useState('');
+	const [listenAddress, setListenAddress] = useState(initialListenAddr ?? '');
+	const [validationError, setValidationError] = useState('');
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
-
 	const { requestClose, unmountingRef } = useModalDialogController();
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
-		e.preventDefault();
-		e.stopPropagation();
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async event => {
+		event.preventDefault();
+		event.stopPropagation();
 
 		if (isSubmitting) {
 			return;
 		}
 
+		const error = validateListenAddress(listenAddress);
+		setValidationError(error);
 		setSubmitError('');
 
-		const err = validateListenAddr(listenAddr);
-		setErrorState(err);
-		if (err) {
+		if (error) {
 			return;
 		}
 
 		setIsSubmitting(true);
+
 		try {
-			await onSubmit(listenAddr.trim());
+			await onSubmit(listenAddress.trim());
+
 			if (!unmountingRef.current) {
 				requestClose(true);
 			}
-		} catch (error) {
+		} catch (cause) {
 			if (!unmountingRef.current) {
-				setSubmitError(error instanceof Error ? error.message : 'Failed to save MCP settings.');
+				setSubmitError(cause instanceof Error ? cause.message : 'Failed to save MCP OAuth settings.');
 			}
 		} finally {
 			if (!unmountingRef.current) {
@@ -125,54 +146,52 @@ function MCPSettingsModalContent({
 					/>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-8" aria-busy={isSubmitting}>
-						{submitError && (
+						{submitError ? (
 							<div className="alert alert-error rounded-2xl text-sm">
-								<div className="flex items-center gap-2">
-									<FiAlertCircle size={14} />
-									<span>{submitError}</span>
-								</div>
+								<FiAlertCircle size={14} />
+								<span>{submitError}</span>
 							</div>
-						)}
+						) : null}
 
-						{oauthRedirectURL && (
-							<div className="flex flex-col gap-2">
+						{oauthRedirectURL ? (
+							<div>
 								<div className="text-base-content/70 mb-1 text-xs font-semibold uppercase">OAuth Redirect URL</div>
 								<div className="bg-base-300 rounded-2xl p-3 text-xs break-all">{oauthRedirectURL}</div>
-								<p className="text-base-content/60 mt-1 text-xs">
-									Register this URL with providers that require a fixed redirect URI.
+								<p className="text-base-content/60 mt-2 text-xs">
+									Register this URL with providers that require a fixed loopback redirect URI.
 								</p>
 							</div>
-						)}
+						) : null}
 
-						<div className="flex flex-col gap-2">
+						<div>
 							<div className="text-base-content/70 mb-1 text-xs font-semibold uppercase">
 								OAuth Loopback Listen Address
 							</div>
 							<input
 								type="text"
-								className={`input w-full rounded-xl ${errorState ? 'input-error' : ''}`}
-								value={listenAddr}
+								className={`input w-full rounded-xl ${validationError ? 'input-error' : ''}`}
+								value={listenAddress}
+								placeholder="127.0.0.1:37645, or leave blank for a random port"
 								spellCheck="false"
 								autoComplete="off"
-								placeholder="127.0.0.1:37645 (leave blank for a random port)"
-								onChange={e => {
-									setListenAddr(e.target.value);
-									setErrorState(validateListenAddr(e.target.value));
+								disabled={isSubmitting}
+								onChange={event => {
+									setListenAddress(event.target.value);
+									setValidationError(validateListenAddress(event.target.value));
 								}}
 							/>
-							{errorState && (
+							{validationError ? (
 								<div className="label">
 									<span className="text-error flex items-center gap-1">
-										<FiAlertCircle size={12} /> {errorState}
+										<FiAlertCircle size={12} />
+										{validationError}
 									</span>
 								</div>
-							)}
-							{activeListenAddr && (
-								<div className="label">
-									<span className="text-base-content/60 text-xs">Currently active: {activeListenAddr}</span>
-								</div>
-							)}
-							<p className="text-base-content/60 mt-1 text-xs">
+							) : null}
+							{activeListenAddr ? (
+								<p className="text-base-content/60 mt-2 text-xs">Currently active: {activeListenAddr}</p>
+							) : null}
+							<p className="text-base-content/60 mt-2 text-xs">
 								Changing this address takes effect after restarting FlexiGPT.
 							</p>
 						</div>
@@ -181,10 +200,10 @@ function MCPSettingsModalContent({
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
+								disabled={isSubmitting}
 								onClick={() => {
 									requestClose();
 								}}
-								disabled={isSubmitting}
 							>
 								Cancel
 							</button>
@@ -204,6 +223,7 @@ export function MCPSettingsModal(props: MCPSettingsModalProps) {
 	if (!props.isOpen) {
 		return null;
 	}
+
 	return (
 		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
 			<MCPSettingsModalContent key="mcp-settings-modal" {...props} />

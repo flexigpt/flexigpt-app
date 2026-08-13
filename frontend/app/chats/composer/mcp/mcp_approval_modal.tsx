@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 
 import { FiAlertCircle } from 'react-icons/fi';
 
-import type { MCPApprovalSummary } from '@/spec/mcp';
-import { MCPApprovalResolution } from '@/spec/mcp';
+import type { MCPApprovalSummary } from '@/spec/mcp_artifact';
+import { MCPApprovalResolution } from '@/spec/mcp_artifact';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
@@ -54,7 +54,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 	};
 
 	const closeAsDenyOnce = () => {
-		resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+		resolveOnce(MCPApprovalResolution.DenyOnce);
 	};
 
 	if (!approvalRequest) {
@@ -80,8 +80,10 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 						<div className="grid grid-cols-12 gap-2 text-sm">
 							<div className="col-span-3 font-semibold">Server</div>
 							<div className="col-span-9 break-all">
-								{summary.serverDisplayName?.trim() || summary.serverID}
-								<div className="text-base-content/60 text-xs">{summary.serverID}</div>
+								{summary.serverDisplayName?.trim() || summary.server.artifactID}
+								<div className="text-base-content/60 text-xs">
+									{summary.server.rootID}/{summary.server.artifactID}
+								</div>
 							</div>
 
 							<div className="col-span-3 font-semibold">Tool</div>
@@ -124,7 +126,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 									type="button"
 									className="btn btn-sm bg-base-300 rounded-xl"
 									onClick={() => {
-										resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+										resolveOnce(MCPApprovalResolution.DenyOnce);
 									}}
 								>
 									Deny once
@@ -133,7 +135,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 									type="button"
 									className="btn btn-sm btn-error rounded-xl"
 									onClick={() => {
-										resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyAlways);
+										resolveOnce(MCPApprovalResolution.DenyAlways);
 									}}
 								>
 									Deny always
@@ -145,7 +147,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 							type="button"
 							className="btn btn-sm bg-base-300 rounded-xl"
 							onClick={() => {
-								resolveOnce(MCPApprovalResolution.MCPApprovalResolutionAllowOnce);
+								resolveOnce(MCPApprovalResolution.AllowOnce);
 							}}
 						>
 							Allow once
@@ -154,7 +156,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 							type="button"
 							className="btn btn-sm btn-primary rounded-xl"
 							onClick={() => {
-								resolveOnce(MCPApprovalResolution.MCPApprovalResolutionAllowAlways);
+								resolveOnce(MCPApprovalResolution.AllowAlways);
 							}}
 						>
 							Allow always

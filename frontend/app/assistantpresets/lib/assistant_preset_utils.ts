@@ -1,6 +1,6 @@
 import type { ArtifactRef } from '@/spec/artifact';
 import type { AssistantPreset, PutAssistantPresetPayload } from '@/spec/assistantpreset';
-import type { MCPConversationContext } from '@/spec/mcp';
+import type { MCPConversationContext } from '@/spec/mcp_artifact';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import type { ToolRef, ToolSelection } from '@/spec/tool';

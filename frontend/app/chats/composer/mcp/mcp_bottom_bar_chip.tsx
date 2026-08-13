@@ -17,6 +17,7 @@ import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import { Link } from 'react-router';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPPromptRef,
 	MCPPromptSelection,
@@ -24,8 +25,8 @@ import type {
 	MCPResourceTemplateRef,
 	MCPResourceTemplateSelection,
 	MCPToolCapability,
-} from '@/spec/mcp';
-import { MCPAuthHealthState, MCPRefType, MCPServerStatus, MCPToolExposure } from '@/spec/mcp';
+} from '@/spec/mcp_artifact';
+import { MCPAuthHealthState, MCPCompletionRefType, MCPServerStatus, MCPToolExposure } from '@/spec/mcp_artifact';
 
 import { mcpAPI } from '@/apis/baseapi';
 
@@ -57,8 +58,8 @@ import {
 	normalizeMCPArgumentDefinitions,
 } from '@/chats/composer/mcp/mcp_composer_types';
 import { optionKey } from '@/chats/composer/mcp/use_composer_mcp';
+import { getServerAuthHealthState, isServerOperational } from '@/mcpservers/lib/mcp_management';
 import {
-	getEffectiveMCPAuthHealthState,
 	getEffectiveMCPServerStatus,
 	getMCPServerAuthHealthBadgeClass,
 	getMCPServerAuthHealthLabel,
@@ -76,19 +77,21 @@ function stop(e: MouseEvent) {
 }
 
 function isEnabledMCPOption(option: MCPComposerServerOption) {
-	return option.bundle.isEnabled && option.server.enabled;
-}
-
-function isOAuthModalRelevant(option: MCPComposerServerOption): boolean {
-	const authState = getEffectiveMCPAuthHealthState(option.server, option.authHealth);
 	return (
-		isMCPAuthActionable(option.authHealth, option.server) ||
-		authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
+		option.bundle.enabled &&
+		option.server.runtimeEnabled &&
+		option.server.artifact.enabled &&
+		isServerOperational(option.server)
 	);
 }
 
+function isOAuthModalRelevant(option: MCPComposerServerOption): boolean {
+	const authState = getServerAuthHealthState(option.server, option.authHealth);
+	return isMCPAuthActionable(option.server, option.authHealth) || authState === MCPAuthHealthState.AuthorizationPending;
+}
+
 function oauthDismissKey(option: MCPComposerServerOption): string {
-	return `${option.bundle.id}:${option.server.id}:${option.authHealth?.authorizationURL ?? option.authHealth?.state ?? ''}`;
+	return `${option.server.ref.rootID}:${option.server.ref.artifactID}:${option.authHealth?.authorizationURL ?? option.authHealth?.state ?? ''}`;
 }
 
 function CheckboxRow({
@@ -226,17 +229,15 @@ function DiscoverySection({
 }
 
 function MCPArgumentFields({
-	bundleID,
-	serverID,
+	server,
 	refType,
 	name,
 	item,
 	disabled,
 	onValueChange,
 }: {
-	bundleID: string;
-	serverID: string;
-	refType: MCPRefType;
+	server: ArtifactRef;
+	refType: MCPCompletionRefType;
 	name: string;
 	item: MCPPromptSelection | MCPResourceTemplateSelection;
 	disabled?: boolean;
@@ -245,7 +246,6 @@ function MCPArgumentFields({
 	const args = normalizeMCPArgumentDefinitions(item.arguments);
 	const [focusedArg, setFocusedArg] = useState<string | null>(null);
 	const [completionsByArg, setCompletionsByArg] = useState<Record<string, string[]>>({});
-
 	const values = item.argumentValues ?? EMPTY_MCP_ARGUMENT_VALUES;
 	const focusedValue = focusedArg ? (values[focusedArg] ?? '') : '';
 
@@ -257,7 +257,7 @@ function MCPArgumentFields({
 		let cancelled = false;
 		const timer = window.setTimeout(() => {
 			void mcpAPI
-				.completeMCPArgument(bundleID, serverID, refType, name, focusedArg, focusedValue, values)
+				.completeMCPArgument(server, refType, name, focusedArg, focusedValue, values)
 				.then(result => {
 					if (cancelled) {
 						return;
@@ -282,7 +282,7 @@ function MCPArgumentFields({
 			cancelled = true;
 			window.clearTimeout(timer);
 		};
-	}, [bundleID, focusedArg, focusedValue, name, refType, serverID, values]);
+	}, [focusedArg, focusedValue, name, refType, server, values]);
 
 	if (args.length === 0) {
 		return null;
@@ -294,7 +294,7 @@ function MCPArgumentFields({
 			<div className="space-y-2">
 				{args.map(arg => {
 					const value = values[arg.name] ?? '';
-					const listID = `mcp-arg-${bundleID}-${serverID}-${refType}-${name}-${arg.name}`.replaceAll(
+					const listID = `mcp-arg-${server.rootID}-${server.artifactID}-${refType}-${name}-${arg.name}`.replaceAll(
 						/[^A-Za-z0-9_-]/g,
 						'_'
 					);
@@ -349,17 +349,17 @@ const MCP_TOOL_EXPOSURE_CHOICES: Array<{
 	title: string;
 }> = [
 	{
-		value: MCPToolExposure.MCPToolExposureNone,
+		value: MCPToolExposure.None,
 		label: 'No tools',
 		title: 'Do not expose tools from this MCP server.',
 	},
 	{
-		value: MCPToolExposure.MCPToolExposureAll,
+		value: MCPToolExposure.All,
 		label: 'All tools',
 		title: 'Expose all enabled model-visible tools from this MCP server.',
 	},
 	{
-		value: MCPToolExposure.MCPToolExposureSelected,
+		value: MCPToolExposure.Selected,
 		label: 'Selected',
 		title: 'Expose only the checked tools from this MCP server.',
 	},
@@ -392,9 +392,9 @@ function ToolExposureControls({
 							disabled={isInputLocked}
 							onClick={e => {
 								stop(e);
-								state.setToolExposure(option.bundle.id, option.server.id, choice.value);
-								if (choice.value !== MCPToolExposure.MCPToolExposureNone) {
-									void state.ensureDiscoveryLoaded(option.bundle.id, option.server.id);
+								state.setToolExposure(option.server.ref, choice.value);
+								if (choice.value !== MCPToolExposure.None) {
+									void state.ensureDiscoveryLoaded(option.server.ref);
 								}
 							}}
 						>
@@ -416,7 +416,7 @@ function ServerDiscoverySection({
 	state: UseComposerMCPResult;
 	isInputLocked: boolean;
 }) {
-	const key = mcpServerKey(option.bundle.id, option.server.id);
+	const key = mcpServerKey(option.server.ref);
 	const selection = state.selectedByServerKey[key];
 	if (!selection) {
 		return null;
@@ -432,9 +432,9 @@ function ServerDiscoverySection({
 	const selectedPromptByKey = new Map(selection.selectedPrompts.map(prompt => [mcpPromptKey(prompt), prompt] as const));
 	const selectableToolCount = option.tools.filter(tool => tool.enabled && isMCPToolVisibleToModel(tool)).length;
 	const selectedToolCount =
-		selection.toolExposure === MCPToolExposure.MCPToolExposureNone
+		selection.toolExposure === MCPToolExposure.None
 			? 0
-			: selection.toolExposure === MCPToolExposure.MCPToolExposureAll
+			: selection.toolExposure === MCPToolExposure.All
 				? selectableToolCount
 				: selectedToolKeys.size;
 	const resourcePresentCount = option.resources.length + option.resourceTemplates.length;
@@ -459,7 +459,7 @@ function ServerDiscoverySection({
 						checked={Boolean(selection.includeServerInstructions)}
 						disabled={isInputLocked}
 						onChange={e => {
-							state.setIncludeServerInstructions(option.bundle.id, option.server.id, e.currentTarget.checked);
+							state.setIncludeServerInstructions(option.server.ref, e.currentTarget.checked);
 						}}
 					/>
 					<span>Include instructions</span>
@@ -474,7 +474,7 @@ function ServerDiscoverySection({
 					title="Tools"
 					presentCount={option.tools.length}
 					selectedCount={selectedToolCount}
-					showBulkActions={selection.toolExposure === MCPToolExposure.MCPToolExposureSelected}
+					showBulkActions={selection.toolExposure === MCPToolExposure.Selected}
 					selectAllDisabled={isInputLocked || selectableToolCount === 0}
 					unselectAllDisabled={isInputLocked || selectedToolKeys.size === 0}
 					onSelectAll={() => {
@@ -490,7 +490,7 @@ function ServerDiscoverySection({
 						});
 					}}
 				>
-					{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected ? (
+					{selection.toolExposure === MCPToolExposure.Selected ? (
 						option.tools.length === 0 ? (
 							<div className="text-base-content/60 px-2 text-xs">No tools discovered.</div>
 						) : (
@@ -525,7 +525,7 @@ function ServerDiscoverySection({
 						)
 					) : (
 						<div className="text-base-content/60 px-2 text-xs">
-							{selection.toolExposure === MCPToolExposure.MCPToolExposureAll
+							{selection.toolExposure === MCPToolExposure.All
 								? 'All enabled model-visible tools will be exposed.'
 								: 'No tools will be exposed.'}
 						</div>
@@ -601,16 +601,14 @@ function ServerDiscoverySection({
 										/>
 										{selectedTemplate ? (
 											<MCPArgumentFields
-												bundleID={template.bundleID}
-												serverID={template.serverID}
-												refType={MCPRefType.MCPRefTypeResource}
+												server={template.server}
+												refType={MCPCompletionRefType.Resource}
 												name={template.uriTemplate}
 												item={selectedTemplate}
 												disabled={isInputLocked}
 												onValueChange={(argumentName, value) => {
 													state.setResourceTemplateArgumentValue(
-														template.bundleID,
-														template.serverID,
+														template.server,
 														template.uriTemplate,
 														argumentName,
 														value
@@ -668,20 +666,13 @@ function ServerDiscoverySection({
 										/>
 										{selectedPrompt ? (
 											<MCPArgumentFields
-												bundleID={prompt.bundleID}
-												serverID={prompt.serverID}
-												refType={MCPRefType.MCPRefTypePrompt}
+												server={prompt.server}
+												refType={MCPCompletionRefType.Prompt}
 												name={prompt.promptName}
 												item={selectedPrompt}
 												disabled={isInputLocked}
 												onValueChange={(argumentName, value) => {
-													state.setPromptArgumentValue(
-														prompt.bundleID,
-														prompt.serverID,
-														prompt.promptName,
-														argumentName,
-														value
-													);
+													state.setPromptArgumentValue(prompt.server, prompt.promptName, argumentName, value);
 												}}
 											/>
 										) : null}
@@ -709,15 +700,17 @@ function ServerRow({
 	onAuthorize: () => void;
 	onToggleSelected: () => void;
 }) {
-	const key = mcpServerKey(option.bundle.id, option.server.id);
+	const key = mcpServerKey(option.server.ref);
 	const selected = Boolean(state.selectedByServerKey[key]);
-	const status = getEffectiveMCPServerStatus(option.server.enabled, option.bundle.isEnabled, option.runtime);
-	const isReady = status === MCPServerStatus.MCPServerStatusReady;
+	const status = isEnabledMCPOption(option)
+		? getEffectiveMCPServerStatus(option.server, option.runtime?.status)
+		: MCPServerStatus.Disabled;
+	const isReady = status === MCPServerStatus.Ready;
 	const selectable = isEnabledMCPOption(option);
 
-	const authState = getEffectiveMCPAuthHealthState(option.server, option.authHealth);
-	const authActionable = isMCPAuthActionable(option.authHealth, option.server);
-	const authPending = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
+	const authState = getServerAuthHealthState(option.server, option.authHealth);
+	const authActionable = isMCPAuthActionable(option.server, option.authHealth);
+	const authPending = authState === MCPAuthHealthState.AuthorizationPending;
 
 	return (
 		<div
@@ -749,7 +742,7 @@ function ServerRow({
 
 						state.setServerSelected(option, e.currentTarget.checked);
 						if (e.currentTarget.checked) {
-							void state.ensureDiscoveryLoaded(option.bundle.id, option.server.id);
+							void state.ensureDiscoveryLoaded(option.server.ref);
 						}
 					}}
 					onClick={e => {
@@ -772,7 +765,7 @@ function ServerRow({
 					</div>
 
 					<div className="text-base-content/60 truncate text-xs">
-						{option.bundle.slug}/{option.server.id} • {getMCPTransportLabel(option.server.transport)}
+						{option.bundle.logicalName}/{option.server.logicalName} • {getMCPTransportLabel(option.transport)}
 					</div>
 
 					{option.runtime?.lastError ? <div className="text-error mt-1 text-xs">{option.runtime.lastError}</div> : null}
@@ -804,7 +797,7 @@ function ServerRow({
 							title="Cancel authorization"
 							onClick={e => {
 								stop(e);
-								void state.cancelOAuth(option.bundle.id, option.server.id);
+								void state.cancelOAuth(option.server.ref);
 							}}
 							disabled={isInputLocked}
 						>
@@ -819,12 +812,12 @@ function ServerRow({
 						onClick={e => {
 							stop(e);
 							if (isReady) {
-								void state.disconnectServer(option.bundle.id, option.server.id).catch(console.error);
+								void state.disconnectServer(option.server.ref).catch(console.error);
 							} else {
-								void state.connectServer(option.bundle.id, option.server.id).catch(console.error);
+								void state.connectServer(option.server.ref).catch(console.error);
 							}
 						}}
-						disabled={isInputLocked || !option.bundle.isEnabled || !option.server.enabled}
+						disabled={isInputLocked || !selectable}
 					>
 						{isReady ? <FiWifiOff size={12} /> : <FiWifi size={12} />}
 					</button>
@@ -837,8 +830,8 @@ function ServerRow({
 						onClick={e => {
 							stop(e);
 							void state
-								.refreshServer(option.bundle.id, option.server.id)
-								.then(() => state.ensureDiscoveryLoaded(option.bundle.id, option.server.id))
+								.refreshServer(option.server.ref)
+								.then(() => state.ensureDiscoveryLoaded(option.server.ref))
 								.catch(console.error);
 						}}
 					>
@@ -855,10 +848,10 @@ function ServerRow({
 function getMCPOptionSearchFields(option: MCPComposerServerOption) {
 	return [
 		{ value: option.server.displayName, weight: 8 },
-		{ value: option.server.id, weight: 7 },
+		{ value: option.server.logicalName, weight: 7 },
 		{ value: option.bundle.displayName, weight: 5 },
-		{ value: option.bundle.slug, weight: 5 },
-		{ value: option.bundle.id, weight: 3 },
+		{ value: option.bundle.logicalName, weight: 5 },
+		{ value: option.server.ref.artifactID, weight: 3 },
 		{ value: option.runtime?.lastError, weight: 2 },
 		{ value: option.authHealth?.lastError, weight: 2 },
 		{ value: option.tools.map(tool => tool.displayName || tool.toolName), weight: 2 },
@@ -915,8 +908,7 @@ export function MCPBottomBarChip({
 			query: searchQuery,
 			getKey: optionKey,
 			getFields: getMCPOptionSearchFields,
-			fallbackCompare: (a, b) =>
-				a.bundle.slug.localeCompare(b.bundle.slug) || a.server.displayName.localeCompare(b.server.displayName),
+			fallbackCompare: (a, b) => a.server.displayName.localeCompare(b.server.displayName),
 		});
 	}, [searchQuery, visibleOptions]);
 
@@ -1031,7 +1023,7 @@ export function MCPBottomBarChip({
 		if (isInputLocked) {
 			return;
 		}
-		const key = mcpServerKey(option.bundle.id, option.server.id);
+		const key = mcpServerKey(option.server.ref);
 		const selected = Boolean(state.selectedByServerKey[key]);
 		if (!selected && !isEnabledMCPOption(option)) {
 			return;
@@ -1039,7 +1031,7 @@ export function MCPBottomBarChip({
 
 		state.setServerSelected(option, !selected);
 		if (!selected) {
-			void state.ensureDiscoveryLoaded(option.bundle.id, option.server.id);
+			void state.ensureDiscoveryLoaded(option.server.ref);
 		}
 	};
 
@@ -1230,7 +1222,7 @@ export function MCPBottomBarChip({
 					if (!oauthModalOption) {
 						return;
 					}
-					await state.cancelOAuth(oauthModalOption.bundle.id, oauthModalOption.server.id);
+					await state.cancelOAuth(oauthModalOption.server.ref);
 					dismissOAuthModal();
 				}}
 			/>

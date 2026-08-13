@@ -10,7 +10,9 @@ export type ArtifactID = string;
  * They intentionally remain strings rather than frontend enums.
  */
 export type ArtifactKind = string;
+type ArtifactCollectionKind = string;
 export type ArtifactSourceKind = string;
+type ArtifactAttachmentRole = string;
 export type ArtifactLocator = string;
 export type ArtifactDigest = string;
 type ArtifactSourceGeneration = string;
@@ -90,6 +92,47 @@ export interface ArtifactRoot {
 	createdAt: Date;
 	modifiedAt: Date;
 	retiredAt?: Date;
+}
+
+export interface ArtifactCollection {
+	id: ArtifactCollectionID;
+	rootID: ArtifactRootID;
+	kind: ArtifactCollectionKind;
+	displayName: string;
+	description?: string;
+	enabled: boolean;
+	revision: number;
+	createdAt: Date;
+	modifiedAt: Date;
+	retiredAt?: Date;
+}
+
+export interface ArtifactCollectionAttachment {
+	rootID: ArtifactRootID;
+	collectionID: ArtifactCollectionID;
+	sourceID: ArtifactSourceID;
+	role: ArtifactAttachmentRole;
+	enabled: boolean;
+	revision: number;
+	createdAt: Date;
+	modifiedAt: Date;
+}
+
+export interface ArtifactRecord {
+	id: ArtifactID;
+	rootID: ArtifactRootID;
+	collectionID: ArtifactCollectionID;
+	binding: ArtifactSourceBinding;
+	kind: ArtifactKind;
+	name: string;
+	enabled: boolean;
+	adoption: ArtifactAdoptionMode;
+	resolvedDefinition?: ArtifactDigest;
+	state: ArtifactState;
+	diagnostics?: ArtifactDiagnostic[];
+	revision: number;
+	createdAt: Date;
+	modifiedAt: Date;
 }
 
 export interface CreateArtifactRootBody {

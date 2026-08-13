@@ -5,26 +5,17 @@ import { FiAlertCircle } from 'react-icons/fi';
 
 import type {
 	MCPAuthHealth,
-	MCPBundle,
 	MCPPromptRef,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
-	MCPServerConfig,
 	MCPServerRuntimeSnapshot,
 	MCPToolCapability,
-} from '@/spec/mcp';
-import { MCPToolRisk } from '@/spec/mcp';
-
-import { redactSensitiveHTTPHeaders } from '@/lib/http_input_utils';
+} from '@/spec/mcp_artifact';
+import { MCPToolRisk } from '@/spec/mcp_artifact';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
-import {
-	getAllMCPServerPrompts,
-	getAllMCPServerResources,
-	getAllMCPServerResourceTemplates,
-	getAllMCPServerTools,
-} from '@/apis/list_helper';
+import { mcpAPI } from '@/apis/baseapi';
 
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
@@ -34,6 +25,8 @@ import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
 
+import type { MCPBundleView, MCPServerView } from '@/mcpservers/lib/mcp_management';
+import { serverRefLabel } from '@/mcpservers/lib/mcp_management';
 import {
 	getEffectiveMCPServerStatus,
 	getMCPApprovalRuleLabel,
@@ -43,14 +36,13 @@ import {
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 	getMCPToolRiskLabel,
-	getMCPTransportLabel,
 } from '@/mcpservers/lib/mcp_server_utils';
 
 interface MCPServerDetailsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	bundle: MCPBundle | null;
-	server: MCPServerConfig | null;
+	bundle: MCPBundleView | null;
+	server: MCPServerView | null;
 	runtime?: MCPServerRuntimeSnapshot;
 	authHealth?: MCPAuthHealth;
 }
@@ -60,15 +52,16 @@ interface DiscoveryData {
 	resources: MCPResourceRef[];
 	resourceTemplates: MCPResourceTemplateRef[];
 	prompts: MCPPromptRef[];
+	error?: string;
 }
 
 function JSONBlock({ value }: { value: unknown }) {
 	if (value === undefined || value === null) {
-		return <span>-</span>;
+		return <span>—</span>;
 	}
 
 	return (
-		<pre className="bg-base-300 max-h-60 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
+		<pre className="bg-base-300 max-h-72 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
 			{JSON.stringify(value, null, 2)}
 		</pre>
 	);
@@ -78,42 +71,25 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 	return <ManagementInfoRow label={label}>{children}</ManagementInfoRow>;
 }
 
-function ArgumentSummary({ args }: { args?: Record<string, { required?: boolean; description?: string } | string> }) {
-	if (!args || Object.keys(args).length === 0) {
-		return <span>-</span>;
+function ArgumentSummary({
+	arguments: values,
+}: {
+	arguments?: Record<string, { required?: boolean; description?: string }>;
+}) {
+	if (!values || Object.keys(values).length === 0) {
+		return <span>—</span>;
 	}
 
 	return (
 		<div className="flex flex-wrap gap-1">
-			{Object.entries(args).map(([name, def]) => {
-				const required = typeof def === 'object' && Boolean(def.required);
-				const description = typeof def === 'object' ? def.description : def;
-				return (
-					<MetadataPill key={name} title={description}>
-						{name}
-						{required ? '*' : ''}
-					</MetadataPill>
-				);
-			})}
+			{Object.entries(values).map(([name, definition]) => (
+				<MetadataPill key={name} title={definition.description}>
+					{name}
+					{definition.required ? '*' : ''}
+				</MetadataPill>
+			))}
 		</div>
 	);
-}
-
-function getEmptyDiscoveryData(): DiscoveryData {
-	return {
-		tools: [],
-		resources: [],
-		resourceTemplates: [],
-		prompts: [],
-	};
-}
-
-interface MCPServerDetailsModalContentProps {
-	onClose: () => void;
-	bundle: MCPBundle;
-	server: MCPServerConfig;
-	runtime?: MCPServerRuntimeSnapshot;
-	authHealth?: MCPAuthHealth;
 }
 
 function MCPServerDetailsModalContent({
@@ -122,79 +98,123 @@ function MCPServerDetailsModalContent({
 	server,
 	runtime,
 	authHealth,
-}: MCPServerDetailsModalContentProps) {
+}: {
+	onClose: () => void;
+	bundle: MCPBundleView;
+	server: MCPServerView;
+	runtime?: MCPServerRuntimeSnapshot;
+	authHealth?: MCPAuthHealth;
+}) {
 	const loadDiscovery = useCallback(
-		async (_signal: AbortSignal) => {
+		async (_signal: AbortSignal): Promise<DiscoveryData> => {
 			const results = await Promise.allSettled([
-				getAllMCPServerTools(bundle.id, server.id),
-				getAllMCPServerResources(bundle.id, server.id),
-				getAllMCPServerResourceTemplates(bundle.id, server.id),
-				getAllMCPServerPrompts(bundle.id, server.id),
+				mcpAPI.listMCPServerTools(server.ref),
+				mcpAPI.listMCPServerResources(server.ref),
+				mcpAPI.listMCPServerResourceTemplates(server.ref),
+				mcpAPI.listMCPServerPrompts(server.ref),
 			]);
 
-			const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
-			const discoveryError = results
-				.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-				.map(result => (result.reason instanceof Error ? result.reason.message : 'Failed to load discovery section.'))
-				.find(message => message.length > 0);
+			const [tools, resources, templates, prompts] = results;
+			const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
 
 			return {
-				discovery: {
-					tools: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
-					resources: resourcesResult.status === 'fulfilled' ? resourcesResult.value : [],
-					resourceTemplates: resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [],
-					prompts: promptsResult.status === 'fulfilled' ? promptsResult.value : [],
-				} satisfies DiscoveryData,
-				discoveryError: discoveryError ?? '',
+				tools: tools.status === 'fulfilled' ? tools.value : [],
+				resources: resources.status === 'fulfilled' ? resources.value : [],
+				resourceTemplates: templates.status === 'fulfilled' ? templates.value : [],
+				prompts: prompts.status === 'fulfilled' ? prompts.value : [],
+				error:
+					failure?.reason instanceof Error
+						? failure.reason.message
+						: failure
+							? 'Some discovery data could not be loaded.'
+							: undefined,
 			};
 		},
-		[bundle.id, server.id]
+		[server.ref]
 	);
 
-	const { data: discoveryResult, isLoading: loadingDiscovery } = useAsyncResource(loadDiscovery, {
+	const { data, isLoading } = useAsyncResource(loadDiscovery, {
 		initialData: {
-			discovery: getEmptyDiscoveryData(),
-			discoveryError: '',
+			tools: [],
+			resources: [],
+			resourceTemplates: [],
+			prompts: [],
 		},
 	});
 
-	const { discovery, discoveryError } = discoveryResult;
-
-	const effectiveRuntimeStatus = getEffectiveMCPServerStatus(server.enabled, bundle.isEnabled, runtime);
+	const status = getEffectiveMCPServerStatus(server, runtime?.status);
 
 	return (
 		<ManagementDetailsModal
 			isOpen={true}
 			onClose={onClose}
 			title="MCP Server Details"
-			description={`${server.displayName} in ${bundle.displayName || bundle.slug}`}
-			modalKey={`mcp-server:${bundle.id}:${server.id}:${server.modifiedAt}`}
+			description={`${server.displayName} in ${bundle.displayName}`}
+			modalKey={`mcp-server:${server.ref.rootID}:${server.ref.artifactID}:${server.artifact.revision}`}
 			width="wide"
 			height="tall"
 		>
-			<ModalSection title="Metadata" description="Identity, runtime state, authorization, and effective server policy.">
+			{server.loadError ? (
+				<div className="alert alert-error rounded-2xl text-sm">
+					<FiAlertCircle size={14} />
+					<span>{server.loadError}</span>
+				</div>
+			) : null}
+
+			<ModalSection title="Artifact and installation">
 				<ManagementInfoGrid>
 					<Field label="Display Name">{server.displayName}</Field>
-					<Field label="Server ID">{server.id}</Field>
-					<Field label="Bundle">{bundle.displayName || bundle.slug}</Field>
-					<Field label="Transport">{getMCPTransportLabel(server.transport)}</Field>
-					<Field label="Enabled">{server.enabled ? 'Yes' : 'No'}</Field>
-					<Field label="Built-in">{server.isBuiltIn ? 'Yes' : 'No'}</Field>
-					<Field label="Created">{server.createdAt}</Field>
-					<Field label="Modified">{server.modifiedAt}</Field>
+					<Field label="Logical Name">{server.logicalName}</Field>
+					<Field label="Artifact Ref">
+						<span className="font-mono text-xs">{serverRefLabel(server)}</span>
+					</Field>
+					<Field label="Artifact Revision">{server.artifact.revision}</Field>
+					<Field label="Built-in">{server.builtIn ? 'Yes' : 'No'}</Field>
+					<Field label="Runtime Enabled">{server.runtimeEnabled ? 'Yes' : 'No'}</Field>
+					<Field label="Created">{server.artifact.createdAt.toLocaleString()}</Field>
+					<Field label="Modified">{server.artifact.modifiedAt.toLocaleString()}</Field>
 
 					<Field label="Runtime">
-						<span className={`badge rounded-xl ${getMCPStatusBadgeClass(effectiveRuntimeStatus)}`}>
-							{getMCPStatusLabel(effectiveRuntimeStatus)}
-						</span>
-						{runtime?.lastError && <div className="text-error mt-1 text-xs">{runtime.lastError}</div>}
+						<span className={`badge rounded-xl ${getMCPStatusBadgeClass(status)}`}>{getMCPStatusLabel(status)}</span>
+						{runtime?.lastError ? <div className="text-error mt-1 text-xs">{runtime.lastError}</div> : null}
 					</Field>
 
-					<Field label="Auth">
+					<Field label="Authorization">
 						<span className={`badge rounded-xl ${getMCPServerAuthHealthBadgeClass(server, authHealth)}`}>
 							{getMCPServerAuthHealthLabel(server, authHealth)}
 						</span>
-						{authHealth?.lastError && <div className="text-error mt-1 text-xs">{authHealth.lastError}</div>}
+						{authHealth?.lastError ? <div className="text-error mt-1 text-xs">{authHealth.lastError}</div> : null}
+					</Field>
+
+					<Field label="Runtime Config">
+						<JSONBlock
+							value={{
+								core: server.document?.mcpServer,
+								auth: server.document?.extension.auth,
+								install: server.document?.extension.install,
+								connectionProfiles: server.document?.extension.connectionProfiles,
+							}}
+						/>
+					</Field>
+
+					<Field label="Installation Data">
+						<JSONBlock
+							value={{
+								schemaVersion: server.installation?.schemaVersion,
+								selectedConnectionProfile: server.installation?.selectedConnectionProfile,
+								inputs: Object.fromEntries(
+									Object.entries(server.installation?.inputs ?? {}).map(([name, binding]) => [
+										name,
+										binding.secretRef ? { secretRef: '[configured]' } : binding,
+									])
+								),
+								additionalPolicies: server.installation?.additionalPolicies,
+							}}
+						/>
+					</Field>
+
+					<Field label="Effective Policy">
+						<JSONBlock value={server.policy} />
 					</Field>
 
 					<Field label="Server Info">
@@ -206,62 +226,28 @@ function MCPServerDetailsModalContent({
 					</Field>
 
 					<Field label="Instructions">
-						<div className="whitespace-pre-wrap">{runtime?.instructions || '-'}</div>
-					</Field>
-
-					<Field label="Config">
-						<JSONBlock
-							value={{
-								transport: server.transport,
-								stdio: server.stdio
-									? {
-											...server.stdio,
-											secretEnvRefs: server.stdio.secretEnvRefs
-												? Object.fromEntries(Object.keys(server.stdio.secretEnvRefs).map(key => [key, '[configured]']))
-												: undefined,
-										}
-									: undefined,
-								streamableHttp: server.streamableHttp
-									? {
-											...server.streamableHttp,
-											headers: redactSensitiveHTTPHeaders(server.streamableHttp.headers),
-											clientCredentialRef: server.streamableHttp.clientCredentialRef ? '[configured]' : undefined,
-											secretHeaderRefs: server.streamableHttp.secretHeaderRefs
-												? Object.fromEntries(
-														Object.keys(server.streamableHttp.secretHeaderRefs).map(key => [key, '[configured]'])
-													)
-												: undefined,
-										}
-									: undefined,
-								trustLevel: server.trustLevel,
-								defaultPolicy: server.defaultPolicy,
-								toolPolicies: server.toolPolicies,
-								appsPolicy: server.appsPolicy,
-							}}
-						/>
+						<div className="whitespace-pre-wrap">{runtime?.instructions || '—'}</div>
 					</Field>
 				</ManagementInfoGrid>
 			</ModalSection>
 
-			<ModalSection title="Discovery" description="Most recently discovered MCP capabilities for this server.">
-				{loadingDiscovery && <div className="text-center text-sm">Loading discovery cache…</div>}
+			<ModalSection title="Discovery" description="Current process-local discovery snapshot.">
+				{isLoading ? <div className="text-center text-sm">Loading discovery cache…</div> : null}
 
-				{discoveryError && (
-					<div className="alert alert-warning rounded-2xl text-sm">
-						<div className="flex items-center gap-2">
-							<FiAlertCircle size={14} />
-							<span>{discoveryError}</span>
-						</div>
+				{data.error ? (
+					<div className="alert alert-warning mb-4 rounded-2xl text-sm">
+						<FiAlertCircle size={14} />
+						<span>{data.error}</span>
 					</div>
-				)}
+				) : null}
 
 				<div className="space-y-6">
 					<div>
-						<h4 className="mb-2 text-sm font-semibold">Tools ({discovery.tools.length})</h4>
+						<h4 className="mb-2 text-sm font-semibold">Tools ({data.tools.length})</h4>
 						<div className="space-y-3">
-							{discovery.tools.map(tool => (
+							{data.tools.map(tool => (
 								<ManagementItemCard
-									key={`${tool.serverID}:${tool.toolName}:${tool.digest}`}
+									key={`${tool.server.artifactID}:${tool.toolName}:${tool.digest}`}
 									title={tool.displayName || tool.title || tool.toolName}
 									subtitle={tool.toolName}
 									description={tool.description}
@@ -272,9 +258,9 @@ function MCPServerDetailsModalContent({
 											</StatusBadge>
 											<StatusBadge
 												tone={
-													tool.inferredRisk === MCPToolRisk.MCPToolRiskRead
+													tool.inferredRisk === MCPToolRisk.Read
 														? 'success'
-														: tool.inferredRisk === MCPToolRisk.MCPToolRiskWrite
+														: tool.inferredRisk === MCPToolRisk.Write
 															? 'warning'
 															: 'error'
 												}
@@ -287,18 +273,12 @@ function MCPServerDetailsModalContent({
 										<>
 											<MetadataPill label="Approval">{getMCPApprovalRuleLabel(tool.approvalRule)}</MetadataPill>
 											<MetadataPill label="Execution">{getMCPExecutionModeLabel(tool.executionMode)}</MetadataPill>
-											{tool.app?.resourceUri ? (
-												<MetadataPill label="App" title={tool.app.resourceUri}>
-													Configured
-												</MetadataPill>
-											) : null}
-											{tool.stale ? <MetadataPill>Stale discovery</MetadataPill> : null}
+											{tool.app?.resourceUri ? <MetadataPill label="App">Configured</MetadataPill> : null}
 										</>
 									}
 								/>
 							))}
-
-							{discovery.tools.length === 0 ? (
+							{data.tools.length === 0 ? (
 								<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
 									No tools discovered.
 								</div>
@@ -307,11 +287,11 @@ function MCPServerDetailsModalContent({
 					</div>
 
 					<div>
-						<h4 className="mb-2 text-sm font-semibold">Resources ({discovery.resources.length})</h4>
+						<h4 className="mb-2 text-sm font-semibold">Resources ({data.resources.length})</h4>
 						<div className="space-y-3">
-							{discovery.resources.map(resource => (
+							{data.resources.map(resource => (
 								<ManagementItemCard
-									key={`${resource.serverID}:${resource.uri}:${resource.digest ?? ''}`}
+									key={`${resource.server.artifactID}:${resource.uri}:${resource.digest ?? ''}`}
 									title={resource.displayName || resource.name || resource.uri}
 									subtitle={resource.uri}
 									description={resource.description}
@@ -323,8 +303,7 @@ function MCPServerDetailsModalContent({
 									}
 								/>
 							))}
-
-							{discovery.resources.length === 0 ? (
+							{data.resources.length === 0 ? (
 								<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
 									No resources discovered.
 								</div>
@@ -333,24 +312,23 @@ function MCPServerDetailsModalContent({
 					</div>
 
 					<div>
-						<h4 className="mb-2 text-sm font-semibold">Resource Templates ({discovery.resourceTemplates.length})</h4>
+						<h4 className="mb-2 text-sm font-semibold">Resource Templates ({data.resourceTemplates.length})</h4>
 						<div className="space-y-3">
-							{discovery.resourceTemplates.map(template => (
+							{data.resourceTemplates.map(template => (
 								<ManagementItemCard
-									key={`${template.serverID}:${template.uriTemplate}:${template.digest ?? ''}`}
+									key={`${template.server.artifactID}:${template.uriTemplate}:${template.digest ?? ''}`}
 									title={template.displayName || template.name || template.uriTemplate}
 									subtitle={template.uriTemplate}
 									description={template.description}
 									metadata={
 										<>
 											<MetadataPill label="MIME">{template.mimeType || 'Unknown'}</MetadataPill>
-											<ArgumentSummary args={template.arguments} />
+											<ArgumentSummary arguments={template.arguments} />
 										</>
 									}
 								/>
 							))}
-
-							{discovery.resourceTemplates.length === 0 ? (
+							{data.resourceTemplates.length === 0 ? (
 								<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
 									No resource templates discovered.
 								</div>
@@ -359,19 +337,18 @@ function MCPServerDetailsModalContent({
 					</div>
 
 					<div>
-						<h4 className="mb-2 text-sm font-semibold">Prompts ({discovery.prompts.length})</h4>
+						<h4 className="mb-2 text-sm font-semibold">Prompts ({data.prompts.length})</h4>
 						<div className="space-y-3">
-							{discovery.prompts.map(prompt => (
+							{data.prompts.map(prompt => (
 								<ManagementItemCard
-									key={`${prompt.serverID}:${prompt.promptName}:${prompt.digest ?? ''}`}
+									key={`${prompt.server.artifactID}:${prompt.promptName}:${prompt.digest ?? ''}`}
 									title={prompt.displayName || prompt.promptName}
 									subtitle={prompt.promptName}
 									description={prompt.description}
-									metadata={<ArgumentSummary args={prompt.arguments} />}
+									metadata={<ArgumentSummary arguments={prompt.arguments} />}
 								/>
 							))}
-
-							{discovery.prompts.length === 0 ? (
+							{data.prompts.length === 0 ? (
 								<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
 									No prompts discovered.
 								</div>
@@ -384,29 +361,19 @@ function MCPServerDetailsModalContent({
 	);
 }
 
-export function MCPServerDetailsModal({
-	isOpen,
-	onClose,
-	bundle,
-	server,
-	runtime,
-	authHealth,
-}: MCPServerDetailsModalProps) {
-	if (!isOpen || !bundle || !server) {
-		return null;
-	}
-	if (typeof document === 'undefined' || !document.body) {
+export function MCPServerDetailsModal(props: MCPServerDetailsModalProps) {
+	if (!props.isOpen || !props.bundle || !props.server) {
 		return null;
 	}
 
 	return (
 		<MCPServerDetailsModalContent
-			key={`${bundle.id}:${server.id}:${server.modifiedAt}`}
-			onClose={onClose}
-			bundle={bundle}
-			server={server}
-			runtime={runtime}
-			authHealth={authHealth}
+			key={`${props.server.ref.rootID}:${props.server.ref.artifactID}:${props.server.artifact.revision}`}
+			onClose={props.onClose}
+			bundle={props.bundle}
+			server={props.server}
+			runtime={props.runtime}
+			authHealth={props.authHealth}
 		/>
 	);
 }

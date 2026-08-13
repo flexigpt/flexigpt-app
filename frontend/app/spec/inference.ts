@@ -1,4 +1,4 @@
-import type { MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp';
+import type { MCPProviderToolMapping, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp_artifact';
 import type { ToolOutputUnion, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 import type { WorkspaceConversationUsage } from '@/spec/workspace';
 
@@ -458,6 +458,7 @@ interface FetchCompletionResponse {
 export interface CompletionResponseBody {
 	inferenceResponse?: FetchCompletionResponse;
 	hydratedCurrentInputs?: InputUnion[];
+	mcpToolMappings?: MCPProviderToolMapping[];
 	workspaceUsage?: WorkspaceConversationUsage;
 }
 

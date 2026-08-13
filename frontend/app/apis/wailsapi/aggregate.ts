@@ -1,6 +1,6 @@
 import type { StoreConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
-import type { MCPConversationContext } from '@/spec/mcp';
+import type { MCPConversationContext } from '@/spec/mcp_artifact';
 import type { ModelPresetID, PostProviderPresetPayload } from '@/spec/modelpreset';
 import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
 import type { ToolStoreChoice } from '@/spec/tool';

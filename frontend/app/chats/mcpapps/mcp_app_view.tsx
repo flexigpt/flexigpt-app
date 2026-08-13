@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiAlertTriangle } from 'react-icons/fi';
 
-import type { MCPAppModelContextUpdate, MCPAppsPolicy, MCPContent } from '@/spec/mcp';
-import { MCPContentType } from '@/spec/mcp';
+import type { MCPAppModelContextUpdate, MCPAppsPolicy, MCPContent } from '@/spec/mcp_artifact';
+import { MCP_APP_HTML_MIME_TYPE, MCPContentType } from '@/spec/mcp_artifact';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
@@ -24,7 +24,7 @@ import { MCPAppRPCRouter } from '@/chats/mcpapps/mcp_app_rpc_router';
 import { MCPAppSandbox } from '@/chats/mcpapps/mcp_app_sandbox';
 import type { JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 
-const APP_MIME = 'text/html;profile=mcp-app';
+const APP_MIME = MCP_APP_HTML_MIME_TYPE;
 const UNKNOWN_APP_POLICY: MCPAppsPolicy = {
 	enabled: true,
 	allowAppInitiatedToolCalls: false,
@@ -75,7 +75,7 @@ function decodeMCPBlob(blob: string | number[] | undefined): string {
 
 function extractAppHTML(contents?: MCPContent[]): LoadedMCPAppResource | null {
 	for (const c of contents ?? []) {
-		if (c.type !== MCPContentType.MCPContentTypeResource) {
+		if (c.type !== MCPContentType.Resource) {
 			continue;
 		}
 		const res = c.resource;
@@ -208,6 +208,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 	const iframeRef = useRef<HTMLIFrameElement | null>(null);
 	const sizeAnimationFrameRef = useRef<number | null>(null);
 
+	const server = instance.server;
 	const effectiveAppsPolicy = appsPolicy ?? UNKNOWN_APP_POLICY;
 
 	useEffect(() => {
@@ -220,7 +221,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		setViewInitialized(false);
 
 		void mcpAPI
-			.readMCPResource(instance.bundleID, instance.serverID, instance.resourceUri)
+			.readMCPResource(server, instance.resourceUri)
 			.then(resp => {
 				if (cancelled) {
 					return;
@@ -242,7 +243,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		return () => {
 			cancelled = true;
 		};
-	}, [instance.bundleID, instance.resourceUri, instance.serverID]);
+	}, [instance.resourceUri, server]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -252,12 +253,12 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		setAppsPolicy(null);
 
 		void mcpAPI
-			.getMCPServer(instance.bundleID, instance.serverID)
-			.then(server => {
+			.inspectMCPServer(server)
+			.then(resolved => {
 				if (cancelled) {
 					return;
 				}
-				const nextPolicy = server?.appsPolicy ?? null;
+				const nextPolicy = resolved.policy.body.appsPolicy;
 				setAppsPolicy(nextPolicy);
 				if (nextPolicy && !nextPolicy.enabled) {
 					setPolicyError('MCP Apps is currently disabled for this server.');
@@ -273,7 +274,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		return () => {
 			cancelled = true;
 		};
-	}, [instance.bundleID, instance.serverID]);
+	}, [server]);
 
 	useEffect(() => {
 		return () => {
@@ -344,10 +345,11 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 					if (!effectiveAppsPolicy.requireApprovalForContextUpdates) {
 						return true;
 					}
+					const contextUpdate = { ...update, server: instance.server };
 
 					return await new Promise<boolean>(resolve => {
 						approvalResolverRef.current = resolve;
-						setPendingContextUpdate(update);
+						setPendingContextUpdate(contextUpdate);
 					});
 				},
 				onModelContextUpdate: update => {
@@ -482,7 +484,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			<div className="border-base-content/10 bg-base-200 rounded-2xl border p-2">
 				<div className="mb-2 flex items-center justify-between gap-2 text-xs">
 					<span className="truncate font-semibold">{instance.displayName ?? instance.toolName}</span>
-					<span className="text-base-content/60 truncate">{instance.serverID}</span>
+					<span className="text-base-content/60 truncate" title={`${server.rootID}/${server.artifactID}`}>
+						{server.artifactID}
+					</span>
 				</div>
 				<MCPAppSandbox
 					html={loadedResource.html}
@@ -497,7 +501,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			<DeleteConfirmationModal
 				isOpen={pendingURL !== null}
 				title="Open external link?"
-				message={`The MCP App for ${instance.serverID} wants to open:\n${pendingURL ?? ''}`}
+				message={`The MCP App for ${server.artifactID} wants to open:\n${pendingURL ?? ''}`}
 				confirmButtonText="Open"
 				onConfirm={() => {
 					const url = pendingURL;
@@ -525,7 +529,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			<DeleteConfirmationModal
 				isOpen={pendingUIMessage !== null}
 				title="Add message from MCP App?"
-				message={`The MCP App for ${instance.serverID} wants to add this draft message:\n\n${pendingUIMessage?.text ?? ''}`}
+				message={`The MCP App for ${server.artifactID} wants to add this draft message:\n\n${pendingUIMessage?.text ?? ''}`}
 				confirmButtonText="Add draft"
 				onConfirm={() => {
 					setPendingUIMessage(null);
@@ -542,7 +546,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			<DeleteConfirmationModal
 				isOpen={pendingContextUpdate !== null}
 				title="Allow MCP App model context?"
-				message={`The MCP App for ${instance.serverID} wants to add context to the next model request.`}
+				message={`The MCP App for ${server.artifactID} wants to add context to the next model request.`}
 				confirmButtonText="Allow"
 				onConfirm={() => {
 					setPendingContextUpdate(null);

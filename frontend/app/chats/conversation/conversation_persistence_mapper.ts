@@ -15,7 +15,7 @@ import type {
 	URLCitation,
 } from '@/spec/inference';
 import { ContentItemKind, InputKind, RoleEnum } from '@/spec/inference';
-import type { MCPToolSelection } from '@/spec/mcp';
+import type { MCPToolSelection } from '@/spec/mcp_artifact';
 import type { ToolStoreChoice } from '@/spec/tool';
 
 import {
@@ -91,7 +91,8 @@ async function buildConversationHydrationContext(
 		toolCallMap = collectToolCallsFromInputs(message.inputs, toolCallMap);
 		toolCallMap = collectToolCallsFromOutputs(message.outputs, toolCallMap);
 
-		for (const [key, selection] of buildMCPToolSelectionMap(message.mcpContext) ?? []) {
+		for (const [key, selection] of buildMCPToolSelectionMap(message.mcpContext, undefined, message.mcpToolMappings) ??
+			[]) {
 			contextMCPSelections.set(key, selection);
 		}
 		for (const [key, selection] of buildMCPToolSelectionMap(undefined, message.debugDetails) ?? []) {

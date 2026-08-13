@@ -1,4 +1,4 @@
-import type { MCPConversationContext } from '@/spec/mcp';
+import type { MCPConversationContext } from '@/spec/mcp_artifact';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import type { ToolSelection } from '@/spec/tool';

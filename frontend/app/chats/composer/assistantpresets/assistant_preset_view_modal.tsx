@@ -3,8 +3,8 @@ import { useMemo } from 'react';
 import { FiServer, FiSliders, FiTool, FiZap } from 'react-icons/fi';
 
 import type { AssistantPreset } from '@/spec/assistantpreset';
-import type { MCPConversationContext } from '@/spec/mcp';
-import { MCPToolExposure } from '@/spec/mcp';
+import type { MCPConversationContext } from '@/spec/mcp_artifact';
+import { MCPToolExposure } from '@/spec/mcp_artifact';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';
@@ -77,11 +77,11 @@ function formatSkillSelectionLabel(sel: SkillSelection) {
 
 function getMCPToolExposureLabel(exposure: MCPToolExposure | string | undefined, selectedToolCount: number): string {
 	switch (exposure) {
-		case MCPToolExposure.MCPToolExposureAll:
+		case MCPToolExposure.All:
 			return selectedToolCount > 0 ? `All tools (${selectedToolCount})` : 'All tools';
-		case MCPToolExposure.MCPToolExposureSelected:
+		case MCPToolExposure.Selected:
 			return `${selectedToolCount} selected tool${selectedToolCount === 1 ? '' : 's'}`;
-		case MCPToolExposure.MCPToolExposureNone:
+		case MCPToolExposure.None:
 			return 'No tools';
 		default:
 			return exposure ? exposure : 'Tools not specified';
@@ -118,20 +118,20 @@ function formatMCPContextLabelItems(context?: MCPConversationContext): Array<{ t
 	for (const server of normalized.servers ?? []) {
 		const selectedToolCount = server.selectedTools?.length ?? 0;
 		const metaParts = [
-			server.bundleID,
+			server.server.rootID,
 			getMCPToolExposureLabel(server.toolExposure, selectedToolCount),
 			server.includeServerInstructions ? 'server instructions' : undefined,
 			server.snapshotDigest ? `snapshot ${server.snapshotDigest}` : undefined,
 		].filter(Boolean);
 
 		items.push({
-			title: `Server: ${server.serverID}`,
+			title: `Server: ${server.server.artifactID}`,
 			meta: metaParts.join(' • '),
 		});
 
 		for (const tool of server.selectedTools ?? []) {
 			const toolMetaParts = [
-				`${tool.bundleID}/${tool.serverID}`,
+				`${tool.server.rootID}/${tool.server.artifactID}`,
 				tool.providerToolName ? `provider ${tool.providerToolName}` : undefined,
 				tool.executionMode ? `execution ${tool.executionMode}` : undefined,
 				tool.approvalRule ? `approval ${tool.approvalRule}` : undefined,
@@ -149,14 +149,17 @@ function formatMCPContextLabelItems(context?: MCPConversationContext): Array<{ t
 	for (const resource of normalized.resources ?? []) {
 		items.push({
 			title: `Resource: ${resource.uri}`,
-			meta: `${resource.bundleID}/${resource.serverID}${resource.digest ? ` • digest ${resource.digest}` : ''}`,
+			meta: `${resource.server.rootID}/${resource.server.artifactID}${resource.digest ? ` • digest ${resource.digest}` : ''}`,
 		});
 	}
 
 	for (const template of normalized.resourceTemplates ?? []) {
 		items.push({
 			title: `Resource template: ${template.uriTemplate}`,
-			meta: [template.bundleID + '/' + template.serverID, formatMCPArgumentSummary(template.argumentValues)]
+			meta: [
+				template.server.rootID + '/' + template.server.artifactID,
+				formatMCPArgumentSummary(template.argumentValues),
+			]
 				.filter(Boolean)
 				.join(' • '),
 		});
@@ -165,7 +168,7 @@ function formatMCPContextLabelItems(context?: MCPConversationContext): Array<{ t
 	for (const prompt of normalized.prompts ?? []) {
 		items.push({
 			title: `Prompt: ${prompt.promptName}`,
-			meta: [prompt.bundleID + '/' + prompt.serverID, formatMCPArgumentSummary(prompt.argumentValues)]
+			meta: [prompt.server.rootID + '/' + prompt.server.artifactID, formatMCPArgumentSummary(prompt.argumentValues)]
 				.filter(Boolean)
 				.join(' • '),
 		});

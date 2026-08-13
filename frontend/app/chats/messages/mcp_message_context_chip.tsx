@@ -2,7 +2,7 @@ import { FiChevronRight, FiServer } from 'react-icons/fi';
 
 import { Menu, MenuButton, useMenuStore } from '@ariakit/react';
 
-import type { MCPConversationContext } from '@/spec/mcp';
+import type { MCPConversationContext } from '@/spec/mcp_artifact';
 
 import { toolExposureLabel } from '@/chats/messages/mcp_message_context_utils';
 
@@ -47,9 +47,12 @@ export function MCPMessageContextChip({ context }: { context?: MCPConversationCo
 				<div className="text-base-content/70 mb-2 text-xs font-semibold">MCP context</div>
 
 				{context.servers.map(server => (
-					<div key={`${server.bundleID}:${server.serverID}`} className="bg-base-200 mb-1 rounded-xl px-2 py-1">
-						<div className="truncate text-xs font-semibold">{server.serverID}</div>
-						<div className="text-base-content/60 truncate text-xs">{server.bundleID}</div>
+					<div
+						key={`${server.server.rootID}:${server.server.artifactID}`}
+						className="bg-base-200 mb-1 rounded-xl px-2 py-1"
+					>
+						<div className="truncate text-xs font-semibold">{server.server.artifactID}</div>
+						<div className="text-base-content/60 truncate text-xs">{server.server.rootID}</div>
 						<div className="mt-1 flex flex-wrap gap-1">
 							<span className="badge badge-ghost badge-xs">{toolExposureLabel(server)}</span>
 							{server.includeServerInstructions ? (
