@@ -176,6 +176,7 @@ const eslintRules: DummyRuleMap = {
 	'no-nested-ternary': 'off',
 	'no-ternary': 'off',
 	'object-shorthand': 'off',
+	'one-var': 'off',
 	'operator-assignment': 'off',
 	'prefer-arrow-callback': 'off',
 	'prefer-destructuring': 'off',
