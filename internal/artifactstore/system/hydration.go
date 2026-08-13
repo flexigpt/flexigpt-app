@@ -2,6 +2,7 @@ package system
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -240,6 +241,17 @@ func (c *Components) ResetTopologyHydration(
 	// Remove source-side package data first. If this fails, metadata remains
 	// intact and the next startup can retry safely.
 	rootValue, err := c.Roots.Get(ctx, rootID)
+	if errors.Is(err, basespec.ErrRootNotFound) {
+		// Preparation runs before EnsureProtectedTopology. Therefore, a
+		// missing protected Root is the normal first-install state.
+		//
+		// It can also occur after a prior reset completed metadata purging
+		// but the process stopped before the replacement topology was
+		// installed and its hydration marker was committed. Source-side
+		// storage is removed before metadata in the reset sequence, so this
+		// is already a clean state and must converge without an error.
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf(
 			"read topology root %q before content reset: %w",
