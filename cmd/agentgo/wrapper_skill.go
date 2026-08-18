@@ -14,14 +14,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
-	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/skill/schemaadapter"
+	"github.com/flexigpt/flexigpt-app/internal/skill/skillruntime"
 	"github.com/flexigpt/flexigpt-app/internal/skill/workspaceadapter"
 )
 
 type SkillBundleWrapper struct {
 	api              *skillBundle.API
-	runtime          *skillRuntime.SkillRuntime
+	runtime          *skillruntime.SkillRuntime
 	builtInInstaller artifactbuiltin.HydrationInstaller
 
 	warmupMu     sync.Mutex
@@ -61,7 +61,7 @@ func InitSkillBundleWrapper(
 		return err
 	}
 
-	router, err := skillRuntime.NewArtifactRouter(
+	router, err := skillruntime.NewArtifactRouter(
 		components.ArtifactReader,
 		components.CollectionReader,
 	)
@@ -89,8 +89,8 @@ func InitSkillBundleWrapper(
 		return err
 	}
 
-	runtime, err := skillRuntime.NewSkillRuntime(
-		skillRuntime.WithArtifactResolver(router),
+	runtime, err := skillruntime.NewSkillRuntime(
+		skillruntime.WithArtifactResolver(router),
 	)
 	if err != nil {
 		return err
@@ -444,49 +444,49 @@ func (w *SkillBundleWrapper) PurgeSkill(
 }
 
 func (w *SkillBundleWrapper) CreateSkillSession(
-	request *skillRuntime.CreateSkillSessionRequest,
-) (*skillRuntime.CreateSkillSessionResponse, error) {
-	return middleware.WithRecoveryResp(func() (*skillRuntime.CreateSkillSessionResponse, error) {
+	request *skillruntime.CreateSkillSessionRequest,
+) (*skillruntime.CreateSkillSessionResponse, error) {
+	return middleware.WithRecoveryResp(func() (*skillruntime.CreateSkillSessionResponse, error) {
 		return w.runtime.CreateSkillSession(context.Background(), request)
 	})
 }
 
 func (w *SkillBundleWrapper) CloseSkillSession(
-	request *skillRuntime.CloseSkillSessionRequest,
-) (*skillRuntime.CloseSkillSessionResponse, error) {
-	return middleware.WithRecoveryResp(func() (*skillRuntime.CloseSkillSessionResponse, error) {
+	request *skillruntime.CloseSkillSessionRequest,
+) (*skillruntime.CloseSkillSessionResponse, error) {
+	return middleware.WithRecoveryResp(func() (*skillruntime.CloseSkillSessionResponse, error) {
 		return w.runtime.CloseSkillSession(context.Background(), request)
 	})
 }
 
 func (w *SkillBundleWrapper) GetSkillsPrompt(
-	request *skillRuntime.GetSkillsPromptRequest,
-) (*skillRuntime.GetSkillsPromptResponse, error) {
-	return middleware.WithRecoveryResp(func() (*skillRuntime.GetSkillsPromptResponse, error) {
+	request *skillruntime.GetSkillsPromptRequest,
+) (*skillruntime.GetSkillsPromptResponse, error) {
+	return middleware.WithRecoveryResp(func() (*skillruntime.GetSkillsPromptResponse, error) {
 		return w.runtime.GetSkillsPrompt(context.Background(), request)
 	})
 }
 
 func (w *SkillBundleWrapper) ListRuntimeSkills(
-	request *skillRuntime.ListRuntimeSkillsRequest,
-) (*skillRuntime.ListRuntimeSkillsResponse, error) {
-	return middleware.WithRecoveryResp(func() (*skillRuntime.ListRuntimeSkillsResponse, error) {
+	request *skillruntime.ListRuntimeSkillsRequest,
+) (*skillruntime.ListRuntimeSkillsResponse, error) {
+	return middleware.WithRecoveryResp(func() (*skillruntime.ListRuntimeSkillsResponse, error) {
 		return w.runtime.ListRuntimeSkills(context.Background(), request)
 	})
 }
 
 func (w *SkillBundleWrapper) RenderSkill(
-	request *skillRuntime.RenderSkillRequest,
-) (*skillRuntime.RenderSkillResponse, error) {
-	return middleware.WithRecoveryResp(func() (*skillRuntime.RenderSkillResponse, error) {
+	request *skillruntime.RenderSkillRequest,
+) (*skillruntime.RenderSkillResponse, error) {
+	return middleware.WithRecoveryResp(func() (*skillruntime.RenderSkillResponse, error) {
 		return w.runtime.RenderSkill(context.Background(), request)
 	})
 }
 
 func (w *SkillBundleWrapper) InvokeSkillTool(
-	request *skillRuntime.InvokeSkillToolRequest,
-) (*skillRuntime.InvokeSkillToolResponse, error) {
-	return middleware.WithRecoveryResp(func() (*skillRuntime.InvokeSkillToolResponse, error) {
+	request *skillruntime.InvokeSkillToolRequest,
+) (*skillruntime.InvokeSkillToolResponse, error) {
+	return middleware.WithRecoveryResp(func() (*skillruntime.InvokeSkillToolResponse, error) {
 		return w.runtime.InvokeSkillTool(context.Background(), request)
 	})
 }

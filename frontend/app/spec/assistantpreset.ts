@@ -22,8 +22,8 @@ export interface AssistantPreset {
 	startingToolSelections?: ToolSelection[];
 	startingSkillSelections?: SkillSelection[];
 	startingMCPContext?: MCPConversationContext;
-	createdAt: Date; // Go type: time
-	modifiedAt: Date; // Go type: time
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface AssistantPresetBundle {
@@ -34,9 +34,9 @@ export interface AssistantPresetBundle {
 	description?: string;
 	isEnabled: boolean;
 	isBuiltIn: boolean;
-	createdAt: Date; // Go type: time
-	modifiedAt: Date; // Go type: time
-	softDeletedAt?: Date; // Go type: time
+	createdAt: string;
+	modifiedAt: string;
+	softDeletedAt?: string;
 }
 
 export interface AssistantPresetListItem {
@@ -48,7 +48,7 @@ export interface AssistantPresetListItem {
 	description?: string;
 	isEnabled: boolean;
 	isBuiltIn: boolean;
-	modifiedAt?: Date; // Go type: time
+	modifiedAt?: string;
 }
 
 /**

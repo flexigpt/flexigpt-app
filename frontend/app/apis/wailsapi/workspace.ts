@@ -1,17 +1,10 @@
 // oxlint-disable typescript/no-misused-spread
 import type {
 	ArtifactDefinitionSelector,
-	ArtifactDefinitionView,
 	ArtifactRef,
 	ArtifactRootID,
 	ArtifactSourceBinding,
 	ArtifactSourceID,
-} from '@/spec/artifact';
-import {
-	ArtifactAdoptionMode,
-	ArtifactDiagnosticSeverity,
-	ArtifactOccurrenceState,
-	ArtifactState,
 } from '@/spec/artifact';
 import type {
 	AdoptWorkspaceOccurrenceBody,
@@ -45,17 +38,9 @@ import type {
 	WorkspaceSuppressionView,
 	WorkspaceView,
 } from '@/spec/workspace';
-import {
-	WorkspaceAttachmentRole,
-	WorkspaceContextCompositionStatus,
-	WorkspaceContextMediaType,
-	WorkspaceContextRole,
-	WorkspaceMode,
-	WorkspaceSkillInsert,
-} from '@/spec/workspace';
 
 import type { IWorkspaceAPI } from '@/apis/interface';
-import { enumFromWails, rawJSONFromWails, requireWailsBody, toFrontendDate } from '@/apis/wailsapi/transport';
+import { rawJSONFromWails, requireWailsBody } from '@/apis/wailsapi/transport';
 import {
 	AdoptWorkspaceOccurrence,
 	AttachWorkspaceSource,
@@ -90,210 +75,6 @@ import {
 	UpdateWorkspace,
 	UpdateWorkspaceAttachment,
 } from '@/apis/wailsjs/go/main/WorkspaceWrapper';
-import type { workspace as wailsWorkspace } from '@/apis/wailsjs/go/models';
-
-function artifactDefinitionFromWails(
-	definition: wailsWorkspace.WorkspaceDefinitionView,
-	operation: string
-): ArtifactDefinitionView {
-	return {
-		...definition,
-		body: rawJSONFromWails(definition.body, `${operation}.definition.body`),
-	} as ArtifactDefinitionView;
-}
-
-function diagnosticsFromWails(
-	values:
-		| Array<{
-				severity: unknown;
-				code: string;
-				message: string;
-				location?: {
-					locator?: string;
-					subresourceLocator?: string;
-					line?: number;
-					column?: number;
-				};
-		  }>
-		| undefined
-) {
-	return values?.map(value => ({
-		severity: enumFromWails(value.severity, ArtifactDiagnosticSeverity, 'workspace.diagnostic.severity'),
-		code: value.code,
-		message: value.message,
-		...(value.location === undefined ? {} : { location: { ...value.location } }),
-	}));
-}
-
-function workspaceViewFromWails(view: wailsWorkspace.WorkspaceView): WorkspaceView {
-	return {
-		...view,
-		mode: enumFromWails(view.mode, WorkspaceMode, 'workspace.mode'),
-		attachments: view.attachments.map(attachment => ({
-			...attachment,
-			role: enumFromWails(attachment.role, WorkspaceAttachmentRole, 'workspace.attachment.role'),
-			diagnostics: diagnosticsFromWails(attachment.diagnostics),
-		})),
-	} as WorkspaceView;
-}
-
-function workspaceArtifactFromWails(view: wailsWorkspace.WorkspaceArtifactView): WorkspaceArtifactView {
-	return {
-		...view,
-		state: enumFromWails(view.state, ArtifactState, 'workspace.artifact.state'),
-		adoption: enumFromWails(view.adoption, ArtifactAdoptionMode, 'workspace.artifact.adoption'),
-		diagnostics: diagnosticsFromWails(view.diagnostics),
-	} as WorkspaceArtifactView;
-}
-
-function workspaceOccurrenceFromWails(
-	view: wailsWorkspace.WorkspaceOccurrenceView
-): WorkspaceCatalogView['occurrences'][number] {
-	return {
-		...view,
-		state: enumFromWails(view.state, ArtifactOccurrenceState, 'workspace.occurrence.state'),
-		diagnostics: diagnosticsFromWails(view.diagnostics),
-	} as WorkspaceCatalogView['occurrences'][number];
-}
-
-function workspaceResourceFromWails(
-	view: wailsWorkspace.WorkspaceResourceView
-): WorkspaceCatalogView['resources'][number] {
-	return {
-		...view,
-		artifact: workspaceArtifactFromWails(view.artifact),
-		diagnostics: diagnosticsFromWails(view.diagnostics),
-	} as WorkspaceCatalogView['resources'][number];
-}
-
-function workspaceLoadPlanFromWails(plan: wailsWorkspace.WorkspaceLoadPlanView): WorkspaceLoadPlanView {
-	return {
-		...plan,
-		items: plan.items.map(item => ({
-			...item,
-			artifact: workspaceArtifactFromWails(item.artifact),
-			definition: artifactDefinitionFromWails(item.definition, 'ComposeWorkspaceLoadPlan'),
-		})),
-		diagnostics: diagnosticsFromWails(plan.diagnostics),
-	} as WorkspaceLoadPlanView;
-}
-
-function resolvedWorkspaceResourceFromWails(
-	result: wailsWorkspace.ResolveWorkspaceResourceResponseBody
-): ResolveWorkspaceResourceResult {
-	return {
-		...result,
-		resource: workspaceResourceFromWails(result.resource),
-		definition: artifactDefinitionFromWails(result.definition, 'ResolveWorkspaceResource'),
-	} as ResolveWorkspaceResourceResult;
-}
-
-function workspaceCatalogFromWails(value: wailsWorkspace.WorkspaceCatalogView): WorkspaceCatalogView {
-	return {
-		...value,
-		workspace: workspaceViewFromWails(value.workspace),
-		resources: value.resources.map(workspaceResourceFromWails),
-		groups: value.groups.map(group => ({
-			...group,
-			resources: group.resources.map(workspaceResourceFromWails),
-			unrecorded: group.unrecorded.map(workspaceOccurrenceFromWails),
-		})),
-		occurrences: value.occurrences.map(workspaceOccurrenceFromWails),
-		validOccurrences: value.validOccurrences.map(workspaceOccurrenceFromWails),
-		invalidOccurrences: value.invalidOccurrences.map(workspaceOccurrenceFromWails),
-		missingOccurrences: value.missingOccurrences.map(workspaceOccurrenceFromWails),
-		unrecordedOccurrences: value.unrecordedOccurrences.map(workspaceOccurrenceFromWails),
-		unresolvedArtifacts: value.unresolvedArtifacts.map(workspaceArtifactFromWails),
-		diagnostics: diagnosticsFromWails(value.diagnostics),
-	} as WorkspaceCatalogView;
-}
-
-function workspaceRefreshFromWails(value: wailsWorkspace.WorkspaceRefreshResult): WorkspaceRefreshResult {
-	return {
-		...value,
-		diagnostics: diagnosticsFromWails(value.diagnostics),
-	} as WorkspaceRefreshResult;
-}
-
-function workspaceSuppressionFromWails(suppression: wailsWorkspace.WorkspaceSuppressionView): WorkspaceSuppressionView {
-	return {
-		...suppression,
-		createdAt: toFrontendDate(suppression.createdAt, 'workspaceSuppression.createdAt'),
-		modifiedAt: toFrontendDate(suppression.modifiedAt, 'workspaceSuppression.modifiedAt'),
-	} as WorkspaceSuppressionView;
-}
-
-function workspaceContextContributionFromWails(
-	value: wailsWorkspace.WorkspaceContextContribution
-): WorkspaceContextLoadPlan['contributions'][number] {
-	return {
-		...value,
-		role: enumFromWails(value.role, WorkspaceContextRole, 'workspace.context.role'),
-		mediaType: enumFromWails(value.mediaType, WorkspaceContextMediaType, 'workspace.context.mediaType'),
-	} as WorkspaceContextLoadPlan['contributions'][number];
-}
-
-function workspaceContextDecisionFromWails(
-	value: wailsWorkspace.WorkspaceContextDecision
-): WorkspaceContextLoadPlan['decisions'][number] {
-	return {
-		...value,
-		status: enumFromWails(value.status, WorkspaceContextCompositionStatus, 'workspace.context.status'),
-	} as WorkspaceContextLoadPlan['decisions'][number];
-}
-
-function workspaceContextFromWails(value: wailsWorkspace.WorkspaceContextView): WorkspaceContextView {
-	return {
-		...value,
-		role: enumFromWails(value.role, WorkspaceContextRole, 'workspace.context.role'),
-		mediaType: enumFromWails(value.mediaType, WorkspaceContextMediaType, 'workspace.context.mediaType'),
-		state: enumFromWails(value.state, ArtifactState, 'workspace.context.state'),
-		diagnostics: diagnosticsFromWails(value.diagnostics),
-	} as WorkspaceContextView;
-}
-
-function workspaceContextInspectionFromWails(
-	value: wailsWorkspace.WorkspaceContextInspectionView
-): WorkspaceContextInspectionView {
-	return {
-		...value,
-		contributions: value.contributions.map(workspaceContextContributionFromWails),
-		diagnostics: diagnosticsFromWails(value.diagnostics),
-	} as WorkspaceContextInspectionView;
-}
-
-function workspaceContextLoadPlanFromWails(value: wailsWorkspace.WorkspaceContextLoadPlan): WorkspaceContextLoadPlan {
-	return {
-		...value,
-		contributions: value.contributions.map(workspaceContextContributionFromWails),
-		decisions: value.decisions.map(workspaceContextDecisionFromWails),
-		diagnostics: diagnosticsFromWails(value.diagnostics),
-	} as WorkspaceContextLoadPlan;
-}
-
-function workspaceSkillFromWails(skill: wailsWorkspace.WorkspaceSkillView): WorkspaceSkillView {
-	return {
-		...skill,
-		state: enumFromWails(skill.state, ArtifactState, 'workspace.skill.state'),
-		diagnostics: diagnosticsFromWails(skill.diagnostics),
-		skill: {
-			...skill.skill,
-			insert: enumFromWails(skill.skill.insert, WorkspaceSkillInsert, 'workspace.skill.insert'),
-			createdAt: toFrontendDate(skill.skill.createdAt, 'workspaceSkill.skill.createdAt'),
-			modifiedAt: toFrontendDate(skill.skill.modifiedAt, 'workspaceSkill.skill.modifiedAt'),
-		},
-	} as WorkspaceSkillView;
-}
-
-function workspaceSkillLoadFromWails(load: wailsWorkspace.WorkspaceSkillLoadView): WorkspaceSkillLoadView {
-	return {
-		...load,
-		skills: (load.skills ?? []).map(s => {
-			return workspaceSkillFromWails(s);
-		}),
-		diagnostics: diagnosticsFromWails(load.diagnostics),
-	} as WorkspaceSkillLoadView;
-}
 
 export class WailsWorkspaceAPI implements IWorkspaceAPI {
 	async createFilesystemWorkspace(rootID: ArtifactRootID, body: CreateFilesystemWorkspaceBody): Promise<WorkspaceView> {
@@ -310,9 +91,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			},
 		} as Parameters<typeof CreateFilesystemWorkspace>[0]);
 
-		return workspaceViewFromWails(
-			requireWailsBody(response.Body, 'CreateFilesystemWorkspace') as wailsWorkspace.WorkspaceView
-		);
+		return requireWailsBody(response.Body, 'CreateFilesystemWorkspace') as WorkspaceView;
 	}
 
 	async createEmptyWorkspace(rootID: ArtifactRootID, body: CreateEmptyWorkspaceBody): Promise<WorkspaceView> {
@@ -321,9 +100,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof CreateEmptyWorkspace>[0]);
 
-		return workspaceViewFromWails(
-			requireWailsBody(response.Body, 'CreateEmptyWorkspace') as wailsWorkspace.WorkspaceView
-		);
+		return requireWailsBody(response.Body, 'CreateEmptyWorkspace') as WorkspaceView;
 	}
 
 	async getWorkspace(workspace: WorkspaceRef): Promise<WorkspaceView> {
@@ -331,7 +108,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			workspace,
 		} as Parameters<typeof GetWorkspace>[0]);
 
-		return workspaceViewFromWails(requireWailsBody(response.Body, 'GetWorkspace'));
+		return requireWailsBody(response.Body, 'GetWorkspace') as WorkspaceView;
 	}
 
 	async listWorkspaces(rootID: ArtifactRootID): Promise<WorkspaceView[]> {
@@ -340,9 +117,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaces>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaces');
-		return (body.workspaces ?? []).map(w => {
-			return workspaceViewFromWails(w);
-		});
+		return (body.workspaces as WorkspaceView[]) ?? [];
 	}
 
 	async updateWorkspace(workspace: WorkspaceRef, body: UpdateWorkspaceBody): Promise<WorkspaceView> {
@@ -351,7 +126,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof UpdateWorkspace>[0]);
 
-		return workspaceViewFromWails(requireWailsBody(response.Body, 'UpdateWorkspace'));
+		return requireWailsBody(response.Body, 'UpdateWorkspace') as WorkspaceView;
 	}
 
 	async replaceWorkspacePrimarySource(
@@ -363,7 +138,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof ReplaceWorkspacePrimarySource>[0]);
 
-		return workspaceViewFromWails(requireWailsBody(response.Body, 'ReplaceWorkspacePrimarySource'));
+		return requireWailsBody(response.Body, 'ReplaceWorkspacePrimarySource') as WorkspaceView;
 	}
 
 	async setWorkspacePrimarySource(
@@ -375,7 +150,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof SetWorkspacePrimarySource>[0]);
 
-		return workspaceViewFromWails(requireWailsBody(response.Body, 'SetWorkspacePrimarySource'));
+		return requireWailsBody(response.Body, 'SetWorkspacePrimarySource') as WorkspaceView;
 	}
 
 	async retireWorkspace(workspace: WorkspaceRef, expectedRevision: number): Promise<RetireWorkspaceResult> {
@@ -408,9 +183,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof AttachWorkspaceSource>[0]);
 
-		return workspaceViewFromWails(
-			requireWailsBody(response.Body, 'AttachWorkspaceSource') as wailsWorkspace.WorkspaceView
-		);
+		return requireWailsBody(response.Body, 'AttachWorkspaceSource') as WorkspaceView;
 	}
 
 	async updateWorkspaceAttachment(
@@ -424,9 +197,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof UpdateWorkspaceAttachment>[0]);
 
-		return workspaceViewFromWails(
-			requireWailsBody(response.Body, 'UpdateWorkspaceAttachment') as wailsWorkspace.WorkspaceView
-		);
+		return requireWailsBody(response.Body, 'UpdateWorkspaceAttachment') as WorkspaceView;
 	}
 
 	async detachWorkspaceSource(
@@ -441,7 +212,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			expectedAttachmentRevision: body.expectedAttachmentRevision,
 		} as Parameters<typeof DetachWorkspaceSource>[0]);
 
-		return workspaceViewFromWails(requireWailsBody(response.Body, 'DetachWorkspaceSource'));
+		return requireWailsBody(response.Body, 'DetachWorkspaceSource') as WorkspaceView;
 	}
 
 	async refreshWorkspace(workspace: WorkspaceRef): Promise<WorkspaceRefreshResult> {
@@ -449,7 +220,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			workspace,
 		} as Parameters<typeof RefreshWorkspace>[0]);
 
-		return workspaceRefreshFromWails(requireWailsBody(response.Body, 'RefreshWorkspace'));
+		return requireWailsBody(response.Body, 'RefreshWorkspace') as WorkspaceRefreshResult;
 	}
 
 	async getWorkspaceCatalog(workspace: WorkspaceRef): Promise<WorkspaceCatalogView> {
@@ -457,7 +228,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			workspace,
 		} as Parameters<typeof GetWorkspaceCatalog>[0]);
 
-		return workspaceCatalogFromWails(requireWailsBody(response.Body, 'GetWorkspaceCatalog'));
+		return requireWailsBody(response.Body, 'GetWorkspaceCatalog') as WorkspaceCatalogView;
 	}
 
 	async composeWorkspaceLoadPlan(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceLoadPlanView> {
@@ -465,9 +236,19 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			workspace,
 			Body: { artifacts },
 		} as Parameters<typeof ComposeWorkspaceLoadPlan>[0]);
-
-		const body = requireWailsBody(response.Body, 'ComposeWorkspaceLoadPlan');
-		return workspaceLoadPlanFromWails(body);
+		const res = requireWailsBody(response.Body, 'ComposeWorkspaceLoadPlan');
+		const r = {
+			...res,
+			items: res.items.map(i => {
+				return Object.assign(i, {
+					definition: {
+						...i.definition,
+						body: rawJSONFromWails(i.definition.body, 'item.definition.body'),
+					},
+				});
+			}),
+		} as WorkspaceLoadPlanView;
+		return r;
 	}
 
 	async resolveWorkspaceResource(
@@ -483,9 +264,15 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			workspace,
 			Body: { artifact, selector },
 		} as Parameters<typeof ResolveWorkspaceResource>[0]);
-
-		const body = requireWailsBody(response.Body, 'ResolveWorkspaceResource');
-		return resolvedWorkspaceResourceFromWails(body);
+		const res = requireWailsBody(response.Body, 'ResolveWorkspaceResource');
+		const r = {
+			...res,
+			definition: {
+				...res.definition,
+				body: rawJSONFromWails(res.definition.body, 'workspace.definition.body'),
+			},
+		} as ResolveWorkspaceResourceResult;
+		return r;
 	}
 
 	async getWorkspaceArtifact(workspace: WorkspaceRef, artifact: ArtifactRef): Promise<WorkspaceArtifactView> {
@@ -494,7 +281,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			artifact,
 		} as Parameters<typeof GetWorkspaceArtifact>[0]);
 
-		return workspaceArtifactFromWails(requireWailsBody(response.Body, 'GetWorkspaceArtifact'));
+		return requireWailsBody(response.Body, 'GetWorkspaceArtifact') as WorkspaceArtifactView;
 	}
 
 	async listWorkspaceArtifacts(workspace: WorkspaceRef): Promise<WorkspaceArtifactView[]> {
@@ -503,9 +290,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaceArtifacts>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaceArtifacts');
-		return (body.artifacts ?? []).map(w => {
-			return workspaceArtifactFromWails(w);
-		});
+		return (body.artifacts as WorkspaceArtifactView[]) ?? [];
 	}
 
 	async adoptWorkspaceOccurrence(
@@ -517,7 +302,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof AdoptWorkspaceOccurrence>[0]);
 
-		return workspaceArtifactFromWails(requireWailsBody(response.Body, 'AdoptWorkspaceOccurrence'));
+		return requireWailsBody(response.Body, 'AdoptWorkspaceOccurrence') as WorkspaceArtifactView;
 	}
 
 	async pinWorkspaceArtifact(workspace: WorkspaceRef, body: PinWorkspaceArtifactBody): Promise<WorkspaceArtifactView> {
@@ -526,7 +311,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof PinWorkspaceArtifact>[0]);
 
-		return workspaceArtifactFromWails(requireWailsBody(response.Body, 'PinWorkspaceArtifact'));
+		return requireWailsBody(response.Body, 'PinWorkspaceArtifact') as WorkspaceArtifactView;
 	}
 
 	async listWorkspaceSuppressions(workspace: WorkspaceRef): Promise<WorkspaceSuppressionView[]> {
@@ -535,9 +320,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaceSuppressions>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaceSuppressions');
-		return (body.suppressions ?? []).map(b => {
-			return workspaceSuppressionFromWails(b);
-		});
+		return (body.suppressions as WorkspaceSuppressionView[]) ?? [];
 	}
 
 	async suppressWorkspaceBinding(
@@ -549,7 +332,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof SuppressWorkspaceBinding>[0]);
 
-		return workspaceSuppressionFromWails(requireWailsBody(response.Body, 'SuppressWorkspaceBinding'));
+		return requireWailsBody(response.Body, 'SuppressWorkspaceBinding') as WorkspaceSuppressionView;
 	}
 
 	async unsuppressWorkspaceBinding(
@@ -572,9 +355,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaceContexts>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaceContexts');
-		return (body.contexts ?? []).map(w => {
-			return workspaceContextFromWails(w);
-		});
+		return (body.contexts as WorkspaceContextView[]) ?? [];
 	}
 
 	async loadWorkspaceContexts(
@@ -586,7 +367,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: { artifacts },
 		} as Parameters<typeof LoadWorkspaceContexts>[0]);
 
-		return workspaceContextInspectionFromWails(requireWailsBody(response.Body, 'LoadWorkspaceContexts'));
+		return requireWailsBody(response.Body, 'LoadWorkspaceContexts') as WorkspaceContextInspectionView;
 	}
 
 	async composeWorkspaceContext(workspace: WorkspaceRef, artifacts?: ArtifactRef[]): Promise<WorkspaceContextLoadPlan> {
@@ -595,7 +376,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: { artifacts },
 		} as Parameters<typeof ComposeWorkspaceContext>[0]);
 
-		return workspaceContextLoadPlanFromWails(requireWailsBody(response.Body, 'ComposeWorkspaceContext'));
+		return requireWailsBody(response.Body, 'ComposeWorkspaceContext') as WorkspaceContextLoadPlan;
 	}
 
 	async listWorkspaceSkills(workspace: WorkspaceRef): Promise<WorkspaceSkillView[]> {
@@ -604,9 +385,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaceSkills>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaceSkills');
-		return (body.skills ?? []).map(s => {
-			return workspaceSkillFromWails(s);
-		});
+		return (body.skills as WorkspaceSkillView[]) ?? [];
 	}
 
 	async loadWorkspaceSkills(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceSkillLoadView> {
@@ -615,8 +394,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: { artifacts },
 		} as Parameters<typeof LoadWorkspaceSkills>[0]);
 
-		const body = requireWailsBody(response.Body, 'LoadWorkspaceSkills');
-		return workspaceSkillLoadFromWails(body);
+		return requireWailsBody(response.Body, 'LoadWorkspaceSkills') as WorkspaceSkillLoadView;
 	}
 
 	async setWorkspaceArtifactEnabled(
@@ -630,7 +408,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof SetWorkspaceArtifactEnabled>[0]);
 
-		return workspaceArtifactFromWails(requireWailsBody(response.Body, 'SetWorkspaceArtifactEnabled'));
+		return requireWailsBody(response.Body, 'SetWorkspaceArtifactEnabled') as WorkspaceArtifactView;
 	}
 
 	async unadoptWorkspaceArtifact(
@@ -676,6 +454,6 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: body,
 		} as Parameters<typeof SetWorkspaceArtifactRuntimeDisabled>[0]);
 
-		return workspaceArtifactFromWails(requireWailsBody(response.Body, 'SetWorkspaceArtifactRuntimeDisabled'));
+		return requireWailsBody(response.Body, 'SetWorkspaceArtifactRuntimeDisabled') as WorkspaceArtifactView;
 	}
 }

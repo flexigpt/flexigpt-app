@@ -1,4 +1,4 @@
-package schemaadapter
+package mcpschemaadapter
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 
-	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/mcpbundle"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 )
@@ -59,7 +59,7 @@ func (d *Decoder) Recognize(
 	candidate discovery.Candidate,
 ) discovery.Recognition {
 	if candidate.RequestsDecoder(artifactbuiltin.DecoderID) &&
-		bundle.IsBundleDocumentLocator(candidate.Locator) {
+		mcpbundle.IsBundleDocumentLocator(candidate.Locator) {
 		return discovery.RecognitionPreferred
 	}
 	return discovery.RecognitionNone
@@ -70,7 +70,7 @@ func (d *Decoder) Decode(
 	candidate discovery.Candidate,
 ) ([]discovery.Decoded, []diagnostic.Diagnostic) {
 	if !candidate.RequestsDecoder(artifactbuiltin.DecoderID) ||
-		!bundle.IsBundleDocumentLocator(candidate.Locator) {
+		!mcpbundle.IsBundleDocumentLocator(candidate.Locator) {
 		return nil, nil
 	}
 	if d == nil || d.documents == nil {
@@ -89,7 +89,7 @@ func (d *Decoder) Decode(
 	if err != nil {
 		return nil, decoderError(candidate.Locator, "bundle", err)
 	}
-	b, err := bundle.BundleFromParsedDocument(parsed)
+	b, err := mcpbundle.BundleFromParsedDocument(parsed)
 	if err != nil {
 		return nil, decoderError(candidate.Locator, "bundle", err)
 	}
@@ -117,7 +117,7 @@ func (d *Decoder) Decode(
 	)
 
 	for _, name := range serverNames {
-		serverDocument, err := bundle.ServerFromCanonicalBundle(b, name)
+		serverDocument, err := mcpbundle.ServerFromCanonicalBundle(b, name)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
@@ -158,7 +158,7 @@ func decoderError(
 ) []diagnostic.Diagnostic {
 	return []diagnostic.Diagnostic{{
 		Severity: diagnostic.DiagnosticError,
-		Code:     "mcp.bundle.subresource-invalid",
+		Code:     "mcp.mcpbundle.subresource-invalid",
 		Message: diagnostic.BoundedDiagnosticMessage(
 			fmt.Sprintf("%s: %v", subresource, err),
 		),

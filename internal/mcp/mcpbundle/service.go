@@ -1,4 +1,4 @@
-package bundle
+package mcpbundle
 
 import (
 	"context"
@@ -107,13 +107,12 @@ func New(dependencies Dependencies) (*API, error) {
 }
 
 type Bundle struct {
-	Collection collection.Collection
-	Data       CollectionData
-	Attachment collection.Attachment
-	Source     source.Summary
-
-	PackageAddress  source.ManagedPackageAddress
-	DocumentLocator basespec.Locator
+	Collection      collection.Collection        `json:"collection"`
+	Data            CollectionData               `json:"data"`
+	Attachment      collection.Attachment        `json:"attachment"`
+	Source          source.Summary               `json:"source"`
+	PackageAddress  source.ManagedPackageAddress `json:"packageAddress"`
+	DocumentLocator basespec.Locator             `json:"documentLocator"`
 }
 
 type Registration struct {

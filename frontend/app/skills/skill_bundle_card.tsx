@@ -76,9 +76,9 @@ function PresenceStatusBadge({ skill }: { skill: Skill }) {
 
 	const tooltip = [
 		`Status: ${status}`,
-		p?.lastCheckedAt ? `Last checked: ${p.lastCheckedAt.toISOString()}` : null,
-		p?.lastSeenAt ? `Last seen: ${p.lastSeenAt.toISOString()}` : null,
-		p?.missingSince ? `Missing since: ${p.missingSince.toISOString()}` : null,
+		p?.lastCheckedAt ? `Last checked: ${p.lastCheckedAt}` : null,
+		p?.lastSeenAt ? `Last seen: ${p.lastSeenAt}` : null,
+		p?.missingSince ? `Missing since: ${p.missingSince}` : null,
 		p?.lastCheckError ? `Error: ${p.lastCheckError}` : null,
 	]
 		.filter(Boolean)

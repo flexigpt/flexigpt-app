@@ -1,6 +1,5 @@
-import type { ArtifactCollectionRef, ArtifactKind, ArtifactRecord, ArtifactRef, ArtifactRootID } from '@/spec/artifact';
-import { ArtifactState } from '@/spec/artifact';
-import { newArtifactStorageKey } from '@/spec/artifact';
+import type { ArtifactCollectionRef, ArtifactKind, ArtifactRecord, ArtifactRef } from '@/spec/artifact';
+import { ArtifactState, newArtifactStorageKey } from '@/spec/artifact';
 import type {
 	MCPAppsPolicy,
 	MCPArtifactRegistration,
@@ -19,7 +18,6 @@ import type {
 	MCPToolPolicyOverride,
 } from '@/spec/mcp_artifact';
 import {
-	MCP_BUILTIN_ROOT_ID,
 	MCP_SCHEMA_VERSION,
 	MCP_USER_ROOT_ID,
 	MCPApprovalRule,
@@ -36,7 +34,7 @@ import {
 import { omitManyKeys } from '@/lib/obj_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { mcpAPI } from '@/apis/baseapi';
+import { artifactStoreAPI, mcpAPI } from '@/apis/baseapi';
 
 const PLACEHOLDER_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 
@@ -479,9 +477,10 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 }
 
 export async function loadMCPBundleViews(): Promise<MCPBundleView[]> {
-	const roots: ArtifactRootID[] = [MCP_USER_ROOT_ID, MCP_BUILTIN_ROOT_ID];
-	const responses = await Promise.allSettled(roots.map(rootID => mcpAPI.listMCPBundles(rootID)));
-
+	const roots = await artifactStoreAPI.listArtifactRoots();
+	console.log(JSON.stringify(roots, null, 2));
+	const responses = await Promise.allSettled(roots.map(root => mcpAPI.listMCPBundles(root.id)));
+	console.log(JSON.stringify(responses, null, 2));
 	const bundles: MCPBundle[] = [];
 
 	for (const response of responses) {

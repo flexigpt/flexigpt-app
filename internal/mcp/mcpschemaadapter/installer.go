@@ -1,4 +1,4 @@
-package schemaadapter
+package mcpschemaadapter
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/mcpbundle"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
@@ -68,8 +68,8 @@ func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
 type builtInBundleEnsurer interface {
 	EnsureBuiltIn(
 		ctx context.Context,
-		request bundle.EnsureBuiltInRequest,
-	) (bundle.Bundle, error)
+		request mcpbundle.EnsureBuiltInRequest,
+	) (mcpbundle.Bundle, error)
 
 	EnsureBuiltInCurrent(
 		ctx context.Context,
@@ -79,7 +79,7 @@ type builtInBundleEnsurer interface {
 	Get(
 		ctx context.Context,
 		ref collection.CollectionRef,
-	) (bundle.Bundle, error)
+	) (mcpbundle.Bundle, error)
 
 	ListServers(
 		ctx context.Context,
@@ -119,7 +119,7 @@ type Installer struct {
 
 type preparedBundle struct {
 	registration   BundleRegistration
-	document       bundle.BundleDocument
+	document       mcpbundle.BundleDocument
 	parsed         shareable.ParsedDocument
 	packageAddress source.ManagedPackageAddress
 	packageFiles   []source.ManagedPackageFile
@@ -243,7 +243,7 @@ func (i *Installer) EnsureHydration(
 	for _, value := range prepared {
 		if _, err := i.bundles.EnsureBuiltIn(
 			ctx,
-			bundle.EnsureBuiltInRequest{
+			mcpbundle.EnsureBuiltInRequest{
 				RootID:         i.builtInTopology.Root.ID,
 				CollectionID:   value.registration.CollectionID,
 				SourceID:       i.builtInTopology.Sources[0].ID,
@@ -373,7 +373,7 @@ func (i *Installer) verifyCurrentBundle(
 	if err != nil {
 		return err
 	}
-	documentLocator, err := bundle.DocumentLocatorForPackage(
+	documentLocator, err := mcpbundle.DocumentLocatorForPackage(
 		expected.packageAddress,
 	)
 	if err != nil {
@@ -520,7 +520,7 @@ func (i *Installer) prepareBundles(
 			)
 		}
 
-		document, err := bundle.BundleFromParsedDocument(parsed)
+		document, err := mcpbundle.BundleFromParsedDocument(parsed)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"project canonical built-in MCP document %q: %w",
@@ -535,7 +535,7 @@ func (i *Installer) prepareBundles(
 				registered.EmbeddedDocumentLocator,
 			)
 		}
-		packageAddress, err := bundle.PackageAddressForBundle(
+		packageAddress, err := mcpbundle.PackageAddressForBundle(
 			document.LogicalName,
 			document.LogicalVersion,
 		)
@@ -718,7 +718,7 @@ func (i *Installer) hydrationFingerprint(
 }
 
 func bundleDefinitions(
-	document bundle.BundleDocument,
+	document mcpbundle.BundleDocument,
 ) (map[basespec.SubresourceLocator]basespec.ArtifactKind, error) {
 	output := make(
 		map[basespec.SubresourceLocator]basespec.ArtifactKind,

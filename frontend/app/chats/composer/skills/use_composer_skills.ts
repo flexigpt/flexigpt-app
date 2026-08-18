@@ -645,7 +645,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 		return clampActiveSkillRefsToEnabled(
 			allowSkillRefs,
-			(items ?? []).map(it => it.artifact)
+			(items ?? []).map(it => it.skillRef)
 		);
 	}, []);
 

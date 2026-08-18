@@ -138,8 +138,8 @@ export interface WorkspaceSuppressionView {
 	workspace: WorkspaceRef;
 	binding: ArtifactSourceBinding;
 	revision: number;
-	createdAt: Date;
-	modifiedAt: Date;
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface WorkspaceOccurrenceView {
@@ -296,8 +296,8 @@ export interface WorkspaceSkillSummary {
 	insert: WorkspaceSkillInsert;
 	arguments?: WorkspaceSkillArgument[];
 	isEnabled: boolean;
-	createdAt: Date;
-	modifiedAt: Date;
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface WorkspaceSkillView {

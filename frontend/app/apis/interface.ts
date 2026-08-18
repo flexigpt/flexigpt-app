@@ -7,11 +7,11 @@ import type {
 	ArtifactRoot,
 	ArtifactRootID,
 	ArtifactSourceBinding,
+	ArtifactSourceDraft,
 	ArtifactSourceID,
 	ArtifactSourceKind,
 	ArtifactSourceSummary,
 	CreateArtifactRootBody,
-	CreateArtifactSourceBody,
 	ManagedSourcePackageResult,
 	ManagedSourceState,
 	PublishManagedSourcePackageBody,
@@ -319,7 +319,7 @@ export interface IArtifactStoreAPI {
 
 	purgeArtifactRoot(rootID: ArtifactRootID, expectedRevision: number): Promise<PurgeArtifactRootResult>;
 
-	createArtifactSource(rootID: ArtifactRootID, body: CreateArtifactSourceBody): Promise<ArtifactSourceSummary>;
+	createArtifactSource(rootID: ArtifactRootID, body: ArtifactSourceDraft): Promise<ArtifactSourceSummary>;
 
 	getArtifactSource(rootID: ArtifactRootID, sourceID: ArtifactSourceID): Promise<ArtifactSourceSummary>;
 

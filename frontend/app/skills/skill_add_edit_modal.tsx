@@ -1342,8 +1342,8 @@ function AddEditSkillModalContent({
 										<ManagementInfoRow label="Presence">
 											{artifactSkill.presence?.status ?? 'unknown'}
 										</ManagementInfoRow>
-										<ManagementInfoRow label="Created">{String(artifactSkill.createdAt)}</ManagementInfoRow>
-										<ManagementInfoRow label="Modified">{String(artifactSkill.modifiedAt)}</ManagementInfoRow>
+										<ManagementInfoRow label="Created">{artifactSkill.createdAt}</ManagementInfoRow>
+										<ManagementInfoRow label="Modified">{artifactSkill.modifiedAt}</ManagementInfoRow>
 									</ManagementInfoGrid>
 								</ModalSection>
 
@@ -1509,9 +1509,9 @@ export function AddEditSkillModal(props: AddEditSkillModalProps) {
 	}
 
 	const remountKey = props.initialData
-		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.skill.id}:${String(
+		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.skill.id}:${
 				props.initialData.skill.modifiedAt
-			)}:${props.initialData.skill.type}:${props.initialData.skill.isBuiltIn ? '1' : '0'}`
+			}:${props.initialData.skill.type}:${props.initialData.skill.isBuiltIn ? '1' : '0'}`
 		: `${props.mode ?? 'auto'}:new`;
 	const requestedMode = props.mode ?? (props.initialData ? 'edit' : 'add');
 	const isLockedSkill =

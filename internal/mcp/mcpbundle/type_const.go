@@ -1,4 +1,4 @@
-package bundle
+package mcpbundle
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"

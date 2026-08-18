@@ -66,12 +66,11 @@ interface AttachmentFileRef {
 	exists: boolean;
 	isDir: boolean;
 	size?: number;
-	// Go type: time
-	modTime?: Date;
-
 	origPath: string;
 	origSize: number;
-	origModTime: Date;
+
+	modTime?: string;
+	origModTime: string;
 }
 
 interface AttachmentImageRef {
@@ -80,17 +79,15 @@ interface AttachmentImageRef {
 	exists: boolean;
 	isDir: boolean;
 	size?: number;
-	// Go type: time
-	modTime?: Date;
-
 	width?: number;
 	height?: number;
 	format?: string;
 	mimeType?: string;
-
 	origPath: string;
 	origSize: number;
-	origModTime: Date;
+
+	modTime?: string;
+	origModTime: string;
 }
 
 interface AttachmentURLRef {
@@ -104,7 +101,7 @@ interface AttachmentGenericRef {
 	origHandle: string;
 }
 
-export enum AttachmentContentBlockKind {
+enum AttachmentContentBlockKind {
 	text = 'text',
 	image = 'image',
 	file = 'file',

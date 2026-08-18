@@ -1,18 +1,10 @@
-// oxlint-disable typescript/no-misused-spread
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
-import { RoleEnum, Status } from '@/spec/inference';
 
 import { parseAnyToTime } from '@/lib/date_utils';
 import { extractTimeFromUUIDv7Str } from '@/lib/uuid_utils';
 
 import type { IConversationStoreAPI } from '@/apis/interface';
-import {
-	enumFromWails,
-	optionalWailsBody,
-	requireWailsArray,
-	requireWailsBody,
-	toFrontendDate,
-} from '@/apis/wailsapi/transport';
+import { optionalWailsBody, requireWailsArray, requireWailsBody } from '@/apis/wailsapi/transport';
 import {
 	DeleteConversation,
 	GetConversation,
@@ -59,7 +51,7 @@ export class WailsConversationStoreAPI implements IConversationStoreAPI {
 		const req = { ID: id, Title: title, ForceFetch: forceFetch ?? false };
 		const c = await GetConversation(req as wailsSpec.GetConversationRequest);
 		const body = optionalWailsBody(c.Body);
-		return body === undefined ? null : conversationFromWails(body);
+		return body === undefined ? null : (body as StoreConversation);
 	}
 
 	async listConversations(
@@ -93,22 +85,6 @@ export class WailsConversationStoreAPI implements IConversationStoreAPI {
 			nextToken: body.nextPageToken || undefined,
 		};
 	}
-}
-
-function conversationFromWails(conversation: wailsSpec.Conversation): StoreConversation {
-	return {
-		...conversation,
-		createdAt: toFrontendDate(conversation.createdAt, 'conversation.createdAt'),
-		modifiedAt: toFrontendDate(conversation.modifiedAt, 'conversation.modifiedAt'),
-		messages: requireWailsArray<wailsSpec.ConversationMessage>(conversation.messages, 'conversation.messages').map(
-			(message, index) =>
-				Object.assign(message, {
-					createdAt: toFrontendDate(message.createdAt, `conversation.messages[${index}].createdAt`),
-					role: enumFromWails(message.role, RoleEnum, `conversation.messages[${index}].role`),
-					status: enumFromWails(message.status, Status, `conversation.messages[${index}].status`),
-				})
-		),
-	} as StoreConversation;
 }
 
 function mapConversationsToSearchItems(conversations: Array<wailsSpec.ConversationListItem>): ConversationSearchItem[] {

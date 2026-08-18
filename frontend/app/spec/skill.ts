@@ -79,14 +79,14 @@ export interface SkillBundleView {
 	displayName: string;
 	description?: string;
 	enabled: boolean;
-	retiredAt?: Date;
+	retiredAt?: string;
 	logicalName: string;
 	logicalVersion?: string;
 	labels?: Record<string, string>;
 	managedSourceID?: ArtifactSourceID;
 	attachments: SkillBundleAttachmentView[];
-	createdAt: Date;
-	modifiedAt: Date;
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface RetireSkillBundleResult {
@@ -106,8 +106,8 @@ export interface SkillArtifactView {
 	binding: ArtifactSourceBinding;
 	definitionDigest?: ArtifactDigest;
 	diagnostics?: ArtifactDiagnostic[];
-	createdAt: Date;
-	modifiedAt: Date;
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface CreateSkillBundleBody {
@@ -257,7 +257,7 @@ interface SkillResourceSummary {
 }
 
 export interface RuntimeSkillListItem {
-	artifact: ArtifactRef;
+	skillRef: ArtifactRef;
 	name?: string;
 	displayName?: string;
 	type?: string;
@@ -337,9 +337,9 @@ export enum SkillPresenceStatus {
 
 interface SkillPresence {
 	status: SkillPresenceStatus;
-	lastCheckedAt?: Date;
-	lastSeenAt?: Date;
-	missingSince?: Date;
+	lastCheckedAt?: string;
+	lastSeenAt?: string;
+	missingSince?: string;
 	lastCheckError?: string;
 }
 
@@ -381,8 +381,8 @@ export interface Skill {
 	adoption: ArtifactAdoptionMode;
 	state: ArtifactState;
 	diagnostics?: ArtifactDiagnostic[];
-	createdAt: Date;
-	modifiedAt: Date;
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface SkillBundle {
@@ -400,8 +400,8 @@ export interface SkillBundle {
 	isEnabled: boolean;
 	isBuiltIn: boolean;
 	attachments: SkillBundleAttachmentView[];
-	createdAt: Date;
-	modifiedAt: Date;
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface SkillListItem {

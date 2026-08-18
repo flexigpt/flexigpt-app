@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -245,13 +244,6 @@ func wantErrContains(t *testing.T, err error, substr string) {
 	}
 	if !strings.Contains(err.Error(), substr) {
 		t.Fatalf("expected error containing %q, got %v", substr, err)
-	}
-}
-
-func PrintJSON(v any) {
-	p, err := json.MarshalIndent(v, "", "")
-	if err == nil {
-		fmt.Print("request params", "json", string(p))
 	}
 }
 

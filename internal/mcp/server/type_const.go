@@ -203,22 +203,18 @@ type ServerDefinitionBody struct {
 }
 
 type Resolved struct {
-	Server     artifact.ArtifactRef
-	Collection collection.CollectionRef
-
-	ArtifactRevision uint64
-	CatalogRevision  uint64
-
-	DefinitionDigest    cryptoutil.Digest
-	SourceContentDigest cryptoutil.Digest
-	SourceGeneration    string
-
-	Document     ServerDocument
-	Installation ServerData
-	Policy       policy.Effective
-
-	InstallationRevision uint64
-	RuntimeEnabled       bool
-	BuiltIn              bool
-	Version              cryptoutil.Digest
+	Server               artifact.ArtifactRef     `json:"server"`
+	Collection           collection.CollectionRef `json:"collection"`
+	ArtifactRevision     uint64                   `json:"artifactRevision"`
+	CatalogRevision      uint64                   `json:"catalogRevision"`
+	DefinitionDigest     cryptoutil.Digest        `json:"definitionDigest"`
+	SourceContentDigest  cryptoutil.Digest        `json:"sourceContentDigest"`
+	SourceGeneration     string                   `json:"sourceGeneration"`
+	Document             ServerDocument           `json:"document"`
+	Installation         ServerData               `json:"installation"`
+	Policy               policy.Effective         `json:"policy"`
+	InstallationRevision uint64                   `json:"installationRevision"`
+	RuntimeEnabled       bool                     `json:"runtimeEnabled"`
+	BuiltIn              bool                     `json:"builtIn"`
+	Version              cryptoutil.Digest        `json:"version"`
 }

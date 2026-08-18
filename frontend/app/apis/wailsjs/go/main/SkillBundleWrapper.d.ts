@@ -3,32 +3,32 @@
 import {bundle} from '../models';
 import {artifact} from '../models';
 import {collection} from '../models';
-import {runtime} from '../models';
+import {skillruntime} from '../models';
 import {basespec} from '../models';
 
 export function AdoptSkill(arg1:bundle.AdoptSkillRequest):Promise<artifact.Artifact>;
 
 export function AttachSkillSource(arg1:collection.CollectionRef,arg2:number,arg3:bundle.AttachmentDraft):Promise<bundle.Bundle>;
 
-export function CloseSkillSession(arg1:runtime.CloseSkillSessionRequest):Promise<runtime.CloseSkillSessionResponse>;
+export function CloseSkillSession(arg1:skillruntime.CloseSkillSessionRequest):Promise<skillruntime.CloseSkillSessionResponse>;
 
 export function CreateManagedSkill(arg1:bundle.CreateManagedSkillRequest):Promise<bundle.CreateManagedSkillResponse>;
 
 export function CreateSkillBundle(arg1:bundle.CreateBundleRequest):Promise<bundle.Bundle>;
 
-export function CreateSkillSession(arg1:runtime.CreateSkillSessionRequest):Promise<runtime.CreateSkillSessionResponse>;
+export function CreateSkillSession(arg1:skillruntime.CreateSkillSessionRequest):Promise<skillruntime.CreateSkillSessionResponse>;
 
 export function GetManagedSkillDocument(arg1:artifact.ArtifactRef):Promise<bundle.ManagedSkillDocument>;
 
 export function GetSkillBundle(arg1:collection.CollectionRef):Promise<bundle.Bundle>;
 
-export function GetSkillsPrompt(arg1:runtime.GetSkillsPromptRequest):Promise<runtime.GetSkillsPromptResponse>;
+export function GetSkillsPrompt(arg1:skillruntime.GetSkillsPromptRequest):Promise<skillruntime.GetSkillsPromptResponse>;
 
-export function InvokeSkillTool(arg1:runtime.InvokeSkillToolRequest):Promise<runtime.InvokeSkillToolResponse>;
+export function InvokeSkillTool(arg1:skillruntime.InvokeSkillToolRequest):Promise<skillruntime.InvokeSkillToolResponse>;
 
 export function ListBundleSkills(arg1:collection.CollectionRef):Promise<Array<artifact.Artifact>>;
 
-export function ListRuntimeSkills(arg1:runtime.ListRuntimeSkillsRequest):Promise<runtime.ListRuntimeSkillsResponse>;
+export function ListRuntimeSkills(arg1:skillruntime.ListRuntimeSkillsRequest):Promise<skillruntime.ListRuntimeSkillsResponse>;
 
 export function ListSkillBundles(arg1:basespec.RootID):Promise<Array<bundle.Bundle>>;
 
@@ -40,7 +40,7 @@ export function PurgeSkillBundle(arg1:collection.CollectionRef,arg2:number):Prom
 
 export function RefreshSkillBundle(arg1:collection.CollectionRef):Promise<void>;
 
-export function RenderSkill(arg1:runtime.RenderSkillRequest):Promise<runtime.RenderSkillResponse>;
+export function RenderSkill(arg1:skillruntime.RenderSkillRequest):Promise<skillruntime.RenderSkillResponse>;
 
 export function RetireSkillBundle(arg1:collection.CollectionRef,arg2:number):Promise<collection.Collection>;
 

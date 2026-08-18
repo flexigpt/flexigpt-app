@@ -16,7 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/skill/skillruntime"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
@@ -95,7 +95,7 @@ func (a *toolSelectionLookupAdapter) GetToolSummaryForSelection(
 }
 
 type skillLookupAdapter struct {
-	runtime *skillRuntime.SkillRuntime
+	runtime *skillruntime.SkillRuntime
 }
 
 func (a *skillLookupAdapter) GetSkillSummaryForSelection(
@@ -163,7 +163,7 @@ type mcpContextLookupAdapter struct {
 func NewAssistantPresetReferenceLookups(
 	modelPresetSt *modelpresetStore.ModelPresetStore,
 	toolSt *toolStore.ToolStore,
-	skillRt *skillRuntime.SkillRuntime,
+	skillRt *skillruntime.SkillRuntime,
 	mcpResolver MCPServerResolver,
 	mcpDiscovery MCPDiscoveryLookup,
 ) assistantpresetStore.ReferenceLookups {

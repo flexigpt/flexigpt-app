@@ -107,8 +107,8 @@ type ManagedSkillDocument struct {
 }
 
 type Bundle struct {
-	Collection  collection.Collection
-	Data        CollectionData
-	Attachments []collection.Attachment
-	Sources     []source.Summary
+	Collection  collection.Collection   `json:"collection"`
+	Data        CollectionData          `json:"data"`
+	Attachments []collection.Attachment `json:"attachments"`
+	Sources     []source.Summary        `json:"sources"`
 }

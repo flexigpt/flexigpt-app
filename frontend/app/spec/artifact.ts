@@ -28,11 +28,6 @@ export type ArtifactLocator = string;
 export type ArtifactDigest = string;
 type ArtifactSourceGeneration = string;
 
-/**
- * Write-only adapter configuration. It is never returned by Source APIs.
- */
-type ArtifactSourceConfig = JSONRawString;
-
 export enum ArtifactAdoptionMode {
 	Observed = 'observed',
 	Pinned = 'pinned',
@@ -101,9 +96,9 @@ export interface ArtifactRoot {
 	displayName: string;
 	description?: string;
 	revision: number;
-	createdAt: Date;
-	modifiedAt: Date;
-	retiredAt?: Date;
+	createdAt: string;
+	modifiedAt: string;
+	retiredAt?: string;
 }
 
 export interface ArtifactCollection {
@@ -114,9 +109,9 @@ export interface ArtifactCollection {
 	description?: string;
 	enabled: boolean;
 	revision: number;
-	createdAt: Date;
-	modifiedAt: Date;
-	retiredAt?: Date;
+	createdAt: string;
+	modifiedAt: string;
+	retiredAt?: string;
 }
 
 export interface ArtifactCollectionAttachment {
@@ -126,8 +121,8 @@ export interface ArtifactCollectionAttachment {
 	role: ArtifactAttachmentRole;
 	enabled: boolean;
 	revision: number;
-	createdAt: Date;
-	modifiedAt: Date;
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface ArtifactRecord {
@@ -143,8 +138,8 @@ export interface ArtifactRecord {
 	state: ArtifactState;
 	diagnostics?: ArtifactDiagnostic[];
 	revision: number;
-	createdAt: Date;
-	modifiedAt: Date;
+	createdAt: string;
+	modifiedAt: string;
 }
 
 export interface CreateArtifactRootBody {
@@ -169,18 +164,18 @@ export interface ArtifactSourceSummary {
 	displayName: string;
 	enabled: boolean;
 	revision: number;
-	createdAt: Date;
-	modifiedAt: Date;
-	retiredAt?: Date;
+	createdAt: string;
+	modifiedAt: string;
+	retiredAt?: string;
 }
 
-export interface CreateArtifactSourceBody {
+export interface ArtifactSourceDraft {
 	id: ArtifactSourceID;
 	storageKey: ArtifactStorageKey;
 	kind: ArtifactSourceKind;
 	displayName: string;
 	enabled: boolean;
-	config: ArtifactSourceConfig;
+	config: JSONRawString;
 }
 
 export interface UpdateArtifactSourceBody {
@@ -192,7 +187,7 @@ export interface UpdateArtifactSourceBody {
 	 * Omitting config preserves the private existing source configuration.
 	 * Providing config replaces it atomically after adapter normalization.
 	 */
-	config?: ArtifactSourceConfig;
+	config?: JSONRawString;
 }
 
 /**

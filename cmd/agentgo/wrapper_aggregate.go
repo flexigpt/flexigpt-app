@@ -25,7 +25,7 @@ import (
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
-	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/skill/skillruntime"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
@@ -42,7 +42,7 @@ type AggregrateWrapper struct {
 	modelPresetStore *modelpresetStore.ModelPresetStore
 	settingStore     *settingStore.SettingStore
 	toolStore        *toolStore.ToolStore
-	skillRuntime     *skillRuntime.SkillRuntime
+	skillRuntime     *skillruntime.SkillRuntime
 	providersetAPI   *inferencewrapper.ProviderSetAPI
 
 	appContext          context.Context
@@ -56,7 +56,7 @@ func InitAggregrateWrapper(
 	mps *modelpresetStore.ModelPresetStore,
 	ss *settingStore.SettingStore,
 	ts *toolStore.ToolStore,
-	skillRt *skillRuntime.SkillRuntime,
+	skillRt *skillruntime.SkillRuntime,
 	mr *mcpRuntime.MCPRuntimeManager,
 	workspaceAPI *workspace.API,
 ) error {

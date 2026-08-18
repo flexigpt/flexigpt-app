@@ -31,7 +31,7 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 			isOpen={isOpen}
 			onClose={onClose}
 			title="Skill Bundle Details"
-			modalKey={`skill-bundle:${bundle.id}:${String(bundle.modifiedAt)}`}
+			modalKey={`skill-bundle:${bundle.id}:${bundle.modifiedAt}`}
 		>
 			<ModalSection title="Bundle metadata">
 				<ManagementInfoGrid>
@@ -51,8 +51,8 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 					<ManagementInfoRow label="Description">
 						<span className="whitespace-pre-wrap">{bundle.description || '—'}</span>
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Created">{String(bundle.createdAt)}</ManagementInfoRow>
-					<ManagementInfoRow label="Modified">{String(bundle.modifiedAt)}</ManagementInfoRow>
+					<ManagementInfoRow label="Created">{bundle.createdAt}</ManagementInfoRow>
+					<ManagementInfoRow label="Modified">{bundle.modifiedAt}</ManagementInfoRow>
 				</ManagementInfoGrid>
 			</ModalSection>
 

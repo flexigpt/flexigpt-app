@@ -133,7 +133,7 @@ export function AssistantPresetBundleEditModal(props: AssistantPresetBundleEditM
 	return (
 		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} blockCancel>
 			<AssistantPresetBundleEditModalContent
-				key={`${props.bundle.id}:${String(props.bundle.modifiedAt)}`}
+				key={`${props.bundle.id}:${props.bundle.modifiedAt}`}
 				{...props}
 				bundle={props.bundle}
 			/>

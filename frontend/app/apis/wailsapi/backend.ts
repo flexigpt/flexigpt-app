@@ -4,13 +4,7 @@ import { sprintf } from 'sprintf-js';
 import type { Attachment, DirectoryAttachmentsResult, FileFilter, PathAttachmentsResult } from '@/spec/attachment';
 
 import type { IBackendAPI, ILogger } from '@/apis/interface';
-import {
-	attachmentFromWails,
-	directoryAttachmentsResultFromWails,
-	pathAttachmentsResultFromWails,
-	requireNonBlankString,
-	requireWailsArray,
-} from '@/apis/wailsapi/transport';
+import { requireNonBlankString, requireWailsArray } from '@/apis/wailsapi/transport';
 import {
 	GetAppVersion,
 	GetPathsAsAttachments,
@@ -200,7 +194,7 @@ export class WailsBackendAPI implements IBackendAPI {
 	async openURLAsAttachment(rawURL: string): Promise<Attachment | undefined> {
 		try {
 			const att = await OpenURLAsAttachment(rawURL);
-			return attachmentFromWails(att, 'OpenURLAsAttachment');
+			return att as Attachment;
 		} catch (err) {
 			console.error('Error opening URL as attachment:', err);
 		}
@@ -216,18 +210,16 @@ export class WailsBackendAPI implements IBackendAPI {
 		additionalFilters?: Array<FileFilter>
 	): Promise<Attachment[]> {
 		const attachments = await OpenMultipleFilesAsAttachments(allowMultiple, additionalFilters ?? []);
-		return requireWailsArray(attachments, 'OpenMultipleFilesAsAttachments').map((attachment, index) =>
-			attachmentFromWails(attachment, `OpenMultipleFilesAsAttachments[${index}]`)
-		);
+		return requireWailsArray(attachments, 'OpenMultipleFilesAsAttachments');
 	}
 
 	async openDirectoryAsAttachments(maxFiles: number): Promise<DirectoryAttachmentsResult> {
 		const result = await OpenDirectoryAsAttachments(maxFiles);
-		return directoryAttachmentsResultFromWails(result, 'OpenDirectoryAsAttachments');
+		return result as DirectoryAttachmentsResult;
 	}
 
 	async getPathsAsAttachments(paths: string[], maxFilesPerDir: number): Promise<PathAttachmentsResult> {
 		const pathResults = await GetPathsAsAttachments(paths, maxFilesPerDir);
-		return pathAttachmentsResultFromWails(pathResults, 'GetPathsAsAttachments');
+		return pathResults as PathAttachmentsResult;
 	}
 }

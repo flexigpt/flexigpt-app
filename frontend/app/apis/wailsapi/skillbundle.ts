@@ -1,5 +1,5 @@
 import type { ArtifactAddress, ArtifactDiagnostic, ArtifactRef, ArtifactRootID } from '@/spec/artifact';
-import { ArtifactAdoptionMode, ArtifactDiagnosticSeverity, ArtifactState } from '@/spec/artifact';
+import { ArtifactAdoptionMode, ArtifactState } from '@/spec/artifact';
 import type {
 	AdoptSkillBody,
 	AttachSkillBundleSourceBody,
@@ -18,21 +18,16 @@ import type {
 	SkillArtifactView,
 	SkillBundleRef,
 	SkillBundleView,
+	SkillDocumentInput,
 	SkillSession,
 	UpdateSkillBundleBody,
 } from '@/spec/skill';
-import { SkillBundleAttachmentRole, SkillInsert } from '@/spec/skill';
+import { SkillBundleAttachmentRole } from '@/spec/skill';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 import type { ISkillBundleAPI } from '@/apis/interface';
-import {
-	byteArrayToWails,
-	enumFromWails,
-	rawJSONToWails,
-	requireWailsBody,
-	toFrontendDate,
-} from '@/apis/wailsapi/transport';
+import { byteArrayToWails, enumFromWails, rawJSONToWails, requireWailsBody } from '@/apis/wailsapi/transport';
 import {
 	AdoptSkill,
 	AttachSkillSource,
@@ -57,71 +52,7 @@ import {
 	UnadoptSkill,
 	UpdateSkillBundle,
 } from '@/apis/wailsjs/go/main/SkillBundleWrapper';
-import type {
-	artifact as wailsArtifact,
-	bundle as wailsSkillBundle,
-	runtime as wailsSkillRuntime,
-	spec as wailsSpec,
-} from '@/apis/wailsjs/go/models';
-
-function optionalFrontendDate(value: unknown, field: string): Date | undefined {
-	if (value === undefined || value === null || value === '') {
-		return undefined;
-	}
-
-	return toFrontendDate(value, field);
-}
-
-function diagnosticsFromWails(diagnostics: wailsArtifact.Artifact['diagnostics']): ArtifactDiagnostic[] | undefined {
-	return diagnostics?.map(diagnostic => ({
-		severity: enumFromWails(diagnostic.severity, ArtifactDiagnosticSeverity, 'skillArtifact.diagnostic.severity'),
-		code: diagnostic.code,
-		message: diagnostic.message,
-		...(diagnostic.location === undefined
-			? {}
-			: {
-					location: {
-						// oxlint-disable-next-line typescript/no-misused-spread
-						...diagnostic.location,
-					},
-				}),
-	}));
-}
-
-function skillBundleFromWails(bundle: wailsSkillBundle.Bundle): SkillBundleView {
-	const collection = bundle.Collection;
-	const sourcesByID = new Map(bundle.Sources.map(source => [source.id, source]));
-
-	return {
-		bundle: {
-			rootID: collection.rootID,
-			collectionID: collection.id,
-		},
-		revision: collection.revision,
-		displayName: collection.displayName,
-		description: collection.description ?? undefined,
-		enabled: collection.enabled,
-		retiredAt: optionalFrontendDate(collection.retiredAt, 'skillBundle.retiredAt'),
-		logicalName: bundle.Data.logicalName,
-		logicalVersion: bundle.Data.logicalVersion ?? undefined,
-		labels: bundle.Data.labels ?? undefined,
-		managedSourceID: bundle.Data.managedSourceID ?? undefined,
-		attachments: bundle.Attachments.map(attachment => {
-			const source = sourcesByID.get(attachment.sourceID);
-
-			return {
-				sourceID: attachment.sourceID,
-				revision: attachment.revision,
-				role: enumFromWails(attachment.role, SkillBundleAttachmentRole, 'skillBundle.attachment.role'),
-				enabled: attachment.enabled,
-				sourceDisplayName: source?.displayName,
-				sourceKind: source?.kind,
-			};
-		}),
-		createdAt: toFrontendDate(collection.createdAt, 'skillBundle.createdAt'),
-		modifiedAt: toFrontendDate(collection.modifiedAt, 'skillBundle.modifiedAt'),
-	};
-}
+import type { artifact as wailsArtifact, bundle as wailsSkillBundle } from '@/apis/wailsjs/go/models';
 
 function skillArtifactFromWails(artifact: wailsArtifact.Artifact): SkillArtifactView {
 	const ref: ArtifactRef = {
@@ -146,69 +77,45 @@ function skillArtifactFromWails(artifact: wailsArtifact.Artifact): SkillArtifact
 		state: enumFromWails(artifact.state, ArtifactState, 'skillArtifact.state'),
 		binding: artifact.binding,
 		definitionDigest: artifact.resolvedDefinition ?? undefined,
-		diagnostics: diagnosticsFromWails(artifact.diagnostics),
-		createdAt: toFrontendDate(artifact.createdAt, 'skillArtifact.createdAt'),
-		modifiedAt: toFrontendDate(artifact.modifiedAt, 'skillArtifact.modifiedAt'),
+		diagnostics: artifact.diagnostics as ArtifactDiagnostic[],
+		createdAt: artifact.createdAt,
+		modifiedAt: artifact.modifiedAt,
 	};
 }
 
-function skillDocumentFromWails(document: wailsSpec.SkillDocument): ManagedSkillDocumentView['document'] {
+function skillBundleFromWails(bundle: wailsSkillBundle.Bundle): SkillBundleView {
+	const collection = bundle.collection;
+	const sourcesByID = new Map(bundle.sources.map(source => [source.id, source]));
+
 	return {
-		name: document.name,
-		displayName: document.displayName ?? undefined,
-		description: document.description,
-		insert: enumFromWails(document.insert, SkillInsert, 'managedSkill.document.insert'),
-		arguments: (document.arguments ?? []).map(argument => ({
-			name: argument.name,
-			description: argument.description ?? undefined,
-			default: argument.default ?? undefined,
-		})),
-		tags: document.tags ?? undefined,
-		markdownBody: document.markdownBody,
-		rawFrontmatter: document.rawFrontmatter ?? undefined,
+		bundle: {
+			rootID: collection.rootID,
+			collectionID: collection.id,
+		},
+		revision: collection.revision,
+		displayName: collection.displayName,
+		description: collection.description ?? undefined,
+		enabled: collection.enabled,
+		retiredAt: collection.retiredAt,
+		logicalName: bundle.data.logicalName,
+		logicalVersion: bundle.data.logicalVersion ?? undefined,
+		labels: bundle.data.labels ?? undefined,
+		managedSourceID: bundle.data.managedSourceID ?? undefined,
+		attachments: bundle.attachments.map(attachment => {
+			const source = sourcesByID.get(attachment.sourceID);
+
+			return {
+				sourceID: attachment.sourceID,
+				revision: attachment.revision,
+				role: enumFromWails(attachment.role, SkillBundleAttachmentRole, 'skillBundle.attachment.role'),
+				enabled: attachment.enabled,
+				sourceDisplayName: source?.displayName,
+				sourceKind: source?.kind,
+			};
+		}),
+		createdAt: collection.createdAt,
+		modifiedAt: collection.modifiedAt,
 	};
-}
-
-function runtimeFilterToWails(filter?: RuntimeSkillFilter): wailsSkillRuntime.RuntimeSkillFilter | undefined {
-	if (!filter) {
-		return undefined;
-	}
-
-	return {
-		types: filter.types,
-		inserts: filter.inserts,
-		locationPrefix: filter.locationPrefix,
-		allowArtifacts: filter.allowArtifacts,
-		sessionID: filter.sessionID,
-		activity: filter.activity,
-	} as wailsSkillRuntime.RuntimeSkillFilter;
-}
-
-function runtimeSkillFromWails(item: wailsSkillRuntime.RuntimeSkillListItem): RuntimeSkillListItem {
-	return {
-		artifact: item.skillRef,
-		type: item.type ?? undefined,
-		name: item.name ?? undefined,
-		displayName: item.displayName ?? undefined,
-		description: item.description ?? undefined,
-		definitionDigest: item.digest ?? undefined,
-		insert: item.insert === undefined ? undefined : enumFromWails(item.insert, SkillInsert, 'runtimeSkill.insert'),
-		arguments: item.arguments ?? undefined,
-		sourceTags: item.sourceTags ?? undefined,
-		resources: item.resources,
-		rawFrontmatter: item.rawFrontmatter ?? undefined,
-		warnings: item.warnings ?? undefined,
-		isActive: item.isActive ?? undefined,
-		errorMessage: item.errorMessage ?? undefined,
-	};
-}
-
-function renderSkillFromWails(response: wailsSkillRuntime.RenderSkillResponseBody): RenderSkillResponse {
-	return {
-		// oxlint-disable-next-line typescript/no-misused-spread
-		...response,
-		insert: enumFromWails(response.insert, SkillInsert, 'renderSkill.insert'),
-	} as RenderSkillResponse;
 }
 
 export class WailsSkillBundleAPI implements ISkillBundleAPI {
@@ -334,7 +241,7 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 
 		return {
 			artifact: skillArtifactFromWails(result.Artifact),
-			document: skillDocumentFromWails(result.Document),
+			document: result.Document as SkillDocumentInput,
 		};
 	}
 
@@ -387,7 +294,7 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 	async getSkillsPrompt(filter: RuntimeSkillFilter): Promise<string> {
 		const response = await GetSkillsPrompt({
 			Body: {
-				filter: runtimeFilterToWails(filter),
+				filter: filter,
 			},
 		} as Parameters<typeof GetSkillsPrompt>[0]);
 
@@ -420,13 +327,11 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 	async listRuntimeSkills(filter: RuntimeSkillFilter): Promise<RuntimeSkillListItem[]> {
 		const response = await ListRuntimeSkills({
 			Body: {
-				filter: runtimeFilterToWails(filter),
+				filter: filter,
 			},
 		} as Parameters<typeof ListRuntimeSkills>[0]);
 
-		return (requireWailsBody(response.Body, 'ListRuntimeSkills').skills ?? []).map(s => {
-			return runtimeSkillFromWails(s);
-		});
+		return (requireWailsBody(response.Body, 'ListRuntimeSkills').skills as RuntimeSkillListItem[]) ?? [];
 	}
 
 	async invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse> {
@@ -449,6 +354,6 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 			},
 		} as Parameters<typeof RenderSkill>[0]);
 
-		return renderSkillFromWails(requireWailsBody(response.Body, 'RenderSkill'));
+		return requireWailsBody(response.Body, 'RenderSkill') as RenderSkillResponse;
 	}
 }

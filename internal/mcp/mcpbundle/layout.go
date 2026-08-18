@@ -1,4 +1,4 @@
-package bundle
+package mcpbundle
 
 import (
 	"fmt"

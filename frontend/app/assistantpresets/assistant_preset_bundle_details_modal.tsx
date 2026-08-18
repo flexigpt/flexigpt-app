@@ -22,7 +22,7 @@ export function AssistantPresetBundleDetailsModal({ isOpen, onClose, bundle }: A
 			isOpen={isOpen}
 			onClose={onClose}
 			title="Assistant Preset Bundle Details"
-			modalKey={`assistant-preset-bundle:${bundle.id}:${String(bundle.modifiedAt)}`}
+			modalKey={`assistant-preset-bundle:${bundle.id}:${bundle.modifiedAt}`}
 		>
 			<ManagementInfoGrid>
 				<ManagementInfoRow label="Display Name">{bundle.displayName || '—'}</ManagementInfoRow>

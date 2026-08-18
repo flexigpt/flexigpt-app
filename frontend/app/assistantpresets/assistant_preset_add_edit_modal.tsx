@@ -1763,7 +1763,7 @@ export function AddEditAssistantPresetModal(props: AddEditAssistantPresetModalPr
 	}
 
 	const remountKey = props.initialData
-		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.preset.id}:${props.initialData.preset.version}:${String(props.initialData.preset.modifiedAt)}`
+		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.preset.id}:${props.initialData.preset.version}:${props.initialData.preset.modifiedAt}`
 		: `${props.mode ?? 'auto'}:new`;
 	const effectiveMode = props.mode ?? (props.initialData ? 'edit' : 'add');
 

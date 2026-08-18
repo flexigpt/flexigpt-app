@@ -15,10 +15,11 @@ type Attachment struct {
 	SourceID     basespec.SourceID       `json:"sourceID"`
 	Role         basespec.AttachmentRole `json:"role"`
 	Enabled      bool                    `json:"enabled"`
-	Data         json.RawMessage         `json:"-"`
 	Revision     uint64                  `json:"revision"`
 	CreatedAt    time.Time               `json:"createdAt"`
 	ModifiedAt   time.Time               `json:"modifiedAt"`
+
+	Data json.RawMessage `json:"-"`
 }
 
 func (a Attachment) Validate() error {

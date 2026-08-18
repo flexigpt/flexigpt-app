@@ -1,4 +1,4 @@
-package schemaadapter
+package mcpschemaadapter
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/bundle"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/mcpbundle"
 )
 
 type ArtifactRegistration struct {
@@ -57,7 +57,7 @@ func (r Registry) Validate() error {
 		); err != nil {
 			return fmt.Errorf("bundles[%d]: %w", index, err)
 		}
-		if err := bundle.ValidateDocumentLocator(
+		if err := mcpbundle.ValidateDocumentLocator(
 			registered.EmbeddedDocumentLocator,
 		); err != nil {
 			return fmt.Errorf("bundles[%d]: %w", index, err)
@@ -171,10 +171,10 @@ func (r Registry) OrderedBundles() []BundleRegistration {
 	return output
 }
 
-func (r BundleRegistration) ToBundleRegistrations() []bundle.Registration {
-	output := make([]bundle.Registration, 0, len(r.Artifacts))
+func (r BundleRegistration) ToBundleRegistrations() []mcpbundle.Registration {
+	output := make([]mcpbundle.Registration, 0, len(r.Artifacts))
 	for _, value := range r.Artifacts {
-		output = append(output, bundle.Registration{
+		output = append(output, mcpbundle.Registration{
 			ArtifactID:  value.ID,
 			Subresource: value.Subresource,
 			Kind:        value.Kind,

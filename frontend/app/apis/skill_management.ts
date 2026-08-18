@@ -1,6 +1,5 @@
 import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
-import { ArtifactAdoptionMode, ArtifactState } from '@/spec/artifact';
-import { newArtifactStorageKey } from '@/spec/artifact';
+import { ArtifactAdoptionMode, ArtifactState, newArtifactStorageKey } from '@/spec/artifact';
 import type {
 	ManagedSkillDocumentView,
 	RenderSkillResponse,
@@ -205,7 +204,7 @@ export class SkillManagementAPI {
 						const runtime = await this.skills.listRuntimeSkills({
 							allowArtifacts: [artifact.artifact],
 						});
-						const item = runtime.find(value => artifactRefKey(value.artifact) === artifactRefKey(artifact.artifact));
+						const item = runtime.find(value => artifactRefKey(value.skillRef) === artifactRefKey(artifact.artifact));
 						if (item) {
 							runtimeByArtifact.set(artifactRefKey(artifact.artifact), item);
 						}
@@ -313,7 +312,7 @@ export class SkillManagementAPI {
 			enabled: input.isEnabled,
 		});
 		return toSkill(bundle, resp.artifact, {
-			artifact: resp.artifact.artifact,
+			skillRef: resp.artifact.artifact,
 			name: input.name,
 			displayName: input.displayName || input.name,
 			description: input.description,

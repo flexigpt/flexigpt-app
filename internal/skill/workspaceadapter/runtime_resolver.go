@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/skill/skillruntime"
 )
 
 // RuntimeResolver adapts Workspace-owned Artifact projection to the generic
@@ -32,10 +32,10 @@ func NewRuntimeResolver(adapter *Adapter) (*RuntimeResolver, error) {
 func (r *RuntimeResolver) ResolveArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (skillRuntime.ResolvedArtifactSkill, error) {
+) (skillruntime.ResolvedArtifactSkill, error) {
 	value, err := r.adapter.LoadArtifact(ctx, ref)
 	if err != nil {
-		return skillRuntime.ResolvedArtifactSkill{}, err
+		return skillruntime.ResolvedArtifactSkill{}, err
 	}
 	return workspaceResolvedArtifactSkill(value)
 }
@@ -43,7 +43,7 @@ func (r *RuntimeResolver) ResolveArtifactSkill(
 func (r *RuntimeResolver) ListCollectionSkills(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-) ([]skillRuntime.ResolvedArtifactSkill, error) {
+) ([]skillruntime.ResolvedArtifactSkill, error) {
 	values, err := r.adapter.List(ctx, workspace)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (r *RuntimeResolver) ListCollectionSkills(
 		refs = append(refs, value.Artifact)
 	}
 	if len(refs) == 0 {
-		return []skillRuntime.ResolvedArtifactSkill{}, nil
+		return []skillruntime.ResolvedArtifactSkill{}, nil
 	}
 
 	plan, err := r.adapter.Load(ctx, workspace, refs)
@@ -77,7 +77,7 @@ func (r *RuntimeResolver) ListCollectionSkills(
 		)
 	}
 
-	output := make([]skillRuntime.ResolvedArtifactSkill, 0, len(plan.Skills))
+	output := make([]skillruntime.ResolvedArtifactSkill, 0, len(plan.Skills))
 	for _, value := range plan.Skills {
 		projected, err := workspaceResolvedArtifactSkill(value)
 		if err != nil {
@@ -90,7 +90,7 @@ func (r *RuntimeResolver) ListCollectionSkills(
 
 func workspaceResolvedArtifactSkill(
 	value WorkspaceSkill,
-) (skillRuntime.ResolvedArtifactSkill, error) {
+) (skillruntime.ResolvedArtifactSkill, error) {
 	if !value.ProjectionValid ||
 		!value.RuntimePathBacked ||
 		!value.WorkspaceEnabled ||
@@ -98,7 +98,7 @@ func workspaceResolvedArtifactSkill(
 		!value.Skill.IsEnabled ||
 		value.RuntimeDisabled ||
 		value.State != artifact.StateAvailable {
-		return skillRuntime.ResolvedArtifactSkill{}, fmt.Errorf(
+		return skillruntime.ResolvedArtifactSkill{}, fmt.Errorf(
 			"%w: Workspace Skill is not eligible for runtime registration",
 			basespec.ErrCatalogStale,
 		)
@@ -109,7 +109,7 @@ func workspaceResolvedArtifactSkill(
 		value.SourceGeneration + "\x00" +
 		strconv.FormatUint(value.ArtifactRevision, 10)
 
-	output := skillRuntime.ResolvedArtifactSkill{
+	output := skillruntime.ResolvedArtifactSkill{
 		Artifact:   value.Artifact,
 		Collection: value.Workspace,
 		Definition: agentskillsSpec.SkillDef{
@@ -122,7 +122,7 @@ func workspaceResolvedArtifactSkill(
 		),
 	}
 	if err := output.Validate(); err != nil {
-		return skillRuntime.ResolvedArtifactSkill{}, err
+		return skillruntime.ResolvedArtifactSkill{}, err
 	}
 	return output, nil
 }

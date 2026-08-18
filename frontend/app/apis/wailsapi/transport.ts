@@ -1,9 +1,4 @@
-import type { Attachment, DirectoryAttachmentsResult, PathAttachmentsResult } from '@/spec/attachment';
-import { AttachmentContentBlockKind, AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
-
 import type { JSONRawString, JSONSchema } from '@/lib/jsonschema_utils';
-
-export type WailsObject = Record<string, unknown>;
 
 const DEFAULT_MAX_PAGES = 1_000;
 
@@ -25,14 +20,6 @@ export function enumFromWails<T extends string>(value: unknown, enumValues: Reco
 	return value as T;
 }
 
-export function requireWailsObject(value: unknown, field: string): WailsObject {
-	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-		throw new Error(`${field} returned an invalid object.`);
-	}
-
-	return value as WailsObject;
-}
-
 export function requireWailsArray<T = unknown>(value: unknown, field: string): T[] {
 	if (!Array.isArray(value)) {
 		throw new TypeError(`${field} returned an invalid array.`);
@@ -41,41 +28,9 @@ export function requireWailsArray<T = unknown>(value: unknown, field: string): T
 	return value as T[];
 }
 
-export function optionalWailsArray(value: unknown, field: string): unknown[] | undefined {
-	if (value === undefined || value === null) {
-		return undefined;
-	}
-
-	return requireWailsArray(value, field);
-}
-
 export function requireWailsString(value: unknown, field: string): string {
 	if (typeof value !== 'string') {
 		throw new TypeError(`${field} returned an invalid string.`);
-	}
-
-	return value;
-}
-
-export function optionalWailsString(value: unknown, field: string): string | undefined {
-	if (value === undefined || value === null) {
-		return undefined;
-	}
-
-	return requireWailsString(value, field);
-}
-
-export function requireWailsBoolean(value: unknown, field: string): boolean {
-	if (typeof value !== 'boolean') {
-		throw new TypeError(`${field} returned an invalid boolean.`);
-	}
-
-	return value;
-}
-
-export function requireWailsNumber(value: unknown, field: string): number {
-	if (typeof value !== 'number' || !Number.isFinite(value)) {
-		throw new TypeError(`${field} returned an invalid number.`);
 	}
 
 	return value;
@@ -145,33 +100,6 @@ export function throwIfAborted(signal?: AbortSignal): void {
 	if (signal?.aborted) {
 		throw createAbortError();
 	}
-}
-
-export function toFrontendTimestamp(value: unknown, field: string): string {
-	return toFrontendDate(value, field).toISOString();
-}
-
-export function toFrontendDate(value: unknown, field: string): Date {
-	if (value instanceof Date) {
-		return value;
-	}
-
-	if (typeof value === 'string' || typeof value === 'number') {
-		const date = new Date(value);
-		if (!Number.isNaN(date.getTime())) {
-			return date;
-		}
-	}
-
-	throw new Error(`Invalid date received for ${field}.`);
-}
-
-export function optionalFrontendDate(value: unknown, field: string): Date | undefined {
-	if (value === undefined || value === null || value === '') {
-		return undefined;
-	}
-
-	return toFrontendDate(value, field);
 }
 
 /**
@@ -278,108 +206,4 @@ export function byteArrayToWails(value: Uint8Array): number[] {
 	}
 
 	return [...value];
-}
-
-function attachmentFileRefFromWails(value: unknown, field: string): NonNullable<Attachment['fileRef']> {
-	const ref = requireWailsObject(value, field);
-
-	return {
-		path: requireWailsString(ref.path, `${field}.path`),
-		name: requireWailsString(ref.name, `${field}.name`),
-		exists: requireWailsBoolean(ref.exists, `${field}.exists`),
-		isDir: requireWailsBoolean(ref.isDir, `${field}.isDir`),
-		size: ref.size === undefined ? undefined : requireWailsNumber(ref.size, `${field}.size`),
-		modTime: optionalFrontendDate(ref.modTime, `${field}.modTime`),
-		origPath: requireWailsString(ref.origPath, `${field}.origPath`),
-		origSize: requireWailsNumber(ref.origSize, `${field}.origSize`),
-		origModTime: toFrontendDate(ref.origModTime, `${field}.origModTime`),
-	};
-}
-
-function attachmentImageRefFromWails(value: unknown, field: string): NonNullable<Attachment['imageRef']> {
-	const ref = requireWailsObject(value, field);
-
-	return {
-		...attachmentFileRefFromWails(ref, field),
-		width: ref.width === undefined ? undefined : requireWailsNumber(ref.width, `${field}.width`),
-		height: ref.height === undefined ? undefined : requireWailsNumber(ref.height, `${field}.height`),
-		format: optionalWailsString(ref.format, `${field}.format`),
-		mimeType: optionalWailsString(ref.mimeType, `${field}.mimeType`),
-	};
-}
-
-export function attachmentFromWails(value: unknown, field: string): Attachment {
-	const attachment = requireWailsObject(value, field);
-	const contentBlock =
-		attachment.contentBlock === undefined
-			? undefined
-			: (() => {
-					const block = requireWailsObject(attachment.contentBlock, `${field}.contentBlock`);
-					return {
-						...block,
-						kind: enumFromWails(block.kind, AttachmentContentBlockKind, `${field}.contentBlock.kind`),
-					};
-				})();
-
-	return {
-		...attachment,
-		kind: enumFromWails(attachment.kind, AttachmentKind, `${field}.kind`),
-		label: requireWailsString(attachment.label, `${field}.label`),
-		mode:
-			attachment.mode === undefined
-				? undefined
-				: enumFromWails(attachment.mode, AttachmentContentBlockMode, `${field}.mode`),
-		availableContentBlockModes: optionalWailsArray(
-			attachment.availableContentBlockModes,
-			`${field}.availableContentBlockModes`
-		)?.map((mode, index) =>
-			enumFromWails(mode, AttachmentContentBlockMode, `${field}.availableContentBlockModes[${index}]`)
-		),
-		fileRef:
-			attachment.fileRef === undefined ? undefined : attachmentFileRefFromWails(attachment.fileRef, `${field}.fileRef`),
-		imageRef:
-			attachment.imageRef === undefined
-				? undefined
-				: attachmentImageRefFromWails(attachment.imageRef, `${field}.imageRef`),
-		contentBlock,
-	} as Attachment;
-}
-
-export function directoryAttachmentsResultFromWails(value: unknown, field: string): DirectoryAttachmentsResult {
-	const result = requireWailsObject(value, field);
-
-	return {
-		dirPath: requireWailsString(result.dirPath, `${field}.dirPath`),
-		attachments: requireWailsArray(result.attachments, `${field}.attachments`).map((attachment, index) =>
-			attachmentFromWails(attachment, `${field}.attachments[${index}]`)
-		),
-		overflowDirs: requireWailsArray(result.overflowDirs, `${field}.overflowDirs`).map((overflow, index) => {
-			const item = requireWailsObject(overflow, `${field}.overflowDirs[${index}]`);
-			return {
-				dirPath: requireWailsString(item.dirPath, `${field}.overflowDirs[${index}].dirPath`),
-				relativePath: requireWailsString(item.relativePath, `${field}.overflowDirs[${index}].relativePath`),
-				fileCount: requireWailsNumber(item.fileCount, `${field}.overflowDirs[${index}].fileCount`),
-				partial: requireWailsBoolean(item.partial, `${field}.overflowDirs[${index}].partial`),
-			};
-		}),
-		maxFiles: requireWailsNumber(result.maxFiles, `${field}.maxFiles`),
-		totalSize: requireWailsNumber(result.totalSize, `${field}.totalSize`),
-		hasMore: requireWailsBoolean(result.hasMore, `${field}.hasMore`),
-	};
-}
-
-export function pathAttachmentsResultFromWails(value: unknown, field: string): PathAttachmentsResult {
-	const result = requireWailsObject(value, field);
-
-	return {
-		fileAttachments: requireWailsArray(result.fileAttachments, `${field}.fileAttachments`).map((attachment, index) =>
-			attachmentFromWails(attachment, `${field}.fileAttachments[${index}]`)
-		),
-		dirAttachments: requireWailsArray(result.dirAttachments, `${field}.dirAttachments`).map((directory, index) =>
-			directoryAttachmentsResultFromWails(directory, `${field}.dirAttachments[${index}]`)
-		),
-		errors: optionalWailsArray(result.errors, `${field}.errors`)?.map((error, index) =>
-			requireWailsString(error, `${field}.errors[${index}]`)
-		),
-	};
 }

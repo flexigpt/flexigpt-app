@@ -16,15 +16,13 @@ export function MCPBundleDetailsModal({ isOpen, onClose, bundle, serverCount }: 
 		return null;
 	}
 
-	const sourcesByID = new Map(bundle.bundle.sources.map(source => [source.id, source] as const));
-
 	return (
 		<ManagementDetailsModal
 			isOpen={isOpen}
 			onClose={onClose}
 			title="MCP Bundle Details"
 			description={`${serverCount} configured server${serverCount === 1 ? '' : 's'}`}
-			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.collectionID}:${bundle.bundle.collection.modifiedAt.toISOString()}`}
+			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.collectionID}:${bundle.bundle.collection.modifiedAt}`}
 		>
 			<ManagementInfoGrid>
 				<ManagementInfoRow label="Display Name">{bundle.displayName}</ManagementInfoRow>
@@ -43,26 +41,14 @@ export function MCPBundleDetailsModal({ isOpen, onClose, bundle, serverCount }: 
 					{bundle.bundle.data.managedSourceID || '—'}
 				</ManagementInfoRow>
 				<ManagementInfoRow label="Attached Sources">
-					{bundle.bundle.attachments.length > 0 ? (
-						<div className="space-y-2">
-							{bundle.bundle.attachments.map(attachment => {
-								const source = sourcesByID.get(attachment.sourceID);
-
-								return (
-									<div key={attachment.sourceID} className="bg-base-100 rounded-xl p-2 text-xs">
-										<div className="font-medium">{source?.displayName || attachment.sourceID}</div>
-										<div className="text-base-content/60 mt-1">
-											{attachment.role}
-											{source?.kind ? ` · ${source.kind}` : ''}
-										</div>
-										<div className="text-base-content/60 mt-1 font-mono break-all">{attachment.sourceID}</div>
-									</div>
-								);
-							})}
+					<div key={bundle.bundle.attachment.sourceID} className="bg-base-100 rounded-xl p-2 text-xs">
+						<div className="font-medium">{bundle.bundle.source?.displayName || bundle.bundle.attachment.sourceID}</div>
+						<div className="text-base-content/60 mt-1">
+							{bundle.bundle.attachment.role}
+							{bundle.bundle.source?.kind ? ` · ${bundle.bundle.source.kind}` : ''}
 						</div>
-					) : (
-						'—'
-					)}
+						<div className="text-base-content/60 mt-1 font-mono break-all">{bundle.bundle.attachment.sourceID}</div>
+					</div>
 				</ManagementInfoRow>
 				<ManagementInfoRow label="Built-in">{bundle.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Runtime Enabled">{bundle.enabled ? 'Yes' : 'No'}</ManagementInfoRow>

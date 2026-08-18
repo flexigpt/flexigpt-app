@@ -11,12 +11,12 @@ import type {
 	ArtifactSourceID,
 	ArtifactSourceSummary,
 	ArtifactStorageKey,
+	ManagedPackageAddress,
 } from '@/spec/artifact';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 export const MCP_USER_ROOT_ID: ArtifactRootID = '0198f097-0d5b-7000-8000-000000000002';
-export const MCP_BUILTIN_ROOT_ID: ArtifactRootID = '0198f097-0d5b-7000-8000-000000000003';
 
 export const MCP_SCHEMA_VERSION = 'v1';
 export const MCP_APP_HTML_MIME_TYPE = 'text/html;profile=mcp-app';
@@ -96,7 +96,7 @@ export enum MCPToolRisk {
 	OpenWorld = 'openWorld',
 }
 
-export enum MCPTaskSupport {
+enum MCPTaskSupport {
 	Forbidden = 'forbidden',
 	Optional = 'optional',
 	Required = 'required',
@@ -145,7 +145,7 @@ export enum MCPCompletionRefType {
 	Prompt = 'prompt',
 }
 
-export enum MCPPromptRole {
+enum MCPPromptRole {
 	User = 'user',
 	Assistant = 'assistant',
 }
@@ -321,9 +321,10 @@ interface MCPBundleData {
 export interface MCPBundle {
 	collection: ArtifactCollection;
 	data: MCPBundleData;
-	attachments: ArtifactCollectionAttachment[];
-	sources: ArtifactSourceSummary[];
-	builtIn: boolean;
+	attachment: ArtifactCollectionAttachment;
+	source: ArtifactSourceSummary;
+	packageAddress: ManagedPackageAddress;
+	documentLocator: string;
 }
 
 export interface MCPArtifactRegistration {

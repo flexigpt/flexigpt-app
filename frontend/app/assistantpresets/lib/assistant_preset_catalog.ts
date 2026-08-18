@@ -272,7 +272,7 @@ async function loadSkillOptionsUncached(): Promise<AssistantSkillOption[]> {
 	const artifactRefs = artifactGroups.flatMap(group => group.artifacts.map(artifact => artifact.artifact));
 	const runtimeSkills =
 		artifactRefs.length > 0 ? await skillBundleAPI.listRuntimeSkills({ allowArtifacts: artifactRefs }) : [];
-	const runtimeSkillByArtifact = new Map(runtimeSkills.map(skill => [artifactRefKey(skill.artifact), skill]));
+	const runtimeSkillByArtifact = new Map(runtimeSkills.map(skill => [artifactRefKey(skill.skillRef), skill]));
 
 	const options: AssistantSkillOption[] = artifactGroups.flatMap(({ bundle, artifacts }) =>
 		artifacts.flatMap(artifact => {
