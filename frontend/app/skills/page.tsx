@@ -5,7 +5,7 @@ import { FiPlus, FiSearch, FiTag, FiX } from 'react-icons/fi';
 import type { SkillBundle } from '@/spec/skill';
 import { SkillInsert } from '@/spec/skill';
 
-import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
+import { throwIfAborted } from '@/lib/async_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
@@ -43,39 +43,118 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
+const SKILL_BUNDLE_DATA_CACHE_TTL_MS = 60 * 60 * 1000;
+
+interface SkillBundleDataCache {
+	data: BundleData[];
+	loadedAt: number;
+}
+
+interface SkillBundleDataLoad {
+	generation: number;
+	promise: Promise<BundleData[]>;
+}
+
+let skillBundleDataCache: SkillBundleDataCache | undefined;
+let skillBundleDataLoad: SkillBundleDataLoad | undefined;
+let skillBundleDataCacheGeneration = 0;
+
+function invalidateSkillBundleDataCache() {
+	skillBundleDataCacheGeneration += 1;
+	skillBundleDataCache = undefined;
+}
+
+function rememberSkillBundleData(data: BundleData[]) {
+	// Invalidate any older request which is still completing after a local
+	// mutation changed the page state.
+	skillBundleDataCacheGeneration += 1;
+	skillBundleDataCache = {
+		data,
+		loadedAt: Date.now(),
+	};
+}
+
+function buildSkillBundleData(
+	skillBundles: SkillBundle[],
+	skillListItems: Awaited<ReturnType<typeof getAllSkills>>
+): BundleData[] {
+	const skillsByBundleID = new Map<string, BundleData['skills']>();
+
+	for (const bundle of skillBundles) {
+		skillsByBundleID.set(bundle.id, []);
+	}
+	for (const item of skillListItems) {
+		skillsByBundleID.get(item.bundleID)?.push(item.skillDefinition);
+	}
+
+	return sortBundleData(
+		skillBundles.map(bundle => ({
+			bundle,
+			skills: skillsByBundleID.get(bundle.id) ?? [],
+		}))
+	);
+}
+
 /**
  * This route intentionally uses only installed Skill Store APIs. Workspace
  * Skills are Workspace Artifacts and are shown only in Workspace management
  * and in the conversation Workspace selector.
  */
-async function loadSkillBundleData(signal: AbortSignal): Promise<BundleData[]> {
+async function fetchSkillBundleData(): Promise<BundleData[]> {
 	const skillBundles = await getAllSkillBundles(undefined, true);
+	if (skillBundles.length === 0) {
+		return [];
+	}
+
+	// One request for all bundle IDs avoids relisting roots and bundles once
+	// for every bundle.
+	const skillListItems = await getAllSkills(
+		skillBundles.map(bundle => bundle.id),
+		undefined,
+		true,
+		true
+	);
+	return buildSkillBundleData(skillBundles, skillListItems);
+}
+
+async function loadSkillBundleData(signal: AbortSignal): Promise<BundleData[]> {
 	throwIfAborted(signal);
 
-	const bundleResults = await mapWithConcurrency(
-		skillBundles,
-		4,
-		async bundle => {
-			try {
-				const skillListItems = await getAllSkills([bundle.id], undefined, true, true);
-				throwIfAborted(signal);
-				return {
-					bundle,
-					skills: skillListItems.map(item => item.skillDefinition),
-				};
-			} catch (error) {
-				throwIfAborted(signal);
-				return {
-					bundle,
-					skills: [],
-					skillLoadError: getErrorMessage(error, 'Failed to load this bundle’s skills.'),
+	const cached = skillBundleDataCache;
+	if (cached && Date.now() - cached.loadedAt <= SKILL_BUNDLE_DATA_CACHE_TTL_MS) {
+		return cached.data;
+	}
+
+	const generation = skillBundleDataCacheGeneration;
+	let load = skillBundleDataLoad;
+	if (!load || load.generation !== generation) {
+		const promise = fetchSkillBundleData().then(data => {
+			if (skillBundleDataCacheGeneration === generation) {
+				skillBundleDataCache = {
+					data,
+					loadedAt: Date.now(),
 				};
 			}
-		},
-		signal
-	);
+			return data;
+		});
 
-	return sortBundleData(bundleResults);
+		load = { generation, promise };
+		skillBundleDataLoad = load;
+
+		const clearLoad = () => {
+			if (skillBundleDataLoad?.promise === promise) {
+				skillBundleDataLoad = undefined;
+			}
+		};
+		void promise.then(clearLoad, clearLoad);
+	}
+
+	// Wails calls currently cannot be cancelled because their wrappers use
+	// context.Background(). Keep the shared operation alive so a remounted
+	// page can reuse it, but do not update an already-aborted consumer.
+	const data = await load.promise;
+	throwIfAborted(signal);
+	return data;
 }
 
 // oxlint-disable-next-line no-restricted-exports
@@ -89,7 +168,14 @@ export default function SkillsPage() {
 		hasResolved,
 		reloadOrThrow,
 		setData: setBundles,
-	} = useAsyncResource(loadPageData, { initialData: [] as BundleData[] });
+	} = useAsyncResource(loadPageData, {
+		initialData: skillBundleDataCache?.data ?? ([] as BundleData[]),
+	});
+
+	const reloadPageData = useCallback(async () => {
+		invalidateSkillBundleDataCache();
+		await reloadOrThrow();
+	}, [reloadOrThrow]);
 
 	const [insertFilter, setInsertFilter] = useState<SkillInsertFilter>('all');
 	const [searchQuery, setSearchQuery] = useState('');
@@ -215,6 +301,12 @@ export default function SkillsPage() {
 			isMountedRef.current = false;
 		};
 	}, []);
+
+	useEffect(() => {
+		if (hasResolved && !pageLoadError && !isLoading && !isRefreshing) {
+			rememberSkillBundleData(bundles);
+		}
+	}, [bundles, hasResolved, isLoading, isRefreshing, pageLoadError]);
 
 	const handleBundleEnableChange = useCallback(
 		async (bundleID: string, nextEnabled: boolean) => {
@@ -481,7 +573,7 @@ export default function SkillsPage() {
 				const id = getUUIDv7();
 				await skillManagementAPI.putSkillBundle(id, slug, display, true, description);
 				try {
-					await reloadOrThrow();
+					await reloadPageData();
 				} catch (refreshError) {
 					console.error('Skill bundle was created but refresh failed:', refreshError);
 					if (isMountedRef.current) {
@@ -496,7 +588,7 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[reloadOrThrow]
+		[reloadPageData]
 	);
 
 	const handleEditBundle = useCallback(
@@ -521,7 +613,7 @@ export default function SkillsPage() {
 		[setBundles]
 	);
 
-	if (isLoading && !hasResolved) {
+	if (isLoading && !hasResolved && bundles.length === 0) {
 		return <Loader text="Loading skill bundles…" />;
 	}
 
@@ -552,7 +644,7 @@ export default function SkillsPage() {
 							error={pageLoadError}
 							isRetrying={isRefreshing}
 							onRetry={async () => {
-								await reloadOrThrow();
+								await reloadPageData();
 							}}
 						/>
 					) : null}
@@ -701,7 +793,7 @@ export default function SkillsPage() {
 								skillLoadError={bundleData.skillLoadError}
 								prefillSkills={allSkillItems}
 								onRefreshSkills={() => {
-									return refreshBundleSkills(bundleData.bundle.id);
+									return refreshBundleSkills(bundleData.bundle.id, !bundleData.bundle.isBuiltIn);
 								}}
 								insertFilter={insertFilter}
 								searchQuery={searchQuery}

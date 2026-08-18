@@ -37,6 +37,23 @@ func (s *SkillRuntime) ResyncCollection(
 	if err := ref.Validate(); err != nil {
 		return err
 	}
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: Skill runtime resync context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+
+	// Resolve only the requested Collection and do slow source verification
+	// without holding the process-local runtime mutation lock.
+	values, err := s.resolver.ListCollectionSkills(ctx, ref)
+	if err != nil {
+		return s.failClosedCollection(ctx, ref, err)
+	}
+	desired, err := desiredCollectionView(ref, values)
+	if err != nil {
+		return s.failClosedCollection(ctx, ref, err)
+	}
 
 	s.rtResyncMu.Lock()
 	defer s.rtResyncMu.Unlock()
@@ -44,54 +61,8 @@ func (s *SkillRuntime) ResyncCollection(
 		return basespec.ErrClosed
 	}
 
-	refs := make([]collection.CollectionRef, 0, len(s.managedCollections)+1)
-	for current := range s.managedCollections {
-		refs = append(refs, current)
-	}
-	if _, exists := s.managedCollections[ref]; !exists {
-		refs = append(refs, ref)
-	}
-	sort.Slice(refs, func(left, right int) bool {
-		if refs[left].RootID != refs[right].RootID {
-			return refs[left].RootID < refs[right].RootID
-		}
-		return refs[left].CollectionID < refs[right].CollectionID
-	})
-
-	collections := make(
-		map[collection.CollectionRef]runtimeDesiredView,
-		len(refs),
-	)
-	for _, currentRef := range refs {
-		values, err := s.resolver.ListCollectionSkills(ctx, currentRef)
-		if err != nil {
-			if currentRef == ref {
-				return s.failClosedCollectionLocked(ctx, ref, err)
-			}
-			slog.Warn(
-				"dropping unavailable Skill runtime Collection",
-				"rootID", currentRef.RootID,
-				"collectionID", currentRef.CollectionID,
-				"error", err,
-			)
-			continue
-		}
-
-		desired, err := desiredCollectionView(currentRef, values)
-		if err != nil {
-			if currentRef == ref {
-				return s.failClosedCollectionLocked(ctx, ref, err)
-			}
-			slog.Warn(
-				"dropping invalid Skill runtime Collection",
-				"rootID", currentRef.RootID,
-				"collectionID", currentRef.CollectionID,
-				"error", err,
-			)
-			continue
-		}
-		collections[currentRef] = desired
-	}
+	collections := cloneCollectionDesiredViews(s.managedCollections)
+	collections[ref] = desired
 
 	return s.reconcileCollectionsLocked(
 		ctx,
@@ -128,20 +99,15 @@ func (s *SkillRuntime) WarmCollections(
 		return err
 	}
 
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
-	if s.isClosed() {
-		return basespec.ErrClosed
-	}
-
-	// Preserve views that were already loaded by a foreground request while
-	// the warmup was waiting for the runtime mutex.
-	collections := cloneCollectionDesiredViews(s.managedCollections)
+	// Catalog and filesystem work must not hold rtResyncMu. Otherwise the
+	// first foreground Skill request waits behind the complete warmup.
+	warmed := make(map[collection.CollectionRef]runtimeDesiredView, len(normalized))
 	var warmErr error
 
 	for _, ref := range normalized {
 		if err := ctx.Err(); err != nil {
-			return errors.Join(warmErr, err)
+			warmErr = errors.Join(warmErr, err)
+			break
 		}
 
 		values, err := s.resolver.ListCollectionSkills(ctx, ref)
@@ -169,6 +135,26 @@ func (s *SkillRuntime) WarmCollections(
 			)
 			continue
 		}
+		warmed[ref] = desired
+	}
+
+	if len(warmed) == 0 {
+		return warmErr
+	}
+
+	s.rtResyncMu.Lock()
+	if s.isClosed() {
+		s.rtResyncMu.Unlock()
+		return errors.Join(warmErr, basespec.ErrClosed)
+	}
+
+	// Preserve a view already loaded by a foreground request while this
+	// background operation was resolving source state.
+	collections := cloneCollectionDesiredViews(s.managedCollections)
+	for ref, desired := range warmed {
+		if _, foregroundLoaded := collections[ref]; foregroundLoaded {
+			continue
+		}
 		collections[ref] = desired
 	}
 
@@ -177,6 +163,7 @@ func (s *SkillRuntime) WarmCollections(
 		collections,
 		runtimeApplyBestEffort,
 	)
+	s.rtResyncMu.Unlock()
 	return errors.Join(warmErr, applyErr)
 }
 
@@ -225,6 +212,20 @@ func (s *SkillRuntime) RemoveCollection(
 	collections := cloneCollectionDesiredViews(s.managedCollections)
 	delete(collections, ref)
 	return s.reconcileCollectionsLocked(ctx, collections, runtimeApplyStrict)
+}
+
+func (s *SkillRuntime) failClosedCollection(
+	ctx context.Context,
+	ref collection.CollectionRef,
+	cause error,
+) error {
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
+
+	if s.isClosed() {
+		return errors.Join(cause, basespec.ErrClosed)
+	}
+	return s.failClosedCollectionLocked(ctx, ref, cause)
 }
 
 func (s *SkillRuntime) failClosedCollectionLocked(

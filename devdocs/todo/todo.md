@@ -7,6 +7,12 @@
   - [ ] test web search etc and pending user args etc after bottom bar migration.
   - [ ] test with some skill that has scripts too
 
+- [x] skill page perf is bad as of now
+
+- [ ] calling "initialize": sending "initialize": rejected by transport: authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response
+
+- [ ] "local host not ready yet" display in the mcp authz modal.
+
 ## M-3
 
 - [x] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"

@@ -61,7 +61,7 @@ export function getAllSkills(
 	bundleIDs?: string[],
 	_tags?: string[],
 	includeDisabled = true,
-	_includeRuntimeMetadata = true
+	includeRuntimeMetadata = true
 ): Promise<SkillListItem[]> {
-	return skillManagementAPI.listSkills(bundleIDs, includeDisabled);
+	return skillManagementAPI.listSkills(bundleIDs, includeDisabled, includeRuntimeMetadata);
 }

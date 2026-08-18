@@ -185,7 +185,11 @@ export class SkillManagementAPI {
 			});
 	}
 
-	async listSkills(bundleIDs?: string[], includeDisabled = true): Promise<SkillListItem[]> {
+	async listSkills(
+		bundleIDs?: string[],
+		includeDisabled = true,
+		includeRuntimeMetadata = true
+	): Promise<SkillListItem[]> {
 		const views = await this.listBundleViews(bundleIDs);
 		const output: SkillListItem[] = [];
 
@@ -194,36 +198,41 @@ export class SkillManagementAPI {
 			const runtimeByArtifact = new Map<string, RuntimeSkillListItem>();
 			const runtimeErrors = new Map<string, string>();
 
-			await Promise.all(
-				artifacts.map(async artifact => {
-					if (!bundle.enabled || !artifact.enabled || artifact.state !== ArtifactState.Available) {
-						return;
+			const runtimeCandidates = includeRuntimeMetadata
+				? artifacts.filter(artifact => bundle.enabled && artifact.enabled && artifact.state === ArtifactState.Available)
+				: [];
+
+			if (runtimeCandidates.length > 0) {
+				try {
+					const runtimeItems = await this.skills.listRuntimeSkills({
+						allowArtifacts: runtimeCandidates.map(artifact => artifact.artifact),
+					});
+					const requestedKeys = new Set(runtimeCandidates.map(artifact => artifactRefKey(artifact.artifact)));
+
+					for (const item of runtimeItems) {
+						const key = artifactRefKey(item.skillRef);
+						if (requestedKeys.has(key)) {
+							runtimeByArtifact.set(key, item);
+						}
 					}
 
-					try {
-						const runtime = await this.skills.listRuntimeSkills({
-							allowArtifacts: [artifact.artifact],
-						});
-						const item = runtime.find(value => artifactRefKey(value.skillRef) === artifactRefKey(artifact.artifact));
-						if (item) {
-							runtimeByArtifact.set(artifactRefKey(artifact.artifact), item);
+					for (const artifact of runtimeCandidates) {
+						const key = artifactRefKey(artifact.artifact);
+						if (!runtimeByArtifact.has(key)) {
+							runtimeErrors.set(key, 'Runtime metadata was not returned for this Skill.');
 						}
-					} catch (error) {
-						runtimeErrors.set(
-							artifactRefKey(artifact.artifact),
-							getErrorMessage(error, 'Runtime metadata is unavailable.')
-						);
 					}
-				})
-			);
+				} catch (error) {
+					const message = getErrorMessage(error, 'Runtime metadata is unavailable.');
+					for (const artifact of runtimeCandidates) {
+						runtimeErrors.set(artifactRefKey(artifact.artifact), message);
+					}
+				}
+			}
 
 			for (const artifact of artifacts) {
-				const skill = toSkill(
-					bundle,
-					artifact,
-					runtimeByArtifact.get(artifactRefKey(artifact.artifact)),
-					runtimeErrors.get(artifactRefKey(artifact.artifact))
-				);
+				const key = artifactRefKey(artifact.artifact);
+				const skill = toSkill(bundle, artifact, runtimeByArtifact.get(key), runtimeErrors.get(key));
 
 				if (!includeDisabled && !skill.isEnabled) {
 					continue;

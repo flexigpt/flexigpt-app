@@ -758,36 +758,52 @@ func (s *SkillRuntime) resolveArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (ResolvedArtifactSkill, bool) {
-	return s.resolveArtifactSkillWithResync(ctx, ref, nil)
+	return s.resolveArtifactSkillWithResync(
+		ctx,
+		ref,
+		map[collection.CollectionRef]error{},
+	)
 }
 
-// resolveArtifactSkillWithResync keeps request-local synchronization state
-// only. It is not a cache of Artifact Store state: every Artifact is resolved
-// again after its owning Collection has been reconciled.
 func (s *SkillRuntime) resolveArtifactSkillWithResync(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	resynced map[collection.CollectionRef]error,
 ) (ResolvedArtifactSkill, bool) {
+	if resynced != nil {
+		if value, found := s.resolvedArtifactSkillFromResyncedCollections(ref, resynced); found {
+			return value, true
+		}
+
+		collectionRef, err := s.resolver.CollectionForArtifact(ctx, ref)
+		if err != nil {
+			return ResolvedArtifactSkill{}, false
+		}
+		if previous, found := resynced[collectionRef]; found {
+			if previous != nil {
+				return ResolvedArtifactSkill{}, false
+			}
+		} else {
+			err := s.ResyncCollection(ctx, collectionRef)
+			resynced[collectionRef] = err
+			if err != nil {
+				return ResolvedArtifactSkill{}, false
+			}
+		}
+
+		return s.resolvedArtifactSkillFromResyncedCollections(
+			ref,
+			resynced,
+		)
+	}
+
 	value, err := s.resolver.ResolveArtifactSkill(ctx, ref)
 	if err != nil {
 		return ResolvedArtifactSkill{}, false
 	}
 
-	if resynced == nil {
-		if err := s.ResyncCollection(ctx, value.Collection); err != nil {
-			return ResolvedArtifactSkill{}, false
-		}
-	} else if previous, found := resynced[value.Collection]; found {
-		if previous != nil {
-			return ResolvedArtifactSkill{}, false
-		}
-	} else {
-		err := s.ResyncCollection(ctx, value.Collection)
-		resynced[value.Collection] = err
-		if err != nil {
-			return ResolvedArtifactSkill{}, false
-		}
+	if err := s.ResyncCollection(ctx, value.Collection); err != nil {
+		return ResolvedArtifactSkill{}, false
 	}
 
 	if s.registrationMatches(value) {
@@ -802,6 +818,48 @@ func (s *SkillRuntime) resolveArtifactSkillWithResync(
 		return ResolvedArtifactSkill{}, false
 	}
 	return refreshed, true
+}
+
+func (s *SkillRuntime) resolvedArtifactSkillFromResyncedCollections(
+	ref artifact.ArtifactRef,
+	resynced map[collection.CollectionRef]error,
+) (ResolvedArtifactSkill, bool) {
+	key := artifactRefKey(ref)
+
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
+
+	for collectionRef, resyncErr := range resynced {
+		if resyncErr != nil {
+			continue
+		}
+		view, found := s.managedCollections[collectionRef]
+		if !found {
+			continue
+		}
+
+		for definition, artifactKey := range view.artifacts {
+			if artifactKey != key {
+				continue
+			}
+			version, found := view.definitions[definition]
+			if !found || s.managedRuntime[definition] != version {
+				return ResolvedArtifactSkill{}, false
+			}
+
+			value := ResolvedArtifactSkill{
+				Artifact:   ref,
+				Collection: collectionRef,
+				Definition: definition,
+				Version:    version,
+			}
+			if err := value.Validate(); err != nil {
+				return ResolvedArtifactSkill{}, false
+			}
+			return value, true
+		}
+	}
+	return ResolvedArtifactSkill{}, false
 }
 
 func (s *SkillRuntime) registrationMatches(

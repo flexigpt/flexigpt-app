@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 
@@ -36,20 +37,45 @@ func (a *API) ListRuntimeSkills(
 	ctx context.Context,
 	bundle collection.CollectionRef,
 ) (output []RuntimeSkill, returnErr error) {
-	records, err := a.ListSkills(ctx, bundle)
+	if err := a.Ready(); err != nil {
+		return nil, err
+	}
+	if err := bundle.Validate(); err != nil {
+		return nil, err
+	}
+
+	bundleValue, err := a.GetBundle(ctx, bundle)
+	if err != nil {
+		return nil, err
+	}
+	records, err := a.dependencies.Artifacts.ListByCollection(ctx, bundle)
 	if err != nil {
 		return nil, err
 	}
 
-	eligible := make([]artifact.ArtifactRef, 0, len(records))
+	eligible := make([]artifact.Artifact, 0, len(records))
 	for _, record := range records {
-		if !record.Enabled || record.State != artifact.StateAvailable {
+		if record.Kind != artifactbuiltin.AgentSkillArtifactKind ||
+			!record.Enabled ||
+			record.State != artifact.StateAvailable {
 			continue
 		}
-		eligible = append(eligible, record.Ref())
+		eligible = append(eligible, record)
 	}
 	if len(eligible) == 0 {
 		return []RuntimeSkill{}, nil
+	}
+	if !bundleValue.Collection.Enabled {
+		return nil, fmt.Errorf(
+			"%w: skill bundle %q is disabled",
+			basespec.ErrReferenceUnresolved,
+			bundle.CollectionID,
+		)
+	}
+
+	catalogValue, err := a.currentBundleCatalog(ctx, bundleValue)
+	if err != nil {
+		return nil, err
 	}
 
 	sessionCtx, session, err := source.NewVerificationSession(
@@ -66,9 +92,29 @@ func (a *API) ListRuntimeSkills(
 		)
 	}()
 
+	sourcesByID := make(map[basespec.SourceID]source.Source)
 	output = make([]RuntimeSkill, 0, len(eligible))
-	for _, ref := range eligible {
-		value, err := a.LoadRuntimeSkill(sessionCtx, ref)
+	for _, record := range eligible {
+		sourceValue, found := sourcesByID[record.Binding.SourceID]
+		if !found {
+			sourceValue, err = a.dependencies.SourceRuntime.Get(
+				sessionCtx,
+				record.RootID,
+				record.Binding.SourceID,
+			)
+			if err != nil {
+				return nil, err
+			}
+			sourcesByID[record.Binding.SourceID] = sourceValue
+		}
+
+		value, err := a.runtimeSkillFromSnapshot(
+			sessionCtx,
+			record,
+			bundleValue,
+			catalogValue,
+			sourceValue,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -106,6 +152,7 @@ func (a *API) LoadRuntimeSkill(
 	if err != nil {
 		return RuntimeSkill{}, err
 	}
+
 	bundleRef := collection.CollectionRef{
 		RootID:       record.RootID,
 		CollectionID: record.CollectionID,
@@ -113,6 +160,43 @@ func (a *API) LoadRuntimeSkill(
 	bundle, err := a.GetBundle(ctx, bundleRef)
 	if err != nil {
 		return RuntimeSkill{}, err
+	}
+
+	snapshot, err := a.currentBundleCatalog(ctx, bundle)
+	if err != nil {
+		return RuntimeSkill{}, err
+	}
+	sourceValue, err := a.dependencies.SourceRuntime.Get(
+		ctx,
+		record.RootID,
+		record.Binding.SourceID,
+	)
+	if err != nil {
+		return RuntimeSkill{}, err
+	}
+	return a.runtimeSkillFromSnapshot(
+		ctx,
+		record,
+		bundle,
+		snapshot,
+		sourceValue,
+	)
+}
+
+func (a *API) runtimeSkillFromSnapshot(
+	ctx context.Context,
+	record artifact.Artifact,
+	bundle Bundle,
+	snapshot catalog.Snapshot,
+	sourceValue source.Source,
+) (RuntimeSkill, error) {
+	bundleRef := bundle.Collection.Ref()
+	if record.RootID != bundleRef.RootID ||
+		record.CollectionID != bundleRef.CollectionID {
+		return RuntimeSkill{}, fmt.Errorf(
+			"%w: Skill Artifact belongs to another bundle",
+			basespec.ErrInvalid,
+		)
 	}
 	if !bundle.Collection.Enabled {
 		return RuntimeSkill{}, fmt.Errorf(
@@ -128,14 +212,10 @@ func (a *API) LoadRuntimeSkill(
 		return RuntimeSkill{}, fmt.Errorf(
 			"%w: Skill Artifact %q is not enabled and available",
 			basespec.ErrReferenceUnresolved,
-			ref.ArtifactID,
+			record.ID,
 		)
 	}
 
-	snapshot, err := a.currentBundleCatalog(ctx, bundle)
-	if err != nil {
-		return RuntimeSkill{}, err
-	}
 	occurrence, err := currentSkillOccurrence(snapshot, record)
 	if err != nil {
 		return RuntimeSkill{}, err
@@ -149,7 +229,7 @@ func (a *API) LoadRuntimeSkill(
 		)
 	}
 
-	value, err := a.currentDefinitionForArtifact(ctx, record)
+	value, err := definitionForArtifact(snapshot, record)
 	if err != nil {
 		return RuntimeSkill{}, err
 	}
@@ -157,13 +237,12 @@ func (a *API) LoadRuntimeSkill(
 		return RuntimeSkill{}, err
 	}
 
-	sourceValue, err := a.dependencies.SourceRuntime.Get(
-		ctx,
-		record.RootID,
-		record.Binding.SourceID,
-	)
-	if err != nil {
-		return RuntimeSkill{}, err
+	if sourceValue.RootID != record.RootID ||
+		sourceValue.ID != record.Binding.SourceID {
+		return RuntimeSkill{}, fmt.Errorf(
+			"%w: Skill source does not match its Artifact binding",
+			basespec.ErrInvalid,
+		)
 	}
 	if sourceValue.Revision != expectedSourceRevision {
 		return RuntimeSkill{}, fmt.Errorf(
@@ -198,6 +277,44 @@ func (a *API) LoadRuntimeSkill(
 			cryptoutil.DigestBytes([]byte(versionInput)),
 		),
 	}, nil
+}
+
+func definitionForArtifact(
+	snapshot catalog.Snapshot,
+	record artifact.Artifact,
+) (definition.Definition, error) {
+	if record.ResolvedDefinition == nil {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: Skill Artifact %q has no current definition",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+	if snapshot.RootID != record.RootID ||
+		snapshot.CollectionID != record.CollectionID {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: Skill catalog belongs to another Collection",
+			basespec.ErrInvalid,
+		)
+	}
+
+	value, err := catalog.DefinitionForOccurrence(snapshot, catalog.OccurrenceKey{
+		CollectionID:       record.CollectionID,
+		SourceID:           record.Binding.SourceID,
+		Locator:            record.Binding.Locator,
+		SubresourceLocator: record.Binding.SubresourceLocator,
+	})
+	if err != nil {
+		return definition.Definition{}, err
+	}
+	if value.Digest != *record.ResolvedDefinition {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: Skill Artifact %q catalog definition changed",
+			basespec.ErrConflict,
+			record.ID,
+		)
+	}
+	return value, nil
 }
 
 func currentSkillOccurrence(

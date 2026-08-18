@@ -30,7 +30,6 @@ type SkillBundleWrapper struct {
 }
 
 const (
-	skillRuntimeWarmupDelay   = time.Second
 	skillRuntimeWarmupTimeout = time.Minute
 )
 
@@ -530,14 +529,6 @@ func (w *SkillBundleWrapper) startBackgroundWarmup(
 				)
 			}
 		}()
-
-		timer := time.NewTimer(skillRuntimeWarmupDelay)
-		defer timer.Stop()
-		select {
-		case <-timer.C:
-		case <-ctx.Done():
-			return
-		}
 
 		refs, err := api.SkillBundleRefs(ctx)
 		if err != nil {

@@ -82,6 +82,36 @@ func (r *ArtifactRouter) Register(
 	return nil
 }
 
+// CollectionForArtifact resolves durable ownership without projecting or
+// opening the Skill source. Batch reconciliation can then load the owning
+// Collection once rather than first performing an expensive single-Skill
+// projection.
+func (r *ArtifactRouter) CollectionForArtifact(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (collection.CollectionRef, error) {
+	if err := ref.Validate(); err != nil {
+		return collection.CollectionRef{}, err
+	}
+
+	record, err := r.artifacts.Get(ctx, ref)
+	if err != nil {
+		return collection.CollectionRef{}, err
+	}
+	collectionRef := collection.CollectionRef{
+		RootID:       record.RootID,
+		CollectionID: record.CollectionID,
+	}
+	collectionValue, err := r.collections.Get(ctx, collectionRef)
+	if err != nil {
+		return collection.CollectionRef{}, err
+	}
+	if _, err := r.loader(collectionValue.Kind); err != nil {
+		return collection.CollectionRef{}, err
+	}
+	return collectionRef, nil
+}
+
 func (r *ArtifactRouter) ResolveArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,

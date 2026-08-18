@@ -980,23 +980,7 @@ func (a *API) currentDefinitionForArtifact(
 		return definition.Definition{}, err
 	}
 
-	value, err := catalog.DefinitionForOccurrence(snapshot, catalog.OccurrenceKey{
-		CollectionID:       record.CollectionID,
-		SourceID:           record.Binding.SourceID,
-		Locator:            record.Binding.Locator,
-		SubresourceLocator: record.Binding.SubresourceLocator,
-	})
-	if err != nil {
-		return definition.Definition{}, err
-	}
-	if value.Digest != *record.ResolvedDefinition {
-		return definition.Definition{}, fmt.Errorf(
-			"%w: Skill Artifact %q catalog definition changed",
-			basespec.ErrConflict,
-			record.ID,
-		)
-	}
-	return value, nil
+	return definitionForArtifact(snapshot, record)
 }
 
 // createBundle keeps the built-in attachment role inside trusted bootstrap

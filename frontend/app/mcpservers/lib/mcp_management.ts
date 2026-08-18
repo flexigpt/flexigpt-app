@@ -478,9 +478,7 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 
 export async function loadMCPBundleViews(): Promise<MCPBundleView[]> {
 	const roots = await artifactStoreAPI.listArtifactRoots();
-	console.log(JSON.stringify(roots, null, 2));
 	const responses = await Promise.allSettled(roots.map(root => mcpAPI.listMCPBundles(root.id)));
-	console.log(JSON.stringify(responses, null, 2));
 	const bundles: MCPBundle[] = [];
 
 	for (const response of responses) {
