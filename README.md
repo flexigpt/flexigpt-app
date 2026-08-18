@@ -8,11 +8,21 @@ FlexiGPT is a local-first BYOK AI workspace for power users and teams who need r
 
 ## Who FlexiGPT is for
 
-FlexiGPT is built for people who use LLMs as part of repeatable work, not just one-off chat.
+- Power users, developers, writers, consultants, teams, and interface builders who use LLMs for repeatable work.
 
-- Power and local-first users who want provider choice, private local history, and control over configuration and orchestration.
-- Developers and technical writers who develop features, review diffs, debug failures, write tests/docs, and reuse assistants/agents, skills, attachments, tools, and model setups.
-- Consultants and small teams who want consistent assistant workflows without sending chat history through another hosted app.
+## Why are you doing this?
+
+- I want to be in the driver's seat when using LLMs.
+- I want to use LLMs as tools while staying in control of what I do and how I do it. Most systems seem to be designed to let their tooling and workflows drive the work.
+
+## What are you doing?
+
+- Writing the whole LLM setup down as plain, versionable files: models, prompts, MCP servers, skills, assistants, files, and workspace context. Open and spec driven, no provider or platform lock-in.
+- Assembling every request from that setup, with its exact input inspectable before it is sent. Nothing gets injected behind your back.
+- Controlling every action: you declare what runs automatically, what asks first, and what is never allowed. Pause automatic execution mid task, change input, resume as needed. Per tool, per assistant, per workspace.
+- Keeping a record of each run - input, output, and what it changed - so it can be reviewed, diffed, and repeated.
+- Exposing all of it through one uniform interface, so any application can drive the same setup.
+- Building use-case UIs on top of that interface, starting with chat.
 
 ## Install
 
