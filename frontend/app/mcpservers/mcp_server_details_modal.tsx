@@ -105,8 +105,19 @@ function MCPServerDetailsModalContent({
 	runtime?: MCPServerRuntimeSnapshot;
 	authHealth?: MCPAuthHealth;
 }) {
+	const hasDiscoverySnapshot = Boolean(runtime?.snapshotDigest);
+
 	const loadDiscovery = useCallback(
 		async (_signal: AbortSignal): Promise<DiscoveryData> => {
+			if (!hasDiscoverySnapshot) {
+				return {
+					tools: [],
+					resources: [],
+					resourceTemplates: [],
+					prompts: [],
+				};
+			}
+
 			const results = await Promise.allSettled([
 				mcpAPI.listMCPServerTools(server.ref),
 				mcpAPI.listMCPServerResources(server.ref),
@@ -130,7 +141,7 @@ function MCPServerDetailsModalContent({
 							: undefined,
 			};
 		},
-		[server.ref]
+		[hasDiscoverySnapshot, server.ref]
 	);
 
 	const { data, isLoading } = useAsyncResource(loadDiscovery, {

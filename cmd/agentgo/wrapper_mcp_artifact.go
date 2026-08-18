@@ -54,6 +54,8 @@ type MCPGlobalSettingsView struct {
 	OAuthRedirectURL        string               `json:"oauthRedirectURL,omitempty"`
 	OAuthLoopbackListenAddr string               `json:"oauthLoopbackListenAddr,omitempty"`
 	OAuthRestartRequired    bool                 `json:"oauthRestartRequired"`
+	OAuthLoopbackReady      bool                 `json:"oauthLoopbackReady"`
+	OAuthLoopbackError      string               `json:"oauthLoopbackError,omitempty"`
 }
 
 func InitMCPWrapper(
@@ -481,7 +483,7 @@ func (w *MCPWrapper) ConnectMCPServer(
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.Connect(context.Background(), ref)
+		return w.runtime.StartConnect(context.Background(), ref)
 	})
 }
 
@@ -866,10 +868,23 @@ func (w *MCPWrapper) ListPendingMCPOAuthAuthorizations() []auth.MCPOAuthAuthoriz
 func (w *MCPWrapper) CancelPendingMCPOAuthAuthorization(
 	srv artifact.ArtifactRef,
 ) bool {
-	if w == nil || w.oauthBroker == nil {
+	if w == nil {
 		return false
 	}
-	return w.oauthBroker.Cancel(srv)
+
+	cancelled := false
+	if w.oauthBroker != nil {
+		cancelled = w.oauthBroker.Cancel(srv)
+	}
+	if w.runtime != nil {
+		if err := w.runtime.Disconnect(context.Background(), srv); err != nil {
+			slog.Warn("cancel MCP OAuth runtime connection", "server", srv, "error", err)
+		}
+	}
+	if w.auth != nil {
+		w.auth.ClearAuthStatus(srv)
+	}
+	return cancelled
 }
 
 func (w *MCPWrapper) UpdateMCPGlobalSettings(
@@ -909,6 +924,7 @@ func (w *MCPWrapper) GetMCPGlobalSettings() (
 		if w.oauthBroker != nil {
 			view.OAuthRedirectURL = w.oauthBroker.RedirectURL()
 			view.OAuthLoopbackListenAddr = w.oauthBroker.ListenAddr()
+			view.OAuthLoopbackReady, view.OAuthLoopbackError = w.oauthBroker.Readiness()
 			view.OAuthRestartRequired = strings.TrimSpace(settings.OAuthLoopbackListenAddr) !=
 				w.oauthLoopbackListenAddrAtStart
 		}

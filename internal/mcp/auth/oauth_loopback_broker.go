@@ -19,6 +19,7 @@ import (
 const (
 	defaultOAuthLoopbackTTL  = 5 * time.Minute
 	defaultOAuthCallbackPath = "/mcp/oauth/callback"
+	unavailableStr           = "OAuth loopback listener is unavailable"
 )
 
 type oauthPendingKey struct {
@@ -59,6 +60,8 @@ type OAuthLoopbackBroker struct {
 
 	server   *http.Server
 	listener net.Listener
+	serveErr error
+	closed   bool
 
 	pendingByServer map[oauthPendingKey]*pendingOAuthAuthorization
 	pendingByState  map[string]*pendingOAuthAuthorization
@@ -122,6 +125,16 @@ func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOption
 
 	go func() {
 		if err := b.server.Serve(ln); err != nil && err != http.ErrServerClosed {
+			b.mu.Lock()
+			b.serveErr = err
+			for _, pending := range b.pendingByServer {
+				b.completeLocked(
+					pending,
+					nil,
+					fmt.Errorf("%w: OAuth loopback listener stopped", ErrMCPAuthRequired),
+				)
+			}
+			b.mu.Unlock()
 			logger.Warn("mcp oauth loopback server stopped unexpectedly", "err", err)
 		}
 	}()
@@ -143,6 +156,26 @@ func (b *OAuthLoopbackBroker) RedirectURL() string {
 	return b.redirectURL
 }
 
+func (b *OAuthLoopbackBroker) Readiness() (ready bool, errStr string) {
+	if b == nil {
+		return false, "OAuth loopback broker is not configured"
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	switch {
+	case b.closed:
+		return false, "OAuth loopback listener is closed"
+	case b.serveErr != nil:
+		return false, b.serveErr.Error()
+	case b.server == nil || b.listener == nil || b.redirectURL == "":
+		return false, "OAuth loopback listener is not initialized"
+	default:
+		return true, ""
+	}
+}
+
 func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	ctx context.Context,
 	req OAuthAuthorizationRequest,
@@ -155,6 +188,16 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	}
 	if req.AuthorizationURL == "" {
 		return nil, fmt.Errorf("%w: OAuth authorization URL required", ErrMCPAuthRequired)
+	}
+	if ready, readinessError := b.Readiness(); !ready {
+		if readinessError == "" {
+			readinessError = unavailableStr
+		}
+		return nil, fmt.Errorf(
+			"%w: %s",
+			ErrMCPAuthRequired,
+			readinessError,
+		)
 	}
 
 	state, err := authorizationState(req.AuthorizationURL)
@@ -267,6 +310,11 @@ func (b *OAuthLoopbackBroker) Close() error {
 	}
 
 	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return nil
+	}
+	b.closed = true
 	for _, p := range b.pendingByServer {
 		b.completeLocked(p, nil, fmt.Errorf("%w: OAuth broker closed", ErrMCPAuthRequired))
 	}

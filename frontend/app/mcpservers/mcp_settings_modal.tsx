@@ -15,6 +15,9 @@ interface MCPSettingsModalProps {
 	initialListenAddr?: string;
 	activeListenAddr?: string;
 	oauthRedirectURL?: string;
+	oauthRestartRequired?: boolean;
+	oauthLoopbackReady?: boolean;
+	oauthLoopbackError?: string;
 	onClose: () => void;
 	onSubmit: (oauthLoopbackListenAddr: string) => Promise<void>;
 }
@@ -90,6 +93,9 @@ function MCPSettingsModalContent({
 	initialListenAddr,
 	activeListenAddr,
 	oauthRedirectURL,
+	oauthRestartRequired,
+	oauthLoopbackReady,
+	oauthLoopbackError,
 	onSubmit,
 }: Omit<MCPSettingsModalProps, 'isOpen' | 'onClose'>) {
 	const [listenAddress, setListenAddress] = useState(initialListenAddr ?? '');
@@ -150,6 +156,25 @@ function MCPSettingsModalContent({
 							<div className="alert alert-error rounded-2xl text-sm">
 								<FiAlertCircle size={14} />
 								<span>{submitError}</span>
+							</div>
+						) : null}
+
+						{oauthLoopbackReady === false ? (
+							<div className="alert alert-error rounded-2xl text-sm">
+								<FiAlertCircle size={14} />
+								<span>
+									{oauthLoopbackError ||
+										'The active OAuth callback listener is unavailable. Restart FlexiGPT before authorizing.'}
+								</span>
+							</div>
+						) : null}
+
+						{oauthRestartRequired ? (
+							<div className="alert alert-warning rounded-2xl text-sm">
+								<FiAlertCircle size={14} />
+								<span>
+									The saved listen address is not active yet. Restart FlexiGPT before using the new callback URL.
+								</span>
 							</div>
 						) : null}
 

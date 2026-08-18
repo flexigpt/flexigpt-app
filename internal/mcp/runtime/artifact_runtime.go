@@ -104,6 +104,11 @@ type sessionState struct {
 	snapshotExpiresAt time.Time
 }
 
+type connectionAttempt struct {
+	generation uint64
+	cancel     context.CancelFunc
+}
+
 type MCPRuntimeManager struct {
 	resolver    server.Resolver
 	secrets     server.SecretResolver
@@ -111,10 +116,14 @@ type MCPRuntimeManager struct {
 	authorizer  auth.ConnectionAuthorizer
 	factory     ClientFactory
 
+	lifecycleContext context.Context
+	cancelLifecycle  context.CancelFunc
+
 	mu          sync.RWMutex
 	sessions    map[artifact.ArtifactRef]*sessionState
 	generations map[artifact.ArtifactRef]uint64
 	timers      map[artifact.ArtifactRef]*time.Timer
+	attempts    map[artifact.ArtifactRef]connectionAttempt
 	closed      bool
 }
 
@@ -134,15 +143,20 @@ func NewMCPRuntimeManager(
 		)
 	}
 
+	lifecycleContext, cancelLifecycle := context.WithCancel(context.Background())
+
 	return &MCPRuntimeManager{
-		resolver:    resolver,
-		secrets:     secrets,
-		environment: environment,
-		authorizer:  authorizer,
-		factory:     factory,
-		sessions:    make(map[artifact.ArtifactRef]*sessionState),
-		generations: make(map[artifact.ArtifactRef]uint64),
-		timers:      make(map[artifact.ArtifactRef]*time.Timer),
+		resolver:         resolver,
+		secrets:          secrets,
+		environment:      environment,
+		authorizer:       authorizer,
+		factory:          factory,
+		lifecycleContext: lifecycleContext,
+		cancelLifecycle:  cancelLifecycle,
+		sessions:         make(map[artifact.ArtifactRef]*sessionState),
+		generations:      make(map[artifact.ArtifactRef]uint64),
+		timers:           make(map[artifact.ArtifactRef]*time.Timer),
+		attempts:         make(map[artifact.ArtifactRef]connectionAttempt),
 	}, nil
 }
 
@@ -159,82 +173,60 @@ func (m *MCPRuntimeManager) Connect(
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
 	}
-	generation, previous, timer, err := m.beginConnection(ref)
+
+	attemptContext, generation, previous, timer, err := m.beginConnection(
+		ctx,
+		ref,
+	)
 	if err != nil {
 		return nil, err
 	}
-	if timer != nil {
-		timer.Stop()
-	}
-	if previous != nil && previous.client != nil {
-		_ = closeMCPClient(ctx, previous.client)
-	}
+	defer m.finishConnectionAttempt(ref, generation)
 
-	resolved, config, authConn, err := m.resolveForConnection(ctx, ref)
-	if err != nil {
-		m.setErrorIfCurrent(ref, generation, err)
-		return nil, err
-	}
-	m.setConnectingCollectionIfCurrent(ref, generation, resolved.Collection)
-	if !m.connectionCurrent(ref, generation) {
-		return nil, fmt.Errorf(
-			"%w: MCP connection was superseded",
-			ErrMCPRuntimeNotReady,
-		)
-	}
-
-	connectCtx, cancel := withMCPConnectTimeout(ctx, config)
-	defer cancel()
-
-	client, err := m.factory.Connect(connectCtx, config, authConn, m)
-	if err != nil {
-		err = redactRuntimeError(
-			err,
-			config.SensitiveValues,
-			authConn.SensitiveValues,
-		)
-		if m.setErrorIfCurrent(ref, generation, err) {
-			m.authorizer.ConnectionFailed(context.WithoutCancel(ctx), config, err)
-		}
-		return nil, err
-	}
-
-	snapshot, err := client.Discover(connectCtx, config)
-	if err != nil {
-		closeErr := closeMCPClient(ctx, client)
-		err = redactRuntimeError(
-			errors.Join(err, closeErr),
-			config.SensitiveValues,
-			authConn.SensitiveValues,
-		)
-		if m.setErrorIfCurrent(ref, generation, err) {
-			m.authorizer.ConnectionFailed(context.WithoutCancel(ctx), config, err)
-		}
-		return nil, err
-	}
-
-	now := time.Now().UTC()
-	normalizeSnapshot(&snapshot, ref, now)
-	if !m.commitConnection(
+	return m.connect(
+		attemptContext,
 		ref,
 		generation,
-		resolved,
-		config,
-		client,
-		snapshot,
-		now,
-	) {
-		_ = closeMCPClient(ctx, client)
-		return nil, fmt.Errorf(
-			"%w: MCP connection was superseded",
-			ErrMCPRuntimeNotReady,
-		)
+		previous,
+		timer,
+	)
+}
+
+// StartConnect starts one managed connection attempt and immediately returns
+// the Connecting snapshot. OAuth browser interaction and discovery continue in
+// the runtime-owned context and can be cancelled by Disconnect or Invalidate.
+
+//nolint:contextcheck // Background check.
+func (m *MCPRuntimeManager) StartConnect(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (*MCPServerRuntimeSnapshot, error) {
+	if err := validateRuntimeRef(ctx, ref); err != nil {
+		return nil, err
 	}
 
-	m.authorizer.ConnectionSucceeded(
-		context.WithoutCancel(ctx),
-		config,
+	attemptContext, generation, previous, timer, err := m.beginConnection(
+		m.lifecycleContext,
+		ref,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		defer m.finishConnectionAttempt(ref, generation)
+
+		if _, connectErr := m.connect(
+			attemptContext,
+			ref,
+			generation,
+			previous,
+			timer,
+		); connectErr != nil && !errors.Is(connectErr, context.Canceled) {
+			slog.Debug("background MCP connection finished with an error", "server", ref, "error", connectErr)
+		}
+	}()
+
 	return m.Status(ctx, ref)
 }
 
@@ -245,8 +237,11 @@ func (m *MCPRuntimeManager) Disconnect(
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return err
 	}
-	state, timer := m.disconnectSession(ref)
+	state, timer, cancelAttempt := m.disconnectSession(ref)
 
+	if cancelAttempt != nil {
+		cancelAttempt()
+	}
 	if timer != nil {
 		timer.Stop()
 	}
@@ -699,6 +694,8 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 	}
 	m.closed = true
 
+	cancelLifecycle := m.cancelLifecycle
+	m.cancelLifecycle = nil
 	states := make([]*sessionState, 0, len(m.sessions))
 	for ref, state := range m.sessions {
 		m.generations[ref]++
@@ -708,10 +705,23 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 	for _, timer := range m.timers {
 		timers = append(timers, timer)
 	}
+	attemptCancels := make([]context.CancelFunc, 0, len(m.attempts))
+	for _, attempt := range m.attempts {
+		if attempt.cancel != nil {
+			attemptCancels = append(attemptCancels, attempt.cancel)
+		}
+	}
 	m.sessions = make(map[artifact.ArtifactRef]*sessionState)
 	m.timers = make(map[artifact.ArtifactRef]*time.Timer)
+	m.attempts = make(map[artifact.ArtifactRef]connectionAttempt)
 	m.mu.Unlock()
 
+	if cancelLifecycle != nil {
+		cancelLifecycle()
+	}
+	for _, cancelAttempt := range attemptCancels {
+		cancelAttempt()
+	}
 	for _, timer := range timers {
 		timer.Stop()
 	}
@@ -805,7 +815,10 @@ func (m *MCPRuntimeManager) Invalidate(
 		return err
 	}
 
-	state, timer := m.removeSession(ref)
+	state, timer, cancelAttempt := m.removeSession(ref)
+	if cancelAttempt != nil {
+		cancelAttempt()
+	}
 	if timer != nil {
 		timer.Stop()
 	}
@@ -838,6 +851,88 @@ func (m *MCPRuntimeManager) Status(
 	}
 
 	return runtimeSnapshot(state), nil
+}
+
+func (m *MCPRuntimeManager) connect(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	generation uint64,
+	previous *sessionState,
+	timer *time.Timer,
+) (*MCPServerRuntimeSnapshot, error) {
+	if timer != nil {
+		timer.Stop()
+	}
+	if previous != nil && previous.client != nil {
+		_ = closeMCPClient(ctx, previous.client)
+	}
+
+	resolved, config, authConn, err := m.resolveForConnection(ctx, ref)
+	if err != nil {
+		m.setErrorIfCurrent(ref, generation, err)
+		return nil, err
+	}
+	m.setConnectingCollectionIfCurrent(ref, generation, resolved.Collection)
+	if !m.connectionCurrent(ref, generation) {
+		return nil, fmt.Errorf(
+			"%w: MCP connection was superseded",
+			ErrMCPRuntimeNotReady,
+		)
+	}
+
+	connectCtx, cancel := withMCPConnectTimeout(ctx, config)
+	defer cancel()
+
+	client, err := m.factory.Connect(connectCtx, config, authConn, m)
+	if err != nil {
+		err = redactRuntimeError(
+			err,
+			config.SensitiveValues,
+			authConn.SensitiveValues,
+		)
+		if m.setErrorIfCurrent(ref, generation, err) {
+			m.authorizer.ConnectionFailed(context.WithoutCancel(ctx), config, err)
+		}
+		return nil, err
+	}
+
+	snapshot, err := client.Discover(connectCtx, config)
+	if err != nil {
+		closeErr := closeMCPClient(ctx, client)
+		err = redactRuntimeError(
+			errors.Join(err, closeErr),
+			config.SensitiveValues,
+			authConn.SensitiveValues,
+		)
+		if m.setErrorIfCurrent(ref, generation, err) {
+			m.authorizer.ConnectionFailed(context.WithoutCancel(ctx), config, err)
+		}
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	normalizeSnapshot(&snapshot, ref, now)
+	if !m.commitConnection(
+		ref,
+		generation,
+		resolved,
+		config,
+		client,
+		snapshot,
+		now,
+	) {
+		_ = closeMCPClient(ctx, client)
+		return nil, fmt.Errorf(
+			"%w: MCP connection was superseded",
+			ErrMCPRuntimeNotReady,
+		)
+	}
+
+	m.authorizer.ConnectionSucceeded(
+		context.WithoutCancel(ctx),
+		config,
+	)
+	return m.Status(ctx, ref)
 }
 
 func (m *MCPRuntimeManager) resolveForConnection(
@@ -926,19 +1021,33 @@ func (m *MCPRuntimeManager) session(
 }
 
 func (m *MCPRuntimeManager) beginConnection(
+	parent context.Context,
 	ref artifact.ArtifactRef,
-) (uint64, *sessionState, *time.Timer, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.closed {
-		return 0, nil, nil, basespec.ErrClosed
+) (context.Context, uint64, *sessionState, *time.Timer, error) {
+	attemptContext, cancelAttempt := context.WithCancel(parent)
+	stopLifecycle := context.AfterFunc(m.lifecycleContext, cancelAttempt)
+	cancelConnection := func() {
+		stopLifecycle()
+		cancelAttempt()
 	}
+
+	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		cancelConnection()
+		return nil, 0, nil, nil, basespec.ErrClosed
+	}
+
+	previousAttempt := m.attempts[ref]
 	m.generations[ref]++
 	generation := m.generations[ref]
 	previous := m.sessions[ref]
 	timer := m.timers[ref]
 
+	m.attempts[ref] = connectionAttempt{
+		generation: generation,
+		cancel:     cancelConnection,
+	}
 	delete(m.timers, ref)
 	next := &sessionState{
 		server:     ref,
@@ -954,8 +1063,32 @@ func (m *MCPRuntimeManager) beginConnection(
 		}
 	}
 	m.sessions[ref] = next
+	m.mu.Unlock()
 
-	return generation, previous, timer, nil
+	if previousAttempt.cancel != nil {
+		previousAttempt.cancel()
+	}
+
+	return attemptContext, generation, previous, timer, nil
+}
+
+func (m *MCPRuntimeManager) finishConnectionAttempt(
+	ref artifact.ArtifactRef,
+	generation uint64,
+) {
+	var cancelAttempt context.CancelFunc
+
+	m.mu.Lock()
+	attempt := m.attempts[ref]
+	if attempt.generation == generation {
+		cancelAttempt = attempt.cancel
+		delete(m.attempts, ref)
+	}
+	m.mu.Unlock()
+
+	if cancelAttempt != nil {
+		cancelAttempt()
+	}
 }
 
 // disconnectSession preserves a bounded process-local discovery snapshot for
@@ -963,16 +1096,18 @@ func (m *MCPRuntimeManager) beginConnection(
 // Invalidate and therefore always drops the snapshot.
 func (m *MCPRuntimeManager) disconnectSession(
 	ref artifact.ArtifactRef,
-) (*sessionState, *time.Timer) {
+) (*sessionState, *time.Timer, context.CancelFunc) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.generations[ref]++
 	state := m.sessions[ref]
 	timer := m.timers[ref]
+	attempt := m.attempts[ref]
 	delete(m.timers, ref)
+	delete(m.attempts, ref)
 	if state == nil {
-		return nil, timer
+		return nil, timer, attempt.cancel
 	}
 
 	closed := cloneSessionState(state)
@@ -985,7 +1120,7 @@ func (m *MCPRuntimeManager) disconnectSession(
 		state.lastSyncedAt = time.Time{}
 		state.snapshotExpiresAt = time.Time{}
 	}
-	return closed, timer
+	return closed, timer, attempt.cancel
 }
 
 func (m *MCPRuntimeManager) setConnectingCollectionIfCurrent(
@@ -1058,15 +1193,17 @@ func (m *MCPRuntimeManager) commitConnection(
 
 func (m *MCPRuntimeManager) removeSession(
 	ref artifact.ArtifactRef,
-) (*sessionState, *time.Timer) {
+) (*sessionState, *time.Timer, context.CancelFunc) {
 	m.mu.Lock()
 	m.generations[ref]++
 	state := m.sessions[ref]
 	timer := m.timers[ref]
+	attempt := m.attempts[ref]
 	delete(m.sessions, ref)
 	delete(m.timers, ref)
+	delete(m.attempts, ref)
 	m.mu.Unlock()
-	return state, timer
+	return state, timer, attempt.cancel
 }
 
 func (m *MCPRuntimeManager) setErrorIfCurrent(
@@ -1182,12 +1319,6 @@ func validateRuntimeRef(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: MCP runtime context is nil",
-			basespec.ErrInvalid,
-		)
-	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}

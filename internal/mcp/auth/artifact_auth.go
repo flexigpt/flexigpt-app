@@ -70,6 +70,10 @@ type OAuthAuthorizationBroker interface {
 	) (*OAuthAuthorizationResult, error)
 }
 
+type oauthAuthorizationBrokerReadiness interface {
+	Readiness() (bool, string)
+}
+
 type AuthStatusSink interface {
 	SaveAuthStatus(
 		ctx context.Context,
@@ -370,6 +374,26 @@ func (m *AuthManager) BuildAuthHealth(
 			health.OAuthRedirectURL = broker.RedirectURL()
 		}
 		if broker, ok := m.oauthBroker.(interface {
+			ListenAddr() string
+		}); ok {
+			health.OAuthLoopbackListenAddr = broker.ListenAddr()
+		}
+		if broker, ok := m.oauthBroker.(oauthAuthorizationBrokerReadiness); ok {
+			ready, readinessError := broker.Readiness()
+			health.OAuthLoopbackReady = &ready
+			health.OAuthLoopbackError = readinessError
+
+			if !ready &&
+				status.AuthMode == server.MCPHTTPAuthOAuth &&
+				status.State != MCPAuthStateAuthorized &&
+				health.LastError == "" {
+				if readinessError == "" {
+					readinessError = unavailableStr
+				}
+				health.LastError = readinessError
+			}
+		}
+		if broker, ok := m.oauthBroker.(interface {
 			Pending() []MCPOAuthAuthorization
 		}); ok {
 			for _, pending := range broker.Pending() {
@@ -418,6 +442,20 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 			ErrMCPAuthRequired,
 			errStrOAuthNotConfigured,
 		)
+	}
+	if broker, ok := m.oauthBroker.(oauthAuthorizationBrokerReadiness); ok {
+		ready, readinessError := broker.Readiness()
+		if !ready {
+			if readinessError == "" {
+				readinessError = unavailableStr
+			}
+			output.Status.LastError = readinessError
+			return fmt.Errorf(
+				"%w: %s",
+				ErrMCPAuthRequired,
+				readinessError,
+			)
+		}
 	}
 
 	httpConfig := config.StreamableHTTP
@@ -669,12 +707,25 @@ func authConfigured(
 			config.StreamableHTTP.ClientCredentialRef != ""
 	case server.MCPHTTPAuthOAuth:
 		return status.State == MCPAuthStateAuthorized ||
-			(manager != nil &&
-				manager.oauthBroker != nil &&
-				strings.TrimSpace(manager.oauthRedirectURL) != "")
+			oauthBrokerConfigured(manager)
 	default:
 		return false
 	}
+}
+
+func oauthBrokerConfigured(manager *AuthManager) bool {
+	if manager == nil ||
+		manager.oauthBroker == nil ||
+		strings.TrimSpace(manager.oauthRedirectURL) == "" {
+		return false
+	}
+
+	if broker, ok := manager.oauthBroker.(oauthAuthorizationBrokerReadiness); ok {
+		ready, _ := broker.Readiness()
+		return ready
+	}
+
+	return true
 }
 
 func authHealthState(

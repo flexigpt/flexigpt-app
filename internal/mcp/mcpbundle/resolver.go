@@ -140,7 +140,7 @@ func (a *API) resolveMCPServer(
 		}
 	}
 
-	installationData, installationRevision, runtimeEnabled, err := a.effectiveInstallation(
+	installationData, installationRevision, _, runtimeEnabled, err := a.effectiveInstallation(
 		ctx,
 		bundle,
 		record,
@@ -277,19 +277,21 @@ func (a *API) effectiveInstallation(
 ) (
 	installationData server.ServerData,
 	installationRevision uint64,
+	installationEnabled bool,
 	runtimeEnabled bool,
 	err error,
 ) {
 	if !a.dependencies.RootPolicy.IsProtectedRoot(record.RootID) {
 		data, err := server.DecodeServerData(record.Data)
 		if err != nil {
-			return server.ServerData{}, 0, false, err
+			return server.ServerData{}, 0, false, false, err
 		}
 		if err := server.ValidateServerDataForDocument(record.Ref(), document, data); err != nil {
-			return server.ServerData{}, 0, false, err
+			return server.ServerData{}, 0, false, false, err
 		}
 		return data,
 			record.Revision,
+			record.Enabled,
 			bundle.Collection.Enabled && record.Enabled,
 			nil
 	}
@@ -297,6 +299,7 @@ func (a *API) effectiveInstallation(
 	if a.dependencies.Overlays == nil {
 		return server.ServerData{},
 			0,
+			false,
 			false,
 			fmt.Errorf(
 				"%w: protected MCP installation overlay store is unavailable",
@@ -309,17 +312,17 @@ func (a *API) effectiveInstallation(
 		record.Ref(),
 	)
 	if err != nil {
-		return server.ServerData{}, 0, false, err
+		return server.ServerData{}, 0, false, false, err
 	}
 	if !found {
-		return server.DefaultServerData(), 0, false, nil
+		return server.DefaultServerData(), 0, false, false, nil
 	}
 	if err := server.ValidateServerDataForDocument(
 		record.Ref(),
 		document,
 		serverOverlay.ServerData,
 	); err != nil {
-		return server.ServerData{}, 0, false, err
+		return server.ServerData{}, 0, false, false, err
 	}
 	bundleOverlay, bundleFound, err := a.dependencies.Overlays.GetBundleOverlay(
 		ctx,
@@ -327,16 +330,18 @@ func (a *API) effectiveInstallation(
 		record.CollectionID,
 	)
 	if err != nil {
-		return server.ServerData{}, 0, false, err
+		return server.ServerData{}, 0, false, false, err
 	}
 	if !bundleFound {
 		return serverOverlay.ServerData,
 			serverOverlay.Revision,
+			serverOverlay.RuntimeEnabled,
 			false,
 			nil
 	}
 	return serverOverlay.ServerData,
 		serverOverlay.Revision,
+		serverOverlay.RuntimeEnabled,
 		bundle.Collection.Enabled &&
 			record.Enabled &&
 			serverOverlay.RuntimeEnabled &&

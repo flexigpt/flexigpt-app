@@ -43,7 +43,6 @@ import {
 	getMCPServerAuthHealthLabel,
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
-	isMCPAuthActionable,
 } from '@/mcpservers/lib/mcp_server_utils';
 import { MCPBundleDetailsModal } from '@/mcpservers/mcp_bundle_details_modal';
 import { AddEditMCPServerModal } from '@/mcpservers/mcp_server_add_edit_modal';
@@ -63,6 +62,7 @@ interface MCPBundleCardProps {
 	authHealthByArtifactID: Record<string, MCPAuthHealth | undefined>;
 	readErrorsByArtifactID?: Record<string, MCPServerReadErrors | undefined>;
 	serverLoadError?: string;
+	isLoadingServers?: boolean;
 
 	onRefreshServers: () => Promise<void>;
 	onToggleBundleEnabled: (bundle: MCPBundleView, enabled: boolean) => Promise<void>;
@@ -82,6 +82,15 @@ interface MCPBundleCardProps {
 	onRequestOAuthAuthorization: (server: MCPServerView) => void;
 }
 
+interface MCPServerEditorState {
+	server?: MCPServerView;
+}
+
+interface MCPSetupTarget {
+	server: MCPServerView;
+	connectAfterSave: boolean;
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim()) {
 		return error.message;
@@ -98,6 +107,7 @@ export function MCPBundleCard({
 	authHealthByArtifactID,
 	readErrorsByArtifactID = {},
 	serverLoadError,
+	isLoadingServers = false,
 	onRefreshServers,
 	onToggleBundleEnabled,
 	onToggleServerEnabled,
@@ -113,9 +123,9 @@ export function MCPBundleCard({
 }: MCPBundleCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [serverToDelete, setServerToDelete] = useState<MCPServerView | null>(null);
-	const [serverToEdit, setServerToEdit] = useState<MCPServerView | undefined>();
+	const [serverEditor, setServerEditor] = useState<MCPServerEditorState | null>(null);
 	const [serverDetails, setServerDetails] = useState<MCPServerView | null>(null);
-	const [setupServer, setSetupServer] = useState<MCPServerView | null>(null);
+	const [setupTarget, setSetupTarget] = useState<MCPSetupTarget | null>(null);
 	const [isBundleDetailsOpen, setIsBundleDetailsOpen] = useState(false);
 	const [alertMessage, setAlertMessage] = useState('');
 
@@ -133,6 +143,17 @@ export function MCPBundleCard({
 		void runAction('bundle:refresh', onRefreshServers).catch((error: unknown) => {
 			showAlert(getErrorMessage(error, 'Failed to reload MCP servers.'));
 		});
+	};
+
+	const connectServer = async (server: MCPServerView) => {
+		const artifactID = server.ref.artifactID;
+
+		try {
+			await runAction(`${artifactID}:connect`, () => onConnectServer(server));
+		} catch (error) {
+			showAlert(getErrorMessage(error, 'Failed to start the MCP server connection.'));
+			throw error;
+		}
 	};
 
 	return (
@@ -162,7 +183,7 @@ export function MCPBundleCard({
 							setIsExpanded(previous => !previous);
 						}}
 					>
-						<span>Servers: {servers.length}</span>
+						<span>{isLoadingServers ? 'Loading servers...' : `Servers: ${servers.length}`}</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>
 				}
@@ -199,7 +220,7 @@ export function MCPBundleCard({
 									className="btn btn-sm btn-ghost rounded-xl"
 									disabled={!bundle.enabled || Boolean(serverLoadError)}
 									onClick={() => {
-										setServerToEdit(undefined);
+										setServerEditor({});
 									}}
 								>
 									<FiPlus size={16} />
@@ -244,7 +265,11 @@ export function MCPBundleCard({
 					<div className="mt-6 space-y-3">
 						{servers.length === 0 ? (
 							<ManagementEmptyState>
-								{serverLoadError ? 'Server contents are unavailable.' : 'No MCP servers in this bundle.'}
+								{isLoadingServers
+									? 'Loading MCP servers...'
+									: serverLoadError
+										? 'Server contents are unavailable.'
+										: 'No MCP servers in this bundle.'}
 							</ManagementEmptyState>
 						) : (
 							servers.map(server => {
@@ -306,10 +331,16 @@ export function MCPBundleCard({
 											leading={
 												<EnabledControl
 													id={`mcp-server-${artifactID}`}
-													checked={server.runtimeEnabled}
-													disabled={!operational}
+													checked={server.installationEnabled}
+													disabled={!operational || !bundle.enabled}
 													busy={isPending(`${artifactID}:toggle`)}
-													title={!operational ? 'The server installation is unavailable.' : undefined}
+													title={
+														!operational
+															? 'The server installation is unavailable.'
+															: !bundle.enabled
+																? 'Enable the bundle before changing its server settings.'
+																: undefined
+													}
 													onChange={enabled => {
 														void runAction(`${artifactID}:toggle`, () =>
 															onToggleServerEnabled(bundle, server, enabled)
@@ -337,7 +368,10 @@ export function MCPBundleCard({
 													className="btn btn-sm btn-ghost rounded-xl"
 													disabled={!operational}
 													onClick={() => {
-														setSetupServer(server);
+														setSetupTarget({
+															server,
+															connectAfterSave: false,
+														});
 													}}
 												>
 													<FiSettings size={15} />
@@ -351,7 +385,9 @@ export function MCPBundleCard({
 													className="btn btn-sm btn-ghost rounded-xl"
 													disabled={!bundle.enabled || !operational}
 													onClick={() => {
-														setServerToEdit(server);
+														setServerEditor({
+															server,
+														});
 													}}
 												>
 													<FiEdit2 size={15} />
@@ -359,7 +395,7 @@ export function MCPBundleCard({
 												</button>
 											) : null}
 
-											{isMCPAuthActionable(server, authHealth) ? (
+											{authPending && authHealth?.authorizationURL?.trim() ? (
 												<button
 													type="button"
 													className="btn btn-sm btn-ghost rounded-xl"
@@ -368,7 +404,7 @@ export function MCPBundleCard({
 													}}
 												>
 													<FiExternalLink size={15} />
-													<span>Authorize</span>
+													<span>Resume authorization</span>
 												</button>
 											) : null}
 
@@ -398,36 +434,42 @@ export function MCPBundleCard({
 													!operational ||
 													ready ||
 													connecting ||
-													!setup.complete ||
+													authPending ||
 													isPending(`${artifactID}:connect`)
 												}
 												onClick={() => {
-													void runAction(`${artifactID}:connect`, () => onConnectServer(server)).catch(
-														(error: unknown) => {
-															showAlert(getErrorMessage(error, 'Failed to connect MCP server.'));
-														}
-													);
+													if (!setup.complete) {
+														setSetupTarget({
+															server,
+															connectAfterSave: true,
+														});
+														return;
+													}
+
+													void connectServer(server).catch(() => undefined);
 												}}
 											>
 												<FiWifi size={15} />
-												<span>Connect</span>
+												<span>{setup.complete ? 'Connect' : 'Set up & connect'}</span>
 											</button>
 
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
-												disabled={!ready || isPending(`${artifactID}:disconnect`)}
-												onClick={() => {
-													void runAction(`${artifactID}:disconnect`, () => onDisconnectServer(server)).catch(
-														(error: unknown) => {
-															showAlert(getErrorMessage(error, 'Failed to disconnect MCP server.'));
-														}
-													);
-												}}
-											>
-												<FiWifiOff size={15} />
-												<span>Disconnect</span>
-											</button>
+											{!authPending ? (
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													disabled={(!ready && !connecting) || isPending(`${artifactID}:disconnect`)}
+													onClick={() => {
+														void runAction(`${artifactID}:disconnect`, () => onDisconnectServer(server)).catch(
+															(error: unknown) => {
+																showAlert(getErrorMessage(error, 'Failed to disconnect MCP server.'));
+															}
+														);
+													}}
+												>
+													<FiWifiOff size={15} />
+													<span>{connecting ? 'Cancel connection' : 'Disconnect'}</span>
+												</button>
+											) : null}
 
 											<button
 												type="button"
@@ -486,15 +528,15 @@ export function MCPBundleCard({
 			/>
 
 			<AddEditMCPServerModal
-				isOpen={serverToEdit !== undefined}
+				isOpen={serverEditor !== null}
 				bundle={bundle}
-				initialServer={serverToEdit}
+				initialServer={serverEditor?.server}
 				existingLogicalNames={existingLogicalNames}
 				onClose={() => {
-					setServerToEdit(undefined);
+					setServerEditor(null);
 				}}
 				onSubmit={async draft => {
-					await onSaveServer(bundle, serverToEdit, draft);
+					await onSaveServer(bundle, serverEditor?.server, draft);
 				}}
 			/>
 
@@ -519,12 +561,24 @@ export function MCPBundleCard({
 			/>
 
 			<MCPServerSetupModal
-				isOpen={setupServer !== null}
-				server={setupServer}
+				isOpen={setupTarget !== null}
+				server={setupTarget?.server ?? null}
 				onClose={() => {
-					setSetupServer(null);
+					setSetupTarget(null);
 				}}
-				onSubmit={onSaveSetup}
+				onSubmit={async (server, values, reset) => {
+					const connectAfterSave = setupTarget?.connectAfterSave ?? false;
+					await onSaveSetup(server, values, reset);
+
+					if (connectAfterSave) {
+						try {
+							await connectServer(server);
+						} catch {
+							// Setup was saved successfully. The card-level alert
+							// reports only the failed connection start.
+						}
+					}
+				}}
 			/>
 
 			<ActionDeniedAlertModal isOpen={Boolean(alertMessage)} message={alertMessage} onClose={clearAlert} />

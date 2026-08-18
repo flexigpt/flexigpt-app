@@ -115,6 +115,8 @@ type Installer struct {
 	overlays        overlay.OverlayRepository
 	documents       shareable.ExpectedCanonicalizer
 	packageScopes   []basespec.Locator
+	prepared        []preparedBundle
+	fingerprint     cryptoutil.Digest
 }
 
 type preparedBundle struct {
@@ -165,10 +167,16 @@ func NewInstaller(
 	if err != nil {
 		return nil, err
 	}
+	fingerprint, err := installer.hydrationFingerprint(prepared)
+	if err != nil {
+		return nil, err
+	}
 	scopes, err := builtInPackageScopes(prepared)
 	if err != nil {
 		return nil, err
 	}
+	installer.prepared = append([]preparedBundle(nil), prepared...)
+	installer.fingerprint = fingerprint
 	installer.packageScopes = scopes
 	return installer, nil
 }
@@ -182,21 +190,21 @@ func (i *Installer) DesiredHydration(
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
 		return topology.Hydration{}, err
 	}
-
-	prepared, err := i.prepareBundles(ctx)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return topology.Hydration{}, err
 	}
-	fingerprint, err := i.hydrationFingerprint(prepared)
-	if err != nil {
-		return topology.Hydration{}, err
+	if i.fingerprint == "" {
+		return topology.Hydration{}, fmt.Errorf(
+			"%w: MCP hydration fingerprint is unavailable",
+			basespec.ErrClosed,
+		)
 	}
 
 	return topology.Hydration{
 		InstallerName: i.BuiltInName(),
 		RootID:        i.builtInTopology.Root.ID,
 		SourceID:      i.builtInTopology.Sources[0].ID,
-		Fingerprint:   fingerprint,
+		Fingerprint:   i.fingerprint,
 	}, nil
 }
 
@@ -215,11 +223,7 @@ func (i *Installer) EnsureHydration(
 		return err
 	}
 	if current {
-		if err := i.FinalizeHydration(ctx); err == nil {
-			return nil
-		} else if ctx.Err() != nil {
-			return err
-		}
+		return nil
 	}
 
 	if !current {
@@ -236,7 +240,7 @@ func (i *Installer) EnsureHydration(
 		}
 	}
 
-	prepared, err := i.prepareBundles(ctx)
+	prepared, err := i.preparedBundles(ctx)
 	if err != nil {
 		return err
 	}
@@ -336,7 +340,7 @@ func (i *Installer) Ensure(ctx context.Context) error {
 }
 
 func (i *Installer) ensureCurrentBundles(ctx context.Context) error {
-	prepared, err := i.prepareBundles(ctx)
+	prepared, err := i.preparedBundles(ctx)
 	if err != nil {
 		return err
 	}
@@ -463,6 +467,21 @@ func (i *Installer) verifyCurrentBundle(
 		)
 	}
 	return nil
+}
+
+func (i *Installer) preparedBundles(
+	ctx context.Context,
+) ([]preparedBundle, error) {
+	if i == nil {
+		return nil, basespec.ErrClosed
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(i.prepared) == 0 {
+		return nil, fmt.Errorf("%w: MCP built-in bundles are not prepared", basespec.ErrClosed)
+	}
+	return append([]preparedBundle(nil), i.prepared...), nil
 }
 
 func (i *Installer) prepareBundles(

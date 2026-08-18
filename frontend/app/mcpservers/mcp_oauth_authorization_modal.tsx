@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { FiAlertCircle, FiExternalLink } from 'react-icons/fi';
+import { FiAlertCircle, FiExternalLink, FiRefreshCw } from 'react-icons/fi';
 
 import type { MCPAuthHealth } from '@/spec/mcp_artifact';
 import { MCPAuthHealthState } from '@/spec/mcp_artifact';
@@ -13,16 +13,15 @@ import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
 import type { MCPServerView } from '@/mcpservers/lib/mcp_management';
-import {
-	getMCPServerAuthHealthBadgeClass,
-	getMCPServerAuthHealthLabel,
-	isMCPAuthActionable,
-} from '@/mcpservers/lib/mcp_server_utils';
+import { getMCPServerAuthHealthBadgeClass, getMCPServerAuthHealthLabel } from '@/mcpservers/lib/mcp_server_utils';
 
 interface MCPOAuthAuthorizationModalProps {
 	isOpen: boolean;
 	server: MCPServerView | null;
 	authHealth?: MCPAuthHealth;
+	isConnecting?: boolean;
+	isReady?: boolean;
+	runtimeError?: string;
 	onClose: () => void;
 	onOpenURL: (url: string) => void;
 	onCancel?: () => Promise<void> | void;
@@ -33,6 +32,9 @@ function MCPOAuthAuthorizationModalContent({
 	authHealth,
 	onOpenURL,
 	onCancel,
+	isConnecting = false,
+	isReady = false,
+	runtimeError,
 	isCancelling,
 	setIsCancelling,
 }: MCPOAuthAuthorizationModalProps & {
@@ -43,9 +45,13 @@ function MCPOAuthAuthorizationModalContent({
 	const [cancelError, setCancelError] = useState('');
 	const { requestClose, unmountingRef } = useModalDialogController();
 
-	const authorizationURL = isMCPAuthActionable(server, authHealth) ? (authHealth?.authorizationURL?.trim() ?? '') : '';
+	const authorizationURL =
+		authHealth?.state === MCPAuthHealthState.Authorized ? '' : (authHealth?.authorizationURL?.trim() ?? '');
 	const isPending = authHealth?.state === MCPAuthHealthState.AuthorizationPending;
 	const isAuthorized = authHealth?.state === MCPAuthHealthState.Authorized;
+	const lastError = authHealth?.lastError?.trim() || runtimeError?.trim() || '';
+	const loopbackUnavailable = authHealth?.oauthLoopbackReady === false;
+	const isPreparing = isConnecting && !authorizationURL && !lastError && !loopbackUnavailable;
 
 	const handleCancel = async () => {
 		if (!onCancel || isCancelling) {
@@ -78,8 +84,12 @@ function MCPOAuthAuthorizationModalContent({
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl p-0">
 				<div className="app-scrollbar-thin p-4 sm:p-6">
 					<ModalHeader
-						title="OAuth authorization required"
-						description={`${server.displayName} needs browser authorization before FlexiGPT can connect.`}
+						title={isAuthorized ? 'OAuth authorization completed' : 'Connect with OAuth'}
+						description={
+							isAuthorized
+								? `${server.displayName} is completing MCP discovery.`
+								: `${server.displayName} needs browser authorization before FlexiGPT can connect.`
+						}
 						onClose={() => {
 							requestClose();
 						}}
@@ -97,7 +107,11 @@ function MCPOAuthAuthorizationModalContent({
 
 					{isAuthorized ? (
 						<div className="alert alert-success rounded-2xl text-sm">
-							Authorization completed. You can close this dialog.
+							{isReady
+								? 'Authorization and MCP connection completed.'
+								: isConnecting
+									? 'Authorization completed. FlexiGPT is loading MCP capabilities.'
+									: 'Authorization completed.'}
 						</div>
 					) : (
 						<div className="space-y-4">
@@ -117,17 +131,32 @@ function MCPOAuthAuthorizationModalContent({
 										{authorizationURL}
 									</div>
 								</div>
+							) : isPreparing ? (
+								<div className="alert alert-info rounded-2xl text-sm">
+									<FiRefreshCw className="animate-spin" size={14} />
+									<span>
+										Preparing a secure authorization request. The browser will open automatically when it is ready.
+									</span>
+								</div>
+							) : loopbackUnavailable ? (
+								<div className="alert alert-error rounded-2xl text-sm">
+									<FiAlertCircle size={14} />
+									<span>
+										{authHealth?.oauthLoopbackError ||
+											'The local OAuth callback listener is unavailable. Check OAuth settings and restart FlexiGPT.'}
+									</span>
+								</div>
 							) : (
 								<div className="alert alert-warning rounded-2xl text-sm">
 									<FiAlertCircle size={14} />
-									<span>The authorization URL is not available yet. Wait briefly and try again.</span>
+									<span>No OAuth authorization request is active. Close this dialog and retry Connect.</span>
 								</div>
 							)}
 
-							{authHealth?.lastError ? (
+							{lastError && !loopbackUnavailable ? (
 								<div className="alert alert-error rounded-2xl text-sm">
 									<FiAlertCircle size={14} />
-									<span>{authHealth.lastError}</span>
+									<span>{lastError}</span>
 								</div>
 							) : null}
 
@@ -141,7 +170,7 @@ function MCPOAuthAuthorizationModalContent({
 					)}
 
 					<ModalActions className="-mx-4 mt-6 -mb-4 sm:-mx-6 sm:-mb-6">
-						{isPending && onCancel ? (
+						{(isPending || isConnecting) && onCancel ? (
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
@@ -150,7 +179,7 @@ function MCPOAuthAuthorizationModalContent({
 									void handleCancel();
 								}}
 							>
-								Cancel authorization
+								{isPending ? 'Cancel authorization' : 'Cancel connection'}
 							</button>
 						) : null}
 

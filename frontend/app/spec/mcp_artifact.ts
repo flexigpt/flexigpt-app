@@ -378,6 +378,7 @@ export interface MCPServerInstallation {
 	document: MCPServerDocument;
 	installation: MCPServerData;
 	installationRevision: number;
+	installationEnabled: boolean;
 	runtimeEnabled: boolean;
 	builtIn: boolean;
 }
@@ -723,6 +724,8 @@ export interface MCPAuthHealth {
 	authorizationExpiresAt?: MCPTimestamp;
 	oauthRedirectURL?: string;
 	oauthLoopbackListenAddr?: string;
+	oauthLoopbackReady?: boolean;
+	oauthLoopbackError?: string;
 	lastError?: string;
 }
 
@@ -742,6 +745,8 @@ export interface MCPGlobalSettings {
 	oauthRedirectURL?: string;
 	oauthLoopbackListenAddr?: string;
 	oauthRestartRequired: boolean;
+	oauthLoopbackReady: boolean;
+	oauthLoopbackError?: string;
 }
 
 export interface MCPSecretWriteResult {

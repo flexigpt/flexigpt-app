@@ -1486,6 +1486,8 @@ export namespace auth {
 	    authorizationExpiresAt?: string;
 	    oauthRedirectURL?: string;
 	    oauthLoopbackListenAddr?: string;
+	    oauthLoopbackReady?: boolean;
+	    oauthLoopbackError?: string;
 	    lastError?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1506,6 +1508,8 @@ export namespace auth {
 	        this.authorizationExpiresAt = source["authorizationExpiresAt"];
 	        this.oauthRedirectURL = source["oauthRedirectURL"];
 	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
+	        this.oauthLoopbackReady = source["oauthLoopbackReady"];
+	        this.oauthLoopbackError = source["oauthLoopbackError"];
 	        this.lastError = source["lastError"];
 	    }
 	
@@ -2456,6 +2460,8 @@ export namespace main {
 	    oauthRedirectURL?: string;
 	    oauthLoopbackListenAddr?: string;
 	    oauthRestartRequired: boolean;
+	    oauthLoopbackReady: boolean;
+	    oauthLoopbackError?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new MCPGlobalSettingsView(source);
@@ -2468,6 +2474,8 @@ export namespace main {
 	        this.oauthRedirectURL = source["oauthRedirectURL"];
 	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
 	        this.oauthRestartRequired = source["oauthRestartRequired"];
+	        this.oauthLoopbackReady = source["oauthLoopbackReady"];
+	        this.oauthLoopbackError = source["oauthLoopbackError"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2841,6 +2849,7 @@ export namespace mcpbundle {
 	    document: server.ServerDocument;
 	    installation: server.ServerData;
 	    installationRevision: number;
+	    installationEnabled: boolean;
 	    runtimeEnabled: boolean;
 	    builtIn: boolean;
 	
@@ -2856,6 +2865,7 @@ export namespace mcpbundle {
 	        this.document = this.convertValues(source["document"], server.ServerDocument);
 	        this.installation = this.convertValues(source["installation"], server.ServerData);
 	        this.installationRevision = source["installationRevision"];
+	        this.installationEnabled = source["installationEnabled"];
 	        this.runtimeEnabled = source["runtimeEnabled"];
 	        this.builtIn = source["builtIn"];
 	    }

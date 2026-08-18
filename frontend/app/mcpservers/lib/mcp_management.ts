@@ -31,12 +31,14 @@ import {
 	MCPTrustLevel,
 } from '@/spec/mcp_artifact';
 
+import { mapWithConcurrency } from '@/lib/async_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { artifactStoreAPI, mcpAPI } from '@/apis/baseapi';
 
 const PLACEHOLDER_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+const INSTALLATION_READ_CONCURRENCY = 6;
 
 const SERVER_SUBRESOURCE_PREFIX = 'mcpServers/';
 const POLICY_SUBRESOURCE_PREFIX = 'policies/';
@@ -61,6 +63,7 @@ export interface MCPServerView {
 	document?: MCPServerDocument;
 	installation?: MCPServerData;
 	installationRevision?: number;
+	installationEnabled: boolean;
 	runtimeEnabled: boolean;
 	builtIn: boolean;
 	policy?: MCPPolicy;
@@ -476,6 +479,28 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 	};
 }
 
+function bundleView(bundle: MCPBundle, installation: MCPBundleInstallation): MCPBundleView {
+	return {
+		bundle,
+		installation,
+		ref: {
+			rootID: bundle.collection.rootID,
+			collectionID: bundle.collection.id,
+		},
+		displayName: bundle.collection.displayName || bundle.data.logicalName,
+		logicalName: bundle.data.logicalName,
+		description: bundle.collection.description,
+		enabled: installation.runtimeEnabled,
+		builtIn: installation.builtIn,
+	};
+}
+
+export async function loadMCPBundleView(ref: ArtifactCollectionRef): Promise<MCPBundleView> {
+	const [bundle, installation] = await Promise.all([mcpAPI.getMCPBundle(ref), mcpAPI.getMCPBundleInstallation(ref)]);
+
+	return bundleView(bundle, installation);
+}
+
 export async function loadMCPBundleViews(): Promise<MCPBundleView[]> {
 	const roots = await artifactStoreAPI.listArtifactRoots();
 	const responses = await Promise.allSettled(roots.map(root => mcpAPI.listMCPBundles(root.id)));
@@ -487,27 +512,13 @@ export async function loadMCPBundleViews(): Promise<MCPBundleView[]> {
 		}
 	}
 
-	const loaded = await Promise.all(
-		bundles.map(async bundle => {
-			const ref: ArtifactCollectionRef = {
-				rootID: bundle.collection.rootID,
-				collectionID: bundle.collection.id,
-			};
-
-			const installation = await mcpAPI.getMCPBundleInstallation(ref);
-
-			return {
-				bundle,
-				installation,
-				ref,
-				displayName: bundle.collection.displayName || bundle.data.logicalName,
-				logicalName: bundle.data.logicalName,
-				description: bundle.collection.description,
-				enabled: installation.runtimeEnabled,
-				builtIn: installation.builtIn,
-			} satisfies MCPBundleView;
-		})
-	);
+	const loaded = await mapWithConcurrency(bundles, INSTALLATION_READ_CONCURRENCY, async bundle => {
+		const installation = await mcpAPI.getMCPBundleInstallation({
+			rootID: bundle.collection.rootID,
+			collectionID: bundle.collection.id,
+		});
+		return bundleView(bundle, installation);
+	});
 
 	return loaded.toSorted((left, right) => {
 		if (left.builtIn !== right.builtIn) {
@@ -521,64 +532,64 @@ export async function loadMCPBundleViews(): Promise<MCPBundleView[]> {
 }
 
 export async function loadMCPServerViews(bundle: MCPBundleView): Promise<MCPServerView[]> {
-	const [document, artifacts] = await Promise.all([
+	const [document, artifacts, policies] = await Promise.all([
 		mcpAPI.getMCPBundleDocument(bundle.ref),
 		mcpAPI.listMCPBundleServers(bundle.ref),
+		mcpAPI.listMCPBundlePolicies(bundle.ref),
 	]);
 
-	const policies = await mcpAPI.listMCPBundlePolicies(bundle.ref);
 	const policiesBySubresource = new Map(
 		policies.map(policy => [policy.binding.subresourceLocator ?? '', policy] as const)
 	);
 
-	const views = await Promise.all(
-		artifacts.map(async artifact => {
-			try {
-				const installation = await mcpAPI.getMCPServerInstallation({
+	const views = await mapWithConcurrency(artifacts, INSTALLATION_READ_CONCURRENCY, async artifact => {
+		try {
+			const installation = await mcpAPI.getMCPServerInstallation({
+				rootID: artifact.rootID,
+				artifactID: artifact.id,
+			});
+			const policyDocument = getPolicyForServer(document, installation.document);
+			const policyReference = installation.document.extension.policy?.ref;
+			const policyArtifact = policyReference
+				? policiesBySubresource.get(policySubresource(policyReference))
+				: undefined;
+
+			return {
+				ref: {
 					rootID: artifact.rootID,
 					artifactID: artifact.id,
-				});
-				const policyDocument = getPolicyForServer(document, installation.document);
-				const policyReference = installation.document.extension.policy?.ref;
-				const policyArtifact = policyReference
-					? policiesBySubresource.get(policySubresource(policyReference))
-					: undefined;
-
-				return {
-					ref: {
-						rootID: artifact.rootID,
-						artifactID: artifact.id,
-					},
-					artifact,
-					bundle: bundle.ref,
-					logicalName: installation.document.logicalName,
-					displayName: installation.document.displayName || artifact.name,
-					document: installation.document,
-					installation: installation.installation,
-					installationRevision: installation.installationRevision,
-					runtimeEnabled: installation.runtimeEnabled,
-					builtIn: installation.builtIn,
-					policy: policyDocument?.body,
-					policyDocument,
-					policyArtifact,
-				} satisfies MCPServerView;
-			} catch (error) {
-				return {
-					ref: {
-						rootID: artifact.rootID,
-						artifactID: artifact.id,
-					},
-					artifact,
-					bundle: bundle.ref,
-					logicalName: artifact.name,
-					displayName: artifact.name,
-					runtimeEnabled: false,
-					builtIn: bundle.builtIn,
-					loadError: getErrorMessage(error, 'Unable to load MCP server installation.'),
-				} satisfies MCPServerView;
-			}
-		})
-	);
+				},
+				artifact,
+				bundle: bundle.ref,
+				logicalName: installation.document.logicalName,
+				displayName: installation.document.displayName || artifact.name,
+				document: installation.document,
+				installation: installation.installation,
+				installationRevision: installation.installationRevision,
+				installationEnabled: installation.installationEnabled ?? installation.artifact.enabled,
+				runtimeEnabled: installation.runtimeEnabled,
+				builtIn: installation.builtIn,
+				policy: policyDocument?.body,
+				policyDocument,
+				policyArtifact,
+			} satisfies MCPServerView;
+		} catch (error) {
+			return {
+				ref: {
+					rootID: artifact.rootID,
+					artifactID: artifact.id,
+				},
+				artifact,
+				bundle: bundle.ref,
+				logicalName: artifact.name,
+				displayName: artifact.name,
+				installationEnabled: false,
+				runtimeEnabled: false,
+				builtIn: bundle.builtIn,
+				loadError: getErrorMessage(error, 'Unable to load MCP server installation.'),
+			} satisfies MCPServerView;
+		}
+	});
 
 	return views.toSorted((left, right) =>
 		serverDisplayName(left).localeCompare(serverDisplayName(right), undefined, {

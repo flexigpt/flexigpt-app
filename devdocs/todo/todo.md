@@ -9,9 +9,9 @@
 
 - [x] skill page perf is bad as of now
 
-- [ ] calling "initialize": sending "initialize": rejected by transport: authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response
+- [x] calling "initialize": sending "initialize": rejected by transport: authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response
 
-- [ ] "local host not ready yet" display in the mcp authz modal.
+- [x] "local host not ready yet" display in the mcp authz modal.
 
 ## M-3
 

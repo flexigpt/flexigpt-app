@@ -78,6 +78,8 @@ type MCPAuthHealth struct {
 
 	OAuthRedirectURL        string `json:"oauthRedirectURL,omitempty"`
 	OAuthLoopbackListenAddr string `json:"oauthLoopbackListenAddr,omitempty"`
+	OAuthLoopbackReady      *bool  `json:"oauthLoopbackReady,omitempty"`
+	OAuthLoopbackError      string `json:"oauthLoopbackError,omitempty"`
 
 	LastError string `json:"lastError,omitempty"`
 }

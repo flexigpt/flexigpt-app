@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -82,38 +83,71 @@ func (s *Session) Discover(
 
 	caps := initResultCapabilities(initResult)
 
+	var (
+		tools             []runtime.MCPToolCapability
+		resources         []runtime.MCPResourceRef
+		resourceTemplates []runtime.MCPResourceTemplateRef
+		prompts           []runtime.MCPPromptRef
+
+		toolsErr             error
+		resourcesErr         error
+		resourceTemplatesErr error
+		promptsErr           error
+
+		wait sync.WaitGroup
+	)
+
 	if caps == nil || caps.Tools != nil {
-		tools, err := s.listAllTools(ctx, config)
-		if err != nil {
-			s.log().Warn("mcp tools discovery failed", "server", s.server, "err", err)
-		} else {
-			out.Tools = tools
-		}
+		wait.Go(func() {
+			tools, toolsErr = s.listAllTools(ctx, config)
+		})
 	}
 
 	if caps == nil || caps.Resources != nil {
-		resources, err := s.listAllResources(ctx)
-		if err != nil {
-			s.log().Warn("mcp resources discovery failed", "server", s.server, "err", err)
-		} else {
-			out.Resources = resources
-		}
-
-		templates, err := s.listAllResourceTemplates(ctx)
-		if err != nil {
-			s.log().Warn("mcp resource templates discovery failed", "server", s.server, "err", err)
-		} else {
-			out.ResourceTemplates = templates
-		}
+		wait.Add(2)
+		go func() {
+			defer wait.Done()
+			resources, resourcesErr = s.listAllResources(ctx)
+		}()
+		go func() {
+			defer wait.Done()
+			resourceTemplates, resourceTemplatesErr = s.listAllResourceTemplates(ctx)
+		}()
 	}
 
 	if caps == nil || caps.Prompts != nil {
-		prompts, err := s.listAllPrompts(ctx)
-		if err != nil {
-			s.log().Warn("mcp prompts discovery failed", "server", s.server, "err", err)
-		} else {
-			out.Prompts = prompts
-		}
+		wait.Go(func() {
+			prompts, promptsErr = s.listAllPrompts(ctx)
+		})
+	}
+
+	wait.Wait()
+
+	if toolsErr != nil {
+		s.log().Warn("mcp tools discovery failed", "server", s.server, "err", toolsErr)
+	} else {
+		out.Tools = tools
+	}
+	if resourcesErr != nil {
+		s.log().Warn("mcp resources discovery failed", "server", s.server, "err", resourcesErr)
+	} else {
+		out.Resources = resources
+	}
+	if resourceTemplatesErr != nil {
+		s.log().Warn(
+			"mcp resource templates discovery failed",
+			"server",
+			s.server,
+			"err",
+			resourceTemplatesErr,
+		)
+	} else {
+		out.ResourceTemplates = resourceTemplates
+	}
+	if promptsErr != nil {
+		s.log().Warn("mcp prompts discovery failed", "server", s.server, "err", promptsErr)
+	} else {
+		out.Prompts = prompts
 	}
 
 	return out, nil

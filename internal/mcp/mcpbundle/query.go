@@ -32,6 +32,7 @@ type ServerInstallationView struct {
 	Document             server.ServerDocument    `json:"document"`
 	Installation         server.ServerData        `json:"installation"`
 	InstallationRevision uint64                   `json:"installationRevision"`
+	InstallationEnabled  bool                     `json:"installationEnabled"`
 	RuntimeEnabled       bool                     `json:"runtimeEnabled"`
 	BuiltIn              bool                     `json:"builtIn"`
 }
@@ -226,7 +227,7 @@ func (a *API) GetServerInstallation(
 		return ServerInstallationView{}, err
 	}
 
-	data, revision, runtimeEnabled, err := a.effectiveInstallation(
+	data, revision, installationEnabled, runtimeEnabled, err := a.effectiveInstallation(
 		ctx,
 		bundle,
 		record,
@@ -243,6 +244,7 @@ func (a *API) GetServerInstallation(
 		Document:             document,
 		Installation:         data,
 		InstallationRevision: revision,
+		InstallationEnabled:  installationEnabled,
 		RuntimeEnabled:       runtimeEnabled,
 		BuiltIn: a.dependencies.RootPolicy.IsProtectedRoot(
 			record.RootID,
