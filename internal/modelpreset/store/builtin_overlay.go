@@ -40,7 +40,7 @@ var builtInDefaultModelPresetIDs = map[inferenceSpec.ProviderName]spec.ModelPres
 	modelpreset.ProviderAnthropic:       spec.ModelPresetID(modelpreset.PresetClaudeSonnet5),
 	modelpreset.ProviderLocalAI:         spec.ModelPresetID(modelpreset.PresetGemma426BA4B),
 	modelpreset.ProviderLMStudio:        spec.ModelPresetID(modelpreset.PresetQwen3627B),
-	modelpreset.ProviderGoogleGemini:    spec.ModelPresetID(modelpreset.PresetGemini36Flash),
+	modelpreset.ProviderGoogleGemini:    spec.ModelPresetID(modelpreset.PresetGemini37Flash),
 	modelpreset.ProviderHuggingFace:     spec.ModelPresetID(modelpreset.PresetGLM52FireworksAI),
 	modelpreset.ProviderLlamaCPP:        spec.ModelPresetID(modelpreset.PresetQwen3635BA3B),
 	modelpreset.ProviderMistral:         spec.ModelPresetID(modelpreset.PresetMistralMedium35),
@@ -50,7 +50,7 @@ var builtInDefaultModelPresetIDs = map[inferenceSpec.ProviderName]spec.ModelPres
 	modelpreset.ProviderOpenRouter:      spec.ModelPresetID(modelpreset.PresetDeepSeekV4Flash),
 	modelpreset.ProviderSGLang:          spec.ModelPresetID(modelpreset.PresetDeepSeekR18B),
 	modelpreset.ProviderVLLM:            spec.ModelPresetID(modelpreset.PresetQwen3VL30BA3B),
-	modelpreset.ProviderXAI:             spec.ModelPresetID(modelpreset.PresetGrok43),
+	modelpreset.ProviderXAI:             spec.ModelPresetID(modelpreset.PresetGrok46),
 }
 
 var builtInDisabledModelPresetIDs = map[inferenceSpec.ProviderName]map[spec.ModelPresetID]struct{}{
@@ -61,6 +61,7 @@ var builtInDisabledModelPresetIDs = map[inferenceSpec.ProviderName]map[spec.Mode
 		spec.ModelPresetID(modelpreset.PresetClaudeSonnet4):  {},
 	},
 	modelpreset.ProviderGoogleGemini: {
+		spec.ModelPresetID(modelpreset.PresetGemini36Flash): {},
 		spec.ModelPresetID(modelpreset.PresetGemini35Flash): {},
 
 		spec.ModelPresetID(modelpreset.PresetGemini31Pro):       {},
@@ -86,6 +87,13 @@ var builtInDisabledModelPresetIDs = map[inferenceSpec.ProviderName]map[spec.Mode
 		spec.ModelPresetID(modelpreset.PresetGPT51Codex):    {},
 		spec.ModelPresetID(modelpreset.PresetGPT51CodexMax): {},
 		spec.ModelPresetID(modelpreset.PresetGPT5Mini):      {},
+	},
+	modelpreset.ProviderXAI: {
+		spec.ModelPresetID(modelpreset.PresetGrok45):             {},
+		spec.ModelPresetID(modelpreset.PresetGrok43):             {},
+		spec.ModelPresetID(modelpreset.PresetBuild01):            {},
+		spec.ModelPresetID(modelpreset.PresetGrok42Reasoning):    {},
+		spec.ModelPresetID(modelpreset.PresetGrok42NonReasoning): {},
 	},
 }
 

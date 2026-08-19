@@ -1,8 +1,6 @@
 #storybook
 stories
 
-
-
 # Logs
 logs
 *.log
@@ -146,3 +144,6 @@ build/flatpak/io.github.flexigpt.client.desktop
 build/flatpak/io.github.flexigpt.client.appdata.xml
 build/licenses/go-dependency-licenses.txt
 build/licenses/js-dependency-licenses.txt
+-
+file_breakdown.txt
+.task

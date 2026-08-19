@@ -1,17 +1,27 @@
 # https://taskfile.dev
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
-
 version: "3"
 
-dotenv: ["build/buildvars.env"]
+dotenv:
+  - "build/buildvars.env"
 
-vars:
-  GREETING: Hello, these are FlexiGPT tasks!
+includes:
+  go:
+    taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/go.yml
+    checksum: 6c5b0575d175fb76291861cd77e646d1cd94bf1008660f331ec9dfe85ca63166
+    dir: "{{.ROOT_DIR}}"
+    internal: true
+    vars:
+      GREETING: Hello, these are FlexiGPT tasks!
+      GO_MODULE_PATH: "{{.COMMON_PRODUCT_GITPATH}}"
+      DEPGRAPH_ENTRY_POINT: "{{.GO_MAIN_ENTRYPOINT}}"
+      DEPGRAPH_ONLYPREFIXES: ""
 
 tasks:
   default:
     cmds:
-      - echo "{{.GREETING}}"
+      - task: go:default
+      - task: go:print-all-vars
     silent: true
 
   licensesgo:
@@ -37,30 +47,23 @@ tasks:
 
   godepgraph:
     cmds:
-      - godepgraph -s -o "{{.COMMON_PRODUCT_GITPATH}}",command-line-arguments "{{.GO_MAIN_ENTRYPOINT}}" | dot -Tpng -o godepgraph.png
+      - task: go:depgraph
 
-  install-tools:
+  install-go-tools:
     cmds:
       - "{{.INSTALL_TOOL_WAILS}}"
       - "{{.INSTALL_TOOL_GO_LICENSES}}"
-      - "{{.INSTALL_TOOL_GOPLS}}"
-      - "{{.INSTALL_TOOL_GO_MOD_UPGRADE}}"
-      - "{{.INSTALL_TOOL_REFDIR}}"
-      - "{{.INSTALL_TOOL_GO_TEST_COVERAGE}}"
-      - "{{.INSTALL_TOOL_GODEPGRAPH}}"
-      - "{{.INSTALL_TOOL_GOMAJOR}}"
+      - task: go:install-tools
 
   upgrade-do:
     cmds:
-      - go-mod-upgrade -v -f
-      - go mod tidy
       - pnpm up -r
+      - task: go:upgrade-do
 
   upgrade-check:
     cmds:
-      - gomajor list
-      - go-mod-upgrade -l
       - pnpm outdated -r
+      - task: go:upgrade-check
 
   upgrade-pnpm:
     cmds:
@@ -121,25 +124,26 @@ tasks:
 
   lint-gopls:
     cmds:
-      - ./scripts/lint_gopls_check.sh
+      - task: go:lint-gopls
 
-  lint-godotfix:
+  lint-go-fix-specific:
     cmds:
-      - golangci-lint run --fix --enable-only=godot
+      - task: go:lint-fix-specific
+        vars:
+          SPECIFIC_LINTER: "godot"
 
-  lint-gosort:
+  lint-go-sort:
     cmds:
       - pnpm run touch:tmp
-      - refdir ./...
-
-  lint-fix:
+      - task: go:lint-sort
+  lint-go-fix:
     cmds:
-      - golangci-lint run --fix
+      - task: go:lint-fix
 
   lint-go:
     cmds:
       - pnpm run touch:tmp
-      - golangci-lint run ./... -v
+      - task: go:lint
 
   lint:
     cmds:
@@ -148,16 +152,12 @@ tasks:
 
   fmt-go:
     cmds:
-      - golangci-lint fmt
+      - task: go:fmt
 
   test-go:
     cmds:
       - pnpm run touch:tmp
-      # The count=1 is needed to disable test caching. this is so that coverage doesnt show stale data.
-      # Issue: https://github.com/golang/go/issues/74873
-      - go test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
-      - go tool cover -func=coverage.out
-      - go-test-coverage --config=./.testcoverage.yml
+      - task: go:coverage
 
   test:
     cmds:
