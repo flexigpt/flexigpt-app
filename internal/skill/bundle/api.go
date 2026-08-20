@@ -2220,7 +2220,8 @@ func validateManagedSkillOperationIntent(
 		return fmt.Errorf(
 			"%w: managed Skill Artifact %q conflicts with its existing creation intent",
 			basespec.ErrConflict,
-			artifactID)
+			artifactID,
+		)
 	}
 
 	return nil

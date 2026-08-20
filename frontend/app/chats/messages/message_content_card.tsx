@@ -142,7 +142,7 @@ function useStreamingMarkdownSegments(text: string) {
 	});
 
 	useLayoutEffect(() => {
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
+		// oxlint-disable-next-line react/set-state-in-effect
 		setState(previous => {
 			const reset = text.length < previous.committedLength;
 			const base: StreamingMarkdownState = reset

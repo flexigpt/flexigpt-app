@@ -48,7 +48,8 @@ function AttachmentBottomBarChipInner({
 			return;
 		}
 		store.hide();
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+
+		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setIsUrlModalOpen(false);
 	}, [isInputLocked, store]);
 

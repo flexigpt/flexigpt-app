@@ -1388,6 +1388,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		);
 
 		if (failedRunnableToolCalls.length > 0) {
+			// oxlint-disable-next-line react/set-state-in-effect
 			finishFastForwardWithError('Some tool calls failed. Retry or discard them before sending.');
 			return;
 		}

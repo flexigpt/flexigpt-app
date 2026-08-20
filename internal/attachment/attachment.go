@@ -71,7 +71,7 @@ func (att *Attachment) BuildContentBlock(ctx context.Context, opts ...ContentBlo
 
 	// Ensure refs are populated; caller may have done this earlier,
 	// but calling again on a populated ref is cheap to do in actual read data path.
-	if err := (att).PopulateRef(ctx, buildContentOptions.OverrideOriginal); err != nil {
+	if err := att.PopulateRef(ctx, buildContentOptions.OverrideOriginal); err != nil {
 		return nil, err
 	}
 

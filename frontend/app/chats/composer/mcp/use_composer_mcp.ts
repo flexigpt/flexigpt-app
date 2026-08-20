@@ -305,7 +305,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 	}, []);
 
 	useEffect(() => {
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
+		// oxlint-disable-next-line react/set-state-in-effect
 		void refreshAll();
 	}, [refreshAll]);
 

@@ -22,7 +22,7 @@ import type { PluggableList } from 'unified';
 import { backendAPI } from '@/apis/baseapi';
 
 import { CustomMDLanguage } from '@/components/markdown/custom_md_utils';
-import { remarkInlineCodeMath, SanitizeLaTeXOutsideFences } from '@/components/markdown/latex_utils';
+import { remarkInlineCodeMath, sanitizeLaTeXOutsideFences } from '@/components/markdown/latex_utils';
 import { CodeBlock } from '@/components/markdown/markdown_code_block';
 import { MdErrorBoundary } from '@/components/markdown/markdown_error_boundary';
 import { ThinkingFence } from '@/components/markdown/thinking_fence';
@@ -95,17 +95,16 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	onLinkClick,
 }: EnhancedMarkdownProps) {
 	const processedText = useMemo(() => {
-		return isBusy ? text : SanitizeLaTeXOutsideFences(text);
+		return isBusy ? text : sanitizeLaTeXOutsideFences(text);
 	}, [isBusy, text]);
 
 	const remarkPlugins = isBusy ? streamingRemarkPlugins : richRemarkPlugins;
 	const rehypePlugins = isBusy ? streamingRehypePlugins : richRehypePlugins;
 
 	const components = useMemo(() => {
-		// oxlint-disable-next-line react/display-name
 		const renderHeading =
 			(tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', baseClassName: string, options?: { hide?: boolean }) =>
-			// oxlint-disable-next-line react/function-component-definition
+			// oxlint-disable-next-line react/function-component-definition,react/display-name
 			({ node, children, className, id, ...rest }: CustomComponentProps) => {
 				if (options?.hide) {
 					return id ? <div id={id} className="scroll-mt-4" aria-hidden="true" /> : null;

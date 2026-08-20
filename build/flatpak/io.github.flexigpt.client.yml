@@ -62,8 +62,8 @@ modules:
       - mv $(pwd)/* $GOROOT
     sources:
       - type: archive
-        url: https://go.dev/dl/go1.26.2.linux-amd64.tar.gz
-        sha256: 990e6b4bbba816dc3ee129eaeaf4b42f17c2800b88a2166c265ac1a200262282
+        url: https://go.dev/dl/go1.27.0.linux-amd64.tar.gz
+        sha256: 675c26c449cbb18fc24b74650de1eabbae6e16f64326fd85a283fb3b58280685
 
   - name: nodejs
     buildsystem: simple

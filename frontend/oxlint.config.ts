@@ -11,22 +11,22 @@ const reactHooksRules: DummyRuleMap = {
 	// Done by OxLint
 	'jsreact-hooks/exhaustive-deps': 'off',
 	'jsreact-hooks/rules-of-hooks': 'off',
+	'jsreact-hooks/error-boundaries': 'off',
+	'jsreact-hooks/globals': 'off',
+	'jsreact-hooks/immutability': 'off',
+	'jsreact-hooks/incompatible-library': 'off',
+	'jsreact-hooks/preserve-manual-memoization': 'off',
+	'jsreact-hooks/purity': 'off',
+	'jsreact-hooks/refs': 'off',
+	'jsreact-hooks/set-state-in-effect': 'off',
+	'jsreact-hooks/set-state-in-render': 'off',
+	'jsreact-hooks/static-components': 'off',
+	'jsreact-hooks/unsupported-syntax': 'off',
+	'jsreact-hooks/use-memo': 'off',
 
 	// Compiler rules
 	'jsreact-hooks/config': 'error',
-	'jsreact-hooks/error-boundaries': 'error',
 	'jsreact-hooks/gating': 'error',
-	'jsreact-hooks/globals': 'error',
-	'jsreact-hooks/immutability': 'error',
-	'jsreact-hooks/preserve-manual-memoization': 'error',
-	'jsreact-hooks/purity': 'error',
-	'jsreact-hooks/refs': 'error',
-	'jsreact-hooks/set-state-in-effect': 'error',
-	'jsreact-hooks/set-state-in-render': 'error',
-	'jsreact-hooks/static-components': 'error',
-	'jsreact-hooks/unsupported-syntax': 'error',
-	'jsreact-hooks/use-memo': 'error',
-	'jsreact-hooks/incompatible-library': 'error',
 };
 
 const reactYouMightNotNeedAnEffectRules: DummyRuleMap = {
@@ -315,16 +315,24 @@ const reactRules: DummyRuleMap = {
 	// Restriction. Default on.
 	'react/only-export-components': ['error', { allowConstantExport: true }],
 
+	'react/todo': 'off',
 	'react/no-multi-comp': 'off',
 	'react/jsx-filename-extension': 'off',
 	'react/jsx-no-literals': 'off',
 	'react/forbid-component-props': 'off',
+	'react/rule-suppression': 'off',
 
 	// Suspicious. Default on.
+	'react/capitalized-calls': 'error',
+	'react/hooks': 'error',
+	'react/exhaustive-effect-dependencies': 'off',
 	'react/react-in-jsx-scope': 'off',
+	'react/memo-dependencies': 'off',
 
 	// Perf. Default on.
 	'react/jsx-no-constructed-context-values': 'error',
+	'react/no-deriving-state-in-effects': 'error',
+
 	'react/no-array-index-key': 'off',
 	'react/no-object-type-as-default-prop': 'off',
 
@@ -346,7 +354,6 @@ const reactRules: DummyRuleMap = {
 
 	// Nursery. Default Off.
 	'react/require-render-return': 'error',
-	'react/react-compiler': 'off',
 };
 
 const reactPerfRules: DummyRuleMap = {

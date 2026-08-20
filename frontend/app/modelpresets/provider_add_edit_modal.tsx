@@ -326,7 +326,7 @@ function AddEditProviderPresetModalContent({
 
 			return next;
 		},
-		[initialPreset?.defaultHeaders, isReadOnly, mode, validateField]
+		[initialPreset, isReadOnly, mode, validateField]
 	);
 
 	const buildPatchPayload = useCallback(

@@ -53,10 +53,8 @@ func TestGetTextBlockWithDisplayNameOnly_LocalFileCarriesFileMetadata(t *testing
 		Kind:  AttachmentFile,
 		Label: "main.go",
 		FileRef: &FileRef{
-			PathInfo: PathInfo{
-				Path: testMainGoFilePath,
-				Name: testMainGoFileName,
-			},
+			Path: testMainGoFilePath,
+			Name: testMainGoFileName,
 		},
 	}
 

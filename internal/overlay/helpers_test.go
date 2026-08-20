@@ -38,8 +38,8 @@ func marshalBool(b bool) json.RawMessage {
 }
 
 func containsErr(err error, substr string) bool {
-	return err != nil && substr != "" && (func() bool {
-		return (len(err.Error()) >= len(substr)) && (func() bool {
+	return err != nil && substr != "" && func() bool {
+		return (len(err.Error()) >= len(substr)) && func() bool {
 			for i := range err.Error() {
 				if len(err.Error())-i < len(substr) {
 					return false
@@ -49,8 +49,8 @@ func containsErr(err error, substr string) bool {
 				}
 			}
 			return false
-		})()
-	})()
+		}()
+	}()
 }
 
 func containsString(list []string, s string) bool {

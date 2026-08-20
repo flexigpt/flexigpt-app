@@ -8,7 +8,7 @@ dotenv:
 includes:
   go:
     taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/go.yml
-    checksum: 6c5b0575d175fb76291861cd77e646d1cd94bf1008660f331ec9dfe85ca63166
+    checksum: e4cc5aea758c6d79d92c78021d32a5b8c9cf086933000f3a715b0b83266f99ed
     dir: "{{.ROOT_DIR}}"
     internal: true
     vars:
@@ -49,12 +49,6 @@ tasks:
     cmds:
       - task: go:depgraph
 
-  install-go-tools:
-    cmds:
-      - "{{.INSTALL_TOOL_WAILS}}"
-      - "{{.INSTALL_TOOL_GO_LICENSES}}"
-      - task: go:install-tools
-
   upgrade-do:
     cmds:
       - pnpm up -r
@@ -78,7 +72,41 @@ tasks:
       - asdf install nodejs v24.14.0
       - asdf set nodejs v24.14.0
       - task: uppnpm
-      - echo '***Search and update builds***'
+      - cmd: echo '***Search and update builds***'
+        silent: true
+
+  install-go-tools:
+    cmds:
+      - "{{.INSTALL_TOOL_WAILS}}"
+      - "{{.INSTALL_TOOL_GO_LICENSES}}"
+      - task: go:install-tools
+      - cmd: echo '***If updating wails or licences-go or golangci-lint, search for their previous versions and then update all places.***'
+        silent: true
+
+  upgrade-go:
+    vars:
+      GO_VERSION: 1.27.0
+    cmds:
+      - asdf install golang {{.GO_VERSION}}
+      - asdf set golang {{.GO_VERSION}}
+      - go version
+
+      - cmd: |
+          GO_ASDF_DIR="$(asdf where golang {{.GO_VERSION}})"
+          export GOPATH="$GO_ASDF_DIR/packages"
+          export GOBIN="$GOPATH/bin"
+          export PATH="$ASDF_DATA_DIR/shims:$GOBIN:$PATH"
+          echo "Installing Go tools into $GOBIN, Path: $PATH"
+          task install-go-tools
+          golangci-lint version
+        silent: true
+
+      - asdf reshim golang {{.GO_VERSION}}
+
+      - cmd: |
+          echo 'Search for {{.GO_VERSION}}. Update builds, flatpak yml has a ref and needs a sha and dl link. See if go mod file needs update.'
+          echo 'See if your Path is properly set via zshrc or bashrc and reflected vscode.'
+        silent: true
 
   build-linux:
     cmds:

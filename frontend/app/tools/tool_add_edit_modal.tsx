@@ -486,6 +486,7 @@ function AddEditToolModalContent({
 		}
 	};
 
+	// oxlint-disable-next-line react/refs
 	const formIsValid = Object.values(validateForm(formData)).every(error => !error);
 	const requiredFieldsPresent =
 		formData.displayName.trim() &&

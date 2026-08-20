@@ -626,9 +626,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						Slug:        "m1",
 						DisplayName: "x",
 						IsEnabled:   true,
-						ModelPresetPatch: spec.ModelPresetPatch{
-							Temperature: &temp,
-						},
+						Temperature: &temp,
 					},
 				},
 				wantErrText: testInvalidTagText,
@@ -643,9 +641,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						Slug:        testInvalidTagInput,
 						DisplayName: "x",
 						IsEnabled:   true,
-						ModelPresetPatch: spec.ModelPresetPatch{
-							Temperature: &temp,
-						},
+						Temperature: &temp,
 					},
 				},
 				wantErrText: testInvalidTagText,
@@ -675,12 +671,10 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						Slug:        "m1",
 						DisplayName: "x",
 						IsEnabled:   true,
-						ModelPresetPatch: spec.ModelPresetPatch{
-							Temperature: &temp,
-							StopSequences: new([]string{
-								"a", "b", "c", "d", "e",
-							}),
-						},
+						Temperature: &temp,
+						StopSequences: new([]string{
+							"a", "b", "c", "d", "e",
+						}),
 					},
 				},
 				wantErrText: "too many stop sequences",
@@ -695,9 +689,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						Slug:        "m1",
 						DisplayName: "x",
 						IsEnabled:   true,
-						ModelPresetPatch: spec.ModelPresetPatch{
-							Temperature: &temp,
-						},
+						Temperature: &temp,
 					},
 				},
 				wantErrIs: spec.ErrProviderNotFound,
@@ -712,9 +704,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						Slug:        "m1",
 						DisplayName: "x",
 						IsEnabled:   true,
-						ModelPresetPatch: spec.ModelPresetPatch{
-							Temperature: &temp,
-						},
+						Temperature: &temp,
 					},
 				},
 				wantErrIs: spec.ErrBuiltInReadOnly,
@@ -729,9 +719,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						Slug:        "m1",
 						DisplayName: "Model One",
 						IsEnabled:   true,
-						ModelPresetPatch: spec.ModelPresetPatch{
-							Temperature: &temp,
-						},
+						Temperature: &temp,
 					},
 				},
 			},
@@ -741,11 +729,11 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 					ProviderName:  userProv,
 					ModelPresetID: "m1",
 					Body: &spec.PostModelPresetRequestBody{
-						Name:             "model-one",
-						Slug:             "m1",
-						DisplayName:      "Model One",
-						IsEnabled:        true,
-						ModelPresetPatch: spec.ModelPresetPatch{Temperature: &temp},
+						Name:        "model-one",
+						Slug:        "m1",
+						DisplayName: "Model One",
+						IsEnabled:   true,
+						Temperature: &temp,
 					},
 				},
 				wantErrIs: spec.ErrModelPresetAlreadyExists,
@@ -779,16 +767,14 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 			ProviderName:  userProv,
 			ModelPresetID: "m4",
 			Body: &spec.PostModelPresetRequestBody{
-				Name:        "model-four",
-				Slug:        "m4",
-				DisplayName: "Model Four",
-				IsEnabled:   true,
-				ModelPresetPatch: spec.ModelPresetPatch{
-					Temperature:                 &temp2,
-					SystemPrompt:                &sysPrompt,
-					StopSequences:               new([]string{"END"}),
-					AdditionalParametersRawJSON: &rawJSON,
-				},
+				Name:                        "model-four",
+				Slug:                        "m4",
+				DisplayName:                 "Model Four",
+				IsEnabled:                   true,
+				Temperature:                 &temp2,
+				SystemPrompt:                &sysPrompt,
+				StopSequences:               new([]string{"END"}),
+				AdditionalParametersRawJSON: &rawJSON,
 			},
 		})
 		if err != nil {
@@ -803,13 +789,11 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 			ProviderName:  userProv,
 			ModelPresetID: "m4",
 			Body: &spec.PatchModelPresetRequestBody{
-				ModelPresetPatch: spec.ModelPresetPatch{
-					Reasoning:                   &reasoning,
-					Temperature:                 new(0.0),
-					SystemPrompt:                new(""),
-					AdditionalParametersRawJSON: new(""),
-					StopSequences:               new([]string{}),
-				},
+				Reasoning:                   &reasoning,
+				Temperature:                 new(0.0),
+				SystemPrompt:                new(""),
+				AdditionalParametersRawJSON: new(""),
+				StopSequences:               new([]string{}),
 			},
 		})
 		if err != nil {
@@ -906,14 +890,12 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 			ProviderName:  userProv,
 			ModelPresetID: "m5",
 			Body: &spec.PostModelPresetRequestBody{
-				Name:        "model-five",
-				Slug:        "m5",
-				DisplayName: "Model Five",
-				IsEnabled:   true,
-				ModelPresetPatch: spec.ModelPresetPatch{
-					Temperature:   &temp,
-					StopSequences: new([]string{"END"}),
-				},
+				Name:          "model-five",
+				Slug:          "m5",
+				DisplayName:   "Model Five",
+				IsEnabled:     true,
+				Temperature:   &temp,
+				StopSequences: new([]string{"END"}),
 			},
 		})
 		if err != nil {
@@ -924,9 +906,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 			ProviderName:  userProv,
 			ModelPresetID: "m5",
 			Body: &spec.PatchModelPresetRequestBody{
-				ModelPresetPatch: spec.ModelPresetPatch{
-					StopSequences: new([]string{}),
-				},
+				StopSequences: new([]string{}),
 			},
 		})
 		if err != nil {
@@ -955,7 +935,7 @@ func TestModelPresetStore_ModelPreset_BuiltInToggle_ViaPatchModelPreset(t *testi
 	_, err := st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
 		ProviderName:  pn,
 		ModelPresetID: mid,
-		Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(!(mp.IsEnabled))},
+		Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(!mp.IsEnabled)},
 	})
 	if err != nil {
 		t.Fatalf("PatchModelPreset(builtin): %v", err)
@@ -1546,9 +1526,7 @@ func TestModelPresetStore_PostModelPreset_AdditionalValidation(t *testing.T) {
 				Slug:        "m1",
 				DisplayName: "Model 1",
 				IsEnabled:   true,
-				ModelPresetPatch: spec.ModelPresetPatch{
-					Temperature: &temp,
-				},
+				Temperature: &temp,
 			},
 		}
 	}
@@ -1799,9 +1777,7 @@ func TestModelPresetStore_PostModelPreset_InvalidOutputParamAndReasoningErrors(t
 				Slug:        "m1",
 				DisplayName: "x",
 				IsEnabled:   true,
-				ModelPresetPatch: spec.ModelPresetPatch{
-					Temperature: &temp,
-				},
+				Temperature: &temp,
 			},
 		}
 	}

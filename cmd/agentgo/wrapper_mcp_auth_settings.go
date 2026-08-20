@@ -78,7 +78,7 @@ func newMCPSettingsAdapter(
 func (s *mcpSettingsAdapter) GetMCPInstallationValue(
 	ctx context.Context,
 	key string,
-) (json.RawMessage, bool, error) {
+) (raw json.RawMessage, found bool, err error) {
 	if err := validateMCPSettingsKey(key); err != nil {
 		return nil, false, err
 	}
@@ -86,7 +86,7 @@ func (s *mcpSettingsAdapter) GetMCPInstallationValue(
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	raw, found, err := s.readRawLocked(ctx, key)
+	raw, found, err = s.readRawLocked(ctx, key)
 	if err != nil || !found {
 		return nil, found, err
 	}
@@ -365,7 +365,7 @@ func (s *mcpSettingsAdapter) writeIndexLocked(
 func (s *mcpSettingsAdapter) readRawLocked(
 	ctx context.Context,
 	logicalKey string,
-) (json.RawMessage, bool, error) {
+) (raw json.RawMessage, found bool, err error) {
 	response, err := s.store.GetAuthKey(
 		ctx,
 		&settingSpec.GetAuthKeyRequest{
@@ -385,14 +385,14 @@ func (s *mcpSettingsAdapter) readRawLocked(
 		return nil, false, nil
 	}
 
-	raw, err := jsonutil.CanonicalizeObject(
+	raw, err = jsonutil.CanonicalizeObject(
 		[]byte(response.Body.Secret),
 		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, false, err
 	}
-	return json.RawMessage(raw), true, nil
+	return raw, true, nil
 }
 
 func (s *mcpSettingsAdapter) writeRawLocked(

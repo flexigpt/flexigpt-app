@@ -30,7 +30,8 @@ func ValidateDigest(value Digest) error {
 	if !digestPattern.MatchString(string(value)) {
 		return fmt.Errorf(
 			"%w: digest must be sha256:<64 lowercase hexadecimal characters>",
-			errInvalid)
+			errInvalid,
+		)
 	}
 	return nil
 }

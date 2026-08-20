@@ -40,8 +40,8 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           args: --verbose
-          version-file: .tool-versions
-          install-mode: "binary"
+          version: v2.13.0
+          install-mode: "goinstall"
           skip-cache: true
 
       - name: Remove embed placeholder

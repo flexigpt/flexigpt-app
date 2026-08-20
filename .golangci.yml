@@ -1,4 +1,4 @@
-# All linters are checked and included either in enable or disable as of v2.12.2 of golangci-lint.
+# All linters are checked and included either in enable or disable as of v2.13.0 of golangci-lint.
 # gofumpt and golines are used as formatters.
 version: "2"
 run:
@@ -151,7 +151,7 @@ linters:
     # Checks that sql.Rows, sql.Stmt, sqlx.NamedStmt, pgx.Query are closed.
     - sqlclosecheck
 
-    # Meta linter: golangci-lint runs all SA checks from staticcheck via this lint config
+    # Meta linter
     - staticcheck
 
     # Makes you add t.Helper() as the first line in test helpers.
@@ -219,7 +219,7 @@ linters:
     - errchkjson
 
     # Forces to initialize all fields of struct. Lots of issues in linter wrt empty struct, private fields etc.
-    - exhaustruct
+    - exhaustruct_v5
 
     # Forbids some identifiers. I don't have a case for it.
     - forbidigo
@@ -377,7 +377,6 @@ linters:
       default-signifies-exhaustive: true
 
     gocritic:
-      # As of golangci-lint v2.0.2 this enabled 102 checks and disables below 4.
       enable-all: true
       disabled-checks:
         # These will detect many cases, but they do make sense
@@ -533,7 +532,17 @@ formatters:
       - builtin$
   settings:
     gofumpt:
-      extra-rules: true
+      # Extra formatting rules.
+      extra:
+        # Groups function parameters with repeated types.
+        # Default: false
+        group-params: true
+        # Clothes naked returns in functions with named results.
+        # Default: false
+        clothe-returns: true
+        # Multi-line function calls with the opening parenthesis at the end of a line should place the closing parenthesis at the start of a line.
+        # Default: false
+        balance-calls: true
     golines:
       max-len: 120
       shorten-comments: true

@@ -308,6 +308,7 @@ export function WorkspaceCard({
 			return;
 		}
 
+		// oxlint-disable-next-line react/set-state-in-effect
 		void reloadCatalog().catch(() => undefined);
 	}, [catalogData, catalogError, isCatalogLoading, isExpanded, reloadCatalog]);
 

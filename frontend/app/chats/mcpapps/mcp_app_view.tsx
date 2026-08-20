@@ -213,7 +213,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	useEffect(() => {
 		let cancelled = false;
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setLoadError(null);
 		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setLoadedResource(null);
@@ -247,7 +247,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	useEffect(() => {
 		let cancelled = false;
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setPolicyError(null);
 		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setAppsPolicy(null);
@@ -328,7 +328,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	const router = useMemo(
 		() =>
-			// oxlint-disable-next-line jsreact-hooks/refs
+			// oxlint-disable-next-line react/refs
 			new MCPAppRPCRouter({
 				instance,
 				requestOpenLinkApproval,

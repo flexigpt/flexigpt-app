@@ -55,7 +55,8 @@ export function useAsyncResource<T>(
 	const controllerRef = useRef<AbortController | null>(null);
 
 	const reloadOrThrow = useCallback(async (): Promise<T> => {
-		const requestID = (requestIDRef.current += 1);
+		requestIDRef.current += 1;
+		const requestID = requestIDRef.current;
 
 		controllerRef.current?.abort();
 		const controller = new AbortController();

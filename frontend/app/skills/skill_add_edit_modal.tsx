@@ -450,7 +450,6 @@ function AddEditSkillModalContent({
 		return next;
 	};
 
-	// oxlint-disable-next-line jsreact-hooks/immutability
 	const isAllValid = isViewMode ? true : !isSubmitting && Object.values(validateForm(formData)).every(error => !error);
 
 	useEffect(() => {
@@ -473,7 +472,7 @@ function AddEditSkillModalContent({
 		}
 
 		let cancelled = false;
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
+
 		setDocumentLoading(true);
 
 		void skillManagementAPI

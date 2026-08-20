@@ -159,7 +159,8 @@ func (w *AggregrateWrapper) PostProviderPreset(
 					APIKeyHeaderKey:          req.Body.APIKeyHeaderKey,
 					DefaultHeaders:           req.Body.DefaultHeaders,
 				},
-			}); err != nil {
+			},
+		); err != nil {
 			return nil, err
 		}
 		resp, err := w.modelPresetStore.PostProviderPreset(context.Background(), req)

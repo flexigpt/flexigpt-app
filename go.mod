@@ -1,14 +1,14 @@
 module github.com/flexigpt/flexigpt-app
 
-go 1.26
+go 1.27
 
 // Tools: These are installed via the taskfile. check the associated task.
 require (
 	github.com/adrg/xdg v0.5.3
-	github.com/flexigpt/agentskills-go v0.20.1
-	github.com/flexigpt/inference-go v0.23.1
-	github.com/flexigpt/llmtools-go v0.23.1
-	github.com/flexigpt/mapstore-go v0.4.1
+	github.com/flexigpt/agentskills-go v0.20.2
+	github.com/flexigpt/inference-go v0.23.2
+	github.com/flexigpt/llmtools-go v0.23.2
+	github.com/flexigpt/mapstore-go v0.4.2
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/google/uuid v1.6.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
@@ -29,7 +29,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/RadhiFadlillah/whatlanggo v0.0.0-20240916001553-aac1f0f737fc // indirect
 	github.com/andybalholm/cascadia v1.3.4 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.63.1 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.66.0 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
@@ -126,7 +126,7 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/genai v1.68.0 // indirect
+	google.golang.org/genai v1.69.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/grpc v1.83.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect

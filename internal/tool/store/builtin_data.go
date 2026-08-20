@@ -176,7 +176,8 @@ func (d *BuiltInToolData) SetToolBundleEnabled(
 ) (spec.ToolBundle, error) {
 	if _, ok := d.bundles[id]; !ok {
 		return spec.ToolBundle{}, fmt.Errorf(
-			"bundleID: %q, err: %w", id, errBuiltInBundleNotFound)
+			"bundleID: %q, err: %w", id, errBuiltInBundleNotFound,
+		)
 	}
 
 	flag, err := d.bundleOverlayFlags.SetFlag(ctx, builtInToolBundleID(id), enabled)

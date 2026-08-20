@@ -33,7 +33,8 @@ func (d *Decoder) Recognize(
 	candidate discovery.Candidate,
 ) discovery.Recognition {
 	if candidate.RequestsDecoder(artifactbuiltin.AgentSkillDecoderID) && basespec.Locator(path.Base(
-		string(candidate.Locator))) == artifactbuiltin.AgentSkillDefinitionFileName {
+		string(candidate.Locator),
+	)) == artifactbuiltin.AgentSkillDefinitionFileName {
 		return discovery.RecognitionPreferred
 	}
 	return discovery.RecognitionNone

@@ -299,7 +299,7 @@ function SanitizeLaTeX(content: string) {
 	return processedContent;
 }
 
-export function SanitizeLaTeXOutsideFences(md: string) {
+export function sanitizeLaTeXOutsideFences(md: string) {
 	if (!testLatexRegex.test(md)) {
 		return md;
 	}

@@ -282,7 +282,8 @@ func (b *BuiltInPresets) SetDefaultModelPreset(
 
 	// Persist in overlay.
 	flag, err := b.providerDefaultModelIDOverlayFlags.SetFlag(
-		ctx, builtInProviderDefaultModelIDKey(provider), modelID)
+		ctx, builtInProviderDefaultModelIDKey(provider), modelID,
+	)
 	if err != nil {
 		return spec.ProviderPreset{}, err
 	}
@@ -322,7 +323,8 @@ func (b *BuiltInPresets) rebuildSnapshot(ctx context.Context) error {
 
 	for pname, p := range b.providers {
 		if flag, ok, err := b.providerDefaultModelIDOverlayFlags.GetFlag(
-			ctx, builtInProviderDefaultModelIDKey(pname)); err != nil {
+			ctx, builtInProviderDefaultModelIDKey(pname),
+		); err != nil {
 			return err
 		} else if ok {
 			p.DefaultModelPresetID = flag.Value

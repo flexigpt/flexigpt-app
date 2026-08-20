@@ -119,7 +119,8 @@ func NewToolStore(baseDir string, opts ...Option) (*ToolStore, error) {
 		true,
 		ts.pp,
 		jsonencdec.JSONEncoderDecoder{},
-		dirOpts...)
+		dirOpts...,
+	)
 	if err != nil {
 		return nil, err
 	}

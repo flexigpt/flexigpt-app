@@ -159,7 +159,7 @@ export function useSearchableMenuState(open: boolean): [string, Dispatch<SetStat
 
 	useEffect(() => {
 		if (!open) {
-			// oxlint-disable-next-line jsreact-hooks/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+			// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 			setQuery('');
 		}
 	}, [open]);
