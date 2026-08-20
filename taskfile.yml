@@ -15,7 +15,7 @@ includes:
       GREETING: Hello, these are FlexiGPT tasks!
       GO_MODULE_PATH: "{{.COMMON_PRODUCT_GITPATH}}"
       DEPGRAPH_ENTRY_POINT: "{{.GO_MAIN_ENTRYPOINT}}"
-      DEPGRAPH_ONLYPREFIXES: "{{.COMMON_PRODUCT_GITPATH}}"
+      DEPGRAPH_ONLYPREFIXES: "{{.COMMON_PRODUCT_GITPATH}},command-line-arguments"
 
 tasks:
   default:
