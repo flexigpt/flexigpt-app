@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
-	"github.com/flexigpt/mapstore-go/uuidv7filename"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 const (
@@ -650,7 +650,7 @@ func Test_NewBuiltInToolData_SyntheticFS_BundleHasNoTools(t *testing.T) {
 		t.Skip("custom fs test has some overlay race in win")
 		return
 	}
-	bundleID := newUUID(t)
+	bundleID := uuidutil.NewUUIDv7()
 	slug := demo
 
 	dir := fmt.Sprintf("%s_%s", bundleID, slug)
@@ -670,10 +670,10 @@ func Test_NewBuiltInToolData_SyntheticFS_BundleDirNotInManifest(t *testing.T) {
 		t.Skip("custom fs test has some overlay race in win")
 		return
 	}
-	bundleID := newUUID(t)
+	bundleID := uuidutil.NewUUIDv7()
 	slug := demo
 
-	ghostID := newUUID(t)
+	ghostID := uuidutil.NewUUIDv7()
 	ghostSlug := "ghost"
 	dir := fmt.Sprintf("%s_%s", ghostID, ghostSlug)
 
@@ -696,7 +696,7 @@ func Test_NewBuiltInToolData_SyntheticFS_SlugMismatchBetweenDirAndManifest(t *te
 		t.Skip("custom fs test has some overlay race in win")
 		return
 	}
-	bundleID := newUUID(t)
+	bundleID := uuidutil.NewUUIDv7()
 	slug := demo
 
 	// Dir slug = wrong, manifest slug = demo.
@@ -720,7 +720,7 @@ func Test_NewBuiltInToolData_SyntheticFS_FilenameSlugVersionMismatch(t *testing.
 		t.Skip("custom fs test has some overlay race in win")
 		return
 	}
-	bundleID := newUUID(t)
+	bundleID := uuidutil.NewUUIDv7()
 	slug := demo
 
 	dir := fmt.Sprintf("%s_%s", bundleID, slug)
@@ -743,7 +743,7 @@ func Test_NewBuiltInToolData_SyntheticFS_DuplicateToolID(t *testing.T) {
 		t.Skip("custom fs test has some overlay race in win")
 		return
 	}
-	bundleID := newUUID(t)
+	bundleID := uuidutil.NewUUIDv7()
 	slug := demo
 
 	dir := fmt.Sprintf("%s_%s", bundleID, slug)
@@ -763,7 +763,7 @@ func Test_NewBuiltInToolData_SyntheticFS_DuplicateToolID(t *testing.T) {
 
 func Test_NewBuiltInToolData_SyntheticFS_HappyAndCRUD(t *testing.T) {
 	ctx := t.Context()
-	bid := newUUID(t)
+	bid := uuidutil.NewUUIDv7()
 	slug := demo
 
 	dir := fmt.Sprintf("%s_%s", bid, slug)
@@ -861,7 +861,7 @@ func buildToolManifest(bundleID, slug string) []byte {
 // buildTool returns filename (slug_version.json), raw JSON and the tool ID.
 func buildTool(t *testing.T, slug, ver string) (fileName string, raw []byte, toolID string) {
 	t.Helper()
-	toolID = newUUID(t)
+	toolID = uuidutil.NewUUIDv7()
 	tool := buildValidTool(t, slug, ver, toolID)
 	raw, _ = json.Marshal(tool)
 	fileName = fmt.Sprintf("%s_%s.json", slug, ver)
@@ -932,14 +932,4 @@ func newToolFromFS(t *testing.T, mem fs.FS) (*BuiltInToolData, error) {
 		t.Cleanup(func() { _ = bi.Close() })
 	}
 	return bi, err
-}
-
-// newUUID returns a v7-UUID as string or fails the test.
-func newUUID(t *testing.T) string {
-	t.Helper()
-	u, err := uuidv7filename.NewUUIDv7String()
-	if err != nil {
-		t.Fatalf("uuidv7: %v", err)
-	}
-	return u
 }

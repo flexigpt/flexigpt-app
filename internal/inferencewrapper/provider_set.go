@@ -17,14 +17,13 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
-	"github.com/google/uuid"
-
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	"github.com/flexigpt/flexigpt-app/internal/skill/skillruntime"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
 
@@ -248,14 +247,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		return nil, errors.New("prepopulated tool choices are not allowed in fetch completion, need tool store choices")
 	}
 
-	var ck string
-	uid, err := uuid.NewV7()
-	if err != nil {
-		// Fallback only.
-		ck = string(req.Provider) + "_" + string(req.ModelPresetID)
-	} else {
-		ck = uid.String()
-	}
+	ck := uuidutil.NewUUIDv7()
 
 	capabilityResolver, err := ps.newPresetCapabilityResolver(
 		ctx,

@@ -22,11 +22,13 @@ func (f ArtifactIDProviderFunc) NewArtifactID(
 }
 
 func UUIDArtifactIDProvider() ArtifactIDProvider {
-	generator := uuidutil.UUIDv7Generator{}
 	return ArtifactIDProviderFunc(
 		func(ctx context.Context) (basespec.ArtifactID, error) {
-			id, err := generator.NewID(ctx)
-			return basespec.ArtifactID(id), err
+			if err := ctx.Err(); err != nil {
+				return "", err
+			}
+			id := uuidutil.NewUUIDv7()
+			return basespec.ArtifactID(id), nil
 		},
 	)
 }

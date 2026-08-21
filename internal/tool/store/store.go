@@ -17,12 +17,12 @@ import (
 
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
-	"github.com/flexigpt/mapstore-go/uuidv7filename"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 const (
@@ -481,7 +481,7 @@ func (ts *ToolStore) PutTool(
 	}
 
 	now := time.Now().UTC()
-	uuid, _ := uuidv7filename.NewUUIDv7String()
+	uuid := uuidutil.NewUUIDv7()
 	argSchemaStr := req.Body.ArgSchema
 	if argSchemaStr == "" {
 		argSchemaStr = "{}"

@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	"github.com/flexigpt/mapstore-go/uuidv7filename"
-	"github.com/google/uuid"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
@@ -45,7 +44,7 @@ func TestInitConversation(t *testing.T) {
 					len(convo.Title),
 				)
 			}
-			if _, err := uuid.Parse(convo.ID); err != nil {
+			if err := uuidutil.ValidateUUIDv7(convo.ID); err != nil {
 				t.Errorf("Expected valid UUID, got error: %v", err)
 			}
 		})
@@ -396,10 +395,8 @@ func TestConversationCollection(t *testing.T) {
 		ctx := t.Context()
 		// Jan.
 		convo1 := &spec.Conversation{}
-		u, err := uuidv7filename.NewUUIDv7String()
-		if err != nil {
-			t.Fatalf("Failed to get uuid: %v", err)
-		}
+		u := uuidutil.NewUUIDv7()
+
 		convo1.ID = u
 		convo1.Title = "Jan"
 		convo1.CreatedAt = time.Date(2023, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -407,10 +404,7 @@ func TestConversationCollection(t *testing.T) {
 		convo1.Messages = []spec.ConversationMessage{}
 
 		// Feb.
-		u, err = uuidv7filename.NewUUIDv7String()
-		if err != nil {
-			t.Fatalf("Failed to get uuid: %v", err)
-		}
+		u = uuidutil.NewUUIDv7()
 
 		convo2 := &spec.Conversation{}
 		convo2.ID = u
@@ -509,10 +503,7 @@ func TestConversationCollectionListing(t *testing.T) {
 		ctx := t.Context()
 		// Add 15 conversations.
 		for range 15 {
-			u, err := uuidv7filename.NewUUIDv7String()
-			if err != nil {
-				t.Fatalf("Failed to init conversation: %v", err)
-			}
+			u := uuidutil.NewUUIDv7()
 			convo, err := initConversation("Paged " + u)
 			if err != nil {
 				t.Fatalf("Failed to init conversation: %v", err)
@@ -597,10 +588,7 @@ func initConversation(title string) (*spec.Conversation, error) {
 		SchemaVersion: spec.ConversationSchemaVersion,
 		Messages:      []spec.ConversationMessage{},
 	}
-	u, err := uuidv7filename.NewUUIDv7String()
-	if err != nil {
-		return nil, err
-	}
+	u := uuidutil.NewUUIDv7()
 	c.ID = u
 	c.Title = title
 	c.CreatedAt = time.Now().UTC()

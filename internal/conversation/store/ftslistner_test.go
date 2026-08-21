@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -281,14 +280,16 @@ func newCollection(t *testing.T, dir string, withFTS bool) *ConversationCollecti
 
 func newConv(t *testing.T, title string) *spec.Conversation {
 	t.Helper()
-	id, _ := uuid.NewV7()
-	sec, nsec := id.Time().UnixTime()
-	createdAt := time.Unix(sec, nsec).UTC()
+	id := uuidutil.NewUUIDv7()
+	at, err := uuidutil.GetUUIDv7UnixTime(id)
+	if err != nil {
+		t.Fatalf("new convo failed %s", err.Error())
+	}
 	return &spec.Conversation{
-		ID:         id.String(),
+		ID:         id,
 		Title:      title,
-		CreatedAt:  createdAt,
-		ModifiedAt: createdAt,
+		CreatedAt:  at,
+		ModifiedAt: at,
 		Messages:   []spec.ConversationMessage{},
 	}
 }

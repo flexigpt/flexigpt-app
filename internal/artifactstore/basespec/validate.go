@@ -101,19 +101,35 @@ func ValidatePortableName(label, value string) error {
 }
 
 func ValidateRootID(value RootID) error {
-	return uuidutil.ValidateUUIDv7("root ID", string(value))
+	err := uuidutil.ValidateUUIDv7(string(value))
+	if err != nil {
+		return fmt.Errorf("root ID: %w", err)
+	}
+	return nil
 }
 
 func ValidateSourceID(value SourceID) error {
-	return uuidutil.ValidateUUIDv7("source ID", string(value))
+	err := uuidutil.ValidateUUIDv7(string(value))
+	if err != nil {
+		return fmt.Errorf("source ID: %w", err)
+	}
+	return nil
 }
 
 func ValidateCollectionID(value CollectionID) error {
-	return uuidutil.ValidateUUIDv7("collection ID", string(value))
+	err := uuidutil.ValidateUUIDv7(string(value))
+	if err != nil {
+		return fmt.Errorf("collection ID: %w", err)
+	}
+	return nil
 }
 
 func ValidateArtifactID(value ArtifactID) error {
-	return uuidutil.ValidateUUIDv7("artifact ID", string(value))
+	err := uuidutil.ValidateUUIDv7(string(value))
+	if err != nil {
+		return fmt.Errorf("artifact ID: %w", err)
+	}
+	return nil
 }
 
 func ValidateSourceKind(value SourceKind) error {
