@@ -4,7 +4,14 @@ import { sprintf } from 'sprintf-js';
 import type { Attachment, DirectoryAttachmentsResult, FileFilter, PathAttachmentsResult } from '@/spec/attachment';
 
 import type { IBackendAPI, ILogger } from '@/apis/interface';
-import { requireNonBlankString, requireWailsArray } from '@/apis/wailsapi/transport';
+import {
+	requireNonBlankString,
+	requireWailsBody,
+	requireWailsBoolean,
+	requireWailsString,
+	wailsArrayOrEmpty,
+	wailsObjectArrayOrEmpty,
+} from '@/apis/wailsapi/transport';
 import {
 	GetAppVersion,
 	GetPathsAsAttachments,
@@ -38,7 +45,8 @@ function stringifyLogArg(arg: unknown): string {
 	}
 
 	try {
-		return JSON.stringify(arg);
+		const serialized = JSON.stringify(arg);
+		return serialized ?? String(arg);
 	} catch {
 		return String(arg);
 	}
@@ -139,26 +147,33 @@ export class WailsBackendAPI implements IBackendAPI {
 	}
 
 	async isAppWindowMaximised(): Promise<boolean> {
-		return WindowIsMaximised();
+		return requireWailsBoolean(await WindowIsMaximised(), 'WindowIsMaximised');
 	}
 
 	async getAppVersion(): Promise<string> {
-		return GetAppVersion();
+		return requireWailsString(await GetAppVersion(), 'GetAppVersion');
 	}
 
-	ping(): Promise<string> {
-		return Ping();
+	async ping(): Promise<string> {
+		return requireWailsString(await Ping(), 'Ping');
 	}
 
 	async pickDirectoryPath(): Promise<string | undefined> {
-		const path = ((await PickDirectory()) ?? '').trim();
+		const result = await PickDirectory();
+		if (result === null || result === undefined) {
+			return undefined;
+		}
+
+		const path = requireWailsString(result, 'PickDirectory').trim();
 		return path || undefined;
 	}
 
 	async pickFilePaths(allowMultiple: boolean): Promise<string[]> {
 		const paths = await PickFiles(allowMultiple);
 
-		return (paths ?? []).map(path => path.trim()).filter(Boolean);
+		return wailsArrayOrEmpty(paths, 'PickFiles')
+			.map((path, index) => requireWailsString(path, `PickFiles[${index}]`).trim())
+			.filter(Boolean);
 	}
 
 	// Implement the log method
@@ -180,6 +195,9 @@ export class WailsBackendAPI implements IBackendAPI {
 					case 'warn':
 						LogWarning(msg);
 						break;
+					default:
+						LogInfo(msg);
+						break;
 				}
 			}
 		} else {
@@ -192,13 +210,12 @@ export class WailsBackendAPI implements IBackendAPI {
 	}
 
 	async openURLAsAttachment(rawURL: string): Promise<Attachment | undefined> {
-		try {
-			const att = await OpenURLAsAttachment(rawURL);
-			return att as Attachment;
-		} catch (err) {
-			console.error('Error opening URL as attachment:', err);
+		const attachment = await OpenURLAsAttachment(rawURL);
+		if (attachment === null || attachment === undefined) {
+			return undefined;
 		}
-		return undefined;
+
+		return requireWailsBody(attachment as Attachment, 'OpenURLAsAttachment');
 	}
 
 	async saveFile(defaultFilename: string, contentBase64: string, additionalFilters?: Array<FileFilter>): Promise<void> {
@@ -210,16 +227,16 @@ export class WailsBackendAPI implements IBackendAPI {
 		additionalFilters?: Array<FileFilter>
 	): Promise<Attachment[]> {
 		const attachments = await OpenMultipleFilesAsAttachments(allowMultiple, additionalFilters ?? []);
-		return requireWailsArray(attachments, 'OpenMultipleFilesAsAttachments');
+		return wailsObjectArrayOrEmpty<Attachment>(attachments, 'OpenMultipleFilesAsAttachments');
 	}
 
 	async openDirectoryAsAttachments(maxFiles: number): Promise<DirectoryAttachmentsResult> {
 		const result = await OpenDirectoryAsAttachments(maxFiles);
-		return result as DirectoryAttachmentsResult;
+		return requireWailsBody(result as DirectoryAttachmentsResult | null | undefined, 'OpenDirectoryAsAttachments');
 	}
 
 	async getPathsAsAttachments(paths: string[], maxFilesPerDir: number): Promise<PathAttachmentsResult> {
 		const pathResults = await GetPathsAsAttachments(paths, maxFilesPerDir);
-		return pathResults as PathAttachmentsResult;
+		return requireWailsBody(pathResults as PathAttachmentsResult | null | undefined, 'GetPathsAsAttachments');
 	}
 }

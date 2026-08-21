@@ -205,6 +205,12 @@ func (f *Factory) Connect(
 	if err != nil {
 		return nil, err
 	}
+	if session == nil {
+		return nil, fmt.Errorf(
+			"%w: MCP SDK returned no client session",
+			runtime.ErrMCPRuntimeNotReady,
+		)
+	}
 
 	return &Session{
 		server:  cfg.Server,

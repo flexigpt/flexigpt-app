@@ -39,6 +39,13 @@ func Compose(
 		return Effective{}, err
 	}
 
+	normalizedPolicies := make(
+		[]MCPPolicy,
+		0,
+		1+len(policies),
+	)
+	normalizedPolicies = append(normalizedPolicies, result)
+
 	conflicts := map[string]string{}
 	for index, candidate := range policies {
 		candidate = NormalizePolicyBody(candidate)
@@ -49,6 +56,7 @@ func Compose(
 				err,
 			)
 		}
+		normalizedPolicies = append(normalizedPolicies, candidate)
 
 		result.TrustLevel = restrictiveTrust(
 			result.TrustLevel,
@@ -78,26 +86,33 @@ func Compose(
 		result.AppsPolicy.RequireApprovalForContextUpdates = result.AppsPolicy.RequireApprovalForContextUpdates ||
 			candidate.AppsPolicy.RequireApprovalForContextUpdates
 
-		if result.ToolPolicies == nil {
-			result.ToolPolicies = map[string]MCPToolPolicyOverride{}
-		}
-		names := make([]string, 0, len(candidate.ToolPolicies))
+	}
+
+	nameSet := make(map[string]struct{})
+	for _, candidate := range normalizedPolicies {
 		for name := range candidate.ToolPolicies {
-			names = append(names, name)
+			nameSet[name] = struct{}{}
 		}
-		sort.Strings(names)
-		for _, name := range names {
-			incoming := candidate.ToolPolicies[name]
-			current, found := result.ToolPolicies[name]
-			if !found {
-				result.ToolPolicies[name] = cloneOverride(incoming)
-				continue
-			}
-			merged, conflict := mergeOverride(current, incoming)
-			result.ToolPolicies[name] = merged
-			if conflict != "" {
-				conflicts[name] = conflict
-			}
+	}
+
+	names := make([]string, 0, len(nameSet))
+	for name := range nameSet {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	result.ToolPolicies = make(
+		map[string]MCPToolPolicyOverride,
+		len(names),
+	)
+	for _, name := range names {
+		merged, conflict := composeToolOverride(
+			name,
+			normalizedPolicies,
+		)
+		result.ToolPolicies[name] = merged
+		if conflict != "" {
+			conflicts[name] = conflict
 		}
 	}
 
@@ -161,38 +176,70 @@ func (e Effective) Validate() error {
 	return nil
 }
 
-func mergeOverride(
-	left MCPToolPolicyOverride,
-	right MCPToolPolicyOverride,
+func composeToolOverride(
+	name string,
+	policies []MCPPolicy,
 ) (merged MCPToolPolicyOverride, conflict string) {
-	output := cloneOverride(left)
-	if output.ToolName == "" {
-		output.ToolName = right.ToolName
-	}
+	output := MCPToolPolicyOverride{ToolName: name}
 
-	if right.ApprovalRule != nil {
-		value := *right.ApprovalRule
-		if output.ApprovalRule != nil {
-			value = restrictiveApproval(*output.ApprovalRule, value)
+	var (
+		approvalRule  MCPApprovalRule
+		executionMode MCPExecutionMode
+		first         = true
+		sawOverride   bool
+		allowStale    = true
+		expected      string
+	)
+
+	for _, candidate := range policies {
+		candidateApproval := candidate.DefaultPolicy.DefaultApprovalRule
+		candidateExecution := candidate.DefaultPolicy.DefaultExecutionMode
+
+		override, found := candidate.ToolPolicies[name]
+		if found {
+			sawOverride = true
+			if override.ApprovalRule != nil {
+				candidateApproval = *override.ApprovalRule
+			}
+			if override.ExecutionMode != nil {
+				candidateExecution = *override.ExecutionMode
+			}
+
+			allowStale = allowStale && override.AllowStaleDigest
+			switch {
+			case override.ExpectedDigest == "":
+			case expected == "":
+				expected = override.ExpectedDigest
+			case expected != override.ExpectedDigest:
+				conflict = "conflicting expected tool digests"
+			}
 		}
-		output.ApprovalRule = &value
-	}
-	if right.ExecutionMode != nil {
-		value := *right.ExecutionMode
-		if output.ExecutionMode != nil {
-			value = restrictiveExecution(*output.ExecutionMode, value)
+
+		if first {
+			approvalRule = candidateApproval
+			executionMode = candidateExecution
+			first = false
+			continue
 		}
-		output.ExecutionMode = &value
+
+		approvalRule = restrictiveApproval(
+			approvalRule,
+			candidateApproval,
+		)
+		executionMode = restrictiveExecution(
+			executionMode,
+			candidateExecution,
+		)
 	}
 
-	output.AllowStaleDigest = output.AllowStaleDigest && right.AllowStaleDigest
+	output.ApprovalRule = &approvalRule
+	output.ExecutionMode = &executionMode
+	output.ExpectedDigest = expected
+	if sawOverride {
+		output.AllowStaleDigest = allowStale
+	}
 
-	switch {
-	case output.ExpectedDigest == "":
-		output.ExpectedDigest = right.ExpectedDigest
-	case right.ExpectedDigest == "":
-	case output.ExpectedDigest != right.ExpectedDigest:
-		conflict = "conflicting expected tool digests"
+	if conflict != "" {
 		deny := MCPApprovalRuleDeny
 		output.ApprovalRule = &deny
 		output.AllowStaleDigest = false
@@ -240,21 +287,6 @@ func restrictiveExecution(
 		return MCPExecutionModeManual
 	}
 	return MCPExecutionModeAuto
-}
-
-func cloneOverride(
-	input MCPToolPolicyOverride,
-) MCPToolPolicyOverride {
-	output := input
-	if input.ApprovalRule != nil {
-		value := *input.ApprovalRule
-		output.ApprovalRule = &value
-	}
-	if input.ExecutionMode != nil {
-		value := *input.ExecutionMode
-		output.ExecutionMode = &value
-	}
-	return output
 }
 
 func effectiveDigest(

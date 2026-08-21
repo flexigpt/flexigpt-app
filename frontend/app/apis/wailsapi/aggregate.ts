@@ -9,7 +9,13 @@ import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_d
 import { ensureMakeID } from '@/lib/uuid_utils';
 
 import type { IAggregateAPI } from '@/apis/interface';
-import { optionalWailsBody, requireNonBlankString, throwIfAborted } from '@/apis/wailsapi/transport';
+import {
+	createAbortError,
+	optionalWailsBody,
+	requireNonBlankString,
+	requireWailsBody,
+	throwIfAborted,
+} from '@/apis/wailsapi/transport';
 import {
 	ApplyUnifiedDiff,
 	CancelCompletion,
@@ -22,13 +28,12 @@ import {
 import type { texttool as texttoolSpec, spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
+const activeCompletionRequestIDs = new Set<string>();
+
 export class WailsAggregateAPI implements IAggregateAPI {
 	async applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut> {
 		const resp = await ApplyUnifiedDiff(args as texttoolSpec.ApplyUnifiedDiffArgs);
-		if (resp === null || typeof resp !== 'object') {
-			throw new Error('ApplyUnifiedDiff returned an invalid response.');
-		}
-		return resp as ApplyUnifiedDiffOut;
+		return requireWailsBody(resp as ApplyUnifiedDiffOut | null | undefined, 'ApplyUnifiedDiff');
 	}
 
 	async postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void> {
@@ -82,7 +87,7 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		onStreamTextData?: (text: string) => void,
 		onStreamThinkingData?: (text: string) => void
 	): Promise<CompletionResponseBody | undefined> {
-		const rid = ensureMakeID(requestId);
+		const rid = requireNonBlankString(ensureMakeID(requestId), 'requestId');
 
 		// Do not subscribe to events or invoke Go when the caller cancelled before
 		// the request reached this boundary.
@@ -91,31 +96,6 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		let textCallbackId = '';
 		let thinkingCallbackId = '';
 		let abortHandler: (() => void) | undefined;
-
-		if (onStreamTextData) {
-			textCallbackId = `text-${rid}`;
-
-			let lastText = '';
-			const textCb = (t: string) => {
-				if (t !== lastText) {
-					lastText = t;
-					onStreamTextData(t);
-				}
-			};
-			EventsOn(textCallbackId, textCb);
-		}
-
-		if (onStreamThinkingData) {
-			thinkingCallbackId = `thinking-${rid}`;
-			let lastThinking = '';
-			const thinkingCb = (t: string) => {
-				if (t !== lastThinking) {
-					lastThinking = t;
-					onStreamThinkingData(t);
-				}
-			};
-			EventsOn(thinkingCallbackId, thinkingCb);
-		}
 
 		const body = {
 			modelParam: modelParams as wailsSpec.ModelParam,
@@ -126,31 +106,88 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			skillSessionID: skillSessionID ?? '',
 		} as wailsSpec.CompletionRequestBody;
 
-		// oxlint-disable-next-line promise/param-names
-		const abortPromise = new Promise<never>((_, reject) => {
-			if (!signal) {
-				return;
-			}
+		let completionStarted = false;
+		let abortHandled = false;
 
-			abortHandler = () => {
-				void CancelCompletion(rid).catch(() => {});
-				reject(new DOMException('Aborted', 'AbortError'));
-			};
+		if (activeCompletionRequestIDs.has(rid)) {
+			throw new Error(`A completion with request ID ${rid} is already active.`);
+		}
 
-			signal.addEventListener('abort', abortHandler, { once: true });
-		});
-
-		// Start backend call only after abort handling is attached / checked.
-		const responsePromise = FetchCompletion(provider, modelPresetID, body, textCallbackId, thinkingCallbackId, rid);
+		activeCompletionRequestIDs.add(rid);
 
 		try {
+			/*
+			 * Event registration belongs inside the try block. If the second
+			 * registration or the bridge invocation throws synchronously, all
+			 * successfully registered events are still removed in finally.
+			 */
+			if (onStreamTextData) {
+				textCallbackId = `text-${rid}`;
+
+				let lastText = '';
+				const textCb = (t: string) => {
+					if (t !== lastText) {
+						lastText = t;
+						onStreamTextData(t);
+					}
+				};
+				EventsOn(textCallbackId, textCb);
+			}
+
+			if (onStreamThinkingData) {
+				thinkingCallbackId = `thinking-${rid}`;
+				let lastThinking = '';
+				const thinkingCb = (t: string) => {
+					if (t !== lastThinking) {
+						lastThinking = t;
+						onStreamThinkingData(t);
+					}
+				};
+				EventsOn(thinkingCallbackId, thinkingCb);
+			}
+
+			// oxlint-disable-next-line promise/param-names
+			const abortPromise = new Promise<never>((_, reject) => {
+				if (!signal) {
+					return;
+				}
+
+				abortHandler = () => {
+					if (abortHandled) {
+						return;
+					}
+
+					abortHandled = true;
+					if (completionStarted) {
+						void CancelCompletion(rid).catch(() => {});
+					}
+					reject(createAbortError());
+				};
+
+				signal.addEventListener('abort', abortHandler, { once: true });
+			});
+
+			// Catch an abort that happened after the initial check but before
+			// the listener above was installed.
+			if (signal?.aborted) {
+				abortHandler?.();
+			}
+
+			if (abortHandled) {
+				await abortPromise;
+			}
+
+			completionStarted = true;
+			const responsePromise = FetchCompletion(provider, modelPresetID, body, textCallbackId, thinkingCallbackId, rid);
 			const resp = await Promise.race([responsePromise, abortPromise]);
-			const respBody = optionalWailsBody(resp.Body);
+
+			if (resp === null || typeof resp !== 'object' || Array.isArray(resp)) {
+				throw new TypeError('FetchCompletion returned an invalid response.');
+			}
+
+			const respBody = optionalWailsBody(resp.Body, 'FetchCompletion');
 			return respBody as CompletionResponseBody | undefined;
 		} finally {
-			// Always clean up
-
-			// Detach the abort handler if it was attached
 			if (signal && abortHandler) {
 				signal.removeEventListener('abort', abortHandler);
 			}
@@ -162,6 +199,8 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			if (thinkingCallbackId) {
 				EventsOff(thinkingCallbackId);
 			}
+
+			activeCompletionRequestIDs.delete(rid);
 		}
 	}
 

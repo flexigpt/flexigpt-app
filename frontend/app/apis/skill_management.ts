@@ -412,6 +412,10 @@ export class SkillManagementAPI {
 		const artifact = await this.resolveArtifact(bundle, artifactID);
 		const hasDocumentChanges = displayName !== undefined || description !== undefined || tags !== undefined;
 
+		if (!hasDocumentChanges && isEnabled === undefined) {
+			return;
+		}
+
 		if (!hasDocumentChanges) {
 			await this.skills.setSkillEnabled(artifact.artifact, {
 				expectedRevision: artifact.revision,
@@ -453,6 +457,11 @@ export class SkillManagementAPI {
 	}
 
 	private documentFromInput(input: SkillArtifactCreateInput): SkillDocumentInput {
+		const name = input.name.trim();
+		if (!name) {
+			throw new Error('Skill name is required.');
+		}
+
 		const description = input.description.trim();
 		if (!description) {
 			throw new Error('Skill description is required.');
@@ -462,7 +471,7 @@ export class SkillManagementAPI {
 		}
 
 		return {
-			name: input.name.trim(),
+			name,
 			displayName: input.displayName?.trim() || undefined,
 			description,
 			insert: input.insert,
@@ -517,14 +526,15 @@ export class SkillManagementAPI {
 	}
 
 	private async resolveCreationRoot(): Promise<ArtifactRootID> {
-		if (!this.rootCreationPromise) {
-			this.rootCreationPromise = this.resolveOrCreateRoot();
-		}
+		const promise = this.rootCreationPromise ?? this.resolveOrCreateRoot();
+		this.rootCreationPromise = promise;
 
 		try {
-			return await this.rootCreationPromise;
+			return await promise;
 		} finally {
-			this.rootCreationPromise = undefined;
+			if (this.rootCreationPromise === promise) {
+				this.rootCreationPromise = undefined;
+			}
 		}
 	}
 

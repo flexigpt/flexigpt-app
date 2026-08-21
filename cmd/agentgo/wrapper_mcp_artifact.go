@@ -646,10 +646,10 @@ func (w *MCPWrapper) EvaluateMappedMCPToolCall(
 func (w *MCPWrapper) ResolveMCPApproval(
 	approvalID string,
 	resolution runtime.MCPApprovalResolution,
-) (*runtime.MCPApprovalToken, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.MCPApprovalToken, error) {
+) (runtime.MCPApprovalResolutionResult, error) {
+	return middleware.WithRecoveryResp(func() (runtime.MCPApprovalResolutionResult, error) {
 		if err := w.ready(); err != nil {
-			return nil, err
+			return runtime.MCPApprovalResolutionResult{}, err
 		}
 		return w.toolBridge.ResolveApproval(
 			context.Background(),

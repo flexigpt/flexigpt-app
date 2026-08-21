@@ -18,11 +18,13 @@ import type {
 
 import type { IArtifactStoreAPI } from '@/apis/interface';
 import {
+	byteArrayToWails,
 	rawJSONObjectToWails,
 	requireNonBlankString,
-	requireWailsArray,
 	requireWailsBody,
 	requireWailsString,
+	wailsArrayOrEmpty,
+	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
 import {
 	CreateArtifactRoot,
@@ -85,7 +87,7 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 		const response = await ListArtifactRoots({} as Parameters<typeof ListArtifactRoots>[0]);
 		const body = requireWailsBody(response.Body, 'ListArtifactRoots');
 
-		return body.roots;
+		return wailsObjectArrayOrEmpty<ArtifactRoot>(body.roots, 'ListArtifactRoots.roots');
 	}
 
 	async updateArtifactRoot(rootID: ArtifactRootID, body: UpdateArtifactRootBody): Promise<ArtifactRoot> {
@@ -112,7 +114,8 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 			expectedRevision,
 		} as Parameters<typeof PurgeArtifactRoot>[0]);
 
-		return { rootID: requireWailsString(result.rootID, 'PurgeArtifactRoot.rootID') as ArtifactRootID };
+		const body = requireWailsBody(result, 'PurgeArtifactRoot');
+		return { rootID: requireWailsString(body.rootID, 'PurgeArtifactRoot.rootID') as ArtifactRootID };
 	}
 
 	async createArtifactSource(rootID: ArtifactRootID, body: ArtifactSourceDraft): Promise<ArtifactSourceSummary> {
@@ -139,7 +142,7 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 		} as Parameters<typeof ListArtifactSources>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListArtifactSources');
-		return body.sources;
+		return wailsObjectArrayOrEmpty<ArtifactSourceSummary>(body.sources, 'ListArtifactSources.sources');
 	}
 
 	async updateArtifactSource(
@@ -181,9 +184,10 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 			expectedRevision,
 		} as Parameters<typeof PurgeArtifactSource>[0]);
 
+		const body = requireWailsBody(result, 'PurgeArtifactSource');
 		return {
-			rootID: result.rootID as ArtifactRootID,
-			sourceID: result.sourceID as ArtifactSourceID,
+			rootID: requireWailsString(body.rootID, 'PurgeArtifactSource.rootID') as ArtifactRootID,
+			sourceID: requireWailsString(body.sourceID, 'PurgeArtifactSource.sourceID') as ArtifactSourceID,
 		};
 	}
 
@@ -191,7 +195,7 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 		const response = await ListArtifactSourceKinds({} as Parameters<typeof ListArtifactSourceKinds>[0]);
 		const body = requireWailsBody(response.Body, 'ListArtifactSourceKinds');
 
-		return requireWailsArray(body.kinds, 'ListArtifactSourceKinds.kinds').map(
+		return wailsArrayOrEmpty(body.kinds, 'ListArtifactSourceKinds.kinds').map(
 			(kind, index) => requireWailsString(kind, `ListArtifactSourceKinds.kinds[${index}]`) as ArtifactSourceKind
 		);
 	}
@@ -204,8 +208,8 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 
 		const body = requireWailsBody(response.Body, 'GetManagedSourceState');
 		return {
-			generation: body.generation as string,
-			source: body.source,
+			generation: requireWailsString(body.generation, 'GetManagedSourceState.generation'),
+			source: requireWailsBody(body.source, 'GetManagedSourceState.source'),
 		};
 	}
 
@@ -217,14 +221,22 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 		const req = {
 			rootID: rootID,
 			sourceID: sourceID,
-			Body: body as unknown as artifactstore.PublishManagedSourcePackageRequestBody,
+			Body: {
+				expectedSourceRevision: body.expectedSourceRevision,
+				address: body.address,
+				expectedGeneration: body.expectedGeneration,
+				files: body.files.map(file => ({
+					locator: file.locator,
+					content: byteArrayToWails(file.content),
+				})),
+			} as artifactstore.PublishManagedSourcePackageRequestBody,
 		} as artifactstore.PublishManagedSourcePackageRequest;
 
 		const response = await PublishManagedSourcePackage(req);
 		const responseBody = requireWailsBody(response.Body, 'PublishManagedSourcePackage');
 		return {
-			generation: responseBody.generation as string,
-			source: responseBody.source,
+			generation: requireWailsString(responseBody.generation, 'PublishManagedSourcePackage.generation'),
+			source: requireWailsBody(responseBody.source, 'PublishManagedSourcePackage.source'),
 		};
 	}
 
@@ -244,8 +256,8 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 		const responseBody = requireWailsBody(response.Body, 'RemoveManagedSourcePackage');
 
 		return {
-			generation: responseBody.generation as string,
-			source: responseBody.source,
+			generation: requireWailsString(responseBody.generation, 'RemoveManagedSourcePackage.generation'),
+			source: requireWailsBody(responseBody.source, 'RemoveManagedSourcePackage.source'),
 		};
 	}
 }

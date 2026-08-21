@@ -356,7 +356,6 @@ func (a *API) effectivePolicy(
 	additional []artifact.ArtifactRef,
 ) (policy.Effective, error) {
 	values := make([]policy.MCPPolicy, 0, 1+len(additional))
-	hasPrimaryPolicy := false
 
 	if reference := serverDocument.Extension.Policy; reference != nil {
 		matches, err := a.policyBodiesByLogicalName(
@@ -378,7 +377,6 @@ func (a *API) effectivePolicy(
 			}
 		case 1:
 			values = append(values, matches[0])
-			hasPrimaryPolicy = true
 		default:
 			return policy.Effective{}, fmt.Errorf(
 				"%w: MCP policy %q is ambiguous",
@@ -423,8 +421,12 @@ func (a *API) effectivePolicy(
 		values = append(values, body)
 	}
 
+	// BaselinePolicy is a fallback, not a mandatory policy floor. A primary
+	// policy already replaces it. Apply the same rule when the installation
+	// explicitly selects only additional policy Artifacts, otherwise allow,
+	// trusted, auto, and Apps-enabled effects can never become effective.
 	baseline := a.dependencies.BaselinePolicy
-	if hasPrimaryPolicy {
+	if len(values) != 0 {
 		baseline = values[0]
 		values = values[1:]
 	}

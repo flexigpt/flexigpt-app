@@ -65,9 +65,6 @@ func ValidateMCPProviderToolMappingsForContext(
 		}
 
 		switch server.ToolExposure {
-		case MCPToolExposureAll:
-			continue
-
 		case MCPToolExposureSelected:
 			selection, found := selectedTool(server.SelectedTools, mapping.ToolName)
 			if !found {
@@ -79,6 +76,16 @@ func ValidateMCPProviderToolMappingsForContext(
 			}
 			if err := mappingMatchesSelection(mapping, selection); err != nil {
 				return err
+			}
+
+		case MCPToolExposureAll:
+			// SelectedTools is optional for "all". When a matching entry is
+			// present, however, its conversation-level tightening still
+			// applies to the durable provider mapping.
+			if selection, found := selectedTool(server.SelectedTools, mapping.ToolName); found {
+				if err := mappingMatchesSelection(mapping, selection); err != nil {
+					return err
+				}
 			}
 
 		default:
@@ -418,7 +425,7 @@ func validateMCPServerSelection(value MCPServerSelection) error {
 	}
 
 	switch value.ToolExposure {
-	case MCPToolExposureNone, MCPToolExposureAll:
+	case MCPToolExposureNone:
 		if len(value.SelectedTools) != 0 {
 			return fmt.Errorf(
 				"%w: selected MCP tools require selected tool exposure",
@@ -433,6 +440,9 @@ func validateMCPServerSelection(value MCPServerSelection) error {
 				basespec.ErrInvalid,
 			)
 		}
+
+	case MCPToolExposureAll:
+		// An all-tools selection does not require a redundant tool list.
 
 	default:
 		return fmt.Errorf(

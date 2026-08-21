@@ -1,4 +1,3 @@
-//nolint:nilnil // Required.
 package runtime
 
 import (
@@ -25,6 +24,8 @@ type approvalDecisionKey struct {
 	ToolName   string               `json:"toolName"`
 	ToolDigest string               `json:"toolDigest,omitempty"`
 	Risk       MCPToolRisk          `json:"risk"`
+	Source     MCPInvocationSource  `json:"source"`
+	AppID      string               `json:"appInstanceID,omitempty"`
 }
 
 type pendingApproval struct {
@@ -36,11 +37,16 @@ type pendingApproval struct {
 	Consumed  bool
 }
 
+type rememberedApprovalDecision struct {
+	Summary    MCPApprovalSummary
+	Resolution MCPApprovalResolution
+}
+
 type ApprovalManager struct {
 	mu        sync.Mutex
 	ttl       time.Duration
 	pending   map[string]*pendingApproval
-	decisions map[string]MCPApprovalResolution
+	decisions map[string]rememberedApprovalDecision
 }
 
 func NewApprovalManager(ttl time.Duration) *ApprovalManager {
@@ -50,7 +56,7 @@ func NewApprovalManager(ttl time.Duration) *ApprovalManager {
 	return &ApprovalManager{
 		ttl:       ttl,
 		pending:   make(map[string]*pendingApproval),
-		decisions: make(map[string]MCPApprovalResolution),
+		decisions: make(map[string]rememberedApprovalDecision),
 	}
 }
 
@@ -60,6 +66,12 @@ func (m *ApprovalManager) Create(
 ) (string, error) {
 	if err := validateApprovalContext(ctx); err != nil {
 		return "", err
+	}
+	if m == nil {
+		return "", fmt.Errorf(
+			"%w: MCP approval manager is unavailable",
+			ErrMCPRuntimeNotReady,
+		)
 	}
 	if err := validateApprovalSummary(summary); err != nil {
 		return "", err
@@ -73,6 +85,9 @@ func (m *ApprovalManager) Create(
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if m.pending == nil {
+		m.pending = make(map[string]*pendingApproval)
+	}
 	m.purgeExpiredLocked(time.Now().UTC())
 	m.pending[id] = &pendingApproval{
 		ID:        id,
@@ -86,12 +101,18 @@ func (m *ApprovalManager) Resolve(
 	ctx context.Context,
 	id string,
 	resolution MCPApprovalResolution,
-) (*MCPApprovalToken, error) {
+) (MCPApprovalResolutionResult, error) {
 	if err := validateApprovalContext(ctx); err != nil {
-		return nil, err
+		return MCPApprovalResolutionResult{}, err
+	}
+	if m == nil {
+		return MCPApprovalResolutionResult{}, fmt.Errorf(
+			"%w: MCP approval manager is unavailable",
+			ErrMCPRuntimeNotReady,
+		)
 	}
 	if strings.TrimSpace(id) == "" {
-		return nil, fmt.Errorf(
+		return MCPApprovalResolutionResult{}, fmt.Errorf(
 			"%w: approval ID is required",
 			ErrMCPInvalidRuntimeRequest,
 		)
@@ -104,49 +125,72 @@ func (m *ApprovalManager) Resolve(
 
 	pending, found := m.pending[id]
 	if !found {
-		return nil, fmt.Errorf(
+		return MCPApprovalResolutionResult{}, fmt.Errorf(
 			"%w: approval was not found",
 			ErrMCPInvalidRuntimeRequest,
 		)
 	}
 	if pending.Issued || pending.Consumed {
-		return nil, fmt.Errorf(
+		return MCPApprovalResolutionResult{}, fmt.Errorf(
 			"%w: approval was already resolved",
 			ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
+	result := MCPApprovalResolutionResult{
+		ApprovalID: pending.ID,
+		Resolution: resolution,
+	}
+
 	switch resolution {
 	case MCPApprovalResolutionDenyOnce:
 		delete(m.pending, id)
-		return nil, nil
+		result.Decision = MCPApprovalDecisionDenied
+		return result, nil
 
 	case MCPApprovalResolutionDenyAlways:
-		m.decisions[approvalDecisionKeyFor(pending.Summary)] = resolution
+		if m.decisions == nil {
+			m.decisions = make(map[string]rememberedApprovalDecision)
+		}
+		m.decisions[approvalDecisionKeyFor(pending.Summary)] = rememberedApprovalDecision{
+			Summary:    cloneApprovalSummary(pending.Summary),
+			Resolution: resolution,
+		}
 		delete(m.pending, id)
-		return nil, nil
+		result.Decision = MCPApprovalDecisionDenied
+		result.RememberedForSession = true
+		return result, nil
 
 	case MCPApprovalResolutionAllowAlways:
-		m.decisions[approvalDecisionKeyFor(pending.Summary)] = resolution
+		if m.decisions == nil {
+			m.decisions = make(map[string]rememberedApprovalDecision)
+		}
+		m.decisions[approvalDecisionKeyFor(pending.Summary)] = rememberedApprovalDecision{
+			Summary:    cloneApprovalSummary(pending.Summary),
+			Resolution: resolution,
+		}
 		delete(m.pending, id)
-		return nil, nil
+		result.Decision = MCPApprovalDecisionAllowed
+		result.RememberedForSession = true
+		return result, nil
 
 	case MCPApprovalResolutionAllowOnce:
 		token, err := randomApprovalToken(32)
 		if err != nil {
-			return nil, err
+			return MCPApprovalResolutionResult{}, err
 		}
 		pending.Token = token
 		pending.Issued = true
 
-		return &MCPApprovalToken{
-			ApprovalID: pending.ID,
-			Token:      token,
-			ExpiresAt:  pending.ExpiresAt.UTC().Format(time.RFC3339Nano),
-		}, nil
+		result.Decision = MCPApprovalDecisionAllowed
+		result.Token = token
+		result.ExpiresAt = pending.ExpiresAt.UTC().Format(
+			time.RFC3339Nano,
+		)
+		return result, nil
 
 	default:
-		return nil, fmt.Errorf(
+		return MCPApprovalResolutionResult{}, fmt.Errorf(
 			"%w: unsupported approval resolution %q",
 			ErrMCPInvalidRuntimeRequest,
 			resolution,
@@ -165,8 +209,46 @@ func (m *ApprovalManager) LookupDecision(
 	defer m.mu.Unlock()
 
 	m.purgeExpiredLocked(time.Now().UTC())
-	value, found := m.decisions[approvalDecisionKeyFor(summary)]
-	return value, found
+	decision, found := m.decisions[approvalDecisionKeyFor(summary)]
+	if !found {
+		return "", false
+	}
+	return decision.Resolution, true
+}
+
+// ClearServer removes pending tokens and remembered decisions belonging to an
+// MCP server. It is called whenever that server's runtime session ends.
+func (m *ApprovalManager) ClearServer(
+	server artifact.ArtifactRef,
+) {
+	if m == nil {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for id, pending := range m.pending {
+		if pending.Summary.Server == server {
+			delete(m.pending, id)
+		}
+	}
+	for key, decision := range m.decisions {
+		if decision.Summary.Server == server {
+			delete(m.decisions, key)
+		}
+	}
+}
+
+func (m *ApprovalManager) Clear() {
+	if m == nil {
+		return
+	}
+
+	m.mu.Lock()
+	m.pending = make(map[string]*pendingApproval)
+	m.decisions = make(map[string]rememberedApprovalDecision)
+	m.mu.Unlock()
 }
 
 func (m *ApprovalManager) VerifyAndConsumeToken(
@@ -176,6 +258,12 @@ func (m *ApprovalManager) VerifyAndConsumeToken(
 ) (string, error) {
 	if err := validateApprovalContext(ctx); err != nil {
 		return "", err
+	}
+	if m == nil {
+		return "", fmt.Errorf(
+			"%w: MCP approval manager is unavailable",
+			ErrMCPRuntimeNotReady,
+		)
 	}
 	if strings.TrimSpace(token) == "" {
 		return "", fmt.Errorf(
@@ -240,6 +328,8 @@ func approvalDecisionKeyFor(summary MCPApprovalSummary) string {
 		ToolName:   summary.ToolName,
 		ToolDigest: summary.ToolDigest,
 		Risk:       summary.Risk,
+		Source:     summary.Source,
+		AppID:      summary.AppInstanceID,
 	})
 	return string(cryptoutil.DigestBytes(raw))
 }
@@ -250,7 +340,9 @@ func approvalSummaryMatches(
 ) bool {
 	if stored.Server != expected.Server ||
 		stored.ToolName != expected.ToolName ||
-		stored.Risk != expected.Risk {
+		stored.Risk != expected.Risk ||
+		stored.Source != expected.Source ||
+		stored.AppInstanceID != expected.AppInstanceID {
 		return false
 	}
 	if stored.ToolDigest != "" &&
@@ -294,6 +386,23 @@ func validateApprovalContext(ctx context.Context) error {
 func validateApprovalSummary(value MCPApprovalSummary) error {
 	if err := value.Server.Validate(); err != nil {
 		return err
+	}
+	if err := validateMCPInvocationSource(value.Source); err != nil {
+		return err
+	}
+	if err := basespec.ValidateOptionalText(
+		"MCP approval app instance ID",
+		value.AppInstanceID,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+	if value.Source == MCPInvocationSourceApp &&
+		strings.TrimSpace(value.AppInstanceID) == "" {
+		return fmt.Errorf(
+			"%w: appInstanceID is required for an app approval",
+			ErrMCPInvalidRuntimeRequest,
+		)
 	}
 	if err := basespec.ValidateRequiredText(
 		"MCP approval tool name",

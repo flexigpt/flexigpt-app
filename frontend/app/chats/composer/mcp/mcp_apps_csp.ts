@@ -19,7 +19,11 @@ export interface MCPAppUIResourceMeta {
 	prefersBorder?: boolean;
 }
 
-function normalizeSource(raw: string): string | undefined {
+function normalizeSource(raw: unknown): string | undefined {
+	if (typeof raw !== 'string') {
+		return undefined;
+	}
+
 	const value = raw.trim();
 	if (!value) {
 		return undefined;
@@ -49,8 +53,8 @@ function normalizeSource(raw: string): string | undefined {
 	}
 }
 
-function normalizeSourceList(values?: string[]): string[] {
-	if (!values || values.length === 0) {
+function normalizeSourceList(values: unknown): string[] {
+	if (!Array.isArray(values) || values.length === 0) {
 		return [];
 	}
 

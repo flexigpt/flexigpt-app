@@ -20,7 +20,10 @@ export function enumFromWails<T extends string>(value: unknown, enumValues: Reco
 	return value as T;
 }
 
-export function requireWailsArray<T = unknown>(value: unknown, field: string): T[] {
+export function wailsArrayOrEmpty<T = unknown>(value: unknown, field: string): T[] {
+	if (value === null || value === undefined) {
+		return [];
+	}
 	if (!Array.isArray(value)) {
 		throw new TypeError(`${field} returned an invalid array.`);
 	}
@@ -36,7 +39,35 @@ export function requireWailsString(value: unknown, field: string): string {
 	return value;
 }
 
-export function requireNonBlankString(value: string, field: string): string {
+export function optionalWailsString(value: unknown, field: string): string | undefined {
+	if (value === null || value === undefined) {
+		return undefined;
+	}
+
+	return requireWailsString(value, field);
+}
+
+export function requireWailsBoolean(value: unknown, field: string): boolean {
+	if (typeof value !== 'boolean') {
+		throw new TypeError(`${field} returned an invalid boolean.`);
+	}
+
+	return value;
+}
+
+export function requireWailsFiniteNumber(value: unknown, field: string): number {
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		throw new TypeError(`${field} returned an invalid number.`);
+	}
+
+	return value;
+}
+
+export function requireNonBlankString(value: unknown, field: string): string {
+	if (typeof value !== 'string') {
+		throw new TypeError(`${field} must be a string.`);
+	}
+
 	if (value.trim().length === 0) {
 		throw new Error(`${field} must not be empty.`);
 	}
@@ -52,24 +83,31 @@ export async function collectAllPages<T>(
 	fetchPage: (pageToken: string | undefined) => Promise<{ items: T[]; nextPageToken?: string }>,
 	maxPages = DEFAULT_MAX_PAGES
 ): Promise<T[]> {
+	if (!Number.isInteger(maxPages) || maxPages <= 0) {
+		throw new RangeError('maxPages must be a positive integer.');
+	}
+
 	const items: T[] = [];
 	const seenTokens = new Set<string>();
 	let pageToken: string | undefined;
 
 	for (let page = 0; page < maxPages; page++) {
-		const result = await fetchPage(pageToken);
-		items.push(...result.items);
+		const result = requireWailsBody(await fetchPage(pageToken), `Pagination page ${page + 1}`);
+		const pageItems = wailsArrayOrEmpty<T>(result.items, `Pagination page ${page + 1}.items`);
+		const nextPageToken = optionalWailsString(result.nextPageToken, `Pagination page ${page + 1}.nextPageToken`);
 
-		if (!result.nextPageToken) {
+		items.push(...pageItems);
+
+		if (!nextPageToken) {
 			return items;
 		}
 
-		if (seenTokens.has(result.nextPageToken)) {
+		if (seenTokens.has(nextPageToken)) {
 			throw new Error('Pagination response repeated a page token.');
 		}
 
-		seenTokens.add(result.nextPageToken);
-		pageToken = result.nextPageToken;
+		seenTokens.add(nextPageToken);
+		pageToken = nextPageToken;
 	}
 
 	throw new Error(`Pagination exceeded the ${maxPages}-page safety limit.`);
@@ -79,14 +117,45 @@ export function requireWailsBody<T>(body: T | null | undefined, operation: strin
 	if (body === null || body === undefined) {
 		throw new Error(`${operation} returned an empty response body.`);
 	}
+
+	if (typeof body !== 'object' || Array.isArray(body)) {
+		throw new TypeError(`${operation} returned an invalid response body.`);
+	}
+
 	return body;
 }
 
-export function optionalWailsBody<T>(body: T | null | undefined): T | undefined {
-	return body === null || body === undefined ? undefined : body;
+export function optionalWailsBody<T>(body: T | null | undefined, operation = 'Wails operation'): T | undefined {
+	if (body === null || body === undefined) {
+		return undefined;
+	}
+
+	if (typeof body !== 'object' || Array.isArray(body)) {
+		throw new TypeError(`${operation} returned an invalid response body.`);
+	}
+
+	return body;
 }
 
-function createAbortError(): Error {
+export function wailsObjectArrayOrEmpty<T extends object = Record<string, unknown>>(
+	value: unknown,
+	field: string
+): T[] {
+	return wailsArrayOrEmpty(value, field).map((item, index) => {
+		const object = requireWailsBody(item as Record<string, unknown> | null | undefined, `${field}[${index}]`);
+		return object as T;
+	});
+}
+
+export function wailsRecordOrEmpty<T = unknown>(value: unknown, field: string): Record<string, T> {
+	if (value === null || value === undefined) {
+		return {};
+	}
+
+	return requireWailsBody(value as Record<string, T> | null | undefined, field);
+}
+
+export function createAbortError(): Error {
 	if (typeof DOMException !== 'undefined') {
 		return new DOMException('Aborted', 'AbortError');
 	}

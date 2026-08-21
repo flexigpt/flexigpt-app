@@ -9,7 +9,16 @@ import type {
 } from '@/spec/modelpreset';
 
 import type { IModelPresetStoreAPI } from '@/apis/interface';
-import { enumFromWails, omitUndefined, requireWailsBody } from '@/apis/wailsapi/transport';
+import {
+	enumFromWails,
+	omitUndefined,
+	optionalWailsString,
+	requireNonBlankString,
+	requireWailsBody,
+	requireWailsString,
+	wailsObjectArrayOrEmpty,
+	wailsRecordOrEmpty,
+} from '@/apis/wailsapi/transport';
 import {
 	DeleteModelPreset,
 	GetDefaultProvider,
@@ -21,12 +30,14 @@ import {
 } from '@/apis/wailsjs/go/main/ModelPresetStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
-function normalizeProviderPreset(provider: ProviderPreset): ProviderPreset {
+function normalizeProviderPreset(providerValue: ProviderPreset, field: string): ProviderPreset {
+	const provider = requireWailsBody(providerValue, field);
+
 	return {
 		...provider,
-		sdkType: enumFromWails(provider.sdkType, ProviderSDKType, 'providerPreset.sdkType'),
-		defaultHeaders: provider.defaultHeaders ?? {},
-		modelPresets: provider.modelPresets ?? {},
+		sdkType: enumFromWails(provider.sdkType, ProviderSDKType, `${field}.sdkType`),
+		defaultHeaders: wailsRecordOrEmpty(provider.defaultHeaders, `${field}.defaultHeaders`),
+		modelPresets: wailsRecordOrEmpty(provider.modelPresets, `${field}.modelPresets`),
 	};
 }
 
@@ -34,7 +45,10 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 	async getDefaultProvider(): Promise<ProviderName> {
 		const resp = await GetDefaultProvider({});
 		const body = requireWailsBody(resp.Body, 'GetDefaultProvider');
-		return body.defaultProvider;
+		return requireNonBlankString(
+			requireWailsString(body.defaultProvider, 'GetDefaultProvider.defaultProvider'),
+			'GetDefaultProvider.defaultProvider'
+		) as ProviderName;
 	}
 
 	async patchDefaultProvider(providerName: ProviderName): Promise<void> {
@@ -123,10 +137,13 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		};
 		const resp = await ListProviderPresets(r);
 		const body = requireWailsBody(resp.Body, 'ListProviderPresets');
-		const providers = (body.providers ?? []).map(p => normalizeProviderPreset(p as ProviderPreset));
+		const providers = wailsObjectArrayOrEmpty<ProviderPreset>(body.providers, 'ListProviderPresets.providers').map(
+			(provider, index) => normalizeProviderPreset(provider, `ListProviderPresets.providers[${index}]`)
+		);
+
 		return {
 			providers: providers,
-			nextPageToken: body.nextPageToken || undefined,
+			nextPageToken: optionalWailsString(body.nextPageToken, 'ListProviderPresets.nextPageToken') || undefined,
 		};
 	}
 }

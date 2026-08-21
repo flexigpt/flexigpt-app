@@ -49,7 +49,38 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {
 		return error.message;
 	}
+	if (typeof error === 'string' && error.trim().length > 0) {
+		return error.trim();
+	}
 	return fallback;
+}
+
+interface NormalizedMCPDiscoveryList<T> {
+	items: T[];
+	error?: string;
+}
+
+function normalizeMCPDiscoveryList<T>(result: PromiseSettledResult<T[]>, label: string): NormalizedMCPDiscoveryList<T> {
+	if (result.status === 'rejected') {
+		return {
+			items: [],
+			error: getErrorMessage(result.reason, `Failed to load MCP ${label}.`),
+		};
+	}
+
+	const value: unknown = result.value;
+	if (value === null || value === undefined) {
+		return { items: [] };
+	}
+
+	if (!Array.isArray(value)) {
+		return {
+			items: [],
+			error: `MCP ${label} discovery returned an invalid response.`,
+		};
+	}
+
+	return { items: value as T[] };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -349,17 +380,25 @@ export function useComposerMCP(): UseComposerMCPResult {
 					mcpAPI.listMCPServerPrompts(server),
 				]);
 
-				const tools = toolsResult.status === 'fulfilled' ? toolsResult.value : [];
-				const resources = resourcesResult.status === 'fulfilled' ? resourcesResult.value : [];
-				const resourceTemplates = resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [];
-				const prompts = promptsResult.status === 'fulfilled' ? promptsResult.value : [];
+				const toolsDiscovery = normalizeMCPDiscoveryList<MCPToolCapability>(toolsResult, 'tools');
+				const resourcesDiscovery = normalizeMCPDiscoveryList<MCPResourceRef>(resourcesResult, 'resources');
+				const templatesDiscovery = normalizeMCPDiscoveryList<MCPResourceTemplateRef>(
+					resourceTemplatesResult,
+					'resource templates'
+				);
+				const promptsDiscovery = normalizeMCPDiscoveryList<MCPPromptRef>(promptsResult, 'prompts');
+
+				const tools = toolsDiscovery.items;
+				const resources = resourcesDiscovery.items;
+				const resourceTemplates = templatesDiscovery.items;
+				const prompts = promptsDiscovery.items;
 
 				const discoveryErrors = [
-					toolsResult.status === 'rejected' ? getErrorMessage(toolsResult.reason, '') : '',
-					resourcesResult.status === 'rejected' ? getErrorMessage(resourcesResult.reason, '') : '',
-					resourceTemplatesResult.status === 'rejected' ? getErrorMessage(resourceTemplatesResult.reason, '') : '',
-					promptsResult.status === 'rejected' ? getErrorMessage(promptsResult.reason, '') : '',
-				].filter((message): message is string => message.trim().length > 0);
+					toolsDiscovery.error,
+					resourcesDiscovery.error,
+					templatesDiscovery.error,
+					promptsDiscovery.error,
+				].filter((message): message is string => typeof message === 'string' && message.length > 0);
 
 				if (!mountedRef.current) {
 					return undefined;
@@ -445,7 +484,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 		for (const selection of Object.values(selectedByServerKeyRef.current)) {
 			void ensureDiscoveryLoaded(selection.server);
 		}
-	}, [ensureDiscoveryLoaded, options.length, selectedServerKeys]);
+	}, [ensureDiscoveryLoaded, options, selectedServerKeys]);
 
 	const refreshServerStatus = useCallback(
 		async (server: ArtifactRef) => {
@@ -523,15 +562,17 @@ export function useComposerMCP(): UseComposerMCPResult {
 					patchOption(server, {
 						runtime,
 						discoveryLoaded: false,
+						discoveryLoading: false,
+						discoveryError: undefined,
 					});
 				}
 			} finally {
 				await refreshServerStatus(server).catch(() => undefined);
 			}
 
-			await ensureDiscoveryLoaded(server).catch(() => undefined);
+			await loadDiscoveryForServer(server, true).catch(() => undefined);
 		},
-		[ensureDiscoveryLoaded, patchOption, refreshServerStatus]
+		[loadDiscoveryForServer, patchOption, refreshServerStatus]
 	);
 
 	const refreshPendingOAuthAuthorizations = useCallback(async () => {

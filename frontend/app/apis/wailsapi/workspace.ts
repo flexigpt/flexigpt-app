@@ -40,7 +40,7 @@ import type {
 } from '@/spec/workspace';
 
 import type { IWorkspaceAPI } from '@/apis/interface';
-import { rawJSONFromWails, requireWailsBody } from '@/apis/wailsapi/transport';
+import { rawJSONFromWails, requireWailsBody, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	AdoptWorkspaceOccurrence,
 	AttachWorkspaceSource,
@@ -117,7 +117,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaces>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaces');
-		return (body.workspaces as WorkspaceView[]) ?? [];
+		return wailsObjectArrayOrEmpty<WorkspaceView>(body.workspaces, 'ListWorkspaces.workspaces');
 	}
 
 	async updateWorkspace(workspace: WorkspaceRef, body: UpdateWorkspaceBody): Promise<WorkspaceView> {
@@ -174,7 +174,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof PurgeWorkspace>[0]);
 
 		const body = requireWailsBody(response.Body, 'PurgeWorkspace');
-		return body.workspace as WorkspaceRef;
+		return requireWailsBody(body.workspace, 'PurgeWorkspace.workspace') as WorkspaceRef;
 	}
 
 	async attachWorkspaceSource(workspace: WorkspaceRef, body: AttachWorkspaceSourceBody): Promise<WorkspaceView> {
@@ -237,13 +237,18 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: { artifacts },
 		} as Parameters<typeof ComposeWorkspaceLoadPlan>[0]);
 		const res = requireWailsBody(response.Body, 'ComposeWorkspaceLoadPlan');
+		const items = wailsObjectArrayOrEmpty<WorkspaceLoadPlanView['items'][number]>(
+			res.items,
+			'ComposeWorkspaceLoadPlan.items'
+		);
 		const r = {
 			...res,
-			items: res.items.map(i => {
+			items: items.map((i, index) => {
+				const definition = requireWailsBody(i.definition, `ComposeWorkspaceLoadPlan.items[${index}].definition`);
 				return Object.assign(i, {
 					definition: {
-						...i.definition,
-						body: rawJSONFromWails(i.definition.body, 'item.definition.body'),
+						...definition,
+						body: rawJSONFromWails(definition.body, `ComposeWorkspaceLoadPlan.items[${index}].definition.body`),
 					},
 				});
 			}),
@@ -265,11 +270,12 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			Body: { artifact, selector },
 		} as Parameters<typeof ResolveWorkspaceResource>[0]);
 		const res = requireWailsBody(response.Body, 'ResolveWorkspaceResource');
+		const definition = requireWailsBody(res.definition, 'ResolveWorkspaceResource.definition');
 		const r = {
 			...res,
 			definition: {
-				...res.definition,
-				body: rawJSONFromWails(res.definition.body, 'workspace.definition.body'),
+				...definition,
+				body: rawJSONFromWails(definition.body, 'workspace.definition.body'),
 			},
 		} as ResolveWorkspaceResourceResult;
 		return r;
@@ -290,7 +296,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaceArtifacts>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaceArtifacts');
-		return (body.artifacts as WorkspaceArtifactView[]) ?? [];
+		return wailsObjectArrayOrEmpty<WorkspaceArtifactView>(body.artifacts, 'ListWorkspaceArtifacts.artifacts');
 	}
 
 	async adoptWorkspaceOccurrence(
@@ -320,7 +326,10 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaceSuppressions>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaceSuppressions');
-		return (body.suppressions as WorkspaceSuppressionView[]) ?? [];
+		return wailsObjectArrayOrEmpty<WorkspaceSuppressionView>(
+			body.suppressions,
+			'ListWorkspaceSuppressions.suppressions'
+		);
 	}
 
 	async suppressWorkspaceBinding(
@@ -355,7 +364,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaceContexts>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaceContexts');
-		return (body.contexts as WorkspaceContextView[]) ?? [];
+		return wailsObjectArrayOrEmpty<WorkspaceContextView>(body.contexts, 'ListWorkspaceContexts.contexts');
 	}
 
 	async loadWorkspaceContexts(
@@ -385,7 +394,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof ListWorkspaceSkills>[0]);
 
 		const body = requireWailsBody(response.Body, 'ListWorkspaceSkills');
-		return (body.skills as WorkspaceSkillView[]) ?? [];
+		return wailsObjectArrayOrEmpty<WorkspaceSkillView>(body.skills, 'ListWorkspaceSkills.skills');
 	}
 
 	async loadWorkspaceSkills(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceSkillLoadView> {
@@ -425,7 +434,7 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 
 		const wbody = requireWailsBody(response.Body, 'UnadoptWorkspaceArtifact');
 		return {
-			artifact: wbody.artifact,
+			artifact: requireWailsBody(wbody.artifact, 'UnadoptWorkspaceArtifact.artifact'),
 		};
 	}
 
@@ -440,7 +449,8 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 			expectedRevision,
 		} as Parameters<typeof PurgeWorkspaceArtifact>[0]);
 
-		return requireWailsBody(response.Body, 'PurgeWorkspaceArtifact').artifact;
+		const body = requireWailsBody(response.Body, 'PurgeWorkspaceArtifact');
+		return requireWailsBody(body.artifact, 'PurgeWorkspaceArtifact.artifact');
 	}
 
 	async setWorkspaceArtifactRuntimeDisabled(

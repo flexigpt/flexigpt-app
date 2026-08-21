@@ -6,7 +6,13 @@ import type {
 } from '@/spec/assistantpreset';
 
 import type { IAssistantPresetStoreAPI } from '@/apis/interface';
-import { omitUndefined, optionalWailsBody, requireWailsArray, requireWailsBody } from '@/apis/wailsapi/transport';
+import {
+	omitUndefined,
+	optionalWailsBody,
+	optionalWailsString,
+	requireWailsBody,
+	wailsObjectArrayOrEmpty,
+} from '@/apis/wailsapi/transport';
 import {
 	DeleteAssistantPreset,
 	DeleteAssistantPresetBundle,
@@ -38,11 +44,11 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		const body = requireWailsBody(resp.Body, 'ListAssistantPresetBundles');
 
 		return {
-			assistantPresetBundles: requireWailsArray<AssistantPresetBundle>(
+			assistantPresetBundles: wailsObjectArrayOrEmpty<AssistantPresetBundle>(
 				body.assistantPresetBundles,
 				'ListAssistantPresetBundles.assistantPresetBundles'
 			),
-			nextPageToken: body.nextPageToken || undefined,
+			nextPageToken: optionalWailsString(body.nextPageToken, 'ListAssistantPresetBundles.nextPageToken') || undefined,
 		};
 	}
 
@@ -102,11 +108,11 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		const body = requireWailsBody(resp.Body, 'ListAssistantPresets');
 
 		return {
-			assistantPresetListItems: requireWailsArray<AssistantPresetListItem>(
+			assistantPresetListItems: wailsObjectArrayOrEmpty<AssistantPresetListItem>(
 				body.assistantPresetListItems,
 				'ListAssistantPresets.assistantPresetListItems'
 			),
-			nextPageToken: body.nextPageToken || undefined,
+			nextPageToken: optionalWailsString(body.nextPageToken, 'ListAssistantPresets.nextPageToken') || undefined,
 		};
 	}
 
@@ -178,7 +184,7 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		};
 
 		const resp = await GetAssistantPreset(req);
-		const body = optionalWailsBody(resp.Body);
+		const body = optionalWailsBody(resp.Body, 'GetAssistantPreset');
 		return body ? (body as AssistantPreset) : undefined;
 	}
 }

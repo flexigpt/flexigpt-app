@@ -720,6 +720,10 @@ function ServerRow({
 			aria-checked={selected}
 			data-searchable-menu-item="true"
 			onKeyDown={event => {
+				if (event.target !== event.currentTarget) {
+					return;
+				}
+
 				if (event.key !== 'Enter' && event.key !== ' ') {
 					return;
 				}

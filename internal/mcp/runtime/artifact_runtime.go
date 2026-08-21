@@ -120,6 +120,7 @@ type MCPRuntimeManager struct {
 	cancelLifecycle  context.CancelFunc
 
 	mu          sync.RWMutex
+	approvals   *ApprovalManager
 	sessions    map[artifact.ArtifactRef]*sessionState
 	generations map[artifact.ArtifactRef]uint64
 	timers      map[artifact.ArtifactRef]*time.Timer
@@ -293,7 +294,7 @@ func (m *MCPRuntimeManager) ListTools(
 	if err != nil {
 		return nil, err
 	}
-	output := append([]MCPToolCapability(nil), snapshot.Tools...)
+	output := append([]MCPToolCapability{}, snapshot.Tools...)
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].ToolName < output[right].ToolName
 	})
@@ -341,7 +342,7 @@ func (m *MCPRuntimeManager) ListResources(
 	if err != nil {
 		return nil, err
 	}
-	output := append([]MCPResourceRef(nil), snapshot.Resources...)
+	output := append([]MCPResourceRef{}, snapshot.Resources...)
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].URI < output[right].URI
 	})
@@ -383,7 +384,7 @@ func (m *MCPRuntimeManager) ListResourceTemplates(
 		return nil, err
 	}
 	output := append(
-		[]MCPResourceTemplateRef(nil),
+		[]MCPResourceTemplateRef{},
 		snapshot.ResourceTemplates...,
 	)
 	sort.Slice(output, func(left, right int) bool {
@@ -429,7 +430,7 @@ func (m *MCPRuntimeManager) ListPrompts(
 	if err != nil {
 		return nil, err
 	}
-	output := append([]MCPPromptRef(nil), snapshot.Prompts...)
+	output := append([]MCPPromptRef{}, snapshot.Prompts...)
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].PromptName < output[right].PromptName
 	})
@@ -479,7 +480,19 @@ func (m *MCPRuntimeManager) ReadResource(
 		return nil, err
 	}
 	body, err := state.client.ReadResource(ctx, uri)
-	return body, redactRuntimeError(err, state.config.SensitiveValues)
+	if err != nil {
+		return nil, redactRuntimeError(
+			err,
+			state.config.SensitiveValues,
+		)
+	}
+	if body == nil {
+		return nil, fmt.Errorf(
+			"%w: MCP resource read returned no response",
+			ErrMCPRuntimeNotReady,
+		)
+	}
+	return body, nil
 }
 
 func (m *MCPRuntimeManager) GetPrompt(
@@ -507,7 +520,19 @@ func (m *MCPRuntimeManager) GetPrompt(
 		name,
 		arguments,
 	)
-	return body, redactRuntimeError(err, state.config.SensitiveValues)
+	if err != nil {
+		return nil, redactRuntimeError(
+			err,
+			state.config.SensitiveValues,
+		)
+	}
+	if body == nil {
+		return nil, fmt.Errorf(
+			"%w: MCP prompt read returned no response",
+			ErrMCPRuntimeNotReady,
+		)
+	}
+	return body, nil
 }
 
 func (m *MCPRuntimeManager) Complete(
@@ -524,10 +549,19 @@ func (m *MCPRuntimeManager) Complete(
 		return nil, err
 	}
 	body, err := state.client.Complete(ctx, request)
-	return body, redactRuntimeError(
-		err,
-		state.config.SensitiveValues,
-	)
+	if err != nil {
+		return nil, redactRuntimeError(
+			err,
+			state.config.SensitiveValues,
+		)
+	}
+	if body == nil {
+		return nil, fmt.Errorf(
+			"%w: MCP completion returned no response",
+			ErrMCPRuntimeNotReady,
+		)
+	}
+	return body, nil
 }
 
 func (m *MCPRuntimeManager) CallToolDryRun(
@@ -696,6 +730,8 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 
 	cancelLifecycle := m.cancelLifecycle
 	m.cancelLifecycle = nil
+	approvals := m.approvals
+	m.approvals = nil
 	states := make([]*sessionState, 0, len(m.sessions))
 	for ref, state := range m.sessions {
 		m.generations[ref]++
@@ -716,6 +752,9 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 	m.attempts = make(map[artifact.ArtifactRef]connectionAttempt)
 	m.mu.Unlock()
 
+	if approvals != nil {
+		approvals.Clear()
+	}
 	if cancelLifecycle != nil {
 		cancelLifecycle()
 	}
@@ -884,6 +923,12 @@ func (m *MCPRuntimeManager) connect(
 	defer cancel()
 
 	client, err := m.factory.Connect(connectCtx, config, authConn, m)
+	if err == nil && client == nil {
+		err = fmt.Errorf(
+			"%w: MCP client factory returned no session",
+			ErrMCPRuntimeNotReady,
+		)
+	}
 	if err != nil {
 		err = redactRuntimeError(
 			err,
@@ -1068,6 +1113,7 @@ func (m *MCPRuntimeManager) beginConnection(
 	if previousAttempt.cancel != nil {
 		previousAttempt.cancel()
 	}
+	m.clearApprovalSession(ref)
 
 	return attemptContext, generation, previous, timer, nil
 }
@@ -1098,8 +1144,6 @@ func (m *MCPRuntimeManager) disconnectSession(
 	ref artifact.ArtifactRef,
 ) (*sessionState, *time.Timer, context.CancelFunc) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	m.generations[ref]++
 	state := m.sessions[ref]
 	timer := m.timers[ref]
@@ -1107,6 +1151,8 @@ func (m *MCPRuntimeManager) disconnectSession(
 	delete(m.timers, ref)
 	delete(m.attempts, ref)
 	if state == nil {
+		m.mu.Unlock()
+		m.clearApprovalSession(ref)
 		return nil, timer, attempt.cancel
 	}
 
@@ -1120,6 +1166,9 @@ func (m *MCPRuntimeManager) disconnectSession(
 		state.lastSyncedAt = time.Time{}
 		state.snapshotExpiresAt = time.Time{}
 	}
+	m.mu.Unlock()
+
+	m.clearApprovalSession(ref)
 	return closed, timer, attempt.cancel
 }
 
@@ -1203,7 +1252,45 @@ func (m *MCPRuntimeManager) removeSession(
 	delete(m.timers, ref)
 	delete(m.attempts, ref)
 	m.mu.Unlock()
+	m.clearApprovalSession(ref)
 	return state, timer, attempt.cancel
+}
+
+func (m *MCPRuntimeManager) bindApprovalManager(
+	approvals *ApprovalManager,
+) {
+	if m == nil {
+		return
+	}
+
+	m.mu.Lock()
+	previous := m.approvals
+	m.approvals = approvals
+	closed := m.closed
+	m.mu.Unlock()
+
+	if previous != nil && previous != approvals {
+		previous.Clear()
+	}
+	if closed && approvals != nil {
+		approvals.Clear()
+	}
+}
+
+func (m *MCPRuntimeManager) clearApprovalSession(
+	ref artifact.ArtifactRef,
+) {
+	if m == nil {
+		return
+	}
+
+	m.mu.RLock()
+	approvals := m.approvals
+	m.mu.RUnlock()
+
+	if approvals != nil {
+		approvals.ClearServer(ref)
+	}
 }
 
 func (m *MCPRuntimeManager) setErrorIfCurrent(
@@ -1319,6 +1406,12 @@ func validateRuntimeRef(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) error {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: MCP runtime context is nil",
+			basespec.ErrInvalid,
+		)
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}

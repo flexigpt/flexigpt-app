@@ -247,6 +247,8 @@ const (
 type MCPApprovalSummary struct {
 	Server            artifact.ArtifactRef   `json:"server"`
 	ServerDisplayName string                 `json:"serverDisplayName,omitempty"`
+	Source            MCPInvocationSource    `json:"source"`
+	AppInstanceID     string                 `json:"appInstanceID,omitempty"`
 	ToolName          string                 `json:"toolName"`
 	ToolDigest        string                 `json:"toolDigest,omitempty"`
 	Risk              MCPToolRisk            `json:"risk"`
@@ -264,4 +266,17 @@ type MCPApprovalToken struct {
 	ApprovalID string `json:"approvalID"`
 	Token      string `json:"token"`
 	ExpiresAt  string `json:"expiresAt"`
+}
+
+// MCPApprovalResolutionResult is returned for every successful resolution.
+// Token and ExpiresAt are populated only for allowOnce. Always resolutions
+// are remembered in process memory until the associated MCP session ends.
+type MCPApprovalResolutionResult struct {
+	ApprovalID string                `json:"approvalID"`
+	Resolution MCPApprovalResolution `json:"resolution"`
+	Decision   MCPApprovalDecision   `json:"decision"`
+
+	RememberedForSession bool   `json:"rememberedForSession,omitempty"`
+	Token                string `json:"token,omitempty"`
+	ExpiresAt            string `json:"expiresAt,omitempty"`
 }

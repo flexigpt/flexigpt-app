@@ -97,15 +97,15 @@ export function useMCPApproval() {
 	);
 
 	useEffect(() => {
-		const queuedCurrent = queuedApprovalsRef.current;
-		const active = activeApprovalRef.current;
 		return () => {
 			clearAdvanceTimer();
 
+			const active = activeApprovalRef.current;
 			activeApprovalRef.current = null;
 			active?.resolve(MCPApprovalResolution.DenyOnce);
 
-			const queued = queuedCurrent.splice(0);
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			const queued = queuedApprovalsRef.current.splice(0);
 			for (const item of queued) {
 				item.resolve(MCPApprovalResolution.DenyOnce);
 			}

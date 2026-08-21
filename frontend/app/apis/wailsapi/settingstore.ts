@@ -10,9 +10,23 @@ import type {
 import { DebugLogLevel, DEFAULT_DEBUG_SETTINGS, ThemeType } from '@/spec/setting';
 
 import type { ISettingStoreAPI } from '@/apis/interface';
-import { enumFromWails, requireWailsBody } from '@/apis/wailsapi/transport';
+import {
+	enumFromWails,
+	requireWailsBody,
+	requireWailsBoolean,
+	requireWailsString,
+	wailsObjectArrayOrEmpty,
+} from '@/apis/wailsapi/transport';
 import { GetAuthKey, GetSettings, SetAppTheme, SetDebugSettings } from '@/apis/wailsjs/go/main/SettingStoreWrapper';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
+
+function booleanOrDefault(value: unknown, fallback: boolean, field: string): boolean {
+	if (value === null || value === undefined) {
+		return fallback;
+	}
+
+	return requireWailsBoolean(value, field);
+}
 
 export class WailsSettingStoreAPI implements ISettingStoreAPI {
 	async setAppTheme(theme: AppTheme): Promise<void> {
@@ -43,7 +57,11 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 		};
 		const resp = await GetAuthKey(r as wailsSpec.GetAuthKeyRequest);
 		const body = requireWailsBody(resp.Body, 'GetAuthKey');
-		return { secret: body.secret, sha256: body.sha256, nonEmpty: body.nonEmpty };
+		return {
+			secret: requireWailsString(body.secret, 'GetAuthKey.secret'),
+			sha256: requireWailsString(body.sha256, 'GetAuthKey.sha256'),
+			nonEmpty: requireWailsBoolean(body.nonEmpty, 'GetAuthKey.nonEmpty'),
+		};
 	}
 
 	async getSettings(forceFetch?: boolean): Promise<SettingsSchema> {
@@ -52,20 +70,32 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 		};
 		const resp = await GetSettings(r);
 		const body = requireWailsBody(resp.Body, 'GetSettings');
-		const debug = body.debug;
+		const appTheme = requireWailsBody(body.appTheme, 'GetSettings.appTheme');
+		const debug =
+			body.debug === null || body.debug === undefined ? undefined : requireWailsBody(body.debug, 'GetSettings.debug');
+
 		return {
 			appTheme: {
-				type: enumFromWails(body.appTheme.type, ThemeType, 'settings.appTheme.type'),
-				name: body.appTheme.name,
+				type: enumFromWails(appTheme.type, ThemeType, 'settings.appTheme.type'),
+				name: requireWailsString(appTheme.name, 'settings.appTheme.name'),
 			},
 			debug: {
-				logLLMReqResp: debug?.logLLMReqResp ?? DEFAULT_DEBUG_SETTINGS.logLLMReqResp,
-				disableContentStripping: debug?.disableContentStripping ?? DEFAULT_DEBUG_SETTINGS.disableContentStripping,
-				logLevel: debug?.logLevel
-					? enumFromWails(debug.logLevel, DebugLogLevel, 'settings.debug.logLevel')
-					: DEFAULT_DEBUG_SETTINGS.logLevel,
+				logLLMReqResp: booleanOrDefault(
+					debug?.logLLMReqResp,
+					DEFAULT_DEBUG_SETTINGS.logLLMReqResp,
+					'settings.debug.logLLMReqResp'
+				),
+				disableContentStripping: booleanOrDefault(
+					debug?.disableContentStripping,
+					DEFAULT_DEBUG_SETTINGS.disableContentStripping,
+					'settings.debug.disableContentStripping'
+				),
+				logLevel:
+					debug?.logLevel === null || debug?.logLevel === undefined
+						? DEFAULT_DEBUG_SETTINGS.logLevel
+						: enumFromWails(debug.logLevel, DebugLogLevel, 'settings.debug.logLevel'),
 			},
-			authKeys: body.authKeys as AuthKeyMeta[],
+			authKeys: wailsObjectArrayOrEmpty<AuthKeyMeta>(body.authKeys, 'GetSettings.authKeys'),
 		};
 	}
 }

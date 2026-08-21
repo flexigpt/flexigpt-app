@@ -9,7 +9,9 @@ import {
 	jsonObjectFromWails,
 	jsonObjectToWails,
 	optionalWailsBody,
+	optionalWailsString,
 	requireWailsBody,
+	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
 import {
 	DeleteTool,
@@ -24,30 +26,37 @@ import {
 } from '@/apis/wailsjs/go/main/ToolStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
-function toolFromWails(tool: Tool, field: string): Tool {
+function httpImplFromWails(httpImpl: HTTPToolImpl | null | undefined, field: string): HTTPToolImpl | undefined {
+	if (httpImpl === null || httpImpl === undefined) {
+		return undefined;
+	}
+
+	const normalized = requireWailsBody(httpImpl, field);
+	const response = requireWailsBody(normalized.response, `${field}.response`);
+
+	return {
+		...normalized,
+		response: {
+			...response,
+			bodyOutputMode: response.bodyOutputMode
+				? enumFromWails(response.bodyOutputMode, HTTPBodyOutputMode, `${field}.response.bodyOutputMode`)
+				: undefined,
+		},
+	};
+}
+
+function toolFromWails(toolValue: Tool, field: string): Tool {
+	const tool = requireWailsBody(toolValue, field);
 	return {
 		...tool,
 		argSchema: jsonObjectFromWails(tool.argSchema, `${field}.argSchema`),
 		userArgSchema:
-			tool.userArgSchema === undefined ? undefined : jsonObjectFromWails(tool.userArgSchema, `${field}.userArgSchema`),
+			tool.userArgSchema === null || tool.userArgSchema === undefined
+				? undefined
+				: jsonObjectFromWails(tool.userArgSchema, `${field}.userArgSchema`),
 		llmToolType: enumFromWails(tool.llmToolType, ToolStoreChoiceType, `${field}.llmToolType`),
 		type: enumFromWails(tool.type, ToolImplType, `${field}.type`),
-		httpImpl:
-			tool.httpImpl === undefined
-				? undefined
-				: {
-						...tool.httpImpl,
-						response: {
-							...tool.httpImpl.response,
-							bodyOutputMode: tool.httpImpl.response.bodyOutputMode
-								? enumFromWails(
-										tool.httpImpl.response.bodyOutputMode,
-										HTTPBodyOutputMode,
-										`${field}.httpImpl.response.bodyOutputMode`
-									)
-								: undefined,
-						},
-					},
+		httpImpl: httpImplFromWails(tool.httpImpl, `${field}.httpImpl`),
 	};
 }
 
@@ -67,8 +76,8 @@ export class WailsToolStoreAPI implements IToolStoreAPI {
 		const resp = await ListToolBundles(req as spec.ListToolBundlesRequest);
 		const body = requireWailsBody(resp.Body, 'ListToolBundles');
 		return {
-			toolBundles: (body.toolBundles ?? []) as ToolBundle[],
-			nextPageToken: body.nextPageToken || undefined,
+			toolBundles: wailsObjectArrayOrEmpty<ToolBundle>(body.toolBundles, 'ListToolBundles.toolBundles'),
+			nextPageToken: optionalWailsString(body.nextPageToken, 'ListToolBundles.nextPageToken') || undefined,
 		};
 	}
 
@@ -124,11 +133,18 @@ export class WailsToolStoreAPI implements IToolStoreAPI {
 		};
 		const resp = await ListTools(req as spec.ListToolsRequest);
 		const body = requireWailsBody(resp.Body, 'ListTools');
+		const items = wailsObjectArrayOrEmpty<ToolListItem>(body.toolListItems, 'ListTools.toolListItems');
+
 		return {
-			toolListItems: (body.toolListItems ?? []).map(item =>
-				Object.assign(item, { toolDefinition: toolFromWails(item.toolDefinition as Tool, 'ListTools.toolDefinition') })
-			) as ToolListItem[],
-			nextPageToken: body.nextPageToken || undefined,
+			toolListItems: items.map((item, index) => {
+				return Object.assign(item, {
+					toolDefinition: toolFromWails(
+						item.toolDefinition as Tool,
+						`ListTools.toolListItems[${index}].toolDefinition`
+					),
+				});
+			}),
+			nextPageToken: optionalWailsString(body.nextPageToken, 'ListTools.nextPageToken') || undefined,
 		};
 	}
 
@@ -195,7 +211,7 @@ export class WailsToolStoreAPI implements IToolStoreAPI {
 			Version: version,
 		};
 		const resp = await GetTool(req);
-		const body = optionalWailsBody(resp.Body);
+		const body = optionalWailsBody(resp.Body, 'GetTool');
 		return body === undefined ? undefined : toolFromWails(body as Tool, 'GetTool');
 	}
 }

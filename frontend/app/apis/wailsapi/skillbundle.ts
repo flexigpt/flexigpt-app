@@ -27,7 +27,14 @@ import { SkillBundleAttachmentRole } from '@/spec/skill';
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 import type { ISkillBundleAPI } from '@/apis/interface';
-import { byteArrayToWails, enumFromWails, rawJSONToWails, requireWailsBody } from '@/apis/wailsapi/transport';
+import {
+	byteArrayToWails,
+	enumFromWails,
+	rawJSONToWails,
+	requireWailsBody,
+	requireWailsString,
+	wailsObjectArrayOrEmpty,
+} from '@/apis/wailsapi/transport';
 import {
 	AdoptSkill,
 	AttachSkillSource,
@@ -54,7 +61,8 @@ import {
 } from '@/apis/wailsjs/go/main/SkillBundleWrapper';
 import type { artifact as wailsArtifact, bundle as wailsSkillBundle } from '@/apis/wailsjs/go/models';
 
-function skillArtifactFromWails(artifact: wailsArtifact.Artifact): SkillArtifactView {
+function skillArtifactFromWails(artifactValue: wailsArtifact.Artifact, field = 'skillArtifact'): SkillArtifactView {
+	const artifact = requireWailsBody(artifactValue, field);
 	const ref: ArtifactRef = {
 		rootID: artifact.rootID,
 		artifactID: artifact.id,
@@ -75,17 +83,30 @@ function skillArtifactFromWails(artifact: wailsArtifact.Artifact): SkillArtifact
 		enabled: artifact.enabled,
 		adoption: enumFromWails(artifact.adoption, ArtifactAdoptionMode, 'skillArtifact.adoption'),
 		state: enumFromWails(artifact.state, ArtifactState, 'skillArtifact.state'),
-		binding: artifact.binding,
+		binding: requireWailsBody(artifact.binding, `${field}.binding`),
 		definitionDigest: artifact.resolvedDefinition ?? undefined,
-		diagnostics: artifact.diagnostics as ArtifactDiagnostic[],
+		diagnostics:
+			artifact.diagnostics === null || artifact.diagnostics === undefined
+				? undefined
+				: wailsObjectArrayOrEmpty<ArtifactDiagnostic>(artifact.diagnostics, `${field}.diagnostics`),
 		createdAt: artifact.createdAt,
 		modifiedAt: artifact.modifiedAt,
 	};
 }
 
-function skillBundleFromWails(bundle: wailsSkillBundle.Bundle): SkillBundleView {
-	const collection = bundle.collection;
-	const sourcesByID = new Map(bundle.sources.map(source => [source.id, source]));
+function skillBundleFromWails(bundleValue: wailsSkillBundle.Bundle, field = 'skillBundle'): SkillBundleView {
+	const bundle = requireWailsBody(bundleValue, field);
+	const collection = requireWailsBody(bundle.collection, `${field}.collection`);
+	const data = requireWailsBody(bundle.data, `${field}.data`);
+	const sources = wailsObjectArrayOrEmpty<wailsSkillBundle.Bundle['sources'][number]>(
+		bundle.sources,
+		`${field}.sources`
+	);
+	const attachments = wailsObjectArrayOrEmpty<wailsSkillBundle.Bundle['attachments'][number]>(
+		bundle.attachments,
+		`${field}.attachments`
+	);
+	const sourcesByID = new Map(sources.map(source => [source.id, source]));
 
 	return {
 		bundle: {
@@ -96,12 +117,12 @@ function skillBundleFromWails(bundle: wailsSkillBundle.Bundle): SkillBundleView 
 		displayName: collection.displayName,
 		description: collection.description ?? undefined,
 		enabled: collection.enabled,
-		retiredAt: collection.retiredAt,
-		logicalName: bundle.data.logicalName,
-		logicalVersion: bundle.data.logicalVersion ?? undefined,
-		labels: bundle.data.labels ?? undefined,
-		managedSourceID: bundle.data.managedSourceID ?? undefined,
-		attachments: bundle.attachments.map(attachment => {
+		retiredAt: collection.retiredAt ?? undefined,
+		logicalName: data.logicalName,
+		logicalVersion: data.logicalVersion ?? undefined,
+		labels: data.labels ?? undefined,
+		managedSourceID: data.managedSourceID ?? undefined,
+		attachments: attachments.map(attachment => {
 			const source = sourcesByID.get(attachment.sourceID);
 
 			return {
@@ -156,7 +177,9 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 
 	async listSkillBundles(rootID: ArtifactRootID): Promise<SkillBundleView[]> {
 		const bundles = await ListSkillBundles(rootID as Parameters<typeof ListSkillBundles>[0]);
-		return bundles.map(bundle => skillBundleFromWails(bundle));
+		return wailsObjectArrayOrEmpty<wailsSkillBundle.Bundle>(bundles, 'ListSkillBundles').map((bundle, index) => {
+			return skillBundleFromWails(bundle, `ListSkillBundles[${index}]`);
+		});
 	}
 
 	async updateSkillBundle(bundle: SkillBundleRef, body: UpdateSkillBundleBody): Promise<SkillBundleView> {
@@ -203,7 +226,9 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 
 	async listSkillBundleArtifacts(bundle: SkillBundleRef): Promise<SkillArtifactView[]> {
 		const artifacts = await ListBundleSkills(bundle as Parameters<typeof ListBundleSkills>[0]);
-		return artifacts.map(artifact => skillArtifactFromWails(artifact));
+		return wailsObjectArrayOrEmpty<wailsArtifact.Artifact>(artifacts, 'ListBundleSkills').map((artifact, index) => {
+			return skillArtifactFromWails(artifact, `ListBundleSkills[${index}]`);
+		});
 	}
 
 	async createManagedSkill(bundle: SkillBundleRef, body: CreateManagedSkillBody): Promise<CreateManagedSkillResult> {
@@ -230,18 +255,20 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 			...semanticAuthoringInput,
 		} as Parameters<typeof CreateManagedSkill>[0]);
 
+		const respBody = requireWailsBody(result, 'CreateManagedSkill');
 		return {
-			artifact: skillArtifactFromWails(result.Artifact),
-			address: result.Address,
+			artifact: skillArtifactFromWails(respBody.Artifact, 'CreateManagedSkill.Artifact'),
+			address: requireWailsBody(respBody.Address, 'CreateManagedSkill.Address'),
 		};
 	}
 
 	async getManagedSkillDocument(artifact: ArtifactRef): Promise<ManagedSkillDocumentView> {
 		const result = await GetManagedSkillDocument(artifact as Parameters<typeof GetManagedSkillDocument>[0]);
+		const body = requireWailsBody(result, 'GetManagedSkillDocument');
 
 		return {
-			artifact: skillArtifactFromWails(result.Artifact),
-			document: result.Document as SkillDocumentInput,
+			artifact: skillArtifactFromWails(body.Artifact, 'GetManagedSkillDocument.Artifact'),
+			document: requireWailsBody(body.Document, 'GetManagedSkillDocument.Document') as SkillDocumentInput,
 		};
 	}
 
@@ -298,7 +325,8 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 			},
 		} as Parameters<typeof GetSkillsPrompt>[0]);
 
-		return requireWailsBody(response.Body, 'GetSkillsPrompt').prompt;
+		const body = requireWailsBody(response.Body, 'GetSkillsPrompt');
+		return requireWailsString(body.prompt, 'GetSkillsPrompt.prompt');
 	}
 
 	async createSkillSession(options: CreateSkillSessionOptions): Promise<SkillSession> {
@@ -313,8 +341,8 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 		const body = requireWailsBody(response.Body, 'CreateSkillSession');
 
 		return {
-			sessionID: body.sessionID,
-			activeArtifacts: body.activeArtifacts ?? [],
+			sessionID: requireWailsString(body.sessionID, 'CreateSkillSession.sessionID'),
+			activeArtifacts: wailsObjectArrayOrEmpty<ArtifactRef>(body.activeArtifacts, 'CreateSkillSession.activeArtifacts'),
 		};
 	}
 
@@ -331,7 +359,8 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 			},
 		} as Parameters<typeof ListRuntimeSkills>[0]);
 
-		return (requireWailsBody(response.Body, 'ListRuntimeSkills').skills as RuntimeSkillListItem[]) ?? [];
+		const body = requireWailsBody(response.Body, 'ListRuntimeSkills');
+		return wailsObjectArrayOrEmpty<RuntimeSkillListItem>(body.skills, 'ListRuntimeSkills.skills');
 	}
 
 	async invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse> {

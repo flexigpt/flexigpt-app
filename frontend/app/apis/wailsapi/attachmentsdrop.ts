@@ -3,51 +3,66 @@ import type { AttachmentsDroppedPayload, PathAttachmentsResult } from '@/spec/at
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import type { IAttachmentsDropAPI } from '@/apis/interface';
+import { requireWailsBody, requireWailsString, wailsArrayOrEmpty } from '@/apis/wailsapi/transport';
 import { GetPathsAsAttachments } from '@/apis/wailsjs/go/main/App';
-import { EventsOn } from '@/apis/wailsjs/runtime/runtime';
+import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
 import { MAX_DIRECTORY_FILES_TO_SCAN } from '@/chats/composer/attachments/attachment_editor_utils';
 
 type DropTarget = (payload: AttachmentsDroppedPayload) => void;
 
+const FILE_DROP_EVENT = 'wails:file-drop';
+
 let inited = false;
+let listenerUsers = 0;
 let activeTarget: DropTarget | null = null;
 let pending: AttachmentsDroppedPayload[] = [];
 let onNoTarget: ((payload: AttachmentsDroppedPayload) => void) | null = null;
 
 function initWailsDropListener(): () => void {
-	if (inited) {
-		return () => {};
+	if (!inited) {
+		EventsOn(FILE_DROP_EVENT, (x: number, y: number, paths: string[]) => {
+			void handleFileDrop(x, y, paths);
+		});
+		inited = true;
 	}
-	inited = true;
 
-	EventsOn('wails:file-drop', (x: number, y: number, paths: string[]) => {
-		void handleFileDrop(x, y, paths);
-	});
+	listenerUsers += 1;
 
 	async function handleFileDrop(x: number, y: number, paths: string[]) {
-		if (paths.length === 0) {
-			console.error('empty paths in file drop');
-			return;
-		}
-
 		try {
-			console.log('got attachments drop', x, y, paths);
-			const pathResults = await GetPathsAsAttachments(paths, MAX_DIRECTORY_FILES_TO_SCAN);
+			const normalizedPaths = wailsArrayOrEmpty<string>(paths, 'wails:file-drop.paths').map((path, index) =>
+				requireWailsString(path, `wails:file-drop.paths[${index}]`)
+			);
 
-			const r = pathResults as PathAttachmentsResult;
+			if (normalizedPaths.length === 0) {
+				console.error('empty paths in file drop');
+				return;
+			}
+
+			const pathResults = await GetPathsAsAttachments(normalizedPaths, MAX_DIRECTORY_FILES_TO_SCAN);
+			const r = requireWailsBody(pathResults as PathAttachmentsResult | null | undefined, 'GetPathsAsAttachments');
+
 			const dropID = getUUIDv7();
 			const payload: AttachmentsDroppedPayload = {
 				dropID: dropID,
 				x: x,
 				y: y,
-				files: r.fileAttachments,
-				directories: r.dirAttachments,
-				errors: r.errors,
+				files: wailsArrayOrEmpty(r.fileAttachments, 'GetPathsAsAttachments.fileAttachments'),
+				directories: wailsArrayOrEmpty(r.dirAttachments, 'GetPathsAsAttachments.dirAttachments'),
+				errors: wailsArrayOrEmpty(r.errors, 'GetPathsAsAttachments.errors'),
 				maxFilesPerDirectory: MAX_DIRECTORY_FILES_TO_SCAN,
 			};
-			if (activeTarget) {
-				activeTarget(payload);
+
+			const target = activeTarget;
+			if (target) {
+				try {
+					target(payload);
+				} catch (error) {
+					pending.push(payload);
+					console.error('Failed to apply active attachment drop; queued for retry', error);
+					onNoTarget?.(payload);
+				}
 				return;
 			}
 
@@ -59,7 +74,20 @@ function initWailsDropListener(): () => void {
 		}
 	}
 
-	return () => {};
+	let stopped = false;
+	return () => {
+		if (stopped) {
+			return;
+		}
+
+		stopped = true;
+		listenerUsers = Math.max(0, listenerUsers - 1);
+
+		if (listenerUsers === 0 && inited) {
+			EventsOff(FILE_DROP_EVENT);
+			inited = false;
+		}
+	};
 }
 
 export class WailsAttachmentsDropAPI implements IAttachmentsDropAPI {
@@ -78,6 +106,7 @@ export class WailsAttachmentsDropAPI implements IAttachmentsDropAPI {
 				fn(p);
 			} catch (e) {
 				console.error('Failed to apply pending drop', e);
+				pending.push(p);
 			}
 		}
 

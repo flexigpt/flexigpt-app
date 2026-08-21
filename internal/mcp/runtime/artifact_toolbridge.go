@@ -29,6 +29,9 @@ func NewToolBridge(
 	runtime *MCPRuntimeManager,
 	approvals *ApprovalManager,
 ) *ToolBridge {
+	if runtime != nil {
+		runtime.bindApprovalManager(approvals)
+	}
 	return &ToolBridge{
 		runtime:   runtime,
 		approvals: approvals,
@@ -39,14 +42,18 @@ func (b *ToolBridge) ResolveApproval(
 	ctx context.Context,
 	approvalID string,
 	resolution MCPApprovalResolution,
-) (*MCPApprovalToken, error) {
+) (MCPApprovalResolutionResult, error) {
 	if b == nil || b.approvals == nil {
-		return nil, fmt.Errorf(
+		return MCPApprovalResolutionResult{}, fmt.Errorf(
 			"%w: MCP approval manager is unavailable",
 			ErrMCPRuntimeNotReady,
 		)
 	}
-	return b.approvals.Resolve(ctx, approvalID, resolution)
+	return b.approvals.Resolve(
+		ctx,
+		approvalID,
+		resolution,
+	)
 }
 
 func (b *ToolBridge) Evaluate(
@@ -729,6 +736,8 @@ func approvalSummary(
 	return &MCPApprovalSummary{
 		Server:            config.Server,
 		ServerDisplayName: config.DisplayName,
+		Source:            request.Source,
+		AppInstanceID:     request.AppInstanceID,
 		ToolName:          tool.ToolName,
 		ToolDigest:        tool.Digest,
 		Risk:              tool.InferredRisk,
@@ -741,7 +750,6 @@ func (b *ToolBridge) applyCachedDecision(
 ) MCPApprovalEvaluation {
 	if b == nil ||
 		b.approvals == nil ||
-		evaluation.Decision != MCPApprovalDecisionApprovalRequired ||
 		evaluation.Summary == nil {
 		return evaluation
 	}
@@ -753,11 +761,22 @@ func (b *ToolBridge) applyCachedDecision(
 
 	switch cached {
 	case MCPApprovalResolutionAllowAlways:
-		evaluation.Decision = MCPApprovalDecisionAllowed
-		evaluation.Reason = "cached allow-always decision"
+		// A remembered user approval may satisfy an approval prompt, but it
+		// must never override a hard policy denial.
+		if evaluation.Decision ==
+			MCPApprovalDecisionApprovalRequired {
+			evaluation.Decision = MCPApprovalDecisionAllowed
+			evaluation.Reason = "remembered session approval"
+		}
+
 	case MCPApprovalResolutionDenyAlways:
-		evaluation.Decision = MCPApprovalDecisionDenied
-		evaluation.Reason = "cached deny-always decision"
+		// A remembered denial also applies when the base policy would
+		// otherwise permit the call.
+		if evaluation.Decision != MCPApprovalDecisionDenied {
+			evaluation.Decision = MCPApprovalDecisionDenied
+			evaluation.Reason = "remembered session denial"
+		}
+
 	default:
 	}
 	return evaluation
