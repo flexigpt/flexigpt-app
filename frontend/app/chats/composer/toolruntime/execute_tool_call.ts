@@ -1,5 +1,12 @@
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { InvokeMCPToolRequestBody, MCPContent, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp_artifact';
+import type {
+	InvokeMCPToolRequestBody,
+	MCPApprovalEvaluation,
+	MCPApprovalResolutionResult,
+	MCPContent,
+	MCPToolAppRenderInfo,
+	MCPToolSelection,
+} from '@/spec/mcp_artifact';
 import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp_artifact';
 import { ToolOutputKind } from '@/spec/tool';
 
@@ -76,6 +83,15 @@ function mcpToolLabel(selection: MCPToolSelection, fallbackName: string): string
 	return selection.toolName || selection.providerToolName || fallbackName;
 }
 
+function mcpFailureText(message: string): string {
+	const normalized = message.trim() || 'MCP tool invocation failed.';
+	return [
+		`MCP tool error: ${normalized}`,
+		'This is a tool error result for the requested call.',
+		'The model may correct the arguments or retry the tool call.',
+	].join('\n\n');
+}
+
 function buildMCPToolOutput(args: {
 	toolCall: UIToolCall;
 	selection: MCPToolSelection;
@@ -123,9 +139,16 @@ async function executeMCPToolCall(
 	requestMCPApproval?: RequestMCPApproval
 ): Promise<ExecuteComposerToolCallResult> {
 	if (!selection.server || !selection.toolName) {
+		const message = 'Cannot resolve MCP tool identity for this call.';
 		return {
-			ok: false,
-			errorMessage: 'Cannot resolve MCP tool identity for this call.',
+			ok: true,
+			output: buildMCPToolOutput({
+				toolCall,
+				selection,
+				text: mcpFailureText(message),
+				isError: true,
+				errorMessage: message,
+			}),
 		};
 	}
 
@@ -138,7 +161,7 @@ async function executeMCPToolCall(
 			output: buildMCPToolOutput({
 				toolCall,
 				selection,
-				text: (err as Error)?.message || 'Invalid MCP tool arguments.',
+				text: mcpFailureText((err as Error)?.message || 'Invalid MCP tool arguments.'),
 				isError: true,
 				errorMessage: (err as Error)?.message || 'Invalid MCP tool arguments.',
 			}),
@@ -155,8 +178,22 @@ async function executeMCPToolCall(
 		toolUseID: toolCall.callID || toolCall.id,
 	};
 
-	const evaluation = await mcpAPI.evaluateMCPToolCall(selection.server, req);
-
+	let evaluation: MCPApprovalEvaluation;
+	try {
+		evaluation = await mcpAPI.evaluateMCPToolCall(selection.server, req);
+	} catch (error) {
+		const message = error instanceof Error && error.message.trim() ? error.message : 'MCP approval evaluation failed.';
+		return {
+			ok: true,
+			output: buildMCPToolOutput({
+				toolCall,
+				selection,
+				text: mcpFailureText(message),
+				isError: true,
+				errorMessage: message,
+			}),
+		};
+	}
 	if (!evaluation) {
 		const message = 'MCP approval evaluation did not return a decision.';
 		return {
@@ -164,7 +201,7 @@ async function executeMCPToolCall(
 			output: buildMCPToolOutput({
 				toolCall,
 				selection,
-				text: message,
+				text: mcpFailureText(message),
 				isError: true,
 				errorMessage: message,
 			}),
@@ -178,7 +215,7 @@ async function executeMCPToolCall(
 			output: buildMCPToolOutput({
 				toolCall,
 				selection,
-				text: message,
+				text: mcpFailureText(message),
 				isError: true,
 				errorMessage: message,
 			}),
@@ -193,31 +230,40 @@ async function executeMCPToolCall(
 				output: buildMCPToolOutput({
 					toolCall,
 					selection,
-					text: message,
+					text: mcpFailureText(message),
 					isError: true,
 					errorMessage: message,
 				}),
 			};
 		}
 
-		let resolution: MCPApprovalResolution;
+		let approval: MCPApprovalResolutionResult;
 
 		try {
-			resolution =
+			approval =
 				requestMCPApproval && evaluation.summary
 					? await requestMCPApproval({
 							approvalID: evaluation.approvalID,
 							summary: evaluation.summary,
 							reason: evaluation.reason,
 						})
-					: MCPApprovalResolution.DenyOnce;
-		} catch {
-			resolution = MCPApprovalResolution.DenyOnce;
+					: await mcpAPI.resolveMCPApproval(evaluation.approvalID, MCPApprovalResolution.DenyOnce);
+		} catch (error) {
+			const message =
+				error instanceof Error && error.message.trim() ? error.message : 'MCP approval could not be resolved.';
+			return {
+				ok: true,
+				output: buildMCPToolOutput({
+					toolCall,
+					selection,
+					text: mcpFailureText(message),
+					isError: true,
+					errorMessage: message,
+				}),
+			};
 		}
 
-		const token = await mcpAPI.resolveMCPApproval(evaluation.approvalID, resolution);
-
-		if (resolution !== MCPApprovalResolution.AllowOnce && resolution !== MCPApprovalResolution.AllowAlways) {
+		if (approval.decision !== MCPApprovalDecision.Allowed) {
 			const message = evaluation.reason
 				? `MCP tool call denied by user. ${evaluation.reason}`
 				: 'MCP tool call denied by user.';
@@ -226,15 +272,15 @@ async function executeMCPToolCall(
 				output: buildMCPToolOutput({
 					toolCall,
 					selection,
-					text: message,
+					text: mcpFailureText(message),
 					isError: true,
 					errorMessage: message,
 				}),
 			};
 		}
 
-		if (!token?.token) {
-			const message = 'MCP approval did not return a usable token.';
+		if (approval.resolution === MCPApprovalResolution.AllowOnce && !approval.token) {
+			const message = 'Allow-once approval did not return a usable token.';
 			return {
 				ok: true,
 				output: buildMCPToolOutput({
@@ -246,9 +292,10 @@ async function executeMCPToolCall(
 				}),
 			};
 		}
-
-		req.approvalID = token.approvalID;
-		req.approvalToken = token.token;
+		req.approvalID = approval.approvalID;
+		if (approval.token) {
+			req.approvalToken = approval.token;
+		}
 	} else if (evaluation.decision !== MCPApprovalDecision.Allowed) {
 		const message = `Unsupported MCP approval decision: ${String(evaluation.decision)}`;
 		return {
@@ -256,7 +303,7 @@ async function executeMCPToolCall(
 			output: buildMCPToolOutput({
 				toolCall,
 				selection,
-				text: message,
+				text: mcpFailureText(message),
 				isError: true,
 				errorMessage: message,
 			}),
@@ -310,7 +357,7 @@ async function executeMCPToolCall(
 			output: buildMCPToolOutput({
 				toolCall,
 				selection,
-				text: message,
+				text: mcpFailureText(message),
 				isError: true,
 				errorMessage: message,
 			}),

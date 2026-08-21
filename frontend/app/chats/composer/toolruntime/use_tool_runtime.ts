@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import { UIToolCallStatus } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';
-import { ToolStoreChoiceType } from '@/spec/tool';
+import { ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
@@ -18,6 +18,41 @@ import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 export interface ComposerToolRuntimeState {
 	toolCalls: UIToolCall[];
 	toolOutputs: UIToolOutput[];
+}
+
+function buildSkippedToolOutput(toolCall: UIToolCall): UIToolOutput {
+	const name = toolCall.mcpToolSelection?.toolName || toolCall.name;
+	const originalError = toolCall.errorMessage?.trim();
+	const message = originalError
+		? `The tool call failed before producing a result: ${originalError}`
+		: 'The tool call was not executed because the user chose to submit an error result.';
+
+	return {
+		id: toolCall.id,
+		callID: toolCall.callID || toolCall.id,
+		name,
+		choiceID: toolCall.choiceID,
+		type: toolCall.type,
+		summary: `Tool error: ${name}`,
+		toolOutputs: [
+			{
+				kind: ToolOutputKind.Text,
+				textItem: {
+					text: [
+						message,
+						'This output intentionally completes the tool call.',
+						'The model may revise the request or retry the tool.',
+					].join('\n\n'),
+				},
+			},
+		],
+		isError: true,
+		errorMessage: originalError || message,
+		arguments: toolCall.arguments,
+		webSearchToolCallItems: toolCall.webSearchToolCallItems,
+		toolStoreChoice: toolCall.toolStoreChoice,
+		mcpToolSelection: toolCall.mcpToolSelection,
+	};
 }
 
 interface UseComposerToolRuntimeArgs {
@@ -325,8 +360,17 @@ export function useComposerToolRuntime({
 
 	const discardToolCall = useCallback(
 		(id: string) => {
+			const toolCall = stateRef.current.toolCalls.find(call => call.id === id);
+			if (!toolCall || toolCall.status === UIToolCallStatus.Running) {
+				return;
+			}
+
 			clearToolCallAttempt(id);
-			dispatchRuntime({ type: 'discard', callId: id });
+			dispatchRuntime({
+				type: 'succeed',
+				callId: id,
+				output: buildSkippedToolOutput(toolCall),
+			});
 		},
 		[clearToolCallAttempt, dispatchRuntime]
 	);

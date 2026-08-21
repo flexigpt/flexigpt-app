@@ -90,7 +90,7 @@ export function getMCPAppUIResourceMeta(value: unknown): MCPAppUIResourceMeta | 
 	}
 
 	const metaRecord = meta as Record<string, unknown>;
-	const ui = metaRecord.ui;
+	const ui = metaRecord.ui ?? metaRecord['io.modelcontextprotocol/ui'];
 
 	if (!ui || typeof ui !== 'object' || Array.isArray(ui)) {
 		return undefined;

@@ -70,6 +70,7 @@ export interface UseComposerMCPResult {
 	openAuthURL: (url: string) => void;
 
 	setServerSelected: (option: MCPComposerServerOption, selected: boolean) => void;
+	ensureServerSelected: (server: ArtifactRef) => boolean;
 	setToolExposure: (server: ArtifactRef, exposure: MCPToolExposure) => void;
 	setIncludeServerInstructions: (server: ArtifactRef, include: boolean) => void;
 	toggleTool: (tool: MCPToolCapability, selected: boolean) => void;

@@ -870,7 +870,8 @@ function replaceControlledSecretTargets(
 
 		const oauthDraft = draft.httpOAuthClientCredentials;
 		const clientCredentialsRequired = draft.httpAuthMode === MCPHTTPAuthMode.ClientCredentials;
-		const useOAuthCredentials = clientCredentialsRequired || oauthDraft.useClientCredentials;
+		const useOAuthCredentials =
+			clientCredentialsRequired || (draft.httpAuthMode === MCPHTTPAuthMode.OAuth && oauthDraft.useClientCredentials);
 
 		if (useOAuthCredentials) {
 			const inputName =

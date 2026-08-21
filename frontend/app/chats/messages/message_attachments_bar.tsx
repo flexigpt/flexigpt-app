@@ -335,14 +335,14 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 		errorMessage: call.errorMessage,
 	};
 
-	const label = getPrettyToolName(tmpCall.name);
+	const label = call.mcpToolSelection?.toolName ? call.mcpToolSelection.toolName : getPrettyToolName(tmpCall.name);
 
 	const statusLabel = call.status ? ` (${call.status})` : '';
 	const isAutoExecute =
 		Boolean(call.toolStoreChoice?.autoExecute) || call.mcpToolSelection?.executionMode === MCPExecutionMode.Auto;
 	const autoLabel = isAutoExecute ? ' • Auto-execute: enabled' : '';
 	const mcpLabel = call.mcpToolSelection
-		? `\nMCP: ${call.mcpToolSelection.server.artifactID}/${call.mcpToolSelection.toolName}`
+		? `\nMCP server: ${call.mcpToolSelection.server.artifactID}\nMCP tool: ${call.mcpToolSelection.toolName}`
 		: '';
 	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}${mcpLabel}`;
 	return (

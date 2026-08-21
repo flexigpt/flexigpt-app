@@ -16,6 +16,7 @@ import type {
 import {
 	MCPAuthHealthState,
 	MCPHTTPAuthMode,
+	MCPServerStatus,
 	MCPServerType,
 	MCPToolExposure,
 	MCPTransportType,
@@ -40,10 +41,18 @@ import {
 	mcpServerKey,
 	mcpToolKey,
 } from '@/chats/composer/mcp/mcp_composer_types';
-import { getAuthMode, loadMCPBundleViews, loadMCPServerViews } from '@/mcpservers/lib/mcp_management';
+import {
+	getAuthMode,
+	isServerOperational,
+	loadMCPBundleViews,
+	loadMCPServerViews,
+} from '@/mcpservers/lib/mcp_management';
 import { isMCPToolModelSelectable, isMCPToolVisibleToModel } from '@/mcpservers/lib/mcp_server_utils';
 
 type MCPDiscoveryLoadResult = Pick<MCPComposerServerOption, 'tools' | 'resources' | 'resourceTemplates' | 'prompts'>;
+
+const MCP_CONNECTION_POLL_MS = 500;
+const MCP_CONNECTION_TIMEOUT_MS = 11 * 60 * 1000;
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {
@@ -228,12 +237,15 @@ export function useComposerMCP(): UseComposerMCPResult {
 	const optionsRef = useRef<MCPComposerServerOption[]>([]);
 	const selectedByServerKeyRef = useRef<Record<string, MCPComposerServerSelection>>({});
 	const discoveryPromisesRef = useRef(new Map<string, Promise<MCPDiscoveryLoadResult | undefined>>());
+	const connectionPromisesRef = useRef(new Map<string, Promise<void>>());
 
 	useEffect(() => {
 		mountedRef.current = true;
 
 		return () => {
 			mountedRef.current = false;
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			connectionPromisesRef.current.clear();
 		};
 	}, []);
 
@@ -336,7 +348,6 @@ export function useComposerMCP(): UseComposerMCPResult {
 	}, []);
 
 	useEffect(() => {
-		// oxlint-disable-next-line react/set-state-in-effect
 		void refreshAll();
 	}, [refreshAll]);
 
@@ -488,6 +499,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const refreshServerStatus = useCallback(
 		async (server: ArtifactRef) => {
+			const previous = optionsRef.current.find(option => optionKey(option) === mcpServerKey(server));
 			const [runtime, authHealth, pendingAuthorizations] = await Promise.all([
 				mcpAPI.getMCPServerStatus(server).catch(() => undefined),
 				mcpAPI.getMCPServerAuthHealth(server).catch(() => undefined),
@@ -495,13 +507,23 @@ export function useComposerMCP(): UseComposerMCPResult {
 			]);
 
 			if (!mountedRef.current) {
-				return;
+				return {
+					runtime: runtime ?? previous?.runtime,
+					authHealth: authHealth ?? previous?.authHealth,
+				};
 			}
 
+			const nextRuntime = runtime ?? previous?.runtime;
+			const nextAuthHealth = overlayPendingOAuthAuthHealth(
+				server,
+				authHealth ?? previous?.authHealth,
+				pendingAuthorizations
+			);
 			patchOption(server, {
-				runtime,
-				authHealth: overlayPendingOAuthAuthHealth(server, authHealth, pendingAuthorizations),
+				runtime: nextRuntime,
+				authHealth: nextAuthHealth,
 			});
+			return { runtime: nextRuntime, authHealth: nextAuthHealth };
 		},
 		[patchOption]
 	);
@@ -539,24 +561,19 @@ export function useComposerMCP(): UseComposerMCPResult {
 	);
 
 	const connectServer = useCallback(
-		async (server: ArtifactRef) => {
-			let settled = false;
-			const connectPromise = mcpAPI.connectMCPServer(server).finally(() => {
-				settled = true;
-			});
+		(server: ArtifactRef): Promise<void> => {
+			const key = mcpServerKey(server);
+			const existing = connectionPromisesRef.current.get(key);
+			if (existing) {
+				return existing;
+			}
 
-			try {
-				while (true) {
-					await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
-
-					if (settled) {
-						break;
-					}
-
-					await refreshServerStatus(server).catch(() => undefined);
-				}
-
-				const runtime = await connectPromise;
+			const promise = (async () => {
+				const current = optionsRef.current.find(option => optionKey(option) === key);
+				let runtime =
+					current?.runtime?.status === MCPServerStatus.Connecting
+						? current.runtime
+						: await mcpAPI.connectMCPServer(server);
 
 				if (mountedRef.current) {
 					patchOption(server, {
@@ -566,11 +583,38 @@ export function useComposerMCP(): UseComposerMCPResult {
 						discoveryError: undefined,
 					});
 				}
-			} finally {
-				await refreshServerStatus(server).catch(() => undefined);
-			}
 
-			await loadDiscoveryForServer(server, true).catch(() => undefined);
+				const deadline = Date.now() + MCP_CONNECTION_TIMEOUT_MS;
+				while (mountedRef.current && runtime.status === MCPServerStatus.Connecting) {
+					if (Date.now() >= deadline) {
+						throw new Error('Timed out waiting for the MCP server to connect.');
+					}
+
+					await sleep(MCP_CONNECTION_POLL_MS);
+					const refreshed = await refreshServerStatus(server).catch(() => undefined);
+					runtime = refreshed?.runtime ?? runtime;
+				}
+
+				if (!mountedRef.current) {
+					return;
+				}
+				if (runtime.status === MCPServerStatus.Error) {
+					throw new Error(runtime.lastError || 'The MCP server connection failed.');
+				}
+				if (runtime.status !== MCPServerStatus.Ready) {
+					throw new Error('The MCP server disconnected before becoming ready.');
+				}
+
+				await refreshServerStatus(server).catch(() => undefined);
+				await loadDiscoveryForServer(server, true);
+			})();
+
+			connectionPromisesRef.current.set(key, promise);
+			return promise.finally(() => {
+				if (connectionPromisesRef.current.get(key) === promise) {
+					connectionPromisesRef.current.delete(key);
+				}
+			});
 		},
 		[loadDiscoveryForServer, patchOption, refreshServerStatus]
 	);
@@ -683,6 +727,42 @@ export function useComposerMCP(): UseComposerMCPResult {
 					},
 				};
 			});
+		},
+		[commitSelectedByServerKey]
+	);
+
+	const ensureServerSelected = useCallback(
+		(server: ArtifactRef): boolean => {
+			const key = mcpServerKey(server);
+			if (selectedByServerKeyRef.current[key]) {
+				return true;
+			}
+
+			const option = optionsRef.current.find(item => optionKey(item) === key);
+			if (
+				!option ||
+				!option.bundle.enabled ||
+				!option.server.runtimeEnabled ||
+				!option.server.artifact.enabled ||
+				!isServerOperational(option.server)
+			) {
+				return false;
+			}
+
+			commitSelectedByServerKey(previous => ({
+				...previous,
+				[key]: {
+					server,
+					snapshotDigest: option.runtime?.snapshotDigest,
+					toolExposure: MCPToolExposure.None,
+					selectedTools: [],
+					selectedResources: [],
+					selectedResourceTemplates: [],
+					selectedPrompts: [],
+					includeServerInstructions: false,
+				},
+			}));
+			return true;
 		},
 		[commitSelectedByServerKey]
 	);
@@ -915,12 +995,34 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 		for (const selection of Object.values(currentSelections)) {
 			const key = mcpServerKey(selection.server);
-			const option = optionsRef.current.find(item => optionKey(item) === key);
+			let option = optionsRef.current.find(item => optionKey(item) === key);
+
+			if (!option) {
+				throw new Error(`Selected MCP server ${selection.server.artifactID} is no longer available.`);
+			}
+			if (
+				!option.bundle.enabled ||
+				!option.server.runtimeEnabled ||
+				!option.server.artifact.enabled ||
+				!isServerOperational(option.server)
+			) {
+				throw new Error(`Selected MCP server ${option.server.displayName} is disabled or unavailable.`);
+			}
+			if (option.runtime?.status !== MCPServerStatus.Ready) {
+				await connectServer(selection.server);
+				option = optionsRef.current.find(item => optionKey(item) === key);
+			}
+			if (!option || option.runtime?.status !== MCPServerStatus.Ready) {
+				throw new Error(`MCP server ${option?.server.displayName ?? selection.server.artifactID} is not ready.`);
+			}
 
 			let selectedTools = selection.selectedTools;
 
 			if (selection.toolExposure === MCPToolExposure.All) {
 				const discovery = await loadDiscoveryForServer(selection.server).catch(() => undefined);
+				if (!discovery) {
+					throw new Error(`Could not load tools from MCP server ${option.server.displayName}.`);
+				}
 				const tools = discovery?.tools ?? option?.tools ?? [];
 				selectedTools = modelSelectableTools(tools).map(t => {
 					return toolToSelection(t);
@@ -947,7 +1049,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 		}
 
 		return mcpSelectionToContext(nextSelections);
-	}, [commitSelectedByServerKey, loadDiscoveryForServer]);
+	}, [commitSelectedByServerKey, connectServer, loadDiscoveryForServer]);
 
 	const shouldPollOAuthAuthorizations = useMemo(
 		() => options.some(option => isOAuthServerOption(option) || hasPendingOAuthHealth(option)),
@@ -1022,6 +1124,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 		cancelOAuth,
 		openAuthURL,
 		setServerSelected,
+		ensureServerSelected,
 		setToolExposure,
 		setIncludeServerInstructions,
 		toggleTool,

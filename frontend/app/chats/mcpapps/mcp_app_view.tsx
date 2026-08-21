@@ -26,7 +26,7 @@ import type { JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_ty
 
 const APP_MIME = MCP_APP_HTML_MIME_TYPE;
 const UNKNOWN_APP_POLICY: MCPAppsPolicy = {
-	enabled: true,
+	enabled: false,
 	allowAppInitiatedToolCalls: false,
 	requireApprovalForOpenLink: true,
 	requireApprovalForContextUpdates: true,
@@ -290,6 +290,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 				setBlockedURL(url);
 				return false;
 			}
+			if (approvalResolverRef.current) {
+				return false;
+			}
 			if (!effectiveAppsPolicy.requireApprovalForOpenLink) {
 				try {
 					backendAPI.openURL(url);
@@ -333,17 +336,24 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 				instance,
 				requestOpenLinkApproval,
 				requestMCPApproval: mcpApproval.requestMCPApproval,
-				requestUIMessageApproval: async message =>
-					await new Promise<boolean>(resolve => {
+				requestUIMessageApproval: async message => {
+					if (approvalResolverRef.current) {
+						return false;
+					}
+					return await new Promise<boolean>(resolve => {
 						approvalResolverRef.current = resolve;
 						setPendingUIMessage(message);
-					}),
+					});
+				},
 				onUIMessage: message => {
 					dispatchMCPAppUIMessage(instance, message);
 				},
 				requestModelContextUpdateApproval: async update => {
 					if (!effectiveAppsPolicy.requireApprovalForContextUpdates) {
 						return true;
+					}
+					if (approvalResolverRef.current) {
+						return false;
 					}
 					const contextUpdate = { ...update, server: instance.server };
 
@@ -454,6 +464,17 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 				});
 		};
 	}, [instance.resourceUri]);
+	useEffect(() => {
+		return () => {
+			approvalResolverRef.current?.(false);
+			approvalResolverRef.current = null;
+		};
+	}, []);
+
+	if (!appsPolicy && !policyError) {
+		return <div className="text-base-content/60 text-xs">Verifying MCP App policy…</div>;
+	}
+
 	if (policyError) {
 		return (
 			<div className="alert alert-warning rounded-2xl text-sm">
@@ -568,8 +589,10 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			/>
 			<MCPApprovalModal
 				approvalRequest={mcpApproval.approvalRequest}
+				isResolving={mcpApproval.isResolving}
+				error={mcpApproval.approvalError}
 				onResolve={r => {
-					mcpApproval.resolveMCPApproval(r);
+					return mcpApproval.resolveMCPApproval(r);
 				}}
 			/>
 		</>

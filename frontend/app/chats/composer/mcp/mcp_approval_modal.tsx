@@ -1,5 +1,3 @@
-import { useEffect, useRef } from 'react';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import type { MCPApprovalSummary } from '@/spec/mcp_artifact';
@@ -15,7 +13,9 @@ import { getMCPToolRiskLabel } from '@/mcpservers/lib/mcp_server_utils';
 
 interface MCPApprovalModalProps {
 	approvalRequest: MCPApprovalRequest | null;
-	onResolve: (resolution: MCPApprovalResolution) => void;
+	isResolving?: boolean;
+	error?: string | null;
+	onResolve: (resolution: MCPApprovalResolution) => Promise<void> | void;
 }
 
 function formatArguments(summary?: MCPApprovalSummary): string {
@@ -32,28 +32,20 @@ function formatArguments(summary?: MCPApprovalSummary): string {
 	}
 }
 
-export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModalProps) {
-	const resolvedApprovalIDRef = useRef<string | null>(null);
-
-	useEffect(() => {
-		if (!approvalRequest) {
-			return;
-		}
-
-		resolvedApprovalIDRef.current = null;
-	}, [approvalRequest]);
-
+export function MCPApprovalModal({ approvalRequest, isResolving = false, error, onResolve }: MCPApprovalModalProps) {
 	const resolveOnce = (resolution: MCPApprovalResolution) => {
 		const approvalID = approvalRequest?.approvalID;
-		if (!approvalID || resolvedApprovalIDRef.current === approvalID) {
+		if (!approvalID || isResolving) {
 			return;
 		}
 
-		resolvedApprovalIDRef.current = approvalID;
-		onResolve(resolution);
+		void onResolve(resolution);
 	};
 
 	const closeAsDenyOnce = () => {
+		if (isResolving) {
+			return;
+		}
 		resolveOnce(MCPApprovalResolution.DenyOnce);
 	};
 
@@ -66,6 +58,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 	return (
 		<ModalDialog
 			isOpen={true}
+			isBusy={isResolving}
 			onClose={closeAsDenyOnce}
 			onCancel={e => {
 				e.preventDefault();
@@ -74,7 +67,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
-					<ModalHeader title="MCP approval required" onClose={closeAsDenyOnce} />
+					<ModalHeader title="MCP approval required" onClose={closeAsDenyOnce} closeDisabled={isResolving} />
 
 					<div className="space-y-4">
 						<div className="grid grid-cols-12 gap-2 text-sm">
@@ -116,6 +109,13 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 								<span>This tool call is waiting for your approval before execution.</span>
 							</div>
 						</div>
+
+						{error ? (
+							<div className="alert alert-error rounded-2xl text-sm">
+								<FiAlertCircle size={14} />
+								<span>{error}</span>
+							</div>
+						) : null}
 					</div>
 
 					<ModalActions
@@ -125,6 +125,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 								<button
 									type="button"
 									className="btn btn-sm bg-base-300 rounded-xl"
+									disabled={isResolving}
 									onClick={() => {
 										resolveOnce(MCPApprovalResolution.DenyOnce);
 									}}
@@ -134,6 +135,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 								<button
 									type="button"
 									className="btn btn-sm btn-error rounded-xl"
+									disabled={isResolving}
 									onClick={() => {
 										resolveOnce(MCPApprovalResolution.DenyAlways);
 									}}
@@ -146,6 +148,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 						<button
 							type="button"
 							className="btn btn-sm bg-base-300 rounded-xl"
+							disabled={isResolving}
 							onClick={() => {
 								resolveOnce(MCPApprovalResolution.AllowOnce);
 							}}
@@ -155,11 +158,12 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 						<button
 							type="button"
 							className="btn btn-sm btn-primary rounded-xl"
+							disabled={isResolving}
 							onClick={() => {
 								resolveOnce(MCPApprovalResolution.AllowAlways);
 							}}
 						>
-							Allow always
+							{isResolving ? 'Saving decision...' : 'Allow for this session'}
 						</button>
 					</ModalActions>
 				</div>

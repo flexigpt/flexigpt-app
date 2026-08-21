@@ -3465,6 +3465,8 @@ export namespace runtime {
 	export class MCPApprovalSummary {
 	    server: artifact.ArtifactRef;
 	    serverDisplayName?: string;
+	    source: string;
+	    appInstanceID?: string;
 	    toolName: string;
 	    toolDigest?: string;
 	    risk: string;
@@ -3478,6 +3480,8 @@ export namespace runtime {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.server = this.convertValues(source["server"], artifact.ArtifactRef);
 	        this.serverDisplayName = source["serverDisplayName"];
+	        this.source = source["source"];
+	        this.appInstanceID = source["appInstanceID"];
 	        this.toolName = source["toolName"];
 	        this.toolDigest = source["toolDigest"];
 	        this.risk = source["risk"];
@@ -3538,23 +3542,29 @@ export namespace runtime {
 		    return a;
 		}
 	}
-	
-	export class MCPApprovalToken {
+	export class MCPApprovalResolutionResult {
 	    approvalID: string;
-	    token: string;
-	    expiresAt: string;
+	    resolution: string;
+	    decision: string;
+	    rememberedForSession?: boolean;
+	    token?: string;
+	    expiresAt?: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new MCPApprovalToken(source);
+	        return new MCPApprovalResolutionResult(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.approvalID = source["approvalID"];
+	        this.resolution = source["resolution"];
+	        this.decision = source["decision"];
+	        this.rememberedForSession = source["rememberedForSession"];
 	        this.token = source["token"];
 	        this.expiresAt = source["expiresAt"];
 	    }
 	}
+	
 	export class MCPArgumentDefinition {
 	    name: string;
 	    title?: string;

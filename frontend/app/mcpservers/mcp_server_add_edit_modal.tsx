@@ -343,7 +343,8 @@ function formToDraft(form: FormState, initial: MCPServerDraft): MCPServerDraft {
 		httpOAuthClientCredentials: {
 			...initial.httpOAuthClientCredentials,
 			useClientCredentials:
-				form.httpAuthMode === MCPHTTPAuthMode.ClientCredentials || form.httpUseOAuthClientCredentials,
+				form.httpAuthMode === MCPHTTPAuthMode.ClientCredentials ||
+				(form.httpAuthMode === MCPHTTPAuthMode.OAuth && form.httpUseOAuthClientCredentials),
 			secretJSON: form.httpOAuthCredentialsJSON,
 			deleteExisting: form.httpOAuthDeleteExisting,
 		},

@@ -1,5 +1,10 @@
-import type { InvokeMCPToolRequestBody, InvokeMCPToolResponseBody, MCPContent } from '@/spec/mcp_artifact';
-import { MCPApprovalDecision, MCPApprovalResolution, MCPInvocationSource } from '@/spec/mcp_artifact';
+import type {
+	InvokeMCPToolRequestBody,
+	InvokeMCPToolResponseBody,
+	MCPApprovalResolutionResult,
+	MCPContent,
+} from '@/spec/mcp_artifact';
+import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp_artifact';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
@@ -16,6 +21,21 @@ import {
 
 function errorResp(id: JSONRPCRequest['id'], code: number, message: string): JSONRPCResponse {
 	return { jsonrpc: '2.0', id, error: { code, message } };
+}
+
+function toolErrorResult(message: string): {
+	content: MCPContent[];
+	isError: true;
+} {
+	return {
+		content: [
+			{
+				type: MCPContentType.Text,
+				text: message,
+			},
+		],
+		isError: true,
+	};
 }
 
 function normalizeToolCallResultForApp(resp: InvokeMCPToolResponseBody | undefined): {
@@ -46,7 +66,7 @@ export interface MCPAppRouterDeps {
 	instance: MCPAppInstance;
 	/** Returns true if the user approves opening this URL. */
 	requestOpenLinkApproval: (url: string) => Promise<boolean>;
-	requestMCPApproval?: (request: MCPApprovalRequest) => Promise<MCPApprovalResolution>;
+	requestMCPApproval?: (request: MCPApprovalRequest) => Promise<MCPApprovalResolutionResult>;
 	requestUIMessageApproval?: (message: MCPAppUIMessage) => Promise<boolean>;
 	onUIMessage?: (message: MCPAppUIMessage) => void;
 	requestModelContextUpdateApproval?: (update: MCPAppModelContextUpdatePayload) => Promise<boolean>;
@@ -68,6 +88,7 @@ export interface MCPAppRouterDeps {
  */
 export class MCPAppRPCRouter {
 	private readonly deps: MCPAppRouterDeps;
+	private toolCallQueue: Promise<void> = Promise.resolve();
 
 	constructor(deps: MCPAppRouterDeps) {
 		this.deps = deps;
@@ -78,7 +99,7 @@ export class MCPAppRPCRouter {
 			case 'ping':
 				return { jsonrpc: '2.0', id: req.id, result: {} };
 			case 'tools/call':
-				return this.handleToolCall(req);
+				return this.enqueueToolCall(req);
 			case 'resources/read':
 				return this.handleResourceRead(req);
 			case 'ui/open-link':
@@ -97,6 +118,18 @@ export class MCPAppRPCRouter {
 					error: { code: JSONRPC_ERR_METHOD_NOT_FOUND, message: `Method ${req.method} is not supported` },
 				};
 		}
+	}
+
+	private enqueueToolCall(req: JSONRPCRequest): Promise<JSONRPCResponse> {
+		const run = this.toolCallQueue.then(
+			() => this.handleToolCall(req),
+			() => this.handleToolCall(req)
+		);
+		this.toolCallQueue = run.then(
+			() => undefined,
+			() => undefined
+		);
+		return run;
 	}
 
 	private async handleToolCall(req: JSONRPCRequest): Promise<JSONRPCResponse> {
@@ -137,35 +170,34 @@ export class MCPAppRPCRouter {
 				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Approval required');
 			}
 
-			const resolution = await this.deps.requestMCPApproval({
-				approvalID: evaluation.approvalID,
-				summary: evaluation.summary,
-				reason: evaluation.reason,
-			});
+			const approval = this.deps.requestMCPApproval
+				? await this.deps.requestMCPApproval({
+						approvalID: evaluation.approvalID,
+						summary: evaluation.summary,
+						reason: evaluation.reason,
+					})
+				: await mcpAPI.resolveMCPApproval(evaluation.approvalID, MCPApprovalResolution.DenyOnce);
 
-			const token = await mcpAPI.resolveMCPApproval(evaluation.approvalID, resolution);
-
-			if (resolution !== MCPApprovalResolution.AllowOnce && resolution !== MCPApprovalResolution.AllowAlways) {
+			if (approval.decision !== MCPApprovalDecision.Allowed) {
 				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied this tool call');
 			}
 
-			if (!token?.token) {
-				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'Approval did not return a usable token');
+			if (approval.resolution === MCPApprovalResolution.AllowOnce && !approval.token) {
+				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'Allow-once approval returned no token');
 			}
 
-			callReq.approvalID = token.approvalID;
-			callReq.approvalToken = token.token;
+			callReq.approvalID = approval.approvalID;
+			if (approval.token) {
+				callReq.approvalToken = approval.token;
+			}
 		}
-		// Allowed.
+
 		try {
 			const resp = await mcpAPI.invokeMCPTool(server, callReq);
 			return { jsonrpc: '2.0', id: req.id, result: normalizeToolCallResultForApp(resp) };
 		} catch (err) {
-			return errorResp(
-				req.id,
-				JSONRPC_ERR_BLOCKED_BY_POLICY,
-				err instanceof Error ? err.message : 'Tool invocation failed'
-			);
+			const message = err instanceof Error ? err.message : 'Tool invocation failed';
+			return { jsonrpc: '2.0', id: req.id, result: toolErrorResult(message) };
 		}
 	}
 

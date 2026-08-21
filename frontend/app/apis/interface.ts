@@ -40,7 +40,7 @@ import type {
 	InvokeMCPToolRequestBody,
 	MCPApprovalEvaluation,
 	MCPApprovalResolution,
-	MCPApprovalToken,
+	MCPApprovalResolutionResult,
 	MCPAuthHealth,
 	MCPBundle,
 	MCPBundleDocument,
@@ -665,7 +665,7 @@ export interface IMCPAPI {
 		mapping: MCPProviderToolMapping,
 		request: InvokeMCPToolRequestBody
 	): Promise<MCPInvokeToolResponseBody>;
-	resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalToken>;
+	resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalResolutionResult>;
 
 	getMCPServerAuthHealth(server: ArtifactRef): Promise<MCPAuthHealth>;
 	listPendingMCPOAuthAuthorizations(): Promise<MCPOAuthAuthorization[]>;

@@ -4,7 +4,7 @@ import type {
 	InvokeMCPToolResponseBody,
 	MCPApprovalEvaluation,
 	MCPApprovalResolution,
-	MCPApprovalToken,
+	MCPApprovalResolutionResult,
 	MCPArtifactRegistration,
 	MCPAuthHealth,
 	MCPBundle,
@@ -371,9 +371,12 @@ export class WailsMCPArtifactAPI implements IMCPAPI {
 		return objectFromWails<InvokeMCPToolResponseBody>(response, 'InvokeMappedMCPTool');
 	}
 
-	async resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalToken> {
+	async resolveMCPApproval(
+		approvalID: string,
+		resolution: MCPApprovalResolution
+	): Promise<MCPApprovalResolutionResult> {
 		const token = await ResolveMCPApproval(approvalID, resolution);
-		return objectFromWails<MCPApprovalToken>(token, 'ResolveMCPApproval');
+		return objectFromWails<MCPApprovalResolutionResult>(token, 'ResolveMCPApproval');
 	}
 
 	async getMCPServerAuthHealth(server: ArtifactRef): Promise<MCPAuthHealth> {

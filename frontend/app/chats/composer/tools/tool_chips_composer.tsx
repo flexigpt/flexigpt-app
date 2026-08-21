@@ -80,7 +80,6 @@ interface ToolChipsComposerRowProps {
 	onRunToolCall: (id: string) => void | Promise<void>;
 	onDiscardToolCall: (id: string) => void;
 	onOpenOutput: (output: UIToolOutput) => void;
-	onRemoveOutput: (id: string) => void;
 	onRetryErroredOutput: (output: UIToolOutput) => void;
 	onOpenCallDetails?: (call: UIToolCall) => void;
 }
@@ -100,7 +99,6 @@ export function ToolChipsComposerRow({
 	onRunToolCall,
 	onDiscardToolCall,
 	onOpenOutput,
-	onRemoveOutput,
 	onRetryErroredOutput,
 	onOpenCallDetails,
 }: ToolChipsComposerRowProps) {
@@ -136,9 +134,6 @@ export function ToolChipsComposerRow({
 						onOpen={() => {
 							onOpenOutput(item.output);
 						}}
-						onRemove={() => {
-							onRemoveOutput(item.output.id);
-						}}
 						onRetry={() => {
 							onRetryErroredOutput(item.output);
 						}}
@@ -162,7 +157,9 @@ interface ToolCallComposerChipViewProps {
  * - "×" discards the suggestion from the composer only.
  */
 function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetails }: ToolCallComposerChipViewProps) {
-	const label = getPrettyToolName(toolCall.name);
+	const label = toolCall.mcpToolSelection?.toolName
+		? toolCall.mcpToolSelection.toolName
+		: getPrettyToolName(toolCall.name);
 	const truncatedLabel = label.length > 64 ? `${label.slice(0, 61)}…` : label;
 
 	const isRunning = toolCall.status === UIToolCallStatus.Running;
@@ -214,7 +211,7 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 							aria-label={isFailed ? 'Retry tool call' : 'Run tool call'}
 						>
 							<FiPlay size={12} />
-							<span className="ml-1 text-xs">Run</span>
+							<span className="ml-1 text-xs">{isFailed ? 'Retry' : 'Run'}</span>
 						</button>
 					))}
 
@@ -237,15 +234,18 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 					/>
 				)}
 
-				<button
-					type="button"
-					className="btn btn-ghost btn-xs text-error p-0 shadow-none"
-					onClick={onDiscard}
-					title="Discard this tool call"
-					aria-label="Discard tool call"
-				>
-					<FiX size={12} />
-				</button>
+				{!isRunning ? (
+					<button
+						type="button"
+						className="btn btn-ghost btn-xs text-error gap-1 px-1 py-0 shadow-none"
+						onClick={onDiscard}
+						title="Submit an error result without running this call"
+						aria-label="Submit tool error result"
+					>
+						<FiX size={12} />
+						<span className="text-xs">Submit error</span>
+					</button>
+				) : null}
 			</div>
 		</div>
 	);
@@ -254,7 +254,6 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 interface ToolOutputComposerChipViewProps {
 	output: UIToolOutput;
 	onOpen: () => void;
-	onRemove: () => void;
 	onRetry: () => void;
 }
 
@@ -264,7 +263,7 @@ interface ToolOutputComposerChipViewProps {
  * - "×" discards the output from the next turn.
  * - If `isError` is true and we have enough info, show a "Retry" button.
  */
-function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolOutputComposerChipViewProps) {
+function ToolOutputComposerChipView({ output, onOpen, onRetry }: ToolOutputComposerChipViewProps) {
 	const label = getPrettyToolName(output.name);
 	const truncatedLabel = label.length > 64 ? `${label.slice(0, 61)}…` : label;
 
@@ -272,10 +271,7 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 
 	const hasResolvableStoredTool =
 		!!output.toolStoreChoice?.bundleID && !!output.toolStoreChoice?.toolSlug && !!output.toolStoreChoice?.toolVersion;
-	const canRetry =
-		isError &&
-		!!output.arguments &&
-		(isSkillsToolName(output.name) || hasResolvableStoredTool || !!output.mcpToolSelection);
+	const canRetry = isError && (isSkillsToolName(output.name) || hasResolvableStoredTool || !!output.mcpToolSelection);
 	const titleLines = [
 		isError ? `Errored result from: ${label}` : label,
 		`Tool: ${output.name}`,
@@ -327,16 +323,6 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 						<span className="ml-1 text-xs">Retry</span>
 					</button>
 				)}
-
-				<button
-					type="button"
-					className="btn btn-ghost btn-xs text-error px-1 py-0 shadow-none"
-					onClick={onRemove}
-					title="Discard this tool output"
-					aria-label="Discard tool output"
-				>
-					<FiX size={12} />
-				</button>
 			</div>
 		</div>
 	);

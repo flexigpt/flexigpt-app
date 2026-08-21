@@ -90,6 +90,10 @@ function getChoiceDisplayInfo(c: ToolStoreChoice) {
 	return { display, slug };
 }
 
+function getToolCallDisplayName(call: UIToolCall): string {
+	return call.mcpToolSelection?.toolName || getPrettyToolName(call.name);
+}
+
 function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; payload: unknown } {
 	switch (state.kind) {
 		case 'choice': {
@@ -109,7 +113,7 @@ function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; 
 		case 'call': {
 			const call = state.call;
 			return {
-				title: `Tool call • ${getPrettyToolName(call.name)}`,
+				title: `Tool call • ${getToolCallDisplayName(call)}`,
 				payload: normalizeStructuredJSONStringDeep(call),
 			};
 		}
@@ -150,10 +154,20 @@ function buildChoicePrimaryContent(choice: ToolStoreChoice): string {
 // Human-oriented "primary" view for a tool call.
 function buildCallPrimaryContent(call: UIToolCall): string {
 	const lines: string[] = [
-		`### Tool: ${call.name}`,
+		`### Tool: ${getToolCallDisplayName(call)}`,
 		`### Call ID: \`${call.callID}\``,
 		`### Status: \`${call.status}\``,
 	];
+
+	if (call.mcpToolSelection) {
+		lines.push(
+			`### MCP server: \`${call.mcpToolSelection.server.artifactID}\``,
+			`### MCP tool: \`${call.mcpToolSelection.toolName}\``
+		);
+		if (call.mcpToolSelection.providerToolName) {
+			lines.push(`### Provider tool ID: \`${call.mcpToolSelection.providerToolName}\``);
+		}
+	}
 
 	const errorBlock = buildJSONOrTextCodeBlock(call.errorMessage);
 	if (errorBlock) {

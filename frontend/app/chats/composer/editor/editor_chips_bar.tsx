@@ -20,7 +20,6 @@ interface EditorChipsBarProps {
 	onRunToolCall?: (id: string) => void | Promise<void>;
 	onDiscardToolCall?: (id: string) => void;
 	onOpenOutput?: (output: UIToolOutput) => void;
-	onRemoveOutput?: (id: string) => void;
 	onRetryErroredOutput?: (output: UIToolOutput) => void;
 	onRemoveAttachment: (att: UIAttachment) => void;
 	onChangeAttachmentContentBlockMode: (att: UIAttachment, mode: AttachmentContentBlockMode) => void;
@@ -49,7 +48,6 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	onRunToolCall,
 	onDiscardToolCall,
 	onOpenOutput,
-	onRemoveOutput,
 	onRetryErroredOutput,
 	onRemoveAttachment,
 	onChangeAttachmentContentBlockMode,
@@ -79,7 +77,6 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	const runToolCall = onRunToolCall ?? (() => {});
 	const discardToolCall = onDiscardToolCall ?? (() => {});
 	const openOutput = onOpenOutput ?? (() => {});
-	const removeOutput = onRemoveOutput ?? (() => {});
 	const retryErroredOutput = onRetryErroredOutput ?? (() => {});
 	const openToolCallDetails = onOpenToolCallDetails ?? (() => {});
 
@@ -121,7 +118,6 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 				onRunToolCall={runToolCall}
 				onDiscardToolCall={discardToolCall}
 				onOpenOutput={openOutput}
-				onRemoveOutput={removeOutput}
 				onRetryErroredOutput={retryErroredOutput}
 				onOpenCallDetails={openToolCallDetails}
 			/>

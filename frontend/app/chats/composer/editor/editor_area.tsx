@@ -456,7 +456,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		runAllPendingToolCalls,
 		handleRunSingleToolCall,
 		handleDiscardToolCall,
-		handleRemoveToolOutput: removeToolOutput,
 		handleRetryErroredOutput,
 		handleAttachedToolsChanged,
 		applyConversationToolsFromChoices,
@@ -524,16 +523,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		setToolDetailsState({ kind: 'choice', choice });
 	}, []);
-
-	const handleRemoveToolOutput = useCallback(
-		(id: string) => {
-			removeToolOutput(id);
-			setToolDetailsState(current =>
-				current && current.kind === 'output' && current.output.id === id ? null : current
-			);
-		},
-		[removeToolOutput]
-	);
 
 	const attachedToolIdentityKeys = useMemo(() => {
 		return new Set(
@@ -950,8 +939,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		const hasAttachments = attachments.length > 0;
 		const hasOutputs = toolOutputs.length > 0;
+		const hasMCPContent = mcp.selectedServerCount > 0 || mcpAppContextUpdates.length > 0;
 
-		return hasAttachments || hasOutputs;
+		return hasAttachments || hasOutputs || hasMCPContent;
 	}, [
 		isInputLocked,
 		isSubmitting,
@@ -960,6 +950,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachments.length,
 		toolOutputs.length,
 		workspaceExecutionBlocked,
+		mcp.selectedServerCount,
+		mcpAppContextUpdates.length,
 	]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
@@ -991,8 +983,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			const hasAttachments = attachments.length > 0;
 			const hasOutputs = toolOutputs.length > 0;
+			const hasMCPContent = mcp.selectedServerCount > 0 || mcpAppContextUpdates.length > 0;
 
-			return hasAttachments || hasOutputs;
+			return hasAttachments || hasOutputs || hasMCPContent;
 		},
 		insertSoftBreak: () => {
 			editor.tf.insertSoftBreak();
@@ -1210,16 +1203,17 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					return;
 				}
 				if (failedRunnableToolCalls.length > 0) {
-					setSubmitError('Some tool calls failed. Retry or discard them before sending.');
+					setSubmitError('Some tool calls failed. Retry them or submit an error result before sending.');
 					return;
 				}
 
 				const hasNonEmptyText = textToSend.trim().length > 0;
 				const hasAttachmentsToSend = attachments.length > 0;
 				const hasToolOutputsToSend = finalToolOutputs.length > 0;
+				const hasMCPContentToSend = mcp.selectedServerCount > 0 || mcpAppContextUpdates.length > 0;
 
 				// Enforce the "non-empty message" invariant *after* tools have run.
-				if (!hasNonEmptyText && !hasAttachmentsToSend && !hasToolOutputsToSend) {
+				if (!hasNonEmptyText && !hasAttachmentsToSend && !hasToolOutputsToSend && !hasMCPContentToSend) {
 					setSubmitError(
 						hadPendingTools
 							? 'Tool calls did not produce any outputs, so there is nothing to send yet.'
@@ -1389,7 +1383,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		if (failedRunnableToolCalls.length > 0) {
 			// oxlint-disable-next-line react/set-state-in-effect
-			finishFastForwardWithError('Some tool calls failed. Retry or discard them before sending.');
+			finishFastForwardWithError('Some tool calls failed. Retry them or submit an error result before sending.');
+
 			return;
 		}
 
@@ -1737,6 +1732,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				setMCPAppContextUpdates(updates ?? []);
 			},
 			appendMCPAppContextUpdate: update => {
+				if (!mcp.ensureServerSelected(update.server)) {
+					setSubmitError('The MCP App context could not be added because its server is unavailable or disabled.');
+					return;
+				}
+
 				setMCPAppContextUpdates(prev => [...prev, update]);
 			},
 			clearMCPContext: () => {
@@ -1877,9 +1877,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				{!submitError && erroredToolOutputsReadyToSubmit ? (
 					<output className="alert alert-warning mx-4 mt-3 mb-1 flex items-start gap-2 text-sm">
 						<FiTool size={16} className="mt-0.5" />
-						<span>
-							A tool returned an error result. It is ready to submit as tool output, or you can retry/discard it.
-						</span>
+						<span>A tool returned an error result. Submit it to the model, or retry the tool before sending.</span>
 					</output>
 				) : null}
 
@@ -1935,12 +1933,16 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									toolCalls={toolCalls}
 									toolOutputs={toolOutputs}
 									isBusy={
-										isGenerating || isSubmitting || isInputLocked || fastForwardPending || workspaceExecutionBlocked
+										isGenerating ||
+										isSubmitting ||
+										isInputLocked ||
+										fastForwardPending ||
+										hasRunningToolCalls ||
+										workspaceExecutionBlocked
 									}
 									onRunToolCall={handleRunSingleToolCall}
 									onDiscardToolCall={handleDiscardToolCall}
 									onOpenOutput={handleOpenToolOutput}
-									onRemoveOutput={handleRemoveToolOutput}
 									onRetryErroredOutput={handleRetryErroredOutput}
 									onRemoveAttachment={handleRemoveAttachment}
 									onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
@@ -2138,8 +2140,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			<MCPApprovalModal
 				approvalRequest={mcpApproval.approvalRequest}
+				isResolving={mcpApproval.isResolving}
+				error={mcpApproval.approvalError}
 				onResolve={r => {
-					mcpApproval.resolveMCPApproval(r);
+					return mcpApproval.resolveMCPApproval(r);
 				}}
 			/>
 

@@ -76,9 +76,10 @@ function MCPServerSetupModalContent({
 		for (const input of inputs) {
 			const row = rows[input.name] ?? emptyRow();
 			const existingConfigured =
-				input.declaration.kind === MCPInputKind.Text || input.declaration.kind === MCPInputKind.Path
+				!reset &&
+				(input.declaration.kind === MCPInputKind.Text || input.declaration.kind === MCPInputKind.Path
 					? Boolean(input.boundValue?.trim() || input.declaration.default?.trim())
-					: Boolean(input.boundSecretRef?.trim());
+					: Boolean(input.boundSecretRef?.trim()));
 
 			if (!input.declaration.required || existingConfigured) {
 				continue;

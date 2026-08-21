@@ -594,15 +594,11 @@ function deriveUIToolCallFromToolCall(
 		return undefined;
 	}
 
-	const choiceID = toolCall.choiceID;
-	if (!choiceID) {
-		return undefined;
-	}
-
 	// NOTE: runtime-injected tools (e.g. skills-*) are not in toolStoreChoices,
 	// so they will not be present in this map. Do NOT drop the tool call.
-	const toolStoreChoice = choiceMap.get(choiceID); // ToolStoreChoice | undefined
 	const mcpToolSelection = findMCPToolSelectionForToolLike(toolCall, mcpToolSelectionMap);
+	const choiceID = toolCall.choiceID || mcpToolSelection?.choiceID || toolCall.callID || toolCall.name;
+	const toolStoreChoice = toolCall.choiceID ? choiceMap.get(toolCall.choiceID) : undefined;
 
 	const type = toolCall.type as unknown as ToolStoreChoiceType;
 
@@ -614,13 +610,13 @@ function deriveUIToolCallFromToolCall(
 		type === ToolStoreChoiceType.WebSearch ? UIToolCallStatus.Succeeded : UIToolCallStatus.Pending;
 
 	return {
-		id: toolCall.id || toolCall.callID,
+		id: toolCall.id || toolCall.callID || `${toolCall.name}:${choiceID}`,
 		callID: toolCall.callID,
 		name: toolCall.name,
 		arguments: toolCall.arguments ?? '',
 		webSearchToolCallItems: toolCall.webSearchToolCallItems,
 		type: type,
-		choiceID: toolCall.choiceID,
+		choiceID,
 		// The LLM would consider the status of tool call as done as soon as it is in output,
 		// for us the call is pending here and then it will run and move to final status.
 		status: status,

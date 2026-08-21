@@ -683,6 +683,8 @@ export interface MCPCompletionResult {
 export interface MCPApprovalSummary {
 	server: ArtifactRef;
 	serverDisplayName?: string;
+	source: MCPInvocationSource;
+	appInstanceID?: string;
 	toolName: string;
 	toolDigest?: string;
 	risk: MCPToolRisk;
@@ -696,12 +698,14 @@ export interface MCPApprovalEvaluation {
 	summary?: MCPApprovalSummary;
 }
 
-export interface MCPApprovalToken {
+export interface MCPApprovalResolutionResult {
 	approvalID: string;
-	token: string;
-	expiresAt: MCPTimestamp;
+	resolution: MCPApprovalResolution;
+	decision: MCPApprovalDecision;
+	rememberedForSession?: boolean;
+	token?: string;
+	expiresAt?: string;
 }
-
 export interface MCPAppModelContextUpdate {
 	instanceID?: string;
 	server: ArtifactRef;

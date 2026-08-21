@@ -78,7 +78,7 @@ export function RefreshMCPServer(arg1:artifact.ArtifactRef):Promise<runtime.MCPS
 
 export function ReplaceMCPBundleDocument(arg1:mcpbundle.ReplaceDocumentRequest):Promise<mcpbundle.Bundle>;
 
-export function ResolveMCPApproval(arg1:string,arg2:runtime.MCPApprovalResolution):Promise<runtime.MCPApprovalToken>;
+export function ResolveMCPApproval(arg1:string,arg2:runtime.MCPApprovalResolution):Promise<runtime.MCPApprovalResolutionResult>;
 
 export function RetireMCPBundle(arg1:collection.CollectionRef,arg2:number):Promise<collection.Collection>;
 

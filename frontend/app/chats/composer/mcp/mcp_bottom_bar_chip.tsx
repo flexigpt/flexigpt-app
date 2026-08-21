@@ -26,7 +26,13 @@ import type {
 	MCPResourceTemplateSelection,
 	MCPToolCapability,
 } from '@/spec/mcp_artifact';
-import { MCPAuthHealthState, MCPCompletionRefType, MCPServerStatus, MCPToolExposure } from '@/spec/mcp_artifact';
+import {
+	MCPAuthHealthState,
+	MCPCompletionRefType,
+	MCPHTTPAuthMode,
+	MCPServerStatus,
+	MCPToolExposure,
+} from '@/spec/mcp_artifact';
 
 import { mcpAPI } from '@/apis/baseapi';
 
@@ -58,7 +64,7 @@ import {
 	normalizeMCPArgumentDefinitions,
 } from '@/chats/composer/mcp/mcp_composer_types';
 import { optionKey } from '@/chats/composer/mcp/use_composer_mcp';
-import { getServerAuthHealthState, isServerOperational } from '@/mcpservers/lib/mcp_management';
+import { getAuthMode, getServerAuthHealthState, isServerOperational } from '@/mcpservers/lib/mcp_management';
 import {
 	getEffectiveMCPServerStatus,
 	getMCPServerAuthHealthBadgeClass,
@@ -87,7 +93,11 @@ function isEnabledMCPOption(option: MCPComposerServerOption) {
 
 function isOAuthModalRelevant(option: MCPComposerServerOption): boolean {
 	const authState = getServerAuthHealthState(option.server, option.authHealth);
-	return isMCPAuthActionable(option.server, option.authHealth) || authState === MCPAuthHealthState.AuthorizationPending;
+	return (
+		isMCPAuthActionable(option.server, option.authHealth) ||
+		authState === MCPAuthHealthState.AuthorizationPending ||
+		(getAuthMode(option.server) === MCPHTTPAuthMode.OAuth && option.runtime?.status === MCPServerStatus.Connecting)
+	);
 }
 
 function oauthDismissKey(option: MCPComposerServerOption): string {
@@ -706,6 +716,7 @@ function ServerRow({
 		? getEffectiveMCPServerStatus(option.server, option.runtime?.status)
 		: MCPServerStatus.Disabled;
 	const isReady = status === MCPServerStatus.Ready;
+	const isConnecting = status === MCPServerStatus.Connecting;
 	const selectable = isEnabledMCPOption(option);
 
 	const authState = getServerAuthHealthState(option.server, option.authHealth);
@@ -746,7 +757,10 @@ function ServerRow({
 
 						state.setServerSelected(option, e.currentTarget.checked);
 						if (e.currentTarget.checked) {
-							void state.ensureDiscoveryLoaded(option.server.ref);
+							const operation = isReady
+								? state.ensureDiscoveryLoaded(option.server.ref)
+								: state.connectServer(option.server.ref);
+							void operation.catch(console.error);
 						}
 					}}
 					onClick={e => {
@@ -812,18 +826,24 @@ function ServerRow({
 					<button
 						type="button"
 						className="btn btn-ghost btn-xs px-1"
-						title={isReady ? 'Disconnect' : 'Connect'}
+						title={isReady ? 'Disconnect' : isConnecting ? 'Cancel connection' : 'Connect'}
 						onClick={e => {
 							stop(e);
-							if (isReady) {
+							if (isReady || isConnecting) {
 								void state.disconnectServer(option.server.ref).catch(console.error);
 							} else {
 								void state.connectServer(option.server.ref).catch(console.error);
 							}
 						}}
-						disabled={isInputLocked || !selectable}
+						disabled={isInputLocked || !selectable || authPending}
 					>
-						{isReady ? <FiWifiOff size={12} /> : <FiWifi size={12} />}
+						{isConnecting ? (
+							<FiRefreshCw className="animate-spin" size={12} />
+						) : isReady ? (
+							<FiWifiOff size={12} />
+						) : (
+							<FiWifi size={12} />
+						)}
 					</button>
 
 					<button
@@ -1035,7 +1055,11 @@ export function MCPBottomBarChip({
 
 		state.setServerSelected(option, !selected);
 		if (!selected) {
-			void state.ensureDiscoveryLoaded(option.server.ref);
+			const operation =
+				option.runtime?.status === MCPServerStatus.Ready
+					? state.ensureDiscoveryLoaded(option.server.ref)
+					: state.connectServer(option.server.ref);
+			void operation.catch(console.error);
 		}
 	};
 
@@ -1221,6 +1245,9 @@ export function MCPBottomBarChip({
 				onClose={dismissOAuthModal}
 				server={oauthModalOption?.server ?? null}
 				authHealth={oauthModalOption?.authHealth}
+				isConnecting={oauthModalOption?.runtime?.status === MCPServerStatus.Connecting}
+				isReady={oauthModalOption?.runtime?.status === MCPServerStatus.Ready}
+				runtimeError={oauthModalOption?.runtime?.lastError}
 				onOpenURL={state.openAuthURL}
 				onCancel={async () => {
 					if (!oauthModalOption) {

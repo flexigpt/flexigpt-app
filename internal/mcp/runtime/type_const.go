@@ -262,12 +262,6 @@ type MCPApprovalEvaluation struct {
 	Summary    *MCPApprovalSummary `json:"summary,omitempty"`
 }
 
-type MCPApprovalToken struct {
-	ApprovalID string `json:"approvalID"`
-	Token      string `json:"token"`
-	ExpiresAt  string `json:"expiresAt"`
-}
-
 // MCPApprovalResolutionResult is returned for every successful resolution.
 // Token and ExpiresAt are populated only for allowOnce. Always resolutions
 // are remembered in process memory until the associated MCP session ends.

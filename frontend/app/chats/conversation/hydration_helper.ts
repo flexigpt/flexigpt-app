@@ -330,11 +330,17 @@ function buildToolOutputFromEditor(ui: UIToolOutput): ToolOutput | undefined {
 	// Without this, an errored output that only has `errorMessage` becomes
 	// an empty tool-output union on the wire.
 	if (ui.isError && !hasContents && !hasWebSearchToolOutputItems) {
-		const msg = 'Tool call returned a error, rectify the call.';
+		const message = ui.errorMessage?.trim() || 'The tool call returned an error.';
 		contents = [
 			{
 				kind: ContentItemKind.Text,
-				textItem: { text: ui.errorMessage ? 'ErrorMessage: ' + ui.errorMessage : msg },
+				textItem: {
+					text: [
+						`Tool error: ${message}`,
+						'This output completes the requested tool call.',
+						'The model may correct the request or retry the tool.',
+					].join('\n\n'),
+				},
 			},
 		] as ToolOutputItemUnion[];
 	}

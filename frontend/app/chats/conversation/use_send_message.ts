@@ -505,8 +505,10 @@ export function useSendMessage({
 			const hasNonEmptyText = trimmed.length > 0;
 			const hasToolOutputs = payload.toolOutputs.length > 0;
 			const hasAttachments = payload.attachments.length > 0;
+			const hasMCPContext = (payload.mcpContext?.servers?.length ?? 0) > 0;
+			const hasMCPAppContext = (payload.mcpAppContextUpdates?.length ?? 0) > 0;
 
-			if (!hasNonEmptyText && !hasToolOutputs && !hasAttachments) {
+			if (!hasNonEmptyText && !hasToolOutputs && !hasAttachments && !hasMCPContext && !hasMCPAppContext) {
 				return;
 			}
 

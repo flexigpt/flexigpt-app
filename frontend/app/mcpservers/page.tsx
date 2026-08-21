@@ -64,9 +64,17 @@ interface OAuthTarget {
 
 const STATUS_READ_CONCURRENCY = 4;
 const BUNDLE_LOAD_CONCURRENCY = 2;
+const CONNECTION_POLL_INTERVAL_MS = 500;
+const CONNECTION_WAIT_TIMEOUT_MS = 11 * 60 * 1000;
 
 function artifactKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise(resolve => {
+		window.setTimeout(resolve, ms);
+	});
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -512,8 +520,30 @@ export default function MCPServersPage() {
 			markServerConnecting(server);
 
 			try {
-				const snapshot = await mcpAPI.connectMCPServer(server.ref);
+				let snapshot = await mcpAPI.connectMCPServer(server.ref);
 				applyRuntimeSnapshot(server, snapshot);
+
+				const deadline = Date.now() + CONNECTION_WAIT_TIMEOUT_MS;
+				while (mountedRef.current && snapshot.status === MCPServerStatus.Connecting) {
+					if (Date.now() >= deadline) {
+						throw new Error('Timed out waiting for the MCP server to connect.');
+					}
+
+					await sleep(CONNECTION_POLL_INTERVAL_MS);
+					snapshot = await mcpAPI.getMCPServerStatus(server.ref);
+					applyRuntimeSnapshot(server, snapshot);
+
+					// Keep OAuth health and pending authorization state in sync
+					// while the runtime is connecting.
+					await refreshSingleServer(server).catch(() => undefined);
+				}
+
+				if (snapshot.status === MCPServerStatus.Error) {
+					throw new Error(snapshot.lastError || 'The MCP server connection failed.');
+				}
+				if (snapshot.status !== MCPServerStatus.Ready && snapshot.status !== MCPServerStatus.Disconnected) {
+					throw new Error('The MCP server did not reach a usable terminal state.');
+				}
 			} catch (error) {
 				await refreshSingleServer(server).catch(() => undefined);
 				throw error;
