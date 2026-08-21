@@ -458,13 +458,7 @@ func validateConversationV1(value *spec.Conversation) error {
 				return fmt.Errorf("messages[%d].mcpContext: %w", index, err)
 			}
 		}
-		if len(message.MCPToolMappings) != 0 {
-			if message.MCPContext == nil {
-				return fmt.Errorf(
-					"messages[%d].mcpToolMappings require mcpContext",
-					index,
-				)
-			}
+		if len(message.MCPToolMappings) != 0 && message.MCPContext != nil {
 			if err := runtime.ValidateMCPProviderToolMappingsForContext(
 				*message.MCPContext,
 				message.MCPToolMappings,
