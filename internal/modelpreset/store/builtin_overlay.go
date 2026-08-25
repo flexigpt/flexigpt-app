@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/flexigpt/inference-go/capabilityoverride"
@@ -17,40 +18,54 @@ import (
 
 var defaultBuiltInProvider = modelpreset.ProviderOpenAIResponses
 
-var builtInBaseTimestamp = time.Date(2025, 7, 30, 0, 0, 0, 0, time.UTC)
-
 var builtInProviderTimestamps = map[inferenceSpec.ProviderName]time.Time{
 	modelpreset.ProviderAnthropic:       time.Date(2025, 7, 30, 0, 0, 0, 0, time.UTC),
+	modelpreset.ProviderDeepSeek:        time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderLocalAI:         time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderLMStudio:        time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderGoogleGemini:    time.Date(2025, 7, 30, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderHuggingFace:     time.Date(2025, 7, 30, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderLlamaCPP:        time.Date(2025, 7, 30, 0, 0, 0, 0, time.UTC),
+	modelpreset.ProviderMeta:            time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
+	modelpreset.ProviderMiniMax:         time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderMistral:         time.Date(2026, 4, 16, 0, 0, 0, 0, time.UTC),
+	modelpreset.ProviderMoonshot:        time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderOllama:          time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderOpenAIChat:      time.Date(2025, 7, 30, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderOpenAIResponses: time.Date(2025, 9, 25, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderOpenRouter:      time.Date(2025, 9, 25, 0, 0, 0, 0, time.UTC),
+	modelpreset.ProviderQwen:            time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderSGLang:          time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderVLLM:            time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC),
 	modelpreset.ProviderXAI:             time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC),
+	modelpreset.ProviderXiaomi:          time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
+	modelpreset.ProviderZAI:             time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
+	modelpreset.ProviderZAICodingPlan:   time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
 }
 
 var builtInDefaultModelPresetIDs = map[inferenceSpec.ProviderName]spec.ModelPresetID{
 	modelpreset.ProviderAnthropic:       spec.ModelPresetID(modelpreset.PresetClaudeSonnet5),
+	modelpreset.ProviderDeepSeek:        spec.ModelPresetID(modelpreset.PresetDeepSeekV4Flash),
 	modelpreset.ProviderLocalAI:         spec.ModelPresetID(modelpreset.PresetGemma426BA4B),
 	modelpreset.ProviderLMStudio:        spec.ModelPresetID(modelpreset.PresetQwen3627B),
 	modelpreset.ProviderGoogleGemini:    spec.ModelPresetID(modelpreset.PresetGemini37Flash),
 	modelpreset.ProviderHuggingFace:     spec.ModelPresetID(modelpreset.PresetGLM52FireworksAI),
 	modelpreset.ProviderLlamaCPP:        spec.ModelPresetID(modelpreset.PresetQwen3635BA3B),
+	modelpreset.ProviderMeta:            spec.ModelPresetID(modelpreset.PresetMuseSpark12),
+	modelpreset.ProviderMiniMax:         spec.ModelPresetID(modelpreset.PresetMiniMaxM3),
 	modelpreset.ProviderMistral:         spec.ModelPresetID(modelpreset.PresetMistralMedium35),
+	modelpreset.ProviderMoonshot:        spec.ModelPresetID(modelpreset.PresetMoonshotKimiK3),
 	modelpreset.ProviderOllama:          spec.ModelPresetID(modelpreset.PresetQwen3635B),
 	modelpreset.ProviderOpenAIChat:      spec.ModelPresetID(modelpreset.PresetGPT41),
 	modelpreset.ProviderOpenAIResponses: spec.ModelPresetID(modelpreset.PresetGPT56Terra),
 	modelpreset.ProviderOpenRouter:      spec.ModelPresetID(modelpreset.PresetDeepSeekV4Flash),
+	modelpreset.ProviderQwen:            spec.ModelPresetID(modelpreset.PresetQwen38Max),
 	modelpreset.ProviderSGLang:          spec.ModelPresetID(modelpreset.PresetDeepSeekR18B),
 	modelpreset.ProviderVLLM:            spec.ModelPresetID(modelpreset.PresetQwen3VL30BA3B),
 	modelpreset.ProviderXAI:             spec.ModelPresetID(modelpreset.PresetGrok46),
+	modelpreset.ProviderXiaomi:          spec.ModelPresetID(modelpreset.PresetMiMoV25Pro),
+	modelpreset.ProviderZAI:             spec.ModelPresetID(modelpreset.PresetGLM53),
+	modelpreset.ProviderZAICodingPlan:   spec.ModelPresetID(modelpreset.PresetGLM53),
 }
 
 var builtInDisabledModelPresetIDs = map[inferenceSpec.ProviderName]map[spec.ModelPresetID]struct{}{
@@ -109,12 +124,21 @@ func (b *BuiltInPresets) populateDataFromInferenceCatalog(ctx context.Context) e
 	if len(catalog.Providers) == 0 {
 		return errors.New("inference model preset catalog contains no providers")
 	}
+	if err := modelpreset.ValidateCatalog(catalog); err != nil {
+		return fmt.Errorf("invalid inference model preset catalog: %w", err)
+	}
+	if err := validateBuiltInOverlayCoverage(catalog); err != nil {
+		return fmt.Errorf("invalid built-in model preset overlay configuration: %w", err)
+	}
 
 	providers := make(map[inferenceSpec.ProviderName]spec.ProviderPreset, len(catalog.Providers))
 	models := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(catalog.Providers))
 
 	for providerName, inferenceProvider := range catalog.Providers {
-		ts := builtInTimestampForProvider(providerName)
+		ts, err := builtInTimestampForProvider(providerName)
+		if err != nil {
+			return err
+		}
 
 		appModels := make(map[spec.ModelPresetID]spec.ModelPreset, len(inferenceProvider.ModelPresets))
 		for _, inferenceModel := range inferenceProvider.ModelPresets {
@@ -122,12 +146,12 @@ func (b *BuiltInPresets) populateDataFromInferenceCatalog(ctx context.Context) e
 			appModels[appModel.ID] = appModel
 		}
 
-		defaultModelID := builtInDefaultModelPresetIDs[providerName]
-		if defaultModelID == "" {
-			defaultModelID = firstModelPresetID(appModels)
-		}
-		if defaultModelID == "" {
-			return fmt.Errorf("provider %q has no model presets", providerName)
+		defaultModelID, ok := builtInDefaultModelPresetIDs[providerName]
+		if !ok || defaultModelID == "" {
+			return fmt.Errorf(
+				"provider %q has no explicit built-in defaultModelPresetID",
+				providerName,
+			)
 		}
 		if _, ok := appModels[defaultModelID]; !ok {
 			return fmt.Errorf(
@@ -234,11 +258,112 @@ func appModelPresetFromInference(
 	}
 }
 
-func builtInTimestampForProvider(provider inferenceSpec.ProviderName) time.Time {
-	if ts, ok := builtInProviderTimestamps[provider]; ok {
-		return ts
+func validateBuiltInOverlayCoverage(catalog modelpreset.Catalog) error {
+	var errs []error
+
+	if _, ok := catalog.Providers[defaultBuiltInProvider]; !ok {
+		errs = append(errs, fmt.Errorf(
+			"default built-in provider %q is absent from the inference catalog",
+			defaultBuiltInProvider,
+		))
 	}
-	return builtInBaseTimestamp
+
+	for providerName, provider := range catalog.Providers {
+		if ts, ok := builtInProviderTimestamps[providerName]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"provider %q is missing a built-in timestamp",
+				providerName,
+			))
+		} else if ts.IsZero() {
+			errs = append(errs, fmt.Errorf(
+				"provider %q has a zero built-in timestamp",
+				providerName,
+			))
+		}
+
+		defaultModelID, ok := builtInDefaultModelPresetIDs[providerName]
+		if !ok || defaultModelID == "" {
+			errs = append(errs, fmt.Errorf(
+				"provider %q is missing an explicit built-in defaultModelPresetID",
+				providerName,
+			))
+		} else if _, ok := provider.ModelPresets[modelpreset.ModelPresetID(defaultModelID)]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"provider %q default model %q is absent from the inference catalog",
+				providerName,
+				defaultModelID,
+			))
+		}
+	}
+
+	for providerName := range builtInProviderTimestamps {
+		if _, ok := catalog.Providers[providerName]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"built-in timestamp references unknown provider %q",
+				providerName,
+			))
+		}
+	}
+
+	for providerName := range builtInDefaultModelPresetIDs {
+		if _, ok := catalog.Providers[providerName]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"built-in default model references unknown provider %q",
+				providerName,
+			))
+		}
+	}
+
+	for providerName, disabledModels := range builtInDisabledModelPresetIDs {
+		provider, ok := catalog.Providers[providerName]
+		if !ok {
+			errs = append(errs, fmt.Errorf(
+				"disabled model overlay references unknown provider %q",
+				providerName,
+			))
+			continue
+		}
+
+		for modelID := range disabledModels {
+			if _, ok := provider.ModelPresets[modelpreset.ModelPresetID(modelID)]; !ok {
+				errs = append(errs, fmt.Errorf(
+					"disabled model overlay references unknown model %q/%q",
+					providerName,
+					modelID,
+				))
+			}
+		}
+	}
+
+	for providerName, headers := range builtInProviderDefaultHeaderOverlays {
+		if _, ok := catalog.Providers[providerName]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"default-header overlay references unknown provider %q",
+				providerName,
+			))
+		}
+		for key, value := range headers {
+			if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+				errs = append(errs, fmt.Errorf(
+					"default-header overlay for provider %q contains an empty key or value",
+					providerName,
+				))
+			}
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func builtInTimestampForProvider(provider inferenceSpec.ProviderName) (time.Time, error) {
+	ts, ok := builtInProviderTimestamps[provider]
+	if !ok {
+		return time.Time{}, fmt.Errorf(
+			"provider %q has no explicit built-in timestamp",
+			provider,
+		)
+	}
+	return ts, nil
 }
 
 func builtInModelPresetEnabled(
@@ -251,17 +376,4 @@ func builtInModelPresetEnabled(
 	}
 	_, isDisabled := disabled[modelID]
 	return !isDisabled
-}
-
-func firstModelPresetID(models map[spec.ModelPresetID]spec.ModelPreset) spec.ModelPresetID {
-	if len(models) == 0 {
-		return ""
-	}
-
-	ids := make([]spec.ModelPresetID, 0, len(models))
-	for id := range models {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
-	return ids[0]
 }

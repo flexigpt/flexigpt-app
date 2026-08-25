@@ -6,7 +6,7 @@ go 1.27
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/flexigpt/agentskills-go v0.20.2
-	github.com/flexigpt/inference-go v0.23.2
+	github.com/flexigpt/inference-go v0.24.1
 	github.com/flexigpt/llmtools-go v0.23.2
 	github.com/flexigpt/mapstore-go v0.4.2
 	github.com/glebarez/go-sqlite v1.23.0

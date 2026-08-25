@@ -21,6 +21,36 @@ const (
 	windows                   = "windows"
 )
 
+func TestBuiltInOverlayConfigurationCoversInferenceCatalog(t *testing.T) {
+	catalog := modelpreset.DefaultCatalog()
+
+	tests := []struct {
+		name  string
+		check func() error
+	}{
+		{
+			name: "inference catalog is structurally valid",
+			check: func() error {
+				return modelpreset.ValidateCatalog(catalog)
+			},
+		},
+		{
+			name: "app built-in overlays cover every inference provider and model reference",
+			check: func() error {
+				return validateBuiltInOverlayCoverage(catalog)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.check(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestNewBuiltInPresets(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -288,7 +318,7 @@ func TestBuiltInPresetAppOverlays(t *testing.T) {
 	if openAIResponses.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetGPT56Terra) {
 		t.Fatalf("openairesponses default model got %q want %q",
 			openAIResponses.DefaultModelPresetID,
-			modelpreset.PresetGPT54Mini,
+			modelpreset.PresetGPT56Terra,
 		)
 	}
 
