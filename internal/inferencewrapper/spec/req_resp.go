@@ -1,11 +1,11 @@
 package spec
 
 import (
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
-	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
@@ -71,8 +71,8 @@ type CompletionRequestBody struct {
 }
 
 type CompletionRequest struct {
-	Provider      inferenceSpec.ProviderName    `path:"provider"      required:"true"`
-	ModelPresetID modelpresetSpec.ModelPresetID `path:"modelPresetID" required:"true"`
+	Provider      inferenceSpec.ProviderName `path:"provider"      required:"true"`
+	ModelPresetID modelpreset.ModelPresetID  `path:"modelPresetID" required:"true"`
 
 	Body *CompletionRequestBody
 

@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	"github.com/flexigpt/inference-go/capabilityoverride"
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -52,7 +53,7 @@ func validateProviderPreset(pp *spec.ProviderPreset) error {
 		return fmt.Errorf("provider %q: capabilitiesOverride: %w", pp.Name, err)
 	}
 	// Per-model validation and duplicate ID detection.
-	seenModel := map[spec.ModelPresetID]string{}
+	seenModel := map[modelpreset.ModelPresetID]string{}
 	for mid, mp := range pp.ModelPresets {
 		if err := validateModelPreset(&mp); err != nil {
 			return fmt.Errorf("provider %q, model %q: %w", pp.Name, mid, err)
@@ -244,7 +245,7 @@ func validateProviderName(n inferenceSpec.ProviderName) error {
 }
 
 // validateModelName is similar free-form stub.
-func validateModelName(n spec.ModelName) error {
+func validateModelName(n inferenceSpec.ModelName) error {
 	if strings.TrimSpace(string(n)) == "" {
 		return errors.New("name is empty")
 	}
@@ -257,7 +258,7 @@ func validateModelSlug(s spec.ModelSlug) error {
 }
 
 // validateModelPresetID uses the same rule set as slugs for now.
-func validateModelPresetID(id spec.ModelPresetID) error {
+func validateModelPresetID(id modelpreset.ModelPresetID) error {
 	return bundleitemutils.ValidateTag(string(id))
 }
 

@@ -26,7 +26,7 @@ type builtInProviderKey inferenceSpec.ProviderName
 func (builtInProviderKey) Group() overlay.GroupID { return "providers" }
 func (k builtInProviderKey) ID() overlay.KeyID    { return overlay.KeyID(k) }
 
-type builtInModelKey spec.ModelPresetID
+type builtInModelKey modelpreset.ModelPresetID
 
 func (builtInModelKey) Group() overlay.GroupID { return "models" }
 func (k builtInModelKey) ID() overlay.KeyID    { return overlay.KeyID(k) }
@@ -41,12 +41,12 @@ type BuiltInPresets struct {
 	// Immutable original data.
 	defaultProvider inferenceSpec.ProviderName
 	providers       map[inferenceSpec.ProviderName]spec.ProviderPreset
-	models          map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset
+	models          map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset
 
 	// View after overlay application, guarded by mu.
 	mu         sync.RWMutex
 	viewProv   map[inferenceSpec.ProviderName]spec.ProviderPreset
-	viewModels map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset
+	viewModels map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset
 
 	// IO.
 	overlayBaseDir string
@@ -54,7 +54,7 @@ type BuiltInPresets struct {
 	store                              *overlay.Store
 	providerOverlayFlags               *overlay.TypedGroup[builtInProviderKey, bool]
 	modelOverlayFlags                  *overlay.TypedGroup[builtInModelKey, bool]
-	providerDefaultModelIDOverlayFlags *overlay.TypedGroup[builtInProviderDefaultModelIDKey, spec.ModelPresetID]
+	providerDefaultModelIDOverlayFlags *overlay.TypedGroup[builtInProviderDefaultModelIDKey, modelpreset.ModelPresetID]
 
 	rebuilder *builtin.AsyncRebuilder
 }
@@ -109,7 +109,7 @@ func NewBuiltInPresets(
 	}
 
 	providerDefaultModelIDOverlayFlags, err := overlay.NewTypedGroup[
-		builtInProviderDefaultModelIDKey, spec.ModelPresetID](ctx, store)
+		builtInProviderDefaultModelIDKey, modelpreset.ModelPresetID](ctx, store)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (b *BuiltInPresets) Close() error {
 // ListBuiltInPresets returns deep-copied snapshots.
 func (b *BuiltInPresets) ListBuiltInPresets(ctx context.Context) (
 	providerPresets map[inferenceSpec.ProviderName]spec.ProviderPreset,
-	modelPresets map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
+	modelPresets map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset,
 	err error,
 ) {
 	b.mu.RLock()
@@ -221,7 +221,7 @@ func (b *BuiltInPresets) SetProviderEnabled(
 func (b *BuiltInPresets) SetModelPresetEnabled(
 	ctx context.Context,
 	provider inferenceSpec.ProviderName,
-	modelID spec.ModelPresetID,
+	modelID modelpreset.ModelPresetID,
 	enabled bool,
 ) (spec.ModelPreset, error) {
 	mp, err := b.GetBuiltInModelPreset(ctx, provider, modelID)
@@ -241,7 +241,7 @@ func (b *BuiltInPresets) SetModelPresetEnabled(
 	// Keep provider snapshot consistent for immediate reads.
 	pp := b.viewProv[provider]
 	if pp.ModelPresets == nil {
-		pp.ModelPresets = map[spec.ModelPresetID]spec.ModelPreset{}
+		pp.ModelPresets = map[modelpreset.ModelPresetID]spec.ModelPreset{}
 	}
 	pp.ModelPresets[modelID] = mp
 	b.viewProv[provider] = pp
@@ -255,7 +255,7 @@ func (b *BuiltInPresets) SetModelPresetEnabled(
 func (b *BuiltInPresets) GetBuiltInModelPreset(
 	ctx context.Context,
 	provider inferenceSpec.ProviderName,
-	modelID spec.ModelPresetID,
+	modelID modelpreset.ModelPresetID,
 ) (spec.ModelPreset, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -273,7 +273,7 @@ func (b *BuiltInPresets) GetBuiltInModelPreset(
 func (b *BuiltInPresets) SetDefaultModelPreset(
 	ctx context.Context,
 	provider inferenceSpec.ProviderName,
-	modelID spec.ModelPresetID,
+	modelID modelpreset.ModelPresetID,
 ) (spec.ProviderPreset, error) {
 	// Validate provider existence.
 	pm, ok := b.models[provider]
@@ -310,10 +310,10 @@ func (b *BuiltInPresets) SetDefaultModelPreset(
 // Caller must hold write lock.
 func (b *BuiltInPresets) rebuildSnapshot(ctx context.Context) error {
 	newProv := make(map[inferenceSpec.ProviderName]spec.ProviderPreset, len(b.providers))
-	newModels := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(b.models))
+	newModels := make(map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset, len(b.models))
 
 	for pname, mm := range b.models {
-		sub := make(map[spec.ModelPresetID]spec.ModelPreset, len(mm))
+		sub := make(map[modelpreset.ModelPresetID]spec.ModelPreset, len(mm))
 		for mid, m := range mm {
 			if flag, ok, err := b.modelOverlayFlags.GetFlag(ctx, getModelKey(pname, mid)); err != nil {
 				return err
@@ -368,7 +368,10 @@ func (b *BuiltInPresets) populateDataFromInferenceCatalog(ctx context.Context) e
 	}
 
 	providers := make(map[inferenceSpec.ProviderName]spec.ProviderPreset, len(catalog.Providers))
-	models := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(catalog.Providers))
+	models := make(
+		map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset,
+		len(catalog.Providers),
+	)
 
 	for providerName, inferenceProvider := range catalog.Providers {
 		ts, err := builtInTimestampForProvider(providerName)
@@ -376,7 +379,7 @@ func (b *BuiltInPresets) populateDataFromInferenceCatalog(ctx context.Context) e
 			return err
 		}
 
-		appModels := make(map[spec.ModelPresetID]spec.ModelPreset, len(inferenceProvider.ModelPresets))
+		appModels := make(map[modelpreset.ModelPresetID]spec.ModelPreset, len(inferenceProvider.ModelPresets))
 		for _, inferenceModel := range inferenceProvider.ModelPresets {
 			appModel := appModelPresetFromInference(providerName, inferenceModel, ts)
 			appModels[appModel.ID] = appModel
@@ -389,7 +392,7 @@ func (b *BuiltInPresets) populateDataFromInferenceCatalog(ctx context.Context) e
 				providerName,
 			)
 		}
-		if _, ok := appModels[spec.ModelPresetID(defaultModelID)]; !ok {
+		if _, ok := appModels[defaultModelID]; !ok {
 			return fmt.Errorf(
 				"provider %q defaultModelPresetID %q not present: %w",
 				providerName,
@@ -401,7 +404,7 @@ func (b *BuiltInPresets) populateDataFromInferenceCatalog(ctx context.Context) e
 		appProvider := appProviderPresetFromInference(
 			inferenceProvider,
 			appModels,
-			spec.ModelPresetID(defaultModelID),
+			defaultModelID,
 			ts,
 		)
 		if err := validateProviderPreset(&appProvider); err != nil {
@@ -427,8 +430,8 @@ func (b *BuiltInPresets) populateDataFromInferenceCatalog(ctx context.Context) e
 
 func appProviderPresetFromInference(
 	in modelpreset.ProviderPreset,
-	models map[spec.ModelPresetID]spec.ModelPreset,
-	defaultModelID spec.ModelPresetID,
+	models map[modelpreset.ModelPresetID]spec.ModelPreset,
+	defaultModelID modelpreset.ModelPresetID,
 	ts time.Time,
 ) spec.ProviderPreset {
 	headers := maps.Clone(in.DefaultHeaders)
@@ -463,7 +466,7 @@ func appModelPresetFromInference(
 	in modelpreset.ModelPreset,
 	ts time.Time,
 ) spec.ModelPreset {
-	modelID := spec.ModelPresetID(in.ID)
+	modelID := in.ID
 	modelParam := in.ModelParam
 
 	var stopSequences *[]string
@@ -489,7 +492,7 @@ func appModelPresetFromInference(
 		CapabilitiesOverride:        capabilityoverride.CloneModelCapabilitiesOverride(in.CapabilitiesOverride),
 		SchemaVersion:               spec.SchemaVersion,
 		ID:                          modelID,
-		Name:                        spec.ModelName(modelParam.Name),
+		Name:                        modelParam.Name,
 		DisplayName:                 in.DisplayName,
 		Slug:                        spec.ModelSlug(modelID),
 		IsEnabled:                   builtInModelPresetEnabled(provider, modelID),
@@ -609,16 +612,16 @@ func builtInTimestampForProvider(provider inferenceSpec.ProviderName) (time.Time
 
 func builtInModelPresetEnabled(
 	provider inferenceSpec.ProviderName,
-	modelID spec.ModelPresetID,
+	modelID modelpreset.ModelPresetID,
 ) bool {
 	disabled, ok := builtin.BuiltInDisabledModelPresetIDs[provider]
 	if !ok {
 		return true
 	}
-	_, isDisabled := disabled[modelpreset.ModelPresetID(modelID)]
+	_, isDisabled := disabled[modelID]
 	return !isDisabled
 }
 
-func getModelKey(pName inferenceSpec.ProviderName, modelID spec.ModelPresetID) builtInModelKey {
+func getModelKey(pName inferenceSpec.ProviderName, modelID modelpreset.ModelPresetID) builtInModelKey {
 	return builtInModelKey(fmt.Sprintf("%s::%s", pName, modelID))
 }

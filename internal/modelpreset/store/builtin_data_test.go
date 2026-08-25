@@ -262,7 +262,7 @@ func TestBuiltInPresetsInitializedFromInferenceCatalog(t *testing.T) {
 		}
 
 		for inferenceModelID, inferenceModel := range inferenceProvider.ModelPresets {
-			appModelID := spec.ModelPresetID(inferenceModelID)
+			appModelID := inferenceModelID
 			appModel, ok := appModels[appModelID]
 			if !ok {
 				t.Fatalf("model %s/%s missing from app built-ins", providerName, inferenceModelID)
@@ -272,7 +272,7 @@ func TestBuiltInPresetsInitializedFromInferenceCatalog(t *testing.T) {
 				t.Errorf("model %s/%s id got %q want %q",
 					providerName, inferenceModelID, appModel.ID, appModelID)
 			}
-			if inferenceSpec.ModelName(appModel.Name) != inferenceModel.ModelParam.Name {
+			if appModel.Name != inferenceModel.ModelParam.Name {
 				t.Errorf("model %s/%s name got %q want %q",
 					providerName, inferenceModelID, appModel.Name, inferenceModel.ModelParam.Name)
 			}
@@ -315,7 +315,7 @@ func TestBuiltInPresetAppOverlays(t *testing.T) {
 	}
 
 	openAIResponses := providers[modelpreset.ProviderOpenAIResponses]
-	if openAIResponses.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetGPT56Terra) {
+	if openAIResponses.DefaultModelPresetID != modelpreset.PresetGPT56Terra {
 		t.Fatalf("openairesponses default model got %q want %q",
 			openAIResponses.DefaultModelPresetID,
 			modelpreset.PresetGPT56Terra,
@@ -323,7 +323,7 @@ func TestBuiltInPresetAppOverlays(t *testing.T) {
 	}
 
 	anthropic := providers[modelpreset.ProviderAnthropic]
-	if anthropic.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetClaudeSonnet5) {
+	if anthropic.DefaultModelPresetID != modelpreset.PresetClaudeSonnet5 {
 		t.Fatalf("anthropic default model got %q want %q",
 			anthropic.DefaultModelPresetID,
 			modelpreset.PresetClaudeSonnet5,
@@ -340,23 +340,23 @@ func TestBuiltInPresetAppOverlays(t *testing.T) {
 
 	disabledChecks := []struct {
 		provider inferenceSpec.ProviderName
-		modelID  spec.ModelPresetID
+		modelID  modelpreset.ModelPresetID
 	}{
 		{
 			provider: modelpreset.ProviderAnthropic,
-			modelID:  spec.ModelPresetID(modelpreset.PresetClaudeSonnet45),
+			modelID:  modelpreset.PresetClaudeSonnet45,
 		},
 		{
 			provider: modelpreset.ProviderGoogleGemini,
-			modelID:  spec.ModelPresetID(modelpreset.PresetGemini3Flash),
+			modelID:  modelpreset.PresetGemini3Flash,
 		},
 		{
 			provider: modelpreset.ProviderOpenAIChat,
-			modelID:  spec.ModelPresetID(modelpreset.PresetGPT4o),
+			modelID:  modelpreset.PresetGPT4o,
 		},
 		{
 			provider: modelpreset.ProviderOpenAIResponses,
-			modelID:  spec.ModelPresetID(modelpreset.PresetGPT52),
+			modelID:  modelpreset.PresetGPT52,
 		},
 	}
 
@@ -444,12 +444,12 @@ func TestSetProviderEnabled(t *testing.T) {
 func TestSetModelPresetEnabled(t *testing.T) {
 	tests := []struct {
 		name    string
-		setup   func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID, bool)
+		setup   func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, modelpreset.ModelPresetID, bool)
 		wantErr bool
 	}{
 		{
 			name: "toggle_existing_model",
-			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID, bool) {
+			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, modelpreset.ModelPresetID, bool) {
 				t.Helper()
 				_, models, err := bi.ListBuiltInPresets(t.Context())
 				if err != nil {
@@ -461,22 +461,22 @@ func TestSetModelPresetEnabled(t *testing.T) {
 		},
 		{
 			name: nonexistentProviderName,
-			setup: func(t *testing.T, _ *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID, bool) {
+			setup: func(t *testing.T, _ *BuiltInPresets) (inferenceSpec.ProviderName, modelpreset.ModelPresetID, bool) {
 				t.Helper()
-				return inferenceSpec.ProviderName("ghost-provider"), spec.ModelPresetID("m"), true
+				return inferenceSpec.ProviderName("ghost-provider"), modelpreset.ModelPresetID("m"), true
 			},
 			wantErr: true,
 		},
 		{
 			name: "nonexistent_model",
-			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID, bool) {
+			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, modelpreset.ModelPresetID, bool) {
 				t.Helper()
 				providers, _, err := bi.ListBuiltInPresets(t.Context())
 				if err != nil {
 					t.Fatalf("ListBuiltInPresets: %v", err)
 				}
 				providerName, _ := anyBuiltInProvider(t, providers)
-				return providerName, spec.ModelPresetID("ghost-model"), true
+				return providerName, modelpreset.ModelPresetID("ghost-model"), true
 			},
 			wantErr: true,
 		},
@@ -532,12 +532,12 @@ func TestSetModelPresetEnabled(t *testing.T) {
 func TestSetDefaultModelPreset(t *testing.T) {
 	tests := []struct {
 		name    string
-		setup   func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID)
+		setup   func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, modelpreset.ModelPresetID)
 		wantErr bool
 	}{
 		{
 			name: "change_existing_provider",
-			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID) {
+			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, modelpreset.ModelPresetID) {
 				t.Helper()
 				providers, models, err := bi.ListBuiltInPresets(t.Context())
 				if err != nil {
@@ -548,22 +548,22 @@ func TestSetDefaultModelPreset(t *testing.T) {
 		},
 		{
 			name: nonexistentProviderName,
-			setup: func(t *testing.T, _ *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID) {
+			setup: func(t *testing.T, _ *BuiltInPresets) (inferenceSpec.ProviderName, modelpreset.ModelPresetID) {
 				t.Helper()
-				return inferenceSpec.ProviderName("ghost-provider"), spec.ModelPresetID("m1")
+				return inferenceSpec.ProviderName("ghost-provider"), modelpreset.ModelPresetID("m1")
 			},
 			wantErr: true,
 		},
 		{
 			name: "nonexistent_model",
-			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID) {
+			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, modelpreset.ModelPresetID) {
 				t.Helper()
 				providers, _, err := bi.ListBuiltInPresets(t.Context())
 				if err != nil {
 					t.Fatalf("ListBuiltInPresets: %v", err)
 				}
 				providerName, _ := anyBuiltInProvider(t, providers)
-				return providerName, spec.ModelPresetID("ghost-model")
+				return providerName, modelpreset.ModelPresetID("ghost-model")
 			},
 			wantErr: true,
 		},
@@ -799,7 +799,7 @@ func TestBuiltInPresetsOverlayPersistsAcrossReopen(t *testing.T) {
 	}
 
 	providerName := modelpreset.ProviderOpenAIResponses
-	modelID := spec.ModelPresetID(modelpreset.PresetGPT54Mini)
+	modelID := modelpreset.PresetGPT54Mini
 
 	providers, models, err := bi1.ListBuiltInPresets(ctx)
 	if err != nil {
@@ -812,7 +812,7 @@ func TestBuiltInPresetsOverlayPersistsAcrossReopen(t *testing.T) {
 		t.Fatalf("model %s/%s missing", providerName, modelID)
 	}
 
-	var newDefaultModelID spec.ModelPresetID
+	var newDefaultModelID modelpreset.ModelPresetID
 	for id := range models[providerName] {
 		if id != providers[providerName].DefaultModelPresetID {
 			newDefaultModelID = id
@@ -934,7 +934,7 @@ func TestGetBuiltInProviderAndModelPreset(t *testing.T) {
 		t.Fatalf("provider name got %q want %q", provider.Name, modelpreset.ProviderAnthropic)
 	}
 
-	modelID := spec.ModelPresetID(modelpreset.PresetClaudeSonnet46)
+	modelID := modelpreset.PresetClaudeSonnet46
 	model, err := bi.GetBuiltInModelPreset(ctx, modelpreset.ProviderAnthropic, modelID)
 	if err != nil {
 		t.Fatalf("GetBuiltInModelPreset: %v", err)
@@ -1011,8 +1011,8 @@ func anyBuiltInProvider(
 
 func anyBuiltInModel(
 	t *testing.T,
-	models map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
-) (inferenceSpec.ProviderName, spec.ModelPresetID, spec.ModelPreset) {
+	models map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset,
+) (inferenceSpec.ProviderName, modelpreset.ModelPresetID, spec.ModelPreset) {
 	t.Helper()
 
 	providerNames := make([]inferenceSpec.ProviderName, 0, len(models))
@@ -1022,7 +1022,7 @@ func anyBuiltInModel(
 	slices.Sort(providerNames)
 
 	for _, providerName := range providerNames {
-		modelIDs := make([]spec.ModelPresetID, 0, len(models[providerName]))
+		modelIDs := make([]modelpreset.ModelPresetID, 0, len(models[providerName]))
 		for modelID := range models[providerName] {
 			modelIDs = append(modelIDs, modelID)
 		}
@@ -1040,8 +1040,8 @@ func anyBuiltInModel(
 func anyProviderWithNonDefaultModel(
 	t *testing.T,
 	providers map[inferenceSpec.ProviderName]spec.ProviderPreset,
-	models map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
-) (inferenceSpec.ProviderName, spec.ModelPresetID) {
+	models map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset,
+) (inferenceSpec.ProviderName, modelpreset.ModelPresetID) {
 	t.Helper()
 
 	providerNames := make([]inferenceSpec.ProviderName, 0, len(providers))
@@ -1056,7 +1056,7 @@ func anyProviderWithNonDefaultModel(
 			continue
 		}
 
-		modelIDs := make([]spec.ModelPresetID, 0, len(modelMap))
+		modelIDs := make([]modelpreset.ModelPresetID, 0, len(modelMap))
 		for modelID := range modelMap {
 			modelIDs = append(modelIDs, modelID)
 		}

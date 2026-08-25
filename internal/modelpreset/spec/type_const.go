@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/inference-go/capabilityoverride"
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -20,20 +21,6 @@ const (
 	DefaultPageSize       = 256 // Default page size.
 	BuiltInSnapshotMaxAge = time.Hour
 )
-
-const (
-	DefaultAuthorizationHeaderKey = "Authorization"
-	DefaultAPITimeout             = 300 * time.Second
-
-	DefaultAnthropicOrigin                 = "https://api.anthropic.com"
-	DefaultAnthropicChatCompletionPrefix   = "/v1/messages"
-	DefaultAnthropicAuthorizationHeaderKey = "x-api-key"
-
-	DefaultOpenAIOrigin                = "https://api.openai.com"
-	DefaultOpenAIChatCompletionsPrefix = "/v1/chat/completions"
-)
-
-var OpenAIChatCompletionsDefaultHeaders = map[string]string{"content-type": "application/json"}
 
 var (
 	ErrInvalidDir = errors.New("invalid directory")
@@ -52,17 +39,13 @@ var (
 	ErrBuiltInReadOnly  = errors.New("built-in resource is read-only")
 )
 
-type (
-	ModelName     string
-	ModelSlug     string
-	ModelPresetID string
-)
+type ModelSlug string
 
 // ModelPresetRef identifies a model preset inside a provider namespace.
 // It is intended for internal helpers and JSON payloads, not HTTP path binding.
 type ModelPresetRef struct {
 	ProviderName  inferenceSpec.ProviderName `json:"providerName"`
-	ModelPresetID ModelPresetID              `json:"modelPresetID"`
+	ModelPresetID modelpreset.ModelPresetID  `json:"modelPresetID"`
 }
 
 func (r ModelPresetRef) IsZero() bool {
@@ -103,12 +86,12 @@ type ModelPresetPatch struct {
 type ModelPreset struct {
 	ModelPresetPatch
 
-	SchemaVersion string        `json:"schemaVersion" required:"true"`
-	ID            ModelPresetID `json:"id"            required:"true"`
-	Name          ModelName     `json:"name"          required:"true"`
-	DisplayName   string        `json:"displayName"   required:"true"`
-	Slug          ModelSlug     `json:"slug"          required:"true"`
-	IsEnabled     bool          `json:"isEnabled"     required:"true"`
+	SchemaVersion string                    `json:"schemaVersion" required:"true"`
+	ID            modelpreset.ModelPresetID `json:"id"            required:"true"`
+	Name          inferenceSpec.ModelName   `json:"name"          required:"true"`
+	DisplayName   string                    `json:"displayName"   required:"true"`
+	Slug          ModelSlug                 `json:"slug"          required:"true"`
+	IsEnabled     bool                      `json:"isEnabled"     required:"true"`
 
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`
@@ -134,8 +117,8 @@ type ProviderPreset struct {
 	// This is NOT the derived/effective capability profile.
 	CapabilitiesOverride *capabilityoverride.ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 
-	DefaultModelPresetID ModelPresetID                 `json:"defaultModelPresetID"`
-	ModelPresets         map[ModelPresetID]ModelPreset `json:"modelPresets"`
+	DefaultModelPresetID modelpreset.ModelPresetID                 `json:"defaultModelPresetID"`
+	ModelPresets         map[modelpreset.ModelPresetID]ModelPreset `json:"modelPresets"`
 }
 
 type PresetsSchema struct {

@@ -635,7 +635,7 @@ func workspaceUnavailableCompletionResponse(
 func (ps *ProviderSetAPI) newPresetCapabilityResolver(
 	ctx context.Context,
 	provider inferenceSpec.ProviderName,
-	modelPresetID modelpresetSpec.ModelPresetID,
+	modelPresetID modelpreset.ModelPresetID,
 	requestModelName inferenceSpec.ModelName,
 	completionKey string,
 ) (inferenceSpec.ModelCapabilityResolver, error) {
@@ -666,7 +666,7 @@ func (ps *ProviderSetAPI) newPresetCapabilityResolver(
 
 	modelName := requestModelName
 	if modelName == "" {
-		modelName = inferenceSpec.ModelName(presp.Body.Model.Name)
+		modelName = presp.Body.Model.Name
 	}
 	if modelName == "" {
 		return nil, errors.New("cannot derive capabilities: model name is empty")
@@ -699,11 +699,11 @@ func inferenceModelPresetFromApp(
 	modelName inferenceSpec.ModelName,
 ) modelpreset.ModelPreset {
 	if modelName == "" {
-		modelName = inferenceSpec.ModelName(mp.Name)
+		modelName = mp.Name
 	}
 
 	return modelpreset.ModelPreset{
-		ID:          modelpreset.ModelPresetID(mp.ID),
+		ID:          mp.ID,
 		Name:        modelName,
 		DisplayName: mp.DisplayName,
 		ModelParam: inferenceSpec.ModelParam{

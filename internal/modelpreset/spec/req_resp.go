@@ -2,6 +2,7 @@ package spec
 
 import (
 	"github.com/flexigpt/inference-go/capabilityoverride"
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -59,7 +60,7 @@ type PatchProviderPresetRequestBody struct {
 	ChatCompletionPathPrefix *string                        `json:"chatCompletionPathPrefix,omitempty"`
 	APIKeyHeaderKey          *string                        `json:"apiKeyHeaderKey,omitempty"`
 	DefaultHeaders           map[string]string              `json:"defaultHeaders,omitempty"`
-	DefaultModelPresetID     *ModelPresetID                 `json:"defaultModelPresetID,omitempty"`
+	DefaultModelPresetID     *modelpreset.ModelPresetID     `json:"defaultModelPresetID,omitempty"`
 
 	CapabilitiesOverride *capabilityoverride.ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
@@ -79,15 +80,15 @@ type DeleteProviderPresetResponse struct{}
 type PostModelPresetRequestBody struct {
 	ModelPresetPatch
 
-	Name        ModelName `json:"name"        required:"true"`
-	Slug        ModelSlug `json:"slug"        required:"true"`
-	DisplayName string    `json:"displayName" required:"true"`
-	IsEnabled   bool      `json:"isEnabled"   required:"true"`
+	Name        inferenceSpec.ModelName `json:"name"        required:"true"`
+	Slug        ModelSlug               `json:"slug"        required:"true"`
+	DisplayName string                  `json:"displayName" required:"true"`
+	IsEnabled   bool                    `json:"isEnabled"   required:"true"`
 }
 
 type PostModelPresetRequest struct {
 	ProviderName  inferenceSpec.ProviderName `path:"providerName"  required:"true"`
-	ModelPresetID ModelPresetID              `path:"modelPresetID" required:"true"`
+	ModelPresetID modelpreset.ModelPresetID  `path:"modelPresetID" required:"true"`
 	Body          *PostModelPresetRequestBody
 }
 type PostModelPresetResponse struct{}
@@ -102,28 +103,28 @@ type PostModelPresetResponse struct{}
 type PatchModelPresetRequestBody struct {
 	ModelPresetPatch
 
-	Name        *ModelName `json:"name,omitempty"`
-	Slug        *ModelSlug `json:"slug,omitempty"`
-	DisplayName *string    `json:"displayName,omitempty"`
-	IsEnabled   *bool      `json:"isEnabled,omitempty"`
+	Name        *inferenceSpec.ModelName `json:"name,omitempty"`
+	Slug        *ModelSlug               `json:"slug,omitempty"`
+	DisplayName *string                  `json:"displayName,omitempty"`
+	IsEnabled   *bool                    `json:"isEnabled,omitempty"`
 }
 
 type PatchModelPresetRequest struct {
 	ProviderName  inferenceSpec.ProviderName `path:"providerName"  required:"true"`
-	ModelPresetID ModelPresetID              `path:"modelPresetID" required:"true"`
+	ModelPresetID modelpreset.ModelPresetID  `path:"modelPresetID" required:"true"`
 	Body          *PatchModelPresetRequestBody
 }
 type PatchModelPresetResponse struct{}
 
 type DeleteModelPresetRequest struct {
 	ProviderName  inferenceSpec.ProviderName `path:"providerName"  required:"true"`
-	ModelPresetID ModelPresetID              `path:"modelPresetID" required:"true"`
+	ModelPresetID modelpreset.ModelPresetID  `path:"modelPresetID" required:"true"`
 }
 type DeleteModelPresetResponse struct{}
 
 type GetModelPresetRequest struct {
 	ProviderName  inferenceSpec.ProviderName `path:"providerName"  required:"true"`
-	ModelPresetID ModelPresetID              `path:"modelPresetID" required:"true"`
+	ModelPresetID modelpreset.ModelPresetID  `path:"modelPresetID" required:"true"`
 
 	// If false, disabled provider/model return an error.
 	IncludeDisabled bool `query:"includeDisabled"`

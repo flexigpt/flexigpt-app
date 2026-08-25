@@ -12,17 +12,21 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 const (
-	renamed                 = "RENAMED"
-	ghostID                 = "ghost"
-	nonexistentProviderName = "nonexistent_provider"
-	invalidTagText          = "invalid tag"
+	windowsGOOS                        = "windows"
+	renamed                            = "RENAMED"
+	ghostID                            = "ghost"
+	nonexistentProviderName            = "nonexistent_provider"
+	invalidTagText                     = "invalid tag"
+	defaultOpenAIChatCompletionsPrefix = "/v1/chat/completions"
+	defaultAuthorizationHeaderKey      = "Authorization"
 )
 
-const windowsGOOS = "windows"
+var openAIChatCompletionsDefaultHeaders = map[string]string{"content-type": "application/json"}
 
 func decodeProviderPageToken(t *testing.T, token string) spec.ProviderPageToken {
 	t.Helper()
@@ -76,9 +80,9 @@ func postUserProvider(t *testing.T, st *ModelPresetStore, name inferenceSpec.Pro
 		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                enabled,
 		Origin:                   "https://api." + string(name) + ".example.test",
-		ChatCompletionPathPrefix: spec.DefaultOpenAIChatCompletionsPrefix,
-		APIKeyHeaderKey:          spec.DefaultAuthorizationHeaderKey,
-		DefaultHeaders:           spec.OpenAIChatCompletionsDefaultHeaders,
+		ChatCompletionPathPrefix: defaultOpenAIChatCompletionsPrefix,
+		APIKeyHeaderKey:          defaultAuthorizationHeaderKey,
+		DefaultHeaders:           openAIChatCompletionsDefaultHeaders,
 	}
 
 	_, err := st.PostProviderPreset(t.Context(), &spec.PostProviderPresetRequest{
@@ -95,7 +99,7 @@ func postUserModelPreset(
 	ctx context.Context,
 	st *ModelPresetStore,
 	provider inferenceSpec.ProviderName,
-	modelID spec.ModelPresetID,
+	modelID modelpreset.ModelPresetID,
 	enabled bool,
 ) {
 	t.Helper()
@@ -105,7 +109,7 @@ func postUserModelPreset(
 		ProviderName:  provider,
 		ModelPresetID: modelID,
 		Body: &spec.PostModelPresetRequestBody{
-			Name:        spec.ModelName(modelID),
+			Name:        inferenceSpec.ModelName(modelID),
 			Slug:        spec.ModelSlug(modelID),
 			DisplayName: strings.ToUpper(string(modelID)),
 			IsEnabled:   enabled,
@@ -194,7 +198,7 @@ func builtInProviderWithAtLeastNModelsFromStore(
 	return "", spec.ProviderPreset{}
 }
 
-func anyModelID(pp spec.ProviderPreset) (spec.ModelPresetID, spec.ModelPreset) {
+func anyModelID(pp spec.ProviderPreset) (modelpreset.ModelPresetID, spec.ModelPreset) {
 	for id, mp := range pp.ModelPresets {
 		return id, mp
 	}
@@ -203,8 +207,8 @@ func anyModelID(pp spec.ProviderPreset) (spec.ModelPresetID, spec.ModelPreset) {
 
 func anotherModelID(
 	pp spec.ProviderPreset,
-	not spec.ModelPresetID,
-) spec.ModelPresetID {
+	not modelpreset.ModelPresetID,
+) modelpreset.ModelPresetID {
 	for id := range pp.ModelPresets {
 		if id != not {
 			return id
@@ -247,6 +251,6 @@ func wantErrContains(t *testing.T, err error, substr string) {
 	}
 }
 
-func mpidPtr(v spec.ModelPresetID) *spec.ModelPresetID { return new(v) }
+func mpidPtr(v modelpreset.ModelPresetID) *modelpreset.ModelPresetID { return new(v) }
 
 func isWindows() bool { return runtime.GOOS == windowsGOOS }

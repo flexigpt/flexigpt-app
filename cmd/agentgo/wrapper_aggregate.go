@@ -11,6 +11,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 	"github.com/flexigpt/llmtools-go/texttool"
 
@@ -290,7 +291,7 @@ func (w *AggregrateWrapper) FetchCompletion(
 
 		req := &inferencewrapperSpec.CompletionRequest{
 			Provider:      inferenceSpec.ProviderName(provider),
-			ModelPresetID: modelpresetSpec.ModelPresetID(modelPresetID),
+			ModelPresetID: modelpreset.ModelPresetID(modelPresetID),
 			Body:          completionData,
 		}
 

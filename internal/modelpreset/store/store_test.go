@@ -152,8 +152,8 @@ func TestModelPresetStore_PostProviderPreset(t *testing.T) {
 		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                true,
 		Origin:                   "https://example.test",
-		ChatCompletionPathPrefix: spec.DefaultOpenAIChatCompletionsPrefix,
-		APIKeyHeaderKey:          spec.DefaultAuthorizationHeaderKey,
+		ChatCompletionPathPrefix: defaultOpenAIChatCompletionsPrefix,
+		APIKeyHeaderKey:          defaultAuthorizationHeaderKey,
 		DefaultHeaders:           map[string]string{"content-type": "application/json"},
 	}
 

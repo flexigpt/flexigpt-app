@@ -6,6 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	"github.com/flexigpt/inference-go/capabilityoverride"
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -17,9 +18,9 @@ func cloneProviderPresetForInference(pp spec.ProviderPreset) spec.ProviderPreset
 }
 
 func cloneModelPresetNestedMap(
-	src map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
-) map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset {
-	dst := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(src))
+	src map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset,
+) map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset {
+	dst := make(map[inferenceSpec.ProviderName]map[modelpreset.ModelPresetID]spec.ModelPreset, len(src))
 	for k, v := range src {
 		dst[k] = cloneModelPresetMap(v)
 	}
@@ -45,9 +46,9 @@ func cloneProviderPreset(pp spec.ProviderPreset) spec.ProviderPreset {
 }
 
 func cloneModelPresetMap(
-	src map[spec.ModelPresetID]spec.ModelPreset,
-) map[spec.ModelPresetID]spec.ModelPreset {
-	dst := make(map[spec.ModelPresetID]spec.ModelPreset, len(src))
+	src map[modelpreset.ModelPresetID]spec.ModelPreset,
+) map[modelpreset.ModelPresetID]spec.ModelPreset {
+	dst := make(map[modelpreset.ModelPresetID]spec.ModelPreset, len(src))
 	for k, v := range src {
 		dst[k] = cloneModelPreset(v)
 	}

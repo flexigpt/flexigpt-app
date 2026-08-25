@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/inference-go/capabilityoverride"
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
@@ -202,7 +203,7 @@ func (s *ModelPresetStore) PostProviderPreset(
 		ChatCompletionPathPrefix: req.Body.ChatCompletionPathPrefix,
 		APIKeyHeaderKey:          req.Body.APIKeyHeaderKey,
 		DefaultHeaders:           maps.Clone(req.Body.DefaultHeaders),
-		ModelPresets:             map[spec.ModelPresetID]spec.ModelPreset{},
+		ModelPresets:             map[modelpreset.ModelPresetID]spec.ModelPreset{},
 		CapabilitiesOverride:     capabilityoverride.CloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride),
 	}
 
@@ -439,7 +440,7 @@ func (s *ModelPresetStore) PostModelPreset(
 	}
 
 	if pp.ModelPresets == nil {
-		pp.ModelPresets = map[spec.ModelPresetID]spec.ModelPreset{}
+		pp.ModelPresets = map[modelpreset.ModelPresetID]spec.ModelPreset{}
 	}
 	if _, ok := pp.ModelPresets[req.ModelPresetID]; ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrModelPresetAlreadyExists, req.ModelPresetID)
