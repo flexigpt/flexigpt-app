@@ -2,12 +2,17 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/flexigpt/inference-go/capabilityoverride"
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
@@ -348,6 +353,270 @@ func (b *BuiltInPresets) rebuildSnapshot(ctx context.Context) error {
 	b.viewProv = newProv
 	b.viewModels = newModels
 	return nil
+}
+
+func (b *BuiltInPresets) populateDataFromInferenceCatalog(ctx context.Context) error {
+	catalog := modelpreset.DefaultCatalog()
+	if len(catalog.Providers) == 0 {
+		return errors.New("inference model preset catalog contains no providers")
+	}
+	if err := modelpreset.ValidateCatalog(catalog); err != nil {
+		return fmt.Errorf("invalid inference model preset catalog: %w", err)
+	}
+	if err := validateBuiltInOverlayCoverage(catalog); err != nil {
+		return fmt.Errorf("invalid built-in model preset overlay configuration: %w", err)
+	}
+
+	providers := make(map[inferenceSpec.ProviderName]spec.ProviderPreset, len(catalog.Providers))
+	models := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(catalog.Providers))
+
+	for providerName, inferenceProvider := range catalog.Providers {
+		ts, err := builtInTimestampForProvider(providerName)
+		if err != nil {
+			return err
+		}
+
+		appModels := make(map[spec.ModelPresetID]spec.ModelPreset, len(inferenceProvider.ModelPresets))
+		for _, inferenceModel := range inferenceProvider.ModelPresets {
+			appModel := appModelPresetFromInference(providerName, inferenceModel, ts)
+			appModels[appModel.ID] = appModel
+		}
+
+		defaultModelID, ok := builtin.BuiltInDefaultModelPresetIDs[providerName]
+		if !ok || defaultModelID == "" {
+			return fmt.Errorf(
+				"provider %q has no explicit built-in defaultModelPresetID",
+				providerName,
+			)
+		}
+		if _, ok := appModels[spec.ModelPresetID(defaultModelID)]; !ok {
+			return fmt.Errorf(
+				"provider %q defaultModelPresetID %q not present: %w",
+				providerName,
+				defaultModelID,
+				spec.ErrModelPresetNotFound,
+			)
+		}
+
+		appProvider := appProviderPresetFromInference(
+			inferenceProvider,
+			appModels,
+			spec.ModelPresetID(defaultModelID),
+			ts,
+		)
+		if err := validateProviderPreset(&appProvider); err != nil {
+			return err
+		}
+
+		providers[providerName] = appProvider
+		models[providerName] = appModels
+	}
+
+	if _, ok := providers[builtin.DefaultBuiltInProvider]; !ok {
+		return fmt.Errorf("default provider %q not present in inference catalog", builtin.DefaultBuiltInProvider)
+	}
+
+	b.defaultProvider = builtin.DefaultBuiltInProvider
+	b.providers = providers
+	b.models = models
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.rebuildSnapshot(ctx)
+}
+
+func appProviderPresetFromInference(
+	in modelpreset.ProviderPreset,
+	models map[spec.ModelPresetID]spec.ModelPreset,
+	defaultModelID spec.ModelPresetID,
+	ts time.Time,
+) spec.ProviderPreset {
+	headers := maps.Clone(in.DefaultHeaders)
+	if extra := builtin.BuiltInProviderDefaultHeaderOverlays[in.Name]; len(extra) > 0 {
+		if headers == nil {
+			headers = map[string]string{}
+		}
+		maps.Copy(headers, extra)
+	}
+
+	return spec.ProviderPreset{
+		SchemaVersion:            spec.SchemaVersion,
+		Name:                     in.Name,
+		DisplayName:              spec.ProviderDisplayName(in.DisplayName),
+		SDKType:                  in.SDKType,
+		IsEnabled:                true,
+		CreatedAt:                ts,
+		ModifiedAt:               ts,
+		IsBuiltIn:                true,
+		Origin:                   in.Origin,
+		ChatCompletionPathPrefix: in.ChatCompletionPathPrefix,
+		APIKeyHeaderKey:          in.APIKeyHeaderKey,
+		DefaultHeaders:           headers,
+		CapabilitiesOverride:     capabilityoverride.CloneModelCapabilitiesOverride(in.CapabilitiesOverride),
+		DefaultModelPresetID:     defaultModelID,
+		ModelPresets:             cloneModelPresetMap(models),
+	}
+}
+
+func appModelPresetFromInference(
+	provider inferenceSpec.ProviderName,
+	in modelpreset.ModelPreset,
+	ts time.Time,
+) spec.ModelPreset {
+	modelID := spec.ModelPresetID(in.ID)
+	modelParam := in.ModelParam
+
+	var stopSequences *[]string
+	if len(modelParam.StopSequences) > 0 {
+		s := slices.Clone(modelParam.StopSequences)
+		stopSequences = &s
+	}
+
+	systemPrompt := modelParam.SystemPrompt
+
+	return spec.ModelPreset{
+		Stream:                      new(modelParam.Stream),
+		MaxPromptLength:             new(modelParam.MaxPromptLength),
+		MaxOutputLength:             new(modelParam.MaxOutputLength),
+		Temperature:                 cloneFloat64Ptr(modelParam.Temperature),
+		Reasoning:                   cloneReasoningParam(modelParam.Reasoning),
+		SystemPrompt:                &systemPrompt,
+		Timeout:                     new(modelParam.Timeout),
+		CacheControl:                cloneCacheControl(modelParam.CacheControl),
+		OutputParam:                 cloneOutputParam(modelParam.OutputParam),
+		StopSequences:               stopSequences,
+		AdditionalParametersRawJSON: cloneStringPtr(modelParam.AdditionalParametersRawJSON),
+		CapabilitiesOverride:        capabilityoverride.CloneModelCapabilitiesOverride(in.CapabilitiesOverride),
+		SchemaVersion:               spec.SchemaVersion,
+		ID:                          modelID,
+		Name:                        spec.ModelName(modelParam.Name),
+		DisplayName:                 spec.ModelDisplayName(in.DisplayName),
+		Slug:                        spec.ModelSlug(modelID),
+		IsEnabled:                   builtInModelPresetEnabled(provider, modelID),
+		CreatedAt:                   ts,
+		ModifiedAt:                  ts,
+		IsBuiltIn:                   true,
+	}
+}
+
+func validateBuiltInOverlayCoverage(catalog modelpreset.Catalog) error {
+	var errs []error
+
+	if _, ok := catalog.Providers[builtin.DefaultBuiltInProvider]; !ok {
+		errs = append(errs, fmt.Errorf(
+			"default built-in provider %q is absent from the inference catalog",
+			builtin.DefaultBuiltInProvider,
+		))
+	}
+
+	for providerName, provider := range catalog.Providers {
+		if ts, ok := builtin.BuiltInProviderTimestamps[providerName]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"provider %q is missing a built-in timestamp",
+				providerName,
+			))
+		} else if ts.IsZero() {
+			errs = append(errs, fmt.Errorf(
+				"provider %q has a zero built-in timestamp",
+				providerName,
+			))
+		}
+
+		defaultModelID, ok := builtin.BuiltInDefaultModelPresetIDs[providerName]
+		if !ok || defaultModelID == "" {
+			errs = append(errs, fmt.Errorf(
+				"provider %q is missing an explicit built-in defaultModelPresetID",
+				providerName,
+			))
+		} else if _, ok := provider.ModelPresets[defaultModelID]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"provider %q default model %q is absent from the inference catalog",
+				providerName,
+				defaultModelID,
+			))
+		}
+	}
+
+	for providerName := range builtin.BuiltInProviderTimestamps {
+		if _, ok := catalog.Providers[providerName]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"built-in timestamp references unknown provider %q",
+				providerName,
+			))
+		}
+	}
+
+	for providerName := range builtin.BuiltInDefaultModelPresetIDs {
+		if _, ok := catalog.Providers[providerName]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"built-in default model references unknown provider %q",
+				providerName,
+			))
+		}
+	}
+
+	for providerName, disabledModels := range builtin.BuiltInDisabledModelPresetIDs {
+		provider, ok := catalog.Providers[providerName]
+		if !ok {
+			errs = append(errs, fmt.Errorf(
+				"disabled model overlay references unknown provider %q",
+				providerName,
+			))
+			continue
+		}
+
+		for modelID := range disabledModels {
+			if _, ok := provider.ModelPresets[modelID]; !ok {
+				errs = append(errs, fmt.Errorf(
+					"disabled model overlay references unknown model %q/%q",
+					providerName,
+					modelID,
+				))
+			}
+		}
+	}
+
+	for providerName, headers := range builtin.BuiltInProviderDefaultHeaderOverlays {
+		if _, ok := catalog.Providers[providerName]; !ok {
+			errs = append(errs, fmt.Errorf(
+				"default-header overlay references unknown provider %q",
+				providerName,
+			))
+		}
+		for key, value := range headers {
+			if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+				errs = append(errs, fmt.Errorf(
+					"default-header overlay for provider %q contains an empty key or value",
+					providerName,
+				))
+			}
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func builtInTimestampForProvider(provider inferenceSpec.ProviderName) (time.Time, error) {
+	ts, ok := builtin.BuiltInProviderTimestamps[provider]
+	if !ok {
+		return time.Time{}, fmt.Errorf(
+			"provider %q has no explicit built-in timestamp",
+			provider,
+		)
+	}
+	return ts, nil
+}
+
+func builtInModelPresetEnabled(
+	provider inferenceSpec.ProviderName,
+	modelID spec.ModelPresetID,
+) bool {
+	disabled, ok := builtin.BuiltInDisabledModelPresetIDs[provider]
+	if !ok {
+		return true
+	}
+	_, isDisabled := disabled[modelpreset.ModelPresetID(modelID)]
+	return !isDisabled
 }
 
 func getModelKey(pName inferenceSpec.ProviderName, modelID spec.ModelPresetID) builtInModelKey {

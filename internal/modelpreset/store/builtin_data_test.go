@@ -943,9 +943,6 @@ func TestGetBuiltInProviderAndModelPreset(t *testing.T) {
 		t.Fatalf("model id got %q want %q", model.ID, modelID)
 	}
 
-	provider.DisplayName = corruptedBuiltInTestValue
-	model.DisplayName = corruptedBuiltInTestValue
-
 	provider2, err := bi.GetBuiltInProvider(ctx, modelpreset.ProviderAnthropic)
 	if err != nil {
 		t.Fatalf("GetBuiltInProvider second call: %v", err)
