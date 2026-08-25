@@ -26,7 +26,7 @@ type GetDefaultProviderResponse struct {
 }
 
 type PostProviderPresetRequestBody struct {
-	DisplayName              ProviderDisplayName           `json:"displayName"              required:"true"`
+	DisplayName              string                        `json:"displayName"              required:"true"`
 	SDKType                  inferenceSpec.ProviderSDKType `json:"sdkType"                  required:"true"`
 	IsEnabled                bool                          `json:"isEnabled"                required:"true"`
 	Origin                   string                        `json:"origin"                   required:"true"`
@@ -52,7 +52,7 @@ type PostProviderPresetResponse struct{}
 //   - only user providers can patch provider metadata/capabilities
 //   - built-ins only support isEnabled and defaultModelPresetID
 type PatchProviderPresetRequestBody struct {
-	DisplayName              *ProviderDisplayName           `json:"displayName,omitempty"`
+	DisplayName              *string                        `json:"displayName,omitempty"`
 	SDKType                  *inferenceSpec.ProviderSDKType `json:"sdkType,omitempty"`
 	IsEnabled                *bool                          `json:"isEnabled,omitempty"`
 	Origin                   *string                        `json:"origin,omitempty"`
@@ -79,10 +79,10 @@ type DeleteProviderPresetResponse struct{}
 type PostModelPresetRequestBody struct {
 	ModelPresetPatch
 
-	Name        ModelName        `json:"name"        required:"true"`
-	Slug        ModelSlug        `json:"slug"        required:"true"`
-	DisplayName ModelDisplayName `json:"displayName" required:"true"`
-	IsEnabled   bool             `json:"isEnabled"   required:"true"`
+	Name        ModelName `json:"name"        required:"true"`
+	Slug        ModelSlug `json:"slug"        required:"true"`
+	DisplayName string    `json:"displayName" required:"true"`
+	IsEnabled   bool      `json:"isEnabled"   required:"true"`
 }
 
 type PostModelPresetRequest struct {
@@ -102,10 +102,10 @@ type PostModelPresetResponse struct{}
 type PatchModelPresetRequestBody struct {
 	ModelPresetPatch
 
-	Name        *ModelName        `json:"name,omitempty"`
-	Slug        *ModelSlug        `json:"slug,omitempty"`
-	DisplayName *ModelDisplayName `json:"displayName,omitempty"`
-	IsEnabled   *bool             `json:"isEnabled,omitempty"`
+	Name        *ModelName `json:"name,omitempty"`
+	Slug        *ModelSlug `json:"slug,omitempty"`
+	DisplayName *string    `json:"displayName,omitempty"`
+	IsEnabled   *bool      `json:"isEnabled,omitempty"`
 }
 
 type PatchModelPresetRequest struct {

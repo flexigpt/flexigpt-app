@@ -292,7 +292,7 @@ func TestModelPresetStore_PatchProviderPreset_MetadataPreservesModelsAndDefault(
 		t.Fatalf("PatchProviderPreset(set default): %v", err)
 	}
 
-	newDisplay := spec.ProviderDisplayName(renamed)
+	newDisplay := renamed
 	newOrigin := "https://changed.example.test"
 	_, err = st.PatchProviderPreset(ctx, &spec.PatchProviderPresetRequest{
 		ProviderName: prov,
@@ -306,7 +306,7 @@ func TestModelPresetStore_PatchProviderPreset_MetadataPreservesModelsAndDefault(
 	}
 
 	pp := getProviderByName(t, st, ctx, prov, true)
-	if string(pp.DisplayName) != renamed {
+	if pp.DisplayName != renamed {
 		t.Fatalf("displayName not updated: got=%q", pp.DisplayName)
 	}
 	if pp.Origin != newOrigin {
@@ -383,7 +383,7 @@ func TestModelPresetStore_PatchProviderPreset_UserProvider(t *testing.T) {
 			req: &spec.PatchProviderPresetRequest{
 				ProviderName: prov,
 				Body: &spec.PatchProviderPresetRequestBody{
-					DisplayName: providerDisplayNamePtr("Patched Name"),
+					DisplayName: new("Patched Name"),
 					Origin:      new("https://patched.example.test"),
 				},
 			},

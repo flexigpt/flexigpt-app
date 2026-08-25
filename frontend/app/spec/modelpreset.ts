@@ -14,7 +14,6 @@ export const PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID = '__conversation__';
 export const DEFAULT_REASONING_TOKENS = 1024;
 
 type ModelName = string;
-type ModelDisplayName = string;
 type ModelSlug = string;
 export type ModelPresetID = string;
 
@@ -22,8 +21,6 @@ export interface ModelPresetRef {
 	providerName: ProviderName;
 	modelPresetID: ModelPresetID;
 }
-
-type ProviderDisplayName = string;
 
 interface ToolCapabilitiesOverride {
 	supportedToolTypes?: string[];
@@ -112,14 +109,14 @@ interface ModelPresetPatch {
 export interface PostModelPresetPayload extends ModelPresetPatch {
 	name: ModelName;
 	slug: ModelSlug;
-	displayName: ModelDisplayName;
+	displayName: string;
 	isEnabled: boolean;
 }
 
 export interface PatchModelPresetPayload extends ModelPresetPatch {
 	name?: ModelName;
 	slug?: ModelSlug;
-	displayName?: ModelDisplayName;
+	displayName?: string;
 	isEnabled?: boolean;
 }
 
@@ -130,7 +127,7 @@ export interface ModelPreset extends ModelPresetPatch {
 	id: ModelPresetID;
 	name: ModelName;
 	slug: ModelSlug;
-	displayName: ModelDisplayName;
+	displayName: string;
 	isEnabled: boolean;
 	capabilitiesOverride?: ModelCapabilitiesOverride;
 	createdAt: ISODateString;
@@ -139,7 +136,7 @@ export interface ModelPreset extends ModelPresetPatch {
 }
 
 export interface PostProviderPresetPayload {
-	displayName: ProviderDisplayName;
+	displayName: string;
 	sdkType: ProviderSDKType;
 	isEnabled: boolean;
 	origin: string;
@@ -151,7 +148,7 @@ export interface PostProviderPresetPayload {
 }
 
 export interface PatchProviderPresetPayload {
-	displayName?: ProviderDisplayName;
+	displayName?: string;
 	sdkType?: ProviderSDKType;
 	isEnabled?: boolean;
 	origin?: string;
@@ -165,7 +162,7 @@ export interface PatchProviderPresetPayload {
 export interface ProviderPreset {
 	schemaVersion: string;
 	name: ProviderName;
-	displayName: ProviderDisplayName;
+	displayName: string;
 	sdkType: ProviderSDKType;
 	isEnabled: boolean;
 	createdAt: ISODateString;
@@ -186,8 +183,8 @@ export interface UIChatOption extends ModelParam {
 	providerName: ProviderName;
 	providerSDKType: ProviderSDKType;
 	modelPresetID: ModelPresetID;
-	providerDisplayName: ProviderDisplayName;
-	modelDisplayName: ModelDisplayName;
+	providerDisplayName: string;
+	modelDisplayName: string;
 	/**
 	 * How many earlier conversation messages to include in addition to the
 	 * current submitted user message.

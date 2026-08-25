@@ -442,7 +442,7 @@ func appProviderPresetFromInference(
 	return spec.ProviderPreset{
 		SchemaVersion:            spec.SchemaVersion,
 		Name:                     in.Name,
-		DisplayName:              spec.ProviderDisplayName(in.DisplayName),
+		DisplayName:              in.DisplayName,
 		SDKType:                  in.SDKType,
 		IsEnabled:                true,
 		CreatedAt:                ts,
@@ -490,7 +490,7 @@ func appModelPresetFromInference(
 		SchemaVersion:               spec.SchemaVersion,
 		ID:                          modelID,
 		Name:                        spec.ModelName(modelParam.Name),
-		DisplayName:                 spec.ModelDisplayName(in.DisplayName),
+		DisplayName:                 in.DisplayName,
 		Slug:                        spec.ModelSlug(modelID),
 		IsEnabled:                   builtInModelPresetEnabled(provider, modelID),
 		CreatedAt:                   ts,

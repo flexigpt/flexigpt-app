@@ -72,7 +72,7 @@ func postUserProvider(t *testing.T, st *ModelPresetStore, name inferenceSpec.Pro
 	t.Helper()
 
 	body := &spec.PostProviderPresetRequestBody{
-		DisplayName:              spec.ProviderDisplayName(strings.ToUpper(string(name))),
+		DisplayName:              strings.ToUpper(string(name)),
 		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                enabled,
 		Origin:                   "https://api." + string(name) + ".example.test",
@@ -107,7 +107,7 @@ func postUserModelPreset(
 		Body: &spec.PostModelPresetRequestBody{
 			Name:        spec.ModelName(modelID),
 			Slug:        spec.ModelSlug(modelID),
-			DisplayName: spec.ModelDisplayName(strings.ToUpper(string(modelID))),
+			DisplayName: strings.ToUpper(string(modelID)),
 			IsEnabled:   enabled,
 			ModelPresetPatch: spec.ModelPresetPatch{
 				Temperature: &temp, // required (or reasoning)
@@ -246,8 +246,6 @@ func wantErrContains(t *testing.T, err error, substr string) {
 		t.Fatalf("expected error containing %q, got %v", substr, err)
 	}
 }
-
-func providerDisplayNamePtr(v spec.ProviderDisplayName) *spec.ProviderDisplayName { return new(v) }
 
 func mpidPtr(v spec.ModelPresetID) *spec.ModelPresetID { return new(v) }
 

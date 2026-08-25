@@ -217,7 +217,7 @@ func TestBuiltInPresetsInitializedFromInferenceCatalog(t *testing.T) {
 			t.Errorf("provider %s name got %q want %q",
 				providerName, appProvider.Name, inferenceProvider.Name)
 		}
-		if string(appProvider.DisplayName) != inferenceProvider.DisplayName {
+		if appProvider.DisplayName != inferenceProvider.DisplayName {
 			t.Errorf("provider %s displayName got %q want %q",
 				providerName, appProvider.DisplayName, inferenceProvider.DisplayName)
 		}
@@ -276,7 +276,7 @@ func TestBuiltInPresetsInitializedFromInferenceCatalog(t *testing.T) {
 				t.Errorf("model %s/%s name got %q want %q",
 					providerName, inferenceModelID, appModel.Name, inferenceModel.ModelParam.Name)
 			}
-			if string(appModel.DisplayName) != inferenceModel.DisplayName {
+			if appModel.DisplayName != inferenceModel.DisplayName {
 				t.Errorf("model %s/%s displayName got %q want %q",
 					providerName, inferenceModelID, appModel.DisplayName, inferenceModel.DisplayName)
 			}

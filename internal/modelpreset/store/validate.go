@@ -36,7 +36,7 @@ func validateProviderPreset(pp *spec.ProviderPreset) error {
 	if err := validateProviderName(pp.Name); err != nil {
 		return fmt.Errorf("provider %q: %w", pp.Name, err)
 	}
-	if strings.TrimSpace(string(pp.DisplayName)) == "" {
+	if strings.TrimSpace(pp.DisplayName) == "" {
 		return fmt.Errorf("provider %q: displayName is empty", pp.Name)
 	}
 	if pp.CreatedAt.IsZero() || pp.ModifiedAt.IsZero() {
@@ -92,7 +92,7 @@ func validateModelPreset(mp *spec.ModelPreset) error {
 	if err := validateModelSlug(mp.Slug); err != nil {
 		return err
 	}
-	if strings.TrimSpace(string(mp.DisplayName)) == "" {
+	if strings.TrimSpace(mp.DisplayName) == "" {
 		return errors.New("displayName is empty")
 	}
 	if mp.CreatedAt.IsZero() || mp.ModifiedAt.IsZero() {

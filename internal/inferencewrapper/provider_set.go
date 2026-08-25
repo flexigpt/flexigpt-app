@@ -684,7 +684,7 @@ func (ps *ProviderSetAPI) newPresetCapabilityResolver(
 func inferenceProviderPresetFromApp(pp modelpresetSpec.ProviderPreset) modelpreset.ProviderPreset {
 	return modelpreset.ProviderPreset{
 		Name:                     pp.Name,
-		DisplayName:              string(pp.DisplayName),
+		DisplayName:              pp.DisplayName,
 		SDKType:                  pp.SDKType,
 		Origin:                   pp.Origin,
 		ChatCompletionPathPrefix: pp.ChatCompletionPathPrefix,
@@ -705,7 +705,7 @@ func inferenceModelPresetFromApp(
 	return modelpreset.ModelPreset{
 		ID:          modelpreset.ModelPresetID(mp.ID),
 		Name:        modelName,
-		DisplayName: string(mp.DisplayName),
+		DisplayName: mp.DisplayName,
 		ModelParam: inferenceSpec.ModelParam{
 			Name: modelName,
 		},

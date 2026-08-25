@@ -53,12 +53,9 @@ var (
 )
 
 type (
-	ModelName        string
-	ModelDisplayName string
-	ModelSlug        string
-	ModelPresetID    string
-
-	ProviderDisplayName string
+	ModelName     string
+	ModelSlug     string
+	ModelPresetID string
 )
 
 // ModelPresetRef identifies a model preset inside a provider namespace.
@@ -106,12 +103,12 @@ type ModelPresetPatch struct {
 type ModelPreset struct {
 	ModelPresetPatch
 
-	SchemaVersion string           `json:"schemaVersion" required:"true"`
-	ID            ModelPresetID    `json:"id"            required:"true"`
-	Name          ModelName        `json:"name"          required:"true"`
-	DisplayName   ModelDisplayName `json:"displayName"   required:"true"`
-	Slug          ModelSlug        `json:"slug"          required:"true"`
-	IsEnabled     bool             `json:"isEnabled"     required:"true"`
+	SchemaVersion string        `json:"schemaVersion" required:"true"`
+	ID            ModelPresetID `json:"id"            required:"true"`
+	Name          ModelName     `json:"name"          required:"true"`
+	DisplayName   string        `json:"displayName"   required:"true"`
+	Slug          ModelSlug     `json:"slug"          required:"true"`
+	IsEnabled     bool          `json:"isEnabled"     required:"true"`
 
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`
@@ -121,7 +118,7 @@ type ModelPreset struct {
 type ProviderPreset struct {
 	SchemaVersion string                        `json:"schemaVersion" required:"true"`
 	Name          inferenceSpec.ProviderName    `json:"name"          required:"true"`
-	DisplayName   ProviderDisplayName           `json:"displayName"   required:"true"`
+	DisplayName   string                        `json:"displayName"   required:"true"`
 	SDKType       inferenceSpec.ProviderSDKType `json:"sdkType"       required:"true"`
 	IsEnabled     bool                          `json:"isEnabled"     required:"true"`
 
