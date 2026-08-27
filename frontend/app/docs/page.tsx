@@ -331,8 +331,8 @@ export default function DocsPage() {
 	return (
 		<PageFrame contentScrollable={false}>
 			<div ref={pageScrollRef} className="h-full min-h-0 overflow-y-auto lg:overflow-hidden">
-				<div className="mx-auto flex min-h-full w-full flex-col gap-6 px-2 py-6 lg:h-full lg:min-h-0 lg:flex-row">
-					<aside className="lg:h-full lg:min-h-0 lg:w-72 lg:shrink-0">
+				<div className="mx-auto flex min-h-full w-full flex-col gap-6 p-4 lg:h-full lg:min-h-0 lg:flex-row">
+					<aside className="m-1 lg:h-full lg:min-h-0 lg:w-72 lg:shrink-0">
 						<div className="bg-base-100 rounded-2xl shadow-lg lg:h-full lg:overflow-y-auto lg:overscroll-contain">
 							<div className="p-4">
 								<div className="flex items-center gap-2 text-lg font-semibold">
@@ -401,9 +401,9 @@ export default function DocsPage() {
 
 					<main
 						ref={mainScrollRef}
-						className="min-w-0 flex-1 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-2"
+						className="min-w-0 flex-1 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain"
 					>
-						<div className="space-y-6">
+						<div className="mx-auto w-full space-y-6 p-1 lg:w-11/12 xl:w-3/4 2xl:max-w-5xl">
 							<section className="bg-base-100 rounded-2xl p-8 shadow-lg">
 								<div className="flex items-start gap-3">
 									<div className="bg-base-200 rounded-2xl p-3">
