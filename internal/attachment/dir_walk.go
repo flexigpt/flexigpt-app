@@ -22,8 +22,8 @@ import (
 //     as an overflow entry with Partial = true and a count of remaining items
 //     (files + subdirs) in that directory.
 func WalkDirectoryWithFiles(ctx context.Context, dirPath string, maxFiles int) (*WalkDirectoryWithFilesResult, error) {
-	if maxFiles <= 0 || maxFiles > maxTotalDirWalkFiles {
-		maxFiles = maxTotalDirWalkFiles
+	if maxFiles < 1 {
+		maxFiles = 1024
 	}
 	if dirPath == "" {
 		// Empty path. Nothing to walk.

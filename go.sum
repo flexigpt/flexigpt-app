@@ -67,8 +67,8 @@ github.com/flexigpt/agentskills-go v0.20.2 h1:iNE9qWFF14kQ52SKB8GYpE3lwMSX3EsybW
 github.com/flexigpt/agentskills-go v0.20.2/go.mod h1:KJNbSiFlWyN8F23ezn2wHosdEs2EJlVGAJdjyfj3MoQ=
 github.com/flexigpt/inference-go v0.24.1 h1:VlOYP0rCd0t72qvI+KQ8OQoGWE/ytcs5vE0URRwyW+Y=
 github.com/flexigpt/inference-go v0.24.1/go.mod h1:u0dV1PK4gSqfCig1uBQvniikrToMMmRRZ/miwQmBwgE=
-github.com/flexigpt/llmtools-go v0.23.2 h1:BWIGjgCnVKf2Q2v7YqSl0gTTB+hssr5S/dg5lbRut5c=
-github.com/flexigpt/llmtools-go v0.23.2/go.mod h1:ly3/bG+IBQk1DPNQ+hlSOdV2rVIaHyWfejsUINGvRNI=
+github.com/flexigpt/llmtools-go v0.24.0 h1:6Wno0JKk+o6aweva0R1Ao89bJ/8NxQjtf3XMkLntjZE=
+github.com/flexigpt/llmtools-go v0.24.0/go.mod h1:ly3/bG+IBQk1DPNQ+hlSOdV2rVIaHyWfejsUINGvRNI=
 github.com/flexigpt/mapstore-go v0.4.2 h1:0wO8im5y7hNqdamqKZCKvuaay9ck1mvrXP2Kjl7Nwzg=
 github.com/flexigpt/mapstore-go v0.4.2/go.mod h1:GE73Ax/m0d16BZYlQ5YzJAH6mVjX8CZE8KKZpRlgtwE=
 github.com/forPelevin/gomoji v1.2.0 h1:9k4WVSSkE1ARO/BWywxgEUBvR/jMnao6EZzrql5nxJ8=

@@ -19,7 +19,7 @@ var (
 
 type Digest string
 
-// DigestBytes returns the canonical SHA-256 digest representation used by the
+// DigestBytes returns the canonical sha256 digest representation used by the
 // artifact store for arbitrary immutable content.
 func DigestBytes(content []byte) Digest {
 	sum := sha256.Sum256(content)

@@ -4,11 +4,11 @@ import { AttachmentContentBlockMode, AttachmentErrorReason, AttachmentKind } fro
 const MAX_SINGLE_ATTACHMENT_BYTES = 16 * 1024 * 1024; // 16 MiB
 
 // At most this many files from a directory are actively sent with a message.
-export const MAX_FILES_PER_DIRECTORY = 128;
+export const MAX_FILES_PER_DIRECTORY = 1028;
 
 // Ask the backend for a larger candidate set so the user can filter it before
 // deciding which files should occupy the active attachment limit.
-export const MAX_DIRECTORY_FILES_TO_SCAN = 512;
+export const MAX_DIRECTORY_FILES_TO_SCAN = 4096;
 
 // Directory grouping is UI-only.
 export interface DirectoryAttachmentGroup {

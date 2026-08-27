@@ -82,9 +82,9 @@ func (a *App) getPathsAsAttachments(paths []string, inMaxFilesPerDir int) (*atta
 	if len(paths) == 0 {
 		return nil, errors.New("empty paths received")
 	}
-	maxFilesPerDir := 256
-	if inMaxFilesPerDir > 0 && inMaxFilesPerDir <= 256 {
-		maxFilesPerDir = inMaxFilesPerDir
+	maxFilesPerDir := inMaxFilesPerDir
+	if maxFilesPerDir < 1 {
+		maxFilesPerDir = 1024
 	}
 
 	// Dedupe incoming paths.

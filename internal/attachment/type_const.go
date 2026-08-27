@@ -12,10 +12,6 @@ var (
 	ErrAttachmentModifiedSinceSnapshot = errors.New("attachment modified since snapshot")
 )
 
-const (
-	maxTotalDirWalkFiles = 256
-)
-
 // AttachmentKind enumerates contextual attachment categories that can be
 // associated with messages sent to the inference layer.
 type AttachmentKind string

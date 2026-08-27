@@ -14,6 +14,8 @@ import (
 	"testing"
 )
 
+const maxTestTotalDirWalkFiles = 1024
+
 func TestWalkDirectoryWithFiles_CoreScenarios(t *testing.T) {
 	type testCase struct {
 		name     string
@@ -482,8 +484,8 @@ func TestWalkDirectoryWithFiles_ContextCanceled(t *testing.T) {
 func TestWalkDirectoryWithFiles_MaxFilesClamped(t *testing.T) {
 	root := t.TempDir()
 
-	// Create more files than the global maxTotalDirWalkFiles limit.
-	totalFiles := maxTotalDirWalkFiles + 5
+	// Create more files than the global maxTestTotalDirWalkFiles limit.
+	totalFiles := maxTestTotalDirWalkFiles + 5
 	for i := range totalFiles {
 		name := fmt.Sprintf("f%03d.txt", i)
 		mustWriteFile(t, root, name, 1)
@@ -497,7 +499,6 @@ func TestWalkDirectoryWithFiles_MaxFilesClamped(t *testing.T) {
 	tests := []testCase{
 		{name: "Zero", maxFiles: 0},
 		{name: "Negative", maxFiles: -5},
-		{name: "AboveGlobal", maxFiles: maxTotalDirWalkFiles + 100},
 	}
 
 	for _, tc := range tests {
@@ -509,11 +510,11 @@ func TestWalkDirectoryWithFiles_MaxFilesClamped(t *testing.T) {
 			if res == nil {
 				t.Fatalf("expected non-nil result")
 			}
-			if res.MaxFiles != maxTotalDirWalkFiles {
-				t.Errorf("expected MaxFiles=%d, got %d", maxTotalDirWalkFiles, res.MaxFiles)
+			if res.MaxFiles != maxTestTotalDirWalkFiles {
+				t.Errorf("expected MaxFiles=%d, got %d", maxTestTotalDirWalkFiles, res.MaxFiles)
 			}
-			if len(res.Files) != maxTotalDirWalkFiles {
-				t.Fatalf("expected %d files kept, got %d", maxTotalDirWalkFiles, len(res.Files))
+			if len(res.Files) != maxTestTotalDirWalkFiles {
+				t.Fatalf("expected %d files kept, got %d", maxTestTotalDirWalkFiles, len(res.Files))
 			}
 			if len(res.OverflowDirs) != 1 {
 				t.Fatalf(
@@ -533,7 +534,7 @@ func TestWalkDirectoryWithFiles_MaxFilesClamped(t *testing.T) {
 				t.Errorf("expected overflow RelativePath=\"\" for root, got %q", ov.RelativePath)
 			}
 			// Remaining files in root that were not included.
-			expectedRemaining := totalFiles - maxTotalDirWalkFiles
+			expectedRemaining := totalFiles - maxTestTotalDirWalkFiles
 			if ov.FileCount != expectedRemaining {
 				t.Errorf("expected overflow FileCount=%d, got %d", expectedRemaining, ov.FileCount)
 			}
