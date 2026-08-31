@@ -56,8 +56,8 @@ tasks:
 
   upgrade-check:
     cmds:
-      - pnpm outdated -r
       - task: go:upgrade-check
+      - pnpm outdated -r || true
 
   upgrade-pnpm:
     cmds:
