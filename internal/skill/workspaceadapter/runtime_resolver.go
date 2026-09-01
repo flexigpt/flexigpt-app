@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/flexigpt/agentskills-go/fsskillprovider"
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/provider"
+	"github.com/flexigpt/agentskills-go/provider/fs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -112,8 +112,8 @@ func workspaceResolvedArtifactSkill(
 	output := skillruntime.ResolvedArtifactSkill{
 		Artifact:   value.Artifact,
 		Collection: value.Workspace,
-		Definition: agentskillsSpec.SkillDef{
-			Type:     fsskillprovider.Type,
+		Definition: provider.SkillDef{
+			Type:     fs.Type,
 			Name:     value.Skill.Name,
 			Location: value.RuntimeLocation,
 		},

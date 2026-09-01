@@ -9,7 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
+
+	"github.com/flexigpt/agentskills-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -23,8 +25,8 @@ const (
 )
 
 type runtimeDesiredView struct {
-	definitions map[agentskillsSpec.SkillDef]string
-	artifacts   map[agentskillsSpec.SkillDef]string
+	definitions map[provider.SkillDef]string
+	artifacts   map[provider.SkillDef]string
 }
 
 func (s *SkillRuntime) ResyncCollection(
@@ -283,14 +285,14 @@ func (s *SkillRuntime) reconcileCollectionsLocked(
 
 func (s *SkillRuntime) runtimeApplyDesired(
 	ctx context.Context,
-	current map[agentskillsSpec.SkillDef]string,
+	current map[provider.SkillDef]string,
 	desired runtimeDesiredView,
 	mode runtimeApplyMode,
-) (map[agentskillsSpec.SkillDef]string, error) {
-	present := make(map[agentskillsSpec.SkillDef]string, len(current))
+) (map[provider.SkillDef]string, error) {
+	present := make(map[provider.SkillDef]string, len(current))
 	maps.Copy(present, current)
 
-	removals := make([]agentskillsSpec.SkillDef, 0)
+	removals := make([]provider.SkillDef, 0)
 	for definition := range present {
 		if _, wanted := desired.definitions[definition]; !wanted {
 			removals = append(removals, definition)
@@ -299,7 +301,7 @@ func (s *SkillRuntime) runtimeApplyDesired(
 	sortSkillDefs(removals)
 	for _, definition := range removals {
 		if _, err := s.runtime.RemoveSkill(ctx, definition); err != nil {
-			if errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
+			if errors.Is(err, agentskillsRuntimeSpec.ErrSkillNotFound) {
 				delete(present, definition)
 				continue
 			}
@@ -312,7 +314,7 @@ func (s *SkillRuntime) runtimeApplyDesired(
 		delete(present, definition)
 	}
 
-	reindexes := make([]agentskillsSpec.SkillDef, 0)
+	reindexes := make([]provider.SkillDef, 0)
 	for definition, version := range desired.definitions {
 		if currentVersion, found := present[definition]; found &&
 			currentVersion != version {
@@ -322,7 +324,7 @@ func (s *SkillRuntime) runtimeApplyDesired(
 	sortSkillDefs(reindexes)
 	for _, definition := range reindexes {
 		if _, err := s.runtime.RemoveSkill(ctx, definition); err != nil &&
-			!errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
+			!errors.Is(err, agentskillsRuntimeSpec.ErrSkillNotFound) {
 			if mode == runtimeApplyStrict {
 				return present, err
 			}
@@ -332,7 +334,7 @@ func (s *SkillRuntime) runtimeApplyDesired(
 		delete(present, definition)
 	}
 
-	additions := make([]agentskillsSpec.SkillDef, 0)
+	additions := make([]provider.SkillDef, 0)
 	for definition := range desired.definitions {
 		if _, found := present[definition]; !found {
 			additions = append(additions, definition)
@@ -342,7 +344,7 @@ func (s *SkillRuntime) runtimeApplyDesired(
 
 	for _, definition := range additions {
 		if _, err := s.runtime.AddSkill(ctx, definition); err != nil {
-			if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
+			if errors.Is(err, agentskillsRuntimeSpec.ErrSkillAlreadyExists) {
 				err = fmt.Errorf(
 					"runtime Skill name collision remained after fail-closed reconciliation: %q",
 					definition.Name,
@@ -448,16 +450,16 @@ func desiredCollectionView(
 
 func (v *runtimeDesiredView) add(value ResolvedArtifactSkill) {
 	if v.definitions == nil {
-		v.definitions = map[agentskillsSpec.SkillDef]string{}
+		v.definitions = map[provider.SkillDef]string{}
 	}
 	if v.artifacts == nil {
-		v.artifacts = map[agentskillsSpec.SkillDef]string{}
+		v.artifacts = map[provider.SkillDef]string{}
 	}
 	v.definitions[value.Definition] = value.Version
 	v.artifacts[value.Definition] = artifactRefKey(value.Artifact)
 }
 
-func sortSkillDefs(values []agentskillsSpec.SkillDef) {
+func sortSkillDefs(values []provider.SkillDef) {
 	sort.Slice(values, func(left, right int) bool {
 		if values[left].Type != values[right].Type {
 			return values[left].Type < values[right].Type
@@ -491,8 +493,8 @@ func cloneRuntimeDesiredView(input runtimeDesiredView) runtimeDesiredView {
 
 func newRuntimeDesiredView() runtimeDesiredView {
 	return runtimeDesiredView{
-		definitions: map[agentskillsSpec.SkillDef]string{},
-		artifacts:   map[agentskillsSpec.SkillDef]string{},
+		definitions: map[provider.SkillDef]string{},
+		artifacts:   map[provider.SkillDef]string{},
 	}
 }
 

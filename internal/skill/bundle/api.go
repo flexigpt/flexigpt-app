@@ -11,8 +11,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/flexigpt/agentskills-go"
-
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -423,11 +422,11 @@ func (a *API) GetManagedSkillDocument(
 	if err != nil {
 		return ManagedSkillDocument{}, err
 	}
-	document, err := skillArtifact.DocumentFromDefinition(definitionValue)
+	doc, err := skillArtifact.DocumentFromDefinition(definitionValue)
 	if err != nil {
 		return ManagedSkillDocument{}, err
 	}
-	return ManagedSkillDocument{Artifact: value.Clone(), Document: document}, nil
+	return ManagedSkillDocument{Artifact: value.Clone(), Document: doc}, nil
 }
 
 func (a *API) AdoptSkill(
@@ -1380,17 +1379,17 @@ func (a *API) createManagedSkill(
 				basespec.ErrInvalid,
 			)
 		}
-		document := *request.Document
-		if document.Name == "" {
-			document.Name = request.SkillName
+		doc := *request.Document
+		if doc.Name == "" {
+			doc.Name = request.SkillName
 		}
-		if document.Name != request.SkillName {
+		if doc.Name != request.SkillName {
 			return CreateManagedSkillResponse{}, fmt.Errorf(
 				"%w: structured Skill name does not match requested skill name",
 				basespec.ErrInvalid,
 			)
 		}
-		encoded, err := agentskills.MarshalSkillDocument(document)
+		encoded, err := document.MarshalSkillDocument(doc)
 		if err != nil {
 			return CreateManagedSkillResponse{}, err
 		}

@@ -3,8 +3,7 @@ package artifact
 import (
 	"fmt"
 
-	"github.com/flexigpt/agentskills-go"
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
@@ -23,91 +22,91 @@ func ValidateDefinition(value definition.Definition) error {
 // delegates to agentskills-go.ParseSkillDocument.
 func DocumentFromDefinition(
 	value definition.Definition,
-) (agentskillsSpec.SkillDocument, error) {
+) (document.SkillDocument, error) {
 	if value.Kind != artifactbuiltin.AgentSkillArtifactKind {
-		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
+		return document.SkillDocument{}, fmt.Errorf(
 			"%w: Skill definition kind must be %q",
 			basespec.ErrInvalid,
 			artifactbuiltin.AgentSkillArtifactKind,
 		)
 	}
 	if value.SchemaID != artifactbuiltin.AgentSkillSchemaID {
-		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
+		return document.SkillDocument{}, fmt.Errorf(
 			"%w: Skill definition schema must be %q",
 			basespec.ErrInvalid,
 			artifactbuiltin.AgentSkillSchemaID,
 		)
 	}
 	if value.SchemaVersion != artifactbuiltin.AgentSkillSchemaVersion {
-		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
+		return document.SkillDocument{}, fmt.Errorf(
 			"%w: Skill definition schema version must be %q",
 			basespec.ErrInvalid,
 			artifactbuiltin.AgentSkillSchemaVersion,
 		)
 	}
 	if len(value.Dependencies) != 0 {
-		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
+		return document.SkillDocument{}, fmt.Errorf(
 			"%w: Agent Skills cannot declare generic portable dependencies",
 			basespec.ErrInvalid,
 		)
 	}
 	body, err := definition.DecodeBody[Body](value.Body)
 	if err != nil {
-		return agentskillsSpec.SkillDocument{}, err
+		return document.SkillDocument{}, err
 	}
-	document := toDocument(body)
-	if err := agentskills.ValidateSkillDocument(document); err != nil {
-		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
+	doc := toDocument(body)
+	if err := document.ValidateSkillDocument(doc); err != nil {
+		return document.SkillDocument{}, fmt.Errorf(
 			"%w: invalid Agent Skill document: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
 	if string(value.LogicalName) != body.Name {
-		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
+		return document.SkillDocument{}, fmt.Errorf(
 			"%w: Skill logical name does not match body.name",
 			basespec.ErrInvalid,
 		)
 	}
 	if value.DisplayName != body.DisplayName {
-		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
+		return document.SkillDocument{}, fmt.Errorf(
 			"%w: Skill display name does not match body.displayName",
 			basespec.ErrInvalid,
 		)
 	}
 	if value.Description != body.Description {
-		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
+		return document.SkillDocument{}, fmt.Errorf(
 			"%w: Skill description does not match body.description",
 			basespec.ErrInvalid,
 		)
 	}
 	if value.Labels[artifactbuiltin.AgentSkillInsertLabelKey] != body.Insert {
-		return agentskillsSpec.SkillDocument{}, fmt.Errorf(
+		return document.SkillDocument{}, fmt.Errorf(
 			"%w: Skill insert label does not match body.insert",
 			basespec.ErrInvalid,
 		)
 	}
-	return document, nil
+	return doc, nil
 }
 
-func toDocument(value Body) agentskillsSpec.SkillDocument {
+func toDocument(value Body) document.SkillDocument {
 	arguments := make(
-		[]agentskillsSpec.SkillArgument,
+		[]document.SkillArgument,
 		0,
 		len(value.Arguments),
 	)
 	for _, argument := range value.Arguments {
-		arguments = append(arguments, agentskillsSpec.SkillArgument{
+		arguments = append(arguments, document.SkillArgument{
 			Name:        argument.Name,
 			Description: argument.Description,
 			Default:     argument.Default,
 		})
 	}
-	return agentskillsSpec.SkillDocument{
+	return document.SkillDocument{
 		Name:           value.Name,
 		DisplayName:    value.DisplayName,
 		Description:    value.Description,
-		Insert:         agentskillsSpec.SkillInsert(value.Insert),
+		Insert:         document.SkillInsert(value.Insert),
 		Arguments:      arguments,
 		Tags:           append([]string(nil), value.Tags...),
 		MarkdownBody:   value.MarkdownBody,

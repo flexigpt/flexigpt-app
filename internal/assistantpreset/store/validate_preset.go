@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
@@ -203,14 +203,14 @@ func validateAssistantPresetReferences(
 
 		insert := summary.Insert
 		if insert == "" {
-			insert = agentskillsSpec.SkillInsertInstructions
+			insert = document.SkillInsertInstructions
 		}
 
-		if insert != agentskillsSpec.SkillInsertInstructions {
+		if insert != document.SkillInsertInstructions {
 			return fmt.Errorf(
 				"startingSkillSelections[%d]: assistant preset skill selections must have insert=%q",
 				i,
-				agentskillsSpec.SkillInsertInstructions,
+				document.SkillInsertInstructions,
 			)
 		}
 

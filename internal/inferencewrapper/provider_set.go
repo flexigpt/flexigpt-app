@@ -9,13 +9,13 @@ import (
 	"slices"
 	"strings"
 
+	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
+
 	"github.com/flexigpt/inference-go"
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	"github.com/flexigpt/inference-go/debugclient"
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
-
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
@@ -412,14 +412,14 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		activeResp, aerr := ps.skillRuntime.ListRuntimeSkills(ctx, &skillruntime.ListRuntimeSkillsRequest{
 			Body: &skillruntime.ListRuntimeSkillsRequestBody{
 				Filter: &skillruntime.RuntimeSkillFilter{
-					SessionID:      agentskillsSpec.SessionID(skillSessionID),
-					Activity:       agentskillsSpec.SkillActivityAny,
+					SessionID:      agentskillsRuntimeSpec.SessionID(skillSessionID),
+					Activity:       agentskillsRuntimeSpec.SkillActivityAny,
 					AllowArtifacts: enabledSkillRefs,
 				},
 			},
 		})
 		if aerr != nil {
-			if errors.Is(aerr, agentskillsSpec.ErrSessionNotFound) {
+			if errors.Is(aerr, agentskillsRuntimeSpec.ErrSessionNotFound) {
 				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
 			}
 			ps.logger.Warn("listRuntimeSkills failed; Workspace Skill session availability is unknown", "err", aerr)
@@ -432,15 +432,15 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		activeResp, aerr = ps.skillRuntime.ListRuntimeSkills(ctx, &skillruntime.ListRuntimeSkillsRequest{
 			Body: &skillruntime.ListRuntimeSkillsRequestBody{
 				Filter: &skillruntime.RuntimeSkillFilter{
-					SessionID:      agentskillsSpec.SessionID(skillSessionID),
-					Activity:       agentskillsSpec.SkillActivityActive,
+					SessionID:      agentskillsRuntimeSpec.SessionID(skillSessionID),
+					Activity:       agentskillsRuntimeSpec.SkillActivityActive,
 					AllowArtifacts: enabledSkillRefs,
 				},
 			},
 		})
 		activeCount := 0
 		if aerr != nil {
-			if errors.Is(aerr, agentskillsSpec.ErrSessionNotFound) {
+			if errors.Is(aerr, agentskillsRuntimeSpec.ErrSessionNotFound) {
 				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
 			}
 			ps.logger.Warn("listRuntimeSkills failed; disabling skills for this turn", "err", aerr)
@@ -454,22 +454,22 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		// Pick prompt activity:
 		// - if none active => show available-only (inactive)
 		// - else => show active + available (any).
-		promptActivity := agentskillsSpec.SkillActivityInactive
+		promptActivity := agentskillsRuntimeSpec.SkillActivityInactive
 		if activeCount > 0 {
-			promptActivity = agentskillsSpec.SkillActivityAny
+			promptActivity = agentskillsRuntimeSpec.SkillActivityAny
 		}
 
 		promptResp, perr := ps.skillRuntime.GetSkillsPrompt(ctx, &skillruntime.GetSkillsPromptRequest{
 			Body: &skillruntime.GetSkillsPromptRequestBody{
 				Filter: &skillruntime.RuntimeSkillFilter{
-					SessionID:      agentskillsSpec.SessionID(skillSessionID),
+					SessionID:      agentskillsRuntimeSpec.SessionID(skillSessionID),
 					Activity:       promptActivity,
 					AllowArtifacts: enabledSkillRefs,
 				},
 			},
 		})
 		if perr != nil {
-			if errors.Is(perr, agentskillsSpec.ErrSessionNotFound) {
+			if errors.Is(perr, agentskillsRuntimeSpec.ErrSessionNotFound) {
 				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
 			}
 			ps.logger.Warn("getSkillsPrompt failed; disabling skills for this turn", "err", perr)

@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/agentskills-go/fsskillprovider"
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/provider"
+	"github.com/flexigpt/agentskills-go/provider/fs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/skill/skillruntime"
@@ -62,8 +62,8 @@ func resolvedArtifactSkillOf(
 	output := skillruntime.ResolvedArtifactSkill{
 		Artifact:   value.Artifact,
 		Collection: value.Collection,
-		Definition: agentskillsSpec.SkillDef{
-			Type:     fsskillprovider.Type,
+		Definition: provider.SkillDef{
+			Type:     fs.Type,
 			Name:     value.Name,
 			Location: value.Location,
 		},

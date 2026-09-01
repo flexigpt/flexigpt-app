@@ -1,7 +1,7 @@
 package bundle
 
 import (
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -56,7 +56,7 @@ type CreateManagedSkillRequest struct {
 
 	// Document is an optional structured authoring input. Serialization is
 	// delegated to agentskills-go. It is mutually exclusive with SKILLMD.
-	Document *agentskillsSpec.SkillDocument
+	Document *document.SkillDocument
 	Files    []source.ManagedPackageFile
 	Enabled  bool
 }
@@ -103,7 +103,7 @@ type BuiltInBundleTopology struct {
 // exposes Source configuration, a native filesystem path, or package internals.
 type ManagedSkillDocument struct {
 	Artifact artifact.Artifact
-	Document agentskillsSpec.SkillDocument
+	Document document.SkillDocument
 }
 
 type Bundle struct {

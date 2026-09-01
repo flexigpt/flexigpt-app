@@ -1,7 +1,7 @@
 package inferencewrapper
 
 import (
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -25,21 +25,25 @@ func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.T
 	}
 
 	var out []inferenceSpec.ToolChoice
-	tc, err := mk("builtin.skills-load", "skills-load", agentskillsSpec.SkillsLoadTool())
+	tc, err := mk("builtin.skills-load", "skills-load", agentskillsRuntimeSpec.SkillsLoadTool())
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, tc)
 
 	if includeAll {
-		if tc, err = mk("builtin.skills-unload", "skills-unload", agentskillsSpec.SkillsUnloadTool()); err != nil {
+		if tc, err = mk(
+			"builtin.skills-unload",
+			"skills-unload",
+			agentskillsRuntimeSpec.SkillsUnloadTool(),
+		); err != nil {
 			return nil, err
 		}
 		out = append(out, tc)
 		if tc, err = mk(
 			"builtin.skills-readresource",
 			"skills-readresource",
-			agentskillsSpec.SkillsReadResourceTool(),
+			agentskillsRuntimeSpec.SkillsReadResourceTool(),
 		); err != nil {
 			return nil, err
 		}
@@ -48,7 +52,7 @@ func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.T
 			if tc, err = mk(
 				"builtin.skills-runscript",
 				"skills-runscript",
-				agentskillsSpec.SkillsRunScriptTool(),
+				agentskillsRuntimeSpec.SkillsRunScriptTool(),
 			); err != nil {
 				return nil, err
 			}
@@ -60,12 +64,12 @@ func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.T
 
 func skillsRulesPrompt(includeAll, includeRunScript bool) string {
 	if !includeAll {
-		return agentskillsSpec.SkillsRulesPromptLoadOnly
+		return agentskillsRuntimeSpec.SkillsRulesPromptLoadOnly
 	}
 
 	if !includeRunScript {
-		return agentskillsSpec.SkillsRulesPromptWithoutRunScript
+		return agentskillsRuntimeSpec.SkillsRulesPromptWithoutRunScript
 	}
 
-	return agentskillsSpec.SkillsRulesPromptAll
+	return agentskillsRuntimeSpec.SkillsRulesPromptAll
 }

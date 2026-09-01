@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -14,7 +14,7 @@ import (
 type ResolvedArtifactSkill struct {
 	Artifact   artifact.ArtifactRef
 	Collection collection.CollectionRef
-	Definition agentskillsSpec.SkillDef
+	Definition provider.SkillDef
 	Version    string
 }
 

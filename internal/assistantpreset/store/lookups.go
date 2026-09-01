@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
 	assistantpresetSpec "github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
@@ -20,7 +20,7 @@ type ToolSummary struct {
 
 type SkillSummary struct {
 	IsEnabled bool
-	Insert    agentskillsSpec.SkillInsert
+	Insert    document.SkillInsert
 
 	// HasArguments is used to reject preloaded instruction skills that need runtime input.
 	HasArguments bool

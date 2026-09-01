@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
@@ -581,7 +581,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
 					return SkillSummary{
 						IsEnabled:    true,
-						Insert:       agentskillsSpec.SkillInsertUserMessage,
+						Insert:       document.SkillInsertUserMessage,
 						HasArguments: true,
 					}, nil
 				}),
@@ -626,7 +626,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
 					return SkillSummary{
 						IsEnabled:    true,
-						Insert:       agentskillsSpec.SkillInsertInstructions,
+						Insert:       document.SkillInsertInstructions,
 						HasArguments: true,
 					}, nil
 				}),
@@ -645,7 +645,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			}(),
 			lookups: ReferenceLookups{
 				Skills: artifactSkillLookup(func(context.Context, spec.ArtifactSkillSelection) (SkillSummary, error) {
-					return SkillSummary{IsEnabled: true, Insert: agentskillsSpec.SkillInsertInstructions}, nil
+					return SkillSummary{IsEnabled: true, Insert: document.SkillInsertInstructions}, nil
 				}),
 			},
 			wantErrContains: "preLoadAsActive and useAsInstructions cannot both be true",

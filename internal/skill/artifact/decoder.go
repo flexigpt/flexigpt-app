@@ -5,8 +5,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/flexigpt/agentskills-go"
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
@@ -76,9 +75,9 @@ func DecodeSkillDocument(
 	content []byte,
 	expectedName string,
 ) (definition.Definition, []diagnostic.Diagnostic, error) {
-	document, warnings, err := agentskills.ParseSkillDocument(
+	doc, warnings, err := document.ParseSkillDocument(
 		content,
-		agentskillsSpec.ParseSkillDocumentOptions{
+		document.ParseSkillDocumentOptions{
 			ExpectedName: expectedName,
 		},
 	)
@@ -86,7 +85,7 @@ func DecodeSkillDocument(
 		return definition.Definition{}, nil, err
 	}
 
-	value, err := definitionForDocument(document)
+	value, err := definitionForDocument(doc)
 	if err != nil {
 		return definition.Definition{}, nil, err
 	}
@@ -98,10 +97,10 @@ func DecodeSkillDocument(
 }
 
 func definitionForDocument(
-	document agentskillsSpec.SkillDocument,
+	doc document.SkillDocument,
 ) (definition.Definition, error) {
-	arguments := make([]Argument, 0, len(document.Arguments))
-	for _, argument := range document.Arguments {
+	arguments := make([]Argument, 0, len(doc.Arguments))
+	for _, argument := range doc.Arguments {
 		arguments = append(arguments, Argument{
 			Name:        argument.Name,
 			Description: argument.Description,
@@ -109,14 +108,14 @@ func definitionForDocument(
 		})
 	}
 	raw, err := definition.EncodeBody(Body{
-		Name:           document.Name,
-		DisplayName:    document.DisplayName,
-		Description:    document.Description,
-		Insert:         string(document.Insert),
+		Name:           doc.Name,
+		DisplayName:    doc.DisplayName,
+		Description:    doc.Description,
+		Insert:         string(doc.Insert),
 		Arguments:      arguments,
-		Tags:           append([]string(nil), document.Tags...),
-		MarkdownBody:   document.MarkdownBody,
-		RawFrontmatter: document.RawFrontmatter,
+		Tags:           append([]string(nil), doc.Tags...),
+		MarkdownBody:   doc.MarkdownBody,
+		RawFrontmatter: doc.RawFrontmatter,
 	})
 	if err != nil {
 		return definition.Definition{}, err
@@ -125,11 +124,11 @@ func definitionForDocument(
 		Kind:          artifactbuiltin.AgentSkillArtifactKind,
 		SchemaID:      artifactbuiltin.AgentSkillSchemaID,
 		SchemaVersion: artifactbuiltin.AgentSkillSchemaVersion,
-		LogicalName:   basespec.LogicalName(document.Name),
-		DisplayName:   document.DisplayName,
-		Description:   document.Description,
+		LogicalName:   basespec.LogicalName(doc.Name),
+		DisplayName:   doc.DisplayName,
+		Description:   doc.Description,
 		Labels: map[string]string{
-			artifactbuiltin.AgentSkillInsertLabelKey: string(document.Insert),
+			artifactbuiltin.AgentSkillInsertLabelKey: string(doc.Insert),
 		},
 		Body: raw,
 	}, nil

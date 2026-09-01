@@ -3,10 +3,14 @@ package skillruntime
 import (
 	"errors"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
+	"github.com/flexigpt/agentskills-go/provider"
+	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
+
+	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
 
 var (
@@ -17,13 +21,13 @@ var (
 const maxSkillToolArgsBytes = 1 << 20
 
 type RuntimeSkillFilter struct {
-	Types          []string                      `json:"types,omitempty"`
-	Inserts        []agentskillsSpec.SkillInsert `json:"inserts,omitempty"`
-	LocationPrefix string                        `json:"locationPrefix,omitempty"`
-	AllowArtifacts []artifact.ArtifactRef        `json:"allowArtifacts,omitempty"`
+	Types          []string               `json:"types,omitempty"`
+	Inserts        []document.SkillInsert `json:"inserts,omitempty"`
+	LocationPrefix string                 `json:"locationPrefix,omitempty"`
+	AllowArtifacts []artifact.ArtifactRef `json:"allowArtifacts,omitempty"`
 
-	SessionID agentskillsSpec.SessionID     `json:"sessionID,omitempty"`
-	Activity  agentskillsSpec.SkillActivity `json:"activity,omitempty"`
+	SessionID agentskillsRuntimeSpec.SessionID     `json:"sessionID,omitempty"`
+	Activity  agentskillsRuntimeSpec.SkillActivity `json:"activity,omitempty"`
 }
 
 type GetSkillsPromptRequestBody struct {
@@ -44,7 +48,7 @@ type GetSkillsPromptResponse struct {
 
 type CreateSkillSessionRequestBody struct {
 	// Optional: close this previous session (best-effort) before creating a new one.
-	CloseSessionID agentskillsSpec.SessionID `json:"closeSessionID,omitempty"`
+	CloseSessionID agentskillsRuntimeSpec.SessionID `json:"closeSessionID,omitempty"`
 
 	MaxActivePerSession int                    `json:"maxActivePerSession,omitempty"`
 	AllowArtifacts      []artifact.ArtifactRef `json:"allowArtifacts,omitempty"`
@@ -57,8 +61,8 @@ type CreateSkillSessionRequest struct {
 }
 
 type CreateSkillSessionResponseBody struct {
-	SessionID       agentskillsSpec.SessionID `json:"sessionID"`
-	ActiveArtifacts []artifact.ArtifactRef    `json:"activeArtifacts"`
+	SessionID       agentskillsRuntimeSpec.SessionID `json:"sessionID"`
+	ActiveArtifacts []artifact.ArtifactRef           `json:"activeArtifacts"`
 }
 
 type CreateSkillSessionResponse struct {
@@ -66,7 +70,7 @@ type CreateSkillSessionResponse struct {
 }
 
 type CloseSkillSessionRequest struct {
-	SessionID agentskillsSpec.SessionID `path:"sessionID" required:"true"`
+	SessionID agentskillsRuntimeSpec.SessionID `path:"sessionID" required:"true"`
 }
 type CloseSkillSessionResponse struct{}
 
@@ -82,7 +86,7 @@ type RenderSkillRequest struct {
 type RenderSkillResponseBody struct {
 	Text string `json:"text"`
 
-	Insert agentskillsSpec.SkillInsert `json:"insert"`
+	Insert document.SkillInsert `json:"insert"`
 
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
@@ -91,12 +95,12 @@ type RenderSkillResponseBody struct {
 	// SourceTags are tags parsed from SKILL.md frontmatter.
 	SourceTags []string `json:"sourceTags,omitempty"`
 
-	Resources agentskillsSpec.SkillResourceInfo `json:"resources"`
+	Resources provider.SkillResourceInfo `json:"resources"`
 
-	Arguments        []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
-	AppliedArguments map[string]string               `json:"appliedArguments,omitempty"`
-	RawFrontmatter   map[string]any                  `json:"rawFrontmatter,omitempty"`
-	Warnings         []string                        `json:"warnings,omitempty"`
+	Arguments        []document.SkillArgument `json:"arguments,omitempty"`
+	AppliedArguments map[string]string        `json:"appliedArguments,omitempty"`
+	RawFrontmatter   map[string]any           `json:"rawFrontmatter,omitempty"`
+	Warnings         []string                 `json:"warnings,omitempty"`
 }
 
 type RenderSkillResponse struct {
@@ -116,13 +120,13 @@ type RuntimeSkillListItem struct {
 	Description string `json:"description,omitempty"`
 	Digest      string `json:"digest,omitempty"`
 
-	Insert    agentskillsSpec.SkillInsert     `json:"insert,omitempty"`
-	Arguments []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
+	Insert    document.SkillInsert     `json:"insert,omitempty"`
+	Arguments []document.SkillArgument `json:"arguments,omitempty"`
 	// SourceTags are tags parsed from SKILL.md frontmatter.
-	SourceTags     []string                          `json:"sourceTags,omitempty"`
-	Resources      agentskillsSpec.SkillResourceInfo `json:"resources"`
-	RawFrontmatter map[string]any                    `json:"rawFrontmatter,omitempty"`
-	Warnings       []string                          `json:"warnings,omitempty"`
+	SourceTags     []string                   `json:"sourceTags,omitempty"`
+	Resources      provider.SkillResourceInfo `json:"resources"`
+	RawFrontmatter map[string]any             `json:"rawFrontmatter,omitempty"`
+	Warnings       []string                   `json:"warnings,omitempty"`
 
 	// Session-scoped.
 	IsActive bool `json:"isActive,omitempty"`
@@ -147,9 +151,9 @@ type ListRuntimeSkillsResponse struct {
 }
 
 type InvokeSkillToolRequestBody struct {
-	SessionID agentskillsSpec.SessionID `json:"sessionID"      required:"true"`
-	ToolName  string                    `json:"toolName"       required:"true"` // "skills-load" | "skills-unload" | "skills-readresource" | "skills-runscript"
-	Args      jsonutil.JSONRawString    `json:"args,omitempty"`                 // JSON object string
+	SessionID agentskillsRuntimeSpec.SessionID `json:"sessionID"      required:"true"`
+	ToolName  string                           `json:"toolName"       required:"true"` // "skills-load" | "skills-unload" | "skills-readresource" | "skills-runscript"
+	Args      jsonutil.JSONRawString           `json:"args,omitempty"`                 // JSON object string
 }
 
 type InvokeSkillToolRequest struct {
@@ -174,7 +178,7 @@ type InvokeSkillToolResponse struct {
 type ArtifactSkillSummary struct {
 	Artifact     artifact.ArtifactRef
 	IsEnabled    bool
-	Insert       agentskillsSpec.SkillInsert
+	Insert       document.SkillInsert
 	HasArguments bool
 	HasResources bool
 }

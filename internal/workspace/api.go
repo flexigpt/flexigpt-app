@@ -8,7 +8,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -1699,7 +1699,7 @@ func workspaceSkillViewOf(value workspaceadapter.WorkspaceSkill) WorkspaceSkillV
 		DisplayName:   value.Skill.DisplayName,
 		Description:   value.Skill.Description,
 		Tags:          append([]string(nil), value.Skill.Tags...),
-		Insert:        agentskillsSpec.SkillInsert(value.Skill.Insert),
+		Insert:        document.SkillInsert(value.Skill.Insert),
 		IsEnabled:     value.Skill.IsEnabled,
 		CreatedAt:     value.Skill.CreatedAt,
 		ModifiedAt:    value.Skill.ModifiedAt,

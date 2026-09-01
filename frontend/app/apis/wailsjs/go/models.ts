@@ -1758,7 +1758,7 @@ export namespace bundle {
 	    SkillName: string;
 	    SKILLMD: number[];
 	    ExpectedArtifactRevision: number;
-	    Document?: spec.SkillDocument;
+	    Document?: document.SkillDocument;
 	    Files: source.ManagedPackageFile[];
 	    Enabled: boolean;
 	
@@ -1774,7 +1774,7 @@ export namespace bundle {
 	        this.SkillName = source["SkillName"];
 	        this.SKILLMD = source["SKILLMD"];
 	        this.ExpectedArtifactRevision = source["ExpectedArtifactRevision"];
-	        this.Document = this.convertValues(source["Document"], spec.SkillDocument);
+	        this.Document = this.convertValues(source["Document"], document.SkillDocument);
 	        this.Files = this.convertValues(source["Files"], source.ManagedPackageFile);
 	        this.Enabled = source["Enabled"];
 	    }
@@ -1831,7 +1831,7 @@ export namespace bundle {
 	}
 	export class ManagedSkillDocument {
 	    Artifact: artifact.Artifact;
-	    Document: spec.SkillDocument;
+	    Document: document.SkillDocument;
 	
 	    static createFrom(source: any = {}) {
 	        return new ManagedSkillDocument(source);
@@ -1840,7 +1840,7 @@ export namespace bundle {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Artifact = this.convertValues(source["Artifact"], artifact.Artifact);
-	        this.Document = this.convertValues(source["Document"], spec.SkillDocument);
+	        this.Document = this.convertValues(source["Document"], document.SkillDocument);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2429,6 +2429,71 @@ export namespace diagnostic {
 	        this.code = source["code"];
 	        this.message = source["message"];
 	        this.location = this.convertValues(source["location"], DiagnosticLocation);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace document {
+	
+	export class SkillArgument {
+	    name: string;
+	    description?: string;
+	    default?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillArgument(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.default = source["default"];
+	    }
+	}
+	export class SkillDocument {
+	    name: string;
+	    displayName?: string;
+	    description: string;
+	    insert: string;
+	    arguments?: SkillArgument[];
+	    tags?: string[];
+	    markdownBody: string;
+	    rawFrontmatter?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillDocument(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.insert = source["insert"];
+	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
+	        this.tags = source["tags"];
+	        this.markdownBody = source["markdownBody"];
+	        this.rawFrontmatter = source["rawFrontmatter"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3072,6 +3137,29 @@ export namespace policy {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace provider {
+	
+	export class SkillResourceInfo {
+	    hasResources: boolean;
+	    totalCount: number;
+	    locations?: string[];
+	    moreLocations: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillResourceInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hasResources = source["hasResources"];
+	        this.totalCount = source["totalCount"];
+	        this.locations = source["locations"];
+	        this.moreLocations = source["moreLocations"];
+	    }
 	}
 
 }
@@ -5441,9 +5529,9 @@ export namespace skillruntime {
 	    description?: string;
 	    digest?: string;
 	    insert?: string;
-	    arguments?: spec.SkillArgument[];
+	    arguments?: document.SkillArgument[];
 	    sourceTags?: string[];
-	    resources: spec.SkillResourceInfo;
+	    resources: provider.SkillResourceInfo;
 	    rawFrontmatter?: Record<string, any>;
 	    warnings?: string[];
 	    isActive?: boolean;
@@ -5462,9 +5550,9 @@ export namespace skillruntime {
 	        this.description = source["description"];
 	        this.digest = source["digest"];
 	        this.insert = source["insert"];
-	        this.arguments = this.convertValues(source["arguments"], spec.SkillArgument);
+	        this.arguments = this.convertValues(source["arguments"], document.SkillArgument);
 	        this.sourceTags = source["sourceTags"];
-	        this.resources = this.convertValues(source["resources"], spec.SkillResourceInfo);
+	        this.resources = this.convertValues(source["resources"], provider.SkillResourceInfo);
 	        this.rawFrontmatter = source["rawFrontmatter"];
 	        this.warnings = source["warnings"];
 	        this.isActive = source["isActive"];
@@ -5620,8 +5708,8 @@ export namespace skillruntime {
 	    description?: string;
 	    displayName?: string;
 	    sourceTags?: string[];
-	    resources: spec.SkillResourceInfo;
-	    arguments?: spec.SkillArgument[];
+	    resources: provider.SkillResourceInfo;
+	    arguments?: document.SkillArgument[];
 	    appliedArguments?: Record<string, string>;
 	    rawFrontmatter?: Record<string, any>;
 	    warnings?: string[];
@@ -5638,8 +5726,8 @@ export namespace skillruntime {
 	        this.description = source["description"];
 	        this.displayName = source["displayName"];
 	        this.sourceTags = source["sourceTags"];
-	        this.resources = this.convertValues(source["resources"], spec.SkillResourceInfo);
-	        this.arguments = this.convertValues(source["arguments"], spec.SkillArgument);
+	        this.resources = this.convertValues(source["resources"], provider.SkillResourceInfo);
+	        this.arguments = this.convertValues(source["arguments"], document.SkillArgument);
 	        this.appliedArguments = source["appliedArguments"];
 	        this.rawFrontmatter = source["rawFrontmatter"];
 	        this.warnings = source["warnings"];
@@ -10669,84 +10757,6 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	
-	    }
-	}
-	export class SkillArgument {
-	    name: string;
-	    description?: string;
-	    default?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SkillArgument(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.description = source["description"];
-	        this.default = source["default"];
-	    }
-	}
-	export class SkillDocument {
-	    name: string;
-	    displayName?: string;
-	    description: string;
-	    insert: string;
-	    arguments?: SkillArgument[];
-	    tags?: string[];
-	    markdownBody: string;
-	    rawFrontmatter?: Record<string, any>;
-	
-	    static createFrom(source: any = {}) {
-	        return new SkillDocument(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.insert = source["insert"];
-	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
-	        this.tags = source["tags"];
-	        this.markdownBody = source["markdownBody"];
-	        this.rawFrontmatter = source["rawFrontmatter"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class SkillResourceInfo {
-	    hasResources: boolean;
-	    totalCount: number;
-	    locations?: string[];
-	    moreLocations: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new SkillResourceInfo(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.hasResources = source["hasResources"];
-	        this.totalCount = source["totalCount"];
-	        this.locations = source["locations"];
-	        this.moreLocations = source["moreLocations"];
 	    }
 	}
 	

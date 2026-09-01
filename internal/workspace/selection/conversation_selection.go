@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
@@ -352,7 +352,7 @@ func (cr *ConversationResolver) ResolveConversationSelection(
 					current.Locator,
 				)
 
-				if skill.Skill.Insert != agentskillsSpec.SkillInsertInstructions {
+				if skill.Skill.Insert != document.SkillInsertInstructions {
 					current.Status = ConversationSkillUsageUnavailable
 					current.Diagnostics = diagnostic.AppendDiagnostics(
 						current.Diagnostics,

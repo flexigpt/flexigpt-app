@@ -13,9 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flexigpt/agentskills-go"
-	"github.com/flexigpt/agentskills-go/fsskillprovider"
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
+	"github.com/flexigpt/agentskills-go/provider"
+	"github.com/flexigpt/agentskills-go/provider/fs"
+	"github.com/flexigpt/agentskills-go/runtime"
+	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -33,7 +36,7 @@ const (
 // sessions, prompt generation, rendering, and tool invocation.
 type SkillRuntime struct {
 	resolver          *ArtifactRouter
-	runtime           *agentskills.Runtime
+	runtime           *runtime.Runtime
 	runScriptsEnabled bool
 
 	rtResyncMu sync.Mutex
@@ -44,11 +47,11 @@ type SkillRuntime struct {
 	// These maps are only an ephemeral inventory of provider registrations.
 	// Artifact Store remains the source of truth for every Artifact decision.
 	managedCollections map[collection.CollectionRef]runtimeDesiredView
-	managedRuntime     map[agentskillsSpec.SkillDef]string
+	managedRuntime     map[provider.SkillDef]string
 }
 
 type skillRuntimeOptions struct {
-	runtime              *agentskills.Runtime
+	runtime              *runtime.Runtime
 	resolver             *ArtifactRouter
 	runScriptsEnabled    bool
 	runScriptsConfigured bool
@@ -56,7 +59,7 @@ type skillRuntimeOptions struct {
 
 type SkillRuntimeOption func(*skillRuntimeOptions) error
 
-func WithRuntime(value *agentskills.Runtime) SkillRuntimeOption {
+func WithRuntime(value *runtime.Runtime) SkillRuntimeOption {
 	return func(options *skillRuntimeOptions) error {
 		if value == nil {
 			return errors.New("skill runtime is nil")
@@ -111,15 +114,14 @@ func NewSkillRuntime(
 		if options.runScriptsConfigured {
 			runScriptsEnabled = options.runScriptsEnabled
 		}
-		filesystemProvider, err := fsskillprovider.New(
-			fsskillprovider.WithRunScripts(runScriptsEnabled),
+		filesystemProvider, err := fs.New(
+			fs.WithRunScripts(runScriptsEnabled),
 		)
 		if err != nil {
 			return nil, err
 		}
-		options.runtime, err = agentskills.New(
-			agentskills.WithProvider(filesystemProvider),
-			agentskills.WithLogger(slog.Default()),
+		options.runtime, err = runtime.New(
+			runtime.WithProvider(filesystemProvider),
 		)
 		if err != nil {
 			return nil, err
@@ -134,12 +136,12 @@ func NewSkillRuntime(
 		runtime:            options.runtime,
 		runScriptsEnabled:  options.runScriptsEnabled,
 		managedCollections: map[collection.CollectionRef]runtimeDesiredView{},
-		managedRuntime:     map[agentskillsSpec.SkillDef]string{},
+		managedRuntime:     map[provider.SkillDef]string{},
 	}
 	return value, nil
 }
 
-func (s *SkillRuntime) AgentSkillsRuntime() *agentskills.Runtime {
+func (s *SkillRuntime) AgentSkillsRuntime() *runtime.Runtime {
 	if s == nil || s.isClosed() {
 		return nil
 	}
@@ -216,7 +218,7 @@ func (s *SkillRuntime) Close() {
 		}
 	}
 	s.managedCollections = map[collection.CollectionRef]runtimeDesiredView{}
-	s.managedRuntime = map[agentskillsSpec.SkillDef]string{}
+	s.managedRuntime = map[provider.SkillDef]string{}
 	s.rtResyncMu.Unlock()
 }
 
@@ -250,24 +252,24 @@ func (s *SkillRuntime) CreateSkillSession(
 		req.Body.AllowArtifacts,
 		req.Body.ActiveArtifacts,
 	)
-	activeDefinitions := map[agentskillsSpec.SkillDef]struct{}{}
+	activeDefinitions := map[provider.SkillDef]struct{}{}
 	for _, ref := range activeRefs {
 		if definition, found := resolved.RefToDef[artifactRefKey(ref)]; found {
 			activeDefinitions[definition] = struct{}{}
 		}
 	}
 
-	activeDefs := make([]agentskillsSpec.SkillDef, 0, len(activeDefinitions))
+	activeDefs := make([]provider.SkillDef, 0, len(activeDefinitions))
 	for definition := range activeDefinitions {
 		activeDefs = append(activeDefs, definition)
 	}
 	sortSkillDefs(activeDefs)
 
-	options := []agentskills.SessionOption{}
+	options := []runtime.SessionOption{}
 	if req.Body.MaxActivePerSession > 0 {
 		options = append(
 			options,
-			agentskills.WithSessionMaxActivePerSession(
+			runtime.WithSessionMaxActivePerSession(
 				req.Body.MaxActivePerSession,
 			),
 		)
@@ -275,7 +277,7 @@ func (s *SkillRuntime) CreateSkillSession(
 	if len(activeDefs) > 0 {
 		options = append(
 			options,
-			agentskills.WithSessionActiveSkills(activeDefs),
+			runtime.WithSessionActiveSkills(activeDefs),
 		)
 	}
 
@@ -284,9 +286,9 @@ func (s *SkillRuntime) CreateSkillSession(
 		return nil, err
 	}
 
-	records, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
+	records, err := s.runtime.ListSkills(ctx, &runtime.SkillListFilter{
 		SessionID:   sessionID,
-		Activity:    agentskillsSpec.SkillActivityActive,
+		Activity:    agentskillsRuntimeSpec.SkillActivityActive,
 		AllowSkills: resolved.AllowDefs,
 	})
 	if err != nil {
@@ -297,7 +299,7 @@ func (s *SkillRuntime) CreateSkillSession(
 		return nil, errors.Join(err, closeErr)
 	}
 
-	active := map[agentskillsSpec.SkillDef]struct{}{}
+	active := map[provider.SkillDef]struct{}{}
 	for _, record := range records {
 		active[record.Def] = struct{}{}
 	}
@@ -306,7 +308,7 @@ func (s *SkillRuntime) CreateSkillSession(
 	// inspected successfully. Closing the old session is explicitly best
 	// effort and must not invalidate a successful new session response.
 	if previousSessionID != "" {
-		_ = s.runtime.CloseSession(context.WithoutCancel(ctx), agentskillsSpec.SessionID(previousSessionID))
+		_ = s.runtime.CloseSession(context.WithoutCancel(ctx), agentskillsRuntimeSpec.SessionID(previousSessionID))
 	}
 
 	return &CreateSkillSessionResponse{
@@ -370,7 +372,7 @@ func (s *SkillRuntime) GetSkillsPrompt(
 		}, nil
 	}
 
-	prompt, err := s.runtime.SkillsPrompt(ctx, &agentskills.SkillFilter{
+	prompt, err := s.runtime.SkillsPrompt(ctx, &runtime.SkillFilter{
 		Types:          append([]string(nil), filterRequest.Types...),
 		LocationPrefix: filterRequest.LocationPrefix,
 		AllowSkills:    resolved.AllowDefs,
@@ -410,9 +412,9 @@ func (s *SkillRuntime) ListRuntimeSkills(
 
 	activity := filterRequest.Activity
 	if activity == "" {
-		activity = agentskillsSpec.SkillActivityAny
+		activity = agentskillsRuntimeSpec.SkillActivityAny
 	}
-	if activity == agentskillsSpec.SkillActivityActive &&
+	if activity == agentskillsRuntimeSpec.SkillActivityActive &&
 		strings.TrimSpace(string(filterRequest.SessionID)) == "" {
 		return nil, fmt.Errorf(
 			"%w: activity=active requires sessionID",
@@ -432,11 +434,11 @@ func (s *SkillRuntime) ListRuntimeSkills(
 		}, nil
 	}
 
-	records, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
+	records, err := s.runtime.ListSkills(ctx, &runtime.SkillListFilter{
 		Types:          append([]string(nil), filterRequest.Types...),
 		LocationPrefix: filterRequest.LocationPrefix,
 		AllowSkills:    resolved.AllowDefs,
-		Inserts:        append([]agentskillsSpec.SkillInsert(nil), filterRequest.Inserts...),
+		Inserts:        append([]document.SkillInsert(nil), filterRequest.Inserts...),
 		SessionID:      filterRequest.SessionID,
 		Activity:       activity,
 	})
@@ -444,12 +446,12 @@ func (s *SkillRuntime) ListRuntimeSkills(
 		return nil, err
 	}
 
-	active := map[agentskillsSpec.SkillDef]struct{}{}
+	active := map[provider.SkillDef]struct{}{}
 	if filterRequest.SessionID != "" &&
-		activity == agentskillsSpec.SkillActivityAny {
-		current, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
+		activity == agentskillsRuntimeSpec.SkillActivityAny {
+		current, err := s.runtime.ListSkills(ctx, &runtime.SkillListFilter{
 			SessionID:   filterRequest.SessionID,
-			Activity:    agentskillsSpec.SkillActivityActive,
+			Activity:    agentskillsRuntimeSpec.SkillActivityActive,
 			AllowSkills: resolved.AllowDefs,
 		})
 		if err != nil {
@@ -475,13 +477,13 @@ func (s *SkillRuntime) ListRuntimeSkills(
 			Description:    record.Description,
 			Digest:         record.Digest,
 			Insert:         record.Insert,
-			Arguments:      append([]agentskillsSpec.SkillArgument(nil), record.Arguments...),
+			Arguments:      append([]document.SkillArgument(nil), record.Arguments...),
 			SourceTags:     append([]string(nil), record.Tags...),
 			Resources:      cloneSkillResourceInfo(record.Resources),
 			RawFrontmatter: cloneAnyMap(record.RawFrontmatter),
 			Warnings:       append([]string(nil), record.Warnings...),
-			IsActive: activity == agentskillsSpec.SkillActivityActive ||
-				(activity == agentskillsSpec.SkillActivityAny && isActive),
+			IsActive: activity == agentskillsRuntimeSpec.SkillActivityActive ||
+				(activity == agentskillsRuntimeSpec.SkillActivityAny && isActive),
 		})
 	}
 	sort.Slice(items, func(left, right int) bool {
@@ -511,7 +513,7 @@ func (s *SkillRuntime) RenderSkill(
 	if !found {
 		return nil, ErrSkillNotFound
 	}
-	out, err := s.runtime.RenderSkill(ctx, agentskills.RenderSkillParams{
+	out, err := s.runtime.RenderSkill(ctx, runtime.RenderSkillParams{
 		Def:       resolved.Definition,
 		Arguments: req.Body.Arguments,
 	})
@@ -527,7 +529,7 @@ func (s *SkillRuntime) RenderSkill(
 			DisplayName:      out.DisplayName,
 			SourceTags:       append([]string(nil), out.Tags...),
 			Resources:        cloneSkillResourceInfo(out.Resources),
-			Arguments:        append([]agentskillsSpec.SkillArgument(nil), out.Arguments...),
+			Arguments:        append([]document.SkillArgument(nil), out.Arguments...),
 			AppliedArguments: cloneStringMap(out.AppliedArguments),
 			RawFrontmatter:   cloneAnyMap(out.RawFrontmatter),
 			Warnings:         append([]string(nil), out.Warnings...),
@@ -567,9 +569,9 @@ func (s *SkillRuntime) DescribeArtifactSkill(
 		)
 	}
 
-	records, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
-		AllowSkills: []agentskillsSpec.SkillDef{resolved.Definition},
-		Activity:    agentskillsSpec.SkillActivityAny,
+	records, err := s.runtime.ListSkills(ctx, &runtime.SkillListFilter{
+		AllowSkills: []provider.SkillDef{resolved.Definition},
+		Activity:    agentskillsRuntimeSpec.SkillActivityAny,
 	})
 	if err != nil {
 		return ArtifactSkillSummary{}, err
@@ -627,18 +629,18 @@ func (s *SkillRuntime) InvokeSkillTool(
 		return nil, fmt.Errorf("%w: args must be a JSON object", errSkillInvalidRequest)
 	}
 
-	registry, err := s.runtime.NewSessionRegistry(ctx, agentskillsSpec.SessionID(sessionID))
+	registry, err := s.runtime.NewSessionRegistry(ctx, agentskillsRuntimeSpec.SessionID(sessionID))
 	if err != nil {
 		return nil, err
 	}
 	var functionID string
 	switch toolName {
 	case "skills-load":
-		functionID = string(agentskillsSpec.FuncIDSkillsLoad)
+		functionID = string(agentskillsRuntimeSpec.FuncIDSkillsLoad)
 	case "skills-unload":
-		functionID = string(agentskillsSpec.FuncIDSkillsUnload)
+		functionID = string(agentskillsRuntimeSpec.FuncIDSkillsUnload)
 	case "skills-readresource":
-		functionID = string(agentskillsSpec.FuncIDSkillsReadResource)
+		functionID = string(agentskillsRuntimeSpec.FuncIDSkillsReadResource)
 	case "skills-runscript":
 		if !s.runScriptsEnabled {
 			return nil, fmt.Errorf(
@@ -646,7 +648,7 @@ func (s *SkillRuntime) InvokeSkillTool(
 				errSkillInvalidRequest,
 			)
 		}
-		functionID = string(agentskillsSpec.FuncIDSkillsRunScript)
+		functionID = string(agentskillsRuntimeSpec.FuncIDSkillsRunScript)
 	default:
 		return nil, fmt.Errorf("%w: unknown toolName %q", errSkillInvalidRequest, toolName)
 	}
@@ -685,9 +687,9 @@ func (s *SkillRuntime) isClosed() bool {
 }
 
 type resolvedAllowArtifacts struct {
-	DefToArtifacts map[agentskillsSpec.SkillDef]artifact.ArtifactRef
-	RefToDef       map[string]agentskillsSpec.SkillDef
-	AllowDefs      []agentskillsSpec.SkillDef
+	DefToArtifacts map[provider.SkillDef]artifact.ArtifactRef
+	RefToDef       map[string]provider.SkillDef
+	AllowDefs      []provider.SkillDef
 }
 
 func (s *SkillRuntime) resolveAllowArtifacts(
@@ -695,8 +697,8 @@ func (s *SkillRuntime) resolveAllowArtifacts(
 	refs []artifact.ArtifactRef,
 ) (resolvedAllowArtifacts, error) {
 	output := resolvedAllowArtifacts{
-		DefToArtifacts: map[agentskillsSpec.SkillDef]artifact.ArtifactRef{},
-		RefToDef:       map[string]agentskillsSpec.SkillDef{},
+		DefToArtifacts: map[provider.SkillDef]artifact.ArtifactRef{},
+		RefToDef:       map[string]provider.SkillDef{},
 	}
 
 	seenRefs := map[string]struct{}{}
@@ -930,8 +932,8 @@ func subsetArtifacts(
 }
 
 func buildActiveArtifacts(
-	definitions map[agentskillsSpec.SkillDef]artifact.ArtifactRef,
-	active map[agentskillsSpec.SkillDef]struct{},
+	definitions map[provider.SkillDef]artifact.ArtifactRef,
+	active map[provider.SkillDef]struct{},
 ) []artifact.ArtifactRef {
 	output := make([]artifact.ArtifactRef, 0)
 	for definition := range active {
@@ -947,9 +949,9 @@ func buildActiveArtifacts(
 }
 
 func containsInstructionInsert(
-	values []agentskillsSpec.SkillInsert,
+	values []document.SkillInsert,
 ) bool {
-	return slices.Contains(values, agentskillsSpec.SkillInsertInstructions)
+	return slices.Contains(values, document.SkillInsertInstructions)
 }
 
 func cloneStringMap(input map[string]string) map[string]string {
@@ -971,8 +973,8 @@ func cloneAnyMap(input map[string]any) map[string]any {
 }
 
 func cloneSkillResourceInfo(
-	input agentskillsSpec.SkillResourceInfo,
-) agentskillsSpec.SkillResourceInfo {
+	input provider.SkillResourceInfo,
+) provider.SkillResourceInfo {
 	input.Locations = append([]string(nil), input.Locations...)
 	return input
 }

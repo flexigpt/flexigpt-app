@@ -5,7 +5,7 @@ go 1.27
 // Tools: These are installed via the taskfile. check the associated task.
 require (
 	github.com/adrg/xdg v0.5.3
-	github.com/flexigpt/agentskills-go v0.20.2
+	github.com/flexigpt/agentskills-go v0.21.0
 	github.com/flexigpt/inference-go v0.24.1
 	github.com/flexigpt/llmtools-go v0.24.0
 	github.com/flexigpt/mapstore-go v0.4.2

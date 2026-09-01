@@ -63,8 +63,8 @@ github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
-github.com/flexigpt/agentskills-go v0.20.2 h1:iNE9qWFF14kQ52SKB8GYpE3lwMSX3EsybWy6NzbBde4=
-github.com/flexigpt/agentskills-go v0.20.2/go.mod h1:KJNbSiFlWyN8F23ezn2wHosdEs2EJlVGAJdjyfj3MoQ=
+github.com/flexigpt/agentskills-go v0.21.0 h1:LaxTXJt7hPDU7WgYzP0DYHnMq6r0/2q/oSVwkRIInYA=
+github.com/flexigpt/agentskills-go v0.21.0/go.mod h1:KJNbSiFlWyN8F23ezn2wHosdEs2EJlVGAJdjyfj3MoQ=
 github.com/flexigpt/inference-go v0.24.1 h1:VlOYP0rCd0t72qvI+KQ8OQoGWE/ytcs5vE0URRwyW+Y=
 github.com/flexigpt/inference-go v0.24.1/go.mod h1:u0dV1PK4gSqfCig1uBQvniikrToMMmRRZ/miwQmBwgE=
 github.com/flexigpt/llmtools-go v0.24.0 h1:6Wno0JKk+o6aweva0R1Ao89bJ/8NxQjtf3XMkLntjZE=

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/agentskills-go/document"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -314,7 +314,7 @@ func projectWorkspaceSkill(
 	if dataErr != nil {
 		return output, dataErr
 	}
-	document, err := skillArtifact.DocumentFromDefinition(
+	doc, err := skillArtifact.DocumentFromDefinition(
 		resourceValue.Definition,
 	)
 	if err != nil {
@@ -322,9 +322,9 @@ func projectWorkspaceSkill(
 	}
 	markdownBody := ""
 	if includeMarkdown {
-		markdownBody = document.MarkdownBody
+		markdownBody = doc.MarkdownBody
 	}
-	output.Skill = skillSummary(resourceValue.Artifact, document)
+	output.Skill = skillSummary(resourceValue.Artifact, doc)
 	output.MarkdownBody = markdownBody
 	if resourceValue.Occurrence != nil &&
 		resourceValue.Occurrence.SourceContentDigest != nil {
@@ -336,7 +336,7 @@ func projectWorkspaceSkill(
 
 func skillSummary(
 	artifactValue artifact.Artifact,
-	value agentskillsSpec.SkillDocument,
+	value document.SkillDocument,
 ) SkillSummary {
 	arguments := make([]SkillArgument, 0, len(value.Arguments))
 	for _, argument := range value.Arguments {
