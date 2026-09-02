@@ -226,13 +226,19 @@ export interface SetSkillEnabledBody {
 export enum RuntimeSkillActivity {
 	Any = 'any',
 	Active = 'active',
+	Inactive = 'inactive',
 }
 
+/**
+ * Artifact-oriented runtime filter used by frontend bridge APIs.
+ * It is not a Wails transport model.
+ */
 export interface RuntimeSkillFilter {
 	types?: string[];
 	inserts?: SkillInsert[];
-	allowArtifacts: ArtifactRef[];
+	namePrefix?: string;
 	locationPrefix?: string;
+	allowArtifacts?: ArtifactRef[];
 	sessionID?: string;
 	activity?: RuntimeSkillActivity;
 }
@@ -240,7 +246,7 @@ export interface RuntimeSkillFilter {
 export interface CreateSkillSessionOptions {
 	closeSessionID?: string;
 	maxActivePerSession?: number;
-	allowArtifacts: ArtifactRef[];
+	allowArtifacts?: ArtifactRef[];
 	activeArtifacts?: ArtifactRef[];
 }
 
@@ -249,7 +255,7 @@ export interface SkillSession {
 	activeArtifacts: ArtifactRef[];
 }
 
-interface SkillResourceSummary {
+export interface SkillResourceInfo {
 	hasResources: boolean;
 	totalCount: number;
 	locations?: string[];
@@ -262,15 +268,100 @@ export interface RuntimeSkillListItem {
 	displayName?: string;
 	type?: string;
 	description?: string;
-	definitionDigest?: ArtifactDigest;
+	digest?: ArtifactDigest;
 	insert?: SkillInsert;
 	arguments?: SkillArgument[];
 	sourceTags?: string[];
-	resources: SkillResourceSummary;
+	resources: SkillResourceInfo;
 	rawFrontmatter?: Record<string, unknown>;
 	warnings?: string[];
 	isActive?: boolean;
 	errorMessage?: string;
+}
+
+/**
+ * Runtime-owned opaque catalog identity. The frontend may carry this value
+ * between bridge calls but does not construct or parse it.
+ */
+export type SkillRuntimeCatalogID = string;
+
+/**
+ * Runtime-native skill identity. Provider type remains a string because
+ * Agent Skills providers are registry-extensible.
+ */
+export interface RuntimeSkillDefinition {
+	type: string;
+	name: string;
+	location: string;
+}
+
+/**
+ * Store-owned ArtifactRef projection into runtime-native identity.
+ * This is used only by frontend bridge code.
+ */
+export interface ResolvedSkillRuntime {
+	artifact: ArtifactRef;
+	collection: ArtifactCollectionRef;
+	definition: RuntimeSkillDefinition;
+	version: string;
+}
+
+/**
+ * Runtime-native filter. It intentionally has no Artifact Store identity.
+ */
+export interface RuntimeSkillQuery {
+	types?: string[];
+	inserts?: SkillInsert[];
+	namePrefix?: string;
+	locationPrefix?: string;
+	allowSkills?: RuntimeSkillDefinition[];
+	sessionID?: string;
+	activity?: RuntimeSkillActivity;
+}
+
+export interface RuntimeSkillSessionOptions {
+	closeSessionID?: string;
+	maxActivePerSession?: number;
+
+	/**
+	 * Undefined preserves the native unrestricted Agent Skills session path.
+	 * An explicit empty array creates a deny-all allowed-skills session.
+	 */
+	allowedSkills?: RuntimeSkillDefinition[];
+	activeSkills?: RuntimeSkillDefinition[];
+}
+
+export interface RuntimeSkillSession {
+	sessionID: string;
+	activeSkills: RuntimeSkillDefinition[];
+}
+
+export interface RuntimeSkillRecord {
+	def: RuntimeSkillDefinition;
+	name: string;
+	description: string;
+	displayName?: string;
+	insert: SkillInsert;
+	arguments?: SkillArgument[];
+	tags?: string[];
+	resources: SkillResourceInfo;
+	rawFrontmatter?: Record<string, unknown>;
+	warnings?: string[];
+	digest?: ArtifactDigest;
+}
+
+export interface RuntimeSkillRenderResult {
+	text: string;
+	insert: SkillInsert;
+	name: string;
+	description?: string;
+	displayName?: string;
+	tags?: string[];
+	resources: SkillResourceInfo;
+	arguments?: SkillArgument[];
+	appliedArguments?: Record<string, string>;
+	rawFrontmatter?: Record<string, unknown>;
+	warnings?: string[];
 }
 
 /**
@@ -281,7 +372,7 @@ export interface RuntimeSkillListItem {
 export interface AssistantSkillOption {
 	key: string;
 	sel: SkillSelection;
-	skillDefinition: RuntimeSkillListItem;
+	skillDefinition: Skill;
 
 	bundleSlug: string;
 	bundleDisplayName: string;
@@ -301,7 +392,7 @@ export interface RenderSkillResponse {
 	description?: string;
 	displayName?: string;
 	sourceTags?: string[];
-	resources: SkillResourceSummary;
+	resources: SkillResourceInfo;
 	arguments?: SkillArgument[];
 	appliedArguments?: Record<string, string>;
 	rawFrontmatter?: Record<string, unknown>;
@@ -343,8 +434,6 @@ interface SkillPresence {
 	lastCheckError?: string;
 }
 
-export type SkillResourceInfo = SkillResourceSummary;
-
 export interface SkillArtifactCreateInput {
 	name: string;
 	displayName?: string;
@@ -374,6 +463,7 @@ export interface Skill {
 	digest?: ArtifactDigest;
 	rawFrontmatter?: Record<string, unknown>;
 	runtimeWarnings?: string[];
+	runtimeError?: string;
 	presence?: SkillPresence;
 	isEnabled: boolean;
 	isBuiltIn: boolean;

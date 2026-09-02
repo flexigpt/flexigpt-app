@@ -83,19 +83,22 @@ import type {
 	CreateManagedSkillBody,
 	CreateManagedSkillResult,
 	CreateSkillBundleBody,
-	CreateSkillSessionOptions,
 	InvokeSkillToolResponse,
 	ManagedSkillDocumentView,
 	PinSkillBody,
-	RenderSkillResponse,
+	ResolvedSkillRuntime,
 	RetireSkillBundleResult,
-	RuntimeSkillFilter,
-	RuntimeSkillListItem,
+	RuntimeSkillDefinition,
+	RuntimeSkillQuery,
+	RuntimeSkillRecord,
+	RuntimeSkillRenderResult,
+	RuntimeSkillSession,
+	RuntimeSkillSessionOptions,
 	SetSkillEnabledBody,
 	SkillArtifactView,
 	SkillBundleRef,
 	SkillBundleView,
-	SkillSession,
+	SkillRuntimeCatalogID,
 	UpdateSkillBundleBody,
 } from '@/spec/skill';
 import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolStoreChoice } from '@/spec/tool';
@@ -260,7 +263,7 @@ export interface IToolStoreAPI {
 	getTool(bundleID: string, toolSlug: string, version: string): Promise<Tool | undefined>;
 }
 
-export interface ISkillBundleAPI {
+export interface ISkillStoreAPI {
 	createSkillBundle(rootID: ArtifactRootID, body: CreateSkillBundleBody): Promise<SkillBundleView>;
 
 	getSkillBundle(bundle: SkillBundleRef): Promise<SkillBundleView>;
@@ -293,17 +296,27 @@ export interface ISkillBundleAPI {
 
 	purgeSkill(artifact: ArtifactRef, expectedRevision: number): Promise<ArtifactRef>;
 
-	getSkillsPrompt(filter: RuntimeSkillFilter): Promise<string>;
+	runtimeCatalogIDForCollection(bundle: SkillBundleRef): Promise<SkillRuntimeCatalogID>;
 
-	createSkillSession(options: CreateSkillSessionOptions): Promise<SkillSession>;
+	resolveArtifactSkill(artifact: ArtifactRef): Promise<ResolvedSkillRuntime>;
+}
+
+export interface ISkillRuntimeAPI {
+	syncSkillCatalog(catalogID: SkillRuntimeCatalogID): Promise<void>;
+
+	removeSkillCatalog(catalogID: SkillRuntimeCatalogID): Promise<void>;
+
+	createSkillSession(options: RuntimeSkillSessionOptions): Promise<RuntimeSkillSession>;
 
 	closeSkillSession(sessionID: string): Promise<void>;
 
-	listRuntimeSkills(filter: RuntimeSkillFilter): Promise<RuntimeSkillListItem[]>;
+	getSkillsPrompt(filter?: RuntimeSkillQuery): Promise<string>;
+
+	listSkills(filter?: RuntimeSkillQuery): Promise<RuntimeSkillRecord[]>;
+
+	renderSkill(definition: RuntimeSkillDefinition, args?: Record<string, string>): Promise<RuntimeSkillRenderResult>;
 
 	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
-
-	renderSkill(artifact: ArtifactRef, args?: Record<string, string>): Promise<RenderSkillResponse>;
 }
 
 export interface IArtifactStoreAPI {

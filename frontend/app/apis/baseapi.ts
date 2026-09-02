@@ -13,7 +13,8 @@ import type {
 	IMCPAPI,
 	IModelPresetStoreAPI,
 	ISettingStoreAPI,
-	ISkillBundleAPI,
+	ISkillRuntimeAPI,
+	ISkillStoreAPI,
 	IToolRuntimeAPI,
 	IToolStoreAPI,
 	IWorkspaceAPI,
@@ -22,7 +23,8 @@ import { SkillManagementAPI } from '@/apis/skill_management';
 // oxlint-disable-next-line import/no-namespace
 import * as wailsImpl from '@/apis/wailsapi';
 import { WailsMCPArtifactAPI } from '@/apis/wailsapi/mcp_artifact';
-import { WailsSkillBundleAPI } from '@/apis/wailsapi/skillbundle';
+import { WailsSkillRuntimeAPI } from '@/apis/wailsapi/skill_runtime';
+import { WailsSkillStoreAPI } from '@/apis/wailsapi/skill_store';
 
 export let log: ILogger;
 
@@ -37,7 +39,8 @@ export let mcpAPI: IMCPAPI;
 
 export let toolStoreAPI: IToolStoreAPI;
 export let toolRuntimeAPI: IToolRuntimeAPI;
-export let skillBundleAPI: ISkillBundleAPI;
+let skillStoreAPI: ISkillStoreAPI;
+let skillRuntimeAPI: ISkillRuntimeAPI;
 export let assistantPresetStoreAPI: IAssistantPresetStoreAPI;
 export let skillManagementAPI: SkillManagementAPI;
 export let artifactStoreAPI: IArtifactStoreAPI;
@@ -58,11 +61,12 @@ if (IS_WAILS_PLATFORM) {
 	mcpAPI = new WailsMCPArtifactAPI();
 	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
 	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
-	skillBundleAPI = new WailsSkillBundleAPI();
 	assistantPresetStoreAPI = new wailsImpl.WailsAssistantPresetStoreAPI();
 	artifactStoreAPI = new wailsImpl.WailsArtifactStoreAPI();
 	workspaceAPI = new wailsImpl.WailsWorkspaceAPI();
-	skillManagementAPI = new SkillManagementAPI(skillBundleAPI, artifactStoreAPI);
+	skillStoreAPI = new WailsSkillStoreAPI();
+	skillRuntimeAPI = new WailsSkillRuntimeAPI();
+	skillManagementAPI = new SkillManagementAPI(skillStoreAPI, skillRuntimeAPI, artifactStoreAPI);
 } else {
 	// Error for unsupported platforms
 	throw new Error('Unsupported platform');

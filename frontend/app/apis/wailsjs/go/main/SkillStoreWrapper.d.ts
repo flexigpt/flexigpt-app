@@ -3,32 +3,23 @@
 import {bundle} from '../models';
 import {artifact} from '../models';
 import {collection} from '../models';
-import {skillruntime} from '../models';
 import {basespec} from '../models';
+import {store} from '../models';
+import {runtime} from '../models';
 
 export function AdoptSkill(arg1:bundle.AdoptSkillRequest):Promise<artifact.Artifact>;
 
 export function AttachSkillSource(arg1:collection.CollectionRef,arg2:number,arg3:bundle.AttachmentDraft):Promise<bundle.Bundle>;
 
-export function CloseSkillSession(arg1:skillruntime.CloseSkillSessionRequest):Promise<skillruntime.CloseSkillSessionResponse>;
-
 export function CreateManagedSkill(arg1:bundle.CreateManagedSkillRequest):Promise<bundle.CreateManagedSkillResponse>;
 
 export function CreateSkillBundle(arg1:bundle.CreateBundleRequest):Promise<bundle.Bundle>;
-
-export function CreateSkillSession(arg1:skillruntime.CreateSkillSessionRequest):Promise<skillruntime.CreateSkillSessionResponse>;
 
 export function GetManagedSkillDocument(arg1:artifact.ArtifactRef):Promise<bundle.ManagedSkillDocument>;
 
 export function GetSkillBundle(arg1:collection.CollectionRef):Promise<bundle.Bundle>;
 
-export function GetSkillsPrompt(arg1:skillruntime.GetSkillsPromptRequest):Promise<skillruntime.GetSkillsPromptResponse>;
-
-export function InvokeSkillTool(arg1:skillruntime.InvokeSkillToolRequest):Promise<skillruntime.InvokeSkillToolResponse>;
-
 export function ListBundleSkills(arg1:collection.CollectionRef):Promise<Array<artifact.Artifact>>;
-
-export function ListRuntimeSkills(arg1:skillruntime.ListRuntimeSkillsRequest):Promise<skillruntime.ListRuntimeSkillsResponse>;
 
 export function ListSkillBundles(arg1:basespec.RootID):Promise<Array<bundle.Bundle>>;
 
@@ -40,9 +31,11 @@ export function PurgeSkillBundle(arg1:collection.CollectionRef,arg2:number):Prom
 
 export function RefreshSkillBundle(arg1:collection.CollectionRef):Promise<void>;
 
-export function RenderSkill(arg1:skillruntime.RenderSkillRequest):Promise<skillruntime.RenderSkillResponse>;
+export function ResolveArtifactSkill(arg1:artifact.ArtifactRef):Promise<store.ResolvedArtifactSkill>;
 
 export function RetireSkillBundle(arg1:collection.CollectionRef,arg2:number):Promise<collection.Collection>;
+
+export function RuntimeCatalogIDForCollection(arg1:collection.CollectionRef):Promise<runtime.CatalogID>;
 
 export function SetSkillEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<artifact.Artifact>;
 

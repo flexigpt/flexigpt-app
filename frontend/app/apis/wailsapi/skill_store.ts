@@ -6,31 +6,25 @@ import type {
 	CreateManagedSkillBody,
 	CreateManagedSkillResult,
 	CreateSkillBundleBody,
-	CreateSkillSessionOptions,
-	InvokeSkillToolResponse,
 	ManagedSkillDocumentView,
 	PinSkillBody,
-	RenderSkillResponse,
+	ResolvedSkillRuntime,
 	RetireSkillBundleResult,
-	RuntimeSkillFilter,
-	RuntimeSkillListItem,
 	SetSkillEnabledBody,
 	SkillArtifactView,
 	SkillBundleRef,
 	SkillBundleView,
 	SkillDocumentInput,
-	SkillSession,
+	SkillRuntimeCatalogID,
 	UpdateSkillBundleBody,
 } from '@/spec/skill';
 import { SkillBundleAttachmentRole } from '@/spec/skill';
 
-import type { JSONRawString } from '@/lib/jsonschema_utils';
-
-import type { ISkillBundleAPI } from '@/apis/interface';
+import type { ISkillStoreAPI } from '@/apis/interface';
 import {
 	byteArrayToWails,
 	enumFromWails,
-	rawJSONToWails,
+	requireNonBlankString,
 	requireWailsBody,
 	requireWailsString,
 	wailsObjectArrayOrEmpty,
@@ -38,28 +32,28 @@ import {
 import {
 	AdoptSkill,
 	AttachSkillSource,
-	CloseSkillSession,
 	CreateManagedSkill,
 	CreateSkillBundle,
-	CreateSkillSession,
 	GetManagedSkillDocument,
 	GetSkillBundle,
-	GetSkillsPrompt,
-	InvokeSkillTool,
 	ListBundleSkills,
-	ListRuntimeSkills,
 	ListSkillBundles,
 	PinSkill,
 	PurgeSkill,
 	PurgeSkillBundle,
 	RefreshSkillBundle,
-	RenderSkill,
+	ResolveArtifactSkill,
 	RetireSkillBundle,
+	RuntimeCatalogIDForCollection,
 	SetSkillEnabled,
 	UnadoptSkill,
 	UpdateSkillBundle,
-} from '@/apis/wailsjs/go/main/SkillBundleWrapper';
-import type { artifact as wailsArtifact, bundle as wailsSkillBundle } from '@/apis/wailsjs/go/models';
+} from '@/apis/wailsjs/go/main/SkillStoreWrapper';
+import type {
+	artifact as wailsArtifact,
+	bundle as wailsSkillBundle,
+	store as wailsSkillStore,
+} from '@/apis/wailsjs/go/models';
 
 function skillArtifactFromWails(artifactValue: wailsArtifact.Artifact, field = 'skillArtifact'): SkillArtifactView {
 	const artifact = requireWailsBody(artifactValue, field);
@@ -139,7 +133,7 @@ function skillBundleFromWails(bundleValue: wailsSkillBundle.Bundle, field = 'ski
 	};
 }
 
-export class WailsSkillBundleAPI implements ISkillBundleAPI {
+export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	async createSkillBundle(rootID: ArtifactRootID, body: CreateSkillBundleBody): Promise<SkillBundleView> {
 		const managedSourceID = body.managedSourceID?.trim() || undefined;
 		const managedSourceStorageKey = body.managedSourceStorageKey?.trim() || undefined;
@@ -318,71 +312,38 @@ export class WailsSkillBundleAPI implements ISkillBundleAPI {
 		return artifact;
 	}
 
-	async getSkillsPrompt(filter: RuntimeSkillFilter): Promise<string> {
-		const response = await GetSkillsPrompt({
-			Body: {
-				filter: filter,
-			},
-		} as Parameters<typeof GetSkillsPrompt>[0]);
-
-		const body = requireWailsBody(response.Body, 'GetSkillsPrompt');
-		return requireWailsString(body.prompt, 'GetSkillsPrompt.prompt');
+	async runtimeCatalogIDForCollection(bundle: SkillBundleRef): Promise<SkillRuntimeCatalogID> {
+		const catalogID = await RuntimeCatalogIDForCollection(
+			bundle as Parameters<typeof RuntimeCatalogIDForCollection>[0]
+		);
+		return requireNonBlankString(catalogID, 'RuntimeCatalogIDForCollection');
 	}
 
-	async createSkillSession(options: CreateSkillSessionOptions): Promise<SkillSession> {
-		const response = await CreateSkillSession({
-			Body: {
-				closeSessionID: options.closeSessionID,
-				maxActivePerSession: options.maxActivePerSession,
-				allowArtifacts: options.allowArtifacts,
-				activeArtifacts: options.activeArtifacts,
-			},
-		} as Parameters<typeof CreateSkillSession>[0]);
-		const body = requireWailsBody(response.Body, 'CreateSkillSession');
+	async resolveArtifactSkill(artifact: ArtifactRef): Promise<ResolvedSkillRuntime> {
+		const value = requireWailsBody(
+			await ResolveArtifactSkill(artifact as Parameters<typeof ResolveArtifactSkill>[0]),
+			'ResolveArtifactSkill'
+		) as wailsSkillStore.ResolvedArtifactSkill;
+
+		const resolvedArtifact = requireWailsBody(value.artifact, 'ResolveArtifactSkill.artifact');
+		const collection = requireWailsBody(value.collection, 'ResolveArtifactSkill.collection');
+		const definition = requireWailsBody(value.definition, 'ResolveArtifactSkill.definition');
 
 		return {
-			sessionID: requireWailsString(body.sessionID, 'CreateSkillSession.sessionID'),
-			activeArtifacts: wailsObjectArrayOrEmpty<ArtifactRef>(body.activeArtifacts, 'CreateSkillSession.activeArtifacts'),
+			artifact: {
+				rootID: requireWailsString(resolvedArtifact.rootID, 'ResolveArtifactSkill.artifact.rootID'),
+				artifactID: requireWailsString(resolvedArtifact.artifactID, 'ResolveArtifactSkill.artifact.artifactID'),
+			},
+			collection: {
+				rootID: requireWailsString(collection.rootID, 'ResolveArtifactSkill.collection.rootID'),
+				collectionID: requireWailsString(collection.collectionID, 'ResolveArtifactSkill.collection.collectionID'),
+			},
+			definition: {
+				type: requireWailsString(definition.type, 'ResolveArtifactSkill.definition.type'),
+				name: requireWailsString(definition.name, 'ResolveArtifactSkill.definition.name'),
+				location: requireWailsString(definition.location, 'ResolveArtifactSkill.definition.location'),
+			},
+			version: requireWailsString(value.version, 'ResolveArtifactSkill.version'),
 		};
-	}
-
-	async closeSkillSession(sessionID: string): Promise<void> {
-		await CloseSkillSession({
-			SessionID: sessionID,
-		} as Parameters<typeof CloseSkillSession>[0]);
-	}
-
-	async listRuntimeSkills(filter: RuntimeSkillFilter): Promise<RuntimeSkillListItem[]> {
-		const response = await ListRuntimeSkills({
-			Body: {
-				filter: filter,
-			},
-		} as Parameters<typeof ListRuntimeSkills>[0]);
-
-		const body = requireWailsBody(response.Body, 'ListRuntimeSkills');
-		return wailsObjectArrayOrEmpty<RuntimeSkillListItem>(body.skills, 'ListRuntimeSkills.skills');
-	}
-
-	async invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse> {
-		const response = await InvokeSkillTool({
-			Body: {
-				sessionID,
-				toolName,
-				args: args === undefined ? undefined : rawJSONToWails(args, 'skill tool arguments'),
-			},
-		} as Parameters<typeof InvokeSkillTool>[0]);
-
-		return requireWailsBody(response.Body, 'InvokeSkillTool') as InvokeSkillToolResponse;
-	}
-
-	async renderSkill(artifact: ArtifactRef, args?: Record<string, string>): Promise<RenderSkillResponse> {
-		const response = await RenderSkill({
-			Body: {
-				artifact,
-				arguments: args,
-			},
-		} as Parameters<typeof RenderSkill>[0]);
-
-		return requireWailsBody(response.Body, 'RenderSkill') as RenderSkillResponse;
 	}
 }

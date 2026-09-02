@@ -1,23 +1,40 @@
 import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
 import { ArtifactAdoptionMode, ArtifactState, newArtifactStorageKey } from '@/spec/artifact';
 import type {
+	CreateSkillSessionOptions,
+	InvokeSkillToolResponse,
 	ManagedSkillDocumentView,
 	RenderSkillResponse,
+	ResolvedSkillRuntime,
+	RuntimeSkillDefinition,
+	RuntimeSkillFilter,
 	RuntimeSkillListItem,
+	RuntimeSkillQuery,
+	RuntimeSkillRecord,
+	RuntimeSkillSessionOptions,
 	Skill,
 	SkillArtifactCreateInput,
 	SkillArtifactView,
 	SkillBundle,
+	SkillBundleRef,
 	SkillBundleView,
 	SkillDocumentInput,
 	SkillListItem,
 	SkillRef,
+	SkillSession,
 } from '@/spec/skill';
-import { SkillBundleAttachmentRole, SkillInsert, SkillPresenceStatus, SkillType } from '@/spec/skill';
+import {
+	RuntimeSkillActivity,
+	SkillBundleAttachmentRole,
+	SkillInsert,
+	SkillPresenceStatus,
+	SkillType,
+} from '@/spec/skill';
 
+import type { JSONRawString } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import type { IArtifactStoreAPI, ISkillBundleAPI } from '@/apis/interface';
+import type { IArtifactStoreAPI, ISkillRuntimeAPI, ISkillStoreAPI } from '@/apis/interface';
 
 const DEFAULT_SKILL_ROOT_DISPLAY_NAME = 'FlexiGPT Skills';
 const DEFAULT_SKILL_ROOT_DESCRIPTION = 'Artifact Store namespace for user-managed Skill Bundles.';
@@ -38,6 +55,16 @@ function bundleIsBuiltIn(bundle: SkillBundleView): boolean {
 
 function artifactRefKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
+}
+
+function runtimeDefinitionKey(definition: RuntimeSkillDefinition): string {
+	return `${definition.type}\u0000${definition.name}\u0000${definition.location}`;
+}
+
+interface ResolvedRuntimeArtifactSet {
+	definitions: RuntimeSkillDefinition[];
+	byArtifactKey: Map<string, ResolvedSkillRuntime>;
+	artifactByDefinitionKey: Map<string, ArtifactRef>;
 }
 
 function skillNameFromLocator(locator: string): string {
@@ -123,8 +150,9 @@ function toSkill(
 		arguments: runtime?.arguments,
 		tags: runtime?.sourceTags,
 		resources: runtime?.resources ?? emptyResources(),
-		digest: runtime?.definitionDigest ?? artifact.definitionDigest,
+		digest: runtime?.digest ?? artifact.definitionDigest,
 		rawFrontmatter: runtime?.rawFrontmatter,
+		runtimeError,
 		runtimeWarnings: [
 			...(runtime?.warnings ?? []),
 			...(runtime?.errorMessage ? [runtime.errorMessage] : []),
@@ -153,12 +181,36 @@ function toSkill(
 	};
 }
 
+function runtimeListItemFromRecord(
+	record: RuntimeSkillRecord,
+	skillRef: ArtifactRef,
+	isActive: boolean
+): RuntimeSkillListItem {
+	return {
+		skillRef,
+		type: record.def.type,
+		name: record.name,
+		displayName: record.displayName,
+		description: record.description,
+		digest: record.digest,
+		insert: record.insert,
+		arguments: record.arguments,
+		sourceTags: record.tags,
+		resources: record.resources,
+		rawFrontmatter: record.rawFrontmatter,
+		warnings: record.warnings,
+		isActive,
+	};
+}
+
 export class SkillManagementAPI {
 	private rootCreationPromise?: Promise<ArtifactRootID>;
 
 	constructor(
 		// oxlint-disable-next-line typescript/parameter-properties
-		private readonly skills: ISkillBundleAPI,
+		private readonly skills: ISkillStoreAPI,
+		// oxlint-disable-next-line typescript/parameter-properties
+		private readonly runtime: ISkillRuntimeAPI,
 		// oxlint-disable-next-line typescript/parameter-properties
 		private readonly artifacts: IArtifactStoreAPI
 	) {}
@@ -204,7 +256,7 @@ export class SkillManagementAPI {
 
 			if (runtimeCandidates.length > 0) {
 				try {
-					const runtimeItems = await this.skills.listRuntimeSkills({
+					const runtimeItems = await this.listRuntimeSkills({
 						allowArtifacts: runtimeCandidates.map(artifact => artifact.artifact),
 					});
 					const requestedKeys = new Set(runtimeCandidates.map(artifact => artifactRefKey(artifact.artifact)));
@@ -264,7 +316,7 @@ export class SkillManagementAPI {
 		const rootID = await this.resolveCreationRoot();
 		const managedSourceID = getUUIDv7();
 
-		await this.skills.createSkillBundle(rootID, {
+		const created = await this.skills.createSkillBundle(rootID, {
 			collectionID: bundleID,
 			displayName,
 			description,
@@ -273,31 +325,35 @@ export class SkillManagementAPI {
 			managedSourceID,
 			managedSourceStorageKey: newArtifactStorageKey(),
 		});
+		await this.syncRuntimeCollection(created.bundle, created.enabled);
 	}
 
 	async patchSkillBundle(bundleID: string, enabled: boolean): Promise<void> {
 		const bundle = await this.resolveBundle(bundleID);
-		await this.skills.updateSkillBundle(bundle.bundle, {
+		const updated = await this.skills.updateSkillBundle(bundle.bundle, {
 			expectedRevision: bundle.revision,
 			displayName: bundle.displayName,
 			description: bundle.description,
 			enabled,
 		});
+		await this.syncRuntimeCollection(updated.bundle, updated.enabled);
 	}
 
 	async updateSkillBundleMetadata(bundleID: string, displayName: string, description?: string): Promise<void> {
 		const bundle = await this.resolveBundle(bundleID);
-		await this.skills.updateSkillBundle(bundle.bundle, {
+		const updated = await this.skills.updateSkillBundle(bundle.bundle, {
 			expectedRevision: bundle.revision,
 			displayName,
 			description,
 			enabled: bundle.enabled,
 		});
+		await this.syncRuntimeCollection(updated.bundle, updated.enabled);
 	}
 
 	async refreshSkillBundle(bundleID: string): Promise<void> {
 		const bundle = await this.resolveBundle(bundleID);
 		await this.skills.refreshSkillBundle(bundle.bundle);
+		await this.syncRuntimeCollection(bundle.bundle, bundle.enabled);
 	}
 
 	async deleteSkillBundle(bundleID: string): Promise<void> {
@@ -309,6 +365,7 @@ export class SkillManagementAPI {
 
 		const retired = await this.skills.retireSkillBundle(bundle.bundle, bundle.revision);
 		await this.skills.purgeSkillBundle(bundle.bundle, retired.revision);
+		await this.syncRuntimeCollection(bundle.bundle, false);
 	}
 
 	async putSkillArtifact(bundleID: string, artifactID: string, input: SkillArtifactCreateInput): Promise<Skill> {
@@ -320,6 +377,8 @@ export class SkillManagementAPI {
 			document: this.documentFromInput(input),
 			enabled: input.isEnabled,
 		});
+
+		await this.syncRuntimeCollection(bundle.bundle, bundle.enabled);
 		return toSkill(bundle, resp.artifact, {
 			skillRef: resp.artifact.artifact,
 			name: input.name,
@@ -353,6 +412,7 @@ export class SkillManagementAPI {
 			document: this.documentFromInput(input),
 			enabled: input.isEnabled,
 		});
+		await this.syncRuntimeCollection(bundle.bundle, bundle.enabled);
 	}
 
 	async getManagedSkillDocument(bundleID: string, artifactID: string): Promise<ManagedSkillDocumentView> {
@@ -365,6 +425,7 @@ export class SkillManagementAPI {
 		const bundle = await this.resolveBundle(bundleID);
 		const sourceID = getUUIDv7();
 		let sourceRevision: number | undefined;
+		let attachedBundle: SkillBundleView | undefined;
 
 		try {
 			const source = await this.artifacts.createArtifactSource(bundle.bundle.rootID, {
@@ -377,7 +438,7 @@ export class SkillManagementAPI {
 			});
 			sourceRevision = source.revision;
 
-			await this.skills.attachSkillBundleSource(bundle.bundle, {
+			attachedBundle = await this.skills.attachSkillBundleSource(bundle.bundle, {
 				expectedCollectionRevision: bundle.revision,
 				sourceID,
 				role: SkillBundleAttachmentRole.External,
@@ -396,6 +457,10 @@ export class SkillManagementAPI {
 				await this.cleanupSource(bundle.bundle.rootID, sourceID, sourceRevision);
 			}
 			throw error;
+		}
+
+		if (attachedBundle) {
+			await this.syncRuntimeCollection(attachedBundle.bundle, attachedBundle.enabled);
 		}
 	}
 
@@ -421,6 +486,7 @@ export class SkillManagementAPI {
 				expectedRevision: artifact.revision,
 				enabled: isEnabled ?? artifact.enabled,
 			});
+			await this.syncRuntimeCollection(bundle.bundle, bundle.enabled);
 			return;
 		}
 
@@ -438,6 +504,7 @@ export class SkillManagementAPI {
 			},
 			enabled: isEnabled ?? artifact.enabled,
 		});
+		await this.syncRuntimeCollection(bundle.bundle, bundle.enabled);
 	}
 
 	async deleteSkill(bundleID: string, artifactID: string): Promise<void> {
@@ -446,14 +513,153 @@ export class SkillManagementAPI {
 
 		if (artifact.adoption === ArtifactAdoptionMode.Observed) {
 			await this.skills.unadoptSkill(artifact.artifact, artifact.revision, true);
+			await this.syncRuntimeCollection(bundle.bundle, bundle.enabled);
 			return;
 		}
 
 		await this.skills.purgeSkill(artifact.artifact, artifact.revision);
+		await this.syncRuntimeCollection(bundle.bundle, bundle.enabled);
+	}
+
+	async getSkillsPrompt(filter: RuntimeSkillFilter): Promise<string> {
+		const resolved = await this.resolveRuntimeArtifacts(filter.allowArtifacts);
+
+		if (filter.inserts?.length && !filter.inserts.includes(SkillInsert.Instructions)) {
+			return '';
+		}
+
+		return this.runtime.getSkillsPrompt(
+			this.runtimeQuery(filter, filter.allowArtifacts === undefined ? undefined : resolved.definitions)
+		);
+	}
+
+	async createSkillSession(options: CreateSkillSessionOptions): Promise<SkillSession> {
+		const allowConfigured = options.allowArtifacts !== undefined;
+		const allowedRefs = options.allowArtifacts ?? [];
+		const allowedKeys = new Set(
+			allowedRefs.map(a => {
+				return artifactRefKey(a);
+			})
+		);
+		const activeRefs = (options.activeArtifacts ?? []).filter(
+			ref => !allowConfigured || allowedKeys.has(artifactRefKey(ref))
+		);
+
+		const resolved = await this.resolveRuntimeArtifacts([...allowedRefs, ...activeRefs]);
+
+		const definitionsFor = (refs: ArtifactRef[]): RuntimeSkillDefinition[] => {
+			const definitions: RuntimeSkillDefinition[] = [];
+			const seen = new Set<string>();
+
+			for (const ref of refs) {
+				const value = resolved.byArtifactKey.get(artifactRefKey(ref));
+				if (!value) {
+					throw new Error(`Runtime definition was not resolved for Skill ${ref.artifactID}.`);
+				}
+
+				const key = runtimeDefinitionKey(value.definition);
+				if (seen.has(key)) {
+					continue;
+				}
+				seen.add(key);
+				definitions.push(value.definition);
+			}
+
+			return definitions;
+		};
+
+		const runtimeOptions: RuntimeSkillSessionOptions = {
+			closeSessionID: options.closeSessionID,
+			maxActivePerSession: options.maxActivePerSession,
+			allowedSkills: allowConfigured ? definitionsFor(allowedRefs) : undefined,
+			activeSkills: definitionsFor(activeRefs),
+		};
+		const session = await this.runtime.createSkillSession(runtimeOptions);
+
+		const activeArtifacts: ArtifactRef[] = [];
+		const seen = new Set<string>();
+		for (const definition of session.activeSkills) {
+			const ref = resolved.artifactByDefinitionKey.get(runtimeDefinitionKey(definition));
+			if (!ref || seen.has(artifactRefKey(ref))) {
+				continue;
+			}
+			seen.add(artifactRefKey(ref));
+			activeArtifacts.push(ref);
+		}
+
+		return {
+			sessionID: session.sessionID,
+			activeArtifacts,
+		};
+	}
+
+	async closeSkillSession(sessionID: string): Promise<void> {
+		await this.runtime.closeSkillSession(sessionID);
+	}
+
+	async listRuntimeSkills(filter: RuntimeSkillFilter): Promise<RuntimeSkillListItem[]> {
+		if (!filter.allowArtifacts?.length) {
+			throw new Error('Artifact skill selection is required.');
+		}
+
+		const resolved = await this.resolveRuntimeArtifacts(filter.allowArtifacts);
+		const activity = filter.activity ?? RuntimeSkillActivity.Any;
+		const query = this.runtimeQuery(filter, resolved.definitions);
+		const records = await this.runtime.listSkills(query);
+
+		const activeDefinitionKeys = new Set<string>();
+		if (filter.sessionID && activity === RuntimeSkillActivity.Any) {
+			const activeRecords = await this.runtime.listSkills({
+				...query,
+				activity: RuntimeSkillActivity.Active,
+			});
+			for (const record of activeRecords) {
+				activeDefinitionKeys.add(runtimeDefinitionKey(record.def));
+			}
+		}
+
+		return records.flatMap(record => {
+			const skillRef = resolved.artifactByDefinitionKey.get(runtimeDefinitionKey(record.def));
+			if (!skillRef) {
+				return [];
+			}
+
+			return [
+				runtimeListItemFromRecord(
+					record,
+					skillRef,
+					activity === RuntimeSkillActivity.Active ||
+						(activity === RuntimeSkillActivity.Any && activeDefinitionKeys.has(runtimeDefinitionKey(record.def)))
+				),
+			];
+		});
+	}
+
+	async invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse> {
+		return this.runtime.invokeSkillTool(sessionID, toolName, args);
 	}
 
 	async renderSkill(ref: SkillRef, args?: Record<string, string>): Promise<RenderSkillResponse> {
-		return this.skills.renderSkill(ref, args);
+		const resolved = await this.resolveRuntimeArtifacts([ref]);
+		const value = resolved.byArtifactKey.get(artifactRefKey(ref));
+		if (!value) {
+			throw new Error(`Runtime definition was not resolved for Skill ${ref.artifactID}.`);
+		}
+
+		const rendered = await this.runtime.renderSkill(value.definition, args);
+		return {
+			text: rendered.text,
+			insert: rendered.insert,
+			name: rendered.name,
+			description: rendered.description,
+			displayName: rendered.displayName,
+			sourceTags: rendered.tags,
+			resources: rendered.resources,
+			arguments: rendered.arguments,
+			appliedArguments: rendered.appliedArguments,
+			rawFrontmatter: rendered.rawFrontmatter,
+			warnings: rendered.warnings,
+		};
 	}
 
 	private documentFromInput(input: SkillArtifactCreateInput): SkillDocumentInput {
@@ -478,6 +684,80 @@ export class SkillManagementAPI {
 			arguments: input.arguments,
 			tags: input.tags,
 			markdownBody: input.markdownBody,
+		};
+	}
+
+	private runtimeQuery(
+		filter: RuntimeSkillFilter,
+		allowSkills: RuntimeSkillDefinition[] | undefined
+	): RuntimeSkillQuery {
+		return {
+			types: filter.types,
+			inserts: filter.inserts,
+			namePrefix: filter.namePrefix,
+			locationPrefix: filter.locationPrefix,
+			allowSkills,
+			sessionID: filter.sessionID,
+			activity: filter.activity,
+		};
+	}
+
+	private async syncRuntimeCollection(collection: SkillBundleRef, enabled = true): Promise<void> {
+		const catalogID = await this.skills.runtimeCatalogIDForCollection(collection);
+
+		if (enabled) {
+			await this.runtime.syncSkillCatalog(catalogID);
+			return;
+		}
+
+		await this.runtime.removeSkillCatalog(catalogID);
+	}
+
+	private async resolveRuntimeArtifacts(refs: ArtifactRef[] | undefined): Promise<ResolvedRuntimeArtifactSet> {
+		const uniqueRefs = new Map<string, ArtifactRef>();
+		for (const ref of refs ?? []) {
+			uniqueRefs.set(artifactRefKey(ref), ref);
+		}
+
+		if (uniqueRefs.size === 0) {
+			return {
+				definitions: [],
+				byArtifactKey: new Map(),
+				artifactByDefinitionKey: new Map(),
+			};
+		}
+
+		const values = await Promise.all([...uniqueRefs.values()].map(ref => this.skills.resolveArtifactSkill(ref)));
+
+		const collections = new Map<string, SkillBundleRef>();
+		for (const value of values) {
+			collections.set(`${value.collection.rootID}:${value.collection.collectionID}`, value.collection);
+		}
+
+		await Promise.all([...collections.values()].map(collection => this.syncRuntimeCollection(collection)));
+
+		const definitions: RuntimeSkillDefinition[] = [];
+		const byArtifactKey = new Map<string, ResolvedSkillRuntime>();
+		const artifactByDefinitionKey = new Map<string, ArtifactRef>();
+
+		for (const value of values) {
+			const definitionKey = runtimeDefinitionKey(value.definition);
+			const previous = artifactByDefinitionKey.get(definitionKey);
+			if (previous && artifactRefKey(previous) !== artifactRefKey(value.artifact)) {
+				throw new Error(
+					`Artifact Skills ${previous.artifactID} and ${value.artifact.artifactID} resolve to the same runtime definition.`
+				);
+			}
+
+			byArtifactKey.set(artifactRefKey(value.artifact), value);
+			artifactByDefinitionKey.set(definitionKey, value.artifact);
+			definitions.push(value.definition);
+		}
+
+		return {
+			definitions,
+			byArtifactKey,
+			artifactByDefinitionKey,
 		};
 	}
 

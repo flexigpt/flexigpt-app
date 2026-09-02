@@ -7,7 +7,7 @@ import type { WorkspaceRef } from '@/spec/workspace';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 
-import { skillBundleAPI, skillManagementAPI } from '@/apis/baseapi';
+import { skillManagementAPI } from '@/apis/baseapi';
 
 import { isInstructionInsertSkill } from '@/skills/lib/skill_artifact_utils';
 import {
@@ -231,7 +231,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		if (!sid) {
 			return;
 		}
-		void skillBundleAPI.closeSkillSession(sid).catch(() => {});
+		void skillManagementAPI.closeSkillSession(sid).catch(() => {});
 	}, []);
 
 	const applySkillSelectionState = useCallback(
@@ -340,7 +340,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			}
 
 			try {
-				const sess = await skillBundleAPI.createSkillSession({
+				const sess = await skillManagementAPI.createSkillSession({
 					closeSessionID: prevSessionID ?? undefined,
 					allowArtifacts: toArtifactRefs(nextEnabled),
 					activeArtifacts: toArtifactRefs(nextActive),
@@ -522,7 +522,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			if (!sid) {
 				return;
 			}
-			void skillBundleAPI.closeSkillSession(sid).catch(() => {});
+			void skillManagementAPI.closeSkillSession(sid).catch(() => {});
 		};
 	}, []);
 
@@ -637,7 +637,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		}
 
 		const allowArtifacts = toArtifactRefs(allowSkillRefs);
-		const items = await skillBundleAPI.listRuntimeSkills({
+		const items = await skillManagementAPI.listRuntimeSkills({
 			sessionID: sid,
 			activity: RuntimeSkillActivity.Active,
 			allowArtifacts,
@@ -671,7 +671,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		sessionStateKeyRef.current = '';
 
 		try {
-			const sess = await skillBundleAPI.createSkillSession({
+			const sess = await skillManagementAPI.createSkillSession({
 				closeSessionID: existing ?? undefined,
 				allowArtifacts: toArtifactRefs(currentEnabled),
 				activeArtifacts: toArtifactRefs(currentActive),

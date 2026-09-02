@@ -10,7 +10,7 @@ import { WorkspaceSkillInsert } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import { skillBundleAPI } from '@/apis/baseapi';
+import { skillManagementAPI } from '@/apis/baseapi';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
@@ -93,7 +93,7 @@ function WorkspaceTemplateRenderModalContent({
 		setIsSubmitting(true);
 
 		try {
-			const rendered = await skillBundleAPI.renderSkill(target.skill.artifact, argumentValues);
+			const rendered = await skillManagementAPI.renderSkill(target.skill.artifact, argumentValues);
 
 			if (rendered.insert !== WorkspaceSkillInsert.UserMessage) {
 				throw new Error(
