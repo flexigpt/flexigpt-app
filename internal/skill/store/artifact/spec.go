@@ -1,7 +1,5 @@
 package artifact
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-
 type Argument struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
@@ -17,10 +15,4 @@ type Body struct {
 	Tags           []string       `json:"tags,omitempty"`
 	MarkdownBody   string         `json:"markdownBody"`
 	RawFrontmatter map[string]any `json:"rawFrontmatter,omitempty"`
-}
-
-type LocatorPolicy interface {
-	ExpectedName(
-		locator basespec.Locator,
-	) (string, bool)
 }

@@ -198,33 +198,6 @@ func (a *API) ListWorkspaces(
 	}, nil
 }
 
-// WorkspaceRefs returns active Workspace Collection references from the
-// configured Workspace Root without projecting Source configuration or native
-// local paths. Application composition uses it to rebuild the derived Agent
-// Skills runtime view.
-func (a *API) WorkspaceRefs(
-	ctx context.Context,
-) ([]WorkspaceRef, error) {
-	if err := a.Ready(); err != nil {
-		return nil, err
-	}
-	values, err := a.workspace.service.List(ctx, a.workspace.workspaceRootID)
-	if err != nil {
-		return nil, err
-	}
-	refs := make([]WorkspaceRef, 0, len(values))
-	for _, value := range values {
-		refs = append(refs, value.Collection.Ref())
-	}
-	sort.Slice(refs, func(left, right int) bool {
-		if refs[left].RootID != refs[right].RootID {
-			return refs[left].RootID < refs[right].RootID
-		}
-		return refs[left].CollectionID < refs[right].CollectionID
-	})
-	return refs, nil
-}
-
 func (a *API) UpdateWorkspace(
 	ctx context.Context,
 	request *UpdateWorkspaceRequest,

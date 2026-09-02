@@ -797,22 +797,6 @@ func (a *API) EnsureBuiltInBundleTopology(
 	return bundle, nil
 }
 
-func (a *API) InstallBuiltInSkill(
-	ctx context.Context,
-	_ CreateManagedSkillRequest,
-) (CreateManagedSkillResponse, error) {
-	if err := a.Ready(); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	return CreateManagedSkillResponse{}, fmt.Errorf(
-		"%w: built-in Skills must be installed through InstallBuiltInCollection",
-		basespec.ErrUnsupported,
-	)
-}
-
 func (a *API) GetBundle(
 	ctx context.Context,
 	ref collection.CollectionRef,
