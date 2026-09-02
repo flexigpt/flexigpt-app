@@ -284,19 +284,6 @@ func (a *API) RefreshBundle(
 	return a.refreshBundle(ctx, ref, false)
 }
 
-// RefreshBuiltInBundle is the trusted feature-level refresh path for a
-// protected built-in Skill Bundle. It is intentionally unavailable through
-// ordinary Skill Bundle mutation APIs.
-func (a *API) RefreshBuiltInBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) (refresh.Result, error) {
-	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
-		return refresh.Result{}, err
-	}
-	return a.refreshBundle(ctx, ref, true)
-}
-
 // EnsureBuiltInBundleCurrent preserves startup convergence without publishing
 // a new catalog when the protected bundle is already current. It is reserved
 // for the trusted built-in installer and explicit built-in update paths.

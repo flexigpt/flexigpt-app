@@ -57,21 +57,6 @@ type HydratedRegistry struct {
 	Collections []HydratedCollection
 }
 
-// SkillReference is a portable semantic built-in reference. It deliberately
-// contains no Artifact Store IDs, package location, enablement, revision, or
-// installation-specific metadata.
-type SkillReference struct {
-	Collection basespec.LogicalName `json:"collection"`
-	Skill      basespec.LogicalName `json:"skill"`
-}
-
-func (r SkillReference) Validate() error {
-	if err := basespec.ValidateLogicalName(r.Collection); err != nil {
-		return err
-	}
-	return basespec.ValidateLogicalName(r.Skill)
-}
-
 func LoadRegistry() (Registry, error) {
 	raw, err := artifactbuiltin.ReadEmbeddedSkillRegistry()
 	if err != nil {
