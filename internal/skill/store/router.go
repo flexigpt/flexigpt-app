@@ -12,10 +12,10 @@ import (
 )
 
 type ResolvedArtifactSkill struct {
-	Artifact   artifact.ArtifactRef
-	Collection collection.CollectionRef
-	Definition provider.SkillDef
-	Version    string
+	Artifact   artifact.ArtifactRef     `json:"artifact"`
+	Collection collection.CollectionRef `json:"collection"`
+	Definition provider.SkillDef        `json:"definition"`
+	Version    string                   `json:"version"`
 }
 
 // ArtifactSkillLoader is implemented by feature adapters. It does not decide

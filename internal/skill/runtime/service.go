@@ -20,8 +20,10 @@ type Service struct {
 	agentRuntime  *agentskillsRuntime.Runtime
 	catalogSource CatalogSource
 
-	mu         sync.Mutex
-	closed     bool
+	lifecycleMu sync.RWMutex
+	catalogMu   sync.Mutex
+
+	closed     bool // Guarded by lifecycleMu.
 	catalogs   map[CatalogID]catalogView
 	registered map[provider.SkillDef]string
 	generation map[CatalogID]uint64
@@ -174,8 +176,8 @@ func (s *Service) readyAgentRuntime() (*agentskillsRuntime.Runtime, error) {
 		return nil, fmt.Errorf("%w: Skill runtime is nil", ErrClosed)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.lifecycleMu.RLock()
+	defer s.lifecycleMu.RUnlock()
 
 	if s.closed || s.agentRuntime == nil {
 		return nil, ErrClosed
@@ -190,19 +192,32 @@ func (s *Service) beginCatalogSync(
 		return nil, 0, fmt.Errorf("%w: Skill runtime is nil", ErrClosed)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	s.lifecycleMu.RLock()
 	if s.closed || s.agentRuntime == nil {
+		s.lifecycleMu.RUnlock()
 		return nil, 0, ErrClosed
 	}
-	if s.catalogSource == nil {
+	source := s.catalogSource
+	s.lifecycleMu.RUnlock()
+
+	if source == nil {
 		return nil, 0, fmt.Errorf(
 			"%w: Skill catalog source is not configured",
 			ErrInvalidRequest,
 		)
 	}
-	return s.catalogSource, s.nextGenerationLocked(id), nil
+
+	s.catalogMu.Lock()
+	defer s.catalogMu.Unlock()
+
+	s.lifecycleMu.RLock()
+	closed := s.closed
+	s.lifecycleMu.RUnlock()
+	if closed {
+		return nil, 0, ErrClosed
+	}
+
+	return source, s.nextGenerationLocked(id), nil
 }
 
 func (s *Service) beginCatalogRemoval(
@@ -212,12 +227,23 @@ func (s *Service) beginCatalogRemoval(
 		return 0, fmt.Errorf("%w: Skill runtime is nil", ErrClosed)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	s.lifecycleMu.RLock()
 	if s.closed || s.agentRuntime == nil {
+		s.lifecycleMu.RUnlock()
 		return 0, ErrClosed
 	}
+	s.lifecycleMu.RUnlock()
+
+	s.catalogMu.Lock()
+	defer s.catalogMu.Unlock()
+
+	s.lifecycleMu.RLock()
+	closed := s.closed
+	s.lifecycleMu.RUnlock()
+	if closed {
+		return 0, ErrClosed
+	}
+
 	return s.nextGenerationLocked(id), nil
 }
 

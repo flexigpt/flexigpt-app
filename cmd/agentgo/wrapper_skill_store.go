@@ -328,22 +328,18 @@ func (w *SkillStoreWrapper) RuntimeCatalogIDForCollection(
 	)
 }
 
-// ResolveArtifactSkillRegistration performs the Store-owned ArtifactRef to
-// runtime registration translation. Callers synchronize the containing
-// catalog through SkillRuntimeWrapper before creating a runtime session.
-func (w *SkillStoreWrapper) ResolveArtifactSkillRegistration(
+// ResolveArtifactSkill performs the Store-owned ArtifactRef to Agent Skills
+// translation. The returned Collection identifies the catalog that must be
+// synchronized before Definition is used in a runtime session.
+func (w *SkillStoreWrapper) ResolveArtifactSkill(
 	ref artifact.ArtifactRef,
-) (skillRuntime.SkillRegistration, error) {
+) (skillStore.ResolvedArtifactSkill, error) {
 	return middleware.WithRecoveryResp(
-		func() (skillRuntime.SkillRegistration, error) {
-			value, err := w.router.ResolveArtifactSkill(context.Background(), ref)
-			if err != nil {
-				return skillRuntime.SkillRegistration{}, err
-			}
-			return skillRuntime.SkillRegistration{
-				Definition: value.Definition,
-				Revision:   value.Version,
-			}, nil
+		func() (skillStore.ResolvedArtifactSkill, error) {
+			return w.router.ResolveArtifactSkill(
+				context.Background(),
+				ref,
+			)
 		},
 	)
 }

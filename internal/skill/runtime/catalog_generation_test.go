@@ -39,7 +39,7 @@ func TestSyncCatalogDoesNotRestoreAfterRemove(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	defer func() {
-		if err := service.Close(t.Context()); err != nil {
+		if err := service.Close(context.WithoutCancel(t.Context())); err != nil {
 			t.Errorf("Close: %v", err)
 		}
 	}()
@@ -65,9 +65,9 @@ func TestSyncCatalogDoesNotRestoreAfterRemove(t *testing.T) {
 		t.Fatalf("SyncCatalog: %v", err)
 	}
 
-	service.mu.Lock()
+	service.catalogMu.Lock()
 	_, restored := service.catalogs[catalogID]
-	service.mu.Unlock()
+	service.catalogMu.Unlock()
 
 	if restored {
 		t.Fatalf("stale sync restored catalog %q after removal", catalogID)

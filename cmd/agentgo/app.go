@@ -27,7 +27,7 @@ type App struct {
 	toolRuntimeAPI          *ToolRuntimeWrapper
 	skillStoreAPI           *SkillStoreWrapper
 	skillRuntimeAPI         *SkillRuntimeWrapper
-	skillAggregate          *skillAggregate.Service
+	artifactSkills          *skillAggregate.Service
 	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
@@ -292,7 +292,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill runtime initialized")
 
-	a.skillAggregate, err = skillAggregate.New(
+	a.artifactSkills, err = skillAggregate.New(
 		a.skillStoreAPI.router,
 		a.skillRuntimeAPI.service,
 	)
@@ -370,7 +370,7 @@ func (a *App) initManagers() {
 		a.assistantPresetsDirPath,
 		a.modelPresetStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.skillAggregate,
+		a.artifactSkills,
 		a.mcpAPI.bundleAPI,
 		a.mcpAPI.runtime,
 	)
@@ -392,7 +392,7 @@ func (a *App) initManagers() {
 		a.modelPresetStoreAPI.store,
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.skillAggregate,
+		a.artifactSkills,
 		a.mcpAPI.runtime,
 		a.workspaceAPI.api,
 	)
@@ -445,9 +445,9 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.settingStoreAPI != nil {
 		a.settingStoreAPI.close()
 	}
-	if a.skillAggregate != nil {
-		a.skillAggregate.Close()
-		a.skillAggregate = nil
+	if a.artifactSkills != nil {
+		a.artifactSkills.Close()
+		a.artifactSkills = nil
 	}
 	if a.skillRuntimeAPI != nil {
 		a.skillRuntimeAPI.close()

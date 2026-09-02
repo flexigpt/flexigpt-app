@@ -74,9 +74,11 @@ func (s *Service) reconcileCatalogAtGeneration(
 		return errors.Join(err, cleanupErr)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.catalogMu.Lock()
+	defer s.catalogMu.Unlock()
 
+	s.lifecycleMu.RLock()
+	defer s.lifecycleMu.RUnlock()
 	if s.closed || s.agentRuntime == nil {
 		return ErrClosed
 	}
@@ -117,9 +119,11 @@ func (s *Service) removeCatalogAtGeneration(
 	id CatalogID,
 	generation uint64,
 ) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.catalogMu.Lock()
+	defer s.catalogMu.Unlock()
 
+	s.lifecycleMu.RLock()
+	defer s.lifecycleMu.RUnlock()
 	if s.closed || s.agentRuntime == nil {
 		return ErrClosed
 	}
@@ -139,9 +143,11 @@ func (s *Service) IsRegistered(value SkillRegistration) bool {
 		return false
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.catalogMu.Lock()
+	defer s.catalogMu.Unlock()
 
+	s.lifecycleMu.RLock()
+	defer s.lifecycleMu.RUnlock()
 	if s.closed {
 		return false
 	}
@@ -157,16 +163,19 @@ func (s *Service) Close(ctx context.Context) error {
 		return fmt.Errorf("%w: close context is nil", ErrInvalidRequest)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	s.lifecycleMu.Lock()
 	if s.closed {
+		s.lifecycleMu.Unlock()
 		return nil
 	}
+	s.closed = true
+	s.lifecycleMu.Unlock()
+
+	s.catalogMu.Lock()
+	defer s.catalogMu.Unlock()
 
 	s.catalogs = map[CatalogID]catalogView{}
 	err := s.reconcileCatalogsLocked(ctx)
-	s.closed = true
 	s.generation = nil
 	return err
 }
