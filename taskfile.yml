@@ -6,6 +6,11 @@ dotenv:
   - "build/buildvars.env"
 
 includes:
+  git:
+    taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/git.yml
+    checksum: b22093001cd4d15f3ccf39ba4ccf16e509468379ac24d25f79196f277a7f02b0
+    flatten: true
+
   go:
     taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/go.yml
     checksum: e4cc5aea758c6d79d92c78021d32a5b8c9cf086933000f3a715b0b83266f99ed
@@ -40,10 +45,6 @@ tasks:
   cloc-multi:
     cmds:
       - gh act workflow_dispatch -W "./.github/workflows/cloc-report.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}"
-
-  tagstats:
-    cmds:
-      - ./scripts/git_tag_stats.sh
 
   godepgraph:
     cmds:
@@ -164,6 +165,7 @@ tasks:
     cmds:
       - pnpm run touch:tmp
       - task: go:lint-sort
+
   lint-go-fix:
     cmds:
       - task: go:lint-fix
