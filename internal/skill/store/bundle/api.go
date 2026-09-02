@@ -95,41 +95,6 @@ func (a *API) ListBundles(
 	return output, nil
 }
 
-// SkillBundleRefs returns every active Skill Bundle Collection. Runtime startup
-// inventory and maintenance code may use this without treating a runtime ref
-// shape as a source-of-truth ownership discriminator. Process-local runtime
-// registration is resolved and reconciled lazily from Artifact identity.
-func (a *API) SkillBundleRefs(
-	ctx context.Context,
-) ([]collection.CollectionRef, error) {
-	if err := a.Ready(); err != nil {
-		return nil, err
-	}
-
-	roots, err := a.dependencies.Roots.List(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	refs := make([]collection.CollectionRef, 0)
-	for _, rootValue := range roots {
-		bundles, err := a.ListBundles(ctx, rootValue.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, bundle := range bundles {
-			refs = append(refs, bundle.Collection.Ref())
-		}
-	}
-	sort.Slice(refs, func(left, right int) bool {
-		if refs[left].RootID != refs[right].RootID {
-			return refs[left].RootID < refs[right].RootID
-		}
-		return refs[left].CollectionID < refs[right].CollectionID
-	})
-	return refs, nil
-}
-
 func (a *API) UpdateBundle(
 	ctx context.Context,
 	request UpdateBundleRequest,

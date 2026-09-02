@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 	"sort"
 	"strings"
 
@@ -31,23 +30,28 @@ func (s *Service) SyncCatalog(
 		return fmt.Errorf("%w: catalog ID is required", ErrInvalidRequest)
 	}
 
-	source, err := s.catalogSourceForSync()
+	source, generation, err := s.beginCatalogSync(id)
 	if err != nil {
 		return err
 	}
 
 	values, err := source.Skills(ctx, id)
 	if err != nil {
-		cleanupErr := s.RemoveCatalog(context.WithoutCancel(ctx), id)
+		cleanupErr := s.removeCatalogAtGeneration(
+			context.WithoutCancel(ctx),
+			id,
+			generation,
+		)
 		return errors.Join(err, cleanupErr)
 	}
 
-	return s.reconcileCatalog(ctx, id, values)
+	return s.reconcileCatalogAtGeneration(ctx, id, generation, values)
 }
 
-func (s *Service) reconcileCatalog(
+func (s *Service) reconcileCatalogAtGeneration(
 	ctx context.Context,
 	id CatalogID,
+	generation uint64,
 	values []SkillRegistration,
 ) error {
 	if ctx == nil {
@@ -62,9 +66,10 @@ func (s *Service) reconcileCatalog(
 
 	view, err := catalogViewFrom(values)
 	if err != nil {
-		cleanupErr := s.RemoveCatalog(
+		cleanupErr := s.removeCatalogAtGeneration(
 			context.WithoutCancel(ctx),
 			id,
+			generation,
 		)
 		return errors.Join(err, cleanupErr)
 	}
@@ -74,6 +79,9 @@ func (s *Service) reconcileCatalog(
 
 	if s.closed || s.agentRuntime == nil {
 		return ErrClosed
+	}
+	if s.generation[id] != generation {
+		return nil
 	}
 
 	next := cloneCatalogViews(s.catalogs)
@@ -90,15 +98,33 @@ func (s *Service) RemoveCatalog(
 	if ctx == nil {
 		return fmt.Errorf("%w: catalog context is nil", ErrInvalidRequest)
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if id == "" {
 		return fmt.Errorf("%w: catalog ID is required", ErrInvalidRequest)
 	}
 
+	generation, err := s.beginCatalogRemoval(id)
+	if err != nil {
+		return err
+	}
+	return s.removeCatalogAtGeneration(ctx, id, generation)
+}
+
+func (s *Service) removeCatalogAtGeneration(
+	ctx context.Context,
+	id CatalogID,
+	generation uint64,
+) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.closed || s.agentRuntime == nil {
 		return ErrClosed
+	}
+	if s.generation[id] != generation {
+		return nil
 	}
 
 	next := cloneCatalogViews(s.catalogs)
@@ -106,26 +132,6 @@ func (s *Service) RemoveCatalog(
 	s.catalogs = next
 
 	return s.reconcileCatalogsLocked(ctx)
-}
-
-func (s *Service) CatalogIDs() []CatalogID {
-	if s == nil {
-		return nil
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.closed {
-		return nil
-	}
-
-	output := make([]CatalogID, 0, len(s.catalogs))
-	for id := range s.catalogs {
-		output = append(output, id)
-	}
-	slices.Sort(output)
-	return output
 }
 
 func (s *Service) IsRegistered(value SkillRegistration) bool {
@@ -161,6 +167,7 @@ func (s *Service) Close(ctx context.Context) error {
 	s.catalogs = map[CatalogID]catalogView{}
 	err := s.reconcileCatalogsLocked(ctx)
 	s.closed = true
+	s.generation = nil
 	return err
 }
 

@@ -43,7 +43,7 @@ func (s *CatalogSource) Skills(
 		)
 	}
 
-	ref, err := CollectionRefForCatalogID(catalogID)
+	ref, err := collectionRefForCatalogID(catalogID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func CollectionCatalogID(
 	), nil
 }
 
-func CollectionRefForCatalogID(
+func collectionRefForCatalogID(
 	catalogID skillRuntime.CatalogID,
 ) (collection.CollectionRef, error) {
 	raw, found := strings.CutPrefix(

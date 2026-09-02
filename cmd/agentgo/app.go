@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -26,7 +27,7 @@ type App struct {
 	toolRuntimeAPI          *ToolRuntimeWrapper
 	skillStoreAPI           *SkillStoreWrapper
 	skillRuntimeAPI         *SkillRuntimeWrapper
-	skillAggregateAPI       *SkillAggregateWrapper
+	skillAggregate          *skillAggregate.Service
 	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
@@ -115,7 +116,6 @@ func NewApp() *App {
 	app.toolStoreAPI = &ToolStoreWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.skillRuntimeAPI = &SkillRuntimeWrapper{}
-	app.skillAggregateAPI = &SkillAggregateWrapper{}
 	app.mcpAPI = &MCPWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
@@ -292,19 +292,19 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill runtime initialized")
 
-	err = InitSkillAggregateWrapper(
-		a.skillAggregateAPI,
-		a.skillStoreAPI,
-		a.skillRuntimeAPI,
+	a.skillAggregate, err = skillAggregate.New(
+		a.skillStoreAPI.router,
+		a.skillRuntimeAPI.service,
 	)
 	if err != nil {
 		slog.Error(
 			"couldn't initialize Skill aggregate",
 			"error", err,
 		)
-		panic("failed to initialize managers: Skill aggregate initialization failed\n" + err.Error())
+		panic("failed to initialize managers: skill aggregate initialization failed\n" + err.Error())
 	}
 	slog.Info("skill aggregate initialized")
+
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
 		slog.Error(
@@ -370,7 +370,7 @@ func (a *App) initManagers() {
 		a.assistantPresetsDirPath,
 		a.modelPresetStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.skillAggregateAPI.service,
+		a.skillAggregate,
 		a.mcpAPI.bundleAPI,
 		a.mcpAPI.runtime,
 	)
@@ -392,7 +392,7 @@ func (a *App) initManagers() {
 		a.modelPresetStoreAPI.store,
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.skillAggregateAPI.service,
+		a.skillAggregate,
 		a.mcpAPI.runtime,
 		a.workspaceAPI.api,
 	)
@@ -445,14 +445,18 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.settingStoreAPI != nil {
 		a.settingStoreAPI.close()
 	}
-	if a.skillAggregateAPI != nil {
-		a.skillAggregateAPI.close()
+	if a.skillAggregate != nil {
+		a.skillAggregate.Close()
+		a.skillAggregate = nil
 	}
 	if a.skillRuntimeAPI != nil {
 		a.skillRuntimeAPI.close()
 	}
 	if a.workspaceAPI != nil {
 		a.workspaceAPI.close()
+	}
+	if a.skillStoreAPI != nil {
+		a.skillStoreAPI.close()
 	}
 
 	if a.artifactStoreAPI != nil {

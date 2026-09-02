@@ -24,6 +24,7 @@ type Service struct {
 	closed     bool
 	catalogs   map[CatalogID]catalogView
 	registered map[provider.SkillDef]string
+	generation map[CatalogID]uint64
 }
 
 type options struct {
@@ -92,23 +93,8 @@ func New(opts ...Option) (*Service, error) {
 		catalogSource: cfg.catalogSource,
 		catalogs:      map[CatalogID]catalogView{},
 		registered:    map[provider.SkillDef]string{},
+		generation:    map[CatalogID]uint64{},
 	}, nil
-}
-
-func (s *Service) AgentSkillsRuntime() *agentskillsRuntime.Runtime {
-	value, err := s.readyAgentRuntime()
-	if err != nil {
-		return nil
-	}
-	return value
-}
-
-func (s *Service) ProviderTypes() []string {
-	value, err := s.readyAgentRuntime()
-	if err != nil {
-		return nil
-	}
-	return value.ProviderTypes()
 }
 
 func (s *Service) SupportsRunScript() bool {
@@ -197,22 +183,48 @@ func (s *Service) readyAgentRuntime() (*agentskillsRuntime.Runtime, error) {
 	return s.agentRuntime, nil
 }
 
-func (s *Service) catalogSourceForSync() (CatalogSource, error) {
+func (s *Service) beginCatalogSync(
+	id CatalogID,
+) (CatalogSource, uint64, error) {
 	if s == nil {
-		return nil, fmt.Errorf("%w: Skill runtime is nil", ErrClosed)
+		return nil, 0, fmt.Errorf("%w: Skill runtime is nil", ErrClosed)
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.closed {
-		return nil, ErrClosed
+	if s.closed || s.agentRuntime == nil {
+		return nil, 0, ErrClosed
 	}
 	if s.catalogSource == nil {
-		return nil, fmt.Errorf(
+		return nil, 0, fmt.Errorf(
 			"%w: Skill catalog source is not configured",
 			ErrInvalidRequest,
 		)
 	}
-	return s.catalogSource, nil
+	return s.catalogSource, s.nextGenerationLocked(id), nil
+}
+
+func (s *Service) beginCatalogRemoval(
+	id CatalogID,
+) (uint64, error) {
+	if s == nil {
+		return 0, fmt.Errorf("%w: Skill runtime is nil", ErrClosed)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed || s.agentRuntime == nil {
+		return 0, ErrClosed
+	}
+	return s.nextGenerationLocked(id), nil
+}
+
+func (s *Service) nextGenerationLocked(id CatalogID) uint64 {
+	if s.generation == nil {
+		s.generation = map[CatalogID]uint64{}
+	}
+	s.generation[id]++
+	return s.generation[id]
 }

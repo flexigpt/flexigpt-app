@@ -11,16 +11,15 @@ import (
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 )
 
-// StoreLoader is the Skill Bundle feature adapter registered with the
-// Artifact-backed Skill Runtime router. It owns only skill.bundle projection;
-// collection ownership itself is resolved by the generic router.
+// StoreLoader is the Skill Bundle feature adapter registered with the generic
+// Artifact Skill router. It owns skill.bundle projection only.
 type StoreLoader struct {
 	api *API
 }
 
 func NewStoreLoader(api *API) (*StoreLoader, error) {
 	if api == nil {
-		return nil, errors.New("skill bundle runtime resolver API is nil")
+		return nil, errors.New("skill bundle store loader API is nil")
 	}
 	return &StoreLoader{api: api}, nil
 }

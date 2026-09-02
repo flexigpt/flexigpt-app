@@ -16,15 +16,15 @@ import (
 )
 
 // StoreLoader adapts Workspace-owned Artifact projection to the generic
-// Artifact-backed Skill Runtime router. The runtime package does not import
-// Workspace and cannot infer Workspace ownership from a reference shape.
+// Artifact Skill router. Runtime does not import Workspace and cannot infer
+// Workspace ownership from a reference shape.
 type StoreLoader struct {
 	adapter *Adapter
 }
 
 func NewStoreLoader(adapter *Adapter) (*StoreLoader, error) {
 	if adapter == nil {
-		return nil, errors.New("workspace skill runtime resolver adapter is nil")
+		return nil, errors.New("workspace skill store loader adapter is nil")
 	}
 	return &StoreLoader{adapter: adapter}, nil
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
 
@@ -42,7 +41,7 @@ func NewWorkspaceInferenceBridge(
 
 // validateArtifactSkillRefsForSelection validates only durable Artifact
 // identities. Artifact membership and owning Collection kind are resolved by
-// skillAggregate.ArtifactRouter, never inferred from reference shape.
+// the internal Artifact Skill bridge, never inferred from reference shape.
 func validateArtifactSkillRefsForSelection(
 	sel *selection.ConversationSelection,
 	refs []artifact.ArtifactRef,
@@ -257,8 +256,8 @@ func filterWorkspaceSkillRefsToResolvedSelection(
 func markWorkspaceSkillSessionUsage(
 	usage *selection.ConversationUsage,
 	enabledSkillRefs []artifact.ArtifactRef,
-	availableItems []skillAggregate.RuntimeSkillListItem,
-	activeItems []skillAggregate.RuntimeSkillListItem,
+	sessionSkillRefs []artifact.ArtifactRef,
+	activeSkillRefs []artifact.ArtifactRef,
 	advertised bool,
 ) {
 	if usage == nil || len(usage.Skills) == 0 {
@@ -270,14 +269,14 @@ func markWorkspaceSkillSessionUsage(
 		enabled[workspaceArtifactRefKey(ref)] = struct{}{}
 	}
 
-	available := make(map[string]struct{}, len(availableItems))
-	for _, item := range availableItems {
-		available[workspaceArtifactRefKey(item.SkillRef)] = struct{}{}
+	available := make(map[string]struct{}, len(sessionSkillRefs))
+	for _, ref := range sessionSkillRefs {
+		available[workspaceArtifactRefKey(ref)] = struct{}{}
 	}
 
-	active := make(map[string]struct{}, len(activeItems))
-	for _, item := range activeItems {
-		active[workspaceArtifactRefKey(item.SkillRef)] = struct{}{}
+	active := make(map[string]struct{}, len(activeSkillRefs))
+	for _, ref := range activeSkillRefs {
+		active[workspaceArtifactRefKey(ref)] = struct{}{}
 	}
 
 	for index := range usage.Skills {

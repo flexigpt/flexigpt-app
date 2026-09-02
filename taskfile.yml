@@ -24,16 +24,19 @@ includes:
 
 tasks:
   default:
+    desc: Run the default Go task suite and print all configured variables.
     cmds:
       - task: go:default
       - task: go:print-all-vars
     silent: true
 
   licensesgo:
+    desc: Generate the Go dependency license report.
     cmds:
       - go-licenses report ./... --template "{{.LICENSE_TEMPLATE_PATH}}" --ignore "{{.COMMON_PRODUCT_GITPATH}}" > "{{.LICENSE_GO_FILENAME}}"
 
   cloc:
+    desc: Count lines of code in the repository using configured exclusions.
     cmds:
       - |
         cloc \
@@ -43,24 +46,29 @@ tasks:
           .
 
   cloc-multi:
+    desc: Run the GitHub Actions CLOC reporting workflow locally with act.
     cmds:
       - gh act workflow_dispatch -W "./.github/workflows/cloc-report.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}"
 
   godepgraph:
+    desc: Generate the Go dependency graph.
     cmds:
       - task: go:depgraph
 
   upgrade-do:
+    desc: Upgrade JavaScript and Go dependencies.
     cmds:
       - pnpm up -r
       - task: go:upgrade-do
 
   upgrade-check:
+    desc: Check for outdated JavaScript and Go dependencies.
     cmds:
       - task: go:upgrade-check
       - pnpm outdated -r || true
 
   upgrade-pnpm:
+    desc: Activate and configure the required pnpm version through Corepack.
     cmds:
       - corepack enable
       - asdf reshim nodejs
@@ -69,14 +77,16 @@ tasks:
       - asdf reshim nodejs
 
   upgrade-nodejs:
+    desc: Install and activate the required Node.js version, then update pnpm.
     cmds:
       - asdf install nodejs v24.14.0
       - asdf set nodejs v24.14.0
-      - task: uppnpm
+      - task: upgrade-pnpm
       - cmd: echo '***Search and update builds***'
         silent: true
 
   install-go-tools:
+    desc: Install Wails, Go license tooling, and the configured Go development tools.
     cmds:
       - "{{.INSTALL_TOOL_WAILS}}"
       - "{{.INSTALL_TOOL_GO_LICENSES}}"
@@ -85,6 +95,7 @@ tasks:
         silent: true
 
   upgrade-go:
+    desc: Install and activate the configured Go version and reinstall Go tools.
     vars:
       GO_VERSION: 1.27.0
     cmds:
@@ -110,96 +121,116 @@ tasks:
         silent: true
 
   build-linux:
+    desc: Build the Linux production application package.
     cmds:
       # we dont setup task inside github action, so redirecting these prod builds to pnpm
       - "{{.LINUX_BUILD_COMMAND}}"
 
   build-mac:
+    desc: Build the macOS production application package.
     cmds:
       # we dont setup task inside github action, so redirecting these prod builds to pnpm
       - "{{.MACOS_BUILD_COMMAND}}"
 
   build-win:
+    desc: Build the Windows production application package.
     cmds:
       # we dont setup task inside github action, so redirecting these prod builds to pnpm
       - "{{.WIN_BUILD_COMMAND}}"
 
   build-withbindings:
+    desc: Build the Wails application with generated bindings and developer tools enabled.
     cmds:
       - pnpm run touch:tmp
       - cd "{{.GO_BACKEND_DIR}}" && wails build -devtools -m -tags webkit2_41 -clean -v 2 -ldflags="-X main.Version={{.COMMON_APP_DEV_VERSION}}" > "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}/log.txt" 2>&1
 
   pack-flatpak:
+    desc: Run the Flatpak packaging workflow locally with act.
     cmds:
       - gh act -v workflow_dispatch -W "./.github/workflows/flatpak.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}" --input tag="{{.COMMON_APP_DEV_VERSION}}"
 
   pack-nsis:
+    desc: Run the NSIS Windows installer packaging workflow locally with act.
     cmds:
       - gh act workflow_dispatch -W "./.github/workflows/nsispak.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}" --input tag="{{.COMMON_APP_DEV_VERSION}}"
 
   pack-macpkg:
+    desc: Run the macOS package workflow locally with act.
     cmds:
       - gh act workflow_dispatch -W "./.github/workflows/macpkg.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}" --input tag="{{.COMMON_APP_DEV_VERSION}}"
 
   run-dev:
+    desc: Start the Wails application in development mode.
     cmds:
       - pnpm run touch:tmp
       - cd "{{.GO_BACKEND_DIR}}" && wails dev -s -v 2 -tags webkit2_41 -ldflags="-X main.Version={{.COMMON_APP_DEV_VERSION}}"
 
   run-watch:
+    desc: Build the frontend for Wails and start the development application.
     cmds:
       - pnpm -F frontend run build:wails
       - task: run-dev
 
   lint-gopls:
+    desc: Run Go linting through gopls.
     cmds:
       - task: go:lint-gopls
 
   lint-go-fix-specific:
+    desc: Apply automatic fixes for the configured specific Go linter.
     cmds:
       - task: go:lint-fix-specific
         vars:
           SPECIFIC_LINTER: "godot"
 
   lint-go-sort:
+    desc: Sort Go imports and apply Go lint sorting fixes.
     cmds:
       - pnpm run touch:tmp
       - task: go:lint-sort
 
   lint-go-fix:
+    desc: Apply automatic fixes for Go lint issues.
     cmds:
       - task: go:lint-fix
 
   lint-go:
+    desc: Run Go lint checks.
     cmds:
       - pnpm run touch:tmp
       - task: go:lint
 
   lint:
+    desc: Run Go and frontend lint checks.
     cmds:
       - task: lint-go
       - pnpm -F frontend run lint
 
   fmt-go:
+    desc: Format Go source files.
     cmds:
       - task: go:fmt
 
   test-go:
+    desc: Run Go tests and generate coverage output.
     cmds:
       - pnpm run touch:tmp
       - task: go:coverage
 
   test:
+    desc: Run Go and frontend test suites.
     cmds:
       - task: test-go
       - pnpm -F frontend run test
 
   lt-go:
+    desc: Run Go linting and tests.
     cmds:
       - task: lint-go
       - task: test-go
 
   lt:
+    desc: Run all linting and test suites.
     cmds:
       - task: lint
       - task: test

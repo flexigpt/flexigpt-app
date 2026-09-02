@@ -31,11 +31,10 @@ func InitSkillStoreWrapper(
 	workspaceSkills *workspaceadapter.Adapter,
 ) error {
 	if wrapper == nil || components == nil || workspaceSkills == nil {
-		return errors.New("skill bundle wrapper dependencies are incomplete")
+		return errors.New("skill store wrapper dependencies are incomplete")
 	}
 	autoAdoptionIDProvider := artifact.UUIDArtifactIDProvider()
 	api, err := skillBundle.New(skillBundle.Dependencies{
-		Roots:                  components.Roots,
 		Sources:                components.Sources,
 		Collections:            components.Collections,
 		Artifacts:              components.Artifacts,
@@ -317,7 +316,9 @@ func (w *SkillStoreWrapper) ListBundleSkills(
 	})
 }
 
-func (w *SkillStoreWrapper) GetSkillRuntimeCatalogID(
+// RuntimeCatalogIDForCollection maps durable Collection identity to the
+// runtime-owned opaque catalog identity. It does not read Skill content.
+func (w *SkillStoreWrapper) RuntimeCatalogIDForCollection(
 	ref collection.CollectionRef,
 ) (skillRuntime.CatalogID, error) {
 	return middleware.WithRecoveryResp(
@@ -327,15 +328,22 @@ func (w *SkillStoreWrapper) GetSkillRuntimeCatalogID(
 	)
 }
 
-func (w *SkillStoreWrapper) ResolveSkillRuntimeProjection(
+// ResolveArtifactSkillRegistration performs the Store-owned ArtifactRef to
+// runtime registration translation. Callers synchronize the containing
+// catalog through SkillRuntimeWrapper before creating a runtime session.
+func (w *SkillStoreWrapper) ResolveArtifactSkillRegistration(
 	ref artifact.ArtifactRef,
-) (skillStore.ResolvedArtifactSkill, error) {
+) (skillRuntime.SkillRegistration, error) {
 	return middleware.WithRecoveryResp(
-		func() (skillStore.ResolvedArtifactSkill, error) {
-			return w.router.ResolveArtifactSkill(
-				context.Background(),
-				ref,
-			)
+		func() (skillRuntime.SkillRegistration, error) {
+			value, err := w.router.ResolveArtifactSkill(context.Background(), ref)
+			if err != nil {
+				return skillRuntime.SkillRegistration{}, err
+			}
+			return skillRuntime.SkillRegistration{
+				Definition: value.Definition,
+				Revision:   value.Version,
+			}, nil
 		},
 	)
 }

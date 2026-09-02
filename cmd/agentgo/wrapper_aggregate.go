@@ -43,7 +43,7 @@ type AggregrateWrapper struct {
 	modelPresetStore *modelpresetStore.ModelPresetStore
 	settingStore     *settingStore.SettingStore
 	toolStore        *toolStore.ToolStore
-	skillRuntime     *skillAggregate.Service
+	artifactSkills   *skillAggregate.Service
 	providersetAPI   *inferencewrapper.ProviderSetAPI
 
 	appContext          context.Context
@@ -57,18 +57,18 @@ func InitAggregrateWrapper(
 	mps *modelpresetStore.ModelPresetStore,
 	ss *settingStore.SettingStore,
 	ts *toolStore.ToolStore,
-	skillRt *skillAggregate.Service,
+	artifactSkills *skillAggregate.Service,
 	mr *mcpRuntime.MCPRuntimeManager,
 	workspaceAPI *workspace.API,
 ) error {
-	if agg == nil || ts == nil || mps == nil || ss == nil || skillRt == nil || workspaceAPI == nil {
+	if agg == nil || ts == nil || mps == nil || ss == nil || artifactSkills == nil || workspaceAPI == nil {
 		panic("initializing aggregate store wrapper on nil receivers")
 	}
 
 	agg.toolStore = ts
 	agg.modelPresetStore = mps
 	agg.settingStore = ss
-	agg.skillRuntime = skillRt
+	agg.artifactSkills = artifactSkills
 
 	defaultDebugConfig := inferencewrapper.DefaultDebugConfig()
 
@@ -88,12 +88,12 @@ func InitAggregrateWrapper(
 	p, err := inferencewrapper.NewProviderSetAPI(
 		agg.toolStore,
 		agg.modelPresetStore,
-		agg.skillRuntime,
+		agg.artifactSkills,
 		bridge,
 		workspaceBridge,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&defaultDebugConfig),
-		inferencewrapper.WithSkillsRunScriptEnabled(skillRt.RunScriptsEnabled()),
+		inferencewrapper.WithSkillsRunScriptEnabled(artifactSkills.RunScriptsEnabled()),
 	)
 	if err != nil {
 		return errors.Join(err, errors.New("invalid default provider"))

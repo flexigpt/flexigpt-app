@@ -1,7 +1,6 @@
 package bundle
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -11,17 +10,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-type RootLister interface {
-	List(ctx context.Context) ([]root.Root, error)
-}
-
 type Dependencies struct {
-	Roots                  RootLister
 	Sources                *source.Service
 	Collections            *collection.Service
 	Artifacts              *artifact.Service
@@ -36,8 +29,7 @@ type Dependencies struct {
 }
 
 func (d Dependencies) Validate() error {
-	if d.Roots == nil ||
-		d.Sources == nil ||
+	if d.Sources == nil ||
 		d.Collections == nil ||
 		d.Artifacts == nil ||
 		d.Refresh == nil ||
