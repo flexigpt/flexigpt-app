@@ -419,6 +419,8 @@ linters:
           alias: inferenceSpec
         - pkg: "github.com/flexigpt/llmtools-go/spec"
           alias: llmtoolsSpec
+        - pkg: "github.com/flexigpt/agentskills-go/runtime"
+          alias: agentskillsRuntime
         - pkg: "github.com/flexigpt/agentskills-go/runtime/spec"
           alias: agentskillsRuntimeSpec
         - pkg: github.com/flexigpt/flexigpt-app/frontend
@@ -435,8 +437,14 @@ linters:
           alias: ${1}Runtime
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/discovery
           alias: ${1}Discovery
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/aggregate
+          alias: ${1}Aggregate
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/artifact
           alias: ${1}Artifact
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/artifact
+          alias: ${1}Artifact
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/bundle
+          alias: ${1}Bundle
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/bundle
           alias: ${1}Bundle
 

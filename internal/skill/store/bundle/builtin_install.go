@@ -19,7 +19,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 )
 
 // builtInSkillArtifactPolicy deliberately creates no observed Artifacts.

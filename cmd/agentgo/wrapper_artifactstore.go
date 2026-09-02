@@ -16,8 +16,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
-	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/bundle"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
+	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/store/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
 

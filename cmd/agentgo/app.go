@@ -24,7 +24,9 @@ type App struct {
 	modelPresetStoreAPI     *ModelPresetStoreWrapper
 	toolStoreAPI            *ToolStoreWrapper
 	toolRuntimeAPI          *ToolRuntimeWrapper
-	skillBundleAPI          *SkillBundleWrapper
+	skillStoreAPI           *SkillStoreWrapper
+	skillRuntimeAPI         *SkillRuntimeWrapper
+	skillAggregateAPI       *SkillAggregateWrapper
 	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
@@ -111,7 +113,9 @@ func NewApp() *App {
 	app.conversationStoreAPI = &ConversationCollectionWrapper{}
 	app.modelPresetStoreAPI = &ModelPresetStoreWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
-	app.skillBundleAPI = &SkillBundleWrapper{}
+	app.skillStoreAPI = &SkillStoreWrapper{}
+	app.skillRuntimeAPI = &SkillRuntimeWrapper{}
+	app.skillAggregateAPI = &SkillAggregateWrapper{}
 	app.mcpAPI = &MCPWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
@@ -261,20 +265,46 @@ func (a *App) initManagers() {
 	}
 	slog.Info("workspace initialized")
 
-	err = InitSkillBundleWrapper(
-		a.skillBundleAPI,
+	err = InitSkillStoreWrapper(
+		a.skillStoreAPI,
 		a.artifactStoreAPI.components,
 		a.workspaceAPI.api.SkillAdapter(),
 	)
 	if err != nil {
 		slog.Error(
-			"couldn't initialize artifact-backed Skill bundles",
+			"couldn't initialize artifact-backed Skill store",
 			"error", err,
 		)
-		panic("failed to initialize managers: skill bundle initialization failed\n" + err.Error())
+		panic("failed to initialize managers: Skill store initialization failed\n" + err.Error())
 	}
-	slog.Info("artifact-backed skill bundles initialized")
+	slog.Info("artifact-backed Skill store initialized")
 
+	err = InitSkillRuntimeWrapper(
+		a.skillRuntimeAPI,
+		a.skillStoreAPI.catalogSource,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Skill runtime",
+			"error", err,
+		)
+		panic("failed to initialize managers: Skill runtime initialization failed\n" + err.Error())
+	}
+	slog.Info("skill runtime initialized")
+
+	err = InitSkillAggregateWrapper(
+		a.skillAggregateAPI,
+		a.skillStoreAPI,
+		a.skillRuntimeAPI,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Skill aggregate",
+			"error", err,
+		)
+		panic("failed to initialize managers: Skill aggregate initialization failed\n" + err.Error())
+	}
+	slog.Info("skill aggregate initialized")
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
 		slog.Error(
@@ -305,7 +335,7 @@ func (a *App) initManagers() {
 	err = EnsureBuiltinArtifactTopology(
 		context.Background(),
 		a.artifactStoreAPI.components,
-		a.skillBundleAPI,
+		a.skillStoreAPI,
 		a.mcpAPI,
 	)
 	if err != nil {
@@ -340,7 +370,7 @@ func (a *App) initManagers() {
 		a.assistantPresetsDirPath,
 		a.modelPresetStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.skillBundleAPI.runtime,
+		a.skillAggregateAPI.service,
 		a.mcpAPI.bundleAPI,
 		a.mcpAPI.runtime,
 	)
@@ -362,7 +392,7 @@ func (a *App) initManagers() {
 		a.modelPresetStoreAPI.store,
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.skillBundleAPI.runtime,
+		a.skillAggregateAPI.service,
 		a.mcpAPI.runtime,
 		a.workspaceAPI.api,
 	)
@@ -383,9 +413,6 @@ func (a *App) startup(ctx context.Context) { //nolint:all
 
 	// Load the frontend.
 	runtime.WindowShow(a.ctx)
-	if a.skillBundleAPI != nil {
-		a.skillBundleAPI.startBackgroundWarmup(a.ctx)
-	}
 }
 
 // domReady is called after front-end resources have been loaded.
@@ -418,12 +445,16 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.settingStoreAPI != nil {
 		a.settingStoreAPI.close()
 	}
+	if a.skillAggregateAPI != nil {
+		a.skillAggregateAPI.close()
+	}
+	if a.skillRuntimeAPI != nil {
+		a.skillRuntimeAPI.close()
+	}
 	if a.workspaceAPI != nil {
 		a.workspaceAPI.close()
 	}
-	if a.skillBundleAPI != nil {
-		a.skillBundleAPI.close()
-	}
+
 	if a.artifactStoreAPI != nil {
 		a.artifactStoreAPI.close()
 	}

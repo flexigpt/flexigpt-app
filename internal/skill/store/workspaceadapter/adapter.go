@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -373,8 +373,7 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 
 // resolveRuntimeLocation performs the Workspace-owned handoff from a selected
 // source-linked record to a native filesystem skill package. It does not
-// register or execute the skill. Agent Skills runtime lifecycle remains in
-// skillRuntime.
+// register or execute the skill. Agent Skills runtime lifecycle remains in skillRuntime.
 func (f *Adapter) runtimeSource(
 	ctx context.Context,
 	item spec.LoadPlanItem,

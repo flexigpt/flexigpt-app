@@ -1,4 +1,4 @@
-package skillruntime
+package aggregate
 
 import (
 	"errors"
@@ -23,6 +23,7 @@ const maxSkillToolArgsBytes = 1 << 20
 type RuntimeSkillFilter struct {
 	Types          []string               `json:"types,omitempty"`
 	Inserts        []document.SkillInsert `json:"inserts,omitempty"`
+	NamePrefix     string                 `json:"namePrefix,omitempty"`
 	LocationPrefix string                 `json:"locationPrefix,omitempty"`
 	AllowArtifacts []artifact.ArtifactRef `json:"allowArtifacts,omitempty"`
 

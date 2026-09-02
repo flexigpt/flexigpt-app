@@ -1,21 +1,19 @@
-package skillruntime
+package aggregate
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"maps"
 	"slices"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/agentskills-go/provider"
-	"github.com/flexigpt/agentskills-go/provider/fs"
+
 	"github.com/flexigpt/agentskills-go/runtime"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
@@ -23,165 +21,53 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
+	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 )
 
 var errSkillInvalidRequest = errors.New("invalid request")
 
-const (
-	runtimeResyncTimeout             = 30 * time.Second
-	runtimeForegroundValidateTimeout = 15 * time.Second
-)
-
-// SkillRuntime owns the in-memory Agent Skills catalog, provider lifecycle,
-// sessions, prompt generation, rendering, and tool invocation.
-type SkillRuntime struct {
-	resolver          *ArtifactRouter
-	runtime           *runtime.Runtime
-	runScriptsEnabled bool
-
-	rtResyncMu sync.Mutex
-
+// Service translates Artifact Store identities into runtime-owned terms.
+// Agent Skills state and lifecycle are owned by runtime.Service.
+type Service struct {
+	resolver    *skillStore.ArtifactRouter
+	runtime     *skillRuntime.Service
 	lifecycleMu sync.RWMutex
 	closed      bool
-
-	// These maps are only an ephemeral inventory of provider registrations.
-	// Artifact Store remains the source of truth for every Artifact decision.
-	managedCollections map[collection.CollectionRef]runtimeDesiredView
-	managedRuntime     map[provider.SkillDef]string
 }
 
-type skillRuntimeOptions struct {
-	runtime              *runtime.Runtime
-	resolver             *ArtifactRouter
-	runScriptsEnabled    bool
-	runScriptsConfigured bool
-}
-
-type SkillRuntimeOption func(*skillRuntimeOptions) error
-
-func WithRuntime(value *runtime.Runtime) SkillRuntimeOption {
-	return func(options *skillRuntimeOptions) error {
-		if value == nil {
-			return errors.New("skill runtime is nil")
-		}
-		options.runtime = value
-		return nil
-	}
-}
-
-func WithArtifactResolver(
-	value *ArtifactRouter,
-) SkillRuntimeOption {
-	return func(options *skillRuntimeOptions) error {
-		if value == nil {
-			return errors.New("artifact skill resolver is nil")
-		}
-		options.resolver = value
-		return nil
-	}
-}
-
-// WithRunScripts configures the shared filesystem-provider execution policy.
-// Workspace filesystem skills and installed filesystem skills always use this
-// same provider and therefore this same policy.
-func WithRunScripts(enabled bool) SkillRuntimeOption {
-	return func(options *skillRuntimeOptions) error {
-		options.runScriptsEnabled = enabled
-		options.runScriptsConfigured = true
-		return nil
-	}
-}
-
-// NewSkillRuntime creates an Artifact-backed Agent Skills runtime. Durable
-// Skill identity is always artifact.ArtifactRef; no standalone Skill Store,
-// bundle slug, legacy Skill ID, or source location enters this package.
-func NewSkillRuntime(
-	opts ...SkillRuntimeOption,
-) (*SkillRuntime, error) {
-	options := skillRuntimeOptions{}
-	for _, option := range opts {
-		if option != nil {
-			if err := option(&options); err != nil {
-				return nil, err
-			}
-		}
-	}
-	if options.resolver == nil {
+func New(
+	resolver *skillStore.ArtifactRouter,
+	runtimeService *skillRuntime.Service,
+) (*Service, error) {
+	if resolver == nil {
 		return nil, errors.New("artifact skill resolver is required")
 	}
-	if options.runtime == nil {
-		runScriptsEnabled := false
-		if options.runScriptsConfigured {
-			runScriptsEnabled = options.runScriptsEnabled
-		}
-		filesystemProvider, err := fs.New(
-			fs.WithRunScripts(runScriptsEnabled),
-		)
-		if err != nil {
-			return nil, err
-		}
-		options.runtime, err = runtime.New(
-			runtime.WithProvider(filesystemProvider),
-		)
-		if err != nil {
-			return nil, err
-		}
-		options.runScriptsEnabled = runScriptsEnabled
-	} else if !options.runScriptsConfigured {
-		options.runScriptsEnabled = false
+	if runtimeService == nil {
+		return nil, errors.New("skill runtime service is required")
 	}
 
-	value := &SkillRuntime{
-		resolver:           options.resolver,
-		runtime:            options.runtime,
-		runScriptsEnabled:  options.runScriptsEnabled,
-		managedCollections: map[collection.CollectionRef]runtimeDesiredView{},
-		managedRuntime:     map[provider.SkillDef]string{},
-	}
-	return value, nil
+	return &Service{
+		resolver: resolver,
+		runtime:  runtimeService,
+	}, nil
 }
 
-func (s *SkillRuntime) AgentSkillsRuntime() *runtime.Runtime {
+func (s *Service) AgentSkillsRuntime() *runtime.Runtime {
 	if s == nil || s.isClosed() {
 		return nil
 	}
-	return s.runtime
+	return s.runtime.AgentSkillsRuntime()
 }
 
-// RunScriptsEnabled reports the effective shared filesystem-provider policy.
-// Inference composition uses this value only to decide whether
-// skills-runscript is advertised to the model.
-func (s *SkillRuntime) RunScriptsEnabled() bool {
+func (s *Service) RunScriptsEnabled() bool {
 	if s == nil || s.isClosed() {
 		return false
 	}
-	return s.runScriptsEnabled
+	return s.runtime.SupportsRunScript()
 }
 
-// ManagedCollectionRefs returns derived runtime partitions. Collection kind is
-// deliberately not encoded in a Skill reference; application feature
-// synchronizers use their own typed Collection discovery to decide removal.
-func (s *SkillRuntime) ManagedCollectionRefs() []collection.CollectionRef {
-	if s == nil {
-		return nil
-	}
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
-
-	output := make([]collection.CollectionRef, 0, len(s.managedCollections))
-	for ref := range s.managedCollections {
-		output = append(output, ref)
-	}
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].RootID != output[right].RootID {
-			return output[left].RootID < output[right].RootID
-		}
-		return output[left].CollectionID < output[right].CollectionID
-	})
-	return output
-}
-
-func (s *SkillRuntime) Close() {
+func (s *Service) Close() {
 	if s == nil {
 		return
 	}
@@ -193,36 +79,9 @@ func (s *SkillRuntime) Close() {
 	}
 	s.closed = true
 	s.lifecycleMu.Unlock()
-
-	s.rtResyncMu.Lock()
-	if s.runtime != nil && len(s.managedRuntime) != 0 {
-		ctx, cancel := context.WithTimeout(
-			context.Background(),
-			runtimeResyncTimeout,
-		)
-		remaining, err := s.runtimeApplyDesired(
-			ctx,
-			s.managedRuntime,
-			newRuntimeDesiredView(),
-			runtimeApplyBestEffort,
-		)
-		cancel()
-		if err != nil || len(remaining) != 0 {
-			slog.Error(
-				"remove managed Skill runtime registrations during close",
-				"remaining",
-				len(remaining),
-				"error",
-				err,
-			)
-		}
-	}
-	s.managedCollections = map[collection.CollectionRef]runtimeDesiredView{}
-	s.managedRuntime = map[provider.SkillDef]string{}
-	s.rtResyncMu.Unlock()
 }
 
-func (s *SkillRuntime) CreateSkillSession(
+func (s *Service) CreateSkillSession(
 	ctx context.Context,
 	req *CreateSkillSessionRequest,
 ) (*CreateSkillSessionResponse, error) {
@@ -232,11 +91,11 @@ func (s *SkillRuntime) CreateSkillSession(
 	if req == nil || req.Body == nil {
 		return nil, fmt.Errorf("%w: missing request", errSkillInvalidRequest)
 	}
-	if len(req.Body.AllowArtifacts) == 0 {
-		return nil, fmt.Errorf("%w: allowArtifacts required", errSkillInvalidRequest)
-	}
-	if err := validateArtifactRefs(req.Body.AllowArtifacts); err != nil {
-		return nil, fmt.Errorf("%w: invalid allowArtifacts: %w", errSkillInvalidRequest, err)
+	allowedConfigured := req.Body.AllowArtifacts != nil
+	if allowedConfigured {
+		if err := validateArtifactRefs(req.Body.AllowArtifacts); err != nil {
+			return nil, fmt.Errorf("%w: invalid allowArtifacts: %w", errSkillInvalidRequest, err)
+		}
 	}
 	if err := validateArtifactRefs(req.Body.ActiveArtifacts); err != nil {
 		return nil, fmt.Errorf("%w: invalid activeArtifacts: %w", errSkillInvalidRequest, err)
@@ -244,14 +103,21 @@ func (s *SkillRuntime) CreateSkillSession(
 
 	previousSessionID := strings.TrimSpace(string(req.Body.CloseSessionID))
 
-	resolved, err := s.resolveAllowArtifacts(ctx, req.Body.AllowArtifacts)
+	refsToResolve := req.Body.AllowArtifacts
+	if !allowedConfigured {
+		refsToResolve = req.Body.ActiveArtifacts
+	}
+	resolved, err := s.resolveAllowArtifacts(ctx, refsToResolve)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errSkillInvalidRequest, err)
 	}
-	activeRefs := subsetArtifacts(
-		req.Body.AllowArtifacts,
-		req.Body.ActiveArtifacts,
-	)
+	activeRefs := req.Body.ActiveArtifacts
+	if allowedConfigured {
+		activeRefs = subsetArtifacts(
+			req.Body.AllowArtifacts,
+			req.Body.ActiveArtifacts,
+		)
+	}
 	activeDefinitions := map[provider.SkillDef]struct{}{}
 	for _, ref := range activeRefs {
 		if definition, found := resolved.RefToDef[artifactRefKey(ref)]; found {
@@ -274,6 +140,14 @@ func (s *SkillRuntime) CreateSkillSession(
 			),
 		)
 	}
+	if allowedConfigured {
+		// The option is omitted only when the caller omitted allowArtifacts.
+		// A configured empty list intentionally creates a deny-all session.
+		options = append(
+			options,
+			runtime.WithSessionAllowedSkills(resolved.AllowDefs),
+		)
+	}
 	if len(activeDefs) > 0 {
 		options = append(
 			options,
@@ -286,7 +160,7 @@ func (s *SkillRuntime) CreateSkillSession(
 		return nil, err
 	}
 
-	records, err := s.runtime.ListSkills(ctx, &runtime.SkillListFilter{
+	records, err := s.runtime.ListAgentSkills(ctx, &runtime.SkillListFilter{
 		SessionID:   sessionID,
 		Activity:    agentskillsRuntimeSpec.SkillActivityActive,
 		AllowSkills: resolved.AllowDefs,
@@ -319,7 +193,7 @@ func (s *SkillRuntime) CreateSkillSession(
 	}, nil
 }
 
-func (s *SkillRuntime) CloseSkillSession(
+func (s *Service) CloseSkillSession(
 	ctx context.Context,
 	req *CloseSkillSessionRequest,
 ) (*CloseSkillSessionResponse, error) {
@@ -335,7 +209,7 @@ func (s *SkillRuntime) CloseSkillSession(
 	return &CloseSkillSessionResponse{}, nil
 }
 
-func (s *SkillRuntime) GetSkillsPrompt(
+func (s *Service) GetSkillsPrompt(
 	ctx context.Context,
 	req *GetSkillsPromptRequest,
 ) (*GetSkillsPromptResponse, error) {
@@ -347,13 +221,16 @@ func (s *SkillRuntime) GetSkillsPrompt(
 	}
 
 	filterRequest := req.Body.Filter
-	if len(filterRequest.AllowArtifacts) == 0 {
-		return &GetSkillsPromptResponse{
-			Body: &GetSkillsPromptResponseBody{},
-		}, nil
-	}
-	if err := validateArtifactRefs(filterRequest.AllowArtifacts); err != nil {
-		return nil, fmt.Errorf("%w: invalid allowArtifacts: %w", errSkillInvalidRequest, err)
+	resolved := resolvedAllowArtifacts{}
+	if len(filterRequest.AllowArtifacts) != 0 {
+		if err := validateArtifactRefs(filterRequest.AllowArtifacts); err != nil {
+			return nil, fmt.Errorf("%w: invalid allowArtifacts: %w", errSkillInvalidRequest, err)
+		}
+		var err error
+		resolved, err = s.resolveAllowArtifacts(ctx, filterRequest.AllowArtifacts)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(filterRequest.Inserts) > 0 &&
 		!containsInstructionInsert(filterRequest.Inserts) {
@@ -362,19 +239,10 @@ func (s *SkillRuntime) GetSkillsPrompt(
 		}, nil
 	}
 
-	resolved, err := s.resolveAllowArtifacts(ctx, filterRequest.AllowArtifacts)
-	if err != nil {
-		return nil, err
-	}
-	if len(resolved.AllowDefs) == 0 {
-		return &GetSkillsPromptResponse{
-			Body: &GetSkillsPromptResponseBody{},
-		}, nil
-	}
-
 	prompt, err := s.runtime.SkillsPrompt(ctx, &runtime.SkillFilter{
 		Types:          append([]string(nil), filterRequest.Types...),
 		LocationPrefix: filterRequest.LocationPrefix,
+		NamePrefix:     filterRequest.NamePrefix,
 		AllowSkills:    resolved.AllowDefs,
 		SessionID:      filterRequest.SessionID,
 		Activity:       filterRequest.Activity,
@@ -387,7 +255,7 @@ func (s *SkillRuntime) GetSkillsPrompt(
 	}, nil
 }
 
-func (s *SkillRuntime) ListRuntimeSkills(
+func (s *Service) ListRuntimeSkills(
 	ctx context.Context,
 	req *ListRuntimeSkillsRequest,
 ) (*ListRuntimeSkillsResponse, error) {
@@ -434,7 +302,7 @@ func (s *SkillRuntime) ListRuntimeSkills(
 		}, nil
 	}
 
-	records, err := s.runtime.ListSkills(ctx, &runtime.SkillListFilter{
+	records, err := s.runtime.ListAgentSkills(ctx, &runtime.SkillListFilter{
 		Types:          append([]string(nil), filterRequest.Types...),
 		LocationPrefix: filterRequest.LocationPrefix,
 		AllowSkills:    resolved.AllowDefs,
@@ -449,7 +317,7 @@ func (s *SkillRuntime) ListRuntimeSkills(
 	active := map[provider.SkillDef]struct{}{}
 	if filterRequest.SessionID != "" &&
 		activity == agentskillsRuntimeSpec.SkillActivityAny {
-		current, err := s.runtime.ListSkills(ctx, &runtime.SkillListFilter{
+		current, err := s.runtime.ListAgentSkills(ctx, &runtime.SkillListFilter{
 			SessionID:   filterRequest.SessionID,
 			Activity:    agentskillsRuntimeSpec.SkillActivityActive,
 			AllowSkills: resolved.AllowDefs,
@@ -495,7 +363,7 @@ func (s *SkillRuntime) ListRuntimeSkills(
 	}, nil
 }
 
-func (s *SkillRuntime) RenderSkill(
+func (s *Service) RenderSkill(
 	ctx context.Context,
 	req *RenderSkillRequest,
 ) (*RenderSkillResponse, error) {
@@ -513,7 +381,7 @@ func (s *SkillRuntime) RenderSkill(
 	if !found {
 		return nil, ErrSkillNotFound
 	}
-	out, err := s.runtime.RenderSkill(ctx, runtime.RenderSkillParams{
+	out, err := s.runtime.RenderAgentSkill(ctx, runtime.RenderSkillParams{
 		Def:       resolved.Definition,
 		Arguments: req.Body.Arguments,
 	})
@@ -541,7 +409,7 @@ func (s *SkillRuntime) RenderSkill(
 // the ownership router before reading Agent Skills metadata. The Artifact
 // record and its Collection membership, rather than reference shape, decide
 // the owning feature adapter.
-func (s *SkillRuntime) DescribeArtifactSkill(
+func (s *Service) DescribeArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (ArtifactSkillSummary, error) {
@@ -569,7 +437,7 @@ func (s *SkillRuntime) DescribeArtifactSkill(
 		)
 	}
 
-	records, err := s.runtime.ListSkills(ctx, &runtime.SkillListFilter{
+	records, err := s.runtime.ListAgentSkills(ctx, &runtime.SkillListFilter{
 		AllowSkills: []provider.SkillDef{resolved.Definition},
 		Activity:    agentskillsRuntimeSpec.SkillActivityAny,
 	})
@@ -597,7 +465,7 @@ func (s *SkillRuntime) DescribeArtifactSkill(
 	)
 }
 
-func (s *SkillRuntime) InvokeSkillTool(
+func (s *Service) InvokeSkillTool(
 	ctx context.Context,
 	req *InvokeSkillToolRequest,
 ) (*InvokeSkillToolResponse, error) {
@@ -642,7 +510,7 @@ func (s *SkillRuntime) InvokeSkillTool(
 	case "skills-readresource":
 		functionID = string(agentskillsRuntimeSpec.FuncIDSkillsReadResource)
 	case "skills-runscript":
-		if !s.runScriptsEnabled {
+		if !s.RunScriptsEnabled() {
 			return nil, fmt.Errorf(
 				"%w: skills-runscript is disabled by runtime policy",
 				errSkillInvalidRequest,
@@ -666,7 +534,7 @@ func (s *SkillRuntime) InvokeSkillTool(
 	return response, nil
 }
 
-func (s *SkillRuntime) ensureConfigured() error {
+func (s *Service) ensureConfigured() error {
 	if s == nil {
 		return errors.New("skill runtime is not configured")
 	}
@@ -680,7 +548,7 @@ func (s *SkillRuntime) ensureConfigured() error {
 	return nil
 }
 
-func (s *SkillRuntime) isClosed() bool {
+func (s *Service) isClosed() bool {
 	s.lifecycleMu.RLock()
 	defer s.lifecycleMu.RUnlock()
 	return s.closed
@@ -692,7 +560,7 @@ type resolvedAllowArtifacts struct {
 	AllowDefs      []provider.SkillDef
 }
 
-func (s *SkillRuntime) resolveAllowArtifacts(
+func (s *Service) resolveAllowArtifacts(
 	ctx context.Context,
 	refs []artifact.ArtifactRef,
 ) (resolvedAllowArtifacts, error) {
@@ -702,7 +570,6 @@ func (s *SkillRuntime) resolveAllowArtifacts(
 	}
 
 	seenRefs := map[string]struct{}{}
-	byName := map[string][]ResolvedArtifactSkill{}
 	resynced := map[collection.CollectionRef]error{}
 	unavailable := make([]artifact.ArtifactRef, 0)
 	for _, ref := range refs {
@@ -724,42 +591,31 @@ func (s *SkillRuntime) resolveAllowArtifacts(
 			unavailable = append(unavailable, ref)
 			continue
 		}
-		byName[value.Definition.Name] = append(
-			byName[value.Definition.Name],
-			value,
-		)
+		if previous, exists := output.DefToArtifacts[value.Definition]; exists && previous != value.Artifact {
+			return output, fmt.Errorf(
+				"%w: Artifact Skills %q and %q resolve to the same runtime definition",
+				basespec.ErrConflict,
+				previous.ArtifactID,
+				value.Artifact.ArtifactID,
+			)
+		}
+
+		output.DefToArtifacts[value.Definition] = value.Artifact
+		output.RefToDef[artifactRefKey(value.Artifact)] = value.Definition
+		output.AllowDefs = append(output.AllowDefs, value.Definition)
 	}
 	if len(unavailable) != 0 {
 		return output, unavailableArtifactSkillsError(unavailable)
 	}
 
-	collisions := make([]string, 0)
-	for name, values := range byName {
-		if len(values) != 1 {
-			collisions = append(collisions, name)
-			continue
-		}
-		value := values[0]
-		output.DefToArtifacts[value.Definition] = value.Artifact
-		output.RefToDef[artifactRefKey(value.Artifact)] = value.Definition
-		output.AllowDefs = append(output.AllowDefs, value.Definition)
-	}
-	if len(collisions) != 0 {
-		sort.Strings(collisions)
-		return output, fmt.Errorf(
-			"%w: ambiguous runtime Skill names: %s",
-			basespec.ErrConflict,
-			strings.Join(collisions, ", "),
-		)
-	}
 	sortSkillDefs(output.AllowDefs)
 	return output, nil
 }
 
-func (s *SkillRuntime) resolveArtifactSkill(
+func (s *Service) resolveArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (ResolvedArtifactSkill, bool) {
+) (skillStore.ResolvedArtifactSkill, bool) {
 	return s.resolveArtifactSkillWithResync(
 		ctx,
 		ref,
@@ -767,111 +623,47 @@ func (s *SkillRuntime) resolveArtifactSkill(
 	)
 }
 
-func (s *SkillRuntime) resolveArtifactSkillWithResync(
+func (s *Service) resolveArtifactSkillWithResync(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	resynced map[collection.CollectionRef]error,
-) (ResolvedArtifactSkill, bool) {
-	if resynced != nil {
-		if value, found := s.resolvedArtifactSkillFromResyncedCollections(ref, resynced); found {
-			return value, true
-		}
+) (skillStore.ResolvedArtifactSkill, bool) {
+	collectionRef, err := s.resolver.CollectionForArtifact(ctx, ref)
+	if err != nil {
+		return skillStore.ResolvedArtifactSkill{}, false
+	}
 
-		collectionRef, err := s.resolver.CollectionForArtifact(ctx, ref)
-		if err != nil {
-			return ResolvedArtifactSkill{}, false
+	if previous, found := resynced[collectionRef]; found {
+		if previous != nil {
+			return skillStore.ResolvedArtifactSkill{}, false
 		}
-		if previous, found := resynced[collectionRef]; found {
-			if previous != nil {
-				return ResolvedArtifactSkill{}, false
-			}
-		} else {
-			err := s.ResyncCollection(ctx, collectionRef)
+	} else {
+		err := s.ResyncCollection(ctx, collectionRef)
+		if resynced != nil {
 			resynced[collectionRef] = err
-			if err != nil {
-				return ResolvedArtifactSkill{}, false
-			}
 		}
-
-		return s.resolvedArtifactSkillFromResyncedCollections(
-			ref,
-			resynced,
-		)
+		if err != nil {
+			return skillStore.ResolvedArtifactSkill{}, false
+		}
 	}
 
 	value, err := s.resolver.ResolveArtifactSkill(ctx, ref)
-	if err != nil {
-		return ResolvedArtifactSkill{}, false
+	if err != nil || value.Collection != collectionRef {
+		return skillStore.ResolvedArtifactSkill{}, false
 	}
-
-	if err := s.ResyncCollection(ctx, value.Collection); err != nil {
-		return ResolvedArtifactSkill{}, false
+	if !s.registrationMatches(value) {
+		return skillStore.ResolvedArtifactSkill{}, false
 	}
-
-	if s.registrationMatches(value) {
-		return value, true
-	}
-
-	refreshed, err := s.resolver.ResolveArtifactSkill(ctx, ref)
-	if err != nil || refreshed.Collection != value.Collection {
-		return ResolvedArtifactSkill{}, false
-	}
-	if !s.registrationMatches(refreshed) {
-		return ResolvedArtifactSkill{}, false
-	}
-	return refreshed, true
+	return value, true
 }
 
-func (s *SkillRuntime) resolvedArtifactSkillFromResyncedCollections(
-	ref artifact.ArtifactRef,
-	resynced map[collection.CollectionRef]error,
-) (ResolvedArtifactSkill, bool) {
-	key := artifactRefKey(ref)
-
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
-
-	for collectionRef, resyncErr := range resynced {
-		if resyncErr != nil {
-			continue
-		}
-		view, found := s.managedCollections[collectionRef]
-		if !found {
-			continue
-		}
-
-		for definition, artifactKey := range view.artifacts {
-			if artifactKey != key {
-				continue
-			}
-			version, found := view.definitions[definition]
-			if !found || s.managedRuntime[definition] != version {
-				return ResolvedArtifactSkill{}, false
-			}
-
-			value := ResolvedArtifactSkill{
-				Artifact:   ref,
-				Collection: collectionRef,
-				Definition: definition,
-				Version:    version,
-			}
-			if err := value.Validate(); err != nil {
-				return ResolvedArtifactSkill{}, false
-			}
-			return value, true
-		}
-	}
-	return ResolvedArtifactSkill{}, false
-}
-
-func (s *SkillRuntime) registrationMatches(
-	value ResolvedArtifactSkill,
+func (s *Service) registrationMatches(
+	value skillStore.ResolvedArtifactSkill,
 ) bool {
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
-
-	version, found := s.managedRuntime[value.Definition]
-	return found && version == value.Version
+	return s.runtime.IsRegistered(skillRuntime.SkillRegistration{
+		Definition: value.Definition,
+		Revision:   value.Version,
+	})
 }
 
 func unavailableArtifactSkillsError(
@@ -977,4 +769,20 @@ func cloneSkillResourceInfo(
 ) provider.SkillResourceInfo {
 	input.Locations = append([]string(nil), input.Locations...)
 	return input
+}
+
+func artifactRefKey(ref artifact.ArtifactRef) string {
+	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
+}
+
+func sortSkillDefs(values []provider.SkillDef) {
+	sort.Slice(values, func(left, right int) bool {
+		if values[left].Type != values[right].Type {
+			return values[left].Type < values[right].Type
+		}
+		if values[left].Name != values[right].Name {
+			return values[left].Name < values[right].Name
+		}
+		return values[left].Location < values[right].Location
+	})
 }

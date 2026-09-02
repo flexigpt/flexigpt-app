@@ -28,7 +28,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 )
 
 type skillArtifactPolicy struct {

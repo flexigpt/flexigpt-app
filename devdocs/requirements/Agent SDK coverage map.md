@@ -506,7 +506,7 @@ This separation gives agents flexibility within a task while keeping business st
   - Current forms:
     - Provider `FunctionToolCall` / `CustomToolCall` output unions.
     - `runtime.InvokeMCPToolRequestBody`.
-    - `skillruntime.InvokeSkillToolRequest`.
+    - `skillRuntime.InvokeSkillToolRequest`.
   - Current responsibility:
     - Provider tool-call payloads can be preserved in conversation history.
     - MCP mappings bind provider tool names to server/tool/digest/policy.
@@ -518,7 +518,7 @@ This separation gives agents flexibility within a task while keeping business st
   - Current forms:
     - `toolruntime.InvokeToolResponseBody`.
     - `runtime.InvokeMCPToolResponseBody`.
-    - `skillruntime.InvokeSkillToolResponseBody`.
+    - `skillRuntime.InvokeSkillToolResponseBody`.
     - Provider tool-output unions.
   - Current responsibility:
     - Text, file, image, structured MCP content, error state, and MCP provenance are supported.

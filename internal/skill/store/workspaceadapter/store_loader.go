@@ -12,38 +12,38 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/skill/skillruntime"
+	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 )
 
-// RuntimeResolver adapts Workspace-owned Artifact projection to the generic
+// StoreLoader adapts Workspace-owned Artifact projection to the generic
 // Artifact-backed Skill Runtime router. The runtime package does not import
 // Workspace and cannot infer Workspace ownership from a reference shape.
-type RuntimeResolver struct {
+type StoreLoader struct {
 	adapter *Adapter
 }
 
-func NewRuntimeResolver(adapter *Adapter) (*RuntimeResolver, error) {
+func NewStoreLoader(adapter *Adapter) (*StoreLoader, error) {
 	if adapter == nil {
 		return nil, errors.New("workspace skill runtime resolver adapter is nil")
 	}
-	return &RuntimeResolver{adapter: adapter}, nil
+	return &StoreLoader{adapter: adapter}, nil
 }
 
-func (r *RuntimeResolver) ResolveArtifactSkill(
+func (r *StoreLoader) ResolveArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (skillruntime.ResolvedArtifactSkill, error) {
+) (skillStore.ResolvedArtifactSkill, error) {
 	value, err := r.adapter.LoadArtifact(ctx, ref)
 	if err != nil {
-		return skillruntime.ResolvedArtifactSkill{}, err
+		return skillStore.ResolvedArtifactSkill{}, err
 	}
-	return workspaceResolvedArtifactSkill(value)
+	return workspaceResolvedSkill(value)
 }
 
-func (r *RuntimeResolver) ListCollectionSkills(
+func (r *StoreLoader) ListCollectionSkills(
 	ctx context.Context,
 	workspace collection.CollectionRef,
-) ([]skillruntime.ResolvedArtifactSkill, error) {
+) ([]skillStore.ResolvedArtifactSkill, error) {
 	values, err := r.adapter.List(ctx, workspace)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (r *RuntimeResolver) ListCollectionSkills(
 		refs = append(refs, value.Artifact)
 	}
 	if len(refs) == 0 {
-		return []skillruntime.ResolvedArtifactSkill{}, nil
+		return []skillStore.ResolvedArtifactSkill{}, nil
 	}
 
 	plan, err := r.adapter.Load(ctx, workspace, refs)
@@ -77,9 +77,9 @@ func (r *RuntimeResolver) ListCollectionSkills(
 		)
 	}
 
-	output := make([]skillruntime.ResolvedArtifactSkill, 0, len(plan.Skills))
+	output := make([]skillStore.ResolvedArtifactSkill, 0, len(plan.Skills))
 	for _, value := range plan.Skills {
-		projected, err := workspaceResolvedArtifactSkill(value)
+		projected, err := workspaceResolvedSkill(value)
 		if err != nil {
 			return nil, err
 		}
@@ -88,9 +88,9 @@ func (r *RuntimeResolver) ListCollectionSkills(
 	return output, nil
 }
 
-func workspaceResolvedArtifactSkill(
+func workspaceResolvedSkill(
 	value WorkspaceSkill,
-) (skillruntime.ResolvedArtifactSkill, error) {
+) (skillStore.ResolvedArtifactSkill, error) {
 	if !value.ProjectionValid ||
 		!value.RuntimePathBacked ||
 		!value.WorkspaceEnabled ||
@@ -98,7 +98,7 @@ func workspaceResolvedArtifactSkill(
 		!value.Skill.IsEnabled ||
 		value.RuntimeDisabled ||
 		value.State != artifact.StateAvailable {
-		return skillruntime.ResolvedArtifactSkill{}, fmt.Errorf(
+		return skillStore.ResolvedArtifactSkill{}, fmt.Errorf(
 			"%w: Workspace Skill is not eligible for runtime registration",
 			basespec.ErrCatalogStale,
 		)
@@ -109,7 +109,7 @@ func workspaceResolvedArtifactSkill(
 		value.SourceGeneration + "\x00" +
 		strconv.FormatUint(value.ArtifactRevision, 10)
 
-	output := skillruntime.ResolvedArtifactSkill{
+	output := skillStore.ResolvedArtifactSkill{
 		Artifact:   value.Artifact,
 		Collection: value.Workspace,
 		Definition: provider.SkillDef{
@@ -122,7 +122,7 @@ func workspaceResolvedArtifactSkill(
 		),
 	}
 	if err := output.Validate(); err != nil {
-		return skillruntime.ResolvedArtifactSkill{}, err
+		return skillStore.ResolvedArtifactSkill{}, err
 	}
 	return output, nil
 }

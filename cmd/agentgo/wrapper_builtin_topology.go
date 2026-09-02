@@ -11,7 +11,7 @@ import (
 func EnsureBuiltinArtifactTopology(
 	ctx context.Context,
 	components *system.Components,
-	skills *SkillBundleWrapper,
+	skills *SkillStoreWrapper,
 	mcp *MCPWrapper,
 ) error {
 	if components == nil ||

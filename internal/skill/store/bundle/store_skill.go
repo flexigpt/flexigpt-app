@@ -16,12 +16,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 
-	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/artifact"
+	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 )
 
-// RuntimeSkill is the typed Skill Bundle handoff to application composition.
+// ResolvedSkill is the typed Skill Bundle handoff to application composition.
 // It is not persisted and is never exposed as a durable runtime identity.
-type RuntimeSkill struct {
+type ResolvedSkill struct {
 	Artifact   artifact.ArtifactRef
 	Collection collection.CollectionRef
 
@@ -30,13 +30,13 @@ type RuntimeSkill struct {
 	Version  string
 }
 
-// ListRuntimeSkills is deliberately fail-closed. A collection reconciliation
+// ListResolvedSkills is deliberately fail-closed. A collection reconciliation
 // must not retain a previous runtime definition when a current Artifact can no
 // longer be projected.
-func (a *API) ListRuntimeSkills(
+func (a *API) ListResolvedSkills(
 	ctx context.Context,
 	bundle collection.CollectionRef,
-) (output []RuntimeSkill, returnErr error) {
+) (output []ResolvedSkill, returnErr error) {
 	if err := a.Ready(); err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (a *API) ListRuntimeSkills(
 		eligible = append(eligible, record)
 	}
 	if len(eligible) == 0 {
-		return []RuntimeSkill{}, nil
+		return []ResolvedSkill{}, nil
 	}
 	if !bundleValue.Collection.Enabled {
 		return nil, fmt.Errorf(
@@ -93,7 +93,7 @@ func (a *API) ListRuntimeSkills(
 	}()
 
 	sourcesByID := make(map[basespec.SourceID]source.Source)
-	output = make([]RuntimeSkill, 0, len(eligible))
+	output = make([]ResolvedSkill, 0, len(eligible))
 	for _, record := range eligible {
 		sourceValue, found := sourcesByID[record.Binding.SourceID]
 		if !found {
@@ -108,7 +108,7 @@ func (a *API) ListRuntimeSkills(
 			sourcesByID[record.Binding.SourceID] = sourceValue
 		}
 
-		value, err := a.runtimeSkillFromSnapshot(
+		value, err := a.resolvedSkillFromSnapshot(
 			sessionCtx,
 			record,
 			bundleValue,
@@ -131,26 +131,26 @@ func (a *API) ListRuntimeSkills(
 	return output, nil
 }
 
-// LoadRuntimeSkill resolves one Artifact-backed Skill Bundle member.
+// ResolveSkill resolves one Artifact-backed Skill Bundle member.
 //
 // It verifies Artifact membership, Collection kind, Collection and Artifact
 // enablement, catalog currentness, definition compatibility, and the source
 // snapshot generation. Source adapters and MapStore remain responsible for
 // their own containment and filesystem behavior.
-func (a *API) LoadRuntimeSkill(
+func (a *API) ResolveSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (RuntimeSkill, error) {
+) (ResolvedSkill, error) {
 	if err := a.Ready(); err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
 	if err := ref.Validate(); err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
 
 	record, err := a.dependencies.Artifacts.Get(ctx, ref)
 	if err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
 
 	bundleRef := collection.CollectionRef{
@@ -159,12 +159,12 @@ func (a *API) LoadRuntimeSkill(
 	}
 	bundle, err := a.GetBundle(ctx, bundleRef)
 	if err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
 
 	snapshot, err := a.currentBundleCatalog(ctx, bundle)
 	if err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
 	sourceValue, err := a.dependencies.SourceRuntime.Get(
 		ctx,
@@ -172,9 +172,9 @@ func (a *API) LoadRuntimeSkill(
 		record.Binding.SourceID,
 	)
 	if err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
-	return a.runtimeSkillFromSnapshot(
+	return a.resolvedSkillFromSnapshot(
 		ctx,
 		record,
 		bundle,
@@ -183,23 +183,23 @@ func (a *API) LoadRuntimeSkill(
 	)
 }
 
-func (a *API) runtimeSkillFromSnapshot(
+func (a *API) resolvedSkillFromSnapshot(
 	ctx context.Context,
 	record artifact.Artifact,
 	bundle Bundle,
 	snapshot catalog.Snapshot,
 	sourceValue source.Source,
-) (RuntimeSkill, error) {
+) (ResolvedSkill, error) {
 	bundleRef := bundle.Collection.Ref()
 	if record.RootID != bundleRef.RootID ||
 		record.CollectionID != bundleRef.CollectionID {
-		return RuntimeSkill{}, fmt.Errorf(
+		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill Artifact belongs to another bundle",
 			basespec.ErrInvalid,
 		)
 	}
 	if !bundle.Collection.Enabled {
-		return RuntimeSkill{}, fmt.Errorf(
+		return ResolvedSkill{}, fmt.Errorf(
 			"%w: skill bundle %q is disabled",
 			basespec.ErrReferenceUnresolved,
 			bundleRef.CollectionID,
@@ -209,7 +209,7 @@ func (a *API) runtimeSkillFromSnapshot(
 		!record.Enabled ||
 		record.State != artifact.StateAvailable ||
 		record.ResolvedDefinition == nil {
-		return RuntimeSkill{}, fmt.Errorf(
+		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill Artifact %q is not enabled and available",
 			basespec.ErrReferenceUnresolved,
 			record.ID,
@@ -218,12 +218,12 @@ func (a *API) runtimeSkillFromSnapshot(
 
 	occurrence, err := currentSkillOccurrence(snapshot, record)
 	if err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
 	expectedGeneration := snapshot.SourceGenerations[record.Binding.SourceID]
 	expectedSourceRevision := snapshot.SourceRevisions[record.Binding.SourceID]
 	if expectedGeneration == "" || expectedSourceRevision == 0 {
-		return RuntimeSkill{}, fmt.Errorf(
+		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill Artifact source has no current catalog state",
 			basespec.ErrCatalogStale,
 		)
@@ -231,21 +231,21 @@ func (a *API) runtimeSkillFromSnapshot(
 
 	value, err := definitionForArtifact(snapshot, record)
 	if err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
 	if err := skillArtifact.ValidateDefinition(value); err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
 
 	if sourceValue.RootID != record.RootID ||
 		sourceValue.ID != record.Binding.SourceID {
-		return RuntimeSkill{}, fmt.Errorf(
+		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill source does not match its Artifact binding",
 			basespec.ErrInvalid,
 		)
 	}
 	if sourceValue.Revision != expectedSourceRevision {
-		return RuntimeSkill{}, fmt.Errorf(
+		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill source changed after catalog publication",
 			basespec.ErrCatalogStale,
 		)
@@ -260,7 +260,7 @@ func (a *API) runtimeSkillFromSnapshot(
 		*occurrence.SourceContentDigest,
 	)
 	if err != nil {
-		return RuntimeSkill{}, err
+		return ResolvedSkill{}, err
 	}
 
 	versionInput := string(value.Digest) + "\x00" +
@@ -268,7 +268,7 @@ func (a *API) runtimeSkillFromSnapshot(
 		strconv.FormatUint(record.Revision, 10) + "\x00" +
 		expectedGeneration
 
-	return RuntimeSkill{
+	return ResolvedSkill{
 		Artifact:   record.Ref(),
 		Collection: bundleRef,
 		Name:       string(value.LogicalName),

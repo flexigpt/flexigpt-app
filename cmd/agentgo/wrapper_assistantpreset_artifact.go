@@ -10,7 +10,7 @@ import (
 	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	"github.com/flexigpt/flexigpt-app/internal/skill/skillruntime"
+	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
@@ -23,7 +23,7 @@ func InitAssistantPresetStoreWrapper(
 	baseDir string,
 	modelPresetSt *modelpresetStore.ModelPresetStore,
 	toolSt *toolStore.ToolStore,
-	skillRt *skillruntime.SkillRuntime,
+	skillRt *skillAggregate.Service,
 	mcpResolver lookupimpl.MCPServerResolver,
 	mcpDiscovery lookupimpl.MCPDiscoveryLookup,
 ) error {
