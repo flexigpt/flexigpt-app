@@ -15,7 +15,6 @@ import type {
 	SkillBundleRef,
 	SkillBundleView,
 	SkillDocumentInput,
-	SkillRuntimeCatalogID,
 	UpdateSkillBundleBody,
 } from '@/spec/skill';
 import { SkillBundleAttachmentRole } from '@/spec/skill';
@@ -24,7 +23,6 @@ import type { ISkillStoreAPI } from '@/apis/interface';
 import {
 	byteArrayToWails,
 	enumFromWails,
-	requireNonBlankString,
 	requireWailsBody,
 	requireWailsString,
 	wailsObjectArrayOrEmpty,
@@ -44,7 +42,6 @@ import {
 	RefreshSkillBundle,
 	ResolveArtifactSkill,
 	RetireSkillBundle,
-	RuntimeCatalogIDForCollection,
 	SetSkillEnabled,
 	UnadoptSkill,
 	UpdateSkillBundle,
@@ -310,13 +307,6 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	async purgeSkill(artifact: ArtifactRef, expectedRevision: number): Promise<ArtifactRef> {
 		await PurgeSkill(artifact as Parameters<typeof PurgeSkill>[0], expectedRevision);
 		return artifact;
-	}
-
-	async runtimeCatalogIDForCollection(bundle: SkillBundleRef): Promise<SkillRuntimeCatalogID> {
-		const catalogID = await RuntimeCatalogIDForCollection(
-			bundle as Parameters<typeof RuntimeCatalogIDForCollection>[0]
-		);
-		return requireNonBlankString(catalogID, 'RuntimeCatalogIDForCollection');
 	}
 
 	async resolveArtifactSkill(artifact: ArtifactRef): Promise<ResolvedSkillRuntime> {

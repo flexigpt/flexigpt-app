@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
-	"github.com/flexigpt/flexigpt-app/internal/skill/aggregatecatalog"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -27,8 +25,8 @@ type App struct {
 	toolStoreAPI            *ToolStoreWrapper
 	toolRuntimeAPI          *ToolRuntimeWrapper
 	skillStoreAPI           *SkillStoreWrapper
+	skillAggregateAPI       *SkillAggregateWrapper
 	skillRuntimeAPI         *SkillRuntimeWrapper
-	artifactSkills          *skillAggregate.Service
 	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
@@ -116,6 +114,7 @@ func NewApp() *App {
 	app.modelPresetStoreAPI = &ModelPresetStoreWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
+	app.skillAggregateAPI = &SkillAggregateWrapper{}
 	app.skillRuntimeAPI = &SkillRuntimeWrapper{}
 	app.mcpAPI = &MCPWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
@@ -280,40 +279,22 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed Skill store initialized")
 
-	catalogSource, err := aggregatecatalog.NewCatalogSource(a.skillStoreAPI.router)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize artifact-backed catalog source",
-			"error", err,
-		)
-		panic("failed to initialize managers: skill catalog source initialization failed\n" + err.Error())
-	}
-
-	err = InitSkillRuntimeWrapper(
-		a.skillRuntimeAPI,
-		catalogSource,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize Skill runtime",
-			"error", err,
-		)
-		panic("failed to initialize managers: Skill runtime initialization failed\n" + err.Error())
-	}
-	slog.Info("skill runtime initialized")
-
-	a.artifactSkills, err = skillAggregate.New(
+	err = InitSkillAggregateWrapper(
+		a.skillAggregateAPI,
 		a.skillStoreAPI.router,
-		a.skillRuntimeAPI.service,
+		a.skillRuntimeAPI,
 	)
 	if err != nil {
 		slog.Error(
-			"couldn't initialize Skill aggregate",
+			"couldn't initialize Skill aggregate and runtime",
 			"error", err,
 		)
-		panic("failed to initialize managers: skill aggregate initialization failed\n" + err.Error())
+		panic(
+			"failed to initialize managers: Skill aggregate initialization failed\n" +
+				err.Error(),
+		)
 	}
-	slog.Info("skill aggregate initialized")
+	slog.Info("skill aggregate and runtime initialized")
 
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
@@ -380,7 +361,7 @@ func (a *App) initManagers() {
 		a.assistantPresetsDirPath,
 		a.modelPresetStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.artifactSkills,
+		a.skillAggregateAPI.service,
 		a.mcpAPI.bundleAPI,
 		a.mcpAPI.runtime,
 	)
@@ -402,7 +383,7 @@ func (a *App) initManagers() {
 		a.modelPresetStoreAPI.store,
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.store,
-		a.artifactSkills,
+		a.skillAggregateAPI.service,
 		a.mcpAPI.runtime,
 		a.workspaceAPI.api,
 	)
@@ -455,9 +436,8 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.settingStoreAPI != nil {
 		a.settingStoreAPI.close()
 	}
-	if a.artifactSkills != nil {
-		a.artifactSkills.Close()
-		a.artifactSkills = nil
+	if a.skillAggregateAPI != nil {
+		a.skillAggregateAPI.close()
 	}
 	if a.skillRuntimeAPI != nil {
 		a.skillRuntimeAPI.close()

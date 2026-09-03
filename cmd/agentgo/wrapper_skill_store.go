@@ -10,8 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	"github.com/flexigpt/flexigpt-app/internal/skill/aggregatecatalog"
-	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/store/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/schemaadapter"
@@ -310,18 +308,6 @@ func (w *SkillStoreWrapper) ListBundleSkills(
 	return middleware.WithRecoveryResp(func() ([]artifact.Artifact, error) {
 		return w.api.ListSkills(context.Background(), ref)
 	})
-}
-
-// RuntimeCatalogIDForCollection maps durable Collection identity to the
-// runtime-owned opaque catalog identity. It does not read Skill content.
-func (w *SkillStoreWrapper) RuntimeCatalogIDForCollection(
-	ref collection.CollectionRef,
-) (skillRuntime.CatalogID, error) {
-	return middleware.WithRecoveryResp(
-		func() (skillRuntime.CatalogID, error) {
-			return aggregatecatalog.CollectionCatalogID(ref)
-		},
-	)
 }
 
 // ResolveArtifactSkill performs the Store-owned ArtifactRef to Agent Skills

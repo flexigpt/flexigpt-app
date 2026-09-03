@@ -15,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/skill/aggregatecatalog"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 )
@@ -222,7 +221,7 @@ func (s *Service) resyncCollection(
 		return err
 	}
 
-	catalogID, err := aggregatecatalog.CollectionCatalogID(ref)
+	catalogID, err := CollectionCatalogID(ref)
 	if err != nil {
 		return err
 	}

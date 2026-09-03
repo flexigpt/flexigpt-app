@@ -105,6 +105,7 @@ func main() {
 			app.toolRuntimeAPI,
 			app.artifactStoreAPI,
 			app.skillStoreAPI,
+			app.skillAggregateAPI,
 			app.skillRuntimeAPI,
 			app.workspaceAPI,
 			app.mcpAPI,

@@ -9,6 +9,7 @@ export * from './conversationstore';
 export * from './mcp_artifact';
 export * from './modelpresetstore';
 export * from './settingstore';
+export * from './skill_aggregate';
 export * from './skill_runtime';
 export * from './skill_store';
 export * from './toolruntime';

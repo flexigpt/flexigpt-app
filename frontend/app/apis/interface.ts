@@ -296,9 +296,11 @@ export interface ISkillStoreAPI {
 
 	purgeSkill(artifact: ArtifactRef, expectedRevision: number): Promise<ArtifactRef>;
 
-	runtimeCatalogIDForCollection(bundle: SkillBundleRef): Promise<SkillRuntimeCatalogID>;
-
 	resolveArtifactSkill(artifact: ArtifactRef): Promise<ResolvedSkillRuntime>;
+}
+
+export interface ISkillAggregateAPI {
+	runtimeCatalogIDForCollection(bundle: SkillBundleRef): Promise<SkillRuntimeCatalogID>;
 }
 
 export interface ISkillRuntimeAPI {

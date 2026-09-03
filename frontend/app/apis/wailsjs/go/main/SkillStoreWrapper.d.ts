@@ -5,7 +5,6 @@ import {artifact} from '../models';
 import {collection} from '../models';
 import {basespec} from '../models';
 import {store} from '../models';
-import {runtime} from '../models';
 
 export function AdoptSkill(arg1:bundle.AdoptSkillRequest):Promise<artifact.Artifact>;
 
@@ -34,8 +33,6 @@ export function RefreshSkillBundle(arg1:collection.CollectionRef):Promise<void>;
 export function ResolveArtifactSkill(arg1:artifact.ArtifactRef):Promise<store.ResolvedArtifactSkill>;
 
 export function RetireSkillBundle(arg1:collection.CollectionRef,arg2:number):Promise<collection.Collection>;
-
-export function RuntimeCatalogIDForCollection(arg1:collection.CollectionRef):Promise<runtime.CatalogID>;
 
 export function SetSkillEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<artifact.Artifact>;
 

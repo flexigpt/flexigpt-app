@@ -34,7 +34,7 @@ import {
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import type { IArtifactStoreAPI, ISkillRuntimeAPI, ISkillStoreAPI } from '@/apis/interface';
+import type { IArtifactStoreAPI, ISkillAggregateAPI, ISkillRuntimeAPI, ISkillStoreAPI } from '@/apis/interface';
 
 const DEFAULT_SKILL_ROOT_DISPLAY_NAME = 'FlexiGPT Skills';
 const DEFAULT_SKILL_ROOT_DESCRIPTION = 'Artifact Store namespace for user-managed Skill Bundles.';
@@ -209,6 +209,8 @@ export class SkillManagementAPI {
 	constructor(
 		// oxlint-disable-next-line typescript/parameter-properties
 		private readonly skills: ISkillStoreAPI,
+		// oxlint-disable-next-line typescript/parameter-properties
+		private readonly aggregate: ISkillAggregateAPI,
 		// oxlint-disable-next-line typescript/parameter-properties
 		private readonly runtime: ISkillRuntimeAPI,
 		// oxlint-disable-next-line typescript/parameter-properties
@@ -703,7 +705,7 @@ export class SkillManagementAPI {
 	}
 
 	private async syncRuntimeCollection(collection: SkillBundleRef, enabled = true): Promise<void> {
-		const catalogID = await this.skills.runtimeCatalogIDForCollection(collection);
+		const catalogID = await this.aggregate.runtimeCatalogIDForCollection(collection);
 
 		if (enabled) {
 			await this.runtime.syncSkillCatalog(catalogID);

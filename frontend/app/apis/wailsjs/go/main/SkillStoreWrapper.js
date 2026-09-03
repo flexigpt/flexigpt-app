@@ -58,10 +58,6 @@ export function RetireSkillBundle(arg1, arg2) {
   return window['go']['main']['SkillStoreWrapper']['RetireSkillBundle'](arg1, arg2);
 }
 
-export function RuntimeCatalogIDForCollection(arg1) {
-  return window['go']['main']['SkillStoreWrapper']['RuntimeCatalogIDForCollection'](arg1);
-}
-
 export function SetSkillEnabled(arg1, arg2, arg3) {
   return window['go']['main']['SkillStoreWrapper']['SetSkillEnabled'](arg1, arg2, arg3);
 }

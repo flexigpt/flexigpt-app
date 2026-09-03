@@ -1,4 +1,4 @@
-package aggregatecatalog
+package aggregate
 
 import (
 	"context"
