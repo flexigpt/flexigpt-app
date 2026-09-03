@@ -8,17 +8,14 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
 const (
@@ -36,7 +33,7 @@ const (
 )
 
 type discoverySnapshotDigestPayload struct {
-	Server                    artifact.ArtifactRef          `json:"server"`
+	Server                    mcpSpec.ServerID              `json:"server"`
 	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
 	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`
 	ServerCapabilities        *MCPServerCapabilitiesSummary `json:"serverCapabilities,omitempty"`
@@ -52,7 +49,7 @@ type ClientSession interface {
 
 	Discover(
 		ctx context.Context,
-		config server.RuntimeConfig,
+		config mcpSpec.RuntimeConfig,
 	) (MCPDiscoverySnapshot, error)
 
 	CallTool(
@@ -81,18 +78,18 @@ type ClientSession interface {
 type ClientFactory interface {
 	Connect(
 		ctx context.Context,
-		config server.RuntimeConfig,
-		auth auth.ResolvedTransportAuth,
+		config mcpSpec.RuntimeConfig,
+		auth mcpAuth.ResolvedTransportAuth,
 		notifications ClientNotificationSink,
 	) (ClientSession, error)
 }
 
 type sessionState struct {
-	server     artifact.ArtifactRef
-	collection collection.CollectionRef
-	version    cryptoutil.Digest
+	server     mcpSpec.ServerID
+	collection mcpSpec.CatalogID
+	version    mcpSpec.Digest
 	generation uint64
-	config     server.RuntimeConfig
+	config     mcpSpec.RuntimeConfig
 
 	status MCPServerStatus
 	client ClientSession
@@ -110,54 +107,48 @@ type connectionAttempt struct {
 }
 
 type MCPRuntimeManager struct {
-	resolver    server.Resolver
-	secrets     server.SecretResolver
-	environment server.EnvironmentResolver
-	authorizer  auth.ConnectionAuthorizer
-	factory     ClientFactory
+	source     mcpSpec.ServerSource
+	authorizer mcpAuth.ConnectionAuthorizer
+	factory    ClientFactory
 
 	lifecycleContext context.Context
 	cancelLifecycle  context.CancelFunc
 
 	mu          sync.RWMutex
 	approvals   *ApprovalManager
-	sessions    map[artifact.ArtifactRef]*sessionState
-	generations map[artifact.ArtifactRef]uint64
-	timers      map[artifact.ArtifactRef]*time.Timer
-	attempts    map[artifact.ArtifactRef]connectionAttempt
+	sessions    map[mcpSpec.ServerID]*sessionState
+	generations map[mcpSpec.ServerID]uint64
+	timers      map[mcpSpec.ServerID]*time.Timer
+	attempts    map[mcpSpec.ServerID]connectionAttempt
 	closed      bool
 }
 
 func NewMCPRuntimeManager(
-	resolver server.Resolver,
-	secrets server.SecretResolver,
-	environment server.EnvironmentResolver,
-	authorizer auth.ConnectionAuthorizer,
+	source mcpSpec.ServerSource,
+	authorizer mcpAuth.ConnectionAuthorizer,
 	factory ClientFactory,
 ) (*MCPRuntimeManager, error) {
-	if resolver == nil ||
+	if source == nil ||
 		authorizer == nil ||
 		factory == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP runtime dependencies are incomplete",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 		)
 	}
 
 	lifecycleContext, cancelLifecycle := context.WithCancel(context.Background())
 
 	return &MCPRuntimeManager{
-		resolver:         resolver,
-		secrets:          secrets,
-		environment:      environment,
+		source:           source,
 		authorizer:       authorizer,
 		factory:          factory,
 		lifecycleContext: lifecycleContext,
 		cancelLifecycle:  cancelLifecycle,
-		sessions:         make(map[artifact.ArtifactRef]*sessionState),
-		generations:      make(map[artifact.ArtifactRef]uint64),
-		timers:           make(map[artifact.ArtifactRef]*time.Timer),
-		attempts:         make(map[artifact.ArtifactRef]connectionAttempt),
+		sessions:         make(map[mcpSpec.ServerID]*sessionState),
+		generations:      make(map[mcpSpec.ServerID]uint64),
+		timers:           make(map[mcpSpec.ServerID]*time.Timer),
+		attempts:         make(map[mcpSpec.ServerID]connectionAttempt),
 	}, nil
 }
 
@@ -169,7 +160,7 @@ func NewMCPRuntimeManager(
 // invalidate sessions, while explicit Refresh performs a new full resolution.
 func (m *MCPRuntimeManager) Connect(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (*MCPServerRuntimeSnapshot, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
@@ -200,7 +191,7 @@ func (m *MCPRuntimeManager) Connect(
 //nolint:contextcheck // Background check.
 func (m *MCPRuntimeManager) StartConnect(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (*MCPServerRuntimeSnapshot, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
@@ -233,7 +224,7 @@ func (m *MCPRuntimeManager) StartConnect(
 
 func (m *MCPRuntimeManager) Disconnect(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) error {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return err
@@ -254,14 +245,14 @@ func (m *MCPRuntimeManager) Disconnect(
 
 func (m *MCPRuntimeManager) InvalidateCollection(
 	ctx context.Context,
-	ref collection.CollectionRef,
+	ref mcpSpec.CatalogID,
 ) error {
 	if err := validateRuntimeCollectionRef(ctx, ref); err != nil {
 		return err
 	}
 
 	m.mu.RLock()
-	refs := make([]artifact.ArtifactRef, 0)
+	refs := make([]mcpSpec.ServerID, 0)
 	for serverRef, state := range m.sessions {
 		if state.collection == ref {
 			refs = append(refs, serverRef)
@@ -269,12 +260,7 @@ func (m *MCPRuntimeManager) InvalidateCollection(
 	}
 	m.mu.RUnlock()
 
-	sort.Slice(refs, func(left, right int) bool {
-		if refs[left].RootID != refs[right].RootID {
-			return refs[left].RootID < refs[right].RootID
-		}
-		return refs[left].ArtifactID < refs[right].ArtifactID
-	})
+	slices.Sort(refs)
 
 	var output error
 	for _, serverRef := range refs {
@@ -285,7 +271,7 @@ func (m *MCPRuntimeManager) InvalidateCollection(
 
 func (m *MCPRuntimeManager) ListTools(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) ([]MCPToolCapability, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
@@ -303,7 +289,7 @@ func (m *MCPRuntimeManager) ListTools(
 
 func (m *MCPRuntimeManager) ListToolsPage(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	pageSize int,
 	pageToken string,
 ) ([]MCPToolCapability, *string, error) {
@@ -333,7 +319,7 @@ func (m *MCPRuntimeManager) ListToolsPage(
 
 func (m *MCPRuntimeManager) ListResources(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) ([]MCPResourceRef, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
@@ -351,7 +337,7 @@ func (m *MCPRuntimeManager) ListResources(
 
 func (m *MCPRuntimeManager) ListResourcesPage(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	pageSize int,
 	pageToken string,
 ) ([]MCPResourceRef, *string, error) {
@@ -374,7 +360,7 @@ func (m *MCPRuntimeManager) ListResourcesPage(
 
 func (m *MCPRuntimeManager) ListResourceTemplates(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) ([]MCPResourceTemplateRef, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
@@ -395,7 +381,7 @@ func (m *MCPRuntimeManager) ListResourceTemplates(
 
 func (m *MCPRuntimeManager) ListResourceTemplatesPage(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	pageSize int,
 	pageToken string,
 ) ([]MCPResourceTemplateRef, *string, error) {
@@ -421,7 +407,7 @@ func (m *MCPRuntimeManager) ListResourceTemplatesPage(
 
 func (m *MCPRuntimeManager) ListPrompts(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) ([]MCPPromptRef, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
@@ -439,7 +425,7 @@ func (m *MCPRuntimeManager) ListPrompts(
 
 func (m *MCPRuntimeManager) ListPromptsPage(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	pageSize int,
 	pageToken string,
 ) ([]MCPPromptRef, *string, error) {
@@ -462,7 +448,7 @@ func (m *MCPRuntimeManager) ListPromptsPage(
 
 func (m *MCPRuntimeManager) ReadResource(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	uri string,
 ) (*MCPReadResourceResponseBody, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
@@ -497,7 +483,7 @@ func (m *MCPRuntimeManager) ReadResource(
 
 func (m *MCPRuntimeManager) GetPrompt(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	name string,
 	arguments map[string]string,
 ) (*MCPGetPromptResponseBody, error) {
@@ -537,7 +523,7 @@ func (m *MCPRuntimeManager) GetPrompt(
 
 func (m *MCPRuntimeManager) Complete(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	request MCPCompleteArgumentRequestBody,
 ) (*MCPCompletionResult, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
@@ -566,32 +552,32 @@ func (m *MCPRuntimeManager) Complete(
 
 func (m *MCPRuntimeManager) CallToolDryRun(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	request InvokeMCPToolRequestBody,
-) (server.RuntimeConfig, MCPToolCapability, error) {
+) (mcpSpec.RuntimeConfig, MCPToolCapability, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
-		return server.RuntimeConfig{}, MCPToolCapability{}, err
+		return mcpSpec.RuntimeConfig{}, MCPToolCapability{}, err
 	}
 	if request.ToolName == "" {
-		return server.RuntimeConfig{},
+		return mcpSpec.RuntimeConfig{},
 			MCPToolCapability{},
 			fmt.Errorf("%w: MCP tool name is required", ErrMCPInvalidRuntimeRequest)
 	}
 
 	state, err := m.readySession(ref)
 	if err != nil {
-		return server.RuntimeConfig{}, MCPToolCapability{}, err
+		return mcpSpec.RuntimeConfig{}, MCPToolCapability{}, err
 	}
 
 	tool, err := toolByName(state.snapshot, request.ToolName)
 	if err != nil {
-		return server.RuntimeConfig{}, MCPToolCapability{}, err
+		return mcpSpec.RuntimeConfig{}, MCPToolCapability{}, err
 	}
 	if request.ToolDigest != "" &&
 		request.ToolDigest != tool.Digest {
 		override := state.config.ToolPolicies[tool.ToolName]
 		if !override.AllowStaleDigest {
-			return server.RuntimeConfig{},
+			return mcpSpec.RuntimeConfig{},
 				MCPToolCapability{},
 				fmt.Errorf(
 					"%w: MCP tool digest changed",
@@ -605,7 +591,7 @@ func (m *MCPRuntimeManager) CallToolDryRun(
 
 func (m *MCPRuntimeManager) CallTool(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	request InvokeMCPToolRequestBody,
 ) (*InvokeMCPToolResponseBody, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
@@ -688,7 +674,7 @@ func (m *MCPRuntimeManager) OnClientNotification(
 	ctx context.Context,
 	event ClientNotification,
 ) {
-	if m == nil || event.Server == (artifact.ArtifactRef{}) {
+	if m == nil || event.Server == "" {
 		return
 	}
 
@@ -747,9 +733,9 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 			attemptCancels = append(attemptCancels, attempt.cancel)
 		}
 	}
-	m.sessions = make(map[artifact.ArtifactRef]*sessionState)
-	m.timers = make(map[artifact.ArtifactRef]*time.Timer)
-	m.attempts = make(map[artifact.ArtifactRef]connectionAttempt)
+	m.sessions = make(map[mcpSpec.ServerID]*sessionState)
+	m.timers = make(map[mcpSpec.ServerID]*time.Timer)
+	m.attempts = make(map[mcpSpec.ServerID]connectionAttempt)
 	m.mu.Unlock()
 
 	if approvals != nil {
@@ -777,7 +763,7 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 
 func (m *MCPRuntimeManager) Refresh(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (*MCPServerRuntimeSnapshot, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
@@ -848,7 +834,7 @@ func (m *MCPRuntimeManager) Refresh(
 // already established that the prior runtime version is obsolete.
 func (m *MCPRuntimeManager) Invalidate(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) error {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return err
@@ -875,7 +861,7 @@ func (m *MCPRuntimeManager) Invalidate(
 
 func (m *MCPRuntimeManager) Status(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (*MCPServerRuntimeSnapshot, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
 		return nil, err
@@ -894,7 +880,7 @@ func (m *MCPRuntimeManager) Status(
 
 func (m *MCPRuntimeManager) connect(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	generation uint64,
 	previous *sessionState,
 	timer *time.Timer,
@@ -911,7 +897,7 @@ func (m *MCPRuntimeManager) connect(
 		m.setErrorIfCurrent(ref, generation, err)
 		return nil, err
 	}
-	m.setConnectingCollectionIfCurrent(ref, generation, resolved.Collection)
+	m.setConnectingCollectionIfCurrent(ref, generation, resolved.Catalog)
 	if !m.connectionCurrent(ref, generation) {
 		return nil, fmt.Errorf(
 			"%w: MCP connection was superseded",
@@ -982,31 +968,27 @@ func (m *MCPRuntimeManager) connect(
 
 func (m *MCPRuntimeManager) resolveForConnection(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (server.Resolved, server.RuntimeConfig, auth.ResolvedTransportAuth, error) {
-	resolved, err := m.resolver.ResolveMCPServer(ctx, ref)
+	ref mcpSpec.ServerID,
+) (mcpSpec.ResolvedServer, mcpSpec.RuntimeConfig, mcpAuth.ResolvedTransportAuth, error) {
+	resolved, err := m.source.ResolveServer(ctx, ref)
 	if err != nil {
-		return server.Resolved{},
-			server.RuntimeConfig{},
-			auth.ResolvedTransportAuth{},
+		return mcpSpec.ResolvedServer{},
+			mcpSpec.RuntimeConfig{},
+			mcpAuth.ResolvedTransportAuth{},
 			err
 	}
-	config, err := resolved.MaterializeTrusted(
-		ctx,
-		m.secrets,
-		m.environment,
-	)
-	if err != nil {
-		return server.Resolved{},
-			server.RuntimeConfig{},
-			auth.ResolvedTransportAuth{},
+	if err := resolved.Validate(); err != nil {
+		return mcpSpec.ResolvedServer{},
+			mcpSpec.RuntimeConfig{},
+			mcpAuth.ResolvedTransportAuth{},
 			err
 	}
+	config := cloneRuntimeConfig(resolved.Config)
 	authConn, err := m.authorizer.PrepareConnection(ctx, config)
 	if err != nil {
-		return server.Resolved{},
-			server.RuntimeConfig{},
-			auth.ResolvedTransportAuth{},
+		return mcpSpec.ResolvedServer{},
+			mcpSpec.RuntimeConfig{},
+			mcpAuth.ResolvedTransportAuth{},
 			err
 	}
 	authConn.SensitiveValues = mergeSensitiveValues(
@@ -1017,7 +999,7 @@ func (m *MCPRuntimeManager) resolveForConnection(
 }
 
 func (m *MCPRuntimeManager) currentSnapshot(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (MCPDiscoverySnapshot, error) {
 	state, found := m.session(ref)
 	if !found {
@@ -1039,7 +1021,7 @@ func (m *MCPRuntimeManager) currentSnapshot(
 }
 
 func (m *MCPRuntimeManager) readySession(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (*sessionState, error) {
 	state, found := m.session(ref)
 	if !found ||
@@ -1054,7 +1036,7 @@ func (m *MCPRuntimeManager) readySession(
 }
 
 func (m *MCPRuntimeManager) session(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (*sessionState, bool) {
 	m.mu.RLock()
 	state := m.sessions[ref]
@@ -1067,7 +1049,7 @@ func (m *MCPRuntimeManager) session(
 
 func (m *MCPRuntimeManager) beginConnection(
 	parent context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (context.Context, uint64, *sessionState, *time.Timer, error) {
 	attemptContext, cancelAttempt := context.WithCancel(parent)
 	stopLifecycle := context.AfterFunc(m.lifecycleContext, cancelAttempt)
@@ -1080,7 +1062,7 @@ func (m *MCPRuntimeManager) beginConnection(
 	if m.closed {
 		m.mu.Unlock()
 		cancelConnection()
-		return nil, 0, nil, nil, basespec.ErrClosed
+		return nil, 0, nil, nil, mcpSpec.ErrClosed
 	}
 
 	previousAttempt := m.attempts[ref]
@@ -1119,7 +1101,7 @@ func (m *MCPRuntimeManager) beginConnection(
 }
 
 func (m *MCPRuntimeManager) finishConnectionAttempt(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	generation uint64,
 ) {
 	var cancelAttempt context.CancelFunc
@@ -1141,7 +1123,7 @@ func (m *MCPRuntimeManager) finishConnectionAttempt(
 // read-only capability display. Lifecycle mutation uses removeSession through
 // Invalidate and therefore always drops the snapshot.
 func (m *MCPRuntimeManager) disconnectSession(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (*sessionState, *time.Timer, context.CancelFunc) {
 	m.mu.Lock()
 	m.generations[ref]++
@@ -1173,9 +1155,9 @@ func (m *MCPRuntimeManager) disconnectSession(
 }
 
 func (m *MCPRuntimeManager) setConnectingCollectionIfCurrent(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	generation uint64,
-	collectionRef collection.CollectionRef,
+	collectionRef mcpSpec.CatalogID,
 ) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1191,7 +1173,7 @@ func (m *MCPRuntimeManager) setConnectingCollectionIfCurrent(
 }
 
 func (m *MCPRuntimeManager) connectionCurrent(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	generation uint64,
 ) bool {
 	m.mu.RLock()
@@ -1205,10 +1187,10 @@ func (m *MCPRuntimeManager) connectionCurrent(
 }
 
 func (m *MCPRuntimeManager) commitConnection(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	generation uint64,
-	resolved server.Resolved,
-	config server.RuntimeConfig,
+	resolved mcpSpec.ResolvedServer,
+	config mcpSpec.RuntimeConfig,
 	client ClientSession,
 	snapshot MCPDiscoverySnapshot,
 	now time.Time,
@@ -1226,7 +1208,7 @@ func (m *MCPRuntimeManager) commitConnection(
 
 	m.sessions[ref] = &sessionState{
 		server:            ref,
-		collection:        resolved.Collection,
+		collection:        resolved.Catalog,
 		version:           resolved.Version,
 		generation:        generation,
 		config:            cloneRuntimeConfig(config),
@@ -1241,7 +1223,7 @@ func (m *MCPRuntimeManager) commitConnection(
 }
 
 func (m *MCPRuntimeManager) removeSession(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) (*sessionState, *time.Timer, context.CancelFunc) {
 	m.mu.Lock()
 	m.generations[ref]++
@@ -1278,7 +1260,7 @@ func (m *MCPRuntimeManager) bindApprovalManager(
 }
 
 func (m *MCPRuntimeManager) clearApprovalSession(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) {
 	if m == nil {
 		return
@@ -1294,7 +1276,7 @@ func (m *MCPRuntimeManager) clearApprovalSession(
 }
 
 func (m *MCPRuntimeManager) setErrorIfCurrent(
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	generation uint64,
 	err error,
 ) bool {
@@ -1324,7 +1306,7 @@ func (m *MCPRuntimeManager) setErrorIfCurrent(
 
 func withMCPConnectTimeout(
 	ctx context.Context,
-	config server.RuntimeConfig,
+	config mcpSpec.RuntimeConfig,
 ) (context.Context, context.CancelFunc) {
 	if _, hasDeadline := ctx.Deadline(); hasDeadline {
 		return ctx, func() {}
@@ -1341,7 +1323,7 @@ func withMCPConnectTimeout(
 			time.Millisecond
 	}
 	if config.StreamableHTTP != nil &&
-		config.StreamableHTTP.AuthMode == server.MCPHTTPAuthOAuth {
+		config.StreamableHTTP.AuthMode == mcpSpec.MCPHTTPAuthOAuth {
 		timeout = max(timeout, defaultInteractiveMCPAuthTimeout)
 	}
 	return context.WithTimeout(ctx, timeout)
@@ -1370,7 +1352,7 @@ func closeMCPClient(ctx context.Context, client ClientSession) error {
 
 func (m *MCPRuntimeManager) scheduleRefresh(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1404,12 +1386,12 @@ func (m *MCPRuntimeManager) scheduleRefresh(
 
 func validateRuntimeRef(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 ) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: MCP runtime context is nil",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -1420,12 +1402,12 @@ func validateRuntimeRef(
 
 func validateRuntimeCollectionRef(
 	ctx context.Context,
-	ref collection.CollectionRef,
+	ref mcpSpec.CatalogID,
 ) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: MCP runtime context is nil",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -1468,7 +1450,7 @@ func runtimeSnapshot(
 
 func (s *sessionState) snapshotStillValid(now time.Time) bool {
 	if s == nil ||
-		s.snapshot.Server == (artifact.ArtifactRef{}) ||
+		s.snapshot.Server == "" ||
 		s.snapshot.Digest == "" ||
 		s.snapshotExpiresAt.IsZero() {
 		return false
@@ -1481,7 +1463,7 @@ func (s *sessionState) snapshotStillValid(now time.Time) bool {
 
 func normalizeSnapshot(
 	snapshot *MCPDiscoverySnapshot,
-	ref artifact.ArtifactRef,
+	ref mcpSpec.ServerID,
 	now time.Time,
 ) {
 	if snapshot == nil {
@@ -1532,7 +1514,7 @@ func computeDiscoverySnapshotDigest(snap MCPDiscoverySnapshot) string {
 	if err != nil {
 		return ""
 	}
-	return string(cryptoutil.DigestBytes(raw))
+	return string(mcpSpec.DigestBytes(raw))
 }
 
 func toolByName(
@@ -1552,7 +1534,7 @@ func toolByName(
 }
 
 func redactRuntimeError(err error, values ...[]string) error {
-	return auth.RedactError(err, mergeSensitiveValues(values...))
+	return mcpAuth.RedactError(err, mergeSensitiveValues(values...))
 }
 
 func mergeSensitiveValues(groups ...[]string) []string {
@@ -1577,7 +1559,7 @@ func mergeSensitiveValues(groups ...[]string) []string {
 }
 
 func paginateArtifactDiscoveryItems[T any](
-	srv artifact.ArtifactRef,
+	srv mcpSpec.ServerID,
 	snapshotDigest string,
 	kind string,
 	items []T,
@@ -1683,7 +1665,7 @@ func cloneSessionState(input *sessionState) *sessionState {
 	return &output
 }
 
-func cloneRuntimeConfig(input server.RuntimeConfig) server.RuntimeConfig {
+func cloneRuntimeConfig(input mcpSpec.RuntimeConfig) mcpSpec.RuntimeConfig {
 	output := input
 	if input.Stdio != nil {
 		value := *input.Stdio

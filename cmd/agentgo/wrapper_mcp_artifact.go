@@ -14,31 +14,33 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/mcpbundle"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/mcpschemaadapter"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/sdkclient"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
+	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
+	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/sdkclient"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
+	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
+	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpSchemaadapter "github.com/flexigpt/flexigpt-app/internal/mcp/store/schemaadapter"
+	mcpSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 type MCPWrapper struct {
-	bundleAPI  *mcpbundle.API
-	artifacts  *artifact.Service
-	runtime    *runtime.MCPRuntimeManager
-	toolBridge *runtime.ToolBridge
-	auth       *auth.AuthManager
+	storeAPI  *mcpStore.API
+	aggregate *mcpAggregate.Service
+	artifacts *artifact.Service
+	runtime   *mcpRuntime.MCPRuntimeManager
+	auth      *mcpAuth.AuthManager
 
-	overlays *overlay.SettingsOverlayRepository
+	overlays *mcpOverlay.SettingsOverlayRepository
 	settings *mcpSettingsAdapter
 	secrets  *settingMCPSecretResolver
 
 	oauthLoopbackListenAddrAtStart string
-	oauthBroker                    *auth.OAuthLoopbackBroker
+	oauthBroker                    *mcpAuth.OAuthLoopbackBroker
 	builtInInstaller               artifactbuiltin.HydrationInstaller
 }
 
@@ -49,13 +51,13 @@ type MCPSecretWriteResult struct {
 }
 
 type MCPGlobalSettingsView struct {
-	Settings                auth.MCPAuthSettings `json:"settings"`
-	Revision                uint64               `json:"revision"`
-	OAuthRedirectURL        string               `json:"oauthRedirectURL,omitempty"`
-	OAuthLoopbackListenAddr string               `json:"oauthLoopbackListenAddr,omitempty"`
-	OAuthRestartRequired    bool                 `json:"oauthRestartRequired"`
-	OAuthLoopbackReady      bool                 `json:"oauthLoopbackReady"`
-	OAuthLoopbackError      string               `json:"oauthLoopbackError,omitempty"`
+	Settings                mcpAuth.MCPAuthSettings `json:"settings"`
+	Revision                uint64                  `json:"revision"`
+	OAuthRedirectURL        string                  `json:"oauthRedirectURL,omitempty"`
+	OAuthLoopbackListenAddr string                  `json:"oauthLoopbackListenAddr,omitempty"`
+	OAuthRestartRequired    bool                    `json:"oauthRestartRequired"`
+	OAuthLoopbackReady      bool                    `json:"oauthLoopbackReady"`
+	OAuthLoopbackError      string                  `json:"oauthLoopbackError,omitempty"`
 }
 
 func InitMCPWrapper(
@@ -75,7 +77,7 @@ func InitMCPWrapper(
 	if err != nil {
 		return err
 	}
-	overlays, err := overlay.NewSettingsOverlayRepository(settings)
+	overlays, err := mcpOverlay.NewSettingsOverlayRepository(settings)
 	if err != nil {
 		return err
 	}
@@ -87,23 +89,26 @@ func InitMCPWrapper(
 	}
 
 	configuredLoopback := strings.TrimSpace(global.OAuthLoopbackListenAddr)
-	brokerOptions := &auth.OAuthLoopbackBrokerOptions{
+	brokerOptions := &mcpAuth.OAuthLoopbackBrokerOptions{
 		ListenAddr: configuredLoopback,
 	}
-	oauthBroker, err := auth.NewOAuthLoopbackBroker(ctx, brokerOptions)
+	oauthBroker, err := mcpAuth.NewOAuthLoopbackBroker(ctx, brokerOptions)
 	if err != nil {
 		return err
 	}
 
-	authManager := auth.NewAuthManager(
+	authManager := mcpAuth.NewAuthManager(
 		secrets,
-		auth.WithOAuthAuthorizationBroker(oauthBroker),
-		auth.WithOAuthRedirectURL(oauthBroker.RedirectURL()),
-		auth.WithOAuthTokenStore(secrets),
+		mcpAuth.WithOAuthAuthorizationBroker(oauthBroker),
+		mcpAuth.WithOAuthRedirectURL(oauthBroker.RedirectURL()),
+		mcpAuth.WithOAuthTokenStore(secrets),
+		mcpAuth.WithClientInfo(
+			artifactbuiltin.MCPHostName,
+			artifactbuiltin.MCPHostVersion,
+		),
 	)
 
-	invalidator := newMCPRuntimeInvalidator()
-	bundleAPI, err := mcpbundle.New(mcpbundle.Dependencies{
+	storeAPI, err := mcpStore.New(mcpStore.Dependencies{
 		Sources:            components.Sources,
 		Collections:        components.Collections,
 		Artifacts:          components.Artifacts,
@@ -116,42 +121,66 @@ func InitMCPWrapper(
 		DecoderFingerprint: components.DecoderFingerprint,
 		RootPolicy:         components.RootMutationPolicy(),
 		UserRootID:         artifactbuiltin.MCPUserRootID,
-		Runtime:            invalidator,
 		Overlays:           overlays,
 		SecretCleaner:      secrets,
-		BaselinePolicy:     policy.Baseline(),
+		BaselinePolicy:     mcpPolicy.Baseline(),
 	})
 	if err != nil {
 		_ = oauthBroker.Close()
 		return err
 	}
 
-	if err := ensureDefaultMCPBundle(ctx, bundleAPI); err != nil {
+	if err := ensureDefaultMCPBundle(ctx, storeAPI); err != nil {
 		_ = oauthBroker.Close()
 		return err
 	}
 
-	rt, err := runtime.NewMCPRuntimeManager(
-		bundleAPI,
+	source, err := mcpAggregate.NewServerSource(
+		storeAPI,
 		secrets,
 		mcpEnvironmentResolver{},
-		authManager,
-		sdkclient.NewFactory(),
 	)
 	if err != nil {
 		_ = oauthBroker.Close()
 		return err
 	}
-	invalidator.Set(rt)
-
-	toolBridge := runtime.NewToolBridge(
-		rt,
-		runtime.NewApprovalManager(5*time.Minute),
+	clientFactory, err := sdkclient.NewFactory(mcpSpec.ClientInfo{
+		Name:    artifactbuiltin.MCPHostName,
+		Version: artifactbuiltin.MCPHostVersion,
+	})
+	if err != nil {
+		_ = oauthBroker.Close()
+		return err
+	}
+	rt, err := mcpRuntime.NewMCPRuntimeManager(
+		source,
+		authManager,
+		clientFactory,
 	)
+	if err != nil {
+		_ = oauthBroker.Close()
+		return err
+	}
+
+	toolBridge := mcpRuntime.NewToolBridge(
+		rt,
+		mcpRuntime.NewApprovalManager(5*time.Minute),
+	)
+	aggregateService, err := mcpAggregate.New(
+		storeAPI,
+		source,
+		rt,
+		toolBridge,
+	)
+	if err != nil {
+		_ = rt.Close(context.Background())
+		_ = oauthBroker.Close()
+		return err
+	}
 
 	builtIns, err := newMCPBuiltInInstaller(
 		components,
-		bundleAPI,
+		storeAPI,
 		overlays,
 	)
 	if err != nil {
@@ -160,10 +189,10 @@ func InitMCPWrapper(
 		return err
 	}
 
-	wrapper.bundleAPI = bundleAPI
+	wrapper.storeAPI = storeAPI
+	wrapper.aggregate = aggregateService
 	wrapper.artifacts = components.Artifacts
 	wrapper.runtime = rt
-	wrapper.toolBridge = toolBridge
 	wrapper.auth = authManager
 	wrapper.overlays = overlays
 	wrapper.settings = settings
@@ -176,16 +205,16 @@ func InitMCPWrapper(
 
 func newMCPBuiltInInstaller(
 	components *system.Components,
-	bundles *mcpbundle.API,
-	overlays overlay.OverlayRepository,
+	bundles *mcpStore.API,
+	overlays mcpOverlay.OverlayRepository,
 ) (artifactbuiltin.HydrationInstaller, error) {
-	registry, packages, err := mcpschemaadapter.LoadEmbeddedRegistry()
+	registry, packages, err := mcpSchemaadapter.LoadEmbeddedRegistry()
 	if err != nil {
 		return nil, err
 	}
 
-	installer, err := mcpschemaadapter.NewInstaller(
-		mcpschemaadapter.InstallerDependencies{
+	installer, err := mcpSchemaadapter.NewInstaller(
+		mcpSchemaadapter.InstallerDependencies{
 			Bundles:            bundles,
 			Registry:           registry,
 			Packages:           packages,
@@ -200,49 +229,49 @@ func newMCPBuiltInInstaller(
 }
 
 func (w *MCPWrapper) CreateMCPBundle(
-	request *mcpbundle.CreateRequest,
-) (mcpbundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpbundle.Bundle, error) {
+	request *mcpStore.CreateRequest,
+) (mcpStore.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (mcpStore.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpbundle.Bundle{}, err
+			return mcpStore.Bundle{}, err
 		}
 		if request == nil {
-			return mcpbundle.Bundle{}, errors.New("MCP Bundle create request is required")
+			return mcpStore.Bundle{}, errors.New("MCP Bundle create request is required")
 		}
-		return w.bundleAPI.Create(context.Background(), *request)
+		return w.storeAPI.Create(context.Background(), *request)
 	})
 }
 
 func (w *MCPWrapper) GetMCPBundle(
 	ref collection.CollectionRef,
-) (mcpbundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpbundle.Bundle, error) {
+) (mcpStore.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (mcpStore.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpbundle.Bundle{}, err
+			return mcpStore.Bundle{}, err
 		}
-		return w.bundleAPI.Get(context.Background(), ref)
+		return w.storeAPI.Get(context.Background(), ref)
 	})
 }
 
 func (w *MCPWrapper) ListMCPBundles(
 	rootID basespec.RootID,
-) ([]mcpbundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() ([]mcpbundle.Bundle, error) {
+) ([]mcpStore.Bundle, error) {
+	return middleware.WithRecoveryResp(func() ([]mcpStore.Bundle, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.bundleAPI.List(context.Background(), rootID)
+		return w.storeAPI.List(context.Background(), rootID)
 	})
 }
 
 func (w *MCPWrapper) GetMCPBundleDocument(
 	ref collection.CollectionRef,
-) (mcpbundle.BundleDocument, error) {
-	return middleware.WithRecoveryResp(func() (mcpbundle.BundleDocument, error) {
+) (mcpStore.BundleDocument, error) {
+	return middleware.WithRecoveryResp(func() (mcpStore.BundleDocument, error) {
 		if err := w.ready(); err != nil {
-			return mcpbundle.BundleDocument{}, err
+			return mcpStore.BundleDocument{}, err
 		}
-		return w.bundleAPI.GetDocument(context.Background(), ref)
+		return w.storeAPI.GetDocument(context.Background(), ref)
 	})
 }
 
@@ -253,7 +282,7 @@ func (w *MCPWrapper) ListMCPBundleServers(
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.bundleAPI.ListServers(context.Background(), ref)
+		return w.storeAPI.ListServers(context.Background(), ref)
 	})
 }
 
@@ -264,19 +293,19 @@ func (w *MCPWrapper) ListMCPBundlePolicies(
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.bundleAPI.ListPolicies(context.Background(), ref)
+		return w.storeAPI.ListPolicies(context.Background(), ref)
 	})
 }
 
 func (w *MCPWrapper) GetMCPServerInstallation(
 	ref artifact.ArtifactRef,
-) (mcpbundle.ServerInstallationView, error) {
+) (mcpStore.ServerInstallationView, error) {
 	return middleware.WithRecoveryResp(
-		func() (mcpbundle.ServerInstallationView, error) {
+		func() (mcpStore.ServerInstallationView, error) {
 			if err := w.ready(); err != nil {
-				return mcpbundle.ServerInstallationView{}, err
+				return mcpStore.ServerInstallationView{}, err
 			}
-			return w.bundleAPI.GetServerInstallation(
+			return w.storeAPI.GetServerInstallation(
 				context.Background(),
 				ref,
 			)
@@ -286,35 +315,35 @@ func (w *MCPWrapper) GetMCPServerInstallation(
 
 func (w *MCPWrapper) InspectMCPServer(
 	ref artifact.ArtifactRef,
-) (server.Resolved, error) {
-	return middleware.WithRecoveryResp(func() (server.Resolved, error) {
+) (mcpArtifact.Resolved, error) {
+	return middleware.WithRecoveryResp(func() (mcpArtifact.Resolved, error) {
 		if err := w.ready(); err != nil {
-			return server.Resolved{}, err
+			return mcpArtifact.Resolved{}, err
 		}
-		return w.bundleAPI.InspectMCPServer(context.Background(), ref)
+		return w.storeAPI.InspectMCPServer(context.Background(), ref)
 	})
 }
 
 func (w *MCPWrapper) InspectMCPPolicy(
 	ref artifact.ArtifactRef,
-) (mcpbundle.PolicyView, error) {
-	return middleware.WithRecoveryResp(func() (mcpbundle.PolicyView, error) {
+) (mcpStore.PolicyView, error) {
+	return middleware.WithRecoveryResp(func() (mcpStore.PolicyView, error) {
 		if err := w.ready(); err != nil {
-			return mcpbundle.PolicyView{}, err
+			return mcpStore.PolicyView{}, err
 		}
-		return w.bundleAPI.InspectMCPPolicy(context.Background(), ref)
+		return w.storeAPI.InspectMCPPolicy(context.Background(), ref)
 	})
 }
 
 func (w *MCPWrapper) GetMCPBundleInstallation(
 	ref collection.CollectionRef,
-) (mcpbundle.BundleInstallationView, error) {
+) (mcpStore.BundleInstallationView, error) {
 	return middleware.WithRecoveryResp(
-		func() (mcpbundle.BundleInstallationView, error) {
+		func() (mcpStore.BundleInstallationView, error) {
 			if err := w.ready(); err != nil {
-				return mcpbundle.BundleInstallationView{}, err
+				return mcpStore.BundleInstallationView{}, err
 			}
-			return w.bundleAPI.GetBundleInstallation(
+			return w.storeAPI.GetBundleInstallation(
 				context.Background(),
 				ref,
 			)
@@ -323,29 +352,33 @@ func (w *MCPWrapper) GetMCPBundleInstallation(
 }
 
 func (w *MCPWrapper) ReplaceMCPBundleDocument(
-	request *mcpbundle.ReplaceDocumentRequest,
-) (mcpbundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpbundle.Bundle, error) {
+	request *mcpStore.ReplaceDocumentRequest,
+) (mcpStore.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (mcpStore.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpbundle.Bundle{}, err
+			return mcpStore.Bundle{}, err
 		}
 		if request == nil {
-			return mcpbundle.Bundle{}, errors.New("MCP document replacement request is required")
+			return mcpStore.Bundle{}, errors.New("MCP document replacement request is required")
 		}
 
 		before, _ := w.artifacts.ListByCollection(
 			context.Background(),
 			request.Bundle,
 		)
-		result, err := w.bundleAPI.ReplaceDocument(
+		result, err := w.aggregate.ReplaceDocument(
 			context.Background(),
 			*request,
 		)
 		if err != nil {
-			return mcpbundle.Bundle{}, err
+			return mcpStore.Bundle{}, err
 		}
 		for _, record := range before {
-			w.auth.ClearAuthStatus(record.Ref())
+			serverID, idErr := mcpAggregate.ServerIDForArtifact(record.Ref())
+			if idErr != nil {
+				return mcpStore.Bundle{}, idErr
+			}
+			w.auth.ClearAuthStatus(serverID)
 		}
 		return result, nil
 	})
@@ -353,12 +386,12 @@ func (w *MCPWrapper) ReplaceMCPBundleDocument(
 
 func (w *MCPWrapper) RefreshMCPBundle(
 	ref collection.CollectionRef,
-) (mcpbundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpbundle.Bundle, error) {
+) (mcpStore.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (mcpStore.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpbundle.Bundle{}, err
+			return mcpStore.Bundle{}, err
 		}
-		return w.bundleAPI.Refresh(context.Background(), ref, false)
+		return w.aggregate.RefreshBundle(context.Background(), ref, false)
 	})
 }
 
@@ -366,12 +399,12 @@ func (w *MCPWrapper) UpdateMCPBundleEnabled(
 	ref collection.CollectionRef,
 	expectedRevision uint64,
 	enabled bool,
-) (mcpbundle.Bundle, error) {
-	return middleware.WithRecoveryResp(func() (mcpbundle.Bundle, error) {
+) (mcpStore.Bundle, error) {
+	return middleware.WithRecoveryResp(func() (mcpStore.Bundle, error) {
 		if err := w.ready(); err != nil {
-			return mcpbundle.Bundle{}, err
+			return mcpStore.Bundle{}, err
 		}
-		return w.bundleAPI.UpdateBundleEnabled(
+		return w.aggregate.UpdateBundleEnabled(
 			context.Background(),
 			ref,
 			expectedRevision,
@@ -388,7 +421,7 @@ func (w *MCPWrapper) RetireMCPBundle(
 		if err := w.ready(); err != nil {
 			return collection.Collection{}, err
 		}
-		return w.bundleAPI.Retire(
+		return w.aggregate.RetireBundle(
 			context.Background(),
 			ref,
 			expectedRevision,
@@ -404,7 +437,7 @@ func (w *MCPWrapper) PurgeMCPBundle(
 		if err := w.ready(); err != nil {
 			return err
 		}
-		return w.bundleAPI.Purge(
+		return w.aggregate.PurgeBundle(
 			context.Background(),
 			ref,
 			expectedRevision,
@@ -415,20 +448,25 @@ func (w *MCPWrapper) PurgeMCPBundle(
 func (w *MCPWrapper) UpdateMCPServerInstallation(
 	ref artifact.ArtifactRef,
 	expectedArtifactRevision uint64,
-	data server.ServerData,
+	data mcpArtifact.ServerData,
 ) (artifact.Artifact, error) {
 	return middleware.WithRecoveryResp(func() (artifact.Artifact, error) {
 		if err := w.ready(); err != nil {
 			return artifact.Artifact{}, err
 		}
-		value, err := w.bundleAPI.UpdateServerInstallation(
+		value, err := w.aggregate.UpdateServerInstallation(
 			context.Background(),
 			ref,
 			expectedArtifactRevision,
 			data,
 		)
 		if err == nil {
-			w.auth.ClearAuthStatus(ref)
+			serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+			if idErr != nil {
+				return artifact.Artifact{}, idErr
+			}
+
+			w.auth.ClearAuthStatus(serverID)
 		}
 		return value, err
 	})
@@ -438,13 +476,13 @@ func (w *MCPWrapper) UpdateProtectedMCPServerInstallation(
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
 	runtimeEnabled bool,
-	data server.ServerData,
+	data mcpArtifact.ServerData,
 ) error {
 	return middleware.WithRecovery(func() error {
 		if err := w.ready(); err != nil {
 			return err
 		}
-		if err := w.bundleAPI.UpdateProtectedServerInstallation(
+		if err := w.aggregate.UpdateProtectedServerInstallation(
 			context.Background(),
 			ref,
 			expectedOverlayRevision,
@@ -453,7 +491,13 @@ func (w *MCPWrapper) UpdateProtectedMCPServerInstallation(
 		); err != nil {
 			return err
 		}
-		w.auth.ClearAuthStatus(ref)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+		if idErr != nil {
+			return idErr
+		}
+
+		w.auth.ClearAuthStatus(serverID)
+
 		return nil
 	})
 }
@@ -467,7 +511,7 @@ func (w *MCPWrapper) UpdateProtectedMCPBundleInstallation(
 		if err := w.ready(); err != nil {
 			return err
 		}
-		return w.bundleAPI.UpdateProtectedBundleInstallation(
+		return w.aggregate.UpdateProtectedBundleInstallation(
 			context.Background(),
 			ref,
 			expectedOverlayRevision,
@@ -478,12 +522,17 @@ func (w *MCPWrapper) UpdateProtectedMCPBundleInstallation(
 
 func (w *MCPWrapper) ConnectMCPServer(
 	ref artifact.ArtifactRef,
-) (*runtime.MCPServerRuntimeSnapshot, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.MCPServerRuntimeSnapshot, error) {
+) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.StartConnect(context.Background(), ref)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+		if idErr != nil {
+			return nil, idErr
+		}
+
+		return w.runtime.StartConnect(context.Background(), serverID)
 	})
 }
 
@@ -494,85 +543,119 @@ func (w *MCPWrapper) DisconnectMCPServer(
 		if err := w.ready(); err != nil {
 			return err
 		}
-		return w.runtime.Disconnect(context.Background(), ref)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+		if idErr != nil {
+			return idErr
+		}
+
+		return w.runtime.Disconnect(context.Background(), serverID)
 	})
 }
 
 func (w *MCPWrapper) RefreshMCPServer(
 	ref artifact.ArtifactRef,
-) (*runtime.MCPServerRuntimeSnapshot, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.MCPServerRuntimeSnapshot, error) {
+) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.Refresh(context.Background(), ref)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+		if idErr != nil {
+			return nil, idErr
+		}
+
+		return w.runtime.Refresh(context.Background(), serverID)
 	})
 }
 
 func (w *MCPWrapper) GetMCPServerStatus(
 	ref artifact.ArtifactRef,
-) (*runtime.MCPServerRuntimeSnapshot, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.MCPServerRuntimeSnapshot, error) {
+) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.Status(context.Background(), ref)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+		if idErr != nil {
+			return nil, idErr
+		}
+		return w.runtime.Status(context.Background(), serverID)
 	})
 }
 
 func (w *MCPWrapper) ListMCPServerTools(
 	ref artifact.ArtifactRef,
-) ([]runtime.MCPToolCapability, error) {
-	return middleware.WithRecoveryResp(func() ([]runtime.MCPToolCapability, error) {
+) ([]mcpRuntime.MCPToolCapability, error) {
+	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPToolCapability, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.ListTools(context.Background(), ref)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+		if idErr != nil {
+			return nil, idErr
+		}
+		return w.runtime.ListTools(context.Background(), serverID)
 	})
 }
 
 func (w *MCPWrapper) ListMCPServerResources(
 	ref artifact.ArtifactRef,
-) ([]runtime.MCPResourceRef, error) {
-	return middleware.WithRecoveryResp(func() ([]runtime.MCPResourceRef, error) {
+) ([]mcpRuntime.MCPResourceRef, error) {
+	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPResourceRef, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.ListResources(context.Background(), ref)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+		if idErr != nil {
+			return nil, idErr
+		}
+		return w.runtime.ListResources(context.Background(), serverID)
 	})
 }
 
 func (w *MCPWrapper) ListMCPServerResourceTemplates(
 	ref artifact.ArtifactRef,
-) ([]runtime.MCPResourceTemplateRef, error) {
-	return middleware.WithRecoveryResp(func() ([]runtime.MCPResourceTemplateRef, error) {
+) ([]mcpRuntime.MCPResourceTemplateRef, error) {
+	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPResourceTemplateRef, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.ListResourceTemplates(context.Background(), ref)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+		if idErr != nil {
+			return nil, idErr
+		}
+		return w.runtime.ListResourceTemplates(context.Background(), serverID)
 	})
 }
 
 func (w *MCPWrapper) ListMCPServerPrompts(
 	ref artifact.ArtifactRef,
-) ([]runtime.MCPPromptRef, error) {
-	return middleware.WithRecoveryResp(func() ([]runtime.MCPPromptRef, error) {
+) ([]mcpRuntime.MCPPromptRef, error) {
+	return middleware.WithRecoveryResp(func() ([]mcpRuntime.MCPPromptRef, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.ListPrompts(context.Background(), ref)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+		if idErr != nil {
+			return nil, idErr
+		}
+		return w.runtime.ListPrompts(context.Background(), serverID)
 	})
 }
 
 func (w *MCPWrapper) ReadMCPResource(
 	srv artifact.ArtifactRef,
 	uri string,
-) (*runtime.MCPReadResourceResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.MCPReadResourceResponseBody, error) {
+) (*mcpRuntime.MCPReadResourceResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPReadResourceResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.ReadResource(context.Background(), srv, uri)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(srv)
+		if idErr != nil {
+			return nil, idErr
+		}
+		return w.runtime.ReadResource(context.Background(), serverID, uri)
 	})
 }
 
@@ -580,14 +663,18 @@ func (w *MCPWrapper) GetMCPPrompt(
 	srv artifact.ArtifactRef,
 	name string,
 	arguments map[string]string,
-) (*runtime.MCPGetPromptResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.MCPGetPromptResponseBody, error) {
+) (*mcpRuntime.MCPGetPromptResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPGetPromptResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(srv)
+		if idErr != nil {
+			return nil, idErr
+		}
 		return w.runtime.GetPrompt(
 			context.Background(),
-			srv,
+			serverID,
 			name,
 			arguments,
 		)
@@ -596,46 +683,50 @@ func (w *MCPWrapper) GetMCPPrompt(
 
 func (w *MCPWrapper) CompleteMCPArgument(
 	srv artifact.ArtifactRef,
-	request runtime.MCPCompleteArgumentRequestBody,
-) (*runtime.MCPCompletionResult, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.MCPCompletionResult, error) {
+	request mcpRuntime.MCPCompleteArgumentRequestBody,
+) (*mcpRuntime.MCPCompletionResult, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPCompletionResult, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
-		return w.runtime.Complete(context.Background(), srv, request)
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(srv)
+		if idErr != nil {
+			return nil, idErr
+		}
+		return w.runtime.Complete(context.Background(), serverID, request)
 	})
 }
 
 func (w *MCPWrapper) EvaluateMCPToolCall(
 	srv artifact.ArtifactRef,
-	request *runtime.InvokeMCPToolRequestBody,
-) (*runtime.MCPApprovalEvaluation, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.MCPApprovalEvaluation, error) {
+	request *mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.MCPApprovalEvaluation, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPApprovalEvaluation, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
 		if request == nil {
-			return nil, fmt.Errorf("%w: MCP tool request is required", runtime.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf("%w: MCP tool request is required", mcpRuntime.ErrMCPInvalidRuntimeRequest)
 		}
-		return w.toolBridge.Evaluate(context.Background(), srv, *request)
+		return w.aggregate.Evaluate(context.Background(), srv, *request)
 	})
 }
 
 func (w *MCPWrapper) EvaluateMappedMCPToolCall(
-	mapping runtime.MCPProviderToolMapping,
-	request *runtime.InvokeMCPToolRequestBody,
-) (*runtime.MCPApprovalEvaluation, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.MCPApprovalEvaluation, error) {
+	mapping mcpRuntime.MCPProviderToolMapping,
+	request *mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.MCPApprovalEvaluation, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.MCPApprovalEvaluation, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
 		if request == nil {
 			return nil, fmt.Errorf(
 				"%w: mapped MCP tool request is required",
-				runtime.ErrMCPInvalidRuntimeRequest,
+				mcpRuntime.ErrMCPInvalidRuntimeRequest,
 			)
 		}
-		return w.toolBridge.EvaluateMapped(
+		return w.aggregate.EvaluateMapped(
 			context.Background(),
 			mapping,
 			*request,
@@ -645,13 +736,13 @@ func (w *MCPWrapper) EvaluateMappedMCPToolCall(
 
 func (w *MCPWrapper) ResolveMCPApproval(
 	approvalID string,
-	resolution runtime.MCPApprovalResolution,
-) (runtime.MCPApprovalResolutionResult, error) {
-	return middleware.WithRecoveryResp(func() (runtime.MCPApprovalResolutionResult, error) {
+	resolution mcpRuntime.MCPApprovalResolution,
+) (mcpRuntime.MCPApprovalResolutionResult, error) {
+	return middleware.WithRecoveryResp(func() (mcpRuntime.MCPApprovalResolutionResult, error) {
 		if err := w.ready(); err != nil {
-			return runtime.MCPApprovalResolutionResult{}, err
+			return mcpRuntime.MCPApprovalResolutionResult{}, err
 		}
-		return w.toolBridge.ResolveApproval(
+		return w.aggregate.ResolveApproval(
 			context.Background(),
 			approvalID,
 			resolution,
@@ -661,34 +752,34 @@ func (w *MCPWrapper) ResolveMCPApproval(
 
 func (w *MCPWrapper) InvokeMCPTool(
 	srv artifact.ArtifactRef,
-	request *runtime.InvokeMCPToolRequestBody,
-) (*runtime.InvokeMCPToolResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.InvokeMCPToolResponseBody, error) {
+	request *mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.InvokeMCPToolResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
 		if request == nil {
-			return nil, fmt.Errorf("%w: MCP tool request is required", runtime.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf("%w: MCP tool request is required", mcpRuntime.ErrMCPInvalidRuntimeRequest)
 		}
-		return w.toolBridge.Invoke(context.Background(), srv, *request)
+		return w.aggregate.Invoke(context.Background(), srv, *request)
 	})
 }
 
 func (w *MCPWrapper) InvokeMappedMCPTool(
-	mapping runtime.MCPProviderToolMapping,
-	request *runtime.InvokeMCPToolRequestBody,
-) (*runtime.InvokeMCPToolResponseBody, error) {
-	return middleware.WithRecoveryResp(func() (*runtime.InvokeMCPToolResponseBody, error) {
+	mapping mcpRuntime.MCPProviderToolMapping,
+	request *mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
+	return middleware.WithRecoveryResp(func() (*mcpRuntime.InvokeMCPToolResponseBody, error) {
 		if err := w.ready(); err != nil {
 			return nil, err
 		}
 		if request == nil {
 			return nil, fmt.Errorf(
 				"%w: mapped MCP tool request is required",
-				runtime.ErrMCPInvalidRuntimeRequest,
+				mcpRuntime.ErrMCPInvalidRuntimeRequest,
 			)
 		}
-		return w.toolBridge.InvokeMapped(
+		return w.aggregate.InvokeMapped(
 			context.Background(),
 			mapping,
 			*request,
@@ -698,7 +789,7 @@ func (w *MCPWrapper) InvokeMappedMCPTool(
 
 func (w *MCPWrapper) PutMCPServerSecret(
 	srv artifact.ArtifactRef,
-	kind secret.MCPSecretKind,
+	kind mcpSecret.MCPSecretKind,
 	slot string,
 	value string,
 ) (MCPSecretWriteResult, error) {
@@ -710,14 +801,14 @@ func (w *MCPWrapper) PutMCPServerSecret(
 		if err := w.requireServerArtifact(ctx, srv); err != nil {
 			return MCPSecretWriteResult{}, err
 		}
-		if kind == secret.MCPSecretKindOAuthToken {
+		if kind == mcpSecret.MCPSecretKindOAuthToken {
 			return MCPSecretWriteResult{}, fmt.Errorf(
 				"%w: OAuth token secrets are runtime-managed",
-				auth.ErrMCPInvalidAuthRequest,
+				mcpAuth.ErrMCPInvalidAuthRequest,
 			)
 		}
 
-		installationView, err := w.bundleAPI.GetServerInstallation(
+		installationView, err := w.storeAPI.GetServerInstallation(
 			ctx,
 			srv,
 		)
@@ -732,44 +823,47 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			return MCPSecretWriteResult{}, err
 		}
 
-		if kind == secret.MCPSecretKindOAuthClientCredentials {
+		if kind == mcpSecret.MCPSecretKindOAuthClientCredentials {
 			mode := installationView.Document.Extension.Auth.Mode
 			switch mode {
-			case server.MCPHTTPAuthOAuth,
-				server.MCPHTTPAuthClientCredentials:
+			case mcpSpec.MCPHTTPAuthOAuth,
+				mcpSpec.MCPHTTPAuthClientCredentials:
 			default:
 				return MCPSecretWriteResult{}, fmt.Errorf(
 					"%w: MCP server does not declare OAuth client credentials",
-					auth.ErrMCPInvalidAuthRequest,
+					mcpAuth.ErrMCPInvalidAuthRequest,
 				)
 			}
 			if installationView.Document.Extension.Auth.ClientCredentialsInput == "" {
 				return MCPSecretWriteResult{}, fmt.Errorf(
 					"%w: MCP server does not declare an OAuth client credentials input",
-					auth.ErrMCPInvalidAuthRequest,
+					mcpAuth.ErrMCPInvalidAuthRequest,
 				)
 			}
-			if err := auth.ValidateOAuthClientCredentialsSecret(
+			if err := mcpAuth.ValidateOAuthClientCredentialsSecret(
 				value,
 				installationView.Document.OAuthClientSecretRequired(),
 			); err != nil {
 				return MCPSecretWriteResult{}, err
 			}
 		}
-
-		if kind == secret.MCPSecretKindHTTPHeader &&
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(srv)
+		if idErr != nil {
+			return MCPSecretWriteResult{}, idErr
+		}
+		if kind == mcpSecret.MCPSecretKindHTTPHeader &&
 			(strings.TrimSpace(value) == "" ||
 				strings.ContainsAny(value, "\r\n\x00")) {
 			return MCPSecretWriteResult{}, fmt.Errorf(
 				"%w: invalid HTTP header secret value",
-				auth.ErrMCPInvalidAuthRequest,
+				mcpAuth.ErrMCPInvalidAuthRequest,
 			)
 		}
-		if err := w.runtime.Invalidate(ctx, srv); err != nil {
+		if err := w.runtime.Invalidate(ctx, serverID); err != nil {
 			return MCPSecretWriteResult{}, err
 		}
 
-		ref, err := secret.NewMCPSecretRefString(srv, kind, slot)
+		ref, err := mcpSecret.NewMCPSecretRefString(srv, kind, slot)
 		if err != nil {
 			return MCPSecretWriteResult{}, err
 		}
@@ -781,7 +875,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 		if err != nil {
 			return MCPSecretWriteResult{}, err
 		}
-		w.auth.ClearAuthStatus(srv)
+		w.auth.ClearAuthStatus(serverID)
 
 		return MCPSecretWriteResult{
 			SecretRef: ref,
@@ -793,7 +887,7 @@ func (w *MCPWrapper) PutMCPServerSecret(
 
 func (w *MCPWrapper) DeleteMCPServerSecret(
 	srv artifact.ArtifactRef,
-	kind secret.MCPSecretKind,
+	kind mcpSecret.MCPSecretKind,
 	slot string,
 ) error {
 	return middleware.WithRecovery(func() error {
@@ -803,49 +897,52 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 		if err := w.requireServerArtifact(context.Background(), srv); err != nil {
 			return err
 		}
-		if kind == secret.MCPSecretKindOAuthToken {
+		if kind == mcpSecret.MCPSecretKindOAuthToken {
 			return fmt.Errorf(
 				"%w: OAuth token secrets are runtime-managed",
-				auth.ErrMCPInvalidAuthRequest,
+				mcpAuth.ErrMCPInvalidAuthRequest,
 			)
 		}
-		if err := w.runtime.Invalidate(context.Background(), srv); err != nil {
+		serverID, idErr := mcpAggregate.ServerIDForArtifact(srv)
+		if idErr != nil {
+			return idErr
+		}
+		if err := w.runtime.Invalidate(context.Background(), serverID); err != nil {
 			return err
 		}
-		ref, err := secret.NewMCPSecretRefString(srv, kind, slot)
+		ref, err := mcpSecret.NewMCPSecretRefString(srv, kind, slot)
 		if err != nil {
 			return err
 		}
 		if err := w.secrets.DeleteSecret(context.Background(), ref); err != nil {
 			return err
 		}
-		w.auth.ClearAuthStatus(srv)
+		w.auth.ClearAuthStatus(serverID)
 		return nil
 	})
 }
 
 func (w *MCPWrapper) GetMCPServerAuthHealth(
 	ref artifact.ArtifactRef,
-) (auth.MCPAuthHealth, error) {
-	return middleware.WithRecoveryResp(func() (auth.MCPAuthHealth, error) {
+) (mcpAuth.MCPAuthHealth, error) {
+	return middleware.WithRecoveryResp(func() (mcpAuth.MCPAuthHealth, error) {
 		if err := w.ready(); err != nil {
-			return auth.MCPAuthHealth{}, err
+			return mcpAuth.MCPAuthHealth{}, err
 		}
 
-		resolved, err := w.bundleAPI.InspectMCPServer(context.Background(), ref)
-		if err != nil {
-			return auth.MCPAuthHealth{}, err
-		}
-		config, err := resolved.MaterializeForInspection(
+		config, resolved, err := w.aggregate.InspectRuntimeConfig(
 			context.Background(),
-			mcpEnvironmentResolver{},
+			ref,
 		)
 		if err != nil {
-			//nolint:nilerr // Explicit value.
-			return auth.MCPAuthHealth{
-				Server:     ref,
+			serverID, idErr := mcpAggregate.ServerIDForArtifact(ref)
+			if idErr != nil {
+				return mcpAuth.MCPAuthHealth{}, idErr
+			}
+			return mcpAuth.MCPAuthHealth{
+				Server:     serverID,
 				AuthMode:   resolved.Document.Extension.Auth.Mode,
-				State:      auth.MCPAuthHealthStateNotConfigured,
+				State:      mcpAuth.MCPAuthHealthStateNotConfigured,
 				Configured: false,
 				LastError:  "required MCP installation input is not configured",
 			}, nil
@@ -854,13 +951,13 @@ func (w *MCPWrapper) GetMCPServerAuthHealth(
 	})
 }
 
-func (w *MCPWrapper) ListPendingMCPOAuthAuthorizations() []auth.MCPOAuthAuthorization {
+func (w *MCPWrapper) ListPendingMCPOAuthAuthorizations() []mcpAuth.MCPOAuthAuthorization {
 	if w == nil || w.oauthBroker == nil {
-		return []auth.MCPOAuthAuthorization{}
+		return []mcpAuth.MCPOAuthAuthorization{}
 	}
 	values := w.oauthBroker.Pending()
 	if values == nil {
-		return []auth.MCPOAuthAuthorization{}
+		return []mcpAuth.MCPOAuthAuthorization{}
 	}
 	return values
 }
@@ -871,25 +968,29 @@ func (w *MCPWrapper) CancelPendingMCPOAuthAuthorization(
 	if w == nil {
 		return false
 	}
+	serverID, err := mcpAggregate.ServerIDForArtifact(srv)
+	if err != nil {
+		return false
+	}
 
 	cancelled := false
 	if w.oauthBroker != nil {
-		cancelled = w.oauthBroker.Cancel(srv)
+		cancelled = w.oauthBroker.Cancel(serverID)
 	}
 	if w.runtime != nil {
-		if err := w.runtime.Disconnect(context.Background(), srv); err != nil {
+		if err := w.runtime.Disconnect(context.Background(), serverID); err != nil {
 			slog.Warn("cancel MCP OAuth runtime connection", "server", srv, "error", err)
 		}
 	}
 	if w.auth != nil {
-		w.auth.ClearAuthStatus(srv)
+		w.auth.ClearAuthStatus(serverID)
 	}
 	return cancelled
 }
 
 func (w *MCPWrapper) UpdateMCPGlobalSettings(
 	expectedRevision uint64,
-	settings auth.MCPAuthSettings,
+	settings mcpAuth.MCPAuthSettings,
 ) (uint64, error) {
 	return middleware.WithRecoveryResp(func() (uint64, error) {
 		if err := w.ready(); err != nil {
@@ -954,40 +1055,40 @@ func (w *MCPWrapper) requireServerArtifact(
 }
 
 func validateMCPSecretTarget(
-	document server.ServerDocument,
-	kind secret.MCPSecretKind,
+	document mcpArtifact.ServerDocument,
+	kind mcpSecret.MCPSecretKind,
 	slot string,
 ) error {
 	switch kind {
-	case secret.MCPSecretKindOAuthClientCredentials:
+	case mcpSecret.MCPSecretKindOAuthClientCredentials:
 		input := document.Extension.Auth.ClientCredentialsInput
 		if input == "" {
 			return fmt.Errorf(
 				"%w: MCP Server does not declare OAuth client credentials",
-				auth.ErrMCPInvalidAuthRequest,
+				mcpAuth.ErrMCPInvalidAuthRequest,
 			)
 		}
 		declaration, found := document.Extension.Install.Inputs[input]
 		if !found ||
-			declaration.Kind != server.InputOAuthClientCredentials ||
+			declaration.Kind != mcpArtifact.InputOAuthClientCredentials ||
 			!strings.EqualFold(strings.TrimSpace(slot), "clientCredentials") {
 			return fmt.Errorf(
 				"%w: invalid OAuth client credentials secret target",
-				auth.ErrMCPInvalidAuthRequest,
+				mcpAuth.ErrMCPInvalidAuthRequest,
 			)
 		}
 		return nil
 
-	case secret.MCPSecretKindStdioEnv,
-		secret.MCPSecretKindHTTPHeader:
-		targets, err := server.SecretInputTargets(document)
+	case mcpSecret.MCPSecretKindStdioEnv,
+		mcpSecret.MCPSecretKindHTTPHeader:
+		targets, err := mcpArtifact.SecretInputTargets(document)
 		if err != nil {
 			return err
 		}
 		for _, target := range targets {
-			expectedKind := secret.MCPSecretKindStdioEnv
-			if target.Kind == server.SecretInputTargetHTTPHeader {
-				expectedKind = secret.MCPSecretKindHTTPHeader
+			expectedKind := mcpSecret.MCPSecretKindStdioEnv
+			if target.Kind == mcpArtifact.SecretInputTargetHTTPHeader {
+				expectedKind = mcpSecret.MCPSecretKindHTTPHeader
 			}
 			if kind == expectedKind &&
 				strings.EqualFold(target.Slot, strings.TrimSpace(slot)) {
@@ -996,13 +1097,13 @@ func validateMCPSecretTarget(
 		}
 		return fmt.Errorf(
 			"%w: secret target is not declared by the MCP Server",
-			auth.ErrMCPInvalidAuthRequest,
+			mcpAuth.ErrMCPInvalidAuthRequest,
 		)
 
 	default:
 		return fmt.Errorf(
 			"%w: unsupported MCP secret kind %q",
-			auth.ErrMCPInvalidAuthRequest,
+			mcpAuth.ErrMCPInvalidAuthRequest,
 			kind,
 		)
 	}
@@ -1010,10 +1111,9 @@ func validateMCPSecretTarget(
 
 func (w *MCPWrapper) ready() error {
 	if w == nil ||
-		w.bundleAPI == nil ||
+		w.storeAPI == nil ||
 		w.artifacts == nil ||
 		w.runtime == nil ||
-		w.toolBridge == nil ||
 		w.auth == nil ||
 		w.settings == nil ||
 		w.secrets == nil {
@@ -1030,10 +1130,9 @@ func (w *MCPWrapper) close() {
 	rt := w.runtime
 	broker := w.oauthBroker
 
-	w.bundleAPI = nil
+	w.storeAPI = nil
 	w.artifacts = nil
 	w.runtime = nil
-	w.toolBridge = nil
 	w.auth = nil
 	w.overlays = nil
 	w.settings = nil
@@ -1059,7 +1158,7 @@ func (w *MCPWrapper) close() {
 
 func ensureDefaultMCPBundle(
 	ctx context.Context,
-	api *mcpbundle.API,
+	api *mcpStore.API,
 ) error {
 	if ctx == nil {
 		return fmt.Errorf(
@@ -1099,7 +1198,7 @@ func ensureDefaultMCPBundle(
 		return fmt.Errorf("encode default MCP Bundle document: %w", err)
 	}
 
-	_, err = api.Create(ctx, mcpbundle.CreateRequest{
+	_, err = api.Create(ctx, mcpStore.CreateRequest{
 		RootID:           artifactbuiltin.MCPUserRootID,
 		CollectionID:     artifactbuiltin.DefaultMCPBundleCollectionID,
 		SourceID:         artifactbuiltin.DefaultMCPBundleSourceID,
@@ -1112,18 +1211,18 @@ func ensureDefaultMCPBundle(
 	return nil
 }
 
-func defaultMCPBundleDocument() mcpbundle.BundleDocument {
-	return mcpbundle.BundleDocument{
+func defaultMCPBundleDocument() mcpStore.BundleDocument {
+	return mcpStore.BundleDocument{
 		Kind:          artifactbuiltin.BundleKind,
 		SchemaID:      artifactbuiltin.BundleSchemaID,
 		SchemaVersion: artifactbuiltin.MCPSchemaVersion,
 		LogicalName:   artifactbuiltin.DefaultMCPBundleLogicalName,
 		DisplayName:   artifactbuiltin.DefaultMCPBundleDisplayName,
 		Description:   artifactbuiltin.DefaultMCPBundleDescription,
-		MCPServers:    map[string]server.CoreServer{},
-		BundleExtension: mcpbundle.BundleExtension{
-			Servers:  map[string]server.ServerExtension{},
-			Policies: map[string]policy.PolicyDocument{},
+		MCPServers:    map[string]mcpArtifact.CoreServer{},
+		BundleExtension: mcpStore.BundleExtension{
+			Servers:  map[string]mcpArtifact.ServerExtension{},
+			Policies: map[string]mcpPolicy.PolicyDocument{},
 		},
 	}
 }

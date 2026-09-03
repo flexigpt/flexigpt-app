@@ -1980,7 +1980,7 @@ No secrets, OAuth tokens, overlays, assistant presets, conversations, or runtime
 | ------------------------------------------- | ------------------------------------------ |
 | MCP Bundle schema                           | `internal/mcp/schema`                      |
 | MCP Server schema and Definition projection | `internal/mcp/artifact`                    |
-| MCP Policy schema and composition           | `internal/mcp/policy`                      |
+| MCP Policy schema and composition           | `internal/mcp/store/policy`                |
 | Bundle lifecycle and managed authoring      | `internal/mcp/bundle`                      |
 | Installation data codec                     | `internal/mcp/installation`                |
 | Built-in registration and hydration         | `internal/mcp/artifactbuiltin`             |

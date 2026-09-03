@@ -17,10 +17,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/server"
+	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
+	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
+	mcpSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/secret"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	"golang.org/x/oauth2"
 )
@@ -62,8 +64,8 @@ type mcpSettingsIndex struct {
 }
 
 type mcpGlobalSettingsRecord struct {
-	Revision uint64               `json:"revision"`
-	Settings auth.MCPAuthSettings `json:"settings"`
+	Revision uint64                  `json:"revision"`
+	Settings mcpAuth.MCPAuthSettings `json:"settings"`
 }
 
 func newMCPSettingsAdapter(
@@ -245,25 +247,25 @@ func (s *mcpSettingsAdapter) DeleteMCPInstallationPrefix(
 
 func (s *mcpSettingsAdapter) GetMCPGlobalSettings(
 	ctx context.Context,
-) (auth.MCPAuthSettings, uint64, error) {
+) (mcpAuth.MCPAuthSettings, uint64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	raw, found, err := s.readRawLocked(ctx, mcpGlobalSettingsLogicalKey)
 	if err != nil {
-		return auth.MCPAuthSettings{}, 0, err
+		return mcpAuth.MCPAuthSettings{}, 0, err
 	}
 	if !found {
-		return auth.MCPAuthSettings{}, 0, nil
+		return mcpAuth.MCPAuthSettings{}, 0, nil
 	}
 
 	var value mcpGlobalSettingsRecord
 	if err := json.Unmarshal(raw, &value); err != nil {
-		return auth.MCPAuthSettings{}, 0, err
+		return mcpAuth.MCPAuthSettings{}, 0, err
 	}
 	normalized, err := normalizeMCPGlobalSettings(value.Settings)
 	if err != nil {
-		return auth.MCPAuthSettings{}, 0, err
+		return mcpAuth.MCPAuthSettings{}, 0, err
 	}
 	return normalized, value.Revision, nil
 }
@@ -271,7 +273,7 @@ func (s *mcpSettingsAdapter) GetMCPGlobalSettings(
 func (s *mcpSettingsAdapter) PutMCPGlobalSettings(
 	ctx context.Context,
 	expectedRevision uint64,
-	value auth.MCPAuthSettings,
+	value mcpAuth.MCPAuthSettings,
 ) (uint64, error) {
 	value, err := normalizeMCPGlobalSettings(value)
 	if err != nil {
@@ -443,12 +445,12 @@ func (s *mcpSettingsAdapter) deleteOverlaySecretsLocked(
 		return nil
 	}
 
-	var ovr overlay.ServerOverlay
+	var ovr mcpOverlay.ServerOverlay
 	if err := json.Unmarshal(raw, &ovr); err != nil {
 		return err
 	}
 
-	refs, err := server.SecretReferences(ovr.ServerData)
+	refs, err := mcpArtifact.SecretReferences(ovr.ServerData)
 	if err != nil {
 		return err
 	}
@@ -473,9 +475,9 @@ func (s *mcpSettingsAdapter) deleteOverlaySecretsLocked(
 		return errors.Join(output, err)
 	}
 
-	tokenRef, err := secret.NewMCPSecretRefString(
+	tokenRef, err := mcpSecret.NewMCPSecretRefString(
 		srv,
-		secret.MCPSecretKindOAuthToken,
+		mcpSecret.MCPSecretKindOAuthToken,
 		"token",
 	)
 	if err != nil {
@@ -488,7 +490,7 @@ func (s *mcpSettingsAdapter) deleteSecretRefLocked(
 	ctx context.Context,
 	ref string,
 ) error {
-	parsed, err := secret.ParseMCPSecretRef(ref)
+	parsed, err := mcpSecret.ParseMCPSecretRef(ref)
 	if err != nil {
 		return err
 	}
@@ -497,7 +499,7 @@ func (s *mcpSettingsAdapter) deleteSecretRefLocked(
 		&settingSpec.DeleteAuthKeyRequest{
 			Type: settingSpec.AuthKeyTypeMCP,
 			KeyName: settingSpec.AuthKeyName(
-				secret.GetMCPSecretRefStorageKey(parsed),
+				mcpSecret.GetMCPSecretRefStorageKey(parsed),
 			),
 		},
 	)
@@ -532,8 +534,8 @@ func validateMCPSettingsKey(value string) error {
 }
 
 func normalizeMCPGlobalSettings(
-	value auth.MCPAuthSettings,
-) (auth.MCPAuthSettings, error) {
+	value mcpAuth.MCPAuthSettings,
+) (mcpAuth.MCPAuthSettings, error) {
 	value.OAuthLoopbackListenAddr = strings.TrimSpace(
 		value.OAuthLoopbackListenAddr,
 	)
@@ -545,20 +547,20 @@ func normalizeMCPGlobalSettings(
 		value.OAuthLoopbackListenAddr,
 	)
 	if err != nil {
-		return auth.MCPAuthSettings{}, fmt.Errorf(
+		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen address must be host:port",
 			basespec.ErrInvalid,
 		)
 	}
 	if !isLoopbackMCPSettingsHost(host) {
-		return auth.MCPAuthSettings{}, fmt.Errorf(
+		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen host must be loopback",
 			basespec.ErrInvalid,
 		)
 	}
 	number, err := strconv.Atoi(port)
 	if err != nil || number <= 0 || number > 65535 {
-		return auth.MCPAuthSettings{}, fmt.Errorf(
+		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen port must be 1..65535",
 			basespec.ErrInvalid,
 		)
@@ -586,9 +588,9 @@ func newSettingMCPSecretResolver(
 
 func (r *settingMCPSecretResolver) LoadOAuthToken(
 	ctx context.Context,
-	status auth.MCPAuthStatus,
+	status mcpAuth.MCPAuthStatus,
 ) (*oauth2.Token, error) {
-	ref, err := oauthTokenSecretRef(status.Server)
+	ref, err := oauthTokenSecretRefForRuntime(status.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -597,7 +599,7 @@ func (r *settingMCPSecretResolver) LoadOAuthToken(
 	if err != nil {
 		if isMissingMCPSetting(err) ||
 			errors.Is(err, basespec.ErrReferenceUnresolved) {
-			return nil, auth.ErrOAuthTokenNotFound
+			return nil, mcpAuth.ErrOAuthTokenNotFound
 		}
 		return nil, err
 	}
@@ -611,13 +613,13 @@ func (r *settingMCPSecretResolver) LoadOAuthToken(
 
 func (r *settingMCPSecretResolver) SaveOAuthToken(
 	ctx context.Context,
-	status auth.MCPAuthStatus,
+	status mcpAuth.MCPAuthStatus,
 	token *oauth2.Token,
 ) error {
 	if token == nil || !token.Valid() {
 		return nil
 	}
-	ref, err := oauthTokenSecretRef(status.Server)
+	ref, err := oauthTokenSecretRefForRuntime(status.Server)
 	if err != nil {
 		return err
 	}
@@ -632,9 +634,9 @@ func (r *settingMCPSecretResolver) SaveOAuthToken(
 
 func (r *settingMCPSecretResolver) DeleteOAuthToken(
 	ctx context.Context,
-	status auth.MCPAuthStatus,
+	status mcpAuth.MCPAuthStatus,
 ) error {
-	ref, err := oauthTokenSecretRef(status.Server)
+	ref, err := oauthTokenSecretRefForRuntime(status.Server)
 	if err != nil {
 		return err
 	}
@@ -650,13 +652,13 @@ func (r *settingMCPSecretResolver) SetMCPSecret(
 		return "", false, errors.New("MCP secret writer is not configured")
 	}
 
-	parsed, err := secret.ParseMCPSecretRef(ref)
+	parsed, err := mcpSecret.ParseMCPSecretRef(ref)
 	if err != nil {
 		return "", false, err
 	}
 
 	keyName := settingSpec.AuthKeyName(
-		secret.GetMCPSecretRefStorageKey(parsed),
+		mcpSecret.GetMCPSecretRefStorageKey(parsed),
 	)
 	_, err = r.store.SetAuthKey(
 		ctx,
@@ -703,7 +705,7 @@ func (r *settingMCPSecretResolver) ResolveSecret(
 		return "", errors.New("MCP secret resolver is not configured")
 	}
 
-	parsed, err := secret.ParseMCPSecretRef(ref)
+	parsed, err := mcpSecret.ParseMCPSecretRef(ref)
 	if err != nil {
 		return "", err
 	}
@@ -712,7 +714,7 @@ func (r *settingMCPSecretResolver) ResolveSecret(
 		&settingSpec.GetAuthKeyRequest{
 			Type: settingSpec.AuthKeyTypeMCP,
 			KeyName: settingSpec.AuthKeyName(
-				secret.GetMCPSecretRefStorageKey(parsed),
+				mcpSecret.GetMCPSecretRefStorageKey(parsed),
 			),
 		},
 	)
@@ -737,7 +739,7 @@ func (r *settingMCPSecretResolver) DeleteSecret(
 		return errors.New("MCP secret cleaner is not configured")
 	}
 
-	parsed, err := secret.ParseMCPSecretRef(ref)
+	parsed, err := mcpSecret.ParseMCPSecretRef(ref)
 	if err != nil {
 		return err
 	}
@@ -746,7 +748,7 @@ func (r *settingMCPSecretResolver) DeleteSecret(
 		&settingSpec.DeleteAuthKeyRequest{
 			Type: settingSpec.AuthKeyTypeMCP,
 			KeyName: settingSpec.AuthKeyName(
-				secret.GetMCPSecretRefStorageKey(parsed),
+				mcpSecret.GetMCPSecretRefStorageKey(parsed),
 			),
 		},
 	)
@@ -768,11 +770,21 @@ func isMissingMCPSetting(err error) bool {
 func oauthTokenSecretRef(
 	srv artifact.ArtifactRef,
 ) (string, error) {
-	return secret.NewMCPSecretRefString(
+	return mcpSecret.NewMCPSecretRefString(
 		srv,
-		secret.MCPSecretKindOAuthToken,
+		mcpSecret.MCPSecretKindOAuthToken,
 		"token",
 	)
+}
+
+func oauthTokenSecretRefForRuntime(
+	serverID mcpSpec.ServerID,
+) (string, error) {
+	ref, err := mcpAggregate.ArtifactRefForServerID(serverID)
+	if err != nil {
+		return "", err
+	}
+	return oauthTokenSecretRef(ref)
 }
 
 type mcpEnvironmentResolver struct{}

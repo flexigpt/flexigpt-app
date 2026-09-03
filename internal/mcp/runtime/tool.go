@@ -1,7 +1,7 @@
 package runtime
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
 type MCPInvocationSource string
@@ -32,7 +32,7 @@ type InvokeMCPToolRequestBody struct {
 }
 
 type InvokeMCPToolRequest struct {
-	Server artifact.ArtifactRef `json:"server" required:"true"`
+	Server mcpSpec.ServerID `json:"server" required:"true"`
 	Body   *InvokeMCPToolRequestBody
 }
 
@@ -45,7 +45,7 @@ type MCPToolAppRenderInfo struct {
 }
 
 type InvokeMCPToolResponseBody struct {
-	Server artifact.ArtifactRef `json:"server"`
+	Server mcpSpec.ServerID `json:"server"`
 
 	ToolName         string `json:"toolName"`
 	ProviderToolName string `json:"providerToolName,omitempty"`

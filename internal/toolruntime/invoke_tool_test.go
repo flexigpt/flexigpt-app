@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/store"
@@ -60,7 +61,7 @@ func TestInvokeTool(t *testing.T) {
 		name          string
 		handler       handlerFn
 		mkTool        mkToolFn
-		args          string
+		args          jsonutil.JSONRawString
 		httpOptions   *spec.InvokeHTTPOptions
 		disableBundle bool
 		disableTool   bool
@@ -735,7 +736,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 		name          string
 		register      func(t *testing.T) string // returns funcName registered in the default registry
 		funcName      string                    // if register is nil, allows unknown func-name case
-		args          string
+		args          jsonutil.JSONRawString
 		disableBundle bool
 		disableTool   bool
 		wantErrIs     error
@@ -1353,7 +1354,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 				ToolSlug: toolSlug,
 				Version:  version,
 				Body: &spec.InvokeToolRequestBody{
-					Args: tc.args,
+					Args: jsonutil.JSONRawString(tc.args),
 				},
 			})
 			if err != nil {

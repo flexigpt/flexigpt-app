@@ -5,7 +5,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go/document"
 	assistantpresetSpec "github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -63,7 +63,7 @@ type SkillLookup interface {
 type MCPContextLookup interface {
 	ValidateMCPConversationContext(
 		ctx context.Context,
-		mcpContext runtime.MCPConversationContext,
+		mcpContext mcpRuntime.MCPConversationContext,
 	) error
 }
 

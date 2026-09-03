@@ -1865,7 +1865,7 @@ User sends chat turn
 Add:
 
 ```text
-internal/mcp/policy/
+internal/mcp/store/policy/
   policy.go
   risk.go
   visibility.go

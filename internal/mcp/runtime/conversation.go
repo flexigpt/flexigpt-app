@@ -1,27 +1,25 @@
 package runtime
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
 type MCPToolSelection struct {
-	Server           artifact.ArtifactRef `json:"server"`
-	ToolName         string               `json:"toolName"`
-	ProviderToolName string               `json:"providerToolName,omitempty"`
-	ChoiceID         string               `json:"choiceID,omitempty"`
-	Digest           string               `json:"digest,omitempty"`
+	Server           mcpSpec.ServerID `json:"server"`
+	ToolName         string           `json:"toolName"`
+	ProviderToolName string           `json:"providerToolName,omitempty"`
+	ChoiceID         string           `json:"choiceID,omitempty"`
+	Digest           string           `json:"digest,omitempty"`
 
-	ApprovalRule  *policy.MCPApprovalRule  `json:"approvalRule,omitempty"`
-	ExecutionMode *policy.MCPExecutionMode `json:"executionMode,omitempty"`
+	ApprovalRule  *mcpSpec.MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode *mcpSpec.MCPExecutionMode `json:"executionMode,omitempty"`
 
 	AppResourceURI string   `json:"appResourceUri,omitempty"`
 	Visibility     []string `json:"visibility,omitempty"`
 }
 
 type MCPProviderToolMapping struct {
-	Server artifact.ArtifactRef `json:"server"`
+	Server mcpSpec.ServerID `json:"server"`
 
 	ProviderToolName string `json:"providerToolName"`
 	ChoiceID         string `json:"choiceID"`
@@ -29,10 +27,10 @@ type MCPProviderToolMapping struct {
 	ToolName   string `json:"toolName"`
 	ToolDigest string `json:"toolDigest"`
 
-	ApprovalRule   policy.MCPApprovalRule  `json:"approvalRule,omitempty"`
-	ExecutionMode  policy.MCPExecutionMode `json:"executionMode,omitempty"`
-	AppResourceURI string                  `json:"appResourceUri,omitempty"`
-	Visibility     []string                `json:"visibility,omitempty"`
+	ApprovalRule   mcpSpec.MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode  mcpSpec.MCPExecutionMode `json:"executionMode,omitempty"`
+	AppResourceURI string                   `json:"appResourceUri,omitempty"`
+	Visibility     []string                 `json:"visibility,omitempty"`
 }
 
 type MCPToolExposure string
@@ -44,7 +42,7 @@ const (
 )
 
 type MCPServerSelection struct {
-	Server artifact.ArtifactRef `json:"server"`
+	Server mcpSpec.ServerID `json:"server"`
 
 	SnapshotDigest string `json:"snapshotDigest,omitempty"`
 
@@ -73,8 +71,8 @@ type MCPConversationContext struct {
 	Prompts           []MCPPromptSelection           `json:"prompts,omitempty"`
 }
 type MCPToolCallProvenance struct {
-	Server     artifact.ArtifactRef     `json:"server"`
-	Collection collection.CollectionRef `json:"collection"`
+	Server     mcpSpec.ServerID  `json:"server"`
+	Collection mcpSpec.CatalogID `json:"collection"`
 
 	ServerDisplayName string `json:"serverDisplayName,omitempty"`
 

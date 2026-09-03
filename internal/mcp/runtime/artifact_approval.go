@@ -11,21 +11,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
 const defaultApprovalTTL = 5 * time.Minute
 
 type approvalDecisionKey struct {
-	Server     artifact.ArtifactRef `json:"server"`
-	ToolName   string               `json:"toolName"`
-	ToolDigest string               `json:"toolDigest,omitempty"`
-	Risk       MCPToolRisk          `json:"risk"`
-	Source     MCPInvocationSource  `json:"source"`
-	AppID      string               `json:"appInstanceID,omitempty"`
+	Server     mcpSpec.ServerID    `json:"server"`
+	ToolName   string              `json:"toolName"`
+	ToolDigest string              `json:"toolDigest,omitempty"`
+	Risk       MCPToolRisk         `json:"risk"`
+	Source     MCPInvocationSource `json:"source"`
+	AppID      string              `json:"appInstanceID,omitempty"`
 }
 
 type pendingApproval struct {
@@ -219,7 +217,7 @@ func (m *ApprovalManager) LookupDecision(
 // ClearServer removes pending tokens and remembered decisions belonging to an
 // MCP server. It is called whenever that server's runtime session ends.
 func (m *ApprovalManager) ClearServer(
-	server artifact.ArtifactRef,
+	server mcpSpec.ServerID,
 ) {
 	if m == nil {
 		return
@@ -331,7 +329,7 @@ func approvalDecisionKeyFor(summary MCPApprovalSummary) string {
 		Source:     summary.Source,
 		AppID:      summary.AppInstanceID,
 	})
-	return string(cryptoutil.DigestBytes(raw))
+	return string(mcpSpec.DigestBytes(raw))
 }
 
 func approvalSummaryMatches(
@@ -356,19 +354,19 @@ func approvalSummaryMatches(
 }
 
 func normalizeApprovalArguments(value jsonutil.JSONRawString) jsonutil.JSONRawString {
-	trimmed := strings.TrimSpace(value)
+	trimmed := strings.TrimSpace(string(value))
 	if trimmed == "" {
 		return jsonutil.JSONRawString(`{}`)
 	}
 
 	var decoded any
 	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
-		return trimmed
+		return jsonutil.JSONRawString(trimmed)
 	}
 
 	normalized, err := json.Marshal(decoded)
 	if err != nil {
-		return trimmed
+		return jsonutil.JSONRawString(trimmed)
 	}
 	return jsonutil.JSONRawString(normalized)
 }
@@ -377,7 +375,7 @@ func validateApprovalContext(ctx context.Context) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: MCP approval context is nil",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 		)
 	}
 	return ctx.Err()
@@ -390,10 +388,10 @@ func validateApprovalSummary(value MCPApprovalSummary) error {
 	if err := validateMCPInvocationSource(value.Source); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := mcpSpec.ValidateOptionalText(
 		"MCP approval app instance ID",
 		value.AppInstanceID,
-		basespec.MaxDisplayNameBytes,
+		mcpSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
@@ -404,10 +402,10 @@ func validateApprovalSummary(value MCPApprovalSummary) error {
 			ErrMCPInvalidRuntimeRequest,
 		)
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := mcpSpec.ValidateRequiredText(
 		"MCP approval tool name",
 		value.ToolName,
-		basespec.MaxDisplayNameBytes,
+		mcpSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
@@ -421,7 +419,7 @@ func validateApprovalSummary(value MCPApprovalSummary) error {
 	default:
 		return fmt.Errorf(
 			"%w: invalid MCP approval risk %q",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 			value.Risk,
 		)
 	}

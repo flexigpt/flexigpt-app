@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-
-	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
 const (
@@ -21,8 +19,8 @@ const (
 )
 
 type MCPAppModelContextUpdate struct {
-	InstanceID string               `json:"instanceID,omitempty"`
-	Server     artifact.ArtifactRef `json:"server"`
+	InstanceID string           `json:"instanceID,omitempty"`
+	Server     mcpSpec.ServerID `json:"server"`
 
 	ResourceURI string `json:"resourceUri,omitempty"`
 
@@ -55,19 +53,19 @@ func ToolVisibleToModel(info *MCPToolAppInfo) bool {
 	return false
 }
 
-// ValidateArtifactAppToolInvocation is the Artifact-backed MCP App
+// ValidateAppToolInvocation is the Artifact-backed MCP App
 // authorization check. It is the target API used by the Artifact Store MCP
 // runtime.
-func ValidateArtifactAppToolInvocation(
-	p policy.MCPAppsPolicy,
+func ValidateAppToolInvocation(
+	p mcpSpec.MCPAppsPolicy,
 	tool MCPToolCapability,
-	appServer artifact.ArtifactRef,
+	appServer mcpSpec.ServerID,
 ) error {
 	if !p.Enabled {
 		return fmt.Errorf(
-			"%w: MCP Apps is not enabled for server Artifact %q",
+			"%w: MCP Apps is not enabled for server %q",
 			ErrMCPPolicyDenied,
-			tool.Server.ArtifactID,
+			tool.Server,
 		)
 	}
 	if !p.AllowAppInitiatedToolCalls {

@@ -362,7 +362,7 @@ func (a *App) initManagers() {
 		a.modelPresetStoreAPI.store,
 		a.toolStoreAPI.store,
 		a.skillAggregateAPI.service,
-		a.mcpAPI.bundleAPI,
+		a.mcpAPI.aggregate,
 		a.mcpAPI.runtime,
 	)
 	if err != nil {

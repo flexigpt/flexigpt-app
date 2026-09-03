@@ -1,6 +1,8 @@
 package runtime
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+import (
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+)
 
 type MCPGetPromptRequestBody struct {
 	PromptName string            `json:"promptName"          required:"true"`
@@ -8,15 +10,15 @@ type MCPGetPromptRequestBody struct {
 }
 
 type MCPGetPromptRequest struct {
-	Server artifact.ArtifactRef `json:"server" required:"true"`
+	Server mcpSpec.ServerID `json:"server" required:"true"`
 	Body   *MCPGetPromptRequestBody
 }
 
 type MCPGetPromptResponseBody struct {
-	Server      artifact.ArtifactRef `json:"server"`
-	PromptName  string               `json:"promptName"`
-	Description string               `json:"description,omitempty"`
-	Messages    []MCPPromptMessage   `json:"messages,omitempty"`
+	Server      mcpSpec.ServerID   `json:"server"`
+	PromptName  string             `json:"promptName"`
+	Description string             `json:"description,omitempty"`
+	Messages    []MCPPromptMessage `json:"messages,omitempty"`
 }
 
 type MCPGetPromptResponse struct {
@@ -32,7 +34,7 @@ type MCPCompleteArgumentRequestBody struct {
 }
 
 type MCPCompleteArgumentRequest struct {
-	Server artifact.ArtifactRef `json:"server" required:"true"`
+	Server mcpSpec.ServerID `json:"server" required:"true"`
 	Body   *MCPCompleteArgumentRequestBody
 }
 
@@ -47,14 +49,14 @@ type MCPReadResourceRequestBody struct {
 }
 
 type MCPReadResourceRequest struct {
-	Server artifact.ArtifactRef `json:"server" required:"true"`
+	Server mcpSpec.ServerID `json:"server" required:"true"`
 	Body   *MCPReadResourceRequestBody
 }
 
 type MCPReadResourceResponseBody struct {
-	Server   artifact.ArtifactRef `json:"server"`
-	URI      string               `json:"uri"`
-	Contents []MCPContent         `json:"contents,omitempty"`
+	Server   mcpSpec.ServerID `json:"server"`
+	URI      string           `json:"uri"`
+	Contents []MCPContent     `json:"contents,omitempty"`
 }
 
 type MCPReadResourceResponse struct {

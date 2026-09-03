@@ -5,9 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
 // ValidateMCPProviderToolMappingsForContext validates durable provider-tool
@@ -25,7 +23,7 @@ func ValidateMCPProviderToolMappingsForContext(
 	}
 
 	servers := make(
-		map[artifact.ArtifactRef]MCPServerSelection,
+		map[mcpSpec.ServerID]MCPServerSelection,
 		len(contextValue.Servers),
 	)
 	for _, server := range contextValue.Servers {
@@ -41,14 +39,14 @@ func ValidateMCPProviderToolMappingsForContext(
 		if _, duplicate := providerNames[mapping.ProviderToolName]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate MCP provider tool name %q",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				mapping.ProviderToolName,
 			)
 		}
 		if _, duplicate := choiceIDs[mapping.ChoiceID]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate MCP choice ID %q",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				mapping.ChoiceID,
 			)
 		}
@@ -59,7 +57,7 @@ func ValidateMCPProviderToolMappingsForContext(
 		if !selected {
 			return fmt.Errorf(
 				"%w: mapped MCP tool %q belongs to an unselected server",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				mapping.ToolName,
 			)
 		}
@@ -70,7 +68,7 @@ func ValidateMCPProviderToolMappingsForContext(
 			if !found {
 				return fmt.Errorf(
 					"%w: mapped MCP tool %q was not selected",
-					basespec.ErrInvalid,
+					mcpSpec.ErrInvalid,
 					mapping.ToolName,
 				)
 			}
@@ -91,7 +89,7 @@ func ValidateMCPProviderToolMappingsForContext(
 		default:
 			return fmt.Errorf(
 				"%w: mapped MCP tool %q has no enabled tool exposure",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				mapping.ToolName,
 			)
 		}
@@ -113,7 +111,7 @@ func ValidateMCPAppContextUpdatesForContext(
 	}
 
 	servers := make(
-		map[artifact.ArtifactRef]struct{},
+		map[mcpSpec.ServerID]struct{},
 		len(contextValue.Servers),
 	)
 	for _, server := range contextValue.Servers {
@@ -123,7 +121,7 @@ func ValidateMCPAppContextUpdatesForContext(
 		if _, selected := servers[update.Server]; !selected {
 			return fmt.Errorf(
 				"%w: MCP App context update %d belongs to an unselected server",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				index,
 			)
 		}
@@ -151,21 +149,21 @@ func mappingMatchesSelection(
 		selection.ProviderToolName != mapping.ProviderToolName {
 		return fmt.Errorf(
 			"%w: mapped MCP provider tool identity changed for %q",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 			mapping.ToolName,
 		)
 	}
 	if selection.ChoiceID != "" && selection.ChoiceID != mapping.ChoiceID {
 		return fmt.Errorf(
 			"%w: mapped MCP choice identity changed for %q",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 			mapping.ToolName,
 		)
 	}
 	if selection.Digest != "" && selection.Digest != mapping.ToolDigest {
 		return fmt.Errorf(
 			"%w: mapped MCP tool digest changed for %q",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 			mapping.ToolName,
 		)
 	}
@@ -173,7 +171,7 @@ func mappingMatchesSelection(
 		selection.AppResourceURI != mapping.AppResourceURI {
 		return fmt.Errorf(
 			"%w: mapped MCP App resource changed for %q",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 			mapping.ToolName,
 		)
 	}
@@ -181,22 +179,22 @@ func mappingMatchesSelection(
 		!sameVisibility(selection.Visibility, mapping.Visibility) {
 		return fmt.Errorf(
 			"%w: mapped MCP App visibility changed for %q",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 			mapping.ToolName,
 		)
 	}
 	if selection.ApprovalRule != nil &&
-		policy.ApprovalRuleRank(mapping.ApprovalRule) < policy.ApprovalRuleRank(*selection.ApprovalRule) {
+		mcpSpec.ApprovalRuleRank(mapping.ApprovalRule) < mcpSpec.ApprovalRuleRank(*selection.ApprovalRule) {
 		return fmt.Errorf(
 			"%w: mapped MCP approval rule weakens conversation policy",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 		)
 	}
 	if selection.ExecutionMode != nil &&
-		policy.ExecutionModeRank(mapping.ExecutionMode) < policy.ExecutionModeRank(*selection.ExecutionMode) {
+		mcpSpec.ExecutionModeRank(mapping.ExecutionMode) < mcpSpec.ExecutionModeRank(*selection.ExecutionMode) {
 		return fmt.Errorf(
 			"%w: mapped MCP execution mode weakens conversation policy",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 		)
 	}
 	return nil
@@ -227,14 +225,14 @@ func normalizedVisibilitySet(values []string) map[string]struct{} {
 // ValidateMCPConversationContext validates durable MCP conversation selection
 // structure without requiring a live MCP runtime connection.
 func ValidateMCPConversationContext(value MCPConversationContext) error {
-	if len(value.Servers) > basespec.MaxDiscoveryCandidates ||
-		len(value.Resources) > basespec.MaxDiscoveryCandidates ||
-		len(value.ResourceTemplates) > basespec.MaxDiscoveryCandidates ||
-		len(value.Prompts) > basespec.MaxDiscoveryCandidates {
-		return fmt.Errorf("%w: MCP conversation context exceeds entry limits", basespec.ErrInvalid)
+	if len(value.Servers) > mcpSpec.MaxDiscoveryCandidates ||
+		len(value.Resources) > mcpSpec.MaxDiscoveryCandidates ||
+		len(value.ResourceTemplates) > mcpSpec.MaxDiscoveryCandidates ||
+		len(value.Prompts) > mcpSpec.MaxDiscoveryCandidates {
+		return fmt.Errorf("%w: MCP conversation context exceeds entry limits", mcpSpec.ErrInvalid)
 	}
 
-	servers := make(map[artifact.ArtifactRef]struct{}, len(value.Servers))
+	servers := make(map[mcpSpec.ServerID]struct{}, len(value.Servers))
 	for index, selection := range value.Servers {
 		if err := validateMCPServerSelection(selection); err != nil {
 			return fmt.Errorf("MCP servers[%d]: %w", index, err)
@@ -242,8 +240,8 @@ func ValidateMCPConversationContext(value MCPConversationContext) error {
 		if _, duplicate := servers[selection.Server]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate MCP server selection %q",
-				basespec.ErrInvalid,
-				selection.Server.ArtifactID,
+				mcpSpec.ErrInvalid,
+				selection.Server,
 			)
 		}
 		servers[selection.Server] = struct{}{}
@@ -257,7 +255,7 @@ func ValidateMCPConversationContext(value MCPConversationContext) error {
 		if _, selected := servers[resource.Server]; !selected {
 			return fmt.Errorf(
 				"%w: MCP resource %q belongs to a server not selected by the conversation",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				resource.URI,
 			)
 		}
@@ -265,7 +263,7 @@ func ValidateMCPConversationContext(value MCPConversationContext) error {
 		if _, duplicate := resources[key]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate MCP resource %q",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				resource.URI,
 			)
 		}
@@ -287,7 +285,7 @@ func ValidateMCPConversationContext(value MCPConversationContext) error {
 		if _, selected := servers[selection.Server]; !selected {
 			return fmt.Errorf(
 				"%w: MCP resource template %q belongs to a server not selected by the conversation",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				selection.URITemplate,
 			)
 		}
@@ -298,7 +296,7 @@ func ValidateMCPConversationContext(value MCPConversationContext) error {
 		if _, duplicate := templates[key]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate MCP resource template %q",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				selection.URITemplate,
 			)
 		}
@@ -313,7 +311,7 @@ func ValidateMCPConversationContext(value MCPConversationContext) error {
 		if _, selected := servers[selection.Server]; !selected {
 			return fmt.Errorf(
 				"%w: MCP prompt %q belongs to a server not selected by the conversation",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				selection.PromptName,
 			)
 		}
@@ -324,7 +322,7 @@ func ValidateMCPConversationContext(value MCPConversationContext) error {
 		if _, duplicate := prompts[key]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate MCP prompt %q",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				selection.PromptName,
 			)
 		}
@@ -343,17 +341,17 @@ func ValidateMCPAppContextUpdates(
 		if err := value.Server.Validate(); err != nil {
 			return fmt.Errorf("MCP App context updates[%d]: %w", index, err)
 		}
-		if err := basespec.ValidateOptionalText(
+		if err := mcpSpec.ValidateOptionalText(
 			"MCP App instance ID",
 			value.InstanceID,
-			basespec.MaxDisplayNameBytes,
+			mcpSpec.MaxDisplayNameBytes,
 		); err != nil {
 			return fmt.Errorf("MCP App context updates[%d]: %w", index, err)
 		}
-		if err := basespec.ValidateOptionalText(
+		if err := mcpSpec.ValidateOptionalText(
 			"MCP App resource URI",
 			value.ResourceURI,
-			basespec.MaxURIBytes,
+			mcpSpec.MaxURIBytes,
 		); err != nil {
 			return fmt.Errorf("MCP App context updates[%d]: %w", index, err)
 		}
@@ -368,44 +366,44 @@ func ValidateMCPProviderToolMapping(m MCPProviderToolMapping) error {
 	if err := m.Server.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := mcpSpec.ValidateRequiredText(
 		"MCP provider tool name",
 		m.ProviderToolName,
-		basespec.MaxLocatorBytes,
+		mcpSpec.MaxLocatorBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := mcpSpec.ValidateRequiredText(
 		"MCP provider choice ID",
 		m.ChoiceID,
-		basespec.MaxLocatorBytes,
+		mcpSpec.MaxLocatorBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := mcpSpec.ValidateRequiredText(
 		"MCP tool name",
 		m.ToolName,
-		basespec.MaxDisplayNameBytes,
+		mcpSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := mcpSpec.ValidateRequiredText(
 		"MCP tool digest",
 		m.ToolDigest,
-		basespec.MaxFingerprintBytes,
+		mcpSpec.MaxFingerprintBytes,
 	); err != nil {
 		return err
 	}
-	if err := policy.ValidateMCPApprovalRule(m.ApprovalRule); err != nil {
+	if err := mcpSpec.ValidateMCPApprovalRule(m.ApprovalRule); err != nil {
 		return err
 	}
-	if err := policy.ValidateMCPExecutionMode(m.ExecutionMode); err != nil {
+	if err := mcpSpec.ValidateMCPExecutionMode(m.ExecutionMode); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := mcpSpec.ValidateOptionalText(
 		"MCP App resource URI",
 		m.AppResourceURI,
-		basespec.MaxURIBytes,
+		mcpSpec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -416,10 +414,10 @@ func validateMCPServerSelection(value MCPServerSelection) error {
 	if err := value.Server.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := mcpSpec.ValidateOptionalText(
 		"MCP snapshot digest",
 		value.SnapshotDigest,
-		basespec.MaxFingerprintBytes,
+		mcpSpec.MaxFingerprintBytes,
 	); err != nil {
 		return err
 	}
@@ -429,7 +427,7 @@ func validateMCPServerSelection(value MCPServerSelection) error {
 		if len(value.SelectedTools) != 0 {
 			return fmt.Errorf(
 				"%w: selected MCP tools require selected tool exposure",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 			)
 		}
 
@@ -437,7 +435,7 @@ func validateMCPServerSelection(value MCPServerSelection) error {
 		if len(value.SelectedTools) == 0 {
 			return fmt.Errorf(
 				"%w: selected MCP tool exposure requires tools",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 			)
 		}
 
@@ -447,7 +445,7 @@ func validateMCPServerSelection(value MCPServerSelection) error {
 	default:
 		return fmt.Errorf(
 			"%w: invalid MCP tool exposure %q",
-			basespec.ErrInvalid,
+			mcpSpec.ErrInvalid,
 			value.ToolExposure,
 		)
 	}
@@ -460,13 +458,13 @@ func validateMCPServerSelection(value MCPServerSelection) error {
 		if tool.Server != value.Server {
 			return fmt.Errorf(
 				"%w: selected MCP tool belongs to another server",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 			)
 		}
 		if _, duplicate := tools[tool.ToolName]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate selected MCP tool %q",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				tool.ToolName,
 			)
 		}
@@ -479,48 +477,48 @@ func validateMCPToolSelection(value MCPToolSelection) error {
 	if err := value.Server.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := mcpSpec.ValidateRequiredText(
 		"MCP tool name",
 		value.ToolName,
-		basespec.MaxDisplayNameBytes,
+		mcpSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := mcpSpec.ValidateOptionalText(
 		"MCP provider tool name",
 		value.ProviderToolName,
-		basespec.MaxLocatorBytes,
+		mcpSpec.MaxLocatorBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := mcpSpec.ValidateOptionalText(
 		"MCP tool choice ID",
 		value.ChoiceID,
-		basespec.MaxLocatorBytes,
+		mcpSpec.MaxLocatorBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := mcpSpec.ValidateOptionalText(
 		"MCP tool digest",
 		value.Digest,
-		basespec.MaxFingerprintBytes,
+		mcpSpec.MaxFingerprintBytes,
 	); err != nil {
 		return err
 	}
 	if value.ApprovalRule != nil {
-		if err := policy.ValidateMCPApprovalRule(*value.ApprovalRule); err != nil {
+		if err := mcpSpec.ValidateMCPApprovalRule(*value.ApprovalRule); err != nil {
 			return err
 		}
 	}
 	if value.ExecutionMode != nil {
-		if err := policy.ValidateMCPExecutionMode(*value.ExecutionMode); err != nil {
+		if err := mcpSpec.ValidateMCPExecutionMode(*value.ExecutionMode); err != nil {
 			return err
 		}
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := mcpSpec.ValidateOptionalText(
 		"MCP App resource URI",
 		value.AppResourceURI,
-		basespec.MaxURIBytes,
+		mcpSpec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -531,17 +529,17 @@ func validateMCPResourceRef(value MCPResourceRef) error {
 	if err := value.Server.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := mcpSpec.ValidateRequiredText(
 		"MCP resource URI",
 		value.URI,
-		basespec.MaxURIBytes,
+		mcpSpec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	return basespec.ValidateOptionalText(
+	return mcpSpec.ValidateOptionalText(
 		"MCP resource digest",
 		value.Digest,
-		basespec.MaxFingerprintBytes,
+		mcpSpec.MaxFingerprintBytes,
 	)
 }
 
@@ -552,17 +550,17 @@ func validateMCPResourceTemplateSelection(
 	if err := ref.Server.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := mcpSpec.ValidateRequiredText(
 		"MCP resource URI template",
 		ref.URITemplate,
-		basespec.MaxURIBytes,
+		mcpSpec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := mcpSpec.ValidateOptionalText(
 		"MCP resource template digest",
 		ref.Digest,
-		basespec.MaxFingerprintBytes,
+		mcpSpec.MaxFingerprintBytes,
 	); err != nil {
 		return err
 	}
@@ -576,17 +574,17 @@ func validateMCPPromptSelection(value MCPPromptSelection) error {
 	if err := value.Server.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := mcpSpec.ValidateRequiredText(
 		"MCP prompt name",
 		value.PromptName,
-		basespec.MaxDisplayNameBytes,
+		mcpSpec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := mcpSpec.ValidateOptionalText(
 		"MCP prompt digest",
 		value.Digest,
-		basespec.MaxFingerprintBytes,
+		mcpSpec.MaxFingerprintBytes,
 	); err != nil {
 		return err
 	}
@@ -600,17 +598,17 @@ func validateMCPArgumentDefinitions(
 	values map[string]MCPArgumentDefinition,
 ) error {
 	for name, value := range values {
-		if err := basespec.ValidateRequiredText(
+		if err := mcpSpec.ValidateRequiredText(
 			"MCP argument name",
 			name,
-			basespec.MaxKindBytes,
+			mcpSpec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
 		if value.Name != "" && value.Name != name {
 			return fmt.Errorf(
 				"%w: MCP argument definition key %q differs from name %q",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				name,
 				value.Name,
 			)
@@ -621,18 +619,18 @@ func validateMCPArgumentDefinitions(
 
 func validateMCPArgumentValues(values map[string]string) error {
 	for name, value := range values {
-		if err := basespec.ValidateRequiredText(
+		if err := mcpSpec.ValidateRequiredText(
 			"MCP argument value name",
 			name,
-			basespec.MaxKindBytes,
+			mcpSpec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
 		if !utf8.ValidString(value) ||
-			len(value) > basespec.MaxDescriptionBytes {
+			len(value) > mcpSpec.MaxDescriptionBytes {
 			return fmt.Errorf(
 				"%w: MCP argument value %q is invalid",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				name,
 			)
 		}
@@ -649,14 +647,14 @@ func validateMCPVisibility(values []string) error {
 		default:
 			return fmt.Errorf(
 				"%w: invalid MCP App visibility %q",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				raw,
 			)
 		}
 		if _, duplicate := seen[value]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate MCP App visibility %q",
-				basespec.ErrInvalid,
+				mcpSpec.ErrInvalid,
 				value,
 			)
 		}
@@ -666,12 +664,8 @@ func validateMCPVisibility(values []string) error {
 }
 
 func mcpReferenceKey(
-	server artifact.ArtifactRef,
+	server mcpSpec.ServerID,
 	value string,
 ) string {
-	return string(server.RootID) +
-		"\x00" +
-		string(server.ArtifactID) +
-		"\x00" +
-		value
+	return string(server) + "\x00" + value
 }

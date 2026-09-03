@@ -8,10 +8,31 @@ import (
 	"io"
 )
 
-type (
-	JSONRawString = string
-	JSONSchema    = json.RawMessage
-)
+type JSONSchema = json.RawMessage
+
+type JSONRawString string
+
+func (value JSONRawString) MarshalJSON() ([]byte, error) {
+	raw := bytes.TrimSpace([]byte(value))
+	if len(raw) == 0 {
+		return []byte("null"), nil
+	}
+	if !json.Valid(raw) {
+		return nil, errors.New("invalid raw JSON")
+	}
+	return append([]byte(nil), raw...), nil
+}
+
+func (value *JSONRawString) UnmarshalJSON(raw []byte) error {
+	if value == nil {
+		return errors.New("nil raw JSON target")
+	}
+	if !json.Valid(raw) {
+		return errors.New("invalid raw JSON")
+	}
+	*value = JSONRawString(append([]byte(nil), raw...))
+	return nil
+}
 
 // EncodeToJSONRaw encodes any value to json.RawMessage.
 // No typed method here as value being of a type doesnt really affect its functionality.

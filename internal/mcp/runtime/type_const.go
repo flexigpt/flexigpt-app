@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
 var (
@@ -29,7 +27,7 @@ const (
 )
 
 type ClientNotification struct {
-	Server artifact.ArtifactRef
+	Server mcpSpec.ServerID
 	Kind   ClientNotificationKind
 
 	ResourceURI string
@@ -76,9 +74,9 @@ type MCPServerCapabilitiesSummary struct {
 }
 
 type MCPServerRuntimeSnapshot struct {
-	Server     artifact.ArtifactRef     `json:"server"`
-	Collection collection.CollectionRef `json:"collection"`
-	Status     MCPServerStatus          `json:"status"`
+	Server     mcpSpec.ServerID  `json:"server"`
+	Collection mcpSpec.CatalogID `json:"collection"`
+	Status     MCPServerStatus   `json:"status"`
 
 	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
 	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`
@@ -101,11 +99,11 @@ type MCPServerRuntimeSnapshot struct {
 // snapshots. It is encoded as base64(JSON) and should not be interpreted by
 // callers.
 type MCPDiscoveryPageToken struct {
-	Server         artifact.ArtifactRef `json:"server"`
-	SnapshotDigest string               `json:"dig"`
-	Kind           string               `json:"k"`
-	PageSize       int                  `json:"ps"`
-	Index          int                  `json:"i"`
+	Server         mcpSpec.ServerID `json:"server"`
+	SnapshotDigest string           `json:"dig"`
+	Kind           string           `json:"k"`
+	PageSize       int              `json:"ps"`
+	Index          int              `json:"i"`
 }
 
 type MCPToolRisk string
@@ -140,10 +138,10 @@ type MCPToolAppInfo struct {
 }
 
 type MCPToolCapability struct {
-	Server           artifact.ArtifactRef `json:"server"`
-	ToolName         string               `json:"toolName"`
-	ProviderToolName string               `json:"providerToolName"`
-	ChoiceID         string               `json:"choiceID"`
+	Server           mcpSpec.ServerID `json:"server"`
+	ToolName         string           `json:"toolName"`
+	ProviderToolName string           `json:"providerToolName"`
+	ChoiceID         string           `json:"choiceID"`
 
 	Title       string `json:"title,omitempty"`
 	DisplayName string `json:"displayName"`
@@ -155,8 +153,8 @@ type MCPToolCapability struct {
 	Annotations  *MCPToolAnnotations `json:"annotations,omitempty"`
 	InferredRisk MCPToolRisk         `json:"inferredRisk"`
 
-	ApprovalRule  policy.MCPApprovalRule  `json:"approvalRule"`
-	ExecutionMode policy.MCPExecutionMode `json:"executionMode"`
+	ApprovalRule  mcpSpec.MCPApprovalRule  `json:"approvalRule"`
+	ExecutionMode mcpSpec.MCPExecutionMode `json:"executionMode"`
 
 	TaskSupport MCPTaskSupport `json:"taskSupport"`
 
@@ -175,20 +173,20 @@ type MCPArgumentDefinition struct {
 }
 
 type MCPResourceRef struct {
-	Server      artifact.ArtifactRef `json:"server"`
-	URI         string               `json:"uri"`
-	Name        string               `json:"name,omitempty"`
-	Title       string               `json:"title,omitempty"`
-	DisplayName string               `json:"displayName"`
-	Description string               `json:"description,omitempty"`
-	MimeType    string               `json:"mimeType,omitempty"`
-	Size        int64                `json:"size,omitempty"`
-	Annotations map[string]any       `json:"annotations,omitempty"`
-	Digest      string               `json:"digest,omitempty"`
+	Server      mcpSpec.ServerID `json:"server"`
+	URI         string           `json:"uri"`
+	Name        string           `json:"name,omitempty"`
+	Title       string           `json:"title,omitempty"`
+	DisplayName string           `json:"displayName"`
+	Description string           `json:"description,omitempty"`
+	MimeType    string           `json:"mimeType,omitempty"`
+	Size        int64            `json:"size,omitempty"`
+	Annotations map[string]any   `json:"annotations,omitempty"`
+	Digest      string           `json:"digest,omitempty"`
 }
 
 type MCPResourceTemplateRef struct {
-	Server      artifact.ArtifactRef             `json:"server"`
+	Server      mcpSpec.ServerID                 `json:"server"`
 	URITemplate string                           `json:"uriTemplate"`
 	Name        string                           `json:"name,omitempty"`
 	Title       string                           `json:"title,omitempty"`
@@ -201,7 +199,7 @@ type MCPResourceTemplateRef struct {
 }
 
 type MCPPromptRef struct {
-	Server      artifact.ArtifactRef             `json:"server"`
+	Server      mcpSpec.ServerID                 `json:"server"`
 	PromptName  string                           `json:"promptName"`
 	Title       string                           `json:"title,omitempty"`
 	DisplayName string                           `json:"displayName"`
@@ -211,7 +209,7 @@ type MCPPromptRef struct {
 }
 
 type MCPDiscoverySnapshot struct {
-	Server artifact.ArtifactRef `json:"server"`
+	Server mcpSpec.ServerID `json:"server"`
 
 	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
 	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`
@@ -245,7 +243,7 @@ const (
 )
 
 type MCPApprovalSummary struct {
-	Server            artifact.ArtifactRef   `json:"server"`
+	Server            mcpSpec.ServerID       `json:"server"`
 	ServerDisplayName string                 `json:"serverDisplayName,omitempty"`
 	Source            MCPInvocationSource    `json:"source"`
 	AppInstanceID     string                 `json:"appInstanceID,omitempty"`

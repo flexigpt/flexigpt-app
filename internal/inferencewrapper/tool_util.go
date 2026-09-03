@@ -115,7 +115,7 @@ func hydrateToolChoice(
 
 	switch tool.Type {
 	case toolSpec.ToolTypeGo, toolSpec.ToolTypeHTTP:
-		argSchema, err := decodeToolArgSchema(string(tool.ArgSchema))
+		argSchema, err := decodeToolArgSchema(jsonutil.JSONRawString(tool.ArgSchema))
 		if err != nil {
 			return nil, fmt.Errorf(
 				"invalid argSchema for %s/%s@%s: %w",
@@ -137,7 +137,7 @@ func hydrateToolChoice(
 			// Decode per-choice config (if any) and map to the
 			// inference-go WebSearchToolChoiceItem.
 			var cfg inferenceSpec.WebSearchToolChoiceItem
-			rawCfg := strings.TrimSpace(sc.UserArgSchemaInstance)
+			rawCfg := strings.TrimSpace(string(sc.UserArgSchemaInstance))
 			if rawCfg != "" {
 				if err := json.Unmarshal([]byte(rawCfg), &cfg); err != nil {
 					return nil, fmt.Errorf(
@@ -166,7 +166,7 @@ func hydrateToolChoice(
 }
 
 func decodeToolArgSchema(raw jsonutil.JSONRawString) (map[string]any, error) {
-	s := strings.TrimSpace(raw)
+	s := strings.TrimSpace(string(raw))
 	if s == "" {
 		return getEmptySchema(), nil
 	}
