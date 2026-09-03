@@ -3,8 +3,8 @@ package store
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
 type CollectionData struct {
@@ -17,8 +17,8 @@ type CollectionData struct {
 }
 
 type BundleExtension struct {
-	Servers  map[string]mcpArtifact.ServerExtension `json:"servers,omitempty"`
-	Policies map[string]mcpPolicy.PolicyDocument    `json:"policies,omitempty"`
+	Servers  map[string]mcpStoreServer.ServerExtension `json:"servers,omitempty"`
+	Policies map[string]mcpStorePolicy.PolicyDocument  `json:"policies,omitempty"`
 }
 
 type BundleDocument struct {
@@ -33,6 +33,6 @@ type BundleDocument struct {
 	Description    string                  `json:"description,omitempty"`
 	Labels         map[string]string       `json:"labels,omitempty"`
 
-	MCPServers      map[string]mcpArtifact.CoreServer `json:"mcpServers"`
-	BundleExtension BundleExtension                   `json:"bundleExtension"`
+	MCPServers      map[string]mcpStoreServer.CoreServer `json:"mcpServers"`
+	BundleExtension BundleExtension                      `json:"bundleExtension"`
 }

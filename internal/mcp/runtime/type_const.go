@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
@@ -132,11 +133,6 @@ type MCPToolAnnotations struct {
 	Title           string `json:"title,omitempty"`
 }
 
-type MCPToolAppInfo struct {
-	ResourceURI string   `json:"resourceUri,omitempty"`
-	Visibility  []string `json:"visibility,omitempty"`
-}
-
 type MCPToolCapability struct {
 	Server           mcpSpec.ServerID `json:"server"`
 	ToolName         string           `json:"toolName"`
@@ -153,8 +149,8 @@ type MCPToolCapability struct {
 	Annotations  *MCPToolAnnotations `json:"annotations,omitempty"`
 	InferredRisk MCPToolRisk         `json:"inferredRisk"`
 
-	ApprovalRule  mcpSpec.MCPApprovalRule  `json:"approvalRule"`
-	ExecutionMode mcpSpec.MCPExecutionMode `json:"executionMode"`
+	ApprovalRule  mcpPolicy.MCPApprovalRule  `json:"approvalRule"`
+	ExecutionMode mcpPolicy.MCPExecutionMode `json:"executionMode"`
 
 	TaskSupport MCPTaskSupport `json:"taskSupport"`
 

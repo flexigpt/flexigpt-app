@@ -15,14 +15,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
 func (a *API) ResolveMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (mcpArtifact.Resolved, error) {
+) (mcpStoreServer.Resolved, error) {
 	return a.resolveMCPServer(ctx, ref, true)
 }
 
@@ -34,7 +35,7 @@ func (a *API) ResolveMCPServer(
 func (a *API) InspectMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (mcpArtifact.Resolved, error) {
+) (mcpStoreServer.Resolved, error) {
 	return a.resolveMCPServer(ctx, ref, false)
 }
 
@@ -42,22 +43,22 @@ func (a *API) resolveMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	verifySource bool,
-) (mcpArtifact.Resolved, error) {
+) (mcpStoreServer.Resolved, error) {
 	if a == nil {
-		return mcpArtifact.Resolved{}, basespec.ErrClosed
+		return mcpStoreServer.Resolved{}, basespec.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
 
 	record, err := a.dependencies.Artifacts.Get(ctx, ref)
 	if err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
 	if record.Kind != artifactbuiltin.ServerKind ||
 		record.State != artifact.StateAvailable ||
 		record.ResolvedDefinition == nil {
-		return mcpArtifact.Resolved{}, fmt.Errorf(
+		return mcpStoreServer.Resolved{}, fmt.Errorf(
 			"%w: MCP Server Artifact is not available",
 			basespec.ErrReferenceUnresolved,
 		)
@@ -68,29 +69,29 @@ func (a *API) resolveMCPServer(
 		CollectionID: record.CollectionID,
 	})
 	if err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
 
 	snapshot, err := a.currentCatalog(ctx, bundle)
 	if err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
 	occurrence, err := currentServerOccurrence(snapshot, record)
 	if err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
 
 	definitionValue, err := definitionForArtifact(snapshot, record)
 	if err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
-	body, err := mcpArtifact.ServerBodyFromDefinition(
+	body, err := mcpStoreServer.ServerBodyFromDefinition(
 		definitionValue,
 	)
 	if err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
-	document := mcpArtifact.ServerDocument{
+	document := mcpStoreServer.ServerDocument{
 		Kind:           artifactbuiltin.ServerKind,
 		SchemaID:       artifactbuiltin.ServerSchemaID,
 		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
@@ -107,7 +108,7 @@ func (a *API) resolveMCPServer(
 	sourceGeneration := snapshot.SourceGenerations[record.Binding.SourceID]
 	if sourceRevision == 0 || sourceGeneration == "" ||
 		occurrence.SourceContentDigest == nil {
-		return mcpArtifact.Resolved{}, fmt.Errorf(
+		return mcpStoreServer.Resolved{}, fmt.Errorf(
 			"%w: MCP Server Source has no current Catalog state",
 			basespec.ErrCatalogStale,
 		)
@@ -119,10 +120,10 @@ func (a *API) resolveMCPServer(
 			record.Binding.SourceID,
 		)
 		if err != nil {
-			return mcpArtifact.Resolved{}, err
+			return mcpStoreServer.Resolved{}, err
 		}
 		if sourceValue.Revision != sourceRevision {
-			return mcpArtifact.Resolved{}, fmt.Errorf(
+			return mcpStoreServer.Resolved{}, fmt.Errorf(
 				"%w: MCP Source changed after Catalog publication",
 				basespec.ErrCatalogStale,
 			)
@@ -136,7 +137,7 @@ func (a *API) resolveMCPServer(
 			*occurrence.SourceContentDigest,
 			basespec.MaxCandidateBytes,
 		); err != nil {
-			return mcpArtifact.Resolved{}, err
+			return mcpStoreServer.Resolved{}, err
 		}
 	}
 
@@ -147,7 +148,7 @@ func (a *API) resolveMCPServer(
 		document,
 	)
 	if err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
 
 	policyValue, err := a.effectivePolicy(
@@ -157,7 +158,7 @@ func (a *API) resolveMCPServer(
 		installationData.AdditionalPolicies,
 	)
 	if err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
 
 	version, err := resolvedVersion(struct {
@@ -182,10 +183,10 @@ func (a *API) resolveMCPServer(
 		PolicyDigest:         policyValue.Digest,
 	})
 	if err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
 
-	resolved := mcpArtifact.Resolved{
+	resolved := mcpStoreServer.Resolved{
 		Server:               ref,
 		Collection:           bundle.Collection.Ref(),
 		ArtifactRevision:     record.Revision,
@@ -204,7 +205,7 @@ func (a *API) resolveMCPServer(
 		Version: version,
 	}
 	if err := resolved.Validate(); err != nil {
-		return mcpArtifact.Resolved{}, err
+		return mcpStoreServer.Resolved{}, err
 	}
 	return resolved, nil
 }
@@ -273,21 +274,21 @@ func (a *API) effectiveInstallation(
 	ctx context.Context,
 	bundle Bundle,
 	record artifact.Artifact,
-	document mcpArtifact.ServerDocument,
+	document mcpStoreServer.ServerDocument,
 ) (
-	installationData mcpArtifact.ServerData,
+	installationData mcpStoreServer.ServerData,
 	installationRevision uint64,
 	installationEnabled bool,
 	runtimeEnabled bool,
 	err error,
 ) {
 	if !a.dependencies.RootPolicy.IsProtectedRoot(record.RootID) {
-		data, err := mcpArtifact.DecodeServerData(record.Data)
+		data, err := mcpStoreServer.DecodeServerData(record.Data)
 		if err != nil {
-			return mcpArtifact.ServerData{}, 0, false, false, err
+			return mcpStoreServer.ServerData{}, 0, false, false, err
 		}
-		if err := mcpArtifact.ValidateServerDataForDocument(record.Ref(), document, data); err != nil {
-			return mcpArtifact.ServerData{}, 0, false, false, err
+		if err := mcpStoreServer.ValidateServerDataForDocument(record.Ref(), document, data); err != nil {
+			return mcpStoreServer.ServerData{}, 0, false, false, err
 		}
 		return data,
 			record.Revision,
@@ -297,7 +298,7 @@ func (a *API) effectiveInstallation(
 	}
 
 	if a.dependencies.Overlays == nil {
-		return mcpArtifact.ServerData{},
+		return mcpStoreServer.ServerData{},
 			0,
 			false,
 			false,
@@ -312,17 +313,17 @@ func (a *API) effectiveInstallation(
 		record.Ref(),
 	)
 	if err != nil {
-		return mcpArtifact.ServerData{}, 0, false, false, err
+		return mcpStoreServer.ServerData{}, 0, false, false, err
 	}
 	if !found {
-		return mcpArtifact.DefaultServerData(), 0, false, false, nil
+		return mcpStoreServer.DefaultServerData(), 0, false, false, nil
 	}
-	if err := mcpArtifact.ValidateServerDataForDocument(
+	if err := mcpStoreServer.ValidateServerDataForDocument(
 		record.Ref(),
 		document,
 		serverOverlay.ServerData,
 	); err != nil {
-		return mcpArtifact.ServerData{}, 0, false, false, err
+		return mcpStoreServer.ServerData{}, 0, false, false, err
 	}
 	bundleOverlay, bundleFound, err := a.dependencies.Overlays.GetBundleOverlay(
 		ctx,
@@ -330,7 +331,7 @@ func (a *API) effectiveInstallation(
 		record.CollectionID,
 	)
 	if err != nil {
-		return mcpArtifact.ServerData{}, 0, false, false, err
+		return mcpStoreServer.ServerData{}, 0, false, false, err
 	}
 	if !bundleFound {
 		return serverOverlay.ServerData,
@@ -352,7 +353,7 @@ func (a *API) effectiveInstallation(
 func (a *API) effectivePolicy(
 	ctx context.Context,
 	bundle Bundle,
-	serverDocument mcpArtifact.ServerDocument,
+	serverDocument mcpStoreServer.ServerDocument,
 	additional []artifact.ArtifactRef,
 ) (mcpPolicy.Effective, error) {
 	values := make([]mcpPolicy.MCPPolicy, 0, 1+len(additional))
@@ -412,7 +413,7 @@ func (a *API) effectivePolicy(
 		if err != nil {
 			return mcpPolicy.Effective{}, err
 		}
-		body, err := mcpPolicy.PolicyBodyFromDefinition(
+		body, err := mcpStorePolicy.PolicyBodyFromDefinition(
 			definitionValue,
 		)
 		if err != nil {
@@ -457,7 +458,7 @@ func (a *API) policyBodiesByLogicalName(
 		if definitionValue.LogicalName != name {
 			continue
 		}
-		body, err := mcpPolicy.PolicyBodyFromDefinition(
+		body, err := mcpStorePolicy.PolicyBodyFromDefinition(
 			definitionValue,
 		)
 		if err != nil {

@@ -1,4 +1,4 @@
-package artifact
+package server
 
 import (
 	"context"
@@ -13,16 +13,6 @@ import (
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
-type Materialized struct {
-	Core CoreServer
-	Auth AuthenticationDeclaration
-
-	ClientCredentialRef            string
-	ClientCredentialSecretRequired bool
-	TimeoutMS                      int
-	SensitiveValues                []string
-}
-
 // MaterializeValidated is for the internal resolver-to-runtime path. Callers
 // must have already established that server, document, and data are valid.
 //
@@ -35,7 +25,7 @@ func MaterializeValidated(
 	data ServerData,
 	secrets SecretResolver,
 	environment EnvironmentResolver,
-) (Materialized, error) {
+) (MaterializedServer, error) {
 	return materializeValidated(
 		ctx,
 		server,
@@ -56,7 +46,7 @@ func MaterializeInspectionValidated(
 	document ServerDocument,
 	data ServerData,
 	environment EnvironmentResolver,
-) (Materialized, error) {
+) (MaterializedServer, error) {
 	return materializeValidated(ctx, server, document, data, nil, environment, false)
 }
 
@@ -68,15 +58,15 @@ func materializeValidated(
 	secrets SecretResolver,
 	environment EnvironmentResolver,
 	resolveSecrets bool,
-) (Materialized, error) {
+) (MaterializedServer, error) {
 	if ctx == nil {
-		return Materialized{}, fmt.Errorf(
+		return MaterializedServer{}, fmt.Errorf(
 			"%w: MCP materialization context is nil",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return Materialized{}, err
+		return MaterializedServer{}, err
 	}
 
 	core, err := selectProfile(
@@ -85,7 +75,7 @@ func materializeValidated(
 		data.SelectedConnectionProfile,
 	)
 	if err != nil {
-		return Materialized{}, err
+		return MaterializedServer{}, err
 	}
 
 	timeoutMS := document.Extension.TimeoutMS
@@ -105,7 +95,7 @@ func materializeValidated(
 		case InputSecret:
 			if !bound || strings.TrimSpace(binding.SecretRef) == "" {
 				if declaration.Required {
-					return Materialized{}, fmt.Errorf(
+					return MaterializedServer{}, fmt.Errorf(
 						"%w: required secret input %q is not bound",
 						basespec.ErrReferenceUnresolved,
 						name,
@@ -119,17 +109,17 @@ func materializeValidated(
 				continue
 			}
 			if secrets == nil {
-				return Materialized{}, fmt.Errorf(
+				return MaterializedServer{}, fmt.Errorf(
 					"%w: secret resolver is unavailable",
 					basespec.ErrReferenceUnresolved,
 				)
 			}
 			value, err := secrets.ResolveSecret(ctx, binding.SecretRef)
 			if err != nil {
-				return Materialized{}, err
+				return MaterializedServer{}, err
 			}
 			if value == "" {
-				return Materialized{}, fmt.Errorf(
+				return MaterializedServer{}, fmt.Errorf(
 					"%w: secret input %q is empty",
 					basespec.ErrReferenceUnresolved,
 					name,
@@ -141,7 +131,7 @@ func materializeValidated(
 		case InputOAuthClientCredentials:
 			if !bound || strings.TrimSpace(binding.SecretRef) == "" {
 				if declaration.Required {
-					return Materialized{}, fmt.Errorf(
+					return MaterializedServer{}, fmt.Errorf(
 						"%w: OAuth client input %q is not bound",
 						basespec.ErrReferenceUnresolved,
 						name,
@@ -157,17 +147,17 @@ func materializeValidated(
 				continue
 			}
 			if secrets == nil {
-				return Materialized{}, fmt.Errorf(
+				return MaterializedServer{}, fmt.Errorf(
 					"%w: secret resolver is unavailable",
 					basespec.ErrReferenceUnresolved,
 				)
 			}
 			value, err := secrets.ResolveSecret(ctx, binding.SecretRef)
 			if err != nil {
-				return Materialized{}, err
+				return MaterializedServer{}, err
 			}
 			if strings.TrimSpace(value) == "" {
-				return Materialized{}, fmt.Errorf(
+				return MaterializedServer{}, fmt.Errorf(
 					"%w: OAuth client input %q is empty",
 					basespec.ErrReferenceUnresolved,
 					name,
@@ -182,7 +172,7 @@ func materializeValidated(
 			case declaration.Default != nil:
 				values[name] = *declaration.Default
 			case declaration.Required:
-				return Materialized{}, fmt.Errorf(
+				return MaterializedServer{}, fmt.Errorf(
 					"%w: required MCP input %q is not bound",
 					basespec.ErrReferenceUnresolved,
 					name,
@@ -192,7 +182,7 @@ func materializeValidated(
 			}
 
 		default:
-			return Materialized{}, fmt.Errorf(
+			return MaterializedServer{}, fmt.Errorf(
 				"%w: unsupported MCP input kind %q",
 				basespec.ErrInvalid,
 				declaration.Kind,
@@ -209,7 +199,7 @@ func materializeValidated(
 		}
 		value, found, err := environment.ResolveEnvironment(ctx, name)
 		if err != nil {
-			return Materialized{}, err
+			return MaterializedServer{}, err
 		}
 		if found {
 			values[name] = value
@@ -219,7 +209,7 @@ func materializeValidated(
 
 	core, err = substituteCore(core, values, unboundOptional)
 	if err != nil {
-		return Materialized{}, err
+		return MaterializedServer{}, err
 	}
 	auth := document.Extension.Auth
 	auth.ClientIDMetadataDocumentURL, err = substituteOptionalScalar(
@@ -228,20 +218,20 @@ func materializeValidated(
 		unboundOptional,
 	)
 	if err != nil {
-		return Materialized{}, err
+		return MaterializedServer{}, err
 	}
 
 	if auth.ClientCredentialsInput != "" &&
 		clientCredentialRef == "" &&
 		auth.Mode == mcpSpec.MCPHTTPAuthClientCredentials {
-		return Materialized{}, fmt.Errorf(
+		return MaterializedServer{}, fmt.Errorf(
 			"%w: required OAuth client credentials are not configured",
 			basespec.ErrReferenceUnresolved,
 		)
 	}
 
 	if err := ValidateMaterializedServer(core, auth); err != nil {
-		return Materialized{}, err
+		return MaterializedServer{}, err
 	}
 
 	sensitive := make([]string, 0, len(secretValues))
@@ -250,7 +240,7 @@ func materializeValidated(
 	}
 	slices.Sort(sensitive)
 
-	return Materialized{
+	return MaterializedServer{
 		Core:                           core,
 		Auth:                           auth,
 		ClientCredentialRef:            clientCredentialRef,

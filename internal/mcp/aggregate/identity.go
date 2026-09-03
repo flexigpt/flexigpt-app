@@ -16,7 +16,7 @@ const (
 	artifactCatalogIDPrefix = "artifact-catalog:v1:"
 )
 
-func ServerIDForArtifact(
+func RuntimeServerIDForArtifact(
 	ref artifact.ArtifactRef,
 ) (mcpSpec.ServerID, error) {
 	if err := ref.Validate(); err != nil {
@@ -29,7 +29,7 @@ func ServerIDForArtifact(
 	), nil
 }
 
-func ArtifactRefForServerID(
+func ArtifactRefForRuntimeServerID(
 	id mcpSpec.ServerID,
 ) (artifact.ArtifactRef, error) {
 	if err := id.Validate(); err != nil {
@@ -67,7 +67,7 @@ func ArtifactRefForServerID(
 	return ref, nil
 }
 
-func CatalogIDForCollection(
+func RuntimeCatalogIDForCollection(
 	ref collection.CollectionRef,
 ) (mcpSpec.CatalogID, error) {
 	if err := ref.Validate(); err != nil {
@@ -80,7 +80,7 @@ func CatalogIDForCollection(
 	), nil
 }
 
-func CollectionRefForCatalogID(
+func CollectionRefForRuntimeCatalogID(
 	id mcpSpec.CatalogID,
 ) (collection.CollectionRef, error) {
 	if err := id.Validate(); err != nil {

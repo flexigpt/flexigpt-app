@@ -9,11 +9,11 @@ import (
 	assistantpresetSpec "github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
@@ -130,7 +130,7 @@ type MCPServerResolver interface {
 	ResolveMCPServer(
 		ctx context.Context,
 		ref mcpSpec.ServerID,
-	) (mcpArtifact.Resolved, error)
+	) (mcpStoreServer.Resolved, error)
 }
 
 type MCPDiscoveryLookup interface {
@@ -323,8 +323,8 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPTools(
 				)
 			}
 			if selected.ExecutionMode != nil &&
-				current.ExecutionMode == mcpSpec.MCPExecutionModeManual &&
-				*selected.ExecutionMode == mcpSpec.MCPExecutionModeAuto {
+				current.ExecutionMode == mcpPolicy.MCPExecutionModeManual &&
+				*selected.ExecutionMode == mcpPolicy.MCPExecutionModeAuto {
 				return fmt.Errorf(
 					"servers[%d].selectedTools[%d]: execution override weakens policy",
 					i,

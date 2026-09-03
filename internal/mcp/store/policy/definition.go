@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 )
 
 func PolicySubresource(
@@ -20,28 +21,28 @@ func PolicySubresource(
 
 func PolicyBodyFromDefinition(
 	input definition.Definition,
-) (MCPPolicy, error) {
+) (mcpPolicy.MCPPolicy, error) {
 	value, err := definition.Canonicalize(input)
 	if err != nil {
-		return MCPPolicy{}, err
+		return mcpPolicy.MCPPolicy{}, err
 	}
 	if value.Kind != artifactbuiltin.PolicyKind ||
 		value.SchemaID != artifactbuiltin.PolicySchemaID ||
 		value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
-		return MCPPolicy{}, fmt.Errorf(
+		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: Definition is not an MCP Policy",
 			basespec.ErrInvalid,
 		)
 	}
-	body, err := definition.DecodeBody[MCPPolicy](
+	body, err := definition.DecodeBody[mcpPolicy.MCPPolicy](
 		value.Body,
 	)
 	if err != nil {
-		return MCPPolicy{}, err
+		return mcpPolicy.MCPPolicy{}, err
 	}
-	body = NormalizePolicyBody(body)
+
 	if err := ValidatePolicyBody(body); err != nil {
-		return MCPPolicy{}, err
+		return mcpPolicy.MCPPolicy{}, err
 	}
 	return body, nil
 }

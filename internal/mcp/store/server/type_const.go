@@ -1,4 +1,4 @@
-package artifact
+package server
 
 import (
 	"regexp"
@@ -7,8 +7,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
 )
 
 var placeholderPattern = regexp.MustCompile(
@@ -36,58 +36,6 @@ type CoreServer struct {
 
 	URL     string            `json:"url,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
-}
-
-type MCPTransportType string
-
-const (
-	MCPTransportStreamableHTTP MCPTransportType = "streamableHttp"
-	MCPTransportStdio          MCPTransportType = "stdio"
-)
-
-// MCPRuntimeStdioConfig is the materialized process-local stdio transport
-// configuration. Secret values have already been resolved into Env only at
-// connection preparation time and are never persisted in an MCP document.
-type MCPRuntimeStdioConfig struct {
-	Command          string            `json:"command"`
-	Args             []string          `json:"args,omitempty"`
-	Env              map[string]string `json:"env,omitempty"`
-	StartupTimeoutMS int               `json:"startupTimeoutMS,omitempty"`
-}
-
-// MCPRuntimeStreamableHTTPConfig is the materialized process-local HTTP
-// transport configuration. ClientCredentialRef remains an opaque
-// Artifact-scoped Setting Store reference. Secret HTTP values are materialized
-// only immediately before opening a runtime connection.
-type MCPRuntimeStreamableHTTPConfig struct {
-	URL       string                  `json:"url"`
-	TimeoutMS int                     `json:"timeoutMS,omitempty"`
-	AuthMode  mcpSpec.MCPHTTPAuthMode `json:"authMode"`
-
-	Headers map[string]string `json:"headers,omitempty"`
-
-	ClientCredentialRef         string `json:"clientCredentialRef,omitempty"`
-	ClientIDMetadataDocumentURL string `json:"clientIDMetadataDocumentURL,omitempty"`
-}
-
-type RuntimeConfig struct {
-	Server     artifact.ArtifactRef
-	Collection collection.CollectionRef
-
-	LogicalName string
-	DisplayName string
-
-	Transport                 MCPTransportType
-	Stdio                     *MCPRuntimeStdioConfig
-	StreamableHTTP            *MCPRuntimeStreamableHTTPConfig
-	OAuthClientSecretRequired bool
-
-	TrustLevel    mcpSpec.MCPTrustLevel
-	DefaultPolicy mcpSpec.MCPServerPolicy
-	ToolPolicies  map[string]mcpSpec.MCPToolPolicyOverride
-	AppsPolicy    mcpSpec.MCPAppsPolicy
-
-	SensitiveValues []string
 }
 
 type InputKind string
@@ -192,6 +140,18 @@ func (d ServerDocument) OAuthClientSecretRequired() bool {
 type ServerDefinitionBody struct {
 	MCPServer CoreServer      `json:"mcpServer"`
 	Extension ServerExtension `json:"extension"`
+}
+
+// MaterializedServer contains only materialized Store document state. It is
+// intentionally not a RuntimeConfig. Aggregate converts this model to the
+// runtime-owned configuration contract.
+type MaterializedServer struct {
+	Core                           CoreServer
+	Auth                           AuthenticationDeclaration
+	ClientCredentialRef            string
+	ClientCredentialSecretRequired bool
+	TimeoutMS                      int
+	SensitiveValues                []string
 }
 
 type Resolved struct {

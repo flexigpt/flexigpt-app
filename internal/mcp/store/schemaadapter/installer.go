@@ -23,9 +23,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
 // LoadEmbeddedRegistry loads only the source-controlled converted MCP
@@ -744,12 +744,12 @@ func bundleDefinitions(
 		len(document.MCPServers)+len(document.BundleExtension.Policies),
 	)
 	for name := range document.MCPServers {
-		output[mcpArtifact.ServerSubresource(
+		output[mcpStoreServer.ServerSubresource(
 			basespec.LogicalName(name),
 		)] = artifactbuiltin.ServerKind
 	}
 	for name := range document.BundleExtension.Policies {
-		output[mcpPolicy.PolicySubresource(
+		output[mcpStorePolicy.PolicySubresource(
 			basespec.LogicalName(name),
 		)] = artifactbuiltin.PolicyKind
 	}

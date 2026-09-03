@@ -11,8 +11,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
 // ServerFromCanonicalBundle projects one server from a Bundle that has
@@ -25,10 +25,10 @@ import (
 func ServerFromCanonicalBundle(
 	bundle BundleDocument,
 	name string,
-) (mcpArtifact.ServerDocument, error) {
+) (mcpStoreServer.ServerDocument, error) {
 	core, found := bundle.MCPServers[name]
 	if !found {
-		return mcpArtifact.ServerDocument{}, fmt.Errorf(
+		return mcpStoreServer.ServerDocument{}, fmt.Errorf(
 			"%w: MCP server %q is not in the Bundle document",
 			basespec.ErrNotFound,
 			name,
@@ -36,13 +36,13 @@ func ServerFromCanonicalBundle(
 	}
 	extension, found := bundle.BundleExtension.Servers[name]
 	if !found {
-		return mcpArtifact.ServerDocument{}, fmt.Errorf(
+		return mcpStoreServer.ServerDocument{}, fmt.Errorf(
 			"%w: canonical MCP Bundle has no extension for server %q",
 			basespec.ErrInvalid,
 			name,
 		)
 	}
-	return jsonutil.CloneJSON(mcpArtifact.ServerDocument{
+	return jsonutil.CloneJSON(mcpStoreServer.ServerDocument{
 		Kind:           artifactbuiltin.ServerKind,
 		SchemaID:       artifactbuiltin.ServerSchemaID,
 		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
@@ -102,7 +102,7 @@ func ValidateBundle(value BundleDocument) error {
 			return err
 		}
 		extension := value.BundleExtension.Servers[name]
-		if err := mcpArtifact.ValidateServerParts(name, core, extension); err != nil {
+		if err := mcpStoreServer.ValidateServerParts(name, core, extension); err != nil {
 			return fmt.Errorf("MCP server %q: %w", name, err)
 		}
 	}
@@ -119,7 +119,7 @@ func ValidateBundle(value BundleDocument) error {
 				policyValue.LogicalName,
 			)
 		}
-		if err := mcpPolicy.ValidatePolicy(policyValue); err != nil {
+		if err := mcpStorePolicy.ValidatePolicy(policyValue); err != nil {
 			return fmt.Errorf("MCP policy %q: %w", name, err)
 		}
 	}
@@ -163,20 +163,20 @@ func CanonicalizeBundle(
 	value.Labels = maps.Clone(value.Labels)
 
 	if value.MCPServers == nil {
-		value.MCPServers = map[string]mcpArtifact.CoreServer{}
+		value.MCPServers = map[string]mcpStoreServer.CoreServer{}
 	}
 	if value.BundleExtension.Servers == nil {
-		value.BundleExtension.Servers = map[string]mcpArtifact.ServerExtension{}
+		value.BundleExtension.Servers = map[string]mcpStoreServer.ServerExtension{}
 	}
 	if value.BundleExtension.Policies == nil {
-		value.BundleExtension.Policies = map[string]mcpPolicy.PolicyDocument{}
+		value.BundleExtension.Policies = map[string]mcpStorePolicy.PolicyDocument{}
 	}
 
 	for name, core := range value.MCPServers {
-		core = mcpArtifact.NormalizeCoreServer(core)
+		core = mcpStoreServer.NormalizeCoreServer(core)
 		value.MCPServers[name] = core
 
-		extension := mcpArtifact.NormalizeServerExtension(
+		extension := mcpStoreServer.NormalizeServerExtension(
 			name,
 			value.BundleExtension.Servers[name],
 		)
@@ -184,7 +184,7 @@ func CanonicalizeBundle(
 	}
 
 	for name, policyValue := range value.BundleExtension.Policies {
-		canonical, _, err := mcpPolicy.CanonicalizePolicy(policyValue)
+		canonical, _, err := mcpStorePolicy.CanonicalizePolicy(policyValue)
 		if err != nil {
 			return BundleDocument{}, nil, fmt.Errorf(
 				"policy %q: %w",

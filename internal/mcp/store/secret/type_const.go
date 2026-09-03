@@ -1,6 +1,12 @@
 package secret
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+import (
+	"errors"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+)
+
+var ErrNotFound = errors.New("MCP secret not found")
 
 const SecretRefVersion = "mcpv2"
 

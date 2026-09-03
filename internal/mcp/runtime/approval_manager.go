@@ -385,7 +385,7 @@ func validateApprovalSummary(value MCPApprovalSummary) error {
 	if err := value.Server.Validate(); err != nil {
 		return err
 	}
-	if err := validateMCPInvocationSource(value.Source); err != nil {
+	if err := validateInvocationSource(value.Source); err != nil {
 		return err
 	}
 	if err := mcpSpec.ValidateOptionalText(
@@ -435,6 +435,21 @@ func cloneApprovalSummary(
 		append([]byte(nil), []byte(input.Arguments)...),
 	)
 	return output
+}
+
+func validateInvocationSource(value MCPInvocationSource) error {
+	switch value {
+	case MCPInvocationSourceModel,
+		MCPInvocationSourceUser,
+		MCPInvocationSourceApp:
+		return nil
+	default:
+		return fmt.Errorf(
+			"%w: invalid MCP invocation source %q",
+			mcpSpec.ErrInvalid,
+			value,
+		)
+	}
 }
 
 func randomApprovalToken(bytes int) (string, error) {

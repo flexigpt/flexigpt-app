@@ -13,8 +13,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
 type BundleInstallationView struct {
@@ -26,15 +27,15 @@ type BundleInstallationView struct {
 }
 
 type ServerInstallationView struct {
-	Artifact             artifact.Artifact          `json:"artifact"`
-	Collection           collection.CollectionRef   `json:"collection"`
-	CatalogRevision      uint64                     `json:"catalogRevision"`
-	Document             mcpArtifact.ServerDocument `json:"document"`
-	Installation         mcpArtifact.ServerData     `json:"installation"`
-	InstallationRevision uint64                     `json:"installationRevision"`
-	InstallationEnabled  bool                       `json:"installationEnabled"`
-	RuntimeEnabled       bool                       `json:"runtimeEnabled"`
-	BuiltIn              bool                       `json:"builtIn"`
+	Artifact             artifact.Artifact             `json:"artifact"`
+	Collection           collection.CollectionRef      `json:"collection"`
+	CatalogRevision      uint64                        `json:"catalogRevision"`
+	Document             mcpStoreServer.ServerDocument `json:"document"`
+	Installation         mcpStoreServer.ServerData     `json:"installation"`
+	InstallationRevision uint64                        `json:"installationRevision"`
+	InstallationEnabled  bool                          `json:"installationEnabled"`
+	RuntimeEnabled       bool                          `json:"runtimeEnabled"`
+	BuiltIn              bool                          `json:"builtIn"`
 }
 
 type PolicyView struct {
@@ -295,7 +296,7 @@ func (a *API) InspectMCPPolicy(
 	if err != nil {
 		return PolicyView{}, err
 	}
-	body, err := mcpPolicy.PolicyBodyFromDefinition(definitionValue)
+	body, err := mcpStorePolicy.PolicyBodyFromDefinition(definitionValue)
 	if err != nil {
 		return PolicyView{}, err
 	}

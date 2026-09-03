@@ -1,9 +1,8 @@
-package artifact
+package server
 
 import (
 	"context"
 	"fmt"
-	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -35,9 +34,9 @@ func (r Resolved) Materialize(
 	ctx context.Context,
 	secrets SecretResolver,
 	environment EnvironmentResolver,
-) (RuntimeConfig, error) {
+) (MaterializedServer, error) {
 	if err := r.Validate(); err != nil {
-		return RuntimeConfig{}, err
+		return MaterializedServer{}, err
 	}
 	return r.MaterializeTrusted(ctx, secrets, environment)
 }
@@ -48,21 +47,17 @@ func (r Resolved) Materialize(
 func (r Resolved) MaterializeForInspection(
 	ctx context.Context,
 	environment EnvironmentResolver,
-) (RuntimeConfig, error) {
+) (MaterializedServer, error) {
 	if err := r.Validate(); err != nil {
-		return RuntimeConfig{}, err
+		return MaterializedServer{}, err
 	}
-	materialized, err := MaterializeInspectionValidated(
+	return MaterializeInspectionValidated(
 		ctx,
 		r.Server,
 		r.Document,
 		r.Installation,
 		environment,
 	)
-	if err != nil {
-		return RuntimeConfig{}, err
-	}
-	return runtimeConfigFromMaterialized(r, materialized)
 }
 
 // MaterializeTrusted is the resolver-to-runtime fast path. Resolver output has
@@ -73,14 +68,14 @@ func (r Resolved) MaterializeTrusted(
 	ctx context.Context,
 	secrets SecretResolver,
 	environment EnvironmentResolver,
-) (RuntimeConfig, error) {
+) (MaterializedServer, error) {
 	if !r.RuntimeEnabled {
-		return RuntimeConfig{}, fmt.Errorf(
+		return MaterializedServer{}, fmt.Errorf(
 			"%w: MCP Server is not enabled for this installation",
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	materialized, err := MaterializeValidated(
+	return MaterializeValidated(
 		ctx,
 		r.Server,
 		r.Document,
@@ -88,10 +83,6 @@ func (r Resolved) MaterializeTrusted(
 		secrets,
 		environment,
 	)
-	if err != nil {
-		return RuntimeConfig{}, err
-	}
-	return runtimeConfigFromMaterialized(r, materialized)
 }
 
 func (r Resolved) Validate() error {
@@ -132,52 +123,4 @@ func (r Resolved) Validate() error {
 		return err
 	}
 	return cryptoutil.ValidateDigest(r.Version)
-}
-
-func runtimeConfigFromMaterialized(
-	r Resolved,
-	materialized Materialized,
-) (RuntimeConfig, error) {
-	config := RuntimeConfig{
-		Server:                    r.Server,
-		Collection:                r.Collection,
-		LogicalName:               string(r.Document.LogicalName),
-		DisplayName:               r.Document.DisplayName,
-		OAuthClientSecretRequired: materialized.ClientCredentialSecretRequired,
-		TrustLevel:                r.Policy.Body.TrustLevel,
-		DefaultPolicy:             r.Policy.Body.DefaultPolicy,
-		ToolPolicies:              r.Policy.Body.ToolPolicies,
-		AppsPolicy:                r.Policy.Body.AppsPolicy,
-		SensitiveValues:           materialized.SensitiveValues,
-	}
-
-	switch materialized.Core.Type {
-	case ServerTypeStdio:
-		config.Transport = MCPTransportStdio
-		config.Stdio = &MCPRuntimeStdioConfig{
-			Command:          materialized.Core.Command,
-			Args:             append([]string(nil), materialized.Core.Args...),
-			Env:              maps.Clone(materialized.Core.Env),
-			StartupTimeoutMS: materialized.TimeoutMS,
-		}
-
-	case ServerTypeHTTP:
-		config.Transport = MCPTransportStreamableHTTP
-		config.StreamableHTTP = &MCPRuntimeStreamableHTTPConfig{
-			URL:                         materialized.Core.URL,
-			TimeoutMS:                   materialized.TimeoutMS,
-			AuthMode:                    materialized.Auth.Mode,
-			Headers:                     maps.Clone(materialized.Core.Headers),
-			ClientCredentialRef:         materialized.ClientCredentialRef,
-			ClientIDMetadataDocumentURL: materialized.Auth.ClientIDMetadataDocumentURL,
-		}
-
-	default:
-		return RuntimeConfig{}, fmt.Errorf(
-			"%w: unsupported materialized MCP transport",
-			basespec.ErrInvalid,
-		)
-	}
-
-	return config, nil
 }

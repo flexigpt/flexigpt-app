@@ -13,8 +13,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
 type Decoder struct {
@@ -121,12 +121,12 @@ func (d *Decoder) Decode(
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
-		definition, err := mcpArtifact.DefinitionForCanonicalServer(serverDocument)
+		definition, err := mcpStoreServer.DefinitionForCanonicalServer(serverDocument)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
 		output = append(output, discovery.Decoded{
-			SubresourceLocator: mcpArtifact.ServerSubresource(
+			SubresourceLocator: mcpStoreServer.ServerSubresource(
 				basespec.LogicalName(name),
 			),
 			Definition: definition,
@@ -134,14 +134,14 @@ func (d *Decoder) Decode(
 	}
 
 	for _, name := range policyNames {
-		definition, err := mcpPolicy.DefinitionForCanonicalPolicy(
+		definition, err := mcpStorePolicy.DefinitionForCanonicalPolicy(
 			b.BundleExtension.Policies[name],
 		)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
 		output = append(output, discovery.Decoded{
-			SubresourceLocator: mcpPolicy.PolicySubresource(
+			SubresourceLocator: mcpStorePolicy.PolicySubresource(
 				basespec.LogicalName(name),
 			),
 			Definition: definition,

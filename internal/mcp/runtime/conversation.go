@@ -1,8 +1,22 @@
 package runtime
 
 import (
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
+
+type MCPAppModelContextUpdate struct {
+	InstanceID string           `json:"instanceID,omitempty"`
+	Server     mcpSpec.ServerID `json:"server"`
+
+	ResourceURI string `json:"resourceUri,omitempty"`
+
+	Content           []MCPContent           `json:"content,omitempty"`
+	StructuredContent any                    `json:"structuredContent,omitempty"`
+	UpdatedAt         string                 `json:"updatedAt,omitempty"`
+	RawArguments      jsonutil.JSONRawString `json:"rawArguments,omitempty"`
+}
 
 type MCPToolSelection struct {
 	Server           mcpSpec.ServerID `json:"server"`
@@ -11,8 +25,8 @@ type MCPToolSelection struct {
 	ChoiceID         string           `json:"choiceID,omitempty"`
 	Digest           string           `json:"digest,omitempty"`
 
-	ApprovalRule  *mcpSpec.MCPApprovalRule  `json:"approvalRule,omitempty"`
-	ExecutionMode *mcpSpec.MCPExecutionMode `json:"executionMode,omitempty"`
+	ApprovalRule  *mcpPolicy.MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode *mcpPolicy.MCPExecutionMode `json:"executionMode,omitempty"`
 
 	AppResourceURI string   `json:"appResourceUri,omitempty"`
 	Visibility     []string `json:"visibility,omitempty"`
@@ -27,10 +41,10 @@ type MCPProviderToolMapping struct {
 	ToolName   string `json:"toolName"`
 	ToolDigest string `json:"toolDigest"`
 
-	ApprovalRule   mcpSpec.MCPApprovalRule  `json:"approvalRule,omitempty"`
-	ExecutionMode  mcpSpec.MCPExecutionMode `json:"executionMode,omitempty"`
-	AppResourceURI string                   `json:"appResourceUri,omitempty"`
-	Visibility     []string                 `json:"visibility,omitempty"`
+	ApprovalRule   mcpPolicy.MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode  mcpPolicy.MCPExecutionMode `json:"executionMode,omitempty"`
+	AppResourceURI string                     `json:"appResourceUri,omitempty"`
+	Visibility     []string                   `json:"visibility,omitempty"`
 }
 
 type MCPToolExposure string

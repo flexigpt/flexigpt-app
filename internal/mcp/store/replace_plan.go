@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
 type documentReplacePlan struct {
@@ -242,11 +242,11 @@ func preparedRegistrationData(
 		RootID:     bundle.Collection.RootID,
 		ArtifactID: registration.ArtifactID,
 	}
-	serverData, err := mcpArtifact.DecodeServerData(data)
+	serverData, err := mcpStoreServer.DecodeServerData(data)
 	if err != nil {
 		return nil, err
 	}
-	if err := mcpArtifact.ValidateServerDataForDocument(
+	if err := mcpStoreServer.ValidateServerDataForDocument(
 		serverRef,
 		document,
 		serverData,

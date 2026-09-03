@@ -16,8 +16,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
 type ReplaceDocumentRequest struct {
@@ -477,8 +477,8 @@ func registrationData(value Registration) (json.RawMessage, error) {
 
 	switch value.Kind {
 	case artifactbuiltin.ServerKind:
-		return mcpArtifact.EncodeServerData(
-			mcpArtifact.DefaultServerData(),
+		return mcpStoreServer.EncodeServerData(
+			mcpStoreServer.DefaultServerData(),
 		)
 	case artifactbuiltin.PolicyKind:
 		return json.RawMessage(jsonutil.EmptyObject), nil
@@ -545,7 +545,7 @@ func (a *API) UpdateServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedArtifactRevision uint64,
-	data mcpArtifact.ServerData,
+	data mcpStoreServer.ServerData,
 ) (artifact.Artifact, error) {
 	if a == nil {
 		return artifact.Artifact{}, basespec.ErrClosed
@@ -584,7 +584,7 @@ func (a *API) UpdateServerInstallation(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if err := mcpArtifact.ValidateServerDataForDocument(
+	if err := mcpStoreServer.ValidateServerDataForDocument(
 		ref,
 		document,
 		data,
@@ -592,7 +592,7 @@ func (a *API) UpdateServerInstallation(
 		return artifact.Artifact{}, err
 	}
 
-	encoded, err := mcpArtifact.EncodeServerData(data)
+	encoded, err := mcpStoreServer.EncodeServerData(data)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -629,7 +629,7 @@ func (a *API) UpdateProtectedServerInstallation(
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
 	runtimeEnabled bool,
-	data mcpArtifact.ServerData,
+	data mcpStoreServer.ServerData,
 ) error {
 	if a == nil {
 		return basespec.ErrClosed
@@ -670,7 +670,7 @@ func (a *API) UpdateProtectedServerInstallation(
 	if err != nil {
 		return err
 	}
-	if err := mcpArtifact.ValidateServerDataForDocument(
+	if err := mcpStoreServer.ValidateServerDataForDocument(
 		ref,
 		document,
 		data,
@@ -726,12 +726,12 @@ func (a *API) UpdateProtectedServerInstallation(
 
 func serverDocumentFromDefinition(
 	value definition.Definition,
-) (mcpArtifact.ServerDocument, error) {
-	body, err := mcpArtifact.ServerBodyFromDefinition(value)
+) (mcpStoreServer.ServerDocument, error) {
+	body, err := mcpStoreServer.ServerBodyFromDefinition(value)
 	if err != nil {
-		return mcpArtifact.ServerDocument{}, err
+		return mcpStoreServer.ServerDocument{}, err
 	}
-	return mcpArtifact.ServerDocument{
+	return mcpStoreServer.ServerDocument{
 		Kind:           artifactbuiltin.ServerKind,
 		SchemaID:       artifactbuiltin.ServerSchemaID,
 		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,

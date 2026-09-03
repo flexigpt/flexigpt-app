@@ -27,7 +27,9 @@ type App struct {
 	skillStoreAPI           *SkillStoreWrapper
 	skillAggregateAPI       *SkillAggregateWrapper
 	skillRuntimeAPI         *SkillRuntimeWrapper
-	mcpAPI                  *MCPWrapper
+	mcpStoreAPI             *MCPStoreWrapper
+	mcpRuntimeAPI           *MCPRuntimeWrapper
+	mcpAggregateAPI         *MCPAggregateWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
 	artifactStoreAPI        *ArtifactStoreWrapper
@@ -116,7 +118,9 @@ func NewApp() *App {
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.skillAggregateAPI = &SkillAggregateWrapper{}
 	app.skillRuntimeAPI = &SkillRuntimeWrapper{}
-	app.mcpAPI = &MCPWrapper{}
+	app.mcpStoreAPI = &MCPStoreWrapper{}
+	app.mcpRuntimeAPI = &MCPRuntimeWrapper{}
+	app.mcpAggregateAPI = &MCPAggregateWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
 	app.artifactStoreAPI = &ArtifactStoreWrapper{}
@@ -307,9 +311,11 @@ func (a *App) initManagers() {
 	}
 	slog.Info("settings store initialized", "directory", a.settingsDirPath)
 
-	err = InitMCPWrapper(
+	err = InitMCPWrappers(
 		context.Background(),
-		a.mcpAPI,
+		a.mcpStoreAPI,
+		a.mcpRuntimeAPI,
+		a.mcpAggregateAPI,
 		a.artifactStoreAPI.components,
 		a.settingStoreAPI.store,
 	)
@@ -327,7 +333,7 @@ func (a *App) initManagers() {
 		context.Background(),
 		a.artifactStoreAPI.components,
 		a.skillStoreAPI,
-		a.mcpAPI,
+		a.mcpStoreAPI,
 	)
 	if err != nil {
 		slog.Error(
@@ -362,8 +368,8 @@ func (a *App) initManagers() {
 		a.modelPresetStoreAPI.store,
 		a.toolStoreAPI.store,
 		a.skillAggregateAPI.service,
-		a.mcpAPI.aggregate,
-		a.mcpAPI.runtime,
+		a.mcpAggregateAPI.serverResolver,
+		a.mcpRuntimeAPI.runtime,
 	)
 	if err != nil {
 		slog.Error(
@@ -384,7 +390,7 @@ func (a *App) initManagers() {
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.store,
 		a.skillAggregateAPI.service,
-		a.mcpAPI.runtime,
+		a.mcpRuntimeAPI.runtime,
 		a.workspaceAPI.api,
 	)
 	if err != nil {
@@ -430,8 +436,14 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.modelPresetStoreAPI != nil {
 		a.modelPresetStoreAPI.close()
 	}
-	if a.mcpAPI != nil {
-		a.mcpAPI.close()
+	if a.mcpAggregateAPI != nil {
+		a.mcpAggregateAPI.close()
+	}
+	if a.mcpRuntimeAPI != nil {
+		a.mcpRuntimeAPI.close()
+	}
+	if a.mcpStoreAPI != nil {
+		a.mcpStoreAPI.close()
 	}
 	if a.settingStoreAPI != nil {
 		a.settingStoreAPI.close()

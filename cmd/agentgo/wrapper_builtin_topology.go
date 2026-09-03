@@ -12,7 +12,7 @@ func EnsureBuiltinArtifactTopology(
 	ctx context.Context,
 	components *system.Components,
 	skills *SkillStoreWrapper,
-	mcp *MCPWrapper,
+	mcp *MCPStoreWrapper,
 ) error {
 	if components == nil ||
 		skills == nil ||

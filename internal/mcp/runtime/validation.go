@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
@@ -184,14 +185,14 @@ func mappingMatchesSelection(
 		)
 	}
 	if selection.ApprovalRule != nil &&
-		mcpSpec.ApprovalRuleRank(mapping.ApprovalRule) < mcpSpec.ApprovalRuleRank(*selection.ApprovalRule) {
+		mcpPolicy.ApprovalRuleRank(mapping.ApprovalRule) < mcpPolicy.ApprovalRuleRank(*selection.ApprovalRule) {
 		return fmt.Errorf(
 			"%w: mapped MCP approval rule weakens conversation policy",
 			mcpSpec.ErrInvalid,
 		)
 	}
 	if selection.ExecutionMode != nil &&
-		mcpSpec.ExecutionModeRank(mapping.ExecutionMode) < mcpSpec.ExecutionModeRank(*selection.ExecutionMode) {
+		mcpPolicy.ExecutionModeRank(mapping.ExecutionMode) < mcpPolicy.ExecutionModeRank(*selection.ExecutionMode) {
 		return fmt.Errorf(
 			"%w: mapped MCP execution mode weakens conversation policy",
 			mcpSpec.ErrInvalid,
@@ -394,10 +395,10 @@ func ValidateMCPProviderToolMapping(m MCPProviderToolMapping) error {
 	); err != nil {
 		return err
 	}
-	if err := mcpSpec.ValidateMCPApprovalRule(m.ApprovalRule); err != nil {
+	if err := mcpPolicy.ValidateMCPApprovalRule(m.ApprovalRule); err != nil {
 		return err
 	}
-	if err := mcpSpec.ValidateMCPExecutionMode(m.ExecutionMode); err != nil {
+	if err := mcpPolicy.ValidateMCPExecutionMode(m.ExecutionMode); err != nil {
 		return err
 	}
 	if err := mcpSpec.ValidateOptionalText(
@@ -506,12 +507,12 @@ func validateMCPToolSelection(value MCPToolSelection) error {
 		return err
 	}
 	if value.ApprovalRule != nil {
-		if err := mcpSpec.ValidateMCPApprovalRule(*value.ApprovalRule); err != nil {
+		if err := mcpPolicy.ValidateMCPApprovalRule(*value.ApprovalRule); err != nil {
 			return err
 		}
 	}
 	if value.ExecutionMode != nil {
-		if err := mcpSpec.ValidateMCPExecutionMode(*value.ExecutionMode); err != nil {
+		if err := mcpPolicy.ValidateMCPExecutionMode(*value.ExecutionMode); err != nil {
 			return err
 		}
 	}

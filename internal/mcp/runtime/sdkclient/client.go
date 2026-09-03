@@ -11,9 +11,11 @@ import (
 	"strings"
 	"time"
 
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	"github.com/modelcontextprotocol/go-sdk/auth"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -63,7 +65,7 @@ func NewFactoryWithLogger(
 func (f *Factory) Connect(
 	ctx context.Context,
 	cfg mcpSpec.RuntimeConfig,
-	resolved mcpAuth.ResolvedTransportAuth,
+	resolved mcpSpec.PreparedConnection,
 	events mcpRuntime.ClientNotificationSink,
 ) (mcpRuntime.ClientSession, error) {
 	if err := cfg.Server.Validate(); err != nil {
@@ -162,7 +164,7 @@ func (f *Factory) Connect(
 			resolved.Env,
 		))
 
-		redactor := mcpAuth.NewSecretRedactor(mcpAuth.ResolvedTransportAuth{
+		redactor := mcpAuth.NewSecretRedactor(mcpSpec.PreparedConnection{
 			SensitiveValues: append(
 				append([]string(nil), cfg.SensitiveValues...),
 				resolved.SensitiveValues...,
@@ -188,6 +190,14 @@ func (f *Factory) Connect(
 			)
 		}
 
+		oauthHandler, err := sdkOAuthHandler(resolved.OAuthHandler)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"%w: unsupported prepared OAuth handler",
+				mcpRuntime.ErrMCPInvalidRuntimeRequest,
+			)
+		}
+
 		headers := mergeStringMaps(
 			cfg.StreamableHTTP.Headers,
 			resolved.Headers,
@@ -199,7 +209,7 @@ func (f *Factory) Connect(
 			HTTPClient:           httpClient,
 			MaxRetries:           defaultHTTPMaxRetries,
 			DisableStandaloneSSE: false,
-			OAuthHandler:         resolved.OAuthHandler,
+			OAuthHandler:         oauthHandler,
 		}
 
 	default:
@@ -238,6 +248,18 @@ func mergeStringMaps(
 	}
 	maps.Copy(output, overlay)
 	return output
+}
+
+func sdkOAuthHandler(value any) (auth.OAuthHandler, error) {
+	if value == nil {
+		//nolint:nilnil // Explicit.
+		return nil, nil
+	}
+	handler, ok := value.(auth.OAuthHandler)
+	if !ok {
+		return nil, fmt.Errorf("prepared OAuth handler has incompatible type %T", value)
+	}
+	return handler, nil
 }
 
 type headerRoundTripper struct {
@@ -280,7 +302,7 @@ func newStreamableHTTPClient(headers map[string]string) *http.Client {
 // buildClientCapabilities returns the client capability set advertised on
 // MCP initialize. FlexiGPT does not advertise roots, sampling, or elicitation.
 func buildClientCapabilities(
-	p mcpSpec.MCPAppsPolicy,
+	p mcpPolicy.MCPAppsPolicy,
 ) *mcpSDK.ClientCapabilities {
 	c := &mcpSDK.ClientCapabilities{}
 	if p.Enabled {

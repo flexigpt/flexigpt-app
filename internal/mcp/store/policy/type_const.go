@@ -3,15 +3,8 @@ package policy
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 )
-
-type MCPPolicy struct {
-	TrustLevel    mcpSpec.MCPTrustLevel                    `json:"trustLevel"`
-	DefaultPolicy mcpSpec.MCPServerPolicy                  `json:"defaultPolicy"`
-	ToolPolicies  map[string]mcpSpec.MCPToolPolicyOverride `json:"toolPolicies,omitempty"`
-	AppsPolicy    mcpSpec.MCPAppsPolicy                    `json:"appsPolicy"`
-}
 
 // Published JSON Schema resources carry $schema and $id metadata. MCP document
 // instances deliberately use kind, schemaID, and schemaVersion instead.
@@ -32,15 +25,5 @@ type PolicyDocument struct {
 	Description    string                  `json:"description,omitempty"`
 	Labels         map[string]string       `json:"labels,omitempty"`
 
-	Body MCPPolicy `json:"body"`
-}
-
-func DefaultMCPServerPolicy() mcpSpec.MCPServerPolicy {
-	return mcpSpec.MCPServerPolicy{
-		DefaultApprovalRule:           mcpSpec.MCPApprovalRuleAsk,
-		DefaultExecutionMode:          mcpSpec.MCPExecutionModeManual,
-		RequireApprovalForUnknownRisk: true,
-		RequireApprovalForWrite:       true,
-		RequireApprovalForDestructive: true,
-	}
+	Body mcpPolicy.MCPPolicy `json:"body"`
 }

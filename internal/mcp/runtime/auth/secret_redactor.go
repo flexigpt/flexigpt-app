@@ -2,13 +2,15 @@ package auth
 
 import (
 	"strings"
+
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
 type SecretRedactor struct {
 	values []string
 }
 
-func NewSecretRedactor(resolved ResolvedTransportAuth) *SecretRedactor {
+func NewSecretRedactor(resolved mcpSpec.PreparedConnection) *SecretRedactor {
 	seen := make(map[string]struct{})
 	values := make([]string, 0, len(resolved.SensitiveValues))
 	for _, v := range resolved.SensitiveValues {

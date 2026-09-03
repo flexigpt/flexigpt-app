@@ -24,9 +24,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
 type noAutomaticAdoption struct{}
@@ -62,7 +63,7 @@ type Dependencies struct {
 	RootPolicy    protection.RootPolicy
 	UserRootID    basespec.RootID
 	Overlays      mcpOverlay.OverlayRepository
-	SecretCleaner mcpArtifact.SecretCleaner
+	SecretCleaner mcpStoreServer.SecretCleaner
 
 	BaselinePolicy mcpPolicy.MCPPolicy
 }
@@ -511,13 +512,13 @@ func (a *API) discoveryPlan(
 func (a *API) cleanupChangedServerInstallation(
 	ctx context.Context,
 	record artifact.Artifact,
-	document mcpArtifact.ServerDocument,
-	after mcpArtifact.ServerData,
+	document mcpStoreServer.ServerDocument,
+	after mcpStoreServer.ServerData,
 ) error {
 	if record.Kind != artifactbuiltin.ServerKind {
 		return nil
 	}
-	if err := mcpArtifact.CleanupUnboundServerSecrets(
+	if err := mcpStoreServer.CleanupUnboundServerSecrets(
 		ctx,
 		record.Ref(),
 		document,
@@ -544,7 +545,7 @@ func (a *API) cleanupRemovedServerInstallation(
 	if err != nil {
 		return err
 	}
-	if err := mcpArtifact.CleanupRemovedServerSecrets(
+	if err := mcpStoreServer.CleanupRemovedServerSecrets(
 		ctx,
 		record.Ref(),
 		data,
@@ -561,16 +562,16 @@ func (a *API) cleanupRemovedServerInstallation(
 func (a *API) serverInstallationDataForCleanup(
 	ctx context.Context,
 	record artifact.Artifact,
-) (mcpArtifact.ServerData, error) {
+) (mcpStoreServer.ServerData, error) {
 	if record.Kind != artifactbuiltin.ServerKind {
-		return mcpArtifact.DefaultServerData(), nil
+		return mcpStoreServer.DefaultServerData(), nil
 	}
 
 	if !a.dependencies.RootPolicy.IsProtectedRoot(record.RootID) {
-		return mcpArtifact.DecodeServerData(record.Data)
+		return mcpStoreServer.DecodeServerData(record.Data)
 	}
 	if a.dependencies.Overlays == nil {
-		return mcpArtifact.ServerData{}, fmt.Errorf(
+		return mcpStoreServer.ServerData{}, fmt.Errorf(
 			"%w: protected MCP overlay store is unavailable",
 			basespec.ErrReferenceUnresolved,
 		)
@@ -581,10 +582,10 @@ func (a *API) serverInstallationDataForCleanup(
 		record.Ref(),
 	)
 	if err != nil {
-		return mcpArtifact.ServerData{}, err
+		return mcpStoreServer.ServerData{}, err
 	}
 	if !found {
-		return mcpArtifact.DefaultServerData(), nil
+		return mcpStoreServer.DefaultServerData(), nil
 	}
 	return ovr.ServerData, nil
 }
@@ -627,11 +628,11 @@ func validateCreateRegistrations(
 		if err != nil {
 			return err
 		}
-		serverData, err := mcpArtifact.DecodeServerData(data)
+		serverData, err := mcpStoreServer.DecodeServerData(data)
 		if err != nil {
 			return err
 		}
-		if err := mcpArtifact.ValidateServerDataForDocument(
+		if err := mcpStoreServer.ValidateServerDataForDocument(
 			artifact.ArtifactRef{
 				RootID:     rootID,
 				ArtifactID: registration.ArtifactID,
@@ -660,20 +661,20 @@ func definitionsForDocument(
 		if err != nil {
 			return nil, err
 		}
-		value, err := mcpArtifact.DefinitionForCanonicalServer(serverDocument)
+		value, err := mcpStoreServer.DefinitionForCanonicalServer(serverDocument)
 		if err != nil {
 			return nil, err
 		}
-		output[mcpArtifact.ServerSubresource(
+		output[mcpStoreServer.ServerSubresource(
 			basespec.LogicalName(name),
 		)] = value
 	}
 	for name, policyDocument := range document.BundleExtension.Policies {
-		value, err := mcpPolicy.DefinitionForCanonicalPolicy(policyDocument)
+		value, err := mcpStorePolicy.DefinitionForCanonicalPolicy(policyDocument)
 		if err != nil {
 			return nil, err
 		}
-		output[mcpPolicy.PolicySubresource(
+		output[mcpStorePolicy.PolicySubresource(
 			basespec.LogicalName(name),
 		)] = value
 	}

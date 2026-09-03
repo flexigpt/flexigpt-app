@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
 func TestSlogLineWriterRedactsStdioSecretAcrossWrites(t *testing.T) {
 	handler := &captureSlogHandler{}
 	logger := slog.New(handler)
 
-	redactor := mcpAuth.NewSecretRedactor(mcpAuth.ResolvedTransportAuth{
+	redactor := mcpAuth.NewSecretRedactor(mcpSpec.PreparedConnection{
 		SensitiveValues: []string{"top-secret"},
 	})
 

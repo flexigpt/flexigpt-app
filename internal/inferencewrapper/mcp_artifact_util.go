@@ -13,9 +13,9 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
 )
 
 const mcpContextInputID = "mcp-context"

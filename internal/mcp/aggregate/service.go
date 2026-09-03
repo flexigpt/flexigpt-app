@@ -4,98 +4,121 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
+	mcpSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/secret"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
-type Service struct {
-	store      *mcpStore.API
-	source     *ServerSource
-	runtime    *mcpRuntime.MCPRuntimeManager
-	toolBridge *mcpRuntime.ToolBridge
+type BundleServerStore interface {
+	ListServers(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) ([]artifact.Artifact, error)
+
+	GetServerInstallation(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+	) (mcpStore.ServerInstallationView, error)
 }
 
-func New(
-	store *mcpStore.API,
-	source *ServerSource,
-	runtimeService *mcpRuntime.MCPRuntimeManager,
-	toolBridge *mcpRuntime.ToolBridge,
-) (*Service, error) {
-	if store == nil ||
-		source == nil ||
-		runtimeService == nil ||
-		toolBridge == nil {
+type AuthState interface {
+	ClearAuthStatus(server mcpSpec.ServerID)
+
+	BuildAuthHealth(
+		ctx context.Context,
+		config mcpSpec.RuntimeConfig,
+	) mcpAuth.MCPAuthHealth
+}
+
+// SecretStore is deliberately narrow. Aggregate owns the mapping from runtime
+// identity to artifact-scoped secret identity; the app supplies persistence.
+type SecretStore interface {
+	ResolveSecret(ctx context.Context, ref string) (string, error)
+
+	SetMCPSecret(
+		ctx context.Context,
+		ref string,
+		value string,
+	) (hash string, nonEmpty bool, err error)
+
+	DeleteSecret(ctx context.Context, ref string) error
+}
+
+type Dependencies struct {
+	Lifecycle *Lifecycle
+	Servers   *ArtifactServerResolver
+	Source    *RuntimeServerSource
+	Bundles   BundleServerStore
+	Auth      AuthState
+	Secrets   SecretStore
+}
+
+type Service struct {
+	lifecycle *Lifecycle
+	servers   *ArtifactServerResolver
+	source    *RuntimeServerSource
+	bundles   BundleServerStore
+	auth      AuthState
+	secrets   SecretStore
+}
+
+type SecretWriteResult struct {
+	SecretRef string `json:"secretRef"`
+	SHA256    string `json:"sha256,omitempty"`
+	NonEmpty  bool   `json:"nonEmpty"`
+}
+
+func NewService(dependencies Dependencies) (*Service, error) {
+	if dependencies.Lifecycle == nil ||
+		dependencies.Servers == nil ||
+		dependencies.Source == nil ||
+		dependencies.Bundles == nil ||
+		dependencies.Auth == nil ||
+		dependencies.Secrets == nil {
 		return nil, errors.New("MCP aggregate dependencies are incomplete")
 	}
-	return &Service{
-		store:      store,
-		source:     source,
-		runtime:    runtimeService,
-		toolBridge: toolBridge,
-	}, nil
-}
 
-func (s *Service) ResolveMCPServer(
-	ctx context.Context,
-	serverID mcpSpec.ServerID,
-) (mcpArtifact.Resolved, error) {
-	if s == nil || s.store == nil {
-		return mcpArtifact.Resolved{}, mcpSpec.ErrClosed
-	}
-	ref, err := ArtifactRefForServerID(serverID)
-	if err != nil {
-		return mcpArtifact.Resolved{}, err
-	}
-	return s.store.ResolveMCPServer(ctx, ref)
+	return &Service{
+		lifecycle: dependencies.Lifecycle,
+		servers:   dependencies.Servers,
+		source:    dependencies.Source,
+		bundles:   dependencies.Bundles,
+		auth:      dependencies.Auth,
+		secrets:   dependencies.Secrets,
+	}, nil
 }
 
 func (s *Service) InspectRuntimeConfig(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (mcpSpec.RuntimeConfig, mcpArtifact.Resolved, error) {
-	if s == nil || s.source == nil {
-		return mcpSpec.RuntimeConfig{},
-			mcpArtifact.Resolved{},
-			mcpSpec.ErrClosed
+) (mcpSpec.RuntimeConfig, mcpStoreServer.Resolved, error) {
+	if err := s.ready(); err != nil {
+		return mcpSpec.RuntimeConfig{}, mcpStoreServer.Resolved{}, err
 	}
 	return s.source.InspectRuntimeConfig(ctx, ref)
-}
-
-func (s *Service) InvalidateServer(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) error {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return err
-	}
-	return s.runtime.Invalidate(ctx, serverID)
-}
-
-func (s *Service) InvalidateCollection(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) error {
-	catalogID, err := CatalogIDForCollection(ref)
-	if err != nil {
-		return err
-	}
-	return s.runtime.InvalidateCollection(ctx, catalogID)
 }
 
 func (s *Service) ReplaceDocument(
 	ctx context.Context,
 	request mcpStore.ReplaceDocumentRequest,
 ) (mcpStore.Bundle, error) {
-	if err := s.InvalidateCollection(ctx, request.Bundle); err != nil {
+	ids, err := s.serverIDsForBundle(ctx, request.Bundle)
+	if err != nil {
 		return mcpStore.Bundle{}, err
 	}
-	return s.store.ReplaceDocument(ctx, request)
+	value, err := s.lifecycle.ReplaceDocument(ctx, request)
+	if err != nil {
+		return mcpStore.Bundle{}, err
+	}
+	s.clearAuthStatuses(ids)
+	return value, nil
 }
 
 func (s *Service) RefreshBundle(
@@ -103,10 +126,16 @@ func (s *Service) RefreshBundle(
 	ref collection.CollectionRef,
 	allowProtected bool,
 ) (mcpStore.Bundle, error) {
-	if err := s.InvalidateCollection(ctx, ref); err != nil {
+	ids, err := s.serverIDsForBundle(ctx, ref)
+	if err != nil {
 		return mcpStore.Bundle{}, err
 	}
-	return s.store.Refresh(ctx, ref, allowProtected)
+	value, err := s.lifecycle.RefreshBundle(ctx, ref, allowProtected)
+	if err != nil {
+		return mcpStore.Bundle{}, err
+	}
+	s.clearAuthStatuses(ids)
+	return value, nil
 }
 
 func (s *Service) UpdateBundleEnabled(
@@ -115,15 +144,16 @@ func (s *Service) UpdateBundleEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (mcpStore.Bundle, error) {
-	if err := s.InvalidateCollection(ctx, ref); err != nil {
+	ids, err := s.serverIDsForBundle(ctx, ref)
+	if err != nil {
 		return mcpStore.Bundle{}, err
 	}
-	return s.store.UpdateBundleEnabled(
-		ctx,
-		ref,
-		expectedRevision,
-		enabled,
-	)
+	value, err := s.lifecycle.UpdateBundleEnabled(ctx, ref, expectedRevision, enabled)
+	if err != nil {
+		return mcpStore.Bundle{}, err
+	}
+	s.clearAuthStatuses(ids)
+	return value, nil
 }
 
 func (s *Service) RetireBundle(
@@ -131,10 +161,16 @@ func (s *Service) RetireBundle(
 	ref collection.CollectionRef,
 	expectedRevision uint64,
 ) (collection.Collection, error) {
-	if err := s.InvalidateCollection(ctx, ref); err != nil {
+	ids, err := s.serverIDsForBundle(ctx, ref)
+	if err != nil {
 		return collection.Collection{}, err
 	}
-	return s.store.Retire(ctx, ref, expectedRevision)
+	value, err := s.lifecycle.RetireBundle(ctx, ref, expectedRevision)
+	if err != nil {
+		return collection.Collection{}, err
+	}
+	s.clearAuthStatuses(ids)
+	return value, nil
 }
 
 func (s *Service) PurgeBundle(
@@ -142,10 +178,10 @@ func (s *Service) PurgeBundle(
 	ref collection.CollectionRef,
 	expectedRevision uint64,
 ) error {
-	if err := s.InvalidateCollection(ctx, ref); err != nil {
+	if err := s.ready(); err != nil {
 		return err
 	}
-	return s.store.Purge(ctx, ref, expectedRevision)
+	return s.lifecycle.PurgeBundle(ctx, ref, expectedRevision)
 }
 
 func (s *Service) UpdateProtectedBundleInstallation(
@@ -154,32 +190,42 @@ func (s *Service) UpdateProtectedBundleInstallation(
 	expectedOverlayRevision uint64,
 	runtimeEnabled bool,
 ) error {
-	if err := s.InvalidateCollection(ctx, ref); err != nil {
+	ids, err := s.serverIDsForBundle(ctx, ref)
+	if err != nil {
 		return err
 	}
-	return s.store.UpdateProtectedBundleInstallation(
+	if err := s.lifecycle.UpdateProtectedBundleInstallation(
 		ctx,
 		ref,
 		expectedOverlayRevision,
 		runtimeEnabled,
-	)
+	); err != nil {
+		return err
+	}
+	s.clearAuthStatuses(ids)
+	return nil
 }
 
 func (s *Service) UpdateServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedArtifactRevision uint64,
-	data mcpArtifact.ServerData,
+	data mcpStoreServer.ServerData,
 ) (artifact.Artifact, error) {
-	if err := s.InvalidateServer(ctx, ref); err != nil {
+	if err := s.ready(); err != nil {
 		return artifact.Artifact{}, err
 	}
-	return s.store.UpdateServerInstallation(
+	value, err := s.lifecycle.UpdateServerInstallation(
 		ctx,
 		ref,
 		expectedArtifactRevision,
 		data,
 	)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	s.clearServerAuthStatus(ref)
+	return value, nil
 }
 
 func (s *Service) UpdateProtectedServerInstallation(
@@ -187,193 +233,253 @@ func (s *Service) UpdateProtectedServerInstallation(
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
 	runtimeEnabled bool,
-	data mcpArtifact.ServerData,
+	data mcpStoreServer.ServerData,
 ) error {
-	if err := s.InvalidateServer(ctx, ref); err != nil {
+	if err := s.ready(); err != nil {
 		return err
 	}
-	return s.store.UpdateProtectedServerInstallation(
+	if err := s.lifecycle.UpdateProtectedServerInstallation(
 		ctx,
 		ref,
 		expectedOverlayRevision,
 		runtimeEnabled,
 		data,
-	)
-}
-
-func (s *Service) StartConnect(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
+	); err != nil {
+		return err
 	}
-	return s.runtime.StartConnect(ctx, serverID)
+	s.clearServerAuthStatus(ref)
+	return nil
 }
 
-func (s *Service) Disconnect(
+func (s *Service) PutServerSecret(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
+	kind mcpSecret.MCPSecretKind,
+	slot string,
+	value string,
+) (SecretWriteResult, error) {
+	if err := s.ready(); err != nil {
+		return SecretWriteResult{}, err
+	}
+	if kind == mcpSecret.MCPSecretKindOAuthToken {
+		return SecretWriteResult{}, fmt.Errorf(
+			"%w: OAuth token secrets are runtime-managed",
+			mcpAuth.ErrMCPInvalidAuthRequest,
+		)
+	}
+
+	installation, err := s.bundles.GetServerInstallation(ctx, ref)
+	if err != nil {
+		return SecretWriteResult{}, err
+	}
+	if err := validateSecretTarget(installation.Document, kind, slot); err != nil {
+		return SecretWriteResult{}, err
+	}
+
+	if kind == mcpSecret.MCPSecretKindOAuthClientCredentials {
+		switch installation.Document.Extension.Auth.Mode {
+		case mcpSpec.MCPHTTPAuthNone, mcpSpec.MCPHTTPAuthClientCredentials:
+		default:
+			return SecretWriteResult{}, fmt.Errorf(
+				"%w: MCP server does not declare OAuth client credentials",
+				mcpAuth.ErrMCPInvalidAuthRequest,
+			)
+		}
+		if err := mcpAuth.ValidateOAuthClientCredentialsSecret(
+			value,
+			installation.Document.OAuthClientSecretRequired(),
+		); err != nil {
+			return SecretWriteResult{}, err
+		}
+	}
+
+	if kind == mcpSecret.MCPSecretKindHTTPHeader &&
+		(strings.TrimSpace(value) == "" || strings.ContainsAny(value, "\r\n\x00")) {
+		return SecretWriteResult{}, fmt.Errorf(
+			"%w: invalid HTTP header secret value",
+			mcpAuth.ErrMCPInvalidAuthRequest,
+		)
+	}
+
+	if err := s.lifecycle.InvalidateServer(ctx, ref); err != nil {
+		return SecretWriteResult{}, err
+	}
+	secretRef, err := mcpSecret.NewMCPSecretRefString(ref, kind, slot)
+	if err != nil {
+		return SecretWriteResult{}, err
+	}
+	hash, nonEmpty, err := s.secrets.SetMCPSecret(ctx, secretRef, value)
+	if err != nil {
+		return SecretWriteResult{}, err
+	}
+	s.clearServerAuthStatus(ref)
+	return SecretWriteResult{
+		SecretRef: secretRef,
+		SHA256:    hash,
+		NonEmpty:  nonEmpty,
+	}, nil
+}
+
+func (s *Service) DeleteServerSecret(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	kind mcpSecret.MCPSecretKind,
+	slot string,
 ) error {
-	serverID, err := ServerIDForArtifact(ref)
+	if err := s.ready(); err != nil {
+		return err
+	}
+	if kind == mcpSecret.MCPSecretKindOAuthToken {
+		return fmt.Errorf(
+			"%w: OAuth token secrets are runtime-managed",
+			mcpAuth.ErrMCPInvalidAuthRequest,
+		)
+	}
+	if _, err := s.bundles.GetServerInstallation(ctx, ref); err != nil {
+		return err
+	}
+	if err := s.lifecycle.InvalidateServer(ctx, ref); err != nil {
+		return err
+	}
+	secretRef, err := mcpSecret.NewMCPSecretRefString(ref, kind, slot)
 	if err != nil {
 		return err
 	}
-	return s.runtime.Disconnect(ctx, serverID)
+	if err := s.secrets.DeleteSecret(ctx, secretRef); err != nil {
+		return err
+	}
+	s.clearServerAuthStatus(ref)
+	return nil
 }
 
-func (s *Service) RefreshServer(
+func (s *Service) GetServerAuthHealth(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	serverID, err := ServerIDForArtifact(ref)
+) (mcpAuth.MCPAuthHealth, error) {
+	if err := s.ready(); err != nil {
+		return mcpAuth.MCPAuthHealth{}, err
+	}
+
+	config, resolved, err := s.source.InspectRuntimeConfig(ctx, ref)
+	if err == nil {
+		return s.auth.BuildAuthHealth(ctx, config), nil
+	}
+	if resolved.Server != ref {
+		return mcpAuth.MCPAuthHealth{}, err
+	}
+
+	serverID, idErr := RuntimeServerIDForArtifact(ref)
+	if idErr != nil {
+		return mcpAuth.MCPAuthHealth{}, idErr
+	}
+	return mcpAuth.MCPAuthHealth{
+		Server:     serverID,
+		AuthMode:   resolved.Document.Extension.Auth.Mode,
+		State:      mcpAuth.MCPAuthHealthStateNotConfigured,
+		Configured: false,
+		LastError:  "required MCP installation input is not configured",
+	}, nil
+}
+
+func (s *Service) serverIDsForBundle(
+	ctx context.Context,
+	ref collection.CollectionRef,
+) ([]mcpSpec.ServerID, error) {
+	if err := s.ready(); err != nil {
+		return nil, err
+	}
+	records, err := s.bundles.ListServers(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	return s.runtime.Refresh(ctx, serverID)
-}
-
-func (s *Service) Status(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
+	seen := make(map[mcpSpec.ServerID]struct{}, len(records))
+	for _, record := range records {
+		serverID, err := RuntimeServerIDForArtifact(record.Ref())
+		if err != nil {
+			return nil, err
+		}
+		seen[serverID] = struct{}{}
 	}
-	return s.runtime.Status(ctx, serverID)
-}
 
-func (s *Service) ListTools(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) ([]mcpRuntime.MCPToolCapability, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
+	output := make([]mcpSpec.ServerID, 0, len(seen))
+	for serverID := range seen {
+		output = append(output, serverID)
 	}
-	return s.runtime.ListTools(ctx, serverID)
+	slices.Sort(output)
+	return output, nil
 }
 
-func (s *Service) ListResources(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) ([]mcpRuntime.MCPResourceRef, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
+func (s *Service) clearAuthStatuses(ids []mcpSpec.ServerID) {
+	for _, id := range ids {
+		s.auth.ClearAuthStatus(id)
 	}
-	return s.runtime.ListResources(ctx, serverID)
 }
 
-func (s *Service) ListResourceTemplates(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) ([]mcpRuntime.MCPResourceTemplateRef, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
+func (s *Service) clearServerAuthStatus(ref artifact.ArtifactRef) {
+	serverID, err := RuntimeServerIDForArtifact(ref)
+	if err == nil {
+		s.auth.ClearAuthStatus(serverID)
 	}
-	return s.runtime.ListResourceTemplates(ctx, serverID)
 }
 
-func (s *Service) ListPrompts(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) ([]mcpRuntime.MCPPromptRef, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
+func (s *Service) ready() error {
+	if s == nil ||
+		s.lifecycle == nil ||
+		s.servers == nil ||
+		s.source == nil ||
+		s.bundles == nil ||
+		s.auth == nil ||
+		s.secrets == nil {
+		return mcpSpec.ErrClosed
 	}
-	return s.runtime.ListPrompts(ctx, serverID)
+	return nil
 }
 
-func (s *Service) ReadResource(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	uri string,
-) (*mcpRuntime.MCPReadResourceResponseBody, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
+func validateSecretTarget(
+	document mcpStoreServer.ServerDocument,
+	kind mcpSecret.MCPSecretKind,
+	slot string,
+) error {
+	switch kind {
+	case mcpSecret.MCPSecretKindOAuthClientCredentials:
+		input := document.Extension.Auth.ClientCredentialsInput
+		declaration, found := document.Extension.Install.Inputs[input]
+		if input == "" ||
+			!found ||
+			declaration.Kind != mcpStoreServer.InputOAuthClientCredentials ||
+			!strings.EqualFold(strings.TrimSpace(slot), "clientCredentials") {
+			return fmt.Errorf(
+				"%w: invalid OAuth client credentials secret target",
+				mcpAuth.ErrMCPInvalidAuthRequest,
+			)
+		}
+		return nil
+
+	case mcpSecret.MCPSecretKindStdioEnv, mcpSecret.MCPSecretKindHTTPHeader:
+		targets, err := mcpStoreServer.SecretInputTargets(document)
+		if err != nil {
+			return err
+		}
+		for _, target := range targets {
+			expectedKind := mcpSecret.MCPSecretKindStdioEnv
+			if target.Kind == mcpStoreServer.SecretInputTargetHTTPHeader {
+				expectedKind = mcpSecret.MCPSecretKindHTTPHeader
+			}
+			if kind == expectedKind &&
+				strings.EqualFold(target.Slot, strings.TrimSpace(slot)) {
+				return nil
+			}
+		}
+		return fmt.Errorf(
+			"%w: secret target is not declared by the MCP server",
+			mcpAuth.ErrMCPInvalidAuthRequest,
+		)
+
+	default:
+		return fmt.Errorf(
+			"%w: unsupported MCP secret kind %q",
+			mcpAuth.ErrMCPInvalidAuthRequest,
+			kind,
+		)
 	}
-	return s.runtime.ReadResource(ctx, serverID, uri)
-}
-
-func (s *Service) GetPrompt(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	name string,
-	arguments map[string]string,
-) (*mcpRuntime.MCPGetPromptResponseBody, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
-	}
-	return s.runtime.GetPrompt(ctx, serverID, name, arguments)
-}
-
-func (s *Service) Complete(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	request mcpRuntime.MCPCompleteArgumentRequestBody,
-) (*mcpRuntime.MCPCompletionResult, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
-	}
-	return s.runtime.Complete(ctx, serverID, request)
-}
-
-func (s *Service) Evaluate(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	request mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.MCPApprovalEvaluation, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
-	}
-	return s.toolBridge.Evaluate(ctx, serverID, request)
-}
-
-func (s *Service) Invoke(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	request mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
-	serverID, err := ServerIDForArtifact(ref)
-	if err != nil {
-		return nil, err
-	}
-	return s.toolBridge.Invoke(ctx, serverID, request)
-}
-
-func (s *Service) EvaluateMapped(
-	ctx context.Context,
-	mapping mcpRuntime.MCPProviderToolMapping,
-	request mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.MCPApprovalEvaluation, error) {
-	return s.toolBridge.EvaluateMapped(ctx, mapping, request)
-}
-
-func (s *Service) InvokeMapped(
-	ctx context.Context,
-	mapping mcpRuntime.MCPProviderToolMapping,
-	request mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
-	return s.toolBridge.InvokeMapped(ctx, mapping, request)
-}
-
-func (s *Service) ResolveApproval(
-	ctx context.Context,
-	approvalID string,
-	resolution mcpRuntime.MCPApprovalResolution,
-) (mcpRuntime.MCPApprovalResolutionResult, error) {
-	if s == nil || s.toolBridge == nil {
-		return mcpRuntime.MCPApprovalResolutionResult{},
-			fmt.Errorf("%w: MCP aggregate is unavailable", mcpSpec.ErrClosed)
-	}
-	return s.toolBridge.ResolveApproval(ctx, approvalID, resolution)
 }

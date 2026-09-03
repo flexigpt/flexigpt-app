@@ -1,4 +1,4 @@
-package runtime
+package invocation
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
@@ -18,16 +20,16 @@ const (
 )
 
 type ToolBridge struct {
-	runtime   *MCPRuntimeManager
-	approvals *ApprovalManager
+	runtime   Runtime
+	approvals *mcpRuntime.ApprovalManager
 }
 
 func NewToolBridge(
-	runtime *MCPRuntimeManager,
-	approvals *ApprovalManager,
+	runtime Runtime,
+	approvals *mcpRuntime.ApprovalManager,
 ) *ToolBridge {
 	if runtime != nil {
-		runtime.bindApprovalManager(approvals)
+		runtime.SetSessionLifecycleCleaner(approvals)
 	}
 	return &ToolBridge{
 		runtime:   runtime,
@@ -38,12 +40,12 @@ func NewToolBridge(
 func (b *ToolBridge) ResolveApproval(
 	ctx context.Context,
 	approvalID string,
-	resolution MCPApprovalResolution,
-) (MCPApprovalResolutionResult, error) {
+	resolution mcpRuntime.MCPApprovalResolution,
+) (mcpRuntime.MCPApprovalResolutionResult, error) {
 	if b == nil || b.approvals == nil {
-		return MCPApprovalResolutionResult{}, fmt.Errorf(
+		return mcpRuntime.MCPApprovalResolutionResult{}, fmt.Errorf(
 			"%w: MCP approval manager is unavailable",
-			ErrMCPRuntimeNotReady,
+			mcpRuntime.ErrMCPRuntimeNotReady,
 		)
 	}
 	return b.approvals.Resolve(
@@ -56,13 +58,13 @@ func (b *ToolBridge) ResolveApproval(
 func (b *ToolBridge) Evaluate(
 	ctx context.Context,
 	serverRef mcpSpec.ServerID,
-	request InvokeMCPToolRequestBody,
-) (*MCPApprovalEvaluation, error) {
+	request mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.MCPApprovalEvaluation, error) {
 	if err := validateBridgeRequest(ctx, serverRef, request); err != nil {
 		return nil, err
 	}
 	if b == nil || b.runtime == nil || b.approvals == nil {
-		return nil, fmt.Errorf("%w: MCP tool bridge is unavailable", ErrMCPRuntimeNotReady)
+		return nil, fmt.Errorf("%w: MCP tool bridge is unavailable", mcpRuntime.ErrMCPRuntimeNotReady)
 	}
 
 	config, tool, err := b.runtime.CallToolDryRun(
@@ -74,8 +76,8 @@ func (b *ToolBridge) Evaluate(
 		return nil, err
 	}
 
-	if request.Source == MCPInvocationSourceApp {
-		if err := ValidateAppToolInvocation(
+	if request.Source == mcpRuntime.MCPInvocationSourceApp {
+		if err := mcpRuntime.ValidateAppToolInvocation(
 			config.AppsPolicy,
 			tool,
 			serverRef,
@@ -83,10 +85,10 @@ func (b *ToolBridge) Evaluate(
 			return nil, err
 		}
 	} else if config.AppsPolicy.Enabled &&
-		!ToolVisibleToModel(tool.App) {
+		!mcpRuntime.ToolVisibleToModel(tool.App) {
 		return nil, fmt.Errorf(
 			"%w: MCP tool %q is not visible to the model",
-			ErrMCPPolicyDenied,
+			mcpRuntime.ErrMCPPolicyDenied,
 			tool.ToolName,
 		)
 	}
@@ -94,7 +96,7 @@ func (b *ToolBridge) Evaluate(
 	evaluation := evaluateTool(config, tool, request)
 	evaluation = b.applyCachedDecision(evaluation)
 
-	if evaluation.Decision == MCPApprovalDecisionApprovalRequired &&
+	if evaluation.Decision == mcpRuntime.MCPApprovalDecisionApprovalRequired &&
 		evaluation.Summary != nil {
 		approvalID, err := b.approvals.Create(
 			ctx,
@@ -116,9 +118,9 @@ func (b *ToolBridge) Evaluate(
 // discovered digest, and any conversation policy tightening.
 func (b *ToolBridge) EvaluateMapped(
 	ctx context.Context,
-	mapping MCPProviderToolMapping,
-	request InvokeMCPToolRequestBody,
-) (*MCPApprovalEvaluation, error) {
+	mapping mcpRuntime.MCPProviderToolMapping,
+	request mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.MCPApprovalEvaluation, error) {
 	config, tool, normalized, err := b.mappedDryRun(
 		ctx,
 		mapping,
@@ -128,8 +130,8 @@ func (b *ToolBridge) EvaluateMapped(
 		return nil, err
 	}
 
-	if normalized.Source == MCPInvocationSourceApp {
-		if err := ValidateAppToolInvocation(
+	if normalized.Source == mcpRuntime.MCPInvocationSourceApp {
+		if err := mcpRuntime.ValidateAppToolInvocation(
 			config.AppsPolicy,
 			tool,
 			mapping.Server,
@@ -137,10 +139,10 @@ func (b *ToolBridge) EvaluateMapped(
 			return nil, err
 		}
 	} else if config.AppsPolicy.Enabled &&
-		!ToolVisibleToModel(tool.App) {
+		!mcpRuntime.ToolVisibleToModel(tool.App) {
 		return nil, fmt.Errorf(
 			"%w: MCP tool %q is not visible to the model",
-			ErrMCPPolicyDenied,
+			mcpRuntime.ErrMCPPolicyDenied,
 			tool.ToolName,
 		)
 	}
@@ -148,7 +150,7 @@ func (b *ToolBridge) EvaluateMapped(
 	evaluation := b.applyCachedDecision(
 		evaluateTool(config, tool, normalized),
 	)
-	if evaluation.Decision != MCPApprovalDecisionApprovalRequired ||
+	if evaluation.Decision != mcpRuntime.MCPApprovalDecisionApprovalRequired ||
 		evaluation.Summary == nil {
 		return &evaluation, nil
 	}
@@ -165,9 +167,9 @@ func (b *ToolBridge) EvaluateMapped(
 // connected runtime snapshot and applying only policy-tightening constraints.
 func (b *ToolBridge) InvokeMapped(
 	ctx context.Context,
-	mapping MCPProviderToolMapping,
-	request InvokeMCPToolRequestBody,
-) (*InvokeMCPToolResponseBody, error) {
+	mapping mcpRuntime.MCPProviderToolMapping,
+	request mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
 	config, tool, normalized, err := b.mappedDryRun(
 		ctx,
 		mapping,
@@ -177,8 +179,8 @@ func (b *ToolBridge) InvokeMapped(
 		return nil, err
 	}
 
-	if normalized.Source == MCPInvocationSourceApp {
-		if err := ValidateAppToolInvocation(
+	if normalized.Source == mcpRuntime.MCPInvocationSourceApp {
+		if err := mcpRuntime.ValidateAppToolInvocation(
 			config.AppsPolicy,
 			tool,
 			mapping.Server,
@@ -186,10 +188,10 @@ func (b *ToolBridge) InvokeMapped(
 			return nil, err
 		}
 	} else if config.AppsPolicy.Enabled &&
-		!ToolVisibleToModel(tool.App) {
+		!mcpRuntime.ToolVisibleToModel(tool.App) {
 		return nil, fmt.Errorf(
 			"%w: MCP tool %q is not visible to the model",
-			ErrMCPPolicyDenied,
+			mcpRuntime.ErrMCPPolicyDenied,
 			tool.ToolName,
 		)
 	}
@@ -198,25 +200,25 @@ func (b *ToolBridge) InvokeMapped(
 		evaluateTool(config, tool, normalized),
 	)
 	switch evaluation.Decision {
-	case MCPApprovalDecisionDenied:
+	case mcpRuntime.MCPApprovalDecisionDenied:
 		if evaluation.Reason == toolDigestChangedReason {
 			return nil, fmt.Errorf(
 				"%w: %s",
-				ErrMCPStaleReference,
+				mcpRuntime.ErrMCPStaleReference,
 				evaluation.Reason,
 			)
 		}
 		return nil, fmt.Errorf(
 			"%w: %s",
-			ErrMCPPolicyDenied,
+			mcpRuntime.ErrMCPPolicyDenied,
 			evaluation.Reason,
 		)
 
-	case MCPApprovalDecisionApprovalRequired:
+	case mcpRuntime.MCPApprovalDecisionApprovalRequired:
 		if normalized.ApprovalToken == "" || evaluation.Summary == nil {
 			return nil, fmt.Errorf(
 				"%w: approval token is required",
-				ErrMCPApprovalNeeded,
+				mcpRuntime.ErrMCPApprovalNeeded,
 			)
 		}
 		approvalID, err := b.approvals.VerifyAndConsumeToken(
@@ -229,11 +231,11 @@ func (b *ToolBridge) InvokeMapped(
 		}
 		normalized.ApprovalID = approvalID
 
-	case MCPApprovalDecisionAllowed:
+	case mcpRuntime.MCPApprovalDecisionAllowed:
 	default:
 		return nil, fmt.Errorf(
 			"%w: invalid MCP approval decision",
-			ErrMCPInvalidRuntimeRequest,
+			mcpRuntime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
@@ -243,13 +245,13 @@ func (b *ToolBridge) InvokeMapped(
 func (b *ToolBridge) Invoke(
 	ctx context.Context,
 	serverRef mcpSpec.ServerID,
-	request InvokeMCPToolRequestBody,
-) (*InvokeMCPToolResponseBody, error) {
+	request mcpRuntime.InvokeMCPToolRequestBody,
+) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
 	if err := validateBridgeRequest(ctx, serverRef, request); err != nil {
 		return nil, err
 	}
 	if b == nil || b.runtime == nil || b.approvals == nil {
-		return nil, fmt.Errorf("%w: MCP tool bridge is unavailable", ErrMCPRuntimeNotReady)
+		return nil, fmt.Errorf("%w: MCP tool bridge is unavailable", mcpRuntime.ErrMCPRuntimeNotReady)
 	}
 
 	config, tool, err := b.runtime.CallToolDryRun(
@@ -261,8 +263,8 @@ func (b *ToolBridge) Invoke(
 		return nil, err
 	}
 
-	if request.Source == MCPInvocationSourceApp {
-		if err := ValidateAppToolInvocation(
+	if request.Source == mcpRuntime.MCPInvocationSourceApp {
+		if err := mcpRuntime.ValidateAppToolInvocation(
 			config.AppsPolicy,
 			tool,
 			serverRef,
@@ -270,10 +272,10 @@ func (b *ToolBridge) Invoke(
 			return nil, err
 		}
 	} else if config.AppsPolicy.Enabled &&
-		!ToolVisibleToModel(tool.App) {
+		!mcpRuntime.ToolVisibleToModel(tool.App) {
 		return nil, fmt.Errorf(
 			"%w: MCP tool %q is not visible to the model",
-			ErrMCPPolicyDenied,
+			mcpRuntime.ErrMCPPolicyDenied,
 			tool.ToolName,
 		)
 	}
@@ -282,25 +284,25 @@ func (b *ToolBridge) Invoke(
 	evaluation = b.applyCachedDecision(evaluation)
 
 	switch evaluation.Decision {
-	case MCPApprovalDecisionDenied:
+	case mcpRuntime.MCPApprovalDecisionDenied:
 		if evaluation.Reason == toolDigestChangedReason {
 			return nil, fmt.Errorf(
 				"%w: %s",
-				ErrMCPStaleReference,
+				mcpRuntime.ErrMCPStaleReference,
 				evaluation.Reason,
 			)
 		}
 		return nil, fmt.Errorf(
 			"%w: %s",
-			ErrMCPPolicyDenied,
+			mcpRuntime.ErrMCPPolicyDenied,
 			evaluation.Reason,
 		)
 
-	case MCPApprovalDecisionApprovalRequired:
+	case mcpRuntime.MCPApprovalDecisionApprovalRequired:
 		if request.ApprovalToken == "" || evaluation.Summary == nil {
 			return nil, fmt.Errorf(
 				"%w: approval token is required",
-				ErrMCPApprovalNeeded,
+				mcpRuntime.ErrMCPApprovalNeeded,
 			)
 		}
 		approvalID, err := b.approvals.VerifyAndConsumeToken(
@@ -313,11 +315,11 @@ func (b *ToolBridge) Invoke(
 		}
 		request.ApprovalID = approvalID
 
-	case MCPApprovalDecisionAllowed:
+	case mcpRuntime.MCPApprovalDecisionAllowed:
 	default:
 		return nil, fmt.Errorf(
 			"%w: invalid MCP approval decision",
-			ErrMCPInvalidRuntimeRequest,
+			mcpRuntime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
@@ -326,35 +328,35 @@ func (b *ToolBridge) Invoke(
 
 func (b *ToolBridge) mappedDryRun(
 	ctx context.Context,
-	mapping MCPProviderToolMapping,
-	request InvokeMCPToolRequestBody,
+	mapping mcpRuntime.MCPProviderToolMapping,
+	request mcpRuntime.InvokeMCPToolRequestBody,
 ) (
 	config mcpSpec.RuntimeConfig,
-	tool MCPToolCapability,
-	normalized InvokeMCPToolRequestBody,
+	tool mcpRuntime.MCPToolCapability,
+	normalized mcpRuntime.InvokeMCPToolRequestBody,
 	err error,
 ) {
 	if b == nil || b.runtime == nil || b.approvals == nil {
 		return mcpSpec.RuntimeConfig{},
-			MCPToolCapability{},
-			InvokeMCPToolRequestBody{},
+			mcpRuntime.MCPToolCapability{},
+			mcpRuntime.InvokeMCPToolRequestBody{},
 			fmt.Errorf(
 				"%w: MCP tool bridge is unavailable",
-				ErrMCPRuntimeNotReady,
+				mcpRuntime.ErrMCPRuntimeNotReady,
 			)
 	}
 
 	normalized, err = normalizeMappedToolRequest(mapping, request)
 	if err != nil {
 		return mcpSpec.RuntimeConfig{},
-			MCPToolCapability{},
-			InvokeMCPToolRequestBody{},
+			mcpRuntime.MCPToolCapability{},
+			mcpRuntime.InvokeMCPToolRequestBody{},
 			err
 	}
 	if err := validateBridgeRequest(ctx, mapping.Server, normalized); err != nil {
 		return mcpSpec.RuntimeConfig{},
-			MCPToolCapability{},
-			InvokeMCPToolRequestBody{},
+			mcpRuntime.MCPToolCapability{},
+			mcpRuntime.InvokeMCPToolRequestBody{},
 			err
 	}
 
@@ -365,8 +367,8 @@ func (b *ToolBridge) mappedDryRun(
 	)
 	if err != nil {
 		return mcpSpec.RuntimeConfig{},
-			MCPToolCapability{},
-			InvokeMCPToolRequestBody{},
+			mcpRuntime.MCPToolCapability{},
+			mcpRuntime.InvokeMCPToolRequestBody{},
 			err
 	}
 	if tool.ProviderToolName != mapping.ProviderToolName ||
@@ -374,11 +376,11 @@ func (b *ToolBridge) mappedDryRun(
 		tool.ToolName != mapping.ToolName ||
 		tool.Digest != mapping.ToolDigest {
 		return mcpSpec.RuntimeConfig{},
-			MCPToolCapability{},
-			InvokeMCPToolRequestBody{},
+			mcpRuntime.MCPToolCapability{},
+			mcpRuntime.InvokeMCPToolRequestBody{},
 			fmt.Errorf(
 				"%w: MCP provider tool mapping is stale",
-				ErrMCPStaleReference,
+				mcpRuntime.ErrMCPStaleReference,
 			)
 	}
 
@@ -389,19 +391,19 @@ func (b *ToolBridge) mappedDryRun(
 	)
 	if err != nil {
 		return mcpSpec.RuntimeConfig{},
-			MCPToolCapability{},
-			InvokeMCPToolRequestBody{},
+			mcpRuntime.MCPToolCapability{},
+			mcpRuntime.InvokeMCPToolRequestBody{},
 			err
 	}
 	return config, tool, normalized, nil
 }
 
 func normalizeMappedToolRequest(
-	mapping MCPProviderToolMapping,
-	request InvokeMCPToolRequestBody,
-) (InvokeMCPToolRequestBody, error) {
-	if err := ValidateMCPProviderToolMapping(mapping); err != nil {
-		return InvokeMCPToolRequestBody{}, err
+	mapping mcpRuntime.MCPProviderToolMapping,
+	request mcpRuntime.InvokeMCPToolRequestBody,
+) (mcpRuntime.InvokeMCPToolRequestBody, error) {
+	if err := mcpRuntime.ValidateMCPProviderToolMapping(mapping); err != nil {
+		return mcpRuntime.InvokeMCPToolRequestBody{}, err
 	}
 
 	request.ToolName = strings.TrimSpace(request.ToolName)
@@ -412,9 +414,9 @@ func normalizeMappedToolRequest(
 	switch request.ToolName {
 	case "":
 		if request.ProviderToolName != mapping.ProviderToolName {
-			return InvokeMCPToolRequestBody{}, fmt.Errorf(
+			return mcpRuntime.InvokeMCPToolRequestBody{}, fmt.Errorf(
 				"%w: provider tool name does not match the persisted mapping",
-				ErrMCPInvalidRuntimeRequest,
+				mcpRuntime.ErrMCPInvalidRuntimeRequest,
 			)
 		}
 		request.ToolName = mapping.ToolName
@@ -424,25 +426,25 @@ func normalizeMappedToolRequest(
 
 	case mapping.ToolName:
 	default:
-		return InvokeMCPToolRequestBody{}, fmt.Errorf(
+		return mcpRuntime.InvokeMCPToolRequestBody{}, fmt.Errorf(
 			"%w: tool name does not match the persisted mapping",
-			ErrMCPInvalidRuntimeRequest,
+			mcpRuntime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
 	if request.ProviderToolName != "" &&
 		request.ProviderToolName != mapping.ProviderToolName {
-		return InvokeMCPToolRequestBody{}, fmt.Errorf(
+		return mcpRuntime.InvokeMCPToolRequestBody{}, fmt.Errorf(
 			"%w: provider tool name does not match the persisted mapping",
-			ErrMCPInvalidRuntimeRequest,
+			mcpRuntime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
 	if request.ToolDigest != "" &&
 		request.ToolDigest != mapping.ToolDigest {
-		return InvokeMCPToolRequestBody{}, fmt.Errorf(
+		return mcpRuntime.InvokeMCPToolRequestBody{}, fmt.Errorf(
 			"%w: provider tool digest does not match the persisted mapping",
-			ErrMCPStaleReference,
+			mcpRuntime.ErrMCPStaleReference,
 		)
 	}
 
@@ -453,32 +455,32 @@ func normalizeMappedToolRequest(
 
 func applyMappedPolicyConstraints(
 	config mcpSpec.RuntimeConfig,
-	tool MCPToolCapability,
-	mapping MCPProviderToolMapping,
+	tool mcpRuntime.MCPToolCapability,
+	mapping mcpRuntime.MCPProviderToolMapping,
 ) (mcpSpec.RuntimeConfig, error) {
 	currentApproval, currentExecution := currentToolConstraints(
 		config,
 		tool,
 	)
-	if approvalRuleRank(mapping.ApprovalRule) <
-		approvalRuleRank(currentApproval) {
+	if mcpPolicy.ApprovalRuleRank(mapping.ApprovalRule) <
+		mcpPolicy.ApprovalRuleRank(currentApproval) {
 		return mcpSpec.RuntimeConfig{}, fmt.Errorf(
 			"%w: mapped approval rule weakens current MCP policy",
-			ErrMCPPolicyDenied,
+			mcpRuntime.ErrMCPPolicyDenied,
 		)
 	}
-	if executionModeRank(mapping.ExecutionMode) <
-		executionModeRank(currentExecution) {
+	if mcpPolicy.ExecutionModeRank(mapping.ExecutionMode) <
+		mcpPolicy.ExecutionModeRank(currentExecution) {
 		return mcpSpec.RuntimeConfig{}, fmt.Errorf(
 			"%w: mapped execution mode weakens current MCP policy",
-			ErrMCPPolicyDenied,
+			mcpRuntime.ErrMCPPolicyDenied,
 		)
 	}
 
 	output := config
 	output.ToolPolicies = maps.Clone(config.ToolPolicies)
 	if output.ToolPolicies == nil {
-		output.ToolPolicies = map[string]mcpSpec.MCPToolPolicyOverride{}
+		output.ToolPolicies = map[string]mcpPolicy.MCPToolPolicyOverride{}
 	}
 
 	override := output.ToolPolicies[tool.ToolName]
@@ -493,9 +495,9 @@ func applyMappedPolicyConstraints(
 
 func currentToolConstraints(
 	config mcpSpec.RuntimeConfig,
-	tool MCPToolCapability,
-) (mcpSpec.MCPApprovalRule, mcpSpec.MCPExecutionMode) {
-	defaults := mcpSpec.DefaultMCPServerPolicy()
+	tool mcpRuntime.MCPToolCapability,
+) (mcpPolicy.MCPApprovalRule, mcpPolicy.MCPExecutionMode) {
+	defaults := mcpPolicy.DefaultMCPServerPolicy()
 	approval := config.DefaultPolicy.DefaultApprovalRule
 	execution := config.DefaultPolicy.DefaultExecutionMode
 	if approval == "" {
@@ -513,65 +515,29 @@ func currentToolConstraints(
 		}
 	}
 
-	toolApproval := normalizedApprovalRule(tool.ApprovalRule)
-	if approvalRuleRank(toolApproval) > approvalRuleRank(approval) {
+	toolApproval := mcpPolicy.NormalizedApprovalRule(tool.ApprovalRule)
+	if mcpPolicy.ApprovalRuleRank(toolApproval) > mcpPolicy.ApprovalRuleRank(approval) {
 		approval = toolApproval
 	}
-	toolExecution := normalizedExecutionMode(tool.ExecutionMode)
-	if executionModeRank(toolExecution) > executionModeRank(execution) {
+	toolExecution := mcpPolicy.NormalizedExecutionMode(tool.ExecutionMode)
+	if mcpPolicy.ExecutionModeRank(toolExecution) > mcpPolicy.ExecutionModeRank(execution) {
 		execution = toolExecution
 	}
 	return approval, execution
 }
 
-func approvalRuleRank(value mcpSpec.MCPApprovalRule) int {
-	switch value {
-	case mcpSpec.MCPApprovalRuleDeny:
-		return 3
-	case mcpSpec.MCPApprovalRuleAsk:
-		return 2
-	default:
-		return 1
-	}
-}
-
-func executionModeRank(value mcpSpec.MCPExecutionMode) int {
-	if value == mcpSpec.MCPExecutionModeManual {
-		return 2
-	}
-	return 1
-}
-
-func normalizedApprovalRule(
-	value mcpSpec.MCPApprovalRule,
-) mcpSpec.MCPApprovalRule {
-	if value == "" {
-		return mcpSpec.MCPApprovalRuleAsk
-	}
-	return value
-}
-
-func normalizedExecutionMode(
-	value mcpSpec.MCPExecutionMode,
-) mcpSpec.MCPExecutionMode {
-	if value == "" {
-		return mcpSpec.MCPExecutionModeManual
-	}
-	return value
-}
-
 func evaluateTool(
 	config mcpSpec.RuntimeConfig,
-	tool MCPToolCapability,
-	request InvokeMCPToolRequestBody,
-) MCPApprovalEvaluation {
+	tool mcpRuntime.MCPToolCapability,
+	request mcpRuntime.InvokeMCPToolRequestBody,
+) mcpRuntime.MCPApprovalEvaluation {
 	p := config.DefaultPolicy
-	if p == (mcpSpec.MCPServerPolicy{}) {
-		p = mcpSpec.DefaultMCPServerPolicy()
+	if p == (mcpPolicy.MCPServerPolicy{}) {
+		p = mcpPolicy.DefaultMCPServerPolicy()
 	}
 
 	if !tool.Enabled ||
-		tool.TaskSupport == MCPTaskSupportRequired {
+		tool.TaskSupport == mcpRuntime.MCPTaskSupportRequired {
 		return deniedEvaluation(
 			config,
 			tool,
@@ -583,7 +549,7 @@ func evaluateTool(
 	rule := p.DefaultApprovalRule
 	executionMode := p.DefaultExecutionMode
 	if executionMode == "" {
-		executionMode = mcpSpec.MCPExecutionModeManual
+		executionMode = mcpPolicy.MCPExecutionModeManual
 	}
 	allowStaleDigest := false
 
@@ -618,7 +584,7 @@ func evaluateTool(
 		)
 	}
 
-	if rule == mcpSpec.MCPApprovalRuleDeny {
+	if rule == mcpPolicy.MCPApprovalRuleDeny {
 		return deniedEvaluation(
 			config,
 			tool,
@@ -626,8 +592,8 @@ func evaluateTool(
 			toolPolicyDeniesReason,
 		)
 	}
-	if executionMode == mcpSpec.MCPExecutionModeManual &&
-		request.Source != MCPInvocationSourceUser {
+	if executionMode == mcpPolicy.MCPExecutionModeManual &&
+		request.Source != mcpRuntime.MCPInvocationSourceUser {
 		return approvalRequiredEvaluation(
 			config,
 			tool,
@@ -635,7 +601,7 @@ func evaluateTool(
 			"manual execution mode requires approval",
 		)
 	}
-	if rule == mcpSpec.MCPApprovalRuleAsk {
+	if rule == mcpPolicy.MCPApprovalRuleAsk {
 		return approvalRequiredEvaluation(
 			config,
 			tool,
@@ -645,7 +611,7 @@ func evaluateTool(
 	}
 
 	switch tool.InferredRisk {
-	case MCPToolRiskUnknown:
+	case mcpRuntime.MCPToolRiskUnknown:
 		if p.RequireApprovalForUnknownRisk {
 			return approvalRequiredEvaluation(
 				config,
@@ -654,7 +620,7 @@ func evaluateTool(
 				"unknown-risk tool requires approval",
 			)
 		}
-	case MCPToolRiskOpenWorld:
+	case mcpRuntime.MCPToolRiskOpenWorld:
 		if p.RequireApprovalForUnknownRisk {
 			return approvalRequiredEvaluation(
 				config,
@@ -663,7 +629,7 @@ func evaluateTool(
 				"open-world tool requires approval",
 			)
 		}
-	case MCPToolRiskWrite:
+	case mcpRuntime.MCPToolRiskWrite:
 		if p.RequireApprovalForWrite {
 			return approvalRequiredEvaluation(
 				config,
@@ -672,7 +638,7 @@ func evaluateTool(
 				"write-risk tool requires approval",
 			)
 		}
-	case MCPToolRiskDestructive:
+	case mcpRuntime.MCPToolRiskDestructive:
 		if p.RequireApprovalForDestructive {
 			return approvalRequiredEvaluation(
 				config,
@@ -684,8 +650,8 @@ func evaluateTool(
 	default:
 	}
 
-	return MCPApprovalEvaluation{
-		Decision: MCPApprovalDecisionAllowed,
+	return mcpRuntime.MCPApprovalEvaluation{
+		Decision: mcpRuntime.MCPApprovalDecisionAllowed,
 		Reason:   policyAllowedReason,
 		Summary:  approvalSummary(config, tool, request),
 	}
@@ -693,12 +659,12 @@ func evaluateTool(
 
 func deniedEvaluation(
 	config mcpSpec.RuntimeConfig,
-	tool MCPToolCapability,
-	request InvokeMCPToolRequestBody,
+	tool mcpRuntime.MCPToolCapability,
+	request mcpRuntime.InvokeMCPToolRequestBody,
 	reason string,
-) MCPApprovalEvaluation {
-	return MCPApprovalEvaluation{
-		Decision: MCPApprovalDecisionDenied,
+) mcpRuntime.MCPApprovalEvaluation {
+	return mcpRuntime.MCPApprovalEvaluation{
+		Decision: mcpRuntime.MCPApprovalDecisionDenied,
 		Reason:   reason,
 		Summary:  approvalSummary(config, tool, request),
 	}
@@ -706,12 +672,12 @@ func deniedEvaluation(
 
 func approvalRequiredEvaluation(
 	config mcpSpec.RuntimeConfig,
-	tool MCPToolCapability,
-	request InvokeMCPToolRequestBody,
+	tool mcpRuntime.MCPToolCapability,
+	request mcpRuntime.InvokeMCPToolRequestBody,
 	reason string,
-) MCPApprovalEvaluation {
-	return MCPApprovalEvaluation{
-		Decision: MCPApprovalDecisionApprovalRequired,
+) mcpRuntime.MCPApprovalEvaluation {
+	return mcpRuntime.MCPApprovalEvaluation{
+		Decision: mcpRuntime.MCPApprovalDecisionApprovalRequired,
 		Reason:   reason,
 		Summary:  approvalSummary(config, tool, request),
 	}
@@ -719,9 +685,9 @@ func approvalRequiredEvaluation(
 
 func approvalSummary(
 	config mcpSpec.RuntimeConfig,
-	tool MCPToolCapability,
-	request InvokeMCPToolRequestBody,
-) *MCPApprovalSummary {
+	tool mcpRuntime.MCPToolCapability,
+	request mcpRuntime.InvokeMCPToolRequestBody,
+) *mcpRuntime.MCPApprovalSummary {
 	arguments := []byte(`{}`)
 	if request.Arguments != nil {
 		encoded, err := json.Marshal(request.Arguments)
@@ -730,7 +696,7 @@ func approvalSummary(
 		}
 	}
 
-	return &MCPApprovalSummary{
+	return &mcpRuntime.MCPApprovalSummary{
 		Server:            config.Server,
 		ServerDisplayName: config.DisplayName,
 		Source:            request.Source,
@@ -743,8 +709,8 @@ func approvalSummary(
 }
 
 func (b *ToolBridge) applyCachedDecision(
-	evaluation MCPApprovalEvaluation,
-) MCPApprovalEvaluation {
+	evaluation mcpRuntime.MCPApprovalEvaluation,
+) mcpRuntime.MCPApprovalEvaluation {
 	if b == nil ||
 		b.approvals == nil ||
 		evaluation.Summary == nil {
@@ -757,20 +723,20 @@ func (b *ToolBridge) applyCachedDecision(
 	}
 
 	switch cached {
-	case MCPApprovalResolutionAllowAlways:
+	case mcpRuntime.MCPApprovalResolutionAllowAlways:
 		// A remembered user approval may satisfy an approval prompt, but it
 		// must never override a hard policy denial.
 		if evaluation.Decision ==
-			MCPApprovalDecisionApprovalRequired {
-			evaluation.Decision = MCPApprovalDecisionAllowed
+			mcpRuntime.MCPApprovalDecisionApprovalRequired {
+			evaluation.Decision = mcpRuntime.MCPApprovalDecisionAllowed
 			evaluation.Reason = "remembered session approval"
 		}
 
-	case MCPApprovalResolutionDenyAlways:
+	case mcpRuntime.MCPApprovalResolutionDenyAlways:
 		// A remembered denial also applies when the base policy would
 		// otherwise permit the call.
-		if evaluation.Decision != MCPApprovalDecisionDenied {
-			evaluation.Decision = MCPApprovalDecisionDenied
+		if evaluation.Decision != mcpRuntime.MCPApprovalDecisionDenied {
+			evaluation.Decision = mcpRuntime.MCPApprovalDecisionDenied
 			evaluation.Reason = "remembered session denial"
 		}
 
@@ -782,12 +748,12 @@ func (b *ToolBridge) applyCachedDecision(
 func validateBridgeRequest(
 	ctx context.Context,
 	serverRef mcpSpec.ServerID,
-	request InvokeMCPToolRequestBody,
+	request mcpRuntime.InvokeMCPToolRequestBody,
 ) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: MCP tool invocation context is nil",
-			ErrMCPInvalidRuntimeRequest,
+			mcpRuntime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -799,17 +765,17 @@ func validateBridgeRequest(
 	if err := validateMCPInvocationSource(request.Source); err != nil {
 		return err
 	}
-	if request.Source == MCPInvocationSourceApp &&
+	if request.Source == mcpRuntime.MCPInvocationSourceApp &&
 		strings.TrimSpace(request.AppInstanceID) == "" {
 		return fmt.Errorf(
 			"%w: appInstanceID is required for app-initiated MCP calls",
-			ErrMCPInvalidRuntimeRequest,
+			mcpRuntime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 	if strings.TrimSpace(request.ToolName) == "" {
 		return fmt.Errorf(
 			"%w: MCP tool name is required",
-			ErrMCPInvalidRuntimeRequest,
+			mcpRuntime.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 	return nil
@@ -817,11 +783,11 @@ func validateBridgeRequest(
 
 // validateMCPInvocationSource validates the source of a tool invocation.
 // The caller is still responsible for policy and approval enforcement.
-func validateMCPInvocationSource(value MCPInvocationSource) error {
+func validateMCPInvocationSource(value mcpRuntime.MCPInvocationSource) error {
 	switch value {
-	case MCPInvocationSourceModel,
-		MCPInvocationSourceUser,
-		MCPInvocationSourceApp:
+	case mcpRuntime.MCPInvocationSourceModel,
+		mcpRuntime.MCPInvocationSourceUser,
+		mcpRuntime.MCPInvocationSourceApp:
 		return nil
 	default:
 		return fmt.Errorf(

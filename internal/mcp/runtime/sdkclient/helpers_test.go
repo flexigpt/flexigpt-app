@@ -6,10 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
-
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestEnvMapAndDisplayHelpers(t *testing.T) {
@@ -181,36 +180,36 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			t.Fatalf("toolAnnotationsToSpec = %#v", gotAnn)
 		}
 
-		if got := inferRisk(nil, mcpSpec.MCPTrustLevelUntrusted); got != mcpRuntime.MCPToolRiskUnknown {
+		if got := inferRisk(nil, mcpPolicy.MCPTrustLevelUntrusted); got != mcpRuntime.MCPToolRiskUnknown {
 			t.Fatalf("inferRisk(nil) = %q, want unknown", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{ReadOnlyHint: true},
-			mcpSpec.MCPTrustLevelTrusted,
+			mcpPolicy.MCPTrustLevelTrusted,
 		); got != mcpRuntime.MCPToolRiskRead {
 			t.Fatalf("inferRisk(read-only, trusted) = %q, want read", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{ReadOnlyHint: true},
-			mcpSpec.MCPTrustLevelUntrusted,
+			mcpPolicy.MCPTrustLevelUntrusted,
 		); got != mcpRuntime.MCPToolRiskUnknown {
 			t.Fatalf("inferRisk(read-only, untrusted) = %q, want unknown", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{OpenWorldHint: &openWorld},
-			mcpSpec.MCPTrustLevelUntrusted,
+			mcpPolicy.MCPTrustLevelUntrusted,
 		); got != mcpRuntime.MCPToolRiskOpenWorld {
 			t.Fatalf("inferRisk(open-world) = %q, want openWorld", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{DestructiveHint: &destructive},
-			mcpSpec.MCPTrustLevelTrusted,
+			mcpPolicy.MCPTrustLevelTrusted,
 		); got != mcpRuntime.MCPToolRiskDestructive {
 			t.Fatalf("inferRisk(destructive) = %q, want destructive", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{DestructiveHint: new(false)},
-			mcpSpec.MCPTrustLevelTrusted,
+			mcpPolicy.MCPTrustLevelTrusted,
 		); got != mcpRuntime.MCPToolRiskWrite {
 			t.Fatalf("inferRisk(non-destructive, trusted) = %q, want write", got)
 		}

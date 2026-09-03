@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 )
 
 var (
@@ -108,124 +110,6 @@ func (value ClientInfo) Validate() error {
 	)
 }
 
-type MCPApprovalRule string
-
-const (
-	MCPApprovalRuleAsk   MCPApprovalRule = "ask"
-	MCPApprovalRuleAllow MCPApprovalRule = "allow"
-	MCPApprovalRuleDeny  MCPApprovalRule = "deny"
-)
-
-type MCPExecutionMode string
-
-const (
-	MCPExecutionModeManual MCPExecutionMode = "manual"
-	MCPExecutionModeAuto   MCPExecutionMode = "auto"
-)
-
-type MCPTrustLevel string
-
-const (
-	MCPTrustLevelUntrusted MCPTrustLevel = "untrusted"
-	MCPTrustLevelTrusted   MCPTrustLevel = "trusted"
-)
-
-type MCPServerPolicy struct {
-	DefaultApprovalRule  MCPApprovalRule  `json:"defaultApprovalRule"`
-	DefaultExecutionMode MCPExecutionMode `json:"defaultExecutionMode"`
-
-	RequireApprovalForUnknownRisk bool `json:"requireApprovalForUnknownRisk"`
-	RequireApprovalForWrite       bool `json:"requireApprovalForWrite"`
-	RequireApprovalForDestructive bool `json:"requireApprovalForDestructive"`
-}
-
-type MCPToolPolicyOverride struct {
-	ToolName string `json:"toolName"`
-
-	ApprovalRule  *MCPApprovalRule  `json:"approvalRule,omitempty"`
-	ExecutionMode *MCPExecutionMode `json:"executionMode,omitempty"`
-
-	AllowStaleDigest bool   `json:"allowStaleDigest,omitempty"`
-	ExpectedDigest   string `json:"expectedDigest,omitempty"`
-}
-
-type MCPAppsPolicy struct {
-	Enabled                          bool `json:"enabled"`
-	AllowAppInitiatedToolCalls       bool `json:"allowAppInitiatedToolCalls"`
-	RequireApprovalForOpenLink       bool `json:"requireApprovalForOpenLink"`
-	RequireApprovalForContextUpdates bool `json:"requireApprovalForContextUpdates"`
-}
-
-func DefaultMCPServerPolicy() MCPServerPolicy {
-	return MCPServerPolicy{
-		DefaultApprovalRule:           MCPApprovalRuleAsk,
-		DefaultExecutionMode:          MCPExecutionModeManual,
-		RequireApprovalForUnknownRisk: true,
-		RequireApprovalForWrite:       true,
-		RequireApprovalForDestructive: true,
-	}
-}
-
-func ValidateMCPApprovalRule(value MCPApprovalRule) error {
-	switch value {
-	case MCPApprovalRuleAllow,
-		MCPApprovalRuleAsk,
-		MCPApprovalRuleDeny:
-		return nil
-	default:
-		return fmt.Errorf(
-			"%w: invalid MCP approval rule %q",
-			ErrInvalid,
-			value,
-		)
-	}
-}
-
-func ValidateMCPExecutionMode(value MCPExecutionMode) error {
-	switch value {
-	case MCPExecutionModeAuto, MCPExecutionModeManual:
-		return nil
-	default:
-		return fmt.Errorf(
-			"%w: invalid MCP execution mode %q",
-			ErrInvalid,
-			value,
-		)
-	}
-}
-
-func ApprovalRuleRank(value MCPApprovalRule) int {
-	switch value {
-	case MCPApprovalRuleDeny:
-		return 3
-	case MCPApprovalRuleAsk:
-		return 2
-	default:
-		return 1
-	}
-}
-
-func ExecutionModeRank(value MCPExecutionMode) int {
-	if value == MCPExecutionModeManual {
-		return 2
-	}
-	return 1
-}
-
-func NormalizedApprovalRule(value MCPApprovalRule) MCPApprovalRule {
-	if value == "" {
-		return MCPApprovalRuleAsk
-	}
-	return value
-}
-
-func NormalizedExecutionMode(value MCPExecutionMode) MCPExecutionMode {
-	if value == "" {
-		return MCPExecutionModeManual
-	}
-	return value
-}
-
 type MCPHTTPAuthMode string
 
 const (
@@ -272,10 +156,10 @@ type RuntimeConfig struct {
 	StreamableHTTP            *MCPRuntimeStreamableHTTPConfig
 	OAuthClientSecretRequired bool
 
-	TrustLevel    MCPTrustLevel
-	DefaultPolicy MCPServerPolicy
-	ToolPolicies  map[string]MCPToolPolicyOverride
-	AppsPolicy    MCPAppsPolicy
+	TrustLevel    mcpPolicy.MCPTrustLevel
+	DefaultPolicy mcpPolicy.MCPServerPolicy
+	ToolPolicies  map[string]mcpPolicy.MCPToolPolicyOverride
+	AppsPolicy    mcpPolicy.MCPAppsPolicy
 
 	SensitiveValues []string
 }
@@ -334,45 +218,14 @@ func (config RuntimeConfig) Validate() error {
 }
 
 func validatePolicy(config RuntimeConfig) error {
-	switch config.TrustLevel {
-	case MCPTrustLevelTrusted, MCPTrustLevelUntrusted:
-	default:
-		return fmt.Errorf(
-			"%w: invalid MCP trust level %q",
-			ErrInvalid,
-			config.TrustLevel,
-		)
+	value := mcpPolicy.MCPPolicy{
+		TrustLevel:    config.TrustLevel,
+		DefaultPolicy: config.DefaultPolicy,
+		ToolPolicies:  config.ToolPolicies,
+		AppsPolicy:    config.AppsPolicy,
 	}
-	if err := ValidateMCPApprovalRule(
-		config.DefaultPolicy.DefaultApprovalRule,
-	); err != nil {
-		return err
-	}
-	if err := ValidateMCPExecutionMode(
-		config.DefaultPolicy.DefaultExecutionMode,
-	); err != nil {
-		return err
-	}
-	for name, override := range config.ToolPolicies {
-		if strings.TrimSpace(name) == "" {
-			return fmt.Errorf("%w: empty MCP tool policy name", ErrInvalid)
-		}
-		if override.ToolName != "" && override.ToolName != name {
-			return fmt.Errorf(
-				"%w: MCP tool policy key differs from toolName",
-				ErrInvalid,
-			)
-		}
-		if override.ApprovalRule != nil {
-			if err := ValidateMCPApprovalRule(*override.ApprovalRule); err != nil {
-				return err
-			}
-		}
-		if override.ExecutionMode != nil {
-			if err := ValidateMCPExecutionMode(*override.ExecutionMode); err != nil {
-				return err
-			}
-		}
+	if err := mcpPolicy.ValidateMCPPolicy(value); err != nil {
+		return fmt.Errorf("%w: invalid MCP runtime policy: %w", ErrInvalid, err)
 	}
 	return nil
 }

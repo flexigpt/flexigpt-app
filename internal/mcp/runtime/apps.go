@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
@@ -12,22 +14,14 @@ const (
 	AppExtensionID = "io.modelcontextprotocol/ui"
 
 	// AppMIMEType is the required MIME type for an MCP Apps UI resource.
-	AppMIMEType = "text/html;profile=mcp-app"
-
+	AppMIMEType     = "text/html;profile=mcp-app"
 	VisibilityModel = "model"
 	VisibilityApp   = "app"
 )
 
-type MCPAppModelContextUpdate struct {
-	InstanceID string           `json:"instanceID,omitempty"`
-	Server     mcpSpec.ServerID `json:"server"`
-
-	ResourceURI string `json:"resourceUri,omitempty"`
-
-	Content           []MCPContent `json:"content,omitempty"`
-	StructuredContent any          `json:"structuredContent,omitempty"`
-
-	UpdatedAt string `json:"updatedAt,omitempty"`
+type MCPToolAppInfo struct {
+	ResourceURI string   `json:"resourceUri,omitempty"`
+	Visibility  []string `json:"visibility,omitempty"`
 }
 
 // IsAppMIMEType returns true if mime is a valid MCP Apps MIME type,
@@ -57,7 +51,7 @@ func ToolVisibleToModel(info *MCPToolAppInfo) bool {
 // authorization check. It is the target API used by the Artifact Store MCP
 // runtime.
 func ValidateAppToolInvocation(
-	p mcpSpec.MCPAppsPolicy,
+	p mcpPolicy.MCPAppsPolicy,
 	tool MCPToolCapability,
 	appServer mcpSpec.ServerID,
 ) error {

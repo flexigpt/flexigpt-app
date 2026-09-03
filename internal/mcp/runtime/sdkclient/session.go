@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -316,7 +317,7 @@ func (s *Session) listAllTools(
 			approvalRule, executionMode, override, hasOverride := effectiveToolPolicy(config, t.Name)
 			toolDigest := digestAny(t)
 			enabled := taskSupport != mcpRuntime.MCPTaskSupportRequired &&
-				approvalRule != mcpSpec.MCPApprovalRuleDeny
+				approvalRule != mcpPolicy.MCPApprovalRuleDeny
 			if hasOverride &&
 				override.ExpectedDigest != "" &&
 				override.ExpectedDigest != toolDigest &&
@@ -540,12 +541,12 @@ func effectiveToolPolicy(
 	config mcpSpec.RuntimeConfig,
 	toolName string,
 ) (
-	mcpSpec.MCPApprovalRule,
-	mcpSpec.MCPExecutionMode,
-	mcpSpec.MCPToolPolicyOverride,
+	mcpPolicy.MCPApprovalRule,
+	mcpPolicy.MCPExecutionMode,
+	mcpPolicy.MCPToolPolicyOverride,
 	bool,
 ) {
-	defaults := mcpSpec.DefaultMCPServerPolicy()
+	defaults := mcpPolicy.DefaultMCPServerPolicy()
 	approvalRule := config.DefaultPolicy.DefaultApprovalRule
 	executionMode := config.DefaultPolicy.DefaultExecutionMode
 	if approvalRule == "" {
@@ -567,7 +568,7 @@ func effectiveToolPolicy(
 	return approvalRule, executionMode, override, found
 }
 
-func inferRisk(a *mcpSDK.ToolAnnotations, trustLevel mcpSpec.MCPTrustLevel) mcpRuntime.MCPToolRisk {
+func inferRisk(a *mcpSDK.ToolAnnotations, trustLevel mcpPolicy.MCPTrustLevel) mcpRuntime.MCPToolRisk {
 	if a == nil {
 		return mcpRuntime.MCPToolRiskUnknown
 	}
@@ -579,7 +580,7 @@ func inferRisk(a *mcpSDK.ToolAnnotations, trustLevel mcpSpec.MCPTrustLevel) mcpR
 		return mcpRuntime.MCPToolRiskOpenWorld
 	}
 	// Do not let untrusted server-provided annotations lower risk.
-	if trustLevel != mcpSpec.MCPTrustLevelTrusted {
+	if trustLevel != mcpPolicy.MCPTrustLevelTrusted {
 		return mcpRuntime.MCPToolRiskUnknown
 	}
 	if a.ReadOnlyHint {

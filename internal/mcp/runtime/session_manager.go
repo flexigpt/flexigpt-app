@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )
 
@@ -79,7 +79,7 @@ type ClientFactory interface {
 	Connect(
 		ctx context.Context,
 		config mcpSpec.RuntimeConfig,
-		auth mcpAuth.ResolvedTransportAuth,
+		authorization mcpSpec.PreparedConnection,
 		notifications ClientNotificationSink,
 	) (ClientSession, error)
 }
@@ -106,16 +106,21 @@ type connectionAttempt struct {
 	cancel     context.CancelFunc
 }
 
+type SessionLifecycleCleaner interface {
+	ClearServer(server mcpSpec.ServerID)
+	Clear()
+}
+
 type MCPRuntimeManager struct {
 	source     mcpSpec.ServerSource
-	authorizer mcpAuth.ConnectionAuthorizer
+	authorizer mcpSpec.ConnectionAuthorizer
 	factory    ClientFactory
 
 	lifecycleContext context.Context
 	cancelLifecycle  context.CancelFunc
 
 	mu          sync.RWMutex
-	approvals   *ApprovalManager
+	cleaner     SessionLifecycleCleaner
 	sessions    map[mcpSpec.ServerID]*sessionState
 	generations map[mcpSpec.ServerID]uint64
 	timers      map[mcpSpec.ServerID]*time.Timer
@@ -125,7 +130,7 @@ type MCPRuntimeManager struct {
 
 func NewMCPRuntimeManager(
 	source mcpSpec.ServerSource,
-	authorizer mcpAuth.ConnectionAuthorizer,
+	authorizer mcpSpec.ConnectionAuthorizer,
 	factory ClientFactory,
 ) (*MCPRuntimeManager, error) {
 	if source == nil ||
@@ -716,8 +721,8 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 
 	cancelLifecycle := m.cancelLifecycle
 	m.cancelLifecycle = nil
-	approvals := m.approvals
-	m.approvals = nil
+	cleaner := m.cleaner
+	m.cleaner = nil
 	states := make([]*sessionState, 0, len(m.sessions))
 	for ref, state := range m.sessions {
 		m.generations[ref]++
@@ -738,8 +743,8 @@ func (m *MCPRuntimeManager) Close(ctx context.Context) error {
 	m.attempts = make(map[mcpSpec.ServerID]connectionAttempt)
 	m.mu.Unlock()
 
-	if approvals != nil {
-		approvals.Clear()
+	if cleaner != nil {
+		cleaner.Clear()
 	}
 	if cancelLifecycle != nil {
 		cancelLifecycle()
@@ -878,6 +883,27 @@ func (m *MCPRuntimeManager) Status(
 	return runtimeSnapshot(state), nil
 }
 
+func (m *MCPRuntimeManager) SetSessionLifecycleCleaner(
+	cleaner SessionLifecycleCleaner,
+) {
+	if m == nil {
+		return
+	}
+
+	m.mu.Lock()
+	previous := m.cleaner
+	m.cleaner = cleaner
+	closed := m.closed
+	m.mu.Unlock()
+
+	if previous != nil && previous != cleaner {
+		previous.Clear()
+	}
+	if closed && cleaner != nil {
+		cleaner.Clear()
+	}
+}
+
 func (m *MCPRuntimeManager) connect(
 	ctx context.Context,
 	ref mcpSpec.ServerID,
@@ -969,18 +995,18 @@ func (m *MCPRuntimeManager) connect(
 func (m *MCPRuntimeManager) resolveForConnection(
 	ctx context.Context,
 	ref mcpSpec.ServerID,
-) (mcpSpec.ResolvedServer, mcpSpec.RuntimeConfig, mcpAuth.ResolvedTransportAuth, error) {
+) (mcpSpec.ResolvedServer, mcpSpec.RuntimeConfig, mcpSpec.PreparedConnection, error) {
 	resolved, err := m.source.ResolveServer(ctx, ref)
 	if err != nil {
 		return mcpSpec.ResolvedServer{},
 			mcpSpec.RuntimeConfig{},
-			mcpAuth.ResolvedTransportAuth{},
+			mcpSpec.PreparedConnection{},
 			err
 	}
 	if err := resolved.Validate(); err != nil {
 		return mcpSpec.ResolvedServer{},
 			mcpSpec.RuntimeConfig{},
-			mcpAuth.ResolvedTransportAuth{},
+			mcpSpec.PreparedConnection{},
 			err
 	}
 	config := cloneRuntimeConfig(resolved.Config)
@@ -988,7 +1014,7 @@ func (m *MCPRuntimeManager) resolveForConnection(
 	if err != nil {
 		return mcpSpec.ResolvedServer{},
 			mcpSpec.RuntimeConfig{},
-			mcpAuth.ResolvedTransportAuth{},
+			mcpSpec.PreparedConnection{},
 			err
 	}
 	authConn.SensitiveValues = mergeSensitiveValues(
@@ -1238,27 +1264,6 @@ func (m *MCPRuntimeManager) removeSession(
 	return state, timer, attempt.cancel
 }
 
-func (m *MCPRuntimeManager) bindApprovalManager(
-	approvals *ApprovalManager,
-) {
-	if m == nil {
-		return
-	}
-
-	m.mu.Lock()
-	previous := m.approvals
-	m.approvals = approvals
-	closed := m.closed
-	m.mu.Unlock()
-
-	if previous != nil && previous != approvals {
-		previous.Clear()
-	}
-	if closed && approvals != nil {
-		approvals.Clear()
-	}
-}
-
 func (m *MCPRuntimeManager) clearApprovalSession(
 	ref mcpSpec.ServerID,
 ) {
@@ -1267,11 +1272,11 @@ func (m *MCPRuntimeManager) clearApprovalSession(
 	}
 
 	m.mu.RLock()
-	approvals := m.approvals
+	cleaner := m.cleaner
 	m.mu.RUnlock()
 
-	if approvals != nil {
-		approvals.ClearServer(ref)
+	if cleaner != nil {
+		cleaner.ClearServer(ref)
 	}
 }
 
@@ -1534,8 +1539,26 @@ func toolByName(
 }
 
 func redactRuntimeError(err error, values ...[]string) error {
-	return mcpAuth.RedactError(err, mergeSensitiveValues(values...))
+	if err == nil {
+		return nil
+	}
+	message := err.Error()
+	for _, value := range mergeSensitiveValues(values...) {
+		message = strings.ReplaceAll(message, value, "[REDACTED]")
+	}
+	if message == err.Error() {
+		return err
+	}
+	return redactedRuntimeError{message: message, cause: err}
 }
+
+type redactedRuntimeError struct {
+	message string
+	cause   error
+}
+
+func (e redactedRuntimeError) Error() string { return e.message }
+func (e redactedRuntimeError) Unwrap() error { return e.cause }
 
 func mergeSensitiveValues(groups ...[]string) []string {
 	seen := make(map[string]struct{})
@@ -1678,7 +1701,7 @@ func cloneRuntimeConfig(input mcpSpec.RuntimeConfig) mcpSpec.RuntimeConfig {
 		value.Headers = maps.Clone(input.StreamableHTTP.Headers)
 		output.StreamableHTTP = &value
 	}
-	output.ToolPolicies = maps.Clone(input.ToolPolicies)
+	output.ToolPolicies = mcpPolicy.CloneToolPolicies(input.ToolPolicies)
 	output.SensitiveValues = append([]string(nil), input.SensitiveValues...)
 	return output
 }

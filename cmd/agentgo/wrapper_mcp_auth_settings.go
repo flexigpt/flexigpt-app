@@ -17,14 +17,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
-	mcpArtifact "github.com/flexigpt/flexigpt-app/internal/mcp/store/artifact"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 	mcpSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/secret"
+	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
-	"golang.org/x/oauth2"
 )
 
 const (
@@ -450,7 +447,7 @@ func (s *mcpSettingsAdapter) deleteOverlaySecretsLocked(
 		return err
 	}
 
-	refs, err := mcpArtifact.SecretReferences(ovr.ServerData)
+	refs, err := mcpStoreServer.SecretReferences(ovr.ServerData)
 	if err != nil {
 		return err
 	}
@@ -586,63 +583,6 @@ func newSettingMCPSecretResolver(
 	return &settingMCPSecretResolver{store: store}
 }
 
-func (r *settingMCPSecretResolver) LoadOAuthToken(
-	ctx context.Context,
-	status mcpAuth.MCPAuthStatus,
-) (*oauth2.Token, error) {
-	ref, err := oauthTokenSecretRefForRuntime(status.Server)
-	if err != nil {
-		return nil, err
-	}
-
-	raw, err := r.ResolveSecret(ctx, ref)
-	if err != nil {
-		if isMissingMCPSetting(err) ||
-			errors.Is(err, basespec.ErrReferenceUnresolved) {
-			return nil, mcpAuth.ErrOAuthTokenNotFound
-		}
-		return nil, err
-	}
-
-	var token oauth2.Token
-	if err := json.Unmarshal([]byte(raw), &token); err != nil {
-		return nil, err
-	}
-	return &token, nil
-}
-
-func (r *settingMCPSecretResolver) SaveOAuthToken(
-	ctx context.Context,
-	status mcpAuth.MCPAuthStatus,
-	token *oauth2.Token,
-) error {
-	if token == nil || !token.Valid() {
-		return nil
-	}
-	ref, err := oauthTokenSecretRefForRuntime(status.Server)
-	if err != nil {
-		return err
-	}
-	//nolint:gosec // Auth token.
-	raw, err := json.Marshal(token)
-	if err != nil {
-		return err
-	}
-	_, _, err = r.SetMCPSecret(ctx, ref, string(raw))
-	return err
-}
-
-func (r *settingMCPSecretResolver) DeleteOAuthToken(
-	ctx context.Context,
-	status mcpAuth.MCPAuthStatus,
-) error {
-	ref, err := oauthTokenSecretRefForRuntime(status.Server)
-	if err != nil {
-		return err
-	}
-	return r.DeleteSecret(ctx, ref)
-}
-
 func (r *settingMCPSecretResolver) SetMCPSecret(
 	ctx context.Context,
 	ref string,
@@ -719,12 +659,21 @@ func (r *settingMCPSecretResolver) ResolveSecret(
 		},
 	)
 	if err != nil {
+		if isMissingMCPSetting(err) {
+			return "", fmt.Errorf(
+				"%w: %w: MCP secret %q is unavailable",
+				basespec.ErrReferenceUnresolved,
+				mcpSecret.ErrNotFound,
+				ref,
+			)
+		}
 		return "", err
 	}
 	if response == nil || response.Body == nil || !response.Body.NonEmpty {
 		return "", fmt.Errorf(
-			"%w: MCP secret %q is unavailable",
+			"%w: %w: MCP secret %q is unavailable",
 			basespec.ErrReferenceUnresolved,
+			mcpSecret.ErrNotFound,
 			ref,
 		)
 	}
@@ -765,26 +714,6 @@ func isMissingMCPSetting(err error) bool {
 	message := strings.ToLower(err.Error())
 	return strings.Contains(message, "not found") ||
 		strings.Contains(message, "does not exist")
-}
-
-func oauthTokenSecretRef(
-	srv artifact.ArtifactRef,
-) (string, error) {
-	return mcpSecret.NewMCPSecretRefString(
-		srv,
-		mcpSecret.MCPSecretKindOAuthToken,
-		"token",
-	)
-}
-
-func oauthTokenSecretRefForRuntime(
-	serverID mcpSpec.ServerID,
-) (string, error) {
-	ref, err := mcpAggregate.ArtifactRefForServerID(serverID)
-	if err != nil {
-		return "", err
-	}
-	return oauthTokenSecretRef(ref)
 }
 
 type mcpEnvironmentResolver struct{}
