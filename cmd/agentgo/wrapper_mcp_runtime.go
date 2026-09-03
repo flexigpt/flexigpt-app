@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
@@ -28,7 +29,7 @@ type MCPGlobalSettingsView struct {
 // MCPRuntimeWrapper exposes pure Runtime operations. Every server argument is
 // an opaque runtime ServerID. ArtifactRef translation is deliberately absent.
 type MCPRuntimeWrapper struct {
-	runtime    *mcpRuntime.MCPRuntimeManager
+	runtime    *mcpConnection.MCPRuntimeManager
 	toolBridge *invocation.ToolBridge
 	auth       *mcpAuth.AuthManager
 
@@ -63,23 +64,23 @@ func withMCPRuntimeError(
 }
 
 func (w *MCPRuntimeWrapper) ConnectMCPServer(
-	server mcpSpec.ServerID,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	server mcpServer.ServerID,
+) (*mcpServer.MCPServerRuntimeSnapshot, error) {
+	return withMCPRuntime(w, func() (*mcpServer.MCPServerRuntimeSnapshot, error) {
 		return w.runtime.Connect(context.Background(), server)
 	})
 }
 
 func (w *MCPRuntimeWrapper) StartMCPServerConnect(
-	server mcpSpec.ServerID,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	server mcpServer.ServerID,
+) (*mcpServer.MCPServerRuntimeSnapshot, error) {
+	return withMCPRuntime(w, func() (*mcpServer.MCPServerRuntimeSnapshot, error) {
 		return w.runtime.StartConnect(context.Background(), server)
 	})
 }
 
 func (w *MCPRuntimeWrapper) DisconnectMCPServer(
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 ) error {
 	return withMCPRuntimeError(w, func() error {
 		return w.runtime.Disconnect(context.Background(), server)
@@ -87,34 +88,34 @@ func (w *MCPRuntimeWrapper) DisconnectMCPServer(
 }
 
 func (w *MCPRuntimeWrapper) RefreshMCPServer(
-	server mcpSpec.ServerID,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	server mcpServer.ServerID,
+) (*mcpServer.MCPServerRuntimeSnapshot, error) {
+	return withMCPRuntime(w, func() (*mcpServer.MCPServerRuntimeSnapshot, error) {
 		return w.runtime.Refresh(context.Background(), server)
 	})
 }
 
 func (w *MCPRuntimeWrapper) GetMCPServerStatus(
-	server mcpSpec.ServerID,
-) (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.MCPServerRuntimeSnapshot, error) {
+	server mcpServer.ServerID,
+) (*mcpServer.MCPServerRuntimeSnapshot, error) {
+	return withMCPRuntime(w, func() (*mcpServer.MCPServerRuntimeSnapshot, error) {
 		return w.runtime.Status(context.Background(), server)
 	})
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerTools(
-	server mcpSpec.ServerID,
-) ([]mcpRuntime.MCPToolCapability, error) {
-	return withMCPRuntime(w, func() ([]mcpRuntime.MCPToolCapability, error) {
+	server mcpServer.ServerID,
+) ([]mcpServer.MCPToolCapability, error) {
+	return withMCPRuntime(w, func() ([]mcpServer.MCPToolCapability, error) {
 		return w.runtime.ListTools(context.Background(), server)
 	})
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerToolsPage(
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) ([]mcpRuntime.MCPToolCapability, *string, error) {
+) ([]mcpServer.MCPToolCapability, *string, error) {
 	if err := w.ready(); err != nil {
 		return nil, nil, err
 	}
@@ -122,18 +123,18 @@ func (w *MCPRuntimeWrapper) ListMCPServerToolsPage(
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerResources(
-	server mcpSpec.ServerID,
-) ([]mcpRuntime.MCPResourceRef, error) {
-	return withMCPRuntime(w, func() ([]mcpRuntime.MCPResourceRef, error) {
+	server mcpServer.ServerID,
+) ([]mcpServer.MCPResourceRef, error) {
+	return withMCPRuntime(w, func() ([]mcpServer.MCPResourceRef, error) {
 		return w.runtime.ListResources(context.Background(), server)
 	})
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerResourcesPage(
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) ([]mcpRuntime.MCPResourceRef, *string, error) {
+) ([]mcpServer.MCPResourceRef, *string, error) {
 	if err := w.ready(); err != nil {
 		return nil, nil, err
 	}
@@ -141,18 +142,18 @@ func (w *MCPRuntimeWrapper) ListMCPServerResourcesPage(
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerResourceTemplates(
-	server mcpSpec.ServerID,
-) ([]mcpRuntime.MCPResourceTemplateRef, error) {
-	return withMCPRuntime(w, func() ([]mcpRuntime.MCPResourceTemplateRef, error) {
+	server mcpServer.ServerID,
+) ([]mcpServer.MCPResourceTemplateRef, error) {
+	return withMCPRuntime(w, func() ([]mcpServer.MCPResourceTemplateRef, error) {
 		return w.runtime.ListResourceTemplates(context.Background(), server)
 	})
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerResourceTemplatesPage(
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) ([]mcpRuntime.MCPResourceTemplateRef, *string, error) {
+) ([]mcpServer.MCPResourceTemplateRef, *string, error) {
 	if err := w.ready(); err != nil {
 		return nil, nil, err
 	}
@@ -165,18 +166,18 @@ func (w *MCPRuntimeWrapper) ListMCPServerResourceTemplatesPage(
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerPrompts(
-	server mcpSpec.ServerID,
-) ([]mcpRuntime.MCPPromptRef, error) {
-	return withMCPRuntime(w, func() ([]mcpRuntime.MCPPromptRef, error) {
+	server mcpServer.ServerID,
+) ([]mcpServer.MCPPromptRef, error) {
+	return withMCPRuntime(w, func() ([]mcpServer.MCPPromptRef, error) {
 		return w.runtime.ListPrompts(context.Background(), server)
 	})
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerPromptsPage(
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) ([]mcpRuntime.MCPPromptRef, *string, error) {
+) ([]mcpServer.MCPPromptRef, *string, error) {
 	if err := w.ready(); err != nil {
 		return nil, nil, err
 	}
@@ -184,52 +185,52 @@ func (w *MCPRuntimeWrapper) ListMCPServerPromptsPage(
 }
 
 func (w *MCPRuntimeWrapper) ReadMCPResource(
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 	uri string,
-) (*mcpRuntime.MCPReadResourceResponseBody, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.MCPReadResourceResponseBody, error) {
+) (*mcpServer.MCPReadResourceResponseBody, error) {
+	return withMCPRuntime(w, func() (*mcpServer.MCPReadResourceResponseBody, error) {
 		return w.runtime.ReadResource(context.Background(), server, uri)
 	})
 }
 
 func (w *MCPRuntimeWrapper) GetMCPPrompt(
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 	name string,
 	arguments map[string]string,
-) (*mcpRuntime.MCPGetPromptResponseBody, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.MCPGetPromptResponseBody, error) {
+) (*mcpServer.MCPGetPromptResponseBody, error) {
+	return withMCPRuntime(w, func() (*mcpServer.MCPGetPromptResponseBody, error) {
 		return w.runtime.GetPrompt(context.Background(), server, name, arguments)
 	})
 }
 
 func (w *MCPRuntimeWrapper) CompleteMCPArgument(
-	server mcpSpec.ServerID,
-	request mcpRuntime.MCPCompleteArgumentRequestBody,
-) (*mcpRuntime.MCPCompletionResult, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.MCPCompletionResult, error) {
+	server mcpServer.ServerID,
+	request mcpServer.MCPCompleteArgumentRequestBody,
+) (*mcpServer.MCPCompletionResult, error) {
+	return withMCPRuntime(w, func() (*mcpServer.MCPCompletionResult, error) {
 		return w.runtime.Complete(context.Background(), server, request)
 	})
 }
 
 func (w *MCPRuntimeWrapper) EvaluateMCPToolCall(
-	server mcpSpec.ServerID,
-	request *mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.MCPApprovalEvaluation, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.MCPApprovalEvaluation, error) {
+	server mcpServer.ServerID,
+	request *mcpServer.InvokeMCPToolRequestBody,
+) (*mcpServer.MCPApprovalEvaluation, error) {
+	return withMCPRuntime(w, func() (*mcpServer.MCPApprovalEvaluation, error) {
 		if request == nil {
-			return nil, fmt.Errorf("%w: MCP tool request is required", mcpRuntime.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf("%w: MCP tool request is required", mcpServer.ErrMCPInvalidRuntimeRequest)
 		}
 		return w.toolBridge.Evaluate(context.Background(), server, *request)
 	})
 }
 
 func (w *MCPRuntimeWrapper) EvaluateMappedMCPToolCall(
-	mapping mcpRuntime.MCPProviderToolMapping,
-	request *mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.MCPApprovalEvaluation, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.MCPApprovalEvaluation, error) {
+	mapping mcpConversation.MCPProviderToolMapping,
+	request *mcpServer.InvokeMCPToolRequestBody,
+) (*mcpServer.MCPApprovalEvaluation, error) {
+	return withMCPRuntime(w, func() (*mcpServer.MCPApprovalEvaluation, error) {
 		if request == nil {
-			return nil, fmt.Errorf("%w: mapped MCP tool request is required", mcpRuntime.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf("%w: mapped MCP tool request is required", mcpServer.ErrMCPInvalidRuntimeRequest)
 		}
 		return w.toolBridge.EvaluateMapped(context.Background(), mapping, *request)
 	})
@@ -237,32 +238,32 @@ func (w *MCPRuntimeWrapper) EvaluateMappedMCPToolCall(
 
 func (w *MCPRuntimeWrapper) ResolveMCPApproval(
 	approvalID string,
-	resolution mcpRuntime.MCPApprovalResolution,
-) (mcpRuntime.MCPApprovalResolutionResult, error) {
-	return withMCPRuntime(w, func() (mcpRuntime.MCPApprovalResolutionResult, error) {
+	resolution mcpServer.MCPApprovalResolution,
+) (mcpServer.MCPApprovalResolutionResult, error) {
+	return withMCPRuntime(w, func() (mcpServer.MCPApprovalResolutionResult, error) {
 		return w.toolBridge.ResolveApproval(context.Background(), approvalID, resolution)
 	})
 }
 
 func (w *MCPRuntimeWrapper) InvokeMCPTool(
-	server mcpSpec.ServerID,
-	request *mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.InvokeMCPToolResponseBody, error) {
+	server mcpServer.ServerID,
+	request *mcpServer.InvokeMCPToolRequestBody,
+) (*mcpServer.InvokeMCPToolResponseBody, error) {
+	return withMCPRuntime(w, func() (*mcpServer.InvokeMCPToolResponseBody, error) {
 		if request == nil {
-			return nil, fmt.Errorf("%w: MCP tool request is required", mcpRuntime.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf("%w: MCP tool request is required", mcpServer.ErrMCPInvalidRuntimeRequest)
 		}
 		return w.toolBridge.Invoke(context.Background(), server, *request)
 	})
 }
 
 func (w *MCPRuntimeWrapper) InvokeMappedMCPTool(
-	mapping mcpRuntime.MCPProviderToolMapping,
-	request *mcpRuntime.InvokeMCPToolRequestBody,
-) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
-	return withMCPRuntime(w, func() (*mcpRuntime.InvokeMCPToolResponseBody, error) {
+	mapping mcpConversation.MCPProviderToolMapping,
+	request *mcpServer.InvokeMCPToolRequestBody,
+) (*mcpServer.InvokeMCPToolResponseBody, error) {
+	return withMCPRuntime(w, func() (*mcpServer.InvokeMCPToolResponseBody, error) {
 		if request == nil {
-			return nil, fmt.Errorf("%w: mapped MCP tool request is required", mcpRuntime.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf("%w: mapped MCP tool request is required", mcpServer.ErrMCPInvalidRuntimeRequest)
 		}
 		return w.toolBridge.InvokeMapped(context.Background(), mapping, *request)
 	})
@@ -282,7 +283,7 @@ func (w *MCPRuntimeWrapper) ListPendingMCPOAuthAuthorizations() (
 }
 
 func (w *MCPRuntimeWrapper) CancelPendingMCPOAuthAuthorization(
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 ) (bool, error) {
 	return withMCPRuntime(w, func() (bool, error) {
 		if err := server.Validate(); err != nil {

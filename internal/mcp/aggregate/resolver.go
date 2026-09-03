@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
@@ -40,10 +40,10 @@ func NewArtifactServerResolver(
 
 func (r *ArtifactServerResolver) ResolveMCPServer(
 	ctx context.Context,
-	serverID mcpSpec.ServerID,
+	serverID mcpServer.ServerID,
 ) (mcpStoreServer.Resolved, error) {
 	if r == nil || r.store == nil {
-		return mcpStoreServer.Resolved{}, mcpSpec.ErrClosed
+		return mcpStoreServer.Resolved{}, mcpServer.ErrClosed
 	}
 
 	ref, err := ArtifactRefForRuntimeServerID(serverID)
@@ -58,7 +58,7 @@ func (r *ArtifactServerResolver) InspectMCPServer(
 	ref artifact.ArtifactRef,
 ) (mcpStoreServer.Resolved, error) {
 	if r == nil || r.store == nil {
-		return mcpStoreServer.Resolved{}, mcpSpec.ErrClosed
+		return mcpStoreServer.Resolved{}, mcpServer.ErrClosed
 	}
 	return r.store.InspectMCPServer(ctx, ref)
 }

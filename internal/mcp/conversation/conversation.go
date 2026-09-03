@@ -1,29 +1,29 @@
-package runtime
+package conversation
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 type MCPAppModelContextUpdate struct {
-	InstanceID string           `json:"instanceID,omitempty"`
-	Server     mcpSpec.ServerID `json:"server"`
+	InstanceID string             `json:"instanceID,omitempty"`
+	Server     mcpServer.ServerID `json:"server"`
 
 	ResourceURI string `json:"resourceUri,omitempty"`
 
-	Content           []MCPContent           `json:"content,omitempty"`
+	Content           []mcpServer.MCPContent `json:"content,omitempty"`
 	StructuredContent any                    `json:"structuredContent,omitempty"`
 	UpdatedAt         string                 `json:"updatedAt,omitempty"`
 	RawArguments      jsonutil.JSONRawString `json:"rawArguments,omitempty"`
 }
 
 type MCPToolSelection struct {
-	Server           mcpSpec.ServerID `json:"server"`
-	ToolName         string           `json:"toolName"`
-	ProviderToolName string           `json:"providerToolName,omitempty"`
-	ChoiceID         string           `json:"choiceID,omitempty"`
-	Digest           string           `json:"digest,omitempty"`
+	Server           mcpServer.ServerID `json:"server"`
+	ToolName         string             `json:"toolName"`
+	ProviderToolName string             `json:"providerToolName,omitempty"`
+	ChoiceID         string             `json:"choiceID,omitempty"`
+	Digest           string             `json:"digest,omitempty"`
 
 	ApprovalRule  *mcpPolicy.MCPApprovalRule  `json:"approvalRule,omitempty"`
 	ExecutionMode *mcpPolicy.MCPExecutionMode `json:"executionMode,omitempty"`
@@ -33,7 +33,7 @@ type MCPToolSelection struct {
 }
 
 type MCPProviderToolMapping struct {
-	Server mcpSpec.ServerID `json:"server"`
+	Server mcpServer.ServerID `json:"server"`
 
 	ProviderToolName string `json:"providerToolName"`
 	ChoiceID         string `json:"choiceID"`
@@ -56,7 +56,7 @@ const (
 )
 
 type MCPServerSelection struct {
-	Server mcpSpec.ServerID `json:"server"`
+	Server mcpServer.ServerID `json:"server"`
 
 	SnapshotDigest string `json:"snapshotDigest,omitempty"`
 
@@ -67,37 +67,20 @@ type MCPServerSelection struct {
 }
 
 type MCPResourceTemplateSelection struct {
-	MCPResourceTemplateRef
+	mcpServer.MCPResourceTemplateRef
 
 	ArgumentValues map[string]string `json:"argumentValues,omitempty"`
 }
 
 type MCPPromptSelection struct {
-	MCPPromptRef
+	mcpServer.MCPPromptRef
 
 	ArgumentValues map[string]string `json:"argumentValues,omitempty"`
 }
 
 type MCPConversationContext struct {
 	Servers           []MCPServerSelection           `json:"servers"`
-	Resources         []MCPResourceRef               `json:"resources,omitempty"`
+	Resources         []mcpServer.MCPResourceRef     `json:"resources,omitempty"`
 	ResourceTemplates []MCPResourceTemplateSelection `json:"resourceTemplates,omitempty"`
 	Prompts           []MCPPromptSelection           `json:"prompts,omitempty"`
-}
-type MCPToolCallProvenance struct {
-	Server     mcpSpec.ServerID  `json:"server"`
-	Collection mcpSpec.CatalogID `json:"collection"`
-
-	ServerDisplayName string `json:"serverDisplayName,omitempty"`
-
-	ToolName         string `json:"toolName"`
-	ProviderToolName string `json:"providerToolName"`
-	ToolDigest       string `json:"toolDigest,omitempty"`
-	ChoiceID         string `json:"choiceID,omitempty"`
-
-	ToolUseID  string `json:"toolUseID,omitempty"`
-	ApprovalID string `json:"approvalID,omitempty"`
-
-	AppResourceURI string `json:"appResourceUri,omitempty"`
-	AppInstanceID  string `json:"appInstanceID,omitempty"`
 }

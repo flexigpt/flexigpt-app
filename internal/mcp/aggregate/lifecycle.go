@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
@@ -71,12 +71,12 @@ type BundleMutator interface {
 type RuntimeInvalidator interface {
 	Invalidate(
 		ctx context.Context,
-		server mcpSpec.ServerID,
+		server mcpServer.ServerID,
 	) error
 
 	InvalidateCollection(
 		ctx context.Context,
-		catalog mcpSpec.CatalogID,
+		catalog mcpServer.CatalogID,
 	) error
 }
 
@@ -103,7 +103,7 @@ func (l *Lifecycle) InvalidateServer(
 	ref artifact.ArtifactRef,
 ) error {
 	if l == nil || l.runtime == nil {
-		return mcpSpec.ErrClosed
+		return mcpServer.ErrClosed
 	}
 	serverID, err := RuntimeServerIDForArtifact(ref)
 	if err != nil {
@@ -117,7 +117,7 @@ func (l *Lifecycle) InvalidateCollection(
 	ref collection.CollectionRef,
 ) error {
 	if l == nil || l.runtime == nil {
-		return mcpSpec.ErrClosed
+		return mcpServer.ErrClosed
 	}
 	catalogID, err := RuntimeCatalogIDForCollection(ref)
 	if err != nil {

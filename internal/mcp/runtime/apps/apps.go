@@ -1,12 +1,11 @@
-package runtime
+package apps
 
 import (
 	"fmt"
 	"strings"
 
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const (
@@ -19,11 +18,6 @@ const (
 	VisibilityApp   = "app"
 )
 
-type MCPToolAppInfo struct {
-	ResourceURI string   `json:"resourceUri,omitempty"`
-	Visibility  []string `json:"visibility,omitempty"`
-}
-
 // IsAppMIMEType returns true if mime is a valid MCP Apps MIME type,
 // tolerating whitespace and additional parameters after the profile.
 func IsAppMIMEType(mime string) bool {
@@ -35,7 +29,7 @@ func IsAppMIMEType(mime string) bool {
 // ToolVisibleToModel reports whether the tool can be exposed to the LLM.
 // A nil/empty visibility list defaults to model+app, so unknown servers
 // don't accidentally hide tools.
-func ToolVisibleToModel(info *MCPToolAppInfo) bool {
+func ToolVisibleToModel(info *mcpServer.MCPToolAppInfo) bool {
 	if info == nil || len(info.Visibility) == 0 {
 		return true
 	}
@@ -52,20 +46,20 @@ func ToolVisibleToModel(info *MCPToolAppInfo) bool {
 // runtime.
 func ValidateAppToolInvocation(
 	p mcpPolicy.MCPAppsPolicy,
-	tool MCPToolCapability,
-	appServer mcpSpec.ServerID,
+	tool mcpServer.MCPToolCapability,
+	appServer mcpServer.ServerID,
 ) error {
 	if !p.Enabled {
 		return fmt.Errorf(
 			"%w: MCP Apps is not enabled for server %q",
-			ErrMCPPolicyDenied,
+			mcpServer.ErrMCPPolicyDenied,
 			tool.Server,
 		)
 	}
 	if !p.AllowAppInitiatedToolCalls {
 		return fmt.Errorf(
 			"%w: app-initiated MCP tool calls are not allowed",
-			ErrMCPPolicyDenied,
+			mcpServer.ErrMCPPolicyDenied,
 		)
 	}
 	if err := tool.Server.Validate(); err != nil {
@@ -74,13 +68,13 @@ func ValidateAppToolInvocation(
 	if appServer != tool.Server {
 		return fmt.Errorf(
 			"%w: MCP App cannot call a tool owned by another Server Artifact",
-			ErrMCPPolicyDenied,
+			mcpServer.ErrMCPPolicyDenied,
 		)
 	}
 	if !ToolVisibleToApp(tool.App) {
 		return fmt.Errorf(
 			"%w: MCP tool %q is not visible to apps",
-			ErrMCPPolicyDenied,
+			mcpServer.ErrMCPPolicyDenied,
 			tool.ToolName,
 		)
 	}
@@ -88,7 +82,7 @@ func ValidateAppToolInvocation(
 }
 
 // ToolVisibleToApp reports whether the tool may be called by an MCP App.
-func ToolVisibleToApp(info *MCPToolAppInfo) bool {
+func ToolVisibleToApp(info *mcpServer.MCPToolAppInfo) bool {
 	if info == nil || len(info.Visibility) == 0 {
 		return true
 	}

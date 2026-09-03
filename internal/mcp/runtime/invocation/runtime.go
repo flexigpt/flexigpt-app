@@ -3,24 +3,24 @@ package invocation
 import (
 	"context"
 
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 type Runtime interface {
 	CallToolDryRun(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-		request mcpRuntime.InvokeMCPToolRequestBody,
-	) (mcpSpec.RuntimeConfig, mcpRuntime.MCPToolCapability, error)
+		server mcpServer.ServerID,
+		request mcpServer.InvokeMCPToolRequestBody,
+	) (mcpServer.RuntimeConfig, mcpServer.MCPToolCapability, error)
 
 	CallTool(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-		request mcpRuntime.InvokeMCPToolRequestBody,
-	) (*mcpRuntime.InvokeMCPToolResponseBody, error)
+		server mcpServer.ServerID,
+		request mcpServer.InvokeMCPToolRequestBody,
+	) (*mcpServer.InvokeMCPToolResponseBody, error)
 
 	SetSessionLifecycleCleaner(
-		cleaner mcpRuntime.SessionLifecycleCleaner,
+		cleaner mcpConnection.SessionLifecycleCleaner,
 	)
 }

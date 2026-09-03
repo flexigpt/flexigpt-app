@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
@@ -36,14 +36,14 @@ func NewRuntimeServerSource(
 
 func (s *RuntimeServerSource) ResolveServer(
 	ctx context.Context,
-	serverID mcpSpec.ServerID,
-) (mcpSpec.ResolvedServer, error) {
+	serverID mcpServer.ServerID,
+) (mcpServer.ResolvedServer, error) {
 	if s == nil || s.servers == nil {
-		return mcpSpec.ResolvedServer{}, mcpSpec.ErrClosed
+		return mcpServer.ResolvedServer{}, mcpServer.ErrClosed
 	}
 	resolved, err := s.servers.ResolveMCPServer(ctx, serverID)
 	if err != nil {
-		return mcpSpec.ResolvedServer{}, err
+		return mcpServer.ResolvedServer{}, err
 	}
 	materialized, err := resolved.MaterializeTrusted(
 		ctx,
@@ -51,21 +51,21 @@ func (s *RuntimeServerSource) ResolveServer(
 		s.environment,
 	)
 	if err != nil {
-		return mcpSpec.ResolvedServer{}, err
+		return mcpServer.ResolvedServer{}, err
 	}
 	config, err := runtimeConfig(resolved, materialized)
 	if err != nil {
-		return mcpSpec.ResolvedServer{}, err
+		return mcpServer.ResolvedServer{}, err
 	}
 
-	output := mcpSpec.ResolvedServer{
+	output := mcpServer.ResolvedServer{
 		Server:  config.Server,
 		Catalog: config.Catalog,
-		Version: mcpSpec.Digest(resolved.Version),
+		Version: mcpServer.Digest(resolved.Version),
 		Config:  config,
 	}
 	if err := output.Validate(); err != nil {
-		return mcpSpec.ResolvedServer{}, err
+		return mcpServer.ResolvedServer{}, err
 	}
 	return output, nil
 }
@@ -73,26 +73,26 @@ func (s *RuntimeServerSource) ResolveServer(
 func (s *RuntimeServerSource) InspectRuntimeConfig(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (mcpSpec.RuntimeConfig, mcpStoreServer.Resolved, error) {
+) (mcpServer.RuntimeConfig, mcpStoreServer.Resolved, error) {
 	if s == nil || s.servers == nil {
-		return mcpSpec.RuntimeConfig{},
+		return mcpServer.RuntimeConfig{},
 			mcpStoreServer.Resolved{},
-			mcpSpec.ErrClosed
+			mcpServer.ErrClosed
 	}
 	resolved, err := s.servers.InspectMCPServer(ctx, ref)
 	if err != nil {
-		return mcpSpec.RuntimeConfig{}, mcpStoreServer.Resolved{}, err
+		return mcpServer.RuntimeConfig{}, mcpStoreServer.Resolved{}, err
 	}
 	materialized, err := resolved.MaterializeForInspection(
 		ctx,
 		s.environment,
 	)
 	if err != nil {
-		return mcpSpec.RuntimeConfig{}, resolved, err
+		return mcpServer.RuntimeConfig{}, resolved, err
 	}
 	config, err := runtimeConfig(resolved, materialized)
 	if err != nil {
-		return mcpSpec.RuntimeConfig{}, resolved, err
+		return mcpServer.RuntimeConfig{}, resolved, err
 	}
 	return config, resolved, nil
 }
@@ -100,26 +100,28 @@ func (s *RuntimeServerSource) InspectRuntimeConfig(
 func runtimeConfig(
 	resolved mcpStoreServer.Resolved,
 	input mcpStoreServer.MaterializedServer,
-) (mcpSpec.RuntimeConfig, error) {
+) (mcpServer.RuntimeConfig, error) {
 	serverID, err := RuntimeServerIDForArtifact(resolved.Server)
 	if err != nil {
-		return mcpSpec.RuntimeConfig{}, err
+		return mcpServer.RuntimeConfig{}, err
 	}
 	catalogID, err := RuntimeCatalogIDForCollection(resolved.Collection)
 	if err != nil {
-		return mcpSpec.RuntimeConfig{}, err
+		return mcpServer.RuntimeConfig{}, err
 	}
 
-	output := mcpSpec.RuntimeConfig{
+	output := mcpServer.RuntimeConfig{
 		Server:                    serverID,
 		Catalog:                   catalogID,
 		LogicalName:               string(resolved.Document.LogicalName),
 		DisplayName:               resolved.Document.DisplayName,
 		OAuthClientSecretRequired: input.ClientCredentialSecretRequired,
-		TrustLevel:                resolved.Policy.Body.TrustLevel,
-		DefaultPolicy:             resolved.Policy.Body.DefaultPolicy,
-		ToolPolicies:              mcpPolicy.CloneToolPolicies(resolved.Policy.Body.ToolPolicies),
-		AppsPolicy:                resolved.Policy.Body.AppsPolicy,
+		Policy: mcpPolicy.MCPPolicy{
+			TrustLevel:    resolved.Policy.Body.TrustLevel,
+			DefaultPolicy: resolved.Policy.Body.DefaultPolicy,
+			ToolPolicies:  mcpPolicy.CloneToolPolicies(resolved.Policy.Body.ToolPolicies),
+			AppsPolicy:    resolved.Policy.Body.AppsPolicy,
+		},
 		SensitiveValues: append(
 			[]string(nil),
 			input.SensitiveValues...,
@@ -128,8 +130,8 @@ func runtimeConfig(
 
 	switch input.Core.Type {
 	case mcpStoreServer.ServerTypeStdio:
-		output.Transport = mcpSpec.MCPTransportStdio
-		output.Stdio = &mcpSpec.MCPRuntimeStdioConfig{
+		output.Transport = mcpServer.MCPTransportStdio
+		output.Stdio = &mcpServer.MCPRuntimeStdioConfig{
 			Command:          input.Core.Command,
 			Args:             append([]string(nil), input.Core.Args...),
 			Env:              maps.Clone(input.Core.Env),
@@ -139,10 +141,10 @@ func runtimeConfig(
 	case mcpStoreServer.ServerTypeHTTP:
 		authMode, err := runtimeHTTPAuthMode(input.Auth.Mode)
 		if err != nil {
-			return mcpSpec.RuntimeConfig{}, err
+			return mcpServer.RuntimeConfig{}, err
 		}
-		output.Transport = mcpSpec.MCPTransportStreamableHTTP
-		output.StreamableHTTP = &mcpSpec.MCPRuntimeStreamableHTTPConfig{
+		output.Transport = mcpServer.MCPTransportStreamableHTTP
+		output.StreamableHTTP = &mcpServer.MCPRuntimeStreamableHTTPConfig{
 			URL:                         input.Core.URL,
 			TimeoutMS:                   input.TimeoutMS,
 			AuthMode:                    authMode,
@@ -152,29 +154,29 @@ func runtimeConfig(
 		}
 
 	default:
-		return mcpSpec.RuntimeConfig{}, errors.New(
+		return mcpServer.RuntimeConfig{}, errors.New(
 			"unsupported materialized MCP server transport",
 		)
 	}
 
 	if err := output.Validate(); err != nil {
-		return mcpSpec.RuntimeConfig{}, err
+		return mcpServer.RuntimeConfig{}, err
 	}
 	return output, nil
 }
 
 func runtimeHTTPAuthMode(
-	input mcpSpec.MCPHTTPAuthMode,
-) (mcpSpec.MCPHTTPAuthMode, error) {
+	input mcpServer.MCPHTTPAuthMode,
+) (mcpServer.MCPHTTPAuthMode, error) {
 	switch input {
-	case mcpSpec.MCPHTTPAuthNone:
-		return mcpSpec.MCPHTTPAuthNone, nil
-	case mcpSpec.MCPHTTPAuthAPIKey:
-		return mcpSpec.MCPHTTPAuthAPIKey, nil
-	case mcpSpec.MCPHTTPAuthOAuth:
-		return mcpSpec.MCPHTTPAuthOAuth, nil
-	case mcpSpec.MCPHTTPAuthClientCredentials:
-		return mcpSpec.MCPHTTPAuthClientCredentials, nil
+	case mcpServer.MCPHTTPAuthNone:
+		return mcpServer.MCPHTTPAuthNone, nil
+	case mcpServer.MCPHTTPAuthAPIKey:
+		return mcpServer.MCPHTTPAuthAPIKey, nil
+	case mcpServer.MCPHTTPAuthOAuth:
+		return mcpServer.MCPHTTPAuthOAuth, nil
+	case mcpServer.MCPHTTPAuthClientCredentials:
+		return mcpServer.MCPHTTPAuthClientCredentials, nil
 	default:
 		return "", errors.New("unsupported materialized MCP authentication mode")
 	}

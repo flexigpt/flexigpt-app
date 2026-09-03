@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/secret"
 )
 
@@ -259,7 +259,7 @@ func normalizeAuthentication(
 	value AuthenticationDeclaration,
 ) AuthenticationDeclaration {
 	if value.Mode == "" {
-		value.Mode = mcpSpec.MCPHTTPAuthNone
+		value.Mode = mcpServer.MCPHTTPAuthNone
 	}
 	return value
 }
@@ -402,7 +402,7 @@ func ValidateServerParts(
 	}
 
 	switch extension.Auth.Mode {
-	case mcpSpec.MCPHTTPAuthNone:
+	case mcpServer.MCPHTTPAuthNone:
 		if extension.Auth.ClientCredentialsInput != "" {
 			return fmt.Errorf(
 				"%w: no-auth server cannot declare OAuth credentials",
@@ -410,7 +410,7 @@ func ValidateServerParts(
 			)
 		}
 
-	case mcpSpec.MCPHTTPAuthAPIKey:
+	case mcpServer.MCPHTTPAuthAPIKey:
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: API-key authentication requires HTTP transport",
@@ -428,7 +428,7 @@ func ValidateServerParts(
 			)
 		}
 
-	case mcpSpec.MCPHTTPAuthOAuth:
+	case mcpServer.MCPHTTPAuthOAuth:
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: OAuth requires HTTP transport",
@@ -447,7 +447,7 @@ func ValidateServerParts(
 			}
 		}
 
-	case mcpSpec.MCPHTTPAuthClientCredentials:
+	case mcpServer.MCPHTTPAuthClientCredentials:
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: client credentials requires HTTP transport",

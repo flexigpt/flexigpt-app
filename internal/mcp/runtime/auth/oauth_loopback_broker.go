@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const (
@@ -23,7 +23,7 @@ const (
 )
 
 type oauthPendingKey struct {
-	Server mcpSpec.ServerID
+	Server mcpServer.ServerID
 }
 
 type oauthLoopbackResult struct {
@@ -31,7 +31,7 @@ type oauthLoopbackResult struct {
 	Err    error
 }
 type pendingOAuthAuthorization struct {
-	Server           mcpSpec.ServerID
+	Server           mcpServer.ServerID
 	ID               string
 	AuthorizationURL string
 	State            string
@@ -282,7 +282,7 @@ func (b *OAuthLoopbackBroker) Pending() []MCPOAuthAuthorization {
 }
 
 func (b *OAuthLoopbackBroker) Cancel(
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 ) bool {
 	if b == nil || server.Validate() != nil {
 		return false

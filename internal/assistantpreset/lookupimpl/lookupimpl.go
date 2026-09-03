@@ -9,10 +9,10 @@ import (
 	assistantpresetSpec "github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
@@ -129,30 +129,30 @@ func (a *skillLookupAdapter) GetSkillSummaryForSelection(
 type MCPServerResolver interface {
 	ResolveMCPServer(
 		ctx context.Context,
-		ref mcpSpec.ServerID,
+		ref mcpServer.ServerID,
 	) (mcpStoreServer.Resolved, error)
 }
 
 type MCPDiscoveryLookup interface {
 	ListTools(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-	) ([]mcpRuntime.MCPToolCapability, error)
+		server mcpServer.ServerID,
+	) ([]mcpServer.MCPToolCapability, error)
 
 	ListResources(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-	) ([]mcpRuntime.MCPResourceRef, error)
+		server mcpServer.ServerID,
+	) ([]mcpServer.MCPResourceRef, error)
 
 	ListResourceTemplates(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-	) ([]mcpRuntime.MCPResourceTemplateRef, error)
+		server mcpServer.ServerID,
+	) ([]mcpServer.MCPResourceTemplateRef, error)
 
 	ListPrompts(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-	) ([]mcpRuntime.MCPPromptRef, error)
+		server mcpServer.ServerID,
+	) ([]mcpServer.MCPPromptRef, error)
 }
 
 type mcpContextLookupAdapter struct {
@@ -196,7 +196,7 @@ func NewMCPContextLookup(
 
 func (a *mcpContextLookupAdapter) ValidateMCPConversationContext(
 	ctx context.Context,
-	mcpContext mcpRuntime.MCPConversationContext,
+	mcpContext mcpConversation.MCPConversationContext,
 ) error {
 	if a == nil || a.resolver == nil {
 		return errors.New("mcp context lookup adapter is not configured")
@@ -228,7 +228,7 @@ func (a *mcpContextLookupAdapter) ValidateMCPConversationContext(
 
 func (a *mcpContextLookupAdapter) validateMCPServers(
 	ctx context.Context,
-	mcpContext mcpRuntime.MCPConversationContext,
+	mcpContext mcpConversation.MCPConversationContext,
 ) error {
 	for _, ref := range collectMCPServerRefs(mcpContext) {
 		resolved, err := a.resolver.ResolveMCPServer(ctx, ref)
@@ -247,10 +247,10 @@ func (a *mcpContextLookupAdapter) validateMCPServers(
 
 func (a *mcpContextLookupAdapter) validateSelectedMCPTools(
 	ctx context.Context,
-	mcpContext mcpRuntime.MCPConversationContext,
+	mcpContext mcpConversation.MCPConversationContext,
 ) error {
 	for i, server := range mcpContext.Servers {
-		if server.ToolExposure != mcpRuntime.MCPToolExposureSelected {
+		if server.ToolExposure != mcpConversation.MCPToolExposureSelected {
 			continue
 		}
 
@@ -262,7 +262,7 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPTools(
 			return fmt.Errorf("servers[%d]: %w", i, err)
 		}
 
-		byName := make(map[string]mcpRuntime.MCPToolCapability, len(tools))
+		byName := make(map[string]mcpServer.MCPToolCapability, len(tools))
 		for _, tool := range tools {
 			if tool.ToolName != "" {
 				byName[tool.ToolName] = tool
@@ -338,9 +338,9 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPTools(
 
 func (a *mcpContextLookupAdapter) validateSelectedMCPResources(
 	ctx context.Context,
-	mcpContext mcpRuntime.MCPConversationContext,
+	mcpContext mcpConversation.MCPConversationContext,
 ) error {
-	cache := map[mcpSpec.ServerID]map[string]mcpRuntime.MCPResourceRef{}
+	cache := map[mcpServer.ServerID]map[string]mcpServer.MCPResourceRef{}
 
 	for i, selected := range mcpContext.Resources {
 		byURI, exists := cache[selected.Server]
@@ -352,7 +352,7 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPResources(
 				}
 				return fmt.Errorf("resources[%d]: %w", i, err)
 			}
-			byURI = make(map[string]mcpRuntime.MCPResourceRef, len(resources))
+			byURI = make(map[string]mcpServer.MCPResourceRef, len(resources))
 
 			for _, resource := range resources {
 				if resource.URI != "" {
@@ -383,9 +383,9 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPResources(
 
 func (a *mcpContextLookupAdapter) validateSelectedMCPResourceTemplates(
 	ctx context.Context,
-	mcpContext mcpRuntime.MCPConversationContext,
+	mcpContext mcpConversation.MCPConversationContext,
 ) error {
-	cache := map[mcpSpec.ServerID]map[string]mcpRuntime.MCPResourceTemplateRef{}
+	cache := map[mcpServer.ServerID]map[string]mcpServer.MCPResourceTemplateRef{}
 
 	for i, selected := range mcpContext.ResourceTemplates {
 		ref := selected.MCPResourceTemplateRef
@@ -398,7 +398,7 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPResourceTemplates(
 				}
 				return fmt.Errorf("resourceTemplates[%d]: %w", i, err)
 			}
-			byTemplate = make(map[string]mcpRuntime.MCPResourceTemplateRef, len(templates))
+			byTemplate = make(map[string]mcpServer.MCPResourceTemplateRef, len(templates))
 			for _, tmpl := range templates {
 				if tmpl.URITemplate != "" {
 					byTemplate[tmpl.URITemplate] = tmpl
@@ -431,9 +431,9 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPResourceTemplates(
 
 func (a *mcpContextLookupAdapter) validateSelectedMCPPrompts(
 	ctx context.Context,
-	mcpContext mcpRuntime.MCPConversationContext,
+	mcpContext mcpConversation.MCPConversationContext,
 ) error {
-	cache := map[mcpSpec.ServerID]map[string]mcpRuntime.MCPPromptRef{}
+	cache := map[mcpServer.ServerID]map[string]mcpServer.MCPPromptRef{}
 
 	for i, selected := range mcpContext.Prompts {
 		byName, exists := cache[selected.Server]
@@ -445,7 +445,7 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPPrompts(
 				}
 				return fmt.Errorf("prompts[%d]: %w", i, err)
 			}
-			byName = make(map[string]mcpRuntime.MCPPromptRef, len(prompts))
+			byName = make(map[string]mcpServer.MCPPromptRef, len(prompts))
 			for _, prompt := range prompts {
 				if prompt.PromptName != "" {
 					byName[prompt.PromptName] = prompt
@@ -477,11 +477,11 @@ func (a *mcpContextLookupAdapter) validateSelectedMCPPrompts(
 }
 
 func collectMCPServerRefs(
-	mcpContext mcpRuntime.MCPConversationContext,
-) []mcpSpec.ServerID {
-	seen := map[mcpSpec.ServerID]struct{}{}
-	refs := make([]mcpSpec.ServerID, 0, len(mcpContext.Servers))
-	add := func(ref mcpSpec.ServerID) {
+	mcpContext mcpConversation.MCPConversationContext,
+) []mcpServer.ServerID {
+	seen := map[mcpServer.ServerID]struct{}{}
+	refs := make([]mcpServer.ServerID, 0, len(mcpContext.Servers))
+	add := func(ref mcpServer.ServerID) {
 		if err := ref.Validate(); err != nil {
 			return
 		}
@@ -509,7 +509,7 @@ func collectMCPServerRefs(
 }
 
 func validateRequiredMCPArgumentsForLookup(
-	defs map[string]mcpRuntime.MCPArgumentDefinition,
+	defs map[string]mcpServer.MCPArgumentDefinition,
 	values map[string]string,
 ) error {
 	for name, def := range defs {
@@ -531,7 +531,7 @@ func validateRequiredMCPArgumentsForLookup(
 }
 
 func isOptionalMCPDiscoveryError(err error) bool {
-	return errors.Is(err, mcpRuntime.ErrMCPRuntimeNotReady) ||
+	return errors.Is(err, mcpServer.ErrMCPRuntimeNotReady) ||
 		errors.Is(err, mcpAuth.ErrMCPAuthRequired)
 }
 

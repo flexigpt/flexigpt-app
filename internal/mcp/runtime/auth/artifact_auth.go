@@ -14,7 +14,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/auth/extauth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const (
@@ -23,7 +24,7 @@ const (
 )
 
 type OAuthAuthorizationRequest struct {
-	Server           mcpSpec.ServerID
+	Server           mcpServer.ServerID
 	AuthorizationURL string
 }
 
@@ -52,7 +53,7 @@ type AuthStatusSink interface {
 }
 
 type authStatusKey struct {
-	Server mcpSpec.ServerID
+	Server mcpServer.ServerID
 }
 
 type AuthManager struct {
@@ -136,13 +137,13 @@ func NewAuthManager(
 
 func (m *AuthManager) PrepareConnection(
 	ctx context.Context,
-	config mcpSpec.RuntimeConfig,
-) (mcpSpec.PreparedConnection, error) {
+	config mcpServer.RuntimeConfig,
+) (mcpConnection.PreparedConnection, error) {
 	if err := validateArtifactAuthInput(ctx, config); err != nil {
-		return mcpSpec.PreparedConnection{}, err
+		return mcpConnection.PreparedConnection{}, err
 	}
 
-	output := mcpSpec.PreparedConnection{
+	output := mcpConnection.PreparedConnection{
 		Env:     map[string]string{},
 		Headers: map[string]string{},
 	}
@@ -159,12 +160,12 @@ func (m *AuthManager) PrepareConnection(
 	}()
 
 	switch config.Transport {
-	case mcpSpec.MCPTransportStdio:
-		status.AuthMode = mcpSpec.MCPHTTPAuthNone
+	case mcpServer.MCPTransportStdio:
+		status.AuthMode = mcpServer.MCPHTTPAuthNone
 		status.State = MCPAuthStateNotRequired
 		return output, nil
 
-	case mcpSpec.MCPTransportStreamableHTTP:
+	case mcpServer.MCPTransportStreamableHTTP:
 		if config.StreamableHTTP == nil {
 			status.State = MCPAuthStateError
 			status.LastError = "missing streamable HTTP runtime config"
@@ -180,11 +181,11 @@ func (m *AuthManager) PrepareConnection(
 		status.Resource = config.StreamableHTTP.URL
 
 		switch mode {
-		case mcpSpec.MCPHTTPAuthNone:
+		case mcpServer.MCPHTTPAuthNone:
 			status.State = MCPAuthStateNotRequired
 			return output, nil
 
-		case mcpSpec.MCPHTTPAuthAPIKey:
+		case mcpServer.MCPHTTPAuthAPIKey:
 			if len(config.StreamableHTTP.Headers) == 0 {
 				status.State = MCPAuthStateRequired
 				status.LastError = "API-key MCP server has no materialized secret header"
@@ -197,7 +198,7 @@ func (m *AuthManager) PrepareConnection(
 			status.State = MCPAuthStateRequired
 			return output, nil
 
-		case mcpSpec.MCPHTTPAuthOAuth:
+		case mcpServer.MCPHTTPAuthOAuth:
 			o := m.configureAuthorizationCodeOAuth(
 				ctx,
 				config,
@@ -206,7 +207,7 @@ func (m *AuthManager) PrepareConnection(
 			)
 			return output, o
 
-		case mcpSpec.MCPHTTPAuthClientCredentials:
+		case mcpServer.MCPHTTPAuthClientCredentials:
 			o := m.configureClientCredentialsOAuth(
 				ctx,
 				config,
@@ -236,7 +237,7 @@ func (m *AuthManager) PrepareConnection(
 
 func (m *AuthManager) ConnectionSucceeded(
 	ctx context.Context,
-	config mcpSpec.RuntimeConfig,
+	config mcpServer.RuntimeConfig,
 ) {
 	if m == nil {
 		return
@@ -244,9 +245,9 @@ func (m *AuthManager) ConnectionSucceeded(
 
 	status := defaultAuthStatus(config)
 	switch status.AuthMode {
-	case mcpSpec.MCPHTTPAuthNone:
+	case mcpServer.MCPHTTPAuthNone:
 		status.State = MCPAuthStateNotRequired
-	case mcpSpec.MCPHTTPAuthAPIKey:
+	case mcpServer.MCPHTTPAuthAPIKey:
 		status.State = MCPAuthStateAuthorized
 	default:
 		return
@@ -257,7 +258,7 @@ func (m *AuthManager) ConnectionSucceeded(
 
 func (m *AuthManager) ConnectionFailed(
 	ctx context.Context,
-	config mcpSpec.RuntimeConfig,
+	config mcpServer.RuntimeConfig,
 	err error,
 ) {
 	if m == nil || err == nil {
@@ -266,11 +267,11 @@ func (m *AuthManager) ConnectionFailed(
 
 	status := defaultAuthStatus(config)
 	switch status.AuthMode {
-	case mcpSpec.MCPHTTPAuthOAuth:
+	case mcpServer.MCPHTTPAuthOAuth:
 		// The tracked OAuth handler owns precise authorization state. Do not
 		// overwrite a pending loopback flow with a generic connect error.
 		return
-	case mcpSpec.MCPHTTPAuthAPIKey, mcpSpec.MCPHTTPAuthClientCredentials:
+	case mcpServer.MCPHTTPAuthAPIKey, mcpServer.MCPHTTPAuthClientCredentials:
 		status.State = MCPAuthStateError
 		status.LastError = redactSensitive(
 			err.Error(),
@@ -301,7 +302,7 @@ func (m *AuthManager) SaveAuthStatus(
 }
 
 func (m *AuthManager) ClearAuthStatus(
-	serverRef mcpSpec.ServerID,
+	serverRef mcpServer.ServerID,
 ) {
 	if m == nil {
 		return
@@ -322,7 +323,7 @@ func (m *AuthManager) ClearAuthStatuses() {
 
 func (m *AuthManager) BuildAuthHealth(
 	ctx context.Context,
-	config mcpSpec.RuntimeConfig,
+	config mcpServer.RuntimeConfig,
 ) MCPAuthHealth {
 	defaultStatus := defaultAuthStatus(config)
 	status := defaultStatus
@@ -330,7 +331,7 @@ func (m *AuthManager) BuildAuthHealth(
 		status = mergeArtifactAuthStatus(saved, defaultStatus)
 	}
 
-	if status.AuthMode == mcpSpec.MCPHTTPAuthOAuth &&
+	if status.AuthMode == mcpServer.MCPHTTPAuthOAuth &&
 		status.State != MCPAuthStateAuthorized &&
 		m != nil &&
 		m.oauthTokenStore != nil {
@@ -370,7 +371,7 @@ func (m *AuthManager) BuildAuthHealth(
 			health.OAuthLoopbackError = readinessError
 
 			if !ready &&
-				status.AuthMode == mcpSpec.MCPHTTPAuthOAuth &&
+				status.AuthMode == mcpServer.MCPHTTPAuthOAuth &&
 				status.State != MCPAuthStateAuthorized &&
 				health.LastError == "" {
 				if readinessError == "" {
@@ -399,7 +400,7 @@ func (m *AuthManager) BuildAuthHealth(
 }
 
 func (m *AuthManager) GetAuthStatus(
-	serverRef mcpSpec.ServerID,
+	serverRef mcpServer.ServerID,
 ) (MCPAuthStatus, bool) {
 	if m == nil {
 		return MCPAuthStatus{}, false
@@ -417,8 +418,8 @@ func (m *AuthManager) GetAuthStatus(
 
 func (m *AuthManager) configureAuthorizationCodeOAuth(
 	ctx context.Context,
-	config mcpSpec.RuntimeConfig,
-	output *mcpSpec.PreparedConnection,
+	config mcpServer.RuntimeConfig,
+	output *mcpConnection.PreparedConnection,
 	status *MCPAuthStatus,
 ) error {
 	status.State = MCPAuthStateRequired
@@ -483,7 +484,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 				SoftwareID:      "flexigpt",
 				SoftwareVersion: m.clientVersion,
 				TokenEndpointAuthMethod: string(
-					mcpSpec.MCPHTTPAuthNone,
+					mcpServer.MCPHTTPAuthNone,
 				),
 				ResponseTypes: []string{"code"},
 				GrantTypes: []string{
@@ -550,7 +551,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		sink:  m,
 		status: MCPAuthStatus{
 			Server:   config.Server,
-			AuthMode: mcpSpec.MCPHTTPAuthOAuth,
+			AuthMode: mcpServer.MCPHTTPAuthOAuth,
 			State:    MCPAuthStateRequired,
 			Resource: httpConfig.URL,
 		},
@@ -565,8 +566,8 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 
 func (m *AuthManager) configureClientCredentialsOAuth(
 	ctx context.Context,
-	config mcpSpec.RuntimeConfig,
-	output *mcpSpec.PreparedConnection,
+	config mcpServer.RuntimeConfig,
+	output *mcpConnection.PreparedConnection,
 	status *MCPAuthStatus,
 ) error {
 	httpConfig := config.StreamableHTTP
@@ -614,7 +615,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 		sink:  m,
 		status: MCPAuthStatus{
 			Server:   config.Server,
-			AuthMode: mcpSpec.MCPHTTPAuthClientCredentials,
+			AuthMode: mcpServer.MCPHTTPAuthClientCredentials,
 			State:    MCPAuthStateRequired,
 			Resource: httpConfig.URL,
 		},
@@ -628,11 +629,11 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 }
 
 func defaultAuthStatus(
-	config mcpSpec.RuntimeConfig,
+	config mcpServer.RuntimeConfig,
 ) MCPAuthStatus {
 	status := MCPAuthStatus{
 		Server:   config.Server,
-		AuthMode: mcpSpec.MCPHTTPAuthNone,
+		AuthMode: mcpServer.MCPHTTPAuthNone,
 		State:    MCPAuthStateNotRequired,
 	}
 	if config.StreamableHTTP == nil {
@@ -644,11 +645,11 @@ func defaultAuthStatus(
 	)
 	status.Resource = config.StreamableHTTP.URL
 	switch status.AuthMode {
-	case mcpSpec.MCPHTTPAuthNone:
+	case mcpServer.MCPHTTPAuthNone:
 		status.State = MCPAuthStateNotRequired
-	case mcpSpec.MCPHTTPAuthAPIKey,
-		mcpSpec.MCPHTTPAuthOAuth,
-		mcpSpec.MCPHTTPAuthClientCredentials:
+	case mcpServer.MCPHTTPAuthAPIKey,
+		mcpServer.MCPHTTPAuthOAuth,
+		mcpServer.MCPHTTPAuthClientCredentials:
 		status.State = MCPAuthStateRequired
 	default:
 		status.State = MCPAuthStateError
@@ -680,20 +681,20 @@ func mergeArtifactAuthStatus(
 }
 
 func authConfigured(
-	config mcpSpec.RuntimeConfig,
+	config mcpServer.RuntimeConfig,
 	status MCPAuthStatus,
 	manager *AuthManager,
 ) bool {
 	switch status.AuthMode {
-	case mcpSpec.MCPHTTPAuthNone:
+	case mcpServer.MCPHTTPAuthNone:
 		return true
-	case mcpSpec.MCPHTTPAuthAPIKey:
+	case mcpServer.MCPHTTPAuthAPIKey:
 		return config.StreamableHTTP != nil &&
 			len(config.StreamableHTTP.Headers) != 0
-	case mcpSpec.MCPHTTPAuthClientCredentials:
+	case mcpServer.MCPHTTPAuthClientCredentials:
 		return config.StreamableHTTP != nil &&
 			config.StreamableHTTP.ClientCredentialRef != ""
-	case mcpSpec.MCPHTTPAuthOAuth:
+	case mcpServer.MCPHTTPAuthOAuth:
 		return status.State == MCPAuthStateAuthorized ||
 			oauthBrokerConfigured(manager)
 	default:
@@ -737,12 +738,12 @@ func authHealthState(
 
 func validateArtifactAuthInput(
 	ctx context.Context,
-	config mcpSpec.RuntimeConfig,
+	config mcpServer.RuntimeConfig,
 ) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: MCP auth context is nil",
-			mcpSpec.ErrInvalid,
+			mcpServer.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -755,13 +756,13 @@ func validateArtifactAuthInput(
 }
 
 func normalizeHTTPAuthMode(
-	mode mcpSpec.MCPHTTPAuthMode,
-) mcpSpec.MCPHTTPAuthMode {
-	mode = mcpSpec.MCPHTTPAuthMode(
+	mode mcpServer.MCPHTTPAuthMode,
+) mcpServer.MCPHTTPAuthMode {
+	mode = mcpServer.MCPHTTPAuthMode(
 		strings.TrimSpace(string(mode)),
 	)
 	if mode == "" {
-		return mcpSpec.MCPHTTPAuthNone
+		return mcpServer.MCPHTTPAuthNone
 	}
 	return mode
 }

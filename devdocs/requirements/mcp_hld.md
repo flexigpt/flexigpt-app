@@ -1744,7 +1744,7 @@ Add MCP context to completion request:
 ```go
 type FetchCompletionRequest struct {
   // existing fields...
-  MCP *mcpSpec.MCPConversationContext `json:"mcp,omitempty"`
+  MCP *mcpServer.MCPConversationContext `json:"mcp,omitempty"`
 }
 ```
 

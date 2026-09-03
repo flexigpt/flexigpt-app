@@ -1,4 +1,4 @@
-package spec
+package server
 
 import (
 	"context"
@@ -156,10 +156,7 @@ type RuntimeConfig struct {
 	StreamableHTTP            *MCPRuntimeStreamableHTTPConfig
 	OAuthClientSecretRequired bool
 
-	TrustLevel    mcpPolicy.MCPTrustLevel
-	DefaultPolicy mcpPolicy.MCPServerPolicy
-	ToolPolicies  map[string]mcpPolicy.MCPToolPolicyOverride
-	AppsPolicy    mcpPolicy.MCPAppsPolicy
+	Policy mcpPolicy.MCPPolicy
 
 	SensitiveValues []string
 }
@@ -218,13 +215,7 @@ func (config RuntimeConfig) Validate() error {
 }
 
 func validatePolicy(config RuntimeConfig) error {
-	value := mcpPolicy.MCPPolicy{
-		TrustLevel:    config.TrustLevel,
-		DefaultPolicy: config.DefaultPolicy,
-		ToolPolicies:  config.ToolPolicies,
-		AppsPolicy:    config.AppsPolicy,
-	}
-	if err := mcpPolicy.ValidateMCPPolicy(value); err != nil {
+	if err := mcpPolicy.ValidateMCPPolicy(config.Policy); err != nil {
 		return fmt.Errorf("%w: invalid MCP runtime policy: %w", ErrInvalid, err)
 	}
 	return nil

@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const (
@@ -18,19 +18,19 @@ const (
 
 func RuntimeServerIDForArtifact(
 	ref artifact.ArtifactRef,
-) (mcpSpec.ServerID, error) {
+) (mcpServer.ServerID, error) {
 	if err := ref.Validate(); err != nil {
 		return "", err
 	}
 	raw := string(ref.RootID) + "\x00" + string(ref.ArtifactID)
-	return mcpSpec.ServerID(
+	return mcpServer.ServerID(
 		artifactServerIDPrefix +
 			base64.RawURLEncoding.EncodeToString([]byte(raw)),
 	), nil
 }
 
 func ArtifactRefForRuntimeServerID(
-	id mcpSpec.ServerID,
+	id mcpServer.ServerID,
 ) (artifact.ArtifactRef, error) {
 	if err := id.Validate(); err != nil {
 		return artifact.ArtifactRef{}, err
@@ -69,19 +69,19 @@ func ArtifactRefForRuntimeServerID(
 
 func RuntimeCatalogIDForCollection(
 	ref collection.CollectionRef,
-) (mcpSpec.CatalogID, error) {
+) (mcpServer.CatalogID, error) {
 	if err := ref.Validate(); err != nil {
 		return "", err
 	}
 	raw := string(ref.RootID) + "\x00" + string(ref.CollectionID)
-	return mcpSpec.CatalogID(
+	return mcpServer.CatalogID(
 		artifactCatalogIDPrefix +
 			base64.RawURLEncoding.EncodeToString([]byte(raw)),
 	), nil
 }
 
 func CollectionRefForRuntimeCatalogID(
-	id mcpSpec.CatalogID,
+	id mcpServer.CatalogID,
 ) (collection.CollectionRef, error) {
 	if err := id.Validate(); err != nil {
 		return collection.CollectionRef{}, err

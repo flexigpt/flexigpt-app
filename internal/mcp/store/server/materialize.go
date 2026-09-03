@@ -10,7 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 // MaterializeValidated is for the internal resolver-to-runtime path. Callers
@@ -223,7 +223,7 @@ func materializeValidated(
 
 	if auth.ClientCredentialsInput != "" &&
 		clientCredentialRef == "" &&
-		auth.Mode == mcpSpec.MCPHTTPAuthClientCredentials {
+		auth.Mode == mcpServer.MCPHTTPAuthClientCredentials {
 		return MaterializedServer{}, fmt.Errorf(
 			"%w: required OAuth client credentials are not configured",
 			basespec.ErrReferenceUnresolved,

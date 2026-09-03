@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 var placeholderPattern = regexp.MustCompile(
@@ -66,7 +66,7 @@ type InstallationDeclaration struct {
 }
 
 type AuthenticationDeclaration struct {
-	Mode mcpSpec.MCPHTTPAuthMode `json:"mode"`
+	Mode mcpServer.MCPHTTPAuthMode `json:"mode"`
 
 	ClientCredentialsInput      string `json:"clientCredentialsInput,omitempty"`
 	ClientIDMetadataDocumentURL string `json:"clientIDMetadataDocumentURL,omitempty"`
@@ -129,7 +129,7 @@ type ServerDocument struct {
 // must contain a confidential-client secret. Client-credentials flow always
 // requires a secret even if a document omitted the explicit declaration flag.
 func (d ServerDocument) OAuthClientSecretRequired() bool {
-	if d.Extension.Auth.Mode == mcpSpec.MCPHTTPAuthClientCredentials {
+	if d.Extension.Auth.Mode == mcpServer.MCPHTTPAuthClientCredentials {
 		return true
 	}
 	input := d.Extension.Auth.ClientCredentialsInput

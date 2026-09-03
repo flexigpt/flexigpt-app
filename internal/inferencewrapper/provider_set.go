@@ -19,7 +19,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
@@ -337,7 +337,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 				"MCP App context updates require an MCP conversation context",
 			)
 		}
-		if err := mcpRuntime.ValidateMCPAppContextUpdatesForContext(
+		if err := mcpConversation.ValidateMCPAppContextUpdatesForContext(
 			*mcpContext,
 			body.Current.MCPAppContextUpdates,
 		); err != nil {
@@ -504,7 +504,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	var mcpDebugDetails map[string]any
-	var mcpToolMappings []mcpRuntime.MCPProviderToolMapping
+	var mcpToolMappings []mcpConversation.MCPProviderToolMapping
 	if ps.mcpInferenceBridge != nil && mcpContext != nil {
 		hydrated, err := ps.mcpInferenceBridge.HydrateCompletion(ctx, MCPCompletionHydrationRequest{
 			Context:             mcpContext,

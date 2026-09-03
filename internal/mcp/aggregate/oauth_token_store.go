@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/secret"
 	"golang.org/x/oauth2"
 )
@@ -80,7 +80,7 @@ func (s *OAuthTokenStore) DeleteOAuthToken(
 	return s.secrets.DeleteSecret(ctx, ref)
 }
 
-func oauthTokenSecretRef(serverID mcpSpec.ServerID) (string, error) {
+func oauthTokenSecretRef(serverID mcpServer.ServerID) (string, error) {
 	ref, err := ArtifactRefForRuntimeServerID(serverID)
 	if err != nil {
 		return "", err
@@ -91,5 +91,3 @@ func oauthTokenSecretRef(serverID mcpSpec.ServerID) (string, error) {
 		"token",
 	)
 }
-
-var _ mcpAuth.OAuthTokenStore = (*OAuthTokenStore)(nil)

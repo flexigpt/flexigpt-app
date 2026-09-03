@@ -13,9 +13,10 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const mcpContextInputID = "mcp-context"
@@ -27,41 +28,41 @@ var simpleMCPURITemplateVariableRE = regexp.MustCompile(
 type MCPRuntime interface {
 	Status(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-	) (*mcpRuntime.MCPServerRuntimeSnapshot, error)
+		server mcpServer.ServerID,
+	) (*mcpServer.MCPServerRuntimeSnapshot, error)
 
 	ListTools(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-	) ([]mcpRuntime.MCPToolCapability, error)
+		server mcpServer.ServerID,
+	) ([]mcpServer.MCPToolCapability, error)
 
 	ListResources(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-	) ([]mcpRuntime.MCPResourceRef, error)
+		server mcpServer.ServerID,
+	) ([]mcpServer.MCPResourceRef, error)
 
 	ListResourceTemplates(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-	) ([]mcpRuntime.MCPResourceTemplateRef, error)
+		server mcpServer.ServerID,
+	) ([]mcpServer.MCPResourceTemplateRef, error)
 
 	ListPrompts(
 		ctx context.Context,
-		server mcpSpec.ServerID,
-	) ([]mcpRuntime.MCPPromptRef, error)
+		server mcpServer.ServerID,
+	) ([]mcpServer.MCPPromptRef, error)
 
 	ReadResource(
 		ctx context.Context,
-		server mcpSpec.ServerID,
+		server mcpServer.ServerID,
 		uri string,
-	) (*mcpRuntime.MCPReadResourceResponseBody, error)
+	) (*mcpServer.MCPReadResourceResponseBody, error)
 
 	GetPrompt(
 		ctx context.Context,
-		server mcpSpec.ServerID,
+		server mcpServer.ServerID,
 		name string,
 		arguments map[string]string,
-	) (*mcpRuntime.MCPGetPromptResponseBody, error)
+	) (*mcpServer.MCPGetPromptResponseBody, error)
 }
 
 type MCPInferenceBridge struct {
@@ -73,7 +74,7 @@ func NewMCPInferenceBridge(rt MCPRuntime) *MCPInferenceBridge {
 }
 
 type MCPCompletionHydrationRequest struct {
-	Context *mcpRuntime.MCPConversationContext
+	Context *mcpConversation.MCPConversationContext
 
 	// ExistingToolChoices are parent-created choices. MCP hydration uses them
 	// only to reject duplicate provider names and choice IDs.
@@ -84,16 +85,16 @@ type MCPCompletionHydrationResult struct {
 	SystemPromptParts []string
 	CurrentInputs     []inferenceSpec.InputUnion
 	ToolChoices       []inferenceSpec.ToolChoice
-	ToolMappings      []mcpRuntime.MCPProviderToolMapping
+	ToolMappings      []mcpConversation.MCPProviderToolMapping
 
 	DebugDetails map[string]any
 }
 
 type mcpHydratedContextSection struct {
-	Kind   string           `json:"kind"`
-	Server mcpSpec.ServerID `json:"server"`
-	Name   string           `json:"name,omitempty"`
-	URI    string           `json:"uri,omitempty"`
+	Kind   string             `json:"kind"`
+	Server mcpServer.ServerID `json:"server"`
+	Name   string             `json:"name,omitempty"`
+	URI    string             `json:"uri,omitempty"`
 }
 
 func (b *MCPInferenceBridge) HydrateCompletion(
@@ -107,7 +108,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 		output.DebugDetails = nil
 		return output, nil
 	}
-	if err := mcpRuntime.ValidateMCPConversationContext(*request.Context); err != nil {
+	if err := mcpConversation.ValidateMCPConversationContext(*request.Context); err != nil {
 		return nil, err
 	}
 
@@ -118,7 +119,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 		hydrated             []mcpHydratedContextSection
 	)
 
-	readyServers := make(map[mcpSpec.ServerID]bool)
+	readyServers := make(map[mcpServer.ServerID]bool)
 	choiceSeen := make(map[string]struct{})
 	for _, choice := range request.ExistingToolChoices {
 		if choice.ID != "" {
@@ -141,7 +142,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				statusErr,
 			))
 		} else if status != nil {
-			readyServers[selection.Server] = status.Status == mcpRuntime.MCPServerStatusReady
+			readyServers[selection.Server] = status.Status == mcpServer.MCPServerStatusReady
 			if selection.SnapshotDigest != "" &&
 				status.SnapshotDigest != selection.SnapshotDigest {
 				warnings = append(warnings, fmt.Sprintf(
@@ -179,7 +180,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 			}
 		}
 
-		if selection.ToolExposure == mcpRuntime.MCPToolExposureNone {
+		if selection.ToolExposure == mcpConversation.MCPToolExposureNone {
 			continue
 		}
 
@@ -212,7 +213,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				continue
 			}
 
-			mapping := mcpRuntime.MCPProviderToolMapping{
+			mapping := mcpConversation.MCPProviderToolMapping{
 				Server:           tool.Server,
 				ProviderToolName: tool.ProviderToolName,
 				ChoiceID:         tool.ChoiceID,
@@ -228,7 +229,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 					tool.App.Visibility...,
 				)
 			}
-			if err := mcpRuntime.ValidateMCPProviderToolMapping(mapping); err != nil {
+			if err := mcpConversation.ValidateMCPProviderToolMapping(mapping); err != nil {
 				warnings = append(warnings, fmt.Sprintf(
 					"MCP tool %q was skipped because its invocation mapping is invalid: %v",
 					tool.ToolName,
@@ -245,7 +246,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 	}
 
 	resourceCache := make(
-		map[mcpSpec.ServerID]map[string]mcpRuntime.MCPResourceRef,
+		map[mcpServer.ServerID]map[string]mcpServer.MCPResourceRef,
 	)
 	for _, resource := range request.Context.Resources {
 		if !readyServers[resource.Server] {
@@ -266,7 +267,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				))
 				continue
 			}
-			byURI = make(map[string]mcpRuntime.MCPResourceRef, len(values))
+			byURI = make(map[string]mcpServer.MCPResourceRef, len(values))
 			for _, value := range values {
 				byURI[value.URI] = value
 			}
@@ -324,7 +325,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 	}
 
 	templateCache := make(
-		map[mcpSpec.ServerID]map[string]mcpRuntime.MCPResourceTemplateRef,
+		map[mcpServer.ServerID]map[string]mcpServer.MCPResourceTemplateRef,
 	)
 	for _, selection := range request.Context.ResourceTemplates {
 		if !readyServers[selection.Server] {
@@ -349,7 +350,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				continue
 			}
 			byTemplate = make(
-				map[string]mcpRuntime.MCPResourceTemplateRef,
+				map[string]mcpServer.MCPResourceTemplateRef,
 				len(values),
 			)
 			for _, value := range values {
@@ -433,7 +434,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 	}
 
 	promptCache := make(
-		map[mcpSpec.ServerID]map[string]mcpRuntime.MCPPromptRef,
+		map[mcpServer.ServerID]map[string]mcpServer.MCPPromptRef,
 	)
 	for _, selection := range request.Context.Prompts {
 		if !readyServers[selection.Server] {
@@ -454,7 +455,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				))
 				continue
 			}
-			byName = make(map[string]mcpRuntime.MCPPromptRef, len(values))
+			byName = make(map[string]mcpServer.MCPPromptRef, len(values))
 			for _, value := range values {
 				byName[value.PromptName] = value
 			}
@@ -543,7 +544,7 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 
 	if len(output.ToolMappings) != 0 {
 		output.DebugDetails["toolMappings"] = append(
-			[]mcpRuntime.MCPProviderToolMapping(nil),
+			[]mcpConversation.MCPProviderToolMapping(nil),
 			output.ToolMappings...,
 		)
 	}
@@ -562,17 +563,17 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 
 func (b *MCPInferenceBridge) serverInstructions(
 	ctx context.Context,
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 ) (string, error) {
 	response, err := b.runtime.Status(ctx, server)
 	if err != nil {
 		return "", err
 	}
 	if response == nil ||
-		response.Status != mcpRuntime.MCPServerStatusReady {
+		response.Status != mcpServer.MCPServerStatusReady {
 		return "", fmt.Errorf(
 			"%w: MCP server is not connected",
-			mcpRuntime.ErrMCPRuntimeNotReady,
+			mcpServer.ErrMCPRuntimeNotReady,
 		)
 	}
 	return response.Instructions, nil
@@ -580,8 +581,8 @@ func (b *MCPInferenceBridge) serverInstructions(
 
 func (b *MCPInferenceBridge) toolsForSelection(
 	ctx context.Context,
-	selection mcpRuntime.MCPServerSelection,
-) (toolList []mcpRuntime.MCPToolCapability, warnings []string) {
+	selection mcpConversation.MCPServerSelection,
+) (toolList []mcpServer.MCPToolCapability, warnings []string) {
 	status, err := b.runtime.Status(ctx, selection.Server)
 	if err != nil {
 		return nil, []string{fmt.Sprintf(
@@ -591,7 +592,7 @@ func (b *MCPInferenceBridge) toolsForSelection(
 		)}
 	}
 	if status == nil ||
-		status.Status != mcpRuntime.MCPServerStatusReady {
+		status.Status != mcpServer.MCPServerStatusReady {
 		return nil, []string{fmt.Sprintf(
 			"MCP tools for server %s were skipped because the server is not connected",
 			selection.Server,
@@ -606,27 +607,27 @@ func (b *MCPInferenceBridge) toolsForSelection(
 		)}
 	}
 
-	byName := make(map[string]mcpRuntime.MCPToolCapability, len(tools))
+	byName := make(map[string]mcpServer.MCPToolCapability, len(tools))
 	for _, tool := range tools {
 		byName[tool.ToolName] = tool
 	}
 
 	switch selection.ToolExposure {
-	case mcpRuntime.MCPToolExposureAll:
-		output := make([]mcpRuntime.MCPToolCapability, 0, len(tools))
+	case mcpConversation.MCPToolExposureAll:
+		output := make([]mcpServer.MCPToolCapability, 0, len(tools))
 		for _, tool := range tools {
 			if !tool.Enabled ||
-				tool.TaskSupport == mcpRuntime.MCPTaskSupportRequired ||
-				!mcpRuntime.ToolVisibleToModel(tool.App) {
+				tool.TaskSupport == mcpServer.MCPTaskSupportRequired ||
+				!mcpApps.ToolVisibleToModel(tool.App) {
 				continue
 			}
 			output = append(output, tool)
 		}
 		return output, nil
 
-	case mcpRuntime.MCPToolExposureSelected:
+	case mcpConversation.MCPToolExposureSelected:
 		output := make(
-			[]mcpRuntime.MCPToolCapability,
+			[]mcpServer.MCPToolCapability,
 			0,
 			len(selection.SelectedTools),
 		)
@@ -667,8 +668,8 @@ func (b *MCPInferenceBridge) toolsForSelection(
 				continue
 			}
 			if !tool.Enabled ||
-				tool.TaskSupport == mcpRuntime.MCPTaskSupportRequired ||
-				!mcpRuntime.ToolVisibleToModel(tool.App) {
+				tool.TaskSupport == mcpServer.MCPTaskSupportRequired ||
+				!mcpApps.ToolVisibleToModel(tool.App) {
 				continue
 			}
 
@@ -691,15 +692,15 @@ func (b *MCPInferenceBridge) toolsForSelection(
 }
 
 func constrainSelectedTool(
-	tool mcpRuntime.MCPToolCapability,
-	selection mcpRuntime.MCPToolSelection,
-) (mcpRuntime.MCPToolCapability, error) {
+	tool mcpServer.MCPToolCapability,
+	selection mcpConversation.MCPToolSelection,
+) (mcpServer.MCPToolCapability, error) {
 	output := tool
 
 	if selection.ApprovalRule != nil {
 		if mcpPolicy.ApprovalRuleRank(*selection.ApprovalRule) <
 			mcpPolicy.ApprovalRuleRank(mcpPolicy.NormalizedApprovalRule(tool.ApprovalRule)) {
-			return mcpRuntime.MCPToolCapability{}, errors.New(
+			return mcpServer.MCPToolCapability{}, errors.New(
 				"conversation approval override weakens effective policy",
 			)
 		}
@@ -709,7 +710,7 @@ func constrainSelectedTool(
 	if selection.ExecutionMode != nil {
 		if mcpPolicy.ExecutionModeRank(*selection.ExecutionMode) <
 			mcpPolicy.ExecutionModeRank(mcpPolicy.NormalizedExecutionMode(tool.ExecutionMode)) {
-			return mcpRuntime.MCPToolCapability{}, errors.New(
+			return mcpServer.MCPToolCapability{}, errors.New(
 				"conversation execution override weakens effective policy",
 			)
 		}
@@ -721,7 +722,7 @@ func constrainSelectedTool(
 
 func (b *MCPInferenceBridge) readResourceAsText(
 	ctx context.Context,
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 	uri string,
 ) (string, error) {
 	response, err := b.runtime.ReadResource(ctx, server, uri)
@@ -743,7 +744,7 @@ func (b *MCPInferenceBridge) readResourceAsText(
 
 func (b *MCPInferenceBridge) getPromptAsText(
 	ctx context.Context,
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 	name string,
 	arguments map[string]string,
 ) (string, error) {
@@ -780,7 +781,7 @@ func (b *MCPInferenceBridge) getPromptAsText(
 }
 
 func missingRequiredMCPArguments(
-	definitions map[string]mcpRuntime.MCPArgumentDefinition,
+	definitions map[string]mcpServer.MCPArgumentDefinition,
 	values map[string]string,
 ) []string {
 	missing := make([]string, 0)
@@ -801,7 +802,7 @@ func missingRequiredMCPArguments(
 }
 
 func toolChoiceFromMCPTool(
-	tool mcpRuntime.MCPToolCapability,
+	tool mcpServer.MCPToolCapability,
 ) inferenceSpec.ToolChoice {
 	arguments := maps.Clone(tool.InputSchema)
 	if len(arguments) == 0 {
@@ -839,7 +840,7 @@ func buildMCPSystemPromptPart(text string) string {
 
 func formatMCPContextSection(
 	title string,
-	server mcpSpec.ServerID,
+	server mcpServer.ServerID,
 	name string,
 	body string,
 ) string {
@@ -862,7 +863,7 @@ func resolveMCPResourceTemplateURI(
 	if raw == "" {
 		return "", fmt.Errorf(
 			"%w: empty MCP resource URI template",
-			mcpRuntime.ErrMCPInvalidRuntimeRequest,
+			mcpServer.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 
@@ -890,21 +891,21 @@ func resolveMCPResourceTemplateURI(
 		slices.Sort(names)
 		return "", fmt.Errorf(
 			"%w: missing MCP resource template arguments: %s",
-			mcpRuntime.ErrMCPInvalidRuntimeRequest,
+			mcpServer.ErrMCPInvalidRuntimeRequest,
 			strings.Join(names, ", "),
 		)
 	}
 	if strings.ContainsAny(resolved, "{}") {
 		return "", fmt.Errorf(
 			"%w: unsupported MCP resource URI template syntax",
-			mcpRuntime.ErrMCPInvalidRuntimeRequest,
+			mcpServer.ErrMCPInvalidRuntimeRequest,
 		)
 	}
 	return resolved, nil
 }
 
 func buildMCPAppContextInput(
-	updates []mcpRuntime.MCPAppModelContextUpdate,
+	updates []mcpConversation.MCPAppModelContextUpdate,
 ) *inferenceSpec.InputUnion {
 	if len(updates) == 0 {
 		return nil
@@ -991,12 +992,12 @@ func buildMCPContextInputWithIntro(
 	}
 }
 
-func mcpContentToText(content mcpRuntime.MCPContent) string {
+func mcpContentToText(content mcpServer.MCPContent) string {
 	switch content.Type {
-	case mcpRuntime.MCPContentTypeText:
+	case mcpServer.MCPContentTypeText:
 		return content.Text
 
-	case mcpRuntime.MCPContentTypeResource:
+	case mcpServer.MCPContentTypeResource:
 		if content.Resource == nil {
 			return ""
 		}
@@ -1013,7 +1014,7 @@ func mcpContentToText(content mcpRuntime.MCPContent) string {
 		}
 		return ""
 
-	case mcpRuntime.MCPContentTypeResourceLink:
+	case mcpServer.MCPContentTypeResourceLink:
 		return strings.Join(getNonEmptyStrings(
 			content.Title,
 			content.Name,
@@ -1021,14 +1022,14 @@ func mcpContentToText(content mcpRuntime.MCPContent) string {
 			content.URI,
 		), "\n")
 
-	case mcpRuntime.MCPContentTypeImage:
+	case mcpServer.MCPContentTypeImage:
 		return fmt.Sprintf(
 			"[MCP image content omitted: mime=%s bytes=%d]",
 			content.MIMEType,
 			len(content.Data),
 		)
 
-	case mcpRuntime.MCPContentTypeAudio:
+	case mcpServer.MCPContentTypeAudio:
 		return fmt.Sprintf(
 			"[MCP audio content omitted: mime=%s bytes=%d]",
 			content.MIMEType,

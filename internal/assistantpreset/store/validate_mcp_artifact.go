@@ -5,16 +5,16 @@ import (
 	"errors"
 	"fmt"
 
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 )
 
 func validateStartingMCPContextStructure(
-	starting *mcpRuntime.MCPConversationContext,
+	starting *mcpConversation.MCPConversationContext,
 ) error {
 	if starting == nil {
 		return nil
 	}
-	if err := mcpRuntime.ValidateMCPConversationContext(*starting); err != nil {
+	if err := mcpConversation.ValidateMCPConversationContext(*starting); err != nil {
 		return fmt.Errorf("startingMCPContext: %w", err)
 	}
 	return nil
@@ -22,7 +22,7 @@ func validateStartingMCPContextStructure(
 
 func validateStartingMCPContextReferences(
 	ctx context.Context,
-	starting *mcpRuntime.MCPConversationContext,
+	starting *mcpConversation.MCPConversationContext,
 	lookups ReferenceLookups,
 ) error {
 	if starting == nil || isEmptyMCPConversationContext(*starting) {
@@ -41,7 +41,7 @@ func validateStartingMCPContextReferences(
 }
 
 func isEmptyMCPConversationContext(
-	value mcpRuntime.MCPConversationContext,
+	value mcpConversation.MCPConversationContext,
 ) bool {
 	return len(value.Servers) == 0 &&
 		len(value.Resources) == 0 &&

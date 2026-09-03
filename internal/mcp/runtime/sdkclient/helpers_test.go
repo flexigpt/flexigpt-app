@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -126,7 +127,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		info := appInfoFromMeta(mcpSDK.Meta{
 			"ui": map[string]any{
 				"resourceUri": "ui://demo",
-				"visibility":  []any{mcpRuntime.VisibilityModel, mcpRuntime.VisibilityApp, ""},
+				"visibility":  []any{mcpApps.VisibilityModel, mcpApps.VisibilityApp, ""},
 			},
 		})
 		if info == nil {
@@ -135,7 +136,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		if info.ResourceURI != "ui://demo" {
 			t.Fatalf("ResourceURI = %q, want %q", info.ResourceURI, "ui://demo")
 		}
-		if !slices.Equal(info.Visibility, []string{mcpRuntime.VisibilityModel, mcpRuntime.VisibilityApp}) {
+		if !slices.Equal(info.Visibility, []string{mcpApps.VisibilityModel, mcpApps.VisibilityApp}) {
 			t.Fatalf("Visibility = %#v, want [model app]", info.Visibility)
 		}
 
@@ -144,19 +145,19 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 				"resourceUri": "ui://fallback",
 			},
 		})
-		if !slices.Equal(info2.Visibility, []string{mcpRuntime.VisibilityModel, mcpRuntime.VisibilityApp}) {
+		if !slices.Equal(info2.Visibility, []string{mcpApps.VisibilityModel, mcpApps.VisibilityApp}) {
 			t.Fatalf("default Visibility = %#v, want [model app]", info2.Visibility)
 		}
 
 		if got := taskSupportFromMeta(mcpSDK.Meta{
 			"execution": map[string]any{
-				"taskSupport": string(mcpRuntime.MCPTaskSupportRequired),
+				"taskSupport": string(mcpServer.MCPTaskSupportRequired),
 			},
-		}); got != mcpRuntime.MCPTaskSupportRequired {
-			t.Fatalf("taskSupportFromMeta = %q, want %q", got, mcpRuntime.MCPTaskSupportRequired)
+		}); got != mcpServer.MCPTaskSupportRequired {
+			t.Fatalf("taskSupportFromMeta = %q, want %q", got, mcpServer.MCPTaskSupportRequired)
 		}
 
-		if got := taskSupportFromMeta(nil); got != mcpRuntime.MCPTaskSupportForbidden {
+		if got := taskSupportFromMeta(nil); got != mcpServer.MCPTaskSupportForbidden {
 			t.Fatalf("taskSupportFromMeta(nil) = %q, want forbidden", got)
 		}
 	})
@@ -180,37 +181,37 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			t.Fatalf("toolAnnotationsToSpec = %#v", gotAnn)
 		}
 
-		if got := inferRisk(nil, mcpPolicy.MCPTrustLevelUntrusted); got != mcpRuntime.MCPToolRiskUnknown {
+		if got := inferRisk(nil, mcpPolicy.MCPTrustLevelUntrusted); got != mcpServer.MCPToolRiskUnknown {
 			t.Fatalf("inferRisk(nil) = %q, want unknown", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{ReadOnlyHint: true},
 			mcpPolicy.MCPTrustLevelTrusted,
-		); got != mcpRuntime.MCPToolRiskRead {
+		); got != mcpServer.MCPToolRiskRead {
 			t.Fatalf("inferRisk(read-only, trusted) = %q, want read", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{ReadOnlyHint: true},
 			mcpPolicy.MCPTrustLevelUntrusted,
-		); got != mcpRuntime.MCPToolRiskUnknown {
+		); got != mcpServer.MCPToolRiskUnknown {
 			t.Fatalf("inferRisk(read-only, untrusted) = %q, want unknown", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{OpenWorldHint: &openWorld},
 			mcpPolicy.MCPTrustLevelUntrusted,
-		); got != mcpRuntime.MCPToolRiskOpenWorld {
+		); got != mcpServer.MCPToolRiskOpenWorld {
 			t.Fatalf("inferRisk(open-world) = %q, want openWorld", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{DestructiveHint: &destructive},
 			mcpPolicy.MCPTrustLevelTrusted,
-		); got != mcpRuntime.MCPToolRiskDestructive {
+		); got != mcpServer.MCPToolRiskDestructive {
 			t.Fatalf("inferRisk(destructive) = %q, want destructive", got)
 		}
 		if got := inferRisk(
 			&mcpSDK.ToolAnnotations{DestructiveHint: new(false)},
 			mcpPolicy.MCPTrustLevelTrusted,
-		); got != mcpRuntime.MCPToolRiskWrite {
+		); got != mcpServer.MCPToolRiskWrite {
 			t.Fatalf("inferRisk(non-destructive, trusted) = %q, want write", got)
 		}
 	})
@@ -221,7 +222,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			Meta: map[string]any{"kind": "text"},
 		}
 		gotText := contentToSpec(text)
-		if gotText.Type != mcpRuntime.MCPContentTypeText || gotText.Text != "hello" {
+		if gotText.Type != mcpServer.MCPContentTypeText || gotText.Text != "hello" {
 			t.Fatalf("text content = %#v", gotText)
 		}
 		if gotText.Meta["kind"] != "text" {
@@ -233,7 +234,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			MIMEType: "image/png",
 		}
 		gotImg := contentToSpec(img)
-		if gotImg.Type != mcpRuntime.MCPContentTypeImage || gotImg.MIMEType != "image/png" {
+		if gotImg.Type != mcpServer.MCPContentTypeImage || gotImg.MIMEType != "image/png" {
 			t.Fatalf("image content = %#v", gotImg)
 		}
 		img.Data[0] = 9
@@ -246,7 +247,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			MIMEType: "audio/mpeg",
 		}
 		gotAudio := contentToSpec(audio)
-		if gotAudio.Type != mcpRuntime.MCPContentTypeAudio || gotAudio.MIMEType != "audio/mpeg" {
+		if gotAudio.Type != mcpServer.MCPContentTypeAudio || gotAudio.MIMEType != "audio/mpeg" {
 			t.Fatalf("audio content = %#v", gotAudio)
 		}
 
@@ -268,7 +269,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 			},
 		}
 		gotLink := contentToSpec(link)
-		if gotLink.Type != mcpRuntime.MCPContentTypeResourceLink || gotLink.URI != link.URI || gotLink.Name != "demo" {
+		if gotLink.Type != mcpServer.MCPContentTypeResourceLink || gotLink.URI != link.URI || gotLink.Name != "demo" {
 			t.Fatalf("resource link = %#v", gotLink)
 		}
 		if len(gotLink.Icons) != 1 || gotLink.Icons[0].Source != "https://example.test/icon.png" {
@@ -293,7 +294,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 
 		embedded := &mcpSDK.EmbeddedResource{Resource: rc}
 		gotEmbedded := contentToSpec(embedded)
-		if gotEmbedded.Type != mcpRuntime.MCPContentTypeResource || gotEmbedded.Resource == nil {
+		if gotEmbedded.Type != mcpServer.MCPContentTypeResource || gotEmbedded.Resource == nil {
 			t.Fatalf("embedded resource = %#v", gotEmbedded)
 		}
 
@@ -301,7 +302,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		if len(gotSlice) != 2 {
 			t.Fatalf("contentSliceToSpec len = %d, want 2", len(gotSlice))
 		}
-		if gotSlice[0].Type != mcpRuntime.MCPContentTypeText || gotSlice[1].Type != mcpRuntime.MCPContentTypeImage {
+		if gotSlice[0].Type != mcpServer.MCPContentTypeText || gotSlice[1].Type != mcpServer.MCPContentTypeImage {
 			t.Fatalf("contentSliceToSpec = %#v", gotSlice)
 		}
 
@@ -324,7 +325,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 	t.Run("completionReference", func(t *testing.T) {
 		tests := []struct {
 			name            string
-			req             mcpRuntime.MCPCompleteArgumentRequestBody
+			req             mcpServer.MCPCompleteArgumentRequestBody
 			wantType        string
 			wantName        string
 			wantURI         string
@@ -332,7 +333,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		}{
 			{
 				name: "prompt",
-				req: mcpRuntime.MCPCompleteArgumentRequestBody{
+				req: mcpServer.MCPCompleteArgumentRequestBody{
 					RefType: " prompt ",
 					Name:    "greet",
 				},
@@ -342,21 +343,21 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 
 			{
 				name: "missing prompt name",
-				req: mcpRuntime.MCPCompleteArgumentRequestBody{
+				req: mcpServer.MCPCompleteArgumentRequestBody{
 					RefType: "prompt",
 				},
 				wantErrContains: "completion prompt name required",
 			},
 			{
 				name: "missing resource uri",
-				req: mcpRuntime.MCPCompleteArgumentRequestBody{
+				req: mcpServer.MCPCompleteArgumentRequestBody{
 					RefType: "resource",
 				},
 				wantErrContains: "completion resource uri required",
 			},
 			{
 				name: "invalid ref type",
-				req: mcpRuntime.MCPCompleteArgumentRequestBody{
+				req: mcpServer.MCPCompleteArgumentRequestBody{
 					RefType: "bogus",
 				},
 				wantErrContains: "invalid completion refType",

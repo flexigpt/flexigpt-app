@@ -5,7 +5,8 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+
+	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
@@ -66,8 +67,8 @@ type CompletionRequestBody struct {
 	// (Those are persisted for UI/analytics only.)
 	ToolStoreChoices []toolSpec.ToolStoreChoice `json:"toolStoreChoices,omitempty"`
 
-	MCPContext     *mcpRuntime.MCPConversationContext `json:"mcpContext,omitempty"`
-	SkillSessionID string                             `json:"skillSessionID,omitempty"`
+	MCPContext     *mcpConversation.MCPConversationContext `json:"mcpContext,omitempty"`
+	SkillSessionID string                                  `json:"skillSessionID,omitempty"`
 }
 
 type CompletionRequest struct {
@@ -88,8 +89,8 @@ type CompletionResponseBody struct {
 	// user turn before a later provider-tool call is routed through
 	// InvokeMappedMCPTool. Conversation storage validates the mappings against
 	// that turn's MCPContext.
-	MCPToolMappings []mcpRuntime.MCPProviderToolMapping `json:"mcpToolMappings,omitempty"`
-	WorkspaceUsage  *selection.ConversationUsage        `json:"workspaceUsage,omitempty"`
+	MCPToolMappings []mcpConversation.MCPProviderToolMapping `json:"mcpToolMappings,omitempty"`
+	WorkspaceUsage  *selection.ConversationUsage             `json:"workspaceUsage,omitempty"`
 }
 
 type CompletionResponse struct {

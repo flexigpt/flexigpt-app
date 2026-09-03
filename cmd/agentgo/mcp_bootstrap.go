@@ -13,12 +13,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/sdkclient"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
@@ -106,7 +106,7 @@ func InitMCPWrappers(
 		return err
 	}
 
-	var runtimeManager *mcpRuntime.MCPRuntimeManager
+	var runtimeManager *mcpConnection.MCPRuntimeManager
 	cleanup := func(cause error) error {
 		if runtimeManager != nil {
 			_ = runtimeManager.Close(context.Background())
@@ -130,14 +130,14 @@ func InitMCPWrappers(
 		),
 	)
 
-	clientFactory, err := sdkclient.NewFactory(mcpSpec.ClientInfo{
+	clientFactory, err := sdkclient.NewFactory(mcpServer.ClientInfo{
 		Name:    artifactbuiltin.MCPHostName,
 		Version: artifactbuiltin.MCPHostVersion,
 	})
 	if err != nil {
 		return cleanup(err)
 	}
-	runtimeManager, err = mcpRuntime.NewMCPRuntimeManager(
+	runtimeManager, err = mcpConnection.NewMCPRuntimeManager(
 		source,
 		authManager,
 		clientFactory,
@@ -148,7 +148,7 @@ func InitMCPWrappers(
 
 	toolBridge := invocation.NewToolBridge(
 		runtimeManager,
-		mcpRuntime.NewApprovalManager(5*time.Minute),
+		invocation.NewApprovalManager(5*time.Minute),
 	)
 	lifecycle, err := mcpAggregate.NewLifecycle(storeAPI, runtimeManager)
 	if err != nil {

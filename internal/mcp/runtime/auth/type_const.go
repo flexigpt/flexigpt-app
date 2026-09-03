@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 var (
@@ -49,9 +49,9 @@ type MCPAuthSettings struct {
 }
 
 type MCPAuthStatus struct {
-	Server   mcpSpec.ServerID        `json:"server"`
-	AuthMode mcpSpec.MCPHTTPAuthMode `json:"authMode"`
-	State    MCPAuthState            `json:"state"`
+	Server   mcpServer.ServerID        `json:"server"`
+	AuthMode mcpServer.MCPHTTPAuthMode `json:"authMode"`
+	State    MCPAuthState              `json:"state"`
 
 	Scopes              []string   `json:"scopes,omitempty"`
 	ExpiresAt           *time.Time `json:"expiresAt,omitempty"`
@@ -61,9 +61,9 @@ type MCPAuthStatus struct {
 }
 
 type MCPAuthHealth struct {
-	Server   mcpSpec.ServerID        `json:"server"`
-	AuthMode mcpSpec.MCPHTTPAuthMode `json:"authMode"`
-	State    MCPAuthHealthState      `json:"state"`
+	Server   mcpServer.ServerID        `json:"server"`
+	AuthMode mcpServer.MCPHTTPAuthMode `json:"authMode"`
+	State    MCPAuthHealthState        `json:"state"`
 
 	Configured bool `json:"configured"`
 
@@ -84,7 +84,7 @@ type MCPAuthHealth struct {
 }
 
 type MCPOAuthAuthorization struct {
-	Server           mcpSpec.ServerID `json:"server"`
-	AuthorizationURL string           `json:"authorizationURL"`
-	ExpiresAt        string           `json:"expiresAt,omitempty"`
+	Server           mcpServer.ServerID `json:"server"`
+	AuthorizationURL string             `json:"authorizationURL"`
+	ExpiresAt        string             `json:"expiresAt,omitempty"`
 }

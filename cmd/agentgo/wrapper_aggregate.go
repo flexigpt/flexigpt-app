@@ -16,12 +16,10 @@ import (
 	"github.com/flexigpt/llmtools-go/texttool"
 
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
-	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
-
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
+	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
@@ -29,6 +27,7 @@ import (
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 )
 
 var appSlogLevelVar slog.LevelVar
@@ -58,7 +57,7 @@ func InitAggregrateWrapper(
 	ss *settingStore.SettingStore,
 	ts *toolStore.ToolStore,
 	artifactSkills *skillAggregate.Service,
-	mr *mcpRuntime.MCPRuntimeManager,
+	mr *mcpConnection.MCPRuntimeManager,
 	workspaceAPI *workspace.API,
 ) error {
 	if agg == nil || ts == nil || mps == nil || ss == nil || artifactSkills == nil || workspaceAPI == nil {

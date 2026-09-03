@@ -1,8 +1,4 @@
-package runtime
-
-import (
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
-)
+package server
 
 type MCPGetPromptRequestBody struct {
 	PromptName string            `json:"promptName"          required:"true"`
@@ -10,12 +6,12 @@ type MCPGetPromptRequestBody struct {
 }
 
 type MCPGetPromptRequest struct {
-	Server mcpSpec.ServerID `json:"server" required:"true"`
+	Server ServerID `json:"server" required:"true"`
 	Body   *MCPGetPromptRequestBody
 }
 
 type MCPGetPromptResponseBody struct {
-	Server      mcpSpec.ServerID   `json:"server"`
+	Server      ServerID           `json:"server"`
 	PromptName  string             `json:"promptName"`
 	Description string             `json:"description,omitempty"`
 	Messages    []MCPPromptMessage `json:"messages,omitempty"`
@@ -34,7 +30,7 @@ type MCPCompleteArgumentRequestBody struct {
 }
 
 type MCPCompleteArgumentRequest struct {
-	Server mcpSpec.ServerID `json:"server" required:"true"`
+	Server ServerID `json:"server" required:"true"`
 	Body   *MCPCompleteArgumentRequestBody
 }
 
@@ -49,14 +45,14 @@ type MCPReadResourceRequestBody struct {
 }
 
 type MCPReadResourceRequest struct {
-	Server mcpSpec.ServerID `json:"server" required:"true"`
+	Server ServerID `json:"server" required:"true"`
 	Body   *MCPReadResourceRequestBody
 }
 
 type MCPReadResourceResponseBody struct {
-	Server   mcpSpec.ServerID `json:"server"`
-	URI      string           `json:"uri"`
-	Contents []MCPContent     `json:"contents,omitempty"`
+	Server   ServerID     `json:"server"`
+	URI      string       `json:"uri"`
+	Contents []MCPContent `json:"contents,omitempty"`
 }
 
 type MCPReadResourceResponse struct {

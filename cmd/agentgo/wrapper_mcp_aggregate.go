@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
 	mcpSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/secret"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
@@ -50,14 +50,14 @@ func withMCPAggregateError(
 
 func (w *MCPAggregateWrapper) RuntimeServerIDForArtifact(
 	ref artifact.ArtifactRef,
-) (mcpSpec.ServerID, error) {
-	return withMCPAggregate(w, func(*mcpAggregate.Service) (mcpSpec.ServerID, error) {
+) (mcpServer.ServerID, error) {
+	return withMCPAggregate(w, func(*mcpAggregate.Service) (mcpServer.ServerID, error) {
 		return mcpAggregate.RuntimeServerIDForArtifact(ref)
 	})
 }
 
 func (w *MCPAggregateWrapper) ArtifactRefForRuntimeServerID(
-	id mcpSpec.ServerID,
+	id mcpServer.ServerID,
 ) (artifact.ArtifactRef, error) {
 	return withMCPAggregate(w, func(*mcpAggregate.Service) (artifact.ArtifactRef, error) {
 		return mcpAggregate.ArtifactRefForRuntimeServerID(id)
@@ -66,14 +66,14 @@ func (w *MCPAggregateWrapper) ArtifactRefForRuntimeServerID(
 
 func (w *MCPAggregateWrapper) RuntimeCatalogIDForCollection(
 	ref collection.CollectionRef,
-) (mcpSpec.CatalogID, error) {
-	return withMCPAggregate(w, func(*mcpAggregate.Service) (mcpSpec.CatalogID, error) {
+) (mcpServer.CatalogID, error) {
+	return withMCPAggregate(w, func(*mcpAggregate.Service) (mcpServer.CatalogID, error) {
 		return mcpAggregate.RuntimeCatalogIDForCollection(ref)
 	})
 }
 
 func (w *MCPAggregateWrapper) CollectionRefForRuntimeCatalogID(
-	id mcpSpec.CatalogID,
+	id mcpServer.CatalogID,
 ) (collection.CollectionRef, error) {
 	return withMCPAggregate(w, func(*mcpAggregate.Service) (collection.CollectionRef, error) {
 		return mcpAggregate.CollectionRefForRuntimeCatalogID(id)

@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
 	mcpSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/secret"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
@@ -29,11 +29,11 @@ type BundleServerStore interface {
 }
 
 type AuthState interface {
-	ClearAuthStatus(server mcpSpec.ServerID)
+	ClearAuthStatus(server mcpServer.ServerID)
 
 	BuildAuthHealth(
 		ctx context.Context,
-		config mcpSpec.RuntimeConfig,
+		config mcpServer.RuntimeConfig,
 	) mcpAuth.MCPAuthHealth
 }
 
@@ -98,9 +98,9 @@ func NewService(dependencies Dependencies) (*Service, error) {
 func (s *Service) InspectRuntimeConfig(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (mcpSpec.RuntimeConfig, mcpStoreServer.Resolved, error) {
+) (mcpServer.RuntimeConfig, mcpStoreServer.Resolved, error) {
 	if err := s.ready(); err != nil {
-		return mcpSpec.RuntimeConfig{}, mcpStoreServer.Resolved{}, err
+		return mcpServer.RuntimeConfig{}, mcpStoreServer.Resolved{}, err
 	}
 	return s.source.InspectRuntimeConfig(ctx, ref)
 }
@@ -278,7 +278,7 @@ func (s *Service) PutServerSecret(
 
 	if kind == mcpSecret.MCPSecretKindOAuthClientCredentials {
 		switch installation.Document.Extension.Auth.Mode {
-		case mcpSpec.MCPHTTPAuthNone, mcpSpec.MCPHTTPAuthClientCredentials:
+		case mcpServer.MCPHTTPAuthNone, mcpServer.MCPHTTPAuthClientCredentials:
 		default:
 			return SecretWriteResult{}, fmt.Errorf(
 				"%w: MCP server does not declare OAuth client credentials",
@@ -384,7 +384,7 @@ func (s *Service) GetServerAuthHealth(
 func (s *Service) serverIDsForBundle(
 	ctx context.Context,
 	ref collection.CollectionRef,
-) ([]mcpSpec.ServerID, error) {
+) ([]mcpServer.ServerID, error) {
 	if err := s.ready(); err != nil {
 		return nil, err
 	}
@@ -392,7 +392,7 @@ func (s *Service) serverIDsForBundle(
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[mcpSpec.ServerID]struct{}, len(records))
+	seen := make(map[mcpServer.ServerID]struct{}, len(records))
 	for _, record := range records {
 		serverID, err := RuntimeServerIDForArtifact(record.Ref())
 		if err != nil {
@@ -401,7 +401,7 @@ func (s *Service) serverIDsForBundle(
 		seen[serverID] = struct{}{}
 	}
 
-	output := make([]mcpSpec.ServerID, 0, len(seen))
+	output := make([]mcpServer.ServerID, 0, len(seen))
 	for serverID := range seen {
 		output = append(output, serverID)
 	}
@@ -409,7 +409,7 @@ func (s *Service) serverIDsForBundle(
 	return output, nil
 }
 
-func (s *Service) clearAuthStatuses(ids []mcpSpec.ServerID) {
+func (s *Service) clearAuthStatuses(ids []mcpServer.ServerID) {
 	for _, id := range ids {
 		s.auth.ClearAuthStatus(id)
 	}
@@ -430,7 +430,7 @@ func (s *Service) ready() error {
 		s.bundles == nil ||
 		s.auth == nil ||
 		s.secrets == nil {
-		return mcpSpec.ErrClosed
+		return mcpServer.ErrClosed
 	}
 	return nil
 }

@@ -11,16 +11,16 @@ import (
 	"strings"
 	"sync"
 
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 var uriTemplateVariableRE = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_.-]*)\}`)
 
 type Session struct {
-	server  mcpSpec.ServerID
+	server  mcpServer.ServerID
 	session *mcpSDK.ClientSession
 	logger  *slog.Logger
 }
@@ -45,20 +45,20 @@ func (s *Session) Close(ctx context.Context) error {
 
 func (s *Session) Discover(
 	ctx context.Context,
-	config mcpSpec.RuntimeConfig,
-) (mcpRuntime.MCPDiscoverySnapshot, error) {
+	config mcpServer.RuntimeConfig,
+) (mcpServer.MCPDiscoverySnapshot, error) {
 	if s == nil || s.session == nil {
-		return mcpRuntime.MCPDiscoverySnapshot{}, fmt.Errorf("%w: nil session", mcpRuntime.ErrMCPRuntimeNotReady)
+		return mcpServer.MCPDiscoverySnapshot{}, fmt.Errorf("%w: nil session", mcpServer.ErrMCPRuntimeNotReady)
 	}
 
 	if config.Server != s.server {
-		return mcpRuntime.MCPDiscoverySnapshot{}, fmt.Errorf(
+		return mcpServer.MCPDiscoverySnapshot{}, fmt.Errorf(
 			"%w: SDK session belongs to another MCP Server Artifact",
-			mcpRuntime.ErrMCPRuntimeNotReady,
+			mcpServer.ErrMCPRuntimeNotReady,
 		)
 	}
 
-	out := mcpRuntime.MCPDiscoverySnapshot{
+	out := mcpServer.MCPDiscoverySnapshot{
 		Server: s.server,
 	}
 
@@ -68,7 +68,7 @@ func (s *Session) Discover(
 		out.Instructions = initResult.Instructions
 
 		if initResult.ServerInfo != nil {
-			out.ServerInfo = &mcpRuntime.MCPImplementationInfo{
+			out.ServerInfo = &mcpServer.MCPImplementationInfo{
 				Name:    initResult.ServerInfo.Name,
 				Version: initResult.ServerInfo.Version,
 			}
@@ -82,10 +82,10 @@ func (s *Session) Discover(
 	caps := initResultCapabilities(initResult)
 
 	var (
-		tools             []mcpRuntime.MCPToolCapability
-		resources         []mcpRuntime.MCPResourceRef
-		resourceTemplates []mcpRuntime.MCPResourceTemplateRef
-		prompts           []mcpRuntime.MCPPromptRef
+		tools             []mcpServer.MCPToolCapability
+		resources         []mcpServer.MCPResourceRef
+		resourceTemplates []mcpServer.MCPResourceTemplateRef
+		prompts           []mcpServer.MCPPromptRef
 
 		toolsErr             error
 		resourcesErr         error
@@ -155,9 +155,9 @@ func (s *Session) CallTool(
 	ctx context.Context,
 	toolName string,
 	args map[string]any,
-) (*mcpRuntime.InvokeMCPToolResponseBody, error) {
+) (*mcpServer.InvokeMCPToolResponseBody, error) {
 	if s == nil || s.session == nil {
-		return nil, fmt.Errorf("%w: nil session", mcpRuntime.ErrMCPRuntimeNotReady)
+		return nil, fmt.Errorf("%w: nil session", mcpServer.ErrMCPRuntimeNotReady)
 	}
 	if args == nil {
 		args = map[string]any{}
@@ -174,7 +174,7 @@ func (s *Session) CallTool(
 		res = &mcpSDK.CallToolResult{}
 	}
 
-	return &mcpRuntime.InvokeMCPToolResponseBody{
+	return &mcpServer.InvokeMCPToolResponseBody{
 		Server:            s.server,
 		ToolName:          toolName,
 		Content:           contentSliceToSpec(res.Content),
@@ -186,9 +186,9 @@ func (s *Session) CallTool(
 func (s *Session) ReadResource(
 	ctx context.Context,
 	uri string,
-) (*mcpRuntime.MCPReadResourceResponseBody, error) {
+) (*mcpServer.MCPReadResourceResponseBody, error) {
 	if s == nil || s.session == nil {
-		return nil, fmt.Errorf("%w: nil session", mcpRuntime.ErrMCPRuntimeNotReady)
+		return nil, fmt.Errorf("%w: nil session", mcpServer.ErrMCPRuntimeNotReady)
 	}
 
 	res, err := s.session.ReadResource(ctx, &mcpSDK.ReadResourceParams{
@@ -198,10 +198,10 @@ func (s *Session) ReadResource(
 		return nil, err
 	}
 	if res == nil {
-		return nil, fmt.Errorf("%w: resource read returned nil response", mcpRuntime.ErrMCPRuntimeNotReady)
+		return nil, fmt.Errorf("%w: resource read returned nil response", mcpServer.ErrMCPRuntimeNotReady)
 	}
 
-	contents := make([]mcpRuntime.MCPContent, 0, len(res.Contents))
+	contents := make([]mcpServer.MCPContent, 0, len(res.Contents))
 	for _, rc := range res.Contents {
 		if rc == nil {
 			continue
@@ -209,7 +209,7 @@ func (s *Session) ReadResource(
 		contents = append(contents, contentToSpec(&mcpSDK.EmbeddedResource{Resource: rc}))
 	}
 
-	return &mcpRuntime.MCPReadResourceResponseBody{
+	return &mcpServer.MCPReadResourceResponseBody{
 		Server:   s.server,
 		URI:      uri,
 		Contents: contents,
@@ -220,9 +220,9 @@ func (s *Session) GetPrompt(
 	ctx context.Context,
 	name string,
 	args map[string]string,
-) (*mcpRuntime.MCPGetPromptResponseBody, error) {
+) (*mcpServer.MCPGetPromptResponseBody, error) {
 	if s == nil || s.session == nil {
-		return nil, fmt.Errorf("%w: nil session", mcpRuntime.ErrMCPRuntimeNotReady)
+		return nil, fmt.Errorf("%w: nil session", mcpServer.ErrMCPRuntimeNotReady)
 	}
 
 	res, err := s.session.GetPrompt(ctx, &mcpSDK.GetPromptParams{
@@ -233,20 +233,20 @@ func (s *Session) GetPrompt(
 		return nil, err
 	}
 	if res == nil {
-		return nil, fmt.Errorf("%w: prompt read returned nil response", mcpRuntime.ErrMCPRuntimeNotReady)
+		return nil, fmt.Errorf("%w: prompt read returned nil response", mcpServer.ErrMCPRuntimeNotReady)
 	}
-	messages := make([]mcpRuntime.MCPPromptMessage, 0, len(res.Messages))
+	messages := make([]mcpServer.MCPPromptMessage, 0, len(res.Messages))
 	for _, msg := range res.Messages {
 		if msg == nil {
 			continue
 		}
-		messages = append(messages, mcpRuntime.MCPPromptMessage{
+		messages = append(messages, mcpServer.MCPPromptMessage{
 			Role:    string(msg.Role),
 			Content: contentToSpec(msg.Content),
 		})
 	}
 
-	return &mcpRuntime.MCPGetPromptResponseBody{
+	return &mcpServer.MCPGetPromptResponseBody{
 		Server:      s.server,
 		PromptName:  name,
 		Description: res.Description,
@@ -256,10 +256,10 @@ func (s *Session) GetPrompt(
 
 func (s *Session) Complete(
 	ctx context.Context,
-	req mcpRuntime.MCPCompleteArgumentRequestBody,
-) (*mcpRuntime.MCPCompletionResult, error) {
+	req mcpServer.MCPCompleteArgumentRequestBody,
+) (*mcpServer.MCPCompletionResult, error) {
 	if s == nil || s.session == nil {
-		return nil, fmt.Errorf("%w: nil session", mcpRuntime.ErrMCPRuntimeNotReady)
+		return nil, fmt.Errorf("%w: nil session", mcpServer.ErrMCPRuntimeNotReady)
 	}
 
 	ref, err := completionReference(req)
@@ -281,9 +281,9 @@ func (s *Session) Complete(
 		return nil, err
 	}
 	if res == nil {
-		return nil, fmt.Errorf("%w: completion returned nil response", mcpRuntime.ErrMCPRuntimeNotReady)
+		return nil, fmt.Errorf("%w: completion returned nil response", mcpServer.ErrMCPRuntimeNotReady)
 	}
-	return &mcpRuntime.MCPCompletionResult{
+	return &mcpServer.MCPCompletionResult{
 		Values:  res.Completion.Values,
 		Total:   res.Completion.Total,
 		HasMore: res.Completion.HasMore,
@@ -292,9 +292,9 @@ func (s *Session) Complete(
 
 func (s *Session) listAllTools(
 	ctx context.Context,
-	config mcpSpec.RuntimeConfig,
-) ([]mcpRuntime.MCPToolCapability, error) {
-	out := make([]mcpRuntime.MCPToolCapability, 0)
+	config mcpServer.RuntimeConfig,
+) ([]mcpServer.MCPToolCapability, error) {
+	out := make([]mcpServer.MCPToolCapability, 0)
 	cursor := ""
 
 	for {
@@ -305,7 +305,7 @@ func (s *Session) listAllTools(
 			return nil, err
 		}
 		if res == nil {
-			return nil, fmt.Errorf("%w: tools/list returned nil response", mcpRuntime.ErrMCPRuntimeNotReady)
+			return nil, fmt.Errorf("%w: tools/list returned nil response", mcpServer.ErrMCPRuntimeNotReady)
 		}
 
 		for _, t := range res.Tools {
@@ -316,7 +316,7 @@ func (s *Session) listAllTools(
 			taskSupport := taskSupportFromMeta(t.Meta)
 			approvalRule, executionMode, override, hasOverride := effectiveToolPolicy(config, t.Name)
 			toolDigest := digestAny(t)
-			enabled := taskSupport != mcpRuntime.MCPTaskSupportRequired &&
+			enabled := taskSupport != mcpServer.MCPTaskSupportRequired &&
 				approvalRule != mcpPolicy.MCPApprovalRuleDeny
 			if hasOverride &&
 				override.ExpectedDigest != "" &&
@@ -325,7 +325,7 @@ func (s *Session) listAllTools(
 				enabled = false
 			}
 
-			out = append(out, mcpRuntime.MCPToolCapability{
+			out = append(out, mcpServer.MCPToolCapability{
 				Server:           s.server,
 				ToolName:         t.Name,
 				ProviderToolName: providerToolName(s.server, t.Name),
@@ -339,7 +339,7 @@ func (s *Session) listAllTools(
 				OutputSchema: optionalSchemaToMap(t.OutputSchema),
 
 				Annotations:  toolAnnotationsToSpec(t.Annotations),
-				InferredRisk: inferRisk(t.Annotations, config.TrustLevel),
+				InferredRisk: inferRisk(t.Annotations, config.Policy.TrustLevel),
 
 				ApprovalRule:  approvalRule,
 				ExecutionMode: executionMode,
@@ -364,8 +364,8 @@ func (s *Session) listAllTools(
 
 func (s *Session) listAllResources(
 	ctx context.Context,
-) ([]mcpRuntime.MCPResourceRef, error) {
-	out := make([]mcpRuntime.MCPResourceRef, 0)
+) ([]mcpServer.MCPResourceRef, error) {
+	out := make([]mcpServer.MCPResourceRef, 0)
 	cursor := ""
 
 	for {
@@ -376,14 +376,14 @@ func (s *Session) listAllResources(
 			return nil, err
 		}
 		if res == nil {
-			return nil, fmt.Errorf("%w: resources/list returned nil response", mcpRuntime.ErrMCPRuntimeNotReady)
+			return nil, fmt.Errorf("%w: resources/list returned nil response", mcpServer.ErrMCPRuntimeNotReady)
 		}
 		for _, r := range res.Resources {
 			if r == nil {
 				continue
 			}
 
-			out = append(out, mcpRuntime.MCPResourceRef{
+			out = append(out, mcpServer.MCPResourceRef{
 				Server:      s.server,
 				URI:         r.URI,
 				Name:        r.Name,
@@ -408,8 +408,8 @@ func (s *Session) listAllResources(
 
 func (s *Session) listAllResourceTemplates(
 	ctx context.Context,
-) ([]mcpRuntime.MCPResourceTemplateRef, error) {
-	out := make([]mcpRuntime.MCPResourceTemplateRef, 0)
+) ([]mcpServer.MCPResourceTemplateRef, error) {
+	out := make([]mcpServer.MCPResourceTemplateRef, 0)
 	cursor := ""
 
 	for {
@@ -422,7 +422,7 @@ func (s *Session) listAllResourceTemplates(
 		if res == nil {
 			return nil, fmt.Errorf(
 				"%w: resources/templates/list returned nil response",
-				mcpRuntime.ErrMCPRuntimeNotReady,
+				mcpServer.ErrMCPRuntimeNotReady,
 			)
 		}
 		for _, rt := range res.ResourceTemplates {
@@ -430,7 +430,7 @@ func (s *Session) listAllResourceTemplates(
 				continue
 			}
 
-			out = append(out, mcpRuntime.MCPResourceTemplateRef{
+			out = append(out, mcpServer.MCPResourceTemplateRef{
 				Server:      s.server,
 				URITemplate: rt.URITemplate,
 				Name:        rt.Name,
@@ -456,8 +456,8 @@ func (s *Session) listAllResourceTemplates(
 
 func (s *Session) listAllPrompts(
 	ctx context.Context,
-) ([]mcpRuntime.MCPPromptRef, error) {
-	out := make([]mcpRuntime.MCPPromptRef, 0)
+) ([]mcpServer.MCPPromptRef, error) {
+	out := make([]mcpServer.MCPPromptRef, 0)
 	cursor := ""
 
 	for {
@@ -468,14 +468,14 @@ func (s *Session) listAllPrompts(
 			return nil, err
 		}
 		if res == nil {
-			return nil, fmt.Errorf("%w: prompts/list returned nil response", mcpRuntime.ErrMCPRuntimeNotReady)
+			return nil, fmt.Errorf("%w: prompts/list returned nil response", mcpServer.ErrMCPRuntimeNotReady)
 		}
 		for _, p := range res.Prompts {
 			if p == nil {
 				continue
 			}
 
-			out = append(out, mcpRuntime.MCPPromptRef{
+			out = append(out, mcpServer.MCPPromptRef{
 				Server:      s.server,
 				PromptName:  p.Name,
 				Title:       p.Title,
@@ -509,12 +509,12 @@ func initResultCapabilities(initResult *mcpSDK.InitializeResult) *mcpSDK.ServerC
 	return initResult.Capabilities
 }
 
-func summarizeCapabilities(caps *mcpSDK.ServerCapabilities) *mcpRuntime.MCPServerCapabilitiesSummary {
+func summarizeCapabilities(caps *mcpSDK.ServerCapabilities) *mcpServer.MCPServerCapabilitiesSummary {
 	if caps == nil {
 		return nil
 	}
 
-	out := &mcpRuntime.MCPServerCapabilitiesSummary{
+	out := &mcpServer.MCPServerCapabilitiesSummary{
 		Tools:        caps.Tools != nil,
 		Resources:    caps.Resources != nil,
 		Prompts:      caps.Prompts != nil,
@@ -538,7 +538,7 @@ func summarizeCapabilities(caps *mcpSDK.ServerCapabilities) *mcpRuntime.MCPServe
 }
 
 func effectiveToolPolicy(
-	config mcpSpec.RuntimeConfig,
+	config mcpServer.RuntimeConfig,
 	toolName string,
 ) (
 	mcpPolicy.MCPApprovalRule,
@@ -546,54 +546,26 @@ func effectiveToolPolicy(
 	mcpPolicy.MCPToolPolicyOverride,
 	bool,
 ) {
-	defaults := mcpPolicy.DefaultMCPServerPolicy()
-	approvalRule := config.DefaultPolicy.DefaultApprovalRule
-	executionMode := config.DefaultPolicy.DefaultExecutionMode
-	if approvalRule == "" {
-		approvalRule = defaults.DefaultApprovalRule
-	}
-	if executionMode == "" {
-		executionMode = defaults.DefaultExecutionMode
-	}
-
-	override, found := config.ToolPolicies[toolName]
-	if found {
-		if override.ApprovalRule != nil {
-			approvalRule = *override.ApprovalRule
-		}
-		if override.ExecutionMode != nil {
-			executionMode = *override.ExecutionMode
-		}
-	}
-	return approvalRule, executionMode, override, found
+	return mcpPolicy.EffectiveToolPolicy(config.Policy, toolName)
 }
 
-func inferRisk(a *mcpSDK.ToolAnnotations, trustLevel mcpPolicy.MCPTrustLevel) mcpRuntime.MCPToolRisk {
-	if a == nil {
-		return mcpRuntime.MCPToolRiskUnknown
+func inferRisk(
+	annotations *mcpSDK.ToolAnnotations,
+	trustLevel mcpPolicy.MCPTrustLevel,
+) mcpServer.MCPToolRisk {
+	hints := mcpPolicy.ToolRiskHints{}
+	if annotations != nil {
+		hints.DestructiveHint = annotations.DestructiveHint
+		hints.OpenWorldHint = annotations.OpenWorldHint
+		hints.ReadOnlyHint = annotations.ReadOnlyHint
 	}
 
-	if a.DestructiveHint != nil && *a.DestructiveHint {
-		return mcpRuntime.MCPToolRiskDestructive
-	}
-	if a.OpenWorldHint != nil && *a.OpenWorldHint {
-		return mcpRuntime.MCPToolRiskOpenWorld
-	}
-	// Do not let untrusted server-provided annotations lower risk.
-	if trustLevel != mcpPolicy.MCPTrustLevelTrusted {
-		return mcpRuntime.MCPToolRiskUnknown
-	}
-	if a.ReadOnlyHint {
-		return mcpRuntime.MCPToolRiskRead
-	}
-	if a.DestructiveHint != nil && !*a.DestructiveHint {
-		return mcpRuntime.MCPToolRiskWrite
-	}
-
-	return mcpRuntime.MCPToolRiskUnknown
+	return mcpServer.MCPToolRisk(
+		mcpPolicy.InferToolRisk(hints, trustLevel),
+	)
 }
 
-func appInfoFromMeta(meta mcpSDK.Meta) *mcpRuntime.MCPToolAppInfo {
+func appInfoFromMeta(meta mcpSDK.Meta) *mcpServer.MCPToolAppInfo {
 	if len(meta) == 0 {
 		return nil
 	}
@@ -601,7 +573,7 @@ func appInfoFromMeta(meta mcpSDK.Meta) *mcpRuntime.MCPToolAppInfo {
 	ui := map[string]any{}
 	// The MCP Apps descriptor may live under "_meta.ui" or under the
 	// advertised extension id key (io.modelcontextprotocol/ui).
-	for _, key := range []string{"ui", mcpRuntime.AppExtensionID} {
+	for _, key := range []string{"ui", mcpApps.AppExtensionID} {
 		if raw, ok := meta[key]; ok && raw != nil {
 			for k, v := range anyToMap(raw) {
 				if _, exists := ui[k]; !exists {
@@ -621,7 +593,7 @@ func appInfoFromMeta(meta mcpSDK.Meta) *mcpRuntime.MCPToolAppInfo {
 		return nil
 	}
 
-	out := &mcpRuntime.MCPToolAppInfo{}
+	out := &mcpServer.MCPToolAppInfo{}
 
 	if resourceURI, ok := ui["resourceUri"].(string); ok {
 		resourceURI = strings.TrimSpace(resourceURI)
@@ -641,7 +613,7 @@ func appInfoFromMeta(meta mcpSDK.Meta) *mcpRuntime.MCPToolAppInfo {
 		return nil
 	}
 	if len(out.Visibility) == 0 {
-		out.Visibility = []string{mcpRuntime.VisibilityModel, mcpRuntime.VisibilityApp}
+		out.Visibility = []string{mcpApps.VisibilityModel, mcpApps.VisibilityApp}
 	}
 	return out
 }
@@ -656,7 +628,7 @@ func normalizeAppVisibility(in []string) []string {
 	for _, raw := range in {
 		v := strings.ToLower(strings.TrimSpace(raw))
 		switch v {
-		case mcpRuntime.VisibilityModel, mcpRuntime.VisibilityApp:
+		case mcpApps.VisibilityModel, mcpApps.VisibilityApp:
 		default:
 			continue
 		}
@@ -669,38 +641,38 @@ func normalizeAppVisibility(in []string) []string {
 	return out
 }
 
-func taskSupportFromMeta(meta mcpSDK.Meta) mcpRuntime.MCPTaskSupport {
+func taskSupportFromMeta(meta mcpSDK.Meta) mcpServer.MCPTaskSupport {
 	if len(meta) == 0 {
-		return mcpRuntime.MCPTaskSupportForbidden
+		return mcpServer.MCPTaskSupportForbidden
 	}
 
 	rawExecution, ok := meta["execution"]
 	if !ok || rawExecution == nil {
-		return mcpRuntime.MCPTaskSupportForbidden
+		return mcpServer.MCPTaskSupportForbidden
 	}
 
 	execution := anyToMap(rawExecution)
 	if len(execution) == 0 {
-		return mcpRuntime.MCPTaskSupportForbidden
+		return mcpServer.MCPTaskSupportForbidden
 	}
 
 	switch strings.TrimSpace(fmt.Sprint(execution["taskSupport"])) {
-	case string(mcpRuntime.MCPTaskSupportRequired):
-		return mcpRuntime.MCPTaskSupportRequired
-	case string(mcpRuntime.MCPTaskSupportOptional):
-		return mcpRuntime.MCPTaskSupportOptional
-	case string(mcpRuntime.MCPTaskSupportForbidden):
-		return mcpRuntime.MCPTaskSupportForbidden
+	case string(mcpServer.MCPTaskSupportRequired):
+		return mcpServer.MCPTaskSupportRequired
+	case string(mcpServer.MCPTaskSupportOptional):
+		return mcpServer.MCPTaskSupportOptional
+	case string(mcpServer.MCPTaskSupportForbidden):
+		return mcpServer.MCPTaskSupportForbidden
 	default:
-		return mcpRuntime.MCPTaskSupportForbidden
+		return mcpServer.MCPTaskSupportForbidden
 	}
 }
 
-func completionReference(req mcpRuntime.MCPCompleteArgumentRequestBody) (*mcpSDK.CompleteReference, error) {
+func completionReference(req mcpServer.MCPCompleteArgumentRequestBody) (*mcpSDK.CompleteReference, error) {
 	switch strings.TrimSpace(strings.ToLower(req.RefType)) {
 	case refTypePrompt, refTypeRefPrompt:
 		if strings.TrimSpace(req.Name) == "" {
-			return nil, fmt.Errorf("%w: completion prompt name required", mcpRuntime.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf("%w: completion prompt name required", mcpServer.ErrMCPInvalidRuntimeRequest)
 		}
 		return &mcpSDK.CompleteReference{
 			Type: refTypeRefPrompt,
@@ -709,7 +681,7 @@ func completionReference(req mcpRuntime.MCPCompleteArgumentRequestBody) (*mcpSDK
 
 	case refTypeResource, refTypeRefResource:
 		if strings.TrimSpace(req.Name) == "" {
-			return nil, fmt.Errorf("%w: completion resource uri required", mcpRuntime.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf("%w: completion resource uri required", mcpServer.ErrMCPInvalidRuntimeRequest)
 		}
 		return &mcpSDK.CompleteReference{
 			Type: refTypeRefResource,
@@ -717,22 +689,22 @@ func completionReference(req mcpRuntime.MCPCompleteArgumentRequestBody) (*mcpSDK
 		}, nil
 
 	default:
-		return nil, fmt.Errorf("%w: invalid completion refType %q", mcpRuntime.ErrMCPInvalidRuntimeRequest, req.RefType)
+		return nil, fmt.Errorf("%w: invalid completion refType %q", mcpServer.ErrMCPInvalidRuntimeRequest, req.RefType)
 	}
 }
 
-func promptArgumentsToSpec(in []*mcpSDK.PromptArgument) map[string]mcpRuntime.MCPArgumentDefinition {
+func promptArgumentsToSpec(in []*mcpSDK.PromptArgument) map[string]mcpServer.MCPArgumentDefinition {
 	if len(in) == 0 {
 		return nil
 	}
 
-	out := make(map[string]mcpRuntime.MCPArgumentDefinition, len(in))
+	out := make(map[string]mcpServer.MCPArgumentDefinition, len(in))
 	for _, arg := range in {
 		if arg == nil || strings.TrimSpace(arg.Name) == "" {
 			continue
 		}
 		name := strings.TrimSpace(arg.Name)
-		out[name] = mcpRuntime.MCPArgumentDefinition{
+		out[name] = mcpServer.MCPArgumentDefinition{
 			Name:        name,
 			Description: arg.Description,
 			Required:    arg.Required,
@@ -745,13 +717,13 @@ func promptArgumentsToSpec(in []*mcpSDK.PromptArgument) map[string]mcpRuntime.MC
 	return out
 }
 
-func resourceTemplateArgumentsToSpec(uriTemplate string) map[string]mcpRuntime.MCPArgumentDefinition {
+func resourceTemplateArgumentsToSpec(uriTemplate string) map[string]mcpServer.MCPArgumentDefinition {
 	matches := uriTemplateVariableRE.FindAllStringSubmatch(uriTemplate, -1)
 	if len(matches) == 0 {
 		return nil
 	}
 
-	out := map[string]mcpRuntime.MCPArgumentDefinition{}
+	out := map[string]mcpServer.MCPArgumentDefinition{}
 	for _, match := range matches {
 		if len(match) < 2 {
 			continue
@@ -760,7 +732,7 @@ func resourceTemplateArgumentsToSpec(uriTemplate string) map[string]mcpRuntime.M
 		if name == "" {
 			continue
 		}
-		out[name] = mcpRuntime.MCPArgumentDefinition{
+		out[name] = mcpServer.MCPArgumentDefinition{
 			Name:     name,
 			Required: true,
 		}
@@ -772,11 +744,11 @@ func resourceTemplateArgumentsToSpec(uriTemplate string) map[string]mcpRuntime.M
 	return out
 }
 
-func contentSliceToSpec(in []mcpSDK.Content) []mcpRuntime.MCPContent {
+func contentSliceToSpec(in []mcpSDK.Content) []mcpServer.MCPContent {
 	if len(in) == 0 {
 		return nil
 	}
-	out := make([]mcpRuntime.MCPContent, 0, len(in))
+	out := make([]mcpServer.MCPContent, 0, len(in))
 	for _, c := range in {
 		if c == nil {
 			continue
@@ -786,34 +758,34 @@ func contentSliceToSpec(in []mcpSDK.Content) []mcpRuntime.MCPContent {
 	return out
 }
 
-func contentToSpec(c mcpSDK.Content) mcpRuntime.MCPContent {
+func contentToSpec(c mcpSDK.Content) mcpServer.MCPContent {
 	switch v := c.(type) {
 	case *mcpSDK.TextContent:
-		return mcpRuntime.MCPContent{
-			Type:        mcpRuntime.MCPContentTypeText,
+		return mcpServer.MCPContent{
+			Type:        mcpServer.MCPContentTypeText,
 			Text:        v.Text,
 			Meta:        cloneMap(v.Meta),
 			Annotations: annotationsToMap(v.Annotations),
 		}
 	case *mcpSDK.ImageContent:
-		return mcpRuntime.MCPContent{
-			Type:        mcpRuntime.MCPContentTypeImage,
+		return mcpServer.MCPContent{
+			Type:        mcpServer.MCPContentTypeImage,
 			Data:        append([]byte(nil), v.Data...),
 			MIMEType:    v.MIMEType,
 			Meta:        cloneMap(v.Meta),
 			Annotations: annotationsToMap(v.Annotations),
 		}
 	case *mcpSDK.AudioContent:
-		return mcpRuntime.MCPContent{
-			Type:        mcpRuntime.MCPContentTypeAudio,
+		return mcpServer.MCPContent{
+			Type:        mcpServer.MCPContentTypeAudio,
 			Data:        append([]byte(nil), v.Data...),
 			MIMEType:    v.MIMEType,
 			Meta:        cloneMap(v.Meta),
 			Annotations: annotationsToMap(v.Annotations),
 		}
 	case *mcpSDK.ResourceLink:
-		return mcpRuntime.MCPContent{
-			Type:        mcpRuntime.MCPContentTypeResourceLink,
+		return mcpServer.MCPContent{
+			Type:        mcpServer.MCPContentTypeResourceLink,
 			URI:         v.URI,
 			Name:        v.Name,
 			Title:       v.Title,
@@ -825,8 +797,8 @@ func contentToSpec(c mcpSDK.Content) mcpRuntime.MCPContent {
 			Icons:       iconsToSpec(v.Icons),
 		}
 	case *mcpSDK.EmbeddedResource:
-		return mcpRuntime.MCPContent{
-			Type:        mcpRuntime.MCPContentTypeResource,
+		return mcpServer.MCPContent{
+			Type:        mcpServer.MCPContentTypeResource,
 			Resource:    resourceContentsToSpec(v.Resource),
 			Meta:        cloneMap(v.Meta),
 			Annotations: annotationsToMap(v.Annotations),
@@ -834,23 +806,23 @@ func contentToSpec(c mcpSDK.Content) mcpRuntime.MCPContent {
 	default:
 		raw, err := json.Marshal(c)
 		if err != nil {
-			return mcpRuntime.MCPContent{
-				Type: mcpRuntime.MCPContentTypeText,
+			return mcpServer.MCPContent{
+				Type: mcpServer.MCPContentTypeText,
 				Text: fmt.Sprintf("%T", c),
 			}
 		}
-		return mcpRuntime.MCPContent{
-			Type: mcpRuntime.MCPContentTypeText,
+		return mcpServer.MCPContent{
+			Type: mcpServer.MCPContentTypeText,
 			Text: string(raw),
 		}
 	}
 }
 
-func resourceContentsToSpec(rc *mcpSDK.ResourceContents) *mcpRuntime.MCPResourceContents {
+func resourceContentsToSpec(rc *mcpSDK.ResourceContents) *mcpServer.MCPResourceContents {
 	if rc == nil {
 		return nil
 	}
-	return &mcpRuntime.MCPResourceContents{
+	return &mcpServer.MCPResourceContents{
 		URI:      rc.URI,
 		MIMEType: rc.MIMEType,
 		Text:     rc.Text,
@@ -859,13 +831,13 @@ func resourceContentsToSpec(rc *mcpSDK.ResourceContents) *mcpRuntime.MCPResource
 	}
 }
 
-func iconsToSpec(in []mcpSDK.Icon) []mcpRuntime.MCPIcon {
+func iconsToSpec(in []mcpSDK.Icon) []mcpServer.MCPIcon {
 	if len(in) == 0 {
 		return nil
 	}
-	out := make([]mcpRuntime.MCPIcon, 0, len(in))
+	out := make([]mcpServer.MCPIcon, 0, len(in))
 	for _, icon := range in {
-		out = append(out, mcpRuntime.MCPIcon{
+		out = append(out, mcpServer.MCPIcon{
 			Source:   icon.Source,
 			MIMEType: icon.MIMEType,
 			Sizes:    slices.Clone(icon.Sizes),
@@ -875,11 +847,11 @@ func iconsToSpec(in []mcpSDK.Icon) []mcpRuntime.MCPIcon {
 	return out
 }
 
-func toolAnnotationsToSpec(a *mcpSDK.ToolAnnotations) *mcpRuntime.MCPToolAnnotations {
+func toolAnnotationsToSpec(a *mcpSDK.ToolAnnotations) *mcpServer.MCPToolAnnotations {
 	if a == nil {
 		return nil
 	}
-	return &mcpRuntime.MCPToolAnnotations{
+	return &mcpServer.MCPToolAnnotations{
 		DestructiveHint: a.DestructiveHint,
 		IdempotentHint:  a.IdempotentHint,
 		OpenWorldHint:   a.OpenWorldHint,
@@ -961,7 +933,7 @@ func stringSliceFromAny(v any) []string {
 
 func digestAny(v any) string {
 	raw, _ := json.Marshal(v)
-	return string(mcpSpec.DigestBytes(raw))
+	return string(mcpServer.DigestBytes(raw))
 }
 
 func displayNameForTool(t *mcpSDK.Tool) string {

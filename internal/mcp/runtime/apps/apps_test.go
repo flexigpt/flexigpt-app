@@ -1,8 +1,10 @@
-package runtime
+package apps
 
 import (
 	"strings"
 	"testing"
+
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 func TestToolVisibilityDefaultsAndFilters(t *testing.T) {
@@ -13,7 +15,7 @@ func TestToolVisibilityDefaultsAndFilters(t *testing.T) {
 		t.Fatalf("nil app info should default visible to app")
 	}
 
-	appOnly := &MCPToolAppInfo{Visibility: []string{VisibilityApp}}
+	appOnly := &mcpServer.MCPToolAppInfo{Visibility: []string{VisibilityApp}}
 	if ToolVisibleToModel(appOnly) {
 		t.Fatalf("app-only tool should not be model-visible")
 	}
@@ -21,7 +23,7 @@ func TestToolVisibilityDefaultsAndFilters(t *testing.T) {
 		t.Fatalf("app-only tool should be app-visible")
 	}
 
-	modelOnly := &MCPToolAppInfo{Visibility: []string{VisibilityModel}}
+	modelOnly := &mcpServer.MCPToolAppInfo{Visibility: []string{VisibilityModel}}
 	if !ToolVisibleToModel(modelOnly) {
 		t.Fatalf("model-only tool should be model-visible")
 	}

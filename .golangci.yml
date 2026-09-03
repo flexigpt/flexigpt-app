@@ -435,8 +435,14 @@ linters:
           alias: ${1}Store
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime
           alias: ${1}Runtime
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/spec
-          alias: ${1}Spec
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/conversation
+          alias: ${1}Conversation
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/apps
+          alias: ${1}Apps
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/connection
+          alias: ${1}Connection
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/server
+          alias: ${1}Server
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/auth
           alias: ${1}Auth
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/policy

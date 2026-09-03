@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 var providerNameUnsafe = regexp.MustCompile(`[^A-Za-z0-9_]`)
@@ -17,7 +17,7 @@ const (
 	minToolPartLen         = 8
 )
 
-func providerToolName(serverID mcpSpec.ServerID, toolName string) string {
+func providerToolName(serverID mcpServer.ServerID, toolName string) string {
 	server := sanitizeName(string(serverID))
 	tool := sanitizeName(toolName)
 
@@ -40,7 +40,7 @@ func providerToolName(serverID mcpSpec.ServerID, toolName string) string {
 	return "mcp__" + server + "__" + tool + "__" + suffix
 }
 
-func choiceID(serverID mcpSpec.ServerID, toolName string) string {
+func choiceID(serverID mcpServer.ServerID, toolName string) string {
 	sum := sha256.Sum256([]byte(string(serverID) + "\x00" + toolName))
 	return "mcp-" + hex.EncodeToString(sum[:])[:16]
 }

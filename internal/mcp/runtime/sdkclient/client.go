@@ -11,12 +11,14 @@ import (
 	"strings"
 	"time"
 
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
+
+	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
+	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const (
@@ -31,11 +33,11 @@ const (
 
 type Factory struct {
 	logger     *slog.Logger
-	clientInfo mcpSpec.ClientInfo
+	clientInfo mcpServer.ClientInfo
 }
 
 func NewFactory(
-	clientInfo mcpSpec.ClientInfo,
+	clientInfo mcpServer.ClientInfo,
 ) (*Factory, error) {
 	if err := clientInfo.Validate(); err != nil {
 		return nil, err
@@ -47,7 +49,7 @@ func NewFactory(
 }
 
 func NewFactoryWithLogger(
-	clientInfo mcpSpec.ClientInfo,
+	clientInfo mcpServer.ClientInfo,
 	logger *slog.Logger,
 ) (*Factory, error) {
 	if err := clientInfo.Validate(); err != nil {
@@ -64,15 +66,15 @@ func NewFactoryWithLogger(
 
 func (f *Factory) Connect(
 	ctx context.Context,
-	cfg mcpSpec.RuntimeConfig,
-	resolved mcpSpec.PreparedConnection,
-	events mcpRuntime.ClientNotificationSink,
-) (mcpRuntime.ClientSession, error) {
+	cfg mcpServer.RuntimeConfig,
+	resolved mcpConnection.PreparedConnection,
+	events mcpConnection.ClientNotificationSink,
+) (mcpConnection.ClientSession, error) {
 	if err := cfg.Server.Validate(); err != nil {
 		return nil, err
 	}
 	logger := f.log()
-	emit := func(ctx context.Context, event mcpRuntime.ClientNotification) {
+	emit := func(ctx context.Context, event mcpServer.ClientNotification) {
 		if events != nil {
 			events.OnClientNotification(ctx, event)
 		}
@@ -88,30 +90,30 @@ func (f *Factory) Connect(
 			// Important:
 			// A nil Capabilities value makes the SDK advertise its historical
 			// roots default. FlexiGPT must not advertise roots, sampling, or
-			// elicitation until the product has explicit UX and safety mcpSpec.
-			Capabilities: buildClientCapabilities(cfg.AppsPolicy),
+			// elicitation until the product has explicit UX and safety mcpServer.
+			Capabilities: buildClientCapabilities(cfg.Policy.AppsPolicy),
 
 			KeepAlive: defaultClientKeepAlive,
 
 			ToolListChangedHandler: func(ctx context.Context, req *mcpSDK.ToolListChangedRequest) {
 				logger.Info("mcp tools list changed", "sessionID", safeClientSessionID(req))
-				emit(ctx, mcpRuntime.ClientNotification{
+				emit(ctx, mcpServer.ClientNotification{
 					Server: cfg.Server,
-					Kind:   mcpRuntime.ClientNotificationToolListChanged,
+					Kind:   mcpServer.ClientNotificationToolListChanged,
 				})
 			},
 			PromptListChangedHandler: func(ctx context.Context, req *mcpSDK.PromptListChangedRequest) {
 				logger.Info("mcp prompts list changed", "sessionID", safeClientSessionID(req))
-				emit(ctx, mcpRuntime.ClientNotification{
+				emit(ctx, mcpServer.ClientNotification{
 					Server: cfg.Server,
-					Kind:   mcpRuntime.ClientNotificationPromptListChanged,
+					Kind:   mcpServer.ClientNotificationPromptListChanged,
 				})
 			},
 			ResourceListChangedHandler: func(ctx context.Context, req *mcpSDK.ResourceListChangedRequest) {
 				logger.Info("mcp resources list changed", "sessionID", safeClientSessionID(req))
-				emit(ctx, mcpRuntime.ClientNotification{
+				emit(ctx, mcpServer.ClientNotification{
 					Server: cfg.Server,
-					Kind:   mcpRuntime.ClientNotificationResourceListChanged,
+					Kind:   mcpServer.ClientNotificationResourceListChanged,
 				})
 			},
 			ResourceUpdatedHandler: func(ctx context.Context, req *mcpSDK.ResourceUpdatedNotificationRequest) {
@@ -119,9 +121,9 @@ func (f *Factory) Connect(
 				if req != nil && req.Params != nil {
 					uri = req.Params.URI
 				}
-				emit(ctx, mcpRuntime.ClientNotification{
+				emit(ctx, mcpServer.ClientNotification{
 					Server:      cfg.Server,
-					Kind:        mcpRuntime.ClientNotificationResourceUpdated,
+					Kind:        mcpServer.ClientNotificationResourceUpdated,
 					ResourceURI: uri,
 				})
 			},
@@ -129,9 +131,9 @@ func (f *Factory) Connect(
 				if req == nil || req.Params == nil {
 					return
 				}
-				emit(ctx, mcpRuntime.ClientNotification{
+				emit(ctx, mcpServer.ClientNotification{
 					Server:   cfg.Server,
-					Kind:     mcpRuntime.ClientNotificationProgress,
+					Kind:     mcpServer.ClientNotificationProgress,
 					Progress: req.Params.Progress,
 					Total:    req.Params.Total,
 					Message:  req.Params.Message,
@@ -149,11 +151,11 @@ func (f *Factory) Connect(
 	var transport mcpSDK.Transport
 
 	switch cfg.Transport {
-	case mcpSpec.MCPTransportStdio:
+	case mcpServer.MCPTransportStdio:
 		if cfg.Stdio == nil {
 			return nil, fmt.Errorf(
 				"%w: missing stdio runtime config",
-				mcpRuntime.ErrMCPInvalidRuntimeRequest,
+				mcpServer.ErrMCPInvalidRuntimeRequest,
 			)
 		}
 
@@ -164,7 +166,7 @@ func (f *Factory) Connect(
 			resolved.Env,
 		))
 
-		redactor := mcpAuth.NewSecretRedactor(mcpSpec.PreparedConnection{
+		redactor := mcpAuth.NewSecretRedactor(mcpConnection.PreparedConnection{
 			SensitiveValues: append(
 				append([]string(nil), cfg.SensitiveValues...),
 				resolved.SensitiveValues...,
@@ -182,11 +184,11 @@ func (f *Factory) Connect(
 			TerminateDuration: defaultStdioTerminateDuration,
 		}
 
-	case mcpSpec.MCPTransportStreamableHTTP:
+	case mcpServer.MCPTransportStreamableHTTP:
 		if cfg.StreamableHTTP == nil {
 			return nil, fmt.Errorf(
 				"%w: missing streamable HTTP runtime config",
-				mcpRuntime.ErrMCPInvalidRuntimeRequest,
+				mcpServer.ErrMCPInvalidRuntimeRequest,
 			)
 		}
 
@@ -194,7 +196,7 @@ func (f *Factory) Connect(
 		if err != nil {
 			return nil, fmt.Errorf(
 				"%w: unsupported prepared OAuth handler",
-				mcpRuntime.ErrMCPInvalidRuntimeRequest,
+				mcpServer.ErrMCPInvalidRuntimeRequest,
 			)
 		}
 
@@ -215,7 +217,7 @@ func (f *Factory) Connect(
 	default:
 		return nil, fmt.Errorf(
 			"%w: unsupported MCP runtime transport %q",
-			mcpRuntime.ErrMCPInvalidRuntimeRequest,
+			mcpServer.ErrMCPInvalidRuntimeRequest,
 			cfg.Transport,
 		)
 	}
@@ -227,7 +229,7 @@ func (f *Factory) Connect(
 	if session == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP SDK returned no client session",
-			mcpRuntime.ErrMCPRuntimeNotReady,
+			mcpServer.ErrMCPRuntimeNotReady,
 		)
 	}
 
@@ -306,8 +308,8 @@ func buildClientCapabilities(
 ) *mcpSDK.ClientCapabilities {
 	c := &mcpSDK.ClientCapabilities{}
 	if p.Enabled {
-		c.AddExtension(mcpRuntime.AppExtensionID, map[string]any{
-			"mimeTypes": []string{mcpRuntime.AppMIMEType},
+		c.AddExtension(mcpApps.AppExtensionID, map[string]any{
+			"mimeTypes": []string{mcpApps.AppMIMEType},
 			"host": map[string]any{
 				"platform": "desktop",
 			},

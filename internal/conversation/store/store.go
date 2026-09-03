@@ -13,13 +13,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/selection"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/dirpartition"
 	"github.com/flexigpt/mapstore-go/ftsengine"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 	"github.com/flexigpt/mapstore-go/uuidv7filename"
+
+	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 )
 
 type ConversationCollection struct {
@@ -452,14 +453,14 @@ func validateConversationV1(value *spec.Conversation) error {
 			return err
 		}
 		if message.MCPContext != nil {
-			if err := mcpRuntime.ValidateMCPConversationContext(
+			if err := mcpConversation.ValidateMCPConversationContext(
 				*message.MCPContext,
 			); err != nil {
 				return fmt.Errorf("messages[%d].mcpContext: %w", index, err)
 			}
 		}
 		if len(message.MCPToolMappings) != 0 && message.MCPContext != nil {
-			if err := mcpRuntime.ValidateMCPProviderToolMappingsForContext(
+			if err := mcpConversation.ValidateMCPProviderToolMappingsForContext(
 				*message.MCPContext,
 				message.MCPToolMappings,
 			); err != nil {
@@ -467,7 +468,7 @@ func validateConversationV1(value *spec.Conversation) error {
 			}
 		}
 		if len(message.MCPAppContextUpdates) != 0 && message.MCPContext != nil {
-			if err := mcpRuntime.ValidateMCPAppContextUpdatesForContext(
+			if err := mcpConversation.ValidateMCPAppContextUpdatesForContext(
 				*message.MCPContext,
 				message.MCPAppContextUpdates,
 			); err != nil {
