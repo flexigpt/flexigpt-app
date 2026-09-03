@@ -439,6 +439,8 @@ linters:
           alias: ${1}Spec
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/auth
           alias: ${1}Auth
+        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/runtime/policy
+          alias: ${1}Policy
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/discovery
           alias: ${1}Discovery
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/aggregate
@@ -453,8 +455,6 @@ linters:
           alias: ${1}Schemaadapter
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/secret
           alias: ${1}Secret
-        - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/policy
-          alias: ${1}Policy
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/policy
           alias: ${1}StorePolicy
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/store/overlay

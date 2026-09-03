@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 )

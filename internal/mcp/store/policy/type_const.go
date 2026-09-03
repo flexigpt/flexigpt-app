@@ -3,7 +3,7 @@ package policy
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 )
 
 // Published JSON Schema resources carry $schema and $id metadata. MCP document

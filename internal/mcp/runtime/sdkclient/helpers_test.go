@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

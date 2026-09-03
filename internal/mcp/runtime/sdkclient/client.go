@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
 	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/spec"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"

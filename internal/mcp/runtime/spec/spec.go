@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/policy"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 )
 
 var (
