@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/skill/aggregatecatalog"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 )
@@ -208,6 +209,25 @@ func (s *Service) DescribeArtifactSkill(
 		basespec.ErrReferenceUnresolved,
 		ref.ArtifactID,
 	)
+}
+
+func (s *Service) resyncCollection(
+	ctx context.Context,
+	ref collection.CollectionRef,
+) error {
+	if err := s.ensureConfigured(); err != nil {
+		return err
+	}
+	if err := ref.Validate(); err != nil {
+		return err
+	}
+
+	catalogID, err := aggregatecatalog.CollectionCatalogID(ref)
+	if err != nil {
+		return err
+	}
+
+	return s.runtime.SyncCatalog(ctx, catalogID)
 }
 
 func (s *Service) ensureConfigured() error {

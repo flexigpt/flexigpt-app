@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/skill/aggregatecatalog"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/store/bundle"
@@ -18,9 +19,8 @@ import (
 )
 
 type SkillStoreWrapper struct {
-	api           *skillBundle.API
-	router        *skillStore.ArtifactRouter
-	catalogSource *skillStore.CatalogSource
+	api    *skillBundle.API
+	router *skillStore.ArtifactRouter
 
 	builtInInstaller artifactbuiltin.HydrationInstaller
 }
@@ -58,10 +58,7 @@ func InitSkillStoreWrapper(
 	if err != nil {
 		return err
 	}
-	catalogSource, err := skillStore.NewCatalogSource(router)
-	if err != nil {
-		return err
-	}
+
 	workspaceResolver, err := workspaceadapter.NewStoreLoader(workspaceSkills)
 	if err != nil {
 		return err
@@ -85,7 +82,6 @@ func InitSkillStoreWrapper(
 
 	wrapper.api = api
 	wrapper.router = router
-	wrapper.catalogSource = catalogSource
 
 	skillRegistry, err := schemaadapter.LoadRegistry()
 	if err != nil {
@@ -323,7 +319,7 @@ func (w *SkillStoreWrapper) RuntimeCatalogIDForCollection(
 ) (skillRuntime.CatalogID, error) {
 	return middleware.WithRecoveryResp(
 		func() (skillRuntime.CatalogID, error) {
-			return skillStore.CollectionCatalogID(ref)
+			return aggregatecatalog.CollectionCatalogID(ref)
 		},
 	)
 }
@@ -398,7 +394,6 @@ func (w *SkillStoreWrapper) close() {
 
 	api := w.api
 	w.builtInInstaller = nil
-	w.catalogSource = nil
 
 	w.router = nil
 	w.api = nil

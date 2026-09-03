@@ -8,6 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
+	"github.com/flexigpt/flexigpt-app/internal/skill/aggregatecatalog"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -279,9 +280,18 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed Skill store initialized")
 
+	catalogSource, err := aggregatecatalog.NewCatalogSource(a.skillStoreAPI.router)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize artifact-backed catalog source",
+			"error", err,
+		)
+		panic("failed to initialize managers: skill catalog source initialization failed\n" + err.Error())
+	}
+
 	err = InitSkillRuntimeWrapper(
 		a.skillRuntimeAPI,
-		a.skillStoreAPI.catalogSource,
+		catalogSource,
 	)
 	if err != nil {
 		slog.Error(

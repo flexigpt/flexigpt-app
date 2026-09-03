@@ -1,4 +1,4 @@
-package store
+package aggregatecatalog
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
+	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 )
 
 func TestCollectionCatalogIDRoundTrip(t *testing.T) {
@@ -49,7 +50,7 @@ func TestCollectionCatalogIDRoundTrip(t *testing.T) {
 
 func TestCatalogSourceRejectsMalformedCatalogIDs(t *testing.T) {
 	source := &CatalogSource{
-		router: &ArtifactRouter{},
+		router: &skillStore.ArtifactRouter{},
 	}
 
 	tests := []struct {

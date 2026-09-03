@@ -372,8 +372,7 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 }
 
 // resolveRuntimeLocation performs the Workspace-owned handoff from a selected
-// source-linked record to a native filesystem Skill package. Registration and
-// execution remain owned by internal/skill/runtime.
+// source-linked record to a native filesystem Skill package.
 func (f *Adapter) runtimeSource(
 	ctx context.Context,
 	item spec.LoadPlanItem,
