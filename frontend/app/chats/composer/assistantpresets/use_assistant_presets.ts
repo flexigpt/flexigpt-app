@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { ArtifactRef } from '@/spec/artifact';
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import type {
 	MCPConversationContext,
 	MCPPromptRef,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
+	MCPRuntimeServerID,
 	MCPToolCapability,
 } from '@/spec/mcp_artifact';
 import { MCPToolExposure } from '@/spec/mcp_artifact';
@@ -61,85 +61,88 @@ interface AssistantPresetMCPAvailabilityLookups {
 	promptErrorsByServerKey: Map<string, string>;
 }
 
-function mcpServerKeyForAvailability(server: ArtifactRef): string {
-	return `${server.rootID}::${server.artifactID}`;
+function mcpServerKeyForAvailability(server: MCPRuntimeServerID): string {
+	return server;
 }
 
-function mcpToolKeyForAvailability(server: ArtifactRef, toolName: string): string {
+function mcpToolKeyForAvailability(server: MCPRuntimeServerID, toolName: string): string {
 	return `${mcpServerKeyForAvailability(server)}::${toolName}`;
 }
 
-function mcpResourceKeyForAvailability(server: ArtifactRef, uri: string): string {
+function mcpResourceKeyForAvailability(server: MCPRuntimeServerID, uri: string): string {
 	return `${mcpServerKeyForAvailability(server)}::${uri}`;
 }
 
-function mcpResourceTemplateKeyForAvailability(server: ArtifactRef, uriTemplate: string): string {
+function mcpResourceTemplateKeyForAvailability(server: MCPRuntimeServerID, uriTemplate: string): string {
 	return `${mcpServerKeyForAvailability(server)}::${uriTemplate}`;
 }
 
-function mcpPromptKeyForAvailability(server: ArtifactRef, promptName: string): string {
+function mcpPromptKeyForAvailability(server: MCPRuntimeServerID, promptName: string): string {
 	return `${mcpServerKeyForAvailability(server)}::${promptName}`;
 }
 
-function addMCPServerRef(refsByKey: Map<string, ArtifactRef>, server: ArtifactRef | undefined) {
-	if (!server?.rootID?.trim() || !server.artifactID?.trim()) {
+function addMCPRuntimeServerID(idsByKey: Map<string, MCPRuntimeServerID>, server: unknown) {
+	if (typeof server !== 'string' || server.trim().length === 0) {
 		return;
 	}
 
-	refsByKey.set(mcpServerKeyForAvailability(server), server);
+	idsByKey.set(mcpServerKeyForAvailability(server), server);
 }
 
-function collectMCPServerRefsFromContext(context?: MCPConversationContext): ArtifactRef[] {
-	const refsByKey = new Map<string, ArtifactRef>();
+function collectMCPRuntimeServerIDsFromContext(context?: MCPConversationContext): MCPRuntimeServerID[] {
+	const idsByKey = new Map<string, MCPRuntimeServerID>();
 
 	for (const server of context?.servers ?? []) {
-		addMCPServerRef(refsByKey, server.server);
+		addMCPRuntimeServerID(idsByKey, server.server);
 
 		for (const tool of server.selectedTools ?? []) {
-			addMCPServerRef(refsByKey, tool.server ?? server.server);
+			addMCPRuntimeServerID(idsByKey, tool.server ?? server.server);
 		}
 	}
 
 	for (const resource of context?.resources ?? []) {
-		addMCPServerRef(refsByKey, resource.server);
+		addMCPRuntimeServerID(idsByKey, resource.server);
 	}
 
 	for (const template of context?.resourceTemplates ?? []) {
-		addMCPServerRef(refsByKey, template.server);
+		addMCPRuntimeServerID(idsByKey, template.server);
 	}
 
 	for (const prompt of context?.prompts ?? []) {
-		addMCPServerRef(refsByKey, prompt.server);
+		addMCPRuntimeServerID(idsByKey, prompt.server);
 	}
 
-	return [...refsByKey.values()];
+	return [...idsByKey.values()];
 }
 
-function collectMCPServerRefsFromPresets(presets: AssistantPreset[]): ArtifactRef[] {
-	const refsByKey = new Map<string, ArtifactRef>();
+function collectMCPRuntimeServerIDsFromPresets(presets: AssistantPreset[]): MCPRuntimeServerID[] {
+	const idsByKey = new Map<string, MCPRuntimeServerID>();
 
 	for (const preset of presets) {
-		for (const ref of collectMCPServerRefsFromContext(preset.startingMCPContext)) {
-			refsByKey.set(mcpServerKeyForAvailability(ref), ref);
+		for (const server of collectMCPRuntimeServerIDsFromContext(preset.startingMCPContext)) {
+			idsByKey.set(mcpServerKeyForAvailability(server), server);
 		}
 	}
 
-	return [...refsByKey.values()];
+	return [...idsByKey.values()];
 }
 
 async function loadAssistantPresetMCPAvailabilityLookups(
 	presets: AssistantPreset[]
 ): Promise<AssistantPresetMCPAvailabilityLookups | undefined> {
-	const serverRefs = collectMCPServerRefsFromPresets(presets);
-	if (serverRefs.length === 0) {
+	const runtimeServerIDs = collectMCPRuntimeServerIDsFromPresets(presets);
+	if (runtimeServerIDs.length === 0) {
 		return undefined;
 	}
 
 	const bundleViews = await loadMCPBundleViews();
 	const serverGroups = await Promise.all(bundleViews.map(bundle => loadMCPServerViews(bundle)));
-	const serversByKey = new Map(
-		serverGroups.flat().map(server => [mcpServerKeyForAvailability(server.ref), server] as const)
-	);
+	const serversByKey = new Map<string, Awaited<ReturnType<typeof loadMCPServerViews>>[number]>();
+	for (const server of serverGroups.flat()) {
+		if (server.runtimeServerID) {
+			serversByKey.set(mcpServerKeyForAvailability(server.runtimeServerID), server);
+		}
+	}
 	const toolsByKey = new Map<string, MCPToolCapability>();
 	const resourcesByKey = new Map<string, MCPResourceRef>();
 	const resourceTemplatesByKey = new Map<string, MCPResourceTemplateRef>();
@@ -150,67 +153,73 @@ async function loadAssistantPresetMCPAvailabilityLookups(
 	const promptErrorsByServerKey = new Map<string, string>();
 
 	await Promise.all(
-		serverRefs
-			.filter(server => serversByKey.has(mcpServerKeyForAvailability(server)))
-			.map(async ref => {
-				const serverKey = mcpServerKeyForAvailability(ref);
-				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = await Promise.allSettled([
-					mcpAPI.listMCPServerTools(ref),
-					mcpAPI.listMCPServerResources(ref),
-					mcpAPI.listMCPServerResourceTemplates(ref),
-					mcpAPI.listMCPServerPrompts(ref),
-				]);
+		runtimeServerIDs.map(async runtimeServerID => {
+			const installedServer = serversByKey.get(mcpServerKeyForAvailability(runtimeServerID));
+			if (!installedServer) {
+				return;
+			}
 
-				if (toolsResult.status === 'fulfilled') {
-					for (const tool of toolsResult.value) {
-						toolsByKey.set(mcpToolKeyForAvailability(tool.server, tool.toolName), tool);
-					}
-				} else {
-					toolErrorsByServerKey.set(
-						serverKey,
-						getErrorMessage(toolsResult.reason, `Could not verify MCP tools for "${ref.artifactID}".`)
+			const serverKey = mcpServerKeyForAvailability(runtimeServerID);
+			const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = await Promise.allSettled([
+				mcpAPI.listMCPServerTools(runtimeServerID),
+				mcpAPI.listMCPServerResources(runtimeServerID),
+				mcpAPI.listMCPServerResourceTemplates(runtimeServerID),
+				mcpAPI.listMCPServerPrompts(runtimeServerID),
+			]);
+
+			if (toolsResult.status === 'fulfilled') {
+				for (const tool of toolsResult.value) {
+					toolsByKey.set(mcpToolKeyForAvailability(tool.server, tool.toolName), tool);
+				}
+			} else {
+				toolErrorsByServerKey.set(
+					serverKey,
+					getErrorMessage(toolsResult.reason, `Could not verify MCP tools for "${installedServer.displayName}".`)
+				);
+			}
+
+			if (resourcesResult.status === 'fulfilled') {
+				for (const resource of resourcesResult.value) {
+					resourcesByKey.set(mcpResourceKeyForAvailability(resource.server, resource.uri), resource);
+				}
+			} else {
+				resourceErrorsByServerKey.set(
+					serverKey,
+					getErrorMessage(
+						resourcesResult.reason,
+						`Could not verify MCP resources for "${installedServer.displayName}".`
+					)
+				);
+			}
+
+			if (resourceTemplatesResult.status === 'fulfilled') {
+				for (const template of resourceTemplatesResult.value) {
+					resourceTemplatesByKey.set(
+						mcpResourceTemplateKeyForAvailability(template.server, template.uriTemplate),
+						template
 					);
 				}
+			} else {
+				resourceTemplateErrorsByServerKey.set(
+					serverKey,
+					getErrorMessage(
+						resourceTemplatesResult.reason,
+						`Could not verify MCP resource templates for "${installedServer.displayName}".`
+					)
+				);
+			}
 
-				if (resourcesResult.status === 'fulfilled') {
-					for (const resource of resourcesResult.value) {
-						resourcesByKey.set(mcpResourceKeyForAvailability(resource.server, resource.uri), resource);
-					}
-				} else {
-					resourceErrorsByServerKey.set(
-						serverKey,
-						getErrorMessage(resourcesResult.reason, `Could not verify MCP resources for "${ref.artifactID}".`)
-					);
+			if (promptsResult.status === 'fulfilled') {
+				for (const prompt of promptsResult.value) {
+					promptsByKey.set(mcpPromptKeyForAvailability(prompt.server, prompt.promptName), prompt);
 				}
-
-				if (resourceTemplatesResult.status === 'fulfilled') {
-					for (const template of resourceTemplatesResult.value) {
-						resourceTemplatesByKey.set(
-							mcpResourceTemplateKeyForAvailability(template.server, template.uriTemplate),
-							template
-						);
-					}
-				} else {
-					resourceTemplateErrorsByServerKey.set(
-						serverKey,
-						getErrorMessage(
-							resourceTemplatesResult.reason,
-							`Could not verify MCP resource templates for "${ref.artifactID}".`
-						)
-					);
-				}
-
-				if (promptsResult.status === 'fulfilled') {
-					for (const prompt of promptsResult.value) {
-						promptsByKey.set(mcpPromptKeyForAvailability(prompt.server, prompt.promptName), prompt);
-					}
-				} else {
-					promptErrorsByServerKey.set(
-						serverKey,
-						getErrorMessage(promptsResult.reason, `Could not verify MCP prompts for "${ref.artifactID}".`)
-					);
-				}
-			})
+			} else {
+				promptErrorsByServerKey.set(
+					serverKey,
+					getErrorMessage(promptsResult.reason, `Could not verify MCP prompts for "${installedServer.displayName}".`)
+				);
+			}
+		})
 	);
 
 	return {
@@ -230,8 +239,8 @@ function getAssistantPresetMCPAvailability(
 	context: MCPConversationContext | undefined,
 	lookups: AssistantPresetMCPAvailabilityLookups | undefined
 ): Pick<AssistantPresetOptionItem, 'isSelectable' | 'availabilityReason'> {
-	const serverRefs = collectMCPServerRefsFromContext(context);
-	if (serverRefs.length === 0) {
+	const runtimeServerIDs = collectMCPRuntimeServerIDsFromContext(context);
+	if (runtimeServerIDs.length === 0) {
 		return { isSelectable: true };
 	}
 
@@ -242,13 +251,13 @@ function getAssistantPresetMCPAvailability(
 		};
 	}
 
-	for (const ref of serverRefs) {
-		const serverKey = mcpServerKeyForAvailability(ref);
+	for (const runtimeServerID of runtimeServerIDs) {
+		const serverKey = mcpServerKeyForAvailability(runtimeServerID);
 		const server = lookups.serversByKey.get(serverKey);
 		if (!server) {
 			return {
 				isSelectable: false,
-				availabilityReason: `MCP server "${ref.artifactID}" no longer exists or is inaccessible.`,
+				availabilityReason: `MCP server "${runtimeServerID}" no longer exists or is inaccessible.`,
 			};
 		}
 		if (!server.artifact.enabled) {
@@ -281,7 +290,7 @@ function getAssistantPresetMCPAvailability(
 					isSelectable: false,
 					availabilityReason:
 						lookups.toolErrorsByServerKey.get(serverKey) ??
-						`MCP tool "${selection.toolName}" no longer exists on server "${toolServer.artifactID}".`,
+						`MCP tool "${selection.toolName}" no longer exists on server "${toolServer}".`,
 				};
 			}
 
@@ -309,7 +318,7 @@ function getAssistantPresetMCPAvailability(
 				isSelectable: false,
 				availabilityReason:
 					lookups.resourceErrorsByServerKey.get(serverKey) ??
-					`MCP resource "${resource.uri}" no longer exists on server "${resource.server.artifactID}".`,
+					`MCP resource "${resource.uri}" no longer exists on server "${resource.server}".`,
 			};
 		}
 	}
@@ -322,7 +331,7 @@ function getAssistantPresetMCPAvailability(
 				isSelectable: false,
 				availabilityReason:
 					lookups.resourceTemplateErrorsByServerKey.get(serverKey) ??
-					`MCP resource template "${template.uriTemplate}" no longer exists on server "${template.server.artifactID}".`,
+					`MCP resource template "${template.uriTemplate}" no longer exists on server "${template.server}".`,
 			};
 		}
 	}
@@ -335,7 +344,7 @@ function getAssistantPresetMCPAvailability(
 				isSelectable: false,
 				availabilityReason:
 					lookups.promptErrorsByServerKey.get(serverKey) ??
-					`MCP prompt "${prompt.promptName}" no longer exists on server "${prompt.server.artifactID}".`,
+					`MCP prompt "${prompt.promptName}" no longer exists on server "${prompt.server}".`,
 			};
 		}
 	}

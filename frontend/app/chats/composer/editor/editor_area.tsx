@@ -25,11 +25,15 @@ import {
 import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
 
-import type { ArtifactRef } from '@/spec/artifact';
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
 import { UIToolCallStatus } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/mcp_artifact';
+import type {
+	MCPAppModelContextUpdate,
+	MCPConversationContext,
+	MCPRuntimeServerID,
+	MCPToolSelection,
+} from '@/spec/mcp_artifact';
 import { MCPExecutionMode } from '@/spec/mcp_artifact';
 import type { SkillRef } from '@/spec/skill';
 import { SkillSessionSyncMode } from '@/spec/skill';
@@ -181,8 +185,8 @@ function mergeMCPToolSelection(selection: MCPToolSelection, contextSelection: MC
 	};
 }
 
-function sameArtifactRef(left: ArtifactRef | undefined, right: ArtifactRef | undefined): boolean {
-	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
+function sameMCPRuntimeServerID(left: MCPRuntimeServerID | undefined, right: MCPRuntimeServerID | undefined): boolean {
+	return left === right;
 }
 
 function findMCPToolSelectionForCall(
@@ -215,7 +219,7 @@ function findMCPToolSelectionForCall(
 	}
 
 	return contextSelections.find(candidate => {
-		if (!sameArtifactRef(selection.server, candidate.server)) {
+		if (!sameMCPRuntimeServerID(selection.server, candidate.server)) {
 			return false;
 		}
 		if (selection.toolName && selection.toolName === candidate.toolName) {

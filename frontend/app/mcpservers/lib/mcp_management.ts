@@ -12,6 +12,7 @@ import type {
 	MCPInputDeclaration,
 	MCPPolicy,
 	MCPPolicyDocument,
+	MCPRuntimeServerID,
 	MCPSecretKind,
 	MCPServerData,
 	MCPServerDocument,
@@ -56,6 +57,7 @@ export interface MCPBundleView {
 
 export interface MCPServerView {
 	ref: ArtifactRef;
+	runtimeServerID?: MCPRuntimeServerID;
 	artifact: ArtifactRecord;
 	bundle: ArtifactCollectionRef;
 	logicalName: string;
@@ -544,10 +546,14 @@ export async function loadMCPServerViews(bundle: MCPBundleView): Promise<MCPServ
 
 	const views = await mapWithConcurrency(artifacts, INSTALLATION_READ_CONCURRENCY, async artifact => {
 		try {
-			const installation = await mcpAPI.getMCPServerInstallation({
+			const serverRef: ArtifactRef = {
 				rootID: artifact.rootID,
 				artifactID: artifact.id,
-			});
+			};
+			const [installation, runtimeServerID] = await Promise.all([
+				mcpAPI.getMCPServerInstallation(serverRef),
+				mcpAPI.runtimeServerIDForArtifact(serverRef),
+			]);
 			const policyDocument = getPolicyForServer(document, installation.document);
 			const policyReference = installation.document.extension.policy?.ref;
 			const policyArtifact = policyReference
@@ -555,10 +561,8 @@ export async function loadMCPServerViews(bundle: MCPBundleView): Promise<MCPServ
 				: undefined;
 
 			return {
-				ref: {
-					rootID: artifact.rootID,
-					artifactID: artifact.id,
-				},
+				ref: serverRef,
+				runtimeServerID,
 				artifact,
 				bundle: bundle.ref,
 				logicalName: installation.document.logicalName,
@@ -1508,6 +1512,14 @@ export async function applyMCPServerSetup(
 
 export function isServerOperational(server: MCPServerView): boolean {
 	return Boolean(server.document && server.installation && server.artifact.state === ArtifactState.Available);
+}
+
+export function requireMCPRuntimeServerID(server: MCPServerView): MCPRuntimeServerID {
+	if (!server.runtimeServerID) {
+		throw new Error(`MCP runtime identity is unavailable for server "${serverDisplayName(server)}".`);
+	}
+
+	return server.runtimeServerID;
 }
 
 export function serverRefLabel(server: MCPServerView): string {

@@ -60,6 +60,7 @@ import type {
 	MCPReplaceBundleDocumentInput,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
+	MCPRuntimeServerID,
 	MCPSecretKind,
 	MCPSecretWriteResult,
 	MCPServerData,
@@ -613,6 +614,14 @@ export interface IAssistantPresetStoreAPI {
 }
 
 export interface IMCPAPI {
+	/**
+	 * Aggregate-bound identity translation between durable Artifact Store
+	 * identities and Runtime-owned opaque identities.
+	 */
+	runtimeServerIDForArtifact(artifact: ArtifactRef): Promise<MCPRuntimeServerID>;
+
+	artifactRefForRuntimeServerID(server: MCPRuntimeServerID): Promise<ArtifactRef>;
+
 	createMCPBundle(input: MCPCreateBundleInput): Promise<MCPBundle>;
 	getMCPBundle(bundle: ArtifactCollectionRef): Promise<MCPBundle>;
 	listMCPBundles(rootID: ArtifactRootID): Promise<MCPBundle[]>;
@@ -646,23 +655,23 @@ export interface IMCPAPI {
 		data: MCPServerData
 	): Promise<void>;
 
-	connectMCPServer(server: ArtifactRef): Promise<MCPServerRuntimeSnapshot>;
-	disconnectMCPServer(server: ArtifactRef): Promise<void>;
-	refreshMCPServer(server: ArtifactRef): Promise<MCPServerRuntimeSnapshot>;
-	getMCPServerStatus(server: ArtifactRef): Promise<MCPServerRuntimeSnapshot>;
-	listMCPServerTools(server: ArtifactRef): Promise<MCPToolCapability[]>;
-	listMCPServerResources(server: ArtifactRef): Promise<MCPResourceRef[]>;
-	listMCPServerResourceTemplates(server: ArtifactRef): Promise<MCPResourceTemplateRef[]>;
-	listMCPServerPrompts(server: ArtifactRef): Promise<MCPPromptRef[]>;
+	connectMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
+	disconnectMCPServer(server: MCPRuntimeServerID): Promise<void>;
+	refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
+	getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
+	listMCPServerTools(server: MCPRuntimeServerID): Promise<MCPToolCapability[]>;
+	listMCPServerResources(server: MCPRuntimeServerID): Promise<MCPResourceRef[]>;
+	listMCPServerResourceTemplates(server: MCPRuntimeServerID): Promise<MCPResourceTemplateRef[]>;
+	listMCPServerPrompts(server: MCPRuntimeServerID): Promise<MCPPromptRef[]>;
 
-	readMCPResource(server: ArtifactRef, uri: string): Promise<MCPReadResourceResponseBody>;
+	readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody>;
 	getMCPPrompt(
-		server: ArtifactRef,
+		server: MCPRuntimeServerID,
 		promptName: string,
 		promptArguments?: Record<string, string>
 	): Promise<MCPGetPromptResponseBody>;
 	completeMCPArgument(
-		server: ArtifactRef,
+		server: MCPRuntimeServerID,
 		refType: MCPCompletionRefType,
 		name: string,
 		argumentName: string,
@@ -670,12 +679,12 @@ export interface IMCPAPI {
 		context?: Record<string, string>
 	): Promise<MCPCompletionResult>;
 
-	evaluateMCPToolCall(server: ArtifactRef, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation>;
+	evaluateMCPToolCall(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation>;
 	evaluateMappedMCPToolCall(
 		mapping: MCPProviderToolMapping,
 		request: InvokeMCPToolRequestBody
 	): Promise<MCPApprovalEvaluation>;
-	invokeMCPTool(server: ArtifactRef, request: InvokeMCPToolRequestBody): Promise<MCPInvokeToolResponseBody>;
+	invokeMCPTool(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPInvokeToolResponseBody>;
 	invokeMappedMCPTool(
 		mapping: MCPProviderToolMapping,
 		request: InvokeMCPToolRequestBody
@@ -684,7 +693,7 @@ export interface IMCPAPI {
 
 	getMCPServerAuthHealth(server: ArtifactRef): Promise<MCPAuthHealth>;
 	listPendingMCPOAuthAuthorizations(): Promise<MCPOAuthAuthorization[]>;
-	cancelPendingMCPOAuthAuthorization(server: ArtifactRef): Promise<boolean>;
+	cancelPendingMCPOAuthAuthorization(server: MCPRuntimeServerID): Promise<boolean>;
 	putMCPServerSecret(
 		server: ArtifactRef,
 		kind: MCPSecretKind,

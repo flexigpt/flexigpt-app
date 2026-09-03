@@ -1,4 +1,3 @@
-import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPArgumentDefinition,
 	MCPAuthHealth,
@@ -8,6 +7,7 @@ import type {
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPResourceTemplateSelection,
+	MCPRuntimeServerID,
 	MCPServerRuntimeSnapshot,
 	MCPServerSelection,
 	MCPToolCapability,
@@ -21,6 +21,7 @@ import type { MCPBundleView, MCPServerView } from '@/mcpservers/lib/mcp_manageme
 export interface MCPComposerServerOption {
 	bundle: MCPBundleView;
 	server: MCPServerView;
+	runtimeServerID: MCPRuntimeServerID;
 	transport: MCPTransportType;
 	runtime?: MCPServerRuntimeSnapshot;
 	authHealth?: MCPAuthHealth;
@@ -36,7 +37,7 @@ export interface MCPComposerServerOption {
 }
 
 export interface MCPComposerServerSelection {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	snapshotDigest?: string;
 	toolExposure: MCPToolExposure;
 	selectedTools: MCPToolSelection[];
@@ -60,36 +61,36 @@ export interface UseComposerMCPResult {
 	argumentsBlocked: boolean;
 
 	refreshAll: () => Promise<void>;
-	refreshServer: (server: ArtifactRef) => Promise<void>;
-	ensureDiscoveryLoaded: (server: ArtifactRef) => Promise<void>;
+	refreshServer: (server: MCPRuntimeServerID) => Promise<void>;
+	ensureDiscoveryLoaded: (server: MCPRuntimeServerID) => Promise<void>;
 	prepareForSubmit: () => Promise<MCPConversationContext | undefined>;
 
-	connectServer: (server: ArtifactRef) => Promise<void>;
-	disconnectServer: (server: ArtifactRef) => Promise<void>;
-	cancelOAuth: (server: ArtifactRef) => Promise<void>;
+	connectServer: (server: MCPRuntimeServerID) => Promise<void>;
+	disconnectServer: (server: MCPRuntimeServerID) => Promise<void>;
+	cancelOAuth: (server: MCPRuntimeServerID) => Promise<void>;
 	openAuthURL: (url: string) => void;
 
 	setServerSelected: (option: MCPComposerServerOption, selected: boolean) => void;
-	ensureServerSelected: (server: ArtifactRef) => boolean;
-	setToolExposure: (server: ArtifactRef, exposure: MCPToolExposure) => void;
-	setIncludeServerInstructions: (server: ArtifactRef, include: boolean) => void;
+	ensureServerSelected: (server: MCPRuntimeServerID) => boolean;
+	setToolExposure: (server: MCPRuntimeServerID, exposure: MCPToolExposure) => void;
+	setIncludeServerInstructions: (server: MCPRuntimeServerID, include: boolean) => void;
 	toggleTool: (tool: MCPToolCapability, selected: boolean) => void;
 	toggleResource: (resource: MCPResourceRef, selected: boolean) => void;
 	toggleResourceTemplate: (template: MCPResourceTemplateRef, selected: boolean) => void;
 	togglePrompt: (prompt: MCPPromptRef, selected: boolean) => void;
 	setResourceTemplateArgumentValue: (
-		server: ArtifactRef,
+		server: MCPRuntimeServerID,
 		uriTemplate: string,
 		argumentName: string,
 		value: string
 	) => void;
-	setPromptArgumentValue: (server: ArtifactRef, promptName: string, argumentName: string, value: string) => void;
+	setPromptArgumentValue: (server: MCPRuntimeServerID, promptName: string, argumentName: string, value: string) => void;
 	clear: () => void;
 	restoreContext: (context?: MCPConversationContext) => void;
 }
 
-export function mcpServerKey(server: ArtifactRef): string {
-	return `${server.rootID}::${server.artifactID}`;
+export function mcpServerKey(server: MCPRuntimeServerID): string {
+	return server;
 }
 
 export function mcpToolKey(tool: Pick<MCPToolCapability | MCPToolSelection, 'server' | 'toolName'>): string {

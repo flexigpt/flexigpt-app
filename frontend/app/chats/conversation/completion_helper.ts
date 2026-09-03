@@ -1,4 +1,3 @@
-import type { ArtifactRef } from '@/spec/artifact';
 import type { ConversationMessage } from '@/spec/conversation';
 import type {
 	CompletionResponseBody,
@@ -16,7 +15,12 @@ import type {
 	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
 import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
-import type { MCPConversationContext, MCPProviderToolMapping, MCPToolSelection } from '@/spec/mcp_artifact';
+import type {
+	MCPConversationContext,
+	MCPProviderToolMapping,
+	MCPRuntimeServerID,
+	MCPToolSelection,
+} from '@/spec/mcp_artifact';
 import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp_artifact';
 import type { ModelPresetID } from '@/spec/modelpreset';
 import type { ToolStoreChoice } from '@/spec/tool';
@@ -332,15 +336,12 @@ function addMCPToolSelectionToMap(map: Map<string, MCPToolSelection>, selection:
 	}
 }
 
-function asArtifactRef(value: unknown): ArtifactRef | undefined {
-	const ref = asRecord(value);
-	if (!ref) {
+function asMCPRuntimeServerID(value: unknown): MCPRuntimeServerID | undefined {
+	if (typeof value !== 'string' || !value.trim()) {
 		return undefined;
 	}
 
-	return typeof ref.rootID === 'string' && typeof ref.artifactID === 'string' && ref.rootID && ref.artifactID
-		? { rootID: ref.rootID, artifactID: ref.artifactID }
-		: undefined;
+	return value;
 }
 
 function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefined {
@@ -348,7 +349,7 @@ function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefin
 	if (!obj) {
 		return undefined;
 	}
-	const server = asArtifactRef(obj.server);
+	const server = asMCPRuntimeServerID(obj.server);
 	const toolName = obj.toolName;
 	const providerToolName = obj.providerToolName;
 	const choiceID = obj.choiceID;

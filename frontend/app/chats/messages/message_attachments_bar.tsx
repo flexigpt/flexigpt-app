@@ -342,7 +342,7 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 		Boolean(call.toolStoreChoice?.autoExecute) || call.mcpToolSelection?.executionMode === MCPExecutionMode.Auto;
 	const autoLabel = isAutoExecute ? ' • Auto-execute: enabled' : '';
 	const mcpLabel = call.mcpToolSelection
-		? `\nMCP server: ${call.mcpToolSelection.server.artifactID}\nMCP tool: ${call.mcpToolSelection.toolName}`
+		? `\nMCP server: ${call.mcpToolSelection.server}\nMCP tool: ${call.mcpToolSelection.toolName}`
 		: '';
 	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}${mcpLabel}`;
 	return (
@@ -379,7 +379,7 @@ function MessageToolOutputChip({ output, fullWidth = false, onClick }: MessageTo
 	const label = output.summary || `Result: ${prettyName}`;
 	const titleLines = [label, `Tool: ${output.name}`, `Call ID: ${output.callID}`];
 	if (output.mcpToolSelection) {
-		titleLines.push(`MCP: ${output.mcpToolSelection.server.artifactID}/${output.mcpToolSelection.toolName}`);
+		titleLines.push(`MCP: ${output.mcpToolSelection.server}/${output.mcpToolSelection.toolName}`);
 	}
 	const title = titleLines.join('\n');
 

@@ -23,6 +23,13 @@ export const MCP_APP_HTML_MIME_TYPE = 'text/html;profile=mcp-app';
 
 type MCPTimestamp = string;
 
+/**
+ * Runtime-owned opaque MCP identities. Frontend code may carry these values
+ * between Runtime calls but must not construct or parse them.
+ */
+export type MCPRuntimeServerID = string;
+type MCPRuntimeCatalogID = string;
+
 export enum MCPServerType {
 	Stdio = 'stdio',
 	HTTP = 'http',
@@ -429,8 +436,8 @@ interface MCPServerCapabilitiesSummary {
 }
 
 export interface MCPServerRuntimeSnapshot {
-	server: ArtifactRef;
-	collection: ArtifactCollectionRef;
+	server: MCPRuntimeServerID;
+	collection: MCPRuntimeCatalogID;
 	status: MCPServerStatus;
 
 	negotiatedProtocolVersion?: string;
@@ -463,7 +470,7 @@ interface MCPToolAppInfo {
 }
 
 export interface MCPToolCapability {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	toolName: string;
 	providerToolName: string;
 	choiceID: string;
@@ -495,7 +502,7 @@ export interface MCPArgumentDefinition {
 }
 
 export interface MCPResourceRef {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	uri: string;
 	name?: string;
 	title?: string;
@@ -508,7 +515,7 @@ export interface MCPResourceRef {
 }
 
 export interface MCPResourceTemplateRef {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	uriTemplate: string;
 	name?: string;
 	title?: string;
@@ -521,7 +528,7 @@ export interface MCPResourceTemplateRef {
 }
 
 export interface MCPPromptRef {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	promptName: string;
 	title?: string;
 	displayName: string;
@@ -539,7 +546,7 @@ export interface MCPPromptSelection extends MCPPromptRef {
 }
 
 export interface MCPToolSelection {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	toolName: string;
 	providerToolName?: string;
 	choiceID?: string;
@@ -551,7 +558,7 @@ export interface MCPToolSelection {
 }
 
 export interface MCPProviderToolMapping {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	providerToolName: string;
 	choiceID: string;
 	toolName: string;
@@ -563,7 +570,7 @@ export interface MCPProviderToolMapping {
 }
 
 export interface MCPServerSelection {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	snapshotDigest?: string;
 	toolExposure: MCPToolExposure;
 	selectedTools?: MCPToolSelection[];
@@ -614,8 +621,8 @@ interface MCPPromptMessage {
 }
 
 interface MCPToolCallProvenance {
-	server: ArtifactRef;
-	collection: ArtifactCollectionRef;
+	Server: MCPRuntimeServerID;
+	Collection: MCPRuntimeCatalogID;
 	serverDisplayName?: string;
 	toolName: string;
 	providerToolName: string;
@@ -651,7 +658,7 @@ export interface MCPToolAppRenderInfo {
 }
 
 export interface InvokeMCPToolResponseBody {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	toolName: string;
 	providerToolName?: string;
 	content?: MCPContent[];
@@ -662,13 +669,13 @@ export interface InvokeMCPToolResponseBody {
 }
 
 export interface MCPReadResourceResponseBody {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	uri: string;
 	contents?: MCPContent[];
 }
 
 export interface MCPGetPromptResponseBody {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	promptName: string;
 	description?: string;
 	messages?: MCPPromptMessage[];
@@ -681,7 +688,7 @@ export interface MCPCompletionResult {
 }
 
 export interface MCPApprovalSummary {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	serverDisplayName?: string;
 	source: MCPInvocationSource;
 	appInstanceID?: string;
@@ -708,15 +715,16 @@ export interface MCPApprovalResolutionResult {
 }
 export interface MCPAppModelContextUpdate {
 	instanceID?: string;
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	resourceUri?: string;
 	content?: MCPContent[];
 	structuredContent?: any;
 	updatedAt?: MCPTimestamp;
+	rawArguments?: JSONRawString;
 }
 
 export interface MCPAuthHealth {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	authMode: MCPHTTPAuthMode;
 	state: MCPAuthHealthState;
 	configured: boolean;
@@ -734,7 +742,7 @@ export interface MCPAuthHealth {
 }
 
 export interface MCPOAuthAuthorization {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	authorizationURL: string;
 	expiresAt?: MCPTimestamp;
 }

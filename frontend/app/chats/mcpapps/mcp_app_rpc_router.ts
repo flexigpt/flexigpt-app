@@ -38,6 +38,14 @@ function toolErrorResult(message: string): {
 	};
 }
 
+function stringifyRawArguments(params: Record<string, unknown>): string | undefined {
+	try {
+		return JSON.stringify(params);
+	} catch {
+		return undefined;
+	}
+}
+
 function normalizeToolCallResultForApp(resp: InvokeMCPToolResponseBody | undefined): {
 	content: MCPContent[];
 	structuredContent?: Record<string, unknown>;
@@ -156,8 +164,8 @@ export class MCPAppRPCRouter {
 			appInstanceID: instanceID,
 		};
 
-		// The ArtifactRef identifies the app's server. The backend remains the
-		// final authority for app policy and cross-server restrictions.
+		// The opaque Runtime server ID identifies the app's connected server.
+		// The backend remains the final authority for policy enforcement.
 		const evaluation = await mcpAPI.evaluateMCPToolCall(server, callReq);
 		if (!evaluation) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP could not evaluate this tool call');
@@ -278,9 +286,11 @@ export class MCPAppRPCRouter {
 			}
 			structuredContent = params.structuredContent;
 		}
+		const rawArguments = stringifyRawArguments(params);
 		const update: MCPAppModelContextUpdatePayload = {
 			content,
 			...(structuredContent !== undefined ? { structuredContent } : {}),
+			...(rawArguments === undefined ? {} : { rawArguments }),
 		};
 
 		if (!content && structuredContent === undefined) {

@@ -39,6 +39,7 @@ import {
 	loadMCPBundleView,
 	loadMCPBundleViews,
 	loadMCPServerViews,
+	requireMCPRuntimeServerID,
 	saveMCPServer,
 	setMCPBundleRuntimeEnabled,
 	setMCPServerRuntimeEnabled,
@@ -90,9 +91,10 @@ function getMatchingAuthHealth(server: MCPServerView, value: MCPAuthHealth | und
 		return undefined;
 	}
 
-	if (value.server.rootID !== server.ref.rootID || value.server.artifactID !== server.ref.artifactID) {
+	const runtimeServerID = server.runtimeServerID;
+	if (!runtimeServerID || value.server !== runtimeServerID) {
 		console.warn('Ignoring MCP auth health returned for another Artifact.', {
-			expected: server.ref,
+			expected: runtimeServerID,
 			actual: value.server,
 		});
 		return undefined;
@@ -109,9 +111,10 @@ function getMatchingRuntimeSnapshot(
 		return undefined;
 	}
 
-	if (value.server.rootID !== server.ref.rootID || value.server.artifactID !== server.ref.artifactID) {
+	const runtimeServerID = server.runtimeServerID;
+	if (!runtimeServerID || value.server !== runtimeServerID) {
 		console.warn('Ignoring MCP runtime snapshot returned for another Artifact.', {
-			expected: server.ref,
+			expected: runtimeServerID,
 			actual: value.server,
 		});
 		return undefined;
@@ -125,9 +128,11 @@ function pendingAuthForServer(
 	pending: MCPOAuthAuthorization[],
 	previous?: MCPAuthHealth
 ): MCPAuthHealth | undefined {
-	const authorization = pending.find(
-		item => item.server.rootID === server.ref.rootID && item.server.artifactID === server.ref.artifactID
-	);
+	const runtimeServerID = server.runtimeServerID;
+	if (!runtimeServerID) {
+		return previous;
+	}
+	const authorization = pending.find(item => item.server === runtimeServerID);
 
 	if (!authorization) {
 		return previous;
@@ -135,7 +140,7 @@ function pendingAuthForServer(
 
 	return {
 		...previous,
-		server: server.ref,
+		server: runtimeServerID,
 		authMode: MCPHTTPAuthMode.OAuth,
 		state: MCPAuthHealthState.AuthorizationPending,
 		configured: previous?.configured ?? true,
@@ -195,15 +200,26 @@ export default function MCPServersPage() {
 
 			const entries = await mapWithConcurrency(servers, STATUS_READ_CONCURRENCY, async server => {
 				const key = server.ref.artifactID;
-				const pendingAuthorization = pending.find(
-					item => item.server.rootID === server.ref.rootID && item.server.artifactID === server.ref.artifactID
-				);
+				const runtimeServerID = server.runtimeServerID;
+
+				if (!runtimeServerID) {
+					return {
+						key,
+						runtime: undefined,
+						auth: undefined,
+						errors: {
+							runtime: 'MCP runtime server identity is unavailable.',
+							auth: 'MCP runtime server identity is unavailable.',
+						},
+					};
+				}
+				const pendingAuthorization = pending.find(item => item.server === runtimeServerID);
 				const authRequest: Promise<MCPAuthHealth | undefined> = pendingAuthorization
 					? Promise.resolve(undefined)
 					: mcpAPI.getMCPServerAuthHealth(server.ref);
 
 				const [runtimeResult, authResult] = await Promise.allSettled([
-					mcpAPI.getMCPServerStatus(server.ref),
+					mcpAPI.getMCPServerStatus(runtimeServerID),
 					authRequest,
 				]);
 
@@ -456,6 +472,11 @@ export default function MCPServersPage() {
 	);
 
 	const markServerConnecting = useCallback((server: MCPServerView) => {
+		const runtimeServerID = server.runtimeServerID;
+		if (!runtimeServerID) {
+			return;
+		}
+
 		setBundles(previous =>
 			previous.map(item => {
 				if (
@@ -472,8 +493,8 @@ export default function MCPServersPage() {
 						...item.runtimeByArtifactID,
 						[server.ref.artifactID]: {
 							...current,
-							server: server.ref,
-							collection: server.bundle,
+							server: runtimeServerID,
+							collection: current?.collection ?? '',
 							status: MCPServerStatus.Connecting,
 							lastError: undefined,
 							toolCount: current?.toolCount ?? 0,
@@ -517,10 +538,11 @@ export default function MCPServersPage() {
 				});
 			}
 
+			const runtimeServerID = requireMCPRuntimeServerID(server);
 			markServerConnecting(server);
 
 			try {
-				let snapshot = await mcpAPI.connectMCPServer(server.ref);
+				let snapshot = await mcpAPI.connectMCPServer(runtimeServerID);
 				applyRuntimeSnapshot(server, snapshot);
 
 				const deadline = Date.now() + CONNECTION_WAIT_TIMEOUT_MS;
@@ -530,7 +552,7 @@ export default function MCPServersPage() {
 					}
 
 					await sleep(CONNECTION_POLL_INTERVAL_MS);
-					snapshot = await mcpAPI.getMCPServerStatus(server.ref);
+					snapshot = await mcpAPI.getMCPServerStatus(runtimeServerID);
 					applyRuntimeSnapshot(server, snapshot);
 
 					// Keep OAuth health and pending authorization state in sync
@@ -924,15 +946,15 @@ export default function MCPServersPage() {
 							}}
 							onConnectServer={handleConnectServer}
 							onDisconnectServer={async server => {
-								await mcpAPI.disconnectMCPServer(server.ref);
+								await mcpAPI.disconnectMCPServer(requireMCPRuntimeServerID(server));
 								await refreshSingleServer(server);
 							}}
 							onRefreshServer={async server => {
-								await mcpAPI.refreshMCPServer(server.ref);
+								await mcpAPI.refreshMCPServer(requireMCPRuntimeServerID(server));
 								await refreshSingleServer(server);
 							}}
 							onCancelOAuth={async server => {
-								await mcpAPI.cancelPendingMCPOAuthAuthorization(server.ref);
+								await mcpAPI.cancelPendingMCPOAuthAuthorization(requireMCPRuntimeServerID(server));
 								await refreshSingleServer(server);
 							}}
 							onRequestOAuthAuthorization={server => {
@@ -1027,7 +1049,7 @@ export default function MCPServersPage() {
 							return;
 						}
 
-						await mcpAPI.cancelPendingMCPOAuthAuthorization(selectedOAuth.server.ref);
+						await mcpAPI.cancelPendingMCPOAuthAuthorization(requireMCPRuntimeServerID(selectedOAuth.server));
 						await refreshSingleServer(selectedOAuth.server);
 						setOAuthTarget(null);
 					}}

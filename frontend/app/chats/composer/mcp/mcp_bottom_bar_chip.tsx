@@ -17,13 +17,13 @@ import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import { Link } from 'react-router';
 
-import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPPromptRef,
 	MCPPromptSelection,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPResourceTemplateSelection,
+	MCPRuntimeServerID,
 	MCPToolCapability,
 } from '@/spec/mcp_artifact';
 import {
@@ -101,7 +101,7 @@ function isOAuthModalRelevant(option: MCPComposerServerOption): boolean {
 }
 
 function oauthDismissKey(option: MCPComposerServerOption): string {
-	return `${option.server.ref.rootID}:${option.server.ref.artifactID}:${option.authHealth?.authorizationURL ?? option.authHealth?.state ?? ''}`;
+	return `${option.runtimeServerID}:${option.authHealth?.authorizationURL ?? option.authHealth?.state ?? ''}`;
 }
 
 function CheckboxRow({
@@ -246,7 +246,7 @@ function MCPArgumentFields({
 	disabled,
 	onValueChange,
 }: {
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	refType: MCPCompletionRefType;
 	name: string;
 	item: MCPPromptSelection | MCPResourceTemplateSelection;
@@ -304,10 +304,7 @@ function MCPArgumentFields({
 			<div className="space-y-2">
 				{args.map(arg => {
 					const value = values[arg.name] ?? '';
-					const listID = `mcp-arg-${server.rootID}-${server.artifactID}-${refType}-${name}-${arg.name}`.replaceAll(
-						/[^A-Za-z0-9_-]/g,
-						'_'
-					);
+					const listID = `mcp-arg-${server}-${refType}-${name}-${arg.name}`.replaceAll(/[^A-Za-z0-9_-]/g, '_');
 					const missing = arg.required && value.trim().length === 0;
 
 					return (
@@ -402,9 +399,10 @@ function ToolExposureControls({
 							disabled={isInputLocked}
 							onClick={e => {
 								stop(e);
-								state.setToolExposure(option.server.ref, choice.value);
+								state.setToolExposure(option.runtimeServerID, choice.value);
+
 								if (choice.value !== MCPToolExposure.None) {
-									void state.ensureDiscoveryLoaded(option.server.ref);
+									void state.ensureDiscoveryLoaded(option.runtimeServerID);
 								}
 							}}
 						>
@@ -426,7 +424,7 @@ function ServerDiscoverySection({
 	state: UseComposerMCPResult;
 	isInputLocked: boolean;
 }) {
-	const key = mcpServerKey(option.server.ref);
+	const key = mcpServerKey(option.runtimeServerID);
 	const selection = state.selectedByServerKey[key];
 	if (!selection) {
 		return null;
@@ -469,7 +467,7 @@ function ServerDiscoverySection({
 						checked={Boolean(selection.includeServerInstructions)}
 						disabled={isInputLocked}
 						onChange={e => {
-							state.setIncludeServerInstructions(option.server.ref, e.currentTarget.checked);
+							state.setIncludeServerInstructions(option.runtimeServerID, e.currentTarget.checked);
 						}}
 					/>
 					<span>Include instructions</span>
@@ -710,7 +708,7 @@ function ServerRow({
 	onAuthorize: () => void;
 	onToggleSelected: () => void;
 }) {
-	const key = mcpServerKey(option.server.ref);
+	const key = mcpServerKey(option.runtimeServerID);
 	const selected = Boolean(state.selectedByServerKey[key]);
 	const status = isEnabledMCPOption(option)
 		? getEffectiveMCPServerStatus(option.server, option.runtime?.status)
@@ -758,8 +756,8 @@ function ServerRow({
 						state.setServerSelected(option, e.currentTarget.checked);
 						if (e.currentTarget.checked) {
 							const operation = isReady
-								? state.ensureDiscoveryLoaded(option.server.ref)
-								: state.connectServer(option.server.ref);
+								? state.ensureDiscoveryLoaded(option.runtimeServerID)
+								: state.connectServer(option.runtimeServerID);
 							void operation.catch(console.error);
 						}
 					}}
@@ -815,7 +813,7 @@ function ServerRow({
 							title="Cancel authorization"
 							onClick={e => {
 								stop(e);
-								void state.cancelOAuth(option.server.ref);
+								void state.cancelOAuth(option.runtimeServerID);
 							}}
 							disabled={isInputLocked}
 						>
@@ -830,9 +828,9 @@ function ServerRow({
 						onClick={e => {
 							stop(e);
 							if (isReady || isConnecting) {
-								void state.disconnectServer(option.server.ref).catch(console.error);
+								void state.disconnectServer(option.runtimeServerID).catch(console.error);
 							} else {
-								void state.connectServer(option.server.ref).catch(console.error);
+								void state.connectServer(option.runtimeServerID).catch(console.error);
 							}
 						}}
 						disabled={isInputLocked || !selectable || authPending}
@@ -854,8 +852,8 @@ function ServerRow({
 						onClick={e => {
 							stop(e);
 							void state
-								.refreshServer(option.server.ref)
-								.then(() => state.ensureDiscoveryLoaded(option.server.ref))
+								.refreshServer(option.runtimeServerID)
+								.then(() => state.ensureDiscoveryLoaded(option.runtimeServerID))
 								.catch(console.error);
 						}}
 					>
@@ -1047,7 +1045,7 @@ export function MCPBottomBarChip({
 		if (isInputLocked) {
 			return;
 		}
-		const key = mcpServerKey(option.server.ref);
+		const key = mcpServerKey(option.runtimeServerID);
 		const selected = Boolean(state.selectedByServerKey[key]);
 		if (!selected && !isEnabledMCPOption(option)) {
 			return;
@@ -1057,8 +1055,8 @@ export function MCPBottomBarChip({
 		if (!selected) {
 			const operation =
 				option.runtime?.status === MCPServerStatus.Ready
-					? state.ensureDiscoveryLoaded(option.server.ref)
-					: state.connectServer(option.server.ref);
+					? state.ensureDiscoveryLoaded(option.runtimeServerID)
+					: state.connectServer(option.runtimeServerID);
 			void operation.catch(console.error);
 		}
 	};
@@ -1253,7 +1251,7 @@ export function MCPBottomBarChip({
 					if (!oauthModalOption) {
 						return;
 					}
-					await state.cancelOAuth(oauthModalOption.server.ref);
+					await state.cancelOAuth(oauthModalOption.runtimeServerID);
 					dismissOAuthModal();
 				}}
 			/>

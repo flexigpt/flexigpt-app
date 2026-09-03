@@ -23,6 +23,7 @@ import type {
 	MCPReplaceBundleDocumentInput,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
+	MCPRuntimeServerID,
 	MCPSecretKind,
 	MCPSecretWriteResult,
 	MCPServerData,
@@ -36,54 +37,61 @@ import type { IMCPAPI } from '@/apis/interface';
 import {
 	rawJSONFromWails,
 	rawJSONObjectToWails,
+	requireNonBlankString,
 	requireWailsBody,
 	requireWailsBoolean,
 	requireWailsFiniteNumber,
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
 import {
+	ArtifactRefForRuntimeServerID,
+	DeleteMCPServerSecret,
+	GetMCPServerAuthHealth,
+	PurgeMCPBundle,
+	PutMCPServerSecret,
+	RefreshMCPBundle,
+	ReplaceMCPBundleDocument,
+	RetireMCPBundle,
+	RuntimeServerIDForArtifact,
+	UpdateMCPBundleEnabled,
+	UpdateMCPServerInstallation,
+	UpdateProtectedMCPBundleInstallation,
+	UpdateProtectedMCPServerInstallation,
+} from '@/apis/wailsjs/go/main/MCPAggregateWrapper';
+import {
 	CancelPendingMCPOAuthAuthorization,
 	CompleteMCPArgument,
-	ConnectMCPServer,
-	CreateMCPBundle,
-	DeleteMCPServerSecret,
 	DisconnectMCPServer,
 	EvaluateMappedMCPToolCall,
 	EvaluateMCPToolCall,
-	GetMCPBundle,
-	GetMCPBundleDocument,
-	GetMCPBundleInstallation,
 	GetMCPGlobalSettings,
 	GetMCPPrompt,
-	GetMCPServerAuthHealth,
-	GetMCPServerInstallation,
 	GetMCPServerStatus,
-	InspectMCPPolicy,
-	InspectMCPServer,
 	InvokeMappedMCPTool,
 	InvokeMCPTool,
-	ListMCPBundlePolicies,
-	ListMCPBundles,
-	ListMCPBundleServers,
 	ListMCPServerPrompts,
 	ListMCPServerResources,
 	ListMCPServerResourceTemplates,
 	ListMCPServerTools,
 	ListPendingMCPOAuthAuthorizations,
-	PurgeMCPBundle,
-	PutMCPServerSecret,
 	ReadMCPResource,
-	RefreshMCPBundle,
 	RefreshMCPServer,
-	ReplaceMCPBundleDocument,
 	ResolveMCPApproval,
-	RetireMCPBundle,
-	UpdateMCPBundleEnabled,
+	StartMCPServerConnect,
 	UpdateMCPGlobalSettings,
-	UpdateMCPServerInstallation,
-	UpdateProtectedMCPBundleInstallation,
-	UpdateProtectedMCPServerInstallation,
-} from '@/apis/wailsjs/go/main/MCPWrapper';
+} from '@/apis/wailsjs/go/main/MCPRuntimeWrapper';
+import {
+	CreateMCPBundle,
+	GetMCPBundle,
+	GetMCPBundleDocument,
+	GetMCPBundleInstallation,
+	GetMCPServerInstallation,
+	InspectMCPPolicy,
+	InspectMCPServer,
+	ListMCPBundlePolicies,
+	ListMCPBundles,
+	ListMCPBundleServers,
+} from '@/apis/wailsjs/go/main/MCPStoreWrapper';
 
 function registrationToWails(value: MCPArtifactRegistration, field: string): unknown {
 	return {
@@ -105,6 +113,18 @@ function objectFromWails<T extends object>(value: unknown, operation: string): T
 }
 
 export class WailsMCPArtifactAPI implements IMCPAPI {
+	async runtimeServerIDForArtifact(artifact: ArtifactRef): Promise<MCPRuntimeServerID> {
+		const server = await RuntimeServerIDForArtifact(artifact as Parameters<typeof RuntimeServerIDForArtifact>[0]);
+
+		return requireNonBlankString(server, 'RuntimeServerIDForArtifact');
+	}
+
+	async artifactRefForRuntimeServerID(server: MCPRuntimeServerID): Promise<ArtifactRef> {
+		const artifact = await ArtifactRefForRuntimeServerID(server as Parameters<typeof ArtifactRefForRuntimeServerID>[0]);
+
+		return objectFromWails<ArtifactRef>(artifact, 'ArtifactRefForRuntimeServerID');
+	}
+
 	async createMCPBundle(input: MCPCreateBundleInput): Promise<MCPBundle> {
 		const bundle = await CreateMCPBundle({
 			RootID: input.rootID,
@@ -253,54 +273,56 @@ export class WailsMCPArtifactAPI implements IMCPAPI {
 		);
 	}
 
-	async connectMCPServer(server: ArtifactRef): Promise<MCPServerRuntimeSnapshot> {
-		const snapshot = await ConnectMCPServer(server as Parameters<typeof ConnectMCPServer>[0]);
-		return objectFromWails<MCPServerRuntimeSnapshot>(snapshot, 'ConnectMCPServer');
+	async connectMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
+		// UI callers poll runtime state and must not block the Wails invocation
+		// while an interactive OAuth authorization is pending.
+		const snapshot = await StartMCPServerConnect(server as Parameters<typeof StartMCPServerConnect>[0]);
+		return objectFromWails<MCPServerRuntimeSnapshot>(snapshot, 'StartMCPServerConnect');
 	}
 
-	async disconnectMCPServer(server: ArtifactRef): Promise<void> {
+	async disconnectMCPServer(server: MCPRuntimeServerID): Promise<void> {
 		await DisconnectMCPServer(server as Parameters<typeof DisconnectMCPServer>[0]);
 	}
 
-	async refreshMCPServer(server: ArtifactRef): Promise<MCPServerRuntimeSnapshot> {
+	async refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
 		const snapshot = await RefreshMCPServer(server as Parameters<typeof RefreshMCPServer>[0]);
 		return objectFromWails<MCPServerRuntimeSnapshot>(snapshot, 'RefreshMCPServer');
 	}
 
-	async getMCPServerStatus(server: ArtifactRef): Promise<MCPServerRuntimeSnapshot> {
+	async getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
 		const snapshot = await GetMCPServerStatus(server as Parameters<typeof GetMCPServerStatus>[0]);
 		return objectFromWails<MCPServerRuntimeSnapshot>(snapshot, 'GetMCPServerStatus');
 	}
 
-	async listMCPServerTools(server: ArtifactRef): Promise<MCPToolCapability[]> {
+	async listMCPServerTools(server: MCPRuntimeServerID): Promise<MCPToolCapability[]> {
 		const tools = await ListMCPServerTools(server as Parameters<typeof ListMCPServerTools>[0]);
 		return wailsObjectArrayOrEmpty<MCPToolCapability>(tools, 'ListMCPServerTools');
 	}
 
-	async listMCPServerResources(server: ArtifactRef): Promise<MCPResourceRef[]> {
+	async listMCPServerResources(server: MCPRuntimeServerID): Promise<MCPResourceRef[]> {
 		const resources = await ListMCPServerResources(server as Parameters<typeof ListMCPServerResources>[0]);
 		return wailsObjectArrayOrEmpty<MCPResourceRef>(resources, 'ListMCPServerResources');
 	}
 
-	async listMCPServerResourceTemplates(server: ArtifactRef): Promise<MCPResourceTemplateRef[]> {
+	async listMCPServerResourceTemplates(server: MCPRuntimeServerID): Promise<MCPResourceTemplateRef[]> {
 		const templates = await ListMCPServerResourceTemplates(
 			server as Parameters<typeof ListMCPServerResourceTemplates>[0]
 		);
 		return wailsObjectArrayOrEmpty<MCPResourceTemplateRef>(templates, 'ListMCPServerResourceTemplates');
 	}
 
-	async listMCPServerPrompts(server: ArtifactRef): Promise<MCPPromptRef[]> {
+	async listMCPServerPrompts(server: MCPRuntimeServerID): Promise<MCPPromptRef[]> {
 		const prompts = await ListMCPServerPrompts(server as Parameters<typeof ListMCPServerPrompts>[0]);
 		return wailsObjectArrayOrEmpty<MCPPromptRef>(prompts, 'ListMCPServerPrompts');
 	}
 
-	async readMCPResource(server: ArtifactRef, uri: string): Promise<MCPReadResourceResponseBody> {
+	async readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody> {
 		const response = await ReadMCPResource(server as Parameters<typeof ReadMCPResource>[0], uri);
 		return objectFromWails<MCPReadResourceResponseBody>(response, 'ReadMCPResource');
 	}
 
 	async getMCPPrompt(
-		server: ArtifactRef,
+		server: MCPRuntimeServerID,
 		promptName: string,
 		promptArguments?: Record<string, string>
 	): Promise<MCPGetPromptResponseBody> {
@@ -313,7 +335,7 @@ export class WailsMCPArtifactAPI implements IMCPAPI {
 	}
 
 	async completeMCPArgument(
-		server: ArtifactRef,
+		server: MCPRuntimeServerID,
 		refType: MCPCompletionRefType,
 		name: string,
 		argumentName: string,
@@ -333,7 +355,10 @@ export class WailsMCPArtifactAPI implements IMCPAPI {
 		return objectFromWails<MCPCompletionResult>(response, 'CompleteMCPArgument');
 	}
 
-	async evaluateMCPToolCall(server: ArtifactRef, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation> {
+	async evaluateMCPToolCall(
+		server: MCPRuntimeServerID,
+		request: InvokeMCPToolRequestBody
+	): Promise<MCPApprovalEvaluation> {
 		const response = await EvaluateMCPToolCall(
 			server as Parameters<typeof EvaluateMCPToolCall>[0],
 			request as Parameters<typeof EvaluateMCPToolCall>[1]
@@ -352,7 +377,10 @@ export class WailsMCPArtifactAPI implements IMCPAPI {
 		return objectFromWails<MCPApprovalEvaluation>(response, 'EvaluateMappedMCPToolCall');
 	}
 
-	async invokeMCPTool(server: ArtifactRef, request: InvokeMCPToolRequestBody): Promise<InvokeMCPToolResponseBody> {
+	async invokeMCPTool(
+		server: MCPRuntimeServerID,
+		request: InvokeMCPToolRequestBody
+	): Promise<InvokeMCPToolResponseBody> {
 		const response = await InvokeMCPTool(
 			server as Parameters<typeof InvokeMCPTool>[0],
 			request as Parameters<typeof InvokeMCPTool>[1]
@@ -389,7 +417,7 @@ export class WailsMCPArtifactAPI implements IMCPAPI {
 		return wailsObjectArrayOrEmpty<MCPOAuthAuthorization>(authorizations, 'ListPendingMCPOAuthAuthorizations');
 	}
 
-	async cancelPendingMCPOAuthAuthorization(server: ArtifactRef): Promise<boolean> {
+	async cancelPendingMCPOAuthAuthorization(server: MCPRuntimeServerID): Promise<boolean> {
 		const cancelled = await CancelPendingMCPOAuthAuthorization(
 			server as Parameters<typeof CancelPendingMCPOAuthAuthorization>[0]
 		);

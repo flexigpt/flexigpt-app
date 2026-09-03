@@ -117,21 +117,23 @@ function formatMCPContextLabelItems(context?: MCPConversationContext): Array<{ t
 
 	for (const server of normalized.servers ?? []) {
 		const selectedToolCount = server.selectedTools?.length ?? 0;
+		const runtimeServerID = server.server;
 		const metaParts = [
-			server.server.rootID,
+			runtimeServerID,
 			getMCPToolExposureLabel(server.toolExposure, selectedToolCount),
 			server.includeServerInstructions ? 'server instructions' : undefined,
 			server.snapshotDigest ? `snapshot ${server.snapshotDigest}` : undefined,
 		].filter(Boolean);
 
 		items.push({
-			title: `Server: ${server.server.artifactID}`,
+			title: `Server: ${runtimeServerID}`,
 			meta: metaParts.join(' • '),
 		});
 
 		for (const tool of server.selectedTools ?? []) {
+			const toolServer = tool.server ?? runtimeServerID;
 			const toolMetaParts = [
-				`${tool.server.rootID}/${tool.server.artifactID}`,
+				toolServer,
 				tool.providerToolName ? `provider ${tool.providerToolName}` : undefined,
 				tool.executionMode ? `execution ${tool.executionMode}` : undefined,
 				tool.approvalRule ? `approval ${tool.approvalRule}` : undefined,
@@ -149,28 +151,21 @@ function formatMCPContextLabelItems(context?: MCPConversationContext): Array<{ t
 	for (const resource of normalized.resources ?? []) {
 		items.push({
 			title: `Resource: ${resource.uri}`,
-			meta: `${resource.server.rootID}/${resource.server.artifactID}${resource.digest ? ` • digest ${resource.digest}` : ''}`,
+			meta: `${resource.server}${resource.digest ? ` • digest ${resource.digest}` : ''}`,
 		});
 	}
 
 	for (const template of normalized.resourceTemplates ?? []) {
 		items.push({
 			title: `Resource template: ${template.uriTemplate}`,
-			meta: [
-				template.server.rootID + '/' + template.server.artifactID,
-				formatMCPArgumentSummary(template.argumentValues),
-			]
-				.filter(Boolean)
-				.join(' • '),
+			meta: [template.server, formatMCPArgumentSummary(template.argumentValues)].filter(Boolean).join(' • '),
 		});
 	}
 
 	for (const prompt of normalized.prompts ?? []) {
 		items.push({
 			title: `Prompt: ${prompt.promptName}`,
-			meta: [prompt.server.rootID + '/' + prompt.server.artifactID, formatMCPArgumentSummary(prompt.argumentValues)]
-				.filter(Boolean)
-				.join(' • '),
+			meta: [prompt.server, formatMCPArgumentSummary(prompt.argumentValues)].filter(Boolean).join(' • '),
 		});
 	}
 

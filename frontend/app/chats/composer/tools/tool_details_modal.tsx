@@ -161,7 +161,7 @@ function buildCallPrimaryContent(call: UIToolCall): string {
 
 	if (call.mcpToolSelection) {
 		lines.push(
-			`### MCP server: \`${call.mcpToolSelection.server.artifactID}\``,
+			`### MCP server: \`${call.mcpToolSelection.server}\``,
 			`### MCP tool: \`${call.mcpToolSelection.toolName}\``
 		);
 		if (call.mcpToolSelection.providerToolName) {

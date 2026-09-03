@@ -26,7 +26,7 @@ import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import type { MCPBundleView, MCPServerView } from '@/mcpservers/lib/mcp_management';
-import { serverRefLabel } from '@/mcpservers/lib/mcp_management';
+import { requireMCPRuntimeServerID, serverRefLabel } from '@/mcpservers/lib/mcp_management';
 import {
 	getEffectiveMCPServerStatus,
 	getMCPApprovalRuleLabel,
@@ -118,11 +118,12 @@ function MCPServerDetailsModalContent({
 				};
 			}
 
+			const runtimeServerID = requireMCPRuntimeServerID(server);
 			const results = await Promise.allSettled([
-				mcpAPI.listMCPServerTools(server.ref),
-				mcpAPI.listMCPServerResources(server.ref),
-				mcpAPI.listMCPServerResourceTemplates(server.ref),
-				mcpAPI.listMCPServerPrompts(server.ref),
+				mcpAPI.listMCPServerTools(runtimeServerID),
+				mcpAPI.listMCPServerResources(runtimeServerID),
+				mcpAPI.listMCPServerResourceTemplates(runtimeServerID),
+				mcpAPI.listMCPServerPrompts(runtimeServerID),
 			]);
 
 			const [tools, resources, templates, prompts] = results;
@@ -141,7 +142,7 @@ function MCPServerDetailsModalContent({
 							: undefined,
 			};
 		},
-		[hasDiscoverySnapshot, server.ref]
+		[hasDiscoverySnapshot, server]
 	);
 
 	const { data, isLoading } = useAsyncResource(loadDiscovery, {
@@ -258,7 +259,7 @@ function MCPServerDetailsModalContent({
 						<div className="space-y-3">
 							{data.tools.map(tool => (
 								<ManagementItemCard
-									key={`${tool.server.artifactID}:${tool.toolName}:${tool.digest}`}
+									key={`${tool.server}:${tool.toolName}:${tool.digest}`}
 									title={tool.displayName || tool.title || tool.toolName}
 									subtitle={tool.toolName}
 									description={tool.description}
@@ -302,7 +303,7 @@ function MCPServerDetailsModalContent({
 						<div className="space-y-3">
 							{data.resources.map(resource => (
 								<ManagementItemCard
-									key={`${resource.server.artifactID}:${resource.uri}:${resource.digest ?? ''}`}
+									key={`${resource.server}:${resource.uri}:${resource.digest ?? ''}`}
 									title={resource.displayName || resource.name || resource.uri}
 									subtitle={resource.uri}
 									description={resource.description}
@@ -327,7 +328,7 @@ function MCPServerDetailsModalContent({
 						<div className="space-y-3">
 							{data.resourceTemplates.map(template => (
 								<ManagementItemCard
-									key={`${template.server.artifactID}:${template.uriTemplate}:${template.digest ?? ''}`}
+									key={`${template.server}:${template.uriTemplate}:${template.digest ?? ''}`}
 									title={template.displayName || template.name || template.uriTemplate}
 									subtitle={template.uriTemplate}
 									description={template.description}
@@ -352,7 +353,7 @@ function MCPServerDetailsModalContent({
 						<div className="space-y-3">
 							{data.prompts.map(prompt => (
 								<ManagementItemCard
-									key={`${prompt.server.artifactID}:${prompt.promptName}:${prompt.digest ?? ''}`}
+									key={`${prompt.server}:${prompt.promptName}:${prompt.digest ?? ''}`}
 									title={prompt.displayName || prompt.promptName}
 									subtitle={prompt.promptName}
 									description={prompt.description}

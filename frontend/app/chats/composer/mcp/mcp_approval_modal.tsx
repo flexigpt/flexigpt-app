@@ -73,10 +73,8 @@ export function MCPApprovalModal({ approvalRequest, isResolving = false, error, 
 						<div className="grid grid-cols-12 gap-2 text-sm">
 							<div className="col-span-3 font-semibold">Server</div>
 							<div className="col-span-9 break-all">
-								{summary.serverDisplayName?.trim() || summary.server.artifactID}
-								<div className="text-base-content/60 text-xs">
-									{summary.server.rootID}/{summary.server.artifactID}
-								</div>
+								{summary.serverDisplayName?.trim() || summary.server}
+								<div className="text-base-content/60 font-mono text-xs">{summary.server}</div>
 							</div>
 
 							<div className="col-span-3 font-semibold">Tool</div>

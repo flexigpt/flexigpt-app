@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiAlertTriangle } from 'react-icons/fi';
 
-import type { MCPAppModelContextUpdate, MCPAppsPolicy, MCPContent } from '@/spec/mcp_artifact';
+import type { ArtifactRef } from '@/spec/artifact';
+import type { MCPAppsPolicy, MCPContent } from '@/spec/mcp_artifact';
 import { MCP_APP_HTML_MIME_TYPE, MCPContentType } from '@/spec/mcp_artifact';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
@@ -16,7 +17,7 @@ import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import type { MCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
 import { buildMCPAppAllowAttribute, buildMCPAppCSP, getMCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
 import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
-import type { MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
+import type { MCPAppModelContextUpdatePayload, MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import { dispatchMCPAppModelContextUpdate, dispatchMCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import { buildMCPAppHostContext } from '@/chats/mcpapps/mcp_app_host_context';
 import { MCPAppPostMessageBridge } from '@/chats/mcpapps/mcp_app_postmessage_bridge';
@@ -191,10 +192,8 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [pendingURL, setPendingURL] = useState<string | null>(null);
 	const [pendingUIMessage, setPendingUIMessage] = useState<MCPAppUIMessage | null>(null);
-	const [pendingContextUpdate, setPendingContextUpdate] = useState<Omit<
-		MCPAppModelContextUpdate,
-		'instanceID' | 'bundleID' | 'serverID' | 'resourceUri' | 'updatedAt'
-	> | null>(null);
+	const [pendingContextUpdate, setPendingContextUpdate] = useState<MCPAppModelContextUpdatePayload | null>(null);
+	const [serverArtifact, setServerArtifact] = useState<ArtifactRef | null>(null);
 	const [blockedURL, setBlockedURL] = useState<string | null>(null);
 	const [viewInitialized, setViewInitialized] = useState(false);
 	const [appsPolicy, setAppsPolicy] = useState<MCPAppsPolicy | null>(null);
@@ -210,6 +209,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	const server = instance.server;
 	const effectiveAppsPolicy = appsPolicy ?? UNKNOWN_APP_POLICY;
+	const serverLabel = serverArtifact?.artifactID ?? server;
 
 	useEffect(() => {
 		let cancelled = false;
@@ -251,13 +251,21 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		setPolicyError(null);
 		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setAppsPolicy(null);
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setServerArtifact(null);
 
 		void mcpAPI
-			.inspectMCPServer(server)
-			.then(resolved => {
+			.artifactRefForRuntimeServerID(server)
+			.then(async artifact => ({
+				artifact,
+				resolved: await mcpAPI.inspectMCPServer(artifact),
+			}))
+			.then(({ artifact, resolved }) => {
 				if (cancelled) {
 					return;
 				}
+
+				setServerArtifact(artifact);
 				const nextPolicy = resolved.policy.body.appsPolicy;
 				setAppsPolicy(nextPolicy);
 				if (nextPolicy && !nextPolicy.enabled) {
@@ -355,11 +363,10 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 					if (approvalResolverRef.current) {
 						return false;
 					}
-					const contextUpdate = { ...update, server: instance.server };
 
 					return await new Promise<boolean>(resolve => {
 						approvalResolverRef.current = resolve;
-						setPendingContextUpdate(contextUpdate);
+						setPendingContextUpdate(update);
 					});
 				},
 				onModelContextUpdate: update => {
@@ -505,8 +512,11 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			<div className="border-base-content/10 bg-base-200 rounded-2xl border p-2">
 				<div className="mb-2 flex items-center justify-between gap-2 text-xs">
 					<span className="truncate font-semibold">{instance.displayName ?? instance.toolName}</span>
-					<span className="text-base-content/60 truncate" title={`${server.rootID}/${server.artifactID}`}>
-						{server.artifactID}
+					<span
+						className="text-base-content/60 truncate"
+						title={serverArtifact ? `${serverArtifact.rootID}/${serverArtifact.artifactID}` : server}
+					>
+						{serverLabel}
 					</span>
 				</div>
 				<MCPAppSandbox
@@ -522,7 +532,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			<DeleteConfirmationModal
 				isOpen={pendingURL !== null}
 				title="Open external link?"
-				message={`The MCP App for ${server.artifactID} wants to open:\n${pendingURL ?? ''}`}
+				message={`The MCP App for ${serverLabel} wants to open:\n${pendingURL ?? ''}`}
 				confirmButtonText="Open"
 				onConfirm={() => {
 					const url = pendingURL;
@@ -550,7 +560,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			<DeleteConfirmationModal
 				isOpen={pendingUIMessage !== null}
 				title="Add message from MCP App?"
-				message={`The MCP App for ${server.artifactID} wants to add this draft message:\n\n${pendingUIMessage?.text ?? ''}`}
+				message={`The MCP App for ${serverLabel} wants to add this draft message:\n\n${pendingUIMessage?.text ?? ''}`}
 				confirmButtonText="Add draft"
 				onConfirm={() => {
 					setPendingUIMessage(null);
@@ -567,7 +577,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			<DeleteConfirmationModal
 				isOpen={pendingContextUpdate !== null}
 				title="Allow MCP App model context?"
-				message={`The MCP App for ${server.artifactID} wants to add context to the next model request.`}
+				message={`The MCP App for ${serverLabel} wants to add context to the next model request.`}
 				confirmButtonText="Allow"
 				onConfirm={() => {
 					setPendingContextUpdate(null);

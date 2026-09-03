@@ -69,18 +69,18 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 		if (!manualOAuthModalKey) {
 			return null;
 		}
-		const option = mcpState.options.find(o => mcpServerKey(o.server.ref) === manualOAuthModalKey);
+		const option = mcpState.options.find(o => mcpServerKey(o.runtimeServerID) === manualOAuthModalKey);
 		return option ?? null;
 	}, [manualOAuthModalKey, mcpState.options]);
 
 	const availableServerOptions = useMemo(() => {
-		return mcpState.options.filter(option => !mcpState.selectedByServerKey[mcpServerKey(option.server.ref)]);
+		return mcpState.options.filter(option => !mcpState.selectedByServerKey[mcpServerKey(option.runtimeServerID)]);
 	}, [mcpState.options, mcpState.selectedByServerKey]);
 
 	const dropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(() => {
 		const items: Record<string, { isEnabled: boolean }> = {};
 		for (const option of availableServerOptions) {
-			items[mcpServerKey(option.server.ref)] = {
+			items[mcpServerKey(option.runtimeServerID)] = {
 				isEnabled: isSelectableServerOption(option),
 			};
 		}
@@ -88,7 +88,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 	}, [availableServerOptions]);
 
 	const orderedKeys = useMemo(
-		() => availableServerOptions.map(option => mcpServerKey(option.server.ref)),
+		() => availableServerOptions.map(option => mcpServerKey(option.runtimeServerID)),
 		[availableServerOptions]
 	);
 
@@ -101,16 +101,16 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 			: '';
 
 	const handleAdd = () => {
-		const option = availableServerOptions.find(o => mcpServerKey(o.server.ref) === effectiveNextServerKey);
+		const option = availableServerOptions.find(o => mcpServerKey(o.runtimeServerID) === effectiveNextServerKey);
 		if (option) {
 			mcpState.setServerSelected(option, true);
-			void mcpState.ensureDiscoveryLoaded(option.server.ref);
+			void mcpState.ensureDiscoveryLoaded(option.runtimeServerID);
 			setNextServerKey('');
 		}
 	};
 
 	const selectedOptions = useMemo(() => {
-		return mcpState.options.filter(option => mcpState.selectedByServerKey[mcpServerKey(option.server.ref)]);
+		return mcpState.options.filter(option => mcpState.selectedByServerKey[mcpServerKey(option.runtimeServerID)]);
 	}, [mcpState.options, mcpState.selectedByServerKey]);
 
 	return (
@@ -140,7 +140,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 						}
 						title="Select an MCP server to add"
 						getDisplayName={key => {
-							const option = availableServerOptions.find(o => mcpServerKey(o.server.ref) === key);
+							const option = availableServerOptions.find(o => mcpServerKey(o.runtimeServerID) === key);
 							if (option) {
 								const status = getOptionStatus(option);
 								const isReady = status === MCPServerStatus.Ready;
@@ -166,7 +166,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 
 			<div className="mt-4 space-y-3">
 				{selectedOptions.map(option => {
-					const serverKey = mcpServerKey(option.server.ref);
+					const serverKey = mcpServerKey(option.runtimeServerID);
 					const selection = mcpState.selectedByServerKey[serverKey];
 					if (!selection) {
 						return null;
@@ -260,7 +260,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 											title="Cancel authorization"
 											onClick={e => {
 												e.stopPropagation();
-												void mcpState.cancelOAuth(option.server.ref);
+												void mcpState.cancelOAuth(option.runtimeServerID);
 											}}
 										>
 											<FiX size={12} />
@@ -274,9 +274,9 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 										onClick={e => {
 											e.stopPropagation();
 											if (isReady) {
-												void mcpState.disconnectServer(option.server.ref).catch(console.error);
+												void mcpState.disconnectServer(option.runtimeServerID).catch(console.error);
 											} else {
-												void mcpState.connectServer(option.server.ref).catch(console.error);
+												void mcpState.connectServer(option.runtimeServerID).catch(console.error);
 											}
 										}}
 										disabled={!isSelectableServerOption(option)}
@@ -292,8 +292,8 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 										onClick={e => {
 											e.stopPropagation();
 											void mcpState
-												.refreshServer(option.server.ref)
-												.then(() => mcpState.ensureDiscoveryLoaded(option.server.ref))
+												.refreshServer(option.runtimeServerID)
+												.then(() => mcpState.ensureDiscoveryLoaded(option.runtimeServerID))
 												.catch(console.error);
 										}}
 									>
@@ -325,7 +325,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 											className="toggle toggle-accent"
 											checked={Boolean(selection.includeServerInstructions)}
 											onChange={e => {
-												mcpState.setIncludeServerInstructions(option.server.ref, e.target.checked);
+												mcpState.setIncludeServerInstructions(option.runtimeServerID, e.target.checked);
 											}}
 										/>
 									</div>
@@ -342,7 +342,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 											if (value === MCPToolExposure.Selected && !canUseSelectedToolExposure) {
 												return;
 											}
-											mcpState.setToolExposure(option.server.ref, value);
+											mcpState.setToolExposure(option.runtimeServerID, value);
 										}}
 										getDisplayName={getToolExposureLabel}
 										title="Tool Exposure"
@@ -551,7 +551,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 					if (!manualOAuthModalOption) {
 						return;
 					}
-					await mcpState.cancelOAuth(manualOAuthModalOption.server.ref);
+					await mcpState.cancelOAuth(manualOAuthModalOption.runtimeServerID);
 					setManualOAuthModalKey(null);
 				}}
 			/>

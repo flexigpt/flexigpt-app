@@ -1,6 +1,5 @@
-import type { ArtifactRef } from '@/spec/artifact';
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPToolSelection } from '@/spec/mcp_artifact';
+import type { MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp_artifact';
 
 /**
  * Runtime-only handle for one MCP App view. Apps are never persisted; this
@@ -8,7 +7,7 @@ import type { MCPToolSelection } from '@/spec/mcp_artifact';
  */
 export interface MCPAppInstance {
 	instanceID: string;
-	server: ArtifactRef;
+	server: MCPRuntimeServerID;
 	resourceUri: string;
 	mimeType?: string;
 	toolName: string;
@@ -82,7 +81,7 @@ export function buildAppInstanceFromToolOutput(output: UIToolOutput): MCPAppInst
 	}
 
 	const resourceUri = app.resourceUri;
-	const instanceID = `mcpapp-${sel.server.rootID}-${sel.server.artifactID}-${output.callID || output.id}`;
+	const instanceID = `mcpapp-${sel.server}-${output.callID || output.id}`;
 	return {
 		instanceID,
 		server: sel.server,

@@ -191,25 +191,25 @@ function getMCPContextDisplayItems(context?: MCPConversationContext): OrderedDis
 	const items: OrderedDisplayItem[] = [];
 
 	for (const server of normalized.servers ?? []) {
-		const serverRef = server.server;
+		const runtimeServerID = server.server;
 		const selectedToolCount = server.selectedTools?.length ?? 0;
 		const parts = [
-			serverRef.rootID,
+			runtimeServerID,
 			getMCPToolExposureLabel(server.toolExposure, selectedToolCount),
 			server.includeServerInstructions ? 'server instructions' : undefined,
 			server.snapshotDigest ? `snapshot ${server.snapshotDigest}` : undefined,
 		].filter(Boolean);
 
 		items.push({
-			key: `server:${serverRef.rootID}:${serverRef.artifactID}`,
-			title: `Server: ${serverRef.artifactID}`,
+			key: `server:${runtimeServerID}`,
+			title: `Server: ${runtimeServerID}`,
 			subtitle: parts.join(' · '),
 		});
 
 		for (const tool of server.selectedTools ?? []) {
-			const toolServer = tool.server ?? serverRef;
+			const toolServer = tool.server ?? runtimeServerID;
 			const toolParts = [
-				`${toolServer.rootID}/${toolServer.artifactID}`,
+				toolServer,
 				tool.providerToolName ? `provider ${tool.providerToolName}` : undefined,
 				tool.executionMode ? `execution ${tool.executionMode}` : undefined,
 				tool.approvalRule ? `approval ${tool.approvalRule}` : undefined,
@@ -217,7 +217,7 @@ function getMCPContextDisplayItems(context?: MCPConversationContext): OrderedDis
 			].filter(Boolean);
 
 			items.push({
-				key: `tool:${toolServer.rootID}:${toolServer.artifactID}:${tool.toolName}`,
+				key: `tool:${toolServer}:${tool.toolName}`,
 				title: `Tool: ${tool.toolName}`,
 				subtitle: toolParts.join(' · '),
 			});
@@ -225,33 +225,29 @@ function getMCPContextDisplayItems(context?: MCPConversationContext): OrderedDis
 	}
 
 	for (const resource of normalized.resources ?? []) {
-		const serverRef = resource.server;
+		const runtimeServerID = resource.server;
 		items.push({
-			key: `resource:${serverRef.rootID}:${serverRef.artifactID}:${resource.uri}`,
+			key: `resource:${runtimeServerID}:${resource.uri}`,
 			title: `Resource: ${resource.uri}`,
-			subtitle: `${serverRef.rootID}/${serverRef.artifactID}${resource.digest ? ` · digest ${resource.digest}` : ''}`,
+			subtitle: `${runtimeServerID}${resource.digest ? ` · digest ${resource.digest}` : ''}`,
 		});
 	}
 
 	for (const template of normalized.resourceTemplates ?? []) {
-		const serverRef = template.server;
+		const runtimeServerID = template.server;
 		items.push({
-			key: `resource-template:${serverRef.rootID}:${serverRef.artifactID}:${template.uriTemplate}`,
+			key: `resource-template:${runtimeServerID}:${template.uriTemplate}`,
 			title: `Resource template: ${template.uriTemplate}`,
-			subtitle: [`${serverRef.rootID}/${serverRef.artifactID}`, formatMCPArgumentSummary(template.argumentValues)]
-				.filter(Boolean)
-				.join(' · '),
+			subtitle: [runtimeServerID, formatMCPArgumentSummary(template.argumentValues)].filter(Boolean).join(' · '),
 		});
 	}
 
 	for (const prompt of normalized.prompts ?? []) {
-		const serverRef = prompt.server;
+		const runtimeServerID = prompt.server;
 		items.push({
-			key: `prompt:${serverRef.rootID}:${serverRef.artifactID}:${prompt.promptName}`,
+			key: `prompt:${runtimeServerID}:${prompt.promptName}`,
 			title: `Prompt: ${prompt.promptName}`,
-			subtitle: [`${serverRef.rootID}/${serverRef.artifactID}`, formatMCPArgumentSummary(prompt.argumentValues)]
-				.filter(Boolean)
-				.join(' · '),
+			subtitle: [runtimeServerID, formatMCPArgumentSummary(prompt.argumentValues)].filter(Boolean).join(' · '),
 		});
 	}
 
