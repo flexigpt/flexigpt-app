@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -310,7 +311,7 @@ func (e *Engine) Discover(
 			)
 			continue
 		}
-		candidate := Candidate{
+		candidate := providerapi.Candidate{
 			SourceID:            sourceID,
 			SourceKind:          sourceKind,
 			Locator:             entry.Locator,
@@ -606,11 +607,11 @@ func (e *Engine) Discover(
 
 func (e *Engine) selectDecoder(
 	ctx context.Context,
-	candidate Candidate,
+	candidate providerapi.Candidate,
 	allowed map[basespec.DecoderID]struct{},
-) (Decoder, []diagnostic.Diagnostic) {
-	var selected Decoder
-	best := RecognitionNone
+) (providerapi.Decoder, []diagnostic.Diagnostic) {
+	var selected providerapi.Decoder
+	best := providerapi.RecognitionNone
 	tied := make([]basespec.DecoderID, 0)
 
 	for _, decoder := range e.decoders.registered() {
@@ -621,8 +622,8 @@ func (e *Engine) selectDecoder(
 		}
 
 		recognition := decoder.Recognize(ctx, cloneCandidate(candidate))
-		if recognition < RecognitionNone ||
-			recognition > RecognitionPreferred {
+		if recognition < providerapi.RecognitionNone ||
+			recognition > providerapi.RecognitionPreferred {
 			return nil, []diagnostic.Diagnostic{{
 				Severity: diagnostic.DiagnosticError,
 				Code:     DiagnosticCodeDecoderInvalidRecognition,
@@ -640,7 +641,7 @@ func (e *Engine) selectDecoder(
 			best = recognition
 			selected = decoder
 			tied = []basespec.DecoderID{decoder.ID()}
-		} else if recognition == best && recognition != RecognitionNone {
+		} else if recognition == best && recognition != providerapi.RecognitionNone {
 			tied = append(tied, decoder.ID())
 		}
 	}
@@ -674,7 +675,7 @@ func (e *Engine) selectDecoder(
 	return selected, nil
 }
 
-func cloneCandidate(value Candidate) Candidate {
+func cloneCandidate(value providerapi.Candidate) providerapi.Candidate {
 	output := value
 	output.Content = append([]byte(nil), value.Content...)
 	output.RequestedDecoderIDs = append([]basespec.DecoderID(nil), value.RequestedDecoderIDs...)

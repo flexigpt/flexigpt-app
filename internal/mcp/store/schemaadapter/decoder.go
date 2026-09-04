@@ -9,8 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
 	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
@@ -18,7 +17,7 @@ import (
 )
 
 type Decoder struct {
-	documents shareable.ExpectedCanonicalizer
+	documents providerapi.ExpectedCanonicalizer
 }
 
 func NewDecoder() *Decoder {
@@ -33,8 +32,14 @@ func (*Decoder) Revision() string {
 	return artifactbuiltin.DecoderRevision
 }
 
-func (d *Decoder) BindShareableSchemas(
-	schemas *shareable.Registry,
+func (*Decoder) RequiredSchemaKeys() []providerapi.SchemaKey {
+	return []providerapi.SchemaKey{
+		artifactbuiltin.MCPBundleSchemaKey,
+	}
+}
+
+func (d *Decoder) BindExpectedCanonicalizer(
+	schemas providerapi.SchemaCatalog,
 ) error {
 	if d == nil || schemas == nil {
 		return fmt.Errorf(
@@ -43,32 +48,35 @@ func (d *Decoder) BindShareableSchemas(
 		)
 	}
 
-	expected := artifactbuiltin.MCPBundleSchemaKey
-	if slices.Contains(schemas.Keys(), expected) {
-		d.documents = schemas
-		return nil
+	registered := schemas.Keys()
+	for _, expected := range d.RequiredSchemaKeys() {
+		if slices.Contains(registered, expected) {
+			continue
+		}
+		return fmt.Errorf(
+			"%w: MCP Bundle shareable schema is not registered",
+			basespec.ErrInvalid,
+		)
 	}
-	return fmt.Errorf(
-		"%w: MCP Bundle shareable schema is not registered",
-		basespec.ErrInvalid,
-	)
+	d.documents = schemas
+	return nil
 }
 
 func (d *Decoder) Recognize(
 	_ context.Context,
-	candidate discovery.Candidate,
-) discovery.Recognition {
+	candidate providerapi.Candidate,
+) providerapi.Recognition {
 	if candidate.RequestsDecoder(artifactbuiltin.DecoderID) &&
 		mcpStore.IsBundleDocumentLocator(candidate.Locator) {
-		return discovery.RecognitionPreferred
+		return providerapi.RecognitionPreferred
 	}
-	return discovery.RecognitionNone
+	return providerapi.RecognitionNone
 }
 
 func (d *Decoder) Decode(
 	ctx context.Context,
-	candidate discovery.Candidate,
-) ([]discovery.Decoded, []diagnostic.Diagnostic) {
+	candidate providerapi.Candidate,
+) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
 	if !candidate.RequestsDecoder(artifactbuiltin.DecoderID) ||
 		!mcpStore.IsBundleDocumentLocator(candidate.Locator) {
 		return nil, nil
@@ -111,7 +119,7 @@ func (d *Decoder) Decode(
 	sort.Strings(policyNames)
 
 	output := make(
-		[]discovery.Decoded,
+		[]providerapi.Decoded,
 		0,
 		len(serverNames)+len(policyNames),
 	)
@@ -125,7 +133,7 @@ func (d *Decoder) Decode(
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
-		output = append(output, discovery.Decoded{
+		output = append(output, providerapi.Decoded{
 			SubresourceLocator: mcpStoreServer.ServerSubresource(
 				basespec.LogicalName(name),
 			),
@@ -140,7 +148,7 @@ func (d *Decoder) Decode(
 		if err != nil {
 			return nil, decoderError(candidate.Locator, name, err)
 		}
-		output = append(output, discovery.Decoded{
+		output = append(output, providerapi.Decoded{
 			SubresourceLocator: mcpStorePolicy.PolicySubresource(
 				basespec.LogicalName(name),
 			),

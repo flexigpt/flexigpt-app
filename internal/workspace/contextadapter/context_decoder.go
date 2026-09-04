@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
@@ -20,6 +20,8 @@ import (
 )
 
 type ContextDecoder struct{}
+
+var _ providerapi.Decoder = (*ContextDecoder)(nil)
 
 func NewContextDecoder() *ContextDecoder {
 	return &ContextDecoder{}
@@ -56,22 +58,22 @@ func ArtifactSupport() spec.ArtifactSupport {
 
 func (*ContextDecoder) Recognize(
 	_ context.Context,
-	candidate discovery.Candidate,
-) discovery.Recognition {
+	candidate providerapi.Candidate,
+) providerapi.Recognition {
 	if _, supported := contextConventionFor(candidate.Locator); !supported {
 		if candidate.RequestsDecoder(artifactbuiltin.WorkspaceContextDecoderID) &&
 			strings.EqualFold(path.Ext(string(candidate.Locator)), ".md") {
-			return discovery.RecognitionPossible
+			return providerapi.RecognitionPossible
 		}
-		return discovery.RecognitionNone
+		return providerapi.RecognitionNone
 	}
-	return discovery.RecognitionPreferred
+	return providerapi.RecognitionPreferred
 }
 
 func (*ContextDecoder) Decode(
 	_ context.Context,
-	candidate discovery.Candidate,
-) ([]discovery.Decoded, []diagnostic.Diagnostic) {
+	candidate providerapi.Candidate,
+) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
 	if !utf8.Valid(candidate.Content) {
 		return nil, artifactadapter.WorkspaceArtifactDiagnostics(
 			candidate.Locator,
@@ -139,5 +141,5 @@ func (*ContextDecoder) Decode(
 			err.Error(),
 		)
 	}
-	return []discovery.Decoded{{Definition: value}}, nil
+	return []providerapi.Decoded{{Definition: value}}, nil
 }

@@ -9,14 +9,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
-	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
-	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
 	mcpSchemaadapter "github.com/flexigpt/flexigpt-app/internal/mcp/store/schemaadapter"
-	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/store/bundle"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
@@ -37,21 +33,20 @@ func InitArtifactStoreWrapper(
 		return err
 	}
 
-	skillDecoder, err := skillArtifact.NewDecoder()
+	workspaceConfig := workspace.DefaultConfig()
+	workspaceProvider, err := workspace.NewProvider(workspaceConfig.ProviderConfig())
 	if err != nil {
 		return err
 	}
-	decoders := append(
-		workspace.DefaultDecoders(),
-		skillDecoder,
-		mcpSchemaadapter.NewDecoder(),
-	)
-	shareableCodecs := []shareable.Codec{
-		skillBundle.NewShareableCodec(),
-		workspace.NewShareableCodec(),
-		mcpStore.NewBundleCodec(),
-		mcpStoreServer.NewServerCodec(),
-		mcpStorePolicy.NewPolicyCodec(),
+
+	skillProvider, err := skillBundle.NewProvider()
+	if err != nil {
+		return err
+	}
+
+	mcpProvider, err := mcpSchemaadapter.NewProvider()
+	if err != nil {
+		return err
 	}
 
 	rootPolicy, err := protection.NewSetRootPolicy(
@@ -65,10 +60,13 @@ func InitArtifactStoreWrapper(
 	components, err := system.Open(
 		context.Background(),
 		system.Config{
-			BaseDirectory:      baseDirectory,
-			Decoders:           decoders,
+			BaseDirectory: baseDirectory,
+			ArtifactProviders: []providerapi.Provider{
+				workspaceProvider,
+				skillProvider,
+				mcpProvider,
+			},
 			RootMutationPolicy: rootPolicy,
-			ShareableCodecs:    shareableCodecs,
 		},
 	)
 	if err != nil {
@@ -259,45 +257,6 @@ func (w *ArtifactStoreWrapper) ListArtifactSourceKinds(
 	return middleware.WithRecoveryResp(
 		func() (*artifactstore.ListArtifactSourceKindsResponse, error) {
 			return w.api.ListArtifactSourceKinds(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *ArtifactStoreWrapper) GetManagedSourceState(
-	request *artifactstore.GetManagedSourceStateRequest,
-) (*artifactstore.GetManagedSourceStateResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*artifactstore.GetManagedSourceStateResponse, error) {
-			return w.api.GetManagedSourceState(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *ArtifactStoreWrapper) PublishManagedSourcePackage(
-	request *artifactstore.PublishManagedSourcePackageRequest,
-) (*artifactstore.PublishManagedSourcePackageResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*artifactstore.PublishManagedSourcePackageResponse, error) {
-			return w.api.PublishManagedSourcePackage(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *ArtifactStoreWrapper) RemoveManagedSourcePackage(
-	request *artifactstore.RemoveManagedSourcePackageRequest,
-) (*artifactstore.RemoveManagedSourcePackageResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*artifactstore.RemoveManagedSourcePackageResponse, error) {
-			return w.api.RemoveManagedSourcePackage(
 				context.Background(),
 				request,
 			)

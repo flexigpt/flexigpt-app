@@ -8,11 +8,11 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
@@ -113,32 +113,29 @@ func (a *API) resolveMCPServer(
 			basespec.ErrCatalogStale,
 		)
 	}
-	if verifySource {
-		sourceValue, err := a.dependencies.SourceRuntime.Get(
-			ctx,
-			record.RootID,
-			record.Binding.SourceID,
+
+	resolvedResource, err := a.dependencies.Resources.ResolveArtifact(
+		ctx,
+		ref,
+		artifactstore.ResolveOptions{
+			VerifySourceContent: verifySource,
+		},
+	)
+	if err != nil {
+		return mcpStoreServer.Resolved{}, err
+	}
+	if resolvedResource.Artifact.Revision != record.Revision ||
+		resolvedResource.CatalogRevision != snapshot.Revision ||
+		resolvedResource.Definition.Digest != definitionValue.Digest ||
+		resolvedResource.Source.Revision != sourceRevision ||
+		resolvedResource.SourceGeneration != sourceGeneration ||
+		resolvedResource.Occurrence.SourceContentDigest == nil ||
+		*resolvedResource.Occurrence.SourceContentDigest !=
+			*occurrence.SourceContentDigest {
+		return mcpStoreServer.Resolved{}, fmt.Errorf(
+			"%w: MCP resource changed during resolution",
+			basespec.ErrCatalogStale,
 		)
-		if err != nil {
-			return mcpStoreServer.Resolved{}, err
-		}
-		if sourceValue.Revision != sourceRevision {
-			return mcpStoreServer.Resolved{}, fmt.Errorf(
-				"%w: MCP Source changed after Catalog publication",
-				basespec.ErrCatalogStale,
-			)
-		}
-		if err := source.VerifySnapshotContentDigest(
-			ctx,
-			a.dependencies.SourceRuntime,
-			sourceValue,
-			record.Binding.Locator,
-			sourceGeneration,
-			*occurrence.SourceContentDigest,
-			basespec.MaxCandidateBytes,
-		); err != nil {
-			return mcpStoreServer.Resolved{}, err
-		}
 	}
 
 	installationData, installationRevision, _, runtimeEnabled, err := a.effectiveInstallation(
@@ -214,30 +211,10 @@ func (a *API) currentCatalog(
 	ctx context.Context,
 	bundle Bundle,
 ) (catalog.Snapshot, error) {
-	snapshot, err := catalog.ReadCurrent(
+	return a.dependencies.Refresh.CurrentCatalog(
 		ctx,
-		a.dependencies.Catalogs,
 		bundle.Collection.Ref(),
 	)
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	planFingerprint, err := a.discoveryPlan(bundle).Fingerprint()
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	decoderFingerprint, err := a.dependencies.DecoderFingerprint()
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	if snapshot.PlanFingerprint != planFingerprint ||
-		snapshot.DecoderFingerprint != decoderFingerprint {
-		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: MCP configuration Catalog inputs changed",
-			basespec.ErrCatalogStale,
-		)
-	}
-	return snapshot, nil
 }
 
 func currentServerOccurrence(

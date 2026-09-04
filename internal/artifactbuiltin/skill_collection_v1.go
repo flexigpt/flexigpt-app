@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -35,7 +35,7 @@ const (
 //go:embed skill-collection-v1.schema.json
 var skillCollectionV1JSONSchema []byte
 
-var SkillCollectionV1SchemaKey = shareable.CollectionSchemaKey(
+var SkillCollectionV1SchemaKey = providerapi.CollectionSchemaKey(
 	SkillCollectionV1Kind,
 	SkillCollectionV1SchemaID,
 	SkillCollectionV1SchemaVersion,

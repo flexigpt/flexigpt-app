@@ -4,8 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
@@ -26,21 +25,18 @@ func InitWorkspaceWrapper(
 		return errors.New("artifact store components are nil")
 	}
 	config := workspace.DefaultConfig()
-	config.WorkspaceRootID = artifactbuiltin.WorkspaceRootID
-	config.AutoAdoptionIDProvider = artifact.UUIDArtifactIDProvider()
+	resources, err := artifactstore.New(artifacts)
+	if err != nil {
+		return err
+	}
 
 	api, err := workspace.New(workspace.Dependencies{
-		Roots:                  artifacts.Roots,
-		Sources:                artifacts.Sources,
-		Collections:            artifacts.Collections,
-		Artifacts:              artifacts.Artifacts,
-		Refresh:                artifacts.Refresh,
-		Catalogs:               artifacts.Catalogs,
-		ShareableCanonicalizer: artifacts.ShareableSchemas,
-		SourceRuntime:          artifacts.SourceRuntime,
-		HasDecoder:             artifacts.HasDecoder,
-		DecoderFingerprint:     artifacts.DecoderFingerprint,
-		RootMutationPolicy:     artifacts.RootMutationPolicy(),
+		Sources:            artifacts.Sources,
+		Collections:        artifacts.Collections,
+		Artifacts:          artifacts.Artifacts,
+		Refresh:            artifacts.Refresh,
+		Resources:          resources,
+		RootMutationPolicy: artifacts.RootMutationPolicy(),
 	}, config)
 	if err != nil {
 		return err
@@ -53,16 +49,7 @@ func (w *WorkspaceWrapper) CreateFilesystemWorkspace(
 	request *workspace.CreateFilesystemWorkspaceRequest,
 ) (*workspace.CreateFilesystemWorkspaceResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.CreateFilesystemWorkspaceResponse, error) {
-		ctx := context.Background()
-		response, err := w.api.CreateFilesystemWorkspace(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		if response == nil || response.Body == nil {
-			return nil, errors.New("create filesystem Workspace returned an empty response")
-		}
-
-		return response, nil
+		return w.api.CreateFilesystemWorkspace(context.Background(), request)
 	})
 }
 
@@ -70,16 +57,7 @@ func (w *WorkspaceWrapper) CreateEmptyWorkspace(
 	request *workspace.CreateEmptyWorkspaceRequest,
 ) (*workspace.CreateEmptyWorkspaceResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.CreateEmptyWorkspaceResponse, error) {
-		ctx := context.Background()
-		response, err := w.api.CreateEmptyWorkspace(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		if response == nil || response.Body == nil {
-			return nil, errors.New("create empty Workspace returned an empty response")
-		}
-
-		return response, nil
+		return w.api.CreateEmptyWorkspace(context.Background(), request)
 	})
 }
 
@@ -105,20 +83,6 @@ func (w *WorkspaceWrapper) UpdateWorkspace(
 	return middleware.WithRecoveryResp(func() (*workspace.UpdateWorkspaceResponse, error) {
 		ctx := context.Background()
 		response, err := w.api.UpdateWorkspace(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-
-		return response, nil
-	})
-}
-
-func (w *WorkspaceWrapper) ReplaceWorkspacePrimarySource(
-	request *workspace.ReplaceWorkspacePrimarySourceRequest,
-) (*workspace.ReplaceWorkspacePrimarySourceResponse, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.ReplaceWorkspacePrimarySourceResponse, error) {
-		ctx := context.Background()
-		response, err := w.api.ReplaceWorkspacePrimarySource(ctx, request)
 		if err != nil {
 			return nil, err
 		}
@@ -230,28 +194,6 @@ func (w *WorkspaceWrapper) GetWorkspaceCatalog(
 ) (*workspace.GetWorkspaceCatalogResponse, error) {
 	return middleware.WithRecoveryResp(func() (*workspace.GetWorkspaceCatalogResponse, error) {
 		return w.api.GetWorkspaceCatalog(context.Background(), request)
-	})
-}
-
-func (w *WorkspaceWrapper) ComposeWorkspaceLoadPlan(
-	request *workspace.ComposeWorkspaceLoadPlanRequest,
-) (*workspace.ComposeWorkspaceLoadPlanResponse, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.ComposeWorkspaceLoadPlanResponse, error) {
-		return w.api.ComposeWorkspaceLoadPlan(
-			context.Background(),
-			request,
-		)
-	})
-}
-
-func (w *WorkspaceWrapper) ResolveWorkspaceResource(
-	request *workspace.ResolveWorkspaceResourceRequest,
-) (*workspace.ResolveWorkspaceResourceResponse, error) {
-	return middleware.WithRecoveryResp(func() (*workspace.ResolveWorkspaceResourceResponse, error) {
-		return w.api.ResolveWorkspaceResource(
-			context.Background(),
-			request,
-		)
 	})
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"sort"
 	"sync/atomic"
 
@@ -13,9 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/workspaceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
@@ -226,36 +223,6 @@ func (a *API) UpdateWorkspace(
 	return &UpdateWorkspaceResponse{Body: &view}, nil
 }
 
-func (a *API) ReplaceWorkspacePrimarySource(
-	ctx context.Context,
-	request *ReplaceWorkspacePrimarySourceRequest,
-) (*ReplaceWorkspacePrimarySourceResponse, error) {
-	if err := a.Ready(); err != nil {
-		return nil, err
-	}
-	if request == nil || request.Body == nil {
-		return nil, invalidAPIRequest("workspace primary replacement body is required")
-	}
-	value, err := a.workspace.service.ReplacePrimary(
-		ctx,
-		spec.ReplacePrimaryRequest{
-			Workspace:                  request.Workspace,
-			ExpectedCollectionRevision: request.Body.ExpectedCollectionRevision,
-			PreviousSourceID:           request.Body.PreviousSourceID,
-			PreviousAttachmentRevision: request.Body.ExpectedPreviousAttachmentRevision,
-			SourceID:                   request.Body.SourceID,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	view, err := a.workspaceViewForAPI(ctx, value)
-	if err != nil {
-		return nil, err
-	}
-	return &ReplaceWorkspacePrimarySourceResponse{Body: &view}, nil
-}
-
 func (a *API) SetWorkspacePrimarySource(
 	ctx context.Context,
 	request *SetWorkspacePrimarySourceRequest,
@@ -434,7 +401,13 @@ func (a *API) RefreshWorkspace(
 	if request == nil {
 		return nil, invalidAPIRequest("workspace refresh request is required")
 	}
-	value, err := a.workspace.refresher.Refresh(ctx, request.Workspace)
+	if _, err := a.workspace.service.Get(ctx, request.Workspace); err != nil {
+		return nil, err
+	}
+	value, err := a.dependencies.Refresh.RefreshCollection(
+		ctx,
+		request.Workspace,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -474,60 +447,6 @@ func (a *API) GetWorkspaceCatalog(
 		return nil, err
 	}
 	return &GetWorkspaceCatalogResponse{Body: &output}, nil
-}
-
-func (a *API) ComposeWorkspaceLoadPlan(
-	ctx context.Context,
-	request *ComposeWorkspaceLoadPlanRequest,
-) (*ComposeWorkspaceLoadPlanResponse, error) {
-	if err := a.Ready(); err != nil {
-		return nil, err
-	}
-	if request == nil || request.Body == nil {
-		return nil, invalidAPIRequest(
-			"workspace load-plan body is required",
-		)
-	}
-	value, err := a.workspace.query.ComposeLoadPlan(
-		ctx,
-		request.Workspace,
-		request.Body.Artifacts,
-	)
-	if err != nil {
-		return nil, err
-	}
-	output := workspaceLoadPlanViewOf(value)
-	return &ComposeWorkspaceLoadPlanResponse{Body: &output}, nil
-}
-
-func (a *API) ResolveWorkspaceResource(
-	ctx context.Context,
-	request *ResolveWorkspaceResourceRequest,
-) (*ResolveWorkspaceResourceResponse, error) {
-	if err := a.Ready(); err != nil {
-		return nil, err
-	}
-	if request == nil || request.Body == nil {
-		return nil, invalidAPIRequest(
-			"workspace resource reference is required",
-		)
-	}
-	value, err := a.workspace.query.Resolve(
-		ctx,
-		request.Workspace,
-		spec.Reference{
-			Artifact: request.Body.Artifact,
-			Selector: request.Body.Selector,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	output := ResolveWorkspaceResourceResponseBody{
-		Resource:   workspaceResourceViewOf(value),
-		Definition: workspaceDefinitionViewOf(value.Definition),
-	}
-	return &ResolveWorkspaceResourceResponse{Body: &output}, nil
 }
 
 func (a *API) GetWorkspaceArtifact(
@@ -1090,9 +1009,10 @@ func (a *API) requireWorkspaceArtifactKind(
 	if err := basespec.ValidateArtifactKind(kind); err != nil {
 		return err
 	}
-	if a.workspace == nil ||
-		a.workspace.policy == nil ||
-		!a.workspace.policy.Supports(kind) {
+	if a.workspace == nil {
+		return invalidAPIRequest("workspace components are unavailable")
+	}
+	if _, supported := a.workspace.supportedKinds[kind]; !supported {
 		return fmt.Errorf(
 			"%w: Artifact kind %q is not supported by Workspace",
 			spec.ErrInvalidWorkspace,
@@ -1157,8 +1077,6 @@ func (a *API) enrichWorkspaceSourcePresentation(
 	output *WorkspaceView,
 	value spec.Workspace,
 ) error {
-	localPaths, supportsLocalPaths := a.dependencies.SourceRuntime.(source.LocalPathRuntime)
-
 	for index := range output.Attachments {
 		attachment := &output.Attachments[index]
 		var summaryFound bool
@@ -1170,10 +1088,7 @@ func (a *API) enrichWorkspaceSourcePresentation(
 			attachment.SourceDisplayName = summary.DisplayName
 			attachment.SourceKind = string(summary.Kind)
 			summaryFound = true
-			if !supportsLocalPaths ||
-				!localPaths.SupportsLocalPath(summary.Kind) {
-				break
-			}
+			break
 		}
 		if !summaryFound {
 			return fmt.Errorf(
@@ -1182,51 +1097,21 @@ func (a *API) enrichWorkspaceSourcePresentation(
 				attachment.SourceID,
 			)
 		}
-		if !supportsLocalPaths ||
-			!localPaths.SupportsLocalPath(basespec.SourceKind(attachment.SourceKind)) {
+		sourceKind := basespec.SourceKind(attachment.SourceKind)
+		if !a.dependencies.Resources.SupportsLocalPath(sourceKind) {
 			continue
 		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		sourceValue, err := a.dependencies.SourceRuntime.Get(
+		pathValue, err := a.dependencies.Resources.ResolveSourceLocalPath(
 			ctx,
 			value.Collection.RootID,
 			attachment.SourceID,
-		)
-		if err != nil {
-			attachment.Diagnostics = diagnostic.AppendDiagnostics(
-				attachment.Diagnostics,
-				workspaceSourcePresentationDiagnostic(
-					"workspace.source.path-unavailable",
-					"the filesystem Source path is currently unavailable",
-				),
-			)
-			continue
-		}
-		if sourceValue.ID != attachment.SourceID ||
-			sourceValue.RootID != value.Collection.RootID ||
-			sourceValue.Kind != basespec.SourceKind(attachment.SourceKind) {
-			attachment.Diagnostics = diagnostic.AppendDiagnostics(
-				attachment.Diagnostics,
-				workspaceSourcePresentationDiagnostic(
-					"workspace.source.presentation-invalid",
-					"the filesystem Source changed while Workspace metadata was being projected",
-				),
-			)
-			continue
-		}
-
-		attachment.Path, err = localPaths.ResolveLocalPath(
-			ctx,
-			sourceValue,
 			".",
 		)
 		if err != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return ctxErr
-			}
 			attachment.Diagnostics = diagnostic.AppendDiagnostics(
 				attachment.Diagnostics,
 				workspaceSourcePresentationDiagnostic(
@@ -1236,6 +1121,7 @@ func (a *API) enrichWorkspaceSourcePresentation(
 			)
 			continue
 		}
+		attachment.Path = pathValue
 		if attachment.SourceID == output.PrimarySourceID {
 			output.PrimaryPath = attachment.Path
 		}
@@ -1503,80 +1389,6 @@ func workspaceOccurrenceViewOf(
 		output.Artifact = &artifactRef
 	}
 	return output
-}
-
-func workspaceResourceViewOf(
-	value spec.Resource,
-) WorkspaceResourceView {
-	artifactView := workspaceArtifactViewOf(value.Artifact)
-	return WorkspaceResourceView{
-		Artifact:         artifactView,
-		DefinitionDigest: value.Definition.Digest,
-		SourceID:         value.Source.ID,
-		Locator:          value.Artifact.Binding.Locator,
-		CatalogCurrent:   value.CatalogCurrent,
-		ProjectionValid:  value.ProjectionValid,
-		Diagnostics: diagnostic.AppendDiagnostics(
-			artifactView.Diagnostics,
-			value.Diagnostics...,
-		),
-	}
-}
-
-func workspaceLoadPlanViewOf(
-	value spec.LoadPlan,
-) WorkspaceLoadPlanView {
-	output := WorkspaceLoadPlanView{
-		Workspace:       value.Workspace,
-		CatalogRevision: value.CatalogRevision,
-		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
-		Items: make(
-			[]WorkspaceLoadPlanItemView,
-			0,
-			len(value.Items),
-		),
-	}
-	for _, item := range value.Items {
-		output.Items = append(
-			output.Items,
-			WorkspaceLoadPlanItemView{
-				Artifact:         workspaceArtifactViewOf(item.Artifact),
-				Definition:       workspaceDefinitionViewOf(item.Definition),
-				SourceID:         item.Source.ID,
-				SourceKind:       item.Source.Kind,
-				Locator:          item.Artifact.Binding.Locator,
-				CatalogCurrent:   item.CatalogCurrent,
-				DefinitionDigest: item.Definition.Digest,
-			},
-		)
-	}
-	return output
-}
-
-func workspaceDefinitionViewOf(
-	value definition.Definition,
-) WorkspaceDefinitionView {
-	dependencies := make(
-		[]definition.Selector,
-		len(value.Dependencies),
-	)
-	for index, selector := range value.Dependencies {
-		dependencies[index] = selector
-		dependencies[index].Labels = maps.Clone(selector.Labels)
-	}
-	return WorkspaceDefinitionView{
-		Digest:         value.Digest,
-		Kind:           value.Kind,
-		SchemaID:       value.SchemaID,
-		SchemaVersion:  value.SchemaVersion,
-		LogicalName:    value.LogicalName,
-		LogicalVersion: value.LogicalVersion,
-		DisplayName:    value.DisplayName,
-		Description:    value.Description,
-		Labels:         maps.Clone(value.Labels),
-		Body:           append(json.RawMessage(nil), value.Body...),
-		Dependencies:   dependencies,
-	}
 }
 
 func contextLoadPlanViewOf(

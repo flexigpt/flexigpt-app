@@ -75,55 +75,6 @@ func NewRuntime(
 	return value, nil
 }
 
-// ConfirmSnapshotGeneration confirms that a trusted Source still presents the
-// generation captured by a catalog or caller. It centralizes snapshot lifetime,
-// generation comparison, confirmation, and close handling for consumers.
-//
-// Consumers must not reimplement this with direct filesystem inspection.
-func ConfirmSnapshotGeneration(
-	ctx context.Context,
-	runtime Runtime,
-	value Source,
-	expectedGeneration string,
-) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: source generation confirmation context is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if runtime == nil {
-		return fmt.Errorf(
-			"%w: source generation confirmation runtime is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := value.Validate(); err != nil {
-		return err
-	}
-	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
-		return err
-	}
-
-	snapshot, err := runtime.Open(ctx, value)
-	if err != nil {
-		return err
-	}
-	if snapshot.Generation() != expectedGeneration {
-		return errors.Join(
-			fmt.Errorf(
-				"%w: source generation changed since it was observed",
-				basespec.ErrConflict,
-			),
-			snapshot.Close(),
-		)
-	}
-	return errors.Join(snapshot.Confirm(ctx), snapshot.Close())
-}
-
 // ReadSnapshotEntry reads one regular Source snapshot entry with the same
 // bounded-read and size-stability rules used by discovery.
 //

@@ -17,17 +17,15 @@ import (
 )
 
 type Service struct {
-	collections             workspaceCollectionStore
-	sources                 sourceSummaryLookup
-	discoveryPolicyRevision string
-	workspaceRootID         basespec.RootID
-	rootPolicy              protection.RootPolicy
+	collections     workspaceCollectionStore
+	sources         sourceSummaryLookup
+	workspaceRootID basespec.RootID
+	rootPolicy      protection.RootPolicy
 }
 
 func NewService(
 	collections workspaceCollectionStore,
 	sources sourceSummaryLookup,
-	discoveryPolicyRevision string,
 	workspaceRootID basespec.RootID,
 	rootPolicy protection.RootPolicy,
 ) (*Service, error) {
@@ -47,19 +45,11 @@ func NewService(
 			workspaceRootID,
 		)
 	}
-	if err := basespec.ValidateRequiredText(
-		"workspace discovery policy revision",
-		discoveryPolicyRevision,
-		basespec.MaxVersionBytes,
-	); err != nil {
-		return nil, err
-	}
 	return &Service{
-		collections:             collections,
-		sources:                 sources,
-		discoveryPolicyRevision: discoveryPolicyRevision,
-		workspaceRootID:         workspaceRootID,
-		rootPolicy:              rootPolicy,
+		collections:     collections,
+		sources:         sources,
+		workspaceRootID: workspaceRootID,
+		rootPolicy:      rootPolicy,
 	}, nil
 }
 
@@ -77,8 +67,7 @@ func (s *Service) CreateEmpty(
 		return spec.Workspace{}, err
 	}
 	data := spec.CollectionData{
-		DiscoveryPolicyRevision: s.discoveryPolicyRevision,
-		Discovery:               request.Discovery,
+		Discovery: request.Discovery,
 	}
 	raw, err := collectiondata.EncodeCollectionData(data)
 	if err != nil {
@@ -144,8 +133,7 @@ func (s *Service) CreateFilesystem(
 		)
 	}
 	data := spec.CollectionData{
-		DiscoveryPolicyRevision: s.discoveryPolicyRevision,
-		Discovery:               request.Discovery,
+		Discovery: request.Discovery,
 	}
 	raw, err := collectiondata.EncodeCollectionData(data)
 	if err != nil {
@@ -246,7 +234,6 @@ func (s *Service) Update(
 		return spec.Workspace{}, err
 	}
 	data := current.Data
-	data.DiscoveryPolicyRevision = s.discoveryPolicyRevision
 	data.Discovery = request.Discovery
 
 	raw, err := collectiondata.EncodeCollectionData(data)
@@ -390,19 +377,6 @@ func (s *Service) UpdateAttachment(
 		return spec.Workspace{}, err
 	}
 	return s.Get(ctx, request.Workspace)
-}
-
-func (s *Service) ReplacePrimary(
-	ctx context.Context,
-	request spec.ReplacePrimaryRequest,
-) (spec.Workspace, error) {
-	return s.SetPrimary(ctx, spec.SetPrimaryRequest{
-		Workspace:                  request.Workspace,
-		ExpectedCollectionRevision: request.ExpectedCollectionRevision,
-		PreviousSourceID:           request.PreviousSourceID,
-		PreviousAttachmentRevision: request.PreviousAttachmentRevision,
-		SourceID:                   request.SourceID,
-	})
 }
 
 // SetPrimary explicitly transitions a Workspace between empty and filesystem
@@ -650,44 +624,6 @@ func (s *Service) Purge(
 		return basespec.ErrConflict
 	}
 	return s.collections.Purge(ctx, ref, expectedRevision)
-}
-
-// PrepareRefresh converges the local policy revision before planning a
-// publication. A policy revision is local metadata, so a user-triggered
-// refresh is the appropriate point to persist an implementation upgrade.
-func (s *Service) PrepareRefresh(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) (spec.Workspace, error) {
-	current, err := s.Get(ctx, ref)
-	if err != nil {
-		return spec.Workspace{}, err
-	}
-	if !current.Collection.Enabled ||
-		current.Data.DiscoveryPolicyRevision == s.discoveryPolicyRevision {
-		return current, nil
-	}
-
-	data := current.Data
-	data.DiscoveryPolicyRevision = s.discoveryPolicyRevision
-	raw, err := collectiondata.EncodeCollectionData(data)
-	if err != nil {
-		return spec.Workspace{}, err
-	}
-	if _, err := s.collections.Update(
-		ctx,
-		ref,
-		collection.Update{
-			ExpectedRevision: current.Collection.Revision,
-			DisplayName:      current.Collection.DisplayName,
-			Description:      current.Collection.Description,
-			Enabled:          current.Collection.Enabled,
-			Data:             raw,
-		},
-	); err != nil {
-		return spec.Workspace{}, err
-	}
-	return s.Get(ctx, ref)
 }
 
 func (s *Service) Get(

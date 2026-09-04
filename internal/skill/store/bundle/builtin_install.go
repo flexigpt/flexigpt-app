@@ -10,10 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -21,21 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 )
-
-// builtInSkillArtifactPolicy deliberately creates no observed Artifacts.
-// Protected topology has one declared static Artifact ID for every member.
-// Unknown source content may remain visible as a catalog occurrence, but it
-// must never silently become a canonical built-in Artifact.
-type builtInSkillArtifactPolicy struct{}
-
-func (builtInSkillArtifactPolicy) Derive(
-	_ context.Context,
-	_ collection.Collection,
-	_ catalog.Occurrence,
-	_ definition.Definition,
-) (artifact.Draft, bool, []diagnostic.Diagnostic, error) {
-	return artifact.Draft{}, false, nil, nil
-}
 
 type BuiltInCollectionSkill struct {
 	ArtifactID basespec.ArtifactID
@@ -295,18 +277,12 @@ func (a *API) InstallBuiltInCollection(
 		}
 	}
 
-	plan, err := a.discoveryPlan(bundle)
-	if err != nil {
-		return nil, pendingBuiltInCollectionInstallError(request.Bundle, err)
-	}
 	if _, err := a.dependencies.ManagedArtifacts.PublishCollection(
 		ctx,
 		managedartifact.PublishCollectionRequest{
 			Collection:     request.Bundle,
 			SourceID:       sourceValue.ID,
 			Package:        publication,
-			Plan:           plan,
-			RefreshPolicy:  builtInSkillArtifactPolicy{},
 			AllowProtected: true,
 			ForceRefresh:   true,
 		},

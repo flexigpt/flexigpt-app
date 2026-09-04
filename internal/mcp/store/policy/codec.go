@@ -6,13 +6,13 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type PolicyCodec struct{}
 
-func NewPolicyCodec() shareable.Codec {
+func NewPolicyCodec() providerapi.SchemaCodec {
 	return PolicyCodec{}
 }
 
@@ -23,22 +23,22 @@ func (PolicyCodec) JSONSchema() []byte {
 func (PolicyCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
-) (shareable.ParsedDocument, error) {
+) (providerapi.ParsedDocument, error) {
 	if err := artifactbuiltin.CheckCodecContext(ctx); err != nil {
-		return shareable.ParsedDocument{}, err
+		return providerapi.ParsedDocument{}, err
 	}
 	value, canonical, err := parsePolicy(raw)
 	if err != nil {
-		return shareable.ParsedDocument{}, err
+		return providerapi.ParsedDocument{}, err
 	}
-	return shareable.ParsedDocument{
+	return providerapi.ParsedDocument{
 		Key:    PolicyCodec{}.Key(),
 		Digest: value.Digest,
 		Raw:    canonical,
 	}, nil
 }
 
-func (PolicyCodec) Key() shareable.SchemaKey {
+func (PolicyCodec) Key() providerapi.SchemaKey {
 	return artifactbuiltin.MCPPolicySchemaKey
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -22,7 +22,7 @@ type EnsureBuiltInRequest struct {
 	PackageAddress source.ManagedPackageAddress
 
 	PackageFiles  []source.ManagedPackageFile
-	Document      shareable.ParsedDocument
+	Document      providerapi.ParsedDocument
 	Registrations []Registration
 }
 

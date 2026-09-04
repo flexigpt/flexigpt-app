@@ -1,70 +1,26 @@
 package discovery
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-type Recognition int
-
-const (
-	RecognitionNone Recognition = iota
-	RecognitionPossible
-	RecognitionPreferred
-)
-
-type Candidate struct {
-	SourceID            basespec.SourceID
-	SourceKind          basespec.SourceKind
-	Locator             basespec.Locator
-	SourceContentDigest cryptoutil.Digest
-	Content             []byte
-	RequestedDecoderIDs []basespec.DecoderID
-}
-
-func (c Candidate) RequestsDecoder(id basespec.DecoderID) bool {
-	return slices.Contains(c.RequestedDecoderIDs, id)
-}
-
-type Decoded struct {
-	SubresourceLocator basespec.SubresourceLocator
-	Definition         definition.Definition
-	Diagnostics        []diagnostic.Diagnostic
-}
-
-type Decoder interface {
-	ID() basespec.DecoderID
-	Revision() string
-	Recognize(ctx context.Context, candidate Candidate) Recognition
-
-	// Decode returns candidate-level diagnostics as its second result.
-	//
-	// Diagnostics attached to Decoded apply only to that emitted subresource.
-	Decode(
-		ctx context.Context,
-		candidate Candidate,
-	) ([]Decoded, []diagnostic.Diagnostic)
-}
-
 type DecoderRegistry struct {
-	decoders []Decoder
-	byID     map[basespec.DecoderID]Decoder
+	decoders []providerapi.Decoder
+	byID     map[basespec.DecoderID]providerapi.Decoder
 }
 
 func NewDecoderRegistry(
-	decoders ...Decoder,
+	decoders ...providerapi.Decoder,
 ) (*DecoderRegistry, error) {
-	byID := make(map[basespec.DecoderID]Decoder, len(decoders))
-	ordered := make([]Decoder, 0, len(decoders))
+	byID := make(map[basespec.DecoderID]providerapi.Decoder, len(decoders))
+	ordered := make([]providerapi.Decoder, 0, len(decoders))
 	for _, decoder := range decoders {
 		if decoder == nil {
 			return nil, fmt.Errorf("%w: decoder is nil", basespec.ErrInvalid)
@@ -130,7 +86,7 @@ func (r *DecoderRegistry) Fingerprint() (cryptoutil.Digest, error) {
 
 func (r *DecoderRegistry) find(
 	id basespec.DecoderID,
-) (Decoder, bool) {
+) (providerapi.Decoder, bool) {
 	if r == nil {
 		return nil, false
 	}
@@ -138,9 +94,9 @@ func (r *DecoderRegistry) find(
 	return value, exists
 }
 
-func (r *DecoderRegistry) registered() []Decoder {
+func (r *DecoderRegistry) registered() []providerapi.Decoder {
 	if r == nil {
 		return nil
 	}
-	return append([]Decoder(nil), r.decoders...)
+	return append([]providerapi.Decoder(nil), r.decoders...)
 }

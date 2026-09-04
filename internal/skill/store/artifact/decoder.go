@@ -10,10 +10,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
 type Decoder struct{}
+
+var _ providerapi.Decoder = (*Decoder)(nil)
 
 func NewDecoder() (*Decoder, error) {
 	return &Decoder{}, nil
@@ -29,20 +31,20 @@ func (*Decoder) Revision() string {
 
 func (d *Decoder) Recognize(
 	_ context.Context,
-	candidate discovery.Candidate,
-) discovery.Recognition {
+	candidate providerapi.Candidate,
+) providerapi.Recognition {
 	if candidate.RequestsDecoder(artifactbuiltin.AgentSkillDecoderID) && basespec.Locator(path.Base(
 		string(candidate.Locator),
 	)) == artifactbuiltin.AgentSkillDefinitionFileName {
-		return discovery.RecognitionPreferred
+		return providerapi.RecognitionPreferred
 	}
-	return discovery.RecognitionNone
+	return providerapi.RecognitionNone
 }
 
 func (d *Decoder) Decode(
 	_ context.Context,
-	candidate discovery.Candidate,
-) ([]discovery.Decoded, []diagnostic.Diagnostic) {
+	candidate providerapi.Candidate,
+) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
 	if !candidate.RequestsDecoder(artifactbuiltin.AgentSkillDecoderID) ||
 		basespec.Locator(path.Base(string(candidate.Locator))) != artifactbuiltin.AgentSkillDefinitionFileName {
 		return nil, nil
@@ -65,7 +67,7 @@ func (d *Decoder) Decode(
 			Locator: candidate.Locator,
 		}
 	}
-	return []discovery.Decoded{{Definition: value}}, warnings
+	return []providerapi.Decoded{{Definition: value}}, warnings
 }
 
 // DecodeSkillDocument is the shared SKILL.md parse-and-definition path used

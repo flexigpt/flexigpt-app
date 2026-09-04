@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
@@ -26,6 +27,9 @@ type Service struct {
 	discovery   *discovery.Engine
 	reconciler  *artifact.Reconciler
 	publisher   Publisher
+	providers   *providerapi.Registry
+	documents   providerapi.ExpectedCanonicalizer
+	artifactIDs artifact.ArtifactIDProvider
 	clock       clockutil.Clock
 	policy      protection.RootPolicy
 }
@@ -38,6 +42,9 @@ func NewService(
 	discoveryEngine *discovery.Engine,
 	reconciler *artifact.Reconciler,
 	publisher Publisher,
+	providers *providerapi.Registry,
+	documents providerapi.ExpectedCanonicalizer,
+	artifactIDs artifact.ArtifactIDProvider,
 	timeClock clockutil.Clock,
 	policy protection.RootPolicy,
 ) (*Service, error) {
@@ -48,6 +55,9 @@ func NewService(
 		discoveryEngine == nil ||
 		reconciler == nil ||
 		publisher == nil ||
+		providers == nil ||
+		documents == nil ||
+		artifactIDs == nil ||
 		timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: refresh service dependencies are incomplete",
@@ -62,12 +72,18 @@ func NewService(
 		discovery:   discoveryEngine,
 		reconciler:  reconciler,
 		publisher:   publisher,
+		providers:   providers,
+		documents:   documents,
+		artifactIDs: artifactIDs,
 		clock:       timeClock,
 		policy:      policy,
 	}, nil
 }
 
-func (s *Service) Refresh(
+// refresh is Artifact Store's internal execution path. Provider-facing and
+// consumer-facing callers enter through RefreshCollection, which resolves the
+// registered behavior before this method is reached.
+func (s *Service) refresh(
 	ctx context.Context,
 	ref collection.CollectionRef,
 	plan discovery.Plan,

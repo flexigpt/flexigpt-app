@@ -160,6 +160,7 @@ func (s *Service) Create(
 	if err != nil {
 		return Collection{}, nil, err
 	}
+
 	return existing.Clone(), cloneAttachments(existingAttachments), nil
 }
 

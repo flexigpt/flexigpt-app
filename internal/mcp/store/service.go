@@ -10,19 +10,16 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
@@ -30,35 +27,15 @@ import (
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
 
-type noAutomaticAdoption struct{}
-
-func (noAutomaticAdoption) Derive(
-	_ context.Context,
-	_ collection.Collection,
-	_ catalog.Occurrence,
-	_ definition.Definition,
-) (
-	artifact.Draft,
-	bool,
-	[]diagnostic.Diagnostic,
-	error,
-) {
-	return artifact.Draft{}, false, nil, nil
-}
-
 type Dependencies struct {
 	Sources          *source.Service
 	Collections      *collection.Service
 	Artifacts        *artifact.Service
 	ManagedArtifacts *managedartifact.Service
-	Refresh          refresh.Runner
+	Refresh          refresh.CollectionAPI
 
-	Catalogs           catalog.Reader
-	SourceRuntime      source.Runtime
-	ShareableDocuments shareable.ExpectedCanonicalizer
-
-	HasDecoder         func(basespec.DecoderID) bool
-	DecoderFingerprint func() (cryptoutil.Digest, error)
+	Resources          artifactstore.ResourceResolver
+	ShareableDocuments providerapi.ExpectedCanonicalizer
 
 	RootPolicy    protection.RootPolicy
 	UserRootID    basespec.RootID
@@ -78,23 +55,13 @@ func New(dependencies Dependencies) (*API, error) {
 		dependencies.Artifacts == nil ||
 		dependencies.ManagedArtifacts == nil ||
 		dependencies.Refresh == nil ||
-		dependencies.Catalogs == nil ||
-		dependencies.SourceRuntime == nil ||
+		dependencies.Resources == nil ||
 		dependencies.ShareableDocuments == nil ||
-		dependencies.HasDecoder == nil ||
-		dependencies.DecoderFingerprint == nil ||
 		dependencies.RootPolicy == nil ||
 		dependencies.SecretCleaner == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP Bundle dependencies are incomplete",
 			basespec.ErrInvalid,
-		)
-	}
-	if !dependencies.HasDecoder(artifactbuiltin.DecoderID) {
-		return nil, fmt.Errorf(
-			"%w: MCP decoder %q is not registered",
-			basespec.ErrDecoderUnavailable,
-			artifactbuiltin.DecoderID,
 		)
 	}
 	if dependencies.UserRootID != "" {
@@ -345,11 +312,9 @@ func (a *API) Refresh(
 		)
 	}
 
-	if _, err := a.dependencies.Refresh.Refresh(
+	if _, err := a.dependencies.Refresh.RefreshCollection(
 		ctx,
 		ref,
-		a.discoveryPlan(bundle),
-		noAutomaticAdoption{},
 	); err != nil {
 		return Bundle{}, err
 	}
@@ -483,30 +448,6 @@ func (a *API) Get(
 		PackageAddress:  attachmentData.PackageAddress,
 		DocumentLocator: documentLocator,
 	}, nil
-}
-
-func (a *API) discoveryPlan(
-	bundle Bundle,
-) discovery.Plan {
-	p := discovery.SourcePlan{
-		SourceID:         bundle.Source.ID,
-		ExplicitLocators: []basespec.Locator{bundle.DocumentLocator},
-		DecoderHints: []discovery.DecoderHint{{
-			Locator:   bundle.DocumentLocator,
-			Recursive: false,
-			DecoderIDs: []basespec.DecoderID{
-				artifactbuiltin.DecoderID,
-			},
-		}},
-		AllowedDecoderIDs: []basespec.DecoderID{
-			artifactbuiltin.DecoderID,
-		},
-		Authoritative: true,
-	}.Normalized()
-	return discovery.Plan{
-		Revision: artifactbuiltin.DecoderRevision,
-		Sources:  []discovery.SourcePlan{p},
-	}
 }
 
 func (a *API) cleanupChangedServerInstallation(

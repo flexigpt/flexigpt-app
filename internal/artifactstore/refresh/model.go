@@ -10,7 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -310,19 +309,61 @@ type Publisher interface {
 	) (catalog.Snapshot, error)
 }
 
+// CollectionRunner is the provider-dispatched collection refresh capability
+// intended for artifact-family consumers.
+//
+// Consumers must not construct discovery.Plan or artifact.Policy values for
+// ordinary Collection refreshes.
+type CollectionRunner interface {
+	RefreshCollection(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) (Result, error)
+}
+
+// CollectionCatalogReader returns a catalog only after Artifact Store confirms
+// that current provider behavior and decoder capabilities still match it.
+type CollectionCatalogReader interface {
+	CurrentCatalog(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) (catalog.Snapshot, error)
+}
+
+// CatalogInspection exposes a read-only freshness result without allowing a
+// consumer to construct discovery plans or invoke publication directly.
+type CatalogInspection struct {
+	Catalog         catalog.Snapshot
+	MetadataChanged bool
+	PlanChanged     bool
+	DecoderChanged  bool
+}
+
+func (i CatalogInspection) IsCurrent() bool {
+	return !i.MetadataChanged &&
+		!i.PlanChanged &&
+		!i.DecoderChanged
+}
+
+type CollectionCatalogInspector interface {
+	InspectCollectionCatalog(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) (CatalogInspection, error)
+}
+
+// CollectionAPI is the narrow provider-dispatched collection capability used
+// by Skill and MCP feature facades.
+type CollectionAPI interface {
+	CollectionRunner
+	CollectionCatalogReader
+	CollectionCatalogInspector
+}
+
 type Result struct {
 	Catalog          catalog.Snapshot
 	CreatedArtifacts []basespec.ArtifactID
 	UpdatedArtifacts []basespec.ArtifactID
 	Diagnostics      []diagnostic.Diagnostic
 	Candidates       int
-}
-
-type Runner interface {
-	Refresh(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		plan discovery.Plan,
-		policy artifact.Policy,
-	) (Result, error)
 }

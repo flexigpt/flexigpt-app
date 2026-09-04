@@ -6,13 +6,13 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type ServerCodec struct{}
 
-func NewServerCodec() shareable.Codec {
+func NewServerCodec() providerapi.SchemaCodec {
 	return ServerCodec{}
 }
 
@@ -23,22 +23,22 @@ func (ServerCodec) JSONSchema() []byte {
 func (ServerCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
-) (shareable.ParsedDocument, error) {
+) (providerapi.ParsedDocument, error) {
 	if err := artifactbuiltin.CheckCodecContext(ctx); err != nil {
-		return shareable.ParsedDocument{}, err
+		return providerapi.ParsedDocument{}, err
 	}
 	value, canonical, err := parseServer(raw)
 	if err != nil {
-		return shareable.ParsedDocument{}, err
+		return providerapi.ParsedDocument{}, err
 	}
-	return shareable.ParsedDocument{
+	return providerapi.ParsedDocument{
 		Key:    ServerCodec{}.Key(),
 		Digest: value.Digest,
 		Raw:    canonical,
 	}, nil
 }
 
-func (ServerCodec) Key() shareable.SchemaKey {
+func (ServerCodec) Key() providerapi.SchemaKey {
 	return artifactbuiltin.MCPServerSchemaKey
 }
 

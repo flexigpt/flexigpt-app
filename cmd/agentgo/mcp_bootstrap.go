@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
@@ -53,18 +54,18 @@ func InitMCPWrappers(
 		return err
 	}
 	secrets := newSettingMCPSecretResolver(settingsStore)
-
+	resources, err := artifactstore.New(components)
+	if err != nil {
+		return err
+	}
 	storeAPI, err := mcpStore.New(mcpStore.Dependencies{
 		Sources:            components.Sources,
 		Collections:        components.Collections,
 		Artifacts:          components.Artifacts,
 		ManagedArtifacts:   components.ManagedArtifacts,
 		Refresh:            components.Refresh,
-		Catalogs:           components.Catalogs,
-		SourceRuntime:      components.SourceRuntime,
+		Resources:          resources,
 		ShareableDocuments: components.ShareableSchemas,
-		HasDecoder:         components.HasDecoder,
-		DecoderFingerprint: components.DecoderFingerprint,
 		RootPolicy:         components.RootMutationPolicy(),
 		UserRootID:         artifactbuiltin.MCPUserRootID,
 		Overlays:           overlays,

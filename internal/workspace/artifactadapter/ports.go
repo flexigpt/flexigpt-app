@@ -5,7 +5,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
@@ -109,11 +108,4 @@ type workspaceCollectionStore interface {
 		ref collection.CollectionRef,
 		replacement collection.AttachmentReplacement,
 	) (collection.Collection, collection.Attachment, error)
-}
-
-type catalogSnapshotReader interface {
-	GetCurrent(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (catalog.Snapshot, error)
 }

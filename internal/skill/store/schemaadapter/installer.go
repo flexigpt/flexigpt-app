@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/bundle"
@@ -44,7 +44,7 @@ type InstallerDependencies struct {
 	Skills                 skillInstaller
 	SkillRegistry          Registry
 	Packages               fs.FS
-	ShareableCanonicalizer shareable.ExpectedCanonicalizer
+	ShareableCanonicalizer providerapi.ExpectedCanonicalizer
 }
 
 type Installer struct {

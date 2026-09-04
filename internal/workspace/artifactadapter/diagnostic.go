@@ -3,24 +3,23 @@ package artifactadapter
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 const (
-	DiagnosticCodeArtifactInvalid           = "workspace.artifact.invalid"
-	DiagnosticCodeContextInvalidContent     = "workspace.context.invalid-content"
-	DiagnosticCodeContextInvalidUTF8        = "workspace.context.invalid-utf8"
-	DiagnosticCodeDefinitionInvalid         = "workspace.definition.invalid"
-	DiagnosticCodeArtifactSchemaUnsupported = "workspace.artifact.schema-unsupported"
-	DiagnosticCodeArtifactKindMismatch      = "workspace.artifact.kind-mismatch"
-	DiagnosticCodeProjectionInvalid         = "workspace.projection.invalid"
-	DiagnosticCodeArtifactUnavailable       = "workspace.artifact.unavailable"
-	DiagnosticCodeArtifactUnresolved        = "workspace.artifact.unresolved"
-	DiagnosticCodeRuntimeDenied             = "workspace.runtime.denied"
-	DiagnosticCodeRuntimeUnavailable        = "workspace.runtime.unavailable"
-	DiagnosticCodeCatalogStale              = "workspace.catalog.stale"
-	DiagnosticCodeCatalogDecoderStale       = "workspace.catalog.decoder-stale"
-	DiagnosticCodeCatalogPolicyStale        = "workspace.catalog.policy-stale"
-	DiagnosticCodeSkillInvalid              = "workspace.skill.invalid"
+	DiagnosticCodeArtifactInvalid           = spec.DiagnosticCodeArtifactInvalid
+	DiagnosticCodeContextInvalidContent     = spec.DiagnosticCodeContextInvalidContent
+	DiagnosticCodeContextInvalidUTF8        = spec.DiagnosticCodeContextInvalidUTF8
+	DiagnosticCodeArtifactSchemaUnsupported = spec.DiagnosticCodeArtifactSchemaUnsupported
+	DiagnosticCodeArtifactKindMismatch      = spec.DiagnosticCodeArtifactKindMismatch
+	DiagnosticCodeProjectionInvalid         = spec.DiagnosticCodeProjectionInvalid
+	DiagnosticCodeArtifactUnavailable       = spec.DiagnosticCodeArtifactUnavailable
+	DiagnosticCodeArtifactUnresolved        = spec.DiagnosticCodeArtifactUnresolved
+	DiagnosticCodeRuntimeDenied             = spec.DiagnosticCodeRuntimeDenied
+	DiagnosticCodeRuntimeUnavailable        = spec.DiagnosticCodeRuntimeUnavailable
+	DiagnosticCodeCatalogStale              = spec.DiagnosticCodeCatalogStale
+	DiagnosticCodeCatalogDecoderStale       = spec.DiagnosticCodeCatalogDecoderStale
+	DiagnosticCodeCatalogPlanStale          = spec.DiagnosticCodeCatalogPlanStale
 )
 
 func WorkspaceArtifactErrorDiagnostics(

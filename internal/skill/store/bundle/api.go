@@ -18,8 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
@@ -31,11 +29,6 @@ import (
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 )
 
-type skillArtifactPolicy struct {
-	ids              artifact.ArtifactIDProvider
-	autoAdoptSources map[basespec.SourceID]struct{}
-}
-
 type API struct {
 	dependencies Dependencies
 	closed       atomic.Bool
@@ -45,13 +38,7 @@ func New(dependencies Dependencies) (*API, error) {
 	if err := dependencies.Validate(); err != nil {
 		return nil, err
 	}
-	if !dependencies.HasDecoder(artifactbuiltin.AgentSkillDecoderID) {
-		return nil, fmt.Errorf(
-			"%w: shared agent skill decoder %q is not registered",
-			basespec.ErrDecoderUnavailable,
-			artifactbuiltin.AgentSkillDecoderID,
-		)
-	}
+
 	return &API{dependencies: dependencies}, nil
 }
 
@@ -115,7 +102,7 @@ func (a *API) UpdateBundle(
 	if err != nil {
 		return Bundle{}, err
 	}
-	if _, err := a.dependencies.Collections.Update(
+	updated, err := a.dependencies.Collections.Update(
 		ctx,
 		request.Bundle,
 		collection.Update{
@@ -125,10 +112,25 @@ func (a *API) UpdateBundle(
 			Enabled:          request.Enabled,
 			Data:             data,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return Bundle{}, err
 	}
-	return a.GetBundle(ctx, request.Bundle)
+	value, err := a.GetBundle(ctx, updated.Ref())
+	if err != nil {
+		return Bundle{}, err
+	}
+	if updated.Revision == current.Collection.Revision ||
+		!value.Collection.Enabled {
+		return value, nil
+	}
+	if _, err := a.refreshBundle(ctx, value.Collection.Ref(), false); err != nil {
+		return value, fmt.Errorf(
+			"skill bundle update completed but catalog refresh remains pending: %w",
+			err,
+		)
+	}
+	return value, nil
 }
 
 func (a *API) RetireBundle(
@@ -274,7 +276,20 @@ func (a *API) AttachSource(
 	if err != nil {
 		return Bundle{}, err
 	}
-	return a.GetBundle(ctx, bundle)
+	value, err := a.GetBundle(ctx, bundle)
+	if err != nil {
+		return Bundle{}, err
+	}
+	if !value.Collection.Enabled {
+		return value, nil
+	}
+	if _, err := a.refreshBundle(ctx, value.Collection.Ref(), false); err != nil {
+		return value, fmt.Errorf(
+			"skill source attachment completed but catalog refresh remains pending: %w",
+			err,
+		)
+	}
+	return value, nil
 }
 
 func (a *API) RefreshBundle(
@@ -628,17 +643,11 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	plan, err := a.discoveryPlan(bundle)
-	if err != nil {
-		return err
-	}
 	if err := a.dependencies.ManagedArtifacts.Remove(
 		ctx,
 		managedartifact.RemoveRequest{
 			Artifact:       value,
 			Package:        packageAddress,
-			Plan:           plan,
-			RefreshPolicy:  a.refreshPolicy(bundle, false),
 			AllowProtected: false,
 		},
 	); err != nil {
@@ -860,35 +869,12 @@ func (a *API) currentBundleCatalog(
 	ctx context.Context,
 	bundle Bundle,
 ) (catalog.Snapshot, error) {
-	snapshot, err := catalog.ReadCurrent(
+	return a.dependencies.Refresh.CurrentCatalog(
+
 		ctx,
-		a.dependencies.Catalogs,
+
 		bundle.Collection.Ref(),
 	)
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-
-	plan, err := a.discoveryPlan(bundle)
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	planFingerprint, err := plan.Fingerprint()
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	decoderFingerprint, err := a.dependencies.DecoderFingerprint()
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	if snapshot.PlanFingerprint != planFingerprint ||
-		snapshot.DecoderFingerprint != decoderFingerprint {
-		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: Skill Bundle catalog capability inputs changed",
-			basespec.ErrCatalogStale,
-		)
-	}
-	return snapshot, nil
 }
 
 func (a *API) currentDefinitionForArtifact(
@@ -903,9 +889,9 @@ func (a *API) currentDefinitionForArtifact(
 		)
 	}
 
-	snapshot, err := catalog.ReadCurrent(
+	snapshot, err := a.dependencies.Refresh.CurrentCatalog(
 		ctx,
-		a.dependencies.Catalogs,
+
 		collection.CollectionRef{
 			RootID:       record.RootID,
 			CollectionID: record.CollectionID,
@@ -1115,6 +1101,18 @@ func (a *API) createBundle(
 			request.CollectionID,
 		))
 	}
+	if !allowBuiltInAttachment && bundle.Collection.Enabled {
+		if _, err := a.refreshBundle(
+			ctx,
+			bundle.Collection.Ref(),
+			false,
+		); err != nil {
+			return bundle, fmt.Errorf(
+				"skill bundle creation completed but initial catalog refresh remains pending: %w",
+				err,
+			)
+		}
+	}
 	return bundle, nil
 }
 
@@ -1269,13 +1267,7 @@ func (a *API) refreshBundle(
 			ref.CollectionID,
 		)
 	}
-
-	plan, err := a.discoveryPlan(bundle)
-	if err != nil {
-		return refresh.Result{}, err
-	}
-	policy := a.refreshPolicy(bundle, allowProtected)
-	return a.dependencies.Refresh.Refresh(ctx, ref, plan, policy)
+	return a.dependencies.Refresh.RefreshCollection(ctx, ref)
 }
 
 // createManagedSkill performs the managed package publication workflow.
@@ -1563,10 +1555,6 @@ func (a *API) createManagedSkill(
 		pinned = &updated
 	}
 
-	plan, err := a.discoveryPlan(bundle)
-	if err != nil {
-		return CreateManagedSkillResponse{}, pending(err)
-	}
 	published, err := a.dependencies.ManagedArtifacts.Publish(
 		ctx,
 		managedartifact.PublishRequest{
@@ -1576,8 +1564,7 @@ func (a *API) createManagedSkill(
 				Address: packageAddress,
 				Files:   files,
 			},
-			Plan:           plan,
-			RefreshPolicy:  a.refreshPolicy(bundle, allowBuiltInAttachment),
+
 			AllowProtected: allowBuiltInAttachment,
 		},
 	)
@@ -1630,26 +1617,6 @@ func (a *API) requireBundleMutation(
 		)
 	}
 	return protection.RequirePrivilegedInstaller(ctx)
-}
-
-func (a *API) refreshPolicy(
-	bundle Bundle,
-	allowProtected bool,
-) artifact.Policy {
-	if allowProtected {
-		return builtInSkillArtifactPolicy{}
-	}
-	autoAdoptSources := make(map[basespec.SourceID]struct{})
-	for _, attachment := range bundle.Attachments {
-		switch attachment.Role {
-		case RoleExternal, RoleLibrary:
-			autoAdoptSources[attachment.SourceID] = struct{}{}
-		}
-	}
-	return skillArtifactPolicy{
-		ids:              a.dependencies.AutoAdoptionIDProvider,
-		autoAdoptSources: autoAdoptSources,
-	}
 }
 
 func managedSkillCreateResult(
@@ -1825,57 +1792,6 @@ func validateRoleSourceKind(
 	return nil
 }
 
-func (a *API) discoveryPlan(value Bundle) (discovery.Plan, error) {
-	plans := make([]discovery.SourcePlan, 0, len(value.Attachments))
-	sources := make(map[basespec.SourceID]source.Summary, len(value.Sources))
-	for _, sourceValue := range value.Sources {
-		sources[sourceValue.ID] = sourceValue
-	}
-
-	for _, attachment := range value.Attachments {
-		if !attachment.Enabled {
-			continue
-		}
-		attachmentData, err := DecodeAttachmentData(attachment.Data)
-		if err != nil {
-			return discovery.Plan{}, err
-		}
-		expectedContentDigests, err := attachmentData.SourceExpectedContentDigests()
-		if err != nil {
-			return discovery.Plan{}, err
-		}
-		sourceValue, found := sources[attachment.SourceID]
-		if !found || !sourceValue.Enabled {
-			continue
-		}
-		plans = append(plans, discovery.SourcePlan{
-			SourceID: attachment.SourceID,
-			DirectoryRoots: []discovery.DirectoryRoot{{
-				Root:            attachmentData.DiscoveryRoot,
-				Recursive:       true,
-				IncludePatterns: []string{string(artifactbuiltin.AgentSkillDefinitionFileName)},
-			}},
-			DecoderHints: []discovery.DecoderHint{{
-				Locator:    attachmentData.DiscoveryRoot,
-				Recursive:  true,
-				DecoderIDs: []basespec.DecoderID{artifactbuiltin.AgentSkillDecoderID},
-			}},
-			ExpectedContentDigests: expectedContentDigests,
-			AllowedDecoderIDs:      []basespec.DecoderID{artifactbuiltin.AgentSkillDecoderID},
-			Authoritative:          true,
-		}.Normalized())
-	}
-
-	plan := discovery.Plan{
-		Revision: DiscoveryPolicyRevision,
-		Sources:  plans,
-	}
-	if err := plan.Validate(); err != nil {
-		return discovery.Plan{}, err
-	}
-	return plan, nil
-}
-
 func managedAttachmentForRole(
 	value Bundle,
 	role basespec.AttachmentRole,
@@ -1946,54 +1862,6 @@ func bundleAttachmentRole(
 		sourceID,
 		value.Collection.ID,
 	)
-}
-
-func (p skillArtifactPolicy) Derive(
-	ctx context.Context,
-	_ collection.Collection,
-	occurrence catalog.Occurrence,
-	value definition.Definition,
-) (artifact.Draft, bool, []diagnostic.Diagnostic, error) {
-	if occurrence.Kind != artifactbuiltin.AgentSkillArtifactKind {
-		return artifact.Draft{}, false, nil, nil
-	}
-	if _, allowed := p.autoAdoptSources[occurrence.Key.SourceID]; !allowed {
-		return artifact.Draft{}, false, nil, nil
-	}
-	if err := skillArtifact.ValidateDefinition(value); err != nil {
-		return artifact.Draft{}, false, []diagnostic.Diagnostic{{
-			Severity: diagnostic.DiagnosticError,
-			Code:     "skill.bundle.definition-invalid",
-			Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
-			Location: &diagnostic.DiagnosticLocation{
-				Locator:            occurrence.Key.Locator,
-				SubresourceLocator: occurrence.Key.SubresourceLocator,
-			},
-		}}, nil
-	}
-	if p.ids == nil {
-		return artifact.Draft{}, false, nil, fmt.Errorf(
-			"%w: skill bundle automatic adoption ID provider is unavailable",
-			basespec.ErrInvalid,
-		)
-	}
-	id, err := p.ids.NewArtifactID(ctx)
-	if err != nil {
-		return artifact.Draft{}, false, nil, err
-	}
-	if err := basespec.ValidateArtifactID(id); err != nil {
-		return artifact.Draft{}, false, nil, err
-	}
-	name := value.DisplayName
-	if name == "" {
-		name = string(value.LogicalName)
-	}
-	return artifact.Draft{
-		ID:      id,
-		Name:    name,
-		Enabled: true,
-		Data:    emptyArtifactData(),
-	}, true, nil, nil
 }
 
 func managedSkillPackageAddressOf(

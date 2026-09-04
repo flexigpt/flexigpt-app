@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -31,19 +32,18 @@ func InitSkillStoreWrapper(
 	if wrapper == nil || components == nil || workspaceSkills == nil {
 		return errors.New("skill store wrapper dependencies are incomplete")
 	}
-	autoAdoptionIDProvider := artifact.UUIDArtifactIDProvider()
+	resources, err := artifactstore.New(components)
+	if err != nil {
+		return err
+	}
 	api, err := skillBundle.New(skillBundle.Dependencies{
-		Sources:                components.Sources,
-		Collections:            components.Collections,
-		Artifacts:              components.Artifacts,
-		Refresh:                components.Refresh,
-		Catalogs:               components.Catalogs,
-		ManagedArtifacts:       components.ManagedArtifacts,
-		SourceRuntime:          components.SourceRuntime,
-		HasDecoder:             components.HasDecoder,
-		DecoderFingerprint:     components.DecoderFingerprint,
-		RootMutationPolicy:     components.RootMutationPolicy(),
-		AutoAdoptionIDProvider: autoAdoptionIDProvider,
+		Sources:            components.Sources,
+		Collections:        components.Collections,
+		Artifacts:          components.Artifacts,
+		Refresh:            components.Refresh,
+		ManagedArtifacts:   components.ManagedArtifacts,
+		Resources:          resources,
+		RootMutationPolicy: components.RootMutationPolicy(),
 	})
 	if err != nil {
 		return err
@@ -137,19 +137,7 @@ func (w *SkillStoreWrapper) AttachSkillSource(
 			expectedCollectionRevision,
 			draft,
 		)
-		if err != nil {
-			return value, err
-		}
-		if !value.Collection.Enabled {
-			return value, nil
-		}
-		if _, err := w.api.RefreshBundle(
-			context.Background(),
-			value.Collection.Ref(),
-		); err != nil {
-			return value, err
-		}
-		return value, nil
+		return value, err
 	})
 }
 
@@ -177,21 +165,7 @@ func (w *SkillStoreWrapper) UpdateSkillBundle(
 			return skillBundle.Bundle{}, errors.New("skill bundle update is required")
 		}
 		value, err := w.api.UpdateBundle(context.Background(), *request)
-		if err != nil {
-			return value, err
-		}
-
-		ref := value.Collection.Ref()
-		if !value.Collection.Enabled {
-			return value, nil
-		}
-		if _, err := w.api.RefreshBundle(
-			context.Background(),
-			ref,
-		); err != nil {
-			return value, err
-		}
-		return value, nil
+		return value, err
 	})
 }
 

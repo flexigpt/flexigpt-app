@@ -1,81 +1,12 @@
 package mapstoreio
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 )
 
 const RawContentKey = "content"
-
-// BoundedJSONEncoderDecoder is a MapStore codec that rejects oversized files
-// and trailing JSON values.
-type BoundedJSONEncoderDecoder struct {
-	MaximumBytes int64
-}
-
-func (c BoundedJSONEncoderDecoder) Encode(
-	writer io.Writer,
-	value any,
-) error {
-	if writer == nil {
-		return errors.New("mapstore JSON writer is nil")
-	}
-	if c.MaximumBytes <= 0 {
-		return errors.New("mapstore JSON maximum byte count is invalid")
-	}
-
-	var encoded bytes.Buffer
-	encoder := json.NewEncoder(&encoded)
-	if err := encoder.Encode(value); err != nil {
-		return fmt.Errorf("encode mapstore JSON: %w", err)
-	}
-	if int64(encoded.Len()) > c.MaximumBytes {
-		return fmt.Errorf(
-			"mapstore JSON exceeds %d bytes",
-			c.MaximumBytes,
-		)
-	}
-	if _, err := writer.Write(encoded.Bytes()); err != nil {
-		return fmt.Errorf("write mapstore JSON: %w", err)
-	}
-	return nil
-}
-
-func (c BoundedJSONEncoderDecoder) Decode(
-	reader io.Reader,
-	value any,
-) error {
-	if reader == nil {
-		return errors.New("mapstore JSON reader is nil")
-	}
-	if value == nil {
-		return errors.New("mapstore JSON target is nil")
-	}
-	if c.MaximumBytes <= 0 {
-		return errors.New("mapstore JSON maximum byte count is invalid")
-	}
-
-	raw, err := readBounded(reader, c.MaximumBytes)
-	if err != nil {
-		return err
-	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(value); err != nil {
-		return fmt.Errorf("decode mapstore JSON: %w", err)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("JSON contains trailing values")
-		}
-		return fmt.Errorf("decode mapstore JSON: %w", err)
-	}
-	return nil
-}
 
 // RawEncoderDecoder lets MapFileStore atomically manage a native payload file
 // without wrapping the payload in JSON on disk.

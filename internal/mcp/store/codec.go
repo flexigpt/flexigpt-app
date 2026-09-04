@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -14,7 +14,7 @@ type (
 	BundleCodec struct{}
 )
 
-func NewBundleCodec() shareable.Codec {
+func NewBundleCodec() providerapi.SchemaCodec {
 	return BundleCodec{}
 }
 
@@ -25,22 +25,22 @@ func (BundleCodec) JSONSchema() []byte {
 func (BundleCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
-) (shareable.ParsedDocument, error) {
+) (providerapi.ParsedDocument, error) {
 	if err := artifactbuiltin.CheckCodecContext(ctx); err != nil {
-		return shareable.ParsedDocument{}, err
+		return providerapi.ParsedDocument{}, err
 	}
 	value, canonical, err := parseBundle(raw)
 	if err != nil {
-		return shareable.ParsedDocument{}, err
+		return providerapi.ParsedDocument{}, err
 	}
-	return shareable.ParsedDocument{
+	return providerapi.ParsedDocument{
 		Key:    BundleCodec{}.Key(),
 		Digest: value.Digest,
 		Raw:    canonical,
 	}, nil
 }
 
-func (BundleCodec) Key() shareable.SchemaKey {
+func (BundleCodec) Key() providerapi.SchemaKey {
 	return artifactbuiltin.MCPBundleSchemaKey
 }
 

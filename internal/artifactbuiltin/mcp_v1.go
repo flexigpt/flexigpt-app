@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 
 	_ "embed"
 )
@@ -49,17 +49,17 @@ const (
 )
 
 var (
-	MCPBundleSchemaKey = shareable.CollectionSchemaKey(
+	MCPBundleSchemaKey = providerapi.CollectionSchemaKey(
 		BundleKind,
 		BundleSchemaID,
 		MCPSchemaVersion,
 	)
-	MCPServerSchemaKey = shareable.ArtifactSchemaKey(
+	MCPServerSchemaKey = providerapi.ArtifactSchemaKey(
 		ServerKind,
 		ServerSchemaID,
 		MCPSchemaVersion,
 	)
-	MCPPolicySchemaKey = shareable.ArtifactSchemaKey(
+	MCPPolicySchemaKey = providerapi.ArtifactSchemaKey(
 		PolicyKind,
 		PolicySchemaID,
 		MCPSchemaVersion,

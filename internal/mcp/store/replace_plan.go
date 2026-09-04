@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
 )
@@ -39,7 +39,7 @@ type documentReplacePlan struct {
 func (a *API) prepareDocumentReplace(
 	ctx context.Context,
 	request ReplaceDocumentRequest,
-	parsed shareable.ParsedDocument,
+	parsed providerapi.ParsedDocument,
 ) (documentReplacePlan, error) {
 	if a == nil {
 		return documentReplacePlan{}, basespec.ErrClosed

@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
@@ -55,7 +55,7 @@ func (a *API) ReplaceDocument(
 func (a *API) replaceCanonicalDocument(
 	ctx context.Context,
 	request ReplaceDocumentRequest,
-	parsed shareable.ParsedDocument,
+	parsed providerapi.ParsedDocument,
 	suppliedFiles []source.ManagedPackageFile,
 ) (Bundle, error) {
 	plan, err := a.prepareDocumentReplace(
@@ -160,8 +160,6 @@ func (a *API) replaceCanonicalDocument(
 				Address: packageAddress,
 				Files:   files,
 			},
-			Plan:           a.discoveryPlan(plan.bundle),
-			RefreshPolicy:  noAutomaticAdoption{},
 			AllowProtected: request.AllowProtected,
 			ForceRefresh:   true,
 		},

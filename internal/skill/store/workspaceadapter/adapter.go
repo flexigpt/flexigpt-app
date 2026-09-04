@@ -9,11 +9,11 @@ import (
 	"github.com/flexigpt/agentskills-go/document"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
@@ -73,15 +73,15 @@ type SkillLoadPlan struct {
 type Adapter struct {
 	query         *artifactadapter.QueryService
 	runtimePolicy artifactadapter.SourceUsePolicy
-	sourceRuntime source.Runtime
+	resources     artifactstore.ResourceResolver
 }
 
 func NewAdapter(
 	query *artifactadapter.QueryService,
 	runtimePolicy artifactadapter.SourceUsePolicy,
-	sourceRuntime source.Runtime,
+	resources artifactstore.ResourceResolver,
 ) (*Adapter, error) {
-	if query == nil || runtimePolicy == nil || sourceRuntime == nil {
+	if query == nil || runtimePolicy == nil || resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Skill adapter dependencies are incomplete",
 			spec.ErrInvalidWorkspace,
@@ -90,7 +90,7 @@ func NewAdapter(
 	return &Adapter{
 		query:         query,
 		runtimePolicy: runtimePolicy,
-		sourceRuntime: sourceRuntime,
+		resources:     resources,
 	}, nil
 }
 
@@ -255,20 +255,11 @@ func (f *Adapter) loadLocal(
 			)
 			continue
 		}
-		projected.SourceContentDigest = item.SourceContentDigest
-		projected.SourceGeneration = item.SourceGeneration
-		sourceValue, err := f.runtimeSource(ctx, item)
-		if err != nil {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
-				output.Diagnostics,
-				runtimeLocationDiagnostic(item.Artifact, err),
-			)
-			continue
-		}
-		runtimeLocation, err := f.resolveRuntimeLocation(
+
+		resolved, err := f.resources.ResolveArtifact(
 			ctx,
-			item,
-			sourceValue,
+			item.Artifact.Ref(),
+			artifactstore.ResolveOptions{},
 		)
 		if err != nil {
 			output.Diagnostics = diagnostic.AppendDiagnostics(
@@ -277,6 +268,48 @@ func (f *Adapter) loadLocal(
 			)
 			continue
 		}
+		if resolved.Artifact.Revision != item.Artifact.Revision ||
+			resolved.CatalogRevision != loadPlan.CatalogRevision ||
+			resolved.Definition.Digest != item.Definition.Digest ||
+			resolved.Source.ID != item.Source.ID {
+			output.Diagnostics = diagnostic.AppendDiagnostics(
+				output.Diagnostics,
+				runtimeLocationDiagnostic(
+					item.Artifact,
+					fmt.Errorf(
+						"%w: Workspace Skill changed after load-plan composition",
+						basespec.ErrCatalogStale,
+					),
+				),
+			)
+			continue
+		}
+
+		packageLocator, err := skillArtifact.RuntimePackageLocator(
+			item.Artifact.Binding.Locator,
+			item.Artifact.Binding.SubresourceLocator,
+		)
+		if err != nil {
+			output.Diagnostics = diagnostic.AppendDiagnostics(
+				output.Diagnostics,
+				runtimeLocationDiagnostic(item.Artifact, err),
+			)
+			continue
+		}
+		runtimeLocation, err := f.resources.ResolveVerifiedLocalPath(
+			ctx,
+			resolved,
+			packageLocator,
+		)
+		if err != nil {
+			output.Diagnostics = diagnostic.AppendDiagnostics(
+				output.Diagnostics,
+				runtimeLocationDiagnostic(item.Artifact, err),
+			)
+			continue
+		}
+		projected.SourceContentDigest = *resolved.Occurrence.SourceContentDigest
+		projected.SourceGeneration = resolved.SourceGeneration
 		projected.RuntimeLocation = runtimeLocation
 		output.Skills = append(output.Skills, projected)
 	}
@@ -371,79 +404,10 @@ func sortWorkspaceSkills(values []WorkspaceSkill) {
 	})
 }
 
-// resolveRuntimeLocation performs the Workspace-owned handoff from a selected
-// source-linked record to a native filesystem Skill package.
-func (f *Adapter) runtimeSource(
-	ctx context.Context,
-	item spec.LoadPlanItem,
-) (source.Source, error) {
-	// Artifact Store owns Source state. Do not retain a feature-owned source
-	// cache merely to avoid repeated reads during one load operation.
-	sourceValue, err := f.sourceRuntime.Get(
-		ctx,
-		item.Artifact.RootID,
-		item.Source.ID,
-	)
-	if err != nil {
-		return source.Source{}, err
-	}
-	if sourceValue.ID != item.Source.ID ||
-		sourceValue.Revision != item.Source.Revision ||
-		sourceValue.Kind != item.Source.Kind {
-		err := fmt.Errorf(
-			"%w: Workspace Skill source changed after load-plan composition",
-			basespec.ErrCatalogStale,
-		)
-		return source.Source{}, err
-	}
-	return sourceValue, nil
-}
-
-func (f *Adapter) resolveRuntimeLocation(
-	ctx context.Context,
-	item spec.LoadPlanItem,
-	sourceValue source.Source,
-) (string, error) {
-	if item.SourceContentDigest == "" ||
-		item.OccurrenceDefinitionDigest == "" {
-		return "", fmt.Errorf(
-			"%w: Workspace Skill has no current source occurrence",
-			basespec.ErrCatalogStale,
-		)
-	}
-	if item.OccurrenceDefinitionDigest != item.Definition.Digest {
-		return "", fmt.Errorf(
-			"%w: selected Workspace Skill definition does not match its current source occurrence",
-			basespec.ErrCatalogStale,
-		)
-	}
-
-	location, err := skillArtifact.ResolveRuntimePackage(
-		ctx,
-		f.sourceRuntime,
-		sourceValue,
-		item.Artifact.Binding.Locator,
-		item.Artifact.Binding.SubresourceLocator,
-		item.SourceGeneration,
-		item.SourceContentDigest,
-	)
-	if err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return "", ctxErr
-		}
-		return "", err
-	}
-	return location, nil
-}
-
 func (f *Adapter) supportsRuntimePath(
 	kind basespec.SourceKind,
 ) bool {
-	localPaths, supported := f.sourceRuntime.(source.LocalPathRuntime)
-	if !supported {
-		return false
-	}
-	return localPaths.SupportsLocalPath(kind)
+	return f.resources.SupportsLocalPath(kind)
 }
 
 func runtimeLocationDiagnostic(

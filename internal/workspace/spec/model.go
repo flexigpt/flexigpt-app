@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -22,7 +22,7 @@ const (
 )
 
 // DirectoryRoot is the generic source-discovery scope type.
-type DirectoryRoot = artifactstoreDiscovery.DirectoryRoot
+type DirectoryRoot = providerapi.DirectoryRoot
 
 // DiscoveryProfile defines discovery rules for one attachment class.
 //
@@ -39,7 +39,7 @@ type DiscoveryProfiles struct {
 }
 
 // DiscoveryRoot is retained as the Workspace preference name.
-type DiscoveryRoot = artifactstoreDiscovery.DirectoryRoot
+type DiscoveryRoot = providerapi.DirectoryRoot
 
 type DiscoveryPreferences struct {
 	AdditionalLocators []basespec.Locator `json:"additionalLocators,omitempty"`
@@ -47,15 +47,12 @@ type DiscoveryPreferences struct {
 	IncludeReadme      bool               `json:"includeReadme,omitempty"`
 }
 
-// CollectionData contains local Workspace policy only. The Workspace mode and
-// primary Source are derived from the current collection attachments.
-//
-// DiscoveryPolicyRevision is deliberately local. It is not portable descriptor
-// content and it gives the running Workspace implementation an explicit way to
-// invalidate a catalog after planner behavior changes.
+// CollectionData contains persisted Workspace preferences only. Workspace mode
+// and primary Source are derived from current collection attachments. Provider
+// behavior revision is Artifact Store capability input and is intentionally not
+// persisted in Collection local data.
 type CollectionData struct {
-	DiscoveryPolicyRevision string               `json:"discoveryPolicyRevision"`
-	Discovery               DiscoveryPreferences `json:"discovery"`
+	Discovery DiscoveryPreferences `json:"discovery"`
 }
 
 type AttachmentData struct {
@@ -142,14 +139,6 @@ type UpdateAttachmentRequest struct {
 	Data                       AttachmentData
 }
 
-type ReplacePrimaryRequest struct {
-	Workspace                  WorkspaceRef
-	ExpectedCollectionRevision uint64
-	PreviousSourceID           basespec.SourceID
-	PreviousAttachmentRevision uint64
-	SourceID                   basespec.SourceID
-}
-
 type SetPrimaryRequest struct {
 	Workspace                  WorkspaceRef
 	ExpectedCollectionRevision uint64
@@ -168,11 +157,6 @@ type CatalogView struct {
 	Groups               []ResourceGroup         `json:"-"`
 	CatalogCurrent       bool                    `json:"-"`
 	FreshnessDiagnostics []diagnostic.Diagnostic `json:"-"`
-}
-
-type Reference struct {
-	Artifact *artifact.ArtifactRef `json:"-"`
-	Selector *definition.Selector  `json:"-"`
 }
 
 // LoadPlanItem contains privileged materialized source state. It must be

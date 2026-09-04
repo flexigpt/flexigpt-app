@@ -2,7 +2,6 @@ package protection
 
 import (
 	"fmt"
-	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
@@ -59,25 +58,4 @@ func (p *SetRootPolicy) IsRootDeletionProtected(
 	}
 	_, found := p.retained[rootID]
 	return found
-}
-
-func (p *SetRootPolicy) ProtectedRoots() []basespec.RootID {
-	if p == nil {
-		return nil
-	}
-	output := make([]basespec.RootID, 0, len(p.protected))
-	for rootID := range p.protected {
-		output = append(output, rootID)
-	}
-	return output
-}
-
-func (p *SetRootPolicy) Clone() *SetRootPolicy {
-	if p == nil {
-		return nil
-	}
-	return &SetRootPolicy{
-		protected: maps.Clone(p.protected),
-		retained:  maps.Clone(p.retained),
-	}
 }

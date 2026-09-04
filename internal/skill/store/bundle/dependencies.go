@@ -3,29 +3,24 @@ package bundle
 import (
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Dependencies struct {
-	Sources                *source.Service
-	Collections            *collection.Service
-	Artifacts              *artifact.Service
-	Refresh                refresh.Runner
-	Catalogs               catalog.Reader
-	ManagedArtifacts       *managedartifact.Service
-	SourceRuntime          source.Runtime
-	HasDecoder             func(basespec.DecoderID) bool
-	DecoderFingerprint     func() (cryptoutil.Digest, error)
-	RootMutationPolicy     protection.RootPolicy
-	AutoAdoptionIDProvider artifact.ArtifactIDProvider
+	Sources            *source.Service
+	Collections        *collection.Service
+	Artifacts          *artifact.Service
+	Refresh            refresh.CollectionAPI
+	ManagedArtifacts   *managedartifact.Service
+	Resources          artifactstore.ResourceResolver
+	RootMutationPolicy protection.RootPolicy
 }
 
 func (d Dependencies) Validate() error {
@@ -33,13 +28,9 @@ func (d Dependencies) Validate() error {
 		d.Collections == nil ||
 		d.Artifacts == nil ||
 		d.Refresh == nil ||
-		d.Catalogs == nil ||
 		d.ManagedArtifacts == nil ||
-		d.SourceRuntime == nil ||
-		d.HasDecoder == nil ||
-		d.DecoderFingerprint == nil ||
-		d.RootMutationPolicy == nil ||
-		d.AutoAdoptionIDProvider == nil {
+		d.Resources == nil ||
+		d.RootMutationPolicy == nil {
 		return fmt.Errorf(
 			"%w: skill bundle Artifact Store dependencies are incomplete",
 			basespec.ErrInvalid,

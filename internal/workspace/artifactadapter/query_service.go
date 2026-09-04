@@ -4,17 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -26,26 +24,21 @@ type occurrenceKindKey struct {
 }
 
 type QueryService struct {
-	workspaces              *Service
-	catalogs                catalogSnapshotReader
-	artifacts               artifactLookup
-	decoderFingerprint      func() (cryptoutil.Digest, error)
-	discoveryPolicyRevision string
-	validators              map[basespec.ArtifactKind]spec.DefinitionValidator
+	workspaces *Service
+	catalogs   refresh.CollectionCatalogInspector
+	artifacts  artifactLookup
+	validators map[basespec.ArtifactKind]spec.DefinitionValidator
 }
 
 func NewQueryService(
 	workspaces *Service,
-	catalogs catalogSnapshotReader,
 	artifacts artifactLookup,
-	decoderFingerprint func() (cryptoutil.Digest, error),
-	discoveryPolicyRevision string,
+	catalogs refresh.CollectionCatalogInspector,
 	supports ...spec.ArtifactSupport,
 ) (*QueryService, error) {
 	if workspaces == nil ||
 		catalogs == nil ||
-		artifacts == nil ||
-		decoderFingerprint == nil {
+		artifacts == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace query dependencies are incomplete",
 			spec.ErrInvalidWorkspace,
@@ -56,13 +49,6 @@ func NewQueryService(
 			"%w: Workspace query requires at least one supported Artifact kind",
 			spec.ErrInvalidWorkspace,
 		)
-	}
-	if err := basespec.ValidateRequiredText(
-		"workspace discovery policy revision",
-		discoveryPolicyRevision,
-		basespec.MaxVersionBytes,
-	); err != nil {
-		return nil, err
 	}
 	validators := make(
 		map[basespec.ArtifactKind]spec.DefinitionValidator,
@@ -82,12 +68,10 @@ func NewQueryService(
 		validators[support.Kind] = support.Validator
 	}
 	return &QueryService{
-		workspaces:              workspaces,
-		catalogs:                catalogs,
-		artifacts:               artifacts,
-		decoderFingerprint:      decoderFingerprint,
-		discoveryPolicyRevision: discoveryPolicyRevision,
-		validators:              validators,
+		workspaces: workspaces,
+		catalogs:   catalogs,
+		artifacts:  artifacts,
+		validators: validators,
 	}, nil
 }
 
@@ -96,83 +80,6 @@ func (q *QueryService) GetWorkspace(
 	workspace collection.CollectionRef,
 ) (spec.Workspace, error) {
 	return q.workspaces.Get(ctx, workspace)
-}
-
-func (q *QueryService) Resolve(
-	ctx context.Context,
-	workspace collection.CollectionRef,
-	reference spec.Reference,
-) (spec.Resource, error) {
-	if (reference.Artifact == nil) == (reference.Selector == nil) {
-		return spec.Resource{}, fmt.Errorf(
-			"%w: exactly one ArtifactRef or selector is required",
-			spec.ErrReferenceUnresolved,
-		)
-	}
-	view, err := q.Catalog(ctx, workspace)
-	if err != nil {
-		return spec.Resource{}, err
-	}
-	if !view.Workspace.Collection.Enabled {
-		return spec.Resource{}, fmt.Errorf("%w: Workspace is disabled", spec.ErrReferenceUnresolved)
-	}
-	if !view.CatalogCurrent {
-		return spec.Resource{}, basespec.ErrCatalogStale
-	}
-
-	if reference.Artifact != nil {
-		if reference.Artifact.RootID != workspace.RootID {
-			return spec.Resource{}, spec.ErrReferenceUnresolved
-		}
-		for _, resourceValue := range view.Resources {
-			if resourceValue.Artifact.ID == reference.Artifact.ArtifactID {
-				if !resourceValue.Artifact.Enabled ||
-					resourceValue.Artifact.State != artifact.StateAvailable ||
-					!resourceValue.CatalogCurrent ||
-					!resourceValue.ProjectionValid {
-					return spec.Resource{}, fmt.Errorf(
-						"%w: Artifact %q is not currently eligible",
-						spec.ErrReferenceUnresolved,
-						reference.Artifact.ArtifactID,
-					)
-				}
-				return resourceValue, nil
-			}
-		}
-		return spec.Resource{}, fmt.Errorf(
-			"%w: Artifact %q does not belong to Workspace %q",
-			spec.ErrReferenceUnresolved,
-			reference.Artifact.ArtifactID,
-			workspace.CollectionID,
-		)
-	}
-
-	selector := *reference.Selector
-	if err := validateWorkspaceSelector(selector); err != nil {
-		return spec.Resource{}, err
-	}
-
-	var selected *spec.Resource
-
-	for index := range view.Resources {
-		resourceValue := &view.Resources[index]
-		if !resourceValue.Artifact.Enabled ||
-			resourceValue.Artifact.State != artifact.StateAvailable ||
-			!resourceValue.CatalogCurrent ||
-			!resourceValue.ProjectionValid ||
-			!matchesSelector(resourceValue.Definition, selector) {
-			continue
-		}
-		if selected != nil {
-			return spec.Resource{}, spec.ErrReferenceAmbiguous
-		}
-		copyValue := *resourceValue
-		selected = &copyValue
-	}
-	if selected == nil {
-		return spec.Resource{}, spec.ErrReferenceUnresolved
-	}
-	return *selected, nil
 }
 
 func (q *QueryService) ResolveArtifact(
@@ -389,25 +296,18 @@ func (q *QueryService) Catalog(
 	if err != nil {
 		return spec.CatalogView{}, err
 	}
-	snapshot, catalogErr := catalog.ReadCurrent(ctx, q.catalogs, workspace)
-	if catalogErr != nil &&
-		!errors.Is(catalogErr, basespec.ErrCatalogStale) {
-		return spec.CatalogView{}, catalogErr
-	}
-
-	currentDecoderFingerprint, err := q.decoderFingerprint()
+	inspection, err := q.catalogs.InspectCollectionCatalog(
+		ctx,
+		workspace,
+	)
 	if err != nil {
 		return spec.CatalogView{}, err
 	}
-	catalogCurrent := catalogErr == nil &&
-		q.catalogIsCurrent(
-			workspaceValue,
-			snapshot,
-			currentDecoderFingerprint,
-		)
+	snapshot := inspection.Catalog
+	catalogCurrent := inspection.IsCurrent()
 
 	freshnessDiagnostics := make([]diagnostic.Diagnostic, 0)
-	if catalogErr != nil {
+	if inspection.MetadataChanged {
 		freshnessDiagnostics = diagnostic.AppendDiagnostics(
 			freshnessDiagnostics,
 			diagnostic.Diagnostic{
@@ -417,7 +317,7 @@ func (q *QueryService) Catalog(
 			},
 		)
 	}
-	if snapshot.DecoderFingerprint != currentDecoderFingerprint {
+	if inspection.DecoderChanged {
 		freshnessDiagnostics = diagnostic.AppendDiagnostics(
 			freshnessDiagnostics,
 			diagnostic.Diagnostic{
@@ -427,13 +327,13 @@ func (q *QueryService) Catalog(
 			},
 		)
 	}
-	if workspaceValue.Data.DiscoveryPolicyRevision != q.discoveryPolicyRevision {
+	if inspection.PlanChanged {
 		freshnessDiagnostics = diagnostic.AppendDiagnostics(
 			freshnessDiagnostics,
 			diagnostic.Diagnostic{
 				Severity: diagnostic.DiagnosticWarning,
-				Code:     DiagnosticCodeCatalogPolicyStale,
-				Message:  "the Workspace discovery policy changed after this catalog was published",
+				Code:     DiagnosticCodeCatalogPlanStale,
+				Message:  "the Workspace provider discovery behavior changed after this catalog was published",
 			},
 		)
 	}
@@ -633,32 +533,6 @@ func (q *QueryService) Catalog(
 	return view, nil
 }
 
-func (q *QueryService) catalogIsCurrent(
-	workspaceValue spec.Workspace,
-	snapshot catalog.Snapshot,
-	currentDecoderFingerprint cryptoutil.Digest,
-) bool {
-	if snapshot.CollectionRevision != workspaceValue.Collection.Revision {
-		return false
-	}
-	if snapshot.DecoderFingerprint != currentDecoderFingerprint {
-		return false
-	}
-	if workspaceValue.Data.DiscoveryPolicyRevision != q.discoveryPolicyRevision {
-		return false
-	}
-	currentRevisions := make(map[basespec.SourceID]uint64)
-	currentAttachmentRevisions := make(map[basespec.SourceID]uint64)
-	for _, sourceValue := range workspaceValue.Sources {
-		currentRevisions[sourceValue.ID] = sourceValue.Revision
-	}
-	for _, attachment := range workspaceValue.Attachments {
-		currentAttachmentRevisions[attachment.SourceID] = attachment.Revision
-	}
-	return maps.Equal(currentRevisions, snapshot.SourceRevisions) &&
-		maps.Equal(currentAttachmentRevisions, snapshot.AttachmentRevisions)
-}
-
 func recordAvailabilityDiagnostic(
 	value artifact.Artifact,
 	code string,
@@ -682,7 +556,7 @@ func projectionDiagnostic(
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.DiagnosticError,
 		Code:     DiagnosticCodeProjectionInvalid,
-		Message:  diagnosticMessage(err.Error()),
+		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
 		Location: &diagnostic.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
@@ -734,61 +608,6 @@ func recordDefinitionUnavailableDiagnostic(
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
 	}
-}
-
-func matchesSelector(
-	value definition.Definition,
-	selector definition.Selector,
-) bool {
-	if value.Kind != selector.Kind {
-		return false
-	}
-	if selector.LogicalName != "" &&
-		value.LogicalName != selector.LogicalName {
-		return false
-	}
-	for key, expected := range selector.Labels {
-		if value.Labels[key] != expected {
-			return false
-		}
-	}
-	constraint := strings.TrimSpace(selector.VersionConstraint)
-	if constraint == "" {
-		return true
-	}
-	constraint = strings.TrimSpace(strings.TrimPrefix(
-		constraint,
-		exactVersionConstraintOp,
-	))
-	return constraint == string(value.LogicalVersion)
-}
-
-func validateWorkspaceSelector(selector definition.Selector) error {
-	if err := selector.Validate(); err != nil {
-		return err
-	}
-	constraint := strings.TrimSpace(selector.VersionConstraint)
-	if constraint == "" {
-		return nil
-	}
-	if after, ok := strings.CutPrefix(constraint, exactVersionConstraintOp); ok {
-		constraint = after
-	}
-	if constraint == "" ||
-		strings.HasPrefix(constraint, exactVersionConstraintOp) ||
-		strings.ContainsAny(constraint, "<>~^*|") {
-		return fmt.Errorf(
-			"%w: Workspace supports only exact logical-version selectors",
-			spec.ErrReferenceUnresolved,
-		)
-	}
-	if err := basespec.ValidateLogicalVersion(
-		basespec.LogicalVersion(constraint),
-		false,
-	); err != nil {
-		return err
-	}
-	return nil
 }
 
 func groupCatalogResources(

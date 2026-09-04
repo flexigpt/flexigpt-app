@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/flexigpt/agentskills-go/document"
@@ -10,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
@@ -128,42 +126,6 @@ type WorkspaceResourceGroupView struct {
 	Kind       basespec.ArtifactKind     `json:"kind"`
 	Resources  []WorkspaceResourceView   `json:"resources"`
 	Unrecorded []WorkspaceOccurrenceView `json:"unrecorded"`
-}
-
-type WorkspaceDefinitionView struct {
-	Digest         cryptoutil.Digest       `json:"digest"`
-	Kind           basespec.ArtifactKind   `json:"kind"`
-	SchemaID       basespec.SchemaID       `json:"schemaID"`
-	SchemaVersion  string                  `json:"schemaVersion"`
-	LogicalName    basespec.LogicalName    `json:"logicalName"`
-	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
-	DisplayName    string                  `json:"displayName,omitempty"`
-	Description    string                  `json:"description,omitempty"`
-	Labels         map[string]string       `json:"labels,omitempty"`
-	Body           json.RawMessage         `json:"body"`
-	Dependencies   []definition.Selector   `json:"dependencies,omitempty"`
-}
-
-type WorkspaceLoadPlanItemView struct {
-	Artifact         WorkspaceArtifactView   `json:"artifact"`
-	Definition       WorkspaceDefinitionView `json:"definition"`
-	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
-	SourceID         basespec.SourceID       `json:"sourceID"`
-	SourceKind       basespec.SourceKind     `json:"sourceKind"`
-	Locator          basespec.Locator        `json:"locator"`
-	CatalogCurrent   bool                    `json:"catalogCurrent"`
-}
-
-type WorkspaceLoadPlanView struct {
-	Workspace       WorkspaceRef                `json:"workspace"`
-	CatalogRevision uint64                      `json:"catalogRevision"`
-	Items           []WorkspaceLoadPlanItemView `json:"items"`
-	Diagnostics     []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
-}
-
-type ResolveWorkspaceResourceResponseBody struct {
-	Resource   WorkspaceResourceView   `json:"resource"`
-	Definition WorkspaceDefinitionView `json:"definition"`
 }
 
 type WorkspaceCatalogView struct {
@@ -305,10 +267,7 @@ type CreateFilesystemWorkspaceRequestBody struct {
 }
 
 type CreateFilesystemWorkspaceRequest struct {
-	// RootID is retained for transport compatibility. Workspace creation uses
-	// the single Root configured by application composition.
-	RootID basespec.RootID `json:"rootID,omitempty"`
-	Body   *CreateFilesystemWorkspaceRequestBody
+	Body *CreateFilesystemWorkspaceRequestBody
 }
 
 type CreateFilesystemWorkspaceResponse struct {
@@ -323,10 +282,7 @@ type CreateEmptyWorkspaceRequestBody struct {
 }
 
 type CreateEmptyWorkspaceRequest struct {
-	// RootID is retained for transport compatibility. Workspace creation uses
-	// the single Root configured by application composition.
-	RootID basespec.RootID `json:"rootID,omitempty"`
-	Body   *CreateEmptyWorkspaceRequestBody
+	Body *CreateEmptyWorkspaceRequestBody
 }
 
 type CreateEmptyWorkspaceResponse struct {
@@ -341,11 +297,7 @@ type GetWorkspaceResponse struct {
 	Body *WorkspaceView
 }
 
-type ListWorkspacesRequest struct {
-	// RootID is retained for transport compatibility. Listing uses the
-	// application-configured Workspace Root.
-	RootID basespec.RootID `json:"rootID,omitempty"`
-}
+type ListWorkspacesRequest struct{}
 
 type ListWorkspacesResponseBody struct {
 	Workspaces []WorkspaceView `json:"workspaces"`
@@ -369,22 +321,6 @@ type UpdateWorkspaceRequest struct {
 }
 
 type UpdateWorkspaceResponse struct {
-	Body *WorkspaceView
-}
-
-type ReplaceWorkspacePrimarySourceRequestBody struct {
-	ExpectedCollectionRevision         uint64            `json:"expectedCollectionRevision"         required:"true"`
-	PreviousSourceID                   basespec.SourceID `json:"previousSourceID"                   required:"true"`
-	ExpectedPreviousAttachmentRevision uint64            `json:"expectedPreviousAttachmentRevision" required:"true"`
-	SourceID                           basespec.SourceID `json:"sourceID"                           required:"true"`
-}
-
-type ReplaceWorkspacePrimarySourceRequest struct {
-	Workspace WorkspaceRef `json:"workspace" required:"true"`
-	Body      *ReplaceWorkspacePrimarySourceRequestBody
-}
-
-type ReplaceWorkspacePrimarySourceResponse struct {
 	Body *WorkspaceView
 }
 
@@ -492,33 +428,6 @@ type GetWorkspaceCatalogRequest struct {
 
 type GetWorkspaceCatalogResponse struct {
 	Body *WorkspaceCatalogView
-}
-
-type ComposeWorkspaceLoadPlanRequestBody struct {
-	Artifacts []artifact.ArtifactRef `json:"artifacts"`
-}
-
-type ComposeWorkspaceLoadPlanRequest struct {
-	Workspace WorkspaceRef `json:"workspace" required:"true"`
-	Body      *ComposeWorkspaceLoadPlanRequestBody
-}
-
-type ComposeWorkspaceLoadPlanResponse struct {
-	Body *WorkspaceLoadPlanView
-}
-
-type ResolveWorkspaceResourceRequestBody struct {
-	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
-	Selector *definition.Selector  `json:"selector,omitempty"`
-}
-
-type ResolveWorkspaceResourceRequest struct {
-	Workspace WorkspaceRef `json:"workspace" required:"true"`
-	Body      *ResolveWorkspaceResourceRequestBody
-}
-
-type ResolveWorkspaceResourceResponse struct {
-	Body *ResolveWorkspaceResourceResponseBody
 }
 
 type GetWorkspaceArtifactRequest struct {

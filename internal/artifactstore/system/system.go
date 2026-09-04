@@ -10,11 +10,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
@@ -24,25 +24,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/sqlite"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Config struct {
-	BaseDirectory             string
-	EmbeddedProviders         map[string]fs.FS
-	AdditionalSources         []source.Adapter
-	Decoders                  []discovery.Decoder
+	BaseDirectory     string
+	EmbeddedProviders map[string]fs.FS
+	AdditionalSources []source.Adapter
+
+	ArtifactProviders []providerapi.Provider
+	// ArtifactIDProvider is used only for Store-owned automatic adoption.
+	// Callers never receive this dependency.
+	ArtifactIDProvider        artifact.ArtifactIDProvider
 	Clock                     clockutil.Clock
-	ShareableCodecs           []shareable.Codec
 	RootMutationPolicy        protection.RootPolicy
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
-}
-
-// shareableSchemaBinder is optional so Artifact Store remains generic. A
-// decoder that emits shareable document-derived Definitions may require the
-// registered schema registry before it accepts source bytes.
-type shareableSchemaBinder interface {
-	BindShareableSchemas(r *shareable.Registry) error
 }
 
 type ManagedPackageResult struct {
@@ -61,13 +56,10 @@ type Components struct {
 	ManagedArtifacts *managedartifact.Service
 	CollectionReader collection.Reader
 	ArtifactReader   artifact.Reader
-	Catalogs         catalog.Reader
 	SourceRuntime    source.Runtime
-	discovery        *discovery.Engine
 
 	metadata           *sqlite.Store
 	managedSources     *source.Registry
-	decoderIDs         map[basespec.DecoderID]struct{}
 	rootMutationPolicy protection.RootPolicy
 }
 
@@ -83,6 +75,13 @@ func Open(
 	}
 	if config.Clock == nil {
 		config.Clock = clockutil.System{}
+	}
+	if config.ArtifactIDProvider == nil {
+		config.ArtifactIDProvider = artifact.UUIDArtifactIDProvider()
+	}
+	providerRegistry, err := providerRegistryFromConfig(config)
+	if err != nil {
+		return nil, err
 	}
 
 	base, err := filepath.Abs(config.BaseDirectory)
@@ -105,15 +104,18 @@ func Open(
 		return nil, err
 	}
 
+	registeredSchemas := providerRegistry.Schemas()
+	registeredDecoders := providerRegistry.Decoders()
+
 	shareableRegistry, err := shareable.NewRegistry(
-		config.ShareableCodecs...,
+		registeredSchemas...,
 	)
 	if err != nil {
 		_ = metadata.Close()
 		return nil, err
 	}
 
-	if err := bindShareableSchemas(config.Decoders, shareableRegistry); err != nil {
+	if err := bindProviderSchemas(registeredDecoders, shareableRegistry); err != nil {
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -162,7 +164,7 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	decoderRegistry, err := discovery.NewDecoderRegistry(config.Decoders...)
+	decoderRegistry, err := discovery.NewDecoderRegistry(registeredDecoders...)
 	if err != nil {
 
 		_ = metadata.Close()
@@ -246,10 +248,6 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	decoderIDs := make(map[basespec.DecoderID]struct{}, len(config.Decoders))
-	for _, decoder := range config.Decoders {
-		decoderIDs[decoder.ID()] = struct{}{}
-	}
 
 	refreshService, err := refresh.NewService(
 		collectionRepository,
@@ -259,6 +257,9 @@ func Open(
 		discoveryEngine,
 		reconciler,
 		metadata.Publisher(),
+		providerRegistry,
+		shareableRegistry,
+		config.ArtifactIDProvider,
 		config.Clock,
 		config.RootMutationPolicy,
 	)
@@ -277,12 +278,9 @@ func Open(
 		ShareableSchemas:   shareableRegistry,
 		CollectionReader:   collectionRepository,
 		ArtifactReader:     artifactRepository,
-		Catalogs:           catalogRepository,
 		SourceRuntime:      sourceRuntime,
-		discovery:          discoveryEngine,
 		metadata:           metadata,
 		managedSources:     sourceRegistry,
-		decoderIDs:         decoderIDs,
 		rootMutationPolicy: config.RootMutationPolicy,
 	}
 	managedArtifacts, err := managedartifact.NewService(
@@ -296,7 +294,7 @@ func Open(
 				rootID basespec.RootID,
 				sourceID basespec.SourceID,
 			) (managedartifact.SourceState, error) {
-				result, err := components.GetManagedSourceState(
+				result, err := components.getManagedSourceState(
 					ctx,
 					rootID,
 					sourceID,
@@ -316,7 +314,7 @@ func Open(
 				expectedRevision uint64,
 				publication source.ManagedPackagePublication,
 			) (managedartifact.SourceState, error) {
-				result, err := components.PublishManagedPackage(
+				result, err := components.publishManagedPackageForMutableRoot(
 					ctx,
 					rootID,
 					sourceID,
@@ -338,7 +336,7 @@ func Open(
 				expectedRevision uint64,
 				publication source.ManagedPackagePublication,
 			) (managedartifact.SourceState, error) {
-				result, err := components.PublishProtectedManagedPackage(
+				result, err := components.publishProtectedManagedPackage(
 					ctx,
 					rootID,
 					sourceID,
@@ -365,14 +363,6 @@ func Open(
 	return components, nil
 }
 
-func (c *Components) HasDecoder(id basespec.DecoderID) bool {
-	if c == nil {
-		return false
-	}
-	_, exists := c.decoderIDs[id]
-	return exists
-}
-
 func (c *Components) RootMutationPolicy() protection.RootPolicy {
 	if c == nil {
 		return nil
@@ -380,44 +370,24 @@ func (c *Components) RootMutationPolicy() protection.RootPolicy {
 	return c.rootMutationPolicy
 }
 
-func bindShareableSchemas(
-	decoders []discovery.Decoder,
-	registry *shareable.Registry,
-) error {
-	for index, decoder := range decoders {
-		binder, supported := decoder.(shareableSchemaBinder)
-		if !supported {
-			continue
-		}
-		if err := binder.BindShareableSchemas(registry); err != nil {
-			return fmt.Errorf(
-				"bind shareable schemas to decoder %d: %w",
-				index,
-				err,
-			)
+func (c *Components) Close() error {
+	if c == nil {
+		return nil
+	}
+	var closeErrors []error
+	if c.metadata != nil {
+		if err := c.metadata.Close(); err != nil {
+			closeErrors = append(closeErrors, err)
 		}
 	}
-	return nil
+	return errors.Join(closeErrors...)
 }
 
-// DecoderFingerprint returns the exact decoder capability fingerprint used by
-// newly published catalogs. Consumers use it to mark old catalogs stale after
-// a decoder implementation or revision changes.
-func (c *Components) DecoderFingerprint() (cryptoutil.Digest, error) {
-	if c == nil || c.discovery == nil {
-		return "", fmt.Errorf(
-			"%w: artifact decoder registry is unavailable",
-			basespec.ErrClosed,
-		)
-	}
-	return c.discovery.DecoderFingerprint()
-}
-
-// GetManagedSourceState returns the current confirmed snapshot generation used
+// getManagedSourceState returns the current confirmed snapshot generation used
 // as the optimistic token for managed package publication and removal. It does
 // not expose Source configuration or the private acknowledged-generation
 // metadata field.
-func (c *Components) GetManagedSourceState(
+func (c *Components) getManagedSourceState(
 	ctx context.Context,
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
@@ -468,7 +438,7 @@ func (c *Components) GetManagedSourceState(
 // Source-side publication and SQLite metadata publication intentionally remain
 // separate operations. If the package write succeeds but the revision advance
 // conflicts, the caller receives the conflict and must reload before retrying.
-func (c *Components) PublishManagedPackage(
+func (c *Components) publishManagedPackageForMutableRoot(
 	ctx context.Context,
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
@@ -489,7 +459,7 @@ func (c *Components) PublishManagedPackage(
 // publication path. Artifact Store assigns no built-in meaning to this
 // method. Application installers use it only for a Root declared protected by
 // the application RootPolicy.
-func (c *Components) PublishProtectedManagedPackage(
+func (c *Components) publishProtectedManagedPackage(
 	ctx context.Context,
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
@@ -518,7 +488,7 @@ func (c *Components) PublishProtectedManagedPackage(
 
 // RemoveManagedPackage removes one complete package and advances the Source
 // revision after successful source-side removal.
-func (c *Components) RemoveManagedPackage(
+func (c *Components) removeManagedPackageForMutableRoot(
 	ctx context.Context,
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
@@ -539,7 +509,7 @@ func (c *Components) RemoveManagedPackage(
 
 // RemoveProtectedManagedPackage is the trusted protected-topology removal
 // path. It is reserved for an explicit installer or update workflow.
-func (c *Components) RemoveProtectedManagedPackage(
+func (c *Components) removeProtectedManagedPackage(
 	ctx context.Context,
 	rootID basespec.RootID,
 	sourceID basespec.SourceID,
@@ -566,19 +536,6 @@ func (c *Components) RemoveProtectedManagedPackage(
 		expectedGeneration,
 		true,
 	)
-}
-
-func (c *Components) Close() error {
-	if c == nil {
-		return nil
-	}
-	var closeErrors []error
-	if c.metadata != nil {
-		if err := c.metadata.Close(); err != nil {
-			closeErrors = append(closeErrors, err)
-		}
-	}
-	return errors.Join(closeErrors...)
 }
 
 func (c *Components) publishManagedPackage(
@@ -892,7 +849,7 @@ func (c *Components) removeManagedArtifactPackage(
 	address source.ManagedPackageAddress,
 	expectedGeneration string,
 ) (managedartifact.SourceState, error) {
-	result, err := c.RemoveManagedPackage(
+	result, err := c.removeManagedPackageForMutableRoot(
 		ctx,
 		rootID,
 		sourceID,
@@ -917,7 +874,7 @@ func (c *Components) removeProtectedManagedArtifactPackage(
 	address source.ManagedPackageAddress,
 	expectedGeneration string,
 ) (managedartifact.SourceState, error) {
-	result, err := c.RemoveProtectedManagedPackage(
+	result, err := c.removeProtectedManagedPackage(
 		ctx,
 		rootID,
 		sourceID,

@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 )
@@ -89,7 +89,7 @@ func LoadRegistry() (Registry, error) {
 // shareable codec before local installation begins.
 func (r Registry) Hydrate(
 	ctx context.Context,
-	canonicalizer shareable.ExpectedCanonicalizer,
+	canonicalizer providerapi.ExpectedCanonicalizer,
 	packages fs.FS,
 ) (HydratedRegistry, error) {
 	if ctx == nil {
@@ -278,7 +278,7 @@ func (r HydratedRegistry) OrderedCollections() []HydratedCollection {
 
 func hydrateCollection(
 	ctx context.Context,
-	canonicalizer shareable.ExpectedCanonicalizer,
+	canonicalizer providerapi.ExpectedCanonicalizer,
 	packages fs.FS,
 	registration Collection,
 ) (HydratedCollection, error) {

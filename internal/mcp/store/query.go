@@ -12,7 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
@@ -71,43 +70,24 @@ func (a *API) GetDocument(
 		return BundleDocument{}, err
 	}
 
-	sourceRevision := snapshot.SourceRevisions[bundle.Source.ID]
-	sourceGeneration := snapshot.SourceGenerations[bundle.Source.ID]
-	if sourceRevision == 0 || sourceGeneration == "" {
-		return BundleDocument{}, fmt.Errorf(
-			"%w: MCP Bundle Source has no current Catalog state",
-			basespec.ErrCatalogStale,
-		)
-	}
-
-	sourceValue, err := a.dependencies.SourceRuntime.Get(
+	entry, err := a.dependencies.Resources.ReadCollectionEntry(
 		ctx,
-		ref.RootID,
+		ref,
 		bundle.Source.ID,
-	)
-	if err != nil {
-		return BundleDocument{}, err
-	}
-	if sourceValue.Revision != sourceRevision {
-		return BundleDocument{}, fmt.Errorf(
-			"%w: MCP Bundle Source changed after Catalog publication",
-			basespec.ErrCatalogStale,
-		)
-	}
-
-	content, sourceDigest, err := source.ReadVerifiedSnapshotEntry(
-		ctx,
-		a.dependencies.SourceRuntime,
-		sourceValue,
 		bundle.DocumentLocator,
-		sourceGeneration,
 		basespec.MaxCandidateBytes,
 	)
 	if err != nil {
 		return BundleDocument{}, err
 	}
+	if entry.CatalogRevision != snapshot.Revision {
+		return BundleDocument{}, fmt.Errorf(
+			"%w: MCP Bundle Catalog changed during document resolution",
+			basespec.ErrCatalogStale,
+		)
+	}
 
-	document, _, err := a.canonicalizeBundleBytes(ctx, content)
+	document, _, err := a.canonicalizeBundleBytes(ctx, entry.Content)
 	if err != nil {
 		return BundleDocument{}, err
 	}
@@ -147,7 +127,7 @@ func (a *API) GetDocument(
 			occurrence.DefinitionDigest == nil ||
 			*occurrence.DefinitionDigest != expectedDefinition.Digest ||
 			occurrence.SourceContentDigest == nil ||
-			*occurrence.SourceContentDigest != sourceDigest {
+			*occurrence.SourceContentDigest != entry.Digest {
 			return BundleDocument{}, fmt.Errorf(
 				"%w: MCP subresource %q differs from the current document",
 				basespec.ErrCatalogStale,

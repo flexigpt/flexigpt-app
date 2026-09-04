@@ -183,14 +183,3 @@ func (r BundleRegistration) ToBundleRegistrations() []mcpStore.Registration {
 	}
 	return output
 }
-
-func (r BundleRegistration) HasExpectedSubresource(
-	subresource basespec.SubresourceLocator,
-) bool {
-	for _, value := range r.Artifacts {
-		if value.Subresource == subresource {
-			return true
-		}
-	}
-	return false
-}

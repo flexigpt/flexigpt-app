@@ -24,21 +24,6 @@ type RootDeletionPolicy interface {
 	IsRootDeletionProtected(rootID basespec.RootID) bool
 }
 
-type StaticRootPolicy struct {
-	RootID         basespec.RootID
-	RetainedRootID basespec.RootID
-}
-
-func (p StaticRootPolicy) IsProtectedRoot(rootID basespec.RootID) bool {
-	return p.RootID != "" && p.RootID == rootID
-}
-
-func (p StaticRootPolicy) IsRootDeletionProtected(
-	rootID basespec.RootID,
-) bool {
-	return p.RetainedRootID != "" && p.RetainedRootID == rootID
-}
-
 type privilegedInstallerContextKey struct{}
 
 // WithPrivilegedInstaller grants the narrow application-composition capability

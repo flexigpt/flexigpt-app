@@ -4,38 +4,18 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	artifactstoreDiscovery "github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/skill/store/workspaceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
-const defaultDiscoveryPolicyRevision = "workspace.discovery.v1"
-
-// DefaultDecoders contains Workspace-owned decoders only. The shared
-// agent.skill decoder is registered exactly once by Artifact Store composition.
-func DefaultDecoders() []artifactstoreDiscovery.Decoder {
-	return []artifactstoreDiscovery.Decoder{
-		contextadapter.NewContextDecoder(),
-	}
-}
-
 type Config struct {
-	WorkspaceRootID         basespec.RootID
-	Supports                []spec.ArtifactSupport
-	DiscoveryProfiles       spec.DiscoveryProfiles
-	DiscoveryPolicyRevision string
-	SkillRoots              []basespec.Locator
-	ContextComposition      contextadapter.CompositionPolicy
-	SourceUsePolicy         artifactadapter.SourceUsePolicy
-	Clock                   clockutil.Clock
-	AutoAdoptionIDProvider  artifact.ArtifactIDProvider
+	WorkspaceRootID    basespec.RootID
+	Supports           []spec.ArtifactSupport
+	ContextComposition contextadapter.CompositionPolicy
+	SourceUsePolicy    artifactadapter.SourceUsePolicy
 }
 
 type defaultArtifactSupport struct {
@@ -64,42 +44,10 @@ func (c Config) normalized() Config {
 	if len(output.Supports) == 0 {
 		output.Supports = DefaultArtifactSupports()
 	}
-	if output.DiscoveryPolicyRevision == "" {
-		output.DiscoveryPolicyRevision = defaultDiscoveryPolicyRevision
-	}
-	if output.Clock == nil {
-		output.Clock = clockutil.System{}
+	if output.WorkspaceRootID == "" {
+		output.WorkspaceRootID = artifactbuiltin.WorkspaceRootID
 	}
 	return output
-}
-
-func (c Config) normalizedDiscoveryProfiles(
-	skillConventions *workspaceadapter.ConventionRegistry,
-) spec.DiscoveryProfiles {
-	var profiles spec.DiscoveryProfiles
-	if len(c.DiscoveryProfiles.Primary.ExplicitLocators) == 0 &&
-		len(c.DiscoveryProfiles.Primary.DirectoryRoots) == 0 &&
-		len(c.DiscoveryProfiles.Attached.ExplicitLocators) == 0 &&
-		len(c.DiscoveryProfiles.Attached.DirectoryRoots) == 0 {
-		profiles = defaultDiscoveryProfiles()
-	} else {
-		profiles = c.DiscoveryProfiles
-	}
-	contextProfile := contextadapter.DiscoveryProfile()
-	profiles.Primary = discovery.MergeDiscoveryProfile(
-		profiles.Primary,
-		contextProfile,
-	)
-	skillProfile := skillConventions.DiscoveryProfile()
-	profiles.Primary = discovery.MergeDiscoveryProfile(
-		profiles.Primary,
-		skillProfile,
-	)
-	profiles.Attached = discovery.MergeDiscoveryProfile(
-		profiles.Attached,
-		skillProfile,
-	)
-	return profiles
 }
 
 func (c Config) normalizedSupports() ([]spec.ArtifactSupport, error) {
@@ -142,29 +90,6 @@ func DefaultArtifactSupports() []spec.ArtifactSupport {
 	return output
 }
 
-func (c Config) skillConventions() (*workspaceadapter.ConventionRegistry, error) {
-	return workspaceadapter.NewConventionRegistry(c.SkillRoots...)
-}
-
-func (c Config) discoveryPolicyRevision() (string, error) {
-	value := c.DiscoveryPolicyRevision
-	if value == "" {
-		value = defaultDiscoveryPolicyRevision
-	}
-	if err := basespec.ValidateRequiredText(
-		"workspace discovery policy revision",
-		value,
-		basespec.MaxVersionBytes,
-	); err != nil {
-		return "", fmt.Errorf(
-			"%w: %w",
-			spec.ErrInvalidWorkspace,
-			err,
-		)
-	}
-	return value, nil
-}
-
 func (c Config) runtimePolicy() artifactadapter.SourceUsePolicy {
 	if c.SourceUsePolicy != nil {
 		return c.SourceUsePolicy
@@ -178,27 +103,9 @@ func (c Config) contextCompositionPolicy() contextadapter.CompositionPolicy {
 
 func DefaultConfig() Config {
 	return Config{
-		Supports:                DefaultArtifactSupports(),
-		DiscoveryPolicyRevision: defaultDiscoveryPolicyRevision,
-		SkillRoots:              workspaceadapter.DefaultSkillRoots(),
-		ContextComposition:      contextadapter.DefaultCompositionPolicy(),
-		SourceUsePolicy:         artifactadapter.NewArtifactRuntimePolicy(),
-	}
-}
-
-func defaultDiscoveryProfiles() spec.DiscoveryProfiles {
-	return spec.DiscoveryProfiles{
-		Primary: spec.DiscoveryProfile{},
-		Attached: spec.DiscoveryProfile{
-			DirectoryRoots: []spec.DirectoryRoot{
-				{
-					Root:      artifactbuiltin.RepositoryRootLocator,
-					Recursive: true,
-					IncludePatterns: []string{
-						artifactbuiltin.WorkspaceMarkdownPattern,
-					},
-				},
-			},
-		},
+		WorkspaceRootID:    artifactbuiltin.WorkspaceRootID,
+		Supports:           DefaultArtifactSupports(),
+		ContextComposition: contextadapter.DefaultCompositionPolicy(),
+		SourceUsePolicy:    artifactadapter.NewArtifactRuntimePolicy(),
 	}
 }

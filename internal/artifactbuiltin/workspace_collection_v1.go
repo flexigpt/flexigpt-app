@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -30,7 +30,7 @@ const (
 //go:embed workspace-collection-v1.schema.json
 var workspaceCollectionV1JSONSchema []byte
 
-var WorkspaceCollectionV1SchemaKey = shareable.CollectionSchemaKey(
+var WorkspaceCollectionV1SchemaKey = providerapi.CollectionSchemaKey(
 	WorkspaceCollectionV1Kind,
 	WorkspaceCollectionV1SchemaID,
 	WorkspaceCollectionV1SchemaVersion,

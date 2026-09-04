@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -104,7 +104,7 @@ type InstallerDependencies struct {
 	Registry           Registry
 	Packages           fs.FS
 	Overlays           mcpOverlay.OverlayRepository
-	ShareableDocuments shareable.ExpectedCanonicalizer
+	ShareableDocuments providerapi.ExpectedCanonicalizer
 }
 
 type Installer struct {
@@ -113,7 +113,7 @@ type Installer struct {
 	builtInTopology topology.Declaration
 	packages        fs.FS
 	overlays        mcpOverlay.OverlayRepository
-	documents       shareable.ExpectedCanonicalizer
+	documents       providerapi.ExpectedCanonicalizer
 	packageScopes   []basespec.Locator
 	prepared        []preparedBundle
 	fingerprint     cryptoutil.Digest
@@ -122,7 +122,7 @@ type Installer struct {
 type preparedBundle struct {
 	registration   BundleRegistration
 	document       mcpStore.BundleDocument
-	parsed         shareable.ParsedDocument
+	parsed         providerapi.ParsedDocument
 	packageAddress source.ManagedPackageAddress
 	packageFiles   []source.ManagedPackageFile
 	packageDigest  cryptoutil.Digest

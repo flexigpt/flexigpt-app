@@ -7,7 +7,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -45,7 +44,7 @@ type RemovePackageFunc func(
 type Dependencies struct {
 	Artifacts   *artifact.Service
 	Collections collection.Reader
-	Refresh     refresh.Runner
+	Refresh     refresh.CollectionRunner
 	Policy      protection.RootPolicy
 
 	GetSourceState          GetSourceStateFunc
@@ -80,8 +79,6 @@ type PublishRequest struct {
 	Artifact           artifact.Artifact
 	ExpectedDefinition cryptoutil.Digest
 	Package            source.ManagedPackagePublication
-	Plan               discovery.Plan
-	RefreshPolicy      artifact.Policy
 	AllowProtected     bool
 }
 
@@ -96,8 +93,6 @@ type PublishCollectionRequest struct {
 	Collection     collection.CollectionRef
 	SourceID       basespec.SourceID
 	Package        source.ManagedPackagePublication
-	Plan           discovery.Plan
-	RefreshPolicy  artifact.Policy
 	AllowProtected bool
 	ForceRefresh   bool
 }
@@ -124,15 +119,7 @@ func (s *Service) PublishCollection(
 	if err := basespec.ValidateSourceID(request.SourceID); err != nil {
 		return PublishCollectionResult{}, err
 	}
-	if request.RefreshPolicy == nil {
-		return PublishCollectionResult{}, fmt.Errorf(
-			"%w: managed collection refresh policy is required",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := request.Plan.Validate(); err != nil {
-		return PublishCollectionResult{}, err
-	}
+
 	if err := s.requireMutable(
 		ctx,
 		request.Collection.RootID,
@@ -147,13 +134,6 @@ func (s *Service) PublishCollection(
 		true,
 	); err != nil {
 		return PublishCollectionResult{}, err
-	}
-	if _, found := request.Plan.BySource()[request.SourceID]; !found {
-		return PublishCollectionResult{}, fmt.Errorf(
-			"%w: managed collection publication plan does not include source %q",
-			basespec.ErrInvalid,
-			request.SourceID,
-		)
 	}
 
 	publication, err := source.NormalizeManagedPackagePublication(
@@ -228,11 +208,9 @@ func (s *Service) PublishCollection(
 	changed := published.Source.Revision != state.Source.Revision ||
 		published.Generation != state.Generation
 	if request.ForceRefresh || changed {
-		if _, err := s.dependencies.Refresh.Refresh(
+		if _, err := s.dependencies.Refresh.RefreshCollection(
 			ctx,
 			request.Collection,
-			request.Plan,
-			request.RefreshPolicy,
 		); err != nil {
 			return PublishCollectionResult{}, err
 		}
@@ -282,12 +260,6 @@ func (s *Service) Publish(
 		true,
 	); err != nil {
 		return PublishResult{}, err
-	}
-	if _, found := request.Plan.BySource()[current.Binding.SourceID]; !found {
-		return PublishResult{}, fmt.Errorf(
-			"%w: managed artifact publication plan does not include its source",
-			basespec.ErrInvalid,
-		)
 	}
 
 	state, err := s.dependencies.GetSourceState(
@@ -364,14 +336,12 @@ func (s *Service) Publish(
 		}
 	}
 
-	if _, err := s.dependencies.Refresh.Refresh(
+	if _, err := s.dependencies.Refresh.RefreshCollection(
 		ctx,
 		collection.CollectionRef{
 			RootID:       current.RootID,
 			CollectionID: current.CollectionID,
 		},
-		request.Plan,
-		request.RefreshPolicy,
 	); err != nil {
 		return PublishResult{}, err
 	}
@@ -396,8 +366,6 @@ func (s *Service) Publish(
 type RemoveRequest struct {
 	Artifact       artifact.Artifact
 	Package        source.ManagedPackageAddress
-	Plan           discovery.Plan
-	RefreshPolicy  artifact.Policy
 	AllowProtected bool
 }
 
@@ -432,13 +400,6 @@ func (s *Service) Remove(
 		true,
 	); err != nil {
 		return err
-	}
-
-	if _, found := request.Plan.BySource()[current.Binding.SourceID]; !found {
-		return fmt.Errorf(
-			"%w: managed artifact removal plan does not include its source",
-			basespec.ErrInvalid,
-		)
 	}
 
 	state, err := s.dependencies.GetSourceState(
@@ -479,14 +440,12 @@ func (s *Service) Remove(
 		return err
 	}
 
-	if _, err := s.dependencies.Refresh.Refresh(
+	if _, err := s.dependencies.Refresh.RefreshCollection(
 		ctx,
 		collection.CollectionRef{
 			RootID:       current.RootID,
 			CollectionID: current.CollectionID,
 		},
-		request.Plan,
-		request.RefreshPolicy,
 	); err != nil {
 		return err
 	}
@@ -542,12 +501,7 @@ func (s *Service) validatePublishRequest(
 	if err := cryptoutil.ValidateDigest(request.ExpectedDefinition); err != nil {
 		return err
 	}
-	if request.RefreshPolicy == nil {
-		return fmt.Errorf("%w: managed artifact refresh policy is required", basespec.ErrInvalid)
-	}
-	if err := request.Plan.Validate(); err != nil {
-		return err
-	}
+
 	if _, err := source.NormalizeManagedPackagePublication(request.Package); err != nil {
 		return err
 	}
@@ -567,12 +521,7 @@ func (s *Service) validateRemoveRequest(
 	if err := request.Package.Validate(); err != nil {
 		return err
 	}
-	if request.RefreshPolicy == nil {
-		return fmt.Errorf("%w: managed artifact refresh policy is required", basespec.ErrInvalid)
-	}
-	if err := request.Plan.Validate(); err != nil {
-		return err
-	}
+
 	return s.requireMutable(ctx, request.Artifact.RootID, request.AllowProtected)
 }
 

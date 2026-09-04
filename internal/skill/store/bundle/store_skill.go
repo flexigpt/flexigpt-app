@@ -2,18 +2,17 @@ package bundle
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
@@ -36,7 +35,7 @@ type ResolvedSkill struct {
 func (a *API) ListResolvedSkills(
 	ctx context.Context,
 	bundle collection.CollectionRef,
-) (output []ResolvedSkill, returnErr error) {
+) ([]ResolvedSkill, error) {
 	if err := a.Ready(); err != nil {
 		return nil, err
 	}
@@ -77,43 +76,13 @@ func (a *API) ListResolvedSkills(
 	if err != nil {
 		return nil, err
 	}
-
-	sessionCtx, session, err := source.NewVerificationSession(
-		ctx,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		returnErr = errors.Join(
-			returnErr,
-			session.Close(sessionCtx),
-		)
-	}()
-
-	sourcesByID := make(map[basespec.SourceID]source.Source)
-	output = make([]ResolvedSkill, 0, len(eligible))
+	output := make([]ResolvedSkill, 0, len(eligible))
 	for _, record := range eligible {
-		sourceValue, found := sourcesByID[record.Binding.SourceID]
-		if !found {
-			sourceValue, err = a.dependencies.SourceRuntime.Get(
-				sessionCtx,
-				record.RootID,
-				record.Binding.SourceID,
-			)
-			if err != nil {
-				return nil, err
-			}
-			sourcesByID[record.Binding.SourceID] = sourceValue
-		}
-
 		value, err := a.resolvedSkillFromSnapshot(
-			sessionCtx,
+			ctx,
 			record,
 			bundleValue,
 			catalogValue,
-			sourceValue,
 		)
 		if err != nil {
 			return nil, err
@@ -166,20 +135,11 @@ func (a *API) ResolveSkill(
 	if err != nil {
 		return ResolvedSkill{}, err
 	}
-	sourceValue, err := a.dependencies.SourceRuntime.Get(
-		ctx,
-		record.RootID,
-		record.Binding.SourceID,
-	)
-	if err != nil {
-		return ResolvedSkill{}, err
-	}
 	return a.resolvedSkillFromSnapshot(
 		ctx,
 		record,
 		bundle,
 		snapshot,
-		sourceValue,
 	)
 }
 
@@ -188,7 +148,6 @@ func (a *API) resolvedSkillFromSnapshot(
 	record artifact.Artifact,
 	bundle Bundle,
 	snapshot catalog.Snapshot,
-	sourceValue source.Source,
 ) (ResolvedSkill, error) {
 	bundleRef := bundle.Collection.Ref()
 	if record.RootID != bundleRef.RootID ||
@@ -237,27 +196,47 @@ func (a *API) resolvedSkillFromSnapshot(
 		return ResolvedSkill{}, err
 	}
 
-	if sourceValue.RootID != record.RootID ||
-		sourceValue.ID != record.Binding.SourceID {
+	resolved, err := a.dependencies.Resources.ResolveArtifact(
+		ctx,
+		record.Ref(),
+		artifactstore.ResolveOptions{},
+	)
+	if err != nil {
+		return ResolvedSkill{}, err
+	}
+	if resolved.Artifact.Revision != record.Revision ||
+		resolved.Artifact.Binding != record.Binding ||
+		resolved.Collection.Revision != bundle.Collection.Revision ||
+		resolved.CatalogRevision != snapshot.Revision ||
+		resolved.Definition.Digest != value.Digest {
 		return ResolvedSkill{}, fmt.Errorf(
-			"%w: Skill source does not match its Artifact binding",
-			basespec.ErrInvalid,
+			"%w: Skill resource changed during runtime resolution",
+			basespec.ErrCatalogStale,
 		)
 	}
-	if sourceValue.Revision != expectedSourceRevision {
+	if resolved.Source.ID != record.Binding.SourceID ||
+		resolved.Source.Revision != expectedSourceRevision ||
+		resolved.SourceGeneration != expectedGeneration ||
+		resolved.Occurrence.SourceContentDigest == nil ||
+		*resolved.Occurrence.SourceContentDigest !=
+			*occurrence.SourceContentDigest {
 		return ResolvedSkill{}, fmt.Errorf(
 			"%w: Skill source changed after catalog publication",
 			basespec.ErrCatalogStale,
 		)
 	}
-	location, err := skillArtifact.ResolveRuntimePackage(
-		ctx,
-		a.dependencies.SourceRuntime,
-		sourceValue,
+
+	packageLocator, err := skillArtifact.RuntimePackageLocator(
 		record.Binding.Locator,
 		record.Binding.SubresourceLocator,
-		expectedGeneration,
-		*occurrence.SourceContentDigest,
+	)
+	if err != nil {
+		return ResolvedSkill{}, err
+	}
+	location, err := a.dependencies.Resources.ResolveVerifiedLocalPath(
+		ctx,
+		resolved,
+		packageLocator,
 	)
 	if err != nil {
 		return ResolvedSkill{}, err

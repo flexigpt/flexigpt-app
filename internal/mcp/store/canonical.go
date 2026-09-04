@@ -8,7 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
@@ -229,15 +229,15 @@ func CanonicalizeBundle(
 func (a *API) canonicalizeBundleBytes(
 	ctx context.Context,
 	raw []byte,
-) (BundleDocument, shareable.ParsedDocument, error) {
+) (BundleDocument, providerapi.ParsedDocument, error) {
 	if a == nil || a.dependencies.ShareableDocuments == nil {
-		return BundleDocument{}, shareable.ParsedDocument{}, fmt.Errorf(
+		return BundleDocument{}, providerapi.ParsedDocument{}, fmt.Errorf(
 			"%w: Artifact Store shareable document canonicalizer is unavailable",
 			basespec.ErrClosed,
 		)
 	}
 	if len(raw) == 0 {
-		return BundleDocument{}, shareable.ParsedDocument{}, fmt.Errorf(
+		return BundleDocument{}, providerapi.ParsedDocument{}, fmt.Errorf(
 			"%w: MCP Bundle document is required",
 			basespec.ErrInvalid,
 		)
@@ -249,7 +249,7 @@ func (a *API) canonicalizeBundleBytes(
 		raw,
 	)
 	if err != nil {
-		return BundleDocument{}, shareable.ParsedDocument{}, fmt.Errorf(
+		return BundleDocument{}, providerapi.ParsedDocument{}, fmt.Errorf(
 			"canonicalize MCP Bundle through Artifact Store schema registry: %w",
 			err,
 		)
@@ -257,7 +257,7 @@ func (a *API) canonicalizeBundleBytes(
 
 	document, err := BundleFromParsedDocument(parsed)
 	if err != nil {
-		return BundleDocument{}, shareable.ParsedDocument{}, err
+		return BundleDocument{}, providerapi.ParsedDocument{}, err
 	}
 	return document, parsed.Clone(), nil
 }

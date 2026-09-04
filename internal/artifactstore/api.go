@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 )
@@ -16,6 +17,7 @@ import (
 // The caller owns the lifecycle of the supplied Components.
 type API struct {
 	components *system.Components
+	resources  *resource.Service
 }
 
 func New(components *system.Components) (*API, error) {
@@ -24,8 +26,27 @@ func New(components *system.Components) (*API, error) {
 		components.Sources == nil {
 		return nil, errors.New("artifact store components are required")
 	}
+
+	if components.ArtifactReader == nil ||
+		components.CollectionReader == nil ||
+		components.Refresh == nil ||
+		components.SourceRuntime == nil {
+		return nil, errors.New(
+			"artifact store resource components are required",
+		)
+	}
+	resources, err := resource.NewService(
+		components.ArtifactReader,
+		components.CollectionReader,
+		components.Refresh,
+		components.SourceRuntime,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &API{
 		components: components,
+		resources:  resources,
 	}, nil
 }
 
@@ -349,99 +370,6 @@ func (a *API) ListArtifactSourceKinds(
 	return &ListArtifactSourceKindsResponse{
 		Body: &ListArtifactSourceKindsResponseBody{
 			Kinds: a.components.Sources.Kinds(),
-		},
-	}, nil
-}
-
-func (a *API) GetManagedSourceState(
-	ctx context.Context,
-	request *GetManagedSourceStateRequest,
-) (*GetManagedSourceStateResponse, error) {
-	if err := a.check(ctx); err != nil {
-		return nil, err
-	}
-	if err := requireRequest(request, "get managed Source state request"); err != nil {
-		return nil, err
-	}
-	result, err := a.components.GetManagedSourceState(
-		ctx,
-		request.RootID,
-		request.SourceID,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &GetManagedSourceStateResponse{
-		Body: &GetManagedSourceStateResponseBody{
-			Generation: result.Generation,
-			Source:     result.Source,
-		},
-	}, nil
-}
-
-func (a *API) PublishManagedSourcePackage(
-	ctx context.Context,
-	request *PublishManagedSourcePackageRequest,
-) (*PublishManagedSourcePackageResponse, error) {
-	if err := a.check(ctx); err != nil {
-		return nil, err
-	}
-	if err := requireRequest(request, "publish managed Source package request"); err != nil {
-		return nil, err
-	}
-	if err := requireBody(request.Body, "managed Source package body"); err != nil {
-		return nil, err
-	}
-	result, err := a.components.PublishManagedPackage(
-		ctx,
-		request.RootID,
-		request.SourceID,
-		request.Body.ExpectedSourceRevision,
-		source.ManagedPackagePublication{
-			Address:            request.Body.Address,
-			ExpectedGeneration: request.Body.ExpectedGeneration,
-			Files:              request.Body.Files,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PublishManagedSourcePackageResponse{
-		Body: &PublishManagedSourcePackageResponseBody{
-			Generation: result.Generation,
-			Source:     result.Source,
-		},
-	}, nil
-}
-
-func (a *API) RemoveManagedSourcePackage(
-	ctx context.Context,
-	request *RemoveManagedSourcePackageRequest,
-) (*RemoveManagedSourcePackageResponse, error) {
-	if err := a.check(ctx); err != nil {
-		return nil, err
-	}
-	if err := requireRequest(request, "remove managed Source package request"); err != nil {
-		return nil, err
-	}
-	result, err := a.components.RemoveManagedPackage(
-		ctx,
-		request.RootID,
-		request.SourceID,
-		request.ExpectedSourceRevision,
-		request.Address,
-		request.ExpectedGeneration,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &RemoveManagedSourcePackageResponse{
-		Body: &RemoveManagedSourcePackageResponseBody{
-			Generation: result.Generation,
-			Source:     result.Source,
 		},
 	}, nil
 }
