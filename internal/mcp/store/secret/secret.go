@@ -2,9 +2,7 @@ package secret
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +10,9 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func NewMCPSecretRefString(
@@ -129,8 +130,11 @@ func GetMCPSecretRefStorageKey(r MCPSecretRef) string {
 	if err != nil {
 		return ""
 	}
-	sum := sha256.Sum256(raw)
-	return SecretRefVersion + ":" + hex.EncodeToString(sum[:])
+	digest := cryptoutil.DigestBytes(raw)
+	return SecretRefVersion + ":" + strings.TrimPrefix(
+		string(digest),
+		cryptoutil.DigestSHA256Prefix,
+	)
 }
 
 func GetMCPSecretRefString(r MCPSecretRef) string {
@@ -154,7 +158,14 @@ func canonicalSecret(r MCPSecretRef) ([]byte, error) {
 		Kind:   r.Kind,
 		Slot:   r.Slot,
 	}
-	return json.Marshal(wire)
+	canonical, err := jsonutil.MarshalCanonicalObject(
+		wire,
+		basespec.MaxLocalDataBytes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(nil), canonical...), nil
 }
 
 func validateSecret(r MCPSecretRef) error {

@@ -3,8 +3,6 @@ package embedded
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +11,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -157,7 +156,7 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 }
 
 func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
-	hash := sha256.New()
+	hash := cryptoutil.NewDigestWriter()
 	entries := 0
 	var totalBytes int64
 
@@ -231,5 +230,5 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
+	return string(hash.Digest()), nil
 }

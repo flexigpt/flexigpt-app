@@ -1,8 +1,6 @@
 package cryptoutil
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -22,8 +20,9 @@ type Digest string
 // DigestBytes returns the canonical sha256 digest representation used by the
 // artifact store for arbitrary immutable content.
 func DigestBytes(content []byte) Digest {
-	sum := sha256.Sum256(content)
-	return Digest(DigestSHA256Prefix + hex.EncodeToString(sum[:]))
+	writer := NewDigestWriter()
+	_, _ = writer.Write(content)
+	return writer.Digest()
 }
 
 func ValidateDigest(value Digest) error {

@@ -3,8 +3,6 @@ package fsdir
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +15,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -323,7 +322,7 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 		return values[left].relative < values[right].relative
 	})
 
-	hash := sha256.New()
+	hash := cryptoutil.NewDigestWriter()
 	var totalBytes int64
 
 	for _, value := range values {
@@ -387,5 +386,5 @@ func fingerprint(ctx context.Context, root string, policy normalizedTraversalPol
 		_, _ = hash.Write([]byte{0})
 		totalBytes += written
 	}
-	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
+	return string(hash.Digest()), nil
 }
