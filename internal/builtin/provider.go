@@ -89,10 +89,10 @@ var BuiltInDefaultModelPresetIDs = map[inferenceSpec.ProviderName]modelpreset.Mo
 	modelpreset.ProviderDeepSeek:        modelpreset.PresetDeepSeekV4Flash,
 	modelpreset.ProviderLocalAI:         modelpreset.PresetGemma426BA4B,
 	modelpreset.ProviderLMStudio:        modelpreset.PresetQwen3627B,
-	modelpreset.ProviderGoogleGemini:    modelpreset.PresetGemini37Flash,
+	modelpreset.ProviderGoogleGemini:    modelpreset.PresetGemini38Flash,
 	modelpreset.ProviderHuggingFace:     modelpreset.PresetGLM52FireworksAI,
 	modelpreset.ProviderLlamaCPP:        modelpreset.PresetQwen3635BA3B,
-	modelpreset.ProviderMeta:            modelpreset.PresetMuseSpark12,
+	modelpreset.ProviderMeta:            modelpreset.PresetMuseSpark13,
 	modelpreset.ProviderMiniMax:         modelpreset.PresetMiniMaxM3,
 	modelpreset.ProviderMistral:         modelpreset.PresetMistralMedium35,
 	modelpreset.ProviderMoonshot:        modelpreset.PresetMoonshotKimiK3,
@@ -117,6 +117,7 @@ var BuiltInDisabledModelPresetIDs = map[inferenceSpec.ProviderName]map[modelpres
 		modelpreset.PresetClaudeSonnet4:  {},
 	},
 	modelpreset.ProviderGoogleGemini: {
+		modelpreset.PresetGemini37Flash: {},
 		modelpreset.PresetGemini36Flash: {},
 		modelpreset.PresetGemini35Flash: {},
 
