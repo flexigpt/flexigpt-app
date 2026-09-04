@@ -29,7 +29,7 @@ export interface DirectoryAttachmentGroup {
 	ownedAttachmentKeys: string[];
 	/**
 	 * Candidates that are not currently attached. This includes files removed
-	 * by the user and candidates beyond the active 128-file limit.
+	 * by the user and candidates beyond the active file limit.
 	 */
 	removedAttachments: UIAttachment[];
 	/**

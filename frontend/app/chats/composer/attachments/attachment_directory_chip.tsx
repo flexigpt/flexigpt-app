@@ -405,7 +405,7 @@ export function DirectoryChip({
 											onClick={() => {
 												restoreToDirectory([attachment]);
 											}}
-											title={canRestore ? 'Attach this file again' : 'The 128-file limit is full'}
+											title={canRestore ? 'Attach this file again' : 'The file limit is full'}
 											aria-label={`Attach ${relativePath} again`}
 										>
 											<FiPlus size={13} />
