@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -455,7 +456,7 @@ func discoveryPlanFromProvider(
 type providerAdoptionPolicy struct {
 	behavior    providerapi.CollectionBehavior
 	attachments map[basespec.SourceID]providerapi.Attachment
-	ids         artifact.ArtifactIDProvider
+	ids         artifactid.Provider
 }
 
 func (p providerAdoptionPolicy) Derive(

@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/providerregistry"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
@@ -29,7 +30,7 @@ type Service struct {
 	publisher   Publisher
 	providers   *providerregistry.Registry
 	documents   providerapi.ExpectedCanonicalizer
-	artifactIDs artifact.ArtifactIDProvider
+	artifactIDs artifactid.Provider
 	clock       clockutil.Clock
 	policy      protection.RootPolicy
 }
@@ -44,7 +45,7 @@ func NewService(
 	publisher Publisher,
 	providers *providerregistry.Registry,
 	documents providerapi.ExpectedCanonicalizer,
-	artifactIDs artifact.ArtifactIDProvider,
+	artifactIDs artifactid.Provider,
 	timeClock clockutil.Clock,
 	policy protection.RootPolicy,
 ) (*Service, error) {

@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/embedded"
@@ -33,8 +34,8 @@ type Config struct {
 
 	ArtifactProviders []providerapi.Provider
 	// ArtifactIDProvider is used only for Store-owned automatic adoption.
-	// Callers never receive this dependency.
-	ArtifactIDProvider        artifact.ArtifactIDProvider
+	// It is Store composition input and never reaches a provider or consumer.
+	ArtifactIDProvider        artifactid.Provider
 	Clock                     clockutil.Clock
 	RootMutationPolicy        protection.RootPolicy
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
@@ -77,7 +78,7 @@ func Open(
 		config.Clock = clockutil.System{}
 	}
 	if config.ArtifactIDProvider == nil {
-		config.ArtifactIDProvider = artifact.UUIDArtifactIDProvider()
+		config.ArtifactIDProvider = artifactid.NewUUIDProvider()
 	}
 	providerRegistry, err := providerRegistryFromConfig(config)
 	if err != nil {
