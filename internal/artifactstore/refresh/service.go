@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/providerregistry"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -26,7 +27,7 @@ type Service struct {
 	discovery   *discovery.Engine
 	reconciler  *artifact.Reconciler
 	publisher   Publisher
-	providers   *providerapi.Registry
+	providers   *providerregistry.Registry
 	documents   providerapi.ExpectedCanonicalizer
 	artifactIDs artifact.ArtifactIDProvider
 	clock       clockutil.Clock
@@ -41,7 +42,7 @@ func NewService(
 	discoveryEngine *discovery.Engine,
 	reconciler *artifact.Reconciler,
 	publisher Publisher,
-	providers *providerapi.Registry,
+	providers *providerregistry.Registry,
 	documents providerapi.ExpectedCanonicalizer,
 	artifactIDs artifact.ArtifactIDProvider,
 	timeClock clockutil.Clock,

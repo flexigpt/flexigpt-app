@@ -5,14 +5,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/resource"
-)
-
-type (
-	ResolveOptions   = resource.ResolveOptions
-	ResolvedArtifact = resource.ResolvedArtifact
-	VerifiedEntry    = resource.VerifiedEntry
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/resource"
 )
 
 // ResourceResolver is the consumer-facing Artifact Store capability for
@@ -61,7 +56,17 @@ func (a *API) ResolveArtifact(
 	if a.resources == nil {
 		return ResolvedArtifact{}, basespec.ErrClosed
 	}
-	return a.resources.ResolveArtifact(ctx, ref, options)
+	value, err := a.resources.ResolveArtifact(
+		ctx,
+		ref,
+		resource.ResolveOptions{
+			VerifySourceContent: options.VerifySourceContent,
+		},
+	)
+	if err != nil {
+		return ResolvedArtifact{}, err
+	}
+	return resolvedArtifactForAPI(value), nil
 }
 
 func (a *API) ResolveVerifiedLocalPath(
@@ -75,9 +80,12 @@ func (a *API) ResolveVerifiedLocalPath(
 	if a.resources == nil {
 		return "", basespec.ErrClosed
 	}
+	if err := resolved.Validate(); err != nil {
+		return "", err
+	}
 	return a.resources.ResolveVerifiedLocalPath(
 		ctx,
-		resolved,
+		resolvedArtifactForStore(resolved),
 		localLocator,
 	)
 }
@@ -95,13 +103,17 @@ func (a *API) ReadCollectionEntry(
 	if a.resources == nil {
 		return VerifiedEntry{}, basespec.ErrClosed
 	}
-	return a.resources.ReadCollectionEntry(
+	value, err := a.resources.ReadCollectionEntry(
 		ctx,
 		ref,
 		sourceID,
 		locator,
 		maximumBytes,
 	)
+	if err != nil {
+		return VerifiedEntry{}, err
+	}
+	return verifiedEntryForAPI(value), nil
 }
 
 func (a *API) ResolveSourceLocalPath(
@@ -128,4 +140,46 @@ func (a *API) SupportsLocalPath(kind basespec.SourceKind) bool {
 	return a != nil &&
 		a.resources != nil &&
 		a.resources.SupportsLocalPath(kind)
+}
+
+func resolvedArtifactForAPI(
+	value resource.ResolvedArtifact,
+) ResolvedArtifact {
+	return ResolvedArtifact{
+		Artifact:         value.Artifact.Clone(),
+		Collection:       value.Collection.Clone(),
+		Definition:       value.Definition.Clone(),
+		Occurrence:       catalog.CloneOccurrence(value.Occurrence),
+		Source:           cloneSourceSummary(value.Source),
+		CatalogRevision:  value.CatalogRevision,
+		SourceGeneration: value.SourceGeneration,
+	}
+}
+
+func resolvedArtifactForStore(
+	value ResolvedArtifact,
+) resource.ResolvedArtifact {
+	return resource.ResolvedArtifact{
+		Artifact:         value.Artifact.Clone(),
+		Collection:       value.Collection.Clone(),
+		Definition:       value.Definition.Clone(),
+		Occurrence:       catalog.CloneOccurrence(value.Occurrence),
+		Source:           cloneSourceSummary(value.Source),
+		CatalogRevision:  value.CatalogRevision,
+		SourceGeneration: value.SourceGeneration,
+	}
+}
+
+func verifiedEntryForAPI(
+	value resource.VerifiedEntry,
+) VerifiedEntry {
+	return VerifiedEntry{
+		Collection:       value.Collection,
+		SourceID:         value.SourceID,
+		CatalogRevision:  value.CatalogRevision,
+		SourceRevision:   value.SourceRevision,
+		SourceGeneration: value.SourceGeneration,
+		Content:          append([]byte(nil), value.Content...),
+		Digest:           value.Digest,
+	}
 }

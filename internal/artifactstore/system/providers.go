@@ -4,13 +4,14 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/providerregistry"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
 func providerRegistryFromConfig(
 	config Config,
-) (*providerapi.Registry, error) {
-	registry, err := providerapi.NewRegistry(
+) (*providerregistry.Registry, error) {
+	registry, err := providerregistry.New(
 		config.ArtifactProviders...,
 	)
 	if err != nil {
