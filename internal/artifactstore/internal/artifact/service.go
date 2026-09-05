@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	collectionimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -19,7 +20,7 @@ import (
 
 type Service struct {
 	repository  Repository
-	collections collection.Reader
+	collections collectionimpl.Reader
 	catalogs    catalog.Reader
 	clock       clockutil.Clock
 	policy      protection.RootPolicy
@@ -27,7 +28,7 @@ type Service struct {
 
 func NewService(
 	repository Repository,
-	collections collection.Reader,
+	collections collectionimpl.Reader,
 	catalogs catalog.Reader,
 	timeClock clockutil.Clock,
 	policy protection.RootPolicy,

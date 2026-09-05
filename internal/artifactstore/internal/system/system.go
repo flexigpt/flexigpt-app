@@ -9,10 +9,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
+	collectionimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
+	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/embedded"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/fsdir"
@@ -22,7 +23,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
@@ -47,15 +47,15 @@ type ManagedPackageResult struct {
 }
 
 type Components struct {
-	Roots            *root.Service
+	Roots            *rootimpl.Service
 	Sources          *source.Service
-	Collections      *collection.Service
+	Collections      *collectionimpl.Service
 	Artifacts        *artifactimpl.Service
 	Refresh          *refresh.Service
 	ShareableSchemas *shareable.Registry
 
 	ManagedArtifacts *managedartifact.Service
-	CollectionReader collection.Reader
+	CollectionReader collectionimpl.Reader
 	ArtifactReader   artifactimpl.Reader
 	SourceRuntime    source.Runtime
 
@@ -199,7 +199,7 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	rootService, err := root.NewService(
+	rootService, err := rootimpl.NewService(
 		rootRepository,
 		config.Clock,
 		config.RootMutationPolicy,
@@ -209,7 +209,7 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	collectionService, err := collection.NewService(
+	collectionService, err := collectionimpl.NewService(
 		collectionRepository,
 		sourceService,
 		config.Clock,

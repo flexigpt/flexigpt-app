@@ -60,9 +60,27 @@ type ArtifactCommands interface {
 	) error
 }
 
+// CollectionReader is the Store-owned Collection query capability required by
+// managed package publication and removal orchestration.
+//
+// It permits validation of the target Collection and source attachment. It
+// does not expose repository mutation or catalog-publication capabilities.
+type CollectionReader interface {
+	Get(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) (collection.Collection, error)
+
+	GetAttachment(
+		ctx context.Context,
+		ref collection.CollectionRef,
+		sourceID basespec.SourceID,
+	) (collection.Attachment, error)
+}
+
 type Dependencies struct {
 	Artifacts   ArtifactCommands
-	Collections collection.Reader
+	Collections CollectionReader
 	Refresh     refresh.CollectionRunner
 	Policy      protection.RootPolicy
 

@@ -1,4 +1,4 @@
-package collection
+package collectionimpl
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -51,27 +52,27 @@ func NewService(
 func (s *Service) Create(
 	ctx context.Context,
 	rootID basespec.RootID,
-	draft Draft,
-	attachmentDrafts []AttachmentDraft,
-) (Collection, []Attachment, error) {
+	draft collection.Draft,
+	attachmentDrafts []collection.AttachmentDraft,
+) (collection.Collection, []collection.Attachment, error) {
 	if err := basespec.ValidateRootID(rootID); err != nil {
-		return Collection{}, nil, err
+		return collection.Collection{}, nil, err
 	}
 	if err := protection.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
-		return Collection{}, nil, err
+		return collection.Collection{}, nil, err
 	}
 	if err := basespec.ValidateCollectionID(draft.ID); err != nil {
-		return Collection{}, nil, err
+		return collection.Collection{}, nil, err
 	}
 	if err := basespec.ValidateCollectionKind(draft.Kind); err != nil {
-		return Collection{}, nil, err
+		return collection.Collection{}, nil, err
 	}
 	data, err := canonicalData(draft.Data)
 	if err != nil {
-		return Collection{}, nil, err
+		return collection.Collection{}, nil, err
 	}
 	now := clockutil.NowUTC(s.clock)
-	value := Collection{
+	value := collection.Collection{
 		ID:          draft.ID,
 		RootID:      rootID,
 		Kind:        draft.Kind,
@@ -84,17 +85,17 @@ func (s *Service) Create(
 		ModifiedAt:  now,
 	}
 	if err := value.Validate(); err != nil {
-		return Collection{}, nil, err
+		return collection.Collection{}, nil, err
 	}
 
 	seenSources := make(
 		map[basespec.SourceID]struct{},
 		len(attachmentDrafts),
 	)
-	attachments := make([]Attachment, 0, len(attachmentDrafts))
+	attachments := make([]collection.Attachment, 0, len(attachmentDrafts))
 	for _, draft := range attachmentDrafts {
 		if _, duplicate := seenSources[draft.SourceID]; duplicate {
-			return Collection{}, nil, fmt.Errorf(
+			return collection.Collection{}, nil, fmt.Errorf(
 				"%w: duplicate collection attachment for source %q",
 				basespec.ErrInvalid,
 				draft.SourceID,
@@ -103,10 +104,10 @@ func (s *Service) Create(
 		seenSources[draft.SourceID] = struct{}{}
 		sourceValue, err := s.sources.Get(ctx, rootID, draft.SourceID)
 		if err != nil {
-			return Collection{}, nil, err
+			return collection.Collection{}, nil, err
 		}
 		if draft.Enabled && !sourceValue.Enabled {
-			return Collection{}, nil, fmt.Errorf(
+			return collection.Collection{}, nil, fmt.Errorf(
 				"%w: enabled attachment cannot use disabled source %q",
 				basespec.ErrInvalid,
 				draft.SourceID,
@@ -114,9 +115,9 @@ func (s *Service) Create(
 		}
 		attachmentData, err := canonicalData(draft.Data)
 		if err != nil {
-			return Collection{}, nil, err
+			return collection.Collection{}, nil, err
 		}
-		attachment := Attachment{
+		attachment := collection.Attachment{
 			RootID:       rootID,
 			CollectionID: value.ID,
 			SourceID:     draft.SourceID,
@@ -128,7 +129,7 @@ func (s *Service) Create(
 			ModifiedAt:   now,
 		}
 		if err := attachment.Validate(); err != nil {
-			return Collection{}, nil, err
+			return collection.Collection{}, nil, err
 		}
 		attachments = append(attachments, attachment)
 	}
@@ -137,19 +138,19 @@ func (s *Service) Create(
 		return value.Clone(), cloneAttachments(attachments), nil
 	}
 	if !errors.Is(createErr, basespec.ErrConflict) {
-		return Collection{}, nil, createErr
+		return collection.Collection{}, nil, createErr
 	}
 
 	existing, err := s.repository.Get(ctx, value.Ref())
 	if err != nil {
 		// Collection IDs are globally unique in the namespace. A matching
 		// ID in another Root remains an ID conflict, not a not-found result.
-		return Collection{}, nil, createErr
+		return collection.Collection{}, nil, createErr
 	}
 	if existing.RootID != value.RootID ||
 		existing.ID != value.ID ||
 		existing.Kind != value.Kind {
-		return Collection{}, nil, fmt.Errorf(
+		return collection.Collection{}, nil, fmt.Errorf(
 			"%w: collection %q creation intent differs",
 			basespec.ErrConflict,
 			value.ID,
@@ -158,7 +159,7 @@ func (s *Service) Create(
 
 	existingAttachments, err := s.repository.ListAttachments(ctx, value.Ref())
 	if err != nil {
-		return Collection{}, nil, err
+		return collection.Collection{}, nil, err
 	}
 
 	return existing.Clone(), cloneAttachments(existingAttachments), nil
@@ -166,10 +167,10 @@ func (s *Service) Create(
 
 func (s *Service) Get(
 	ctx context.Context,
-	ref CollectionRef,
-) (Collection, error) {
+	ref collection.CollectionRef,
+) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	return s.repository.Get(ctx, ref)
 }
@@ -179,10 +180,10 @@ func (s *Service) Get(
 // active aggregate.
 func (s *Service) GetRetired(
 	ctx context.Context,
-	ref CollectionRef,
-) (Collection, error) {
+	ref collection.CollectionRef,
+) (collection.Collection, error) {
 	if err := ref.Validate(); err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	return s.repository.GetRetired(ctx, ref)
 }
@@ -190,7 +191,7 @@ func (s *Service) GetRetired(
 func (s *Service) ListByRoot(
 	ctx context.Context,
 	rootID basespec.RootID,
-) ([]Collection, error) {
+) ([]collection.Collection, error) {
 	if err := basespec.ValidateRootID(rootID); err != nil {
 		return nil, err
 	}
@@ -199,31 +200,31 @@ func (s *Service) ListByRoot(
 
 func (s *Service) Update(
 	ctx context.Context,
-	ref CollectionRef,
-	update Update,
-) (Collection, error) {
+	ref collection.CollectionRef,
+	update collection.Update,
+) (collection.Collection, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	if update.ExpectedRevision == 0 {
-		return Collection{}, fmt.Errorf(
+		return collection.Collection{}, fmt.Errorf(
 			"%w: expected collection revision is required",
 			basespec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	if current.Revision != update.ExpectedRevision {
-		return Collection{}, fmt.Errorf(
+		return collection.Collection{}, fmt.Errorf(
 			"%w: collection changed since it was read",
 			basespec.ErrConflict,
 		)
 	}
 	data, err := canonicalData(update.Data)
 	if err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	next := current
 	next.DisplayName = update.DisplayName
@@ -239,28 +240,28 @@ func (s *Service) Update(
 	next.Revision++
 	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	if err := s.repository.Update(ctx, next, update.ExpectedRevision); err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	return next.Clone(), nil
 }
 
 func (s *Service) Retire(
 	ctx context.Context,
-	ref CollectionRef,
+	ref collection.CollectionRef,
 	expectedRevision uint64,
-) (Collection, error) {
+) (collection.Collection, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	if expectedRevision == 0 || current.Revision != expectedRevision {
-		return Collection{}, fmt.Errorf(
+		return collection.Collection{}, fmt.Errorf(
 			"%w: collection changed since it was read",
 			basespec.ErrConflict,
 		)
@@ -272,17 +273,17 @@ func (s *Service) Retire(
 	next.ModifiedAt = now
 	next.Revision++
 	if err := next.Validate(); err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	if err := s.repository.Retire(ctx, next, expectedRevision); err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	return next.Clone(), nil
 }
 
 func (s *Service) Purge(
 	ctx context.Context,
-	ref CollectionRef,
+	ref collection.CollectionRef,
 	expectedRevision uint64,
 ) error {
 	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
@@ -299,8 +300,8 @@ func (s *Service) Purge(
 
 func (s *Service) ListAttachments(
 	ctx context.Context,
-	ref CollectionRef,
-) ([]Attachment, error) {
+	ref collection.CollectionRef,
+) ([]collection.Attachment, error) {
 	if _, err := s.repository.Get(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -309,48 +310,48 @@ func (s *Service) ListAttachments(
 
 func (s *Service) GetAttachment(
 	ctx context.Context,
-	ref CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
-) (Attachment, error) {
+) (collection.Attachment, error) {
 	if _, err := s.repository.Get(ctx, ref); err != nil {
-		return Attachment{}, err
+		return collection.Attachment{}, err
 	}
 	return s.repository.GetAttachment(ctx, ref, sourceID)
 }
 
 func (s *Service) Attach(
 	ctx context.Context,
-	ref CollectionRef,
+	ref collection.CollectionRef,
 	expectedCollectionRevision uint64,
-	draft AttachmentDraft,
-) (Collection, Attachment, error) {
+	draft collection.AttachmentDraft,
+) (collection.Collection, collection.Attachment, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	if expectedCollectionRevision == 0 ||
 		current.Revision != expectedCollectionRevision {
-		return Collection{}, Attachment{}, basespec.ErrConflict
+		return collection.Collection{}, collection.Attachment{}, basespec.ErrConflict
 	}
 	sourceValue, err := s.sources.Get(ctx, ref.RootID, draft.SourceID)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	if draft.Enabled && !sourceValue.Enabled {
-		return Collection{}, Attachment{}, fmt.Errorf(
+		return collection.Collection{}, collection.Attachment{}, fmt.Errorf(
 			"%w: enabled attachment cannot use a disabled source",
 			basespec.ErrInvalid,
 		)
 	}
 	data, err := canonicalData(draft.Data)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	now := clockutil.Next(s.clock, current.ModifiedAt)
-	value := Attachment{
+	value := collection.Attachment{
 		RootID:       ref.RootID,
 		CollectionID: ref.CollectionID,
 		SourceID:     draft.SourceID,
@@ -362,7 +363,7 @@ func (s *Service) Attach(
 		ModifiedAt:   now,
 	}
 	if err := value.Validate(); err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	updated, err := s.repository.Attach(
 		ctx,
@@ -370,45 +371,45 @@ func (s *Service) Attach(
 		expectedCollectionRevision,
 	)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	return updated.Clone(), value.Clone(), nil
 }
 
 func (s *Service) UpdateAttachment(
 	ctx context.Context,
-	ref CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
-	update AttachmentUpdate,
-) (Collection, Attachment, error) {
+	update collection.AttachmentUpdate,
+) (collection.Collection, collection.Attachment, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	currentCollection, err := s.repository.Get(ctx, ref)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	current, err := s.repository.GetAttachment(ctx, ref, sourceID)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	if currentCollection.Revision != update.ExpectedCollectionRevision ||
 		current.Revision != update.ExpectedAttachmentRevision {
-		return Collection{}, Attachment{}, basespec.ErrConflict
+		return collection.Collection{}, collection.Attachment{}, basespec.ErrConflict
 	}
 	sourceValue, err := s.sources.Get(ctx, ref.RootID, sourceID)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	if update.Enabled && !sourceValue.Enabled {
-		return Collection{}, Attachment{}, fmt.Errorf(
+		return collection.Collection{}, collection.Attachment{}, fmt.Errorf(
 			"%w: enabled attachment cannot use disabled source",
 			basespec.ErrInvalid,
 		)
 	}
 	data, err := canonicalData(update.Data)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	next := current
 	next.Role = update.Role
@@ -426,7 +427,7 @@ func (s *Service) UpdateAttachment(
 	}
 	next.ModifiedAt = clockutil.Next(s.clock, previous)
 	if err := next.Validate(); err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	updated, err := s.repository.UpdateAttachment(
 		ctx,
@@ -435,27 +436,27 @@ func (s *Service) UpdateAttachment(
 		update.ExpectedAttachmentRevision,
 	)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	return updated.Clone(), next.Clone(), nil
 }
 
 func (s *Service) Detach(
 	ctx context.Context,
-	ref CollectionRef,
+	ref collection.CollectionRef,
 	sourceID basespec.SourceID,
 	expectedCollectionRevision uint64,
 	expectedAttachmentRevision uint64,
-) (Collection, error) {
+) (collection.Collection, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
-		return Collection{}, err
+		return collection.Collection{}, err
 	}
 	if current.Revision != expectedCollectionRevision {
-		return Collection{}, basespec.ErrConflict
+		return collection.Collection{}, basespec.ErrConflict
 	}
 	return s.repository.Detach(
 		ctx,
@@ -469,19 +470,19 @@ func (s *Service) Detach(
 
 func (s *Service) ReplaceAttachment(
 	ctx context.Context,
-	ref CollectionRef,
-	replacement AttachmentReplacement,
-) (Collection, Attachment, error) {
+	ref collection.CollectionRef,
+	replacement collection.AttachmentReplacement,
+) (collection.Collection, collection.Attachment, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	if replacement.ExpectedCollectionRevision == 0 ||
 		current.Revision != replacement.ExpectedCollectionRevision {
-		return Collection{}, Attachment{}, basespec.ErrConflict
+		return collection.Collection{}, collection.Attachment{}, basespec.ErrConflict
 	}
 	sourceValue, err := s.sources.Get(
 		ctx,
@@ -489,20 +490,20 @@ func (s *Service) ReplaceAttachment(
 		replacement.Replacement.SourceID,
 	)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	if replacement.Replacement.Enabled && !sourceValue.Enabled {
-		return Collection{}, Attachment{}, fmt.Errorf(
+		return collection.Collection{}, collection.Attachment{}, fmt.Errorf(
 			"%w: enabled replacement cannot use disabled source",
 			basespec.ErrInvalid,
 		)
 	}
 	data, err := canonicalData(replacement.Replacement.Data)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	now := clockutil.Next(s.clock, current.ModifiedAt)
-	value := Attachment{
+	value := collection.Attachment{
 		RootID:       ref.RootID,
 		CollectionID: ref.CollectionID,
 		SourceID:     replacement.Replacement.SourceID,
@@ -514,7 +515,7 @@ func (s *Service) ReplaceAttachment(
 		ModifiedAt:   now,
 	}
 	if err := value.Validate(); err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	updated, err := s.repository.ReplaceAttachment(
 		ctx,
@@ -525,7 +526,7 @@ func (s *Service) ReplaceAttachment(
 		replacement.ExpectedCollectionRevision,
 	)
 	if err != nil {
-		return Collection{}, Attachment{}, err
+		return collection.Collection{}, collection.Attachment{}, err
 	}
 	return updated.Clone(), value.Clone(), nil
 }
@@ -541,8 +542,8 @@ func canonicalData(raw json.RawMessage) (json.RawMessage, error) {
 	return json.RawMessage(value), nil
 }
 
-func cloneAttachments(values []Attachment) []Attachment {
-	output := make([]Attachment, len(values))
+func cloneAttachments(values []collection.Attachment) []collection.Attachment {
+	output := make([]collection.Attachment, len(values))
 	for index, value := range values {
 		output[index] = value.Clone()
 	}

@@ -1,33 +1,34 @@
-package collection
+package collectionimpl
 
 import (
 	"context"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 )
 
 type Reader interface {
 	Get(
 		ctx context.Context,
-		ref CollectionRef,
-	) (Collection, error)
+		ref collection.CollectionRef,
+	) (collection.Collection, error)
 
 	ListByRoot(
 		ctx context.Context,
 		rootID basespec.RootID,
-	) ([]Collection, error)
+	) ([]collection.Collection, error)
 
 	GetAttachment(
 		ctx context.Context,
-		ref CollectionRef,
+		ref collection.CollectionRef,
 		sourceID basespec.SourceID,
-	) (Attachment, error)
+	) (collection.Attachment, error)
 
 	ListAttachments(
 		ctx context.Context,
-		ref CollectionRef,
-	) ([]Attachment, error)
+		ref collection.CollectionRef,
+	) ([]collection.Attachment, error)
 }
 
 // RetiredReader is intentionally separate from Reader. Ordinary consumers
@@ -36,8 +37,8 @@ type Reader interface {
 type RetiredReader interface {
 	GetRetired(
 		ctx context.Context,
-		ref CollectionRef,
-	) (Collection, error)
+		ref collection.CollectionRef,
+	) (collection.Collection, error)
 }
 
 type Repository interface {
@@ -46,56 +47,56 @@ type Repository interface {
 
 	Create(
 		ctx context.Context,
-		value Collection,
-		attachments []Attachment,
+		value collection.Collection,
+		attachments []collection.Attachment,
 	) error
 
 	Update(
 		ctx context.Context,
-		value Collection,
+		value collection.Collection,
 		expectedRevision uint64,
 	) error
 
 	Retire(
 		ctx context.Context,
-		value Collection,
+		value collection.Collection,
 		expectedRevision uint64,
 	) error
 
 	Purge(
 		ctx context.Context,
-		ref CollectionRef,
+		ref collection.CollectionRef,
 		expectedRevision uint64,
 	) error
 
 	Attach(
 		ctx context.Context,
-		value Attachment,
+		value collection.Attachment,
 		expectedCollectionRevision uint64,
-	) (Collection, error)
+	) (collection.Collection, error)
 
 	UpdateAttachment(
 		ctx context.Context,
-		value Attachment,
+		value collection.Attachment,
 		expectedCollectionRevision uint64,
 		expectedAttachmentRevision uint64,
-	) (Collection, error)
+	) (collection.Collection, error)
 
 	Detach(
 		ctx context.Context,
-		ref CollectionRef,
+		ref collection.CollectionRef,
 		sourceID basespec.SourceID,
 		expectedCollectionRevision uint64,
 		expectedAttachmentRevision uint64,
 		modifiedAt time.Time,
-	) (Collection, error)
+	) (collection.Collection, error)
 
 	ReplaceAttachment(
 		ctx context.Context,
-		ref CollectionRef,
+		ref collection.CollectionRef,
 		previousSourceID basespec.SourceID,
 		expectedPreviousRevision uint64,
-		replacement Attachment,
+		replacement collection.Attachment,
 		expectedCollectionRevision uint64,
-	) (Collection, error)
+	) (collection.Collection, error)
 }

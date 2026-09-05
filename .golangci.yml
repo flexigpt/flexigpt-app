@@ -427,6 +427,10 @@ linters:
           alias: assets
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact
           alias: artifactimpl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection
+          alias: collectionimpl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/root
+          alias: rootimpl
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/api
           alias: artifactAPI
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts

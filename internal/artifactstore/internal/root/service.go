@@ -1,4 +1,4 @@
-package root
+package rootimpl
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -36,10 +37,10 @@ func NewService(
 
 func (s *Service) Create(
 	ctx context.Context,
-	draft RootDraft,
-) (Root, error) {
+	draft root.RootDraft,
+) (root.Root, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, draft.ID); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	return s.create(ctx, draft)
 }
@@ -48,20 +49,20 @@ func (s *Service) Create(
 // installer. Artifact Store does not assign any feature meaning to the Root.
 func (s *Service) EnsureSystem(
 	ctx context.Context,
-	draft RootDraft,
-) (Root, error) {
+	draft root.RootDraft,
+) (root.Root, error) {
 	if err := basespec.ValidateRootID(draft.ID); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	if s.policy == nil || !s.policy.IsProtectedRoot(draft.ID) {
-		return Root{}, fmt.Errorf(
+		return root.Root{}, fmt.Errorf(
 			"%w: Root %q is not declared as protected application topology",
 			basespec.ErrProtected,
 			draft.ID,
 		)
 	}
 	if err := protection.RequirePrivilegedInstaller(ctx); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	return s.create(ctx, draft)
 }
@@ -69,37 +70,37 @@ func (s *Service) EnsureSystem(
 func (s *Service) Get(
 	ctx context.Context,
 	id basespec.RootID,
-) (Root, error) {
+) (root.Root, error) {
 	if err := basespec.ValidateRootID(id); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	return s.repository.Get(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context) ([]Root, error) {
+func (s *Service) List(ctx context.Context) ([]root.Root, error) {
 	return s.repository.List(ctx)
 }
 
 func (s *Service) Update(
 	ctx context.Context,
 	id basespec.RootID,
-	update RootUpdate,
-) (Root, error) {
+	update root.RootUpdate,
+) (root.Root, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, id); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	if update.ExpectedRevision == 0 {
-		return Root{}, fmt.Errorf(
+		return root.Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
 			basespec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	if current.Revision != update.ExpectedRevision {
-		return Root{}, fmt.Errorf(
+		return root.Root{}, fmt.Errorf(
 			"%w: root %q changed since it was read",
 			basespec.ErrConflict,
 			id,
@@ -116,10 +117,10 @@ func (s *Service) Update(
 	next.Revision++
 	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	if err := s.repository.Update(ctx, next, update.ExpectedRevision); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	return next, nil
 }
@@ -128,25 +129,25 @@ func (s *Service) Retire(
 	ctx context.Context,
 	id basespec.RootID,
 	expectedRevision uint64,
-) (Root, error) {
+) (root.Root, error) {
 	if err := basespec.ValidateRootID(id); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	if err := protection.RequireRootDeletion(ctx, s.policy, id); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	if expectedRevision == 0 {
-		return Root{}, fmt.Errorf(
+		return root.Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
 			basespec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	if current.Revision != expectedRevision {
-		return Root{}, fmt.Errorf(
+		return root.Root{}, fmt.Errorf(
 			"%w: root %q changed since it was read",
 			basespec.ErrConflict,
 			id,
@@ -158,10 +159,10 @@ func (s *Service) Retire(
 	next.ModifiedAt = modifiedAt
 	next.Revision++
 	if err := next.Validate(); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	if err := s.repository.Retire(ctx, next, expectedRevision); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	return next, nil
 }
@@ -188,13 +189,13 @@ func (s *Service) Purge(
 
 func (s *Service) create(
 	ctx context.Context,
-	draft RootDraft,
-) (Root, error) {
+	draft root.RootDraft,
+) (root.Root, error) {
 	if err := basespec.ValidateRootID(draft.ID); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	now := clockutil.NowUTC(s.clock)
-	value := Root{
+	value := root.Root{
 		ID:          draft.ID,
 		StorageKey:  draft.StorageKey,
 		DisplayName: draft.DisplayName,
@@ -204,24 +205,24 @@ func (s *Service) create(
 		ModifiedAt:  now,
 	}
 	if err := value.Validate(); err != nil {
-		return Root{}, err
+		return root.Root{}, err
 	}
 	createErr := s.repository.Create(ctx, value)
 	if createErr == nil {
 		return value, nil
 	}
 	if !errors.Is(createErr, basespec.ErrConflict) {
-		return Root{}, createErr
+		return root.Root{}, createErr
 	}
 
 	existing, err := s.repository.Get(ctx, draft.ID)
 	if err != nil {
-		return Root{}, createErr
+		return root.Root{}, createErr
 	}
 	if existing.DisplayName != draft.DisplayName ||
 		existing.StorageKey != draft.StorageKey ||
 		existing.Description != draft.Description {
-		return Root{}, fmt.Errorf(
+		return root.Root{}, fmt.Errorf(
 			"%w: root %q creation intent differs",
 			basespec.ErrConflict,
 			draft.ID,
