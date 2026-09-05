@@ -1,4 +1,4 @@
-package source
+package sourceimpl
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -20,11 +21,11 @@ type Runtime interface {
 		ctx context.Context,
 		rootID basespec.RootID,
 		id basespec.SourceID,
-	) (Source, error)
+	) (source.Source, error)
 
 	Open(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 	) (Snapshot, error)
 }
 
@@ -36,7 +37,7 @@ type Runtime interface {
 type LocalPathRuntime interface {
 	ResolveLocalPath(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 		locator basespec.Locator,
 	) (string, error)
 
@@ -83,7 +84,7 @@ func NewRuntime(
 func ReadSnapshotEntry(
 	ctx context.Context,
 	snapshot Snapshot,
-	entry Entry,
+	entry source.Entry,
 	maximumBytes int64,
 ) ([]byte, error) {
 	if ctx == nil {
@@ -170,7 +171,7 @@ func ReadSnapshotEntry(
 func ReadVerifiedSnapshotEntry(
 	ctx context.Context,
 	runtime Runtime,
-	value Source,
+	value source.Source,
 	locator basespec.Locator,
 	expectedGeneration string,
 	maximumBytes int64,
@@ -247,7 +248,7 @@ func ReadVerifiedSnapshotEntry(
 func VerifySnapshotContentDigest(
 	ctx context.Context,
 	runtime Runtime,
-	value Source,
+	value source.Source,
 	locator basespec.Locator,
 	expectedGeneration string,
 	expectedDigest cryptoutil.Digest,
@@ -312,31 +313,31 @@ func (r *runtime) Get(
 	ctx context.Context,
 	rootID basespec.RootID,
 	id basespec.SourceID,
-) (Source, error) {
+) (source.Source, error) {
 	if r == nil || r.reader == nil {
-		return Source{}, basespec.ErrClosed
+		return source.Source{}, basespec.ErrClosed
 	}
 	if ctx == nil {
-		return Source{}, fmt.Errorf(
+		return source.Source{}, fmt.Errorf(
 			"%w: source runtime context is nil",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return Source{}, err
+		return source.Source{}, err
 	}
 	if err := basespec.ValidateRootID(rootID); err != nil {
-		return Source{}, err
+		return source.Source{}, err
 	}
 	if err := basespec.ValidateSourceID(id); err != nil {
-		return Source{}, err
+		return source.Source{}, err
 	}
 	value, err := r.reader.Get(ctx, rootID, id)
 	if err != nil {
-		return Source{}, err
+		return source.Source{}, err
 	}
 	if value.ID != id {
-		return Source{}, fmt.Errorf(
+		return source.Source{}, fmt.Errorf(
 			"%w: source reader returned %q for requested source %q",
 			basespec.ErrInvalid,
 			value.ID,
@@ -344,7 +345,7 @@ func (r *runtime) Get(
 		)
 	}
 	if value.RootID != rootID {
-		return Source{}, fmt.Errorf(
+		return source.Source{}, fmt.Errorf(
 			"%w: source reader returned root %q for requested root %q",
 			basespec.ErrInvalid,
 			value.RootID,
@@ -352,14 +353,14 @@ func (r *runtime) Get(
 		)
 	}
 	if err := value.Validate(); err != nil {
-		return Source{}, fmt.Errorf("invalid source returned by runtime reader: %w", err)
+		return source.Source{}, fmt.Errorf("invalid source returned by runtime reader: %w", err)
 	}
 	return value.Clone(), nil
 }
 
 func (r *runtime) Open(
 	ctx context.Context,
-	value Source,
+	value source.Source,
 ) (Snapshot, error) {
 	if r == nil || r.opener == nil {
 		return nil, basespec.ErrClosed
@@ -394,7 +395,7 @@ func (r *runtime) Open(
 // become path-backed implicitly.
 func (r *runtime) ResolveLocalPath(
 	ctx context.Context,
-	value Source,
+	value source.Source,
 	locator basespec.Locator,
 ) (string, error) {
 	if ctx == nil {

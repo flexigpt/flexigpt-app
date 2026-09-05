@@ -11,8 +11,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
+	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -26,7 +26,7 @@ func (s *Store) Publisher() *Publisher {
 
 func (p *Publisher) Publish(
 	ctx context.Context,
-	publication refresh.Publication,
+	publication refreshimpl.Publication,
 ) (catalog.Snapshot, error) {
 	if err := publication.Validate(); err != nil {
 		return catalog.Snapshot{}, err

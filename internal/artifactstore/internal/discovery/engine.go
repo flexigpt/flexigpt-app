@@ -12,6 +12,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -66,7 +67,7 @@ func (e *Engine) Discover(
 	collectionID basespec.CollectionID,
 	sourceID basespec.SourceID,
 	sourceKind basespec.SourceKind,
-	snapshot source.Snapshot,
+	snapshot sourceimpl.Snapshot,
 	plan SourcePlan,
 	previous []catalog.Occurrence,
 ) (Result, error) {
@@ -259,7 +260,7 @@ func (e *Engine) Discover(
 			)
 		}
 
-		content, err := source.ReadSnapshotEntry(
+		content, err := sourceimpl.ReadSnapshotEntry(
 			ctx,
 			snapshot,
 			entry,
@@ -746,7 +747,7 @@ func validateDecodedDiagnostics(
 
 func collectCandidates(
 	ctx context.Context,
-	snapshot source.Snapshot,
+	snapshot sourceimpl.Snapshot,
 	plan SourcePlan,
 ) ([]source.Entry, error) {
 	found := make(map[basespec.Locator]source.Entry)
@@ -866,7 +867,7 @@ func collectCandidates(
 
 func statEntry(
 	ctx context.Context,
-	snapshot source.Snapshot,
+	snapshot sourceimpl.Snapshot,
 	locator basespec.Locator,
 ) (source.Entry, error) {
 	entry, err := snapshot.Stat(ctx, locator)
@@ -893,7 +894,7 @@ func statEntry(
 
 func readDirectoryEntries(
 	ctx context.Context,
-	snapshot source.Snapshot,
+	snapshot sourceimpl.Snapshot,
 	directory basespec.Locator,
 ) ([]source.Entry, error) {
 	values, err := snapshot.ReadDir(ctx, directory)

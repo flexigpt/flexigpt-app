@@ -1,4 +1,4 @@
-package source
+package sourceimpl
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -112,7 +113,7 @@ func (s *VerificationSession) Close(ctx context.Context) error {
 func ResolveVerifiedLocalPath(
 	ctx context.Context,
 	runtime Runtime,
-	value Source,
+	value source.Source,
 	verifiedLocator basespec.Locator,
 	localLocator basespec.Locator,
 	expectedGeneration string,
@@ -195,7 +196,7 @@ func ResolveVerifiedLocalPath(
 func (s *VerificationSession) verify(
 	ctx context.Context,
 	runtime Runtime,
-	value Source,
+	value source.Source,
 	locator basespec.Locator,
 	expectedGeneration string,
 	expectedDigest cryptoutil.Digest,

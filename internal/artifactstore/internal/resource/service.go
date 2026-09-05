@@ -10,22 +10,28 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	collectionimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source"
 )
+
+type catalogReader interface {
+	CurrentCatalog(
+		ctx context.Context,
+		ref collection.CollectionRef,
+	) (catalog.Snapshot, error)
+}
 
 type Service struct {
 	artifacts   artifactimpl.Reader
 	collections collectionimpl.Reader
-	catalogs    refresh.CollectionCatalogReader
-	sources     source.Runtime
+	catalogs    catalogReader
+	sources     sourceimpl.Runtime
 }
 
 func NewService(
 	artifacts artifactimpl.Reader,
 	collections collectionimpl.Reader,
-	catalogs refresh.CollectionCatalogReader,
-	sources source.Runtime,
+	catalogs catalogReader,
+	sources sourceimpl.Runtime,
 ) (*Service, error) {
 	if artifacts == nil ||
 		collections == nil ||
@@ -167,7 +173,7 @@ func (s *Service) ResolveArtifact(
 	}
 
 	if options.VerifySourceContent {
-		if err := source.VerifySnapshotContentDigest(
+		if err := sourceimpl.VerifySnapshotContentDigest(
 			ctx,
 			s.sources,
 			sourceValue,
@@ -232,7 +238,7 @@ func (s *Service) ResolveVerifiedLocalPath(
 		)
 	}
 
-	return source.ResolveVerifiedLocalPath(
+	return sourceimpl.ResolveVerifiedLocalPath(
 		ctx,
 		s.sources,
 		sourceValue,
@@ -294,7 +300,7 @@ func (s *Service) ReadCollectionEntry(
 		)
 	}
 
-	content, digest, err := source.ReadVerifiedSnapshotEntry(
+	content, digest, err := sourceimpl.ReadVerifiedSnapshotEntry(
 		ctx,
 		s.sources,
 		sourceValue,
@@ -346,7 +352,7 @@ func (s *Service) ResolveSourceLocalPath(
 		return "", err
 	}
 
-	localPaths, supported := s.sources.(source.LocalPathRuntime)
+	localPaths, supported := s.sources.(sourceimpl.LocalPathRuntime)
 	if !supported {
 		return "", fmt.Errorf(
 			"%w: Artifact Store Source runtime has no local-path capability",
@@ -372,7 +378,7 @@ func (s *Service) SupportsLocalPath(kind basespec.SourceKind) bool {
 	if s == nil || s.sources == nil {
 		return false
 	}
-	localPaths, supported := s.sources.(source.LocalPathRuntime)
+	localPaths, supported := s.sources.(sourceimpl.LocalPathRuntime)
 	return supported && localPaths.SupportsLocalPath(kind)
 }
 

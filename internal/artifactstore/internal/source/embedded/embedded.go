@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -85,7 +86,7 @@ func (a *Adapter) NormalizeConfig(
 func (a *Adapter) Open(
 	ctx context.Context,
 	value source.Source,
-) (source.Snapshot, error) {
+) (sourceimpl.Snapshot, error) {
 	if value.Kind != basespec.SourceKindEmbeddedDirectory {
 		return nil, fmt.Errorf(
 			"%w: embedded adapter received source kind %q",

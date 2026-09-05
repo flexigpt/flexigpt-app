@@ -1,4 +1,4 @@
-package refresh
+package refreshimpl
 
 import (
 	"context"
@@ -6,20 +6,20 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 type providerPlanningDocumentReader struct {
 	rootID    basespec.RootID
 	attached  map[basespec.SourceID]struct{}
-	runtime   source.Runtime
+	runtime   sourceimpl.Runtime
 	documents providerapi.ExpectedCanonicalizer
 }
 
 func newProviderPlanningDocumentReader(
 	input providerRefreshInput,
-	runtime source.Runtime,
+	runtime sourceimpl.Runtime,
 	documents providerapi.ExpectedCanonicalizer,
 ) providerPlanningDocumentReader {
 	attached := make(
@@ -113,7 +113,7 @@ func (r providerPlanningDocumentReader) ReadCanonicalDocument(
 		)
 	}
 
-	content, err := source.ReadSnapshotEntry(
+	content, err := sourceimpl.ReadSnapshotEntry(
 		ctx,
 		snapshot,
 		entry,

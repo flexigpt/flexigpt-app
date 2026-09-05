@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	catalogimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/catalog"
 	collectionimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -21,7 +22,7 @@ import (
 type Service struct {
 	repository  Repository
 	collections collectionimpl.Reader
-	catalogs    catalog.Reader
+	catalogs    catalogimpl.Reader
 	clock       clockutil.Clock
 	policy      protection.RootPolicy
 }
@@ -29,7 +30,7 @@ type Service struct {
 func NewService(
 	repository Repository,
 	collections collectionimpl.Reader,
-	catalogs catalog.Reader,
+	catalogs catalogimpl.Reader,
 	timeClock clockutil.Clock,
 	policy protection.RootPolicy,
 ) (*Service, error) {
@@ -128,7 +129,7 @@ func (s *Service) Adopt(
 	); err != nil {
 		return artifact.Artifact{}, err
 	}
-	snapshot, err := catalog.ReadCurrent(ctx, s.catalogs, request.Collection)
+	snapshot, err := catalogimpl.ReadCurrent(ctx, s.catalogs, request.Collection)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -258,7 +259,7 @@ func (s *Service) Pin(
 		expectedCatalogRevision uint64
 	)
 
-	snapshot, snapshotErr := catalog.ReadCurrent(ctx, s.catalogs, request.Collection)
+	snapshot, snapshotErr := catalogimpl.ReadCurrent(ctx, s.catalogs, request.Collection)
 	switch {
 	case snapshotErr == nil:
 		expectedCatalogRevision = snapshot.Revision

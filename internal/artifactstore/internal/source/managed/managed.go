@@ -18,6 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/mapstoreio"
+	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -539,7 +540,7 @@ func (*Adapter) NormalizeConfig(
 func (a *Adapter) Open(
 	ctx context.Context,
 	value source.Source,
-) (source.Snapshot, error) {
+) (sourceimpl.Snapshot, error) {
 	if err := a.validateSource(ctx, value); err != nil {
 		return nil, err
 	}

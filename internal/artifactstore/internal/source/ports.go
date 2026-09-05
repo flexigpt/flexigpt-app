@@ -1,4 +1,4 @@
-package source
+package sourceimpl
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 type Reader interface {
@@ -13,7 +14,7 @@ type Reader interface {
 		ctx context.Context,
 		rootID basespec.RootID,
 		id basespec.SourceID,
-	) (Source, error)
+	) (source.Source, error)
 }
 
 type Repository interface {
@@ -21,23 +22,23 @@ type Repository interface {
 
 	Create(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 	) error
 
 	List(
 		ctx context.Context,
 		rootID basespec.RootID,
-	) ([]Source, error)
+	) ([]source.Source, error)
 
 	Update(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 		expectedRevision uint64,
 	) error
 
 	Retire(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 		expectedRevision uint64,
 	) error
 
@@ -62,12 +63,12 @@ type Snapshot interface {
 	Stat(
 		ctx context.Context,
 		locator basespec.Locator,
-	) (Entry, error)
+	) (source.Entry, error)
 
 	ReadDir(
 		ctx context.Context,
 		locator basespec.Locator,
-	) ([]Entry, error)
+	) ([]source.Entry, error)
 
 	Open(
 		ctx context.Context,
@@ -81,7 +82,7 @@ type Snapshot interface {
 type Opener interface {
 	Open(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 	) (Snapshot, error)
 }
 
@@ -95,7 +96,7 @@ type Opener interface {
 type LocalPathResolver interface {
 	ResolveLocalPath(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 		locator basespec.Locator,
 	) (string, error)
 }
@@ -118,14 +119,14 @@ type LocalPathCapability interface {
 type ManagedPackageWriter interface {
 	PublishPackage(
 		ctx context.Context,
-		value Source,
-		publication ManagedPackagePublication,
+		value source.Source,
+		publication source.ManagedPackagePublication,
 	) (generation string, err error)
 
 	RemovePackage(
 		ctx context.Context,
-		value Source,
-		address ManagedPackageAddress,
+		value source.Source,
+		address source.ManagedPackageAddress,
 		expectedGeneration string,
 	) error
 }
@@ -141,12 +142,12 @@ type ManagedPackageWriter interface {
 type ManagedSourceBootstrapper interface {
 	BootstrapManagedSource(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 	) error
 
 	DiscardBootstrappedManagedSource(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 	) error
 }
 
@@ -173,6 +174,6 @@ type Adapter interface {
 
 	Open(
 		ctx context.Context,
-		value Source,
+		value source.Source,
 	) (Snapshot, error)
 }

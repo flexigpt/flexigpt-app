@@ -1,4 +1,4 @@
-package refresh
+package refreshimpl
 
 import (
 	"context"
@@ -13,9 +13,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
+	catalogimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
@@ -38,37 +40,37 @@ type providerRefreshInput struct {
 func (s *Service) RefreshCollection(
 	ctx context.Context,
 	ref collection.CollectionRef,
-) (Result, error) {
+) (refresh.Result, error) {
 	if s == nil || s.providers == nil || s.artifactIDs == nil {
-		return Result{}, basespec.ErrClosed
+		return refresh.Result{}, basespec.ErrClosed
 	}
 	if ctx == nil {
-		return Result{}, fmt.Errorf(
+		return refresh.Result{}, fmt.Errorf(
 			"%w: collection refresh context is nil",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	if err := ref.Validate(); err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	if err := protection.RequireMutableRoot(
 		ctx,
 		s.policy,
 		ref.RootID,
 	); err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 
 	input, err := s.loadProviderRefreshInput(ctx, ref)
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	plan, err := s.buildProviderPlan(ctx, input)
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 
 	return s.refresh(
@@ -110,50 +112,50 @@ func (s *Service) CurrentCatalog(
 func (s *Service) InspectCollectionCatalog(
 	ctx context.Context,
 	ref collection.CollectionRef,
-) (CatalogInspection, error) {
+) (refresh.CatalogInspection, error) {
 	if s == nil ||
 		s.providers == nil ||
 		s.catalogs == nil ||
 		s.discovery == nil {
-		return CatalogInspection{}, basespec.ErrClosed
+		return refresh.CatalogInspection{}, basespec.ErrClosed
 	}
 	if ctx == nil {
-		return CatalogInspection{}, fmt.Errorf(
+		return refresh.CatalogInspection{}, fmt.Errorf(
 			"%w: collection catalog inspection context is nil",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return CatalogInspection{}, err
+		return refresh.CatalogInspection{}, err
 	}
 	if err := ref.Validate(); err != nil {
-		return CatalogInspection{}, err
+		return refresh.CatalogInspection{}, err
 	}
 
 	input, err := s.loadProviderRefreshInput(ctx, ref)
 	if err != nil {
-		return CatalogInspection{}, err
+		return refresh.CatalogInspection{}, err
 	}
 	plan, err := s.buildProviderPlan(ctx, input)
 	if err != nil {
-		return CatalogInspection{}, err
+		return refresh.CatalogInspection{}, err
 	}
-	snapshot, catalogErr := catalog.ReadCurrent(ctx, s.catalogs, ref)
+	snapshot, catalogErr := catalogimpl.ReadCurrent(ctx, s.catalogs, ref)
 	if catalogErr != nil &&
 		!errors.Is(catalogErr, basespec.ErrCatalogStale) {
-		return CatalogInspection{}, catalogErr
+		return refresh.CatalogInspection{}, catalogErr
 	}
 
 	planFingerprint, err := plan.Fingerprint()
 	if err != nil {
-		return CatalogInspection{}, err
+		return refresh.CatalogInspection{}, err
 	}
 	decoderFingerprint, err := s.discovery.DecoderFingerprint()
 	if err != nil {
-		return CatalogInspection{}, err
+		return refresh.CatalogInspection{}, err
 	}
 
-	return CatalogInspection{
+	return refresh.CatalogInspection{
 		Catalog:         catalog.CloneSnapshot(snapshot),
 		MetadataChanged: errors.Is(catalogErr, basespec.ErrCatalogStale),
 		PlanChanged:     snapshot.PlanFingerprint != planFingerprint,

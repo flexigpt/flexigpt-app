@@ -11,26 +11,41 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
+	catalogimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/catalog"
 	collectionimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
+	managedartifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/managedartifact"
+	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/refresh"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/shareable"
+	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/embedded"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/sqlite"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
+)
+
+var (
+	_ artifactimpl.Repository         = (*sqlite.ArtifactRepository)(nil)
+	_ catalogimpl.Reader              = (*sqlite.CatalogRepository)(nil)
+	_ collectionimpl.Repository       = (*sqlite.CollectionRepository)(nil)
+	_ rootimpl.Repository             = (*sqlite.RootRepository)(nil)
+	_ sourceimpl.Repository           = (*sqlite.SourceRepository)(nil)
+	_ refreshimpl.Publisher           = (*sqlite.Publisher)(nil)
+	_ sourceimpl.Adapter              = (*embedded.Adapter)(nil)
+	_ sourceimpl.Adapter              = (*fsdir.Adapter)(nil)
+	_ sourceimpl.Adapter              = (*managed.Adapter)(nil)
+	_ sourceimpl.ManagedPackageWriter = (*managed.Adapter)(nil)
 )
 
 type Config struct {
 	BaseDirectory     string
 	EmbeddedProviders map[string]fs.FS
-	AdditionalSources []source.Adapter
+	AdditionalSources []sourceimpl.Adapter
 
 	ArtifactProviders []providerapi.Provider
 	// ArtifactIDProvider is used only for Store-owned automatic adoption.
@@ -48,19 +63,19 @@ type ManagedPackageResult struct {
 
 type Components struct {
 	Roots            *rootimpl.Service
-	Sources          *source.Service
+	Sources          *sourceimpl.Service
 	Collections      *collectionimpl.Service
 	Artifacts        *artifactimpl.Service
-	Refresh          *refresh.Service
+	Refresh          *refreshimpl.Service
 	ShareableSchemas *shareable.Registry
 
-	ManagedArtifacts *managedartifact.Service
+	ManagedArtifacts *managedartifactimpl.Service
 	CollectionReader collectionimpl.Reader
 	ArtifactReader   artifactimpl.Reader
-	SourceRuntime    source.Runtime
+	SourceRuntime    sourceimpl.Runtime
 
 	metadata           *sqlite.Store
-	managedSources     *source.Registry
+	managedSources     *sourceimpl.Registry
 	rootMutationPolicy protection.RootPolicy
 }
 
@@ -150,7 +165,7 @@ func Open(
 		return nil, err
 	}
 
-	sourceAdapters := make([]source.Adapter, 0, 3+len(config.AdditionalSources))
+	sourceAdapters := make([]sourceimpl.Adapter, 0, 3+len(config.AdditionalSources))
 	sourceAdapters = append(
 		sourceAdapters,
 		filesystemAdapter,
@@ -159,7 +174,7 @@ func Open(
 	)
 	sourceAdapters = append(sourceAdapters, config.AdditionalSources...)
 
-	sourceRegistry, err := source.NewRegistry(sourceAdapters...)
+	sourceRegistry, err := sourceimpl.NewRegistry(sourceAdapters...)
 	if err != nil {
 
 		_ = metadata.Close()
@@ -177,7 +192,7 @@ func Open(
 	collectionRepository := metadata.Collections()
 	catalogRepository := metadata.Catalogs()
 	artifactRepository := metadata.Artifacts()
-	sourceRuntime, err := source.NewRuntime(
+	sourceRuntime, err := sourceimpl.NewRuntime(
 		sourceRepository,
 		sourceRegistry,
 	)
@@ -187,7 +202,7 @@ func Open(
 		return nil, err
 	}
 
-	sourceService, err := source.NewService(
+	sourceService, err := sourceimpl.NewService(
 		sourceRepository,
 		sourceRegistry,
 		rootRepository,
@@ -250,7 +265,7 @@ func Open(
 		return nil, err
 	}
 
-	refreshService, err := refresh.NewService(
+	refreshService, err := refreshimpl.NewService(
 		collectionRepository,
 		catalogRepository,
 		sourceRuntime,
@@ -284,8 +299,8 @@ func Open(
 		managedSources:     sourceRegistry,
 		rootMutationPolicy: config.RootMutationPolicy,
 	}
-	managedArtifacts, err := managedartifact.NewService(
-		managedartifact.Dependencies{
+	managedArtifacts, err := managedartifactimpl.NewService(
+		managedartifactimpl.Dependencies{
 			Artifacts:   artifactService,
 			Collections: collectionRepository,
 			Refresh:     refreshService,
@@ -294,16 +309,16 @@ func Open(
 				ctx context.Context,
 				rootID basespec.RootID,
 				sourceID basespec.SourceID,
-			) (managedartifact.SourceState, error) {
+			) (managedartifactimpl.SourceState, error) {
 				result, err := components.getManagedSourceState(
 					ctx,
 					rootID,
 					sourceID,
 				)
 				if err != nil {
-					return managedartifact.SourceState{}, err
+					return managedartifactimpl.SourceState{}, err
 				}
-				return managedartifact.SourceState{
+				return managedartifactimpl.SourceState{
 					Source:     result.Source,
 					Generation: result.Generation,
 				}, nil
@@ -314,7 +329,7 @@ func Open(
 				sourceID basespec.SourceID,
 				expectedRevision uint64,
 				publication source.ManagedPackagePublication,
-			) (managedartifact.SourceState, error) {
+			) (managedartifactimpl.SourceState, error) {
 				result, err := components.publishManagedPackageForMutableRoot(
 					ctx,
 					rootID,
@@ -323,9 +338,9 @@ func Open(
 					publication,
 				)
 				if err != nil {
-					return managedartifact.SourceState{}, err
+					return managedartifactimpl.SourceState{}, err
 				}
-				return managedartifact.SourceState{
+				return managedartifactimpl.SourceState{
 					Source:     result.Source,
 					Generation: result.Generation,
 				}, nil
@@ -336,7 +351,7 @@ func Open(
 				sourceID basespec.SourceID,
 				expectedRevision uint64,
 				publication source.ManagedPackagePublication,
-			) (managedartifact.SourceState, error) {
+			) (managedartifactimpl.SourceState, error) {
 				result, err := components.publishProtectedManagedPackage(
 					ctx,
 					rootID,
@@ -345,9 +360,9 @@ func Open(
 					publication,
 				)
 				if err != nil {
-					return managedartifact.SourceState{}, err
+					return managedartifactimpl.SourceState{}, err
 				}
-				return managedartifact.SourceState{
+				return managedartifactimpl.SourceState{
 					Source:     result.Source,
 					Generation: result.Generation,
 				}, nil
@@ -738,7 +753,7 @@ func (c *Components) removeManagedPackage(
 
 func managedPackageExists(
 	ctx context.Context,
-	runtime source.Runtime,
+	runtime sourceimpl.Runtime,
 	value source.Source,
 	address source.ManagedPackageAddress,
 ) (bool, error) {
@@ -826,7 +841,7 @@ func (c *Components) managedSource(
 
 func sourceSnapshotGeneration(
 	ctx context.Context,
-	runtime source.Runtime,
+	runtime sourceimpl.Runtime,
 	value source.Source,
 ) (string, error) {
 	snapshot, err := runtime.Open(ctx, value)
@@ -849,7 +864,7 @@ func (c *Components) removeManagedArtifactPackage(
 	expectedRevision uint64,
 	address source.ManagedPackageAddress,
 	expectedGeneration string,
-) (managedartifact.SourceState, error) {
+) (managedartifactimpl.SourceState, error) {
 	result, err := c.removeManagedPackageForMutableRoot(
 		ctx,
 		rootID,
@@ -859,9 +874,9 @@ func (c *Components) removeManagedArtifactPackage(
 		expectedGeneration,
 	)
 	if err != nil {
-		return managedartifact.SourceState{}, err
+		return managedartifactimpl.SourceState{}, err
 	}
-	return managedartifact.SourceState{
+	return managedartifactimpl.SourceState{
 		Source:     result.Source,
 		Generation: result.Generation,
 	}, nil
@@ -874,7 +889,7 @@ func (c *Components) removeProtectedManagedArtifactPackage(
 	expectedRevision uint64,
 	address source.ManagedPackageAddress,
 	expectedGeneration string,
-) (managedartifact.SourceState, error) {
+) (managedartifactimpl.SourceState, error) {
 	result, err := c.removeProtectedManagedPackage(
 		ctx,
 		rootID,
@@ -884,9 +899,9 @@ func (c *Components) removeProtectedManagedArtifactPackage(
 		expectedGeneration,
 	)
 	if err != nil {
-		return managedartifact.SourceState{}, err
+		return managedartifactimpl.SourceState{}, err
 	}
-	return managedartifact.SourceState{
+	return managedartifactimpl.SourceState{
 		Source:     result.Source,
 		Generation: result.Generation,
 	}, nil

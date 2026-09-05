@@ -427,10 +427,18 @@ linters:
           alias: assets
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact
           alias: artifactimpl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/catalog
+          alias: catalogimpl
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection
           alias: collectionimpl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/managedartifact
+          alias: managedartifactimpl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/refresh
+          alias: refreshimpl
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/root
           alias: rootimpl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source
+          alias: sourceimpl
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/api
           alias: artifactAPI
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts

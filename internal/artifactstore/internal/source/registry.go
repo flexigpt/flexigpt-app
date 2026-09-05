@@ -1,4 +1,4 @@
-package source
+package sourceimpl
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 type Registry struct {
@@ -41,7 +42,7 @@ func NewRegistry(adapters ...Adapter) (*Registry, error) {
 
 func (r *Registry) Open(
 	ctx context.Context,
-	value Source,
+	value source.Source,
 ) (Snapshot, error) {
 	if ctx == nil {
 		return nil, basespec.ErrInvalid
@@ -103,7 +104,7 @@ func (r *Registry) SupportsManagedPackages(
 // continue to expose Summary values only and never reveal source paths.
 func (r *Registry) ResolveLocalPath(
 	ctx context.Context,
-	value Source,
+	value source.Source,
 	locator basespec.Locator,
 ) (string, error) {
 	if ctx == nil {
@@ -147,8 +148,8 @@ func (r *Registry) ResolveLocalPath(
 
 func (r *Registry) PublishPackage(
 	ctx context.Context,
-	value Source,
-	publication ManagedPackagePublication,
+	value source.Source,
+	publication source.ManagedPackagePublication,
 ) (string, error) {
 	if ctx == nil {
 		return "", fmt.Errorf(
@@ -162,7 +163,7 @@ func (r *Registry) PublishPackage(
 	if err := value.Validate(); err != nil {
 		return "", err
 	}
-	normalized, err := NormalizeManagedPackagePublication(publication)
+	normalized, err := source.NormalizeManagedPackagePublication(publication)
 	if err != nil {
 		return "", err
 	}
@@ -203,8 +204,8 @@ func (r *Registry) PublishPackage(
 
 func (r *Registry) RemovePackage(
 	ctx context.Context,
-	value Source,
-	address ManagedPackageAddress,
+	value source.Source,
+	address source.ManagedPackageAddress,
 	expectedGeneration string,
 ) error {
 	if ctx == nil {

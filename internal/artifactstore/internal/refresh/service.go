@@ -1,4 +1,4 @@
-package refresh
+package refreshimpl
 
 import (
 	"context"
@@ -12,18 +12,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
+	catalogimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/providerregistry"
+	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
 type Service struct {
 	collections CollectionReader
-	catalogs    catalog.Reader
-	sources     source.Runtime
+	catalogs    catalogimpl.Reader
+	sources     sourceimpl.Runtime
 	artifacts   ArtifactReader
 	discovery   *discovery.Engine
 	reconciler  *artifactimpl.Reconciler
@@ -37,8 +39,8 @@ type Service struct {
 
 func NewService(
 	collections CollectionReader,
-	catalogs catalog.Reader,
-	sources source.Runtime,
+	catalogs catalogimpl.Reader,
+	sources sourceimpl.Runtime,
 	artifacts ArtifactReader,
 	discoveryEngine *discovery.Engine,
 	reconciler *artifactimpl.Reconciler,
@@ -89,45 +91,48 @@ func (s *Service) refresh(
 	ref collection.CollectionRef,
 	plan discovery.Plan,
 	policy artifactimpl.Policy,
-) (Result, error) {
+) (refresh.Result, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	if ctx == nil {
-		return Result{}, fmt.Errorf("%w: refresh context is nil", basespec.ErrInvalid)
+		return refresh.Result{}, fmt.Errorf("%w: refresh context is nil", basespec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	if policy == nil {
-		return Result{}, fmt.Errorf(
+		return refresh.Result{}, fmt.Errorf(
 			"%w: artifact adoption policy is required",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := ref.Validate(); err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	if err := plan.Validate(); err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 
 	collectionValue, err := s.collections.Get(ctx, ref)
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	if err := collectionValue.Validate(); err != nil {
-		return Result{}, fmt.Errorf(
+		return refresh.Result{}, fmt.Errorf(
 			"%w: collection reader returned an invalid collection: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
 	if collectionValue.Ref() != ref {
-		return Result{}, fmt.Errorf("%w: collection reader returned another collection", basespec.ErrInvalid)
+		return refresh.Result{}, fmt.Errorf(
+			"%w: collection reader returned another collection",
+			basespec.ErrInvalid,
+		)
 	}
 	if !collectionValue.Enabled {
-		return Result{}, fmt.Errorf(
+		return refresh.Result{}, fmt.Errorf(
 			"%w: collection %q is disabled",
 			basespec.ErrConflict,
 			ref.CollectionID,
@@ -136,17 +141,17 @@ func (s *Service) refresh(
 
 	attachments, err := s.collections.ListAttachments(ctx, ref)
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 
 	plansBySource := plan.BySource()
 
 	var previous catalog.Snapshot
-	previous, err = catalog.ReadCurrent(ctx, s.catalogs, ref)
+	previous, err = catalogimpl.ReadCurrent(ctx, s.catalogs, ref)
 	hasPrevious := err == nil || errors.Is(err, basespec.ErrCatalogStale)
 	if !hasPrevious &&
 		!errors.Is(err, basespec.ErrCatalogUnavailable) {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 
 	previousBySource := make(
@@ -164,7 +169,7 @@ func (s *Service) refresh(
 	sourceGenerations := make(map[basespec.SourceID]string)
 	finalOccurrences := make([]catalog.Occurrence, 0)
 	allDiagnostics := make([]providerapi.Diagnostic, 0)
-	snapshots := make([]source.Snapshot, 0)
+	snapshots := make([]sourceimpl.Snapshot, 0)
 	candidates := 0
 
 	defer func() {
@@ -178,7 +183,7 @@ func (s *Service) refresh(
 
 	for _, attachment := range attachments {
 		if err := attachment.Validate(); err != nil {
-			return Result{}, fmt.Errorf(
+			return refresh.Result{}, fmt.Errorf(
 				"%w: collection reader returned an invalid attachment: %w",
 				basespec.ErrInvalid,
 				err,
@@ -186,11 +191,14 @@ func (s *Service) refresh(
 		}
 		if attachment.RootID != ref.RootID ||
 			attachment.CollectionID != ref.CollectionID {
-			return Result{}, fmt.Errorf("%w: attachment belongs to another collection", basespec.ErrInvalid)
+			return refresh.Result{}, fmt.Errorf(
+				"%w: attachment belongs to another collection",
+				basespec.ErrInvalid,
+			)
 		}
 
 		if _, duplicate := expectedAttachmentRevisions[attachment.SourceID]; duplicate {
-			return Result{}, fmt.Errorf(
+			return refresh.Result{}, fmt.Errorf(
 				"%w: collection reader returned duplicate attachment source %q",
 				basespec.ErrInvalid,
 				attachment.SourceID,
@@ -200,18 +208,18 @@ func (s *Service) refresh(
 
 		sourceValue, err := s.sources.Get(ctx, ref.RootID, attachment.SourceID)
 		if err != nil {
-			return Result{}, err
+			return refresh.Result{}, err
 		}
 		if sourceValue.ID != attachment.SourceID ||
 			sourceValue.RootID != ref.RootID {
-			return Result{}, fmt.Errorf(
+			return refresh.Result{}, fmt.Errorf(
 				"%w: source runtime returned a source that does not match attachment %q",
 				basespec.ErrInvalid,
 				attachment.SourceID,
 			)
 		}
 		if err := sourceValue.Validate(); err != nil {
-			return Result{}, fmt.Errorf(
+			return refresh.Result{}, fmt.Errorf(
 				"%w: source runtime returned an invalid source: %w",
 				basespec.ErrInvalid,
 				err,
@@ -220,7 +228,7 @@ func (s *Service) refresh(
 		if _, planned := plansBySource[sourceValue.ID]; planned &&
 
 			(!attachment.Enabled || !sourceValue.Enabled) {
-			return Result{}, fmt.Errorf(
+			return refresh.Result{}, fmt.Errorf(
 				"%w: discovery plan includes disabled source %q",
 				basespec.ErrInvalid,
 				sourceValue.ID,
@@ -234,7 +242,7 @@ func (s *Service) refresh(
 		}
 		sourcePlan, exists := plansBySource[sourceValue.ID]
 		if !exists {
-			return Result{}, fmt.Errorf(
+			return refresh.Result{}, fmt.Errorf(
 				"%w: enabled source %q has no discovery plan",
 				basespec.ErrInvalid,
 				sourceValue.ID,
@@ -243,7 +251,7 @@ func (s *Service) refresh(
 
 		snapshot, err := s.sources.Open(ctx, sourceValue)
 		if err != nil {
-			return Result{}, err
+			return refresh.Result{}, err
 		}
 		snapshots = append(snapshots, snapshot)
 		sourceGenerations[sourceValue.ID] = snapshot.Generation()
@@ -259,7 +267,7 @@ func (s *Service) refresh(
 			previousBySource[sourceValue.ID],
 		)
 		if err != nil {
-			return Result{}, err
+			return refresh.Result{}, err
 		}
 
 		finalOccurrences = append(
@@ -275,7 +283,7 @@ func (s *Service) refresh(
 
 	for sourceID := range plansBySource {
 		if _, exists := expectedSourceRevisions[sourceID]; !exists {
-			return Result{}, fmt.Errorf(
+			return refresh.Result{}, fmt.Errorf(
 				"%w: discovery plan includes unattached source %q",
 				basespec.ErrInvalid,
 				sourceID,
@@ -287,11 +295,11 @@ func (s *Service) refresh(
 
 	existingArtifacts, err := s.artifacts.ListByCollection(ctx, ref)
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	suppressions, err := s.artifacts.ListSuppressions(ctx, ref)
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 
 	reconciliation, err := s.reconciler.Reconcile(
@@ -303,7 +311,7 @@ func (s *Service) refresh(
 		policy,
 	)
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 
 	allDiagnostics = providerapi.AppendDiagnostics(
@@ -316,23 +324,23 @@ func (s *Service) refresh(
 	// unavoidable, but this closes the current large confirmation gap.
 	for _, snapshot := range snapshots {
 		if err := snapshot.Confirm(ctx); err != nil {
-			return Result{}, err
+			return refresh.Result{}, err
 		}
 	}
 
 	closeErr := closeRefreshSnapshots(snapshots)
 	snapshots = nil
 	if closeErr != nil {
-		return Result{}, closeErr
+		return refresh.Result{}, closeErr
 	}
 
 	planFingerprint, err := plan.Fingerprint()
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	decoderFingerprint, err := s.discovery.DecoderFingerprint()
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 
 	publication := Publication{
@@ -352,10 +360,10 @@ func (s *Service) refresh(
 	}
 	published, err := s.publisher.Publish(ctx, publication)
 	if err != nil {
-		return Result{}, err
+		return refresh.Result{}, err
 	}
 	if err := published.Validate(); err != nil {
-		return Result{}, fmt.Errorf(
+		return refresh.Result{}, fmt.Errorf(
 			"%w: publisher returned an invalid catalog: %w",
 			basespec.ErrInvalid,
 			err,
@@ -380,20 +388,20 @@ func (s *Service) refresh(
 		expected.Occurrences[index] = catalog.CloneOccurrence(occurrence)
 	}
 	if err := expected.Validate(); err != nil {
-		return Result{}, fmt.Errorf(
+		return refresh.Result{}, fmt.Errorf(
 			"%w: refresh service produced an invalid expected catalog: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
 	if !catalog.EqualSnapshot(published, expected) {
-		return Result{}, fmt.Errorf(
+		return refresh.Result{}, fmt.Errorf(
 			"%w: publisher returned a catalog that does not exactly match the publication",
 			basespec.ErrInvalid,
 		)
 	}
 
-	result := Result{
+	result := refresh.Result{
 		Catalog:     catalog.CloneSnapshot(published),
 		Diagnostics: providerapi.CloneDiagnostics(allDiagnostics),
 		Candidates:  candidates,
@@ -407,7 +415,7 @@ func (s *Service) refresh(
 	return result, nil
 }
 
-func closeRefreshSnapshots(values []source.Snapshot) error {
+func closeRefreshSnapshots(values []sourceimpl.Snapshot) error {
 	var closeErr error
 	for _, snapshot := range values {
 		if snapshot == nil {
