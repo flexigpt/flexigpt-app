@@ -1,6 +1,7 @@
-package artifactstore
+package api
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
@@ -11,6 +12,39 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
+
+// ResourceResolver is the consumer-facing Artifact Store capability for
+// current resource resolution and controlled Source access.
+type ResourceResolver interface {
+	ResolveArtifact(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+		options ResolveOptions,
+	) (ResolvedArtifact, error)
+
+	ResolveVerifiedLocalPath(
+		ctx context.Context,
+		resolved ResolvedArtifact,
+		localLocator basespec.Locator,
+	) (string, error)
+
+	ReadCollectionEntry(
+		ctx context.Context,
+		ref collection.CollectionRef,
+		sourceID basespec.SourceID,
+		locator basespec.Locator,
+		maximumBytes int64,
+	) (VerifiedEntry, error)
+
+	ResolveSourceLocalPath(
+		ctx context.Context,
+		rootID basespec.RootID,
+		sourceID basespec.SourceID,
+		locator basespec.Locator,
+	) (string, error)
+
+	SupportsLocalPath(kind basespec.SourceKind) bool
+}
 
 // ResolveOptions controls Store-owned source verification.
 //
@@ -115,7 +149,7 @@ func (r ResolvedArtifact) Clone() ResolvedArtifact {
 	output.Collection = r.Collection.Clone()
 	output.Definition = r.Definition.Clone()
 	output.Occurrence = catalog.CloneOccurrence(r.Occurrence)
-	output.Source = cloneSourceSummary(r.Source)
+	output.Source = CloneSourceSummary(r.Source)
 	return output
 }
 
@@ -165,7 +199,7 @@ func (e VerifiedEntry) Clone() VerifiedEntry {
 	return output
 }
 
-func cloneSourceSummary(value source.Summary) source.Summary {
+func CloneSourceSummary(value source.Summary) source.Summary {
 	output := value
 	if value.RetiredAt != nil {
 		retiredAt := *value.RetiredAt

@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	artifactAPI "github.com/flexigpt/flexigpt-app/internal/artifactstore/api"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -117,7 +117,7 @@ func (a *API) resolveMCPServer(
 	resolvedResource, err := a.dependencies.Store.ResolveArtifact(
 		ctx,
 		ref,
-		artifactstore.ResolveOptions{
+		artifactAPI.ResolveOptions{
 			VerifySourceContent: verifySource,
 		},
 	)

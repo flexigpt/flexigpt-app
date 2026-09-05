@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	artifactAPI "github.com/flexigpt/flexigpt-app/internal/artifactstore/api"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -28,13 +28,13 @@ type workspaceManager interface {
 }
 
 type Service struct {
-	store      artifactstore.ConsumerAPI
+	store      artifactAPI.ConsumerAPI
 	workspaces workspaceManager
 }
 
 func NewService(
 	workspaces workspaceManager,
-	store artifactstore.ConsumerAPI,
+	store artifactAPI.ConsumerAPI,
 ) (*Service, error) {
 	if store == nil || workspaces == nil {
 		return nil, fmt.Errorf(

@@ -115,7 +115,7 @@ func (r ResolvedArtifact) Clone() ResolvedArtifact {
 	output.Collection = r.Collection.Clone()
 	output.Definition = r.Definition.Clone()
 	output.Occurrence = catalog.CloneOccurrence(r.Occurrence)
-	output.Source = cloneSourceSummary(r.Source)
+	output.Source = CloneSourceSummary(r.Source)
 	return output
 }
 
@@ -165,7 +165,7 @@ func (e VerifiedEntry) Clone() VerifiedEntry {
 	return output
 }
 
-func cloneSourceSummary(input source.Summary) source.Summary {
+func CloneSourceSummary(input source.Summary) source.Summary {
 	output := input
 	if input.RetiredAt != nil {
 		value := *input.RetiredAt

@@ -3,12 +3,12 @@ package bundle
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	artifactAPI "github.com/flexigpt/flexigpt-app/internal/artifactstore/api"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 type Dependencies struct {
-	Store artifactstore.ConsumerAPI
+	Store artifactAPI.ConsumerAPI
 }
 
 func (d Dependencies) Validate() error {

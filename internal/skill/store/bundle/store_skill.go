@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -15,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 
+	artifactAPI "github.com/flexigpt/flexigpt-app/internal/artifactstore/api"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 )
 
@@ -199,7 +199,7 @@ func (a *API) resolvedSkillFromSnapshot(
 	resolved, err := a.dependencies.Store.ResolveArtifact(
 		ctx,
 		record.Ref(),
-		artifactstore.ResolveOptions{},
+		artifactAPI.ResolveOptions{},
 	)
 	if err != nil {
 		return ResolvedSkill{}, err

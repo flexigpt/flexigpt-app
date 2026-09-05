@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	artifactAPI "github.com/flexigpt/flexigpt-app/internal/artifactstore/api"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
@@ -31,7 +32,7 @@ func InitMCPWrappers(
 	storeWrapper *MCPStoreWrapper,
 	runtimeWrapper *MCPRuntimeWrapper,
 	aggregateWrapper *MCPAggregateWrapper,
-	store *artifactstore.API,
+	store artifactAPI.ConsumerAPI,
 	settingsStore mcpAuthKeyStore,
 ) error {
 	if storeWrapper == nil ||
@@ -39,14 +40,6 @@ func InitMCPWrappers(
 		aggregateWrapper == nil ||
 		store == nil {
 		return errors.New("MCP wrapper dependencies are incomplete")
-	}
-	if _, err := store.GetArtifactRoot(
-		ctx,
-		&artifactstore.GetArtifactRootRequest{
-			RootID: artifactbuiltin.MCPUserRootID,
-		},
-	); err != nil {
-		return fmt.Errorf("ensure retained MCP user Root: %w", err)
 	}
 
 	settings, err := newMCPSettingsAdapter(settingsStore)
@@ -59,12 +52,11 @@ func InitMCPWrappers(
 	}
 	secrets := newSettingMCPSecretResolver(settingsStore)
 	storeAPI, err := mcpStore.New(mcpStore.Dependencies{
-		Store:              store,
-		ShareableDocuments: store,
-		UserRootID:         artifactbuiltin.MCPUserRootID,
-		Overlays:           overlays,
-		SecretCleaner:      secrets,
-		BaselinePolicy:     mcpPolicy.Baseline(),
+		Store:          store,
+		UserRootID:     artifactbuiltin.MCPUserRootID,
+		Overlays:       overlays,
+		SecretCleaner:  secrets,
+		BaselinePolicy: mcpPolicy.Baseline(),
 	})
 	if err != nil {
 		return err
@@ -183,7 +175,7 @@ func InitMCPWrappers(
 }
 
 func newMCPBuiltInInstaller(
-	store *artifactstore.API,
+	documents providerapi.ExpectedCanonicalizer,
 	bundles *mcpStore.API,
 	overlays mcpOverlay.OverlayRepository,
 ) (artifactbuiltin.HydrationInstaller, error) {
@@ -198,7 +190,7 @@ func newMCPBuiltInInstaller(
 			Registry:           registry,
 			Packages:           packages,
 			Overlays:           overlays,
-			ShareableDocuments: store,
+			ShareableDocuments: documents,
 		},
 	)
 }

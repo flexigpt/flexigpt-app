@@ -8,51 +8,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/resource"
+
+	artifactAPI "github.com/flexigpt/flexigpt-app/internal/artifactstore/api"
 )
-
-// ResourceResolver is the consumer-facing Artifact Store capability for
-// current resource resolution and controlled Source access.
-type ResourceResolver interface {
-	ResolveArtifact(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-		options ResolveOptions,
-	) (ResolvedArtifact, error)
-
-	ResolveVerifiedLocalPath(
-		ctx context.Context,
-		resolved ResolvedArtifact,
-		localLocator basespec.Locator,
-	) (string, error)
-
-	ReadCollectionEntry(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		sourceID basespec.SourceID,
-		locator basespec.Locator,
-		maximumBytes int64,
-	) (VerifiedEntry, error)
-
-	ResolveSourceLocalPath(
-		ctx context.Context,
-		rootID basespec.RootID,
-		sourceID basespec.SourceID,
-		locator basespec.Locator,
-	) (string, error)
-
-	SupportsLocalPath(kind basespec.SourceKind) bool
-}
 
 func (a *API) ResolveArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	options ResolveOptions,
-) (ResolvedArtifact, error) {
+	options artifactAPI.ResolveOptions,
+) (artifactAPI.ResolvedArtifact, error) {
 	if err := a.check(ctx); err != nil {
-		return ResolvedArtifact{}, err
+		return artifactAPI.ResolvedArtifact{}, err
 	}
 	if a.resources == nil {
-		return ResolvedArtifact{}, basespec.ErrClosed
+		return artifactAPI.ResolvedArtifact{}, basespec.ErrClosed
 	}
 	value, err := a.resources.ResolveArtifact(
 		ctx,
@@ -62,14 +31,14 @@ func (a *API) ResolveArtifact(
 		},
 	)
 	if err != nil {
-		return ResolvedArtifact{}, err
+		return artifactAPI.ResolvedArtifact{}, err
 	}
 	return resolvedArtifactForAPI(value), nil
 }
 
 func (a *API) ResolveVerifiedLocalPath(
 	ctx context.Context,
-	resolved ResolvedArtifact,
+	resolved artifactAPI.ResolvedArtifact,
 	localLocator basespec.Locator,
 ) (string, error) {
 	if err := a.check(ctx); err != nil {
@@ -94,12 +63,12 @@ func (a *API) ReadCollectionEntry(
 	sourceID basespec.SourceID,
 	locator basespec.Locator,
 	maximumBytes int64,
-) (VerifiedEntry, error) {
+) (artifactAPI.VerifiedEntry, error) {
 	if err := a.check(ctx); err != nil {
-		return VerifiedEntry{}, err
+		return artifactAPI.VerifiedEntry{}, err
 	}
 	if a.resources == nil {
-		return VerifiedEntry{}, basespec.ErrClosed
+		return artifactAPI.VerifiedEntry{}, basespec.ErrClosed
 	}
 	value, err := a.resources.ReadCollectionEntry(
 		ctx,
@@ -109,7 +78,7 @@ func (a *API) ReadCollectionEntry(
 		maximumBytes,
 	)
 	if err != nil {
-		return VerifiedEntry{}, err
+		return artifactAPI.VerifiedEntry{}, err
 	}
 	return verifiedEntryForAPI(value), nil
 }
@@ -142,27 +111,28 @@ func (a *API) SupportsLocalPath(kind basespec.SourceKind) bool {
 
 func resolvedArtifactForAPI(
 	value resource.ResolvedArtifact,
-) ResolvedArtifact {
-	return ResolvedArtifact{
+) artifactAPI.ResolvedArtifact {
+	return artifactAPI.ResolvedArtifact{
 		Artifact:         value.Artifact.Clone(),
 		Collection:       value.Collection.Clone(),
 		Definition:       value.Definition.Clone(),
 		Occurrence:       catalog.CloneOccurrence(value.Occurrence),
-		Source:           cloneSourceSummary(value.Source),
+		Source:           artifactAPI.CloneSourceSummary(value.Source),
 		CatalogRevision:  value.CatalogRevision,
 		SourceGeneration: value.SourceGeneration,
-	}
+	}.Clone()
 }
 
 func resolvedArtifactForStore(
-	value ResolvedArtifact,
+	value artifactAPI.ResolvedArtifact,
 ) resource.ResolvedArtifact {
+	value = value.Clone()
 	return resource.ResolvedArtifact{
 		Artifact:         value.Artifact.Clone(),
 		Collection:       value.Collection.Clone(),
 		Definition:       value.Definition.Clone(),
 		Occurrence:       catalog.CloneOccurrence(value.Occurrence),
-		Source:           cloneSourceSummary(value.Source),
+		Source:           artifactAPI.CloneSourceSummary(value.Source),
 		CatalogRevision:  value.CatalogRevision,
 		SourceGeneration: value.SourceGeneration,
 	}
@@ -170,8 +140,8 @@ func resolvedArtifactForStore(
 
 func verifiedEntryForAPI(
 	value resource.VerifiedEntry,
-) VerifiedEntry {
-	return VerifiedEntry{
+) artifactAPI.VerifiedEntry {
+	return artifactAPI.VerifiedEntry{
 		Collection:       value.Collection,
 		SourceID:         value.SourceID,
 		CatalogRevision:  value.CatalogRevision,
@@ -179,5 +149,5 @@ func verifiedEntryForAPI(
 		SourceGeneration: value.SourceGeneration,
 		Content:          append([]byte(nil), value.Content...),
 		Digest:           value.Digest,
-	}
+	}.Clone()
 }

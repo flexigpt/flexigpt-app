@@ -7,7 +7,7 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	artifactAPI "github.com/flexigpt/flexigpt-app/internal/artifactstore/api"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
@@ -25,13 +25,13 @@ type occurrenceKindKey struct {
 
 type QueryService struct {
 	workspaces *Service
-	store      artifactstore.ConsumerAPI
+	store      artifactAPI.ConsumerAPI
 	validators map[basespec.ArtifactKind]spec.DefinitionValidator
 }
 
 func NewQueryService(
 	workspaces *Service,
-	store artifactstore.ConsumerAPI,
+	store artifactAPI.ConsumerAPI,
 	supports ...spec.ArtifactSupport,
 ) (*QueryService, error) {
 	if workspaces == nil ||

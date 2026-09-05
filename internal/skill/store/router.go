@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/flexigpt/agentskills-go/provider"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	artifactAPI "github.com/flexigpt/flexigpt-app/internal/artifactstore/api"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -35,13 +35,13 @@ type ArtifactSkillLoader interface {
 }
 
 type ArtifactRouter struct {
-	store   artifactstore.ConsumerAPI
+	store   artifactAPI.ConsumerAPI
 	mu      sync.RWMutex
 	loaders map[basespec.CollectionKind]ArtifactSkillLoader
 }
 
 func NewArtifactRouter(
-	store artifactstore.ConsumerAPI,
+	store artifactAPI.ConsumerAPI,
 ) (*ArtifactRouter, error) {
 	if store == nil {
 		return nil, fmt.Errorf(

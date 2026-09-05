@@ -10,7 +10,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
+	artifactAPI "github.com/flexigpt/flexigpt-app/internal/artifactstore/api"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -25,8 +25,7 @@ import (
 )
 
 type Dependencies struct {
-	Store              artifactstore.ConsumerAPI
-	ShareableDocuments providerapi.ExpectedCanonicalizer
+	Store artifactAPI.ConsumerAPI
 
 	UserRootID     basespec.RootID
 	Overlays       mcpOverlay.OverlayRepository
@@ -40,7 +39,6 @@ type API struct {
 
 func New(dependencies Dependencies) (*API, error) {
 	if dependencies.Store == nil ||
-		dependencies.ShareableDocuments == nil ||
 		dependencies.SecretCleaner == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP Bundle dependencies are incomplete",
