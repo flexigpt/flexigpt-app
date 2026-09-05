@@ -8,9 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	mcpSchemaadapter "github.com/flexigpt/flexigpt-app/internal/mcp/store/schemaadapter"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillBundle "github.com/flexigpt/flexigpt-app/internal/skill/store/bundle"
@@ -18,8 +16,7 @@ import (
 )
 
 type ArtifactStoreWrapper struct {
-	api             *artifactstore.API
-	componentsClose func() error
+	api *artifactstore.API
 }
 
 func InitArtifactStoreWrapper(
@@ -49,33 +46,20 @@ func InitArtifactStoreWrapper(
 		return err
 	}
 
-	rootPolicy, err := protection.NewSetRootPolicy(
-		artifactbuiltin.ProtectedRootIDs(),
-		artifactbuiltin.RetainedRootIDs(),
-	)
-	if err != nil {
-		return err
-	}
-
-	components, err := system.Open(
+	api, err := artifactstore.Open(
 		context.Background(),
-		system.Config{
+		artifactstore.OpenConfig{
 			BaseDirectory: baseDirectory,
 			ArtifactProviders: []providerapi.Provider{
 				workspaceProvider,
 				skillProvider,
 				mcpProvider,
 			},
-			RootMutationPolicy: rootPolicy,
+			ProtectedRoots: artifactbuiltin.ProtectedRootIDs(),
+			RetainedRoots:  artifactbuiltin.RetainedRootIDs(),
 		},
 	)
 	if err != nil {
-		return err
-	}
-
-	api, err := artifactstore.New(components)
-	if err != nil {
-		_ = components.Close()
 		return err
 	}
 
@@ -87,13 +71,11 @@ func InitArtifactStoreWrapper(
 			},
 		); err != nil {
 			api.Close()
-			_ = components.Close()
 			return fmt.Errorf("ensure retained application Root %q: %w", draft.ID, err)
 		}
 	}
 
 	wrapper.api = api
-	wrapper.componentsClose = components.Close
 
 	return nil
 }
@@ -280,17 +262,11 @@ func (w *ArtifactStoreWrapper) close() {
 	}
 
 	api := w.api
-	closeStore := w.componentsClose
 	w.api = nil
-	w.componentsClose = nil
 
 	if api != nil {
-		api.Close()
-	}
-	if closeStore == nil {
-		return
-	}
-	if err := closeStore(); err != nil {
-		slog.Error("close artifact store", "error", err)
+		if err := api.Close(); err != nil {
+			slog.Error("close artifact store", "error", err)
+		}
 	}
 }

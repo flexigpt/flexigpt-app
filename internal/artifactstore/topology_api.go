@@ -3,7 +3,6 @@ package artifactstore
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/topology"
 )
 
@@ -40,13 +39,4 @@ func (a *API) CommitTopologyHydration(
 		return err
 	}
 	return a.components.CommitTopologyHydration(ctx, desired)
-}
-
-func (a *API) RootMutationPolicy() error {
-	if a == nil ||
-		a.components == nil ||
-		a.components.RootMutationPolicy() == nil {
-		return basespec.ErrClosed
-	}
-	return nil
 }

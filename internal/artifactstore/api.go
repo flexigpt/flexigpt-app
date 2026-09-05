@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/system"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 )
 
 // API provides the transport-independent Artifact Store API.
@@ -18,9 +20,13 @@ import (
 type API struct {
 	components *system.Components
 	resources  *resource.Service
+
+	closeOnce sync.Once
+	closeErr  error
+	closed    atomic.Bool
 }
 
-func New(components *system.Components) (*API, error) {
+func newAPI(components *system.Components) (*API, error) {
 	if components == nil ||
 		components.Roots == nil ||
 		components.Sources == nil {
@@ -426,12 +432,24 @@ func (a *API) ListArtifactSourceKinds(
 	}, nil
 }
 
-// Close exists for transport lifecycle symmetry. Components remain owned and
-// closed by the application composition root.
-func (*API) Close() {}
+func (a *API) Close() error {
+	if a == nil {
+		return nil
+	}
+	a.closeOnce.Do(func() {
+		a.closed.Store(true)
+		if a.components != nil {
+			a.closeErr = a.components.Close()
+		}
+		a.resources = nil
+		a.components = nil
+	})
+	return a.closeErr
+}
 
 func (a *API) check(ctx context.Context) error {
 	if a == nil ||
+		a.closed.Load() ||
 		a.components == nil ||
 		a.components.Roots == nil ||
 		a.components.Sources == nil {
