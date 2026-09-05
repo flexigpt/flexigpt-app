@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -57,7 +58,7 @@ type Publication struct {
 	DecoderFingerprint cryptoutil.Digest
 	Occurrences        []catalog.Occurrence
 	ArtifactCreates    []artifact.Artifact
-	ArtifactUpdates    []artifact.SourceStateUpdate
+	ArtifactUpdates    []artifactimpl.SourceStateUpdate
 	Diagnostics        []providerapi.Diagnostic
 	PublishedAt        time.Time
 }

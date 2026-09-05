@@ -1,33 +1,31 @@
-package artifact
+package artifactimpl
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Reader interface {
 	Get(
 		ctx context.Context,
-		ref ArtifactRef,
-	) (Artifact, error)
+		ref artifact.ArtifactRef,
+	) (artifact.Artifact, error)
 
 	ListByCollection(
 		ctx context.Context,
 		ref collection.CollectionRef,
-	) ([]Artifact, error)
+	) ([]artifact.Artifact, error)
 
 	ListSuppressions(
 		ctx context.Context,
 		ref collection.CollectionRef,
-	) ([]Suppression, error)
+	) ([]artifact.Suppression, error)
 }
 
 type Repository interface {
@@ -35,54 +33,54 @@ type Repository interface {
 
 	CreateAdopted(
 		ctx context.Context,
-		value Artifact,
+		value artifact.Artifact,
 		expectedCollectionRevision uint64,
 		expectedCatalogRevision uint64,
 	) error
 
 	CreatePinned(
 		ctx context.Context,
-		value Artifact,
+		value artifact.Artifact,
 		expectedCollectionRevision uint64,
 		expectedCatalogRevision uint64,
 	) error
 
 	Update(
 		ctx context.Context,
-		value Artifact,
+		value artifact.Artifact,
 		expectedRevision uint64,
 	) error
 
 	Unadopt(
 		ctx context.Context,
-		ref ArtifactRef,
+		ref artifact.ArtifactRef,
 		expectedRevision uint64,
-		suppression *Suppression,
+		suppression *artifact.Suppression,
 	) error
 
 	Suppress(
 		ctx context.Context,
-		value Suppression,
+		value artifact.Suppression,
 		expectedCollectionRevision uint64,
 	) error
 
 	Unsuppress(
 		ctx context.Context,
 		ref collection.CollectionRef,
-		binding SourceBinding,
+		binding artifact.SourceBinding,
 		expectedRevision uint64,
 	) error
 
 	PurgeAndSuppress(
 		ctx context.Context,
-		ref ArtifactRef,
+		ref artifact.ArtifactRef,
 		expectedRevision uint64,
-		suppression Suppression,
+		suppression artifact.Suppression,
 	) error
 
 	Purge(
 		ctx context.Context,
-		ref ArtifactRef,
+		ref artifact.ArtifactRef,
 		expectedRevision uint64,
 	) error
 }
@@ -103,47 +101,8 @@ type Policy interface {
 	) (Draft, bool, []providerapi.Diagnostic, error)
 }
 
-type SourceStateUpdate struct {
-	ArtifactID         basespec.ArtifactID
-	RootID             basespec.RootID
-	CollectionID       basespec.CollectionID
-	ResolvedDefinition *cryptoutil.Digest
-	State              State
-	Diagnostics        []providerapi.Diagnostic
-	Revision           uint64
-	ModifiedAt         time.Time
-	ExpectedRevision   uint64
-}
-
-func (u SourceStateUpdate) Validate() error {
-	if err := basespec.ValidateArtifactID(u.ArtifactID); err != nil {
-		return err
-	}
-	if err := basespec.ValidateRootID(u.RootID); err != nil {
-		return err
-	}
-	if err := basespec.ValidateCollectionID(u.CollectionID); err != nil {
-		return err
-	}
-	if err := validateSourceState(u.State, u.ResolvedDefinition); err != nil {
-		return err
-	}
-	if err := providerapi.ValidateDiagnostics(u.Diagnostics); err != nil {
-		return err
-	}
-	if u.ExpectedRevision == 0 ||
-		u.Revision != u.ExpectedRevision+1 ||
-		u.ModifiedAt.IsZero() {
-		return fmt.Errorf(
-			"%w: invalid source-derived artifact update",
-			basespec.ErrInvalid,
-		)
-	}
-	return nil
-}
-
 type Reconciliation struct {
-	Creates     []Artifact
+	Creates     []artifact.Artifact
 	Updates     []SourceStateUpdate
 	Diagnostics []providerapi.Diagnostic
 }

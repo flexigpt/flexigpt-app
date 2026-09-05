@@ -41,8 +41,27 @@ type RemovePackageFunc func(
 	expectedGeneration string,
 ) (SourceState, error)
 
+// ArtifactCommands is the Store-owned Artifact capability required by managed
+// package publication and removal orchestration.
+//
+// The managed-artifact package does not receive repository access or refresh
+// publication access. It can only read the target Artifact and purge it after
+// source-side package removal has been reconciled.
+type ArtifactCommands interface {
+	Get(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+	) (artifact.Artifact, error)
+
+	Purge(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+		expectedRevision uint64,
+	) error
+}
+
 type Dependencies struct {
-	Artifacts   *artifact.Service
+	Artifacts   ArtifactCommands
 	Collections collection.Reader
 	Refresh     refresh.CollectionRunner
 	Policy      protection.RootPolicy

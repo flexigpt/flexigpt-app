@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/shareable"
@@ -50,13 +50,13 @@ type Components struct {
 	Roots            *root.Service
 	Sources          *source.Service
 	Collections      *collection.Service
-	Artifacts        *artifact.Service
+	Artifacts        *artifactimpl.Service
 	Refresh          *refresh.Service
 	ShareableSchemas *shareable.Registry
 
 	ManagedArtifacts *managedartifact.Service
 	CollectionReader collection.Reader
-	ArtifactReader   artifact.Reader
+	ArtifactReader   artifactimpl.Reader
 	SourceRuntime    source.Runtime
 
 	metadata           *sqlite.Store
@@ -220,7 +220,7 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	artifactService, err := artifact.NewService(
+	artifactService, err := artifactimpl.NewService(
 		artifactRepository,
 		collectionRepository,
 		catalogRepository,
@@ -241,7 +241,7 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	reconciler, err := artifact.NewReconciler(
+	reconciler, err := artifactimpl.NewReconciler(
 		config.Clock,
 	)
 	if err != nil {

@@ -7,10 +7,10 @@ import (
 	"maps"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/providerregistry"
@@ -26,7 +26,7 @@ type Service struct {
 	sources     source.Runtime
 	artifacts   ArtifactReader
 	discovery   *discovery.Engine
-	reconciler  *artifact.Reconciler
+	reconciler  *artifactimpl.Reconciler
 	publisher   Publisher
 	providers   *providerregistry.Registry
 	documents   providerapi.ExpectedCanonicalizer
@@ -41,7 +41,7 @@ func NewService(
 	sources source.Runtime,
 	artifacts ArtifactReader,
 	discoveryEngine *discovery.Engine,
-	reconciler *artifact.Reconciler,
+	reconciler *artifactimpl.Reconciler,
 	publisher Publisher,
 	providers *providerregistry.Registry,
 	documents providerapi.ExpectedCanonicalizer,
@@ -88,7 +88,7 @@ func (s *Service) refresh(
 	ctx context.Context,
 	ref collection.CollectionRef,
 	plan discovery.Plan,
-	policy artifact.Policy,
+	policy artifactimpl.Policy,
 ) (Result, error) {
 	if err := protection.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
 		return Result{}, err

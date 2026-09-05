@@ -425,6 +425,8 @@ linters:
           alias: agentskillsRuntimeSpec
         - pkg: github.com/flexigpt/flexigpt-app/frontend
           alias: assets
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact
+          alias: artifactimpl
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/api
           alias: artifactAPI
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts

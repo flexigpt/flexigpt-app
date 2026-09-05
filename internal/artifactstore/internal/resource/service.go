@@ -8,19 +8,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 )
 
 type Service struct {
-	artifacts   artifact.Reader
+	artifacts   artifactimpl.Reader
 	collections collection.Reader
 	catalogs    refresh.CollectionCatalogReader
 	sources     source.Runtime
 }
 
 func NewService(
-	artifacts artifact.Reader,
+	artifacts artifactimpl.Reader,
 	collections collection.Reader,
 	catalogs refresh.CollectionCatalogReader,
 	sources source.Runtime,

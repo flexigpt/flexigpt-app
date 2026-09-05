@@ -8,10 +8,10 @@ import (
 	"maps"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
+	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
@@ -465,13 +465,13 @@ func (p providerAdoptionPolicy) Derive(
 	occurrence catalog.Occurrence,
 	definitionValue providerapi.Definition,
 ) (
-	artifact.Draft,
+	artifactimpl.Draft,
 	bool,
 	[]providerapi.Diagnostic,
 	error,
 ) {
 	if p.behavior == nil || p.ids == nil {
-		return artifact.Draft{},
+		return artifactimpl.Draft{},
 			false,
 			nil,
 			fmt.Errorf(
@@ -482,7 +482,7 @@ func (p providerAdoptionPolicy) Derive(
 
 	attachment, found := p.attachments[occurrence.Key.SourceID]
 	if !found {
-		return artifact.Draft{},
+		return artifactimpl.Draft{},
 			false,
 			nil,
 			fmt.Errorf(
@@ -509,16 +509,16 @@ func (p providerAdoptionPolicy) Derive(
 		},
 	)
 	if err != nil {
-		return artifact.Draft{}, false, nil, err
+		return artifactimpl.Draft{}, false, nil, err
 	}
 
 	decision = decision.Clone()
 	if err := decision.Validate(); err != nil {
-		return artifact.Draft{}, false, nil, err
+		return artifactimpl.Draft{}, false, nil, err
 	}
 	if !decision.Adopt ||
 		providerapi.ContainsErrorDiagnostic(decision.Diagnostics) {
-		return artifact.Draft{},
+		return artifactimpl.Draft{},
 			false,
 			providerapi.CloneDiagnostics(decision.Diagnostics),
 			nil
@@ -526,13 +526,13 @@ func (p providerAdoptionPolicy) Derive(
 
 	id, err := p.ids.NewArtifactID(ctx)
 	if err != nil {
-		return artifact.Draft{}, false, nil, err
+		return artifactimpl.Draft{}, false, nil, err
 	}
 	if err := basespec.ValidateArtifactID(id); err != nil {
-		return artifact.Draft{}, false, nil, err
+		return artifactimpl.Draft{}, false, nil, err
 	}
 
-	return artifact.Draft{
+	return artifactimpl.Draft{
 			ID:      id,
 			Name:    decision.Name,
 			Enabled: decision.Enabled,

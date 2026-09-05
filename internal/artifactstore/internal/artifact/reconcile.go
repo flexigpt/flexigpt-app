@@ -1,4 +1,4 @@
-package artifact
+package artifactimpl
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
@@ -17,7 +18,7 @@ import (
 
 type bindingIdentity struct {
 	CollectionID basespec.CollectionID
-	Binding      SourceBinding
+	Binding      artifact.SourceBinding
 }
 
 // occurrenceIdentity intentionally excludes ExpectedKind. A source can stop
@@ -50,8 +51,8 @@ func (r *Reconciler) Reconcile(
 	ctx context.Context,
 	collectionValue collection.Collection,
 	occurrences []catalog.Occurrence,
-	existing []Artifact,
-	suppressions []Suppression,
+	existing []artifact.Artifact,
+	suppressions []artifact.Suppression,
 	policy Policy,
 ) (Reconciliation, error) {
 	if policy == nil {
@@ -109,7 +110,7 @@ func (r *Reconciler) Reconcile(
 
 		identity := bindingIdentity{
 			CollectionID: collectionValue.ID,
-			Binding: SourceBinding{
+			Binding: artifact.SourceBinding{
 				SourceID:           occurrence.Key.SourceID,
 				Locator:            occurrence.Key.Locator,
 				SubresourceLocator: occurrence.Key.SubresourceLocator,
@@ -128,7 +129,7 @@ func (r *Reconciler) Reconcile(
 	}
 
 	existingByBinding := make(
-		map[bindingIdentity]Artifact,
+		map[bindingIdentity]artifact.Artifact,
 		len(existing),
 	)
 	existingSourceBindings := make(
@@ -206,7 +207,7 @@ func (r *Reconciler) Reconcile(
 	result := Reconciliation{}
 	now := clockutil.NowUTC(r.clock)
 
-	orderedExisting := append([]Artifact(nil), existing...)
+	orderedExisting := append([]artifact.Artifact(nil), existing...)
 	sort.Slice(orderedExisting, func(left, right int) bool {
 		return orderedExisting[left].ID < orderedExisting[right].ID
 	})
@@ -329,7 +330,7 @@ func (r *Reconciler) Reconcile(
 		}
 
 		resolved := *occurrence.DefinitionDigest
-		created := Artifact{
+		created := artifact.Artifact{
 			ID:                 draft.ID,
 			RootID:             collectionValue.RootID,
 			CollectionID:       collectionValue.ID,
@@ -337,10 +338,10 @@ func (r *Reconciler) Reconcile(
 			Kind:               occurrence.Kind,
 			Name:               draft.Name,
 			Enabled:            draft.Enabled,
-			Adoption:           AdoptionObserved,
+			Adoption:           artifact.AdoptionObserved,
 			ResolvedDefinition: &resolved,
 			Data:               json.RawMessage(data),
-			State:              StateAvailable,
+			State:              artifact.StateAvailable,
 			Diagnostics: providerapi.AppendDiagnostics(
 				occurrence.Diagnostics,
 				diagnostics...,
@@ -367,16 +368,16 @@ func (r *Reconciler) Reconcile(
 // Publisher cannot apply a source-derived state transition that the
 // Reconciler itself would never produce.
 func DeriveSourceState(
-	current Artifact,
+	current artifact.Artifact,
 	occurrence *catalog.Occurrence,
 ) (
 	*cryptoutil.Digest,
-	State,
+	artifact.State,
 	[]providerapi.Diagnostic,
 	error,
 ) {
 	if occurrence == nil || occurrence.State == catalog.OccurrenceMissing {
-		return nil, StateMissing, []providerapi.Diagnostic{{
+		return nil, artifact.StateMissing, []providerapi.Diagnostic{{
 			Severity: providerapi.DiagnosticWarning,
 			Code:     "artifact.source-missing",
 			Message:  "the artifact source binding is missing",
@@ -386,7 +387,7 @@ func DeriveSourceState(
 	switch occurrence.State {
 	case catalog.OccurrenceInvalid:
 		return nil,
-			StateInvalid,
+			artifact.StateInvalid,
 			providerapi.CloneDiagnostics(occurrence.Diagnostics),
 			nil
 
@@ -401,7 +402,7 @@ func DeriveSourceState(
 		resolved := cryptoutil.CloneDigest(occurrence.DefinitionDigest)
 		if occurrence.Kind == current.Kind {
 			return resolved,
-				StateAvailable,
+				artifact.StateAvailable,
 				providerapi.CloneDiagnostics(occurrence.Diagnostics),
 				nil
 		}
@@ -418,7 +419,7 @@ func DeriveSourceState(
 				},
 			},
 		)
-		return resolved, StateIncompatible, diagnostics, nil
+		return resolved, artifact.StateIncompatible, diagnostics, nil
 
 	default:
 		return nil, "", nil, fmt.Errorf(
@@ -430,7 +431,7 @@ func DeriveSourceState(
 }
 
 func occurrenceIdentityForBinding(
-	binding SourceBinding,
+	binding artifact.SourceBinding,
 ) occurrenceIdentity {
 	return occurrenceIdentity{
 		SourceID:           binding.SourceID,
@@ -447,7 +448,7 @@ func occurrenceIdentityForKey(key catalog.OccurrenceKey) occurrenceIdentity {
 	}
 }
 
-func equivalentSourceState(left, right Artifact) bool {
+func equivalentSourceState(left, right artifact.Artifact) bool {
 	return left.State == right.State &&
 		digestPointersEqual(left.ResolvedDefinition, right.ResolvedDefinition) &&
 		providerapi.EqualDiagnostics(left.Diagnostics, right.Diagnostics)

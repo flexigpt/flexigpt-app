@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
+	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -333,7 +334,7 @@ func requirePublishedSourceGenerationsTx(
 func updateArtifactSourceStateTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	value artifact.SourceStateUpdate,
+	value artifactimpl.SourceStateUpdate,
 	occurrences map[catalog.OccurrenceKey]catalog.Occurrence,
 ) error {
 	current, err := getArtifactTx(ctx, tx, artifact.ArtifactRef{
@@ -381,7 +382,7 @@ func updateArtifactSourceStateTx(
 		occurrence = &observed
 	}
 
-	expectedDigest, expectedState, expectedDiagnostics, err := artifact.DeriveSourceState(current, occurrence)
+	expectedDigest, expectedState, expectedDiagnostics, err := artifactimpl.DeriveSourceState(current, occurrence)
 	if err != nil {
 		return err
 	}
