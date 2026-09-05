@@ -11,8 +11,6 @@ import (
 
 type mcpCollectionBehavior struct{}
 
-var _ providerapi.CollectionBehavior = mcpCollectionBehavior{}
-
 func NewCollectionBehavior() providerapi.CollectionBehavior {
 	return mcpCollectionBehavior{}
 }

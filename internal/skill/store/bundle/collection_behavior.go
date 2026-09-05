@@ -12,8 +12,6 @@ import (
 
 type skillCollectionBehavior struct{}
 
-var _ providerapi.CollectionBehavior = skillCollectionBehavior{}
-
 func NewCollectionBehavior() providerapi.CollectionBehavior {
 	return skillCollectionBehavior{}
 }

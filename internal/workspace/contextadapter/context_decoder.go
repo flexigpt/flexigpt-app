@@ -19,8 +19,6 @@ import (
 
 type ContextDecoder struct{}
 
-var _ providerapi.Decoder = (*ContextDecoder)(nil)
-
 func NewContextDecoder() *ContextDecoder {
 	return &ContextDecoder{}
 }

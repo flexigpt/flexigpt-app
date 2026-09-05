@@ -43,8 +43,6 @@ type ResourceResolver interface {
 	SupportsLocalPath(kind basespec.SourceKind) bool
 }
 
-var _ ResourceResolver = (*API)(nil)
-
 func (a *API) ResolveArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,

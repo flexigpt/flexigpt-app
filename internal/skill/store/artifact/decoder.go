@@ -13,8 +13,6 @@ import (
 
 type Decoder struct{}
 
-var _ providerapi.Decoder = (*Decoder)(nil)
-
 func NewDecoder() (*Decoder, error) {
 	return &Decoder{}, nil
 }

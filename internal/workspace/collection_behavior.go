@@ -34,8 +34,6 @@ type workspaceCollectionBehavior struct {
 	profiles        spec.DiscoveryProfiles
 }
 
-var _ providerapi.DocumentPlanningBehavior = (*workspaceCollectionBehavior)(nil)
-
 type workspacePlanningTopology struct {
 	attachments     []providerapi.Attachment
 	attachmentData  map[basespec.SourceID]spec.AttachmentData

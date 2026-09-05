@@ -13,8 +13,6 @@ type Provider struct {
 	descriptor providerapi.Descriptor
 }
 
-var _ providerapi.Provider = (*Provider)(nil)
-
 func NewProvider() (*Provider, error) {
 	decoder, err := skillArtifact.NewDecoder()
 	if err != nil {

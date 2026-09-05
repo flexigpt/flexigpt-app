@@ -224,6 +224,58 @@ func (a *API) CreateArtifactSource(
 	}, nil
 }
 
+func (a *API) CreateSource(
+	ctx context.Context,
+	rootID basespec.RootID,
+	draft source.Draft,
+) (source.Summary, error) {
+	if err := a.check(ctx); err != nil {
+		return source.Summary{}, err
+	}
+	draft.Config = append(json.RawMessage(nil), draft.Config...)
+	return a.components.Sources.Create(ctx, rootID, draft)
+}
+
+func (a *API) CreateSourceWithStatus(
+	ctx context.Context,
+	rootID basespec.RootID,
+	draft source.Draft,
+) (source.Summary, bool, error) {
+	if err := a.check(ctx); err != nil {
+		return source.Summary{}, false, err
+	}
+	draft.Config = append(json.RawMessage(nil), draft.Config...)
+	return a.components.Sources.CreateWithStatus(ctx, rootID, draft)
+}
+
+func (a *API) DiscardSource(
+	ctx context.Context,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
+	expectedRevision uint64,
+) error {
+	if err := a.check(ctx); err != nil {
+		return err
+	}
+	return a.components.Sources.Discard(
+		ctx,
+		rootID,
+		sourceID,
+		expectedRevision,
+	)
+}
+
+func (a *API) GetSource(
+	ctx context.Context,
+	rootID basespec.RootID,
+	sourceID basespec.SourceID,
+) (source.Summary, error) {
+	if err := a.check(ctx); err != nil {
+		return source.Summary{}, err
+	}
+	return a.components.Sources.Get(ctx, rootID, sourceID)
+}
+
 func (a *API) GetArtifactSource(
 	ctx context.Context,
 	request *GetArtifactSourceRequest,
