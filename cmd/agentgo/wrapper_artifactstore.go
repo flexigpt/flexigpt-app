@@ -18,8 +18,8 @@ import (
 )
 
 type ArtifactStoreWrapper struct {
-	api        *artifactstore.API
-	components *system.Components
+	api             *artifactstore.API
+	componentsClose func() error
 }
 
 func InitArtifactStoreWrapper(
@@ -73,24 +73,27 @@ func InitArtifactStoreWrapper(
 		return err
 	}
 
-	for _, draft := range artifactbuiltin.RetainedRootDrafts() {
-		if _, err := components.Roots.Create(
-			context.Background(),
-			draft,
-		); err != nil {
-			_ = components.Close()
-			return fmt.Errorf("ensure retained application Root %q: %w", draft.ID, err)
-		}
-	}
-
 	api, err := artifactstore.New(components)
 	if err != nil {
 		_ = components.Close()
 		return err
 	}
 
-	wrapper.components = components
+	for _, draft := range artifactbuiltin.RetainedRootDrafts() {
+		if _, err := api.CreateArtifactRoot(
+			context.Background(),
+			&artifactstore.CreateArtifactRootRequest{
+				Body: &draft,
+			},
+		); err != nil {
+			api.Close()
+			_ = components.Close()
+			return fmt.Errorf("ensure retained application Root %q: %w", draft.ID, err)
+		}
+	}
+
 	wrapper.api = api
+	wrapper.componentsClose = components.Close
 
 	return nil
 }
@@ -264,23 +267,30 @@ func (w *ArtifactStoreWrapper) ListArtifactSourceKinds(
 	)
 }
 
+func (w *ArtifactStoreWrapper) Store() *artifactstore.API {
+	if w == nil {
+		return nil
+	}
+	return w.api
+}
+
 func (w *ArtifactStoreWrapper) close() {
 	if w == nil {
 		return
 	}
 
 	api := w.api
-	components := w.components
+	closeStore := w.componentsClose
 	w.api = nil
-	w.components = nil
+	w.componentsClose = nil
 
 	if api != nil {
 		api.Close()
 	}
-	if components == nil {
+	if closeStore == nil {
 		return
 	}
-	if err := components.Close(); err != nil {
+	if err := closeStore(); err != nil {
 		slog.Error("close artifact store", "error", err)
 	}
 }

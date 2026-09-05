@@ -25,6 +25,20 @@ import (
 type ConsumerAPI interface {
 	ResourceResolver
 
+	IsProtectedRoot(
+		rootID basespec.RootID,
+	) bool
+
+	RequirePrivilegedInstaller(
+		ctx context.Context,
+	) error
+
+	CanonicalizeExpected(
+		ctx context.Context,
+		expected providerapi.SchemaKey,
+		raw []byte,
+	) (providerapi.ParsedDocument, error)
+
 	CreateSource(
 		ctx context.Context,
 		rootID basespec.RootID,
@@ -220,12 +234,6 @@ type ConsumerAPI interface {
 		ctx context.Context,
 		ref collection.CollectionRef,
 	) (refresh.CatalogInspection, error)
-
-	CanonicalizeExpectedDocument(
-		ctx context.Context,
-		expected providerapi.SchemaKey,
-		raw []byte,
-	) (providerapi.ParsedDocument, error)
 
 	PublishManagedArtifact(
 		ctx context.Context,
@@ -638,7 +646,7 @@ func (a *API) InspectCollectionCatalog(
 	return a.components.Refresh.InspectCollectionCatalog(ctx, ref)
 }
 
-func (a *API) CanonicalizeExpectedDocument(
+func (a *API) CanonicalizeExpected(
 	ctx context.Context,
 	expected providerapi.SchemaKey,
 	raw []byte,

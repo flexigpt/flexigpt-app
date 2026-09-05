@@ -12,7 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
@@ -32,16 +31,21 @@ func InitMCPWrappers(
 	storeWrapper *MCPStoreWrapper,
 	runtimeWrapper *MCPRuntimeWrapper,
 	aggregateWrapper *MCPAggregateWrapper,
-	components *system.Components,
+	store *artifactstore.API,
 	settingsStore mcpAuthKeyStore,
 ) error {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
 		aggregateWrapper == nil ||
-		components == nil {
+		store == nil {
 		return errors.New("MCP wrapper dependencies are incomplete")
 	}
-	if _, err := components.Roots.Get(ctx, artifactbuiltin.MCPUserRootID); err != nil {
+	if _, err := store.GetArtifactRoot(
+		ctx,
+		&artifactstore.GetArtifactRootRequest{
+			RootID: artifactbuiltin.MCPUserRootID,
+		},
+	); err != nil {
 		return fmt.Errorf("ensure retained MCP user Root: %w", err)
 	}
 
@@ -54,19 +58,9 @@ func InitMCPWrappers(
 		return err
 	}
 	secrets := newSettingMCPSecretResolver(settingsStore)
-	resources, err := artifactstore.New(components)
-	if err != nil {
-		return err
-	}
 	storeAPI, err := mcpStore.New(mcpStore.Dependencies{
-		Sources:            components.Sources,
-		Collections:        components.Collections,
-		Artifacts:          components.Artifacts,
-		ManagedArtifacts:   components.ManagedArtifacts,
-		Refresh:            components.Refresh,
-		Resources:          resources,
-		ShareableDocuments: components.ShareableSchemas,
-		RootPolicy:         components.RootMutationPolicy(),
+		Store:              store,
+		ShareableDocuments: store,
 		UserRootID:         artifactbuiltin.MCPUserRootID,
 		Overlays:           overlays,
 		SecretCleaner:      secrets,
@@ -167,7 +161,7 @@ func InitMCPWrappers(
 		return cleanup(err)
 	}
 
-	builtIns, err := newMCPBuiltInInstaller(components, storeAPI, overlays)
+	builtIns, err := newMCPBuiltInInstaller(store, storeAPI, overlays)
 	if err != nil {
 		return cleanup(err)
 	}
@@ -189,7 +183,7 @@ func InitMCPWrappers(
 }
 
 func newMCPBuiltInInstaller(
-	components *system.Components,
+	store *artifactstore.API,
 	bundles *mcpStore.API,
 	overlays mcpOverlay.OverlayRepository,
 ) (artifactbuiltin.HydrationInstaller, error) {
@@ -204,7 +198,7 @@ func newMCPBuiltInInstaller(
 			Registry:           registry,
 			Packages:           packages,
 			Overlays:           overlays,
-			ShareableDocuments: components.ShareableSchemas,
+			ShareableDocuments: store,
 		},
 	)
 }

@@ -30,18 +30,15 @@ func newComponents(
 	}
 
 	service, err := artifactadapter.NewService(
-		dependencies.Collections,
-		dependencies.Sources,
+		dependencies.Store,
 		config.WorkspaceRootID,
-		dependencies.RootMutationPolicy,
 	)
 	if err != nil {
 		return nil, err
 	}
 	query, err := artifactadapter.NewQueryService(
 		service,
-		dependencies.Artifacts,
-		dependencies.Refresh,
+		dependencies.Store,
 		supports...,
 	)
 	if err != nil {
@@ -59,7 +56,7 @@ func newComponents(
 	skillAdapter, err := workspaceadapter.NewAdapter(
 		query,
 		runtimePolicy,
-		dependencies.Resources,
+		dependencies.Store,
 	)
 	if err != nil {
 		return nil, err

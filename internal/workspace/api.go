@@ -45,8 +45,8 @@ func New(
 		return nil, err
 	}
 	provisioner, err := provision.NewService(
-		dependencies.Sources,
 		workspaceComponents.service,
+		dependencies.Store,
 	)
 	if err != nil {
 		return nil, err
@@ -404,7 +404,7 @@ func (a *API) RefreshWorkspace(
 	if _, err := a.workspace.service.Get(ctx, request.Workspace); err != nil {
 		return nil, err
 	}
-	value, err := a.dependencies.Refresh.RefreshCollection(
+	value, err := a.dependencies.Store.RefreshCollection(
 		ctx,
 		request.Workspace,
 	)
@@ -484,7 +484,7 @@ func (a *API) ListWorkspaceArtifacts(
 	if _, err := a.workspace.service.Get(ctx, request.Workspace); err != nil {
 		return nil, err
 	}
-	values, err := a.dependencies.Artifacts.ListByCollection(
+	values, err := a.dependencies.Store.ListCollectionArtifacts(
 		ctx,
 		request.Workspace,
 	)
@@ -541,7 +541,7 @@ func (a *API) AdoptWorkspaceOccurrence(
 	if err != nil {
 		return nil, err
 	}
-	value, err := a.dependencies.Artifacts.Adopt(ctx, artifact.AdoptRequest{
+	value, err := a.dependencies.Store.AdoptArtifact(ctx, artifact.AdoptRequest{
 		ArtifactID:              request.Body.ArtifactID,
 		Collection:              request.Workspace,
 		Occurrence:              key,
@@ -582,7 +582,7 @@ func (a *API) PinWorkspaceArtifact(
 	if err != nil {
 		return nil, err
 	}
-	value, err := a.dependencies.Artifacts.Pin(ctx, artifact.PinRequest{
+	value, err := a.dependencies.Store.PinArtifact(ctx, artifact.PinRequest{
 		ArtifactID:                 request.Body.ArtifactID,
 		Collection:                 request.Workspace,
 		ExpectedCollectionRevision: request.Body.ExpectedCollectionRevision,
@@ -611,7 +611,7 @@ func (a *API) ListWorkspaceSuppressions(
 	if _, err := a.workspace.service.Get(ctx, request.Workspace); err != nil {
 		return nil, err
 	}
-	values, err := a.dependencies.Artifacts.ListSuppressions(
+	values, err := a.dependencies.Store.ListCollectionSuppressions(
 		ctx,
 		request.Workspace,
 	)
@@ -648,7 +648,7 @@ func (a *API) SuppressWorkspaceBinding(
 	); err != nil {
 		return nil, err
 	}
-	value, err := a.dependencies.Artifacts.Suppress(ctx, artifact.SuppressRequest{
+	value, err := a.dependencies.Store.SuppressBinding(ctx, artifact.SuppressRequest{
 		Collection:                 request.Workspace,
 		ExpectedCollectionRevision: request.Body.ExpectedCollectionRevision,
 		Binding:                    request.Body.Binding,
@@ -673,7 +673,7 @@ func (a *API) UnsuppressWorkspaceBinding(
 	if _, err := a.workspace.service.Get(ctx, request.Workspace); err != nil {
 		return nil, err
 	}
-	if err := a.dependencies.Artifacts.Unsuppress(
+	if err := a.dependencies.Store.UnsuppressBinding(
 		ctx,
 		request.Workspace,
 		request.Binding,
@@ -829,7 +829,7 @@ func (a *API) SetWorkspaceArtifactEnabled(
 	if _, err := a.workspaceArtifact(ctx, request.Workspace, request.Artifact); err != nil {
 		return nil, err
 	}
-	value, err := a.dependencies.Artifacts.SetEnabled(
+	value, err := a.dependencies.Store.SetArtifactEnabled(
 		ctx,
 		request.Artifact,
 		request.Body.ExpectedRevision,
@@ -855,7 +855,7 @@ func (a *API) UnadoptWorkspaceArtifact(
 	if _, err := a.workspaceArtifact(ctx, request.Workspace, request.Artifact); err != nil {
 		return nil, err
 	}
-	if err := a.dependencies.Artifacts.Unadopt(
+	if err := a.dependencies.Store.UnadoptArtifact(
 		ctx,
 		request.Artifact,
 		request.ExpectedRevision,
@@ -887,7 +887,7 @@ func (a *API) PurgeWorkspaceArtifact(
 	); err != nil {
 		return nil, err
 	}
-	if err := a.dependencies.Artifacts.Purge(
+	if err := a.dependencies.Store.PurgeArtifact(
 		ctx,
 		request.Artifact,
 		request.ExpectedRevision,
@@ -924,7 +924,7 @@ func (a *API) SetWorkspaceArtifactRuntimeDisabled(
 	if err != nil {
 		return nil, err
 	}
-	value, err := a.dependencies.Artifacts.UpdateData(
+	value, err := a.dependencies.Store.UpdateArtifactData(
 		ctx,
 		request.Artifact,
 		request.Body.ExpectedRevision,
@@ -955,7 +955,7 @@ func (a *API) workspaceArtifact(
 	if _, err := a.workspace.service.Get(ctx, workspace); err != nil {
 		return artifact.Artifact{}, err
 	}
-	value, err := a.dependencies.Artifacts.Get(ctx, ref)
+	value, err := a.dependencies.Store.GetArtifact(ctx, ref)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -1098,14 +1098,14 @@ func (a *API) enrichWorkspaceSourcePresentation(
 			)
 		}
 		sourceKind := basespec.SourceKind(attachment.SourceKind)
-		if !a.dependencies.Resources.SupportsLocalPath(sourceKind) {
+		if !a.dependencies.Store.SupportsLocalPath(sourceKind) {
 			continue
 		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		pathValue, err := a.dependencies.Resources.ResolveSourceLocalPath(
+		pathValue, err := a.dependencies.Store.ResolveSourceLocalPath(
 			ctx,
 			value.Collection.RootID,
 			attachment.SourceID,

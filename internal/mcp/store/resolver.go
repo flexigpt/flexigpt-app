@@ -51,7 +51,7 @@ func (a *API) resolveMCPServer(
 		return mcpStoreServer.Resolved{}, err
 	}
 
-	record, err := a.dependencies.Artifacts.Get(ctx, ref)
+	record, err := a.dependencies.Store.GetArtifact(ctx, ref)
 	if err != nil {
 		return mcpStoreServer.Resolved{}, err
 	}
@@ -114,7 +114,7 @@ func (a *API) resolveMCPServer(
 		)
 	}
 
-	resolvedResource, err := a.dependencies.Resources.ResolveArtifact(
+	resolvedResource, err := a.dependencies.Store.ResolveArtifact(
 		ctx,
 		ref,
 		artifactstore.ResolveOptions{
@@ -196,7 +196,7 @@ func (a *API) resolveMCPServer(
 		Policy:               policyValue,
 		InstallationRevision: installationRevision,
 		RuntimeEnabled:       runtimeEnabled,
-		BuiltIn: a.dependencies.RootPolicy.IsProtectedRoot(
+		BuiltIn: a.dependencies.Store.IsProtectedRoot(
 			ref.RootID,
 		),
 		Version: version,
@@ -211,7 +211,7 @@ func (a *API) currentCatalog(
 	ctx context.Context,
 	bundle Bundle,
 ) (catalog.Snapshot, error) {
-	return a.dependencies.Refresh.CurrentCatalog(
+	return a.dependencies.Store.CurrentCollectionCatalog(
 		ctx,
 		bundle.Collection.Ref(),
 	)
@@ -259,7 +259,7 @@ func (a *API) effectiveInstallation(
 	runtimeEnabled bool,
 	err error,
 ) {
-	if !a.dependencies.RootPolicy.IsProtectedRoot(record.RootID) {
+	if !a.dependencies.Store.IsProtectedRoot(record.RootID) {
 		data, err := mcpStoreServer.DecodeServerData(record.Data)
 		if err != nil {
 			return mcpStoreServer.ServerData{}, 0, false, false, err
@@ -371,7 +371,7 @@ func (a *API) effectivePolicy(
 				basespec.ErrInvalid,
 			)
 		}
-		record, err := a.dependencies.Artifacts.Get(ctx, ref)
+		record, err := a.dependencies.Store.GetArtifact(ctx, ref)
 		if err != nil {
 			return mcpPolicy.Effective{}, err
 		}
@@ -416,7 +416,7 @@ func (a *API) policyBodiesByLogicalName(
 	ref collection.CollectionRef,
 	name basespec.LogicalName,
 ) ([]mcpPolicy.MCPPolicy, error) {
-	records, err := a.dependencies.Artifacts.ListByCollection(ctx, ref)
+	records, err := a.dependencies.Store.ListCollectionArtifacts(ctx, ref)
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/system"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/workspace"
 )
@@ -16,28 +15,19 @@ type WorkspaceWrapper struct {
 
 func InitWorkspaceWrapper(
 	wrapper *WorkspaceWrapper,
-	artifacts *system.Components,
+	store artifactstore.ConsumerAPI,
 ) error {
 	if wrapper == nil {
 		return errors.New("workspace wrapper is nil")
 	}
-	if artifacts == nil {
-		return errors.New("artifact store components are nil")
-	}
-	config := workspace.DefaultConfig()
-	resources, err := artifactstore.New(artifacts)
-	if err != nil {
-		return err
+	if store == nil {
+		return errors.New("artifact store API is nil")
 	}
 
-	api, err := workspace.New(workspace.Dependencies{
-		Sources:            artifacts.Sources,
-		Collections:        artifacts.Collections,
-		Artifacts:          artifacts.Artifacts,
-		Refresh:            artifacts.Refresh,
-		Resources:          resources,
-		RootMutationPolicy: artifacts.RootMutationPolicy(),
-	}, config)
+	api, err := workspace.New(
+		workspace.Dependencies{Store: store},
+		workspace.DefaultConfig(),
+	)
 	if err != nil {
 		return err
 	}

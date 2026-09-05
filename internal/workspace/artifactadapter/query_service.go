@@ -7,12 +7,12 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -25,20 +25,17 @@ type occurrenceKindKey struct {
 
 type QueryService struct {
 	workspaces *Service
-	catalogs   refresh.CollectionCatalogInspector
-	artifacts  artifactLookup
+	store      artifactstore.ConsumerAPI
 	validators map[basespec.ArtifactKind]spec.DefinitionValidator
 }
 
 func NewQueryService(
 	workspaces *Service,
-	artifacts artifactLookup,
-	catalogs refresh.CollectionCatalogInspector,
+	store artifactstore.ConsumerAPI,
 	supports ...spec.ArtifactSupport,
 ) (*QueryService, error) {
 	if workspaces == nil ||
-		catalogs == nil ||
-		artifacts == nil {
+		store == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace query dependencies are incomplete",
 			spec.ErrInvalidWorkspace,
@@ -69,8 +66,7 @@ func NewQueryService(
 	}
 	return &QueryService{
 		workspaces: workspaces,
-		catalogs:   catalogs,
-		artifacts:  artifacts,
+		store:      store,
 		validators: validators,
 	}, nil
 }
@@ -89,7 +85,7 @@ func (q *QueryService) ResolveArtifact(
 	if err := ref.Validate(); err != nil {
 		return spec.Workspace{}, spec.Resource{}, err
 	}
-	value, err := q.artifacts.Get(ctx, ref)
+	value, err := q.store.GetArtifact(ctx, ref)
 	if err != nil {
 		return spec.Workspace{}, spec.Resource{}, err
 	}
@@ -296,7 +292,7 @@ func (q *QueryService) Catalog(
 	if err != nil {
 		return spec.CatalogView{}, err
 	}
-	inspection, err := q.catalogs.InspectCollectionCatalog(
+	inspection, err := q.store.InspectCollectionCatalog(
 		ctx,
 		workspace,
 	)
@@ -338,7 +334,7 @@ func (q *QueryService) Catalog(
 		)
 	}
 
-	artifacts, err := q.artifacts.ListByCollection(ctx, workspace)
+	artifacts, err := q.store.ListCollectionArtifacts(ctx, workspace)
 	if err != nil {
 		return spec.CatalogView{}, err
 	}

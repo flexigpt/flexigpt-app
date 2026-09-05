@@ -70,7 +70,7 @@ func (a *API) GetDocument(
 		return BundleDocument{}, err
 	}
 
-	entry, err := a.dependencies.Resources.ReadCollectionEntry(
+	entry, err := a.dependencies.Store.ReadCollectionEntry(
 		ctx,
 		ref,
 		bundle.Source.ID,
@@ -171,7 +171,7 @@ func (a *API) GetServerInstallation(
 		return ServerInstallationView{}, err
 	}
 
-	record, err := a.dependencies.Artifacts.Get(ctx, ref)
+	record, err := a.dependencies.Store.GetArtifact(ctx, ref)
 	if err != nil {
 		return ServerInstallationView{}, err
 	}
@@ -227,7 +227,7 @@ func (a *API) GetServerInstallation(
 		InstallationRevision: revision,
 		InstallationEnabled:  installationEnabled,
 		RuntimeEnabled:       runtimeEnabled,
-		BuiltIn: a.dependencies.RootPolicy.IsProtectedRoot(
+		BuiltIn: a.dependencies.Store.IsProtectedRoot(
 			record.RootID,
 		),
 	}, nil
@@ -244,7 +244,7 @@ func (a *API) InspectMCPPolicy(
 		return PolicyView{}, err
 	}
 
-	record, err := a.dependencies.Artifacts.Get(ctx, ref)
+	record, err := a.dependencies.Store.GetArtifact(ctx, ref)
 	if err != nil {
 		return PolicyView{}, err
 	}
@@ -289,7 +289,7 @@ func (a *API) InspectMCPPolicy(
 		Body:            body,
 		EffectiveEnabled: bundle.Collection.Enabled &&
 			record.Enabled,
-		BuiltIn: a.dependencies.RootPolicy.IsProtectedRoot(
+		BuiltIn: a.dependencies.Store.IsProtectedRoot(
 			record.RootID,
 		),
 	}, nil
@@ -308,7 +308,7 @@ func (a *API) GetBundleInstallation(
 		return BundleInstallationView{}, err
 	}
 
-	builtIn := a.dependencies.RootPolicy.IsProtectedRoot(ref.RootID)
+	builtIn := a.dependencies.Store.IsProtectedRoot(ref.RootID)
 	output := BundleInstallationView{
 		Bundle:             ref,
 		BuiltIn:            builtIn,
@@ -353,7 +353,7 @@ func (a *API) listArtifactsByKind(
 		return nil, err
 	}
 
-	records, err := a.dependencies.Artifacts.ListByCollection(ctx, ref)
+	records, err := a.dependencies.Store.ListCollectionArtifacts(ctx, ref)
 	if err != nil {
 		return nil, err
 	}

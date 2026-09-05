@@ -257,7 +257,7 @@ func (a *App) initManagers() {
 
 	err = InitWorkspaceWrapper(
 		a.workspaceAPI,
-		a.artifactStoreAPI.components,
+		a.artifactStoreAPI.Store(),
 	)
 	if err != nil {
 		slog.Error(
@@ -271,7 +271,7 @@ func (a *App) initManagers() {
 
 	err = InitSkillStoreWrapper(
 		a.skillStoreAPI,
-		a.artifactStoreAPI.components,
+		a.artifactStoreAPI.Store(),
 		a.workspaceAPI.api.SkillAdapter(),
 	)
 	if err != nil {
@@ -316,7 +316,7 @@ func (a *App) initManagers() {
 		a.mcpStoreAPI,
 		a.mcpRuntimeAPI,
 		a.mcpAggregateAPI,
-		a.artifactStoreAPI.components,
+		a.artifactStoreAPI.Store(),
 		a.settingStoreAPI.store,
 	)
 	if err != nil {
@@ -331,7 +331,7 @@ func (a *App) initManagers() {
 
 	err = EnsureBuiltinArtifactTopology(
 		context.Background(),
-		a.artifactStoreAPI.components,
+		a.artifactStoreAPI.Store(),
 		a.skillStoreAPI,
 		a.mcpStoreAPI,
 	)
