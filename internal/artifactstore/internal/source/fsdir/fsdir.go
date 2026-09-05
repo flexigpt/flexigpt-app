@@ -20,8 +20,7 @@ import (
 )
 
 const (
-	directoryReadBatchSize                     = 256
-	Kind                   basespec.SourceKind = "fs-directory"
+	directoryReadBatchSize = 256
 )
 
 type Config struct {
@@ -49,7 +48,7 @@ func NewWithTraversalPolicy(policy *TraversalPolicy) (*Adapter, error) {
 }
 
 func (a *Adapter) Kind() basespec.SourceKind {
-	return Kind
+	return basespec.SourceKindFilesystemDirectory
 }
 
 func (a *Adapter) NormalizeConfig(
@@ -91,7 +90,7 @@ func (a *Adapter) Open(
 	ctx context.Context,
 	value source.Source,
 ) (source.Snapshot, error) {
-	if value.Kind != Kind {
+	if value.Kind != basespec.SourceKindFilesystemDirectory {
 		return nil, fmt.Errorf(
 			"%w: filesystem adapter received source kind %q",
 			basespec.ErrInvalid,
@@ -127,7 +126,7 @@ func (a *Adapter) ResolveLocalPath(
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	if value.Kind != Kind {
+	if value.Kind != basespec.SourceKindFilesystemDirectory {
 		return "", fmt.Errorf(
 			"%w: filesystem adapter received source kind %q",
 			basespec.ErrInvalid,

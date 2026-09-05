@@ -88,7 +88,7 @@ func (a *API) EnsureBuiltIn(
 	if err != nil {
 		return Bundle{}, err
 	}
-	if sourceValue.Kind != artifactbuiltin.ManagedDirectorySourceKind ||
+	if sourceValue.Kind != basespec.SourceKindManagedDirectory ||
 		!sourceValue.Enabled {
 		return Bundle{}, fmt.Errorf(
 			"%w: protected MCP Bundle requires an enabled managed Source",

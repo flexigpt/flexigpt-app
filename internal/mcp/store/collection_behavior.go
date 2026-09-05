@@ -120,7 +120,7 @@ func (b mcpCollectionBehavior) BuildDiscoveryPlan(
 			attachment.SourceID,
 		)
 	}
-	if sourceValue.Kind != artifactbuiltin.ManagedDirectorySourceKind {
+	if sourceValue.Kind != basespec.SourceKindManagedDirectory {
 		return providerapi.Plan{}, fmt.Errorf(
 			"%w: MCP Bundle requires a managed Source",
 			basespec.ErrInvalid,

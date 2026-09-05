@@ -8,9 +8,12 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
+
+type filesystemSourceConfig struct {
+	RootPath string `json:"rootPath"`
+}
 
 type sourceManager interface {
 	CreateWithStatus(
@@ -86,19 +89,20 @@ func (s *Service) CreateFilesystem(
 		return spec.Workspace{}, err
 	}
 
-	config, err := json.Marshal(fsdir.Config{
+	config, err := json.Marshal(filesystemSourceConfig{
 		RootPath: request.RootPath,
 	})
 	if err != nil {
 		return spec.Workspace{}, err
 	}
+
 	sourceValue, sourceCreated, err := s.sources.CreateWithStatus(
 		ctx,
 		request.RootID,
 		source.Draft{
 			ID:          request.SourceID,
 			StorageKey:  request.SourceStorageKey,
-			Kind:        fsdir.Kind,
+			Kind:        basespec.SourceKindFilesystemDirectory,
 			DisplayName: request.DisplayName,
 			Enabled:     true,
 			Config:      config,

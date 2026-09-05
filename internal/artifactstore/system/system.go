@@ -13,6 +13,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/shareable"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/embedded"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/sqlite"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
@@ -20,9 +23,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/embedded"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 

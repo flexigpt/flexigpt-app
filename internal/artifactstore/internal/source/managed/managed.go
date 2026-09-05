@@ -18,8 +18,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/mapstoreio"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -86,7 +86,7 @@ func New(
 }
 
 func (*Adapter) Kind() basespec.SourceKind {
-	return artifactbuiltin.ManagedDirectorySourceKind
+	return basespec.SourceKindManagedDirectory
 }
 
 func (a *Adapter) ResolveLocalPath(
@@ -561,7 +561,7 @@ func (a *Adapter) validateSource(ctx context.Context, value source.Source) error
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	if value.Kind != artifactbuiltin.ManagedDirectorySourceKind {
+	if value.Kind != basespec.SourceKindManagedDirectory {
 		return fmt.Errorf(
 			"%w: managed adapter received source kind %q",
 			basespec.ErrInvalid,
@@ -688,7 +688,7 @@ func (a *Adapter) filesystemSource(
 		return source.Source{}, err
 	}
 	output := value.Clone()
-	output.Kind = fsdir.Kind
+	output.Kind = basespec.SourceKindFilesystemDirectory
 	output.Config = raw
 	return output, nil
 }
@@ -708,15 +708,6 @@ func (a *Adapter) confirmedGeneration(
 		return "", errors.Join(confirmErr, closeErr)
 	}
 	return generation, nil
-}
-
-// ValidatePackagePublication applies managed-directory-specific checks before
-// callers persist Artifact metadata or start an external publication step.
-func ValidatePackagePublication(
-	publication source.ManagedPackagePublication,
-) error {
-	_, err := validatePublication(publication)
-	return err
 }
 
 func validatePublication(

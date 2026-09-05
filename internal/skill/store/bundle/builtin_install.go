@@ -14,7 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 )
@@ -127,7 +126,9 @@ func (a *API) InstallBuiltInCollection(
 	if err != nil {
 		return nil, err
 	}
-	if err := managed.ValidatePackagePublication(publication); err != nil {
+	if _, err := source.NormalizeManagedPackagePublication(
+		publication,
+	); err != nil {
 		return nil, err
 	}
 

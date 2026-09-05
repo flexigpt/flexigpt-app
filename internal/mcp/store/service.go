@@ -157,7 +157,7 @@ func (a *API) Create(
 		source.Draft{
 			ID:          request.SourceID,
 			StorageKey:  request.SourceStorageKey,
-			Kind:        artifactbuiltin.ManagedDirectorySourceKind,
+			Kind:        basespec.SourceKindManagedDirectory,
 			DisplayName: displayName(document),
 			Enabled:     true,
 			Config:      json.RawMessage(jsonutil.EmptyObject),
@@ -424,7 +424,7 @@ func (a *API) Get(
 	if err != nil {
 		return Bundle{}, err
 	}
-	if sourceValue.Kind != artifactbuiltin.ManagedDirectorySourceKind {
+	if sourceValue.Kind != basespec.SourceKindManagedDirectory {
 		return Bundle{}, fmt.Errorf(
 			"%w: MCP Bundle requires a managed Source",
 			basespec.ErrInvalid,

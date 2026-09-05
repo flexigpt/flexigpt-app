@@ -84,3 +84,9 @@ type (
 	LogicalName    string
 	LogicalVersion string
 )
+
+const (
+	SourceKindFilesystemDirectory SourceKind = "fs-directory"
+	SourceKindEmbeddedDirectory   SourceKind = "embedded-directory"
+	SourceKindManagedDirectory    SourceKind = "managed-directory"
+)

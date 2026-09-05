@@ -36,8 +36,6 @@ const (
 	ArtifactStoreDirectoryMode = 0o750
 	ArtifactStoreManifestMode  = 0o600
 
-	ManagedDirectorySourceKind basespec.SourceKind = "managed-directory"
-
 	ManagedPackageTemporaryPrefix = "package-"
 	ManagedPackagePreviousPrefix  = "previous-package-"
 	ManagedPackageRemovalPrefix   = "remove-"
@@ -226,7 +224,7 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 		Sources: []source.Draft{{
 			ID:          BuiltinSourceID,
 			StorageKey:  BuiltinSourceStorageKey,
-			Kind:        ManagedDirectorySourceKind,
+			Kind:        basespec.SourceKindManagedDirectory,
 			DisplayName: BuiltinSourceDisplayName,
 			Enabled:     true,
 			Config:      json.RawMessage(jsonutil.EmptyObject),

@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
@@ -30,7 +29,7 @@ var attachmentOperationMatrix = [...]AttachmentOperation{
 	{
 		Role:                                 spec.RolePrimary,
 		IsPrimary:                            true,
-		RequiredSourceKind:                   fsdir.Kind,
+		RequiredSourceKind:                   basespec.SourceKindFilesystemDirectory,
 		DefaultAuthoritative:                 true,
 		IncludeReadmeWhenRequested:           true,
 		AppliesWorkspaceDiscoveryPreferences: true,

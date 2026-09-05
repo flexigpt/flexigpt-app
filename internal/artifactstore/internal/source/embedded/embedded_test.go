@@ -96,7 +96,7 @@ func embeddedTestSource(config json.RawMessage) source.Source {
 		RootID:         "019d3150-6a1f-7a6b-a34e-d9032342bc31",
 		RootStorageKey: "test-root",
 		StorageKey:     "embedded-fixture",
-		Kind:           Kind,
+		Kind:           basespec.SourceKindEmbeddedDirectory,
 		DisplayName:    "Embedded fixture",
 		Enabled:        true,
 		Config:         config,

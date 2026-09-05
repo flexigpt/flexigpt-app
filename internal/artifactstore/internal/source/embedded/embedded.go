@@ -15,8 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-const Kind basespec.SourceKind = "embedded-directory"
-
 type Config struct {
 	ProviderKey string           `json:"providerKey"`
 	Root        basespec.Locator `json:"root"`
@@ -49,7 +47,7 @@ func New(providers map[string]fs.FS) (*Adapter, error) {
 }
 
 func (*Adapter) Kind() basespec.SourceKind {
-	return Kind
+	return basespec.SourceKindEmbeddedDirectory
 }
 
 func (a *Adapter) NormalizeConfig(
@@ -88,7 +86,7 @@ func (a *Adapter) Open(
 	ctx context.Context,
 	value source.Source,
 ) (source.Snapshot, error) {
-	if value.Kind != Kind {
+	if value.Kind != basespec.SourceKindEmbeddedDirectory {
 		return nil, fmt.Errorf(
 			"%w: embedded adapter received source kind %q",
 			basespec.ErrInvalid,

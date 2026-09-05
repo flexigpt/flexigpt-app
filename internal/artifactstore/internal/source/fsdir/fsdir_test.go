@@ -107,7 +107,7 @@ func fsdirTestSource(root string, config json.RawMessage) source.Source {
 		RootID:         "019d3150-6a1d-7a6b-a34e-d9032342bc31",
 		RootStorageKey: "test-root",
 		StorageKey:     "filesystem-fixture",
-		Kind:           Kind,
+		Kind:           basespec.SourceKindFilesystemDirectory,
 		DisplayName:    "Filesystem fixture",
 		Enabled:        true,
 		Config:         config,

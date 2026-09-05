@@ -22,8 +22,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
@@ -194,13 +192,13 @@ func (a *API) PurgeBundle(
 		if err != nil {
 			return err
 		}
-		if ownedSource.Kind != artifactbuiltin.ManagedDirectorySourceKind {
+		if ownedSource.Kind != basespec.SourceKindManagedDirectory {
 			return fmt.Errorf(
 				"%w: bundle-owned managed Source %q has kind %q, not %q",
 				basespec.ErrInvalid,
 				data.ManagedSourceID,
 				ownedSource.Kind,
-				artifactbuiltin.ManagedDirectorySourceKind,
+				basespec.SourceKindManagedDirectory,
 			)
 		}
 	}
@@ -1016,7 +1014,7 @@ func (a *API) createBundle(
 			source.Draft{
 				ID:          request.ManagedSourceID,
 				StorageKey:  request.ManagedSourceStorageKey,
-				Kind:        artifactbuiltin.ManagedDirectorySourceKind,
+				Kind:        basespec.SourceKindManagedDirectory,
 				DisplayName: request.DisplayName,
 				Enabled:     true,
 				Config:      json.RawMessage(jsonutil.EmptyObject),
@@ -1190,7 +1188,7 @@ func bundleCreationIntentMatches(
 				continue
 			}
 			found = sourceValue.RootID == request.RootID &&
-				sourceValue.Kind == artifactbuiltin.ManagedDirectorySourceKind &&
+				sourceValue.Kind == basespec.SourceKindManagedDirectory &&
 				sourceValue.DisplayName == request.DisplayName &&
 				sourceValue.Enabled
 			break
@@ -1408,7 +1406,7 @@ func (a *API) createManagedSkill(
 	if err := basespec.ValidatePortableLocator(skillLocator, false); err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	if err := managed.ValidatePackagePublication(
+	if _, err := source.NormalizeManagedPackagePublication(
 		source.ManagedPackagePublication{
 			Address: packageAddress,
 			Files:   files,
@@ -1771,21 +1769,21 @@ func validateRoleSourceKind(
 ) error {
 	switch role {
 	case artifactbuiltin.ManagedAttachmentRole, artifactbuiltin.BuiltInAttachmentRole:
-		if kind != artifactbuiltin.ManagedDirectorySourceKind {
+		if kind != basespec.SourceKindManagedDirectory {
 			return fmt.Errorf(
 				"%w: skill bundle role %q requires source kind %q",
 				basespec.ErrInvalid,
 				role,
-				artifactbuiltin.ManagedDirectorySourceKind,
+				basespec.SourceKindManagedDirectory,
 			)
 		}
 	case RoleExternal, RoleLibrary:
-		if kind != fsdir.Kind {
+		if kind != basespec.SourceKindFilesystemDirectory {
 			return fmt.Errorf(
 				"%w: skill bundle role %q requires source kind %q",
 				basespec.ErrInvalid,
 				role,
-				fsdir.Kind,
+				basespec.SourceKindFilesystemDirectory,
 			)
 		}
 	}
