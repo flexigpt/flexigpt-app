@@ -6,19 +6,14 @@ import type {
 	ArtifactSourceKind,
 	ArtifactSourceSummary,
 	CreateArtifactRootBody,
-	ManagedSourcePackageResult,
-	ManagedSourceState,
-	PublishManagedSourcePackageBody,
 	PurgeArtifactRootResult,
 	PurgeArtifactSourceResult,
-	RemoveManagedSourcePackageBody,
 	UpdateArtifactRootBody,
 	UpdateArtifactSourceBody,
 } from '@/spec/artifact';
 
 import type { IArtifactStoreAPI } from '@/apis/interface';
 import {
-	byteArrayToWails,
 	rawJSONObjectToWails,
 	requireNonBlankString,
 	requireWailsBody,
@@ -31,20 +26,16 @@ import {
 	CreateArtifactSource,
 	GetArtifactRoot,
 	GetArtifactSource,
-	GetManagedSourceState,
 	ListArtifactRoots,
 	ListArtifactSourceKinds,
 	ListArtifactSources,
-	PublishManagedSourcePackage,
 	PurgeArtifactRoot,
 	PurgeArtifactSource,
-	RemoveManagedSourcePackage,
 	RetireArtifactRoot,
 	RetireArtifactSource,
 	UpdateArtifactRoot,
 	UpdateArtifactSource,
 } from '@/apis/wailsjs/go/main/ArtifactStoreWrapper';
-import type { artifactstore } from '@/apis/wailsjs/go/models';
 
 function updateSourceBodyToWails(body: UpdateArtifactSourceBody): unknown {
 	return {
@@ -198,66 +189,5 @@ export class WailsArtifactStoreAPI implements IArtifactStoreAPI {
 		return wailsArrayOrEmpty(body.kinds, 'ListArtifactSourceKinds.kinds').map(
 			(kind, index) => requireWailsString(kind, `ListArtifactSourceKinds.kinds[${index}]`) as ArtifactSourceKind
 		);
-	}
-
-	async getManagedSourceState(rootID: ArtifactRootID, sourceID: ArtifactSourceID): Promise<ManagedSourceState> {
-		const response = await GetManagedSourceState({
-			rootID,
-			sourceID,
-		} as Parameters<typeof GetManagedSourceState>[0]);
-
-		const body = requireWailsBody(response.Body, 'GetManagedSourceState');
-		return {
-			generation: requireWailsString(body.generation, 'GetManagedSourceState.generation'),
-			source: requireWailsBody(body.source, 'GetManagedSourceState.source'),
-		};
-	}
-
-	async publishManagedSourcePackage(
-		rootID: ArtifactRootID,
-		sourceID: ArtifactSourceID,
-		body: PublishManagedSourcePackageBody
-	): Promise<ManagedSourcePackageResult> {
-		const req = {
-			rootID: rootID,
-			sourceID: sourceID,
-			Body: {
-				expectedSourceRevision: body.expectedSourceRevision,
-				address: body.address,
-				expectedGeneration: body.expectedGeneration,
-				files: body.files.map(file => ({
-					locator: file.locator,
-					content: byteArrayToWails(file.content),
-				})),
-			} as artifactstore.PublishManagedSourcePackageRequestBody,
-		} as artifactstore.PublishManagedSourcePackageRequest;
-
-		const response = await PublishManagedSourcePackage(req);
-		const responseBody = requireWailsBody(response.Body, 'PublishManagedSourcePackage');
-		return {
-			generation: requireWailsString(responseBody.generation, 'PublishManagedSourcePackage.generation'),
-			source: requireWailsBody(responseBody.source, 'PublishManagedSourcePackage.source'),
-		};
-	}
-
-	async removeManagedSourcePackage(
-		rootID: ArtifactRootID,
-		sourceID: ArtifactSourceID,
-		body: RemoveManagedSourcePackageBody
-	): Promise<ManagedSourcePackageResult> {
-		const response = await RemoveManagedSourcePackage({
-			rootID,
-			sourceID,
-			expectedSourceRevision: body.expectedSourceRevision,
-			address: body.address,
-			expectedGeneration: body.expectedGeneration,
-		} as Parameters<typeof RemoveManagedSourcePackage>[0]);
-
-		const responseBody = requireWailsBody(response.Body, 'RemoveManagedSourcePackage');
-
-		return {
-			generation: requireWailsString(responseBody.generation, 'RemoveManagedSourcePackage.generation'),
-			source: requireWailsBody(responseBody.source, 'RemoveManagedSourcePackage.source'),
-		};
 	}
 }

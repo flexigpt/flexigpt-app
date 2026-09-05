@@ -8,8 +8,6 @@ export function AttachWorkspaceSource(arg1:workspace.AttachWorkspaceSourceReques
 
 export function ComposeWorkspaceContext(arg1:workspace.ComposeWorkspaceContextRequest):Promise<workspace.ComposeWorkspaceContextResponse>;
 
-export function ComposeWorkspaceLoadPlan(arg1:workspace.ComposeWorkspaceLoadPlanRequest):Promise<workspace.ComposeWorkspaceLoadPlanResponse>;
-
 export function CreateEmptyWorkspace(arg1:workspace.CreateEmptyWorkspaceRequest):Promise<workspace.CreateEmptyWorkspaceResponse>;
 
 export function CreateFilesystemWorkspace(arg1:workspace.CreateFilesystemWorkspaceRequest):Promise<workspace.CreateFilesystemWorkspaceResponse>;
@@ -43,10 +41,6 @@ export function PurgeWorkspace(arg1:workspace.PurgeWorkspaceRequest):Promise<wor
 export function PurgeWorkspaceArtifact(arg1:workspace.PurgeWorkspaceArtifactRequest):Promise<workspace.PurgeWorkspaceArtifactResponse>;
 
 export function RefreshWorkspace(arg1:workspace.RefreshWorkspaceRequest):Promise<workspace.RefreshWorkspaceResponse>;
-
-export function ReplaceWorkspacePrimarySource(arg1:workspace.ReplaceWorkspacePrimarySourceRequest):Promise<workspace.ReplaceWorkspacePrimarySourceResponse>;
-
-export function ResolveWorkspaceResource(arg1:workspace.ResolveWorkspaceResourceRequest):Promise<workspace.ResolveWorkspaceResourceResponse>;
 
 export function RetireWorkspace(arg1:workspace.RetireWorkspaceRequest):Promise<workspace.RetireWorkspaceResponse>;
 

@@ -54,6 +54,8 @@ interface ReasoningCapabilitiesOverride {
 	supportedReasoningLevels?: string[];
 	hybridTokenBudgetCapabilities?: ReasoningTokenBudgetCapabilitiesOverride;
 	supportsSummaryStyle?: boolean;
+	supportsReasoningContext?: boolean;
+	supportsReasoningMode?: boolean;
 	supportsEncryptedReasoningInput?: boolean;
 	temperatureDisallowedWhenEnabled?: boolean;
 }

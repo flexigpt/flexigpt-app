@@ -26,7 +26,6 @@ export type ArtifactSourceKind = string;
 type ArtifactAttachmentRole = string;
 export type ArtifactLocator = string;
 export type ArtifactDigest = string;
-type ArtifactSourceGeneration = string;
 
 export enum ArtifactAdoptionMode {
 	Observed = 'observed',
@@ -205,29 +204,6 @@ export interface ManagedSourcePackageFile {
 	content: Uint8Array;
 }
 
-export interface PublishManagedSourcePackageBody {
-	expectedSourceRevision: number;
-	address: ManagedPackageAddress;
-	expectedGeneration?: ArtifactSourceGeneration;
-	files: ManagedSourcePackageFile[];
-}
-
-export interface RemoveManagedSourcePackageBody {
-	expectedSourceRevision: number;
-	address: ManagedPackageAddress;
-	expectedGeneration: ArtifactSourceGeneration;
-}
-
-export interface ManagedSourceState {
-	generation: ArtifactSourceGeneration;
-	source: ArtifactSourceSummary;
-}
-
-export interface ManagedSourcePackageResult {
-	generation: ArtifactSourceGeneration;
-	source: ArtifactSourceSummary;
-}
-
 export interface ArtifactSourceBinding {
 	sourceID: ArtifactSourceID;
 	locator: ArtifactLocator;
@@ -235,7 +211,7 @@ export interface ArtifactSourceBinding {
 	expectedKind: ArtifactKind;
 }
 
-export interface ArtifactDefinitionSelector {
+interface ArtifactDefinitionSelector {
 	kind: ArtifactKind;
 	logicalName?: string;
 	versionConstraint?: string;

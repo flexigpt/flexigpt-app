@@ -93,11 +93,24 @@ export enum ReasoningSummaryStyle {
 	Detailed = 'detailed',
 }
 
+enum ReasoningContext {
+	Auto = 'auto',
+	CurrentTurn = 'current_turn',
+	AllTurns = 'all_turns',
+}
+
+enum ReasoningMode {
+	Standard = 'standard',
+	Pro = 'pro',
+}
+
 export interface ReasoningParam {
 	type: ReasoningType;
 	level: ReasoningLevel;
 	tokens: number;
 	summaryStyle?: ReasoningSummaryStyle;
+	context?: ReasoningContext;
+	mode?: ReasoningMode;
 }
 
 export enum OutputVerbosity {

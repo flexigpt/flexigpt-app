@@ -10,25 +10,21 @@ export function GetArtifactRoot(arg1:artifactstore.GetArtifactRootRequest):Promi
 
 export function GetArtifactSource(arg1:artifactstore.GetArtifactSourceRequest):Promise<artifactstore.GetArtifactSourceResponse>;
 
-export function GetManagedSourceState(arg1:artifactstore.GetManagedSourceStateRequest):Promise<artifactstore.GetManagedSourceStateResponse>;
-
 export function ListArtifactRoots(arg1:artifactstore.ListArtifactRootsRequest):Promise<artifactstore.ListArtifactRootsResponse>;
 
 export function ListArtifactSourceKinds(arg1:artifactstore.ListArtifactSourceKindsRequest):Promise<artifactstore.ListArtifactSourceKindsResponse>;
 
 export function ListArtifactSources(arg1:artifactstore.ListArtifactSourcesRequest):Promise<artifactstore.ListArtifactSourcesResponse>;
 
-export function PublishManagedSourcePackage(arg1:artifactstore.PublishManagedSourcePackageRequest):Promise<artifactstore.PublishManagedSourcePackageResponse>;
-
 export function PurgeArtifactRoot(arg1:artifactstore.PurgeArtifactRootRequest):Promise<artifactstore.PurgeArtifactRootResponse>;
 
 export function PurgeArtifactSource(arg1:artifactstore.PurgeArtifactSourceRequest):Promise<artifactstore.PurgeArtifactSourceResponse>;
 
-export function RemoveManagedSourcePackage(arg1:artifactstore.RemoveManagedSourcePackageRequest):Promise<artifactstore.RemoveManagedSourcePackageResponse>;
-
 export function RetireArtifactRoot(arg1:artifactstore.RetireArtifactRootRequest):Promise<artifactstore.RetireArtifactRootResponse>;
 
 export function RetireArtifactSource(arg1:artifactstore.RetireArtifactSourceRequest):Promise<artifactstore.RetireArtifactSourceResponse>;
+
+export function Store():Promise<artifactstore.API>;
 
 export function UpdateArtifactRoot(arg1:artifactstore.UpdateArtifactRootRequest):Promise<artifactstore.UpdateArtifactRootResponse>;
 

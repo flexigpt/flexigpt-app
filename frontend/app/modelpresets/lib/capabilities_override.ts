@@ -150,6 +150,14 @@ export function mergeModelCapabilitiesOverride(
 							m?.reasoningCapabilities?.supportsSummaryStyle,
 							p?.reasoningCapabilities?.supportsSummaryStyle
 						),
+						supportsReasoningContext: pick(
+							m?.reasoningCapabilities?.supportsReasoningContext,
+							p?.reasoningCapabilities?.supportsReasoningContext
+						),
+						supportsReasoningMode: pick(
+							m?.reasoningCapabilities?.supportsReasoningMode,
+							p?.reasoningCapabilities?.supportsReasoningMode
+						),
 						supportsEncryptedReasoningInput: pick(
 							m?.reasoningCapabilities?.supportsEncryptedReasoningInput,
 							p?.reasoningCapabilities?.supportsEncryptedReasoningInput

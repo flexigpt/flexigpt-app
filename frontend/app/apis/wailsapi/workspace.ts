@@ -1,11 +1,4 @@
-// oxlint-disable typescript/no-misused-spread
-import type {
-	ArtifactDefinitionSelector,
-	ArtifactRef,
-	ArtifactRootID,
-	ArtifactSourceBinding,
-	ArtifactSourceID,
-} from '@/spec/artifact';
+import type { ArtifactRef, ArtifactRootID, ArtifactSourceBinding, ArtifactSourceID } from '@/spec/artifact';
 import type {
 	AdoptWorkspaceOccurrenceBody,
 	AttachWorkspaceSourceBody,
@@ -13,8 +6,6 @@ import type {
 	CreateFilesystemWorkspaceBody,
 	DetachWorkspaceSourceBody,
 	PinWorkspaceArtifactBody,
-	ReplaceWorkspacePrimarySourceBody,
-	ResolveWorkspaceResourceResult,
 	RetireWorkspaceResult,
 	SetWorkspaceArtifactEnabledBody,
 	SetWorkspaceArtifactRuntimeDisabledBody,
@@ -30,7 +21,6 @@ import type {
 	WorkspaceContextInspectionView,
 	WorkspaceContextLoadPlan,
 	WorkspaceContextView,
-	WorkspaceLoadPlanView,
 	WorkspaceRef,
 	WorkspaceRefreshResult,
 	WorkspaceSkillLoadView,
@@ -40,12 +30,11 @@ import type {
 } from '@/spec/workspace';
 
 import type { IWorkspaceAPI } from '@/apis/interface';
-import { rawJSONFromWails, requireWailsBody, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { requireWailsBody, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	AdoptWorkspaceOccurrence,
 	AttachWorkspaceSource,
 	ComposeWorkspaceContext,
-	ComposeWorkspaceLoadPlan,
 	CreateEmptyWorkspace,
 	CreateFilesystemWorkspace,
 	DetachWorkspaceSource,
@@ -63,8 +52,6 @@ import {
 	PurgeWorkspace,
 	PurgeWorkspaceArtifact,
 	RefreshWorkspace,
-	ReplaceWorkspacePrimarySource,
-	ResolveWorkspaceResource,
 	RetireWorkspace,
 	SetWorkspaceArtifactEnabled,
 	SetWorkspaceArtifactRuntimeDisabled,
@@ -79,7 +66,6 @@ import {
 export class WailsWorkspaceAPI implements IWorkspaceAPI {
 	async createFilesystemWorkspace(rootID: ArtifactRootID, body: CreateFilesystemWorkspaceBody): Promise<WorkspaceView> {
 		const response = await CreateFilesystemWorkspace({
-			rootID,
 			Body: {
 				workspaceID: body.workspaceID,
 				sourceID: body.sourceID,
@@ -96,7 +82,6 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 
 	async createEmptyWorkspace(rootID: ArtifactRootID, body: CreateEmptyWorkspaceBody): Promise<WorkspaceView> {
 		const response = await CreateEmptyWorkspace({
-			rootID,
 			Body: body,
 		} as Parameters<typeof CreateEmptyWorkspace>[0]);
 
@@ -127,18 +112,6 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof UpdateWorkspace>[0]);
 
 		return requireWailsBody(response.Body, 'UpdateWorkspace') as WorkspaceView;
-	}
-
-	async replaceWorkspacePrimarySource(
-		workspace: WorkspaceRef,
-		body: ReplaceWorkspacePrimarySourceBody
-	): Promise<WorkspaceView> {
-		const response = await ReplaceWorkspacePrimarySource({
-			workspace,
-			Body: body,
-		} as Parameters<typeof ReplaceWorkspacePrimarySource>[0]);
-
-		return requireWailsBody(response.Body, 'ReplaceWorkspacePrimarySource') as WorkspaceView;
 	}
 
 	async setWorkspacePrimarySource(
@@ -229,56 +202,6 @@ export class WailsWorkspaceAPI implements IWorkspaceAPI {
 		} as Parameters<typeof GetWorkspaceCatalog>[0]);
 
 		return requireWailsBody(response.Body, 'GetWorkspaceCatalog') as WorkspaceCatalogView;
-	}
-
-	async composeWorkspaceLoadPlan(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceLoadPlanView> {
-		const response = await ComposeWorkspaceLoadPlan({
-			workspace,
-			Body: { artifacts },
-		} as Parameters<typeof ComposeWorkspaceLoadPlan>[0]);
-		const res = requireWailsBody(response.Body, 'ComposeWorkspaceLoadPlan');
-		const items = wailsObjectArrayOrEmpty<WorkspaceLoadPlanView['items'][number]>(
-			res.items,
-			'ComposeWorkspaceLoadPlan.items'
-		);
-		const r = {
-			...res,
-			items: items.map((i, index) => {
-				const definition = requireWailsBody(i.definition, `ComposeWorkspaceLoadPlan.items[${index}].definition`);
-				return Object.assign(i, {
-					definition: {
-						...definition,
-						body: rawJSONFromWails(definition.body, `ComposeWorkspaceLoadPlan.items[${index}].definition.body`),
-					},
-				});
-			}),
-		} as WorkspaceLoadPlanView;
-		return r;
-	}
-
-	async resolveWorkspaceResource(
-		workspace: WorkspaceRef,
-		artifact?: ArtifactRef,
-		selector?: ArtifactDefinitionSelector
-	): Promise<ResolveWorkspaceResourceResult> {
-		if ((artifact === undefined) === (selector === undefined)) {
-			throw new Error('Provide exactly one of artifact or selector.');
-		}
-
-		const response = await ResolveWorkspaceResource({
-			workspace,
-			Body: { artifact, selector },
-		} as Parameters<typeof ResolveWorkspaceResource>[0]);
-		const res = requireWailsBody(response.Body, 'ResolveWorkspaceResource');
-		const definition = requireWailsBody(res.definition, 'ResolveWorkspaceResource.definition');
-		const r = {
-			...res,
-			definition: {
-				...definition,
-				body: rawJSONFromWails(definition.body, 'workspace.definition.body'),
-			},
-		} as ResolveWorkspaceResourceResult;
-		return r;
 	}
 
 	async getWorkspaceArtifact(workspace: WorkspaceRef, artifact: ArtifactRef): Promise<WorkspaceArtifactView> {

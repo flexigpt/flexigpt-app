@@ -18,10 +18,6 @@ export function GetArtifactSource(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['GetArtifactSource'](arg1);
 }
 
-export function GetManagedSourceState(arg1) {
-  return window['go']['main']['ArtifactStoreWrapper']['GetManagedSourceState'](arg1);
-}
-
 export function ListArtifactRoots(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['ListArtifactRoots'](arg1);
 }
@@ -34,10 +30,6 @@ export function ListArtifactSources(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['ListArtifactSources'](arg1);
 }
 
-export function PublishManagedSourcePackage(arg1) {
-  return window['go']['main']['ArtifactStoreWrapper']['PublishManagedSourcePackage'](arg1);
-}
-
 export function PurgeArtifactRoot(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['PurgeArtifactRoot'](arg1);
 }
@@ -46,16 +38,16 @@ export function PurgeArtifactSource(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['PurgeArtifactSource'](arg1);
 }
 
-export function RemoveManagedSourcePackage(arg1) {
-  return window['go']['main']['ArtifactStoreWrapper']['RemoveManagedSourcePackage'](arg1);
-}
-
 export function RetireArtifactRoot(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['RetireArtifactRoot'](arg1);
 }
 
 export function RetireArtifactSource(arg1) {
   return window['go']['main']['ArtifactStoreWrapper']['RetireArtifactSource'](arg1);
+}
+
+export function Store() {
+  return window['go']['main']['ArtifactStoreWrapper']['Store']();
 }
 
 export function UpdateArtifactRoot(arg1) {

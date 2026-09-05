@@ -1,7 +1,6 @@
 import type {
 	ArtifactAdoptionMode,
 	ArtifactCollectionRef,
-	ArtifactDefinitionView,
 	ArtifactDiagnostic,
 	ArtifactDigest,
 	ArtifactKind,
@@ -199,28 +198,6 @@ export interface WorkspaceRefreshResult {
 	candidates: number;
 }
 
-export interface WorkspaceLoadPlanItemView {
-	artifact: WorkspaceArtifactView;
-	definition: ArtifactDefinitionView;
-	definitionDigest: ArtifactDigest;
-	sourceID: ArtifactSourceID;
-	sourceKind: string;
-	locator: ArtifactLocator;
-	catalogCurrent: boolean;
-}
-
-export interface WorkspaceLoadPlanView {
-	workspace: WorkspaceRef;
-	catalogRevision: number;
-	items: WorkspaceLoadPlanItemView[];
-	diagnostics?: ArtifactDiagnostic[];
-}
-
-export interface ResolveWorkspaceResourceResult {
-	resource: WorkspaceResourceView;
-	definition: ArtifactDefinitionView;
-}
-
 export interface WorkspaceContextContribution {
 	artifact: ArtifactRef;
 	recordRevision: number;
@@ -353,13 +330,6 @@ export interface UpdateWorkspaceBody {
 	description?: string;
 	enabled: boolean;
 	discovery: WorkspaceDiscovery;
-}
-
-export interface ReplaceWorkspacePrimarySourceBody {
-	expectedCollectionRevision: number;
-	previousSourceID: ArtifactSourceID;
-	expectedPreviousAttachmentRevision: number;
-	sourceID: ArtifactSourceID;
 }
 
 export interface SetWorkspacePrimarySourceBody {

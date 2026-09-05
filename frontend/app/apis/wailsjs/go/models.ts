@@ -50,7 +50,7 @@ export namespace artifact {
 	    adoption: string;
 	    resolvedDefinition?: string;
 	    state: string;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	    revision: number;
 	    // Go type: time
 	    createdAt: any;
@@ -73,7 +73,7 @@ export namespace artifact {
 	        this.adoption = source["adoption"];
 	        this.resolvedDefinition = source["resolvedDefinition"];
 	        this.state = source["state"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	        this.revision = source["revision"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
@@ -134,6 +134,18 @@ export namespace artifact {
 
 export namespace artifactstore {
 	
+	export class API {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new API(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class ArtifactSourceDraft {
 	    id: string;
 	    storageKey: string;
@@ -364,83 +376,6 @@ export namespace artifactstore {
 		    return a;
 		}
 	}
-	export class GetManagedSourceStateRequest {
-	    rootID: string;
-	    sourceID: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new GetManagedSourceStateRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
-	        this.sourceID = source["sourceID"];
-	    }
-	}
-	export class GetManagedSourceStateResponseBody {
-	    generation: string;
-	    source: source.Summary;
-	
-	    static createFrom(source: any = {}) {
-	        return new GetManagedSourceStateResponseBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.generation = source["generation"];
-	        this.source = this.convertValues(source["source"], source.Summary);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class GetManagedSourceStateResponse {
-	    Body?: GetManagedSourceStateResponseBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new GetManagedSourceStateResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], GetManagedSourceStateResponseBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
 	export class ListArtifactRootsRequest {
 	
 	
@@ -642,140 +577,6 @@ export namespace artifactstore {
 		}
 	}
 	
-	export class PublishManagedSourcePackageRequestBody {
-	    expectedSourceRevision: number;
-	    address: source.ManagedPackageAddress;
-	    expectedGeneration?: string;
-	    files: source.ManagedPackageFile[];
-	
-	    static createFrom(source: any = {}) {
-	        return new PublishManagedSourcePackageRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.expectedSourceRevision = source["expectedSourceRevision"];
-	        this.address = this.convertValues(source["address"], source.ManagedPackageAddress);
-	        this.expectedGeneration = source["expectedGeneration"];
-	        this.files = this.convertValues(source["files"], source.ManagedPackageFile);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class PublishManagedSourcePackageRequest {
-	    rootID: string;
-	    sourceID: string;
-	    Body?: PublishManagedSourcePackageRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new PublishManagedSourcePackageRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
-	        this.sourceID = source["sourceID"];
-	        this.Body = this.convertValues(source["Body"], PublishManagedSourcePackageRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class PublishManagedSourcePackageResponseBody {
-	    generation: string;
-	    source: source.Summary;
-	
-	    static createFrom(source: any = {}) {
-	        return new PublishManagedSourcePackageResponseBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.generation = source["generation"];
-	        this.source = this.convertValues(source["source"], source.Summary);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class PublishManagedSourcePackageResponse {
-	    Body?: PublishManagedSourcePackageResponseBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new PublishManagedSourcePackageResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], PublishManagedSourcePackageResponseBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
 	export class PurgeArtifactRootRequest {
 	    RootID: string;
 	    expectedRevision: number;
@@ -832,107 +633,6 @@ export namespace artifactstore {
 	        this.sourceID = source["sourceID"];
 	    }
 	}
-	export class RemoveManagedSourcePackageRequest {
-	    rootID: string;
-	    sourceID: string;
-	    expectedSourceRevision: number;
-	    address: source.ManagedPackageAddress;
-	    expectedGeneration: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new RemoveManagedSourcePackageRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
-	        this.sourceID = source["sourceID"];
-	        this.expectedSourceRevision = source["expectedSourceRevision"];
-	        this.address = this.convertValues(source["address"], source.ManagedPackageAddress);
-	        this.expectedGeneration = source["expectedGeneration"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class RemoveManagedSourcePackageResponseBody {
-	    generation: string;
-	    source: source.Summary;
-	
-	    static createFrom(source: any = {}) {
-	        return new RemoveManagedSourcePackageResponseBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.generation = source["generation"];
-	        this.source = this.convertValues(source["source"], source.Summary);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class RemoveManagedSourcePackageResponse {
-	    Body?: RemoveManagedSourcePackageResponseBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new RemoveManagedSourcePackageResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], RemoveManagedSourcePackageResponseBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
 	export class RetireArtifactRootRequest {
 	    RootID: string;
 	    expectedRevision: number;
@@ -2096,6 +1796,8 @@ export namespace capabilityoverride {
 	    supportedReasoningLevels?: string[];
 	    hybridTokenBudgetCapabilities?: ReasoningTokenBudgetCapabilitiesOverride;
 	    supportsSummaryStyle?: boolean;
+	    supportsReasoningContext?: boolean;
+	    supportsReasoningMode?: boolean;
 	    supportsEncryptedReasoningInput?: boolean;
 	    temperatureDisallowedWhenEnabled?: boolean;
 	
@@ -2110,6 +1812,8 @@ export namespace capabilityoverride {
 	        this.supportedReasoningLevels = source["supportedReasoningLevels"];
 	        this.hybridTokenBudgetCapabilities = this.convertValues(source["hybridTokenBudgetCapabilities"], ReasoningTokenBudgetCapabilitiesOverride);
 	        this.supportsSummaryStyle = source["supportsSummaryStyle"];
+	        this.supportsReasoningContext = source["supportsReasoningContext"];
+	        this.supportsReasoningMode = source["supportsReasoningMode"];
 	        this.supportsEncryptedReasoningInput = source["supportsEncryptedReasoningInput"];
 	        this.temperatureDisallowedWhenEnabled = source["temperatureDisallowedWhenEnabled"];
 	    }
@@ -2597,138 +2301,6 @@ export namespace conversation {
 
 }
 
-export namespace definition {
-	
-	export class Selector {
-	    kind: string;
-	    logicalName?: string;
-	    versionConstraint?: string;
-	    labels?: Record<string, string>;
-	
-	    static createFrom(source: any = {}) {
-	        return new Selector(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.kind = source["kind"];
-	        this.logicalName = source["logicalName"];
-	        this.versionConstraint = source["versionConstraint"];
-	        this.labels = source["labels"];
-	    }
-	}
-	export class Definition {
-	    digest: string;
-	    kind: string;
-	    schemaID: string;
-	    schemaVersion: string;
-	    logicalName: string;
-	    logicalVersion?: string;
-	    displayName?: string;
-	    description?: string;
-	    labels?: Record<string, string>;
-	    body: number[];
-	    dependencies?: Selector[];
-	
-	    static createFrom(source: any = {}) {
-	        return new Definition(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.digest = source["digest"];
-	        this.kind = source["kind"];
-	        this.schemaID = source["schemaID"];
-	        this.schemaVersion = source["schemaVersion"];
-	        this.logicalName = source["logicalName"];
-	        this.logicalVersion = source["logicalVersion"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.labels = source["labels"];
-	        this.body = source["body"];
-	        this.dependencies = this.convertValues(source["dependencies"], Selector);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-
-}
-
-export namespace diagnostic {
-	
-	export class DiagnosticLocation {
-	    locator?: string;
-	    subresourceLocator?: string;
-	    line?: number;
-	    column?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new DiagnosticLocation(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.locator = source["locator"];
-	        this.subresourceLocator = source["subresourceLocator"];
-	        this.line = source["line"];
-	        this.column = source["column"];
-	    }
-	}
-	export class Diagnostic {
-	    severity: string;
-	    code: string;
-	    message: string;
-	    location?: DiagnosticLocation;
-	
-	    static createFrom(source: any = {}) {
-	        return new Diagnostic(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.severity = source["severity"];
-	        this.code = source["code"];
-	        this.message = source["message"];
-	        this.location = this.convertValues(source["location"], DiagnosticLocation);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-
-}
-
 export namespace document {
 	
 	export class SkillArgument {
@@ -3062,6 +2634,134 @@ export namespace provider {
 	        this.moreLocations = source["moreLocations"];
 	    }
 	}
+
+}
+
+export namespace providerapi {
+	
+	export class Selector {
+	    kind: string;
+	    logicalName?: string;
+	    versionConstraint?: string;
+	    labels?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new Selector(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.logicalName = source["logicalName"];
+	        this.versionConstraint = source["versionConstraint"];
+	        this.labels = source["labels"];
+	    }
+	}
+	export class Definition {
+	    digest: string;
+	    kind: string;
+	    schemaID: string;
+	    schemaVersion: string;
+	    logicalName: string;
+	    logicalVersion?: string;
+	    displayName?: string;
+	    description?: string;
+	    labels?: Record<string, string>;
+	    body: number[];
+	    dependencies?: Selector[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Definition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.digest = source["digest"];
+	        this.kind = source["kind"];
+	        this.schemaID = source["schemaID"];
+	        this.schemaVersion = source["schemaVersion"];
+	        this.logicalName = source["logicalName"];
+	        this.logicalVersion = source["logicalVersion"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.labels = source["labels"];
+	        this.body = source["body"];
+	        this.dependencies = this.convertValues(source["dependencies"], Selector);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DiagnosticLocation {
+	    locator?: string;
+	    subresourceLocator?: string;
+	    line?: number;
+	    column?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiagnosticLocation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.locator = source["locator"];
+	        this.subresourceLocator = source["subresourceLocator"];
+	        this.line = source["line"];
+	        this.column = source["column"];
+	    }
+	}
+	export class Diagnostic {
+	    severity: string;
+	    code: string;
+	    message: string;
+	    location?: DiagnosticLocation;
+	
+	    static createFrom(source: any = {}) {
+	        return new Diagnostic(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.severity = source["severity"];
+	        this.code = source["code"];
+	        this.message = source["message"];
+	        this.location = this.convertValues(source["location"], DiagnosticLocation);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 
 }
 
@@ -3941,7 +3641,7 @@ export namespace selection {
 	    originalBytes?: number;
 	    includedBytes?: number;
 	    changed?: boolean;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ConversationContextUsage(source);
@@ -3960,7 +3660,7 @@ export namespace selection {
 	        this.originalBytes = source["originalBytes"];
 	        this.includedBytes = source["includedBytes"];
 	        this.changed = source["changed"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -4072,7 +3772,7 @@ export namespace selection {
 	    sessionAvailable?: boolean;
 	    active?: boolean;
 	    advertised?: boolean;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ConversationSkillUsage(source);
@@ -4092,7 +3792,7 @@ export namespace selection {
 	        this.sessionAvailable = source["sessionAvailable"];
 	        this.active = source["active"];
 	        this.advertised = source["advertised"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -4121,7 +3821,7 @@ export namespace selection {
 	    status: string;
 	    contexts?: ConversationContextUsage[];
 	    skills?: ConversationSkillUsage[];
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ConversationUsage(source);
@@ -4136,7 +3836,7 @@ export namespace selection {
 	        this.status = source["status"];
 	        this.contexts = this.convertValues(source["contexts"], ConversationContextUsage);
 	        this.skills = this.convertValues(source["skills"], ConversationSkillUsage);
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -6790,6 +6490,8 @@ export namespace spec {
 	    level: string;
 	    tokens: number;
 	    summaryStyle?: string;
+	    context?: string;
+	    mode?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ReasoningParam(source);
@@ -6801,6 +6503,8 @@ export namespace spec {
 	        this.level = source["level"];
 	        this.tokens = source["tokens"];
 	        this.summaryStyle = source["summaryStyle"];
+	        this.context = source["context"];
+	        this.mode = source["mode"];
 	    }
 	}
 	export class ModelParam {
@@ -10661,7 +10365,7 @@ export namespace store {
 	    artifact: artifact.Artifact;
 	    collection: collection.CollectionRef;
 	    catalogRevision: number;
-	    definition: definition.Definition;
+	    definition: providerapi.Definition;
 	    body: policy.MCPPolicy;
 	    effectiveEnabled: boolean;
 	    builtIn: boolean;
@@ -10675,7 +10379,7 @@ export namespace store {
 	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
 	        this.collection = this.convertValues(source["collection"], collection.CollectionRef);
 	        this.catalogRevision = source["catalogRevision"];
-	        this.definition = this.convertValues(source["definition"], definition.Definition);
+	        this.definition = this.convertValues(source["definition"], providerapi.Definition);
 	        this.body = this.convertValues(source["body"], policy.MCPPolicy);
 	        this.effectiveEnabled = source["effectiveEnabled"];
 	        this.builtIn = source["builtIn"];
@@ -11141,7 +10845,7 @@ export namespace workspace {
 	    locator: string;
 	    subresourceLocator?: string;
 	    runtimeDisabled: boolean;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceArtifactView(source);
@@ -11161,7 +10865,7 @@ export namespace workspace {
 	        this.locator = source["locator"];
 	        this.subresourceLocator = source["subresourceLocator"];
 	        this.runtimeDisabled = source["runtimeDisabled"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -11306,7 +11010,7 @@ export namespace workspace {
 	    sourceKind?: string;
 	    path?: string;
 	    settings: WorkspaceAttachmentSettings;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceAttachmentView(source);
@@ -11322,7 +11026,7 @@ export namespace workspace {
 	        this.sourceKind = source["sourceKind"];
 	        this.path = source["path"];
 	        this.settings = this.convertValues(source["settings"], WorkspaceAttachmentSettings);
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -11631,7 +11335,7 @@ export namespace workspace {
 	    catalogRevision: number;
 	    contributions: WorkspaceContextContribution[];
 	    prompt: string;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	    decisions: WorkspaceContextDecision[];
 	    promptBytes: number;
 	
@@ -11645,7 +11349,7 @@ export namespace workspace {
 	        this.catalogRevision = source["catalogRevision"];
 	        this.contributions = this.convertValues(source["contributions"], WorkspaceContextContribution);
 	        this.prompt = source["prompt"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	        this.decisions = this.convertValues(source["decisions"], WorkspaceContextDecision);
 	        this.promptBytes = source["promptBytes"];
 	    }
@@ -11678,227 +11382,6 @@ export namespace workspace {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], WorkspaceContextLoadPlan);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ComposeWorkspaceLoadPlanRequestBody {
-	    artifacts: artifact.ArtifactRef[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ComposeWorkspaceLoadPlanRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifacts = this.convertValues(source["artifacts"], artifact.ArtifactRef);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ComposeWorkspaceLoadPlanRequest {
-	    workspace: collection.CollectionRef;
-	    Body?: ComposeWorkspaceLoadPlanRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new ComposeWorkspaceLoadPlanRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
-	        this.Body = this.convertValues(source["Body"], ComposeWorkspaceLoadPlanRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class WorkspaceDefinitionView {
-	    digest: string;
-	    kind: string;
-	    schemaID: string;
-	    schemaVersion: string;
-	    logicalName: string;
-	    logicalVersion?: string;
-	    displayName?: string;
-	    description?: string;
-	    labels?: Record<string, string>;
-	    body: number[];
-	    dependencies?: definition.Selector[];
-	
-	    static createFrom(source: any = {}) {
-	        return new WorkspaceDefinitionView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.digest = source["digest"];
-	        this.kind = source["kind"];
-	        this.schemaID = source["schemaID"];
-	        this.schemaVersion = source["schemaVersion"];
-	        this.logicalName = source["logicalName"];
-	        this.logicalVersion = source["logicalVersion"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.labels = source["labels"];
-	        this.body = source["body"];
-	        this.dependencies = this.convertValues(source["dependencies"], definition.Selector);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class WorkspaceLoadPlanItemView {
-	    artifact: WorkspaceArtifactView;
-	    definition: WorkspaceDefinitionView;
-	    definitionDigest: string;
-	    sourceID: string;
-	    sourceKind: string;
-	    locator: string;
-	    catalogCurrent: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new WorkspaceLoadPlanItemView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], WorkspaceArtifactView);
-	        this.definition = this.convertValues(source["definition"], WorkspaceDefinitionView);
-	        this.definitionDigest = source["definitionDigest"];
-	        this.sourceID = source["sourceID"];
-	        this.sourceKind = source["sourceKind"];
-	        this.locator = source["locator"];
-	        this.catalogCurrent = source["catalogCurrent"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class WorkspaceLoadPlanView {
-	    workspace: collection.CollectionRef;
-	    catalogRevision: number;
-	    items: WorkspaceLoadPlanItemView[];
-	    diagnostics?: diagnostic.Diagnostic[];
-	
-	    static createFrom(source: any = {}) {
-	        return new WorkspaceLoadPlanView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
-	        this.catalogRevision = source["catalogRevision"];
-	        this.items = this.convertValues(source["items"], WorkspaceLoadPlanItemView);
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ComposeWorkspaceLoadPlanResponse {
-	    Body?: WorkspaceLoadPlanView;
-	
-	    static createFrom(source: any = {}) {
-	        return new ComposeWorkspaceLoadPlanResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], WorkspaceLoadPlanView);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -11956,7 +11439,6 @@ export namespace workspace {
 		}
 	}
 	export class CreateEmptyWorkspaceRequest {
-	    rootID?: string;
 	    Body?: CreateEmptyWorkspaceRequestBody;
 	
 	    static createFrom(source: any = {}) {
@@ -11965,7 +11447,6 @@ export namespace workspace {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
 	        this.Body = this.convertValues(source["Body"], CreateEmptyWorkspaceRequestBody);
 	    }
 	
@@ -12061,7 +11542,6 @@ export namespace workspace {
 		}
 	}
 	export class CreateFilesystemWorkspaceRequest {
-	    rootID?: string;
 	    Body?: CreateFilesystemWorkspaceRequestBody;
 	
 	    static createFrom(source: any = {}) {
@@ -12070,7 +11550,6 @@ export namespace workspace {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
 	        this.Body = this.convertValues(source["Body"], CreateFilesystemWorkspaceRequestBody);
 	    }
 	
@@ -12293,7 +11772,7 @@ export namespace workspace {
 	    state: string;
 	    recorded: boolean;
 	    artifact?: artifact.ArtifactRef;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceOccurrenceView(source);
@@ -12312,7 +11791,7 @@ export namespace workspace {
 	        this.state = source["state"];
 	        this.recorded = source["recorded"];
 	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -12374,7 +11853,7 @@ export namespace workspace {
 	    locator: string;
 	    catalogCurrent: boolean;
 	    projectionValid: boolean;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceResourceView(source);
@@ -12388,7 +11867,7 @@ export namespace workspace {
 	        this.locator = source["locator"];
 	        this.catalogCurrent = source["catalogCurrent"];
 	        this.projectionValid = source["projectionValid"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -12413,7 +11892,7 @@ export namespace workspace {
 	    workspace: WorkspaceView;
 	    catalogRevision: number;
 	    catalogCurrent: boolean;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	    resources: WorkspaceResourceView[];
 	    groups: WorkspaceResourceGroupView[];
 	    occurrences: WorkspaceOccurrenceView[];
@@ -12434,7 +11913,7 @@ export namespace workspace {
 	        this.workspace = this.convertValues(source["workspace"], WorkspaceView);
 	        this.catalogRevision = source["catalogRevision"];
 	        this.catalogCurrent = source["catalogCurrent"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	        this.resources = this.convertValues(source["resources"], WorkspaceResourceView);
 	        this.groups = this.convertValues(source["groups"], WorkspaceResourceGroupView);
 	        this.occurrences = this.convertValues(source["occurrences"], WorkspaceOccurrenceView);
@@ -12690,7 +12169,7 @@ export namespace workspace {
 	    catalogCurrent: boolean;
 	    projectionValid: boolean;
 	    runtimeDisabled: boolean;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceContextView(source);
@@ -12711,7 +12190,7 @@ export namespace workspace {
 	        this.catalogCurrent = source["catalogCurrent"];
 	        this.projectionValid = source["projectionValid"];
 	        this.runtimeDisabled = source["runtimeDisabled"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -12906,7 +12385,7 @@ export namespace workspace {
 	    projectionValid: boolean;
 	    catalogCurrent: boolean;
 	    runtimeDisabled: boolean;
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceSkillView(source);
@@ -12926,7 +12405,7 @@ export namespace workspace {
 	        this.projectionValid = source["projectionValid"];
 	        this.catalogCurrent = source["catalogCurrent"];
 	        this.runtimeDisabled = source["runtimeDisabled"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -13140,7 +12619,7 @@ export namespace workspace {
 	}
 	
 	export class ListWorkspacesRequest {
-	    rootID?: string;
+	
 	
 	    static createFrom(source: any = {}) {
 	        return new ListWorkspacesRequest(source);
@@ -13148,7 +12627,7 @@ export namespace workspace {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
+	
 	    }
 	}
 	export class ListWorkspacesResponseBody {
@@ -13279,7 +12758,7 @@ export namespace workspace {
 	    workspace: collection.CollectionRef;
 	    catalogRevision: number;
 	    contributions: WorkspaceContextContribution[];
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceContextInspectionView(source);
@@ -13290,7 +12769,7 @@ export namespace workspace {
 	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
 	        this.catalogRevision = source["catalogRevision"];
 	        this.contributions = this.convertValues(source["contributions"], WorkspaceContextContribution);
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -13408,7 +12887,7 @@ export namespace workspace {
 	    workspace: collection.CollectionRef;
 	    catalogRevision: number;
 	    skills: WorkspaceSkillView[];
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceSkillLoadView(source);
@@ -13419,7 +12898,7 @@ export namespace workspace {
 	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
 	        this.catalogRevision = source["catalogRevision"];
 	        this.skills = this.convertValues(source["skills"], WorkspaceSkillView);
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -13796,7 +13275,7 @@ export namespace workspace {
 	    catalogRevision: number;
 	    createdArtifacts: artifact.ArtifactRef[];
 	    updatedArtifacts: artifact.ArtifactRef[];
-	    diagnostics?: diagnostic.Diagnostic[];
+	    diagnostics?: providerapi.Diagnostic[];
 	    candidates: number;
 	
 	    static createFrom(source: any = {}) {
@@ -13809,7 +13288,7 @@ export namespace workspace {
 	        this.catalogRevision = source["catalogRevision"];
 	        this.createdArtifacts = this.convertValues(source["createdArtifacts"], artifact.ArtifactRef);
 	        this.updatedArtifacts = this.convertValues(source["updatedArtifacts"], artifact.ArtifactRef);
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.diagnostics = this.convertValues(source["diagnostics"], providerapi.Diagnostic);
 	        this.candidates = source["candidates"];
 	    }
 	
@@ -13861,215 +13340,6 @@ export namespace workspace {
 		    return a;
 		}
 	}
-	export class ReplaceWorkspacePrimarySourceRequestBody {
-	    expectedCollectionRevision: number;
-	    previousSourceID: string;
-	    expectedPreviousAttachmentRevision: number;
-	    sourceID: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ReplaceWorkspacePrimarySourceRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.expectedCollectionRevision = source["expectedCollectionRevision"];
-	        this.previousSourceID = source["previousSourceID"];
-	        this.expectedPreviousAttachmentRevision = source["expectedPreviousAttachmentRevision"];
-	        this.sourceID = source["sourceID"];
-	    }
-	}
-	export class ReplaceWorkspacePrimarySourceRequest {
-	    workspace: collection.CollectionRef;
-	    Body?: ReplaceWorkspacePrimarySourceRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new ReplaceWorkspacePrimarySourceRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
-	        this.Body = this.convertValues(source["Body"], ReplaceWorkspacePrimarySourceRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class ReplaceWorkspacePrimarySourceResponse {
-	    Body?: WorkspaceView;
-	
-	    static createFrom(source: any = {}) {
-	        return new ReplaceWorkspacePrimarySourceResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], WorkspaceView);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ResolveWorkspaceResourceRequestBody {
-	    artifact?: artifact.ArtifactRef;
-	    selector?: definition.Selector;
-	
-	    static createFrom(source: any = {}) {
-	        return new ResolveWorkspaceResourceRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
-	        this.selector = this.convertValues(source["selector"], definition.Selector);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ResolveWorkspaceResourceRequest {
-	    workspace: collection.CollectionRef;
-	    Body?: ResolveWorkspaceResourceRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new ResolveWorkspaceResourceRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], collection.CollectionRef);
-	        this.Body = this.convertValues(source["Body"], ResolveWorkspaceResourceRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class ResolveWorkspaceResourceResponseBody {
-	    resource: WorkspaceResourceView;
-	    definition: WorkspaceDefinitionView;
-	
-	    static createFrom(source: any = {}) {
-	        return new ResolveWorkspaceResourceResponseBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.resource = this.convertValues(source["resource"], WorkspaceResourceView);
-	        this.definition = this.convertValues(source["definition"], WorkspaceDefinitionView);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ResolveWorkspaceResourceResponse {
-	    Body?: ResolveWorkspaceResourceResponseBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new ResolveWorkspaceResourceResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], ResolveWorkspaceResourceResponseBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
 	export class RetireWorkspaceRequest {
 	    workspace: collection.CollectionRef;
 	    expectedRevision: number;
@@ -14899,9 +14169,6 @@ export namespace workspace {
 		    return a;
 		}
 	}
-	
-	
-	
 	
 	
 	

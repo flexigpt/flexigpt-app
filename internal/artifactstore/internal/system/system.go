@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
-	catalogimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/catalog"
 	collectionimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	managedartifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/managedartifact"
@@ -27,19 +26,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
-)
-
-var (
-	_ artifactimpl.Repository         = (*sqlite.ArtifactRepository)(nil)
-	_ catalogimpl.Reader              = (*sqlite.CatalogRepository)(nil)
-	_ collectionimpl.Repository       = (*sqlite.CollectionRepository)(nil)
-	_ rootimpl.Repository             = (*sqlite.RootRepository)(nil)
-	_ sourceimpl.Repository           = (*sqlite.SourceRepository)(nil)
-	_ refreshimpl.Publisher           = (*sqlite.Publisher)(nil)
-	_ sourceimpl.Adapter              = (*embedded.Adapter)(nil)
-	_ sourceimpl.Adapter              = (*fsdir.Adapter)(nil)
-	_ sourceimpl.Adapter              = (*managed.Adapter)(nil)
-	_ sourceimpl.ManagedPackageWriter = (*managed.Adapter)(nil)
 )
 
 type Config struct {

@@ -1,7 +1,6 @@
 import type {
 	ArtifactCollection,
 	ArtifactCollectionRef,
-	ArtifactDefinitionSelector,
 	ArtifactRecord,
 	ArtifactRef,
 	ArtifactRoot,
@@ -12,12 +11,8 @@ import type {
 	ArtifactSourceKind,
 	ArtifactSourceSummary,
 	CreateArtifactRootBody,
-	ManagedSourcePackageResult,
-	ManagedSourceState,
-	PublishManagedSourcePackageBody,
 	PurgeArtifactRootResult,
 	PurgeArtifactSourceResult,
-	RemoveManagedSourcePackageBody,
 	UpdateArtifactRootBody,
 	UpdateArtifactSourceBody,
 } from '@/spec/artifact';
@@ -112,8 +107,6 @@ import type {
 	CreateFilesystemWorkspaceBody,
 	DetachWorkspaceSourceBody,
 	PinWorkspaceArtifactBody,
-	ReplaceWorkspacePrimarySourceBody,
-	ResolveWorkspaceResourceResult,
 	RetireWorkspaceResult,
 	SetWorkspaceArtifactEnabledBody,
 	SetWorkspaceArtifactRuntimeDisabledBody,
@@ -129,7 +122,6 @@ import type {
 	WorkspaceContextInspectionView,
 	WorkspaceContextLoadPlan,
 	WorkspaceContextView,
-	WorkspaceLoadPlanView,
 	WorkspaceRef,
 	WorkspaceRefreshResult,
 	WorkspaceSkillLoadView,
@@ -360,20 +352,6 @@ export interface IArtifactStoreAPI {
 	): Promise<PurgeArtifactSourceResult>;
 
 	listArtifactSourceKinds(): Promise<ArtifactSourceKind[]>;
-
-	getManagedSourceState(rootID: ArtifactRootID, sourceID: ArtifactSourceID): Promise<ManagedSourceState>;
-
-	publishManagedSourcePackage(
-		rootID: ArtifactRootID,
-		sourceID: ArtifactSourceID,
-		body: PublishManagedSourcePackageBody
-	): Promise<ManagedSourcePackageResult>;
-
-	removeManagedSourcePackage(
-		rootID: ArtifactRootID,
-		sourceID: ArtifactSourceID,
-		body: RemoveManagedSourcePackageBody
-	): Promise<ManagedSourcePackageResult>;
 }
 
 export interface IWorkspaceAPI {
@@ -386,11 +364,6 @@ export interface IWorkspaceAPI {
 	listWorkspaces(rootID: ArtifactRootID): Promise<WorkspaceView[]>;
 
 	updateWorkspace(workspace: WorkspaceRef, body: UpdateWorkspaceBody): Promise<WorkspaceView>;
-
-	replaceWorkspacePrimarySource(
-		workspace: WorkspaceRef,
-		body: ReplaceWorkspacePrimarySourceBody
-	): Promise<WorkspaceView>;
 
 	setWorkspacePrimarySource(workspace: WorkspaceRef, body: SetWorkspacePrimarySourceBody): Promise<WorkspaceView>;
 
@@ -415,14 +388,6 @@ export interface IWorkspaceAPI {
 	refreshWorkspace(workspace: WorkspaceRef): Promise<WorkspaceRefreshResult>;
 
 	getWorkspaceCatalog(workspace: WorkspaceRef): Promise<WorkspaceCatalogView>;
-
-	composeWorkspaceLoadPlan(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceLoadPlanView>;
-
-	resolveWorkspaceResource(
-		workspace: WorkspaceRef,
-		artifact?: ArtifactRef,
-		selector?: ArtifactDefinitionSelector
-	): Promise<ResolveWorkspaceResourceResult>;
 
 	getWorkspaceArtifact(workspace: WorkspaceRef, artifact: ArtifactRef): Promise<WorkspaceArtifactView>;
 

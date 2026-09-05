@@ -14,10 +14,6 @@ export function ComposeWorkspaceContext(arg1) {
   return window['go']['main']['WorkspaceWrapper']['ComposeWorkspaceContext'](arg1);
 }
 
-export function ComposeWorkspaceLoadPlan(arg1) {
-  return window['go']['main']['WorkspaceWrapper']['ComposeWorkspaceLoadPlan'](arg1);
-}
-
 export function CreateEmptyWorkspace(arg1) {
   return window['go']['main']['WorkspaceWrapper']['CreateEmptyWorkspace'](arg1);
 }
@@ -84,14 +80,6 @@ export function PurgeWorkspaceArtifact(arg1) {
 
 export function RefreshWorkspace(arg1) {
   return window['go']['main']['WorkspaceWrapper']['RefreshWorkspace'](arg1);
-}
-
-export function ReplaceWorkspacePrimarySource(arg1) {
-  return window['go']['main']['WorkspaceWrapper']['ReplaceWorkspacePrimarySource'](arg1);
-}
-
-export function ResolveWorkspaceResource(arg1) {
-  return window['go']['main']['WorkspaceWrapper']['ResolveWorkspaceResource'](arg1);
 }
 
 export function RetireWorkspace(arg1) {
