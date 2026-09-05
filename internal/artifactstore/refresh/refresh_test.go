@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -125,8 +125,8 @@ func refreshTestPublication() Publication {
 	}
 }
 
-func refreshTestDefinition() definition.Definition {
-	value, err := definition.Canonicalize(definition.Definition{
+func refreshTestDefinition() providerapi.Definition {
+	value, err := providerapi.Canonicalize(providerapi.Definition{
 		Kind:           "test.artifact",
 		SchemaID:       "test.schema",
 		SchemaVersion:  "v1",

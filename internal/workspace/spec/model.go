@@ -7,8 +7,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -79,13 +77,13 @@ type Workspace struct {
 }
 
 type Resource struct {
-	Artifact        artifact.Artifact       `json:"-"`
-	Definition      definition.Definition   `json:"-"`
-	Occurrence      *catalog.Occurrence     `json:"-"`
-	Source          source.Summary          `json:"-"`
-	CatalogCurrent  bool                    `json:"-"`
-	ProjectionValid bool                    `json:"-"`
-	Diagnostics     []diagnostic.Diagnostic `json:"-"`
+	Artifact        artifact.Artifact        `json:"-"`
+	Definition      providerapi.Definition   `json:"-"`
+	Occurrence      *catalog.Occurrence      `json:"-"`
+	Source          source.Summary           `json:"-"`
+	CatalogCurrent  bool                     `json:"-"`
+	ProjectionValid bool                     `json:"-"`
+	Diagnostics     []providerapi.Diagnostic `json:"-"`
 }
 
 type ResourceGroup struct {
@@ -149,36 +147,36 @@ type SetPrimaryRequest struct {
 }
 
 type CatalogView struct {
-	Workspace            Workspace               `json:"-"`
-	Catalog              catalog.Snapshot        `json:"-"`
-	Resources            []Resource              `json:"-"`
-	Unrecorded           []catalog.Occurrence    `json:"-"`
-	UnresolvedArtifacts  []artifact.Artifact     `json:"-"`
-	Groups               []ResourceGroup         `json:"-"`
-	CatalogCurrent       bool                    `json:"-"`
-	FreshnessDiagnostics []diagnostic.Diagnostic `json:"-"`
+	Workspace            Workspace                `json:"-"`
+	Catalog              catalog.Snapshot         `json:"-"`
+	Resources            []Resource               `json:"-"`
+	Unrecorded           []catalog.Occurrence     `json:"-"`
+	UnresolvedArtifacts  []artifact.Artifact      `json:"-"`
+	Groups               []ResourceGroup          `json:"-"`
+	CatalogCurrent       bool                     `json:"-"`
+	FreshnessDiagnostics []providerapi.Diagnostic `json:"-"`
 }
 
 // LoadPlanItem contains privileged materialized source state. It must be
 // projected into an explicit adapter response before crossing an API boundary.
 type LoadPlanItem struct {
-	Artifact                   artifact.Artifact     `json:"-"`
-	Definition                 definition.Definition `json:"-"`
-	Source                     source.Summary        `json:"-"`
-	CatalogCurrent             bool                  `json:"-"`
-	OccurrenceDefinitionDigest cryptoutil.Digest     `json:"-"`
-	SourceContentDigest        cryptoutil.Digest     `json:"-"`
-	SourceGeneration           string                `json:"-"`
+	Artifact                   artifact.Artifact      `json:"-"`
+	Definition                 providerapi.Definition `json:"-"`
+	Source                     source.Summary         `json:"-"`
+	CatalogCurrent             bool                   `json:"-"`
+	OccurrenceDefinitionDigest cryptoutil.Digest      `json:"-"`
+	SourceContentDigest        cryptoutil.Digest      `json:"-"`
+	SourceGeneration           string                 `json:"-"`
 }
 
 type LoadPlan struct {
-	Workspace       WorkspaceRef            `json:"-"`
-	CatalogRevision uint64                  `json:"-"`
-	Items           []LoadPlanItem          `json:"-"`
-	Diagnostics     []diagnostic.Diagnostic `json:"-"`
+	Workspace       WorkspaceRef             `json:"-"`
+	CatalogRevision uint64                   `json:"-"`
+	Items           []LoadPlanItem           `json:"-"`
+	Diagnostics     []providerapi.Diagnostic `json:"-"`
 }
 
-type DefinitionValidator func(definition.Definition) error
+type DefinitionValidator func(providerapi.Definition) error
 
 type ArtifactSupport struct {
 	Kind      basespec.ArtifactKind

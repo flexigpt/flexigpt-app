@@ -3,7 +3,7 @@ package catalog
 import (
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -21,7 +21,7 @@ func EqualSnapshot(left, right Snapshot) bool {
 		!maps.Equal(left.AttachmentRevisions, right.AttachmentRevisions) ||
 		!maps.Equal(left.SourceRevisions, right.SourceRevisions) ||
 		!maps.Equal(left.SourceGenerations, right.SourceGenerations) ||
-		!diagnostic.EqualDiagnostics(left.Diagnostics, right.Diagnostics) {
+		!providerapi.EqualDiagnostics(left.Diagnostics, right.Diagnostics) {
 		return false
 	}
 
@@ -71,5 +71,5 @@ func equalOccurrence(left, right Occurrence) bool {
 		left.DecoderID == right.DecoderID &&
 		left.State == right.State &&
 		left.ObservedAt.Equal(right.ObservedAt) &&
-		diagnostic.EqualDiagnostics(left.Diagnostics, right.Diagnostics)
+		providerapi.EqualDiagnostics(left.Diagnostics, right.Diagnostics)
 }

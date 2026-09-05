@@ -4,7 +4,7 @@ import (
 	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -26,7 +26,7 @@ func CloneSnapshot(input Snapshot) Snapshot {
 		len(input.SourceGenerations),
 	)
 	maps.Copy(output.SourceGenerations, input.SourceGenerations)
-	output.Diagnostics = diagnostic.CloneDiagnostics(input.Diagnostics)
+	output.Diagnostics = providerapi.CloneDiagnostics(input.Diagnostics)
 	output.Occurrences = make([]Occurrence, len(input.Occurrences))
 	for index, occurrence := range input.Occurrences {
 		output.Occurrences[index] = CloneOccurrence(occurrence)
@@ -44,6 +44,6 @@ func CloneOccurrence(input Occurrence) Occurrence {
 		value := input.Definition.Clone()
 		output.Definition = &value
 	}
-	output.Diagnostics = diagnostic.CloneDiagnostics(input.Diagnostics)
+	output.Diagnostics = providerapi.CloneDiagnostics(input.Diagnostics)
 	return output
 }

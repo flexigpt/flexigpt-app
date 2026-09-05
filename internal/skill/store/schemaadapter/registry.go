@@ -13,7 +13,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
@@ -42,7 +41,7 @@ type Registry struct {
 type HydratedArtifact struct {
 	Registration    Artifact
 	Member          artifactbuiltin.ContentRef
-	SkillDefinition definition.Definition
+	SkillDefinition providerapi.Definition
 }
 
 type HydratedCollection struct {

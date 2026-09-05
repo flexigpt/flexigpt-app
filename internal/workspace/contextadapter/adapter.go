@@ -9,8 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -37,7 +36,7 @@ type ContextLoadPlan struct {
 	CatalogRevision uint64                   `json:"catalogRevision"`
 	Contributions   []ContextContribution    `json:"contributions"`
 	Prompt          string                   `json:"prompt"`
-	Diagnostics     []diagnostic.Diagnostic  `json:"diagnostics,omitempty"`
+	Diagnostics     []providerapi.Diagnostic `json:"diagnostics,omitempty"`
 	Decisions       []CompositionDecision    `json:"decisions"`
 	PromptBytes     int                      `json:"promptBytes"`
 }
@@ -56,14 +55,14 @@ type ContextDocument struct {
 	CatalogCurrent   bool                                      `json:"catalogCurrent"`
 	ProjectionValid  bool                                      `json:"projectionValid"`
 	RuntimeDisabled  bool                                      `json:"runtimeDisabled"`
-	Diagnostics      []diagnostic.Diagnostic                   `json:"diagnostics,omitempty"`
+	Diagnostics      []providerapi.Diagnostic                  `json:"diagnostics,omitempty"`
 }
 
 type ContextInspection struct {
 	Workspace       collection.CollectionRef `json:"workspace"`
 	CatalogRevision uint64                   `json:"catalogRevision"`
 	Contributions   []ContextContribution    `json:"contributions"`
-	Diagnostics     []diagnostic.Diagnostic  `json:"diagnostics,omitempty"`
+	Diagnostics     []providerapi.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type Adapter struct {
@@ -126,13 +125,13 @@ func (p *Adapter) Compose(
 	output := ContextLoadPlan{
 		Workspace:       workspace,
 		CatalogRevision: loadPlan.CatalogRevision,
-		Diagnostics:     diagnostic.CloneDiagnostics(loadPlan.Diagnostics),
+		Diagnostics:     providerapi.CloneDiagnostics(loadPlan.Diagnostics),
 	}
 	handled := make(map[basespec.ArtifactID]struct{}, len(loadPlan.Items))
 	for _, item := range loadPlan.Items {
 		handled[item.Artifact.ID] = struct{}{}
 		if err := ValidateContextDefinition(item.Definition); err != nil {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				contextProjectionDiagnostic(item.Artifact, err),
 			)
@@ -154,7 +153,7 @@ func (p *Adapter) Compose(
 			return ContextLoadPlan{}, err
 		}
 		if decision.Disposition != artifactadapter.RuntimeAllowed {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				artifactadapter.RuntimeDecisionDiagnostic(decision, item.Artifact),
 			)
@@ -169,12 +168,12 @@ func (p *Adapter) Compose(
 			})
 			continue
 		}
-		body, err := definition.DecodeBody[contextDefinition](
+		body, err := providerapi.DecodeBody[contextDefinition](
 			item.Definition.Body,
 		)
 		if err != nil {
 			handled[item.Artifact.ID] = struct{}{}
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				contextProjectionDiagnostic(item.Artifact, err),
 			)
@@ -244,7 +243,7 @@ func (p *Adapter) List(
 		}
 		value, err := projectContextDocument(resourceValue)
 		if err != nil {
-			value.Diagnostics = diagnostic.AppendDiagnostics(
+			value.Diagnostics = providerapi.AppendDiagnostics(
 				value.Diagnostics,
 				contextProjectionDiagnostic(resourceValue.Artifact, err),
 			)
@@ -310,14 +309,14 @@ func (p *Adapter) Load(
 		}
 		contribution, err := projectContext(resourceValue)
 		if err != nil {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				contextProjectionDiagnostic(resourceValue.Artifact, err),
 			)
 			continue
 		}
 		output.Contributions = append(output.Contributions, contribution)
-		output.Diagnostics = diagnostic.AppendDiagnostics(
+		output.Diagnostics = providerapi.AppendDiagnostics(
 			output.Diagnostics,
 			resourceValue.Artifact.Diagnostics...,
 		)
@@ -325,10 +324,10 @@ func (p *Adapter) Load(
 	sortContextContributions(output.Contributions)
 	if len(requested) != 0 &&
 		len(output.Contributions) != len(requested) {
-		output.Diagnostics = diagnostic.AppendDiagnostics(
+		output.Diagnostics = providerapi.AppendDiagnostics(
 			output.Diagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.DiagnosticError,
+			providerapi.Diagnostic{
+				Severity: providerapi.DiagnosticError,
 				Code:     artifactadapter.DiagnosticCodeArtifactUnresolved,
 				Message:  "one or more requested Context Artifacts were not available for inspection",
 			},
@@ -352,7 +351,7 @@ func projectContextDocument(
 		State:            value.Artifact.State,
 		CatalogCurrent:   value.CatalogCurrent,
 		RuntimeDisabled:  runtimeDisabled,
-		Diagnostics: diagnostic.AppendDiagnostics(
+		Diagnostics: providerapi.AppendDiagnostics(
 			value.Artifact.Diagnostics,
 			value.Diagnostics...,
 		),
@@ -363,7 +362,7 @@ func projectContextDocument(
 	if err := ValidateContextDefinition(value.Definition); err != nil {
 		return output, err
 	}
-	body, err := definition.DecodeBody[contextDefinition](
+	body, err := providerapi.DecodeBody[contextDefinition](
 		value.Definition.Body,
 	)
 	if err != nil {
@@ -382,7 +381,7 @@ func projectContext(
 	if err := ValidateContextDefinition(value.Definition); err != nil {
 		return ContextContribution{}, err
 	}
-	body, err := definition.DecodeBody[contextDefinition](value.Definition.Body)
+	body, err := providerapi.DecodeBody[contextDefinition](value.Definition.Body)
 	if err != nil {
 		return ContextContribution{}, err
 	}
@@ -423,12 +422,12 @@ func contextRuntimeOrder(locator basespec.Locator) int {
 func contextProjectionDiagnostic(
 	value artifact.Artifact,
 	err error,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.DiagnosticError,
+) providerapi.Diagnostic {
+	return providerapi.Diagnostic{
+		Severity: providerapi.DiagnosticError,
 		Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
-		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
-		Location: &diagnostic.DiagnosticLocation{
+		Message:  providerapi.BoundedDiagnosticMessage(err.Error()),
+		Location: &providerapi.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},

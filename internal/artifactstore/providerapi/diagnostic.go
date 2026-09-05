@@ -1,4 +1,4 @@
-package diagnostic
+package providerapi
 
 import (
 	"fmt"

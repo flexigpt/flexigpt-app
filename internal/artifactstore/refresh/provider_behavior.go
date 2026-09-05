@@ -12,9 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -464,11 +462,11 @@ func (p providerAdoptionPolicy) Derive(
 	ctx context.Context,
 	collectionValue collection.Collection,
 	occurrence catalog.Occurrence,
-	definitionValue definition.Definition,
+	definitionValue providerapi.Definition,
 ) (
 	artifact.Draft,
 	bool,
-	[]diagnostic.Diagnostic,
+	[]providerapi.Diagnostic,
 	error,
 ) {
 	if p.behavior == nil || p.ids == nil {
@@ -518,10 +516,10 @@ func (p providerAdoptionPolicy) Derive(
 		return artifact.Draft{}, false, nil, err
 	}
 	if !decision.Adopt ||
-		diagnostic.ContainsErrorDiagnostic(decision.Diagnostics) {
+		providerapi.ContainsErrorDiagnostic(decision.Diagnostics) {
 		return artifact.Draft{},
 			false,
-			diagnostic.CloneDiagnostics(decision.Diagnostics),
+			providerapi.CloneDiagnostics(decision.Diagnostics),
 			nil
 	}
 
@@ -543,7 +541,7 @@ func (p providerAdoptionPolicy) Derive(
 			),
 		},
 		true,
-		diagnostic.CloneDiagnostics(decision.Diagnostics),
+		providerapi.CloneDiagnostics(decision.Diagnostics),
 		nil
 }
 

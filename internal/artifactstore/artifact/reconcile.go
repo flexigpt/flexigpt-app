@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -246,7 +246,7 @@ func (r *Reconciler) Reconcile(
 			CollectionID:       next.CollectionID,
 			ResolvedDefinition: cryptoutil.CloneDigest(next.ResolvedDefinition),
 			State:              next.State,
-			Diagnostics:        diagnostic.CloneDiagnostics(next.Diagnostics),
+			Diagnostics:        providerapi.CloneDiagnostics(next.Diagnostics),
 			Revision:           next.Revision,
 			ModifiedAt:         next.ModifiedAt,
 			ExpectedRevision:   current.Revision,
@@ -294,18 +294,18 @@ func (r *Reconciler) Reconcile(
 			occurrence,
 			occurrence.Definition.Clone(),
 		)
-		if err := diagnostic.ValidateDiagnostics(diagnostics); err != nil {
+		if err := providerapi.ValidateDiagnostics(diagnostics); err != nil {
 			return Reconciliation{}, err
 		}
 		if err != nil {
 			return Reconciliation{}, err
 		}
 
-		result.Diagnostics = diagnostic.AppendDiagnostics(
+		result.Diagnostics = providerapi.AppendDiagnostics(
 			result.Diagnostics,
 			diagnostics...,
 		)
-		if !create || diagnostic.ContainsErrorDiagnostic(diagnostics) {
+		if !create || providerapi.ContainsErrorDiagnostic(diagnostics) {
 			continue
 		}
 
@@ -341,7 +341,7 @@ func (r *Reconciler) Reconcile(
 			ResolvedDefinition: &resolved,
 			Data:               json.RawMessage(data),
 			State:              StateAvailable,
-			Diagnostics: diagnostic.AppendDiagnostics(
+			Diagnostics: providerapi.AppendDiagnostics(
 				occurrence.Diagnostics,
 				diagnostics...,
 			),
@@ -372,12 +372,12 @@ func DeriveSourceState(
 ) (
 	*cryptoutil.Digest,
 	State,
-	[]diagnostic.Diagnostic,
+	[]providerapi.Diagnostic,
 	error,
 ) {
 	if occurrence == nil || occurrence.State == catalog.OccurrenceMissing {
-		return nil, StateMissing, []diagnostic.Diagnostic{{
-			Severity: diagnostic.DiagnosticWarning,
+		return nil, StateMissing, []providerapi.Diagnostic{{
+			Severity: providerapi.DiagnosticWarning,
 			Code:     "artifact.source-missing",
 			Message:  "the artifact source binding is missing",
 		}}, nil
@@ -387,7 +387,7 @@ func DeriveSourceState(
 	case catalog.OccurrenceInvalid:
 		return nil,
 			StateInvalid,
-			diagnostic.CloneDiagnostics(occurrence.Diagnostics),
+			providerapi.CloneDiagnostics(occurrence.Diagnostics),
 			nil
 
 	case catalog.OccurrenceValid:
@@ -402,17 +402,17 @@ func DeriveSourceState(
 		if occurrence.Kind == current.Kind {
 			return resolved,
 				StateAvailable,
-				diagnostic.CloneDiagnostics(occurrence.Diagnostics),
+				providerapi.CloneDiagnostics(occurrence.Diagnostics),
 				nil
 		}
 
-		diagnostics := diagnostic.AppendDiagnostics(
+		diagnostics := providerapi.AppendDiagnostics(
 			occurrence.Diagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.DiagnosticError,
+			providerapi.Diagnostic{
+				Severity: providerapi.DiagnosticError,
 				Code:     "artifact.kind-incompatible",
 				Message:  "the source occurrence changed artifact kind",
-				Location: &diagnostic.DiagnosticLocation{
+				Location: &providerapi.DiagnosticLocation{
 					Locator:            current.Binding.Locator,
 					SubresourceLocator: current.Binding.SubresourceLocator,
 				},
@@ -450,7 +450,7 @@ func occurrenceIdentityForKey(key catalog.OccurrenceKey) occurrenceIdentity {
 func equivalentSourceState(left, right Artifact) bool {
 	return left.State == right.State &&
 		digestPointersEqual(left.ResolvedDefinition, right.ResolvedDefinition) &&
-		diagnostic.EqualDiagnostics(left.Diagnostics, right.Diagnostics)
+		providerapi.EqualDiagnostics(left.Diagnostics, right.Diagnostics)
 }
 
 func digestPointersEqual(left, right *cryptoutil.Digest) bool {

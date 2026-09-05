@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
@@ -25,7 +24,7 @@ type documentReplacePlan struct {
 
 	collectionData json.RawMessage
 
-	definitions   map[basespec.SubresourceLocator]definition.Definition
+	definitions   map[basespec.SubresourceLocator]providerapi.Definition
 	registrations map[basespec.SubresourceLocator]Registration
 
 	dataBySubresource   map[basespec.SubresourceLocator]json.RawMessage
@@ -214,7 +213,7 @@ func validateRequiredPolicyReferences(
 func preparedRegistrationData(
 	bundle Bundle,
 	registration Registration,
-	definitionValue definition.Definition,
+	definitionValue providerapi.Definition,
 	existing artifact.Artifact,
 ) (json.RawMessage, error) {
 	var (

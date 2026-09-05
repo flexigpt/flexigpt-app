@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 )
 
 // Collection is a provider-safe view of a persisted Collection.
@@ -79,7 +77,7 @@ type AdoptionInput struct {
 	Collection Collection
 	Attachment Attachment
 	Occurrence Occurrence
-	Definition definition.Definition
+	Definition Definition
 }
 
 func (i AdoptionInput) Clone() AdoptionInput {
@@ -98,18 +96,18 @@ type AdoptionDecision struct {
 	Name        string
 	Enabled     bool
 	Data        json.RawMessage
-	Diagnostics []diagnostic.Diagnostic
+	Diagnostics []Diagnostic
 }
 
 func (d AdoptionDecision) Clone() AdoptionDecision {
 	output := d
 	output.Data = append(json.RawMessage(nil), d.Data...)
-	output.Diagnostics = diagnostic.CloneDiagnostics(d.Diagnostics)
+	output.Diagnostics = CloneDiagnostics(d.Diagnostics)
 	return output
 }
 
 func (d AdoptionDecision) Validate() error {
-	if err := diagnostic.ValidateDiagnostics(d.Diagnostics); err != nil {
+	if err := ValidateDiagnostics(d.Diagnostics); err != nil {
 		return err
 	}
 	if !d.Adopt {

@@ -44,7 +44,7 @@ type InvokeToolRequest struct {
 // InvokeToolResponseBody is the result of a tool invocation.
 type InvokeToolResponseBody struct {
 	// Output is the JSON-serializable result produced by the tool. Its shape depends on
-	// the tool definition.
+	// the tool providerapi.
 	Outputs []llmtoolsSpec.ToolOutputUnion `json:"outputs,omitempty"`
 
 	// Meta contains implementation-specific metadata (e.g., HTTP status, duration, etc.).

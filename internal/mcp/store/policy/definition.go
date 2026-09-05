@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 )
 
@@ -20,9 +20,9 @@ func PolicySubresource(
 }
 
 func PolicyBodyFromDefinition(
-	input definition.Definition,
+	input providerapi.Definition,
 ) (mcpPolicy.MCPPolicy, error) {
-	value, err := definition.Canonicalize(input)
+	value, err := providerapi.Canonicalize(input)
 	if err != nil {
 		return mcpPolicy.MCPPolicy{}, err
 	}
@@ -34,7 +34,7 @@ func PolicyBodyFromDefinition(
 			basespec.ErrInvalid,
 		)
 	}
-	body, err := definition.DecodeBody[mcpPolicy.MCPPolicy](
+	body, err := providerapi.DecodeBody[mcpPolicy.MCPPolicy](
 		value.Body,
 	)
 	if err != nil {
@@ -51,21 +51,21 @@ func PolicyBodyFromDefinition(
 // Artifact Store-canonicalized MCP Bundle into an immutable Definition.
 func DefinitionForCanonicalPolicy(
 	input PolicyDocument,
-) (definition.Definition, error) {
+) (providerapi.Definition, error) {
 	if input.Kind != artifactbuiltin.PolicyKind ||
 		input.SchemaID != artifactbuiltin.PolicySchemaID ||
 		input.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
-		return definition.Definition{}, fmt.Errorf(
+		return providerapi.Definition{}, fmt.Errorf(
 			"%w: canonical MCP policy input has another schema identity",
 			basespec.ErrInvalid,
 		)
 	}
-	body, err := definition.EncodeBody(input.Body)
+	body, err := providerapi.EncodeBody(input.Body)
 	if err != nil {
-		return definition.Definition{}, err
+		return providerapi.Definition{}, err
 	}
-	return definition.Canonicalize(
-		definition.Definition{
+	return providerapi.Canonicalize(
+		providerapi.Definition{
 			Kind:           artifactbuiltin.PolicyKind,
 			SchemaID:       artifactbuiltin.PolicySchemaID,
 			SchemaVersion:  artifactbuiltin.MCPSchemaVersion,

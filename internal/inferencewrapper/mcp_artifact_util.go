@@ -781,15 +781,15 @@ func (b *MCPInferenceBridge) getPromptAsText(
 }
 
 func missingRequiredMCPArguments(
-	definitions map[string]mcpServer.MCPArgumentDefinition,
+	defs map[string]mcpServer.MCPArgumentDefinition,
 	values map[string]string,
 ) []string {
 	missing := make([]string, 0)
-	for name, definition := range definitions {
-		if !definition.Required {
+	for name, def := range defs {
+		if !def.Required {
 			continue
 		}
-		argumentName := definition.Name
+		argumentName := def.Name
 		if argumentName == "" {
 			argumentName = name
 		}

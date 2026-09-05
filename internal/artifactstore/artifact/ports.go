@@ -9,8 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -100,8 +99,8 @@ type Policy interface {
 		ctx context.Context,
 		value collection.Collection,
 		occurrence catalog.Occurrence,
-		def definition.Definition,
-	) (Draft, bool, []diagnostic.Diagnostic, error)
+		def providerapi.Definition,
+	) (Draft, bool, []providerapi.Diagnostic, error)
 }
 
 type SourceStateUpdate struct {
@@ -110,7 +109,7 @@ type SourceStateUpdate struct {
 	CollectionID       basespec.CollectionID
 	ResolvedDefinition *cryptoutil.Digest
 	State              State
-	Diagnostics        []diagnostic.Diagnostic
+	Diagnostics        []providerapi.Diagnostic
 	Revision           uint64
 	ModifiedAt         time.Time
 	ExpectedRevision   uint64
@@ -129,7 +128,7 @@ func (u SourceStateUpdate) Validate() error {
 	if err := validateSourceState(u.State, u.ResolvedDefinition); err != nil {
 		return err
 	}
-	if err := diagnostic.ValidateDiagnostics(u.Diagnostics); err != nil {
+	if err := providerapi.ValidateDiagnostics(u.Diagnostics); err != nil {
 		return err
 	}
 	if u.ExpectedRevision == 0 ||
@@ -146,5 +145,5 @@ func (u SourceStateUpdate) Validate() error {
 type Reconciliation struct {
 	Creates     []Artifact
 	Updates     []SourceStateUpdate
-	Diagnostics []diagnostic.Diagnostic
+	Diagnostics []providerapi.Diagnostic
 }

@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -27,24 +26,24 @@ type OccurrenceKey struct {
 }
 
 type Occurrence struct {
-	RootID              basespec.RootID         `json:"rootID"`
-	CollectionID        basespec.CollectionID   `json:"collectionID"`
-	Key                 OccurrenceKey           `json:"key"`
-	Kind                basespec.ArtifactKind   `json:"kind,omitempty"`
-	LogicalName         basespec.LogicalName    `json:"logicalName,omitempty"`
-	LogicalVersion      basespec.LogicalVersion `json:"logicalVersion,omitempty"`
-	DefinitionDigest    *cryptoutil.Digest      `json:"definitionDigest,omitempty"`
-	SourceContentDigest *cryptoutil.Digest      `json:"sourceContentDigest,omitempty"`
-	DecoderID           basespec.DecoderID      `json:"decoderID,omitempty"`
-	State               OccurrenceState         `json:"state"`
-	Diagnostics         []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
-	ObservedAt          time.Time               `json:"observedAt"`
+	RootID              basespec.RootID          `json:"rootID"`
+	CollectionID        basespec.CollectionID    `json:"collectionID"`
+	Key                 OccurrenceKey            `json:"key"`
+	Kind                basespec.ArtifactKind    `json:"kind,omitempty"`
+	LogicalName         basespec.LogicalName     `json:"logicalName,omitempty"`
+	LogicalVersion      basespec.LogicalVersion  `json:"logicalVersion,omitempty"`
+	DefinitionDigest    *cryptoutil.Digest       `json:"definitionDigest,omitempty"`
+	SourceContentDigest *cryptoutil.Digest       `json:"sourceContentDigest,omitempty"`
+	DecoderID           basespec.DecoderID       `json:"decoderID,omitempty"`
+	State               OccurrenceState          `json:"state"`
+	Diagnostics         []providerapi.Diagnostic `json:"diagnostics,omitempty"`
+	ObservedAt          time.Time                `json:"observedAt"`
 
 	// Definition is the current parsed definition cache. The portable source
 	// package remains authoritative. SQLite persists this field with the
 	// current catalog occurrence, but it is intentionally not part of the
 	// public catalog JSON projection.
-	Definition *definition.Definition `json:"-"`
+	Definition *providerapi.Definition `json:"-"`
 }
 
 func (o Occurrence) Validate() error {
@@ -89,7 +88,7 @@ func (o Occurrence) Validate() error {
 		}
 	}
 	if o.Definition != nil {
-		canonical, err := definition.Canonicalize(*o.Definition)
+		canonical, err := providerapi.Canonicalize(*o.Definition)
 		if err != nil {
 			return fmt.Errorf("occurrence definition: %w", err)
 		}
@@ -146,7 +145,7 @@ func (o Occurrence) Validate() error {
 			o.State,
 		)
 	}
-	if err := diagnostic.ValidateDiagnostics(o.Diagnostics); err != nil {
+	if err := providerapi.ValidateDiagnostics(o.Diagnostics); err != nil {
 		return err
 	}
 	if o.ObservedAt.IsZero() {

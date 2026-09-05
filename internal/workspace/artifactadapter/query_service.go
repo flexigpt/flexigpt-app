@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -150,7 +150,7 @@ func (q *QueryService) ComposeLoadPlan(
 	plan := spec.LoadPlan{
 		Workspace:       workspace,
 		CatalogRevision: view.Catalog.Revision,
-		Diagnostics: diagnostic.AppendDiagnostics(
+		Diagnostics: providerapi.AppendDiagnostics(
 			view.Catalog.Diagnostics,
 			view.FreshnessDiagnostics...,
 		),
@@ -177,11 +177,11 @@ func (q *QueryService) ComposeLoadPlan(
 		resourceValue, found := resources[artifactID]
 		if !found {
 			if unresolvedValue, exists := unresolved[artifactID]; exists {
-				plan.Diagnostics = diagnostic.AppendDiagnostics(
+				plan.Diagnostics = providerapi.AppendDiagnostics(
 					plan.Diagnostics,
 					unresolvedValue.Diagnostics...,
 				)
-				plan.Diagnostics = diagnostic.AppendDiagnostics(
+				plan.Diagnostics = providerapi.AppendDiagnostics(
 					plan.Diagnostics,
 					recordAvailabilityDiagnostic(
 						unresolvedValue,
@@ -190,10 +190,10 @@ func (q *QueryService) ComposeLoadPlan(
 					),
 				)
 			} else {
-				plan.Diagnostics = diagnostic.AppendDiagnostics(
+				plan.Diagnostics = providerapi.AppendDiagnostics(
 					plan.Diagnostics,
-					diagnostic.Diagnostic{
-						Severity: diagnostic.DiagnosticError,
+					providerapi.Diagnostic{
+						Severity: providerapi.DiagnosticError,
 						Code:     DiagnosticCodeArtifactUnresolved,
 						Message:  "the requested Workspace Artifact was not found",
 					},
@@ -204,7 +204,7 @@ func (q *QueryService) ComposeLoadPlan(
 
 		switch {
 		case !view.CatalogCurrent:
-			plan.Diagnostics = diagnostic.AppendDiagnostics(
+			plan.Diagnostics = providerapi.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
 					resourceValue.Artifact,
@@ -215,7 +215,7 @@ func (q *QueryService) ComposeLoadPlan(
 			continue
 
 		case !resourceValue.Artifact.Enabled:
-			plan.Diagnostics = diagnostic.AppendDiagnostics(
+			plan.Diagnostics = providerapi.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
 					resourceValue.Artifact,
@@ -226,7 +226,7 @@ func (q *QueryService) ComposeLoadPlan(
 			continue
 
 		case resourceValue.Artifact.State != artifact.StateAvailable:
-			plan.Diagnostics = diagnostic.AppendDiagnostics(
+			plan.Diagnostics = providerapi.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
 					resourceValue.Artifact,
@@ -237,7 +237,7 @@ func (q *QueryService) ComposeLoadPlan(
 			continue
 
 		case !resourceValue.CatalogCurrent:
-			plan.Diagnostics = diagnostic.AppendDiagnostics(
+			plan.Diagnostics = providerapi.AppendDiagnostics(
 				plan.Diagnostics,
 				recordAvailabilityDiagnostic(
 					resourceValue.Artifact,
@@ -248,7 +248,7 @@ func (q *QueryService) ComposeLoadPlan(
 			continue
 
 		case !resourceValue.ProjectionValid:
-			plan.Diagnostics = diagnostic.AppendDiagnostics(
+			plan.Diagnostics = providerapi.AppendDiagnostics(
 				plan.Diagnostics,
 				resourceValue.Diagnostics...,
 			)
@@ -274,7 +274,7 @@ func (q *QueryService) ComposeLoadPlan(
 			SourceContentDigest:        sourceContentDigest,
 			SourceGeneration:           view.Catalog.SourceGenerations[resourceValue.Source.ID],
 		})
-		plan.Diagnostics = diagnostic.AppendDiagnostics(
+		plan.Diagnostics = providerapi.AppendDiagnostics(
 			plan.Diagnostics,
 			resourceValue.Artifact.Diagnostics...,
 		)
@@ -306,32 +306,32 @@ func (q *QueryService) Catalog(
 	snapshot := inspection.Catalog
 	catalogCurrent := inspection.IsCurrent()
 
-	freshnessDiagnostics := make([]diagnostic.Diagnostic, 0)
+	freshnessDiagnostics := make([]providerapi.Diagnostic, 0)
 	if inspection.MetadataChanged {
-		freshnessDiagnostics = diagnostic.AppendDiagnostics(
+		freshnessDiagnostics = providerapi.AppendDiagnostics(
 			freshnessDiagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.DiagnosticWarning,
+			providerapi.Diagnostic{
+				Severity: providerapi.DiagnosticWarning,
 				Code:     DiagnosticCodeCatalogStale,
 				Message:  "the Workspace catalog no longer matches current collection metadata",
 			},
 		)
 	}
 	if inspection.DecoderChanged {
-		freshnessDiagnostics = diagnostic.AppendDiagnostics(
+		freshnessDiagnostics = providerapi.AppendDiagnostics(
 			freshnessDiagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.DiagnosticWarning,
+			providerapi.Diagnostic{
+				Severity: providerapi.DiagnosticWarning,
 				Code:     DiagnosticCodeCatalogDecoderStale,
 				Message:  "the Workspace decoder capability set changed after this catalog was published",
 			},
 		)
 	}
 	if inspection.PlanChanged {
-		freshnessDiagnostics = diagnostic.AppendDiagnostics(
+		freshnessDiagnostics = providerapi.AppendDiagnostics(
 			freshnessDiagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.DiagnosticWarning,
+			providerapi.Diagnostic{
+				Severity: providerapi.DiagnosticWarning,
 				Code:     DiagnosticCodeCatalogPlanStale,
 				Message:  "the Workspace provider discovery behavior changed after this catalog was published",
 			},
@@ -442,7 +442,7 @@ func (q *QueryService) Catalog(
 		}
 
 		projectionValid := true
-		projectionDiagnostics := make([]diagnostic.Diagnostic, 0)
+		projectionDiagnostics := make([]providerapi.Diagnostic, 0)
 		if _, dataErr := DecodeArtifactData(localArtifact.Data); dataErr != nil {
 			projectionValid = false
 			projectionDiagnostics = append(
@@ -537,12 +537,12 @@ func recordAvailabilityDiagnostic(
 	value artifact.Artifact,
 	code string,
 	message string,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.DiagnosticError,
+) providerapi.Diagnostic {
+	return providerapi.Diagnostic{
+		Severity: providerapi.DiagnosticError,
 		Code:     code,
 		Message:  message,
-		Location: &diagnostic.DiagnosticLocation{
+		Location: &providerapi.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
@@ -552,12 +552,12 @@ func recordAvailabilityDiagnostic(
 func projectionDiagnostic(
 	value artifact.Artifact,
 	err error,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.DiagnosticError,
+) providerapi.Diagnostic {
+	return providerapi.Diagnostic{
+		Severity: providerapi.DiagnosticError,
 		Code:     DiagnosticCodeProjectionInvalid,
-		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
-		Location: &diagnostic.DiagnosticLocation{
+		Message:  providerapi.BoundedDiagnosticMessage(err.Error()),
+		Location: &providerapi.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
@@ -566,11 +566,11 @@ func projectionDiagnostic(
 
 func recordWithDiagnostic(
 	value artifact.Artifact,
-	d diagnostic.Diagnostic,
+	d providerapi.Diagnostic,
 ) artifact.Artifact {
 	output := value
-	output.Diagnostics = diagnostic.AppendDiagnostics(
-		[]diagnostic.Diagnostic{d},
+	output.Diagnostics = providerapi.AppendDiagnostics(
+		[]providerapi.Diagnostic{d},
 		value.Diagnostics...,
 	)
 	return output
@@ -578,12 +578,12 @@ func recordWithDiagnostic(
 
 func recordSourceUnavailableDiagnostic(
 	value artifact.Artifact,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.DiagnosticError,
+) providerapi.Diagnostic {
+	return providerapi.Diagnostic{
+		Severity: providerapi.DiagnosticError,
 		Code:     DiagnosticCodeArtifactUnavailable,
 		Message:  "the Artifact Source is no longer attached to this Workspace",
-		Location: &diagnostic.DiagnosticLocation{
+		Location: &providerapi.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
@@ -593,17 +593,17 @@ func recordSourceUnavailableDiagnostic(
 func recordDefinitionUnavailableDiagnostic(
 	value artifact.Artifact,
 	cause error,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.DiagnosticError,
+) providerapi.Diagnostic {
+	return providerapi.Diagnostic{
+		Severity: providerapi.DiagnosticError,
 		Code:     DiagnosticCodeArtifactUnavailable,
-		Message: diagnostic.BoundedDiagnosticMessage(
+		Message: providerapi.BoundedDiagnosticMessage(
 			fmt.Sprintf(
 				"the resolved Workspace Artifact definition could not be read: %v",
 				cause,
 			),
 		),
-		Location: &diagnostic.DiagnosticLocation{
+		Location: &providerapi.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},

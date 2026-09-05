@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -265,7 +265,7 @@ func (p *Publisher) Publish(
 		PlanFingerprint:     publication.PlanFingerprint,
 		DecoderFingerprint:  publication.DecoderFingerprint,
 		PublishedAt:         publication.PublishedAt,
-		Diagnostics:         diagnostic.CloneDiagnostics(publication.Diagnostics),
+		Diagnostics:         providerapi.CloneDiagnostics(publication.Diagnostics),
 		Occurrences:         occurrences,
 	}
 	if err := snapshot.Validate(); err != nil {
@@ -387,7 +387,7 @@ func updateArtifactSourceStateTx(
 	}
 	if value.State != expectedState ||
 		!cryptoutil.IsDigestEqual(value.ResolvedDefinition, expectedDigest) ||
-		!diagnostic.EqualDiagnostics(value.Diagnostics, expectedDiagnostics) {
+		!providerapi.EqualDiagnostics(value.Diagnostics, expectedDiagnostics) {
 		return fmt.Errorf(
 			"%w: source-derived artifact update does not match current occurrence",
 			basespec.ErrInvalid,

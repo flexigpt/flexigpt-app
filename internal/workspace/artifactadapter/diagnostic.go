@@ -2,7 +2,7 @@ package artifactadapter
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -25,7 +25,7 @@ const (
 func WorkspaceArtifactErrorDiagnostics(
 	locator basespec.Locator,
 	err error,
-) []diagnostic.Diagnostic {
+) []providerapi.Diagnostic {
 	return WorkspaceArtifactDiagnostics(
 		locator,
 		DiagnosticCodeArtifactInvalid,
@@ -37,12 +37,12 @@ func WorkspaceArtifactDiagnostics(
 	locator basespec.Locator,
 	code string,
 	message string,
-) []diagnostic.Diagnostic {
-	return []diagnostic.Diagnostic{{
-		Severity: diagnostic.DiagnosticError,
+) []providerapi.Diagnostic {
+	return []providerapi.Diagnostic{{
+		Severity: providerapi.DiagnosticError,
 		Code:     code,
-		Message:  diagnostic.BoundedDiagnosticMessage(message),
-		Location: &diagnostic.DiagnosticLocation{
+		Message:  providerapi.BoundedDiagnosticMessage(message),
+		Location: &providerapi.DiagnosticLocation{
 			Locator: locator,
 		},
 	}}

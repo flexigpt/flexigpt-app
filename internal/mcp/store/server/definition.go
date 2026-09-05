@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
 const (
@@ -31,24 +31,24 @@ func ServerSubresource(
 // projection and generic Definition canonicalization.
 func DefinitionForCanonicalServer(
 	input ServerDocument,
-) (definition.Definition, error) {
+) (providerapi.Definition, error) {
 	if input.Kind != artifactbuiltin.ServerKind ||
 		input.SchemaID != artifactbuiltin.ServerSchemaID ||
 		input.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
-		return definition.Definition{}, fmt.Errorf(
+		return providerapi.Definition{}, fmt.Errorf(
 			"%w: canonical MCP server input has another schema identity",
 			basespec.ErrInvalid,
 		)
 	}
 
-	body, err := definition.EncodeBody(
+	body, err := providerapi.EncodeBody(
 		ServerDefinitionBody{
 			MCPServer: input.MCPServer,
 			Extension: input.Extension,
 		},
 	)
 	if err != nil {
-		return definition.Definition{}, err
+		return providerapi.Definition{}, err
 	}
 
 	labels := maps.Clone(input.Labels)
@@ -58,19 +58,19 @@ func DefinitionForCanonicalServer(
 	labels[TransportLabelKey] = string(input.MCPServer.Type)
 	labels[AuthModeLabelKey] = string(input.Extension.Auth.Mode)
 
-	dependencies := []definition.Selector(nil)
+	dependencies := []providerapi.Selector(nil)
 	if input.Extension.Policy != nil {
 		dependencies = append(
 			dependencies,
-			definition.Selector{
+			providerapi.Selector{
 				Kind:        artifactbuiltin.PolicyKind,
 				LogicalName: input.Extension.Policy.Ref,
 			},
 		)
 	}
 
-	return definition.Canonicalize(
-		definition.Definition{
+	return providerapi.Canonicalize(
+		providerapi.Definition{
 			Kind:           artifactbuiltin.ServerKind,
 			SchemaID:       artifactbuiltin.ServerSchemaID,
 			SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
@@ -86,9 +86,9 @@ func DefinitionForCanonicalServer(
 }
 
 func ServerBodyFromDefinition(
-	input definition.Definition,
+	input providerapi.Definition,
 ) (ServerDefinitionBody, error) {
-	value, err := definition.Canonicalize(input)
+	value, err := providerapi.Canonicalize(input)
 	if err != nil {
 		return ServerDefinitionBody{}, err
 	}
@@ -101,7 +101,7 @@ func ServerBodyFromDefinition(
 		)
 	}
 
-	body, err := definition.DecodeBody[ServerDefinitionBody](value.Body)
+	body, err := providerapi.DecodeBody[ServerDefinitionBody](value.Body)
 	if err != nil {
 		return ServerDefinitionBody{}, err
 	}

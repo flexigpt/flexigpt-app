@@ -8,8 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -30,8 +29,8 @@ func TestSnapshotCloneAndEqualityIgnoreOccurrenceOrder(t *testing.T) {
 	}
 	cloned := CloneSnapshot(original)
 	original.AttachmentRevisions[catalogTestSourceID] = 9
-	original.Occurrences[0].Diagnostics = []diagnostic.Diagnostic{{
-		Severity: diagnostic.DiagnosticWarning,
+	original.Occurrences[0].Diagnostics = []providerapi.Diagnostic{{
+		Severity: providerapi.DiagnosticWarning,
 		Code:     "test.warning",
 		Message:  "changed",
 	}}
@@ -145,8 +144,8 @@ func catalogTestOccurrence(locator basespec.Locator) Occurrence {
 	}
 }
 
-func catalogTestDefinition() definition.Definition {
-	value, err := definition.Canonicalize(definition.Definition{
+func catalogTestDefinition() providerapi.Definition {
+	value, err := providerapi.Canonicalize(providerapi.Definition{
 		Kind:           "test.artifact",
 		SchemaID:       "test.schema",
 		SchemaVersion:  "v1",

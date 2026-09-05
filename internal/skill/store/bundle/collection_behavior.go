@@ -6,7 +6,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 )
@@ -209,11 +208,11 @@ func (skillCollectionBehavior) DecideAutomaticAdoption(
 
 	if err := skillArtifact.ValidateDefinition(input.Definition); err != nil {
 		return providerapi.AdoptionDecision{
-			Diagnostics: []diagnostic.Diagnostic{{
-				Severity: diagnostic.DiagnosticError,
+			Diagnostics: []providerapi.Diagnostic{{
+				Severity: providerapi.DiagnosticError,
 				Code:     "skill.bundle.definition-invalid",
-				Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
-				Location: &diagnostic.DiagnosticLocation{
+				Message:  providerapi.BoundedDiagnosticMessage(err.Error()),
+				Location: &providerapi.DiagnosticLocation{
 					Locator: input.Occurrence.Locator,
 					SubresourceLocator: input.Occurrence.
 						SubresourceLocator,

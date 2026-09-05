@@ -12,8 +12,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -22,7 +20,7 @@ import (
 
 type Result struct {
 	Occurrences []catalog.Occurrence
-	Diagnostics []diagnostic.Diagnostic
+	Diagnostics []providerapi.Diagnostic
 	Candidates  int
 }
 
@@ -220,14 +218,14 @@ func (e *Engine) Discover(
 		}
 		result.Candidates++
 		if entry.SizeBytes > plan.MaxCandidateBytes {
-			diagnostics := []diagnostic.Diagnostic{{
-				Severity: diagnostic.DiagnosticError,
+			diagnostics := []providerapi.Diagnostic{{
+				Severity: providerapi.DiagnosticError,
 				Code:     DiagnosticCodeCandidateTooLarge,
 				Message: fmt.Sprintf(
 					"candidate exceeds the %d byte limit",
 					plan.MaxCandidateBytes,
 				),
-				Location: &diagnostic.DiagnosticLocation{
+				Location: &providerapi.DiagnosticLocation{
 					Locator: entry.Locator,
 				},
 			}}
@@ -248,7 +246,7 @@ func (e *Engine) Discover(
 				sourceID,
 				entry.Locator,
 			)
-			result.Diagnostics = diagnostic.AppendDiagnostics(
+			result.Diagnostics = providerapi.AppendDiagnostics(
 				result.Diagnostics,
 				diagnostics...,
 			)
@@ -280,11 +278,11 @@ func (e *Engine) Discover(
 		sourceDigest := cryptoutil.DigestBytes(content)
 		if expectedDigest, expected := plan.ExpectedContentDigests[entry.Locator]; expected &&
 			sourceDigest != expectedDigest {
-			diagnostics := []diagnostic.Diagnostic{{
-				Severity: diagnostic.DiagnosticError,
+			diagnostics := []providerapi.Diagnostic{{
+				Severity: providerapi.DiagnosticError,
 				Code:     DiagnosticCodeContentDigestMismatch,
 				Message:  "candidate content does not match its expected portable digest",
-				Location: &diagnostic.DiagnosticLocation{
+				Location: &providerapi.DiagnosticLocation{
 					Locator: entry.Locator,
 				},
 			}}
@@ -305,7 +303,7 @@ func (e *Engine) Discover(
 				sourceID,
 				entry.Locator,
 			)
-			result.Diagnostics = diagnostic.AppendDiagnostics(
+			result.Diagnostics = providerapi.AppendDiagnostics(
 				result.Diagnostics,
 				diagnostics...,
 			)
@@ -339,7 +337,7 @@ func (e *Engine) Discover(
 				sourceID,
 				entry.Locator,
 			)
-			result.Diagnostics = diagnostic.AppendDiagnostics(
+			result.Diagnostics = providerapi.AppendDiagnostics(
 				result.Diagnostics,
 				diagnostics...,
 			)
@@ -353,7 +351,7 @@ func (e *Engine) Discover(
 				now,
 			)
 			if len(diagnostics) != 0 {
-				result.Diagnostics = diagnostic.AppendDiagnostics(
+				result.Diagnostics = providerapi.AppendDiagnostics(
 					result.Diagnostics,
 					diagnostics...,
 				)
@@ -376,12 +374,12 @@ func (e *Engine) Discover(
 				err,
 			)
 		}
-		result.Diagnostics = diagnostic.AppendDiagnostics(
+		result.Diagnostics = providerapi.AppendDiagnostics(
 			result.Diagnostics,
 			diagnostics...,
 		)
 
-		if diagnostic.ContainsErrorDiagnostic(diagnostics) {
+		if providerapi.ContainsErrorDiagnostic(diagnostics) {
 			applyInvalidForLocator(
 				occurrences,
 				rootID,
@@ -443,22 +441,22 @@ func (e *Engine) Discover(
 					err,
 				)
 			}
-			result.Diagnostics = diagnostic.AppendDiagnostics(
+			result.Diagnostics = providerapi.AppendDiagnostics(
 				result.Diagnostics,
 				item.Diagnostics...,
 			)
-			itemDiagnostics := diagnostic.AppendDiagnostics(
+			itemDiagnostics := providerapi.AppendDiagnostics(
 				diagnostics,
 				item.Diagnostics...,
 			)
-			if diagnostic.ContainsErrorDiagnostic(item.Diagnostics) {
+			if providerapi.ContainsErrorDiagnostic(item.Diagnostics) {
 				previous, found := occurrences[key]
 				if found {
 					previous.DefinitionDigest = nil
 					previous.SourceContentDigest = &sourceDigest
 					previous.DecoderID = decoder.ID()
 					previous.State = catalog.OccurrenceInvalid
-					previous.Diagnostics = diagnostic.CloneDiagnostics(itemDiagnostics)
+					previous.Diagnostics = providerapi.CloneDiagnostics(itemDiagnostics)
 					previous.ObservedAt = now
 					occurrences[key] = previous
 					continue
@@ -477,18 +475,18 @@ func (e *Engine) Discover(
 				continue
 			}
 
-			canonical, err := definition.Canonicalize(item.Definition)
+			canonical, err := providerapi.Canonicalize(item.Definition)
 			if err != nil {
-				definitionDiagnostics := []diagnostic.Diagnostic{{
-					Severity: diagnostic.DiagnosticError,
+				definitionDiagnostics := []providerapi.Diagnostic{{
+					Severity: providerapi.DiagnosticError,
 					Code:     DiagnosticCodeDefinitionInvalid,
-					Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
-					Location: &diagnostic.DiagnosticLocation{
+					Message:  providerapi.BoundedDiagnosticMessage(err.Error()),
+					Location: &providerapi.DiagnosticLocation{
 						Locator:            entry.Locator,
 						SubresourceLocator: item.SubresourceLocator,
 					},
 				}}
-				itemDiagnostics = diagnostic.AppendDiagnostics(
+				itemDiagnostics = providerapi.AppendDiagnostics(
 					itemDiagnostics,
 					definitionDiagnostics...,
 				)
@@ -498,10 +496,10 @@ func (e *Engine) Discover(
 					previous.SourceContentDigest = &sourceDigest
 					previous.DecoderID = decoder.ID()
 					previous.State = catalog.OccurrenceInvalid
-					previous.Diagnostics = diagnostic.CloneDiagnostics(itemDiagnostics)
+					previous.Diagnostics = providerapi.CloneDiagnostics(itemDiagnostics)
 					previous.ObservedAt = now
 					occurrences[key] = previous
-					result.Diagnostics = diagnostic.AppendDiagnostics(
+					result.Diagnostics = providerapi.AppendDiagnostics(
 						result.Diagnostics,
 						definitionDiagnostics...,
 					)
@@ -518,7 +516,7 @@ func (e *Engine) Discover(
 					Diagnostics:         itemDiagnostics,
 					ObservedAt:          now,
 				}
-				result.Diagnostics = diagnostic.AppendDiagnostics(
+				result.Diagnostics = providerapi.AppendDiagnostics(
 					result.Diagnostics,
 					definitionDiagnostics...,
 				)
@@ -539,7 +537,7 @@ func (e *Engine) Discover(
 				SourceContentDigest: &sourceDigest,
 				DecoderID:           decoder.ID(),
 				State:               catalog.OccurrenceValid,
-				Diagnostics:         diagnostic.CloneDiagnostics(itemDiagnostics),
+				Diagnostics:         providerapi.CloneDiagnostics(itemDiagnostics),
 				ObservedAt:          now,
 			}
 		}
@@ -556,11 +554,11 @@ func (e *Engine) Discover(
 			previousValue.State = catalog.OccurrenceMissing
 			previousValue.DefinitionDigest = nil
 			previousValue.Definition = nil
-			previousValue.Diagnostics = []diagnostic.Diagnostic{{
-				Severity: diagnostic.DiagnosticWarning,
+			previousValue.Diagnostics = []providerapi.Diagnostic{{
+				Severity: providerapi.DiagnosticWarning,
 				Code:     DiagnosticCodeSubresourceMissing,
 				Message:  "the decoder no longer emits this subresource",
-				Location: &diagnostic.DiagnosticLocation{
+				Location: &providerapi.DiagnosticLocation{
 					Locator:            previousValue.Key.Locator,
 					SubresourceLocator: previousValue.Key.SubresourceLocator,
 				},
@@ -584,11 +582,11 @@ func (e *Engine) Discover(
 			previousValue.State = catalog.OccurrenceMissing
 			previousValue.DefinitionDigest = nil
 			previousValue.Definition = nil
-			previousValue.Diagnostics = []diagnostic.Diagnostic{{
-				Severity: diagnostic.DiagnosticWarning,
+			previousValue.Diagnostics = []providerapi.Diagnostic{{
+				Severity: providerapi.DiagnosticWarning,
 				Code:     DiagnosticCodeResourceMissing,
 				Message:  "the source occurrence was not found during authoritative discovery",
-				Location: &diagnostic.DiagnosticLocation{
+				Location: &providerapi.DiagnosticLocation{
 					Locator:            previousValue.Key.Locator,
 					SubresourceLocator: previousValue.Key.SubresourceLocator,
 				},
@@ -609,7 +607,7 @@ func (e *Engine) selectDecoder(
 	ctx context.Context,
 	candidate providerapi.Candidate,
 	allowed map[basespec.DecoderID]struct{},
-) (providerapi.Decoder, []diagnostic.Diagnostic) {
+) (providerapi.Decoder, []providerapi.Diagnostic) {
 	var selected providerapi.Decoder
 	best := providerapi.RecognitionNone
 	tied := make([]basespec.DecoderID, 0)
@@ -624,15 +622,15 @@ func (e *Engine) selectDecoder(
 		recognition := decoder.Recognize(ctx, cloneCandidate(candidate))
 		if recognition < providerapi.RecognitionNone ||
 			recognition > providerapi.RecognitionPreferred {
-			return nil, []diagnostic.Diagnostic{{
-				Severity: diagnostic.DiagnosticError,
+			return nil, []providerapi.Diagnostic{{
+				Severity: providerapi.DiagnosticError,
 				Code:     DiagnosticCodeDecoderInvalidRecognition,
 				Message: fmt.Sprintf(
 					"decoder %q returned invalid recognition %d",
 					decoder.ID(),
 					recognition,
 				),
-				Location: &diagnostic.DiagnosticLocation{
+				Location: &providerapi.DiagnosticLocation{
 					Locator: candidate.Locator,
 				},
 			}}
@@ -663,11 +661,11 @@ func (e *Engine) selectDecoder(
 				len(tied)-len(listed),
 			)
 		}
-		return nil, []diagnostic.Diagnostic{{
-			Severity: diagnostic.DiagnosticError,
+		return nil, []providerapi.Diagnostic{{
+			Severity: providerapi.DiagnosticError,
 			Code:     DiagnosticCodeDecoderAmbiguous,
-			Message:  diagnostic.BoundedDiagnosticMessage(message),
-			Location: &diagnostic.DiagnosticLocation{
+			Message:  providerapi.BoundedDiagnosticMessage(message),
+			Location: &providerapi.DiagnosticLocation{
 				Locator: candidate.Locator,
 			},
 		}}
@@ -684,9 +682,9 @@ func cloneCandidate(value providerapi.Candidate) providerapi.Candidate {
 
 func validateCandidateDiagnostics(
 	locator basespec.Locator,
-	values []diagnostic.Diagnostic,
+	values []providerapi.Diagnostic,
 ) error {
-	if err := diagnostic.ValidateDiagnostics(values); err != nil {
+	if err := providerapi.ValidateDiagnostics(values); err != nil {
 		return err
 	}
 	for index, value := range values {
@@ -715,9 +713,9 @@ func validateCandidateDiagnostics(
 func validateDecodedDiagnostics(
 	locator basespec.Locator,
 	subresource basespec.SubresourceLocator,
-	values []diagnostic.Diagnostic,
+	values []providerapi.Diagnostic,
 ) error {
-	if err := diagnostic.ValidateDiagnostics(values); err != nil {
+	if err := providerapi.ValidateDiagnostics(values); err != nil {
 		return err
 	}
 	for index, value := range values {
@@ -960,7 +958,7 @@ func applyInvalidForLocator(
 	locator basespec.Locator,
 	sourceDigest *cryptoutil.Digest,
 	decoderID basespec.DecoderID,
-	diagnostics []diagnostic.Diagnostic,
+	diagnostics []providerapi.Diagnostic,
 	now time.Time,
 ) {
 	matched := false
@@ -975,7 +973,7 @@ func applyInvalidForLocator(
 		previous.Definition = nil
 		previous.DecoderID = decoderID
 		previous.State = catalog.OccurrenceInvalid
-		previous.Diagnostics = diagnostic.CloneDiagnostics(diagnostics)
+		previous.Diagnostics = providerapi.CloneDiagnostics(diagnostics)
 		previous.ObservedAt = now
 		values[key] = previous
 	}
@@ -994,7 +992,7 @@ func applyInvalidForLocator(
 		SourceContentDigest: cryptoutil.CloneDigest(sourceDigest),
 		DecoderID:           decoderID,
 		State:               catalog.OccurrenceInvalid,
-		Diagnostics:         diagnostic.CloneDiagnostics(diagnostics),
+		Diagnostics:         providerapi.CloneDiagnostics(diagnostics),
 		ObservedAt:          now,
 	}
 }
@@ -1023,7 +1021,7 @@ func markUnrecognizedForLocator(
 	sourceID basespec.SourceID,
 	locator basespec.Locator,
 	now time.Time,
-) []diagnostic.Diagnostic {
+) []providerapi.Diagnostic {
 	keys := make([]catalog.OccurrenceKey, 0)
 	for key, value := range values {
 		if value.Key.SourceID != sourceID ||
@@ -1039,14 +1037,14 @@ func markUnrecognizedForLocator(
 		return keys[left].SubresourceLocator < keys[right].SubresourceLocator
 	})
 
-	diagnostics := make([]diagnostic.Diagnostic, 0, len(keys))
+	diagnostics := make([]providerapi.Diagnostic, 0, len(keys))
 	for _, key := range keys {
 		previous := values[key]
-		d := diagnostic.Diagnostic{
-			Severity: diagnostic.DiagnosticWarning,
+		d := providerapi.Diagnostic{
+			Severity: providerapi.DiagnosticWarning,
 			Code:     DiagnosticCodeDecoderNoLongerRecognizes,
 			Message:  "the source candidate no longer matches any configured decoder",
-			Location: &diagnostic.DiagnosticLocation{
+			Location: &providerapi.DiagnosticLocation{
 				Locator:            previous.Key.Locator,
 				SubresourceLocator: previous.Key.SubresourceLocator,
 			},
@@ -1054,10 +1052,10 @@ func markUnrecognizedForLocator(
 		previous.State = catalog.OccurrenceMissing
 		previous.DefinitionDigest = nil
 		previous.Definition = nil
-		previous.Diagnostics = []diagnostic.Diagnostic{d}
+		previous.Diagnostics = []providerapi.Diagnostic{d}
 		previous.ObservedAt = now
 		values[key] = previous
-		diagnostics = diagnostic.AppendDiagnostics(diagnostics, d)
+		diagnostics = providerapi.AppendDiagnostics(diagnostics, d)
 	}
 	return diagnostics
 }

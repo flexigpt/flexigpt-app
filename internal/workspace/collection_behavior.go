@@ -12,7 +12,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -391,11 +390,11 @@ func workspaceAdoptionDiagnostic(
 	message string,
 ) providerapi.AdoptionDecision {
 	return providerapi.AdoptionDecision{
-		Diagnostics: []diagnostic.Diagnostic{{
-			Severity: diagnostic.DiagnosticError,
+		Diagnostics: []providerapi.Diagnostic{{
+			Severity: providerapi.DiagnosticError,
 			Code:     code,
-			Message:  diagnostic.BoundedDiagnosticMessage(message),
-			Location: &diagnostic.DiagnosticLocation{
+			Message:  providerapi.BoundedDiagnosticMessage(message),
+			Location: &providerapi.DiagnosticLocation{
 				Locator:            occurrence.Locator,
 				SubresourceLocator: occurrence.SubresourceLocator,
 			},

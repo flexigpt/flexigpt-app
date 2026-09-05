@@ -5,8 +5,6 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -37,15 +35,10 @@ func (c Candidate) RequestsDecoder(id basespec.DecoderID) bool {
 }
 
 // Decoded is one provider-derived definition emitted from a source candidate.
-//
-// This compatibility-first version retains definition.Definition and
-// diagnostic.Diagnostic. The next decoder migration should replace these with
-// providerapi DefinitionDraft and Diagnostic DTOs so decoder implementations
-// depend only on providerapi, basespec, and the standard library.
 type Decoded struct {
 	SubresourceLocator basespec.SubresourceLocator
-	Definition         definition.Definition
-	Diagnostics        []diagnostic.Diagnostic
+	Definition         Definition
+	Diagnostics        []Diagnostic
 }
 
 // Decoder is an Artifact Store inbound content-decoding plugin.
@@ -65,7 +58,7 @@ type Decoder interface {
 	Decode(
 		ctx context.Context,
 		candidate Candidate,
-	) ([]Decoded, []diagnostic.Diagnostic)
+	) ([]Decoded, []Diagnostic)
 }
 
 // SchemaCanonicalizerBinder is optional. A decoder implements it when its

@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -58,7 +58,7 @@ type Publication struct {
 	Occurrences        []catalog.Occurrence
 	ArtifactCreates    []artifact.Artifact
 	ArtifactUpdates    []artifact.SourceStateUpdate
-	Diagnostics        []diagnostic.Diagnostic
+	Diagnostics        []providerapi.Diagnostic
 	PublishedAt        time.Time
 }
 
@@ -290,7 +290,7 @@ func (p Publication) Validate() error {
 		seenArtifacts[update.ArtifactID] = struct{}{}
 	}
 
-	if err := diagnostic.ValidateDiagnostics(p.Diagnostics); err != nil {
+	if err := providerapi.ValidateDiagnostics(p.Diagnostics); err != nil {
 		return err
 	}
 	if p.PublishedAt.IsZero() {
@@ -364,6 +364,6 @@ type Result struct {
 	Catalog          catalog.Snapshot
 	CreatedArtifacts []basespec.ArtifactID
 	UpdatedArtifacts []basespec.ArtifactID
-	Diagnostics      []diagnostic.Diagnostic
+	Diagnostics      []providerapi.Diagnostic
 	Candidates       int
 }

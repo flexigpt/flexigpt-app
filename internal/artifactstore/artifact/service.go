@@ -9,8 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -191,7 +191,7 @@ func (s *Service) Adopt(
 		ResolvedDefinition: &resolved,
 		Data:               data,
 		State:              StateAvailable,
-		Diagnostics:        diagnostic.CloneDiagnostics(occurrence.Diagnostics),
+		Diagnostics:        providerapi.CloneDiagnostics(occurrence.Diagnostics),
 		Revision:           1,
 		CreatedAt:          now,
 		ModifiedAt:         now,
@@ -268,8 +268,8 @@ func (s *Service) Pin(
 	var (
 		resolvedDefinition *cryptoutil.Digest
 		state              = StateMissing
-		diagnostics        = []diagnostic.Diagnostic{{
-			Severity: diagnostic.DiagnosticInfo,
+		diagnostics        = []providerapi.Diagnostic{{
+			Severity: providerapi.DiagnosticInfo,
 			Code:     "artifact.pinned.awaiting-catalog",
 			Message:  "the pinned source binding has no current catalog observation",
 		}}
@@ -306,10 +306,10 @@ func (s *Service) Pin(
 
 	case errors.Is(snapshotErr, basespec.ErrCatalogUnavailable):
 	case errors.Is(snapshotErr, basespec.ErrCatalogStale):
-		diagnostics = diagnostic.AppendDiagnostics(
+		diagnostics = providerapi.AppendDiagnostics(
 			diagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.DiagnosticWarning,
+			providerapi.Diagnostic{
+				Severity: providerapi.DiagnosticWarning,
 				Code:     "artifact.pinned.catalog-stale",
 				Message:  "the pinned source binding will be reconciled after the collection catalog is refreshed",
 			},

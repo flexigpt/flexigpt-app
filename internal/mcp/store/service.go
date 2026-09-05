@@ -14,7 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -590,11 +589,11 @@ func validateCreateRegistrations(
 func definitionsForDocument(
 	document BundleDocument,
 ) (
-	map[basespec.SubresourceLocator]definition.Definition,
+	map[basespec.SubresourceLocator]providerapi.Definition,
 	error,
 ) {
 	output := make(
-		map[basespec.SubresourceLocator]definition.Definition,
+		map[basespec.SubresourceLocator]providerapi.Definition,
 		len(document.MCPServers)+len(document.BundleExtension.Policies),
 	)
 	for name := range document.MCPServers {

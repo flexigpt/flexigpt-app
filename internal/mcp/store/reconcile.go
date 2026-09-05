@@ -10,7 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -277,7 +276,7 @@ func (a *API) pinRegisteredArtifact(
 	ctx context.Context,
 	bundle Bundle,
 	registration Registration,
-	expected definition.Definition,
+	expected providerapi.Definition,
 	data json.RawMessage,
 ) (artifact.Artifact, error) {
 	name := expected.DisplayName
@@ -309,7 +308,7 @@ func (a *API) updateRegisteredArtifact(
 	bundle Bundle,
 	current artifact.Artifact,
 	registration Registration,
-	expected definition.Definition,
+	expected providerapi.Definition,
 	data json.RawMessage,
 ) (artifact.Artifact, error) {
 	expectedBinding := artifact.SourceBinding{
@@ -376,7 +375,7 @@ func (a *API) updateRegisteredArtifact(
 
 func registrationMap(
 	values []Registration,
-	expected map[basespec.SubresourceLocator]definition.Definition,
+	expected map[basespec.SubresourceLocator]providerapi.Definition,
 ) (map[basespec.SubresourceLocator]Registration, error) {
 	if len(values) != len(expected) {
 		return nil, fmt.Errorf(
@@ -723,7 +722,7 @@ func (a *API) UpdateProtectedServerInstallation(
 }
 
 func serverDocumentFromDefinition(
-	value definition.Definition,
+	value providerapi.Definition,
 ) (mcpStoreServer.ServerDocument, error) {
 	body, err := mcpStoreServer.ServerBodyFromDefinition(value)
 	if err != nil {
@@ -746,18 +745,18 @@ func serverDocumentFromDefinition(
 func (a *API) currentDefinitionForArtifact(
 	ctx context.Context,
 	record artifact.Artifact,
-) (definition.Definition, error) {
+) (providerapi.Definition, error) {
 	bundle, err := a.Get(ctx, collection.CollectionRef{
 		RootID:       record.RootID,
 		CollectionID: record.CollectionID,
 	})
 	if err != nil {
-		return definition.Definition{}, err
+		return providerapi.Definition{}, err
 	}
 
 	snapshot, err := a.currentCatalog(ctx, bundle)
 	if err != nil {
-		return definition.Definition{}, err
+		return providerapi.Definition{}, err
 	}
 	return definitionForArtifact(snapshot, record)
 }

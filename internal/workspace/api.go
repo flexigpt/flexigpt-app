@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/workspaceadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
@@ -422,7 +422,7 @@ func (a *API) RefreshWorkspace(
 			make([]artifact.ArtifactRef, 0, len(value.UpdatedArtifacts)),
 			artifactRefsOf(request.Workspace.RootID, value.UpdatedArtifacts)...,
 		),
-		Diagnostics: diagnostic.CloneDiagnostics(value.Diagnostics),
+		Diagnostics: providerapi.CloneDiagnostics(value.Diagnostics),
 		Candidates:  value.Candidates,
 	}
 	return &RefreshWorkspaceResponse{Body: &output}, nil
@@ -733,7 +733,7 @@ func (a *API) LoadWorkspaceContexts(
 	output := WorkspaceContextInspectionView{
 		Workspace:       value.Workspace,
 		CatalogRevision: value.CatalogRevision,
-		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:     providerapi.CloneDiagnostics(value.Diagnostics),
 		Contributions: make(
 			[]WorkspaceContextContribution,
 			0,
@@ -1112,7 +1112,7 @@ func (a *API) enrichWorkspaceSourcePresentation(
 			".",
 		)
 		if err != nil {
-			attachment.Diagnostics = diagnostic.AppendDiagnostics(
+			attachment.Diagnostics = providerapi.AppendDiagnostics(
 				attachment.Diagnostics,
 				workspaceSourcePresentationDiagnostic(
 					"workspace.source.path-unavailable",
@@ -1132,9 +1132,9 @@ func (a *API) enrichWorkspaceSourcePresentation(
 func workspaceSourcePresentationDiagnostic(
 	code string,
 	message string,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.DiagnosticWarning,
+) providerapi.Diagnostic {
+	return providerapi.Diagnostic{
+		Severity: providerapi.DiagnosticWarning,
 		Code:     code,
 		Message:  message,
 	}
@@ -1190,7 +1190,7 @@ func workspaceCatalogViewOf(
 		Workspace:       workspaceValue,
 		CatalogRevision: value.Catalog.Revision,
 		CatalogCurrent:  value.CatalogCurrent,
-		Diagnostics: diagnostic.AppendDiagnostics(
+		Diagnostics: providerapi.AppendDiagnostics(
 			value.Catalog.Diagnostics,
 			value.FreshnessDiagnostics...,
 		),
@@ -1216,7 +1216,7 @@ func workspaceCatalogViewOf(
 			Locator:          resourceValue.Artifact.Binding.Locator,
 			CatalogCurrent:   resourceValue.CatalogCurrent,
 			ProjectionValid:  resourceValue.ProjectionValid,
-			Diagnostics: diagnostic.AppendDiagnostics(
+			Diagnostics: providerapi.AppendDiagnostics(
 				artifactView.Diagnostics,
 				resourceValue.Diagnostics...,
 			),
@@ -1280,7 +1280,7 @@ func workspaceCatalogViewOf(
 					Locator:          resourceValue.Artifact.Binding.Locator,
 					CatalogCurrent:   resourceValue.CatalogCurrent,
 					ProjectionValid:  resourceValue.ProjectionValid,
-					Diagnostics: diagnostic.AppendDiagnostics(
+					Diagnostics: providerapi.AppendDiagnostics(
 						artifactView.Diagnostics,
 						resourceValue.Diagnostics...,
 					),
@@ -1376,7 +1376,7 @@ func workspaceOccurrenceViewOf(
 		DefinitionDigest:    cryptoutil.CloneDigest(value.DefinitionDigest),
 		SourceContentDigest: cryptoutil.CloneDigest(value.SourceContentDigest),
 		State:               string(value.State),
-		Diagnostics:         diagnostic.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:         providerapi.CloneDiagnostics(value.Diagnostics),
 	}
 	if localArtifact, found := artifacts[occurrenceViewKey(
 		value.Key.SourceID,
@@ -1398,7 +1398,7 @@ func contextLoadPlanViewOf(
 		Workspace:       value.Workspace,
 		CatalogRevision: value.CatalogRevision,
 		Prompt:          value.Prompt,
-		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:     providerapi.CloneDiagnostics(value.Diagnostics),
 		Contributions:   make([]WorkspaceContextContribution, 0, len(value.Contributions)),
 		Decisions:       make([]WorkspaceContextDecision, 0, len(value.Decisions)),
 		PromptBytes:     value.PromptBytes,
@@ -1456,7 +1456,7 @@ func contextViewOf(value contextadapter.ContextDocument) WorkspaceContextView {
 		CatalogCurrent:   value.CatalogCurrent,
 		ProjectionValid:  value.ProjectionValid,
 		RuntimeDisabled:  value.RuntimeDisabled,
-		Diagnostics:      diagnostic.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:      providerapi.CloneDiagnostics(value.Diagnostics),
 	}
 }
 
@@ -1466,7 +1466,7 @@ func workspaceSkillLoadViewOf(
 	output := WorkspaceSkillLoadView{
 		Workspace:       value.Workspace,
 		CatalogRevision: value.CatalogRevision,
-		Diagnostics:     diagnostic.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:     providerapi.CloneDiagnostics(value.Diagnostics),
 		Skills:          make([]WorkspaceSkillView, 0, len(value.Skills)),
 	}
 	for _, skill := range value.Skills {
@@ -1510,7 +1510,7 @@ func workspaceSkillViewOf(value workspaceadapter.WorkspaceSkill) WorkspaceSkillV
 		ProjectionValid:  value.ProjectionValid,
 		CatalogCurrent:   value.CatalogCurrent,
 		RuntimeDisabled:  value.RuntimeDisabled,
-		Diagnostics:      diagnostic.CloneDiagnostics(value.Diagnostics),
+		Diagnostics:      providerapi.CloneDiagnostics(value.Diagnostics),
 	}
 }
 
@@ -1528,16 +1528,16 @@ func workspaceArtifactViewOf(value artifact.Artifact) WorkspaceArtifactView {
 		copyValue := *value.ResolvedDefinition
 		digest = &copyValue
 	}
-	diagnostics := diagnostic.CloneDiagnostics(value.Diagnostics)
+	diagnostics := providerapi.CloneDiagnostics(value.Diagnostics)
 	runtimeDisabled, dataErr := artifactadapter.ArtifactRuntimeDisabled(value)
 	if dataErr != nil {
-		diagnostics = diagnostic.AppendDiagnostics(
+		diagnostics = providerapi.AppendDiagnostics(
 			diagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.DiagnosticError,
+			providerapi.Diagnostic{
+				Severity: providerapi.DiagnosticError,
 				Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
 				Message:  "the Workspace Artifact has invalid local runtime settings",
-				Location: &diagnostic.DiagnosticLocation{
+				Location: &providerapi.DiagnosticLocation{
 					Locator:            value.Binding.Locator,
 					SubresourceLocator: value.Binding.SubresourceLocator,
 				},

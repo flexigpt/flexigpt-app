@@ -95,10 +95,6 @@ func (k SchemaKey) Validate() error {
 
 // ParsedDocument is a canonical document accepted by a registered schema
 // codec.
-//
-// This first provider API version retains cryptoutil.Digest for compatibility
-// with the existing shareable package. A later migration can standardize
-// document digest calculation entirely inside Artifact Store.
 type ParsedDocument struct {
 	Key    SchemaKey
 	Digest cryptoutil.Digest
@@ -159,15 +155,6 @@ type ExpectedCanonicalizer interface {
 	CanonicalizeExpected(
 		ctx context.Context,
 		expected SchemaKey,
-		raw []byte,
-	) (ParsedDocument, error)
-}
-
-// Canonicalizer preserves the current collection-default canonicalization
-// contract for compatibility.
-type Canonicalizer interface {
-	Canonicalize(
-		ctx context.Context,
 		raw []byte,
 	) (ParsedDocument, error)
 }

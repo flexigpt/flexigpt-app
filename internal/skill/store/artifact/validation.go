@@ -6,10 +6,10 @@ import (
 	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
-func ValidateDefinition(value definition.Definition) error {
+func ValidateDefinition(value providerapi.Definition) error {
 	_, err := DocumentFromDefinition(value)
 	return err
 }
@@ -21,7 +21,7 @@ func ValidateDefinition(value definition.Definition) error {
 // Raw SKILL.md parsing remains exclusively in DecodeSkillDocument, which
 // delegates to agentskills-go.ParseSkillDocument.
 func DocumentFromDefinition(
-	value definition.Definition,
+	value providerapi.Definition,
 ) (document.SkillDocument, error) {
 	if value.Kind != artifactbuiltin.AgentSkillArtifactKind {
 		return document.SkillDocument{}, fmt.Errorf(
@@ -50,7 +50,7 @@ func DocumentFromDefinition(
 			basespec.ErrInvalid,
 		)
 	}
-	body, err := definition.DecodeBody[Body](value.Body)
+	body, err := providerapi.DecodeBody[Body](value.Body)
 	if err != nil {
 		return document.SkillDocument{}, err
 	}

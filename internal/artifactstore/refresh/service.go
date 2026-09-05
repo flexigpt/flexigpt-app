@@ -11,8 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
@@ -162,7 +161,7 @@ func (s *Service) refresh(
 	expectedSourceRevisions := make(map[basespec.SourceID]uint64)
 	sourceGenerations := make(map[basespec.SourceID]string)
 	finalOccurrences := make([]catalog.Occurrence, 0)
-	allDiagnostics := make([]diagnostic.Diagnostic, 0)
+	allDiagnostics := make([]providerapi.Diagnostic, 0)
 	snapshots := make([]source.Snapshot, 0)
 	candidates := 0
 
@@ -265,7 +264,7 @@ func (s *Service) refresh(
 			finalOccurrences,
 			discovered.Occurrences...,
 		)
-		allDiagnostics = diagnostic.AppendDiagnostics(
+		allDiagnostics = providerapi.AppendDiagnostics(
 			allDiagnostics,
 			discovered.Diagnostics...,
 		)
@@ -305,7 +304,7 @@ func (s *Service) refresh(
 		return Result{}, err
 	}
 
-	allDiagnostics = diagnostic.AppendDiagnostics(
+	allDiagnostics = providerapi.AppendDiagnostics(
 		allDiagnostics,
 		reconciliation.Diagnostics...,
 	)
@@ -372,7 +371,7 @@ func (s *Service) refresh(
 		PlanFingerprint:     planFingerprint,
 		DecoderFingerprint:  decoderFingerprint,
 		PublishedAt:         publication.PublishedAt,
-		Diagnostics:         diagnostic.CloneDiagnostics(allDiagnostics),
+		Diagnostics:         providerapi.CloneDiagnostics(allDiagnostics),
 		Occurrences:         make([]catalog.Occurrence, len(finalOccurrences)),
 	}
 	for index, occurrence := range finalOccurrences {
@@ -394,7 +393,7 @@ func (s *Service) refresh(
 
 	result := Result{
 		Catalog:     catalog.CloneSnapshot(published),
-		Diagnostics: diagnostic.CloneDiagnostics(allDiagnostics),
+		Diagnostics: providerapi.CloneDiagnostics(allDiagnostics),
 		Candidates:  candidates,
 	}
 	for _, value := range reconciliation.Creates {

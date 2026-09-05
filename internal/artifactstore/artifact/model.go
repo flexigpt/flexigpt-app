@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -79,11 +79,11 @@ type Artifact struct {
 	ResolvedDefinition *cryptoutil.Digest    `json:"resolvedDefinition,omitempty"`
 	Data               json.RawMessage       `json:"-"`
 
-	State       State                   `json:"state"`
-	Diagnostics []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
-	Revision    uint64                  `json:"revision"`
-	CreatedAt   time.Time               `json:"createdAt"`
-	ModifiedAt  time.Time               `json:"modifiedAt"`
+	State       State                    `json:"state"`
+	Diagnostics []providerapi.Diagnostic `json:"diagnostics,omitempty"`
+	Revision    uint64                   `json:"revision"`
+	CreatedAt   time.Time                `json:"createdAt"`
+	ModifiedAt  time.Time                `json:"modifiedAt"`
 }
 
 func (a Artifact) Ref() ArtifactRef {
@@ -156,7 +156,7 @@ func (a Artifact) Validate() error {
 	); err != nil {
 		return fmt.Errorf("%w: artifact data: %w", basespec.ErrInvalid, err)
 	}
-	if err := diagnostic.ValidateDiagnostics(a.Diagnostics); err != nil {
+	if err := providerapi.ValidateDiagnostics(a.Diagnostics); err != nil {
 		return err
 	}
 	if a.Revision == 0 {
@@ -183,7 +183,7 @@ func (a Artifact) Validate() error {
 func (a Artifact) Clone() Artifact {
 	output := a
 	output.Data = append(json.RawMessage(nil), a.Data...)
-	output.Diagnostics = diagnostic.CloneDiagnostics(a.Diagnostics)
+	output.Diagnostics = providerapi.CloneDiagnostics(a.Diagnostics)
 	if a.ResolvedDefinition != nil {
 		value := *a.ResolvedDefinition
 		output.ResolvedDefinition = &value

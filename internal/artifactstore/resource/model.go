@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -29,7 +29,7 @@ type ResolveOptions struct {
 type ResolvedArtifact struct {
 	Artifact         artifact.Artifact
 	Collection       collection.Collection
-	Definition       definition.Definition
+	Definition       providerapi.Definition
 	Occurrence       catalog.Occurrence
 	Source           source.Summary
 	CatalogRevision  uint64

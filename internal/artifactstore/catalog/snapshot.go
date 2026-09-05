@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -20,7 +20,7 @@ type Snapshot struct {
 	PlanFingerprint     cryptoutil.Digest            `json:"planFingerprint"`
 	DecoderFingerprint  cryptoutil.Digest            `json:"decoderFingerprint"`
 	PublishedAt         time.Time                    `json:"publishedAt"`
-	Diagnostics         []diagnostic.Diagnostic      `json:"diagnostics,omitempty"`
+	Diagnostics         []providerapi.Diagnostic     `json:"diagnostics,omitempty"`
 	Occurrences         []Occurrence                 `json:"occurrences"`
 }
 
@@ -87,7 +87,7 @@ func (s Snapshot) Validate() error {
 	if s.PublishedAt.IsZero() {
 		return fmt.Errorf("%w: catalog publication time is required", basespec.ErrInvalid)
 	}
-	if err := diagnostic.ValidateDiagnostics(s.Diagnostics); err != nil {
+	if err := providerapi.ValidateDiagnostics(s.Diagnostics); err != nil {
 		return err
 	}
 	seenOccurrences := make(map[OccurrenceKey]struct{}, len(s.Occurrences))

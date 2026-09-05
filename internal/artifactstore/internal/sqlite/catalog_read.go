@@ -10,8 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -85,7 +84,7 @@ func (s *Store) getCurrentCatalog(
 	attachmentRevisions := map[basespec.SourceID]uint64{}
 	sourceRevisions := map[basespec.SourceID]uint64{}
 	sourceGenerations := map[basespec.SourceID]string{}
-	diagnostics := []diagnostic.Diagnostic{}
+	diagnostics := []providerapi.Diagnostic{}
 	if err := decodeJSON(attachmentRevisionsRaw, &attachmentRevisions); err != nil {
 		return catalog.Snapshot{}, err
 	}
@@ -203,13 +202,13 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 	); err != nil {
 		return catalog.Occurrence{}, err
 	}
-	diagnostics := []diagnostic.Diagnostic{}
+	diagnostics := []providerapi.Diagnostic{}
 	if err := decodeJSON(diagnosticsRaw, &diagnostics); err != nil {
 		return catalog.Occurrence{}, err
 	}
-	var cachedDefinition *definition.Definition
+	var cachedDefinition *providerapi.Definition
 	if len(definitionRaw) != 0 {
-		var value definition.Definition
+		var value providerapi.Definition
 		if err := decodeJSON(definitionRaw, &value); err != nil {
 			return catalog.Occurrence{}, err
 		}

@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
@@ -261,9 +261,9 @@ func (a *API) resolvedSkillFromSnapshot(
 func definitionForArtifact(
 	snapshot catalog.Snapshot,
 	record artifact.Artifact,
-) (definition.Definition, error) {
+) (providerapi.Definition, error) {
 	if record.ResolvedDefinition == nil {
-		return definition.Definition{}, fmt.Errorf(
+		return providerapi.Definition{}, fmt.Errorf(
 			"%w: Skill Artifact %q has no current definition",
 			basespec.ErrReferenceUnresolved,
 			record.ID,
@@ -271,7 +271,7 @@ func definitionForArtifact(
 	}
 	if snapshot.RootID != record.RootID ||
 		snapshot.CollectionID != record.CollectionID {
-		return definition.Definition{}, fmt.Errorf(
+		return providerapi.Definition{}, fmt.Errorf(
 			"%w: Skill catalog belongs to another Collection",
 			basespec.ErrInvalid,
 		)
@@ -284,10 +284,10 @@ func definitionForArtifact(
 		SubresourceLocator: record.Binding.SubresourceLocator,
 	})
 	if err != nil {
-		return definition.Definition{}, err
+		return providerapi.Definition{}, err
 	}
 	if value.Digest != *record.ResolvedDefinition {
-		return definition.Definition{}, fmt.Errorf(
+		return providerapi.Definition{}, fmt.Errorf(
 			"%w: Skill Artifact %q catalog definition changed",
 			basespec.ErrConflict,
 			record.ID,

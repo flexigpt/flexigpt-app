@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpStorePolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/policy"
 	mcpStoreServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/server"
@@ -41,7 +41,7 @@ type PolicyView struct {
 	Artifact         artifact.Artifact        `json:"artifact"`
 	Collection       collection.CollectionRef `json:"collection"`
 	CatalogRevision  uint64                   `json:"catalogRevision"`
-	Definition       definition.Definition    `json:"definition"`
+	Definition       providerapi.Definition   `json:"definition"`
 	Body             mcpPolicy.MCPPolicy      `json:"body"`
 	EffectiveEnabled bool                     `json:"effectiveEnabled"`
 	BuiltIn          bool                     `json:"builtIn"`
@@ -409,9 +409,9 @@ func requireCurrentPolicyOccurrence(
 func definitionForArtifact(
 	snapshot catalog.Snapshot,
 	record artifact.Artifact,
-) (definition.Definition, error) {
+) (providerapi.Definition, error) {
 	if record.ResolvedDefinition == nil {
-		return definition.Definition{}, fmt.Errorf(
+		return providerapi.Definition{}, fmt.Errorf(
 			"%w: MCP Artifact %q has no resolved definition fingerprint",
 			basespec.ErrReferenceUnresolved,
 			record.ID,
@@ -428,10 +428,10 @@ func definitionForArtifact(
 		},
 	)
 	if err != nil {
-		return definition.Definition{}, err
+		return providerapi.Definition{}, err
 	}
 	if value.Digest != *record.ResolvedDefinition {
-		return definition.Definition{}, fmt.Errorf(
+		return providerapi.Definition{}, fmt.Errorf(
 			"%w: MCP Artifact %q does not match its current catalog definition",
 			basespec.ErrCatalogStale,
 			record.ID,

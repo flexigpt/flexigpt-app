@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/contextadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
@@ -52,7 +52,7 @@ type WorkspaceAttachmentView struct {
 	SourceKind        string                      `json:"sourceKind,omitempty"`
 	Path              string                      `json:"path,omitempty"`
 	Settings          WorkspaceAttachmentSettings `json:"settings"`
-	Diagnostics       []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
+	Diagnostics       []providerapi.Diagnostic    `json:"diagnostics,omitempty"`
 }
 
 // WorkspaceView is the API-safe representation of a workspace.
@@ -86,7 +86,7 @@ type WorkspaceArtifactView struct {
 	Locator            basespec.Locator            `json:"locator"`
 	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
 	RuntimeDisabled    bool                        `json:"runtimeDisabled"`
-	Diagnostics        []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
+	Diagnostics        []providerapi.Diagnostic    `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceSuppressionView struct {
@@ -98,13 +98,13 @@ type WorkspaceSuppressionView struct {
 }
 
 type WorkspaceResourceView struct {
-	Artifact         WorkspaceArtifactView   `json:"artifact"`
-	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
-	SourceID         basespec.SourceID       `json:"sourceID"`
-	Locator          basespec.Locator        `json:"locator"`
-	CatalogCurrent   bool                    `json:"catalogCurrent"`
-	ProjectionValid  bool                    `json:"projectionValid"`
-	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Artifact         WorkspaceArtifactView    `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
+	SourceID         basespec.SourceID        `json:"sourceID"`
+	Locator          basespec.Locator         `json:"locator"`
+	CatalogCurrent   bool                     `json:"catalogCurrent"`
+	ProjectionValid  bool                     `json:"projectionValid"`
+	Diagnostics      []providerapi.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceOccurrenceView struct {
@@ -119,7 +119,7 @@ type WorkspaceOccurrenceView struct {
 	State               string                      `json:"state"`
 	Recorded            bool                        `json:"recorded"`
 	Artifact            *artifact.ArtifactRef       `json:"artifact,omitempty"`
-	Diagnostics         []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
+	Diagnostics         []providerapi.Diagnostic    `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceResourceGroupView struct {
@@ -132,7 +132,7 @@ type WorkspaceCatalogView struct {
 	Workspace               WorkspaceView                `json:"workspace"`
 	CatalogRevision         uint64                       `json:"catalogRevision"`
 	CatalogCurrent          bool                         `json:"catalogCurrent"`
-	Diagnostics             []diagnostic.Diagnostic      `json:"diagnostics,omitempty"`
+	Diagnostics             []providerapi.Diagnostic     `json:"diagnostics,omitempty"`
 	Resources               []WorkspaceResourceView      `json:"resources"`
 	Groups                  []WorkspaceResourceGroupView `json:"groups"`
 	Occurrences             []WorkspaceOccurrenceView    `json:"occurrences"`
@@ -146,12 +146,12 @@ type WorkspaceCatalogView struct {
 }
 
 type WorkspaceRefreshResult struct {
-	Workspace        WorkspaceRef            `json:"workspace"`
-	CatalogRevision  uint64                  `json:"catalogRevision"`
-	CreatedArtifacts []artifact.ArtifactRef  `json:"createdArtifacts"`
-	UpdatedArtifacts []artifact.ArtifactRef  `json:"updatedArtifacts"`
-	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
-	Candidates       int                     `json:"candidates"`
+	Workspace        WorkspaceRef             `json:"workspace"`
+	CatalogRevision  uint64                   `json:"catalogRevision"`
+	CreatedArtifacts []artifact.ArtifactRef   `json:"createdArtifacts"`
+	UpdatedArtifacts []artifact.ArtifactRef   `json:"updatedArtifacts"`
+	Diagnostics      []providerapi.Diagnostic `json:"diagnostics,omitempty"`
+	Candidates       int                      `json:"candidates"`
 }
 
 type WorkspaceContextContribution struct {
@@ -183,7 +183,7 @@ type WorkspaceContextLoadPlan struct {
 	CatalogRevision uint64                         `json:"catalogRevision"`
 	Contributions   []WorkspaceContextContribution `json:"contributions"`
 	Prompt          string                         `json:"prompt"`
-	Diagnostics     []diagnostic.Diagnostic        `json:"diagnostics,omitempty"`
+	Diagnostics     []providerapi.Diagnostic       `json:"diagnostics,omitempty"`
 	Decisions       []WorkspaceContextDecision     `json:"decisions"`
 	PromptBytes     int                            `json:"promptBytes"`
 }
@@ -202,14 +202,14 @@ type WorkspaceContextView struct {
 	CatalogCurrent   bool                                      `json:"catalogCurrent"`
 	ProjectionValid  bool                                      `json:"projectionValid"`
 	RuntimeDisabled  bool                                      `json:"runtimeDisabled"`
-	Diagnostics      []diagnostic.Diagnostic                   `json:"diagnostics,omitempty"`
+	Diagnostics      []providerapi.Diagnostic                  `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceContextInspectionView struct {
 	Workspace       WorkspaceRef                   `json:"workspace"`
 	CatalogRevision uint64                         `json:"catalogRevision"`
 	Contributions   []WorkspaceContextContribution `json:"contributions"`
-	Diagnostics     []diagnostic.Diagnostic        `json:"diagnostics,omitempty"`
+	Diagnostics     []providerapi.Diagnostic       `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceSkillArgument struct {
@@ -234,26 +234,26 @@ type WorkspaceSkillSummary struct {
 }
 
 type WorkspaceSkillView struct {
-	Workspace        WorkspaceRef            `json:"workspace"`
-	Artifact         artifact.ArtifactRef    `json:"artifact"`
-	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
-	SourceID         basespec.SourceID       `json:"sourceID"`
-	Locator          basespec.Locator        `json:"locator"`
-	Skill            WorkspaceSkillSummary   `json:"skill"`
-	MarkdownBody     string                  `json:"markdownBody,omitempty"`
-	RecordRevision   uint64                  `json:"recordRevision"`
-	State            artifact.State          `json:"state"`
-	ProjectionValid  bool                    `json:"projectionValid"`
-	CatalogCurrent   bool                    `json:"catalogCurrent"`
-	RuntimeDisabled  bool                    `json:"runtimeDisabled"`
-	Diagnostics      []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Workspace        WorkspaceRef             `json:"workspace"`
+	Artifact         artifact.ArtifactRef     `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
+	SourceID         basespec.SourceID        `json:"sourceID"`
+	Locator          basespec.Locator         `json:"locator"`
+	Skill            WorkspaceSkillSummary    `json:"skill"`
+	MarkdownBody     string                   `json:"markdownBody,omitempty"`
+	RecordRevision   uint64                   `json:"recordRevision"`
+	State            artifact.State           `json:"state"`
+	ProjectionValid  bool                     `json:"projectionValid"`
+	CatalogCurrent   bool                     `json:"catalogCurrent"`
+	RuntimeDisabled  bool                     `json:"runtimeDisabled"`
+	Diagnostics      []providerapi.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type WorkspaceSkillLoadView struct {
-	Workspace       WorkspaceRef            `json:"workspace"`
-	CatalogRevision uint64                  `json:"catalogRevision"`
-	Skills          []WorkspaceSkillView    `json:"skills"`
-	Diagnostics     []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Workspace       WorkspaceRef             `json:"workspace"`
+	CatalogRevision uint64                   `json:"catalogRevision"`
+	Skills          []WorkspaceSkillView     `json:"skills"`
+	Diagnostics     []providerapi.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type CreateFilesystemWorkspaceRequestBody struct {

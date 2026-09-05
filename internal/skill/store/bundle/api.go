@@ -17,9 +17,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/managedartifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/protection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/source/fsdir"
@@ -880,9 +880,9 @@ func (a *API) currentBundleCatalog(
 func (a *API) currentDefinitionForArtifact(
 	ctx context.Context,
 	record artifact.Artifact,
-) (definition.Definition, error) {
+) (providerapi.Definition, error) {
 	if record.ResolvedDefinition == nil {
-		return definition.Definition{}, fmt.Errorf(
+		return providerapi.Definition{}, fmt.Errorf(
 			"%w: Skill Artifact %q has no current definition",
 			basespec.ErrReferenceUnresolved,
 			record.ID,
@@ -898,7 +898,7 @@ func (a *API) currentDefinitionForArtifact(
 		},
 	)
 	if err != nil {
-		return definition.Definition{}, err
+		return providerapi.Definition{}, err
 	}
 
 	return definitionForArtifact(snapshot, record)

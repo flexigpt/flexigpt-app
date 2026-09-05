@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillArtifact "github.com/flexigpt/flexigpt-app/internal/skill/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/artifactadapter"
@@ -54,7 +54,7 @@ type WorkspaceSkill struct {
 	CatalogCurrent   bool                     `json:"catalogCurrent"`
 	WorkspaceEnabled bool                     `json:"-"`
 	RuntimeDisabled  bool                     `json:"runtimeDisabled"`
-	Diagnostics      []diagnostic.Diagnostic  `json:"diagnostics,omitempty"`
+	Diagnostics      []providerapi.Diagnostic `json:"diagnostics,omitempty"`
 
 	ProjectionValid     bool              `json:"-"`
 	RuntimePathBacked   bool              `json:"-"`
@@ -67,7 +67,7 @@ type SkillLoadPlan struct {
 	Workspace       collection.CollectionRef `json:"workspace"`
 	CatalogRevision uint64                   `json:"catalogRevision"`
 	Skills          []WorkspaceSkill         `json:"skills"`
-	Diagnostics     []diagnostic.Diagnostic  `json:"diagnostics,omitempty"`
+	Diagnostics     []providerapi.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type Adapter struct {
@@ -119,7 +119,7 @@ func (f *Adapter) List(
 			f.supportsRuntimePath(resourceValue.Source.Kind),
 		)
 		if err != nil {
-			value.Diagnostics = diagnostic.AppendDiagnostics(
+			value.Diagnostics = providerapi.AppendDiagnostics(
 				value.Diagnostics,
 				skillProjectionDiagnostic(resourceValue.Artifact, err),
 			)
@@ -213,7 +213,7 @@ func (f *Adapter) loadLocal(
 	output := SkillLoadPlan{
 		Workspace:       workspace,
 		CatalogRevision: loadPlan.CatalogRevision,
-		Diagnostics:     diagnostic.CloneDiagnostics(loadPlan.Diagnostics),
+		Diagnostics:     providerapi.CloneDiagnostics(loadPlan.Diagnostics),
 	}
 
 	for _, item := range loadPlan.Items {
@@ -232,7 +232,7 @@ func (f *Adapter) loadLocal(
 			f.supportsRuntimePath(item.Source.Kind),
 		)
 		if err != nil {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				skillProjectionDiagnostic(item.Artifact, err),
 			)
@@ -249,7 +249,7 @@ func (f *Adapter) loadLocal(
 			return SkillLoadPlan{}, err
 		}
 		if decision.Disposition != artifactadapter.RuntimeAllowed {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				artifactadapter.RuntimeDecisionDiagnostic(decision, item.Artifact),
 			)
@@ -262,7 +262,7 @@ func (f *Adapter) loadLocal(
 			artifactstore.ResolveOptions{},
 		)
 		if err != nil {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				runtimeLocationDiagnostic(item.Artifact, err),
 			)
@@ -272,7 +272,7 @@ func (f *Adapter) loadLocal(
 			resolved.CatalogRevision != loadPlan.CatalogRevision ||
 			resolved.Definition.Digest != item.Definition.Digest ||
 			resolved.Source.ID != item.Source.ID {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				runtimeLocationDiagnostic(
 					item.Artifact,
@@ -290,7 +290,7 @@ func (f *Adapter) loadLocal(
 			item.Artifact.Binding.SubresourceLocator,
 		)
 		if err != nil {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				runtimeLocationDiagnostic(item.Artifact, err),
 			)
@@ -302,7 +302,7 @@ func (f *Adapter) loadLocal(
 			packageLocator,
 		)
 		if err != nil {
-			output.Diagnostics = diagnostic.AppendDiagnostics(
+			output.Diagnostics = providerapi.AppendDiagnostics(
 				output.Diagnostics,
 				runtimeLocationDiagnostic(item.Artifact, err),
 			)
@@ -338,7 +338,7 @@ func projectWorkspaceSkill(
 		CatalogCurrent:   resourceValue.CatalogCurrent,
 		RuntimeDisabled:  runtimeDisabled,
 		WorkspaceEnabled: workspaceEnabled,
-		Diagnostics: diagnostic.AppendDiagnostics(
+		Diagnostics: providerapi.AppendDiagnostics(
 			resourceValue.Artifact.Diagnostics,
 			resourceValue.Diagnostics...,
 		),
@@ -413,12 +413,12 @@ func (f *Adapter) supportsRuntimePath(
 func runtimeLocationDiagnostic(
 	value artifact.Artifact,
 	err error,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.DiagnosticError,
+) providerapi.Diagnostic {
+	return providerapi.Diagnostic{
+		Severity: providerapi.DiagnosticError,
 		Code:     artifactadapter.DiagnosticCodeRuntimeUnavailable,
-		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
-		Location: &diagnostic.DiagnosticLocation{
+		Message:  providerapi.BoundedDiagnosticMessage(err.Error()),
+		Location: &providerapi.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},
@@ -428,12 +428,12 @@ func runtimeLocationDiagnostic(
 func skillProjectionDiagnostic(
 	value artifact.Artifact,
 	err error,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.DiagnosticError,
+) providerapi.Diagnostic {
+	return providerapi.Diagnostic{
+		Severity: providerapi.DiagnosticError,
 		Code:     artifactadapter.DiagnosticCodeProjectionInvalid,
-		Message:  diagnostic.BoundedDiagnosticMessage(err.Error()),
-		Location: &diagnostic.DiagnosticLocation{
+		Message:  providerapi.BoundedDiagnosticMessage(err.Error()),
+		Location: &providerapi.DiagnosticLocation{
 			Locator:            value.Binding.Locator,
 			SubresourceLocator: value.Binding.SubresourceLocator,
 		},

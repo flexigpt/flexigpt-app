@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
@@ -103,12 +103,12 @@ type CompositionDecision struct {
 func applyCompositionPolicy(
 	policy CompositionPolicy,
 	values []ContextContribution,
-	diagnostics []diagnostic.Diagnostic,
+	diagnostics []providerapi.Diagnostic,
 	decisions []CompositionDecision,
 ) (
 	[]ContextContribution,
 	string,
-	[]diagnostic.Diagnostic,
+	[]providerapi.Diagnostic,
 	[]CompositionDecision,
 ) {
 	policy = policy.Normalized()
@@ -125,7 +125,7 @@ func applyCompositionPolicy(
 		if len(content) > policy.MaxDocumentBytes {
 			if policy.Overflow == OverflowExclude {
 				code = DiagnosticCodeContextDocumentExcluded
-				diagnostics = diagnostic.AppendDiagnostics(
+				diagnostics = providerapi.AppendDiagnostics(
 					diagnostics,
 					compositionDiagnostic(
 						value,
@@ -158,7 +158,7 @@ func applyCompositionPolicy(
 		if len(rendered) > remaining {
 			if policy.Overflow == OverflowExclude {
 				code = DiagnosticCodeContextBudgetExceeded
-				diagnostics = diagnostic.AppendDiagnostics(
+				diagnostics = providerapi.AppendDiagnostics(
 					diagnostics,
 					compositionDiagnostic(
 						value,
@@ -179,7 +179,7 @@ func applyCompositionPolicy(
 			contentBudget := remaining - len(emptyRendered)
 			if contentBudget <= 0 {
 				code = DiagnosticCodeContextBudgetExceeded
-				diagnostics = diagnostic.AppendDiagnostics(
+				diagnostics = providerapi.AppendDiagnostics(
 					diagnostics,
 					compositionDiagnostic(
 						value,
@@ -198,7 +198,7 @@ func applyCompositionPolicy(
 			content = truncateUTF8(content, contentBudget)
 			if strings.TrimSpace(content) == "" {
 				code = DiagnosticCodeContextBudgetExceeded
-				diagnostics = diagnostic.AppendDiagnostics(
+				diagnostics = providerapi.AppendDiagnostics(
 					diagnostics,
 					compositionDiagnostic(
 						value,
@@ -220,7 +220,7 @@ func applyCompositionPolicy(
 		}
 
 		if status == CompositionTruncated {
-			diagnostics = diagnostic.AppendDiagnostics(
+			diagnostics = providerapi.AppendDiagnostics(
 				diagnostics,
 				compositionDiagnostic(
 					value,
@@ -268,12 +268,12 @@ func compositionDiagnostic(
 	value ContextContribution,
 	code string,
 	message string,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.DiagnosticWarning,
+) providerapi.Diagnostic {
+	return providerapi.Diagnostic{
+		Severity: providerapi.DiagnosticWarning,
 		Code:     code,
 		Message:  message,
-		Location: &diagnostic.DiagnosticLocation{
+		Location: &providerapi.DiagnosticLocation{
 			Locator: value.Locator,
 		},
 	}

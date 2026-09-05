@@ -202,62 +202,62 @@ func (s *Service) applyDesiredLocked(
 	var applyErr error
 
 	removals := make([]provider.SkillDef, 0)
-	for definition, currentRevision := range present {
-		desiredRevision, wanted := desired[definition]
+	for def, currentRevision := range present {
+		desiredRevision, wanted := desired[def]
 		if !wanted || desiredRevision != currentRevision {
-			removals = append(removals, definition)
+			removals = append(removals, def)
 		}
 	}
 	sortSkillDefs(removals)
 
-	for _, definition := range removals {
+	for _, def := range removals {
 		if err := ctx.Err(); err != nil {
 			applyErr = errors.Join(applyErr, err)
 			break
 		}
 
-		_, err := s.agentRuntime.RemoveSkill(ctx, definition)
+		_, err := s.agentRuntime.RemoveSkill(ctx, def)
 		if err != nil &&
 			!errors.Is(err, agentskillsRuntimeSpec.ErrSkillNotFound) {
 			applyErr = errors.Join(
 				applyErr,
 				fmt.Errorf(
 					"remove runtime Skill %q: %w",
-					definition.Name,
+					def.Name,
 					err,
 				),
 			)
 			continue
 		}
-		delete(present, definition)
+		delete(present, def)
 	}
 
 	additions := make([]provider.SkillDef, 0)
-	for definition := range desired {
-		if _, found := present[definition]; !found {
-			additions = append(additions, definition)
+	for def := range desired {
+		if _, found := present[def]; !found {
+			additions = append(additions, def)
 		}
 	}
 	sortSkillDefs(additions)
 
-	for _, definition := range additions {
+	for _, def := range additions {
 		if err := ctx.Err(); err != nil {
 			applyErr = errors.Join(applyErr, err)
 			break
 		}
 
-		if _, err := s.agentRuntime.AddSkill(ctx, definition); err != nil {
+		if _, err := s.agentRuntime.AddSkill(ctx, def); err != nil {
 			applyErr = errors.Join(
 				applyErr,
 				fmt.Errorf(
 					"add runtime Skill %q: %w",
-					definition.Name,
+					def.Name,
 					err,
 				),
 			)
 			continue
 		}
-		present[definition] = desired[definition]
+		present[def] = desired[def]
 	}
 
 	return present, applyErr
@@ -273,18 +273,18 @@ func mergeCatalogViews(
 	conflicts := map[provider.SkillDef]struct{}{}
 
 	for _, catalog := range catalogs {
-		for definition, revision := range catalog {
-			if _, conflict := conflicts[definition]; conflict {
+		for def, revision := range catalog {
+			if _, conflict := conflicts[def]; conflict {
 				continue
 			}
 
-			previous, found := output[definition]
+			previous, found := output[def]
 			if found && previous != revision {
-				delete(output, definition)
-				conflicts[definition] = struct{}{}
+				delete(output, def)
+				conflicts[def] = struct{}{}
 				continue
 			}
-			output[definition] = revision
+			output[def] = revision
 		}
 	}
 
@@ -293,18 +293,18 @@ func mergeCatalogViews(
 	}
 
 	definitions := make([]provider.SkillDef, 0, len(conflicts))
-	for definition := range conflicts {
-		definitions = append(definitions, definition)
+	for def := range conflicts {
+		definitions = append(definitions, def)
 	}
 	sortSkillDefs(definitions)
 
 	names := make([]string, 0, len(definitions))
-	for _, definition := range definitions {
+	for _, def := range definitions {
 		names = append(names, fmt.Sprintf(
 			"%s:%s@%s",
-			definition.Type,
-			definition.Name,
-			definition.Location,
+			def.Type,
+			def.Name,
+			def.Location,
 		))
 	}
 	return output, fmt.Errorf(
@@ -322,7 +322,7 @@ func catalogViewFrom(
 		previous, duplicate := output[value.Definition]
 		if duplicate && previous != value.Revision {
 			return nil, fmt.Errorf(
-				"%w: duplicate Skill definition has conflicting revisions: %+v",
+				"%w: duplicate Skill def has conflicting revisions: %+v",
 				ErrInvalidRequest,
 				value.Definition,
 			)

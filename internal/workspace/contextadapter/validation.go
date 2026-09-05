@@ -8,14 +8,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/spec"
 )
 
 const maxWorkspaceContextContentBytes = 2 << 20
 
 func ValidateContextDefinition(
-	value definition.Definition,
+	value providerapi.Definition,
 ) error {
 	if value.Kind != artifactbuiltin.WorkspaceContextArtifactKind {
 		return fmt.Errorf(
@@ -45,7 +45,7 @@ func ValidateContextDefinition(
 		)
 	}
 
-	body, err := definition.DecodeBody[contextDefinition](value.Body)
+	body, err := providerapi.DecodeBody[contextDefinition](value.Body)
 	if err != nil {
 		return err
 	}
