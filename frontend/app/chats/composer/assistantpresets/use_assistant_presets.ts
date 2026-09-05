@@ -590,10 +590,8 @@ async function loadAssistantPresetOptions(force = false): Promise<AssistantPrese
 }
 
 export function useAssistantPresets() {
-	const [presetOptions, setPresetOptions] = useState<AssistantPresetOptionItem[]>(
-		() => assistantPresetOptionsCache ?? []
-	);
-	const [loading, setLoading] = useState(() => assistantPresetOptionsCache === undefined);
+	const [presetOptions, setPresetOptions] = useState<AssistantPresetOptionItem[]>([]);
+	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
 	const refreshPresets = useCallback(async () => {
@@ -614,7 +612,7 @@ export function useAssistantPresets() {
 	useEffect(() => {
 		let cancelled = false;
 
-		void loadAssistantPresetOptions()
+		void loadAssistantPresetOptions(true)
 			.then(options => {
 				if (!cancelled) {
 					setPresetOptions(options);

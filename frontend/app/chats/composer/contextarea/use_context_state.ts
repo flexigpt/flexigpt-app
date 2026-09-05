@@ -40,11 +40,15 @@ type ChatInputOptionsResult = Awaited<ReturnType<typeof getChatInputOptions>>;
 let chatInputOptionsCache: ChatInputOptionsResult | undefined;
 let chatInputOptionsPromise: Promise<ChatInputOptionsResult> | undefined;
 
-function loadChatInputOptionsCached(): Promise<ChatInputOptionsResult> {
-	if (chatInputOptionsCache) {
-		return Promise.resolve(chatInputOptionsCache);
-	}
-	if (chatInputOptionsPromise) {
+function loadChatInputOptionsCached(options?: { forceRefresh?: boolean }): Promise<ChatInputOptionsResult> {
+	if (!options?.forceRefresh) {
+		if (chatInputOptionsCache) {
+			return Promise.resolve(chatInputOptionsCache);
+		}
+		if (chatInputOptionsPromise) {
+			return chatInputOptionsPromise;
+		}
+	} else if (chatInputOptionsPromise) {
 		return chatInputOptionsPromise;
 	}
 
@@ -462,41 +466,48 @@ export function useAssistantContextState(): AssistantContextController {
 		[]
 	);
 
-	useEffect(() => {
-		let cancelled = false;
-
-		void (async () => {
-			const r = await loadChatInputOptionsCached();
-			if (cancelled) {
-				return;
-			}
-
+	const applyLoadedChatOptions = useCallback(
+		(r: ChatInputOptionsResult) => {
 			const nextSelectedModel = sanitizeUIChatOptionByCapabilities(r.default);
 			const nextIsHybridReasoningEnabled = isHybridReasoningModel(nextSelectedModel);
-
 			setAllOptions(r.allOptions);
 			allOptionsRef.current = r.allOptions;
 			defaultLoadedOptionRef.current = nextSelectedModel;
 			setOptionsLoaded(true);
-
 			const pendingRestore = pendingRestoreContextRef.current;
 			if (pendingRestore) {
 				pendingRestoreContextRef.current = null;
 				applyRestoredConversationContext(pendingRestore, r.allOptions);
 				return;
 			}
-
 			selectedModelRef.current = nextSelectedModel;
 			isHybridReasoningEnabledRef.current = nextIsHybridReasoningEnabled;
 			setSelectedModel(nextSelectedModel);
 			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
 			setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
-		})();
+		},
+		[applyRestoredConversationContext]
+	);
 
+	useEffect(() => {
+		let cancelled = false;
+		void (async () => {
+			try {
+				const r = await loadChatInputOptionsCached({ forceRefresh: true });
+				if (cancelled) {
+					return;
+				}
+				applyLoadedChatOptions(r);
+			} catch (error) {
+				if (!cancelled) {
+					console.error('Failed to load chat input options:', error);
+				}
+			}
+		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [applyRestoredConversationContext]);
+	}, [applyLoadedChatOptions]);
 
 	const handleSetSelectedModel = useCallback(
 		(action: SetStateAction<UIChatOption>) => {
