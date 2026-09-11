@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -44,7 +43,7 @@ func (ServerCodec) Key() schema.Key {
 func parseServer(
 	raw []byte,
 ) (mcpDomainServer.ServerDocument, json.RawMessage, error) {
-	value, err := jsonutil.DecodeCanonicalObject[mcpDomainServer.ServerDocument](raw, basespec.MaxDefinitionBytes)
+	value, err := jsonutil.DecodeJSONRaw[mcpDomainServer.ServerDocument](json.RawMessage(raw))
 	if err != nil {
 		return mcpDomainServer.ServerDocument{}, nil, err
 	}

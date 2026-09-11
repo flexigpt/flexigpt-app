@@ -10,7 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // BundleFromParsedDocument projects an Artifact Store-validated canonical MCP
@@ -61,25 +60,7 @@ func decodeCanonicalDocument(
 	raw json.RawMessage,
 	target any,
 ) error {
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxDefinitionBytes,
-	)
-	if err != nil {
-		return fmt.Errorf(
-			"%w: canonical MCP document output is invalid: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if !bytes.Equal(canonical, raw) {
-		return fmt.Errorf(
-			"%w: Artifact Store returned non-canonical MCP document JSON",
-			basespec.ErrInvalid,
-		)
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
+	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		return fmt.Errorf(

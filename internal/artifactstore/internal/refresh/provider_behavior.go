@@ -145,7 +145,7 @@ func (s *Service) InspectCollectionCatalog(
 		return catalog.CatalogInspection{}, catalogErr
 	}
 
-	planFingerprint, err := plan.Fingerprint()
+	planFingerprint, err := plan.FingerprintNormalized()
 	if err != nil {
 		return catalog.CatalogInspection{}, err
 	}

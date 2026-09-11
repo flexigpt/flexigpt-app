@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -44,7 +43,7 @@ func (PolicyCodec) Key() schema.Key {
 func parsePolicy(
 	raw []byte,
 ) (mcpDomainPolicy.PolicyDocument, json.RawMessage, error) {
-	value, err := jsonutil.DecodeCanonicalObject[mcpDomainPolicy.PolicyDocument](raw, basespec.MaxDefinitionBytes)
+	value, err := jsonutil.DecodeJSONRaw[mcpDomainPolicy.PolicyDocument](json.RawMessage(raw))
 	if err != nil {
 		return mcpDomainPolicy.PolicyDocument{}, nil, err
 	}

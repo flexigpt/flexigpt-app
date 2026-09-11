@@ -19,6 +19,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 
@@ -371,7 +372,9 @@ func hydrateCollection(
 	if err != nil {
 		return HydratedCollection{}, err
 	}
-	canonical, err := skillcollectionv1.DecodeSkillCollectionJSON(parsed.Raw)
+	canonical, err := jsonutil.DecodeJSONRaw[skillcollectionv1.SkillCollectionDocument](
+		parsed.Raw,
+	)
 	if err != nil {
 		return HydratedCollection{}, err
 	}

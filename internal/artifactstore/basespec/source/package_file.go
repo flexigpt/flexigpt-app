@@ -59,13 +59,7 @@ func NormalizeManagedPackageFiles(
 		}
 		seen[file.Locator] = struct{}{}
 
-		identity, err := portableLocatorIdentity(
-			file.Locator,
-			false,
-		)
-		if err != nil {
-			return nil, err
-		}
+		identity := portableLocatorIdentity(file.Locator)
 		if previous, collision := filesByIdentity[identity]; collision {
 			return nil, fmt.Errorf(
 				"%w: managed package file %q collides with %q",
@@ -84,13 +78,9 @@ func NormalizeManagedPackageFiles(
 		}
 
 		for parent := path.Dir(string(file.Locator)); parent != "."; parent = path.Dir(parent) {
-			parentIdentity, err := portableLocatorIdentity(
+			parentIdentity := portableLocatorIdentity(
 				basespec.Locator(parent),
-				false,
 			)
-			if err != nil {
-				return nil, err
-			}
 			if parentFile, conflict := filesByIdentity[parentIdentity]; conflict {
 				return nil, fmt.Errorf(
 					"%w: managed package path %q is below file %q",
@@ -125,13 +115,9 @@ func NormalizeManagedPackageFiles(
 
 func portableLocatorIdentity(
 	value basespec.Locator,
-	allowRoot bool,
-) (string, error) {
-	if err := value.ValidatePortable(allowRoot); err != nil {
-		return "", err
-	}
+) string {
 	if value == "." {
-		return ".", nil
+		return "."
 	}
-	return strings.ToLower(string(value)), nil
+	return strings.ToLower(string(value))
 }

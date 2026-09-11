@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type skillCollectionCodec struct{}
@@ -32,7 +33,9 @@ func (c skillCollectionCodec) Canonicalize(
 		return schema.ParsedDocument{}, err
 	}
 
-	value, err := skillcollectionv1.DecodeSkillCollectionJSON(raw)
+	value, err := jsonutil.DecodeJSONRaw[skillcollectionv1.SkillCollectionDocument](
+		json.RawMessage(raw),
+	)
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}

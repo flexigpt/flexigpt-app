@@ -20,6 +20,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/domain/artifactadapter"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/domain/attachmentdata"
@@ -674,7 +675,7 @@ func readWorkspaceDescriptor(
 		)
 	}
 
-	descriptor, err := workspacecollectionv1.DecodeWorkspaceCollectionJSON(
+	descriptor, err := jsonutil.DecodeJSONRaw[workspacecollectionv1.WorkspaceCollectionDocument](
 		parsed.Raw,
 	)
 	if err != nil {

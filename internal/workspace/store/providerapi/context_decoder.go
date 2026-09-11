@@ -13,7 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/domain/artifactadapter"
 	workspaceDomainContext "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain/context"
@@ -87,13 +86,6 @@ func (*ContextDecoder) Decode(
 		),
 	}
 	raw, err := json.Marshal(document)
-	if err != nil {
-		return nil, artifactadapter.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
-	}
-	raw, err = jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxDefinitionBodyBytes,
-	)
 	if err != nil {
 		return nil, artifactadapter.WorkspaceArtifactErrorDiagnostics(candidate.Locator, err)
 	}

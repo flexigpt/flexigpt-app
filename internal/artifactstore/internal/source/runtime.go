@@ -255,30 +255,6 @@ func VerifySnapshotContentDigest(
 	expectedDigest cryptoutil.Digest,
 	maximumBytes int64,
 ) error {
-	if ctx == nil {
-		return fmt.Errorf(
-			"%w: source digest verification context is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if runtime == nil {
-		return fmt.Errorf(
-			"%w: source digest verification runtime is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := value.Validate(); err != nil {
-		return err
-	}
-	if err := locator.Validate(false); err != nil {
-		return err
-	}
-	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
-		return err
-	}
 	if err := cryptoutil.ValidateDigest(expectedDigest); err != nil {
 		return err
 	}

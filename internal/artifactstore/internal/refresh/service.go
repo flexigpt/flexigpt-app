@@ -112,10 +112,6 @@ func (s *Service) refresh(
 	if err := ref.Validate(); err != nil {
 		return catalog.RefreshCollectionResult{}, err
 	}
-	if err := plan.Validate(); err != nil {
-		return catalog.RefreshCollectionResult{}, err
-	}
-
 	collectionValue, err := s.collections.Get(ctx, ref)
 	if err != nil {
 		return catalog.RefreshCollectionResult{}, err
@@ -336,7 +332,7 @@ func (s *Service) refresh(
 		return catalog.RefreshCollectionResult{}, closeErr
 	}
 
-	planFingerprint, err := plan.Fingerprint()
+	planFingerprint, err := plan.FingerprintNormalized()
 	if err != nil {
 		return catalog.RefreshCollectionResult{}, err
 	}

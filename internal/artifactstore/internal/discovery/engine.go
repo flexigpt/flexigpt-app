@@ -100,10 +100,8 @@ func (e *Engine) Discover(
 	if err := basespec.ValidateSourceGeneration(generation); err != nil {
 		return Result{}, fmt.Errorf("%w: invalid source snapshot generation: %w", basespec.ErrInvalid, err)
 	}
-	if err := plan.Validate(); err != nil {
-		return Result{}, err
-	}
-	plan = plan.Normalized()
+	// Refresh constructs plans through buildProviderPlan, which has already
+	// normalized and validated the complete provider plan.
 	if plan.SourceID != sourceID {
 		return Result{}, fmt.Errorf(
 			"%w: discovery plan source mismatch",

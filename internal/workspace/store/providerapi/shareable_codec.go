@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type workspaceCollectionCodec struct{}
@@ -39,7 +40,9 @@ func (workspaceCollectionCodec) Canonicalize(
 		return schema.ParsedDocument{}, err
 	}
 
-	value, err := workspacecollectionv1.DecodeWorkspaceCollectionJSON(raw)
+	value, err := jsonutil.DecodeJSONRaw[workspacecollectionv1.WorkspaceCollectionDocument](
+		json.RawMessage(raw),
+	)
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
