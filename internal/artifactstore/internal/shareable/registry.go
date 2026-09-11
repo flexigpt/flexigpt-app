@@ -201,24 +201,29 @@ func (r *Registry) CanonicalizeEntity(
 			basespec.ErrInvalid,
 		)
 	}
-	if err := validateJSONSchemaInstance(registered.schema, value.Raw); err != nil {
+	can, err := validateCodecOutput(key, value)
+	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
-	if err := validateCodecOutput(key, value); err != nil {
+	if err := validateJSONSchemaInstance(
+		registered.schema,
+		can,
+	); err != nil {
 		return schema.ParsedDocument{}, err
 	}
+	value.Raw = json.RawMessage(can)
 	return value.Clone(), nil
 }
 
 func validateCodecOutput(
 	expected schema.Key,
 	value schema.ParsedDocument,
-) error {
+) ([]byte, error) {
 	if err := value.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 	if value.Key != expected {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: shareable codec returned another schema key",
 			basespec.ErrInvalid,
 		)
@@ -229,10 +234,10 @@ func validateCodecOutput(
 		basespec.MaxDefinitionBytes,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !bytes.Equal(canonical, value.Raw) {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: shareable codec returned non-canonical JSON",
 			basespec.ErrInvalid,
 		)
@@ -245,7 +250,7 @@ func validateCodecOutput(
 		Digest        string          `json:"digest"`
 	}
 	if err := json.Unmarshal(canonical, &header); err != nil {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: decode canonical shareable document header: %w",
 			basespec.ErrInvalid,
 			err,
@@ -258,12 +263,12 @@ func validateCodecOutput(
 		SchemaVersion: header.SchemaVersion,
 	}
 	if actual != expected || header.Digest != string(value.Digest) {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: shareable codec output does not match its metadata",
 			basespec.ErrDigestMismatch,
 		)
 	}
-	return nil
+	return canonical, nil
 }
 
 func compilePublishedJSONSchema(raw []byte) (*jsonschema.Schema, error) {

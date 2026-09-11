@@ -44,9 +44,6 @@ func BundleFromParsedDocument(
 			basespec.ErrInvalid,
 		)
 	}
-	if err := output.Validate(); err != nil {
-		return BundleDocument{}, err
-	}
 	if output.Digest != input.Digest {
 		return BundleDocument{}, fmt.Errorf(
 			"%w: canonical MCP Bundle digest does not match registry output",

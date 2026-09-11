@@ -1,6 +1,7 @@
 package collectionimpl
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -235,7 +236,7 @@ func (s *Service) Update(
 	if current.DisplayName == next.DisplayName &&
 		current.Description == next.Description &&
 		current.Enabled == next.Enabled &&
-		jsonutil.Equal(current.Data, next.Data) {
+		bytes.Equal(current.Data, next.Data) {
 		return current, nil
 	}
 	next.Revision++
@@ -418,7 +419,7 @@ func (s *Service) UpdateAttachment(
 	next.Data = data
 	if current.Role == next.Role &&
 		current.Enabled == next.Enabled &&
-		jsonutil.Equal(current.Data, next.Data) {
+		bytes.Equal(current.Data, next.Data) {
 		return currentCollection, current, nil
 	}
 	next.Revision++

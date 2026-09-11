@@ -1,6 +1,7 @@
 package sourceimpl
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -237,7 +238,7 @@ func sourceCreationIntentMatches(
 		existing.Kind == requested.Kind &&
 		existing.DisplayName == requested.DisplayName &&
 		existing.Enabled == requested.Enabled &&
-		jsonutil.Equal(existing.Config, requested.Config)
+		bytes.Equal(existing.Config, requested.Config)
 }
 
 func (s *Service) Get(
@@ -344,7 +345,7 @@ func (s *Service) Update(
 
 	unchanged := current.DisplayName == next.DisplayName &&
 		current.Enabled == next.Enabled &&
-		jsonutil.Equal(current.Config, next.Config)
+		bytes.Equal(current.Config, next.Config)
 	if unchanged {
 		return current.Summary(), nil
 	}

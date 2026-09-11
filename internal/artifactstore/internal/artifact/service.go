@@ -1,6 +1,7 @@
 package artifactimpl
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -434,7 +435,7 @@ func (s *Service) UpdateData(
 	if expectedRevision == 0 || current.Revision != expectedRevision {
 		return artifact.Artifact{}, basespec.ErrConflict
 	}
-	if jsonutil.Equal(current.Data, canonical) {
+	if bytes.Equal(current.Data, canonical) {
 		return current, nil
 	}
 	next := current
@@ -764,7 +765,7 @@ func (s *Service) resolveCreateConflict(
 		existing.Adoption != requested.Adoption ||
 		existing.Name != requested.Name ||
 		existing.Enabled != requested.Enabled ||
-		!jsonutil.Equal(existing.Data, requested.Data) {
+		!bytes.Equal(existing.Data, requested.Data) {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: artifact %q creation intent differs",
 			basespec.ErrConflict,
