@@ -31,6 +31,19 @@ type Definition struct {
 }
 
 func (d Definition) Validate() error {
+	if err := validateDefinitionFields(d); err != nil {
+		return err
+	}
+	if _, err := jsonutil.CanonicalizeObject(
+		d.Body,
+		basespec.MaxDefinitionBodyBytes,
+	); err != nil {
+		return fmt.Errorf("%w: definition body: %w", basespec.ErrInvalid, err)
+	}
+	return nil
+}
+
+func validateDefinitionFields(d Definition) error {
 	if err := cryptoutil.ValidateDigest(d.Digest); err != nil {
 		return fmt.Errorf("definition: %w", err)
 	}
@@ -76,12 +89,6 @@ func (d Definition) Validate() error {
 			basespec.ErrInvalid,
 			basespec.MaxDefinitionDependencies,
 		)
-	}
-	if _, err := jsonutil.CanonicalizeObject(
-		d.Body,
-		basespec.MaxDefinitionBodyBytes,
-	); err != nil {
-		return fmt.Errorf("%w: definition body: %w", basespec.ErrInvalid, err)
 	}
 	for index, selector := range d.Dependencies {
 		if err := selector.Validate(); err != nil {

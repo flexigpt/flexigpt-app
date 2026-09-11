@@ -33,7 +33,7 @@ func Canonicalize(input Definition) (Definition, error) {
 	if output.Digest == "" {
 		output.Digest = placeholderDigest
 	}
-	if err := output.Validate(); err != nil {
+	if err := validateDefinitionFields(output); err != nil {
 		return Definition{}, err
 	}
 
@@ -74,10 +74,6 @@ func Canonicalize(input Definition) (Definition, error) {
 		)
 	}
 	output.Digest = calculated
-
-	if err := output.Validate(); err != nil {
-		return Definition{}, err
-	}
 	return output, nil
 }
 

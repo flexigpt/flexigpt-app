@@ -108,11 +108,6 @@ func (a *API) InstallBuiltInCollection(
 	if err != nil {
 		return nil, err
 	}
-	if _, err := source.NormalizeManagedPackagePublication(
-		publication,
-	); err != nil {
-		return nil, err
-	}
 
 	filesByLocator := make(
 		map[basespec.Locator][]byte,

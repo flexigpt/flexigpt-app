@@ -119,12 +119,9 @@ func (b mcpCollectionBehavior) BuildDiscoveryPlan(
 	}
 	plan := providerapi.Plan{
 		Revision: b.Revision(),
-		Sources:  []providerapi.SourcePlan{p.Normalized()},
+		Sources:  []providerapi.SourcePlan{p},
 	}
-	if err := plan.Validate(); err != nil {
-		return providerapi.Plan{}, err
-	}
-	return plan.Normalized(), nil
+	return plan, nil
 }
 
 func (mcpCollectionBehavior) DecideAutomaticAdoption(

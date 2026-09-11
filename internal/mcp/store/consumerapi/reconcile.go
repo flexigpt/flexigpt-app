@@ -294,26 +294,20 @@ func documentPackageFiles(
 		}}
 	}
 
-	publication, err := source.NormalizeManagedPackagePublication(
-		source.ManagedPackagePublication{
-			Address: address,
-			Files:   supplied,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
+	files := make([]source.ManagedPackageFile, len(supplied))
 	foundDocument := false
-	for index := range publication.Files {
-		if publication.Files[index].Locator != artifactbuiltin.MCPBundleDocumentFileName {
-			continue
+	for index, file := range supplied {
+		files[index] = source.ManagedPackageFile{
+			Locator: file.Locator,
+			Content: append([]byte(nil), file.Content...),
 		}
-		publication.Files[index].Content = append(
-			[]byte(nil),
-			canonicalDocument...,
-		)
-		foundDocument = true
+		if file.Locator == artifactbuiltin.MCPBundleDocumentFileName {
+			files[index].Content = append(
+				[]byte(nil),
+				canonicalDocument...,
+			)
+			foundDocument = true
+		}
 	}
 	if !foundDocument {
 		return nil, fmt.Errorf(
@@ -323,7 +317,12 @@ func documentPackageFiles(
 		)
 	}
 
-	publication, err = source.NormalizeManagedPackagePublication(publication)
+	publication, err := source.NormalizeManagedPackagePublication(
+		source.ManagedPackagePublication{
+			Address: address,
+			Files:   files,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

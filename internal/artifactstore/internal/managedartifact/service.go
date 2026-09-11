@@ -514,9 +514,6 @@ func (s *Service) validatePublishRequest(
 		return err
 	}
 
-	if _, err := source.NormalizeManagedPackagePublication(request.Package); err != nil {
-		return err
-	}
 	return s.requireMutable(ctx, request.Artifact.RootID, request.AllowProtected)
 }
 

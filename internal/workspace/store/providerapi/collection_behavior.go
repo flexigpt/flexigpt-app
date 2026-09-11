@@ -364,7 +364,7 @@ func (b *workspaceCollectionBehavior) buildDiscoveryPlan(
 			}
 		}
 
-		plans = append(plans, sourcePlan.Normalized())
+		plans = append(plans, sourcePlan)
 	}
 
 	sort.Slice(plans, func(left, right int) bool {
@@ -374,9 +374,6 @@ func (b *workspaceCollectionBehavior) buildDiscoveryPlan(
 	plan := providerapi.Plan{
 		Revision: b.revision,
 		Sources:  plans,
-	}.Normalized()
-	if err := plan.Validate(); err != nil {
-		return providerapi.Plan{}, err
 	}
 	return plan, nil
 }

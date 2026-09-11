@@ -727,10 +727,6 @@ func managedPackagePath(
 	directory basespec.Locator,
 	createParent bool,
 ) (string, error) {
-	if err := validatePackageDirectory(directory); err != nil {
-		return "", err
-	}
-
 	parent := path.Dir(string(directory))
 	parentPath := root
 	if parent != "." {
@@ -745,14 +741,6 @@ func managedPackagePath(
 		parentPath,
 		filepath.FromSlash(path.Base(string(directory))),
 	), nil
-}
-
-func validatePackageDirectory(directory basespec.Locator) error {
-	if err := directory.ValidatePortable(false); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func pruneEmptyManagedParents(root, start string) error {

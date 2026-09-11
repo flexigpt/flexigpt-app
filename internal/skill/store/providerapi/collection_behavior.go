@@ -150,7 +150,7 @@ func (b skillCollectionBehavior) BuildDiscoveryPlan(
 				artifactbuiltin.AgentSkillDecoderID,
 			},
 			Authoritative: true,
-		}.Normalized())
+		})
 	}
 
 	topology := make(
@@ -172,10 +172,7 @@ func (b skillCollectionBehavior) BuildDiscoveryPlan(
 		Revision: b.Revision(),
 		Sources:  plans,
 	}
-	if err := plan.Validate(); err != nil {
-		return providerapi.Plan{}, err
-	}
-	return plan.Normalized(), nil
+	return plan, nil
 }
 
 func (skillCollectionBehavior) DecideAutomaticAdoption(

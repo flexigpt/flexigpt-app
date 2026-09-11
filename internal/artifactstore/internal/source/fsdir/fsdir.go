@@ -134,9 +134,6 @@ func (a *Adapter) ResolveLocalPath(
 			value.Kind,
 		)
 	}
-	if err := locator.Validate(true); err != nil {
-		return "", err
-	}
 
 	if a.traversalPolicy.excludesLocator(string(locator)) {
 		return "", fmt.Errorf(

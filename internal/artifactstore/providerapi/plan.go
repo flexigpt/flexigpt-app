@@ -526,7 +526,7 @@ func (p Plan) Fingerprint() (cryptoutil.Digest, error) {
 
 	values := make([]SourcePlan, len(p.Sources))
 	for index, value := range p.Sources {
-		values[index] = value.Normalized()
+		values[index] = value
 		values[index].ExpectedGeneration = ""
 	}
 
