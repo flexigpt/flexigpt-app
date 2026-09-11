@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
@@ -141,7 +143,7 @@ func (a *API) resolveServerMaterial(
 	if err != nil {
 		return serverResolutionMaterial{}, err
 	}
-	if resourceValue.Artifact.Kind != artifactbuiltin.ServerKind {
+	if resourceValue.Artifact.Kind != mcpserverv1.MCPServerKind {
 		return serverResolutionMaterial{}, fmt.Errorf(
 			"%w: Artifact is not an MCP Server",
 			basespec.ErrReferenceUnresolved,
@@ -331,7 +333,8 @@ func (a *API) effectivePolicy(
 			return mcpPolicy.Effective{}, err
 		}
 		record := resolvedResource.Artifact
-		if record.Kind != artifactbuiltin.PolicyKind ||
+		if record.Kind != mcppolicyv1.MCPPolicyKind ||
+			resolvedResource.Collection.Kind != mcpbundlev1.MCPBundleKind ||
 			resolvedResource.Collection.Ref() != bundle.Collection.Ref() ||
 			!record.Enabled {
 			return mcpPolicy.Effective{}, fmt.Errorf(
@@ -379,7 +382,7 @@ func (a *API) policyBodiesByLogicalName(
 
 	output := make([]mcpPolicy.MCPPolicy, 0)
 	for _, value := range inspection.Resources {
-		if value.Artifact.Kind != artifactbuiltin.PolicyKind ||
+		if value.Artifact.Kind != mcppolicyv1.MCPPolicyKind ||
 			!value.Artifact.Enabled ||
 			!value.CatalogCurrent ||
 			value.Resolved == nil {

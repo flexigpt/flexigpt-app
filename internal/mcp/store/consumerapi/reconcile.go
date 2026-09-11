@@ -6,6 +6,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
@@ -528,11 +531,11 @@ func registrationData(value Registration) (json.RawMessage, error) {
 	}
 
 	switch value.Kind {
-	case artifactbuiltin.ServerKind:
+	case mcpserverv1.MCPServerKind:
 		return mcpDomainServer.EncodeServerData(
 			mcpDomainServer.DefaultServerData(),
 		)
-	case artifactbuiltin.PolicyKind:
+	case mcppolicyv1.MCPPolicyKind:
 		return json.RawMessage(jsonutil.EmptyObject), nil
 	default:
 		return nil, fmt.Errorf(
@@ -547,7 +550,7 @@ func (a *API) deleteProtectedOverlayIfPresent(
 	ctx context.Context,
 	record artifact.Artifact,
 ) error {
-	if record.Kind != artifactbuiltin.ServerKind {
+	if record.Kind != mcpserverv1.MCPServerKind {
 		return nil
 	}
 	if a.overlays == nil ||
@@ -639,7 +642,7 @@ func (a *API) PrepareUpdateServerInstallation(
 		)
 	}
 	if record.Revision != expectedArtifactRevision ||
-		record.Kind != artifactbuiltin.ServerKind {
+		record.Kind != mcpserverv1.MCPServerKind {
 		return nil, basespec.ErrConflict
 	}
 	document, err := mcpDomainServer.ServerDocumentFromDefinition(
@@ -745,8 +748,8 @@ func (a *API) PrepareUpdateProtectedServerInstallation(
 		return nil, err
 	}
 	record := resolvedResource.Artifact
-	if record.Kind != artifactbuiltin.ServerKind ||
-		resolvedResource.Collection.Kind != artifactbuiltin.BundleKind {
+	if record.Kind != mcpserverv1.MCPServerKind ||
+		resolvedResource.Collection.Kind != mcpbundlev1.MCPBundleKind {
 		return nil, fmt.Errorf(
 			"%w: Artifact is not an available MCP Server",
 			basespec.ErrInvalid,

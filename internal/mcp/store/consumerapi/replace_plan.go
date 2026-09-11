@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -211,7 +212,7 @@ func preparedRegistrationData(
 		}
 	}
 
-	if registration.Kind != artifactbuiltin.ServerKind {
+	if registration.Kind != mcpserverv1.MCPServerKind {
 		return data, nil
 	}
 

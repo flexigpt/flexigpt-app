@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacecollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
@@ -96,7 +96,7 @@ func validateWorkspaceState(
 			return "", "", fmt.Errorf("%w: invalid Workspace collection: %w", workspaceDomain.ErrInvalidWorkspace, err)
 		}
 	}
-	if value.Kind != artifactbuiltin.WorkspaceCollectionV1Kind {
+	if value.Kind != workspacecollectionv1.WorkspaceCollectionKind {
 		return "", "", fmt.Errorf(
 			"%w: collection %q has kind %q",
 			workspaceDomain.ErrNotWorkspace,

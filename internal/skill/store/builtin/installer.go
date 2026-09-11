@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
@@ -523,7 +524,7 @@ func (i *Installer) rejectDynamicBuiltInArtifacts(
 func (i *Installer) packageFiles(
 	ctx context.Context,
 	packageRoot basespec.Locator,
-	document artifactbuiltin.SkillCollectionV1,
+	document skillcollectionv1.SkillCollectionDocument,
 	address source.ManagedPackageAddress,
 ) ([]source.ManagedPackageFile, error) {
 	embeddedFiles, err := topology.ReadPackageFiles(
@@ -535,7 +536,7 @@ func (i *Installer) packageFiles(
 		return nil, err
 	}
 
-	canonicalDocument, err := artifactbuiltin.MarshalSkillCollectionV1(document)
+	canonicalDocument, err := document.CanonicalJSON()
 	if err != nil {
 		return nil, err
 	}

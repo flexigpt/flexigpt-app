@@ -13,6 +13,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go/document"
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
@@ -497,7 +498,7 @@ func (a *API) ListBundles(
 
 	output := make([]skillDomain.SkillBundle, 0)
 	for _, value := range values {
-		if value.Kind != artifactbuiltin.SkillCollectionV1Kind {
+		if value.Kind != skillcollectionv1.SkillCollectionKind {
 			continue
 		}
 		bundle, err := a.GetBundle(ctx, value.Ref())
@@ -596,7 +597,7 @@ func (a *API) PurgeBundle(
 	if err != nil {
 		return err
 	}
-	if value.Kind != artifactbuiltin.SkillCollectionV1Kind {
+	if value.Kind != skillcollectionv1.SkillCollectionKind {
 		return fmt.Errorf(
 			"%w: collection %q is not a retired skill bundle",
 			basespec.ErrNotFound,
@@ -864,7 +865,7 @@ func (a *API) EnsureBuiltInBundleTopology(
 	}
 	if !builtInBundleTopologyMatches(bundle, request) {
 		data, err := skillDomain.EncodeCollectionData(skillDomain.CollectionData{
-			SchemaVersion:           artifactbuiltin.SkillCollectionV1SchemaVersion,
+			SchemaVersion:           skillcollectionv1.SkillCollectionSchemaVersion,
 			DiscoveryPolicyRevision: skillDomain.DiscoveryPolicyRevision,
 			LogicalName:             request.LogicalName,
 			LogicalVersion:          request.LogicalVersion,
@@ -957,7 +958,7 @@ func (a *API) GetBundle(
 	if err != nil {
 		return skillDomain.SkillBundle{}, err
 	}
-	if value.Kind != artifactbuiltin.SkillCollectionV1Kind {
+	if value.Kind != skillcollectionv1.SkillCollectionKind {
 		return skillDomain.SkillBundle{}, fmt.Errorf(
 			"%w: collection %q is not a skill bundle",
 			basespec.ErrNotFound,
@@ -1418,7 +1419,7 @@ func (a *API) createBundle(
 	}
 
 	data, err := skillDomain.EncodeCollectionData(skillDomain.CollectionData{
-		SchemaVersion:           artifactbuiltin.SkillCollectionV1SchemaVersion,
+		SchemaVersion:           skillcollectionv1.SkillCollectionSchemaVersion,
 		DiscoveryPolicyRevision: skillDomain.DiscoveryPolicyRevision,
 		LogicalName:             request.LogicalName,
 		LogicalVersion:          request.LogicalVersion,
@@ -1546,7 +1547,7 @@ func (a *API) createBundle(
 		request.RootID,
 		collection.Draft{
 			ID:          request.CollectionID,
-			Kind:        artifactbuiltin.SkillCollectionV1Kind,
+			Kind:        skillcollectionv1.SkillCollectionKind,
 			DisplayName: request.DisplayName,
 			Description: request.Description,
 			Enabled:     request.Enabled,
@@ -1605,7 +1606,7 @@ func bundleCreationIntentMatches(
 ) bool {
 	if value.Collection.RootID != request.RootID ||
 		value.Collection.ID != request.CollectionID ||
-		value.Collection.Kind != artifactbuiltin.SkillCollectionV1Kind {
+		value.Collection.Kind != skillcollectionv1.SkillCollectionKind {
 		return false
 	}
 	if value.Collection.ID != request.CollectionID ||

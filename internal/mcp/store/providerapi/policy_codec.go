@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -39,7 +38,7 @@ func (PolicyCodec) Canonicalize(
 }
 
 func (PolicyCodec) Key() schema.Key {
-	return artifactbuiltin.MCPPolicySchemaKey
+	return mcppolicyv1.MCPPolicySchemaKey
 }
 
 func parsePolicy(

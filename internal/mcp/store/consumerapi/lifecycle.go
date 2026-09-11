@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -168,7 +169,7 @@ func (a *API) PreparePurge(
 	if err != nil {
 		return nil, err
 	}
-	if retired.Kind != artifactbuiltin.BundleKind {
+	if retired.Kind != mcpbundlev1.MCPBundleKind {
 		return nil, fmt.Errorf(
 			"%w: Collection %q is not a retired MCP Bundle",
 			basespec.ErrCollectionNotFound,

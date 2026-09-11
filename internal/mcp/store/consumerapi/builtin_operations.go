@@ -7,6 +7,9 @@ import (
 	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
@@ -122,7 +125,7 @@ func (a *API) EnsureBuiltIn(
 		request.RootID,
 		collection.Draft{
 			ID:          request.CollectionID,
-			Kind:        artifactbuiltin.BundleKind,
+			Kind:        mcpbundlev1.MCPBundleKind,
 			DisplayName: displayName(document),
 			Description: document.Description,
 			Enabled:     true,
@@ -181,7 +184,7 @@ func ensureBuiltInTopologyMatches(
 ) error {
 	if bundle.Collection.RootID != request.RootID ||
 		bundle.Collection.ID != request.CollectionID ||
-		bundle.Collection.Kind != artifactbuiltin.BundleKind ||
+		bundle.Collection.Kind != mcpbundlev1.MCPBundleKind ||
 		bundle.Collection.DisplayName != displayName(document) ||
 		bundle.Collection.Description != document.Description ||
 		!bundle.Collection.Enabled ||
@@ -207,5 +210,6 @@ func ensureBuiltInTopologyMatches(
 }
 
 func isMCPKind(kind artifact.ArtifactKind) bool {
-	return kind == artifactbuiltin.ServerKind || kind == artifactbuiltin.PolicyKind
+	return kind == mcpserverv1.MCPServerKind ||
+		kind == mcppolicyv1.MCPPolicyKind
 }

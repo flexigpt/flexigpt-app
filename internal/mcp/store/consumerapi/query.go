@@ -6,7 +6,9 @@ import (
 	"maps"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
@@ -144,14 +146,14 @@ func (a *API) ListServers(
 	ctx context.Context,
 	ref collection.CollectionRef,
 ) ([]artifact.Artifact, error) {
-	return a.listArtifactsByKind(ctx, ref, artifactbuiltin.ServerKind)
+	return a.listArtifactsByKind(ctx, ref, mcpserverv1.MCPServerKind)
 }
 
 func (a *API) ListPolicies(
 	ctx context.Context,
 	ref collection.CollectionRef,
 ) ([]artifact.Artifact, error) {
-	return a.listArtifactsByKind(ctx, ref, artifactbuiltin.PolicyKind)
+	return a.listArtifactsByKind(ctx, ref, mcppolicyv1.MCPPolicyKind)
 }
 
 func (a *API) GetServerInstallation(
@@ -196,8 +198,8 @@ func (a *API) InspectMCPPolicyForRuntime(
 	if err != nil {
 		return PolicyView{}, err
 	}
-	if resolvedResource.Artifact.Kind != artifactbuiltin.PolicyKind ||
-		resolvedResource.Collection.Kind != artifactbuiltin.BundleKind {
+	if resolvedResource.Artifact.Kind != mcppolicyv1.MCPPolicyKind ||
+		resolvedResource.Collection.Kind != mcpbundlev1.MCPBundleKind {
 		return PolicyView{}, fmt.Errorf(
 			"%w: Artifact is not an available MCP Policy",
 			basespec.ErrReferenceUnresolved,

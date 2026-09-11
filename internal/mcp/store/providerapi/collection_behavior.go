@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -18,7 +19,7 @@ func NewCollectionBehavior() providerapi.CollectionBehavior {
 }
 
 func (mcpCollectionBehavior) CollectionKind() collection.CollectionKind {
-	return artifactbuiltin.BundleKind
+	return mcpbundlev1.MCPBundleKind
 }
 
 func (mcpCollectionBehavior) Revision() string {

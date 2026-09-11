@@ -12,6 +12,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
@@ -43,13 +44,13 @@ type Registry struct {
 
 type HydratedArtifact struct {
 	Registration    Artifact
-	Member          artifactbuiltin.ContentRef
+	Member          skillcollectionv1.SkillCollectionMember
 	SkillDefinition definition.Definition
 }
 
 type HydratedCollection struct {
 	Registration          Collection
-	Definition            artifactbuiltin.SkillCollectionV1
+	Definition            skillcollectionv1.SkillCollectionDocument
 	EmbeddedPackageRoot   basespec.Locator
 	ExpectedMemberDigests map[basespec.Locator]cryptoutil.Digest
 	Artifacts             []HydratedArtifact
@@ -143,7 +144,7 @@ func (r Registry) Hydrate(
 }
 
 func (r Registry) Validate() error {
-	if r.SchemaVersion != artifactbuiltin.SkillCollectionV1SchemaVersion {
+	if r.SchemaVersion != skillcollectionv1.SkillCollectionSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported built-in Skill registry schema %q",
 			basespec.ErrInvalid,
@@ -312,8 +313,7 @@ func hydrateCollection(
 		}
 		member := payload.Members[index]
 		if member.Locator == "" ||
-			member.URI != "" ||
-			member.SubresourceLocator != "" {
+			member.URI != "" {
 			return HydratedCollection{}, fmt.Errorf(
 				"%w: built-in Collection member %d must use a local relative locator",
 				basespec.ErrInvalid,
@@ -365,13 +365,13 @@ func hydrateCollection(
 	}
 	parsed, err := canonicalizer.CanonicalizeExpected(
 		ctx,
-		artifactbuiltin.SkillCollectionV1SchemaKey,
+		skillcollectionv1.SkillCollectionSchemaKey,
 		hydratedRaw,
 	)
 	if err != nil {
 		return HydratedCollection{}, err
 	}
-	canonical, err := artifactbuiltin.ParseSkillCollectionV1(parsed.Raw)
+	canonical, err := skillcollectionv1.DecodeSkillCollectionJSON(parsed.Raw)
 	if err != nil {
 		return HydratedCollection{}, err
 	}
@@ -469,8 +469,8 @@ func hydrateCollection(
 
 func decodeCollectionPayload(
 	raw []byte,
-) (artifactbuiltin.SkillCollectionV1, error) {
-	return artifactbuiltin.ParseSkillCollectionV1(raw)
+) (skillcollectionv1.SkillCollectionDocument, error) {
+	return skillcollectionv1.DecodeSkillCollectionJSON(raw)
 }
 
 func scopedLocator(

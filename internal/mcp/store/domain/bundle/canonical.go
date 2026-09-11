@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
@@ -44,9 +45,9 @@ func ServerFromCanonicalBundle(
 		)
 	}
 	return jsonutil.CloneJSON(mcpDomainServer.ServerDocument{
-		Kind:           artifactbuiltin.ServerKind,
-		SchemaID:       artifactbuiltin.ServerSchemaID,
-		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
+		Kind:           mcpserverv1.MCPServerKind,
+		SchemaID:       mcpserverv1.MCPServerSchemaID,
+		SchemaVersion:  mcpserverv1.MCPServerSchemaVersion,
 		LogicalName:    basespec.LogicalName(name),
 		LogicalVersion: extension.LogicalVersion,
 		DisplayName:    extension.DisplayName,
@@ -58,9 +59,9 @@ func ServerFromCanonicalBundle(
 }
 
 func validateDocument(value BundleDocument) error {
-	if value.Kind != artifactbuiltin.BundleKind ||
-		value.SchemaID != artifactbuiltin.BundleSchemaID ||
-		value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
+	if value.Kind != mcpbundlev1.MCPBundleKind ||
+		value.SchemaID != mcpbundlev1.MCPBundleSchemaID ||
+		value.SchemaVersion != mcpbundlev1.MCPBundleSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP Bundle schema",
 			basespec.ErrInvalid,

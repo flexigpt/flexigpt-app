@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -260,9 +260,9 @@ func normalizeAuthentication(
 }
 
 func (value ServerDocument) Validate() error {
-	if value.Kind != artifactbuiltin.ServerKind ||
-		value.SchemaID != artifactbuiltin.ServerSchemaID ||
-		value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
+	if value.Kind != mcpserverv1.MCPServerKind ||
+		value.SchemaID != mcpserverv1.MCPServerSchemaID ||
+		value.SchemaVersion != mcpserverv1.MCPServerSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP Server schema",
 			basespec.ErrInvalid,

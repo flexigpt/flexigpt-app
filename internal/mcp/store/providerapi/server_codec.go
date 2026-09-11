@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -39,7 +38,7 @@ func (ServerCodec) Canonicalize(
 }
 
 func (ServerCodec) Key() schema.Key {
-	return artifactbuiltin.MCPServerSchemaKey
+	return mcpserverv1.MCPServerSchemaKey
 }
 
 func parseServer(

@@ -100,6 +100,23 @@ const (
 	DefaultMCPBundleDescription                          = "Editable starter bundle for user-managed MCP server definitions."
 )
 
+const (
+	MCPHostName    = "FlexiGPT"
+	MCPHostVersion = "dev"
+
+	MCPBuiltInInstallerName = "mcp.bundle"
+
+	MCPBundleHydrationFingerprintSchemaVersion = "mcp.builtin-hydration/v1"
+
+	MCPSchemaVersion = "v1"
+
+	MCPServerSubresourceDirectory basespec.SubresourceLocator = "mcpServers"
+	MCPPolicySubresourceDirectory basespec.SubresourceLocator = "policies"
+
+	DecoderRevision                    = "mcp.bundle.discovery.v1"
+	DecoderID       basespec.DecoderID = "mcp.bundle-json"
+)
+
 type (
 	WorkspaceContextRole       string
 	WorkspaceContextMediaType  string

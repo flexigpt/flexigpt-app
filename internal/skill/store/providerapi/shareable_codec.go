@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -33,23 +32,24 @@ func (c skillCollectionCodec) Canonicalize(
 		return schema.ParsedDocument{}, err
 	}
 
-	value, err := artifactbuiltin.ParseSkillCollectionV1(raw)
+	value, err := skillcollectionv1.DecodeSkillCollectionJSON(raw)
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
-	canonical, err := artifactbuiltin.CanonicalizeSkillCollectionV1(value)
+	canonical, err := value.Canonicalize()
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
-	encoded, err := artifactbuiltin.MarshalSkillCollectionV1(canonical)
+	digest, err := canonical.CalculatedDigest()
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
-	if canonical.Digest == nil {
-		return schema.ParsedDocument{}, fmt.Errorf(
-			"%w: canonical skill collection has no digest",
-			basespec.ErrInvalid,
-		)
+	digestValue := string(digest)
+	canonical.Digest = &digestValue
+
+	encoded, err := canonical.CanonicalJSON()
+	if err != nil {
+		return schema.ParsedDocument{}, err
 	}
 
 	return schema.ParsedDocument{
@@ -60,7 +60,7 @@ func (c skillCollectionCodec) Canonicalize(
 }
 
 func (skillCollectionCodec) Key() schema.Key {
-	return artifactbuiltin.SkillCollectionV1SchemaKey
+	return skillcollectionv1.SkillCollectionSchemaKey
 }
 
 func (skillCollectionCodec) JSONSchema() []byte {

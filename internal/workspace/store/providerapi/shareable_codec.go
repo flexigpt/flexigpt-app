@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacecollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type workspaceCollectionCodec struct{}
@@ -20,7 +18,7 @@ func NewCollectionCodec() providerapi.SchemaCodec {
 }
 
 func (workspaceCollectionCodec) Key() schema.Key {
-	return artifactbuiltin.WorkspaceCollectionV1SchemaKey
+	return workspacecollectionv1.WorkspaceCollectionSchemaKey
 }
 
 func (workspaceCollectionCodec) JSONSchema() []byte {
@@ -41,28 +39,29 @@ func (workspaceCollectionCodec) Canonicalize(
 		return schema.ParsedDocument{}, err
 	}
 
-	value, err := artifactbuiltin.ParseWorkspaceCollectionV1(raw)
+	value, err := workspacecollectionv1.DecodeWorkspaceCollectionJSON(raw)
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
-	canonical, err := artifactbuiltin.CanonicalizeWorkspaceCollectionV1(value)
+	canonical, err := value.Canonicalize()
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
-	if canonical.Digest == nil {
-		return schema.ParsedDocument{}, fmt.Errorf(
-			"%w: canonical workspace collection has no digest",
-			basespec.ErrInvalid,
-		)
+	digest, err := canonical.CalculatedDigest()
+	if err != nil {
+		return schema.ParsedDocument{}, err
 	}
-	encoded, err := artifactbuiltin.MarshalWorkspaceCollectionV1(canonical)
+	digestValue := string(digest)
+	canonical.Digest = &digestValue
+
+	encoded, err := canonical.CanonicalJSON()
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
 
 	return schema.ParsedDocument{
-		Key:    artifactbuiltin.WorkspaceCollectionV1SchemaKey,
-		Digest: cryptoutil.Digest(*canonical.Digest),
+		Key:    workspacecollectionv1.WorkspaceCollectionSchemaKey,
+		Digest: digest,
 		Raw:    json.RawMessage(encoded),
 	}, nil
 }

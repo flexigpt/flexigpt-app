@@ -6,6 +6,8 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
@@ -107,9 +109,9 @@ func (r Registry) Validate() error {
 			}
 			var expectedParent string
 			switch value.Kind {
-			case artifactbuiltin.ServerKind:
+			case mcpserverv1.MCPServerKind:
 				expectedParent = string(artifactbuiltin.MCPServerSubresourceDirectory)
-			case artifactbuiltin.PolicyKind:
+			case mcppolicyv1.MCPPolicyKind:
 				expectedParent = string(artifactbuiltin.MCPPolicySubresourceDirectory)
 			default:
 				return fmt.Errorf(

@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacecollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
@@ -79,7 +80,9 @@ func newWorkspaceCollectionBehavior(
 }
 
 func (*workspaceCollectionBehavior) CollectionKind() collection.CollectionKind {
-	return artifactbuiltin.WorkspaceCollectionV1Kind
+	return collection.CollectionKind(
+		workspacecollectionv1.WorkspaceCollectionKind,
+	)
 }
 
 func (b *workspaceCollectionBehavior) Revision() string {
@@ -633,7 +636,7 @@ func readWorkspaceDescriptor(
 	request := providerapi.PlanningDocumentRequest{
 		SourceID:       primarySourceID,
 		Locator:        artifactbuiltin.WorkspaceDescriptorFileName,
-		ExpectedSchema: artifactbuiltin.WorkspaceCollectionV1SchemaKey,
+		ExpectedSchema: workspacecollectionv1.WorkspaceCollectionSchemaKey,
 	}
 	result, err := reader.ReadCanonicalDocument(ctx, request)
 	if err != nil {
@@ -666,15 +669,15 @@ func readWorkspaceDescriptor(
 	}
 
 	parsed := result.Document.Clone()
-	if parsed.Key != artifactbuiltin.WorkspaceCollectionV1SchemaKey {
+	if parsed.Key != workspacecollectionv1.WorkspaceCollectionSchemaKey {
 		return workspaceDescriptorObservation{}, fmt.Errorf(
 			"%w: Workspace descriptor schema does not identify %q",
 			workspaceDomain.ErrWorkspaceDefinitionInvalid,
-			artifactbuiltin.WorkspaceCollectionV1Kind,
+			workspacecollectionv1.WorkspaceCollectionKind,
 		)
 	}
 
-	descriptor, err := artifactbuiltin.ParseWorkspaceCollectionV1(
+	descriptor, err := workspacecollectionv1.DecodeWorkspaceCollectionJSON(
 		parsed.Raw,
 	)
 	if err != nil {
@@ -692,16 +695,7 @@ func readWorkspaceDescriptor(
 		)
 	}
 
-	body, err := artifactbuiltin.DecodeWorkspaceCollectionV1Body(
-		descriptor.Body,
-	)
-	if err != nil {
-		return workspaceDescriptorObservation{}, fmt.Errorf(
-			"%w: %w",
-			workspaceDomain.ErrWorkspaceDefinitionInvalid,
-			err,
-		)
-	}
+	body := descriptor.Body
 
 	base, err := workspaceDescriptorBaseLocator(
 		artifactbuiltin.WorkspaceDescriptorFileName,
@@ -745,13 +739,6 @@ func readWorkspaceDescriptor(
 					workspaceDomain.ErrWorkspaceDefinitionInvalid,
 					index,
 					err,
-				)
-			}
-			if member.SubresourceLocator != "" {
-				return workspaceDescriptorObservation{}, fmt.Errorf(
-					"%w: Workspace descriptor member %d subresources are not supported by source discovery",
-					workspaceDomain.ErrWorkspaceDefinitionInvalid,
-					index,
 				)
 			}
 
@@ -809,12 +796,13 @@ func readWorkspaceDescriptor(
 }
 
 func resolveWorkspaceDescriptorPreferences(
-	input artifactbuiltin.WorkspaceDiscoveryV1,
+	input workspacecollectionv1.WorkspaceCollectionDiscovery,
 	base basespec.Locator,
 ) (workspaceDomain.DiscoveryPreferences, error) {
 	output := workspaceDomain.DiscoveryPreferences{
 		IncludeReadme: input.IncludeReadme,
 	}
+
 	for index, locator := range input.AdditionalLocators {
 		resolved, err := resolveWorkspaceRelativeLocator(
 			base,

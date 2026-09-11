@@ -59,12 +59,12 @@ type WorkspaceCollectionBody struct {
 type WorkspaceCollectionDiscovery struct {
 	AdditionalLocators []string                           `json:"additionalLocators,omitempty"`
 	AdditionalRoots    []WorkspaceCollectionDirectoryRoot `json:"additionalRoots,omitempty"`
-	IncludeReadme      *bool                              `json:"includeReadme,omitempty"`
+	IncludeReadme      bool                               `json:"includeReadme,omitempty"`
 }
 
 type WorkspaceCollectionDirectoryRoot struct {
 	Root            string   `json:"root"`
-	Recursive       *bool    `json:"recursive,omitempty"`
+	Recursive       bool     `json:"recursive,omitempty"`
 	IncludePatterns []string `json:"includePatterns,omitempty"`
 }
 

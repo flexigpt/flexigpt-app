@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -48,9 +48,9 @@ func CanonicalizePolicy(
 }
 
 func validateDocument(value PolicyDocument) error {
-	if value.Kind != artifactbuiltin.PolicyKind ||
-		value.SchemaID != artifactbuiltin.PolicySchemaID ||
-		value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
+	if value.Kind != mcppolicyv1.MCPPolicyKind ||
+		value.SchemaID != mcppolicyv1.MCPPolicySchemaID ||
+		value.SchemaVersion != mcppolicyv1.MCPPolicySchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP Policy schema",
 			basespec.ErrInvalid,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -41,7 +40,7 @@ func (BundleCodec) Canonicalize(
 }
 
 func (BundleCodec) Key() schema.Key {
-	return artifactbuiltin.MCPBundleSchemaKey
+	return mcpbundlev1.MCPBundleSchemaKey
 }
 
 func parseBundle(

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -270,8 +271,8 @@ func ensureDefaultMCPBundle(
 
 func defaultMCPBundleDocument() mcpDomainBundle.BundleDocument {
 	return mcpDomainBundle.BundleDocument{
-		Kind:          artifactbuiltin.BundleKind,
-		SchemaID:      artifactbuiltin.BundleSchemaID,
+		Kind:          mcpbundlev1.MCPBundleKind,
+		SchemaID:      mcpbundlev1.MCPBundleSchemaID,
 		SchemaVersion: artifactbuiltin.MCPSchemaVersion,
 		LogicalName:   artifactbuiltin.DefaultMCPBundleLogicalName,
 		DisplayName:   artifactbuiltin.DefaultMCPBundleDisplayName,

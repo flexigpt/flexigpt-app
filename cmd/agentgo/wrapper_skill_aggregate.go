@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacecollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
@@ -79,13 +80,13 @@ func InitSkillAggregateWrapper(
 	}
 
 	if err := router.Register(
-		artifactbuiltin.WorkspaceCollectionV1Kind,
+		workspacecollectionv1.WorkspaceCollectionKind,
 		workspaceLoader,
 	); err != nil {
 		return fmt.Errorf("register Workspace Skill loader: %w", err)
 	}
 	if err := router.Register(
-		artifactbuiltin.SkillCollectionV1Kind,
+		skillcollectionv1.SkillCollectionKind,
 		bundleLoader,
 	); err != nil {
 		return fmt.Errorf("register Skill Bundle runtime loader: %w", err)

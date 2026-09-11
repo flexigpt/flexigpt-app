@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacecollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -61,7 +61,7 @@ func (s *Service) List(
 
 	output := make([]workspaceDomain.Workspace, 0)
 	for _, value := range collections {
-		if value.Kind != artifactbuiltin.WorkspaceCollectionV1Kind {
+		if value.Kind != workspacecollectionv1.WorkspaceCollectionKind {
 			continue
 		}
 
@@ -102,7 +102,7 @@ func (s *Service) Get(
 			workspaceDomain.ErrInvalidWorkspace,
 		)
 	}
-	if value.Kind != artifactbuiltin.WorkspaceCollectionV1Kind {
+	if value.Kind != workspacecollectionv1.WorkspaceCollectionKind {
 		return workspaceDomain.Workspace{}, fmt.Errorf(
 			"%w: collection %q has kind %q",
 			workspaceDomain.ErrNotWorkspace,

@@ -10,6 +10,9 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
@@ -213,7 +216,7 @@ func (a *API) Create(
 		request.RootID,
 		collection.Draft{
 			ID:          request.CollectionID,
-			Kind:        artifactbuiltin.BundleKind,
+			Kind:        mcpbundlev1.MCPBundleKind,
 			DisplayName: displayName(document),
 			Description: document.Description,
 			Enabled:     true,
@@ -270,7 +273,7 @@ func (a *API) List(
 	}
 	output := make([]Bundle, 0)
 	for _, value := range values {
-		if value.Kind != artifactbuiltin.BundleKind {
+		if value.Kind != mcpbundlev1.MCPBundleKind {
 			continue
 		}
 		bundle, err := a.Get(ctx, value.Ref())
@@ -393,7 +396,7 @@ func (a *API) Get(
 	if err != nil {
 		return Bundle{}, err
 	}
-	if value.Kind != artifactbuiltin.BundleKind {
+	if value.Kind != mcpbundlev1.MCPBundleKind {
 		return Bundle{}, fmt.Errorf(
 			"%w: Collection %q is not an MCP Bundle",
 			basespec.ErrCollectionNotFound,
@@ -707,13 +710,13 @@ func (a *API) GetMCPServerSchemaIdentity(
 	}
 
 	server, err := mcpDocumentSchemaIdentity(
-		artifactbuiltin.MCPServerSchemaKey,
+		mcpserverv1.MCPServerSchemaKey,
 	)
 	if err != nil {
 		return MCPServerSchemaIdentity{}, err
 	}
 	policy, err := mcpDocumentSchemaIdentity(
-		artifactbuiltin.MCPPolicySchemaKey,
+		mcppolicyv1.MCPPolicySchemaKey,
 	)
 	if err != nil {
 		return MCPServerSchemaIdentity{}, err
@@ -771,7 +774,7 @@ func (a *API) canonicalizeBundleBytes(
 	}
 	parsed, err := a.schemas.CanonicalizeExpected(
 		ctx,
-		artifactbuiltin.MCPBundleSchemaKey,
+		mcpbundlev1.MCPBundleSchemaKey,
 		raw,
 	)
 	if err != nil {
@@ -907,7 +910,7 @@ func (a *API) cleanupChangedServerInstallation(
 	document mcpDomainServer.ServerDocument,
 	after mcpDomainServer.ServerData,
 ) error {
-	if record.Kind != artifactbuiltin.ServerKind {
+	if record.Kind != mcpserverv1.MCPServerKind {
 		return nil
 	}
 	if err := mcpDomainServer.CleanupUnboundServerSecrets(
@@ -929,7 +932,7 @@ func (a *API) cleanupRemovedServerInstallation(
 	ctx context.Context,
 	record artifact.Artifact,
 ) error {
-	if record.Kind != artifactbuiltin.ServerKind {
+	if record.Kind != mcpserverv1.MCPServerKind {
 		return nil
 	}
 
@@ -960,7 +963,7 @@ func validateCreateRegistrations(
 
 	for _, subresource := range subresources {
 		registration := values[subresource]
-		if registration.Kind != artifactbuiltin.ServerKind {
+		if registration.Kind != mcpserverv1.MCPServerKind {
 			continue
 		}
 
@@ -999,7 +1002,7 @@ func validateCreateBundleIntent(
 ) error {
 	if value.Collection.RootID != request.RootID ||
 		value.Collection.ID != request.CollectionID ||
-		value.Collection.Kind != artifactbuiltin.BundleKind ||
+		value.Collection.Kind != mcpbundlev1.MCPBundleKind ||
 		value.Source.ID != request.SourceID ||
 		value.PackageAddress != packageAddress ||
 		value.Data.ManagedSourceID != request.SourceID ||

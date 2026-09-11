@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -74,7 +74,7 @@ func DecodeCollectionData(
 }
 
 func (d CollectionData) Validate() error {
-	if d.SchemaVersion != artifactbuiltin.SkillCollectionV1SchemaVersion {
+	if d.SchemaVersion != skillcollectionv1.SkillCollectionSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported skill bundle schema version %q",
 			basespec.ErrInvalid,

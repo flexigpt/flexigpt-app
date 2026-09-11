@@ -69,9 +69,9 @@ type MCPServerInputDeclaration struct {
 	Description          string `json:"description,omitempty"`
 	Note                 string `json:"note,omitempty"`
 	Placeholder          string `json:"placeholder,omitempty"`
-	Required             *bool  `json:"required,omitempty"`
+	Required             bool   `json:"required,omitempty"`
 	Default              string `json:"default,omitempty"`
-	ClientSecretRequired *bool  `json:"clientSecretRequired,omitempty"`
+	ClientSecretRequired bool   `json:"clientSecretRequired,omitempty"`
 }
 
 type MCPServerInstallation struct {
@@ -101,7 +101,7 @@ type MCPServerConnectionProfile struct {
 
 type MCPServerPolicyReference struct {
 	Ref      string `json:"ref"`
-	Required *bool  `json:"required,omitempty"`
+	Required bool   `json:"required,omitempty"`
 }
 
 type MCPServerExtension struct {

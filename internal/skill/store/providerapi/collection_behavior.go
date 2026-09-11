@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
@@ -22,7 +23,7 @@ func NewCollectionBehavior() providerapi.CollectionBehavior {
 }
 
 func (skillCollectionBehavior) CollectionKind() collection.CollectionKind {
-	return artifactbuiltin.SkillCollectionV1Kind
+	return skillcollectionv1.SkillCollectionKind
 }
 
 func (skillCollectionBehavior) Revision() string {
@@ -190,7 +191,7 @@ func (skillCollectionBehavior) DecideAutomaticAdoption(
 	if err := ctx.Err(); err != nil {
 		return providerapi.AdoptionDecision{}, err
 	}
-	if input.Collection.Kind != artifactbuiltin.SkillCollectionV1Kind {
+	if input.Collection.Kind != skillcollectionv1.SkillCollectionKind {
 		return providerapi.AdoptionDecision{}, fmt.Errorf(
 			"%w: skill automatic adoption received collection kind %q",
 			basespec.ErrInvalid,

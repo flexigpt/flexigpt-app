@@ -5,7 +5,8 @@ import (
 	"maps"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 )
@@ -19,7 +20,7 @@ func ServerSubresource(
 	name basespec.LogicalName,
 ) basespec.SubresourceLocator {
 	return basespec.SubresourceLocator(
-		path.Join(string(artifactbuiltin.MCPServerSubresourceDirectory), string(name)),
+		path.Join("mcpServers", string(name)),
 	)
 }
 
@@ -42,9 +43,9 @@ func ServerDocumentFromDefinition(
 func DefinitionForCanonicalServer(
 	input ServerDocument,
 ) (definition.Definition, error) {
-	if input.Kind != artifactbuiltin.ServerKind ||
-		input.SchemaID != artifactbuiltin.ServerSchemaID ||
-		input.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
+	if input.Kind != mcpserverv1.MCPServerKind ||
+		input.SchemaID != mcpserverv1.MCPServerSchemaID ||
+		input.SchemaVersion != mcpserverv1.MCPServerSchemaVersion {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: canonical MCP server input has another schema identity",
 			basespec.ErrInvalid,
@@ -73,7 +74,7 @@ func DefinitionForCanonicalServer(
 		dependencies = append(
 			dependencies,
 			definition.Selector{
-				Kind:        artifactbuiltin.PolicyKind,
+				Kind:        mcppolicyv1.MCPPolicyKind,
 				LogicalName: input.Extension.Policy.Ref,
 			},
 		)
@@ -81,9 +82,9 @@ func DefinitionForCanonicalServer(
 
 	return definition.Canonicalize(
 		definition.Definition{
-			Kind:           artifactbuiltin.ServerKind,
-			SchemaID:       artifactbuiltin.ServerSchemaID,
-			SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
+			Kind:           mcpserverv1.MCPServerKind,
+			SchemaID:       mcpserverv1.MCPServerSchemaID,
+			SchemaVersion:  mcpserverv1.MCPServerSchemaVersion,
 			LogicalName:    input.LogicalName,
 			LogicalVersion: input.LogicalVersion,
 			DisplayName:    input.DisplayName,
@@ -112,9 +113,9 @@ func serverDocumentAndBodyFromDefinition(
 	if err != nil {
 		return ServerDocument{}, ServerDefinitionBody{}, err
 	}
-	if value.Kind != artifactbuiltin.ServerKind ||
-		value.SchemaID != artifactbuiltin.ServerSchemaID ||
-		value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
+	if value.Kind != mcpserverv1.MCPServerKind ||
+		value.SchemaID != mcpserverv1.MCPServerSchemaID ||
+		value.SchemaVersion != mcpserverv1.MCPServerSchemaVersion {
 		return ServerDocument{}, ServerDefinitionBody{}, fmt.Errorf(
 			"%w: Definition is not an MCP Server",
 			basespec.ErrInvalid,
@@ -127,9 +128,9 @@ func serverDocumentAndBodyFromDefinition(
 	}
 
 	document := ServerDocument{
-		Kind:           artifactbuiltin.ServerKind,
-		SchemaID:       artifactbuiltin.ServerSchemaID,
-		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
+		Kind:           mcpserverv1.MCPServerKind,
+		SchemaID:       mcpserverv1.MCPServerSchemaID,
+		SchemaVersion:  mcpserverv1.MCPServerSchemaVersion,
 		LogicalName:    value.LogicalName,
 		LogicalVersion: value.LogicalVersion,
 		DisplayName:    value.DisplayName,

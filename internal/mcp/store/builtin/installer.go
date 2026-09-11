@@ -13,6 +13,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
@@ -502,7 +503,7 @@ func (i *Installer) prepareBundles(
 
 		parsed, err := i.documents.CanonicalizeExpected(
 			ctx,
-			artifactbuiltin.MCPBundleSchemaKey,
+			mcpbundlev1.MCPBundleSchemaKey,
 			raw,
 		)
 		if err != nil {

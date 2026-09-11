@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -34,7 +35,7 @@ func (*Decoder) Revision() string {
 
 func (*Decoder) RequiredSchemaKeys() []schema.Key {
 	return []schema.Key{
-		artifactbuiltin.MCPBundleSchemaKey,
+		mcpbundlev1.MCPBundleSchemaKey,
 	}
 }
 
@@ -91,7 +92,7 @@ func (d *Decoder) Decode(
 
 	parsed, err := d.documents.CanonicalizeExpected(
 		ctx,
-		artifactbuiltin.MCPBundleSchemaKey,
+		mcpbundlev1.MCPBundleSchemaKey,
 		candidate.Content,
 	)
 	if err != nil {

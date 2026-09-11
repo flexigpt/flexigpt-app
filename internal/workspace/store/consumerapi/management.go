@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacecollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
@@ -63,7 +64,7 @@ func (a *StoreAPI) CreateFilesystemWorkspace(
 		rootID,
 		collection.Draft{
 			ID:          collection.CollectionID(uuidutil.NewUUIDv7()),
-			Kind:        artifactbuiltin.WorkspaceCollectionV1Kind,
+			Kind:        workspacecollectionv1.WorkspaceCollectionKind,
 			DisplayName: input.DisplayName,
 			Description: input.Description,
 			Enabled:     true,
@@ -109,7 +110,7 @@ func (a *StoreAPI) CreateEmptyWorkspace(
 		a.workspace.workspaceRootID,
 		collection.Draft{
 			ID:          collection.CollectionID(uuidutil.NewUUIDv7()),
-			Kind:        artifactbuiltin.WorkspaceCollectionV1Kind,
+			Kind:        workspacecollectionv1.WorkspaceCollectionKind,
 			DisplayName: input.DisplayName,
 			Description: input.Description,
 			Enabled:     true,
@@ -424,7 +425,7 @@ func (a *StoreAPI) PurgeWorkspace(
 	if err != nil {
 		return WorkspaceRef{}, err
 	}
-	if retired.Kind != artifactbuiltin.WorkspaceCollectionV1Kind {
+	if retired.Kind != workspacecollectionv1.WorkspaceCollectionKind {
 		return WorkspaceRef{}, fmt.Errorf(
 			"%w: Collection %q is not a Workspace",
 			workspaceDomain.ErrNotWorkspace,
