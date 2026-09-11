@@ -8,18 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
-
-	_ "embed"
 )
-
-//go:embed mcp-bundle-v1.schema.json
-var BundleV1JSONSchema []byte
-
-//go:embed mcp-server-v1.schema.json
-var ServerV1JSONSchema []byte
-
-//go:embed mcp-policy-v1.schema.json
-var PolicyV1JSONSchema []byte
 
 const (
 	MCPHostName    = "FlexiGPT"

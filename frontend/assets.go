@@ -1,6 +1,8 @@
 package frontend
 
-import "embed"
+import (
+	"embed"
+)
 
 //go:embed all:dist/client
 var Assets embed.FS

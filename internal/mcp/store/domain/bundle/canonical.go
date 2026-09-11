@@ -72,6 +72,7 @@ func validateDocument(value BundleDocument) error {
 		value.DisplayName,
 		value.Description,
 		value.Labels,
+		nil,
 	); err != nil {
 		return err
 	}

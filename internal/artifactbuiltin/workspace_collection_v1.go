@@ -2,7 +2,6 @@ package artifactbuiltin
 
 import (
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,18 +27,11 @@ const (
 	maxWorkspaceCollectionV1MediaTypeLen = 256
 )
 
-//go:embed workspace-collection-v1.schema.json
-var workspaceCollectionV1JSONSchema []byte
-
 var WorkspaceCollectionV1SchemaKey = schema.CollectionKey(
 	WorkspaceCollectionV1Kind,
 	WorkspaceCollectionV1SchemaID,
 	WorkspaceCollectionV1SchemaVersion,
 )
-
-func WorkspaceCollectionV1JSONSchema() []byte {
-	return append([]byte(nil), workspaceCollectionV1JSONSchema...)
-}
 
 // WorkspaceCollectionV1 is the portable workspace.json schema model.
 //
@@ -219,22 +211,7 @@ func (v WorkspaceCollectionV1) Validate() error {
 			WorkspaceCollectionV1SchemaVersion,
 		)
 	}
-	if err := basespec.ValidatePortableMetadata(
-		basespec.LogicalName(v.LogicalName),
-		basespec.LogicalVersion(v.LogicalVersion),
-		v.DisplayName,
-		v.Description,
-		v.Labels,
-	); err != nil {
-		return err
-	}
-	if v.Digest != nil {
-		if err := cryptoutil.ValidateDigest(
-			cryptoutil.Digest(*v.Digest),
-		); err != nil {
-			return fmt.Errorf("workspace collection digest: %w", err)
-		}
-	}
+
 	if _, _, err := decodeWorkspaceCollectionV1Body(v.Body); err != nil {
 		return err
 	}

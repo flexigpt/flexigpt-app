@@ -62,6 +62,7 @@ func validateDocument(value PolicyDocument) error {
 		value.DisplayName,
 		value.Description,
 		value.Labels,
+		nil,
 	); err != nil {
 		return err
 	}

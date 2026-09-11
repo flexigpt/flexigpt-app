@@ -274,6 +274,7 @@ func (value ServerDocument) Validate() error {
 		value.DisplayName,
 		value.Description,
 		value.Labels,
+		nil,
 	); err != nil {
 		return err
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -63,5 +64,5 @@ func (skillCollectionCodec) Key() schema.Key {
 }
 
 func (skillCollectionCodec) JSONSchema() []byte {
-	return artifactbuiltin.SkillCollectionV1JSONSchema()
+	return skillcollectionv1.SkillCollectionJSONSchema()
 }

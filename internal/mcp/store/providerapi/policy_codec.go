@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -19,7 +20,7 @@ func NewPolicyCodec() providerapi.SchemaCodec {
 }
 
 func (PolicyCodec) JSONSchema() []byte {
-	return append([]byte(nil), artifactbuiltin.PolicyV1JSONSchema...)
+	return mcppolicyv1.MCPPolicyJSONSchema()
 }
 
 func (PolicyCodec) Canonicalize(

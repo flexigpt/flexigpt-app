@@ -1,12 +1,16 @@
 package basespec
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
 	"path"
 	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 var portableNamePattern = regexp.MustCompile(
@@ -19,6 +23,7 @@ func ValidatePortableMetadata(
 	displayName string,
 	description string,
 	labels map[string]string,
+	digest *string,
 ) error {
 	if err := ValidatePortableName(
 		"logical name",
@@ -48,7 +53,72 @@ func ValidatePortableMetadata(
 	); err != nil {
 		return err
 	}
-	return ValidateLabels("", labels)
+	if err := ValidateLabels("", labels); err != nil {
+		return err
+	}
+	if digest != nil {
+		if err := cryptoutil.ValidateDigest(cryptoutil.Digest(*digest)); err != nil {
+			return fmt.Errorf("document digest: %w", err)
+		}
+	}
+	return nil
+}
+
+func ValidateContentReference(
+	locator string,
+	uri string,
+	digest *string,
+) error {
+	switch {
+	case locator != "" && uri != "":
+		return errors.New("invalid content reference: cannot contain both locator and URI")
+
+	case locator != "":
+		if err := Locator(locator).ValidatePortable(false); err != nil {
+			return err
+		}
+
+	case uri != "":
+		if err := validateContentReferenceURI(uri); err != nil {
+			return err
+		}
+
+	default:
+		return errors.New("invalid content reference:: content reference requires a locator or URI")
+	}
+
+	if digest != nil {
+		if err := cryptoutil.ValidateDigest(cryptoutil.Digest(*digest)); err != nil {
+			return fmt.Errorf("content reference digest: %w", err)
+		}
+	}
+	return nil
+}
+
+func validateContentReferenceURI(value string) error {
+	if err := ValidateRequiredText(
+		"content reference URI",
+		value,
+		MaxURIBytes,
+	); err != nil {
+		return err
+	}
+	if strings.Contains(value, "#") {
+		return errors.New("invalid content reference: URI cannot contain a fragment")
+	}
+
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil {
+		return fmt.Errorf("invalid content reference: URI: %w", err)
+	}
+	if !parsed.IsAbs() ||
+		parsed.Scheme == "" ||
+		parsed.User != nil ||
+		parsed.Fragment != "" ||
+		strings.EqualFold(parsed.Scheme, "file") {
+		return errors.New("invalid content reference: URI")
+	}
+	return nil
 }
 
 func ValidatePortableName(label, value string) error {

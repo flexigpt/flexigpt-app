@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacecollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -23,7 +24,7 @@ func (workspaceCollectionCodec) Key() schema.Key {
 }
 
 func (workspaceCollectionCodec) JSONSchema() []byte {
-	return artifactbuiltin.WorkspaceCollectionV1JSONSchema()
+	return workspacecollectionv1.WorkspaceCollectionJSONSchema()
 }
 
 func (workspaceCollectionCodec) Canonicalize(

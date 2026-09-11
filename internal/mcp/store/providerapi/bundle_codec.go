@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -21,7 +22,7 @@ func NewBundleCodec() providerapi.SchemaCodec {
 }
 
 func (BundleCodec) JSONSchema() []byte {
-	return append([]byte(nil), artifactbuiltin.BundleV1JSONSchema...)
+	return mcpbundlev1.MCPBundleJSONSchema()
 }
 
 func (BundleCodec) Canonicalize(

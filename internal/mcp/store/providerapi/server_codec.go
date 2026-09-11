@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -19,7 +20,7 @@ func NewServerCodec() providerapi.SchemaCodec {
 }
 
 func (ServerCodec) JSONSchema() []byte {
-	return append([]byte(nil), artifactbuiltin.ServerV1JSONSchema...)
+	return mcpserverv1.MCPServerJSONSchema()
 }
 
 func (ServerCodec) Canonicalize(

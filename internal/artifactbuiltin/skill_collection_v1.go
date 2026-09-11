@@ -2,7 +2,6 @@ package artifactbuiltin
 
 import (
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,18 +32,11 @@ const (
 	maxSkillCollectionV1MediaTypeLen = 256
 )
 
-//go:embed skill-collection-v1.schema.json
-var skillCollectionV1JSONSchema []byte
-
 var SkillCollectionV1SchemaKey = schema.CollectionKey(
 	SkillCollectionV1Kind,
 	SkillCollectionV1SchemaID,
 	SkillCollectionV1SchemaVersion,
 )
-
-func SkillCollectionV1JSONSchema() []byte {
-	return append([]byte(nil), skillCollectionV1JSONSchema...)
-}
 
 type skillCollectionV1Body struct {
 	MemberFormat string `json:"memberFormat"`
@@ -183,22 +175,7 @@ func (v SkillCollectionV1) Validate() error {
 	if err := v.ValidateEnvelope(); err != nil {
 		return err
 	}
-	if err := basespec.ValidatePortableMetadata(
-		basespec.LogicalName(v.LogicalName),
-		basespec.LogicalVersion(v.LogicalVersion),
-		v.DisplayName,
-		v.Description,
-		v.Labels,
-	); err != nil {
-		return err
-	}
-	if v.Digest != nil {
-		if err := cryptoutil.ValidateDigest(
-			cryptoutil.Digest(*v.Digest),
-		); err != nil {
-			return fmt.Errorf("skill collection digest: %w", err)
-		}
-	}
+
 	if _, err := canonicalSkillCollectionV1Body(v.Body); err != nil {
 		return err
 	}

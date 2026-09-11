@@ -94,6 +94,7 @@ func (d CollectionData) Validate() error {
 		"",
 		"",
 		d.Labels,
+		nil,
 	); err != nil {
 		return err
 	}
