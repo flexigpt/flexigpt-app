@@ -23,7 +23,14 @@ func CanonicalizePolicy(
 	if err := value.Validate(); err != nil {
 		return PolicyDocument{}, nil, err
 	}
+	return CanonicalizeValidatedPolicy(value)
+}
 
+// CanonicalizeValidatedPolicy accepts a PolicyDocument that has already
+// passed PolicyDocument.Validate.
+func CanonicalizeValidatedPolicy(
+	value PolicyDocument,
+) (PolicyDocument, json.RawMessage, error) {
 	supplied := value.Digest
 	value.Digest = ""
 	calculated, err := cryptoutil.CanonicalDigest(value)

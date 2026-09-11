@@ -53,9 +53,6 @@ func Compose(
 		Conflicts: maps.Clone(composed.Conflicts),
 		Digest:    digest,
 	}
-	if err := output.Validate(); err != nil {
-		return Effective{}, err
-	}
 	return output, nil
 }
 

@@ -114,14 +114,11 @@ func (o Occurrence) Validate() error {
 
 	switch o.State {
 	case OccurrenceValid:
-		if err := o.Kind.Validate(); err != nil {
-			return err
+		if o.Kind == "" {
+			return o.Kind.Validate()
 		}
-		if err := o.LogicalName.Validate(); err != nil {
-			return err
-		}
-		if err := o.LogicalVersion.Validate(true); err != nil {
-			return err
+		if o.LogicalName == "" {
+			return o.LogicalName.Validate()
 		}
 		if o.DefinitionDigest == nil ||
 			o.SourceContentDigest == nil ||

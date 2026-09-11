@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"maps"
-	"sort"
 	"strings"
 )
 
@@ -221,90 +219,7 @@ func ComposeMCPPolicy(
 	baseline MCPPolicy,
 	policies ...MCPPolicy,
 ) (Composition, error) {
-	result := Normalize(baseline)
-	if err := result.Validate(); err != nil {
-		return Composition{}, err
-	}
-
-	normalized := make([]MCPPolicy, 0, len(policies)+1)
-	normalized = append(normalized, result)
-
-	conflicts := map[string]string{}
-	for index, candidate := range policies {
-		candidate = Normalize(candidate)
-		if err := candidate.Validate(); err != nil {
-			return Composition{}, fmt.Errorf("policy %d: %w", index, err)
-		}
-
-		normalized = append(normalized, candidate)
-		result.TrustLevel = restrictiveTrust(
-			result.TrustLevel,
-			candidate.TrustLevel,
-		)
-		result.DefaultPolicy.DefaultApprovalRule = restrictiveApproval(
-			result.DefaultPolicy.DefaultApprovalRule,
-			candidate.DefaultPolicy.DefaultApprovalRule,
-		)
-		result.DefaultPolicy.DefaultExecutionMode = restrictiveExecution(
-			result.DefaultPolicy.DefaultExecutionMode,
-			candidate.DefaultPolicy.DefaultExecutionMode,
-		)
-		result.DefaultPolicy.RequireApprovalForUnknownRisk =
-			result.DefaultPolicy.RequireApprovalForUnknownRisk ||
-				candidate.DefaultPolicy.RequireApprovalForUnknownRisk
-		result.DefaultPolicy.RequireApprovalForWrite =
-			result.DefaultPolicy.RequireApprovalForWrite ||
-				candidate.DefaultPolicy.RequireApprovalForWrite
-		result.DefaultPolicy.RequireApprovalForDestructive =
-			result.DefaultPolicy.RequireApprovalForDestructive ||
-				candidate.DefaultPolicy.RequireApprovalForDestructive
-
-		result.AppsPolicy.Enabled =
-			result.AppsPolicy.Enabled && candidate.AppsPolicy.Enabled
-		result.AppsPolicy.AllowAppInitiatedToolCalls =
-			result.AppsPolicy.AllowAppInitiatedToolCalls &&
-				candidate.AppsPolicy.AllowAppInitiatedToolCalls
-		result.AppsPolicy.RequireApprovalForOpenLink =
-			result.AppsPolicy.RequireApprovalForOpenLink ||
-				candidate.AppsPolicy.RequireApprovalForOpenLink
-		result.AppsPolicy.RequireApprovalForContextUpdates =
-			result.AppsPolicy.RequireApprovalForContextUpdates ||
-				candidate.AppsPolicy.RequireApprovalForContextUpdates
-	}
-
-	names := map[string]struct{}{}
-	for _, candidate := range normalized {
-		for name := range candidate.ToolPolicies {
-			names[name] = struct{}{}
-		}
-	}
-
-	orderedNames := make([]string, 0, len(names))
-	for name := range names {
-		orderedNames = append(orderedNames, name)
-	}
-	sort.Strings(orderedNames)
-
-	result.ToolPolicies = make(
-		map[string]MCPToolPolicyOverride,
-		len(orderedNames),
-	)
-	for _, name := range orderedNames {
-		override, conflict := composeToolPolicyOverride(name, normalized)
-		result.ToolPolicies[name] = override
-		if conflict != "" {
-			conflicts[name] = conflict
-		}
-	}
-
-	if err := result.Validate(); err != nil {
-		return Composition{}, err
-	}
-
-	return Composition{
-		Body:      result,
-		Conflicts: maps.Clone(conflicts),
-	}, nil
+	return composePolicies(baseline, policies...)
 }
 
 func ApprovalRuleRank(value MCPApprovalRule) int {

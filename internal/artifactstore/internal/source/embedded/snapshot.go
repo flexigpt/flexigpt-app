@@ -159,13 +159,6 @@ func fsName(locator basespec.Locator) (string, error) {
 	if locator == "." {
 		return ".", nil
 	}
-	if !fs.ValidPath(string(locator)) {
-		return "", fmt.Errorf(
-			"%w: invalid embedded locator %q",
-			basespec.ErrInvalid,
-			locator,
-		)
-	}
 	return string(locator), nil
 }
 

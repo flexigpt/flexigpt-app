@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -112,11 +111,11 @@ func (d AttachmentData) SourceExpectedContentDigests() (
 		len(d.ExpectedMemberDigests),
 	)
 	for member, digest := range d.ExpectedMemberDigests {
-		locator := basespec.Locator(
-			path.Join(string(d.DiscoveryRoot), string(member)),
-		)
-		if err := locator.Validate(false); err != nil {
-			return nil, err
+		locator := member
+		if d.DiscoveryRoot != "." {
+			locator = basespec.Locator(
+				string(d.DiscoveryRoot) + "/" + string(member),
+			)
 		}
 		output[locator] = digest
 	}

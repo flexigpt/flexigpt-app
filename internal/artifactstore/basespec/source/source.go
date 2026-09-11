@@ -61,16 +61,6 @@ func (s Source) Validate() error {
 	if err := s.Summary().Validate(); err != nil {
 		return err
 	}
-	if err := s.Kind.Validate(); err != nil {
-		return err
-	}
-	if err := basespec.ValidateRequiredText(
-		"source display name",
-		s.DisplayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return err
-	}
 	if _, err := jsonutil.CanonicalizeObject(
 		s.Config,
 		basespec.MaxConfigBytes,

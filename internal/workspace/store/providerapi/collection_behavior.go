@@ -869,22 +869,16 @@ func resolveWorkspaceRelativeLocator(
 		return "", fmt.Errorf("portable relative locator: %w", err)
 	}
 
-	var resolved basespec.Locator
 	switch {
 	case base == ".":
-		resolved = relative
+		return relative, nil
 	case relative == ".":
-		resolved = base
+		return base, nil
 	default:
-		resolved = basespec.Locator(
-			path.Join(string(base), string(relative)),
-		)
+		return basespec.Locator(
+			string(base) + "/" + string(relative),
+		), nil
 	}
-
-	if err := resolved.ValidatePortable(allowRelativeRoot); err != nil {
-		return "", fmt.Errorf("resolved portable locator: %w", err)
-	}
-	return resolved, nil
 }
 
 func workspaceProviderDirectoryRoots(

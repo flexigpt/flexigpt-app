@@ -187,8 +187,13 @@ func CanonicalizeBundle(
 		value.BundleExtension.Servers[name] = extension
 	}
 
+	if err := value.Validate(); err != nil {
+		return BundleDocument{}, nil, err
+	}
+
 	for name, policyValue := range value.BundleExtension.Policies {
-		canonical, _, err := mcpDomainPolicy.CanonicalizePolicy(policyValue)
+		canonical, _, err := mcpDomainPolicy.
+			CanonicalizeValidatedPolicy(policyValue)
 		if err != nil {
 			return BundleDocument{}, nil, fmt.Errorf(
 				"policy %q: %w",
@@ -197,10 +202,6 @@ func CanonicalizeBundle(
 			)
 		}
 		value.BundleExtension.Policies[name] = canonical
-	}
-
-	if err := value.Validate(); err != nil {
-		return BundleDocument{}, nil, err
 	}
 
 	supplied := value.Digest

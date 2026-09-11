@@ -110,12 +110,7 @@ func (a ManagedPackageAddress) FileLocator(
 	if err != nil {
 		return "", err
 	}
-	value := basespec.Locator(path.Join(
-		string(directory),
-		string(relative),
-	))
-	if err := value.ValidatePortable(false); err != nil {
-		return "", err
-	}
-	return value, nil
+	return basespec.Locator(
+		string(directory) + "/" + string(relative),
+	), nil
 }

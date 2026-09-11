@@ -179,16 +179,6 @@ func packageRelativeLocator(
 			)
 		}
 	}
-	if relative == "." ||
-		relative == ".." ||
-		strings.HasPrefix(relative, "../") ||
-		!fs.ValidPath(relative) {
-		return "", fmt.Errorf(
-			"%w: invalid embedded package file %q",
-			basespec.ErrInvalid,
-			location,
-		)
-	}
 
 	value := basespec.Locator(relative)
 	if err := value.ValidatePortable(false); err != nil {
