@@ -644,11 +644,7 @@ func canonicalPackageFiles(
 	if err != nil {
 		return nil, "", err
 	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return nil, "", err
-	}
-	return publication.Files, cryptoutil.DigestBytes(canonical), nil
+	return publication.Files, cryptoutil.DigestBytes(raw), nil
 }
 
 func (i *Installer) hydrationFingerprint(

@@ -1114,6 +1114,12 @@ func currentOccurrenceForBindingTx(
 	if err != nil {
 		return nil, err
 	}
+	if err := occurrence.Validate(); err != nil {
+		return nil, fmt.Errorf(
+			"invalid persisted occurrence: %w",
+			err,
+		)
+	}
 	return &occurrence, nil
 }
 

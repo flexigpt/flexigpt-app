@@ -566,14 +566,11 @@ func (a *Adapter) validateSource(ctx context.Context, value source.Source) error
 			value.Kind,
 		)
 	}
-	normalized, err := a.NormalizeConfig(ctx, value.Config)
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(normalized, []byte(jsonutil.EmptyObject)) {
+	if _, err := jsonutil.DecodeJSONRaw[config](value.Config); err != nil {
 		return fmt.Errorf(
-			"%w: invalid normalized managed Source config",
+			"%w: invalid managed Source config: %w",
 			basespec.ErrInvalid,
+			err,
 		)
 	}
 	return nil
@@ -583,12 +580,7 @@ func (a *Adapter) sourceRootPath(
 	value source.Source,
 	create bool,
 ) (string, error) {
-	if err := value.ID.Validate(); err != nil {
-		return "", err
-	}
-	if err := value.StorageKey.Validate(); err != nil {
-		return "", err
-	}
+	// Every caller has already passed value through validateSource.
 	root, err := a.managedRootPath(value.RootStorageKey)
 	if err != nil {
 		return "", err
@@ -607,12 +599,7 @@ func (a *Adapter) sourceStagingPath(
 	value source.Source,
 	create bool,
 ) (string, error) {
-	if err := value.ID.Validate(); err != nil {
-		return "", err
-	}
-	if err := value.StorageKey.Validate(); err != nil {
-		return "", err
-	}
+	// Every caller has already passed value through validateSource.
 	root, err := a.managedStagingRootPath(value.RootStorageKey)
 	if err != nil {
 		return "", err

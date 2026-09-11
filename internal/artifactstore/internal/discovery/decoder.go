@@ -8,7 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type DecoderRegistry struct {
@@ -77,11 +76,7 @@ func (r *DecoderRegistry) Fingerprint() (cryptoutil.Digest, error) {
 	if err != nil {
 		return "", err
 	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return "", err
-	}
-	return cryptoutil.DigestBytes(canonical), nil
+	return cryptoutil.DigestBytes(raw), nil
 }
 
 func (r *DecoderRegistry) find(

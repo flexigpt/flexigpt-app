@@ -109,10 +109,7 @@ func ServerBodyFromDefinition(
 func serverDocumentAndBodyFromDefinition(
 	input definition.Definition,
 ) (ServerDocument, ServerDefinitionBody, error) {
-	value, err := definition.Canonicalize(input)
-	if err != nil {
-		return ServerDocument{}, ServerDefinitionBody{}, err
-	}
+	value := input
 	if value.Kind != mcpserverv1.MCPServerKind ||
 		value.SchemaID != mcpserverv1.MCPServerSchemaID ||
 		value.SchemaVersion != mcpserverv1.MCPServerSchemaVersion {

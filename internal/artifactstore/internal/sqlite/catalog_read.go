@@ -238,9 +238,6 @@ func scanOccurrence(row scanner) (catalog.Occurrence, error) {
 		Diagnostics:         diagnostics,
 		ObservedAt:          parseTime(observedAt),
 	}
-	if err := value.Validate(); err != nil {
-		return catalog.Occurrence{}, err
-	}
 	return value, nil
 }
 
@@ -250,6 +247,7 @@ func currentAttachmentSourceRevisionsTx(
 	ref collection.CollectionRef,
 ) (
 	currentAttachments map[source.SourceID]uint64,
+
 	currentSources map[source.SourceID]uint64,
 	err error,
 ) {

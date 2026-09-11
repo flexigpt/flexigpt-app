@@ -22,10 +22,7 @@ func PolicySubresource(
 func BodyFromDefinition(
 	input definition.Definition,
 ) (mcpPolicy.MCPPolicy, error) {
-	value, err := definition.Canonicalize(input)
-	if err != nil {
-		return mcpPolicy.MCPPolicy{}, err
-	}
+	value := input
 	if value.Kind != mcppolicyv1.MCPPolicyKind ||
 		value.SchemaID != mcppolicyv1.MCPPolicySchemaID ||
 		value.SchemaVersion != mcppolicyv1.MCPPolicySchemaVersion {

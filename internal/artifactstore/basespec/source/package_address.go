@@ -87,15 +87,11 @@ func (a ManagedPackageAddress) Directory() (basespec.Locator, error) {
 	if err := a.Validate(); err != nil {
 		return "", err
 	}
-	value := basespec.Locator(path.Join(
+	return basespec.Locator(path.Join(
 		string(a.Kind),
 		string(a.Name),
 		string(a.Version),
-	))
-	if err := value.ValidatePortable(false); err != nil {
-		return "", err
-	}
-	return value, nil
+	)), nil
 }
 
 // FileLocator returns a source-relative locator for one package-relative

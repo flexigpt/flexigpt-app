@@ -1886,17 +1886,6 @@ func (a *API) createManagedSkill(
 	if err != nil {
 		return CreateManagedSkillResponse{}, err
 	}
-	if err := skillLocator.ValidatePortable(false); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if _, err := source.NormalizeManagedPackagePublication(
-		source.ManagedPackagePublication{
-			Address: packageAddress,
-			Files:   files,
-		},
-	); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
 
 	artifactName := definitionValue.DisplayName
 	if artifactName == "" {
@@ -2443,19 +2432,11 @@ func validateManagedSkillOperationIntent(
 func managedSkillPackageDigest(
 	files []source.ManagedPackageFile,
 ) (cryptoutil.Digest, error) {
-	normalized, err := source.NormalizeManagedPackageFiles(files)
+	raw, err := json.Marshal(files)
 	if err != nil {
 		return "", err
 	}
-	raw, err := json.Marshal(normalized)
-	if err != nil {
-		return "", err
-	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return "", err
-	}
-	return cryptoutil.DigestBytes(canonical), nil
+	return cryptoutil.DigestBytes(raw), nil
 }
 
 func skillDirectoryStorageKey() basespec.StorageKey {
