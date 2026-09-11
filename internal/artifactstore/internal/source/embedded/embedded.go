@@ -73,14 +73,7 @@ func (a *Adapter) NormalizeConfig(
 	if err != nil {
 		return nil, err
 	}
-	canonical, err := jsonutil.CanonicalizeObject(
-		encoded,
-		basespec.MaxConfigBytes,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return json.RawMessage(canonical), nil
+	return json.RawMessage(encoded), nil
 }
 
 func (a *Adapter) Open(

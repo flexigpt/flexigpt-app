@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"path"
 	"slices"
 	"sort"
 	"strings"
@@ -695,16 +694,7 @@ func readWorkspaceDescriptor(
 
 	body := descriptor.Body
 
-	base, err := workspaceDescriptorBaseLocator(
-		artifactbuiltin.WorkspaceDescriptorFileName,
-	)
-	if err != nil {
-		return workspaceDescriptorObservation{}, fmt.Errorf(
-			"%w: resolve Workspace descriptor base: %w",
-			workspaceDomain.ErrWorkspaceDefinitionInvalid,
-			err,
-		)
-	}
+	base := basespec.Locator(".")
 
 	preferences, err := resolveWorkspaceDescriptorPreferences(
 		body.Discovery,
@@ -844,27 +834,15 @@ func resolveWorkspaceDescriptorPreferences(
 	return output, nil
 }
 
-func workspaceDescriptorBaseLocator(
-	document basespec.Locator,
-) (basespec.Locator, error) {
-	if err := document.Validate(false); err != nil {
-		return "", fmt.Errorf("workspace descriptor locator: %w", err)
-	}
-
-	base := basespec.Locator(path.Dir(string(document)))
-	if err := base.Validate(true); err != nil {
-		return "", fmt.Errorf("workspace descriptor base locator: %w", err)
-	}
-	return base, nil
-}
-
 func resolveWorkspaceRelativeLocator(
 	base basespec.Locator,
 	relative basespec.Locator,
 	allowRelativeRoot bool,
 ) (basespec.Locator, error) {
-	if err := base.ValidatePortable(true); err != nil {
-		return "", fmt.Errorf("portable base locator: %w", err)
+	if base != "." {
+		if err := base.ValidatePortable(true); err != nil {
+			return "", fmt.Errorf("portable base locator: %w", err)
+		}
 	}
 	if err := relative.ValidatePortable(allowRelativeRoot); err != nil {
 		return "", fmt.Errorf("portable relative locator: %w", err)

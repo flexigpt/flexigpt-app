@@ -52,9 +52,6 @@ func BodyFromDefinition(
 func DefinitionForCanonicalPolicy(
 	input PolicyDocument,
 ) (definition.Definition, error) {
-	if err := input.Validate(); err != nil {
-		return definition.Definition{}, err
-	}
 	if input.Kind != mcppolicyv1.MCPPolicyKind ||
 		input.SchemaID != mcppolicyv1.MCPPolicySchemaID ||
 		input.SchemaVersion != mcppolicyv1.MCPPolicySchemaVersion {

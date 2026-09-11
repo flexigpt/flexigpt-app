@@ -565,13 +565,7 @@ func (c *Components) publishManagedPackage(
 	if err := rootimpl.RequireMutableRoot(ctx, c.rootMutationPolicy, rootID); err != nil {
 		return ManagedPackageResult{}, err
 	}
-	normalizedPublication, err := source.NormalizeManagedPackagePublication(
-		publication,
-	)
-	if err != nil {
-		return ManagedPackageResult{}, err
-	}
-	requestedGeneration := normalizedPublication.ExpectedGeneration
+	requestedGeneration := publication.ExpectedGeneration
 	value, err := c.managedSource(
 		ctx,
 		rootID,
@@ -581,7 +575,6 @@ func (c *Components) publishManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
-	publication = normalizedPublication
 
 	beforeGeneration, err := sourceSnapshotGeneration(
 		ctx,

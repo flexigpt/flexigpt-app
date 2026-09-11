@@ -78,8 +78,7 @@ func (d *Decoder) Decode(
 	ctx context.Context,
 	candidate providerapi.Candidate,
 ) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
-	if !candidate.RequestsDecoder(artifactbuiltin.DecoderID) ||
-		!mcpDomainBundle.IsBundleDocumentLocator(candidate.Locator) {
+	if !candidate.RequestsDecoder(artifactbuiltin.DecoderID) {
 		return nil, nil
 	}
 	if d == nil || d.documents == nil {

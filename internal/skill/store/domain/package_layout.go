@@ -62,9 +62,6 @@ func ManagedPackageAddressFromSkillLocator(
 func validateManagedSkillPackageAddress(
 	address source.ManagedPackageAddress,
 ) error {
-	if err := address.Validate(); err != nil {
-		return err
-	}
 	if address.Kind != artifactbuiltin.AgentSkillPackageKind {
 		return fmt.Errorf(
 			"%w: Skill package kind must be %q",

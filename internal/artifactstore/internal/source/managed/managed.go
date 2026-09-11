@@ -244,10 +244,7 @@ func (a *Adapter) PublishPackage(
 	if err := a.validateSource(ctx, value); err != nil {
 		return "", err
 	}
-	files, err := validatePublication(publication)
-	if err != nil {
-		return "", err
-	}
+	files := publication.Files
 	directory, err := publication.Address.Directory()
 	if err != nil {
 		return "", err
@@ -637,9 +634,8 @@ func (a *Adapter) managedRootPath(
 		return "", err
 	}
 
-	base := filepath.Clean(a.base)
-	root := filepath.Join(base, string(rootStorageKey))
-	relative, err := filepath.Rel(base, root)
+	root := filepath.Join(a.base, string(rootStorageKey))
+	relative, err := filepath.Rel(a.base, root)
 	if err != nil {
 		return "", err
 	}
@@ -661,9 +657,8 @@ func (a *Adapter) managedStagingRootPath(
 		return "", err
 	}
 
-	base := filepath.Clean(a.stagingBase)
-	root := filepath.Join(base, string(rootStorageKey))
-	relative, err := filepath.Rel(base, root)
+	root := filepath.Join(a.stagingBase, string(rootStorageKey))
+	relative, err := filepath.Rel(a.stagingBase, root)
 	if err != nil {
 		return "", err
 	}
@@ -709,17 +704,6 @@ func (a *Adapter) confirmedGeneration(
 		return "", errors.Join(confirmErr, closeErr)
 	}
 	return generation, nil
-}
-
-func validatePublication(
-	publication source.ManagedPackagePublication,
-) ([]source.ManagedPackageFile, error) {
-	normalized, err := source.NormalizeManagedPackagePublication(publication)
-	if err != nil {
-		return nil, err
-	}
-
-	return normalized.Files, nil
 }
 
 func managedPackagePath(
@@ -840,7 +824,7 @@ func equivalentPackage(
 			)
 		}
 		total += info.Size()
-		relative = path.Clean(filepath.ToSlash(relative))
+		relative = filepath.ToSlash(relative)
 		if err := basespec.Locator(relative).ValidatePortable(false); err != nil {
 			return err
 		}

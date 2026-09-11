@@ -26,8 +26,12 @@ func PackageAddressForBundle(
 func DocumentLocatorForPackage(
 	address source.ManagedPackageAddress,
 ) (basespec.Locator, error) {
-	if err := validatePackageAddress(address); err != nil {
-		return "", err
+	if address.Kind != artifactbuiltin.MCPBundlePackageKind {
+		return "", fmt.Errorf(
+			"%w: MCP Bundle package kind must be %q",
+			basespec.ErrInvalid,
+			artifactbuiltin.MCPBundlePackageKind,
+		)
 	}
 	return address.FileLocator(artifactbuiltin.MCPBundleDocumentFileName)
 }

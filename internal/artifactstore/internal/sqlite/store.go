@@ -144,7 +144,7 @@ func tableExistsTx(
 }
 
 func dataSourceName(path string) string {
-	normalized := filepath.ToSlash(filepath.Clean(path))
+	normalized := filepath.ToSlash(path)
 	if filepath.VolumeName(path) != "" &&
 		!strings.HasPrefix(normalized, "/") {
 		normalized = "/" + normalized

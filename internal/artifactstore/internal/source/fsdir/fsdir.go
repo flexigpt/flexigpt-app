@@ -80,10 +80,6 @@ func (a *Adapter) NormalizeConfig(
 	if err != nil {
 		return nil, err
 	}
-	encoded, err = jsonutil.CanonicalizeObject(encoded, basespec.MaxConfigBytes)
-	if err != nil {
-		return nil, err
-	}
 	return json.RawMessage(encoded), nil
 }
 
