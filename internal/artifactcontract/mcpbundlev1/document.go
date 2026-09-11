@@ -17,7 +17,6 @@ const (
 	MCPBundleKind          = "mcp.bundle"
 	MCPBundleSchemaID      = "mcp.bundle.v1"
 	MCPBundleSchemaVersion = "v1"
-	MCPBundleSchemaURL     = "https://schemas.flexigpt.dev/mcp/bundle/v1.json"
 )
 
 //go:embed mcp-bundle-v1.schema.json

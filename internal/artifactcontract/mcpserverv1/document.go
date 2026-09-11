@@ -15,7 +15,6 @@ const (
 	MCPServerKind          = "mcp.server"
 	MCPServerSchemaID      = "mcp.server.v1"
 	MCPServerSchemaVersion = "v1"
-	MCPServerSchemaURL     = "https://schemas.flexigpt.dev/mcp/server/v1.json"
 )
 
 //go:embed mcp-server-v1.schema.json

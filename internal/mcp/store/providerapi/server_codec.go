@@ -27,9 +27,6 @@ func (ServerCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (schema.ParsedDocument, error) {
-	if err := artifactbuiltin.CheckCodecContext(ctx); err != nil {
-		return schema.ParsedDocument{}, err
-	}
 	value, canonical, err := parseServer(raw)
 	if err != nil {
 		return schema.ParsedDocument{}, err

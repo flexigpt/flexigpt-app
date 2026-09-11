@@ -15,7 +15,6 @@ const (
 	MCPPolicyKind          = "mcp.policy"
 	MCPPolicySchemaID      = "mcp.policy.v1"
 	MCPPolicySchemaVersion = "v1"
-	MCPPolicySchemaURL     = "https://schemas.flexigpt.dev/mcp/policy/v1.json"
 )
 
 //go:embed mcp-policy-v1.schema.json

@@ -29,9 +29,6 @@ func (BundleCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (schema.ParsedDocument, error) {
-	if err := artifactbuiltin.CheckCodecContext(ctx); err != nil {
-		return schema.ParsedDocument{}, err
-	}
 	value, canonical, err := parseBundle(raw)
 	if err != nil {
 		return schema.ParsedDocument{}, err
