@@ -290,6 +290,7 @@ export interface ReasoningContent {
 	role: RoleEnum;
 	status?: Status;
 	cacheControl?: CacheControl;
+	continuationFingerprint?: string;
 	signature?: string;
 	summary?: string[];
 	thinking?: string[];

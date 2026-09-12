@@ -10026,6 +10026,7 @@ export namespace spec {
 	    role: string;
 	    status: string;
 	    cacheControl?: CacheControl;
+	    continuationFingerprint?: string;
 	    signature: string;
 	    summary?: string[];
 	    thinking?: string[];
@@ -10042,6 +10043,7 @@ export namespace spec {
 	        this.role = source["role"];
 	        this.status = source["status"];
 	        this.cacheControl = this.convertValues(source["cacheControl"], CacheControl);
+	        this.continuationFingerprint = source["continuationFingerprint"];
 	        this.signature = source["signature"];
 	        this.summary = source["summary"];
 	        this.thinking = source["thinking"];
