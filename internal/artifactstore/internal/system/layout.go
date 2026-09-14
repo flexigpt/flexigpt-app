@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
@@ -22,14 +22,14 @@ type storeManifest struct {
 func ensureStoreLayout(base string) error {
 	if err := os.MkdirAll(
 		base,
-		os.FileMode(artifactbuiltin.ArtifactStoreDirectoryMode),
+		os.FileMode(builtin.ArtifactStoreDirectoryMode),
 	); err != nil {
 		return err
 	}
 
 	manifestPath := filepath.Join(
 		base,
-		artifactbuiltin.ArtifactStoreManifestFileName,
+		builtin.ArtifactStoreManifestFileName,
 	)
 	raw, err := os.ReadFile(manifestPath)
 	switch {
@@ -45,13 +45,13 @@ func ensureStoreLayout(base string) error {
 			return fmt.Errorf(
 				"%w: Artifact Store base directory is non-empty but has no %s",
 				basespec.ErrUnsupported,
-				artifactbuiltin.ArtifactStoreManifestFileName,
+				builtin.ArtifactStoreManifestFileName,
 			)
 		}
 
 		raw, err = json.Marshal(storeManifest{
-			Format:        artifactbuiltin.ArtifactStoreFormat,
-			ContentLayout: artifactbuiltin.ArtifactStoreContentLayout,
+			Format:        builtin.ArtifactStoreFormat,
+			ContentLayout: builtin.ArtifactStoreContentLayout,
 		})
 		if err != nil {
 			return err
@@ -69,8 +69,8 @@ func ensureStoreLayout(base string) error {
 	if err != nil {
 		return err
 	}
-	if manifest.Format != artifactbuiltin.ArtifactStoreFormat ||
-		manifest.ContentLayout != artifactbuiltin.ArtifactStoreContentLayout {
+	if manifest.Format != builtin.ArtifactStoreFormat ||
+		manifest.ContentLayout != builtin.ArtifactStoreContentLayout {
 		return fmt.Errorf(
 			"%w: unsupported Artifact Store layout %q/%q",
 			basespec.ErrUnsupported,
@@ -80,12 +80,12 @@ func ensureStoreLayout(base string) error {
 	}
 
 	for _, directory := range []string{
-		artifactbuiltin.ArtifactStoreContentDirectoryName,
-		artifactbuiltin.ArtifactStoreStagingDirectoryName,
+		builtin.ArtifactStoreContentDirectoryName,
+		builtin.ArtifactStoreStagingDirectoryName,
 	} {
 		if err := os.MkdirAll(
 			filepath.Join(base, directory),
-			os.FileMode(artifactbuiltin.ArtifactStoreDirectoryMode),
+			os.FileMode(builtin.ArtifactStoreDirectoryMode),
 		); err != nil {
 			return err
 		}
@@ -101,7 +101,7 @@ func removeStaleManifestTemporaryFiles(base string) error {
 	for _, entry := range entries {
 		if !strings.HasPrefix(
 			entry.Name(),
-			artifactbuiltin.ArtifactStoreManifestTemporaryName,
+			builtin.ArtifactStoreManifestTemporaryName,
 		) {
 			continue
 		}
@@ -126,7 +126,7 @@ func writeNewStoreManifest(
 	base := filepath.Dir(manifestPath)
 	temporary, err := os.CreateTemp(
 		base,
-		artifactbuiltin.ArtifactStoreManifestTemporaryName,
+		builtin.ArtifactStoreManifestTemporaryName,
 	)
 	if err != nil {
 		return err
@@ -140,7 +140,7 @@ func writeNewStoreManifest(
 	}
 
 	if err := temporary.Chmod(
-		os.FileMode(artifactbuiltin.ArtifactStoreManifestMode),
+		os.FileMode(builtin.ArtifactStoreManifestMode),
 	); err != nil {
 		return cleanup(err)
 	}

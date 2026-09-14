@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
@@ -14,7 +14,7 @@ func ManagedPackageAddressForSkill(
 	version basespec.LogicalVersion,
 ) (source.ManagedPackageAddress, error) {
 	if version == "" {
-		version = artifactbuiltin.UnversionedPackageVersion
+		version = builtin.UnversionedPackageVersion
 	}
 	return source.NewManagedPackageAddress(
 		ManagedSkillPackageKind,

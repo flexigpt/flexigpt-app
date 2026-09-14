@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -24,7 +24,7 @@ type SkillStoreWrapper struct {
 
 func NewSkillBuiltInInstaller(
 	skills skillConsumerAPI.BuiltinStore,
-) (artifactbuiltin.HydrationInstaller, error) {
+) (builtin.HydrationInstaller, error) {
 	if skills == nil {
 		return nil, errors.New("skill built-in installer dependencies are incomplete")
 	}
@@ -33,7 +33,7 @@ func NewSkillBuiltInInstaller(
 	if err != nil {
 		return nil, err
 	}
-	packages, err := artifactbuiltin.EmbeddedSkillPackages()
+	packages, err := builtin.EmbeddedSkillPackages()
 	if err != nil {
 		return nil, err
 	}

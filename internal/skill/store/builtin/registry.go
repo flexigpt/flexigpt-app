@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -45,7 +45,7 @@ type HydratedRegistry struct {
 }
 
 func LoadRegistry() (Registry, error) {
-	raw, err := artifactbuiltin.ReadEmbeddedSkillRegistry()
+	raw, err := builtin.ReadEmbeddedSkillRegistry()
 	if err != nil {
 		return Registry{}, err
 	}

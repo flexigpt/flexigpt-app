@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -26,13 +26,13 @@ type App struct {
 	toolStoreAPI            *ToolStoreWrapper
 	toolRuntimeAPI          *ToolRuntimeWrapper
 	skillStoreAPI           *SkillStoreWrapper
-	skillBuiltInInstaller   artifactbuiltin.HydrationInstaller
+	skillBuiltInInstaller   builtin.HydrationInstaller
 	skillAggregateAPI       *SkillAggregateWrapper
 	skillRuntimeAPI         *SkillRuntimeWrapper
 	mcpStoreAPI             *MCPStoreWrapper
 	mcpRuntimeAPI           *MCPRuntimeWrapper
 	mcpAggregateAPI         *MCPAggregateWrapper
-	mcpBuiltInInstaller     artifactbuiltin.HydrationInstaller
+	mcpBuiltInInstaller     builtin.HydrationInstaller
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
 	workspaceStoreAPI       *WorkspaceStoreWrapper
@@ -63,32 +63,32 @@ func NewApp() *App {
 	app := &App{}
 	app.dataBasePath = filepath.Join(
 		xdg.DataHome,
-		artifactbuiltin.ApplicationDataDirectoryName,
+		builtin.ApplicationDataDirectoryName,
 	)
 
 	app.settingsDirPath = filepath.Join(
 		app.dataBasePath,
-		artifactbuiltin.SettingsDirectoryName,
+		builtin.SettingsDirectoryName,
 	)
 	app.conversationsDirPath = filepath.Join(
 		app.dataBasePath,
-		artifactbuiltin.ConversationsDirectoryName,
+		builtin.ConversationsDirectoryName,
 	)
 	app.modelPresetsDirPath = filepath.Join(
 		app.dataBasePath,
-		artifactbuiltin.ModelPresetsDirectoryName,
+		builtin.ModelPresetsDirectoryName,
 	)
 	app.toolsDirPath = filepath.Join(
 		app.dataBasePath,
-		artifactbuiltin.ToolsDirectoryName,
+		builtin.ToolsDirectoryName,
 	)
 	app.assistantPresetsDirPath = filepath.Join(
 		app.dataBasePath,
-		artifactbuiltin.AssistantPresetsDirectoryName,
+		builtin.AssistantPresetsDirectoryName,
 	)
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
-		artifactbuiltin.ArtifactStoreDirectoryName,
+		builtin.ArtifactStoreDirectoryName,
 	)
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
@@ -213,7 +213,7 @@ func (a *App) GetAppVersion() string {
 func ensureAppPrivateDirectory(location string) error {
 	return os.MkdirAll(
 		location,
-		os.FileMode(artifactbuiltin.ApplicationDirectoryMode),
+		os.FileMode(builtin.ApplicationDirectoryMode),
 	)
 }
 

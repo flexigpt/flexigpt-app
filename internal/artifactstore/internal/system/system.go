@@ -7,7 +7,7 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -99,7 +99,7 @@ func Open(
 		ctx,
 		filepath.Join(
 			base,
-			artifactbuiltin.ArtifactStoreMetadataFileName,
+			builtin.ArtifactStoreMetadataFileName,
 		),
 	)
 	if err != nil {
@@ -133,11 +133,11 @@ func Open(
 	managedAdapter, err := managed.New(
 		filepath.Join(
 			base,
-			artifactbuiltin.ArtifactStoreContentDirectoryName,
+			builtin.ArtifactStoreContentDirectoryName,
 		),
 		filepath.Join(
 			base,
-			artifactbuiltin.ArtifactStoreStagingDirectoryName,
+			builtin.ArtifactStoreStagingDirectoryName,
 		),
 	)
 	if err != nil {

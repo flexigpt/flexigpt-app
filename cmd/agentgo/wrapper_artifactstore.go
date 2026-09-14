@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
@@ -16,7 +16,7 @@ func composeArtifactStore(
 	ctx context.Context,
 	baseDirectory string,
 ) (*compositionapi.Store, error) {
-	if err := artifactbuiltin.ValidateApplicationTopology(); err != nil {
+	if err := builtin.ValidateApplicationTopology(); err != nil {
 		return nil, err
 	}
 
@@ -52,8 +52,8 @@ func composeArtifactStore(
 		compositionapi.Config{
 			BaseDirectory:    baseDirectory,
 			Providers:        providers,
-			ProtectedRootIDs: artifactbuiltin.ProtectedRootIDs(),
-			RetainedRoots:    artifactbuiltin.RetainedRootDrafts(),
+			ProtectedRootIDs: builtin.ProtectedRootIDs(),
+			RetainedRoots:    builtin.RetainedRootDrafts(),
 		},
 	)
 }

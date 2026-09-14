@@ -4,27 +4,27 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 )
 
 func EnsureBuiltinArtifactTopology(
 	ctx context.Context,
 	topologyAPI installerapi.API,
-	skills artifactbuiltin.HydrationInstaller,
-	mcp artifactbuiltin.HydrationInstaller,
+	skills builtin.HydrationInstaller,
+	mcp builtin.HydrationInstaller,
 ) error {
 	if topologyAPI == nil ||
 		skills == nil ||
 		mcp == nil {
 		return errors.New("built-in topology dependencies are incomplete")
 	}
-	if err := artifactbuiltin.ValidateApplicationTopology(); err != nil {
+	if err := builtin.ValidateApplicationTopology(); err != nil {
 		return err
 	}
 
-	bootstrap, err := artifactbuiltin.NewBootstrapRegistry(
-		artifactbuiltin.BuiltinTopologyDeclaration(),
+	bootstrap, err := builtin.NewBootstrapRegistry(
+		builtin.BuiltinTopologyDeclaration(),
 		topologyAPI,
 		topologyAPI,
 	)

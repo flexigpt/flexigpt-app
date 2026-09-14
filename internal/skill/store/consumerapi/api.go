@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
@@ -654,7 +654,7 @@ func (a *API) InstallBuiltInSkillCollection(
 		Type:        collectionv1.CollectionType,
 		Name:        string(request.Name),
 		Description: request.Description,
-		Version:     string(artifactbuiltin.UnversionedPackageVersion),
+		Version:     string(builtin.UnversionedPackageVersion),
 		Members:     members,
 	}
 	raw, err := document.CanonicalJSON()
@@ -673,7 +673,7 @@ func (a *API) InstallBuiltInSkillCollection(
 	address, err := source.NewManagedPackageAddress(
 		skillDomain.BuiltinCollectionPackageKind,
 		request.Name,
-		artifactbuiltin.UnversionedPackageVersion,
+		builtin.UnversionedPackageVersion,
 	)
 	if err != nil {
 		return artifact.Artifact{}, err

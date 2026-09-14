@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -42,7 +42,7 @@ func NewInstaller(
 		return nil, err
 	}
 
-	topologyValue := artifactbuiltin.BuiltinTopologyDeclaration()
+	topologyValue := builtin.BuiltinTopologyDeclaration()
 	if err := topologyValue.Validate(); err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func builtInPackageScopes(
 	collectionAddress, err := source.NewManagedPackageAddress(
 		skillDomain.BuiltinCollectionPackageKind,
 		skillDomain.BuiltinSkillCollectionName,
-		artifactbuiltin.UnversionedPackageVersion,
+		builtin.UnversionedPackageVersion,
 	)
 	if err != nil {
 		return nil, err

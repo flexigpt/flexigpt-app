@@ -7,7 +7,7 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
@@ -42,7 +42,7 @@ func NewInstaller(
 			basespec.ErrInvalid,
 		)
 	}
-	topologyValue := artifactbuiltin.BuiltinTopologyDeclaration()
+	topologyValue := builtin.BuiltinTopologyDeclaration()
 	if err := topologyValue.Validate(); err != nil {
 		return nil, err
 	}

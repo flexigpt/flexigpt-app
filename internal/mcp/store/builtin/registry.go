@@ -7,7 +7,7 @@ import (
 	"path"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -53,11 +53,11 @@ type PreparedPackage struct {
 }
 
 func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
-	packages, err := artifactbuiltin.EmbeddedMCPPackages()
+	packages, err := builtin.EmbeddedMCPPackages()
 	if err != nil {
 		return Registry{}, nil, err
 	}
-	raw, err := artifactbuiltin.ReadEmbeddedMCPRegistry()
+	raw, err := builtin.ReadEmbeddedMCPRegistry()
 	if err != nil {
 		return Registry{}, nil, err
 	}
@@ -221,7 +221,7 @@ func PrepareCollections(
 		address, err := source.NewManagedPackageAddress(
 			mcpDomain.MCPCollectionPackageKind,
 			packageName,
-			artifactbuiltin.UnversionedPackageVersion,
+			builtin.UnversionedPackageVersion,
 		)
 		if err != nil {
 			return nil, err

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -62,7 +62,7 @@ func (a *API) UpsertManagedMCPPolicy(
 	address, err := source.NewManagedPackageAddress(
 		mcpDomain.ManagedMCPPolicyPackageKind,
 		request.Name,
-		artifactbuiltin.UnversionedPackageVersion,
+		builtin.UnversionedPackageVersion,
 	)
 	if err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err

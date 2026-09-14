@@ -1,4 +1,4 @@
-package artifactbuiltin
+package builtin
 
 import (
 	"encoding/json"

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
@@ -33,7 +33,7 @@ func InitMCPWrappers(
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
 	settingsStore mcpAuthKeyStore,
-) (artifactbuiltin.HydrationInstaller, error) {
+) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
 		aggregateWrapper == nil {
@@ -108,7 +108,7 @@ func InitMCPWrappers(
 	var runtimeManager *mcpConnection.MCPRuntimeManager
 	cleanup := func(
 		cause error,
-	) (artifactbuiltin.HydrationInstaller, error) {
+	) (builtin.HydrationInstaller, error) {
 		if runtimeManager != nil {
 			_ = runtimeManager.Close(context.Background())
 		}
@@ -126,13 +126,13 @@ func InitMCPWrappers(
 		mcpAuth.WithOAuthRedirectURL(broker.RedirectURL()),
 		mcpAuth.WithOAuthTokenStore(tokenStore),
 		mcpAuth.WithClientInfo(
-			artifactbuiltin.MCPHostName,
-			artifactbuiltin.MCPHostVersion,
+			builtin.MCPHostName,
+			builtin.MCPHostVersion,
 		),
 	)
 	clientFactory, err := sdkclient.NewFactory(mcpServer.ClientInfo{
-		Name:    artifactbuiltin.MCPHostName,
-		Version: artifactbuiltin.MCPHostVersion,
+		Name:    builtin.MCPHostName,
+		Version: builtin.MCPHostVersion,
 	})
 	if err != nil {
 		return cleanup(err)
@@ -189,7 +189,7 @@ func InitMCPWrappers(
 func NewMCPBuiltInInstaller(
 	store mcpConsumerAPI.BuiltinStore,
 	overlays mcpOverlay.RootPurger,
-) (artifactbuiltin.HydrationInstaller, error) {
+) (builtin.HydrationInstaller, error) {
 	if store == nil {
 		return nil, errors.New("MCP built-in Store is required")
 	}

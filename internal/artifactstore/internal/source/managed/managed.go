@@ -15,7 +15,7 @@ import (
 
 	"github.com/flexigpt/mapstore-go"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/mapstoreio"
@@ -310,13 +310,13 @@ func (a *Adapter) PublishPackage(
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(stagingRoot, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, builtin.ArtifactStoreDirectoryMode); err != nil {
 		return "", err
 	}
 
 	temporary, err := os.MkdirTemp(
 		stagingRoot,
-		artifactbuiltin.ManagedPackageTemporaryPrefix,
+		builtin.ManagedPackageTemporaryPrefix,
 	)
 	if err != nil {
 		return "", err
@@ -340,7 +340,7 @@ func (a *Adapter) PublishPackage(
 	if exists {
 		previousPackage, err = os.MkdirTemp(
 			stagingRoot,
-			artifactbuiltin.ManagedPackagePreviousPrefix,
+			builtin.ManagedPackagePreviousPrefix,
 		)
 		if err != nil {
 			return "", err
@@ -466,13 +466,13 @@ func (a *Adapter) RemovePackage(
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(stagingRoot, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, builtin.ArtifactStoreDirectoryMode); err != nil {
 		return err
 	}
 
 	tombstone, err := os.MkdirTemp(
 		stagingRoot,
-		artifactbuiltin.ManagedPackageRemovalPrefix,
+		builtin.ManagedPackageRemovalPrefix,
 	)
 	if err != nil {
 		return err
@@ -588,7 +588,7 @@ func (a *Adapter) sourceRootPath(
 	if !create {
 		return root, nil
 	}
-	if err := os.MkdirAll(root, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(root, builtin.ArtifactStoreDirectoryMode); err != nil {
 		return "", err
 	}
 	return root, nil
@@ -607,7 +607,7 @@ func (a *Adapter) sourceStagingPath(
 	if !create {
 		return root, nil
 	}
-	if err := os.MkdirAll(root, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(root, builtin.ArtifactStoreDirectoryMode); err != nil {
 		return "", err
 	}
 	return root, nil
@@ -702,7 +702,7 @@ func managedPackagePath(
 	if parent != "." {
 		parentPath = filepath.Join(root, filepath.FromSlash(parent))
 		if createParent {
-			if err := os.MkdirAll(parentPath, artifactbuiltin.ArtifactStoreDirectoryMode); err != nil {
+			if err := os.MkdirAll(parentPath, builtin.ArtifactStoreDirectoryMode); err != nil {
 				return "", err
 			}
 		}
