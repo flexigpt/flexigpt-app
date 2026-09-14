@@ -57,7 +57,7 @@ Request body:
 The wrapper receives the target `ArtifactRef` separately and returns:
 
     {
-      "secretRef": "mcpv2:...",
+      "secretRef": "mcpv1:...",
       "sha256": "...",
       "nonEmpty": true
     }

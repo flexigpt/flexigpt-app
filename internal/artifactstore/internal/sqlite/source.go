@@ -245,7 +245,15 @@ func (s *Store) updateSource(
 	); err != nil {
 		return err
 	}
-	if current.Enabled && !value.Enabled {
+	if current.Enabled &&
+		(!value.Enabled || value.Discovery.Empty()) {
+		code := "artifact.source-disabled"
+		message := "the Artifact Source was disabled"
+		if value.Enabled {
+			code = "artifact.discovery-disabled"
+			message = "the Artifact Source no longer has declaration discovery"
+		}
+
 		_, err := tx.ExecContext(
 			ctx,
 			`DELETE FROM artifact_source_refresh_state
@@ -262,8 +270,8 @@ func (s *Store) updateSource(
 			value.RootID,
 			value.ID,
 			value.ModifiedAt,
-			"artifact.source-disabled",
-			"the Artifact Source was disabled",
+			code,
+			message,
 		); err != nil {
 			return err
 		}

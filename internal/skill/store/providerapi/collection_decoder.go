@@ -102,6 +102,10 @@ func (*CollectionDecoder) decode(
 
 	members := make([]declaration.Entry, 0, len(rawMembers))
 	skills := make([]providerapi.Decoded, 0, len(rawMembers))
+	emittedSkillOrigins := make(
+		map[basespec.Locator]struct{},
+		len(rawMembers),
+	)
 	for index, rawMember := range rawMembers {
 		locator, err := decodeSkillCollectionMember(rawMember)
 		if err != nil {
@@ -165,6 +169,10 @@ func (*CollectionDecoder) decode(
 			)
 		}
 		members = append(members, member)
+		if _, duplicate := emittedSkillOrigins[sourceContent.Locator]; duplicate {
+			continue
+		}
+		emittedSkillOrigins[sourceContent.Locator] = struct{}{}
 
 		digest := sourceContent.Digest
 		// A Skill owns SKILL.md as its physical declaration origin. It must

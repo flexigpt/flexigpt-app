@@ -17,13 +17,15 @@ import (
 )
 
 type WorkspaceStoreWrapper struct {
-	api *workspaceConsumerAPI.StoreAPI
+	api   *workspaceConsumerAPI.StoreAPI
+	roots compositionapi.RootAPI
 }
 
 func InitWorkspaceWrappers(
 	storeWrapper *WorkspaceStoreWrapper,
 	runtimeWrapper *WorkspaceRuntimeWrapper,
 	aggregateWrapper *WorkspaceAggregateWrapper,
+	roots compositionapi.RootAPI,
 	sources compositionapi.SourceAPI,
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
@@ -34,6 +36,7 @@ func InitWorkspaceWrappers(
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
 		aggregateWrapper == nil ||
+		roots == nil ||
 		mcpServers == nil {
 		return errors.New("workspace wrapper receivers are incomplete")
 	}
@@ -55,6 +58,7 @@ func InitWorkspaceWrappers(
 		return err
 	}
 	storeWrapper.api = api
+	storeWrapper.roots = roots
 	runtimeWrapper.api = api
 	aggregateWrapper.api = api
 	return nil
@@ -71,6 +75,35 @@ func withWorkspaceStore[T any](
 		}
 		return fn(w.api)
 	})
+}
+
+// CreateWorkspaceRoot exposes the existing generic Root creation flow for
+// user-owned Workspace Sources. It does not create a Workspace Store entity.
+func (w *WorkspaceStoreWrapper) CreateWorkspaceRoot(
+	draft root.RootDraft,
+) (root.Root, error) {
+	return middleware.WithRecoveryResp(
+		func() (root.Root, error) {
+			if w == nil || w.roots == nil {
+				return root.Root{}, basespec.ErrClosed
+			}
+			return w.roots.Create(context.Background(), draft)
+		},
+	)
+}
+
+func (w *WorkspaceStoreWrapper) ListWorkspaceRoots() (
+	[]root.Root,
+	error,
+) {
+	return middleware.WithRecoveryResp(
+		func() ([]root.Root, error) {
+			if w == nil || w.roots == nil {
+				return nil, basespec.ErrClosed
+			}
+			return w.roots.List(context.Background())
+		},
+	)
 }
 
 func (w *WorkspaceStoreWrapper) RegisterFilesystemWorkspaceSource(
@@ -160,4 +193,5 @@ func (w *WorkspaceStoreWrapper) close() {
 		return
 	}
 	w.api = nil
+	w.roots = nil
 }

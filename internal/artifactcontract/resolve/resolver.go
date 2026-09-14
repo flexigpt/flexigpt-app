@@ -365,8 +365,7 @@ func (r *Resolver) resolveEntry(
 			depth,
 		)
 	}
-	if shouldResolveDeclarationLocator(entry, header.Locator) ||
-		shouldResolveNestedSkillLocator(entry, header.Locator, from) {
+	if shouldResolveDeclarationLocator(entry, header.Locator) {
 		return r.resolveDeclarationLocator(
 			ctx,
 			state,
@@ -851,20 +850,32 @@ func shouldResolveDeclarationLocator(
 	entry declaration.Entry,
 	locator *declaration.Locator,
 ) bool {
-	value, err := isLocatorOnlyEntry(entry, locator)
-	return err == nil && value
-}
-
-func shouldResolveNestedSkillLocator(
-	entry declaration.Entry,
-	locator *declaration.Locator,
-	from *artifact.Artifact,
-) bool {
-	if from == nil || entry.Header().Type != declaration.TypeSkill {
+	if !declarationLocatorLoadsArtifact(entry.Header().Type) {
 		return false
 	}
 	value, err := isLocatorOnlyEntry(entry, locator)
 	return err == nil && value
+}
+
+// declarationLocatorLoadsArtifact identifies declarations whose locator is a
+// declaration source that the Resolver must load. Leaf declaration locators
+// identify implementation or resource material and remain available to their
+// corresponding consumer materializers.
+func declarationLocatorLoadsArtifact(
+	declarationType declaration.Type,
+) bool {
+	switch declarationType {
+	case declaration.TypeCollection,
+		declaration.TypeAgent,
+		declaration.TypeTeam,
+		declaration.TypeLoop,
+		declaration.TypeWorkflow,
+		declaration.TypeWorkspace,
+		declaration.TypeMCPPolicy:
+		return true
+	default:
+		return false
+	}
 }
 
 func isLocatorOnlyEntry(

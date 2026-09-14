@@ -355,6 +355,7 @@ func (a *App) initManagers() {
 		a.workspaceStoreAPI,
 		a.workspaceRuntimeAPI,
 		a.workspaceAggregateAPI,
+		artifactComposition.Roots,
 		artifactComposition.Sources,
 		artifactComposition.Discovery,
 		artifactComposition.Artifacts,
@@ -449,6 +450,8 @@ func (a *App) initManagers() {
 // startup is called at application startup.
 func (a *App) startup(ctx context.Context) { //nolint:all
 	a.ctx = ctx
+
+	SetWrappedProviderAppContext(a.aggregateAPI, a.ctx)
 
 	// Load the frontend.
 	runtime.WindowShow(a.ctx)

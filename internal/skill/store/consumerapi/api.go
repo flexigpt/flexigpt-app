@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -114,6 +115,11 @@ func (a *API) RegisterSkillDirectory(
 		return source.Summary{}, err
 	}
 
+	rootPath, err := normalizeSkillDirectoryRoot(request.RootPath)
+	if err != nil {
+		return source.Summary{}, err
+	}
+
 	discovery, err := SkillDiscoverySpec(".")
 	if err != nil {
 		return source.Summary{}, err
@@ -121,19 +127,18 @@ func (a *API) RegisterSkillDirectory(
 	config, err := json.Marshal(struct {
 		RootPath string `json:"rootPath"`
 	}{
-		RootPath: request.RootPath,
+		RootPath: rootPath,
 	})
 	if err != nil {
 		return source.Summary{}, err
 	}
 
-	sourceID := source.SourceID(uuidutil.NewUUIDv7())
-	value, err := a.sources.Create(
+	value, _, err := a.sources.Ensure(
 		ctx,
 		request.RootID,
 		source.Draft{
-			ID:          sourceID,
-			StorageKey:  generatedSkillSourceStorageKey(),
+			ID:          source.SourceID(uuidutil.NewUUIDv7()),
+			StorageKey:  skillPathStorageKey(rootPath),
 			Kind:        source.SourceKindFilesystemDirectory,
 			DisplayName: request.SourceDisplayName,
 			Enabled:     true,
@@ -144,6 +149,24 @@ func (a *API) RegisterSkillDirectory(
 	if err != nil {
 		return source.Summary{}, err
 	}
+	if !value.Enabled ||
+		value.DisplayName != request.SourceDisplayName ||
+		!value.Discovery.Equal(discovery) {
+		value, err = a.sources.Update(
+			ctx,
+			request.RootID,
+			value.ID,
+			source.Update{
+				ExpectedRevision: value.Revision,
+				DisplayName:      request.SourceDisplayName,
+				Enabled:          true,
+				Discovery:        &discovery,
+			},
+		)
+		if err != nil {
+			return source.Summary{}, err
+		}
+	}
 	if _, err := a.discovery.RefreshSource(
 		ctx,
 		request.RootID,
@@ -152,6 +175,22 @@ func (a *API) RegisterSkillDirectory(
 		return source.Summary{}, err
 	}
 	return value, nil
+}
+
+func normalizeSkillDirectoryRoot(
+	raw string,
+) (string, error) {
+	if raw == "" || strings.TrimSpace(raw) != raw {
+		return "", fmt.Errorf(
+			"%w: Skill Source root path is required",
+			basespec.ErrInvalid,
+		)
+	}
+	absolute, err := filepath.Abs(raw)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(absolute), nil
 }
 
 func (a *API) RefreshSkillSource(
@@ -249,28 +288,6 @@ func (a *API) CreateManagedSkill(
 		return ManagedSkillCreateResult{}, err
 	}
 
-	sourceValue, err := a.sources.Get(
-		ctx,
-		request.RootID,
-		request.SourceID,
-	)
-	if err != nil {
-		return ManagedSkillCreateResult{}, err
-	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory {
-		return ManagedSkillCreateResult{}, fmt.Errorf(
-			"%w: managed Skill Source must have kind %q",
-			basespec.ErrInvalid,
-			source.SourceKindManagedDirectory,
-		)
-	}
-	if !sourceValue.Enabled {
-		return ManagedSkillCreateResult{}, fmt.Errorf(
-			"%w: managed Skill Source is disabled",
-			basespec.ErrConflict,
-		)
-	}
-
 	files, skillMD, err := skillDomain.NormalizeManagedSkillFiles(
 		request.SKILLMD,
 		request.Files,
@@ -305,8 +322,10 @@ func (a *API) CreateManagedSkill(
 	if err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
-	if err := validateSkillSourceDiscovery(
-		sourceValue.Discovery,
+	if _, err := a.ensureManagedSkillDiscovery(
+		ctx,
+		request.RootID,
+		request.SourceID,
 		locator,
 	); err != nil {
 		return ManagedSkillCreateResult{}, err
@@ -511,22 +530,10 @@ func (a *API) InstallBuiltInSkill(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	sourceValue, err := a.sources.Get(
+	if _, err := a.ensureManagedSkillDiscovery(
 		ctx,
 		request.RootID,
 		request.SourceID,
-	)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: built-in Skill Source must be managed",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := validateSkillSourceDiscovery(
-		sourceValue.Discovery,
 		locator,
 	); err != nil {
 		return artifact.Artifact{}, err
@@ -781,38 +788,65 @@ func (a *API) requireMutable(
 	return a.protection.RequirePrivilegedInstaller(ctx)
 }
 
-func validateSkillSourceDiscovery(
-	discovery source.DiscoverySpec,
+func (a *API) ensureManagedSkillDiscovery(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
 	locator basespec.Locator,
-) error {
-	discovery = discovery.Effective()
-	if discovery.Empty() {
-		return fmt.Errorf(
-			"%w: Skill Source has no declaration discovery configuration",
-			basespec.ErrRefreshRequired,
+) (source.Summary, error) {
+	value, err := a.sources.Get(ctx, rootID, sourceID)
+	if err != nil {
+		return source.Summary{}, err
+	}
+	if value.Kind != source.SourceKindManagedDirectory {
+		return source.Summary{}, fmt.Errorf(
+			"%w: managed Skill Source must have kind %q",
+			basespec.ErrInvalid,
+			source.SourceKindManagedDirectory,
 		)
 	}
-	inScope, err := discovery.InScope(locator)
+	if !value.Enabled {
+		return source.Summary{}, fmt.Errorf(
+			"%w: managed Skill Source is disabled",
+			basespec.ErrConflict,
+		)
+	}
+
+	next := value.Discovery.Clone()
+	inScope, err := next.InScope(locator)
 	if err != nil {
-		return err
+		return source.Summary{}, err
 	}
 	if !inScope {
-		return fmt.Errorf(
-			"%w: Skill declaration locator %q is outside Source discovery",
-			basespec.ErrInvalid,
+		next.ExplicitLocators = append(
+			next.ExplicitLocators,
 			locator,
 		)
 	}
-	if len(discovery.AllowedDecoderIDs) == 0 {
-		return nil
+	if len(next.AllowedDecoderIDs) != 0 &&
+		!slices.Contains(
+			next.AllowedDecoderIDs,
+			skillDomain.MarkdownDecoderID,
+		) {
+		next.AllowedDecoderIDs = append(
+			next.AllowedDecoderIDs,
+			skillDomain.MarkdownDecoderID,
+		)
 	}
-	if slices.Contains(discovery.AllowedDecoderIDs, skillDomain.MarkdownDecoderID) {
-		return nil
+	next = next.Normalized()
+	if value.Discovery.Equal(next) {
+		return value, nil
 	}
-	return fmt.Errorf(
-		"%w: Skill Source does not allow decoder %q",
-		basespec.ErrInvalid,
-		skillDomain.MarkdownDecoderID,
+	return a.sources.Update(
+		ctx,
+		rootID,
+		sourceID,
+		source.Update{
+			ExpectedRevision: value.Revision,
+			DisplayName:      value.DisplayName,
+			Enabled:          value.Enabled,
+			Discovery:        &next,
+		},
 	)
 }
 
@@ -851,15 +885,3 @@ func validateCanonicalCollectionSourceDiscovery(
 		decoder.JSONDecoderID,
 	)
 }
-
-func generatedSkillSourceStorageKey() basespec.StorageKey {
-	return basespec.StorageKey(
-		"skill-" + strings.ReplaceAll(
-			uuidutil.NewUUIDv7(),
-			"-",
-			"",
-		),
-	)
-}
-
-var _ BuiltinStore = (*API)(nil)

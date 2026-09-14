@@ -69,10 +69,6 @@ func (s Source) Validate() error {
 	); err != nil {
 		return fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
 	}
-	if err := s.Discovery.Validate(); err != nil {
-		return fmt.Errorf("source discovery: %w", err)
-	}
-
 	return nil
 }
 

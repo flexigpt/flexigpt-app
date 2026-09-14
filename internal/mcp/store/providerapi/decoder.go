@@ -2,6 +2,7 @@ package providerapi
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"strings"
 
@@ -34,8 +35,7 @@ func (*Decoder) Recognize(
 	switch {
 	case sourceformat.IsMCPCollection(candidate.Content):
 		return providerapi.RecognitionPreferred
-	case sourceformat.IsMCPConfig(candidate.Content) &&
-		isMCPConfigCandidate(candidate):
+	case isMCPConfigCandidate(candidate):
 		return providerapi.RecognitionPossible
 	default:
 		return providerapi.RecognitionNone
@@ -86,6 +86,16 @@ func (d *Decoder) Decode(
 			return nil, decoderError(candidate.Locator, "", err)
 		}
 		return decodedValues(values), nil
+
+	case isMCPConfigCandidate(candidate):
+		return nil, decoderError(
+			candidate.Locator,
+			"",
+			fmt.Errorf(
+				"%w: MCP configuration requires mcpServers",
+				basespec.ErrInvalid,
+			),
+		)
 
 	}
 	return nil, nil

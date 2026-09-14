@@ -13,14 +13,12 @@ type Provider struct {
 func NewProvider() (*Provider, error) {
 	markdownDecoder := NewDecoder()
 	collectionDecoder := NewCollectionDecoder()
+
 	descriptor := providerapi.Descriptor{
 		Name: artifactProviderName,
 		Decoders: []providerapi.Decoder{
 			markdownDecoder,
 			collectionDecoder,
-		},
-		LocatorResolvers: []providerapi.LocatorResolverFactory{
-			NewPathLocatorResolver(),
 		},
 	}
 	if err := descriptor.Validate(); err != nil {

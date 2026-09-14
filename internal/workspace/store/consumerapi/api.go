@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -124,6 +125,11 @@ func (a *StoreAPI) RegisterFilesystemSource(
 		return source.Summary{}, err
 	}
 
+	rootPath, err := normalizeWorkspaceSourceRoot(request.RootPath)
+	if err != nil {
+		return source.Summary{}, err
+	}
+
 	discovery, err := a.defaultDiscovery()
 	if err != nil {
 		return source.Summary{}, err
@@ -131,18 +137,18 @@ func (a *StoreAPI) RegisterFilesystemSource(
 	config, err := json.Marshal(struct {
 		RootPath string `json:"rootPath"`
 	}{
-		RootPath: request.RootPath,
+		RootPath: rootPath,
 	})
 	if err != nil {
 		return source.Summary{}, err
 	}
 
-	value, err := a.sources.Create(
+	value, _, err := a.sources.Ensure(
 		ctx,
 		request.RootID,
 		source.Draft{
 			ID:          source.SourceID(uuidutil.NewUUIDv7()),
-			StorageKey:  workspaceSourceStorageKey(),
+			StorageKey:  workspacePathStorageKey(rootPath),
 			Kind:        source.SourceKindFilesystemDirectory,
 			DisplayName: request.SourceDisplayName,
 			Enabled:     true,
@@ -152,6 +158,24 @@ func (a *StoreAPI) RegisterFilesystemSource(
 	)
 	if err != nil {
 		return source.Summary{}, err
+	}
+	if !value.Enabled ||
+		value.DisplayName != request.SourceDisplayName ||
+		!value.Discovery.Equal(discovery) {
+		value, err = a.sources.Update(
+			ctx,
+			request.RootID,
+			value.ID,
+			source.Update{
+				ExpectedRevision: value.Revision,
+				DisplayName:      request.SourceDisplayName,
+				Enabled:          true,
+				Discovery:        &discovery,
+			},
+		)
+		if err != nil {
+			return source.Summary{}, err
+		}
 	}
 	if _, err := a.discovery.RefreshSource(
 		ctx,
@@ -298,14 +322,6 @@ func (a *StoreAPI) SetWorkspaceArtifactEnabled(
 		)
 	}
 
-	record, err := a.artifacts.Get(ctx, ref)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
-	}
-	if record.Revision != expectedRevision {
-		return WorkspaceArtifactView{}, basespec.ErrConflict
-	}
-
 	updated, err := a.artifacts.SetEnabled(
 		ctx,
 		ref,
@@ -339,9 +355,6 @@ func (a *StoreAPI) SetArtifactRuntimeDisabled(
 	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
 		return WorkspaceArtifactView{}, err
-	}
-	if record.Revision != expectedRevision {
-		return WorkspaceArtifactView{}, basespec.ErrConflict
 	}
 
 	data, err := workspaceDomain.DecodeArtifactData(record.Data)
@@ -428,6 +441,22 @@ func (a *StoreAPI) defaultDiscovery() (
 	return value, nil
 }
 
+func normalizeWorkspaceSourceRoot(
+	raw string,
+) (string, error) {
+	if raw == "" || strings.TrimSpace(raw) != raw {
+		return "", fmt.Errorf(
+			"%w: Workspace Source root path is required",
+			basespec.ErrInvalid,
+		)
+	}
+	absolute, err := filepath.Abs(raw)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(absolute), nil
+}
+
 func workspaceArtifactViewOf(
 	value artifact.Artifact,
 ) (WorkspaceArtifactView, error) {
@@ -449,14 +478,4 @@ func workspaceArtifactViewOf(
 		SubresourceLocator: value.Binding.SubresourceLocator,
 		RuntimeDisabled:    data.RuntimeDisabled,
 	}, nil
-}
-
-func workspaceSourceStorageKey() basespec.StorageKey {
-	return basespec.StorageKey(
-		"workspace-" + strings.ReplaceAll(
-			uuidutil.NewUUIDv7(),
-			"-",
-			"",
-		),
-	)
 }
