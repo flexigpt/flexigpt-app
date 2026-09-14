@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
@@ -150,7 +151,7 @@ func (a *Adapter) compose(
 	)
 	contributionsByID := make(map[string]int)
 
-	for _, record := range selected {
+	for occurrence, record := range selected {
 		settings, err := workspaceDomain.DecodeArtifactData(record.Data)
 		if err != nil {
 			output.Diagnostics = diagnostic.Append(
@@ -203,7 +204,7 @@ func (a *Adapter) compose(
 			continue
 		}
 
-		id := contributionID(contribution.Artifact)
+		id := contributionID(contribution.Artifact, occurrence)
 		contributionsByID[id] = len(output.Contributions)
 		output.Contributions = append(output.Contributions, contribution)
 		runtimeValues = append(runtimeValues, workspaceRuntime.ContextContribution{
@@ -319,7 +320,6 @@ func (a *Adapter) selection(
 		return output, nil
 	}
 
-	seen := make(map[artifact.ArtifactID]struct{}, len(refs))
 	output := make([]artifact.Artifact, 0, len(refs))
 	for _, ref := range refs {
 		if err := ref.Validate(); err != nil {
@@ -331,13 +331,6 @@ func (a *Adapter) selection(
 				workspaceDomain.ErrReferenceUnresolved,
 			)
 		}
-		if _, duplicate := seen[ref.ArtifactID]; duplicate {
-			return nil, fmt.Errorf(
-				"%w: duplicate selected Workspace Artifact",
-				workspaceDomain.ErrInvalidWorkspace,
-			)
-		}
-		seen[ref.ArtifactID] = struct{}{}
 		value, err := a.artifacts.Get(ctx, ref)
 		if err != nil {
 			return nil, err
@@ -408,8 +401,11 @@ func selectedArtifact(
 	}
 }
 
-func contributionID(ref artifact.ArtifactRef) string {
-	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
+func contributionID(
+	ref artifact.ArtifactRef,
+	occurrence int,
+) string {
+	return string(ref.RootID) + "\x00" + string(ref.ArtifactID) + "\x00" + strconv.Itoa(occurrence)
 }
 
 func artifactDiagnostic(

@@ -48,8 +48,8 @@ func ValidatePathPattern(pattern string) error {
 	return nil
 }
 
-// ValidatePathPatterns validates a bounded pattern list and rejects duplicate
-// entries. Pattern order is otherwise retained by the caller.
+// ValidatePathPatterns validates a bounded pattern list.
+// Repeated patterns are harmless and preserve caller-owned configuration.
 func ValidatePathPatterns(
 	label string,
 	patterns []string,
@@ -63,20 +63,10 @@ func ValidatePathPatterns(
 		)
 	}
 
-	seen := make(map[string]struct{}, len(patterns))
 	for index, pattern := range patterns {
 		if err := ValidatePathPattern(pattern); err != nil {
 			return fmt.Errorf("%s[%d]: %w", label, index, err)
 		}
-		if _, duplicate := seen[pattern]; duplicate {
-			return fmt.Errorf(
-				"%w: %s contains duplicate pattern %q",
-				ErrInvalid,
-				label,
-				pattern,
-			)
-		}
-		seen[pattern] = struct{}{}
 	}
 	return nil
 }

@@ -116,10 +116,6 @@ func (h DecoderHint) Validate() error {
 		)
 	}
 
-	seen := make(
-		map[basespec.DecoderID]struct{},
-		len(h.DecoderIDs),
-	)
 	for index, decoderID := range h.DecoderIDs {
 		if err := decoderID.Validate(); err != nil {
 			return fmt.Errorf(
@@ -128,21 +124,8 @@ func (h DecoderHint) Validate() error {
 				err,
 			)
 		}
-		if _, duplicate := seen[decoderID]; duplicate {
-			return fmt.Errorf(
-				"%w: Source decoder hint repeats decoder %q",
-				basespec.ErrInvalid,
-				decoderID,
-			)
-		}
-		seen[decoderID] = struct{}{}
 	}
 	return nil
-}
-
-type decoderHintScope struct {
-	Locator   basespec.Locator
-	Recursive bool
 }
 
 // DiscoverySpec is Store-owned declaration discovery configuration for one
@@ -337,10 +320,6 @@ func (s DiscoverySpec) Validate() error {
 		)
 	}
 
-	seenLocators := make(
-		map[basespec.Locator]struct{},
-		len(s.ExplicitLocators),
-	)
 	for index, locator := range s.ExplicitLocators {
 		if err := locator.Validate(false); err != nil {
 			return fmt.Errorf(
@@ -349,14 +328,6 @@ func (s DiscoverySpec) Validate() error {
 				err,
 			)
 		}
-		if _, duplicate := seenLocators[locator]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate Source explicit locator %q",
-				basespec.ErrInvalid,
-				locator,
-			)
-		}
-		seenLocators[locator] = struct{}{}
 	}
 
 	for index, root := range s.DirectoryRoots {
@@ -369,10 +340,6 @@ func (s DiscoverySpec) Validate() error {
 		}
 	}
 
-	seenHints := make(
-		map[decoderHintScope]struct{},
-		len(s.DecoderHints),
-	)
 	for index, hint := range s.DecoderHints {
 		if err := hint.Validate(); err != nil {
 			return fmt.Errorf(
@@ -381,25 +348,8 @@ func (s DiscoverySpec) Validate() error {
 				err,
 			)
 		}
-		scope := decoderHintScope{
-			Locator:   hint.Locator,
-			Recursive: hint.Recursive,
-		}
-		if _, duplicate := seenHints[scope]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate Source decoder hint scope %q recursive=%t",
-				basespec.ErrInvalid,
-				hint.Locator,
-				hint.Recursive,
-			)
-		}
-		seenHints[scope] = struct{}{}
 	}
 
-	seenAllowed := make(
-		map[basespec.DecoderID]struct{},
-		len(s.AllowedDecoderIDs),
-	)
 	for index, decoderID := range s.AllowedDecoderIDs {
 		if err := decoderID.Validate(); err != nil {
 			return fmt.Errorf(
@@ -408,14 +358,6 @@ func (s DiscoverySpec) Validate() error {
 				err,
 			)
 		}
-		if _, duplicate := seenAllowed[decoderID]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate Source allowed decoder %q",
-				basespec.ErrInvalid,
-				decoderID,
-			)
-		}
-		seenAllowed[decoderID] = struct{}{}
 	}
 
 	if len(s.ExpectedContentDigests) >

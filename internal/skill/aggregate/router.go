@@ -145,13 +145,52 @@ func (r *ArtifactRouter) resolveRecord(
 			basespec.ErrRefreshRequired,
 		)
 	}
-	if err := skillDomain.ValidateDefinition(resolved.Definition); err != nil {
+
+	declarationValue, err := skillDomain.SkillDeclarationFromDefinition(
+		resolved.Definition,
+	)
+	if err != nil {
 		return ResolvedArtifactSkill{}, err
+	}
+	documentLocator, err := skillDomain.SourceDocumentLocator(
+		declarationValue.Locator,
+		record.Binding.Locator,
+	)
+	if err != nil {
+		return ResolvedArtifactSkill{}, err
+	}
+	sourceEntry, err := r.resources.ReadSourceEntry(
+		ctx,
+		record.RootID,
+		record.Binding.SourceID,
+		documentLocator,
+		basespec.MaxCandidateBytes,
+	)
+	if err != nil {
+		return ResolvedArtifactSkill{}, err
+	}
+	if sourceEntry.SourceGeneration != resolved.RefreshState.SourceGeneration {
+		return ResolvedArtifactSkill{}, fmt.Errorf(
+			"%w: Skill Source changed during runtime resolution",
+			basespec.ErrRefreshRequired,
+		)
+	}
+	if documentLocator == record.Binding.Locator &&
+		sourceEntry.Digest != *record.SourceContentDigest {
+		return ResolvedArtifactSkill{}, fmt.Errorf(
+			"%w: Skill declaration source changed during runtime resolution",
+			basespec.ErrRefreshRequired,
+		)
 	}
 
 	packageLocator, err := skillDomain.RuntimePackageLocator(
-		record.Binding.Locator,
-		record.Binding.SubresourceLocator,
+		documentLocator,
+		func() basespec.SubresourceLocator {
+			if documentLocator == record.Binding.Locator {
+				return record.Binding.SubresourceLocator
+			}
+			return ""
+		}(),
 	)
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
@@ -166,7 +205,7 @@ func (r *ArtifactRouter) resolveRecord(
 	}
 
 	versionInput := string(resolved.Definition.Digest) + "\x00" +
-		string(*record.SourceContentDigest) + "\x00" +
+		string(sourceEntry.Digest) + "\x00" +
 		resolved.RefreshState.SourceGeneration + "\x00" +
 		strconv.FormatUint(record.Revision, 10)
 	value := ResolvedArtifactSkill{

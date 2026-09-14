@@ -129,9 +129,9 @@ func (i *Installer) EnsureHydration(
 		}
 	}
 	if current {
-		return i.FinalizeHydration(ctx)
+		return nil
 	}
-	return i.Ensure(ctx)
+	return i.ensurePackages(ctx)
 }
 
 func (i *Installer) Ensure(
@@ -143,6 +143,31 @@ func (i *Installer) Ensure(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
+	if err := i.ensurePackages(ctx); err != nil {
+		return err
+	}
+	return i.FinalizeHydration(ctx)
+}
+
+func (i *Installer) FinalizeHydration(
+	ctx context.Context,
+) error {
+	if i == nil {
+		return basespec.ErrClosed
+	}
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return err
+	}
+	return i.mcp.EnsureBuiltInSourceCurrent(
+		ctx,
+		i.builtInTopology.Root.ID,
+		i.builtInTopology.Sources[0].ID,
+	)
+}
+
+func (i *Installer) ensurePackages(
+	ctx context.Context,
+) error {
 	for _, value := range i.prepared {
 		if _, err := i.mcp.InstallBuiltInPackage(
 			ctx,
@@ -162,23 +187,7 @@ func (i *Installer) Ensure(
 			)
 		}
 	}
-	return i.FinalizeHydration(ctx)
-}
-
-func (i *Installer) FinalizeHydration(
-	ctx context.Context,
-) error {
-	if i == nil {
-		return basespec.ErrClosed
-	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
-		return err
-	}
-	return i.mcp.EnsureBuiltInSourceCurrent(
-		ctx,
-		i.builtInTopology.Root.ID,
-		i.builtInTopology.Sources[0].ID,
-	)
+	return nil
 }
 
 func hydrationFingerprint(

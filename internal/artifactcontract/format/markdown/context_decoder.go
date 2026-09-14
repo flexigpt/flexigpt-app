@@ -26,7 +26,7 @@ func (*ContextDecoder) ID() basespec.DecoderID {
 }
 
 func (*ContextDecoder) Revision() string {
-	return "workspace-context-markdown/v1"
+	return "artifact-context-markdown/v1"
 }
 
 func (*ContextDecoder) Recognize(
@@ -121,7 +121,7 @@ func contextDiagnostics(
 ) []diagnostic.Diagnostic {
 	return []diagnostic.Diagnostic{{
 		Severity: diagnostic.SeverityError,
-		Code:     "workspace.context.invalid",
+		Code:     "artifact.context-markdown.invalid",
 		Message:  diagnostic.BoundedMessage(err.Error()),
 		Location: &diagnostic.Location{
 			Locator: locator,

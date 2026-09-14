@@ -2,6 +2,8 @@ package providerapi
 
 import (
 	"context"
+	"path"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -22,7 +24,7 @@ func (*Decoder) ID() basespec.DecoderID {
 }
 
 func (*Decoder) Revision() string {
-	return "mcp-source-decoder-v5"
+	return "mcp-source-decoder-v6"
 }
 
 func (*Decoder) Recognize(
@@ -32,10 +34,25 @@ func (*Decoder) Recognize(
 	switch {
 	case sourceformat.IsMCPCollection(candidate.Content):
 		return providerapi.RecognitionPreferred
-	case sourceformat.IsMCPConfig(candidate.Content):
+	case sourceformat.IsMCPConfig(candidate.Content) &&
+		isMCPConfigCandidate(candidate):
 		return providerapi.RecognitionPossible
 	default:
 		return providerapi.RecognitionNone
+	}
+}
+
+func isMCPConfigCandidate(
+	candidate providerapi.Candidate,
+) bool {
+	if candidate.RequestsDecoder(mcpDomain.SourceDecoderID) {
+		return true
+	}
+	switch strings.ToLower(path.Base(string(candidate.Locator))) {
+	case ".mcp.json", "mcp.json":
+		return true
+	default:
+		return false
 	}
 }
 

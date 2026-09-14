@@ -204,7 +204,8 @@ func scanDefinition(
 	value.DisplayName = displayName
 	value.Description = description
 	value.Body = append([]byte(nil), bodyRaw...)
-	if err := value.Validate(); err != nil {
+	canonical, err := definition.Canonicalize(value)
+	if err != nil {
 		return definition.Definition{}, fmt.Errorf(
 			"invalid persisted Definition %q/%q: %w",
 			rootID,
@@ -212,7 +213,7 @@ func scanDefinition(
 			err,
 		)
 	}
-	return value, nil
+	return canonical, nil
 }
 
 func equalDefinitions(

@@ -44,7 +44,6 @@ func InitWorkspaceWrappers(
 		locatorResolvers...,
 	)
 	config.MCPServers = mcpServers
-	config.MCPServers = mcpServers
 	api, err := workspaceConsumerAPI.NewStoreAPI(
 		sources,
 		discovery,

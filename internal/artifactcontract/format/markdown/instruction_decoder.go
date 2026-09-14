@@ -26,7 +26,7 @@ func (*InstructionDecoder) ID() basespec.DecoderID {
 }
 
 func (*InstructionDecoder) Revision() string {
-	return "workspace-instruction-markdown/v1"
+	return "artifact-instruction-markdown/v1"
 }
 
 func (*InstructionDecoder) Recognize(
@@ -98,7 +98,7 @@ func instructionDiagnostics(
 ) []diagnostic.Diagnostic {
 	return []diagnostic.Diagnostic{{
 		Severity: diagnostic.SeverityError,
-		Code:     "workspace.instruction.invalid",
+		Code:     "artifact.instruction-markdown.invalid",
 		Message:  diagnostic.BoundedMessage(err.Error()),
 		Location: &diagnostic.Location{
 			Locator: locator,

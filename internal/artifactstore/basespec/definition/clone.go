@@ -13,7 +13,7 @@ func (d Definition) Clone() Definition {
 }
 
 func cloneSelectors(input []Selector) []Selector {
-	if input == nil {
+	if len(input) == 0 {
 		return nil
 	}
 	output := make([]Selector, len(input))
@@ -25,7 +25,7 @@ func cloneSelectors(input []Selector) []Selector {
 }
 
 func cloneLabels(input map[string]string) map[string]string {
-	if input == nil {
+	if len(input) == 0 {
 		return nil
 	}
 	output := make(map[string]string, len(input))

@@ -49,7 +49,6 @@ func (a *StoreAPI) resolveWorkspaceCapabilities(
 	}
 	collector := workspaceCapabilityCollector{
 		capabilities: &capabilities,
-		promptSeen:   make(map[artifact.ArtifactRef]struct{}),
 		skillSeen:    make(map[artifact.ArtifactRef]struct{}),
 		mcpSeen:      make(map[artifact.ArtifactRef]struct{}),
 	}
@@ -65,7 +64,6 @@ func (a *StoreAPI) resolveWorkspaceCapabilities(
 
 type workspaceCapabilityCollector struct {
 	capabilities *WorkspaceCapabilityPlan
-	promptSeen   map[artifact.ArtifactRef]struct{}
 	skillSeen    map[artifact.ArtifactRef]struct{}
 	mcpSeen      map[artifact.ArtifactRef]struct{}
 }
@@ -96,11 +94,7 @@ func (c workspaceCapabilityCollector) collect(
 		if err != nil {
 			return err
 		}
-		appendUniqueWorkspaceArtifact(
-			&c.capabilities.PromptArtifacts,
-			c.promptSeen,
-			ref,
-		)
+		c.capabilities.PromptArtifacts = append(c.capabilities.PromptArtifacts, ref)
 		return nil
 
 	case declaration.TypeSkill:

@@ -58,9 +58,6 @@ func DecodeCanonicalEntryJSON(
 			err,
 		)
 	}
-	if err := header.Validate(HeaderValidation{}); err != nil {
-		return Entry{}, err
-	}
 	value := Entry{
 		raw:    append(json.RawMessage(nil), raw...),
 		header: header,
@@ -87,12 +84,6 @@ func NewSymbolicEntry(
 	declarationType Type,
 	name basespec.LogicalName,
 ) (Entry, error) {
-	if err := declarationType.Validate(); err != nil {
-		return Entry{}, err
-	}
-	if err := name.Validate(); err != nil {
-		return Entry{}, err
-	}
 	return NewEntry(Header{
 		Type: declarationType,
 		Name: string(name),

@@ -42,7 +42,7 @@ values. Callers must not recreate those values with different whitespace rules.
 ## Backend helper endpoints
 
 The frontend must call Artifact-backed MCP wrapper methods to create or delete
-MCP secrets. It must not construct `mcpv2:` references manually.
+MCP secrets. It must not construct `mcpv1:` references manually.
 
 ### Create or update a secret
 

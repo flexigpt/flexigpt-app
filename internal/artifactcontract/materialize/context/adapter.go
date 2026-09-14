@@ -141,12 +141,6 @@ func (a *Adapter) contentForDocument(
 	if err != nil {
 		return "", err
 	}
-	if len(entries) == 0 {
-		return "", fmt.Errorf(
-			"%w: Context locator selected no source entries",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
 
 	var output strings.Builder
 	for index, entry := range entries {
@@ -182,14 +176,7 @@ func (a *Adapter) contentForDocument(
 		output.Write(entry.Content)
 	}
 
-	content := output.String()
-	if strings.TrimSpace(content) == "" {
-		return "", fmt.Errorf(
-			"%w: Context locator selected only empty content",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-	return content, nil
+	return output.String(), nil
 }
 
 func declarationRelativeSourceLocator(

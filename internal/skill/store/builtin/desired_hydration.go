@@ -115,11 +115,7 @@ func (i *Installer) EnsureHydration(
 		return err
 	}
 	if current {
-		if err := i.FinalizeHydration(ctx); err == nil {
-			return nil
-		} else if ctx.Err() != nil {
-			return err
-		}
+		return nil
 	}
 	return i.EnsureBuiltInArtifacts(ctx)
 }

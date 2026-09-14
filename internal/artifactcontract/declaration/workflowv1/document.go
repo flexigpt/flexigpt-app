@@ -186,7 +186,6 @@ func (v WorkflowDocument) validate(requireName bool) error {
 		}
 	}
 
-	seenStart := make(map[string]struct{}, len(v.Start))
 	for index, start := range v.Start {
 		if _, found := nodes[start]; !found {
 			return fmt.Errorf(
@@ -196,14 +195,6 @@ func (v WorkflowDocument) validate(requireName bool) error {
 				start,
 			)
 		}
-		if _, duplicate := seenStart[start]; duplicate {
-			return fmt.Errorf(
-				"%w: workflow start repeats node %q",
-				basespec.ErrInvalid,
-				start,
-			)
-		}
-		seenStart[start] = struct{}{}
 	}
 
 	for index, edge := range v.Edges {

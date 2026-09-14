@@ -330,139 +330,15 @@ func (r *Resolver) resolveSymbolic(
 			depth,
 		)
 	default:
-		return r.resolveSymbolicCandidates(
-			ctx,
-			state,
-			rootID,
-			declarationType,
-			name,
-			candidates,
-			depth,
-		)
-	}
-}
-
-// resolveSymbolicCandidates distinguishes concrete declarations from minimal
-// locator-only aliases. Concrete duplicates remain identity conflicts. Alias
-// declarations are accepted only when they resolve to the same target.
-func (r *Resolver) resolveSymbolicCandidates(
-	ctx context.Context,
-	state *resolutionState,
-	rootID root.RootID,
-	declarationType declaration.Type,
-	name basespec.LogicalName,
-	candidates []artifact.Artifact,
-	depth int,
-) (*ResolvedEntry, error) {
-	concrete := make([]artifact.Artifact, 0, len(candidates))
-	aliases := make([]artifact.Artifact, 0, len(candidates))
-	for _, candidate := range candidates {
-		isAlias, err := r.isLocatorAlias(
-			ctx,
-			candidate,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if isAlias {
-			aliases = append(aliases, candidate)
-			continue
-		}
-		concrete = append(concrete, candidate)
-	}
-
-	if len(concrete) > 1 {
 		return nil, fmt.Errorf(
-			"%w: %s/%s has %d concrete Artifacts in Root %q",
+			"%w: %s/%s has %d available Artifacts in Root %q",
 			basespec.ErrIdentityConflict,
 			declarationType,
 			name,
-			len(concrete),
+			len(candidates),
 			rootID,
 		)
 	}
-
-	var selected *ResolvedEntry
-	if len(concrete) == 1 {
-		value, err := r.resolveArtifact(
-			ctx,
-			state,
-			concrete[0].Ref(),
-			declarationType,
-			depth,
-		)
-		if err != nil {
-			return nil, err
-		}
-		selected = value
-	}
-
-	for _, alias := range aliases {
-		target, err := r.resolveArtifact(
-			ctx,
-			state,
-			alias.Ref(),
-			declarationType,
-			depth,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if selected == nil {
-			selected = target
-			continue
-		}
-		if !sameResolvedArtifactTarget(selected, target) {
-			return nil, fmt.Errorf(
-				"%w: locator aliases for %s/%s resolve to different Artifacts",
-				basespec.ErrIdentityConflict,
-				declarationType,
-				name,
-			)
-		}
-	}
-
-	if selected == nil {
-		return nil, fmt.Errorf(
-			"%w: %s/%s",
-			basespec.ErrReferenceUnresolved,
-			declarationType,
-			name,
-		)
-	}
-	return selected, nil
-}
-
-func (r *Resolver) isLocatorAlias(
-	ctx context.Context,
-	record artifact.Artifact,
-) (bool, error) {
-	value, err := r.artifacts.GetDefinition(
-		ctx,
-		record.Ref(),
-	)
-	if err != nil {
-		return false, err
-	}
-	entry, err := declaration.DecodeCanonicalEntryJSON(value.Body)
-	if err != nil {
-		return false, err
-	}
-	return isLocatorOnlyDeclaration(
-		entry,
-		entry.Header().Locator,
-	)
-}
-
-func sameResolvedArtifactTarget(
-	left *ResolvedEntry,
-	right *ResolvedEntry,
-) bool {
-	leftRef, leftFound := left.ArtifactRef()
-	rightRef, rightFound := right.ArtifactRef()
-	return leftFound &&
-		rightFound &&
-		leftRef == rightRef
 }
 
 func (r *Resolver) resolveEntry(
@@ -489,7 +365,8 @@ func (r *Resolver) resolveEntry(
 			depth,
 		)
 	}
-	if shouldResolveDeclarationLocator(entry, header.Locator) {
+	if shouldResolveDeclarationLocator(entry, header.Locator) ||
+		shouldResolveNestedSkillLocator(entry, header.Locator, from) {
 		return r.resolveDeclarationLocator(
 			ctx,
 			state,
@@ -941,24 +818,56 @@ func (r *Resolver) resolveDeclarationLocator(
 	if err != nil {
 		return nil, err
 	}
-	return r.resolveArtifact(
+	if ref.RootID != rootID {
+		return nil, fmt.Errorf(
+			"%w: locator resolver returned an Artifact from another Root",
+			basespec.ErrInvalid,
+		)
+	}
+	resolved, err := r.resolveArtifact(
 		ctx,
 		state,
 		ref,
 		header.Type,
 		depth+1,
 	)
+	if err != nil {
+		return nil, err
+	}
+	if header.Name != "" &&
+		(resolved.Artifact == nil ||
+			resolved.Artifact.LogicalName != basespec.LogicalName(header.Name)) {
+		return nil, fmt.Errorf(
+			"%w: located declaration %s/%s resolved to another logical name",
+			basespec.ErrReferenceUnresolved,
+			header.Type,
+			header.Name,
+		)
+	}
+	return resolved, nil
 }
 
 func shouldResolveDeclarationLocator(
 	entry declaration.Entry,
 	locator *declaration.Locator,
 ) bool {
-	value, err := isLocatorOnlyDeclaration(entry, locator)
+	value, err := isLocatorOnlyEntry(entry, locator)
 	return err == nil && value
 }
 
-func isLocatorOnlyDeclaration(
+func shouldResolveNestedSkillLocator(
+	entry declaration.Entry,
+	locator *declaration.Locator,
+	from *artifact.Artifact,
+) bool {
+	if from == nil || entry.Header().Type != declaration.TypeSkill {
+		return false
+	}
+	value, err := isLocatorOnlyEntry(entry, locator)
+	return err == nil && value
+}
+
+func isLocatorOnlyEntry(
 	entry declaration.Entry,
 	locator *declaration.Locator,
 ) (bool, error) {
@@ -966,17 +875,7 @@ func isLocatorOnlyDeclaration(
 		locator.Kind == declaration.LocatorKindCommand {
 		return false, nil
 	}
-	switch entry.Header().Type {
-	case declaration.TypeCollection,
-		declaration.TypeAgent,
-		declaration.TypeTeam,
-		declaration.TypeLoop,
-		declaration.TypeWorkflow,
-		declaration.TypeWorkspace,
-		declaration.TypeMCPPolicy:
-	default:
-		return false, nil
-	}
+
 	raw, err := entry.CanonicalJSON()
 	if err != nil {
 		return false, err

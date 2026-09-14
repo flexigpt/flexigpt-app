@@ -94,7 +94,10 @@ func (i *Installer) Ensure(ctx context.Context) error {
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	return i.EnsureBuiltInArtifacts(ctx)
+	if err := i.EnsureBuiltInArtifacts(ctx); err != nil {
+		return err
+	}
+	return i.FinalizeHydration(ctx)
 }
 
 func (i *Installer) EnsureBuiltInArtifacts(
@@ -158,7 +161,7 @@ func (i *Installer) EnsureBuiltInArtifacts(
 		return fmt.Errorf("%w: built-in Skill Collection is unavailable", basespec.ErrReferenceUnresolved)
 	}
 
-	return i.FinalizeHydration(ctx)
+	return nil
 }
 
 func verifyBuiltInArtifact(

@@ -34,7 +34,7 @@ func (*AgentMarkdownDecoder) ID() basespec.DecoderID {
 }
 
 func (*AgentMarkdownDecoder) Revision() string {
-	return "workspace-agent-markdown/v1"
+	return "artifact-agent-markdown/v1"
 }
 
 func (*AgentMarkdownDecoder) Recognize(
@@ -206,7 +206,7 @@ func agentMarkdownDiagnostics(
 ) []diagnostic.Diagnostic {
 	return []diagnostic.Diagnostic{{
 		Severity: diagnostic.SeverityError,
-		Code:     "workspace.agent-markdown.invalid",
+		Code:     "artifact.agent-markdown.invalid",
 		Message:  diagnostic.BoundedMessage(err.Error()),
 		Location: &diagnostic.Location{
 			Locator: locator,

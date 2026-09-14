@@ -9,6 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func boolInt(value bool) int {
@@ -61,14 +62,39 @@ func encodeJSON(value any) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return encoded, nil
+	if len(encoded) > basespec.MaxDefinitionBytes {
+		return nil, fmt.Errorf(
+			"%w: persisted JSON exceeds %d bytes",
+			basespec.ErrInvalid,
+			basespec.MaxDefinitionBytes,
+		)
+	}
+	canonical, err := jsonutil.Canonicalize(encoded)
+	if err != nil {
+		return nil, err
+	}
+	if len(canonical) > basespec.MaxDefinitionBytes {
+		return nil, fmt.Errorf(
+			"%w: canonical persisted JSON exceeds %d bytes",
+			basespec.ErrInvalid,
+			basespec.MaxDefinitionBytes,
+		)
+	}
+	return canonical, nil
 }
 
 func decodeJSON(raw []byte, target any) error {
 	if len(raw) == 0 {
 		return fmt.Errorf("%w: persisted JSON is empty", basespec.ErrInvalid)
 	}
-	if err := json.Unmarshal(raw, target); err != nil {
+	if len(raw) > basespec.MaxDefinitionBytes {
+		return fmt.Errorf("%w: persisted JSON exceeds size limit", basespec.ErrInvalid)
+	}
+	canonical, err := jsonutil.Canonicalize(raw)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(canonical, target); err != nil {
 		return err
 	}
 	return nil

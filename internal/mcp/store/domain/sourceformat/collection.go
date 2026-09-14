@@ -66,12 +66,6 @@ func DecodeMCPCollection(
 	if err != nil {
 		return nil, err
 	}
-	if len(collection.MCPServers) == 0 {
-		return nil, fmt.Errorf(
-			"%w: MCP Collection has no servers",
-			basespec.ErrInvalid,
-		)
-	}
 
 	serverNames := make([]string, 0, len(collection.MCPServers))
 	for name := range collection.MCPServers {
@@ -293,12 +287,6 @@ func DecodeMCPConfig(
 	config, err := decodeMCPConfigDocument(raw)
 	if err != nil {
 		return nil, err
-	}
-	if len(config.MCPServers) == 0 {
-		return nil, fmt.Errorf(
-			"%w: MCP configuration has no servers",
-			basespec.ErrInvalid,
-		)
 	}
 
 	names := make([]string, 0, len(config.MCPServers))
