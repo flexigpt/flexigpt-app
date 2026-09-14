@@ -34,6 +34,22 @@ type Candidate struct {
 	RequestedDecoderIDs []basespec.DecoderID
 }
 
+// SourceContent is one bounded, snapshot-backed source file requested by a
+// source-aware decoder. The discovery engine owns the read, digest, and
+// snapshot lifetime.
+type SourceContent struct {
+	Locator basespec.Locator
+	Content []byte
+	Digest  cryptoutil.Digest
+}
+
+// SourceEntryReader permits a source-aware decoder to read explicitly
+// referenced sibling source files without exposing Source configuration,
+// snapshots, or native paths.
+type SourceEntryReader interface {
+	ReadSourceEntry(ctx context.Context, locator basespec.Locator) (SourceContent, error)
+}
+
 func (c Candidate) RequestsDecoder(id basespec.DecoderID) bool {
 	return slices.Contains(c.RequestedDecoderIDs, id)
 }
@@ -41,8 +57,16 @@ func (c Candidate) RequestsDecoder(id basespec.DecoderID) bool {
 // Decoded is one provider-derived definition emitted from a source candidate.
 type Decoded struct {
 	SubresourceLocator basespec.SubresourceLocator
-	Definition         definition.Definition
-	Diagnostics        []diagnostic.Diagnostic
+
+	// OriginLocator and OriginContentDigest override the candidate file as
+	// the physical declaration origin. They are used by source-aware format
+	// adapters such as a Skill Collection manifest that emits Skills from
+	// referenced SKILL.md files.
+	OriginLocator       basespec.Locator
+	OriginContentDigest *cryptoutil.Digest
+
+	Definition  definition.Definition
+	Diagnostics []diagnostic.Diagnostic
 }
 
 // Decoder is an Artifact Store inbound content-decoding plugin.
@@ -62,6 +86,18 @@ type Decoder interface {
 	Decode(
 		ctx context.Context,
 		candidate Candidate,
+	) ([]Decoded, []diagnostic.Diagnostic)
+}
+
+// SourceAwareDecoder is implemented only by formats whose declarations refer
+// to sibling source files. Ordinary decoders remain candidate-byte-only.
+type SourceAwareDecoder interface {
+	Decoder
+
+	DecodeWithSource(
+		ctx context.Context,
+		candidate Candidate,
+		reader SourceEntryReader,
 	) ([]Decoded, []diagnostic.Diagnostic)
 }
 

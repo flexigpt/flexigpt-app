@@ -39,6 +39,25 @@ func DecodeDocumentInto(
 	)
 }
 
+// ValidateEntryDocument validates the original canonical Entry bytes against
+// a concrete declaration schema. This preserves field presence for nested
+// declarations, including values such as maxIterations: 0 that would be lost
+// when an omitempty Go struct is marshaled again.
+func ValidateEntryDocument(
+	entry Entry,
+	compiled *jsonschema.Schema,
+) error {
+	raw, err := entry.CanonicalJSON()
+	if err != nil {
+		return err
+	}
+	return jsonutil.ValidateJSONSchema(
+		compiled,
+		json.RawMessage(raw),
+		basespec.MaxDefinitionBytes,
+	)
+}
+
 func ValidateDocument(
 	compiled *jsonschema.Schema,
 	value any,

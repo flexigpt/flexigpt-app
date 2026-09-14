@@ -421,13 +421,18 @@ func localSourceLocator(
 func isContextMarkdownLocator(
 	value basespec.Locator,
 ) bool {
+	base := strings.ToLower(path.Base(string(value)))
+	if base == "agent.md" ||
+		strings.HasSuffix(base, ".agent.md") {
+		return false
+	}
 	if strings.EqualFold(path.Base(string(value)), "llms.txt") {
 		return true
 	}
 	if !strings.EqualFold(path.Ext(string(value)), ".md") {
 		return false
 	}
-	switch strings.ToUpper(path.Base(string(value))) {
+	switch strings.ToUpper(base) {
 	case "AGENTS.MD", "CLAUDE.MD", "SKILL.MD":
 		return false
 	default:

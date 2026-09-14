@@ -15,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -26,6 +25,7 @@ const (
 	DiagnosticCodeDecoderInvalidRecognition = "artifact.discovery.decoder-invalid-recognition"
 	DiagnosticCodeDefinitionInvalid         = "artifact.discovery.definition-invalid"
 	DiagnosticCodeSubresourceDuplicate      = "artifact.discovery.subresource-duplicate"
+	DiagnosticCodeOriginConflict            = "artifact.discovery.origin-conflict"
 )
 
 type Result struct {
@@ -114,14 +114,12 @@ func (r Result) Validate() error {
 
 type Engine struct {
 	decoders *DecoderRegistry
-	clock    clockutil.Clock
 }
 
 func NewEngine(
 	decoders *DecoderRegistry,
-	timeClock clockutil.Clock,
 ) (*Engine, error) {
-	if decoders == nil || timeClock == nil {
+	if decoders == nil {
 		return nil, fmt.Errorf(
 			"%w: discovery engine dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -129,7 +127,6 @@ func NewEngine(
 	}
 	return &Engine{
 		decoders: decoders,
-		clock:    timeClock,
 	}, nil
 }
 
@@ -220,21 +217,19 @@ func (e *Engine) Discover(
 
 	result := Result{
 		Observations: make([]Observation, 0),
-		SeenLocators: make([]basespec.Locator, 0, len(entries)),
 		Diagnostics:  make([]diagnostic.Diagnostic, 0),
 	}
-	var consumed int64
+	seenLocators := make(map[basespec.Locator]struct{}, len(entries))
+	validOrigins := make(map[typedOrigin]Observation)
 	invalidBindings := make(map[artifact.SourceBinding]struct{})
+	var consumed int64
 
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
 			return Result{}, err
 		}
 		result.Candidates++
-		result.SeenLocators = append(
-			result.SeenLocators,
-			entry.Locator,
-		)
+		seenLocators[entry.Locator] = struct{}{}
 
 		if entry.SizeBytes > spec.MaxCandidateBytes {
 			diagnostics := []diagnostic.Diagnostic{{
@@ -346,10 +341,20 @@ func (e *Engine) Discover(
 			continue
 		}
 
-		decoded, decoderDiagnostics := decoder.Decode(
-			ctx,
-			cloneCandidate(candidate),
-		)
+		var decoded []providerapi.Decoded
+		var decoderDiagnostics []diagnostic.Diagnostic
+		if sourceAware, supported := decoder.(providerapi.SourceAwareDecoder); supported {
+			decoded, decoderDiagnostics = sourceAware.DecodeWithSource(
+				ctx,
+				cloneCandidate(candidate),
+				snapshotEntryReader{
+					snapshot:     snapshot,
+					maximumBytes: spec.MaxCandidateBytes,
+				},
+			)
+		} else {
+			decoded, decoderDiagnostics = decoder.Decode(ctx, cloneCandidate(candidate))
+		}
 		if err := validateCandidateDiagnostics(
 			entry.Locator,
 			decoderDiagnostics,
@@ -378,7 +383,6 @@ func (e *Engine) Discover(
 		}
 
 		emitted := make(map[typedOrigin]struct{}, len(decoded))
-		emittedBindings := make(map[artifact.SourceBinding]struct{})
 		for _, item := range decoded {
 			if err := item.SubresourceLocator.Validate(); err != nil {
 				return Result{}, fmt.Errorf(
@@ -388,8 +392,18 @@ func (e *Engine) Discover(
 					err,
 				)
 			}
-			if err := validateDecodedDiagnostics(
+			binding, itemSourceDigest, err := decodedBinding(
+				value.ID,
 				entry.Locator,
+				sourceDigest,
+				item,
+			)
+			if err != nil {
+				return Result{}, err
+			}
+			seenLocators[binding.Locator] = struct{}{}
+			if err := validateDecodedDiagnostics(
+				binding.Locator,
 				item.SubresourceLocator,
 				item.Diagnostics,
 			); err != nil {
@@ -409,11 +423,6 @@ func (e *Engine) Discover(
 				result.Diagnostics,
 				item.Diagnostics...,
 			)
-			binding := artifact.SourceBinding{
-				SourceID:           value.ID,
-				Locator:            entry.Locator,
-				SubresourceLocator: item.SubresourceLocator,
-			}
 			if _, invalid := invalidBindings[binding]; invalid {
 				continue
 			}
@@ -422,47 +431,18 @@ func (e *Engine) Discover(
 					result.Observations,
 					binding,
 				)
+				deleteValidOriginsForBinding(validOrigins, binding)
 				invalidBindings[binding] = struct{}{}
 				appendInvalidBinding(
 					&result,
 					value,
 					binding,
-					&sourceDigest,
+					itemSourceDigest,
 					decoder.ID(),
 					itemDiagnostics,
 				)
 				continue
 			}
-			if _, duplicate := emittedBindings[binding]; duplicate {
-				result.Observations = removeObservationsForBinding(
-					result.Observations,
-					binding,
-				)
-				diagnostics := []diagnostic.Diagnostic{{
-					Severity: diagnostic.SeverityError,
-					Code:     DiagnosticCodeSubresourceDuplicate,
-					Message:  "decoder emitted duplicate declaration subresource",
-					Location: &diagnostic.Location{
-						Locator:            entry.Locator,
-						SubresourceLocator: item.SubresourceLocator,
-					},
-				}}
-				result.Diagnostics = diagnostic.Append(
-					result.Diagnostics,
-					diagnostics...,
-				)
-				appendInvalidBinding(
-					&result,
-					value,
-					binding,
-					&sourceDigest,
-					decoder.ID(),
-					diagnostics,
-				)
-				invalidBindings[binding] = struct{}{}
-				continue
-			}
-			emittedBindings[binding] = struct{}{}
 			canonical, err := definition.Canonicalize(item.Definition)
 			if err != nil {
 				diagnostics := diagnostic.Append(
@@ -484,7 +464,7 @@ func (e *Engine) Discover(
 					&result,
 					value,
 					binding,
-					&sourceDigest,
+					itemSourceDigest,
 					decoder.ID(),
 					diagnostics,
 				)
@@ -511,34 +491,83 @@ func (e *Engine) Discover(
 					&result,
 					value,
 					binding,
-					&sourceDigest,
+					itemSourceDigest,
 					decoder.ID(),
 					duplicateDiagnostics,
 				)
+				deleteValidOriginsForBinding(validOrigins, binding)
 				invalidBindings[binding] = struct{}{}
 				continue
 			}
 			emitted[key] = struct{}{}
 
+			if previous, duplicate := validOrigins[key]; duplicate {
+				if equivalentObservedOrigin(
+					previous,
+					canonical,
+					itemSourceDigest,
+				) {
+					continue
+				}
+				result.Observations = removeObservationsForBinding(
+					result.Observations,
+					binding,
+				)
+				deleteValidOriginsForBinding(validOrigins, binding)
+				diagnostics := []diagnostic.Diagnostic{{
+					Severity: diagnostic.SeverityError,
+					Code:     DiagnosticCodeOriginConflict,
+					Message:  "multiple decoders emitted different definitions for one artifact origin",
+					Location: &diagnostic.Location{
+						Locator:            binding.Locator,
+						SubresourceLocator: binding.SubresourceLocator,
+					},
+				}}
+				result.Diagnostics = diagnostic.Append(
+					result.Diagnostics,
+					diagnostics...,
+				)
+				appendInvalidBinding(
+					&result,
+					value,
+					binding,
+					itemSourceDigest,
+					decoder.ID(),
+					diagnostics,
+				)
+				invalidBindings[binding] = struct{}{}
+				continue
+			}
+
 			definitionValue := canonical.Clone()
+			observed := Observation{
+				RootID:              value.RootID,
+				Binding:             binding,
+				Kind:                canonical.Kind,
+				LogicalName:         canonical.LogicalName,
+				LogicalVersion:      canonical.LogicalVersion,
+				Definition:          &definitionValue,
+				SourceContentDigest: cryptoutil.CloneDigest(itemSourceDigest),
+				DecoderID:           decoder.ID(),
+				State:               ObservationValid,
+				Diagnostics:         itemDiagnostics,
+			}
 			result.Observations = append(
 				result.Observations,
-				Observation{
-					RootID:              value.RootID,
-					Binding:             binding,
-					Kind:                canonical.Kind,
-					LogicalName:         canonical.LogicalName,
-					LogicalVersion:      canonical.LogicalVersion,
-					Definition:          &definitionValue,
-					SourceContentDigest: &sourceDigest,
-					DecoderID:           decoder.ID(),
-					State:               ObservationValid,
-					Diagnostics:         itemDiagnostics,
-				},
+				observed,
 			)
+			validOrigins[key] = observed.Clone()
 		}
 	}
 
+	result.SeenLocators = make(
+		[]basespec.Locator,
+		0,
+		len(seenLocators),
+	)
+	for locator := range seenLocators {
+		result.SeenLocators = append(result.SeenLocators, locator)
+	}
 	slices.Sort(result.SeenLocators)
 	sort.Slice(result.Observations, func(left, right int) bool {
 		leftValue := result.Observations[left]
@@ -575,6 +604,92 @@ func removeObservationsForBinding(
 		output = append(output, value)
 	}
 	return output
+}
+
+func decodedBinding(
+	sourceID source.SourceID,
+	candidateLocator basespec.Locator,
+	candidateDigest cryptoutil.Digest,
+	item providerapi.Decoded,
+) (artifact.SourceBinding, *cryptoutil.Digest, error) {
+	originLocator := candidateLocator
+	if item.OriginLocator != "" {
+		if err := item.OriginLocator.Validate(false); err != nil {
+			return artifact.SourceBinding{}, nil, fmt.Errorf(
+				"%w: decoder emitted invalid declaration origin: %w",
+				basespec.ErrInvalid,
+				err,
+			)
+		}
+		originLocator = item.OriginLocator
+	}
+
+	originDigest := candidateDigest
+	if item.OriginContentDigest != nil {
+		if err := cryptoutil.ValidateDigest(*item.OriginContentDigest); err != nil {
+			return artifact.SourceBinding{}, nil, err
+		}
+		originDigest = *item.OriginContentDigest
+	}
+
+	return artifact.SourceBinding{
+		SourceID:           sourceID,
+		Locator:            originLocator,
+		SubresourceLocator: item.SubresourceLocator,
+	}, &originDigest, nil
+}
+
+func equivalentObservedOrigin(
+	previous Observation,
+	current definition.Definition,
+	currentDigest *cryptoutil.Digest,
+) bool {
+	return previous.Definition != nil &&
+		previous.Definition.Digest == current.Digest &&
+		cryptoutil.IsDigestEqual(
+			previous.SourceContentDigest,
+			currentDigest,
+		)
+}
+
+func deleteValidOriginsForBinding(
+	values map[typedOrigin]Observation,
+	binding artifact.SourceBinding,
+) {
+	for key := range values {
+		if key.Binding == binding {
+			delete(values, key)
+		}
+	}
+}
+
+type snapshotEntryReader struct {
+	snapshot     sourceimpl.Snapshot
+	maximumBytes int64
+}
+
+func (r snapshotEntryReader) ReadSourceEntry(
+	ctx context.Context,
+	locator basespec.Locator,
+) (providerapi.SourceContent, error) {
+	entry, err := statEntry(ctx, r.snapshot, locator)
+	if err != nil {
+		return providerapi.SourceContent{}, err
+	}
+	content, err := sourceimpl.ReadSnapshotEntry(
+		ctx,
+		r.snapshot,
+		entry,
+		r.maximumBytes,
+	)
+	if err != nil {
+		return providerapi.SourceContent{}, err
+	}
+	return providerapi.SourceContent{
+		Locator: entry.Locator,
+		Content: content,
+		Digest:  cryptoutil.DigestBytes(content),
+	}, nil
 }
 
 func appendInvalid(

@@ -15,7 +15,8 @@ const (
 	SkillSchemaID      schema.SchemaID = skillv1.SkillSchemaID
 	SkillSchemaVersion                 = skillv1.SkillSchemaVersion
 
-	MarkdownDecoderID basespec.DecoderID = "agent.skill-markdown"
+	MarkdownDecoderID        basespec.DecoderID = "agent.skill-markdown"
+	SkillCollectionDecoderID basespec.DecoderID = "agent.skill-collection"
 
 	ManagedSkillPackageKind       source.PackageKind = "skill"
 	SkillDefinitionFileName       basespec.Locator   = "SKILL.md"

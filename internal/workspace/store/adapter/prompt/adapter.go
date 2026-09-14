@@ -70,7 +70,7 @@ func New(
 	if err := policy.Validate(); err != nil {
 		return nil, err
 	}
-	instructions, err := instruction.New(artifacts, resources)
+	instructions, err := instruction.New(resources)
 	if err != nil {
 		return nil, err
 	}

@@ -14,6 +14,19 @@ const markdownMediaType = "text/markdown"
 func normalizeMarkdown(
 	content []byte,
 ) (string, error) {
+	return normalizeMarkdownContent(content, true)
+}
+
+func normalizeMarkdownOptional(
+	content []byte,
+) (string, error) {
+	return normalizeMarkdownContent(content, false)
+}
+
+func normalizeMarkdownContent(
+	content []byte,
+	requireContent bool,
+) (string, error) {
 	if !utf8.Valid(content) {
 		return "", fmt.Errorf(
 			"%w: Markdown source must contain valid UTF-8",
@@ -32,7 +45,8 @@ func normalizeMarkdown(
 		"\r",
 		"\n",
 	)
-	if strings.TrimSpace(value) == "" {
+	if requireContent &&
+		strings.TrimSpace(value) == "" {
 		return "", fmt.Errorf(
 			"%w: Markdown source is empty",
 			basespec.ErrInvalid,

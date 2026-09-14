@@ -14,7 +14,7 @@ import (
 
 const installationDataNamespace = "flexigpt.dev/mcp-installation-v1"
 
-var legacyInstallationDataKeys = []string{
+var unscopedInstallationDataKeys = []string{
 	"schemaVersion",
 	"selectedConnectionProfile",
 	"inputs",
@@ -76,7 +76,7 @@ func MergeServerData(
 	if err != nil {
 		return nil, err
 	}
-	for _, key := range legacyInstallationDataKeys {
+	for _, key := range unscopedInstallationDataKeys {
 		delete(fields, key)
 	}
 	fields[installationDataNamespace] = payload
@@ -93,20 +93,20 @@ func DecodeServerData(
 	if payload, found := fields[installationDataNamespace]; found {
 		return decodeServerDataPayload(payload)
 	}
-	if !containsLegacyInstallationData(fields) {
+	if !containsUnscopedInstallationData(fields) {
 		return DefaultServerData(), nil
 	}
-	legacy, err := artifact.EncodeDataObject(fields)
+	unscoped, err := artifact.EncodeDataObject(fields)
 	if err != nil {
 		return ServerData{}, err
 	}
-	return decodeServerDataPayload(legacy)
+	return decodeServerDataPayload(unscoped)
 }
 
-func containsLegacyInstallationData(
+func containsUnscopedInstallationData(
 	values map[string]json.RawMessage,
 ) bool {
-	for _, key := range legacyInstallationDataKeys {
+	for _, key := range unscopedInstallationDataKeys {
 		if _, found := values[key]; found {
 			return true
 		}

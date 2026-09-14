@@ -2,7 +2,6 @@ package providerapi
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -19,27 +18,19 @@ func NewDecoder() *Decoder {
 }
 
 func (*Decoder) ID() basespec.DecoderID {
-	return mcpDomain.CanonicalDecoderID
+	return mcpDomain.SourceDecoderID
 }
 
 func (*Decoder) Revision() string {
-	return "mcp-source-decoder-v4"
+	return "mcp-source-decoder-v5"
 }
 
 func (*Decoder) Recognize(
 	_ context.Context,
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
-	var header struct {
-		Kind string `json:"kind"`
-	}
-	if err := json.Unmarshal(candidate.Content, &header); err != nil {
-		return providerapi.RecognitionNone
-	}
-
 	switch {
-
-	case header.Kind == "mcp.bundle":
+	case sourceformat.IsMCPCollection(candidate.Content):
 		return providerapi.RecognitionPreferred
 	case sourceformat.IsMCPConfig(candidate.Content):
 		return providerapi.RecognitionPossible
@@ -52,24 +43,16 @@ func (d *Decoder) Decode(
 	ctx context.Context,
 	candidate providerapi.Candidate,
 ) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
-	var header struct {
-		Kind string `json:"kind"`
-	}
-	if err := json.Unmarshal(candidate.Content, &header); err != nil {
-		return nil, nil
-	}
-
 	switch {
-
-	case header.Kind == "mcp.bundle":
+	case sourceformat.IsMCPCollection(candidate.Content):
 		collectionName, err := declaration.DeriveLogicalName(
-			"mcp-bundle",
+			"mcp-collection",
 			candidate.Locator,
 		)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, "", err)
 		}
-		values, err := sourceformat.DecodeLegacyBundleWithCollection(
+		values, err := sourceformat.DecodeMCPCollectionWithCollection(
 			candidate.Content,
 			collectionName,
 		)
@@ -87,9 +70,8 @@ func (d *Decoder) Decode(
 		}
 		return decodedValues(values), nil
 
-	default:
-		return nil, nil
 	}
+	return nil, nil
 }
 
 func decodedValues(

@@ -83,7 +83,7 @@ func DefinitionForDocument(
 	return definition.Canonicalize(value)
 }
 
-func DocumentFromLegacyBody(
+func DocumentFromSourceBody(
 	name basespec.LogicalName,
 	description string,
 	body mcppolicyv1.MCPPolicyBody,

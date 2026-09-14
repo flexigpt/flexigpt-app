@@ -4,8 +4,8 @@ import "github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 
 const artifactProviderName = "mcp"
 
-// Provider registers standalone MCP and MCP Policy schemas plus source format
-// adapters. It has no Collection behavior and emits only flat Artifacts.
+// Provider registers MCP source-format adapters. MCP Collection source
+// documents normalize into a canonical collection plus flat MCP Artifacts.
 type Provider struct {
 	descriptor providerapi.Descriptor
 }

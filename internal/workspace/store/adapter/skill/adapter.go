@@ -185,20 +185,39 @@ func (a *Adapter) resolve(
 	if err := skillDomain.ValidateDefinition(resolved.Definition); err != nil {
 		return WorkspaceSkill{}, err
 	}
+	declarationValue, err := skillDomain.SkillDeclarationFromDefinition(
+		resolved.Definition,
+	)
+	if err != nil {
+		return WorkspaceSkill{}, err
+	}
+	documentLocator, err := skillDomain.SourceDocumentLocator(
+		declarationValue.Locator,
+		record.Binding.Locator,
+	)
+	if err != nil {
+		return WorkspaceSkill{}, err
+	}
 
 	sourceEntry, err := a.resources.ReadSourceEntry(
 		ctx,
 		record.RootID,
 		record.Binding.SourceID,
-		record.Binding.Locator,
+		documentLocator,
 		basespec.MaxCandidateBytes,
 	)
 	if err != nil {
 		return WorkspaceSkill{}, err
 	}
-	if sourceEntry.Digest != *record.SourceContentDigest ||
-		sourceEntry.SourceGeneration !=
-			resolved.RefreshState.SourceGeneration {
+	if sourceEntry.SourceGeneration !=
+		resolved.RefreshState.SourceGeneration {
+		return WorkspaceSkill{}, fmt.Errorf(
+			"%w: Skill Source changed during Workspace resolution",
+			basespec.ErrRefreshRequired,
+		)
+	}
+	if documentLocator == record.Binding.Locator &&
+		sourceEntry.Digest != *record.SourceContentDigest {
 		return WorkspaceSkill{}, fmt.Errorf(
 			"%w: Skill Source changed during Workspace resolution",
 			basespec.ErrRefreshRequired,
@@ -212,9 +231,13 @@ func (a *Adapter) resolve(
 		return WorkspaceSkill{}, err
 	}
 
+	subresource := record.Binding.SubresourceLocator
+	if documentLocator != record.Binding.Locator {
+		subresource = ""
+	}
 	packageLocator, err := skillDomain.RuntimePackageLocator(
-		record.Binding.Locator,
-		record.Binding.SubresourceLocator,
+		documentLocator,
+		subresource,
 	)
 	if err != nil {
 		return WorkspaceSkill{}, err
@@ -229,7 +252,7 @@ func (a *Adapter) resolve(
 	}
 
 	versionInput := string(resolved.Definition.Digest) + "\x00" +
-		string(*record.SourceContentDigest) + "\x00" +
+		string(sourceEntry.Digest) + "\x00" +
 		resolved.RefreshState.SourceGeneration + "\x00" +
 		strconv.FormatUint(record.Revision, 10)
 
@@ -238,7 +261,7 @@ func (a *Adapter) resolve(
 		ArtifactRevision: record.Revision,
 		DefinitionDigest: resolved.Definition.Digest,
 		SourceID:         string(record.Binding.SourceID),
-		Locator:          record.Binding.Locator,
+		Locator:          documentLocator,
 		Document:         documentValue,
 		RuntimeLocation:  location,
 		Version: "workspace-skill:" + string(

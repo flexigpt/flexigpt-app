@@ -386,6 +386,8 @@ func (a *StoreAPI) defaultDiscovery() (
 					"**/*.yml",
 					"**/SKILL.md",
 					"**/AGENTS.md",
+					"**/AGENT.md",
+					"**/*.agent.md",
 					"**/CLAUDE.md",
 					"**/README.md",
 					"**/llms.txt",
@@ -403,7 +405,10 @@ func (a *StoreAPI) defaultDiscovery() (
 		Authoritative: true,
 	}
 	for _, hint := range a.config.AdditionalDecoderHints {
-		value.DecoderHints = append(value.DecoderHints, hint.Clone())
+		value.DecoderHints = appendDecoderHint(
+			value.DecoderHints,
+			hint,
+		)
 	}
 	value = value.Normalized()
 	if err := value.Validate(); err != nil {

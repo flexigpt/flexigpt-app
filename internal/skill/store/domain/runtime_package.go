@@ -3,9 +3,51 @@ package domain
 import (
 	"fmt"
 	"path"
+	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
+
+// SourceDocumentLocator resolves the SKILL.md document used by a canonical
+// Skill declaration. A nil portable locator means that the declaration-origin
+// entry itself is SKILL.md. A local locator may identify SKILL.md directly or
+// its containing Skill directory.
+//
+// URL, Git, package, archive, and command locators remain the responsibility
+// of a locator resolver outside the local Skill runtime path.
+func SourceDocumentLocator(
+	locator *declaration.Locator,
+	declarationLocator basespec.Locator,
+) (basespec.Locator, error) {
+	if locator == nil {
+		if err := declarationLocator.Validate(false); err != nil {
+			return "", err
+		}
+		return declarationLocator, nil
+	}
+
+	target, err := declaration.ResolveSourceRelativePathLocator(
+		*locator,
+		declarationLocator,
+	)
+	if err != nil {
+		return "", err
+	}
+	if !strings.EqualFold(
+		path.Base(string(target)),
+		string(SkillDefinitionFileName),
+	) {
+		target = basespec.Locator(path.Join(
+			string(target),
+			string(SkillDefinitionFileName),
+		))
+	}
+	if err := target.Validate(false); err != nil {
+		return "", err
+	}
+	return target, nil
+}
 
 // RuntimePackageLocator derives the Skill package directory from a verified
 // SKILL.md Artifact binding. Artifact Store verifies source generation and the

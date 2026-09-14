@@ -23,75 +23,64 @@ type Decoded struct {
 	Definition         definition.Definition
 }
 
-type legacyBundle struct {
+type mcpCollectionManifest struct {
 	Kind          string `json:"kind"`
 	SchemaID      string `json:"schemaID"`
 	SchemaVersion string `json:"schemaVersion"`
 
-	MCPServers      map[string]mcpDomainServer.CoreServer `json:"mcpServers"`
-	BundleExtension legacyBundleExtension                 `json:"bundleExtension"`
+	MCPServers          map[string]mcpDomainServer.CoreServer `json:"mcpServers"`
+	CollectionExtension mcpCollectionExtension                `json:"bundleExtension"`
 }
 
-type legacyBundleExtension struct {
+type mcpCollectionExtension struct {
 	Servers  map[string]mcpDomainServer.ServerExtension `json:"servers,omitempty"`
 	Policies map[string]json.RawMessage                 `json:"policies,omitempty"`
 }
 
-type legacyPolicy struct {
+type sourcePolicy struct {
 	LogicalName string                    `json:"logicalName"`
 	Description string                    `json:"description,omitempty"`
 	Body        mcppolicyv1.MCPPolicyBody `json:"body"`
 }
 
-func IsLegacyBundle(
+func IsMCPCollection(
 	raw []byte,
 ) bool {
 	var header struct {
 		Kind string `json:"kind"`
 	}
 	return json.Unmarshal(raw, &header) == nil &&
-		header.Kind == "mcp.bundle"
+		isMCPCollectionKind(header.Kind)
 }
 
-// DecodeLegacyBundle preserves the old physical mcps.json input format while
-// normalizing every contained server and policy into ordinary flat Artifacts.
-//
-// Callers that need the final bundle semantics should use
-// DecodeLegacyBundleWithCollection.
-func DecodeLegacyBundle(
+func isMCPCollectionKind(kind string) bool {
+	return kind == "mcp.collection" || kind == "mcp.bundle"
+}
+
+// DecodeMCPCollection normalizes one MCP Collection source document into
+// ordinary MCP and MCP Policy Artifacts.
+func DecodeMCPCollection(
 	raw []byte,
 ) ([]Decoded, error) {
-	var bundle legacyBundle
-	if err := jsonutil.DecodeCanonicalObjectInto(
-		raw,
-		&bundle,
-		basespec.MaxDefinitionBytes,
-	); err != nil {
+	collection, err := decodeMCPCollectionManifest(raw)
+	if err != nil {
 		return nil, err
 	}
-	if bundle.Kind != "mcp.bundle" ||
-		bundle.SchemaID != "mcp.bundle.v1" ||
-		bundle.SchemaVersion != "v1" {
+	if len(collection.MCPServers) == 0 {
 		return nil, fmt.Errorf(
-			"%w: unsupported legacy MCP package format",
-			basespec.ErrInvalid,
-		)
-	}
-	if len(bundle.MCPServers) == 0 {
-		return nil, fmt.Errorf(
-			"%w: legacy MCP package has no servers",
+			"%w: MCP Collection has no servers",
 			basespec.ErrInvalid,
 		)
 	}
 
-	serverNames := make([]string, 0, len(bundle.MCPServers))
-	for name := range bundle.MCPServers {
+	serverNames := make([]string, 0, len(collection.MCPServers))
+	for name := range collection.MCPServers {
 		serverNames = append(serverNames, name)
 	}
 	sort.Strings(serverNames)
 
-	policyNames := make([]string, 0, len(bundle.BundleExtension.Policies))
-	for name := range bundle.BundleExtension.Policies {
+	policyNames := make([]string, 0, len(collection.CollectionExtension.Policies))
+	for name := range collection.CollectionExtension.Policies {
 		policyNames = append(policyNames, name)
 	}
 	sort.Strings(policyNames)
@@ -102,18 +91,18 @@ func DecodeLegacyBundle(
 		if err := logicalName.Validate(); err != nil {
 			return nil, err
 		}
-		extension := bundle.BundleExtension.Servers[name]
-		document, err := mcpDomainServer.LegacyServerDocument(
+		extension := collection.CollectionExtension.Servers[name]
+		document, err := mcpDomainServer.NewDocument(
 			logicalName,
 			extension.LogicalVersion,
 			extension.DisplayName,
 			extension.Description,
 			maps.Clone(extension.Labels),
-			bundle.MCPServers[name],
+			collection.MCPServers[name],
 			extension,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("legacy MCP server %q: %w", name, err)
+			return nil, fmt.Errorf("MCP Collection server %q: %w", name, err)
 		}
 		definitionValue, err := mcpDomainServer.DefinitionForDocument(
 			document,
@@ -134,31 +123,31 @@ func DecodeLegacyBundle(
 		if err := logicalName.Validate(); err != nil {
 			return nil, err
 		}
-		var legacy legacyPolicy
+		var sourceValue sourcePolicy
 		if err := jsonutil.DecodeCanonicalObjectInto(
-			bundle.BundleExtension.Policies[name],
-			&legacy,
+			collection.CollectionExtension.Policies[name],
+			&sourceValue,
 			basespec.MaxDefinitionBodyBytes,
 		); err != nil {
-			return nil, fmt.Errorf("legacy MCP policy %q: %w", name, err)
+			return nil, fmt.Errorf("MCP Collection policy %q: %w", name, err)
 		}
-		if legacy.LogicalName != "" &&
-			legacy.LogicalName != name {
+		if sourceValue.LogicalName != "" &&
+			sourceValue.LogicalName != name {
 			return nil, fmt.Errorf(
-				"%w: legacy MCP policy key %q differs from logicalName %q",
+				"%w: MCP Collection policy key %q differs from logicalName %q",
 				basespec.ErrInvalid,
 				name,
-				legacy.LogicalName,
+				sourceValue.LogicalName,
 			)
 		}
-		document, err := mcpDomainPolicy.DocumentFromLegacyBody(
+		document, err := mcpDomainPolicy.DocumentFromSourceBody(
 			logicalName,
-			legacy.Description,
-			legacy.Body,
+			sourceValue.Description,
+			sourceValue.Body,
 		)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"legacy MCP policy %q: %w",
+				"MCP Collection policy %q: %w",
 				name,
 				err,
 			)
@@ -189,19 +178,41 @@ func DecodeLegacyBundle(
 	return output, nil
 }
 
-// DecodeLegacyBundleWithCollection normalizes one legacy MCP bundle into its
-// ordinary MCP and MCP policy Artifacts plus one canonical Collection Artifact.
-//
-// The legacy format has no portable bundle name, so the caller supplies a
-// deterministic name derived from its physical source origin.
-func DecodeLegacyBundleWithCollection(
+func decodeMCPCollectionManifest(
+	raw []byte,
+) (mcpCollectionManifest, error) {
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxDefinitionBytes,
+	)
+	if err != nil {
+		return mcpCollectionManifest{}, err
+	}
+	var value mcpCollectionManifest
+	if err := json.Unmarshal(canonical, &value); err != nil {
+		return mcpCollectionManifest{}, err
+	}
+	if !isMCPCollectionKind(value.Kind) ||
+		value.SchemaVersion != "v1" {
+		return mcpCollectionManifest{}, fmt.Errorf(
+			"%w: unsupported MCP Collection source format",
+			basespec.ErrInvalid,
+		)
+	}
+	return value, nil
+}
+
+// DecodeMCPCollectionWithCollection emits all normalized MCP members plus one
+// canonical collection Artifact. The physical source spelling is normalized
+// immediately and never becomes a persisted Artifact kind.
+func DecodeMCPCollectionWithCollection(
 	raw []byte,
 	collectionName basespec.LogicalName,
 ) ([]Decoded, error) {
 	if err := collectionName.Validate(); err != nil {
 		return nil, err
 	}
-	output, err := DecodeLegacyBundle(raw)
+	output, err := DecodeMCPCollection(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -253,12 +264,13 @@ type configDocument struct {
 }
 
 type configServer struct {
-	Type    string            `json:"type,omitempty"`
-	Command string            `json:"command,omitempty"`
-	Args    []string          `json:"args,omitempty"`
-	Env     map[string]string `json:"env,omitempty"`
-	URL     string            `json:"url,omitempty"`
-	Headers map[string]string `json:"headers,omitempty"`
+	Type      string            `json:"type,omitempty"`
+	Transport string            `json:"transport,omitempty"`
+	Command   string            `json:"command,omitempty"`
+	Args      []string          `json:"args,omitempty"`
+	Env       map[string]string `json:"env,omitempty"`
+	URL       string            `json:"url,omitempty"`
+	Headers   map[string]string `json:"headers,omitempty"`
 }
 
 func IsMCPConfig(
@@ -278,12 +290,8 @@ func IsMCPConfig(
 func DecodeMCPConfig(
 	raw []byte,
 ) ([]Decoded, error) {
-	var config configDocument
-	if err := jsonutil.DecodeCanonicalObjectInto(
-		raw,
-		&config,
-		basespec.MaxDefinitionBytes,
-	); err != nil {
+	config, err := decodeMCPConfigDocument(raw)
+	if err != nil {
 		return nil, err
 	}
 	if len(config.MCPServers) == 0 {
@@ -313,45 +321,29 @@ func DecodeMCPConfig(
 			URL:     input.URL,
 			Headers: maps.Clone(input.Headers),
 		}
-		switch input.Type {
-		case "", "stdio":
+		transport := input.Transport
+		if input.Type != "" {
+			transport = input.Type
+		}
+		switch transport {
+		case "":
+			if input.URL != "" {
+				core.Type = mcpDomainServer.ServerTypeHTTP
+			} else {
+				core.Type = mcpDomainServer.ServerTypeStdio
+			}
+		case "stdio":
 			core.Type = mcpDomainServer.ServerTypeStdio
-		case "http", "streamable-http":
+		case "http", "streamable-http", "streamableHttp":
 			core.Type = mcpDomainServer.ServerTypeHTTP
 		case "sse":
-			decl := mcpv1.MCPDocument{
-				APIVersion: mcpv1.MCPSchemaVersion,
-				Type:       mcpv1.MCPType,
-				Name:       name,
-				Transport:  mcpv1.TransportSSE,
-				Command:    input.Command,
-				Args:       append([]string(nil), input.Args...),
-				Env:        maps.Clone(input.Env),
-				URL:        input.URL,
-				Headers:    maps.Clone(input.Headers),
-			}
-			definitionValue, err := mcpv1.DefinitionForDeclaration(decl)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"decode MCP config SSE server %q: %w",
-					name,
-					err,
-				)
-			}
-			output = append(output, Decoded{
-				SubresourceLocator: basespec.SubresourceLocator(
-					"mcpServers/" + name,
-				),
-				Definition: definitionValue,
-			})
-			continue
-
+			core.Type = mcpDomainServer.ServerTypeSSE
 		default:
 			return nil, fmt.Errorf(
 				"%w: MCP config server %q has unsupported type %q",
 				basespec.ErrInvalid,
 				name,
-				input.Type,
+				transport,
 			)
 		}
 		document, err := mcpDomainServer.NewDocument(
@@ -380,6 +372,23 @@ func DecodeMCPConfig(
 		})
 	}
 	return output, nil
+}
+
+func decodeMCPConfigDocument(
+	raw []byte,
+) (configDocument, error) {
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxDefinitionBytes,
+	)
+	if err != nil {
+		return configDocument{}, err
+	}
+	var value configDocument
+	if err := json.Unmarshal(canonical, &value); err != nil {
+		return configDocument{}, err
+	}
+	return value, nil
 }
 
 func MCPDocumentFromCanonical(

@@ -4,18 +4,20 @@ import "github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 
 const artifactProviderName = "agent-skill"
 
-// Provider registers source format adapters and the standalone canonical Skill
-// schema. It does not register Collection behavior.
+// Provider registers Skill and Skill Collection source-format adapters. It
+// does not register Collection behavior or Store lifecycle policy.
 type Provider struct {
 	descriptor providerapi.Descriptor
 }
 
 func NewProvider() (*Provider, error) {
 	markdownDecoder := NewDecoder()
+	collectionDecoder := NewCollectionDecoder()
 	descriptor := providerapi.Descriptor{
 		Name: artifactProviderName,
 		Decoders: []providerapi.Decoder{
 			markdownDecoder,
+			collectionDecoder,
 		},
 		LocatorResolvers: []providerapi.LocatorResolverFactory{
 			NewPathLocatorResolver(),

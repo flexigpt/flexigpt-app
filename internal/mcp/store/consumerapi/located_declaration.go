@@ -91,8 +91,8 @@ func decodeLocatedMCPDefinitions(
 		}
 		return decodedDefinitions(values), nil
 	}
-	if sourceformat.IsLegacyBundle(content) {
-		values, err := sourceformat.DecodeLegacyBundle(content)
+	if sourceformat.IsMCPCollection(content) {
+		values, err := sourceformat.DecodeMCPCollection(content)
 		if err != nil {
 			return nil, err
 		}

@@ -26,22 +26,19 @@ type Document struct {
 }
 
 type Adapter struct {
-	artifacts compositionapi.ArtifactAPI
 	resources compositionapi.ResourceAPI
 }
 
 func New(
-	artifacts compositionapi.ArtifactAPI,
 	resources compositionapi.ResourceAPI,
 ) (*Adapter, error) {
-	if artifacts == nil || resources == nil {
+	if resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Instruction adapter dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
 	return &Adapter{
-		artifacts: artifacts,
 		resources: resources,
 	}, nil
 }

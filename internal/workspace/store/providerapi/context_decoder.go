@@ -91,6 +91,9 @@ func (*ContextDecoder) Decode(
 func isMarkdownContextCandidate(
 	locator basespec.Locator,
 ) bool {
+	if isAgentMarkdownCandidate(locator) {
+		return false
+	}
 	if strings.EqualFold(path.Base(string(locator)), "llms.txt") {
 		return true
 	}

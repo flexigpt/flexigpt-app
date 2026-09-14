@@ -30,9 +30,9 @@ type ArtifactRegistration struct {
 	Enabled     bool                        `json:"enabled"`
 }
 
-// PackageRegistration describes one physical embedded package. The JSON field
-// remains `bundles` so existing embedded package indexes remain readable, but
-// this no longer represents a Store Collection or an mcp.bundle Artifact.
+// PackageRegistration describes one physical embedded MCP package. The
+// physical registry keeps its existing `bundles` JSON field, while every
+// package normalizes into an ordinary canonical collection Artifact.
 type PackageRegistration struct {
 	EmbeddedPackageRoot     basespec.Locator       `json:"embeddedPackageRoot"`
 	EmbeddedDocumentLocator basespec.Locator       `json:"embeddedDocumentLocator"`
@@ -219,7 +219,7 @@ func PreparePackages(
 			return nil, err
 		}
 		address, err := source.NewManagedPackageAddress(
-			mcpDomain.LegacyMCPPackageKind,
+			mcpDomain.MCPCollectionPackageKind,
 			packageName,
 			artifactbuiltin.UnversionedPackageVersion,
 		)
@@ -231,13 +231,13 @@ func PreparePackages(
 			return nil, err
 		}
 		collectionName, err := declaration.DeriveLogicalName(
-			"mcp-bundle",
+			"mcp-collection",
 			documentLocator,
 		)
 		if err != nil {
 			return nil, err
 		}
-		decoded, err := sourceformat.DecodeLegacyBundleWithCollection(
+		decoded, err := sourceformat.DecodeMCPCollectionWithCollection(
 			document,
 			collectionName,
 		)

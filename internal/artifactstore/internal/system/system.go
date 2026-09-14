@@ -221,10 +221,8 @@ func Open(
 	}
 	discoveryEngine, err := discovery.NewEngine(
 		decoderRegistry,
-		config.Clock,
 	)
 	if err != nil {
-
 		_ = metadata.Close()
 		return nil, err
 	}

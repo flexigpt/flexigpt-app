@@ -1,19 +1,19 @@
 # Artifact-backed MCP secrets
 
-Artifact-backed MCP Server Definitions, MCP Bundle documents, Artifact local
-data, Catalogs, and runtime snapshots must never contain raw secret values.
+Artifact-backed MCP Server Definitions, MCP Collection source documents,
+Artifact local data, and runtime snapshots must never contain raw secret values.
 They contain only opaque Artifact-scoped secret references.
 
 Secret values are stored through the existing Setting Store under the `mcp`
 auth-key namespace. OAuth access and refresh tokens are application-local
 secret values. They are never included in source documents, Definitions,
-Artifact data, Catalogs, conversation records, or general runtime projections.
+Artifact data, conversation records, or general runtime projections.
 
 ## Storage model
 
 A secret ref is a string with this shape:
 
-    mcpv2:<base64url-canonical-json>
+    mcpv1:<base64url-canonical-json>
 
 The canonical JSON contains:
 
@@ -28,7 +28,7 @@ The canonical JSON contains:
 
 The actual Setting Store key is not the ref itself. It is:
 
-    mcpv2:<sha256(canonical-secret-ref-json)>
+    mcpv1:<sha256(canonical-secret-ref-json)>
 
 The Setting Store namespace is:
 
@@ -153,7 +153,7 @@ Do not:
 - Put secrets in a portable MCP URL.
 - Use URL userinfo in MCP HTTP URLs.
 - Store OAuth access tokens or refresh tokens in portable MCP configuration.
-- Hand-build `mcpv2:` refs in frontend code.
+- Hand-build `mcpv1:` refs in frontend code.
 - Log raw secret values.
 
 ## Redaction

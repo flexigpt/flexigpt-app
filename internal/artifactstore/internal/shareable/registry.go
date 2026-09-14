@@ -201,7 +201,7 @@ func (r *Registry) CanonicalizeEntity(
 		return schema.ParsedDocument{}, err
 	}
 
-	key, headerStyle, err := r.dispatchKey(
+	key, err := r.dispatchKey(
 		entity,
 		canonical,
 	)
@@ -242,7 +242,7 @@ func (r *Registry) CanonicalizeEntity(
 			basespec.ErrInvalid,
 		)
 	}
-	can, err := validateCodecOutput(key, value, headerStyle)
+	can, err := validateCodecOutput(key, value)
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
@@ -262,20 +262,13 @@ func (r *Registry) CanonicalizeEntity(
 	return value.Clone(), nil
 }
 
-type documentHeaderStyle int
-
-const (
-	documentHeaderLegacy documentHeaderStyle = iota + 1
-	documentHeaderTypeVersion
-)
-
 func (r *Registry) dispatchKey(
 	entity schema.EntityType,
 	canonical []byte,
-) (schema.Key, documentHeaderStyle, error) {
+) (schema.Key, error) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(canonical, &fields); err != nil {
-		return schema.Key{}, 0, fmt.Errorf(
+		return schema.Key{}, fmt.Errorf(
 			"%w: decode shareable document header: %w",
 			basespec.ErrInvalid,
 			err,
@@ -292,94 +285,78 @@ func (r *Registry) dispatchKey(
 	hasLegacyHeader := hasKind ||
 		hasSchemaID ||
 		hasSchemaVersion
-	if hasTypeHeader && hasLegacyHeader {
-		return schema.Key{}, 0, fmt.Errorf(
-			"%w: shareable document mixes type/apiVersion and kind/schemaID/schemaVersion headers",
+	if hasLegacyHeader {
+		if hasTypeHeader {
+			return schema.Key{}, fmt.Errorf(
+				"%w: shareable document mixes type/apiVersion and kind/schemaID/schemaVersion headers",
+				basespec.ErrInvalid,
+			)
+		}
+		return schema.Key{}, fmt.Errorf(
+			"%w: canonical Artifact declarations require type and optional apiVersion",
+			basespec.ErrInvalid,
+		)
+	}
+	if !hasType {
+		return schema.Key{}, fmt.Errorf(
+			"%w: canonical Artifact declaration requires type",
+			basespec.ErrInvalid,
+		)
+	}
+	if entity != schema.EntityArtifact {
+		return schema.Key{}, fmt.Errorf(
+			"%w: type/apiVersion documents are Artifact declarations",
 			basespec.ErrInvalid,
 		)
 	}
 
-	if hasTypeHeader {
-		if entity != schema.EntityArtifact {
-			return schema.Key{}, 0, fmt.Errorf(
-				"%w: type/apiVersion documents are Artifact declarations",
-				basespec.ErrInvalid,
-			)
-		}
-
-		var header struct {
-			Type       schema.Kind `json:"type"`
-			APIVersion string      `json:"apiVersion"`
-		}
-		if err := json.Unmarshal(canonical, &header); err != nil {
-			return schema.Key{}, 0, fmt.Errorf(
-				"%w: decode type/apiVersion header: %w",
-				basespec.ErrInvalid,
-				err,
-			)
-		}
-		if err := artifactKindFromSchemaKind(header.Type).Validate(); err != nil {
-			return schema.Key{}, 0, err
-		}
-
-		if header.APIVersion != "" {
-			key, found := r.byTypeVersion[typeVersionKey{
-				Entity:     entity,
-				Type:       header.Type,
-				APIVersion: header.APIVersion,
-			}]
-			if !found {
-				return schema.Key{}, 0, fmt.Errorf(
-					"%w: shareable Artifact type %q apiVersion %q",
-					basespec.ErrUnsupported,
-					header.Type,
-					header.APIVersion,
-				)
-			}
-			return key, documentHeaderTypeVersion, nil
-		}
-
-		candidates := r.byType[header.Type]
-		if len(candidates) != 1 {
-			return schema.Key{}, 0, fmt.Errorf(
-				"%w: Artifact type %q without apiVersion resolves to %d registered schemas",
-				basespec.ErrUnsupported,
-				header.Type,
-				len(candidates),
-			)
-		}
-		return candidates[0], documentHeaderTypeVersion, nil
-	}
-
 	var header struct {
-		Kind          string          `json:"kind"`
-		SchemaID      schema.SchemaID `json:"schemaID"`
-		SchemaVersion string          `json:"schemaVersion"`
+		Type       schema.Kind `json:"type"`
+		APIVersion string      `json:"apiVersion"`
 	}
 	if err := json.Unmarshal(canonical, &header); err != nil {
-		return schema.Key{}, 0, fmt.Errorf(
-			"%w: decode legacy shareable document header: %w",
+		return schema.Key{}, fmt.Errorf(
+			"%w: decode type/apiVersion header: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
+	if err := artifactKindFromSchemaKind(header.Type).Validate(); err != nil {
+		return schema.Key{}, err
+	}
 
-	key := schema.Key{
-		Entity:        entity,
-		Kind:          schema.Kind(header.Kind),
-		SchemaID:      header.SchemaID,
-		SchemaVersion: header.SchemaVersion,
+	if header.APIVersion != "" {
+		key, found := r.byTypeVersion[typeVersionKey{
+			Entity:     entity,
+			Type:       header.Type,
+			APIVersion: header.APIVersion,
+		}]
+		if !found {
+			return schema.Key{}, fmt.Errorf(
+				"%w: shareable Artifact type %q apiVersion %q",
+				basespec.ErrUnsupported,
+				header.Type,
+				header.APIVersion,
+			)
+		}
+		return key, nil
 	}
-	if err := key.Validate(); err != nil {
-		return schema.Key{}, 0, err
+
+	candidates := r.byType[header.Type]
+	if len(candidates) != 1 {
+		return schema.Key{}, fmt.Errorf(
+			"%w: Artifact type %q without apiVersion resolves to %d registered schemas",
+			basespec.ErrUnsupported,
+			header.Type,
+			len(candidates),
+		)
 	}
-	return key, documentHeaderLegacy, nil
+	return candidates[0], nil
 }
 
 func validateCodecOutput(
 	expected schema.Key,
 	value schema.ParsedDocument,
-	headerStyle documentHeaderStyle,
 ) ([]byte, error) {
 	if err := value.Validate(); err != nil {
 		return nil, err
@@ -404,71 +381,42 @@ func validateCodecOutput(
 			basespec.ErrInvalid,
 		)
 	}
-	if headerStyle == documentHeaderTypeVersion {
-		var fields map[string]json.RawMessage
-		if err := json.Unmarshal(canonical, &fields); err != nil {
-			return nil, err
-		}
-		if _, found := fields["kind"]; found {
-			return nil, fmt.Errorf(
-				"%w: type/apiVersion codec emitted a legacy kind",
-				basespec.ErrInvalid,
-			)
-		}
-		if _, found := fields["schemaID"]; found {
-			return nil, fmt.Errorf(
-				"%w: type/apiVersion codec emitted a legacy schemaID",
-				basespec.ErrInvalid,
-			)
-		}
-		if _, found := fields["schemaVersion"]; found {
-			return nil, fmt.Errorf(
-				"%w: type/apiVersion codec emitted a legacy schemaVersion",
-				basespec.ErrInvalid,
-			)
-		}
-
-		var header struct {
-			Type       schema.Kind `json:"type"`
-			APIVersion string      `json:"apiVersion"`
-		}
-		if err := json.Unmarshal(canonical, &header); err != nil {
-			return nil, err
-		}
-		if header.Type != expected.Kind ||
-			(header.APIVersion != "" &&
-				header.APIVersion != expected.SchemaVersion) ||
-			value.Digest != cryptoutil.DigestBytes(canonical) {
-			return nil, fmt.Errorf(
-				"%w: type/apiVersion codec output does not match its metadata",
-				basespec.ErrDigestMismatch,
-			)
-		}
-		return canonical, nil
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(canonical, &fields); err != nil {
+		return nil, err
+	}
+	if _, found := fields["kind"]; found {
+		return nil, fmt.Errorf(
+			"%w: type/apiVersion codec emitted a legacy kind",
+			basespec.ErrInvalid,
+		)
+	}
+	if _, found := fields["schemaID"]; found {
+		return nil, fmt.Errorf(
+			"%w: type/apiVersion codec emitted a legacy schemaID",
+			basespec.ErrInvalid,
+		)
+	}
+	if _, found := fields["schemaVersion"]; found {
+		return nil, fmt.Errorf(
+			"%w: type/apiVersion codec emitted a legacy schemaVersion",
+			basespec.ErrInvalid,
+		)
 	}
 
 	var header struct {
-		Kind          string          `json:"kind"`
-		SchemaID      schema.SchemaID `json:"schemaID"`
-		SchemaVersion string          `json:"schemaVersion"`
-		Digest        string          `json:"digest"`
+		Type       schema.Kind `json:"type"`
+		APIVersion string      `json:"apiVersion"`
 	}
 	if err := json.Unmarshal(canonical, &header); err != nil {
-		return nil, fmt.Errorf(
-			"%w: decode canonical shareable document header: %w",
-			basespec.ErrInvalid,
-			err,
-		)
+		return nil, err
 	}
-	actual := schema.Key{
-		Entity:        expected.Entity,
-		Kind:          schema.Kind(header.Kind),
-		SchemaID:      header.SchemaID,
-		SchemaVersion: header.SchemaVersion,
-	}
-	if actual != expected || header.Digest != string(value.Digest) {
+	if header.Type != expected.Kind ||
+		(header.APIVersion != "" &&
+			header.APIVersion != expected.SchemaVersion) ||
+		value.Digest != cryptoutil.DigestBytes(canonical) {
 		return nil, fmt.Errorf(
-			"%w: shareable codec output does not match its metadata",
+			"%w: type/apiVersion codec output does not match its metadata",
 			basespec.ErrDigestMismatch,
 		)
 	}

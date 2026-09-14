@@ -260,26 +260,6 @@ func extensionFromDeclaration(
 	return value, nil
 }
 
-func LegacyServerDocument(
-	name basespec.LogicalName,
-	logicalVersion basespec.LogicalVersion,
-	displayName string,
-	description string,
-	labels map[string]string,
-	core CoreServer,
-	extension ServerExtension,
-) (ServerDocument, error) {
-	return NewDocument(
-		name,
-		logicalVersion,
-		displayName,
-		description,
-		labels,
-		core,
-		extension,
-	)
-}
-
 func PolicyReferenceSelector(
 	name basespec.LogicalName,
 ) definition.Selector {

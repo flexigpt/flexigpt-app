@@ -49,11 +49,17 @@ func DecodeLoopEntry(
 	entry declaration.Entry,
 	implicitBody bool,
 ) (LoopDocument, error) {
+	if err := declaration.ValidateEntryDocument(
+		entry,
+		compiledLoopSchema,
+	); err != nil {
+		return LoopDocument{}, err
+	}
 	var value LoopDocument
 	if err := entry.DecodeInto(&value); err != nil {
 		return LoopDocument{}, err
 	}
-	if err := value.validate(false, implicitBody); err != nil {
+	if err := value.validateFields(false, implicitBody); err != nil {
 		return LoopDocument{}, err
 	}
 	return value, nil
@@ -72,7 +78,7 @@ func decodeLoop(
 	); err != nil {
 		return LoopDocument{}, err
 	}
-	if err := value.validate(requireName, implicitBody); err != nil {
+	if err := value.validateFields(requireName, implicitBody); err != nil {
 		return LoopDocument{}, err
 	}
 	return value, nil
@@ -114,12 +120,16 @@ func (v LoopDocument) validate(
 	requireName bool,
 	implicitBody bool,
 ) error {
-	if err := declaration.ValidateDocument(
-		compiledLoopSchema,
-		v,
-	); err != nil {
+	if err := declaration.ValidateDocument(compiledLoopSchema, v); err != nil {
 		return fmt.Errorf("loop schema: %w", err)
 	}
+	return v.validateFields(requireName, implicitBody)
+}
+
+func (v LoopDocument) validateFields(
+	requireName bool,
+	implicitBody bool,
+) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: LoopType,
 		APIVersion:   LoopSchemaVersion,
@@ -127,12 +137,7 @@ func (v LoopDocument) validate(
 	}); err != nil {
 		return err
 	}
-	if v.MaxIterations < 0 {
-		return fmt.Errorf(
-			"%w: Loop maxIterations cannot be negative",
-			basespec.ErrInvalid,
-		)
-	}
+
 	if v.Body != nil {
 		if err := v.Body.Validate(); err != nil {
 			return fmt.Errorf("loop body: %w", err)

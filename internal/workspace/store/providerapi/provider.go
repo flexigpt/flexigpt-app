@@ -15,6 +15,7 @@ func NewProvider() (*Provider, error) {
 	descriptor := providerapi.Descriptor{
 		Name: providerName,
 		Decoders: []providerapi.Decoder{
+			NewAgentMarkdownDecoder(),
 			NewInstructionDecoder(),
 			NewContextDecoder(),
 		},
@@ -36,6 +37,7 @@ func (p *Provider) Descriptor() providerapi.Descriptor {
 
 func DefaultDecoderIDs() []string {
 	return []string{
+		string(AgentMarkdownDecoderID),
 		string(InstructionMarkdownDecoderID),
 		string(ContextMarkdownDecoderID),
 	}

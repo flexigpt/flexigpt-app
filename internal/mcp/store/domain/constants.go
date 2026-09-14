@@ -16,16 +16,14 @@ const (
 		mcppolicyv1.MCPPolicyType,
 	)
 
-	CanonicalDecoderID basespec.DecoderID = "artifact.mcp-json"
-	LegacyDecoderID    basespec.DecoderID = "mcp-legacy-package-json"
+	SourceDecoderID basespec.DecoderID = "artifact.mcp-json"
 
 	ManagedMCPPackageKind       source.PackageKind = "mcp"
 	ManagedMCPPolicyPackageKind source.PackageKind = "mcp-policy"
-	LegacyMCPPackageKind        source.PackageKind = "mcp-package"
+	MCPCollectionPackageKind    source.PackageKind = "mcp-package"
 
 	ManagedMCPDocumentFile       basespec.Locator = "mcp.json"
 	ManagedMCPPolicyDocumentFile basespec.Locator = "mcp-policy.json"
-	LegacyMCPDocumentFile        basespec.Locator = "mcps.json"
 
 	InstallationDataSchemaVersion = "v1"
 	RuntimeExtensionMetadataKey   = "flexigpt.dev/mcp-runtime-v1"
